@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-"""
-Binary memcached test client.
-
-Copyright (c) 2007  Dustin Sallings <dustin@spy.net>
-"""
 from Queue import Queue
 from threading import Thread
 
@@ -446,34 +440,53 @@ class VBucketAwareMemcachedClient(object):
     def _start_dispatcher(self):
         self.dispatcher.dispatch()
 
-    def reconfig_vbucket_map(self):
-        self.__init__vbucket_map(self.rest, self.bucket)
+    def reconfig_vbucket_map(self,vbucket):
+        self.__init__vbucket_map(self.rest, self.bucket,vbucket)
 
-    def __init__vbucket_map(self, rest, bucket):
+    def __init__vbucket_map(self, rest, bucket, vbucket=-1):
         vb_ready = RestHelper(rest).vbucket_map_ready(bucket, 60)
         if not vb_ready:
             raise Exception("vbucket map is not ready for bucket {0}".format(bucket))
         vBuckets = rest.get_vbuckets(bucket)
         nodes = rest.get_nodes()
-        for vBucket in vBuckets:
-            masterIp = vBucket.master.split(":")[0]
-            masterPort = int(vBucket.master.split(":")[1])
-            self._vBucketMap[vBucket.id] = vBucket.master
-            if not vBucket.master in self._memcacheds:
-                server = {"ip": masterIp, "port": rest.port, "rest_username": rest.username,
-                          "rest_password": rest.password, "username": rest.username, "password": rest.password}
-                try:
-                    for node in nodes:
-                        if node.ip == masterIp and node.memcached == masterPort:
-                            self._memcacheds[vBucket.master] =\
-                            MemcachedClientHelper.direct_client(server, bucket)
-                            break
-                except Exception as ex:
-                    msg = "unable to establish connection to {0}.cleanup open connections"
-                    self.log.warn(msg.format(masterIp))
-                    self.done()
-                    raise ex
-
+        if vbucket == -1:
+            for vBucket in vBuckets:
+                masterIp = vBucket.master.split(":")[0]
+                masterPort = int(vBucket.master.split(":")[1])
+                self._vBucketMap[vBucket.id] = vBucket.master
+                if not vBucket.master in self._memcacheds:
+                    server = {"ip": masterIp, "port": rest.port, "rest_username": rest.username,
+                              "rest_password": rest.password, "username": rest.username, "password": rest.password}
+                    try:
+                        for node in nodes:
+                            if node.ip == masterIp and node.memcached == masterPort:
+                                self._memcacheds[vBucket.master] =\
+                                MemcachedClientHelper.direct_client(server, bucket)
+                                break
+                    except Exception as ex:
+                        msg = "unable to establish connection to {0}.cleanup open connections"
+                        self.log.warn(msg.format(masterIp))
+                        self.done()
+                        raise ex
+        else:
+            for vBucket in vBuckets:
+                if vbucket.id == vbucket:
+                    masterIp = vBucket.master.split(":")[0]
+                    masterPort = int(vBucket.master.split(":")[1])
+                    self._vBucketMap[vBucket.id] = vBucket.master
+                    server = {"ip": masterIp, "port": rest.port, "username": rest.username, "password": rest.password}
+                    try:
+                        for node in nodes:
+                            if node.ip == masterIp and node.memcached == masterPort:
+                                self._memcacheds[vBucket.master].close()
+                                self._memcacheds[vBucket.master] =\
+                                MemcachedClientHelper.direct_client(server, bucket)
+                                break
+                    except Exception as ex:
+                        msg = "unable to establish connection to {0}.cleanup open connections"
+                        self.log.warn(msg.format(masterIp))
+                        self.done()
+                        raise ex
 
     def memcached(self, key):
         vBucketId = crc32.crc32_hash(key) & 1023
@@ -481,17 +494,9 @@ class VBucketAwareMemcachedClient(object):
             msg = "vbucket map does not have an entry for vb : {0}"
             raise Exception(msg.format(vBucketId))
         if self._vBucketMap[vBucketId] not in self._memcacheds:
-            msg = "poxi does not have a mc connection for server : {0}"
+            msg = "smart client does not have a mc connection for server : {0}"
             raise Exception(msg.format(self._vBucketMap[vBucketId]))
         return self._memcacheds[self._vBucketMap[vBucketId]]
-
-    def not_my_vbucket_memcached(self, key):
-        vBucketId = crc32.crc32_hash(key) & 1023
-        which_mc = self._vBucketMap[vBucketId]
-        for server in self._memcacheds:
-            if server != which_mc:
-                return self._memcacheds[server]
-
 
     def done(self):
         [self._memcacheds[ip].close() for ip in self._memcacheds]
@@ -508,20 +513,34 @@ class VBucketAwareMemcachedClient(object):
         self.dispatcher.queue.put(item)
         return self._respond(item,event)
 
-    def gat(self, key, exp):
-        return super(VBucketAwareMemcachedClient, self).gat(key, exp)
+    def gat(self, key, expiry):
+        event = Event()
+        item = {"operation": "gat", "key": key, "expiry": expiry, "event": event,
+                "response": {}}
+        self.dispatcher.queue.put(item)
+        return self._respond(item, event)
 
-    def touch(self, key, exp):
-        return super(VBucketAwareMemcachedClient, self).touch(key, exp)
 
-    def cas(self, key, exp, flags, oldVal, val):
-        super(VBucketAwareMemcachedClient, self).cas(key, exp, flags, oldVal, val)
+    def touch(self, key, expiry):
+        event = Event()
+        item = {"operation": "touch", "key": key, "expiry": expiry, "event": event,
+                "response": {}}
+        self.dispatcher.queue.put(item)
+        return self._respond(item, event)
 
-    def delete_vbucket(self, vbucket):
-        return super(VBucketAwareMemcachedClient, self).delete_vbucket(vbucket)
+    def cas(self, key, expiry, flags, old_value, value):
+        event = Event()
+        item = {"operation": "cas", "key": key, "expiry": expiry, "flags": flags, "old_value": old_value, "value": value
+                , "event": event, "response": {}}
+        self.dispatcher.queue.put(item)
+        return self._respond(item, event)
 
-    def decr(self, key, amt=1, init=0, exp=0):
-        return super(VBucketAwareMemcachedClient, self).decr(key, amt, init, exp)
+    def decr(self, key, amount=1, init=0, expiry=0):
+        event = Event()
+        item = {"operation": "decr", "key": key, "amt": amount, "init": init, "expiry": expiry, "event": event,
+                "response": {}}
+        self.dispatcher.queue.put(item)
+        return self._respond(item, event)
 
     def set(self, key, expiry, flags, value):
         event = Event()
@@ -530,30 +549,48 @@ class VBucketAwareMemcachedClient(object):
         self.dispatcher.queue.put(item)
         return self._respond(item, event)
 
-    def add(self, key, exp, flags, val):
-        return super(VBucketAwareMemcachedClient, self).add(key, exp, flags, val)
+    def add(self, key, expiry, flags, value):
+        event = Event()
+        item = {"operation": "add", "key": key, "expiry": expiry, "flags": flags, "value": value, "event": event,
+                "response": {}}
+        self.dispatcher.queue.put(item)
+        return self._respond(item, event)
 
-    def delete(self, key, cas=0, vbucket=-1):
-        return super(VBucketAwareMemcachedClient, self).delete(key, cas, vbucket)
+    def delete(self, key, cas=0):
+        event = Event()
+        item = {"operation": "delete", "key": key, "cas": cas, "event": event,
+                "response": {}}
+        self.dispatcher.queue.put(item)
+        return self._respond(item, event)
 
     def prepend(self, key, value, cas=0):
-        return super(VBucketAwareMemcachedClient, self).prepend(key, value, cas)
+        event = Event()
+        item = {"operation": "prepend", "key": key, "cas": cas, "value": value, "event": event,
+                "response": {}}
+        self.dispatcher.queue.put(item)
+        return self._respond(item, event)
 
-    def getl(self, key, exp=15):
-        return super(VBucketAwareMemcachedClient, self).getl(key, exp)
 
-    def replace(self, key, exp, flags, val):
-        return super(VBucketAwareMemcachedClient, self).replace(key, exp, flags, val)
+    def getl(self, key, expiry=15):
+        event = Event()
+        item = {"operation": "getl", "key": key, "expiry": expiry, "event": event,
+                "response": {}}
+        self.dispatcher.queue.put(item)
+        return self._respond(item, event)
 
-    def getMulti(self, keys):
-        return super(VBucketAwareMemcachedClient, self).getMulti(keys)
+    def replace(self, key, expiry, flags, value):
+        event = Event()
+        item = {"operation": "replace", "key": key, "expiry": expiry, "flags": flags, "value": value, "event": event,
+                "response": {}}
+        self.dispatcher.queue.put(item)
+        return self._respond(item, event)
 
-    def flush(self, timebomb=0):
-        return super(VBucketAwareMemcachedClient, self).flush(timebomb)
-
-    def incr(self, key, amt=1, init=0, exp=0):
-        return super(VBucketAwareMemcachedClient, self).incr(key, amt, init, exp)
-
+    def incr(self, key, amount=1, init=0, expiry=0):
+        event = Event()
+        item = {"operation": "incr", "key": key, "amt": amount, "init": init, "expiry": expiry, "event": event,
+                "response": {}}
+        self.dispatcher.queue.put(item)
+        return self._respond(item, event)
 
 class CommandDispatcher(object):
     #this class contains a queue where request
@@ -581,12 +618,13 @@ class CommandDispatcher(object):
             item = self.queue.get()
             if item:
                 try:
-                    response = self.do(item)
+                    self.do(item)
                 except Exception as ex:
                     if isinstance(ex, MemcachedError):
                         #put the item back in the queue
                         self.queue.put(item)
                         if ex.status == 7:
+                            #reconfig only for that specific vbucket ?
                             self.reconfig_callback(self.reconfig_callback)
 
 
@@ -603,7 +641,68 @@ class CommandDispatcher(object):
             value = item["value"]
             item["response"]["return"] = self.vbaware.memcached(key).set(key, expiry, flags, value)
             item["event"].set()
-
+        elif item["operation"] == "add":
+            key = item["key"]
+            expiry = item["expiry"]
+            flags = item["flags"]
+            value = item["value"]
+            item["response"]["return"] = self.vbaware.memcached(key).add(key, expiry, flags, value)
+            item["event"].set()
+        elif item["operation"] == "replace":
+            key = item["key"]
+            expiry = item["expiry"]
+            flags = item["flags"]
+            value = item["value"]
+            item["response"]["return"] = self.vbaware.memcached(key).replace(key, expiry, flags, value)
+            item["event"].set()
+        elif item["operation"] == "delete":
+            key = item["key"]
+            cas = item["cas"]
+            item["response"]["return"] = self.vbaware.memcached(key).delete(key, cas)
+            item["event"].set()
+        elif item["operation"] == "prepend":
+            key = item["key"]
+            cas = item["cas"]
+            value = item["value"]
+            item["response"]["return"] = self.vbaware.memcached(key).prepend(key, value, cas)
+            item["event"].set()
+        elif item["operation"] == "getl":
+            key = item["key"]
+            expiry = item["expiry"]
+            item["response"]["return"] = self.vbaware.memcached(key).getl(key, expiry)
+            item["event"].set()
+        elif item["operation"] == "gat":
+            key = item["key"]
+            expiry = item["expiry"]
+            item["response"]["return"] = self.vbaware.memcached(key).get(key, expiry)
+            item["event"].set()
+        elif item["operation"] == "touch":
+            key = item["key"]
+            expiry = item["expiry"]
+            item["response"]["return"] = self.vbaware.memcached(key).touch(key, expiry)
+            item["event"].set()
+        elif item["operation"] == "incr":
+            key = item["key"]
+            amount = item["amount"]
+            init = item["init"]
+            expiry = item["expiry"]
+            item["response"]["return"] = self.vbaware.memcached(key).incr(key, amount, init, expiry)
+            item["event"].set()
+        elif item["operation"] == "decr":
+            key = item["key"]
+            amount = item["amount"]
+            init = item["init"]
+            expiry = item["expiry"]
+            item["response"]["return"] = self.vbaware.memcached(key).decr(key, amount, init, expiry)
+            item["event"].set()
+        elif item["operation"] == "cas":
+            key = item["key"]
+            expiry = item["expiry"]
+            flags = item["flags"]
+            old_value = item["old_value"]
+            value = item["value"]
+            item["response"]["return"] = self.vbaware.memcached(key).cas(key, expiry, flags, old_value, value)
+            item["event"].set()
 
 class MemcachedClientHelper(object):
     @staticmethod
