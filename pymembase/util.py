@@ -44,3 +44,9 @@ class ProgressBar:
             self._old_pbar = self.pbar_str
             sys.stdout.write(self.pbar_str + '\r')
             sys.stdout.flush()      # force updating of screen
+
+class StringUtil(object):
+
+    @staticmethod
+    def create_value(pattern, size):
+        return (pattern * (size / len(pattern))) + pattern[0:(size % len(pattern))]
