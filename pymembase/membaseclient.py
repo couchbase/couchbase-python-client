@@ -9,6 +9,7 @@ import random
 import exceptions
 import crc32
 import struct
+from encodings import ascii,hex_codec
 from rest_client import RestHelper, RestConnection
 
 class MemcachedConstants(object):
