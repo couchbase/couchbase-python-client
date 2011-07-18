@@ -1,4 +1,4 @@
-from Queue import Queue, Full
+from Queue import Queue, Full, Empty
 from threading import Thread
 
 import logger
@@ -9,7 +9,7 @@ import random
 import exceptions
 import crc32
 import struct
-from encodings import ascii,hex_codec
+from encodings import ascii, hex_codec
 from rest_client import RestHelper, RestConnection
 
 class MemcachedConstants(object):
@@ -498,30 +498,30 @@ class MemcachedClient(object):
 
     def sync_persistence(self, keyspecs):
         payload = self._build_sync_payload(0x8, keyspecs)
-        (opaque, cas, data) = self._doCmd(MemcachedConstants.CMD_SYNC, "", payload)
+        opaque, cas, data = self._doCmd(MemcachedConstants.CMD_SYNC, "", payload)
         return opaque, cas, self._parse_sync_response(data)
 
 
     def sync_mutation(self, keyspecs):
         payload = self._build_sync_payload(0x4, keyspecs)
-        (opaque, cas, data) = self._doCmd(MemcachedConstants.CMD_SYNC, "", payload)
+        opaque, cas, data = self._doCmd(MemcachedConstants.CMD_SYNC, "", payload)
         return opaque, cas, self._parse_sync_response(data)
 
     def sync_replication(self, numReplicas, keyspecs):
         payload = self._build_sync_payload((numReplicas & 0x0f) << 4, keyspecs)
-        (opaque, cas, data) = self._doCmd(MemcachedConstants.CMD_SYNC, "", payload)
+        opaque, cas, data = self._doCmd(MemcachedConstants.CMD_SYNC, "", payload)
         return opaque, cas, self._parse_sync_response(data)
 
     def sync_replication_or_persistence(self, numReplicas, keyspecs):
         payload = self._build_sync_payload(((numReplicas & 0x0f) << 4) | 0x8, keyspecs)
 
-        (opaque, cas, data) = self._doCmd(MemcachedConstants.CMD_SYNC, "", payload)
+        opaque, cas, data = self._doCmd(MemcachedConstants.CMD_SYNC, "", payload)
         return opaque, cas, self._parse_sync_response(data)
 
     def sync_replication_and_persistence(self, numReplicas, keyspecs):
         payload = self._build_sync_payload(((numReplicas & 0x0f) << 4) | 0xA, keyspecs)
 
-        (opaque, cas, data) = self._doCmd(MemcachedConstants.CMD_SYNC, "", payload)
+        opaque, cas, data = self._doCmd(MemcachedConstants.CMD_SYNC, "", payload)
         return opaque, cas, self._parse_sync_response(data)
 
     def _build_sync_payload(self, flags, keyspecs):
@@ -551,7 +551,7 @@ class MemcachedClient(object):
         for i in xrange(nkeys):
             spec = {}
             width = struct.calcsize("QHHB")
-            (spec['cas'], spec['vbucket'], keylen, eventid) = struct.unpack(">QHHB", data[offset: offset + width])
+            spec['cas'], spec['vbucket'], keylen, eventid = struct.unpack(">QHHB", data[offset: offset + width])
 
             offset += width
             spec['key'] = data[offset: offset + keylen]
@@ -669,7 +669,9 @@ class VBucketAwareMembaseClient(object):
         return self._memcacheds[self._vBucketMap[vBucketId]]
 
     def done(self):
+        self.dispatcher.shutdown()
         [self._memcacheds[ip].close() for ip in self._memcacheds]
+
 
     def _respond(self, item, event):
         event.wait(3)
@@ -795,15 +797,18 @@ class CommandDispatcher(object):
             #wait if its reconfiguring the vbucket-map
             if self.status == "vbucketmap-configuration":
                 continue
-            item = self.queue.get()
-            if item:
-                try:
-                    self.do(item)
-                    #do will only raise not_my_vbucket_exception
-                except Exception as ex:
-                    print ex
-                    self.queue.put(item)
-                    self.reconfig_callback(self.reconfig_callback)
+            try:
+                item = self.queue.get(block=False, timeout=1)
+                if item:
+                    try:
+                        self.do(item)
+                        #do will only raise not_my_vbucket_exception
+                    except Exception as ex:
+                        print ex
+                        self.queue.put(item)
+                        self.reconfig_callback(self.reconfig_callback)
+            except Empty:
+                pass
 
     def _raise_if_not_my_vbucket(self, ex, item):
         if isinstance(ex, MemcachedError) and ex.status == 7:
@@ -935,6 +940,7 @@ class CommandDispatcher(object):
                 self._raise_if_not_my_vbucket(ex, item)
             finally:
                 item["event"].set()
+
 
 class MemcachedClientHelper(object):
     @staticmethod
