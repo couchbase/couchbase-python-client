@@ -222,6 +222,7 @@ class MemcachedClient(object):
         self.s.connect_ex((host, port))
         self.r = random.Random()
         self.log = logger.logger("MemcachedClient")
+        self.vbucket_count = 1024
 
     def close(self):
         self.s.close()
@@ -311,7 +312,7 @@ class MemcachedClient(object):
     def set(self, key, exp, flags, val, vbucket=-1):
         """Set a value in the memcached server."""
         if vbucket == -1:
-            self.vbucketId = crc32.crc32_hash(key) & 1023
+            self.vbucketId = crc32.crc32_hash(key) & (self.vbucket_count - 1)
         else:
             self.vbucketId = vbucket
         return self._mutate(MemcachedConstants.CMD_SET, key, exp, flags, 0, val)
@@ -332,7 +333,7 @@ class MemcachedClient(object):
     def get(self, key, vbucket=-1):
         """Get the value for a given key within the memcached server."""
         if vbucket == -1:
-            self.vbucketId = crc32.crc32_hash(key) & 1023
+            self.vbucketId = crc32.crc32_hash(key) & (self.vbucket_count - 1)
         else:
             self.vbucketId = vbucket
         parts = self._doCmd(MemcachedConstants.CMD_GET, key, '')
@@ -484,7 +485,7 @@ class MemcachedClient(object):
     def delete(self, key, cas=0, vbucket=-1):
         """Delete the value for a given key within the memcached server."""
         if vbucket == -1:
-            self.vbucketId = crc32.crc32_hash(key) & 1023
+            self.vbucketId = crc32.crc32_hash(key) & (self.vbucket_count - 1)
         return self._doCmd(MemcachedConstants.CMD_DELETE, key, '', '', cas)
 
     def flush(self, timebomb=0):
@@ -602,6 +603,7 @@ class VBucketAwareMembaseClient(object):
         self.dispatcher = CommandDispatcher(self)
         self.dispatcher_thread = Thread(name="dispatcher-thread", target=self._start_dispatcher)
         self.dispatcher_thread.start()
+        self.vbucket_count = 1024
         #kick off dispatcher
 
     def _start_dispatcher(self):
@@ -615,6 +617,7 @@ class VBucketAwareMembaseClient(object):
         if not vb_ready:
             raise Exception("vbucket map is not ready for bucket {0}".format(bucket))
         vBuckets = rest.get_vbuckets(bucket)
+        self.vbucket_count = len(vBuckets)
         nodes = rest.get_nodes()
         if vbucket == -1:
             for vBucket in vBuckets:
@@ -656,7 +659,7 @@ class VBucketAwareMembaseClient(object):
                         raise ex
 
     def memcached(self, key):
-        vBucketId = crc32.crc32_hash(key) & 1023
+        vBucketId = crc32.crc32_hash(key) & (len(self._vBucketMap) - 1)
         if vBucketId not in self._vBucketMap:
             msg = "vbucket map does not have an entry for vb : {0}"
             raise Exception(msg.format(vBucketId))
@@ -942,6 +945,9 @@ class MemcachedClientHelper(object):
         else:
             ip = server.ip
         client = MemcachedClient(ip, node.memcached)
+        #set the vbucket count here ?
+        vBuckets = RestConnection(server).get_vbuckets(bucket)
+        client.vbucket_count = len(vBuckets)
         bucket_info = RestConnection(server).get_bucket(bucket)
         #todo raise exception for not bucket_info
         client.sasl_auth_plain(bucket_info.name.encode('ascii'),
@@ -957,6 +963,8 @@ class MemcachedClientHelper(object):
         for node in nodes:
             if node.ip == server.ip and int(node.port) == int(server.port):
                 client = MemcachedClient(server.ip, node.moxi)
+                vBuckets = RestConnection(server).get_vbuckets(bucket)
+                client.vbucket_count = len(vBuckets)
                 if bucket_info.authType == "sasl":
                     client.sasl_auth_plain(bucket_info.name.encode('ascii'),
                                            bucket_info.saslPassword.encode('ascii'))
