@@ -45,6 +45,7 @@ if __name__ == "__main__":
               "username": options.username,
               "password": options.password}
     print server
+    v = None
     try:
         v = VBucketAwareMembaseClient(server, options.bucket)
         number_of_items = int(options.items)
@@ -73,10 +74,7 @@ if __name__ == "__main__":
         sys.stdout.flush()
         v.done()
         print ""
-    except KeyboardInterrupt:
-        print "ctrl+c inserted"
-        sys.exit()
-    except Exception as ex:
-        print ex
-
-
+    except:
+        print ""
+        if v:
+            v.done()

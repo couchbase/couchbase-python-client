@@ -9,6 +9,7 @@ import random
 import exceptions
 import crc32
 import struct
+import time
 from encodings import ascii, hex_codec
 from rest_client import RestHelper, RestConnection
 
@@ -670,7 +671,10 @@ class VBucketAwareMembaseClient(object):
 
     def done(self):
         self.dispatcher.shutdown()
+        self.log.info("dispatcher shutdown invoked")
         [self._memcacheds[ip].close() for ip in self._memcacheds]
+        self.log.info("closed all memcached open connections")
+
 
 
     def _respond(self, item, event):
@@ -777,6 +781,7 @@ class CommandDispatcher(object):
         self.status = "initialized"
         self.vbaware = vbaware
         self.reconfig_callback = self.vbaware.reconfig_vbucket_map
+        self.log = logger.logger("CommandDispatcher")
 
     def put(self, item):
         try:
@@ -788,6 +793,8 @@ class CommandDispatcher(object):
 
     def shutdown(self):
         self.status = "shutdown"
+        self.log.info("dispatcher shutdown command received")
+        time.sleep(2)
 
     def reconfig_completed(self):
         self.status = "ok"
@@ -809,6 +816,7 @@ class CommandDispatcher(object):
                         self.reconfig_callback(self.reconfig_callback)
             except Empty:
                 pass
+        self.log.info("dispatcher stopped")
 
     def _raise_if_not_my_vbucket(self, ex, item):
         if isinstance(ex, MemcachedError) and ex.status == 7:
