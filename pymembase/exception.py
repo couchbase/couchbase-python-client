@@ -83,3 +83,4 @@ class ServerAlreadyJoinedException(MembaseHttpException):
         self.parameters['nodeIp'] = nodeIp
         self.parameters['remoteIp'] = remoteIp
         self.type = MembaseHttpExceptionTypes.NODE_ALREADY_JOINED
+

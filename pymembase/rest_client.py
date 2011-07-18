@@ -6,7 +6,7 @@ import socket
 import time
 import logger
 from exception import ServerAlreadyJoinedException, ServerUnavailableException, InvalidArgumentException
-from membase.api.exception import BucketCreationException, ServerJoinException
+from exception import BucketCreationException, ServerJoinException
 
 log = logger.logger("rest_client")
 #helper library methods built on top of RestConnection interface
@@ -515,7 +515,7 @@ class RestConnection(object):
         parsed = []
         api = self.baseUrl + 'pools/default'
         try:
-            response, content = httplib2.Http().request(api, 'GET', headers=self._create_headers())
+            response, content = httplib2.Http().request(api, headers=self._create_headers())
             #if status is 200 then it was a success otherwise it was a failure
             if response['status'] == '400':
                 #extract the error

@@ -172,7 +172,7 @@ def parse_uri(uri):
         (scheme, authority, path, query, fragment) = parse_uri(uri)
     """
     groups = URI.match(uri).groups()
-    return (groups[1], groups[3], groups[4], groups[6], groups[8])
+    return groups[1], groups[3], groups[4], groups[6], groups[8]
 
 
 def urlnorm(uri):
@@ -797,7 +797,7 @@ class HTTPSConnectionWithTimeout(httplib.HTTPSConnection):
             self.sock.setproxy(*self.proxy_info.astuple())
             sock.setproxy(*self.proxy_info.astuple())
         else:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock = socket.socket()
         if self.timeout is not None:
             sock.settimeout(self.timeout)
         sock.connect((self.host, self.port))
@@ -905,7 +905,7 @@ the same interface as FileCache."""
                     content = _decompressContent(response, content)
 
             break
-        return (response, content)
+        return response, content
 
 
     def _request(self, conn, host, absolute_uri, request_uri, method, body, headers, redirections, cachekey):
@@ -934,7 +934,7 @@ the same interface as FileCache."""
                     authorization.response(response, body)
                     break
 
-        if (self.follow_all_redirects or (method in ["GET", "HEAD"]) or response.status == 303):
+        if self.follow_all_redirects or (method in ["GET", "HEAD"]) or response.status == 303:
             if self.follow_redirects and response.status in [300, 301, 302, 303, 307]:
                 # Pick out the location header and basically start from the beginning
                 # remembering first to strip the ETag header and decrement our 'depth'
@@ -975,7 +975,7 @@ the same interface as FileCache."""
                     response['content-location'] = absolute_uri
                 _updateCache(headers, response, content, self.cache, cachekey)
 
-        return (response, content)
+        return response, content
 
 
     # Need to catch and rebrand some exceptions
@@ -1087,7 +1087,7 @@ a string that contains the response entity body.
                         response = Response(info)
                         if cached_value:
                             response.fromcache = True
-                        return (response, content)
+                        return response, content
 
                     if entry_disposition == "STALE":
                         if info.has_key('etag') and not self.ignore_etag and not 'if-none-match' in headers:
@@ -1150,7 +1150,7 @@ a string that contains the response entity body.
             else:
                 raise
 
-        return (response, content)
+        return response, content
 
 
 class Response(dict):
