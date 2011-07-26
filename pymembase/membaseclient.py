@@ -9,8 +9,6 @@ import random
 import exceptions
 import crc32
 import struct
-import time
-from encodings import ascii, hex_codec
 from rest_client import RestHelper, RestConnection
 
 class MemcachedConstants(object):
@@ -594,7 +592,7 @@ class MemcachedClient(object):
 class VBucketAwareMembaseClient(object):
     #poll server every few seconds to see if the vbucket-map
     #has changes
-    def __init__(self, server, bucket):
+    def __init__(self, server, bucket, verbose=False):
         self.log = logger.logger("VBucketAwareMemcachedClient")
         self.bucket = bucket
         self._memcacheds = {}
@@ -605,6 +603,7 @@ class VBucketAwareMembaseClient(object):
         self.dispatcher_thread = Thread(name="dispatcher-thread", target=self._start_dispatcher)
         self.dispatcher_thread.start()
         self.vbucket_count = 1024
+        self.verbose = verbose
         #kick off dispatcher
 
     def _start_dispatcher(self):
@@ -641,7 +640,7 @@ class VBucketAwareMembaseClient(object):
                         raise ex
         else:
             for vBucket in vBuckets:
-                if vbucket.id == vbucket:
+                if vBucket.id == vbucket:
                     masterIp = vBucket.master.split(":")[0]
                     masterPort = int(vBucket.master.split(":")[1])
                     self._vBucketMap[vBucket.id] = vBucket.master
@@ -670,11 +669,14 @@ class VBucketAwareMembaseClient(object):
         return self._memcacheds[self._vBucketMap[vBucketId]]
 
     def done(self):
-        self.dispatcher.shutdown()
-        self.log.info("dispatcher shutdown invoked")
-        [self._memcacheds[ip].close() for ip in self._memcacheds]
-        self.log.info("closed all memcached open connections")
-
+        if self.dispatcher:
+            self.dispatcher.shutdown()
+            if self.verbose:
+                self.log.info("dispatcher shutdown invoked")
+            [self._memcacheds[ip].close() for ip in self._memcacheds]
+            if self.verbose:
+                self.log.info("closed all memcached open connections")
+            self.dispatcher = None
 
 
     def _respond(self, item, event):
@@ -774,14 +776,16 @@ class VBucketAwareMembaseClient(object):
 class CommandDispatcher(object):
     #this class contains a queue where request
 
-    def __init__(self, vbaware):
+    def __init__(self, vbaware, verbose=False):
         #have a queue , in case of not my vbucket error
         #let's reinitialize the config/memcached socket connections ?
         self.queue = Queue(10000)
         self.status = "initialized"
         self.vbaware = vbaware
         self.reconfig_callback = self.vbaware.reconfig_vbucket_map
+        self.verbose = verbose
         self.log = logger.logger("CommandDispatcher")
+        self._dispatcher_stopped_event = Event()
 
     def put(self, item):
         try:
@@ -792,15 +796,17 @@ class CommandDispatcher(object):
 
 
     def shutdown(self):
-        self.status = "shutdown"
-        self.log.info("dispatcher shutdown command received")
-        time.sleep(2)
+        if self.status != "shutdown":
+            self.status = "shutdown"
+            if self.verbose:
+                self.log.info("dispatcher shutdown command received")
+        self._dispatcher_stopped_event.wait(2)
 
     def reconfig_completed(self):
         self.status = "ok"
 
     def dispatch(self):
-        while self.status != "shutdown":
+        while self.status != "shutdown" or (self.status == "shutdown" and self.queue.qsize() > 0) :
             #wait if its reconfiguring the vbucket-map
             if self.status == "vbucketmap-configuration":
                 continue
@@ -811,15 +817,18 @@ class CommandDispatcher(object):
                         self.do(item)
                         #do will only raise not_my_vbucket_exception
                     except Exception as ex:
-                        print ex
+                        self.log.error(ex)
                         self.queue.put(item)
                         self.reconfig_callback(self.reconfig_callback)
             except Empty:
                 pass
-        self.log.info("dispatcher stopped")
+        if self.verbose:
+            self.log.info("dispatcher stopped")
+            self._dispatcher_stopped_event.set()
 
     def _raise_if_not_my_vbucket(self, ex, item):
         if isinstance(ex, MemcachedError) and ex.status == 7:
+            self.log.error("got not my vb error")
             raise ex
         item["response"]["error"] = ex
 
