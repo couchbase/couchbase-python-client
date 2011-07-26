@@ -60,19 +60,19 @@ class SmartLoader(object):
                     document = "\"name\":\"pymc-{0}\"".format(key, key)
                     document = document + ",\"age\":{0}".format(random.randint(0, 1000))
                     document = "{" + document + "}"
-                    self._profile_before()
                     try:
+                        self._profile_before()
                         v.set(key, 0, 0, document)
+                        self._profile_after()
                     except MemcachedTimeoutException:
                         self._stats["timeouts"] += 1
-                    self._profile_after()
                 else:
-                    self._profile_before()
                     try:
+                        self._profile_before()
                         v.set(key, 0, 0, value)
+                        self._profile_after()
                     except MemcachedTimeoutException:
                         self._stats["timeouts"] += 1
-                    self._profile_after()
                 self._bar.update()
             v.done()
             v = None
