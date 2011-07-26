@@ -3,6 +3,7 @@ import random
 from threading import Thread
 import uuid
 import time
+from exception import MemcachedTimeoutException
 from membaseclient import VBucketAwareMembaseClient
 from optparse import OptionParser
 from util import ProgressBar, StringUtil
@@ -31,12 +32,12 @@ class SharedProgressBar(object):
 
 
 class SmartLoader(object):
-    def __init__(self, options, server, sharedProgressBar,thread_id):
+    def __init__(self, options, server, sharedProgressBar, thread_id):
         self._options = options
         self._server = server
         self._thread = None
         self.shut_down = False
-        self._stats = {"total_time": 0, "max": 0, "min": 1 * 1000 * 1000, "samples": 0}
+        self._stats = {"total_time": 0, "max": 0, "min": 1 * 1000 * 1000, "samples": 0, "timeouts": 0}
         self._bar = sharedProgressBar
         self._thread_id = thread_id
 
@@ -60,11 +61,17 @@ class SmartLoader(object):
                     document = document + ",\"age\":{0}".format(random.randint(0, 1000))
                     document = "{" + document + "}"
                     self._profile_before()
-                    v.set(key, 0, 0, document)
+                    try:
+                        v.set(key, 0, 0, document)
+                    except MemcachedTimeoutException:
+                        self._stats["timeouts"] += 1
                     self._profile_after()
                 else:
                     self._profile_before()
-                    v.set(key, 0, 0, value)
+                    try:
+                        v.set(key, 0, 0, value)
+                    except MemcachedTimeoutException:
+                        self._stats["timeouts"] += 1
                     self._profile_after()
                 self._bar.update()
             v.done()
@@ -76,10 +83,10 @@ class SmartLoader(object):
                 v.done()
 
     def print_stats(self):
-        print "stats"
-        msg = "Thread {0} - average set time {1} seconds , min {2} seconds , max {3} seconds"
-        print msg.format(self._thread_id, self._stats["total_time"] / self._stats["samples"],
-                         self._stats["min"], self._stats["max"])
+        msg = "Thread {0} - average set time : {1} seconds , min : {2} seconds , max : {3} seconds , operation timeouts {4}"
+        if self._stats["samples"]:
+            print msg.format(self._thread_id, self._stats["total_time"] / self._stats["samples"],
+                             self._stats["min"], self._stats["max"], self._stats["timeouts"])
 
     def wait(self):
         self._thread.join()
