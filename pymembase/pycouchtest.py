@@ -1,10 +1,106 @@
 #!/usr/bin/python
 import random
+from threading import Thread
 import uuid
+import time
 from membaseclient import VBucketAwareMembaseClient
 from optparse import OptionParser
 from util import ProgressBar, StringUtil
 import sys
+
+class SharedProgressBar(object):
+    def __init__(self, number_of_items):
+        self.bar = ProgressBar(0, number_of_items, 77)
+        self.number_of_items = number_of_items
+        self.counter = 0
+        self.old_bar_string = ""
+
+    def update(self):
+        self.counter += 1
+        if self.old_bar_string != str(self.bar):
+            sys.stdout.write(str(self.bar) + '\r')
+            sys.stdout.flush()
+            self.old_bar_string = str(self.bar)
+        self.bar.updateAmount(self.counter)
+
+    def flush(self):
+        self.bar.updateAmount(self.number_of_items)
+        sys.stdout.write(str(self.bar) + '\r')
+        sys.stdout.flush()
+        old_bar_string = str(self.bar)
+
+
+class SmartLoader(object):
+    def __init__(self, options, server, sharedProgressBar,thread_id):
+        self._options = options
+        self._server = server
+        self._thread = None
+        self.shut_down = False
+        self._stats = {"total_time": 0, "max": 0, "min": 1 * 1000 * 1000, "samples": 0}
+        self._bar = sharedProgressBar
+        self._thread_id = thread_id
+
+    def start(self):
+        self._thread = Thread(target=self._run)
+        self._thread.start()
+
+    def _run(self):
+        v = None
+        try:
+            options = self._options
+            v = VBucketAwareMembaseClient(self._server, options.bucket, options.verbose)
+            number_of_items = (int(options.items) / int(options.num_of_threads))
+            value = StringUtil.create_value("*", int(options.value_size))
+            for i in range(0, number_of_items):
+                if self.shut_down:
+                    break
+                key = "{0}-{1}".format(options.key_prefix, str(uuid.uuid4())[:5])
+                if options.load_json:
+                    document = "\"name\":\"pymc-{0}\"".format(key, key)
+                    document = document + ",\"age\":{0}".format(random.randint(0, 1000))
+                    document = "{" + document + "}"
+                    self._profile_before()
+                    v.set(key, 0, 0, document)
+                    self._profile_after()
+                else:
+                    self._profile_before()
+                    v.set(key, 0, 0, value)
+                    self._profile_after()
+                self._bar.update()
+            v.done()
+            v = None
+        except BaseException as err:
+            print err
+            print ""
+            if v:
+                v.done()
+
+    def print_stats(self):
+        print "stats"
+        msg = "Thread {0} - average set time {1} seconds , min {2} seconds , max {3} seconds"
+        print msg.format(self._thread_id, self._stats["total_time"] / self._stats["samples"],
+                         self._stats["min"], self._stats["max"])
+
+    def wait(self):
+        self._thread.join()
+
+    def stop(self):
+        self.shut_down = True
+        if v:
+            v.done()
+
+    def _profile_before(self):
+        self.start = time.time()
+
+    def _profile_after(self):
+        self.end = time.time()
+        diff = self.end - self.start
+        self._stats["samples"] += 1
+        self._stats["total_time"] = self._stats["total_time"] + diff
+        if self._stats["min"] > diff:
+            self._stats["min"] = diff
+        if self._stats["max"] < diff:
+            self._stats["max"] = diff
 
 if __name__ == "__main__":
     parser = OptionParser()
@@ -18,11 +114,18 @@ if __name__ == "__main__":
                       default="default", metavar="default")
     parser.add_option("-j", "--json", dest="load_json", help="insert json data",
                       default=False, metavar="True")
+
+    parser.add_option("-v", "--verbose", dest="verbose", help="run in verbose mode",
+                      default=False, metavar="False")
+
     parser.add_option("-i", "--items", dest="items", help="number of items to be inserted",
                       default=100, metavar="100")
 
     parser.add_option("--size", dest="value_size", help="value size,default is 256 byte",
                       default=512, metavar="100")
+
+    parser.add_option("--threads", dest="num_of_threads", help="number of threads to run load",
+                      default=1, metavar="100")
 
     parser.add_option("--prefix", dest="key_prefix",
                       help="prefix to use for memcached keys and json _ids,default is uuid string",
@@ -31,7 +134,11 @@ if __name__ == "__main__":
     options, args = parser.parse_args()
 
     node = options.node
-    #if port is not given use :8091
+
+    if not node:
+        parser.print_help()
+        exit()
+        #if port is not given use :8091
     if node.find(":") == -1:
         hostname = node
         port = 8091
@@ -40,41 +147,29 @@ if __name__ == "__main__":
         port = node[node.find(":") + 1:]
     server = {"ip": hostname,
               "port": port,
-              "rest_username": options.username,
-              "rest_password": options.password,
               "username": options.username,
               "password": options.password}
-    print server
     v = None
+    workers = []
     try:
-        v = VBucketAwareMembaseClient(server, options.bucket)
+        no_threads = options.num_of_threads
         number_of_items = int(options.items)
-        bar = ProgressBar(0, number_of_items, 77)
-        old_bar_string = ""
-        value = StringUtil.create_value("*", options.value_size)
-        for i in range(0, number_of_items):
-            key = "{0}-{1}".format(options.key_prefix, str(uuid.uuid4())[:5])
-            if options.load_json:
-                document = "\"name\":\"pymc-{0}\"".format(key, key)
-                document = document + ",\"age\":{0}".format(random.randint(0, 1000))
-                document = "{" + document + "}"
-                a, b, c = v.set(key, 0, 0, document)
-            else:
-                a, b, c = v.set(key, 0, 0, value)
-            a, b, c = v.get(key)
-
-            bar.updateAmount(i)
-            if old_bar_string != str(bar):
-                sys.stdout.write(str(bar) + '\r')
-                sys.stdout.flush()
-                old_bar_string = str(bar)
-
-        bar.updateAmount(number_of_items)
-        sys.stdout.write(str(bar) + '\r')
-        sys.stdout.flush()
-        v.done()
+        sharedProgressBar = SharedProgressBar(number_of_items)
+        for i in range(0, int(no_threads)):
+            worker = SmartLoader(options, server, sharedProgressBar, i)
+            worker.start()
+            workers.append(worker)
+        for worker in workers:
+            worker.wait()
+        sharedProgressBar.flush()
+        for worker in workers:
+            worker.print_stats()
+    except Exception as ex:
+        print ex
         print ""
+        for worker in workers:
+            worker.stop()
     except:
         print ""
-        if v:
-            v.done()
+        for worker in workers:
+            worker.stop()
