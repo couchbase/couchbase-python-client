@@ -1,5 +1,6 @@
 from Queue import Queue, Full, Empty
 from threading import Thread
+from exception import MemcachedTimeoutException
 
 import logger
 import hmac
@@ -680,9 +681,10 @@ class VBucketAwareMembaseClient(object):
 
 
     def _respond(self, item, event):
-        event.wait(3)
+        timeout = 3
+        event.wait(timeout)
         if not event.is_set():
-            raise Exception("timeout")
+            raise MemcachedTimeoutException(item, timeout)
         if "error" in item["response"]:
             raise item["response"]["error"]
         return item["response"]["return"]

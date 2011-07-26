@@ -8,6 +8,18 @@ class MembaseHttpExceptionTypes(object):
     BUCKET_CREATION_ERROR = 1004
     STATS_UNAVAILABLE = 1005
 
+class MemcachedTimeoutException(Exception):
+    def __init__(self, item, timeout):
+        msg = "timeout - memcached did not return in {0} second during {1} operation for key {2}"
+        self._message = msg.format(timeout, item["operation"], item["key"])
+
+    def __str__(self):
+        string = ''
+        if self._message:
+            string += self._message
+        return string
+
+
 #base exception class for membase apis
 class MembaseHttpException(Exception):
     def __init__(self):
