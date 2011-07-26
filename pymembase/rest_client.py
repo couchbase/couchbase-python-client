@@ -669,7 +669,6 @@ class RestConnection(object):
                 log.error('get_bucket error {0}'.format(content))
             elif response['status'] == '200':
                 bucketInfo = RestParser().parse_get_bucket_response(content)
-                #                log.debug('set stats to {0}'.format(bucketInfo.stats.ram))
         except socket.error:
             raise ServerUnavailableException(ip=self.ip)
         except httplib2.ServerNotFoundError:
@@ -677,6 +676,10 @@ class RestConnection(object):
         return bucketInfo
 
     def get_vbuckets(self, bucket='default'):
+        bucket_info = self.get_bucket(bucket)
+        #TODOL either bucket does not exist or user is not authenticated
+        if not bucket_info:
+            raise Exception("bucket {0} does not exist or the given bucket password is invalid".format(bucket))
         return self.get_bucket(bucket).vbuckets
 
     def delete_bucket(self, bucket='default'):
@@ -687,11 +690,11 @@ class RestConnection(object):
                 return True
             else:
                 log.error('delete_bucket error {0}'.format(content))
+                raise Exception("unable to delete the bucket {0}".format(bucket))
         except socket.error:
             raise ServerUnavailableException(ip=self.ip)
         except httplib2.ServerNotFoundError:
             raise ServerUnavailableException(ip=self.ip)
-        return False
 
     # figure out the proxy port
     def create_bucket(self, bucket='',
