@@ -28,8 +28,6 @@ class SharedProgressBar(object):
         self.bar.updateAmount(self.number_of_items)
         sys.stdout.write(str(self.bar) + '\r')
         sys.stdout.flush()
-        old_bar_string = str(self.bar)
-
 
 class SmartLoader(object):
     def __init__(self, options, server, sharedProgressBar, thread_id):
@@ -76,9 +74,7 @@ class SmartLoader(object):
                 self._bar.update()
             v.done()
             v = None
-        except BaseException as err:
-            print err
-            print ""
+        except:
             if v:
                 v.done()
 
@@ -88,8 +84,12 @@ class SmartLoader(object):
             print msg.format(self._thread_id, self._stats["total_time"] / self._stats["samples"],
                              self._stats["min"], self._stats["max"], self._stats["timeouts"])
 
-    def wait(self):
-        self._thread.join()
+    def wait(self, block=False):
+        if block:
+            self._thread.join()
+        else:
+            return not self._thread.is_alive()
+
 
     def stop(self):
         self.shut_down = True
@@ -166,17 +166,18 @@ if __name__ == "__main__":
             worker = SmartLoader(options, server, sharedProgressBar, i)
             worker.start()
             workers.append(worker)
-        for worker in workers:
-            worker.wait()
+        while True:
+            all_finished = True
+            for worker in workers:
+                all_finished &= worker.wait()
+            if all_finished:
+                break
+            else:
+                time.sleep(0.5)
         sharedProgressBar.flush()
         for worker in workers:
             worker.print_stats()
-    except Exception as ex:
-        print ex
-        print ""
-        for worker in workers:
-            worker.stop()
-    except:
+    except :
         print ""
         for worker in workers:
             worker.stop()
