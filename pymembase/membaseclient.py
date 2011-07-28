@@ -1,6 +1,6 @@
 from Queue import Queue, Full, Empty
 from threading import Thread
-from exception import MemcachedTimeoutException
+from exception import MemcachedTimeoutException, InvalidArgumentException
 
 import logger
 import hmac
@@ -593,11 +593,22 @@ class MemcachedClient(object):
 class VBucketAwareMembaseClient(object):
     #poll server every few seconds to see if the vbucket-map
     #has changes
-    def __init__(self, server, bucket, verbose=False):
+    def __init__(self, url, bucket, password, verbose=False):
         self.log = logger.logger("VBucketAwareMemcachedClient")
         self.bucket = bucket
         self._memcacheds = {}
         self._vBucketMap = {}
+        #TODO: use regular expressions to parse the
+        server = {}
+        if not bucket:
+            raise InvalidArgumentException("bucket can not be an empty string", parameters="bucket")
+        if not url:
+            raise InvalidArgumentException("url can not be an empty string", parameters="url")
+        if url.find("http://") != -1 and url.rfind(":") != -1 and url.find("/pools/default") != -1:
+            server["ip"] = url[url.find("http://") + len("http://"):url.rfind(":")]
+            server["port"] = url[url.rfind(":") + 1:url.find("/pools/default")]
+            server["username"] = bucket
+            server["password"] = password
         self.rest = RestConnection(server)
         self.__init__vbucket_map(self.rest, bucket, -1)
         self.dispatcher = CommandDispatcher(self)
@@ -605,7 +616,6 @@ class VBucketAwareMembaseClient(object):
         self.dispatcher_thread.start()
         self.vbucket_count = 1024
         self.verbose = verbose
-        #kick off dispatcher
 
     def _start_dispatcher(self):
         self.dispatcher.dispatch()
@@ -619,43 +629,43 @@ class VBucketAwareMembaseClient(object):
             raise Exception("vbucket map is not ready for bucket {0}".format(bucket))
         vBuckets = rest.get_vbuckets(bucket)
         self.vbucket_count = len(vBuckets)
-        nodes = rest.get_nodes()
+        bucket_info = rest.get_bucket(bucket)
+        nodes = bucket_info.nodes
         if vbucket == -1:
             for vBucket in vBuckets:
                 masterIp = vBucket.master.split(":")[0]
+                masterIp = masterIp.encode("ascii", "ignore")
                 masterPort = int(vBucket.master.split(":")[1])
                 self._vBucketMap[vBucket.id] = vBucket.master
                 if not vBucket.master in self._memcacheds:
-                    server = {"ip": masterIp, "port": rest.port, "rest_username": rest.username,
-                              "rest_password": rest.password, "username": rest.username, "password": rest.password}
                     try:
                         for node in nodes:
                             if node.ip == masterIp and node.memcached == masterPort:
                                 self._memcacheds[vBucket.master] =\
-                                MemcachedClientHelper.direct_client(server, bucket)
+                                MemcachedClientHelper.direct_client(rest, node.ip, bucket)
                                 break
                     except Exception as ex:
                         msg = "unable to establish connection to {0}.cleanup open connections"
-                        self.log.warn(msg.format(masterIp))
+                        self.log.error(msg.format(masterIp))
                         self.done()
                         raise ex
         else:
             for vBucket in vBuckets:
                 if vBucket.id == vbucket:
                     masterIp = vBucket.master.split(":")[0]
+                    masterIp = masterIp.encode("ascii", "ignore")
                     masterPort = int(vBucket.master.split(":")[1])
                     self._vBucketMap[vBucket.id] = vBucket.master
-                    server = {"ip": masterIp, "port": rest.port, "username": rest.username, "password": rest.password}
                     try:
                         for node in nodes:
                             if node.ip == masterIp and node.memcached == masterPort:
                                 self._memcacheds[vBucket.master].close()
                                 self._memcacheds[vBucket.master] =\
-                                MemcachedClientHelper.direct_client(server, bucket)
+                                MemcachedClientHelper.direct_client(rest, node.ip, bucket)
                                 break
                     except Exception as ex:
                         msg = "unable to establish connection to {0}.cleanup open connections"
-                        self.log.warn(msg.format(masterIp))
+                        self.log.error(msg.format(masterIp))
                         self.done()
                         raise ex
 
@@ -713,7 +723,7 @@ class VBucketAwareMembaseClient(object):
     def cas(self, key, expiry, flags, old_value, value):
         event = Event()
         item = {"operation": "cas", "key": key, "expiry": expiry, "flags": flags, "old_value": old_value, "value": value
-                , "event": event, "response": {}}
+            , "event": event, "response": {}}
         self.dispatcher.put(item)
         return self._respond(item, event)
 
@@ -808,7 +818,7 @@ class CommandDispatcher(object):
         self.status = "ok"
 
     def dispatch(self):
-        while self.status != "shutdown" or (self.status == "shutdown" and self.queue.qsize() > 0) :
+        while self.status != "shutdown" or (self.status == "shutdown" and self.queue.qsize() > 0):
             #wait if its reconfiguring the vbucket-map
             if self.status == "vbucketmap-configuration":
                 continue
@@ -830,6 +840,7 @@ class CommandDispatcher(object):
 
     def _raise_if_not_my_vbucket(self, ex, item):
         if isinstance(ex, MemcachedError) and ex.status == 7:
+            print ex
             self.log.error("got not my vb error")
             raise ex
         item["response"]["error"] = ex
@@ -963,35 +974,15 @@ class CommandDispatcher(object):
 
 class MemcachedClientHelper(object):
     @staticmethod
-    def direct_client(server, bucket):
-        node = RestConnection(server).get_nodes_self()
-        if isinstance(server, dict):
-            ip = server["ip"]
-        else:
-            ip = server.ip
-        client = MemcachedClient(ip, node.memcached)
-        #set the vbucket count here ?
-        vBuckets = RestConnection(server).get_vbuckets(bucket)
-        client.vbucket_count = len(vBuckets)
-        bucket_info = RestConnection(server).get_bucket(bucket)
-        #todo raise exception for not bucket_info
-        client.sasl_auth_plain(bucket_info.name.encode('ascii'),
-                               bucket_info.saslPassword.encode('ascii'))
-        return client
-
-    @staticmethod
-    def proxy_client(server, bucket):
-        #for this bucket on this node what is the proxy ?
-        rest = RestConnection(server)
+    def direct_client(rest, ip, bucket):
         bucket_info = rest.get_bucket(bucket)
-        nodes = bucket_info.nodes
-        for node in nodes:
-            if node.ip == server.ip and int(node.port) == int(server.port):
-                client = MemcachedClient(server.ip, node.moxi)
-                vBuckets = RestConnection(server).get_vbuckets(bucket)
+        vBuckets = bucket_info.vbuckets
+        for node in bucket_info.nodes:
+            if node.ip == ip:
+                print node.memcached
+                client = MemcachedClient(ip, node.memcached)
                 client.vbucket_count = len(vBuckets)
-                if bucket_info.authType == "sasl":
-                    client.sasl_auth_plain(bucket_info.name.encode('ascii'),
-                                           bucket_info.saslPassword.encode('ascii'))
+                client.sasl_auth_plain(bucket_info.name.encode('ascii'),
+                                       bucket_info.saslPassword.encode('ascii'))
                 return client
-        raise Exception("unable to find {0} in get_nodes()".format(server.ip))
+        raise Exception("unexpected error - unable to find ip:{0} in this cluster".format(ip))

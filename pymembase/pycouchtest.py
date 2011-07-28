@@ -47,7 +47,7 @@ class SmartLoader(object):
         v = None
         try:
             options = self._options
-            v = VBucketAwareMembaseClient(self._server, options.bucket, options.verbose)
+            v = VBucketAwareMembaseClient(self._server, options.bucket, options.password, options.verbose)
             number_of_items = (int(options.items) / int(options.num_of_threads))
             value = StringUtil.create_value("*", int(options.value_size))
             for i in range(0, number_of_items):
@@ -57,6 +57,7 @@ class SmartLoader(object):
                 if options.load_json:
                     document = "\"name\":\"pymc-{0}\"".format(key, key)
                     document = document + ",\"age\":{0}".format(random.randint(0, 1000))
+                    document = document + ",\"index\":{0}".format(i)
                     document = "{" + document + "}"
                     try:
                         self._profile_before()
@@ -152,10 +153,7 @@ if __name__ == "__main__":
     else:
         hostname = node[:node.find(":")]
         port = node[node.find(":") + 1:]
-    server = {"ip": hostname,
-              "port": port,
-              "username": options.username,
-              "password": options.password}
+    server = "http://{0}:{1}/pools/default".format(hostname, port)
     v = None
     workers = []
     try:

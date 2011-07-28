@@ -664,7 +664,10 @@ class RestConnection(object):
         bucketInfo = None
         api = '{0}{1}{2}'.format(self.baseUrl, 'pools/default/buckets/', bucket)
         try:
-            response, content = httplib2.Http().request(api, headers=self._create_headers())
+            if self.password:
+                response, content = httplib2.Http().request(api, headers=self._create_headers())
+            else:
+                response, content = httplib2.Http().request(api)
             if response['status'] == '400':
                 log.error('get_bucket error {0}'.format(content))
             elif response['status'] == '200':
