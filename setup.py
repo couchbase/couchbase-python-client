@@ -7,7 +7,7 @@ setup(
     description = "Membase Python SDK",
     author = "Couchbase Inc",
     author_email = "info@couchbae.com",
-    url = "http://couchbase.com/",
+    url = "http://couchbase.org/",
     download_url = "http://.../pysdk.tar.gz",
     keywords = ["encoding", "i18n", "xml"],
     classifiers = [
@@ -16,7 +16,7 @@ setup(
         "Development Status :: 4 - Beta",
         "Environment :: Other Environment",
         "Intended Audience :: Developers",
-        "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",
+        "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
         "Topic :: Software Development :: Libraries :: Python Modules",
         ],
