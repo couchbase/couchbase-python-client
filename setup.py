@@ -2,7 +2,7 @@
 from distutils.core import setup
 setup(
     name = "pymembase",
-    packages = ["pymembase"],
+    packages = ["pymembase","pymembase/httplib2"],
     version = "0.0.1",
     description = "Membase Python SDK",
     author = "Couchbase Inc",
