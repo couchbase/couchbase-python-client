@@ -520,7 +520,7 @@ class RestConnection(object):
                     node.port = int(key[key.rfind(":") + 1:])
                     node.replication = value['replication']
                     nodes.append(node)
-                    #let's also populate the membase_version_info
+                    #let's also populate the couchbase_version_info
             return nodes
         except socket.error:
             raise ServerUnavailableException(ip=self.ip)
@@ -569,7 +569,7 @@ class RestConnection(object):
                 log.error('get_pools error {0}'.format(content))
             elif response['status'] == '200':
                 parsed = json.loads(content)
-                version = MembaseServerVersion(parsed['implementationVersion'], parsed['componentsVersion'])
+                version = CouchbaseServerVersion(parsed['implementationVersion'], parsed['componentsVersion'])
             return version
         except socket.error:
             raise ServerUnavailableException(ip=self.ip)
@@ -910,7 +910,7 @@ class RestConnection(object):
             raise ServerUnavailableException(ip=self.ip)
 
 
-class MembaseServerVersion:
+class CouchbaseServerVersion:
     def __init__(self, implementationVersion='', componentsVersion=''):
         self.implementationVersion = implementationVersion
         self.componentsVersion = componentsVersion

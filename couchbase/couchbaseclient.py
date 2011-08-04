@@ -607,7 +607,7 @@ class MemcachedClient(object):
         return self._doCmd(MemcachedConstants.CMD_DEREGISTER_TAP_CLIENT, tap_name, '')
 
 
-class VBucketAwareMembaseClient(object):
+class VBucketAwareCouchbaseClient(object):
     #poll server every few seconds to see if the vbucket-map
     #has changes
     def __init__(self, url, bucket, password, verbose=False):

@@ -21,7 +21,7 @@ from threading import Thread
 import uuid
 import time
 from exception import MemcachedTimeoutException
-from membaseclient import VBucketAwareMembaseClient
+from couchbaseclient import VBucketAwareCouchbaseClient
 from optparse import OptionParser
 from util import ProgressBar, StringUtil
 import sys
@@ -64,7 +64,7 @@ class SmartLoader(object):
         v = None
         try:
             options = self._options
-            v = VBucketAwareMembaseClient(self._server, options.bucket, options.password, options.verbose)
+            v = VBucketAwareCouchbaseClient(self._server, options.bucket, options.password, options.verbose)
             number_of_items = (int(options.items) / int(options.num_of_threads))
             value = StringUtil.create_value("*", int(options.value_size))
             for i in range(0, number_of_items):
