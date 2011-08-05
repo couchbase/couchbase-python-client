@@ -624,8 +624,8 @@ class VBucketAwareCouchbaseClient(object):
         if url.find("http://") != -1 and url.rfind(":") != -1 and url.find("/pools/default") != -1:
             server["ip"] = url[url.find("http://") + len("http://"):url.rfind(":")]
             server["port"] = url[url.rfind(":") + 1:url.find("/pools/default")]
-            server["username"] = bucket
-            server["password"] = password
+            server["username"] = ""
+            server["password"] = ""
         self.rest = RestConnection(server)
         self.__init__vbucket_map(self.rest, bucket, -1)
         self.dispatcher = CommandDispatcher(self)
