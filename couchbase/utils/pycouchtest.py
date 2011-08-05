@@ -20,10 +20,10 @@ import random
 from threading import Thread
 import uuid
 import time
-from exception import MemcachedTimeoutException
-from couchbaseclient import VBucketAwareCouchbaseClient
+from couchbase.exception import MemcachedTimeoutException
+from couchbase.couchbaseclient import VBucketAwareCouchbaseClient
 from optparse import OptionParser
-from util import ProgressBar, StringUtil
+from couchbase.util import ProgressBar, StringUtil
 import sys
 
 class SharedProgressBar(object):
