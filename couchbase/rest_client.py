@@ -281,7 +281,10 @@ class RestConnection(object):
                 if response['status'] in ['200', '201', '202']:
                     return True, content
                 else:
-                    json_parsed = json.loads(content)
+                    try:
+                        json_parsed = json.loads(content)
+                    except:
+                        json_parsed = {}
                     reason = "unknown"
                     if "error" in json_parsed:
                         reason = json_parsed["error"]
