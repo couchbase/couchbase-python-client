@@ -16,7 +16,7 @@ setup(
     description = "Couchbase Python SDK",
     author = "Couchbase Inc",
     author_email = "info@couchbase.com",
-    packages = ["couchbase", "couchbase/httplib2", "couchbase/utils"],
+    packages = ["couchbase", "couchbase/httplib2", "couchbase/utils", "couchbase/migrator"],
     url = "http://couchbase.org/",
     download_url = "http://.../pysdk.tar.gz",
     license = "LICENSE.txt",
