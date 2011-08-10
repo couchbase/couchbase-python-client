@@ -1,14 +1,25 @@
-# chardet's setup.py
 from distutils.core import setup
+import subprocess
+
+def get_version():
+    try:
+        p = subprocess.Popen('git describe', stdout=subprocess.PIPE, shell=True)
+        version = p.communicate()[0].strip()
+    except:
+        version = ''
+    return version
+
+
 setup(
-    name = "couchbase",
-    packages = ["couchbase", "couchbase/httplib2"],
-    version = "0.0.1",
+    name = "couchbase-python",
+    version = get_version(),
     description = "Couchbase Python SDK",
     author = "Couchbase Inc",
     author_email = "info@couchbase.com",
+    packages = ["couchbase", "couchbase/httplib2", "couchbase/utils"],
     url = "http://couchbase.org/",
     download_url = "http://.../pysdk.tar.gz",
+    license = "LICENSE.txt",
     keywords = ["encoding", "i18n", "xml"],
     classifiers = [
         "Programming Language :: Python",
@@ -20,8 +31,5 @@ setup(
         "Operating System :: OS Independent",
         "Topic :: Software Development :: Libraries :: Python Modules",
         ],
-    long_description = """\
-Couchbase Python Library
-This version requires Python 2.6 or later
-"""
+    long_description = open('README.txt').read(),
 )
