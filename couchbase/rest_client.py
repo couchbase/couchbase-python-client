@@ -186,10 +186,11 @@ class RestConnection(object):
 
 
     #http://10.1.6.108:8091/couchBase/bucket-0/_design/dev_6ca50/_view/dev_6ca50?limit=10&_=1311107815807
-    def view_results(self, bucket, view, params, limit=100):
+    def view_results(self, bucket, view, name, params, limit=100):
         view_query = 'couchBase/{0}/_design/{1}/_view/{2}'
-        api = self.baseUrl + view_query.format(bucket, view, view)
-        api += "?limit={0}".format(limit)
+        api = self.baseUrl + view_query.format(bucket, view, name)
+        if limit != None:
+            api += "?limit={0}".format(limit)
         for param in params:
             api += "&{0}={1}".format(param, params[param])
 
@@ -267,7 +268,6 @@ class RestConnection(object):
         while True:
             try:
                 response, content = httplib2.Http().request(api, method, params, headers)
-#                log.info("{0} response {1} ,content {2}".format(api, response, content))
                 if response['status'] in ['200', '201', '202']:
                     return True, content
                 else:
