@@ -16,17 +16,19 @@
 #
 
 from Queue import Queue, Full, Empty
-from threading import Thread
+from threading import Thread, Event
 from exception import MemcachedTimeoutException, InvalidArgumentException
 
 import logger
 import hmac
-from multiprocessing import Event
 import socket
 import random
 import exceptions
 import crc32
 import struct
+import urllib
+import json
+from copy import deepcopy
 from rest_client import RestHelper, RestConnection
 
 class MemcachedConstants(object):
@@ -610,12 +612,15 @@ class MemcachedClient(object):
 class VBucketAwareCouchbaseClient(object):
     #poll server every few seconds to see if the vbucket-map
     #has changes
-    def __init__(self, url, bucket, password, verbose=False):
+    def __init__(self, url, bucket, password="", verbose=False):
         self.log = logger.logger("VBucketAwareMemcachedClient")
         self.bucket = bucket
+        self.rest_username = bucket
+        self.rest_password = password
         self._memcacheds = {}
         self._vBucketMap = {}
-        #TODO: use regular expressions to parse the
+        self._vBucketMapFastForward = {}
+        #TODO: use regular expressions to parse the url
         server = {}
         if not bucket:
             raise InvalidArgumentException("bucket can not be an empty string", parameters="bucket")
@@ -624,70 +629,129 @@ class VBucketAwareCouchbaseClient(object):
         if url.find("http://") != -1 and url.rfind(":") != -1 and url.find("/pools/default") != -1:
             server["ip"] = url[url.find("http://") + len("http://"):url.rfind(":")]
             server["port"] = url[url.rfind(":") + 1:url.find("/pools/default")]
-            server["username"] = ""
-            server["password"] = ""
+            server["username"] = self.rest_username
+            server["password"] = self.rest_password
+        self.servers = [server]
         self.rest = RestConnection(server)
-        self.__init__vbucket_map(self.rest, bucket, -1)
+        self.reconfig_vbucket_map()
+        self.init_vbucket_connections()
         self.dispatcher = CommandDispatcher(self)
         self.dispatcher_thread = Thread(name="dispatcher-thread", target=self._start_dispatcher)
+        self.dispatcher_thread.daemon = True
         self.dispatcher_thread.start()
-        self.vbucket_count = 1024
+        self.streaming_thread = Thread(name="streaming", target=self._start_streaming, args=())
+        self.streaming_thread.daemon = True
+        self.streaming_thread.start()
         self.verbose = verbose
 
     def _start_dispatcher(self):
         self.dispatcher.dispatch()
 
-    def reconfig_vbucket_map(self, vbucket):
-        self.__init__vbucket_map(self.rest, self.bucket, vbucket)
+    def _start_streaming(self):
+        # this will dynamically update vBucketMap, vBucketMapFastForward, servers
+        urlopener = urllib.FancyURLopener()
+        urlopener.prompt_user_passwd = lambda host, realm: (self.rest_username, self.rest_password)
+        while self.servers:
+            current_servers = deepcopy(self.servers)
+            for server in current_servers:
+                response = urlopener.open("http://{0}:{1}/pools/default/bucketsStreaming/{2}".format(server["ip"], server["port"], self.bucket))
+                while response:
+                    try:
+                        line = response.readline()
+                        if not line:
+                            # try next server if we get an EOF
+                            response.close()
+                            break
+                    except:
+                        # try next server if we fail to read
+                        response.close()
+                        break
+                    try:
+                        data = json.loads(line)
+                    except:
+                        continue
 
-    def __init__vbucket_map(self, rest, bucket, vbucket=-1):
-        vb_ready = RestHelper(rest).vbucket_map_ready(bucket, 60)
+                    serverlist = data['vBucketServerMap']['serverList']
+                    vbucketmapfastforward = {}
+                    index = 0
+                    if 'vBucketMapForward' in data['vBucketServerMap']:
+                        for vbucket in data['vBucketServerMap']['vBucketMapForward']:
+                            vbucketmapfastforward[index] = serverlist[vbucket[0]]
+                            index += 1
+                        self._vBucketMapFastForward = deepcopy(vbucketmapfastforward)
+                    vbucketmap = {}
+                    index = 0
+                    for vbucket in data['vBucketServerMap']['vBucketMap']:
+                        vbucketmap[index] = serverlist[vbucket[0]]
+                        index += 1
+
+                    # only update vBucketMap if we don't have a fastforward
+                    # on a not_mb_vbucket error, we already update the
+                    # vBucketMap from the fastforward map
+                    if not vbucketmapfastforward:
+                        self._vBucketMap = deepcopy(vbucketmap)
+
+                    new_servers = []
+                    nodes = data["nodes"]
+                    for node in nodes:
+                        if node["clusterMembership"] == "active" and node["status"] == "healthy":
+                            hostport = node["hostname"]
+                            new_servers.append({"ip":hostport.split(":")[0],
+                                                "port":int(hostport.split(":")[1]),
+                                                "username":self.rest_username,
+                                                "password":self.rest_password})
+                    new_servers.sort()
+                    self.servers = deepcopy(new_servers)
+
+
+    def init_vbucket_connections(self):
+        # start up all vbucket connections
+        for i in range(len(self._vBucketMap)):
+            self.start_vbucket_connection(i)
+
+    def start_vbucket_connection(self,vbucket):
+        server = self._vBucketMap[vbucket]
+        serverIp, serverPort = server.split(":")
+        if not server in self._memcacheds:
+            self._memcacheds[server] = MemcachedClientHelper.direct_client(self.rest, serverIp, serverPort, self.bucket)
+
+    def start_vbucket_fastforward_connection(self,vbucket):
+        if not vbucket in self._vBucketMapFastForward:
+            return
+        server = self._vBucketMapFastForward[vbucket]
+        serverIp, serverPort = server.split(":")
+        if not server in self._memcacheds:
+            self._memcacheds[server] = MemcachedClientHelper.direct_client(self.rest, serverIp, serverPort, self.bucket)
+
+    def restart_vbucket_connection(self,vbucket):
+        server = self._vBucketMap[vbucket]
+        serverIp, serverPort = server.split(":")
+        if server in self._memcacheds:
+            self._memcacheds[server].close()
+        self._memcacheds[server] = MemcachedClientHelper.direct_client(self.rest, serverIp, serverPort, self.bucket)
+
+    def reconfig_vbucket_map(self, vbucket=-1):
+        vb_ready = RestHelper(self.rest).vbucket_map_ready(self.bucket, 60)
         if not vb_ready:
-            raise Exception("vbucket map is not ready for bucket {0}".format(bucket))
-        vBuckets = rest.get_vbuckets(bucket)
+            raise Exception("vbucket map is not ready for bucket {0}".format(self.bucket))
+        vBuckets = self.rest.get_vbuckets(self.bucket)
         self.vbucket_count = len(vBuckets)
-        bucket_info = rest.get_bucket(bucket)
+        bucket_info = self.rest.get_bucket(self.bucket)
         nodes = bucket_info.nodes
-        if vbucket == -1:
-            for vBucket in vBuckets:
-                masterIp = vBucket.master.split(":")[0]
-                masterIp = masterIp.encode("ascii", "ignore")
-                masterPort = int(vBucket.master.split(":")[1])
-                self._vBucketMap[vBucket.id] = vBucket.master
-                if not vBucket.master in self._memcacheds:
-                    try:
-                        for node in nodes:
-                            if node.ip == masterIp and node.memcached == masterPort:
-                                self._memcacheds[vBucket.master] =\
-                                MemcachedClientHelper.direct_client(rest, node.ip, bucket)
-                                break
-                    except Exception as ex:
-                        msg = "unable to establish connection to {0}.cleanup open connections"
-                        self.log.error(msg.format(masterIp))
-                        self.done()
-                        raise ex
-        else:
-            for vBucket in vBuckets:
-                if vBucket.id == vbucket:
-                    masterIp = vBucket.master.split(":")[0]
-                    masterIp = masterIp.encode("ascii", "ignore")
-                    masterPort = int(vBucket.master.split(":")[1])
-                    self._vBucketMap[vBucket.id] = vBucket.master
-                    try:
-                        for node in nodes:
-                            if node.ip == masterIp and node.memcached == masterPort:
-                                self._memcacheds[vBucket.master].close()
-                                self._memcacheds[vBucket.master] =\
-                                MemcachedClientHelper.direct_client(rest, node.ip, bucket)
-                                break
-                    except Exception as ex:
-                        msg = "unable to establish connection to {0}.cleanup open connections"
-                        self.log.error(msg.format(masterIp))
-                        self.done()
-                        raise ex
 
-    def memcached(self, key):
+        for vBucket in vBuckets:
+            if vBucket.id == vbucket or vbucket == -1:
+                self._vBucketMap[vBucket.id] = vBucket.master
+
+    def memcached(self, key, fastforward=False):
         vBucketId = crc32.crc32_hash(key) & (len(self._vBucketMap) - 1)
+
+        if fastforward and vBucketId in self._vBucketMapFastForward:
+            # only try the fastforward if we have an entry
+            # otherwise we just wait for the main map to update
+            self.start_vbucket_fastforward_connection(vBucketId)
+            self._vBucketMap[vBucketId] = self._vBucketMapFastForward[vBucketId]
+
         if vBucketId not in self._vBucketMap:
             msg = "vbucket map does not have an entry for vb : {0}"
             raise Exception(msg.format(vBucketId))
@@ -695,6 +759,9 @@ class VBucketAwareCouchbaseClient(object):
             msg = "smart client does not have a mc connection for server : {0}"
             raise Exception(msg.format(self._vBucketMap[vBucketId]))
         return self._memcacheds[self._vBucketMap[vBucketId]]
+
+    def vbucketid(self, key):
+        return crc32.crc32_hash(key) & (len(self._vBucketMap) - 1)
 
     def done(self):
         if self.dispatcher:
@@ -708,9 +775,12 @@ class VBucketAwareCouchbaseClient(object):
 
 
     def _respond(self, item, event):
-        timeout = 3
+        timeout = 30
         event.wait(timeout)
         if not event.is_set():
+            # if we timeout, then try to reconnect to the server
+            # responsible for this vbucket
+            self.restart_vbucket_connection(self.vbucketid(item['key']))
             raise MemcachedTimeoutException(item, timeout)
         if "error" in item["response"]:
             raise item["response"]["error"]
@@ -812,6 +882,8 @@ class CommandDispatcher(object):
         self.status = "initialized"
         self.vbaware = vbaware
         self.reconfig_callback = self.vbaware.reconfig_vbucket_map
+        self.start_connection_callback = self.vbaware.start_vbucket_connection
+        self.restart_connection_callback = self.vbaware.restart_vbucket_connection
         self.verbose = verbose
         self.log = logger.logger("CommandDispatcher")
         self._dispatcher_stopped_event = Event()
@@ -820,7 +892,7 @@ class CommandDispatcher(object):
         try:
             self.queue.put(item, False)
         except Full:
-            #TODOL add a better error message here
+            #TODO: add a better error message here
             raise Exception("queue is full")
 
 
@@ -844,136 +916,158 @@ class CommandDispatcher(object):
                 if item:
                     try:
                         self.do(item)
-                        #do will only raise not_my_vbucket_exception
-                    except Exception as ex:
+                        # do will only raise not_my_vbucket_exception,
+                        # EOF and socket.error
+                    except MemcachedError as ex:
+                        # if we get a not_my_vbucket then requeue item
+                        #  with fast forward map vbucket
                         self.log.error(ex)
+                        self.reconfig_callback(ex.vbucket)
+                        self.start_connection_callback(ex.vbucket)
+                        item["fastforward"] = True
                         self.queue.put(item)
-                        self.reconfig_callback(self.reconfig_callback)
+                    except exceptions.EOFError as ex:
+                        # we go an EOF error, restart the connection
+                        self.log.error(ex)
+                        self.restart_connection_callback(ex.vbucket)
+                        self.queue.put(item)
+                    except socket.error as ex:
+                        # we got a socket error, restart the connection
+                        self.log.error(ex)
+                        self.restart_connection_callback(ex.vbucket)
+                        self.queue.put(item)
+
             except Empty:
                 pass
         if self.verbose:
             self.log.info("dispatcher stopped")
             self._dispatcher_stopped_event.set()
 
-    def _raise_if_not_my_vbucket(self, ex, item):
+    def _raise_if_recoverable(self, ex, item):
         if isinstance(ex, MemcachedError) and ex.status == 7:
+            ex.vbucket = item["vbucket"]
             print ex
-            self.log.error("got not my vb error")
+            self.log.error("got not my vb error. key: {0}, vbucket: {1}".format(item["key"],item["vbucket"]))
+            raise ex
+        if isinstance(ex, exceptions.EOFError):
+            ex.vbucket = item["vbucket"]
+            print ex
+            self.log.error("got EOF")
+            raise ex
+        if isinstance(ex, socket.error):
+            ex.vbucket = item["vbucket"]
+            print ex
+            self.log.error("got socket.error")
             raise ex
         item["response"]["error"] = ex
 
 
     def do(self, item):
         #find which vbucket this belongs to and then run the operation on that ?
+        if "key" in item:
+            item["vbucket"] = self.vbaware.vbucketid(item["key"])
+        if not "fastforward" in item:
+            item["fastforward"] = False
+        item["response"]["return"] = None
+
         if item["operation"] == "get":
             key = item["key"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key).get(key)
+                item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).get(key)
             except Exception as ex:
-                self._raise_if_not_my_vbucket(ex, item)
-            finally:
-                item["event"].set()
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
         elif item["operation"] == "set":
             key = item["key"]
             expiry = item["expiry"]
             flags = item["flags"]
             value = item["value"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key).set(key, expiry, flags, value)
+                item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).set(key, expiry, flags, value)
             except Exception as ex:
-                self._raise_if_not_my_vbucket(ex, item)
-            finally:
-                item["event"].set()
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
         elif item["operation"] == "add":
             key = item["key"]
             expiry = item["expiry"]
             flags = item["flags"]
             value = item["value"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key).add(key, expiry, flags, value)
+                item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).add(key, expiry, flags, value)
             except Exception as ex:
-                self._raise_if_not_my_vbucket(ex, item)
-            finally:
-                item["event"].set()
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
         elif item["operation"] == "replace":
             key = item["key"]
             expiry = item["expiry"]
             flags = item["flags"]
             value = item["value"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key).replace(key, expiry, flags, value)
+                item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).replace(key, expiry, flags, value)
             except Exception as ex:
-                self._raise_if_not_my_vbucket(ex, item)
-            finally:
-                item["event"].set()
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
         elif item["operation"] == "delete":
             key = item["key"]
             cas = item["cas"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key).delete(key, cas)
+                item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).delete(key, cas)
             except Exception as ex:
-                self._raise_if_not_my_vbucket(ex, item)
-            finally:
-                item["event"].set()
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
         elif item["operation"] == "prepend":
             key = item["key"]
             cas = item["cas"]
             value = item["value"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key).prepend(key, value, cas)
+                item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).prepend(key, value, cas)
             except Exception as ex:
-                self._raise_if_not_my_vbucket(ex, item)
-            finally:
-                item["event"].set()
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
         elif item["operation"] == "getl":
             key = item["key"]
             expiry = item["expiry"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key).getl(key, expiry)
+                item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).getl(key, expiry)
             except Exception as ex:
-                self._raise_if_not_my_vbucket(ex, item)
-            finally:
-                item["event"].set()
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
         elif item["operation"] == "gat":
             key = item["key"]
             expiry = item["expiry"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key).gat(key, expiry)
+                item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).gat(key, expiry)
             except Exception as ex:
-                self._raise_if_not_my_vbucket(ex, item)
-            finally:
-                item["event"].set()
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
         elif item["operation"] == "touch":
             key = item["key"]
             expiry = item["expiry"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key).touch(key, expiry)
+                item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).touch(key, expiry)
             except Exception as ex:
-                self._raise_if_not_my_vbucket(ex, item)
-            finally:
-                item["event"].set()
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
         elif item["operation"] == "incr":
             key = item["key"]
             amount = item["amount"]
             init = item["init"]
             expiry = item["expiry"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key).incr(key, amount, init, expiry)
+                item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).incr(key, amount, init, expiry)
             except Exception as ex:
-                self._raise_if_not_my_vbucket(ex, item)
-            finally:
-                item["event"].set()
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
         elif item["operation"] == "decr":
             key = item["key"]
             amount = item["amount"]
             init = item["init"]
             expiry = item["expiry"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key).decr(key, amount, init, expiry)
+                item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).decr(key, amount, init, expiry)
             except Exception as ex:
-                self._raise_if_not_my_vbucket(ex, item)
-            finally:
-                item["event"].set()
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
 
         elif item["operation"] == "cas":
             key = item["key"]
@@ -982,22 +1076,20 @@ class CommandDispatcher(object):
             old_value = item["old_value"]
             value = item["value"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key).cas(key, expiry, flags, old_value, value)
+                item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).cas(key, expiry, flags, old_value, value)
             except Exception as ex:
-                self._raise_if_not_my_vbucket(ex, item)
-            finally:
-                item["event"].set()
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
 
 
 class MemcachedClientHelper(object):
     @staticmethod
-    def direct_client(rest, ip, bucket):
+    def direct_client(rest, ip, port, bucket):
         bucket_info = rest.get_bucket(bucket)
         vBuckets = bucket_info.vbuckets
         for node in bucket_info.nodes:
-            if node.ip == ip:
-                print node.memcached
-                client = MemcachedClient(ip, node.memcached)
+            if node.ip == ip and node.memcached == int(port):
+                client = MemcachedClient(ip.encode('ascii','ignore'), int(port))
                 client.vbucket_count = len(vBuckets)
                 client.sasl_auth_plain(bucket_info.name.encode('ascii'),
                                        bucket_info.saslPassword.encode('ascii'))

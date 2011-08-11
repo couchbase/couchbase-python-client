@@ -156,16 +156,6 @@ class RestHelper(object):
 
 
 class RestConnection(object):
-    #port is always 8091
-    def __init__(self, ip, username='Administrator', password='password'):
-        #throw some error here if the ip is null ?
-        self.ip = ip
-        self.username = username
-        self.password = password
-        self.baseUrl = "http://{0}:8091/".format(self.ip)
-        self.port = 8091
-
-
     def __init__(self, serverInfo):
         #serverInfo can be a json object
         if isinstance(serverInfo, dict):
@@ -303,7 +293,7 @@ class RestConnection(object):
 
     def init_cluster(self, username='Administrator', password='password'):
         api = self.baseUrl + 'settings/web'
-        params = urllib.urlencode({'port': '8091',
+        params = urllib.urlencode({'port': str(self.port),
                                    'username': username,
                                    'password': password})
 

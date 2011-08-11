@@ -1,6 +1,6 @@
 
 sources=[]
-destinations=[{'type':'couchbase','class':'CouchbaseWriter','example':'couchbase:username:password@example.com:8091/bucket'}]
+destinations=[{'type':'couchbase','class':'CouchbaseWriter','example':'couchbase:bucket:password@example.com:8091/bucket'}]
 
 import re
 import json
@@ -13,7 +13,7 @@ import migrator
 class CouchbaseReader(migrator.Reader):
     def __init__(self, source):
         # username:password@example.com:8091/bucket
-        m = re.match('^([^:]+):([^@]+)@([^:]+):([^/]+)/(.+)$', source)
+        m = re.match('^([^:]+):([^@]*)@([^:]+):([^/]+)/(.+)$', source)
         self.username = m.group(1)
         self.password = m.group(2)
         self.host = m.group(3)
@@ -40,7 +40,7 @@ class CouchbaseReader(migrator.Reader):
 class CouchbaseWriter(migrator.Writer):
     def __init__(self, destination):
         # username:password@example.com:8091/bucket
-        m = re.match('^([^:]+):([^@]+)@([^:]+):([^/]+)/(.+)$', destination)
+        m = re.match('^([^:]+):([^@]*)@([^:]+):([^/]+)/(.+)$', destination)
         self.username = m.group(1)
         self.password = m.group(2)
         self.host = m.group(3)
@@ -53,8 +53,8 @@ class CouchbaseWriter(migrator.Writer):
         self.verbose = False
 
         # todo: use server username/password to query the bucket password/port if needed
-        self.server = "http://{2}:{3}/pools/default".format(self.username, self.password, self.host, self.port)
-        self.client = VBucketAwareCouchbaseClient(self.server, self.bucket, self.bucket_password, self.verbose)
+        self.server = "http://{0}:{1}/pools/default".format(self.host, self.port)
+        self.client = VBucketAwareCouchbaseClient(self.server, self.bucket, self.password, self.verbose)
 
     def write(self, record):
         for i in range(5):
@@ -66,7 +66,7 @@ class CouchbaseWriter(migrator.Writer):
                 pass
             except:
                 self.client.done()
-                self.client = VBucketAwareCouchbaseClient(self.server, self.bucket, self.bucket_password, self.verbose)
+                self.client = VBucketAwareCouchbaseClient(self.server, self.bucket, self.password, self.verbose)
         print 'unable to set key {0}'.format(str(record['id']))
 
     def close(self):
