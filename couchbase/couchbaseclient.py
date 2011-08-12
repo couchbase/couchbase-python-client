@@ -746,7 +746,7 @@ class VBucketAwareCouchbaseClient(object):
 
     def decr(self, key, amount=1, init=0, expiry=0):
         event = Event()
-        item = {"operation": "decr", "key": key, "amt": amount, "init": init, "expiry": expiry, "event": event,
+        item = {"operation": "decr", "key": key, "amount": amount, "init": init, "expiry": expiry, "event": event,
                 "response": {}}
         self.dispatcher.put(item)
         return self._respond(item, event)
@@ -796,7 +796,7 @@ class VBucketAwareCouchbaseClient(object):
 
     def incr(self, key, amount=1, init=0, expiry=0):
         event = Event()
-        item = {"operation": "incr", "key": key, "amt": amount, "init": init, "expiry": expiry, "event": event,
+        item = {"operation": "incr", "key": key, "amount": amount, "init": init, "expiry": expiry, "event": event,
                 "response": {}}
         self.dispatcher.put(item)
         return self._respond(item, event)
