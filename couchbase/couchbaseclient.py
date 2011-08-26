@@ -16,7 +16,7 @@
 #
 
 from Queue import Queue, Full, Empty
-from threading import Thread, Event
+from threading import Thread, Event, Lock
 from exception import MemcachedTimeoutException, InvalidArgumentException
 
 import logger
@@ -619,7 +619,9 @@ class VBucketAwareCouchbaseClient(object):
         self.rest_password = password
         self._memcacheds = {}
         self._vBucketMap = {}
+        self._vBucketMap_lock = Lock()
         self._vBucketMapFastForward = {}
+        self._vBucketMapFastForward_lock = Lock()
         #TODO: use regular expressions to parse the url
         server = {}
         if not bucket:
@@ -632,6 +634,7 @@ class VBucketAwareCouchbaseClient(object):
             server["username"] = self.rest_username
             server["password"] = self.rest_password
         self.servers = [server]
+        self.servers_lock = Lock()
         self.rest = RestConnection(server)
         self.reconfig_vbucket_map()
         self.init_vbucket_connections()
@@ -651,8 +654,11 @@ class VBucketAwareCouchbaseClient(object):
         # this will dynamically update vBucketMap, vBucketMapFastForward, servers
         urlopener = urllib.FancyURLopener()
         urlopener.prompt_user_passwd = lambda host, realm: (self.rest_username, self.rest_password)
-        while self.servers:
+        current_servers = True
+        while current_servers:
+            self.servers_lock.acquire()
             current_servers = deepcopy(self.servers)
+            self.servers_lock.release()
             for server in current_servers:
                 response = urlopener.open("http://{0}:{1}/pools/default/bucketsStreaming/{2}".format(server["ip"], server["port"], self.bucket))
                 while response:
@@ -678,7 +684,9 @@ class VBucketAwareCouchbaseClient(object):
                         for vbucket in data['vBucketServerMap']['vBucketMapForward']:
                             vbucketmapfastforward[index] = serverlist[vbucket[0]]
                             index += 1
+                        self._vBucketMapFastForward_lock.acquire()
                         self._vBucketMapFastForward = deepcopy(vbucketmapfastforward)
+                        self._vBucketMapFastForward_lock.release()
                     vbucketmap = {}
                     index = 0
                     for vbucket in data['vBucketServerMap']['vBucketMap']:
@@ -689,7 +697,9 @@ class VBucketAwareCouchbaseClient(object):
                     # on a not_mb_vbucket error, we already update the
                     # vBucketMap from the fastforward map
                     if not vbucketmapfastforward:
+                        self._vBucketMap_lock.acquire()
                         self._vBucketMap = deepcopy(vbucketmap)
+                        self._vBucketMap_lock.release()
 
                     new_servers = []
                     nodes = data["nodes"]
@@ -701,30 +711,42 @@ class VBucketAwareCouchbaseClient(object):
                                                 "username":self.rest_username,
                                                 "password":self.rest_password})
                     new_servers.sort()
+                    self.servers_lock.acquire()
                     self.servers = deepcopy(new_servers)
+                    self.servers_lock.release()
 
 
     def init_vbucket_connections(self):
         # start up all vbucket connections
-        for i in range(len(self._vBucketMap)):
+        self._vBucketMap_lock.acquire()
+        vbucketcount = len(self._vBucketMap)
+        self._vBucketMap_lock.release()
+        for i in range(vbucketcount):
             self.start_vbucket_connection(i)
 
     def start_vbucket_connection(self,vbucket):
-        server = self._vBucketMap[vbucket]
+        self._vBucketMap_lock.acquire()
+        server = deepcopy(self._vBucketMap[vbucket])
+        self._vBucketMap_lock.release()
         serverIp, serverPort = server.split(":")
         if not server in self._memcacheds:
             self._memcacheds[server] = MemcachedClientHelper.direct_client(self.rest, serverIp, serverPort, self.bucket)
 
     def start_vbucket_fastforward_connection(self,vbucket):
+        self._vBucketMapFastForward_lock.acquire()
         if not vbucket in self._vBucketMapFastForward:
+            self._vBucketMapFastForward_lock.release()
             return
-        server = self._vBucketMapFastForward[vbucket]
+        server = deepcopy(self._vBucketMapFastForward[vbucket])
+        self._vBucketMapFastForward_lock.release()
         serverIp, serverPort = server.split(":")
         if not server in self._memcacheds:
             self._memcacheds[server] = MemcachedClientHelper.direct_client(self.rest, serverIp, serverPort, self.bucket)
 
     def restart_vbucket_connection(self,vbucket):
-        server = self._vBucketMap[vbucket]
+        self._vBucketMap_lock.acquire()
+        server = deepcopy(self._vBucketMap[vbucket])
+        self._vBucketMap_lock.release()
         serverIp, serverPort = server.split(":")
         if server in self._memcacheds:
             self._memcacheds[server].close()
@@ -739,11 +761,15 @@ class VBucketAwareCouchbaseClient(object):
         bucket_info = self.rest.get_bucket(self.bucket)
         nodes = bucket_info.nodes
 
+        self._vBucketMap_lock.acquire()
         for vBucket in vBuckets:
             if vBucket.id == vbucket or vbucket == -1:
                 self._vBucketMap[vBucket.id] = vBucket.master
+        self._vBucketMap_lock.release()
 
     def memcached(self, key, fastforward=False):
+        self._vBucketMap_lock.acquire()
+        self._vBucketMapFastForward_lock.acquire()
         vBucketId = crc32.crc32_hash(key) & (len(self._vBucketMap) - 1)
 
         if fastforward and vBucketId in self._vBucketMapFastForward:
@@ -754,14 +780,24 @@ class VBucketAwareCouchbaseClient(object):
 
         if vBucketId not in self._vBucketMap:
             msg = "vbucket map does not have an entry for vb : {0}"
+            self._vBucketMapFastForward_lock.release()
+            self._vBucketMap_lock.release()
             raise Exception(msg.format(vBucketId))
         if self._vBucketMap[vBucketId] not in self._memcacheds:
             msg = "smart client does not have a mc connection for server : {0}"
+            self._vBucketMapFastForward_lock.release()
+            self._vBucketMap_lock.release()
             raise Exception(msg.format(self._vBucketMap[vBucketId]))
-        return self._memcacheds[self._vBucketMap[vBucketId]]
+        r = self._memcacheds[self._vBucketMap[vBucketId]]
+        self._vBucketMapFastForward_lock.release()
+        self._vBucketMap_lock.release()
+        return r
 
     def vbucketid(self, key):
-        return crc32.crc32_hash(key) & (len(self._vBucketMap) - 1)
+        self._vBucketMap_lock.acquire()
+        r = crc32.crc32_hash(key) & (len(self._vBucketMap) - 1)
+        self._vBucketMap_lock.release()
+        return r
 
     def done(self):
         if self.dispatcher:

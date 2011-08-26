@@ -19,7 +19,7 @@ import uuid
 import json
 import time
 from copy import deepcopy
-from threading import Thread
+from threading import Thread, Lock
 import urllib
 
 import logging
@@ -33,11 +33,15 @@ logging.disable(logging.ERROR)
 class Server(object):
     def __init__(self, host, username, password):
         server = {'ip':host.split(':')[0],
-                  'port':host.split(':')[1]}
+                  'port':host.split(':')[1],
+                  'username':username,
+                  'password':password
+                  }
         if server['ip'] == server['port']:
             server['port'] = 8091
 
         self.servers = [server]
+        self.servers_lock = Lock()
 
         self.rest_username = username
         self.rest_password = password
@@ -49,8 +53,11 @@ class Server(object):
 
     def _start_streaming(self):
         # this will dynamically update servers
-        while self.servers:
+        current_servers = True
+        while current_servers:
+            self.servers_lock.acquire()
             current_servers = deepcopy(self.servers)
+            self.servers_lock.release()
             for server in current_servers:
                 url = "http://{0}:{1}/poolsStreaming/default".format(server["ip"], server["port"])
                 f = urllib.urlopen(url)
@@ -81,7 +88,10 @@ class Server(object):
                                                 "password":self.rest_password,
                                                 })
                     new_servers.sort()
+                    self.servers_lock.acquire()
                     self.servers = deepcopy(new_servers)
+                    self.servers_lock.release()
+
 
 
     def bucket(self, bucket_name):
@@ -135,7 +145,9 @@ class Server(object):
 
 
     def _rest(self):
-        server_info = self.servers[0]
+        self.servers_lock.acquire()
+        server_info = deepcopy(self.servers[0])
+        self.servers_lock.release()
         server_info['username'] = self.rest_username
         server_info['password'] = self.rest_password
         rest = RestConnection(server_info)
@@ -143,7 +155,10 @@ class Server(object):
 
 
     def _rest_info(self):
-        return self.servers[0]['ip'], self.servers[0]['port'], self.servers[0]['username'], self.servers[0]['password']
+        self.servers_lock.acquire()
+        server_info = deepcopy(self.servers[0])
+        self.servers_lock.release()
+        return server_info['ip'], server_info['port'], server_info['username'], server_info['password']
 
 
 
