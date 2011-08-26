@@ -173,7 +173,7 @@ class Bucket(object):
         self.bucket_password = rest.get_bucket(bucket_name).saslPassword
 
         ip, port, rest_username, rest_password = server._rest_info()
-        self.mc_client = VBucketAwareCouchbaseClient("http://{0}:{1}/pools/default".format(ip, port), self.bucket_name, rest_username, rest_password)
+        self.mc_client = VBucketAwareCouchbaseClient("http://{0}:{1}/pools/default".format(ip, port), self.bucket_name, self.bucket_password)
 
 
     def append(self, key, value, cas=0):
