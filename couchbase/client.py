@@ -53,6 +53,8 @@ class Server(object):
 
     def _start_streaming(self):
         # this will dynamically update servers
+        urlopener = urllib.FancyURLopener()
+        urlopener.prompt_user_passwd = lambda host, realm: (self.rest_username, self.rest_password)
         current_servers = True
         while current_servers:
             self.servers_lock.acquire()
@@ -60,7 +62,7 @@ class Server(object):
             self.servers_lock.release()
             for server in current_servers:
                 url = "http://{0}:{1}/poolsStreaming/default".format(server["ip"], server["port"])
-                f = urllib.urlopen(url)
+                f = urlopener.open(url)
                 while f:
                     try:
                         d = f.readline()
