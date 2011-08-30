@@ -23,6 +23,7 @@ class CouchbaseHttpExceptionTypes(object):
     NODE_CANT_ADD_TO_ITSELF=1003
     BUCKET_CREATION_ERROR = 1004
     STATS_UNAVAILABLE = 1005
+    BUCKET_UNAVAILABLE = 1006
 
 class MemcachedTimeoutException(Exception):
     def __init__(self, item, timeout):
@@ -67,13 +68,26 @@ class UnauthorizedException(CouchbaseHttpException):
         self.type = CouchbaseHttpExceptionTypes.UNAUTHORIZED
 
 class BucketCreationException(CouchbaseHttpException):
-    def __init__(self,ip = '',bucket_name = ''):
+    def __init__(self,ip = '',bucket_name = '', error = ''):
         self.parameters = dict()
         self.parameters['host'] = ip
         self.parameters['bucket'] = bucket_name
         self.type = CouchbaseHttpExceptionTypes.BUCKET_CREATION_ERROR
         self._message = 'unable to create bucket {0} on the host @ {1}'\
             .format(bucket_name,ip)
+        if error:
+            self._message += ' due to error: ' + error
+
+class BucketUnavailableException(CouchbaseHttpException):
+    def __init__(self,ip = '',bucket_name = '', error = ''):
+        self.parameters = dict()
+        self.parameters['host'] = ip
+        self.parameters['bucket'] = bucket_name
+        self.type = CouchbaseHttpExceptionTypes.BUCKET_UNAVAILABLE
+        self._message = 'unable to find bucket {0} on the host @ {1}'\
+            .format(bucket_name,ip)
+        if error:
+            self._message += ' due to error: ' + error
 
 class StatsUnavailableException(CouchbaseHttpException):
     def __init__(self):

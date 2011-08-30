@@ -23,7 +23,7 @@ import socket
 import time
 import logger
 from exception import ServerAlreadyJoinedException, ServerUnavailableException, InvalidArgumentException
-from exception import BucketCreationException, ServerJoinException
+from exception import BucketCreationException, ServerJoinException, BucketUnavailableException
 
 log = logger.logger("rest_client")
 #helper library methods built on top of RestConnection interface
@@ -179,7 +179,7 @@ class RestConnection(object):
 
         json_parsed = json.loads(content)
 
-        if status == False:
+        if not status == True:
             raise Exception("unable to create view")
 
         return json_parsed
@@ -198,7 +198,7 @@ class RestConnection(object):
 
         json_parsed = json.loads(content)
 
-        if status == False:
+        if not status == True:
             raise Exception("unable to obtain view results")
 
         return json_parsed
@@ -211,7 +211,7 @@ class RestConnection(object):
 
         json_parsed = json.loads(content)
 
-        if status == False:
+        if not status == True:
             raise Exception("unable to get the view definition")
 
         return json_parsed
@@ -224,7 +224,7 @@ class RestConnection(object):
 
         json_parsed = json.loads(content)
 
-        if status == False:
+        if not status == True:
             raise Exception("unable to create view")
 
         return json_parsed
@@ -241,7 +241,7 @@ class RestConnection(object):
 
         json_parsed = json.loads(content)
 
-        if status == False:
+        if not status == True:
             raise Exception("unable to delete the view")
 
         return json_parsed
@@ -276,10 +276,16 @@ class RestConnection(object):
                     except:
                         json_parsed = {}
                     reason = "unknown"
+                    status = False
                     if "error" in json_parsed:
                         reason = json_parsed["error"]
+                        status = reason
+                    elif "errors" in json_parsed:
+                        errors = [error for _,error in json_parsed["errors"].iteritems()]
+                        reason = ", ".join(errors)
+                        status = reason
                     log.error('{0} error {1} reason: {2} {3}'.format(api, response['status'], reason, content))
-                    return False, content
+                    return status, content
             except socket.error as e:
                 log.error(e)
                 if time.time() > end_time:
@@ -300,6 +306,8 @@ class RestConnection(object):
         log.info('settings/web params : {0}'.format(params))
 
         status, content = self._http_request(api, 'POST', params)
+        if not status == True:
+            return False
         return status
 
 
@@ -312,6 +320,8 @@ class RestConnection(object):
         log.info('settings/web params : {0}'.format(params))
 
         status, content = self._http_request(api, 'POST', params)
+        if not status == True:
+            return False
         return status
 
 
@@ -326,6 +336,8 @@ class RestConnection(object):
         log.info('pools/default params : {0}'.format(params))
 
         status, content = self._http_request(api, 'POST', params)
+        if not status == True:
+            return False
         return status
 
 
@@ -407,6 +419,8 @@ class RestConnection(object):
         else:
             log.error('fail_over error : {0}'.format(content))
 
+        if not status == True:
+            return False
         return status
 
 
@@ -446,6 +460,8 @@ class RestConnection(object):
             raise InvalidArgumentException('controller/rebalance',
                                            parameters=params)
 
+        if not status == True:
+            return False
         return status
 
 
@@ -524,7 +540,7 @@ class RestConnection(object):
 
         status, content = self._http_request(api, 'POST', post)
 
-        if status == False:
+        if not status == True:
             log.error('unable to logClientError')
 
 
@@ -699,6 +715,8 @@ class RestConnection(object):
         if status == True:
             bucketInfo = RestParser().parse_get_bucket_response(content)
             # log.debug('set stats to {0}'.format(bucketInfo.stats.ram))
+        else:
+            raise BucketUnavailableException(ip=self.ip, bucket_name=bucket, error=status)
 
         return bucketInfo
 
@@ -711,6 +729,8 @@ class RestConnection(object):
         api = '{0}{1}{2}'.format(self.baseUrl, '/pools/default/buckets/', bucket)
 
         status, content = self._http_request(api, 'DELETE')
+        if not status == True:
+            return False
         return status
 
 
@@ -757,8 +777,8 @@ class RestConnection(object):
 
         status, content = self._http_request(api, 'POST', params)
 
-        if not status:
-            raise BucketCreationException(ip=self.ip, bucket_name=bucket)
+        if not status == True:
+            raise BucketCreationException(ip=self.ip, bucket_name=bucket, error=status)
 
         return status
 
@@ -794,6 +814,8 @@ class RestConnection(object):
         log.info('settings/autoFailover params : {0}'.format(params))
 
         status, content = self._http_request(api, 'POST', params)
+        if not status == True:
+            return False
         return status
 
 
@@ -801,6 +823,8 @@ class RestConnection(object):
         api = self.baseUrl + 'settings/autoFailover/resetCount'
 
         status, content = self._http_request(api, 'POST', '')
+        if not status == True:
+            return False
         return status
 
 
@@ -818,6 +842,8 @@ class RestConnection(object):
         log.info('settings/alerts params : {0}'.format(params))
 
         status, content = self._http_request(api, 'POST', params)
+        if not status == True:
+            return False
         return status
 
 
@@ -827,6 +853,8 @@ class RestConnection(object):
         log.info('settings/alerts params : {0}'.format(params))
 
         status, content = self._http_request(api, 'POST', params)
+        if not status == True:
+            return False
         return status
 
 
@@ -834,6 +862,8 @@ class RestConnection(object):
         api = self.baseUrl + '/controller/stopRebalance'
 
         status, content = self._http_request(api, 'POST')
+        if not status == True:
+            return False
         return status
 
 
@@ -843,6 +873,8 @@ class RestConnection(object):
         log.info('/nodes/self/controller/settings params : {0}'.format(params))
 
         status, content = self._http_request(api, 'POST', params)
+        if not status == True:
+            return False
         return status
 
 
