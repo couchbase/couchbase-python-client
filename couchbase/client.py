@@ -265,6 +265,9 @@ class Bucket(object):
             rest = self.server._rest()
             rest.create_view(self.bucket_name, view, json.dumps(value))
         else:
+            if '_rev' in value:
+                # couchbase works in clobber mode so for a "set" _rev is useless
+                del value['_rev']
             self.set(key, expiration, flags, json.dumps(value))
 
         return key
