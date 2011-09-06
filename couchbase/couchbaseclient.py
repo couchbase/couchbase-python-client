@@ -1086,7 +1086,7 @@ class CommandDispatcher(object):
             item["event"].set()
         elif item["operation"] == "incr":
             key = item["key"]
-            amount = item["amount"]
+            amount = item["amt"]
             init = item["init"]
             expiry = item["expiry"]
             try:
@@ -1096,7 +1096,7 @@ class CommandDispatcher(object):
             item["event"].set()
         elif item["operation"] == "decr":
             key = item["key"]
-            amount = item["amount"]
+            amount = item["amt"]
             init = item["init"]
             expiry = item["expiry"]
             try:
