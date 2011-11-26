@@ -24,7 +24,7 @@ import hmac
 import socket
 import random
 import exceptions
-import crc32
+import zlib
 import struct
 import urllib
 import json
@@ -309,10 +309,12 @@ class MemcachedClient(object):
     def _cat(self, cmd, key, cas, val):
         return self._doCmd(cmd, key, val, '', cas)
 
-    def append(self, key, value, cas=0):
+    def append(self, key, value, cas=0,vbucket=-1):
+        self._set_vbucket_id(key, vbucket)
         return self._cat(MemcachedConstants.CMD_APPEND, key, cas, value)
 
-    def prepend(self, key, value, cas=0):
+    def prepend(self, key, value, cas=0,vbucket=-1):
+        self._set_vbucket_id(key, vbucket)
         return self._cat(MemcachedConstants.CMD_PREPEND, key, cas, value)
 
     def __incrdecr(self, cmd, key, amt, init, exp):
@@ -320,28 +322,35 @@ class MemcachedClient(object):
                                           struct.pack(MemcachedConstants.INCRDECR_PKT_FMT, amt, init, exp))
         return struct.unpack(MemcachedConstants.INCRDECR_RES_FMT, val)[0], cas
 
-    def incr(self, key, amt=1, init=0, exp=0):
+    def incr(self, key, amt=1, init=0, exp=0,vbucket=-1):
+        self._set_vbucket_id(key, vbucket)
         """Increment or create the named counter."""
         return self.__incrdecr(MemcachedConstants.CMD_INCR, key, amt, init, exp)
 
-    def decr(self, key, amt=1, init=0, exp=0):
+    def decr(self, key, amt=1, init=0, exp=0,vbucket=-1):
+        self._set_vbucket_id(key, vbucket)
         """Decrement or create the named counter."""
         return self.__incrdecr(MemcachedConstants.CMD_DECR, key, amt, init, exp)
 
-    def set(self, key, exp, flags, val, vbucket=-1):
-        """Set a value in the memcached server."""
+    def _set_vbucket_id(self,key,vbucket):
         if vbucket == -1:
-            self.vbucketId = crc32.crc32_hash(key) & (self.vbucket_count - 1)
+            self.vbucketId = (zlib.crc32(key) >> 16) & (self.vbucket_count - 1)
         else:
             self.vbucketId = vbucket
+
+    def set(self, key, exp, flags, val, vbucket=-1):
+        """Set a value in the memcached server."""
+        self._set_vbucket_id(key, vbucket)
         return self._mutate(MemcachedConstants.CMD_SET, key, exp, flags, 0, val)
 
-    def add(self, key, exp, flags, val):
+    def add(self, key, exp, flags, val,vbucket=-1):
         """Add a value in the memcached server iff it doesn't already exist."""
+        self._set_vbucket_id(key, vbucket)
         return self._mutate(MemcachedConstants.CMD_ADD, key, exp, flags, 0, val)
 
-    def replace(self, key, exp, flags, val):
+    def replace(self, key, exp, flags, val,vbucket=-1):
         """Replace a value in the memcached server iff it already exists."""
+        self._set_vbucket_id(key, vbucket)
         return self._mutate(MemcachedConstants.CMD_REPLACE, key, exp, flags, 0,
                             val)
 
@@ -351,32 +360,33 @@ class MemcachedClient(object):
 
     def get(self, key, vbucket=-1):
         """Get the value for a given key within the memcached server."""
-        if vbucket == -1:
-            self.vbucketId = crc32.crc32_hash(key) & (self.vbucket_count - 1)
-        else:
-            self.vbucketId = vbucket
+        self._set_vbucket_id(key, vbucket)
         parts = self._doCmd(MemcachedConstants.CMD_GET, key, '')
 
         return self.__parseGet(parts)
 
-    def getl(self, key, exp=15):
+    def getl(self, key, exp=15,vbucket=-1):
         """Get the value for a given key within the memcached server."""
+        self._set_vbucket_id(key, vbucket)
         parts = self._doCmd(MemcachedConstants.CMD_GET_LOCKED, key, '',
                             struct.pack(MemcachedConstants.GETL_PKT_FMT, exp))
         return self.__parseGet(parts)
 
-    def cas(self, key, exp, flags, oldVal, val):
+    def cas(self, key, exp, flags, oldVal, val,vbucket=-1):
         """CAS in a new value for the given key and comparison value."""
+        self._set_vbucket_id(key, vbucket)
         self._mutate(MemcachedConstants.CMD_SET, key, exp, flags,
                      oldVal, val)
 
-    def touch(self, key, exp):
+    def touch(self, key, exp,vbucket=-1):
         """Touch a key in the memcached server."""
+        self._set_vbucket_id(key, vbucket)
         return self._doCmd(MemcachedConstants.CMD_TOUCH, key, '',
                            struct.pack(MemcachedConstants.TOUCH_PKT_FMT, exp))
 
-    def gat(self, key, exp):
+    def gat(self, key, exp,vbucket=-1):
         """Get the value for a given key and touch it within the memcached server."""
+        self._set_vbucket_id(key, vbucket)
         parts = self._doCmd(MemcachedConstants.CMD_GAT, key, '',
                             struct.pack(MemcachedConstants.GAT_PKT_FMT, exp))
         return self.__parseGet(parts)
@@ -387,6 +397,7 @@ class MemcachedClient(object):
 
     def sasl_mechanisms(self):
         """Get the supported SASL methods."""
+
         return set(self._doCmd(MemcachedConstants.CMD_SASL_LIST_MECHS,
                                '', '')[2].split(' '))
 
@@ -503,8 +514,7 @@ class MemcachedClient(object):
 
     def delete(self, key, cas=0, vbucket=-1):
         """Delete the value for a given key within the memcached server."""
-        if vbucket == -1:
-            self.vbucketId = crc32.crc32_hash(key) & (self.vbucket_count - 1)
+        self._set_vbucket_id(key, vbucket)
         return self._doCmd(MemcachedConstants.CMD_DELETE, key, '', '', cas)
 
     def flush(self, timebomb=0):
@@ -770,7 +780,7 @@ class VBucketAwareCouchbaseClient(object):
     def memcached(self, key, fastforward=False):
         self._vBucketMap_lock.acquire()
         self._vBucketMapFastForward_lock.acquire()
-        vBucketId = crc32.crc32_hash(key) & (len(self._vBucketMap) - 1)
+        vBucketId = (zlib.crc32(key) >> 16) & (len(self._vBucketMap) - 1)
 
         if fastforward and vBucketId in self._vBucketMapFastForward:
             # only try the fastforward if we have an entry
@@ -795,7 +805,7 @@ class VBucketAwareCouchbaseClient(object):
 
     def vbucketid(self, key):
         self._vBucketMap_lock.acquire()
-        r = crc32.crc32_hash(key) & (len(self._vBucketMap) - 1)
+        r = (zlib.crc32(key) >> 16) & (len(self._vBucketMap) - 1)
         self._vBucketMap_lock.release()
         return r
 
@@ -1102,7 +1112,7 @@ class CommandDispatcher(object):
             item["event"].set()
         elif item["operation"] == "incr":
             key = item["key"]
-            amount = item["amt"]
+            amount = item["amount"]
             init = item["init"]
             expiry = item["expiry"]
             try:
@@ -1112,7 +1122,7 @@ class CommandDispatcher(object):
             item["event"].set()
         elif item["operation"] == "decr":
             key = item["key"]
-            amount = item["amt"]
+            amount = item["amount"]
             init = item["init"]
             expiry = item["expiry"]
             try:
