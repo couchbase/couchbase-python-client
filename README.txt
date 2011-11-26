@@ -116,3 +116,5 @@ the unified client::
 
 
 This version requires Python 2.6 or later
+
+Open Issues : http://www.couchbase.org/issues/browse/PYCBC
