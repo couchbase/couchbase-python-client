@@ -871,6 +871,13 @@ class VBucketAwareCouchbaseClient(object):
         self.dispatcher.put(item)
         return self._respond(item, event)
 
+    def append(self, key, value, cas=0):
+        event = Event()
+        item = {"operation": "append", "key": key, "cas": cas, "value": value, "event": event,
+                "response": {}}
+        self.dispatcher.put(item)
+        return self._respond(item, event)
+
     def delete(self, key, cas=0):
         event = Event()
         item = {"operation": "delete", "key": key, "cas": cas, "event": event,
@@ -1057,6 +1064,15 @@ class CommandDispatcher(object):
             value = item["value"]
             try:
                 item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).prepend(key, value, cas)
+            except Exception as ex:
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
+        elif item["operation"] == "append":
+            key = item["key"]
+            cas = item["cas"]
+            value = item["value"]
+            try:
+                item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).append(key, value, cas)
             except Exception as ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
