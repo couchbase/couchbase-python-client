@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+# to run :
+# couchbase/utils/pycouchtests.py -h
 
 import random
 from threading import Thread
@@ -26,6 +28,7 @@ from optparse import OptionParser
 from couchbase.util import ProgressBar, StringUtil
 import sys
 
+sys.path.append(".")
 class SharedProgressBar(object):
     def __init__(self, number_of_items):
         self.bar = ProgressBar(0, number_of_items, 77)
@@ -64,6 +67,8 @@ class SmartLoader(object):
         v = None
         try:
             options = self._options
+            if not options.password:
+                options.password = ""
             v = VBucketAwareCouchbaseClient(self._server, options.bucket, options.password, options.verbose)
             number_of_items = (int(options.items) / int(options.num_of_threads))
             value = StringUtil.create_value("*", int(options.value_size))
