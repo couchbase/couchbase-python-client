@@ -6,6 +6,7 @@ from migrator_csv import CSVReader, CSVWriter
 from migrator_json import JSONReader, JSONWriter
 from migrator_couchdb import CouchdbReader, CouchdbWriter
 from migrator_couchbase import CouchbaseReader, CouchbaseWriter
+from migrator_dir import DirReader, DirWriter
 
 sources = []
 destinations = []
@@ -14,11 +15,13 @@ sources.extend(migrator_couchbase.sources)
 sources.extend(migrator_csv.sources)
 sources.extend(migrator_json.sources)
 sources.extend(migrator_couchdb.sources)
+sources.extend(migrator_dir.sources)
 
 destinations.extend(migrator_couchbase.destinations)
 destinations.extend(migrator_csv.destinations)
 destinations.extend(migrator_json.destinations)
 destinations.extend(migrator_couchdb.destinations)
+destinations.extend(migrator_dir.destinations)
 
 def reader(loc):
     kind, fp = loc.split(':', 1)
@@ -30,6 +33,8 @@ def reader(loc):
         return CouchdbReader(fp)
     elif kind.lower() == 'couchbase':
         return CouchbaseReader(fp)
+    elif kind.lower() == 'dir':
+        return DirReader(fp)
 
 def writer(loc):
     kind, fp = loc.split(':', 1)
@@ -41,3 +46,5 @@ def writer(loc):
         return CouchdbWriter(fp)
     elif kind.lower() == 'couchbase':
         return CouchbaseWriter(fp)
+    elif kind.lower() == 'dir':
+        return DirWriter(fp)
