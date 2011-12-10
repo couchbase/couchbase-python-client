@@ -262,7 +262,7 @@ class Bucket(object):
         else:
             flags = 0
         if '$expiration' in value:
-            flags = value['$expiration']
+            expiration = value['$expiration']
             del value['$expiration']
         else:
             expiration = 0
