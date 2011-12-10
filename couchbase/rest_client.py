@@ -192,7 +192,7 @@ class RestConnection(object):
         if limit != None:
             api += "?limit={0}".format(limit)
         for param in params:
-            api += "&{0}={1}".format(param, params[param])
+            api += "&{0}={1}".format(param, json.dumps(params[param]))
 
         status, content = self._http_request(api, headers=self._create_capi_headers())
 
