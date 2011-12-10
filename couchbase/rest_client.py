@@ -187,7 +187,10 @@ class RestConnection(object):
 
     #http://10.1.6.108:8091/couchBase/bucket-0/_design/dev_6ca50/_view/dev_6ca50?limit=10&_=1311107815807
     def view_results(self, bucket, view, name, params, limit=100):
-        view_query = 'couchBase/{0}/_design/{1}/_view/{2}'
+        if name:
+            view_query = 'couchBase/{0}/_design/{1}/_view/{2}'
+        else:
+            view_query = 'couchBase/{0}/{1}'
         api = self.baseUrl + view_query.format(bucket, view, name)
         num_params = 0
         if limit != None:
@@ -199,7 +202,10 @@ class RestConnection(object):
             else:
                 api += "?"
             num_params += 1
-            if param in ["key", "startkey", "endkey"]:
+            if param in ["key", "startkey", "endkey",
+                         "startkey_docid", "endkey_docid"] or \
+                         params[param] is True or \
+                         params[param] is False:
                 api += "{0}={1}".format(param, json.dumps(params[param]))
             else:
                 api += "{0}={1}".format(param, params[param])
@@ -209,7 +215,7 @@ class RestConnection(object):
         json_parsed = json.loads(content)
 
         if not status == True:
-            raise Exception("unable to obtain view results")
+            raise Exception("unable to obtain view results for " + api + "\n"+ `status` + "\n" + content)
 
         return json_parsed
 

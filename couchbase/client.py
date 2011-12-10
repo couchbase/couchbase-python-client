@@ -300,9 +300,13 @@ class Bucket(object):
             limit = params['limit']
             del params['limit']
 
-        view_s = view.split('/')
-        view_doc = view_s[1]
-        view_map = view_s[3]
+        if view.startswith("_design/"):
+            view_s = view.split('/')
+            view_doc = view_s[1]
+            view_map = view_s[3]
+        else:
+            view_doc = view
+            view_map = None
 
         rest = self.server._rest()
         results = rest.view_results(self.bucket_name, view_doc, view_map, params, limit)
