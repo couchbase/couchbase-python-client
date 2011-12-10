@@ -239,7 +239,14 @@ class Bucket(object):
         return self.mc_client.stats(sub)
 
     def delete(self, key, cas=0):
-        return self.mc_client.delete(key, cas)
+        if key.startswith('_design/'):
+            # this is a design doc, we need to handle it differently
+            view = key.split('/')[1]
+
+            rest = self.server._rest()
+            rest.delete_view(self.bucket_name, view)
+        else:
+            return self.mc_client.delete(key, cas)
 
 
     def save(self, document):
