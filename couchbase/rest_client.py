@@ -254,8 +254,11 @@ class RestConnection(object):
 
     #authorization must be a base64 string of username:password
     def _create_headers(self):
-        authorization = base64.encodestring('%s:%s' % (self.username, self.password))
-        return {'Content-Type': 'application/x-www-form-urlencoded',
+        if self.username == "default":
+            return {'Content-Type': 'application/json', 'Accept': '*/*'}
+        else:
+            authorization = base64.encodestring('%s:%s' % (self.username, self.password))
+            return {'Content-Type': 'application/x-www-form-urlencoded',
                 'Authorization': 'Basic %s' % authorization,
                 'Accept': '*/*'}
 
@@ -263,7 +266,6 @@ class RestConnection(object):
     def _http_request(self, api, method='GET', params='', headers=None, timeout=120):
         if not headers:
             headers=self._create_headers()
-
         end_time = time.time() + timeout
         while True:
             try:
@@ -709,7 +711,6 @@ class RestConnection(object):
     def get_bucket(self, bucket='default'):
         bucketInfo = None
         api = '{0}{1}{2}'.format(self.baseUrl, 'pools/default/buckets/', bucket)
-
         status, content = self._http_request(api)
 
         if status == True:
