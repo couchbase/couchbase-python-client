@@ -1,11 +1,15 @@
 
 sources=[{'type':'couchdb','class':'CouchdbReader','example':'couchdb:example.com:5984/database'}]
-destinations=[]
+destinations=[{'type':'couchdb','class':'CouchdbWriter','example':'couchdb:example.com:5984/database'}]
 
 import re
 import json
 
-import couchdb
+try:
+    import couchdb
+except:
+    sources=[]
+    destinations=[]
 
 import migrator
 
@@ -39,4 +43,18 @@ class CouchdbReader(migrator.Reader):
 
 
 class CouchdbWriter(migrator.Writer):
-    pass
+    def __init__(self, destination):
+        # example.com:5984/database
+
+        m = re.match('^([^:]+):([^/]+)/(.+)$', destination)
+        self.host = m.group(1)
+        self.port = m.group(2)
+        self.database = m.group(3)
+
+        self.couch = couchdb.Server('http://{0}:{1}'.format(self.host,self.port))
+        self.db = self.couch[self.database]
+
+    def write(self, record):
+        record_save = record['value']
+        record_save['_id'] = record['id']
+        self.db.save(record_save)
