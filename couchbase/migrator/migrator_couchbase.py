@@ -60,14 +60,14 @@ class CouchbaseWriter(migrator.Writer):
         for i in range(5):
             try:
                 # todo: check for timeout and flags
-                self.client.set(str(record['id']), 0, 0, json.dumps(record['value']))
+                self.client.set(str(record['id'].encode('utf-8')), 0, 0, json.dumps(record['value']))
                 return
             except MemcachedTimeoutException as e:
                 pass
             except:
                 self.client.done()
                 self.client = VBucketAwareCouchbaseClient(self.server, self.bucket, self.password, self.verbose)
-        print 'unable to set key {0}'.format(str(record['id']))
+        print 'unable to set key {0}'.format(str(record['id'].encode('utf-8')))
 
     def close(self):
         self.client.done()
