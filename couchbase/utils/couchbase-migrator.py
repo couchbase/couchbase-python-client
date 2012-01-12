@@ -54,32 +54,6 @@ Options:
         print "     " + destination['example']
         print
 
-        """
-Sources:
- json
-     [json:]<filename>
- csv
-     [csv:]<filename>
- sqlite
-     [sqlite:]<filename>
- couchdb
-     [couchdb:]example.com:5984/database
- couchbase
-     [couchbase:]username:password@example.com:8091/bucket
- membase
-     [membase:]username:password@example.com:8091/bucket
- membase-sqlite
-     [membase-sqlite:]<dirname>
- memcached
-     [memcached:]bucket:password@example.com:11211
-
-Destinations:
- json
-     [json:]<filename>
- couchbase
-     [couchbase:]username:password@example.com:8091/bucket
-"""
-
     sys.exit(r)
 
 class Config(object):
