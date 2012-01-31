@@ -1,5 +1,5 @@
-sources=[{'type':'json','class':'JSONReader','example':'json:<filename>'}]
-destinations=[{'type':'json','class':'JSONWriter','example':'json:<filename>'}]
+sources=[{'type':'json','class':'JSONReader','example':'json://<filename>'}]
+destinations=[{'type':'json','class':'JSONWriter','example':'json://<filename>'}]
 
 import json
 
@@ -7,6 +7,8 @@ import migrator
 
 class JSONReader(migrator.Reader):
     def __init__(self, source):
+        if source[0:2] == "//":
+            source = source[2:]
         self.reader = open(source, 'rb')
 
     def __iter__(self):
@@ -28,6 +30,8 @@ class JSONReader(migrator.Reader):
 
 class JSONWriter(migrator.Writer):
     def __init__(self, destination):
+        if destination[0:2] == "//":
+            destination = destination[2:]
         self.file = open(destination, 'w')
 
     def write(self, record):

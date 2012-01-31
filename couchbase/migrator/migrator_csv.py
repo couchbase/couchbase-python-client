@@ -1,4 +1,4 @@
-sources=[{'type':'csv','class':'CSVReader','example':'csv:<filename>'}]
+sources=[{'type':'csv','class':'CSVReader','example':'csv://<filename>'}]
 destinations=[]
 
 import csv
@@ -7,6 +7,8 @@ import migrator
 
 class CSVReader(migrator.Reader):
     def __init__(self, source):
+        if source[0:2] == "//":
+            source = source[2:]
         self.reader = csv.DictReader(open(source, 'rb'))
         self.reader.fieldnames[0] = 'id'
 

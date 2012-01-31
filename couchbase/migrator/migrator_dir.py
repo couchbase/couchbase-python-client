@@ -9,8 +9,8 @@
 # writes out items that have _id: _design/* to <dir>/design_docs
 # writes out all other items to <dir>/docs
 
-sources=[{'type':'dir','class':'DirReader','example':'dir:<directory>'}]
-destinations=[{'type':'dir','class':'DirWriter','example':'dir:<directory>'}]
+sources=[{'type':'dir','class':'DirReader','example':'dir://<directory>'}]
+destinations=[{'type':'dir','class':'DirWriter','example':'dir://<directory>'}]
 
 import os
 import json
@@ -19,6 +19,8 @@ import migrator
 
 class DirReader(migrator.Reader):
     def __init__(self, source):
+        if source[0:2] == "//":
+            source = source[2:]
         self.dir = os.path.expanduser(source)
         self.files = self._get_filenames()
 
@@ -89,6 +91,8 @@ class DirReader(migrator.Reader):
 
 class DirWriter(migrator.Writer):
     def __init__(self, destination):
+        if destination[0:2] == "//":
+            destination = destination[2:]
         self.dir = os.path.expanduser(destination)
         try:
             os.makedirs(os.path.join(destination,"docs"))

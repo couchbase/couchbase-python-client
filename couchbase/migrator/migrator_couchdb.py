@@ -1,9 +1,10 @@
 
-sources=[{'type':'couchdb','class':'CouchdbReader','example':'couchdb:example.com:5984/database'}]
-destinations=[{'type':'couchdb','class':'CouchdbWriter','example':'couchdb:example.com:5984/database'}]
+sources=[{'type':'couchdb','class':'CouchdbReader','example':'couchdb://example.com:5984/database'}]
+destinations=[{'type':'couchdb','class':'CouchdbWriter','example':'couchdb://example.com:5984/database'}]
 
 import re
 import json
+from urlparse import urlparse
 
 try:
     import couchdb
@@ -15,11 +16,11 @@ import migrator
 
 class CouchdbReader(migrator.Reader):
     def __init__(self, source):
-        # example.com:5984/database
-        m = re.match('^([^:]+):([^/]+)/(.+)$', source)
-        self.host = m.group(1)
-        self.port = m.group(2)
-        self.database = m.group(3)
+        # couchdb://example.com:5984/database
+        url = urlparse(source)
+        self.host = url.hostname
+        self.port = url.port
+        self.database = url.path[1:]
 
         self.couch = couchdb.Server('http://{0}:{1}'.format(self.host,self.port))
         self.db = self.couch[self.database]
@@ -44,12 +45,11 @@ class CouchdbReader(migrator.Reader):
 
 class CouchdbWriter(migrator.Writer):
     def __init__(self, destination):
-        # example.com:5984/database
-
-        m = re.match('^([^:]+):([^/]+)/(.+)$', destination)
-        self.host = m.group(1)
-        self.port = m.group(2)
-        self.database = m.group(3)
+        # couchdb://example.com:5984/database
+        url = urlparse(destination)
+        self.host = url.hostname
+        self.port = url.port
+        self.database = url.path[1:]
 
         self.couch = couchdb.Server('http://{0}:{1}'.format(self.host,self.port))
         self.db = self.couch[self.database]

@@ -1,9 +1,10 @@
 
 sources=[]
-destinations=[{'type':'couchbase','class':'CouchbaseWriter','example':'couchbase:bucket:password@example.com:8091/bucket'}]
+destinations=[{'type':'couchbase','class':'CouchbaseWriter','example':'couchbase://bucket:password@example.com:8091/bucket'}]
 
 import re
 import json
+from urlparse import urlparse
 
 from couchbase.couchbaseclient import VBucketAwareCouchbaseClient, MemcachedTimeoutException
 #import mc_bin_client
@@ -12,13 +13,13 @@ import migrator
 
 class CouchbaseReader(migrator.Reader):
     def __init__(self, source):
-        # username:password@example.com:8091/bucket
-        m = re.match('^([^:]+):([^@]*)@([^:]+):([^/]+)/(.+)$', source)
-        self.username = m.group(1)
-        self.password = m.group(2)
-        self.host = m.group(3)
-        self.port = m.group(4)
-        self.bucket = m.group(5)
+        # couchbase://username:password@example.com:8091/bucket
+        url = urlparse(source)
+        self.username = url.username
+        self.password = url.password
+        self.host = url.hostname
+        self.port = url.port
+        self.bucket = url.path[1:]
 
         self.bucket_port = 11211
         self.bucket_password = ''
@@ -39,13 +40,13 @@ class CouchbaseReader(migrator.Reader):
 
 class CouchbaseWriter(migrator.Writer):
     def __init__(self, destination):
-        # username:password@example.com:8091/bucket
-        m = re.match('^([^:]+):([^@]*)@([^:]+):([^/]+)/(.+)$', destination)
-        self.username = m.group(1)
-        self.password = m.group(2)
-        self.host = m.group(3)
-        self.port = m.group(4)
-        self.bucket = m.group(5)
+        # couchbase://username:password@example.com:8091/bucket
+        url = urlparse(destination)
+        self.username = url.username
+        self.password = url.password
+        self.host = url.hostname
+        self.port = url.port
+        self.bucket = url.path[1:]
 
         self.bucket_port = 11211
         self.bucket_password = ''
