@@ -4,6 +4,7 @@ destinations=[{'type':'couchdb','class':'CouchdbWriter','example':'couchdb://exa
 
 import re
 import json
+import urllib
 from urlparse import urlparse
 
 try:
@@ -22,25 +23,29 @@ class CouchdbReader(migrator.Reader):
         self.port = url.port
         self.database = url.path[1:]
 
+        self.page_limit = 100
+
         self.couch = couchdb.Server('http://{0}:{1}'.format(self.host,self.port))
         self.db = self.couch[self.database]
-        self.rows = list(self.db.view('_all_docs'))
+
+        self.items = list(self.db.view('_all_docs', limit=self.page_limit+1, include_docs=True))
 
     def __iter__(self):
         return self
 
     def next(self):
-        if not self.rows:
+        if len(self.items) < 1:
             raise StopIteration()
+        elif len(self.items) == 1:
+            next_startkey = self.items[0]['key'].replace('"','\\"').encode('utf-8')
+            next_startkey_docid = self.items[0]['key'].replace('"','\\"').encode('utf-8')
+            self.items = list(self.db.view('_all_docs', limit=self.page_limit+1, startkey=next_startkey, startkey_docid=next_startkey_docid, include_docs=True))
 
-        data = self.rows.pop()
-        if data:
-            record = {'id':data['id']}
-            record['value'] = dict((k,v) for (k,v) in self.db[data['id']].iteritems() if not k.startswith('_'))
-            return record
-        else:
-            raise StopIteration()
-        raise StopIteration()
+        data = self.items.pop(0)
+
+        record = {'id':data['doc']['_id']}
+        record['value'] = dict((k,v) for (k,v) in data['doc'].iteritems())
+        return record
 
 
 class CouchdbWriter(migrator.Writer):
