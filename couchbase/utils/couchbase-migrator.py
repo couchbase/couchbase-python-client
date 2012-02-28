@@ -3,8 +3,6 @@
 import sys
 import getopt
 
-import couchbase.migrator
-
 #sources: json, csv, sqlite, couchdb, couchbase, membase, memcached, membase-sqlite
 #dest: json (chunked), couchbase
 

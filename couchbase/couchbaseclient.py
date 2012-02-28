@@ -210,6 +210,7 @@ class MemcachedConstants(object):
     ERR_UNKNOWN_CMD = 0x81
     ERR_NOT_FOUND = 0x1
     ERR_EXISTS = 0x2
+    ERR_NOT_STORED = 0x5
     ERR_AUTH = 0x20
     ERR_AUTH_CONTINUE = 0x21
 
@@ -338,10 +339,10 @@ class MemcachedClient(object):
         else:
             self.vbucketId = vbucket
 
-    def set(self, key, exp, flags, val, vbucket=-1):
+    def set(self, key, exp, flags, val, cas=0, vbucket=-1):
         """Set a value in the memcached server."""
         self._set_vbucket_id(key, vbucket)
-        return self._mutate(MemcachedConstants.CMD_SET, key, exp, flags, 0, val)
+        return self._mutate(MemcachedConstants.CMD_SET, key, exp, flags, cas, val)
 
     def add(self, key, exp, flags, val,vbucket=-1):
         """Add a value in the memcached server iff it doesn't already exist."""
@@ -845,7 +846,6 @@ class VBucketAwareCouchbaseClient(object):
         self.dispatcher.put(item)
         return self._respond(item, event)
 
-
     def touch(self, key, expiry):
         event = Event()
         item = {"operation": "touch", "key": key, "expiry": expiry, "event": event,
@@ -867,9 +867,9 @@ class VBucketAwareCouchbaseClient(object):
         self.dispatcher.put(item)
         return self._respond(item, event)
 
-    def set(self, key, expiry, flags, value):
+    def set(self, key, expiry, flags, value, cas=0):
         event = Event()
-        item = {"operation": "set", "key": key, "expiry": expiry, "flags": flags, "value": value, "event": event,
+        item = {"operation": "set", "key": key, "expiry": expiry, "flags": flags, "value": value, "event": event, "cas": cas,
                 "response": {}}
         self.dispatcher.put(item)
         return self._respond(item, event)
@@ -1035,8 +1035,9 @@ class CommandDispatcher(object):
             expiry = item["expiry"]
             flags = item["flags"]
             value = item["value"]
+            cas = item["cas"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).set(key, expiry, flags, value)
+                item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).set(key, expiry, flags, value, cas)
             except Exception as ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
@@ -1130,7 +1131,6 @@ class CommandDispatcher(object):
             except Exception as ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
-
         elif item["operation"] == "cas":
             key = item["key"]
             expiry = item["expiry"]
