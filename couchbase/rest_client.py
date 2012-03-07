@@ -172,7 +172,7 @@ class RestConnection(object):
 
 
     def create_view(self, bucket, view, function):
-        api = self.baseUrl + 'couchBase/{0}/_design/{1}'.format(bucket, view)
+        api = self.baseUrl + '{0}/_design/{1}'.format(bucket, view)
         #check if this view exists and update the rev
 
         status, content = self._http_request(api, 'PUT', function, headers=self._create_capi_headers())
@@ -185,12 +185,12 @@ class RestConnection(object):
         return json_parsed
 
 
-    #http://10.1.6.108:8091/couchBase/bucket-0/_design/dev_6ca50/_view/dev_6ca50?limit=10&_=1311107815807
+    #http://10.1.6.108:8091/bucket-0/_design/dev_6ca50/_view/dev_6ca50?limit=10&_=1311107815807
     def view_results(self, bucket, view, name, params, limit=100):
         if name:
-            view_query = 'couchBase/{0}/_design/{1}/_view/{2}'
+            view_query = '{0}/_design/{1}/_view/{2}'
         else:
-            view_query = 'couchBase/{0}/{1}'
+            view_query = '{0}/{1}'
         api = self.baseUrl + view_query.format(bucket, view, name)
         num_params = 0
         if limit != None:
@@ -221,7 +221,7 @@ class RestConnection(object):
 
 
     def get_view(self, bucket, view):
-        api = self.baseUrl + 'couchBase/{0}/_design/{1}'.format(bucket, view)
+        api = self.baseUrl + '{0}/_design/{1}'.format(bucket, view)
 
         status, content = self._http_request(api, headers=self._create_capi_headers())
 
@@ -234,7 +234,7 @@ class RestConnection(object):
 
 
     def run_view(self,bucket,view,name):
-        api = self.baseUrl + 'couchBase/{0}/_design/{1}/_view/{2}'.format(bucket, view, name)
+        api = self.baseUrl + '{0}/_design/{1}/_view/{2}'.format(bucket, view, name)
 
         status, content = self._http_request(api, headers=self._create_capi_headers())
 
@@ -247,7 +247,7 @@ class RestConnection(object):
 
 
     def delete_view(self,bucket,view):
-        api = self.baseUrl + 'couchBase/{0}/_design/{1}'.format(bucket, view)
+        api = self.baseUrl + '{0}/_design/{1}'.format(bucket, view)
         get_view = self.get_view(bucket,view)
         rev = get_view["_rev"]
         #pass in the rev
