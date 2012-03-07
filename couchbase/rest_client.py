@@ -171,8 +171,8 @@ class RestConnection(object):
         self.baseUrl = "http://{0}:{1}/".format(self.ip, self.port)
 
 
-    def create_view(self, bucket, view, function):
-        api = self.baseUrl + '{0}/_design/{1}'.format(bucket, view)
+    def create_design_doc(self, bucket, design_doc, function):
+        api = self.baseUrl + '{0}/_design/{1}'.format(bucket, design_doc)
         #check if this view exists and update the rev
 
         status, content = self._http_request(api, 'PUT', function, headers=self._create_capi_headers())
@@ -180,18 +180,18 @@ class RestConnection(object):
         json_parsed = json.loads(content)
 
         if not status == True:
-            raise Exception("unable to create view")
+            raise Exception("unable to create design doc")
 
         return json_parsed
 
 
     #http://10.1.6.108:8091/bucket-0/_design/dev_6ca50/_view/dev_6ca50?limit=10&_=1311107815807
-    def view_results(self, bucket, view, name, params, limit=100):
-        if name:
+    def view_results(self, bucket, design_doc, view, params, limit=100):
+        if view:
             view_query = '{0}/_design/{1}/_view/{2}'
         else:
             view_query = '{0}/{1}'
-        api = self.baseUrl + view_query.format(bucket, view, name)
+        api = self.baseUrl + view_query.format(bucket, design_doc, view)
         num_params = 0
         if limit != None:
             num_params = 1
@@ -202,7 +202,7 @@ class RestConnection(object):
             else:
                 api += "?"
             num_params += 1
-            if param in ["key", "startkey", "endkey",
+            if param in ["key", "start_key", "end_key",
                          "startkey_docid", "endkey_docid"] or \
                          params[param] is True or \
                          params[param] is False:
@@ -220,45 +220,45 @@ class RestConnection(object):
         return json_parsed
 
 
-    def get_view(self, bucket, view):
-        api = self.baseUrl + '{0}/_design/{1}'.format(bucket, view)
+    def get_design_doc(self, bucket, design_doc):
+        api = self.baseUrl + '{0}/_design/{1}'.format(bucket, design_doc)
 
         status, content = self._http_request(api, headers=self._create_capi_headers())
 
         json_parsed = json.loads(content)
 
         if not status == True:
-            raise Exception("unable to get the view definition")
+            raise Exception("unable to get design doc")
 
         return json_parsed
 
 
-    def run_view(self,bucket,view,name):
-        api = self.baseUrl + '{0}/_design/{1}/_view/{2}'.format(bucket, view, name)
+    def get_view(self, bucket, design_doc, view):
+        api = self.baseUrl + '{0}/_design/{1}/_view/{2}'.format(bucket, design_doc, view)
 
         status, content = self._http_request(api, headers=self._create_capi_headers())
 
         json_parsed = json.loads(content)
 
         if not status == True:
-            raise Exception("unable to create view")
+            raise Exception("unable to get view")
 
         return json_parsed
 
 
-    def delete_view(self,bucket,view):
-        api = self.baseUrl + '{0}/_design/{1}'.format(bucket, view)
-        get_view = self.get_view(bucket,view)
-        rev = get_view["_rev"]
+    def delete_design_doc(self, bucket, design_doc):
+        api = self.baseUrl + '{0}/_design/{1}'.format(bucket, design_doc)
+        design_doc = self.get_design_doc(bucket, design_doc)
+        rev = design_doc["_rev"]
         #pass in the rev
         api = api + "?rev={0}".format(rev)
 
         status, content = self._http_request(api, 'DELETE', headers=self._create_capi_headers())
 
         json_parsed = json.loads(content)
-
         if not status == True:
-            raise Exception("unable to delete the view")
+
+            raise Exception("unable to delete the design doc")
 
         return json_parsed
 
