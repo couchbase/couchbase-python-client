@@ -163,6 +163,7 @@ class RestConnection(object):
             self.username = serverInfo["username"]
             self.password = serverInfo["password"]
             self.port = serverInfo["port"]
+            self.couch_api_base = serverInfo.get("couchApiBase")
         else:
             self.ip = serverInfo.ip
             self.username = serverInfo.rest_username
@@ -172,7 +173,7 @@ class RestConnection(object):
 
 
     def create_design_doc(self, bucket, design_doc, function):
-        api = self.baseUrl + '{0}/_design/{1}'.format(bucket, design_doc)
+        api = self.couch_api_base + '{0}/_design/{1}'.format(bucket, design_doc)
         #check if this view exists and update the rev
 
         status, content = self._http_request(api, 'PUT', function, headers=self._create_capi_headers())
@@ -191,7 +192,7 @@ class RestConnection(object):
             view_query = '{0}/_design/{1}/_view/{2}'
         else:
             view_query = '{0}/{1}'
-        api = self.baseUrl + view_query.format(bucket, design_doc, view)
+        api = self.couch_api_base + view_query.format(bucket, design_doc, view)
         num_params = 0
         if limit != None:
             num_params = 1
@@ -221,7 +222,7 @@ class RestConnection(object):
 
 
     def get_design_doc(self, bucket, design_doc):
-        api = self.baseUrl + '{0}/_design/{1}'.format(bucket, design_doc)
+        api = self.couch_api_base + '{0}/_design/{1}'.format(bucket, design_doc)
 
         status, content = self._http_request(api, headers=self._create_capi_headers())
 
@@ -234,7 +235,7 @@ class RestConnection(object):
 
 
     def get_view(self, bucket, design_doc, view):
-        api = self.baseUrl + '{0}/_design/{1}/_view/{2}'.format(bucket, design_doc, view)
+        api = self.couch_api_base + '{0}/_design/{1}/_view/{2}'.format(bucket, design_doc, view)
 
         status, content = self._http_request(api, headers=self._create_capi_headers())
 
@@ -247,7 +248,7 @@ class RestConnection(object):
 
 
     def delete_design_doc(self, bucket, design_doc):
-        api = self.baseUrl + '{0}/_design/{1}'.format(bucket, design_doc)
+        api = self.couch_api_base + '{0}/_design/{1}'.format(bucket, design_doc)
         design_doc = self.get_design_doc(bucket, design_doc)
         rev = design_doc["_rev"]
         #pass in the rev

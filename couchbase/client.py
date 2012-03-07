@@ -46,6 +46,11 @@ class Server(object):
         self.rest_username = username
         self.rest_password = password
 
+        server_config_uri = "http://{0}:{1}/pools/default".format(server['ip'], server['port'])
+        config = ServerHelper.parse_server_config(server_config_uri, username, password)
+        #couchApiBase will not be in node config before Couchbase Server 2.0
+        self.couch_api_base = config["nodes"][0].get("couchApiBase")
+
         self.streaming_thread = Thread(name="streaming", target=self._start_streaming, args=())
         self.streaming_thread.daemon = True
         self.streaming_thread.start()
@@ -84,10 +89,12 @@ class Server(object):
                     for node in nodes:
                         if node["clusterMembership"] == "active" and node["status"] == "healthy":
                             hostport = node["hostname"]
+                            couch_api_base = node.get("couchApiBase")
                             new_servers.append({"ip":hostport.split(":")[0],
                                                 "port":int(hostport.split(":")[1]),
                                                 "username":self.rest_username,
                                                 "password":self.rest_password,
+                                                "couchApiBase" : couch_api_base
                                                 })
                     new_servers.sort()
                     self.servers_lock.acquire()
@@ -152,6 +159,7 @@ class Server(object):
         self.servers_lock.release()
         server_info['username'] = self.rest_username
         server_info['password'] = self.rest_password
+        server_info['couchApiBase'] = self.couch_api_base
         rest = RestConnection(server_info)
         return rest
 
@@ -188,6 +196,7 @@ class Bucket(object):
         self.bucket_name = bucket_name
         rest = server._rest()
         self.bucket_password = rest.get_bucket(bucket_name).saslPassword
+
 
         ip, port, rest_username, rest_password = server._rest_info()
         self.mc_client = VBucketAwareCouchbaseClient("http://{0}:{1}/pools/default".format(ip, port), self.bucket_name, self.bucket_password)
@@ -309,8 +318,25 @@ class Bucket(object):
             view_map = None
 
         rest = self.server._rest()
+
         results = rest.view_results(self.bucket_name, view_doc, view_map, params, limit)
         if 'rows' in results:
             return results['rows']
         else:
             return None
+
+class ServerHelper(object):
+    @staticmethod
+    def parse_server_config(uri, username = "", password = ""):
+        urlopener = urllib.FancyURLopener()
+        if len(username) > 0 and len(password) > 0:
+            urlopener.prompt_user_passwd = lambda host, realm: (username, password)
+        response = urlopener.open(uri)
+
+        try:
+            line = response.readline()
+            data = json.loads(line)
+            return data
+        except:
+            raise Exception("unexpected error - unable to parse server config at {0}".format(url))
+
