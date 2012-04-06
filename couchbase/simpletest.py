@@ -28,3 +28,6 @@ class CouchbaseClientTest(unittest.TestCase):
             self.client.set(k, 0, 0, v)
         for k, v in kvs:
             self.client.delete(k)
+
+if __name__ == '__main__':
+    unittest.main()
