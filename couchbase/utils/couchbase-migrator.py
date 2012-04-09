@@ -120,4 +120,4 @@ if __name__ == "__main__":
     reader.close()
     writer.close()
 
-    print 'migrated {0} items'.format(count)
+    print 'migrated %s items' % (count)

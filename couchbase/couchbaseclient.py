@@ -27,7 +27,10 @@ import exceptions
 import zlib
 import struct
 import urllib
-import json
+try:
+    import json
+except:
+    import simplejson as json
 from copy import deepcopy
 from rest_client import RestHelper, RestConnection
 
@@ -266,7 +269,7 @@ class MemcachedClient(object):
         while len(response) < MemcachedConstants.MIN_RECV_PACKET:
             data = self.s.recv(MemcachedConstants.MIN_RECV_PACKET - len(response))
             if data == '':
-                raise exceptions.EOFError("Got empty data (remote died?). from {0}".format(self.host))
+                raise exceptions.EOFError("Got empty data (remote died?). from %s" % (self.host))
             response += data
         assert len(response) == MemcachedConstants.MIN_RECV_PACKET
         magic, cmd, keylen, extralen, dtype, errcode, remaining, opaque, cas =\
@@ -276,7 +279,7 @@ class MemcachedClient(object):
         while remaining > 0:
             data = self.s.recv(remaining)
             if data == '':
-                raise exceptions.EOFError("Got empty data (remote died?). from {0}".format(self.host))
+                raise exceptions.EOFError("Got empty data (remote died?). from %s" % (self.host))
             rv += data
             remaining -= len(data)
 
@@ -670,7 +673,7 @@ class VBucketAwareCouchbaseClient(object):
             current_servers = deepcopy(self.servers)
             self.servers_lock.release()
             for server in current_servers:
-                response = urlopener.open("http://{0}:{1}/pools/default/bucketsStreaming/{2}".format(server["ip"], server["port"], self.bucket))
+                response = urlopener.open("http://%s:%s/pools/default/bucketsStreaming/%s" % (server["ip"], server["port"], self.bucket))
                 while response:
                     try:
                         line = response.readline()
@@ -765,7 +768,7 @@ class VBucketAwareCouchbaseClient(object):
     def reconfig_vbucket_map(self, vbucket=-1):
         vb_ready = RestHelper(self.rest).vbucket_map_ready(self.bucket, 60)
         if not vb_ready:
-            raise Exception("vbucket map is not ready for bucket {0}".format(self.bucket))
+            raise Exception("vbucket map is not ready for bucket %s" % (self.bucket))
         vBuckets = self.rest.get_vbuckets(self.bucket)
         self.vbucket_count = len(vBuckets)
         bucket_info = self.rest.get_bucket(self.bucket)
@@ -789,15 +792,15 @@ class VBucketAwareCouchbaseClient(object):
             self._vBucketMap[vBucketId] = self._vBucketMapFastForward[vBucketId]
 
         if vBucketId not in self._vBucketMap:
-            msg = "vbucket map does not have an entry for vb : {0}"
+            msg = "vbucket map does not have an entry for vb : %s"
             self._vBucketMapFastForward_lock.release()
             self._vBucketMap_lock.release()
-            raise Exception(msg.format(vBucketId))
+            raise Exception(msg % (vBucketId))
         if self._vBucketMap[vBucketId] not in self._memcacheds:
-            msg = "smart client does not have a mc connection for server : {0}"
+            msg = "smart client does not have a mc connection for server : %s"
             self._vBucketMapFastForward_lock.release()
             self._vBucketMap_lock.release()
-            raise Exception(msg.format(self._vBucketMap[vBucketId]))
+            raise Exception(msg % (self._vBucketMap[vBucketId]))
         r = self._memcacheds[self._vBucketMap[vBucketId]]
         self._vBucketMapFastForward_lock.release()
         self._vBucketMap_lock.release()
@@ -971,7 +974,7 @@ class CommandDispatcher(object):
                         self.do(item)
                         # do will only raise not_my_vbucket_exception,
                         # EOF and socket.error
-                    except MemcachedError as ex:
+                    except MemcachedError,ex:
                         # if we get a not_my_vbucket then requeue item
                         #  with fast forward map vbucket
                         self.log.error(ex)
@@ -979,12 +982,12 @@ class CommandDispatcher(object):
                         self.start_connection_callback(ex.vbucket)
                         item["fastforward"] = True
                         self.queue.put(item)
-                    except exceptions.EOFError as ex:
+                    except exceptions.EOFError,ex:
                         # we go an EOF error, restart the connection
                         self.log.error(ex)
                         self.restart_connection_callback(ex.vbucket)
                         self.queue.put(item)
-                    except socket.error as ex:
+                    except socket.error,ex:
                         # we got a socket error, restart the connection
                         self.log.error(ex)
                         self.restart_connection_callback(ex.vbucket)
@@ -1000,7 +1003,7 @@ class CommandDispatcher(object):
         if isinstance(ex, MemcachedError) and ex.status == 7:
             ex.vbucket = item["vbucket"]
             print ex
-            self.log.error("got not my vb error. key: {0}, vbucket: {1}".format(item["key"],item["vbucket"]))
+            self.log.error("got not my vb error. key: %s, vbucket: %s" % (item["key"],item["vbucket"]))
             raise ex
         if isinstance(ex, exceptions.EOFError):
             ex.vbucket = item["vbucket"]
@@ -1027,7 +1030,7 @@ class CommandDispatcher(object):
             key = item["key"]
             try:
                 item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).get(key)
-            except Exception as ex:
+            except Exception,ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
         elif item["operation"] == "set":
@@ -1037,7 +1040,7 @@ class CommandDispatcher(object):
             value = item["value"]
             try:
                 item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).set(key, expiry, flags, value)
-            except Exception as ex:
+            except Exception,ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
         elif item["operation"] == "add":
@@ -1047,7 +1050,7 @@ class CommandDispatcher(object):
             value = item["value"]
             try:
                 item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).add(key, expiry, flags, value)
-            except Exception as ex:
+            except Exception,ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
         elif item["operation"] == "replace":
@@ -1057,7 +1060,7 @@ class CommandDispatcher(object):
             value = item["value"]
             try:
                 item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).replace(key, expiry, flags, value)
-            except Exception as ex:
+            except Exception,ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
         elif item["operation"] == "delete":
@@ -1065,7 +1068,7 @@ class CommandDispatcher(object):
             cas = item["cas"]
             try:
                 item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).delete(key, cas)
-            except Exception as ex:
+            except Exception,ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
         elif item["operation"] == "prepend":
@@ -1074,7 +1077,7 @@ class CommandDispatcher(object):
             value = item["value"]
             try:
                 item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).prepend(key, value, cas)
-            except Exception as ex:
+            except Exception,ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
         elif item["operation"] == "append":
@@ -1083,7 +1086,7 @@ class CommandDispatcher(object):
             value = item["value"]
             try:
                 item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).append(key, value, cas)
-            except Exception as ex:
+            except Exception,ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
         elif item["operation"] == "getl":
@@ -1091,7 +1094,7 @@ class CommandDispatcher(object):
             expiry = item["expiry"]
             try:
                 item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).getl(key, expiry)
-            except Exception as ex:
+            except Exception,ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
         elif item["operation"] == "gat":
@@ -1099,7 +1102,7 @@ class CommandDispatcher(object):
             expiry = item["expiry"]
             try:
                 item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).gat(key, expiry)
-            except Exception as ex:
+            except Exception,ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
         elif item["operation"] == "touch":
@@ -1107,7 +1110,7 @@ class CommandDispatcher(object):
             expiry = item["expiry"]
             try:
                 item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).touch(key, expiry)
-            except Exception as ex:
+            except Exception,ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
         elif item["operation"] == "incr":
@@ -1117,7 +1120,7 @@ class CommandDispatcher(object):
             expiry = item["expiry"]
             try:
                 item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).incr(key, amount, init, expiry)
-            except Exception as ex:
+            except Exception,ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
         elif item["operation"] == "decr":
@@ -1127,7 +1130,7 @@ class CommandDispatcher(object):
             expiry = item["expiry"]
             try:
                 item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).decr(key, amount, init, expiry)
-            except Exception as ex:
+            except Exception,ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
 
@@ -1139,7 +1142,7 @@ class CommandDispatcher(object):
             value = item["value"]
             try:
                 item["response"]["return"] = self.vbaware.memcached(key,item["fastforward"]).cas(key, expiry, flags, old_value, value)
-            except Exception as ex:
+            except Exception,ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
 
@@ -1156,4 +1159,4 @@ class MemcachedClientHelper(object):
                 client.sasl_auth_plain(bucket_info.name.encode('ascii'),
                                        bucket_info.saslPassword.encode('ascii'))
                 return client
-        raise Exception("unexpected error - unable to find ip:{0} in this cluster".format(ip))
+        raise Exception("unexpected error - unable to find ip:%s in this cluster" % (ip))

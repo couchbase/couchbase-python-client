@@ -16,7 +16,10 @@
 #
 
 import base64
-import json
+try:
+   import json
+except:
+   import simplejson as json
 import urllib
 import httplib2
 import socket
@@ -39,8 +42,8 @@ class RestHelper(object):
                     return True
             except ServerUnavailableException:
                 time.sleep(1)
-        msg = 'unable to connect to the node {0} even after waiting {1} seconds'
-        log.info(msg.format(self.rest.ip, timeout_in_seconds))
+        msg = 'unable to connect to the node %s even after waiting %s seconds'
+        log.info(msg % (self.rest.ip, timeout_in_seconds))
         return False
 
 
@@ -64,11 +67,11 @@ class RestHelper(object):
                 retry = 0
             time.sleep(.1)
         if progress < 0:
-            log.error("rebalance progress code : {0}".format(progress))
+            log.error("rebalance progress code : %s" % (progress))
             return False
         else:
             duration = time.time() - start
-            log.info('rebalance reached >{0}% in {1} seconds '.format(progress, duration))
+            log.info('rebalance reached >%s percent in %s seconds ' % (progress, duration))
             return True
 
 
@@ -92,8 +95,8 @@ class RestHelper(object):
                 return True
             else:
                 time.sleep(0.5)
-        msg = 'vbucket map is not ready for bucket {0} after waiting {1} seconds'
-        log.info(msg.format(bucket, timeout_in_seconds))
+        msg = 'vbucket map is not ready for bucket %s after waiting %s seconds'
+        log.info(msg % (bucket, timeout_in_seconds))
         return False
 
 
@@ -101,10 +104,10 @@ class RestHelper(object):
         try:
             buckets = self.rest.get_buckets()
             names = [item.name for item in buckets]
-            log.info("existing buckets : {0}".format(names))
+            log.info("existing buckets : %s" % (names))
             for item in buckets:
                 if item.name == bucket:
-                    log.info("found bucket {0}".format(bucket))
+                    log.info("found bucket %s" % (bucket))
                     return True
             return False
         except Exception:
@@ -118,14 +121,14 @@ class RestHelper(object):
             nodes = self.rest.node_statuses()
             for n in nodes:
                 if node.id == n.id:
-                    log.info('node {0} status : {1}'.format(node.id, n.status))
+                    log.info('node %s status : %s' % (node.id, n.status))
                     if n.status.lower() == expected_status.lower():
                         status_reached = True
                     break
             if not status_reached:
                 log.info("sleep for 5 seconds before reading the node.status again")
                 time.sleep(5)
-        log.info('node {0} status_reached : {1}'.format(node.id, status_reached))
+        log.info('node %s status_reached : %s' % (node.id, status_reached))
         return status_reached
 
 
@@ -137,10 +140,10 @@ class RestHelper(object):
                 break
             wait_count += 1
             if wait_count == 10:
-                log.info('replication state : {0}'.format(self.all_nodes_replicated(debug=True)))
+                log.info('replication state : %s' % (self.all_nodes_replicated(debug=True)))
                 wait_count = 0
             time.sleep(5)
-        log.info('replication state : {0}'.format(self.all_nodes_replicated()))
+        log.info('replication state : %s' % (self.all_nodes_replicated()))
         return self.all_nodes_replicated()
 
 
@@ -149,7 +152,7 @@ class RestHelper(object):
         nodes = self.rest.node_statuses()
         for node in nodes:
             if debug:
-                log.info("node {0} replication state : {1}".format(node.id, node.replication))
+                log.info("node %s replication state : %s" % (node.id, node.replication))
             if node.replication != 1.0:
                 replicated = False
         return replicated
@@ -169,11 +172,11 @@ class RestConnection(object):
             self.username = serverInfo.rest_username
             self.password = serverInfo.rest_password
             self.port = serverInfo.port
-        self.baseUrl = "http://{0}:{1}/".format(self.ip, self.port)
+        self.baseUrl = "http://%s:%s/" % (self.ip, self.port)
 
 
     def create_design_doc(self, bucket, design_doc, function):
-        api = self.couch_api_base + '{0}/_design/{1}'.format(bucket, design_doc)
+        api = self.couch_api_base + '%s/_design/%s' % (bucket, design_doc)
         #check if this view exists and update the rev
 
         status, content = self._http_request(api, 'PUT', function, headers=self._create_capi_headers())
@@ -196,7 +199,7 @@ class RestConnection(object):
         num_params = 0
         if limit != None:
             num_params = 1
-            api += "?limit={0}".format(limit)
+            api += "?limit=%s" % (limit)
         for param in params:
             if num_params > 0:
                 api += "&"
@@ -207,9 +210,9 @@ class RestConnection(object):
                          "startkey_docid", "endkey_docid"] or \
                          params[param] is True or \
                          params[param] is False:
-                api += "{0}={1}".format(param, json.dumps(params[param]))
+                api += "%s=%s" % (param, json.dumps(params[param]))
             else:
-                api += "{0}={1}".format(param, params[param])
+                api += "%s=%s" % (param, params[param])
 
         status, content = self._http_request(api, headers=self._create_capi_headers())
 
@@ -222,7 +225,7 @@ class RestConnection(object):
 
 
     def get_design_doc(self, bucket, design_doc):
-        api = self.couch_api_base + '{0}/_design/{1}'.format(bucket, design_doc)
+        api = self.couch_api_base + '%s/_design/%s' % (bucket, design_doc)
 
         status, content = self._http_request(api, headers=self._create_capi_headers())
 
@@ -235,7 +238,7 @@ class RestConnection(object):
 
 
     def get_view(self, bucket, design_doc, view):
-        api = self.couch_api_base + '{0}/_design/{1}/_view/{2}'.format(bucket, design_doc, view)
+        api = self.couch_api_base + '%s/_design/%s/_view/%s' % (bucket, design_doc, view)
 
         status, content = self._http_request(api, headers=self._create_capi_headers())
 
@@ -248,11 +251,11 @@ class RestConnection(object):
 
 
     def delete_design_doc(self, bucket, design_doc):
-        api = self.couch_api_base + '{0}/_design/{1}'.format(bucket, design_doc)
+        api = self.couch_api_base + '%s/_design/%s' % (bucket, design_doc)
         design_doc = self.get_design_doc(bucket, design_doc)
         rev = design_doc["_rev"]
         #pass in the rev
-        api = api + "?rev={0}".format(rev)
+        api = api + "?rev=%s" % (rev)
 
         status, content = self._http_request(api, 'DELETE', headers=self._create_capi_headers())
 
@@ -303,13 +306,13 @@ class RestConnection(object):
                         errors = [error for _,error in json_parsed["errors"].iteritems()]
                         reason = ", ".join(errors)
                         status = reason
-                    log.error('{0} error {1} reason: {2} {3}'.format(api, response['status'], reason, content))
+                    log.error('%s error %s reason: %s %s' % (api, response['status'], reason, content))
                     return status, content
-            except socket.error as e:
+            except socket.error,e:
                 log.error(e)
                 if time.time() > end_time:
                     raise ServerUnavailableException(ip=self.ip)
-            except httplib2.ServerNotFoundError as e:
+            except httplib2.ServerNotFoundError,e:
                 log.error(e)
                 if time.time() > end_time:
                     raise ServerUnavailableException(ip=self.ip)
@@ -322,7 +325,7 @@ class RestConnection(object):
                                    'username': username,
                                    'password': password})
 
-        log.info('settings/web params : {0}'.format(params))
+        log.info('settings/web params : %s' % (params))
 
         status, content = self._http_request(api, 'POST', params)
         if not status == True:
@@ -336,7 +339,7 @@ class RestConnection(object):
                                    'username': username,
                                    'password': password})
 
-        log.info('settings/web params : {0}'.format(params))
+        log.info('settings/web params : %s' % (params))
 
         status, content = self._http_request(api, 'POST', params)
         if not status == True:
@@ -352,7 +355,7 @@ class RestConnection(object):
                                    'username': username,
                                    'password': password})
 
-        log.info('pools/default params : {0}'.format(params))
+        log.info('pools/default params : %s' % (params))
 
         status, content = self._http_request(api, 'POST', params)
         if not status == True:
@@ -369,10 +372,10 @@ class RestConnection(object):
     #returns otpNode
     def add_node(self, user='', password='', remoteIp='', port='8091' ):
         otpNode = None
-        log.info('adding remote node : {0} to this cluster @ : {1}'\
-        .format(remoteIp, self.ip))
+        log.info('adding remote node : %s to this cluster @ : %s'\
+        % (remoteIp, self.ip))
         api = self.baseUrl + 'controller/addNode'
-        params = urllib.urlencode({'hostname': "{0}:{1}".format(remoteIp, port),
+        params = urllib.urlencode({'hostname': "%s:%s" % (remoteIp, port),
                                    'user': user,
                                    'password': password})
 
@@ -392,7 +395,7 @@ class RestConnection(object):
                 raise ServerJoinException(nodeIp=self.ip,
                                           remoteIp=remoteIp)
             else:
-                log.error('add_node error : {0}'.format(content))
+                log.error('add_node error : %s' % (content))
                 raise ServerJoinException(nodeIp=self.ip,
                                           remoteIp=remoteIp)
 
@@ -419,7 +422,7 @@ class RestConnection(object):
                                                    remoteIp=otpNode)
             else:
                 # todo : raise an exception here
-                log.error('eject_node error {0}'.format(content))
+                log.error('eject_node error %s' % (content))
         return True
 
 
@@ -436,7 +439,7 @@ class RestConnection(object):
         if status == True:
             log.info('fail_over successful')
         else:
-            log.error('fail_over error : {0}'.format(content))
+            log.error('fail_over error : %s' % (content))
 
         if not status == True:
             return False
@@ -465,7 +468,7 @@ class RestConnection(object):
                                    'ejectedNodes': ejectedNodesString,
                                    'user': self.username,
                                    'password': self.password})
-        log.info('rebalanace params : {0}'.format(params))
+        log.info('rebalanace params : %s' % (params))
 
         api = self.baseUrl + "controller/rebalance"
 
@@ -499,11 +502,11 @@ class RestConnection(object):
             #sleep for 2 seconds
             time.sleep(2)
         if progress < 0:
-            log.error("rebalance progress code : {0}".format(progress))
+            log.error("rebalance progress code : %s" % (progress))
             return False
         else:
             duration = time.time() - start
-            log.info('rebalance progress took {0} seconds '.format(duration))
+            log.info('rebalance progress took %s seconds ' % (duration))
             log.info("sleep for 10 seconds after rebalance...")
             time.sleep(10)
             return True
@@ -520,13 +523,13 @@ class RestConnection(object):
         if status == True:
             if "status" in json_parsed:
                 if "errorMessage" in json_parsed:
-                    log.error('{0} - rebalance failed'.format(json_parsed))
+                    log.error('%s - rebalance failed' % (json_parsed))
                 elif json_parsed["status"] == "running":
                     for key in json_parsed:
                         if key.find('@') >= 0:
                             ns_1_dictionary = json_parsed[key]
                             percentage = ns_1_dictionary['progress'] * 100
-                            log.info('rebalance percentage : {0} %' .format(percentage))
+                            log.info('rebalance percentage : %s percent' % (percentage))
                             break
                     if percentage == -1:
                         percentage = 0
@@ -647,7 +650,7 @@ class RestConnection(object):
     def get_buckets(self):
         #get all the buckets
         buckets = []
-        api = '{0}{1}'.format(self.baseUrl, 'pools/default/buckets/')
+        api = '%s%s' % (self.baseUrl, 'pools/default/buckets/')
 
         status, content = self._http_request(api)
 
@@ -667,7 +670,7 @@ class RestConnection(object):
             return None
 
         stats = {}
-        api = "{0}{1}{2}{3}{4}{5}".format(self.baseUrl, 'pools/default/buckets/',
+        api = "%s%s%s%s%s%s" % (self.baseUrl, 'pools/default/buckets/',
                                           bucket, "/nodes/", node_ip, ":8091/stats")
 
         status, content = self._http_request(api)
@@ -707,7 +710,7 @@ class RestConnection(object):
 
     def get_bucket_stats(self, bucket='default'):
         stats = {}
-        api = "{0}{1}{2}{3}".format(self.baseUrl, 'pools/default/buckets/', bucket, "/stats")
+        api = "".join([self.baseUrl, 'pools/default/buckets/', bucket, "/stats"])
 
         status, content = self._http_request(api)
 
@@ -727,12 +730,12 @@ class RestConnection(object):
 
     def get_bucket(self, bucket='default'):
         bucketInfo = None
-        api = '{0}{1}{2}'.format(self.baseUrl, 'pools/default/buckets/', bucket)
+        api = '%s%s%s' % (self.baseUrl, 'pools/default/buckets/', bucket)
         status, content = self._http_request(api)
 
         if status == True:
             bucketInfo = RestParser().parse_get_bucket_response(content)
-            # log.debug('set stats to {0}'.format(bucketInfo.stats.ram))
+            # log.debug('set stats to %s' % (bucketInfo.stats.ram))
         else:
             raise BucketUnavailableException(ip=self.ip, bucket_name=bucket, error=status)
 
@@ -744,7 +747,7 @@ class RestConnection(object):
 
 
     def delete_bucket(self, bucket='default'):
-        api = '{0}{1}{2}'.format(self.baseUrl, '/pools/default/buckets/', bucket)
+        api = '%s%s%s' % (self.baseUrl, '/pools/default/buckets/', bucket)
 
         status, content = self._http_request(api, 'DELETE')
         if not status == True:
@@ -760,7 +763,7 @@ class RestConnection(object):
                       replicaNumber=1,
                       proxyPort=11211,
                       bucketType='membase'):
-        api = '{0}{1}'.format(self.baseUrl, '/pools/default/buckets')
+        api = '%s%s' % (self.baseUrl, '/pools/default/buckets')
         params = urllib.urlencode({})
         #this only works for default bucket ?
         if bucket == 'default':
@@ -791,7 +794,7 @@ class RestConnection(object):
 
 
 
-        log.info("{0} with param: {1}".format(api, params))
+        log.info("%s with param: %s" % (api, params))
 
         status, content = self._http_request(api, 'POST', params)
 
@@ -829,7 +832,7 @@ class RestConnection(object):
                                        'timeout': timeout,
                                        'maxNodes': max_nodes})
         api = self.baseUrl + 'settings/autoFailover'
-        log.info('settings/autoFailover params : {0}'.format(params))
+        log.info('settings/autoFailover params : %s' % (params))
 
         status, content = self._http_request(api, 'POST', params)
         if not status == True:
@@ -857,7 +860,7 @@ class RestConnection(object):
                                    'emailPrt': email_port,
                                    'emailEncrypt': email_encrypt,
                                    'alerts': alerts})
-        log.info('settings/alerts params : {0}'.format(params))
+        log.info('settings/alerts params : %s'%(params))
 
         status, content = self._http_request(api, 'POST', params)
         if not status == True:
@@ -868,7 +871,7 @@ class RestConnection(object):
     def disable_autofailover_alerts(self):
         api = self.baseUrl + 'settings/alerts'
         params = urllib.urlencode({'enabled': 'false'})
-        log.info('settings/alerts params : {0}'.format(params))
+        log.info('settings/alerts params : %s' % (params))
 
         status, content = self._http_request(api, 'POST', params)
         if not status == True:
@@ -888,7 +891,7 @@ class RestConnection(object):
     def set_data_path(self, data_path):
         api = self.baseUrl + '/nodes/self/controller/settings'
         params = urllib.urlencode({'path': data_path})
-        log.info('/nodes/self/controller/settings params : {0}'.format(params))
+        log.info('/nodes/self/controller/settings params : %s'% (params))
 
         status, content = self._http_request(api, 'POST', params)
         if not status == True:
@@ -930,7 +933,7 @@ class NodeDataStorage(object):
         self.state = '' #ok
 
     def __str__(self):
-        return '{0}'.format({'type': self.type,
+        return '%s' % ({'type': self.type,
                              'path': self.path,
                              'quotaMb': self.quotaMb,
                              'state': self.state})
@@ -1120,11 +1123,11 @@ class RestParser(object):
                 #now go through each vbucket and populate the info
             #who is master , who is replica
         # get the 'storageTotals'
-        log.debug('read {0} vbuckets'.format(len(bucket.vbuckets)))
+        log.debug('read %s vbuckets' % (len(bucket.vbuckets)))
         stats = parsed['basicStats']
         #vBucketServerMap
         bucketStats = BucketStats()
-        log.debug('stats:{0}'.format(stats))
+        log.debug('stats:%s' % (stats))
         bucketStats.quotaPercentUsed = stats['quotaPercentUsed']
         bucketStats.opsPerSec = stats['opsPerSec']
         if 'diskFetches' in stats:

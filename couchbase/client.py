@@ -16,7 +16,10 @@
 #
 
 import uuid
-import json
+try:
+   import json
+except:
+   import simplejson as json
 import time
 from copy import deepcopy
 from threading import Thread, Lock
@@ -46,7 +49,7 @@ class Server(object):
         self.rest_username = username
         self.rest_password = password
 
-        server_config_uri = "http://{0}:{1}/pools/default".format(server['ip'], server['port'])
+        server_config_uri = "http://%s:%s/pools/default" % (server['ip'], server['port'])
         config = ServerHelper.parse_server_config(server_config_uri, username, password)
         #couchApiBase will not be in node config before Couchbase Server 2.0
         self.couch_api_base = config["nodes"][0].get("couchApiBase")
@@ -66,7 +69,7 @@ class Server(object):
             current_servers = deepcopy(self.servers)
             self.servers_lock.release()
             for server in current_servers:
-                url = "http://{0}:{1}/poolsStreaming/default".format(server["ip"], server["port"])
+                url = "http://%s:%s/poolsStreaming/default" % (server["ip"], server["port"])
                 f = urlopener.open(url)
                 while f:
                     try:
@@ -129,7 +132,7 @@ class Server(object):
         while True:
             try:
                 content = '{"basicStats":{"quotaPercentUsed":0.0}}'
-                status, content = rest._http_request("http://{0}:{1}/pools/default/buckets/{2}".format(ip, port, bucket_name), method='GET', params='', headers=None, timeout=120)
+                status, content = rest._http_request("http://%s:%s/pools/default/buckets/%s" % (ip, port, bucket_name), method='GET', params='', headers=None, timeout=120)
             except ValueError:
                 pass
             if json.loads(content)['basicStats']['quotaPercentUsed'] > 0.0:
@@ -199,7 +202,7 @@ class Bucket(object):
 
 
         ip, port, rest_username, rest_password = server._rest_info()
-        self.mc_client = VBucketAwareCouchbaseClient("http://{0}:{1}/pools/default".format(ip, port), self.bucket_name, self.bucket_password)
+        self.mc_client = VBucketAwareCouchbaseClient("http://%s:%s/pools/default" % (ip, port), self.bucket_name, self.bucket_password)
 
 
     def append(self, key, value, cas=0):
@@ -338,5 +341,5 @@ class ServerHelper(object):
             data = json.loads(line)
             return data
         except:
-            raise Exception("unexpected error - unable to parse server config at {0}".format(uri))
+            raise Exception("unexpected error - unable to parse server config at %s" % (uri))
 

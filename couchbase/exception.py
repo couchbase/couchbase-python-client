@@ -27,8 +27,8 @@ class CouchbaseHttpExceptionTypes(object):
 
 class MemcachedTimeoutException(Exception):
     def __init__(self, item, timeout):
-        msg = "timeout - memcached did not return in {0} second during {1} operation for key {2}"
-        self._message = msg.format(timeout, item["operation"], item["key"])
+        msg = "timeout - memcached did not return in %s second during %s operation for key %s"
+        self._message = msg % (timeout, item["operation"], item["key"])
 
     def __str__(self):
         string = ''
@@ -66,8 +66,7 @@ class BucketCreationException(CouchbaseHttpException):
         self.parameters['host'] = ip
         self.parameters['bucket'] = bucket_name
         self.type = CouchbaseHttpExceptionTypes.BUCKET_CREATION_ERROR
-        self._message = 'unable to create bucket {0} on the host @ {1}'\
-            .format(bucket_name,ip)
+        self._message = 'unable to create bucket %s on the host @ %s' % (bucket_name,ip)
         if error:
             self._message += ' due to error: ' + error
 
@@ -77,8 +76,7 @@ class BucketUnavailableException(CouchbaseHttpException):
         self.parameters['host'] = ip
         self.parameters['bucket'] = bucket_name
         self.type = CouchbaseHttpExceptionTypes.BUCKET_UNAVAILABLE
-        self._message = 'unable to find bucket {0} on the host @ {1}'\
-            .format(bucket_name,ip)
+        self._message = 'unable to find bucket %s on the host @ %s' % (bucket_name,ip)
         if error:
             self._message += ' due to error: ' + error
 
@@ -93,18 +91,16 @@ class ServerUnavailableException(CouchbaseHttpException):
         self.parameters = dict()
         self.parameters['host'] = ip
         self.type = CouchbaseHttpExceptionTypes.NOT_REACHABLE
-        self._message = 'unable to reach the host @ {0}'.format(ip)
+        self._message = 'unable to reach the host @ %s' % (ip)
 class InvalidArgumentException(CouchbaseHttpException):
     def __init__(self,api,parameters):
         self.parameters = parameters
         self.api = api
-        self._message = '{0} failed when invoked with parameters: {1}'\
-            .format(self.api,self.parameters)
+        self._message = '%s failed when invoked with parameters: %s' % (self.api,self.parameters)
 
 class ServerJoinException(CouchbaseHttpException):
     def __init__(self,nodeIp='',remoteIp=''):
-        self._message = 'node: {0} already added to this cluster:{1}'.format(remoteIp,
-                                                              nodeIp)
+        self._message = 'node: %s already added to this cluster:%s' % (remoteIp,nodeIp)
         self.parameters = dict()
         self.parameters['nodeIp'] = nodeIp
         self.parameters['remoteIp'] = remoteIp
@@ -112,8 +108,7 @@ class ServerJoinException(CouchbaseHttpException):
 
 class ServerAlreadyJoinedException(CouchbaseHttpException):
     def __init__(self,nodeIp='',remoteIp=''):
-        self._message = 'node: {0} already added to this cluster:{1}'.format(remoteIp,
-                                                              nodeIp)
+        self._message = 'node: %s already added to this cluster:%s' % (remoteIp,nodeIp)
         self.parameters = dict()
         self.parameters['nodeIp'] = nodeIp
         self.parameters['remoteIp'] = remoteIp

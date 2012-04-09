@@ -25,7 +25,7 @@ class CouchdbReader(migrator.Reader):
 
         self.page_limit = 100
 
-        self.couch = couchdb.Server('http://{0}:{1}'.format(self.host,self.port))
+        self.couch = couchdb.Server('http://%s:%s' % (self.host,self.port))
         self.db = self.couch[self.database]
 
         self.items = list(self.db.view('_all_docs', limit=self.page_limit+1, include_docs=True))
@@ -56,7 +56,7 @@ class CouchdbWriter(migrator.Writer):
         self.port = url.port
         self.database = url.path[1:]
 
-        self.couch = couchdb.Server('http://{0}:{1}'.format(self.host,self.port))
+        self.couch = couchdb.Server('http://%s:%s' % (self.host,self.port))
         self.db = self.couch[self.database]
 
     def write(self, record):
