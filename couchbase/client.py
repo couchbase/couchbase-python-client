@@ -338,5 +338,5 @@ class ServerHelper(object):
             data = json.loads(line)
             return data
         except:
-            raise Exception("unexpected error - unable to parse server config at {0}".format(url))
+            raise Exception("unexpected error - unable to parse server config at {0}".format(uri))
 
