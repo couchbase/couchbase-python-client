@@ -1,14 +1,12 @@
 import unittest
 import uuid
-
+from testconfig import config
 from couchbase.couchbaseclient import VBucketAwareCouchbaseClient
 
 class CouchbaseClientTest(unittest.TestCase):
-    url = "http://localhost:8091/pools/default"
-    bucket = "default"
-    client = None
-
     def setUp(self):
+        self.url = config['node-1']['url']
+        self.bucket = config['node-1']['bucket']
         self.client = VBucketAwareCouchbaseClient(self.url, self.bucket, "", True)
 
     def tearDown(self):

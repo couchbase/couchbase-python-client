@@ -118,3 +118,18 @@ the unified client::
 This version requires Python 2.6 or later
 
 Open Issues : http://www.couchbase.org/issues/browse/PYCBC
+
+=============
+RUNNING TESTS
+=============
+
+Requirements:
+* easy_install nosetests
+* pip install nose-testconfig
+
+We're now using nose to run our tests. There's a supplied
+test.ini.template that you can customize to match your installed
+environment. Copy test.ini.template to test.ini, customize, and
+then run the following command:
+
+    nosetests --tc-file=test.ini
