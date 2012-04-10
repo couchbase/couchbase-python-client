@@ -2,3 +2,5 @@
 *~
 *.DS_*
 *.idea
+.pydevproject
+build
