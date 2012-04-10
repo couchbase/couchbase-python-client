@@ -15,6 +15,8 @@
 # limitations under the License.
 #
 
+import sys
+
 class ProgressBar:
     def __init__(self, minValue=0, maxValue=10, totalWidth=12):
         self.progBar = "[]"   # This holds the progress bar string
