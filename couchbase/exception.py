@@ -39,16 +39,9 @@ class MemcachedTimeoutException(Exception):
 
 #base exception class for couchbase apis
 class CouchbaseHttpException(Exception):
-    def __init__(self):
-        self._message = ""
-        self.type = ""
-        #you can embed the params values here
-        #dictionary mostly
-        self.parameters = dict()
-
-    def __init__(self,message,type,parameters):
+    def __init__(self,message='',errorType='',parameters=dict()):
         self._message = message
-        self.type = type
+        self.type = errorType
         #you can embed the params values here
         #dictionary mostly
         self.parameters = parameters
