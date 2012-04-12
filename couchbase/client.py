@@ -214,8 +214,8 @@ class Bucket(object):
     def decr(self, key, amt=1, init=0, exp=0):
         return self.mc_client.decr(key, amt, init, exp)
 
-    def set(self, key, expiration, flags, value):
-        self.mc_client.set(key, expiration, flags, value)
+    def set(self, key, expiration, flags, value, cas=0):
+        self.mc_client.set(key, expiration, flags, value, cas)
 
     def add(self, key, exp, flags, val):
         return self.mc_client.add(key, exp, flags, val)
