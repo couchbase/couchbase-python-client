@@ -326,13 +326,13 @@ class MemcachedClient(object):
         return struct.unpack(MemcachedConstants.INCRDECR_RES_FMT, val)[0], cas
 
     def incr(self, key, amt=1, init=0, exp=0,vbucket=-1):
-        self._set_vbucket_id(key, vbucket)
         """Increment or create the named counter."""
+        self._set_vbucket_id(key, vbucket)
         return self.__incrdecr(MemcachedConstants.CMD_INCR, key, amt, init, exp)
 
     def decr(self, key, amt=1, init=0, exp=0,vbucket=-1):
-        self._set_vbucket_id(key, vbucket)
         """Decrement or create the named counter."""
+        self._set_vbucket_id(key, vbucket)
         return self.__incrdecr(MemcachedConstants.CMD_DECR, key, amt, init, exp)
 
     def _set_vbucket_id(self,key,vbucket):
