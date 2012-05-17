@@ -1,23 +1,10 @@
-#
-# Copyright 2011, Couchbase, Inc.
-# All Rights Reserved
-#
-# Licensed under the Apache License, Version 2.0 (the "License")
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
 
 import sys
 
 class ProgressBar:
+    """from http://code.activestate.com/recipes/168639-progress-bar-class/
+    License: http://www.opensource.org/licenses/PythonSoftFoundation.php
+    """
     def __init__(self, minValue=0, maxValue=10, totalWidth=12):
         self.progBar = "[]"   # This holds the progress bar string
         self.min = minValue
@@ -58,7 +45,10 @@ class ProgressBar:
         return str(self.progBar)
 
     def draw(self):
-    # draw progress bar - but only if it has changed
+        """from
+        http://code.activestate.com/recipes/168639-progress-bar-class/#c6
+        Draw progress bar - but only if it has changed
+        """
         if self.pbar_str != self._old_pbar:
             self._old_pbar = self.pbar_str
             sys.stdout.write(self.pbar_str + '\r')
