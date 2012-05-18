@@ -1,3 +1,7 @@
 [node-1]
+host = localhost
+port = 8091
+username = Administrator
+password = asdasd
 url = http://localhost:8091/pools/default
 bucket = default
