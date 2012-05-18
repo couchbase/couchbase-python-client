@@ -5,3 +5,5 @@
 .pydevproject
 build
 test.ini
+.coverage
+cover

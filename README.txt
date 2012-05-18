@@ -133,3 +133,11 @@ environment. Copy test.ini.template to test.ini, customize, and
 then run the following command:
 
     nosetests --tc-file=test.ini
+
+Adding coverage information is as easy as install coverage and running
+nosetests with these settings:
+
+    nosetests --tc-file=test.ini --with-coverage
+--cover-package=couchbase --cover-html
+
+This will output coverage reports into the 'cover' directory.
