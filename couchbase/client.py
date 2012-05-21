@@ -24,6 +24,7 @@ import time
 from copy import deepcopy
 from threading import Thread, Lock
 import urllib
+import warnings
 
 import logging
 
@@ -32,7 +33,8 @@ from couchbaseclient import VBucketAwareCouchbaseClient
 
 logging.disable(logging.ERROR)
 
-class Server(object):
+
+class Couchbase(object):
     def __init__(self, host, username, password):
         if (':' in host):
             [ip, port] = host.split(':')
@@ -165,6 +167,11 @@ class Server(object):
         self.servers_lock.release()
         return server_info['ip'], server_info['port'], server_info['username'], server_info['password']
 
+
+class Server(Couchbase):
+    def __init__(self, host, username, password):
+        warnings.warn("Server is deprecated; use Couchbase instead", DeprecationWarning)
+        Couchbase.__init__(self, host, username, password)
 
 
 class BucketIterator(object):
