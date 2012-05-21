@@ -124,7 +124,7 @@ RUNNING TESTS
 =============
 
 Requirements:
-* easy_install nosetests
+* easy_install nose
 * pip install nose-testconfig
 
 We're now using nose to run our tests. There's a supplied
