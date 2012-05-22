@@ -17,9 +17,11 @@
 
 import unittest
 import types
+import warnings
 
+from warnings_catcher import setup_warning_catcher
 from testconfig import config
-from couchbase.client import Server
+from couchbase.client import *
 
 
 class ClientTest(unittest.TestCase):
@@ -35,10 +37,18 @@ class ClientTest(unittest.TestCase):
     def tearDown(self):
         pass
 
+    def test_couchbase_object_construction(self):
+        cb = Couchbase(self.host + ':' + self.port, self.username, self.password)
+        self.assertTrue(isinstance(cb.servers, types.ListType))
 
     def test_server_object_construction(self):
-        cb = Server(self.host+':'+self.port, self.username, self.password)
+        w = setup_warning_catcher()
+        warnings.simplefilter("always")
+        cb = Server(self.host + ':' + self.port, self.username, self.password)
         self.assertTrue(isinstance(cb.servers, types.ListType))
+        self.assertTrue(len(w) == 1)
+        self.assertTrue("deprecated" in str(w[-1].message))
+
 
 
 if __name__ == "__main__":

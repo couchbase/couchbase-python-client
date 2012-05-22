@@ -32,7 +32,6 @@ from couchbaseclient import VBucketAwareCouchbaseClient
 
 logging.disable(logging.ERROR)
 
-
 class Server(object):
     def __init__(self, host, username, password):
         server = {'ip':host.split(':')[0],
@@ -57,7 +56,6 @@ class Server(object):
         self.streaming_thread = Thread(name="streaming", target=self._start_streaming, args=())
         self.streaming_thread.daemon = True
         self.streaming_thread.start()
-
 
     def _start_streaming(self):
         # this will dynamically update servers
@@ -104,11 +102,8 @@ class Server(object):
                     self.servers = deepcopy(new_servers)
                     self.servers_lock.release()
 
-
-
     def bucket(self, bucket_name):
         return Bucket(bucket_name, self)
-
 
     def buckets(self):
         """Get a list of all buckets as Buckets"""
@@ -117,7 +112,6 @@ class Server(object):
         for rest_bucket in  rest.get_buckets():
             buckets.append(Bucket(rest_bucket.name, self))
         return buckets
-
 
     def create(self, bucket_name, bucket_password='', ram_quota_mb=100, replica=0):
         rest = self._rest()
@@ -142,19 +136,15 @@ class Server(object):
 
         return Bucket(bucket_name, self)
 
-
     def delete(self, bucket_name):
         rest = self._rest()
         rest.delete_bucket(bucket_name)
 
-
     def __getitem__(self, key):
         return self.bucket(key)
 
-
     def __iter__(self):
         return BucketIterator(self.buckets())
-
 
     def _rest(self):
         self.servers_lock.acquire()
@@ -165,7 +155,6 @@ class Server(object):
         server_info['couchApiBase'] = self.couch_api_base
         rest = RestConnection(server_info)
         return rest
-
 
     def _rest_info(self):
         self.servers_lock.acquire()
@@ -179,17 +168,14 @@ class BucketIterator(object):
     def __init__(self, buckets):
         self.buckets = buckets
 
-
     def __iter__(self):
         return self
-
 
     def next(self):
         try:
             return self.buckets.pop(0)
         except IndexError:
             raise StopIteration
-
 
 
 class Bucket(object):
@@ -200,10 +186,8 @@ class Bucket(object):
         rest = server._rest()
         self.bucket_password = rest.get_bucket(bucket_name).saslPassword
 
-
         ip, port, rest_username, rest_password = server._rest_info()
         self.mc_client = VBucketAwareCouchbaseClient("http://%s:%s/pools/default" % (ip, port), self.bucket_name, self.bucket_password)
-
 
     def append(self, key, value, cas=0):
         return self.mc_client.append(key, value, cas)
@@ -260,7 +244,6 @@ class Bucket(object):
         else:
             return self.mc_client.delete(key, cas)
 
-
     def save(self, document):
         value = deepcopy(document)
         if '_id' in value:
@@ -293,17 +276,14 @@ class Bucket(object):
 
         return key
 
-
     def __setitem__(self, key, value):
         if isinstance(value, dict):
             self.set(key, value['expiration'], value['flags'], value['value'])
         else:
             self.set(key, 0, 0, value)
 
-
     def __getitem__(self, key):
         return self.get(key)
-
 
     def view(self, view, **options):
         params = deepcopy(options)
@@ -330,7 +310,7 @@ class Bucket(object):
 
 class ServerHelper(object):
     @staticmethod
-    def parse_server_config(uri, username = "", password = ""):
+    def parse_server_config(uri, username="", password=""):
         urlopener = urllib.FancyURLopener()
         if len(username) > 0 and len(password) > 0:
             urlopener.prompt_user_passwd = lambda host, realm: (username, password)
@@ -342,4 +322,3 @@ class ServerHelper(object):
             return data
         except:
             raise Exception("unexpected error - unable to parse server config at %s" % (uri))
-

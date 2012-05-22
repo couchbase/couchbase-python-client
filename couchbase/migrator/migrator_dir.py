@@ -26,8 +26,8 @@
 # writes out items that have _id: _design/* to <dir>/design_docs
 # writes out all other items to <dir>/docs
 
-sources=[{'type':'dir','class':'DirReader','example':'dir://<directory>'}]
-destinations=[{'type':'dir','class':'DirWriter','example':'dir://<directory>'}]
+sources = [{'type':'dir', 'class':'DirReader', 'example':'dir://<directory>'}]
+destinations = [{'type':'dir', 'class':'DirWriter', 'example':'dir://<directory>'}]
 
 import os
 import json
@@ -77,8 +77,8 @@ class DirReader(migrator.Reader):
                 id = f.read().strip('\n\r,')
             json_data = {}
             for f in self._get_nonjson_filenames(os.path.dirname(filename)):
-                f_relative_path = f[len(doc_basepath)+1:]
-                if os.path.isfile(os.path.join(doc_basepath,f_relative_path.split(os.path.sep)[0])):
+                f_relative_path = f[len(doc_basepath) + 1:]
+                if os.path.isfile(os.path.join(doc_basepath, f_relative_path.split(os.path.sep)[0])):
                     # its a plain file
                     with open (f) as item:
                         json_data[f_relative_path.split(os.path.sep)[0]] = item.read().strip('\n\r,')
@@ -102,7 +102,7 @@ class DirReader(migrator.Reader):
                     id = os.path.splitext(os.path.basename(filename))[0]
 
         record = {'id':id}
-        record['value'] = dict((k,v) for (k,v) in json_data.iteritems() if not k.startswith('_'))
+        record['value'] = dict((k, v) for (k, v) in json_data.iteritems() if not k.startswith('_'))
         return record
 
 
@@ -112,8 +112,8 @@ class DirWriter(migrator.Writer):
             destination = destination[2:]
         self.dir = os.path.expanduser(destination)
         try:
-            os.makedirs(os.path.join(destination,"docs"))
-            os.makedirs(os.path.join(destination,"design_docs"))
+            os.makedirs(os.path.join(destination, "docs"))
+            os.makedirs(os.path.join(destination, "design_docs"))
         except OSError as e:
             pass
 

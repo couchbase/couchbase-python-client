@@ -29,6 +29,8 @@ from exception import ServerAlreadyJoinedException, ServerUnavailableException, 
 from exception import BucketCreationException, ServerJoinException, BucketUnavailableException
 
 log = logger.logger("rest_client")
+
+
 #helper library methods built on top of RestConnection interface
 class RestHelper(object):
     def __init__(self, rest_connection):
@@ -46,12 +48,10 @@ class RestHelper(object):
         log.info(msg % (self.rest.ip, timeout_in_seconds))
         return False
 
-
     def is_cluster_healthy(self):
         #get the nodes and verify that all the nodes.status are healthy
         nodes = self.rest.node_statuses()
         return all(node.status == 'healthy' for node in nodes)
-
 
     def rebalance_reached(self, percentage=100):
         start = time.time()
@@ -74,18 +74,15 @@ class RestHelper(object):
             log.info('rebalance reached >%s percent in %s seconds ' % (progress, duration))
             return True
 
-
     def is_cluster_rebalanced(self):
         #get the nodes and verify that all the nodes.status are healthy
         return self.rest.rebalance_statuses()
-
 
     #this method will rebalance the cluster by passing the remote_node as
     #ejected node
     def remove_nodes(self, knownNodes, ejectedNodes):
         self.rest.rebalance(knownNodes, ejectedNodes)
         return self.rest.monitorRebalance()
-
 
     def vbucket_map_ready(self, bucket, timeout_in_seconds=360):
         end_time = time.time() + timeout_in_seconds
@@ -99,7 +96,6 @@ class RestHelper(object):
         log.info(msg % (bucket, timeout_in_seconds))
         return False
 
-
     def bucket_exists(self, bucket):
         try:
             buckets = self.rest.get_buckets()
@@ -112,7 +108,6 @@ class RestHelper(object):
             return False
         except Exception:
             return False
-
 
     def wait_for_node_status(self, node, expected_status, timeout_in_seconds):
         status_reached = False
@@ -131,7 +126,6 @@ class RestHelper(object):
         log.info('node %s status_reached : %s' % (node.id, status_reached))
         return status_reached
 
-
     def wait_for_replication(self, timeout_in_seconds=120):
         wait_count = 0
         end_time = time.time() + timeout_in_seconds
@@ -145,7 +139,6 @@ class RestHelper(object):
             time.sleep(5)
         log.info('replication state : %s' % (self.all_nodes_replicated()))
         return self.all_nodes_replicated()
-
 
     def all_nodes_replicated(self, debug=False):
         replicated = True
@@ -174,7 +167,6 @@ class RestConnection(object):
             self.port = serverInfo.port
         self.baseUrl = "http://%s:%s/" % (self.ip, self.port)
 
-
     def create_design_doc(self, bucket, design_doc, function):
         api = self.couch_api_base + '%s/_design/%s' % (bucket, design_doc)
         #check if this view exists and update the rev
@@ -187,7 +179,6 @@ class RestConnection(object):
             raise Exception("unable to create design doc")
 
         return json_parsed
-
 
     #http://10.1.6.108:8091/bucket-0/_design/dev_6ca50/_view/dev_6ca50?limit=10&_=1311107815807
     def view_results(self, bucket, design_doc, view, params, limit=100):
@@ -219,10 +210,9 @@ class RestConnection(object):
         json_parsed = json.loads(content)
 
         if not status == True:
-            raise Exception("unable to obtain view results for " + api + "\n"+ `status` + "\n" + content)
+            raise Exception("unable to obtain view results for " + api + "\n" + `status` + "\n" + content)
 
         return json_parsed
-
 
     def get_design_doc(self, bucket, design_doc):
         api = self.couch_api_base + '%s/_design/%s' % (bucket, design_doc)
@@ -236,7 +226,6 @@ class RestConnection(object):
 
         return json_parsed
 
-
     def get_view(self, bucket, design_doc, view):
         api = self.couch_api_base + '%s/_design/%s/_view/%s' % (bucket, design_doc, view)
 
@@ -248,7 +237,6 @@ class RestConnection(object):
             raise Exception("unable to get view")
 
         return json_parsed
-
 
     def delete_design_doc(self, bucket, design_doc):
         api = self.couch_api_base + '%s/_design/%s' % (bucket, design_doc)
@@ -266,11 +254,9 @@ class RestConnection(object):
 
         return json_parsed
 
-
     def _create_capi_headers(self):
         return {'Content-Type': 'application/json',
                 'Accept': '*/*'}
-
 
     #authorization must be a base64 string of username:password
     def _create_headers(self):
@@ -282,10 +268,9 @@ class RestConnection(object):
                 'Authorization': 'Basic %s' % authorization,
                 'Accept': '*/*'}
 
-
     def _http_request(self, api, method='GET', params='', headers=None, timeout=120):
         if not headers:
-            headers=self._create_headers()
+            headers = self._create_headers()
         end_time = time.time() + timeout
         while True:
             try:
@@ -303,21 +288,20 @@ class RestConnection(object):
                         reason = json_parsed["error"]
                         status = reason
                     elif "errors" in json_parsed:
-                        errors = [error for _,error in json_parsed["errors"].iteritems()]
+                        errors = [error for _, error in json_parsed["errors"].iteritems()]
                         reason = ", ".join(errors)
                         status = reason
                     log.error('%s error %s reason: %s %s' % (api, response['status'], reason, content))
                     return status, content
-            except socket.error,e:
+            except socket.error, e:
                 log.error(e)
                 if time.time() > end_time:
                     raise ServerUnavailableException(ip=self.ip)
-            except httplib2.ServerNotFoundError,e:
+            except httplib2.ServerNotFoundError, e:
                 log.error(e)
                 if time.time() > end_time:
                     raise ServerUnavailableException(ip=self.ip)
             time.sleep(1)
-
 
     def init_cluster(self, username='Administrator', password='password'):
         api = self.baseUrl + 'settings/web'
@@ -332,7 +316,6 @@ class RestConnection(object):
             return False
         return status
 
-
     def init_cluster_port(self, username='Administrator', password='password'):
         api = self.baseUrl + 'settings/web'
         params = urllib.urlencode({'port': '8091',
@@ -345,7 +328,6 @@ class RestConnection(object):
         if not status == True:
             return False
         return status
-
 
     def init_cluster_memoryQuota(self, username='Administrator',
                                  password='password',
@@ -362,7 +344,6 @@ class RestConnection(object):
             return False
         return status
 
-
     #params serverIp : the server to add to this cluster
     #raises exceptions when
     #unauthorized user
@@ -370,7 +351,7 @@ class RestConnection(object):
     #can't add the node to itself ( TODO )
     #server already added
     #returns otpNode
-    def add_node(self, user='', password='', remoteIp='', port='8091' ):
+    def add_node(self, user='', password='', remoteIp='', port='8091'):
         otpNode = None
         log.info('adding remote node : %s to this cluster @ : %s'\
         % (remoteIp, self.ip))
@@ -401,7 +382,6 @@ class RestConnection(object):
 
         return otpNode
 
-
     def eject_node(self, user='', password='', otpNode=None):
         if not otpNode:
             log.error('otpNode parameter required')
@@ -425,8 +405,7 @@ class RestConnection(object):
                 log.error('eject_node error %s' % (content))
         return True
 
-
-    def fail_over(self, otpNode=None ):
+    def fail_over(self, otpNode=None):
         if not otpNode:
             log.error('otpNode parameter required')
             return False
@@ -444,7 +423,6 @@ class RestConnection(object):
         if not status == True:
             return False
         return status
-
 
     def rebalance(self, otpNodes, ejectedNodes):
         knownNodes = ''
@@ -486,7 +464,6 @@ class RestConnection(object):
             return False
         return status
 
-
     def monitorRebalance(self):
         start = time.time()
         progress = 0
@@ -510,7 +487,6 @@ class RestConnection(object):
             log.info("sleep for 10 seconds after rebalance...")
             time.sleep(10)
             return True
-
 
     def _rebalance_progress(self):
         percentage = -1
@@ -540,7 +516,6 @@ class RestConnection(object):
 
         return percentage
 
-
     #if status is none , is there an errorMessage
     #convoluted logic which figures out if the rebalance failed or suceeded
     def rebalance_statuses(self):
@@ -556,7 +531,6 @@ class RestConnection(object):
 
         return rebalanced
 
-
     def log_client_error(self, post):
         api = self.baseUrl + 'logClientError'
 
@@ -564,7 +538,6 @@ class RestConnection(object):
 
         if not status == True:
             log.error('unable to logClientError')
-
 
     #returns node data for this host
     def get_nodes_self(self):
@@ -579,7 +552,6 @@ class RestConnection(object):
             node = RestParser().parse_get_nodes_response(json_parsed)
 
         return node
-
 
     def node_statuses(self):
         nodes = []
@@ -604,7 +576,6 @@ class RestConnection(object):
 
         return nodes
 
-
     def cluster_status(self):
         parsed = {}
         api = self.baseUrl + 'pools/default'
@@ -617,7 +588,6 @@ class RestConnection(object):
             parsed = json_parsed
 
         return parsed
-
 
     def get_pools_info(self):
         parsed = {}
@@ -632,7 +602,6 @@ class RestConnection(object):
 
         return parsed
 
-
     def get_pools(self):
         version = None
         api = self.baseUrl + 'pools'
@@ -645,7 +614,6 @@ class RestConnection(object):
             version = CouchbaseServerVersion(json_parsed['implementationVersion'], json_parsed['componentsVersion'])
 
         return version
-
 
     def get_buckets(self):
         #get all the buckets
@@ -662,7 +630,6 @@ class RestConnection(object):
                 buckets.append(bucketInfo)
 
         return buckets
-
 
     def get_bucket_stats_for_node(self, bucket='default', node_ip=None):
         if not Node:
@@ -685,7 +652,6 @@ class RestConnection(object):
 
         return stats
 
-
     def get_nodes(self):
         nodes = []
         api = self.baseUrl + 'pools/default'
@@ -707,7 +673,6 @@ class RestConnection(object):
 
         return nodes
 
-
     def get_bucket_stats(self, bucket='default'):
         stats = {}
         api = "".join([self.baseUrl, 'pools/default/buckets/', bucket, "/stats"])
@@ -727,7 +692,6 @@ class RestConnection(object):
 
         return stats
 
-
     def get_bucket(self, bucket='default'):
         bucketInfo = None
         api = '%s%s%s' % (self.baseUrl, 'pools/default/buckets/', bucket)
@@ -741,10 +705,8 @@ class RestConnection(object):
 
         return bucketInfo
 
-
     def get_vbuckets(self, bucket='default'):
         return self.get_bucket(bucket).vbuckets
-
 
     def delete_bucket(self, bucket='default'):
         api = '%s%s%s' % (self.baseUrl, '/pools/default/buckets/', bucket)
@@ -753,7 +715,6 @@ class RestConnection(object):
         if not status == True:
             return False
         return status
-
 
     # figure out the proxy port
     def create_bucket(self, bucket='',
@@ -792,8 +753,6 @@ class RestConnection(object):
                                        'proxyPort': self.get_nodes_self().moxi,
                                        'bucketType': bucketType})
 
-
-
         log.info("%s with param: %s" % (api, params))
 
         status, content = self._http_request(api, 'POST', params)
@@ -802,7 +761,6 @@ class RestConnection(object):
             raise BucketCreationException(ip=self.ip, bucket_name=bucket, error=status)
 
         return status
-
 
     #return AutoFailoverSettings
     def get_autofailover_settings(self):
@@ -821,7 +779,6 @@ class RestConnection(object):
 
         return settings
 
-
     def update_autofailover_settings(self, enabled, timeout, max_nodes):
         if enabled:
             params = urllib.urlencode({'enabled': 'true',
@@ -839,7 +796,6 @@ class RestConnection(object):
             return False
         return status
 
-
     def reset_autofailover(self):
         api = self.baseUrl + 'settings/autoFailover/resetCount'
 
@@ -847,7 +803,6 @@ class RestConnection(object):
         if not status == True:
             return False
         return status
-
 
     def enable_autofailover_alerts(self, recipients, sender, email_username, email_password, email_host='localhost', email_port=25, email_encrypt='false', alerts='auto_failover_node,auto_failover_maximum_reached'):
         api = self.baseUrl + 'settings/alerts'
@@ -860,13 +815,12 @@ class RestConnection(object):
                                    'emailPrt': email_port,
                                    'emailEncrypt': email_encrypt,
                                    'alerts': alerts})
-        log.info('settings/alerts params : %s'%(params))
+        log.info('settings/alerts params : %s' % (params))
 
         status, content = self._http_request(api, 'POST', params)
         if not status == True:
             return False
         return status
-
 
     def disable_autofailover_alerts(self):
         api = self.baseUrl + 'settings/alerts'
@@ -878,7 +832,6 @@ class RestConnection(object):
             return False
         return status
 
-
     def stop_rebalance(self):
         api = self.baseUrl + '/controller/stopRebalance'
 
@@ -887,11 +840,10 @@ class RestConnection(object):
             return False
         return status
 
-
     def set_data_path(self, data_path):
         api = self.baseUrl + '/nodes/self/controller/settings'
         params = urllib.urlencode({'path': data_path})
-        log.info('/nodes/self/controller/settings params : %s'% (params))
+        log.info('/nodes/self/controller/settings params : %s' % (params))
 
         status, content = self._http_request(api, 'POST', params)
         if not status == True:
@@ -1074,11 +1026,9 @@ class RestParser(object):
                 node.memcached = ports["direct"]
         return node
 
-
     def parse_get_bucket_response(self, response):
         parsed = json.loads(response)
         return self.parse_get_bucket_json(parsed)
-
 
     def parse_get_bucket_json(self, parsed):
         bucket = Bucket()

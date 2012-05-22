@@ -15,8 +15,8 @@
 # limitations under the License.
 #
 
-sources=[{'type':'json','class':'JSONReader','example':'json://<filename>'}]
-destinations=[{'type':'json','class':'JSONWriter','example':'json://<filename>'}]
+sources = [{'type':'json', 'class':'JSONReader', 'example':'json://<filename>'}]
+destinations = [{'type':'json', 'class':'JSONWriter', 'example':'json://<filename>'}]
 
 import json
 
@@ -39,7 +39,7 @@ class JSONReader(migrator.Reader):
             except ValueError:
                 raise StopIteration()
             record = {'id':json_data['id']}
-            record['value'] = dict((k,v) for (k,v) in json_data['value'].iteritems() if not k.startswith('_'))
+            record['value'] = dict((k, v) for (k, v) in json_data['value'].iteritems() if not k.startswith('_'))
             return record
         else:
             raise StopIteration()

@@ -15,15 +15,17 @@
 # limitations under the License.
 #
 
+
 class CouchbaseHttpExceptionTypes(object):
 
     UNAUTHORIZED = 1000
     NOT_REACHABLE = 1001
     NODE_ALREADY_JOINED = 1002
-    NODE_CANT_ADD_TO_ITSELF=1003
+    NODE_CANT_ADD_TO_ITSELF = 1003
     BUCKET_CREATION_ERROR = 1004
     STATS_UNAVAILABLE = 1005
     BUCKET_UNAVAILABLE = 1006
+
 
 class MemcachedTimeoutException(Exception):
     def __init__(self, item, timeout):
@@ -39,7 +41,7 @@ class MemcachedTimeoutException(Exception):
 
 #base exception class for couchbase apis
 class CouchbaseHttpException(Exception):
-    def __init__(self,message='',errorType='',parameters=dict()):
+    def __init__(self, message='', errorType='', parameters=dict()):
         self._message = message
         self.type = errorType
         #you can embed the params values here
@@ -52,33 +54,37 @@ class CouchbaseHttpException(Exception):
             string += self._message
         return string
 
+
 class UnauthorizedException(CouchbaseHttpException):
-    def __init__(self,username='',password=''):
+    def __init__(self, username='', password=''):
         self._message = 'user not logged in'
         self.parameters = dict()
         self.parameters['username'] = username
         self.parameters['password'] = password
         self.type = CouchbaseHttpExceptionTypes.UNAUTHORIZED
 
+
 class BucketCreationException(CouchbaseHttpException):
-    def __init__(self,ip = '',bucket_name = '', error = ''):
+    def __init__(self, ip='', bucket_name='', error=''):
         self.parameters = dict()
         self.parameters['host'] = ip
         self.parameters['bucket'] = bucket_name
         self.type = CouchbaseHttpExceptionTypes.BUCKET_CREATION_ERROR
-        self._message = 'unable to create bucket %s on the host @ %s' % (bucket_name,ip)
+        self._message = 'unable to create bucket %s on the host @ %s' % (bucket_name, ip)
         if error:
             self._message += ' due to error: ' + error
 
+
 class BucketUnavailableException(CouchbaseHttpException):
-    def __init__(self,ip = '',bucket_name = '', error = ''):
+    def __init__(self, ip='', bucket_name='', error=''):
         self.parameters = dict()
         self.parameters['host'] = ip
         self.parameters['bucket'] = bucket_name
         self.type = CouchbaseHttpExceptionTypes.BUCKET_UNAVAILABLE
-        self._message = 'unable to find bucket %s on the host @ %s' % (bucket_name,ip)
+        self._message = 'unable to find bucket %s on the host @ %s' % (bucket_name, ip)
         if error:
             self._message += ' due to error: ' + error
+
 
 class StatsUnavailableException(CouchbaseHttpException):
     def __init__(self):
@@ -87,30 +93,33 @@ class StatsUnavailableException(CouchbaseHttpException):
 
 
 class ServerUnavailableException(CouchbaseHttpException):
-    def __init__(self,ip = ''):
+    def __init__(self, ip=''):
         self.parameters = dict()
         self.parameters['host'] = ip
         self.type = CouchbaseHttpExceptionTypes.NOT_REACHABLE
         self._message = 'unable to reach the host @ %s' % (ip)
+
+
 class InvalidArgumentException(CouchbaseHttpException):
-    def __init__(self,api,parameters):
+    def __init__(self, api, parameters):
         self.parameters = parameters
         self.api = api
-        self._message = '%s failed when invoked with parameters: %s' % (self.api,self.parameters)
+        self._message = '%s failed when invoked with parameters: %s' % (self.api, self.parameters)
+
 
 class ServerJoinException(CouchbaseHttpException):
-    def __init__(self,nodeIp='',remoteIp=''):
-        self._message = 'node: %s already added to this cluster:%s' % (remoteIp,nodeIp)
+    def __init__(self, nodeIp='', remoteIp=''):
+        self._message = 'node: %s already added to this cluster:%s' % (remoteIp, nodeIp)
         self.parameters = dict()
         self.parameters['nodeIp'] = nodeIp
         self.parameters['remoteIp'] = remoteIp
         self.type = CouchbaseHttpExceptionTypes.NODE_CANT_ADD_TO_ITSELF
 
+
 class ServerAlreadyJoinedException(CouchbaseHttpException):
-    def __init__(self,nodeIp='',remoteIp=''):
-        self._message = 'node: %s already added to this cluster:%s' % (remoteIp,nodeIp)
+    def __init__(self, nodeIp='', remoteIp=''):
+        self._message = 'node: %s already added to this cluster:%s' % (remoteIp, nodeIp)
         self.parameters = dict()
         self.parameters['nodeIp'] = nodeIp
         self.parameters['remoteIp'] = remoteIp
         self.type = CouchbaseHttpExceptionTypes.NODE_ALREADY_JOINED
-

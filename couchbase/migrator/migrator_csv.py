@@ -15,8 +15,8 @@
 # limitations under the License.
 #
 
-sources=[{'type':'csv','class':'CSVReader','example':'csv://<filename>'}]
-destinations=[]
+sources = [{'type':'csv', 'class':'CSVReader', 'example':'csv://<filename>'}]
+destinations = []
 
 import csv
 
@@ -36,7 +36,7 @@ class CSVReader(migrator.Reader):
         data = self.reader.next()
         if data:
             record = {'id':data['id']}
-            record['value'] = dict((k,v) for (k,v) in data.iteritems() if k != 'id' and not k.startswith('_'))
+            record['value'] = dict((k, v) for (k, v) in data.iteritems() if k != 'id' and not k.startswith('_'))
             return record
         else:
             raise StopIteration()

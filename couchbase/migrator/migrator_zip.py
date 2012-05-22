@@ -17,8 +17,8 @@
 
 # source *.json files from a zip file into destination
 
-sources=[{'type':'zip','class':'ZipReader','example':'zip://<zipfile>'}]
-destinations=[{'type':'zip','class':'ZipWriter','example':'zip://<zipfile>'}]
+sources = [{'type':'zip', 'class':'ZipReader', 'example':'zip://<zipfile>'}]
+destinations = [{'type':'zip', 'class':'ZipWriter', 'example':'zip://<zipfile>'}]
 
 import os
 import json
