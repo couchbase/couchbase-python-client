@@ -34,13 +34,16 @@ logging.disable(logging.ERROR)
 
 class Server(object):
     def __init__(self, host, username, password):
-        server = {'ip':host.split(':')[0],
-                  'port':host.split(':')[1],
+        if (':' in host):
+            [ip, port] = host.split(':')
+        else:
+            [ip, port] = host, 8091
+
+        server = {'ip':ip,
+                  'port':port,
                   'username':username,
                   'password':password
                   }
-        if server['ip'] == server['port']:
-            server['port'] = 8091
 
         self.servers = [server]
         self.servers_lock = Lock()

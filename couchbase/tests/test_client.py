@@ -46,6 +46,9 @@ class ClientTest(unittest.TestCase):
         self.assertTrue(len(w) == 1)
         self.assertTrue("deprecated" in str(w[-1].message))
 
+    def test_couchbase_object_construction_without_port(self):
+        cb = Couchbase(self.host, self.username, self.password)
+        self.assertTrue(isinstance(cb.servers, types.ListType))
 
 if __name__ == "__main__":
     unittest.main()
