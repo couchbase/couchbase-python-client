@@ -21,18 +21,14 @@ from couchbase.rest_client import RestConnection
 
 
 class RestClientTest(unittest.TestCase):
-
-
     def setUp(self):
         self.host = config['node-1']['host']
         self.port = config['node-1']['port']
         self.username = config['node-1']['username']
         self.password = config['node-1']['password']
 
-
     def tearDown(self):
         pass
-
 
     def test_rest_client_object_creation(self):
         server_info = {"ip":self.host,

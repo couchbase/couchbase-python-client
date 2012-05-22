@@ -25,14 +25,11 @@ from couchbase.client import *
 
 
 class ClientTest(unittest.TestCase):
-
-
     def setUp(self):
         self.host = config['node-1']['host']
         self.port = config['node-1']['port']
         self.username = config['node-1']['username']
         self.password = config['node-1']['password']
-
 
     def tearDown(self):
         pass
@@ -48,7 +45,6 @@ class ClientTest(unittest.TestCase):
         self.assertTrue(isinstance(cb.servers, types.ListType))
         self.assertTrue(len(w) == 1)
         self.assertTrue("deprecated" in str(w[-1].message))
-
 
 
 if __name__ == "__main__":
