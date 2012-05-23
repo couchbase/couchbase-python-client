@@ -122,7 +122,8 @@ class MemcachedConstants(object):
                       'pending': VB_STATE_PENDING,
                       'dead': VB_STATE_DEAD}
 
-    COMMAND_NAMES = dict(((globals()[k], k) for k in globals() if k.startswith("CMD_")))
+    COMMAND_NAMES = (dict(((globals()[k], k) for k in globals()
+                     if k.startswith("CMD_"))))
 
     # TAP_OPAQUE types
     TAP_OPAQUE_ENABLE_AUTO_NACK = 0
@@ -145,7 +146,7 @@ class MemcachedConstants(object):
 
     # TAP per-message flags
     TAP_FLAG_ACK = 0x01
-    TAP_FLAG_NO_VALUE = 0x02 # The value for the key is not included in the packet
+    TAP_FLAG_NO_VALUE = 0x02  # The value for key is not included in the packet
 
     # Flags, expiration
     SET_PKT_FMT = ">II"
@@ -222,8 +223,9 @@ class MemcachedError(exceptions.Exception):
     """Error raised when a command fails."""
 
     def __init__(self, status, msg):
-        supermsg = 'Memcached error #' + `status`
-        if msg: supermsg += ":  " + msg
+        supermsg = 'Memcached error #' + repr(status)
+        if msg:
+            supermsg += ":  " + msg
         exceptions.Exception.__init__(self, supermsg)
 
         self.status = status
@@ -259,7 +261,8 @@ class MemcachedClient(object):
 
     def _sendMsg(self, cmd, key, val, opaque, extraHeader='', cas=0,
                  dtype=0, vbucketId=0,
-                 fmt=MemcachedConstants.REQ_PKT_FMT, magic=MemcachedConstants.REQ_MAGIC_BYTE):
+                 fmt=MemcachedConstants.REQ_PKT_FMT,
+                 magic=MemcachedConstants.REQ_MAGIC_BYTE):
         msg = struct.pack(fmt, magic,
                           cmd, len(key), len(extraHeader), dtype, vbucketId,
                           len(key) + len(extraHeader) + len(val), opaque, cas)
@@ -268,24 +271,28 @@ class MemcachedClient(object):
     def _recvMsg(self):
         response = ""
         while len(response) < MemcachedConstants.MIN_RECV_PACKET:
-            data = self.s.recv(MemcachedConstants.MIN_RECV_PACKET - len(response))
+            data = self.s.recv(MemcachedConstants.MIN_RECV_PACKET
+                               - len(response))
             if data == '':
-                raise exceptions.EOFError("Got empty data (remote died?). from %s" % (self.host))
+                raise exceptions.EOFError("Got empty data (remote died?)."
+                                          " from %s" % (self.host))
             response += data
         assert len(response) == MemcachedConstants.MIN_RECV_PACKET
-        magic, cmd, keylen, extralen, dtype, errcode, remaining, opaque, cas = \
+        magic, cmd, keylen, extralen, dtype, errcode, remaining, opaque, cas =\
         struct.unpack(MemcachedConstants.RES_PKT_FMT, response)
 
         rv = ""
         while remaining > 0:
             data = self.s.recv(remaining)
             if data == '':
-                raise exceptions.EOFError("Got empty data (remote died?). from %s" % (self.host))
+                raise exceptions.EOFError("Got empty data (remote died?)."
+                                          " from %s" % (self.host))
             rv += data
             remaining -= len(data)
 
-        assert (
-            magic in (MemcachedConstants.RES_MAGIC_BYTE, MemcachedConstants.REQ_MAGIC_BYTE)), "Got magic: %d" % magic
+        assert (magic in (MemcachedConstants.RES_MAGIC_BYTE,
+                          MemcachedConstants.REQ_MAGIC_BYTE)),\
+            "Got magic: %d" % magic
         return cmd, errcode, opaque, cas, keylen, extralen, rv
 
     def _handleKeyedResponse(self, myopaque):
@@ -297,7 +304,8 @@ class MemcachedClient(object):
         return cmd, opaque, cas, keylen, extralen, rv
 
     def _handleSingleResponse(self, myopaque):
-        cmd, opaque, cas, keylen, extralen, data = self._handleKeyedResponse(myopaque)
+        cmd, opaque, cas, keylen, extralen, data =\
+            self._handleKeyedResponse(myopaque)
         return opaque, cas, data
 
     def _doCmd(self, cmd, key, val, extraHeader='', cas=0):
@@ -307,8 +315,9 @@ class MemcachedClient(object):
         return self._handleSingleResponse(opaque)
 
     def _mutate(self, cmd, key, exp, flags, cas, val):
-        return self._doCmd(cmd, key, val, struct.pack(MemcachedConstants.SET_PKT_FMT, flags, exp),
-                           cas)
+        return self._doCmd(cmd, key, val,
+                           struct.pack(MemcachedConstants.SET_PKT_FMT, flags,
+                                       exp), cas)
 
     def _cat(self, cmd, key, cas, val):
         return self._doCmd(cmd, key, val, '', cas)
@@ -322,22 +331,26 @@ class MemcachedClient(object):
         return self._cat(MemcachedConstants.CMD_PREPEND, key, cas, value)
 
     def __incrdecr(self, cmd, key, amt, init, exp):
-        something, cas, val = self._doCmd(cmd, key, '',
-                                          struct.pack(MemcachedConstants.INCRDECR_PKT_FMT, amt, init, exp))
+        something, cas, val =\
+            self._doCmd(cmd, key, '',
+                        struct.pack(MemcachedConstants.INCRDECR_PKT_FMT,
+                                amt, init, exp))
         return struct.unpack(MemcachedConstants.INCRDECR_RES_FMT, val)[0], cas
 
-    def incr(self, key, amt=1, init=0, exp=0,vbucket=-1):
+    def incr(self, key, amt=1, init=0, exp=0, vbucket=-1):
         """Increment or create the named counter."""
         self._set_vbucket_id(key, vbucket)
-        return self.__incrdecr(MemcachedConstants.CMD_INCR, key, amt, init, exp)
+        return self.__incrdecr(MemcachedConstants.CMD_INCR, key, amt, init,
+                               exp)
 
-    def decr(self, key, amt=1, init=0, exp=0,vbucket=-1):
+    def decr(self, key, amt=1, init=0, exp=0, vbucket=-1):
         """Decrement or create the named counter."""
         self._set_vbucket_id(key, vbucket)
-        return self.__incrdecr(MemcachedConstants.CMD_DECR, key, amt, init, exp)
+        return self.__incrdecr(MemcachedConstants.CMD_DECR, key, amt, init,
+                               exp)
 
     def _set_vbucket_id(self, key, vbucket):
-        if vbucket ==-1:
+        if vbucket == -1:
             self.vbucketId = (zlib.crc32(key) >> 16) & (self.vbucket_count - 1)
         else:
             self.vbucketId = vbucket
@@ -345,12 +358,14 @@ class MemcachedClient(object):
     def set(self, key, exp, flags, val, vbucket=-1):
         """Set a value in the memcached server."""
         self._set_vbucket_id(key, vbucket)
-        return self._mutate(MemcachedConstants.CMD_SET, key, exp, flags, 0, val)
+        return self._mutate(MemcachedConstants.CMD_SET, key, exp, flags, 0,
+                            val)
 
     def add(self, key, exp, flags, val, vbucket=-1):
         """Add a value in the memcached server iff it doesn't already exist."""
         self._set_vbucket_id(key, vbucket)
-        return self._mutate(MemcachedConstants.CMD_ADD, key, exp, flags, 0, val)
+        return self._mutate(MemcachedConstants.CMD_ADD, key, exp, flags, 0,
+                            val)
 
     def replace(self, key, exp, flags, val, vbucket=-1):
         """Replace a value in the memcached server iff it already exists."""
@@ -389,14 +404,14 @@ class MemcachedClient(object):
                            struct.pack(MemcachedConstants.TOUCH_PKT_FMT, exp))
 
     def gat(self, key, exp, vbucket=-1):
-        """Get the value for a given key and touch it within the memcached server."""
+        """Get the value for a given key and touch it."""
         self._set_vbucket_id(key, vbucket)
         parts = self._doCmd(MemcachedConstants.CMD_GAT, key, '',
                             struct.pack(MemcachedConstants.GAT_PKT_FMT, exp))
         return self.__parseGet(parts)
 
     def version(self):
-        """Get the value for a given key within the memcached server."""
+        """Get the version of the server."""
         return self._doCmd(MemcachedConstants.CMD_VERSION, '', '')
 
     def sasl_mechanisms(self):
@@ -411,7 +426,8 @@ class MemcachedClient(object):
 
     def sasl_auth_plain(self, user, password, foruser=''):
         """Perform plain auth."""
-        return self.sasl_auth_start('PLAIN', '\0'.join([foruser, user, password]))
+        return self.sasl_auth_start('PLAIN', '\0'.join([foruser, user,
+                                                        password]))
 
     def sasl_auth_cram_md5(self, user, password):
         """Start a plan auth session."""
@@ -446,7 +462,8 @@ class MemcachedClient(object):
         return self._doCmd(MemcachedConstants.CMD_START_ONLINEUPDATE, '', '')
 
     def complete_onlineupdate(self):
-        return self._doCmd(MemcachedConstants.CMD_COMPLETE_ONLINEUPDATE, '', '')
+        return self._doCmd(MemcachedConstants.CMD_COMPLETE_ONLINEUPDATE, '',
+                           '')
 
     def revert_onlineupdate(self):
         return self._doCmd(MemcachedConstants.CMD_REVERT_ONLINEUPDATE, '', '')
@@ -505,7 +522,8 @@ class MemcachedClient(object):
         done = False
         rv = {}
         while not done:
-            cmd, opaque, cas, klen, extralen, data = self._handleKeyedResponse(None)
+            cmd, opaque, cas, klen, extralen, data =\
+                self._handleKeyedResponse(None)
             if klen:
                 rv[data[0:klen]] = data[klen:]
             else:
@@ -524,36 +542,44 @@ class MemcachedClient(object):
     def flush(self, timebomb=0):
         """Flush all storage in a memcached instance."""
         return self._doCmd(MemcachedConstants.CMD_FLUSH, '', '',
-                           struct.pack(MemcachedConstants.FLUSH_PKT_FMT, timebomb))
+                           struct.pack(MemcachedConstants.FLUSH_PKT_FMT,
+                                       timebomb))
 
     def bucket_select(self, name):
         return self._doCmd(MemcachedConstants.CMD_SELECT_BUCKET, name, '')
 
     def sync_persistence(self, keyspecs):
         payload = self._build_sync_payload(0x8, keyspecs)
-        opaque, cas, data = self._doCmd(MemcachedConstants.CMD_SYNC, "", payload)
+        opaque, cas, data = self._doCmd(MemcachedConstants.CMD_SYNC, "",
+                                        payload)
         return opaque, cas, self._parse_sync_response(data)
 
     def sync_mutation(self, keyspecs):
         payload = self._build_sync_payload(0x4, keyspecs)
-        opaque, cas, data = self._doCmd(MemcachedConstants.CMD_SYNC, "", payload)
+        opaque, cas, data = self._doCmd(MemcachedConstants.CMD_SYNC, "",
+                                        payload)
         return opaque, cas, self._parse_sync_response(data)
 
     def sync_replication(self, numReplicas, keyspecs):
         payload = self._build_sync_payload((numReplicas & 0x0f) << 4, keyspecs)
-        opaque, cas, data = self._doCmd(MemcachedConstants.CMD_SYNC, "", payload)
+        opaque, cas, data = self._doCmd(MemcachedConstants.CMD_SYNC, "",
+                                        payload)
         return opaque, cas, self._parse_sync_response(data)
 
     def sync_replication_or_persistence(self, numReplicas, keyspecs):
-        payload = self._build_sync_payload(((numReplicas & 0x0f) << 4) | 0x8, keyspecs)
+        payload = self._build_sync_payload(((numReplicas & 0x0f) << 4) |
+                                            0x8, keyspecs)
 
-        opaque, cas, data = self._doCmd(MemcachedConstants.CMD_SYNC, "", payload)
+        opaque, cas, data = self._doCmd(MemcachedConstants.CMD_SYNC, "",
+                                        payload)
         return opaque, cas, self._parse_sync_response(data)
 
     def sync_replication_and_persistence(self, numReplicas, keyspecs):
-        payload = self._build_sync_payload(((numReplicas & 0x0f) << 4) | 0xA, keyspecs)
+        payload = self._build_sync_payload(((numReplicas & 0x0f) << 4) |
+                                            0xA, keyspecs)
 
-        opaque, cas, data = self._doCmd(MemcachedConstants.CMD_SYNC, "", payload)
+        opaque, cas, data = self._doCmd(MemcachedConstants.CMD_SYNC, "",
+                                        payload)
         return opaque, cas, self._parse_sync_response(data)
 
     def _build_sync_payload(self, flags, keyspecs):
@@ -563,9 +589,9 @@ class MemcachedClient(object):
         for spec in keyspecs:
             if not isinstance(spec, dict):
                 raise TypeError("each keyspec must be a dict")
-            if not spec.has_key('vbucket'):
+            if 'vbucket' not in spec:
                 raise TypeError("missing vbucket property in keyspec")
-            if not spec.has_key('key'):
+            if 'key' not in spec:
                 raise TypeError("missing key property in keyspec")
 
             payload += struct.pack(">Q", spec.get('cas', 0))
@@ -582,7 +608,8 @@ class MemcachedClient(object):
         for i in xrange(nkeys):
             spec = {}
             width = struct.calcsize("QHHB")
-            spec['cas'], spec['vbucket'], keylen, eventid = struct.unpack(">QHHB", data[offset: offset + width])
+            spec['cas'], spec['vbucket'], keylen, eventid =\
+                struct.unpack(">QHHB", data[offset: offset + width])
 
             offset += width
             spec['key'] = data[offset: offset + keylen]
@@ -616,7 +643,8 @@ class MemcachedClient(object):
 
     def deregister_tap_client(self, tap_name):
         """Deregister the TAP client with a given name."""
-        return self._doCmd(MemcachedConstants.CMD_DEREGISTER_TAP_CLIENT, tap_name, '')
+        return self._doCmd(MemcachedConstants.CMD_DEREGISTER_TAP_CLIENT,
+                           tap_name, '')
 
 
 class VBucketAwareCouchbaseClient(object):
@@ -635,11 +663,15 @@ class VBucketAwareCouchbaseClient(object):
         #TODO: use regular expressions to parse the url
         server = {}
         if not bucket:
-            raise InvalidArgumentException("bucket can not be an empty string", parameters="bucket")
+            raise InvalidArgumentException("bucket can not be an empty string",
+                                           parameters="bucket")
         if not url:
-            raise InvalidArgumentException("url can not be an empty string", parameters="url")
-        if url.find("http://") != -1 and url.rfind(":") != -1 and url.find("/pools/default") != -1:
-            server["ip"] = url[url.find("http://") + len("http://"):url.rfind(":")]
+            raise InvalidArgumentException("url can not be an empty string",
+                                           parameters="url")
+        if (url.find("http://") != -1 and url.rfind(":") != -1 and
+            url.find("/pools/default") != -1):
+            server["ip"] = (url[url.find("http://")
+                            + len("http://"):url.rfind(":")])
             server["port"] = url[url.rfind(":") + 1:url.find("/pools/default")]
             server["username"] = self.rest_username
             server["password"] = self.rest_password
@@ -649,10 +681,12 @@ class VBucketAwareCouchbaseClient(object):
         self.reconfig_vbucket_map()
         self.init_vbucket_connections()
         self.dispatcher = CommandDispatcher(self)
-        self.dispatcher_thread = Thread(name="dispatcher-thread", target=self._start_dispatcher)
+        self.dispatcher_thread = Thread(name="dispatcher-thread",
+                                        target=self._start_dispatcher)
         self.dispatcher_thread.daemon = True
         self.dispatcher_thread.start()
-        self.streaming_thread = Thread(name="streaming", target=self._start_streaming, args=())
+        self.streaming_thread = Thread(name="streaming",
+                                       target=self._start_streaming, args=())
         self.streaming_thread.daemon = True
         self.streaming_thread.start()
         self.verbose = verbose
@@ -661,16 +695,20 @@ class VBucketAwareCouchbaseClient(object):
         self.dispatcher.dispatch()
 
     def _start_streaming(self):
-        # this will dynamically update vBucketMap, vBucketMapFastForward, servers
+        # This will dynamically update vBucketMap, vBucketMapFastForward,
+        # and servers
         urlopener = urllib.FancyURLopener()
-        urlopener.prompt_user_passwd = lambda host, realm: (self.rest_username, self.rest_password)
+        urlopener.prompt_user_passwd = lambda: (self.rest_username,
+                                                self.rest_password)
         current_servers = True
         while current_servers:
             self.servers_lock.acquire()
             current_servers = deepcopy(self.servers)
             self.servers_lock.release()
             for server in current_servers:
-                response = urlopener.open("http://%s:%s/pools/default/bucketsStreaming/%s" % (server["ip"], server["port"], self.bucket))
+                response = urlopener.open("http://%s:%s/pools/default/bucketsS"
+                                          "treaming/%s" % (server["ip"],
+                                          server["port"], self.bucket))
                 while response:
                     try:
                         line = response.readline()
@@ -691,11 +729,14 @@ class VBucketAwareCouchbaseClient(object):
                     vbucketmapfastforward = {}
                     index = 0
                     if 'vBucketMapForward' in data['vBucketServerMap']:
-                        for vbucket in data['vBucketServerMap']['vBucketMapForward']:
-                            vbucketmapfastforward[index] = serverlist[vbucket[0]]
+                        for vbucket in\
+                            data['vBucketServerMap']['vBucketMapForward']:
+                            vbucketmapfastforward[index] =\
+                                serverlist[vbucket[0]]
                             index += 1
                         self._vBucketMapFastForward_lock.acquire()
-                        self._vBucketMapFastForward = deepcopy(vbucketmapfastforward)
+                        self._vBucketMapFastForward =\
+                            deepcopy(vbucketmapfastforward)
                         self._vBucketMapFastForward_lock.release()
                     vbucketmap = {}
                     index = 0
@@ -714,12 +755,14 @@ class VBucketAwareCouchbaseClient(object):
                     new_servers = []
                     nodes = data["nodes"]
                     for node in nodes:
-                        if node["clusterMembership"] == "active" and node["status"] == "healthy":
-                            hostport = node["hostname"]
-                            new_servers.append({"ip":hostport.split(":")[0],
-                                                "port":int(hostport.split(":")[1]),
-                                                "username":self.rest_username,
-                                                "password":self.rest_password})
+                        if (node["clusterMembership"] == "active" and
+                            node["status"] == "healthy"):
+                            ip, port = node["hostname"].split(":")
+                            new_servers.append({"ip": ip,
+                                                "port": port,
+                                                "username": self.rest_username,
+                                                "password": self.rest_password
+                                                })
                     new_servers.sort()
                     self.servers_lock.acquire()
                     self.servers = deepcopy(new_servers)
@@ -739,7 +782,9 @@ class VBucketAwareCouchbaseClient(object):
         self._vBucketMap_lock.release()
         serverIp, serverPort = server.split(":")
         if not server in self._memcacheds:
-            self._memcacheds[server] = MemcachedClientHelper.direct_client(self.rest, serverIp, serverPort, self.bucket)
+            self._memcacheds[server] =\
+                MemcachedClientHelper.direct_client(self.rest, serverIp,
+                                                    serverPort, self.bucket)
 
     def start_vbucket_fastforward_connection(self, vbucket):
         self._vBucketMapFastForward_lock.acquire()
@@ -750,7 +795,9 @@ class VBucketAwareCouchbaseClient(object):
         self._vBucketMapFastForward_lock.release()
         serverIp, serverPort = server.split(":")
         if not server in self._memcacheds:
-            self._memcacheds[server] = MemcachedClientHelper.direct_client(self.rest, serverIp, serverPort, self.bucket)
+            self._memcacheds[server] =\
+                MemcachedClientHelper.direct_client(self.rest, serverIp,
+                                                    serverPort, self.bucket)
 
     def restart_vbucket_connection(self, vbucket):
         self._vBucketMap_lock.acquire()
@@ -759,16 +806,17 @@ class VBucketAwareCouchbaseClient(object):
         serverIp, serverPort = server.split(":")
         if server in self._memcacheds:
             self._memcacheds[server].close()
-        self._memcacheds[server] = MemcachedClientHelper.direct_client(self.rest, serverIp, serverPort, self.bucket)
+        self._memcacheds[server] =\
+            MemcachedClientHelper.direct_client(self.rest, serverIp,
+                                                serverPort, self.bucket)
 
     def reconfig_vbucket_map(self, vbucket=-1):
         vb_ready = RestHelper(self.rest).vbucket_map_ready(self.bucket, 60)
         if not vb_ready:
-            raise Exception("vbucket map is not ready for bucket %s" % (self.bucket))
+            raise Exception("vbucket map is not ready for bucket %s" %
+                            (self.bucket))
         vBuckets = self.rest.get_vbuckets(self.bucket)
         self.vbucket_count = len(vBuckets)
-        bucket_info = self.rest.get_bucket(self.bucket)
-        nodes = bucket_info.nodes
 
         self._vBucketMap_lock.acquire()
         for vBucket in vBuckets:
@@ -785,7 +833,8 @@ class VBucketAwareCouchbaseClient(object):
             # only try the fastforward if we have an entry
             # otherwise we just wait for the main map to update
             self.start_vbucket_fastforward_connection(vBucketId)
-            self._vBucketMap[vBucketId] = self._vBucketMapFastForward[vBucketId]
+            self._vBucketMap[vBucketId] =\
+                self._vBucketMapFastForward[vBucketId]
 
         if vBucketId not in self._vBucketMap:
             msg = "vbucket map does not have an entry for vb : %s"
@@ -838,50 +887,52 @@ class VBucketAwareCouchbaseClient(object):
 
     def gat(self, key, expiry):
         event = Event()
-        item = {"operation": "gat", "key": key, "expiry": expiry, "event": event,
-                "response": {}}
+        item = {"operation": "gat", "key": key, "expiry": expiry,
+                "event": event, "response": {}}
         self.dispatcher.put(item)
         return self._respond(item, event)
 
     def touch(self, key, expiry):
         event = Event()
-        item = {"operation": "touch", "key": key, "expiry": expiry, "event": event,
+        item = {"operation": "touch", "key": key, "expiry": expiry,
+                "event": event,
                 "response": {}}
         self.dispatcher.put(item)
         return self._respond(item, event)
 
     def cas(self, key, expiry, flags, old_value, value):
         event = Event()
-        item = {"operation": "cas", "key": key, "expiry": expiry, "flags": flags, "old_value": old_value, "value": value
-            , "event": event, "response": {}}
+        item = {"operation": "cas", "key": key, "expiry": expiry,
+                "flags": flags, "old_value": old_value, "value": value,
+                "event": event, "response": {}}
         self.dispatcher.put(item)
         return self._respond(item, event)
 
     def decr(self, key, amount=1, init=0, expiry=0):
         event = Event()
-        item = {"operation": "decr", "key": key, "amount": amount, "init": init, "expiry": expiry, "event": event,
-                "response": {}}
+        item = {"operation": "decr", "key": key, "amount": amount,
+                "init": init, "expiry": expiry, "event": event, "response": {}}
         self.dispatcher.put(item)
         return self._respond(item, event)
 
     def set(self, key, expiry, flags, value):
         event = Event()
-        item = {"operation": "set", "key": key, "expiry": expiry, "flags": flags, "value": value, "event": event,
-                "response": {}}
+        item = {"operation": "set", "key": key, "expiry": expiry,
+                "flags": flags, "value": value, "event": event, "response": {}}
         self.dispatcher.put(item)
         return self._respond(item, event)
 
     def add(self, key, expiry, flags, value):
         event = Event()
-        item = {"operation": "add", "key": key, "expiry": expiry, "flags": flags, "value": value, "event": event,
-                "response": {}}
+        item = {"operation": "add", "key": key, "expiry": expiry,
+                "flags": flags, "value": value, "event": event, "response": {}}
         self.dispatcher.put(item)
         return self._respond(item, event)
 
     def append(self, key, value, cas=0):
         event = Event()
-        item = {"operation": "append", "key": key, "cas": cas, "value": value, "event": event,
-                "response": {}}
+        item = {"operation": "append", "key": key, "cas": cas, "value": value,
+                "event": event, "response": {}}
         self.dispatcher.put(item)
         return self._respond(item, event)
 
@@ -894,29 +945,29 @@ class VBucketAwareCouchbaseClient(object):
 
     def prepend(self, key, value, cas=0):
         event = Event()
-        item = {"operation": "prepend", "key": key, "cas": cas, "value": value, "event": event,
-                "response": {}}
+        item = {"operation": "prepend", "key": key, "cas": cas, "value": value,
+                "event": event, "response": {}}
         self.dispatcher.put(item)
         return self._respond(item, event)
 
     def getl(self, key, expiry=15):
         event = Event()
-        item = {"operation": "getl", "key": key, "expiry": expiry, "event": event,
-                "response": {}}
+        item = {"operation": "getl", "key": key, "expiry": expiry,
+                "event": event, "response": {}}
         self.dispatcher.put(item)
         return self._respond(item, event)
 
     def replace(self, key, expiry, flags, value):
         event = Event()
-        item = {"operation": "replace", "key": key, "expiry": expiry, "flags": flags, "value": value, "event": event,
-                "response": {}}
+        item = {"operation": "replace", "key": key, "expiry": expiry,
+                "flags": flags, "value": value, "event": event, "response": {}}
         self.dispatcher.put(item)
         return self._respond(item, event)
 
     def incr(self, key, amount=1, init=0, expiry=0):
         event = Event()
-        item = {"operation": "incr", "key": key, "amount": amount, "init": init, "expiry": expiry, "event": event,
-                "response": {}}
+        item = {"operation": "incr", "key": key, "amount": amount,
+                "init": init, "expiry": expiry, "event": event, "response": {}}
         self.dispatcher.put(item)
         return self._respond(item, event)
 
@@ -932,7 +983,8 @@ class CommandDispatcher(object):
         self.vbaware = vbaware
         self.reconfig_callback = self.vbaware.reconfig_vbucket_map
         self.start_connection_callback = self.vbaware.start_vbucket_connection
-        self.restart_connection_callback = self.vbaware.restart_vbucket_connection
+        self.restart_connection_callback =\
+            self.vbaware.restart_vbucket_connection
         self.verbose = verbose
         self.log = logger.logger("CommandDispatcher")
         self._dispatcher_stopped_event = Event()
@@ -955,7 +1007,8 @@ class CommandDispatcher(object):
         self.status = "ok"
 
     def dispatch(self):
-        while self.status != "shutdown" or (self.status == "shutdown" and self.queue.qsize() > 0):
+        while (self.status != "shutdown" or (self.status == "shutdown" and
+               self.queue.qsize() > 0)):
             #wait if its reconfiguring the vbucket-map
             if self.status == "vbucketmap-configuration":
                 continue
@@ -995,7 +1048,8 @@ class CommandDispatcher(object):
         if isinstance(ex, MemcachedError) and ex.status == 7:
             ex.vbucket = item["vbucket"]
             print ex
-            self.log.error("got not my vb error. key: %s, vbucket: %s" % (item["key"], item["vbucket"]))
+            self.log.error("got not my vb error. key: %s, vbucket: %s" %
+                           (item["key"], item["vbucket"]))
             raise ex
         if isinstance(ex, exceptions.EOFError):
             ex.vbucket = item["vbucket"]
@@ -1010,7 +1064,7 @@ class CommandDispatcher(object):
         item["response"]["error"] = ex
 
     def do(self, item):
-        #find which vbucket this belongs to and then run the operation on that ?
+        #find which vbucket this belongs to and then run the operation on that
         if "key" in item:
             item["vbucket"] = self.vbaware.vbucketid(item["key"])
         if not "fastforward" in item:
@@ -1020,7 +1074,8 @@ class CommandDispatcher(object):
         if item["operation"] == "get":
             key = item["key"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key, item["fastforward"]).get(key)
+                item["response"]["return"] =\
+                    self.vbaware.memcached(key, item["fastforward"]).get(key)
             except Exception, ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
@@ -1030,7 +1085,9 @@ class CommandDispatcher(object):
             flags = item["flags"]
             value = item["value"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key, item["fastforward"]).set(key, expiry, flags, value)
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.set(key, expiry, flags,
+                                                      value)
             except Exception, ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
@@ -1040,7 +1097,9 @@ class CommandDispatcher(object):
             flags = item["flags"]
             value = item["value"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key, item["fastforward"]).add(key, expiry, flags, value)
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.add(key, expiry, flags,
+                                                      value)
             except Exception, ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
@@ -1050,7 +1109,9 @@ class CommandDispatcher(object):
             flags = item["flags"]
             value = item["value"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key, item["fastforward"]).replace(key, expiry, flags, value)
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.replace(key, expiry, flags,
+                                                          value)
             except Exception, ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
@@ -1058,7 +1119,8 @@ class CommandDispatcher(object):
             key = item["key"]
             cas = item["cas"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key, item["fastforward"]).delete(key, cas)
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.delete(key, cas)
             except Exception, ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
@@ -1067,7 +1129,8 @@ class CommandDispatcher(object):
             cas = item["cas"]
             value = item["value"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key, item["fastforward"]).prepend(key, value, cas)
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.prepend(key, value, cas)
             except Exception, ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
@@ -1076,7 +1139,8 @@ class CommandDispatcher(object):
             cas = item["cas"]
             value = item["value"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key, item["fastforward"]).append(key, value, cas)
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.append(key, value, cas)
             except Exception, ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
@@ -1084,7 +1148,8 @@ class CommandDispatcher(object):
             key = item["key"]
             expiry = item["expiry"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key, item["fastforward"]).getl(key, expiry)
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.getl(key, expiry)
             except Exception, ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
@@ -1092,7 +1157,8 @@ class CommandDispatcher(object):
             key = item["key"]
             expiry = item["expiry"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key, item["fastforward"]).gat(key, expiry)
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.gat(key, expiry)
             except Exception, ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
@@ -1100,7 +1166,8 @@ class CommandDispatcher(object):
             key = item["key"]
             expiry = item["expiry"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key, item["fastforward"]).touch(key, expiry)
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.touch(key, expiry)
             except Exception, ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
@@ -1110,7 +1177,9 @@ class CommandDispatcher(object):
             init = item["init"]
             expiry = item["expiry"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key, item["fastforward"]).incr(key, amount, init, expiry)
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.incr(key, amount, init,
+                                                       expiry)
             except Exception, ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
@@ -1120,7 +1189,9 @@ class CommandDispatcher(object):
             init = item["init"]
             expiry = item["expiry"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key, item["fastforward"]).decr(key, amount, init, expiry)
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.decr(key, amount, init,
+                                                       expiry)
             except Exception, ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
@@ -1132,7 +1203,9 @@ class CommandDispatcher(object):
             old_value = item["old_value"]
             value = item["value"]
             try:
-                item["response"]["return"] = self.vbaware.memcached(key, item["fastforward"]).cas(key, expiry, flags, old_value, value)
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.cas(key, expiry, flags,
+                                                      old_value, value)
             except Exception, ex:
                 self._raise_if_recoverable(ex, item)
             item["event"].set()
@@ -1145,9 +1218,12 @@ class MemcachedClientHelper(object):
         vBuckets = bucket_info.vbuckets
         for node in bucket_info.nodes:
             if node.ip == ip and node.memcached == int(port):
-                client = MemcachedClient(ip.encode('ascii', 'ignore'), int(port))
+                client = MemcachedClient(ip.encode('ascii', 'ignore'),
+                                         int(port))
                 client.vbucket_count = len(vBuckets)
                 client.sasl_auth_plain(bucket_info.name.encode('ascii'),
-                                       bucket_info.saslPassword.encode('ascii'))
+                                       bucket_info.saslPassword
+                                       .encode('ascii'))
                 return client
-        raise Exception("unexpected error - unable to find ip:%s in this cluster" % (ip))
+        raise Exception(("unexpected error - unable to find ip:%s in this"
+                         " cluster" % (ip)))

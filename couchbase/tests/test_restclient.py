@@ -31,12 +31,13 @@ class RestClientTest(unittest.TestCase):
         pass
 
     def test_rest_client_object_creation(self):
-        server_info = {"ip":self.host,
-                       "port":self.port,
-                       "username":self.username,
-                       "password":self.password}
+        server_info = {"ip": self.host,
+                       "port": self.port,
+                       "username": self.username,
+                       "password": self.password}
         rest = RestConnection(server_info)
-        self.assertEqual(rest.baseUrl, "http://%s:%s/" % (self.host, self.port))
+        self.assertEqual(rest.baseUrl, "http://%s:%s/" %
+                         (self.host, self.port))
 
 
 if __name__ == "__main__":

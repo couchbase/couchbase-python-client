@@ -19,8 +19,8 @@ sources = [{'type':'csv', 'class':'CSVReader', 'example':'csv://<filename>'}]
 destinations = []
 
 import csv
-
 import migrator
+
 
 class CSVReader(migrator.Reader):
     def __init__(self, source):
@@ -35,8 +35,9 @@ class CSVReader(migrator.Reader):
     def next(self):
         data = self.reader.next()
         if data:
-            record = {'id':data['id']}
-            record['value'] = dict((k, v) for (k, v) in data.iteritems() if k != 'id' and not k.startswith('_'))
+            record = {'id': data['id']}
+            record['value'] = (dict((k, v) for (k, v) in data.iteritems()
+                               if k != 'id' and not k.startswith('_')))
             return record
         else:
             raise StopIteration()

@@ -19,11 +19,11 @@
 
 import sys
 import getopt
-
 import couchbase.migrator
 
-#sources: json, csv, sqlite, couchdb, couchbase, membase, memcached, membase-sqlite
-#dest: json (chunked), couchbase
+# sources: json, csv, sqlite, couchdb, couchbase, membase, memcached,
+# membase-sqlite
+# dest: json (chunked), couchbase
 
 
 def usage(err=None):
@@ -73,6 +73,7 @@ Options:
 
     sys.exit(r)
 
+
 class Config(object):
     def __init__(self):
         self.source = ''
@@ -81,6 +82,7 @@ class Config(object):
         self.dryrun = False
         self.verbose = False
         self.quiet = False
+
 
 def parse_args(argv):
     config = Config()

@@ -35,7 +35,8 @@ class ClientTest(unittest.TestCase):
         pass
 
     def test_couchbase_object_construction(self):
-        cb = Couchbase(self.host + ':' + self.port, self.username, self.password)
+        cb = Couchbase(self.host + ':' + self.port, self.username,
+                       self.password)
         self.assertTrue(isinstance(cb.servers, types.ListType))
 
     def test_server_object_construction(self):

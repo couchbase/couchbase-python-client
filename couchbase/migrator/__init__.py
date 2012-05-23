@@ -26,6 +26,7 @@ destinations.extend(migrator_couchdb.destinations)
 destinations.extend(migrator_dir.destinations)
 destinations.extend(migrator_zip.destinations)
 
+
 def reader(loc):
     kind, fp = loc.split(':', 1)
     if kind.lower() == 'csv':
@@ -40,6 +41,7 @@ def reader(loc):
         return DirReader(fp)
     elif kind.lower() == 'zip':
         return ZipReader(fp)
+
 
 def writer(loc):
     kind, fp = loc.split(':', 1)

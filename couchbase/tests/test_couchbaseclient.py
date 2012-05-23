@@ -20,11 +20,13 @@ import uuid
 from testconfig import config
 from couchbase.couchbaseclient import VBucketAwareCouchbaseClient
 
+
 class CouchbaseClientTest(unittest.TestCase):
     def setUp(self):
         self.url = config['node-1']['url']
         self.bucket = config['node-1']['bucket']
-        self.client = VBucketAwareCouchbaseClient(self.url, self.bucket, "", True)
+        self.client = VBucketAwareCouchbaseClient(self.url, self.bucket, "",
+                                                  True)
 
     def tearDown(self):
         self.client.done()

@@ -17,15 +17,14 @@
 
 import uuid
 try:
-   import json
+    import json
 except:
-   import simplejson as json
+    import simplejson as json
 import time
 from copy import deepcopy
 from threading import Thread, Lock
 import urllib
 import warnings
-
 import logging
 
 from rest_client import RestConnection
@@ -41,10 +40,10 @@ class Couchbase(object):
         else:
             [ip, port] = host, 8091
 
-        server = {'ip':ip,
-                  'port':port,
-                  'username':username,
-                  'password':password
+        server = {'ip': ip,
+                  'port': port,
+                  'username': username,
+                  'password': password
                   }
 
         self.servers = [server]
@@ -53,26 +52,31 @@ class Couchbase(object):
         self.rest_username = username
         self.rest_password = password
 
-        server_config_uri = "http://%s:%s/pools/default" % (server['ip'], server['port'])
-        config = ServerHelper.parse_server_config(server_config_uri, username, password)
+        server_config_uri = "http://%s:%s/pools/default" % (server['ip'],
+                                                            server['port'])
+        config = ServerHelper.parse_server_config(server_config_uri, username,
+                                                  password)
         #couchApiBase will not be in node config before Couchbase Server 2.0
         self.couch_api_base = config["nodes"][0].get("couchApiBase")
 
-        self.streaming_thread = Thread(name="streaming", target=self._start_streaming, args=())
+        self.streaming_thread = Thread(name="streaming",
+                                       target=self._start_streaming, args=())
         self.streaming_thread.daemon = True
         self.streaming_thread.start()
 
     def _start_streaming(self):
         # this will dynamically update servers
         urlopener = urllib.FancyURLopener()
-        urlopener.prompt_user_passwd = lambda host, realm: (self.rest_username, self.rest_password)
+        urlopener.prompt_user_passwd = lambda: (self.rest_username,
+                                                self.rest_password)
         current_servers = True
         while current_servers:
             self.servers_lock.acquire()
             current_servers = deepcopy(self.servers)
             self.servers_lock.release()
             for server in current_servers:
-                url = "http://%s:%s/poolsStreaming/default" % (server["ip"], server["port"])
+                url = "http://%s:%s/poolsStreaming/default" % (server["ip"],
+                                                               server["port"])
                 f = urlopener.open(url)
                 while f:
                     try:
@@ -93,14 +97,15 @@ class Couchbase(object):
                     new_servers = []
                     nodes = data["nodes"]
                     for node in nodes:
-                        if node["clusterMembership"] == "active" and node["status"] == "healthy":
-                            hostport = node["hostname"]
+                        if (node["clusterMembership"] == "active" and
+                            node["status"] == "healthy"):
+                            ip, port = node["hostname"].split(":")
                             couch_api_base = node.get("couchApiBase")
-                            new_servers.append({"ip":hostport.split(":")[0],
-                                                "port":int(hostport.split(":")[1]),
-                                                "username":self.rest_username,
-                                                "password":self.rest_password,
-                                                "couchApiBase" : couch_api_base
+                            new_servers.append({"ip": ip,
+                                                "port": port,
+                                                "username": self.rest_username,
+                                                "password": self.rest_password,
+                                                "couchApiBase": couch_api_base
                                                 })
                     new_servers.sort()
                     self.servers_lock.acquire()
@@ -118,7 +123,8 @@ class Couchbase(object):
             buckets.append(Bucket(rest_bucket.name, self))
         return buckets
 
-    def create(self, bucket_name, bucket_password='', ram_quota_mb=100, replica=0):
+    def create(self, bucket_name, bucket_password='', ram_quota_mb=100,
+               replica=0):
         rest = self._rest()
         rest.create_bucket(bucket=bucket_name,
                            ramQuotaMB=ram_quota_mb,
@@ -131,7 +137,11 @@ class Couchbase(object):
         while True:
             try:
                 content = '{"basicStats":{"quotaPercentUsed":0.0}}'
-                status, content = rest._http_request("http://%s:%s/pools/default/buckets/%s" % (ip, port, bucket_name), method='GET', params='', headers=None, timeout=120)
+                formatter_uri = "http://%s:%s/pools/default/buckets/%s"
+                status, content = rest._http_request(formatter_uri %
+                                                     (ip, port, bucket_name),
+                                                     method='GET', params='',
+                                                     headers=None, timeout=120)
             except ValueError:
                 pass
             if json.loads(content)['basicStats']['quotaPercentUsed'] > 0.0:
@@ -165,12 +175,14 @@ class Couchbase(object):
         self.servers_lock.acquire()
         server_info = deepcopy(self.servers[0])
         self.servers_lock.release()
-        return server_info['ip'], server_info['port'], server_info['username'], server_info['password']
+        return (server_info['ip'], server_info['port'],
+                server_info['username'], server_info['password'])
 
 
 class Server(Couchbase):
     def __init__(self, host, username, password):
-        warnings.warn("Server is deprecated; use Couchbase instead", DeprecationWarning)
+        warnings.warn("Server is deprecated; use Couchbase instead",
+                      DeprecationWarning)
         Couchbase.__init__(self, host, username, password)
 
 
@@ -197,7 +209,11 @@ class Bucket(object):
         self.bucket_password = rest.get_bucket(bucket_name).saslPassword
 
         ip, port, rest_username, rest_password = server._rest_info()
-        self.mc_client = VBucketAwareCouchbaseClient("http://%s:%s/pools/default" % (ip, port), self.bucket_name, self.bucket_password)
+        formatter_uri = "http://%s:%s/pools/default"
+        self.mc_client = VBucketAwareCouchbaseClient(formatter_uri %
+                                                     (ip, port),
+                                                     self.bucket_name,
+                                                     self.bucket_password)
 
     def append(self, key, value, cas=0):
         return self.mc_client.append(key, value, cas)
@@ -280,7 +296,7 @@ class Bucket(object):
             rest.create_view(self.bucket_name, view, json.dumps(value))
         else:
             if '_rev' in value:
-                # couchbase works in clobber mode so for a "set" _rev is useless
+                # couchbase works in clobber mode so for "set" _rev is useless
                 del value['_rev']
             self.set(key, expiration, flags, json.dumps(value))
 
@@ -312,18 +328,20 @@ class Bucket(object):
 
         rest = self.server._rest()
 
-        results = rest.view_results(self.bucket_name, view_doc, view_map, params, limit)
+        results = rest.view_results(self.bucket_name, view_doc, view_map,
+                                    params, limit)
         if 'rows' in results:
             return results['rows']
         else:
             return None
+
 
 class ServerHelper(object):
     @staticmethod
     def parse_server_config(uri, username="", password=""):
         urlopener = urllib.FancyURLopener()
         if len(username) > 0 and len(password) > 0:
-            urlopener.prompt_user_passwd = lambda host, realm: (username, password)
+            urlopener.prompt_user_passwd = lambda: (username, password)
         response = urlopener.open(uri)
 
         try:
@@ -331,4 +349,5 @@ class ServerHelper(object):
             data = json.loads(line)
             return data
         except:
-            raise Exception("unexpected error - unable to parse server config at %s" % (uri))
+            raise Exception("unexpected error - unable to parse server config"
+                            " at %s" % (uri))

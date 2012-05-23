@@ -15,6 +15,7 @@
 # limitations under the License.
 #
 
+
 class Reader(object):
     def __init__(self, fp):
         pass
@@ -28,11 +29,12 @@ class Reader(object):
     def close(self):
         pass
 
+
 class Writer(object):
     def __init__(self, fp):
         pass
 
-    def write(self):
+    def write(self, record):
         raise NotImplementedError
 
     def close(self):

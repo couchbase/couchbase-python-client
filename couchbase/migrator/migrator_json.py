@@ -14,13 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
-sources = [{'type':'json', 'class':'JSONReader', 'example':'json://<filename>'}]
-destinations = [{'type':'json', 'class':'JSONWriter', 'example':'json://<filename>'}]
-
 import json
-
 import migrator
+
+sources = [{'type':'json', 'class':'JSONReader',
+            'example':'json://<filename>'}]
+destinations = [{'type':'json', 'class':'JSONWriter',
+                 'example':'json://<filename>'}]
+
 
 class JSONReader(migrator.Reader):
     def __init__(self, source):
@@ -38,8 +39,10 @@ class JSONReader(migrator.Reader):
                 json_data = json.loads(data.strip('\n\r,'))
             except ValueError:
                 raise StopIteration()
-            record = {'id':json_data['id']}
-            record['value'] = dict((k, v) for (k, v) in json_data['value'].iteritems() if not k.startswith('_'))
+            record = {'id': json_data['id']}
+            record['value'] = (dict((k, v) for (k, v) in
+                               json_data['value'].iteritems()
+                               if not k.startswith('_')))
             return record
         else:
             raise StopIteration()

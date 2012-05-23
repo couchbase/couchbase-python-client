@@ -17,17 +17,18 @@
 
 # source *.json files from a zip file into destination
 
-sources = [{'type':'zip', 'class':'ZipReader', 'example':'zip://<zipfile>'}]
-destinations = [{'type':'zip', 'class':'ZipWriter', 'example':'zip://<zipfile>'}]
-
 import os
 import json
 import zipfile
 import tempfile
 import shutil
 
-import migrator
 from migrator_dir import DirReader, DirWriter
+
+sources = [{'type':'zip', 'class':'ZipReader', 'example':'zip://<zipfile>'}]
+destinations = [{'type':'zip', 'class':'ZipWriter',
+                 'example':'zip://<zipfile>'}]
+
 
 class ZipReader(DirReader):
     def __init__(self, source):
@@ -41,14 +42,16 @@ class ZipReader(DirReader):
         DirReader.__init__(self, self.tempdir)
 
     def close(self):
-       shutil.rmtree(self.tempdir)
-       self.zipfile.close()
+        shutil.rmtree(self.tempdir)
+        self.zipfile.close()
+
 
 class ZipWriter(DirWriter):
     def __init__(self, destination):
         if destination[0:2] == "//":
             destination = destination[2:]
-        self.zipfile = zipfile.ZipFile(os.path.expanduser(destination), "w", zipfile.ZIP_DEFLATED)
+        self.zipfile = zipfile.ZipFile(os.path.expanduser(destination), "w",
+                                       zipfile.ZIP_DEFLATED)
         self.dirname = os.path.splitext(os.path.basename(destination))[0]
         self.tempdir = tempfile.mkdtemp()
 

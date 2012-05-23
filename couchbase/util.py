@@ -1,6 +1,7 @@
 
 import sys
 
+
 class ProgressBar:
     """from http://code.activestate.com/recipes/168639-progress-bar-class/
     License: http://www.opensource.org/licenses/PythonSoftFoundation.php
@@ -15,8 +16,10 @@ class ProgressBar:
         self.updateAmount(0)  # Build progress bar string
 
     def updateAmount(self, newAmount=0):
-        if newAmount < self.min: newAmount = self.min
-        if newAmount > self.max: newAmount = self.max
+        if newAmount < self.min:
+            newAmount = self.min
+        if newAmount > self.max:
+            newAmount = self.max
         self.amount = newAmount
 
         # Figure out the new percent done, round to an integer
@@ -31,15 +34,16 @@ class ProgressBar:
         numHashes = int(round(numHashes))
 
         # build a progress bar with hashes and spaces
-        self.progBar = "[" + '#' * numHashes + ' ' * (allFull - numHashes) + "]"
+        self.progBar = ("[" + '#' * numHashes + ' ' * (allFull - numHashes)
+                        + "]")
 
         # figure out where to put the percentage, roughly centered
         percentPlace = (len(self.progBar) / 2) - len(str(percentDone))
         percentString = str(percentDone) + "%"
 
         # slice the percentage into the bar
-        self.progBar = self.progBar[0:percentPlace] + percentString + self.progBar[percentPlace + len(percentString):]
-
+        self.progBar = (self.progBar[0:percentPlace] + percentString
+                        + self.progBar[percentPlace + len(percentString):])
 
     def __str__(self):
         return str(self.progBar)
@@ -54,8 +58,10 @@ class ProgressBar:
             sys.stdout.write(self.pbar_str + '\r')
             sys.stdout.flush()      # force updating of screen
 
+
 class StringUtil(object):
 
     @staticmethod
     def create_value(pattern, size):
-        return (pattern * (size / len(pattern))) + pattern[0:(size % len(pattern))]
+        return ((pattern * (size / len(pattern)))
+                + pattern[0:(size % len(pattern))])
