@@ -35,6 +35,9 @@ class ClientTest(unittest.TestCase):
     def tearDown(self):
         pass
 
+    def setup_cb(self):
+        self.cb = Couchbase(self.host + ':' + self.port, self.username, self.password)
+
     def test_couchbase_object_construction(self):
         cb = Couchbase(self.host + ':' + self.port, self.username,
                        self.password)
@@ -61,6 +64,10 @@ class ClientTest(unittest.TestCase):
         self.assertTrue(isinstance(cb.servers, types.ListType))
         self.assertTrue(len(w) == 1)
         self.assertTrue("deprecated" in str(w[-1].message))
+
+    def test_bucket(self):
+        self.setup_cb()
+        self.assertTrue(isinstance(self.cb.bucket('default'), Bucket))
 
 if __name__ == "__main__":
     unittest.main()
