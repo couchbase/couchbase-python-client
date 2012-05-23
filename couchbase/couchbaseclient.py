@@ -675,6 +675,9 @@ class VBucketAwareCouchbaseClient(object):
             server["port"] = url[url.rfind(":") + 1:url.find("/pools/default")]
             server["username"] = self.rest_username
             server["password"] = self.rest_password
+        else:
+            raise InvalidArgumentException("invalid url string",
+                                           parameters=url)
         self.servers = [server]
         self.servers_lock = Lock()
         self.rest = RestConnection(server)
