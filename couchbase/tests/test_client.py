@@ -22,6 +22,7 @@ import warnings
 from warnings_catcher import setup_warning_catcher
 from testconfig import config
 from couchbase.client import *
+from couchbase.couchbaseclient import *
 
 
 class ClientTest(unittest.TestCase):
@@ -50,6 +51,16 @@ class ClientTest(unittest.TestCase):
     def test_couchbase_object_construction_without_port(self):
         cb = Couchbase(self.host, self.username, self.password)
         self.assertTrue(isinstance(cb.servers, types.ListType))
+
+    def test_vbucketawarecouchbaseclient_object_construction(self):
+        w = setup_warning_catcher()
+        warnings.simplefilter("always")
+        cb = VBucketAwareCouchbaseClient("http://" + self.host + ':'
+                                         + self.port + "/pools/default",
+                                         'default', self.password)
+        self.assertTrue(isinstance(cb.servers, types.ListType))
+        self.assertTrue(len(w) == 1)
+        self.assertTrue("deprecated" in str(w[-1].message))
 
 if __name__ == "__main__":
     unittest.main()

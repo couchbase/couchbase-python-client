@@ -27,6 +27,7 @@ import exceptions
 import zlib
 import struct
 import urllib
+import warnings
 try:
     import json
 except:
@@ -647,11 +648,11 @@ class MemcachedClient(object):
                            tap_name, '')
 
 
-class VBucketAwareCouchbaseClient(object):
+class CouchbaseClient(object):
     #poll server every few seconds to see if the vbucket-map
     #has changes
     def __init__(self, url, bucket, password="", verbose=False):
-        self.log = logger.logger("VBucketAwareMemcachedClient")
+        self.log = logger.logger("CouchbaseClient")
         self.bucket = bucket
         self.rest_username = bucket
         self.rest_password = password
@@ -973,6 +974,13 @@ class VBucketAwareCouchbaseClient(object):
                 "init": init, "expiry": expiry, "event": event, "response": {}}
         self.dispatcher.put(item)
         return self._respond(item, event)
+
+
+class VBucketAwareCouchbaseClient(CouchbaseClient):
+    def __init__(self, host, username, password):
+        warnings.warn("Server is deprecated; use VBucketAwareCouchbaseClient"
+                      " instead", DeprecationWarning)
+        CouchbaseClient.__init__(self, host, username, password)
 
 
 class CommandDispatcher(object):

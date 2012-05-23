@@ -28,7 +28,7 @@ import warnings
 import logging
 
 from rest_client import RestConnection
-from couchbaseclient import VBucketAwareCouchbaseClient
+from couchbaseclient import CouchbaseClient
 
 logging.disable(logging.ERROR)
 
@@ -210,10 +210,9 @@ class Bucket(object):
 
         ip, port, rest_username, rest_password = server._rest_info()
         formatter_uri = "http://%s:%s/pools/default"
-        self.mc_client = VBucketAwareCouchbaseClient(formatter_uri %
-                                                     (ip, port),
-                                                     self.bucket_name,
-                                                     self.bucket_password)
+        self.mc_client = CouchbaseClient(formatter_uri % (ip, port),
+                                         self.bucket_name,
+                                         self.bucket_password)
 
     def append(self, key, value, cas=0):
         return self.mc_client.append(key, value, cas)

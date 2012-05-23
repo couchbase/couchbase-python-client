@@ -10,12 +10,12 @@ and then create a new bucket using the memcached and rest clients::
 
     #!/usr/bin/env python
 
-    from couchbase.couchbaseclient import VBucketAwareCouchbaseClient
+    from couchbase.couchbaseclient import CouchbaseClient
     from couchbase.couchbaseclient import MemcachedTimeoutException
     from couchbase.rest_client import RestConnection
 
-    client = VBucketAwareCouchbaseClient("http://localhost:8091/pools/default",
-                                         "default","",False)
+    client = CouchbaseClient("http://localhost:8091/pools/default",
+                             "default","",False)
     client.set("key1", 0, 0, "value1")
     client.get("key1")
 
