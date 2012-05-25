@@ -975,6 +975,13 @@ class CouchbaseClient(object):
         self.dispatcher.put(item)
         return self._respond(item, event)
 
+    def flush(self, wait_time=0):
+        event = Event()
+        item = {"operation": "flush", "expiry": wait_time, "event": event,
+                "response": {}}
+        self.dispatcher.put(item)
+        return self._respond(item, event)
+
 
 class VBucketAwareCouchbaseClient(CouchbaseClient):
     def __init__(self, host, username, password):
@@ -1219,6 +1226,12 @@ class CommandDispatcher(object):
                                                       old_value, value)
             except Exception, ex:
                 self._raise_if_recoverable(ex, item)
+            item["event"].set()
+        elif item["operation"] == "flush":
+            wait_time = item["expiry"]
+            for key, conn in self.vbaware._memcacheds.items():
+                conn.flush(wait_time)
+            item["response"]["return"] = True
             item["event"].set()
 
 
