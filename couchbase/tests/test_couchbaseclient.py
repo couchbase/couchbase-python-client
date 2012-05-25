@@ -15,10 +15,13 @@
 # limitations under the License.
 #
 
+import sys
 import unittest
 import uuid
+import time
 from testconfig import config
-from couchbase.couchbaseclient import CouchbaseClient
+from couchbase.couchbaseclient import *
+from couchbase.exception import *
 
 
 class CouchbaseClientTest(unittest.TestCase):
@@ -28,7 +31,57 @@ class CouchbaseClientTest(unittest.TestCase):
         self.client = CouchbaseClient(self.url, self.bucket, "", True)
 
     def tearDown(self):
+        self.client.flush()
         self.client.done()
+
+    def test_simple_add(self):
+        self.client.add('key', 0, 0, 'value')
+        self.assertTrue(self.client.get('key')[2] == 'value')
+
+    def test_simple_append(self):
+        self.client.set('key', 0, 0, 'value')
+        self.client.append('key', 'appended')
+        self.assertTrue(self.client.get('key')[2] == 'valueappended')
+
+    def test_simple_delete(self):
+        self.client.set('key', 0, 0, 'value')
+        self.client.delete('key')
+
+    def test_simple_decr(self):
+        self.client.set('key', 0, 0, '4')
+        self.client.decr('key', 1)
+        self.assertTrue(self.client.get('key')[2] == '3')
+
+    def test_simple_incr(self):
+        self.client.set('key', 0, 0, '1')
+        self.client.incr('key', 1)
+        self.assertTrue(self.client.get('key')[2] == '2')
+
+    def test_simple_get(self):
+        try:
+            self.client.get('key')
+            raise(Exception('Key existed that should not have'))
+        except MemcachedError as e:
+            if e.status != 1:
+                raise e
+        self.client.set('key', 0, 0, 'value')
+        self.assertTrue(self.client.get('key')[2] == 'value')
+
+    def test_simple_prepend(self):
+        self.client.set('key', 0, 0, 'value')
+        self.client.prepend('key', 'prepend')
+        self.assertTrue(self.client.get('key')[2] == 'prependvalue')
+
+    def test_simple_replace(self):
+        self.client.set('key', 0, 0, 'value')
+        self.client.replace('key', 0, 0, 'replaced')
+        self.assertTrue(self.client.get('key')[2] == 'replaced')
+
+    def test_simple_touch(self):
+        self.client.set('key', 2, 0, 'value')
+        self.client.touch('key', 5)
+        time.sleep(3)
+        self.assertTrue(self.client.get('key')[2] == 'value')
 
     def test_set_and_get(self):
         kvs = [(str(uuid.uuid4()), str(uuid.uuid4())) for i in range(0, 100)]
