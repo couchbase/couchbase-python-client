@@ -69,5 +69,11 @@ class ClientTest(unittest.TestCase):
         self.setup_cb()
         self.assertTrue(isinstance(self.cb.bucket('default'), Bucket))
 
+    def test_buckets(self):
+        self.setup_cb()
+        buckets = self.cb.buckets()
+        self.assertIsInstance(buckets, types.ListType)
+        self.assertIsInstance(buckets[0], Bucket)
+
 if __name__ == "__main__":
     unittest.main()
