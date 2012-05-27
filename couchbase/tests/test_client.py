@@ -41,19 +41,19 @@ class ClientTest(unittest.TestCase):
     def test_couchbase_object_construction(self):
         cb = Couchbase(self.host + ':' + self.port, self.username,
                        self.password)
-        self.assertTrue(isinstance(cb.servers, types.ListType))
+        self.assertIsInstance(cb.servers, types.ListType)
 
     def test_server_object_construction(self):
         w = setup_warning_catcher()
         warnings.simplefilter("always")
         cb = Server(self.host + ':' + self.port, self.username, self.password)
-        self.assertTrue(isinstance(cb.servers, types.ListType))
+        self.assertIsInstance(cb.servers, types.ListType)
         self.assertTrue(len(w) == 1)
         self.assertTrue("deprecated" in str(w[-1].message))
 
     def test_couchbase_object_construction_without_port(self):
         cb = Couchbase(self.host, self.username, self.password)
-        self.assertTrue(isinstance(cb.servers, types.ListType))
+        self.assertIsInstance(cb.servers, types.ListType)
 
     def test_vbucketawarecouchbaseclient_object_construction(self):
         w = setup_warning_catcher()
@@ -61,13 +61,13 @@ class ClientTest(unittest.TestCase):
         cb = VBucketAwareCouchbaseClient("http://" + self.host + ':'
                                          + self.port + "/pools/default",
                                          'default', self.password)
-        self.assertTrue(isinstance(cb.servers, types.ListType))
+        self.assertIsInstance(cb.servers, types.ListType)
         self.assertTrue(len(w) == 1)
         self.assertTrue("deprecated" in str(w[-1].message))
 
     def test_bucket(self):
         self.setup_cb()
-        self.assertTrue(isinstance(self.cb.bucket('default'), Bucket))
+        self.assertIsInstance(self.cb.bucket('default'), Bucket)
 
     def test_buckets(self):
         self.setup_cb()
