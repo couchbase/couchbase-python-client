@@ -1,0 +1,17 @@
+language: python
+
+python:
+  - "2.6"
+  - "2.7"
+
+before_install:
+  - wget -q http://packages.couchbase.com/releases/1.8.0/couchbase-server-community_x86_1.8.0.deb
+  - sudo dpkg -i couchbase-server-community_x86_1.8.0.deb
+  - sudo chmod a+x cluster_connect
+  - ./cluster_connect -n 1
+  - cp test.ini.template test.ini
+
+install:
+  - pip install nose-testconfig coverage
+
+script: nosetests --tc-file=test.ini --with-coverage --cover-package=couchbase --cover-html

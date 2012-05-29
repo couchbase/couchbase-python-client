@@ -1,0 +1,78 @@
+#!/usr/bin/env python
+import os, sys, getopt, urllib2, urllib, json
+
+from urllib2 import HTTPError
+
+valid_bucket_types = ["membase", "memcached"]
+
+def usage():
+    print "usage: \n\
+            -n <number of nodes>\n\
+            -s <memory size (min 256) default: 256\n\
+            -t <bucket type> (membase, memcached) default: membase\n\
+            -r <num replicas> (max 3) default: 0 (Only for membase buckets!)\n"
+
+
+class PasswordManager(urllib2.HTTPPasswordMgr):
+    def __init__(self, username, password):
+        self.auth = (username, password)
+
+    def find_user_password(self, realm, authuri):
+        return self.auth
+
+
+def main():
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "n:t:s:r:")
+    except getopt.GetoptError, err:
+        print str(err)
+        usage()
+        sys.exit()
+    nodes = 0
+    buckettype = "membase"
+    memsize = 256
+    replicas = 0
+    data_base_path = os.getcwd() + "/data"
+    for o, a in opts:
+        if o == "-n":
+            nodes = a
+        elif o == "-t":
+            buckettype = a
+        elif o == "-s":
+            memsize = a
+        elif o == "-r":
+            replicas = a
+        else:
+            usage()
+            sys.exit()
+    if nodes == 0 or buckettype not in valid_bucket_types or \
+            int(memsize) < 256 or int(replicas) > 3:
+        usage()
+        sys.exit()
+
+    password_mgr = PasswordManager("Administrator", "asdasd")
+    handler = urllib2.HTTPBasicAuthHandler(password_mgr)
+    o = urllib2.build_opener(handler)
+
+    print "Connecting " + str(nodes) + " nodes, bucket type " + buckettype + " mem size " + str(memsize) + " with " +\
+           str(replicas) + " replica copies, password asdasd\n"
+
+    o.open("http://127.0.0.1:8091/pools/default", "memoryQuota=" + str(memsize)).read()
+    o.open("http://127.0.0.1:8091/controller/setupDefaultBucket", "bucketType=" + buckettype +
+            "&ramQuotaMB=" + str(memsize) +
+            "&replicaNumber=" + str(replicas)).read()
+    o.open("http://127.0.0.1:8091/settings/web", "port=SAME&username=Administrator&password=asdasd").read()
+    for i in range(1, int(nodes)):
+        port = 8091 + i
+        print "Connecting node {0}".format(i)
+        o.open("http://127.0.0.1:{0}/node/controller/doJoinCluster".format(port),
+               "user=Administrator&password=asdasd&clusterMemberHostIp=127.0.0.1&clusterMemberPort=8091").read()
+    print "Getting node list"
+    info = json.loads(o.open("http://127.0.0.1:8091/nodeStatuses").read())
+    print "Servers added, triggering rebalance."
+    o.open("http://127.0.0.1:8091/controller/rebalance", urllib.urlencode(
+            {'knownNodes': ",".join([info[k]['otpNode'] for k in info]),
+             'ejectedNodes': ''})).read()
+
+if __name__ == '__main__':
+    main()
