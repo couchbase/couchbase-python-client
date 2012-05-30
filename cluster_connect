@@ -62,9 +62,14 @@ def main():
            str(replicas) + " replica copies, password asdasd\n"
 
     o.open("http://127.0.0.1:8091/pools/default", "memoryQuota=" + str(memsize)).read()
-    o.open("http://127.0.0.1:8091/controller/setupDefaultBucket", "bucketType=" + buckettype +
+    try:
+        o.open("http://127.0.0.1:8091/controller/setupDefaultBucket", "bucketType=" + buckettype +
             "&ramQuotaMB=" + str(memsize) +
             "&replicaNumber=" + str(replicas)).read()
+    except HTTPError, e:
+        if e.code > 100 and e.code < 300:
+            pass
+
     o.open("http://127.0.0.1:8091/settings/web", "port=SAME&username=Administrator&password=asdasd").read()
     for i in range(1, int(nodes)):
         port = 8091 + i
