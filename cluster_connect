@@ -1,5 +1,9 @@
 #!/usr/bin/env python
-import os, sys, getopt, urllib2, urllib, json
+import os, sys, getopt, urllib2, urllib
+try:
+    import json
+except:
+    import simplejson as json
 
 from urllib2 import HTTPError
 
