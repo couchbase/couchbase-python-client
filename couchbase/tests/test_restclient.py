@@ -15,7 +15,10 @@
 # limitations under the License.
 #
 
-import unittest
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
 from testconfig import config
 from couchbase.rest_client import RestConnection
 
