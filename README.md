@@ -1,4 +1,3 @@
-========================
 COUCHBASE PYTHON LIBRARY
 ========================
 
@@ -119,13 +118,13 @@ This version requires Python 2.6 or later
 
 Open Issues : http://www.couchbase.org/issues/browse/PYCBC
 
-=============
 RUNNING TESTS
 =============
 
 Requirements:
-* easy_install nose
-* pip install nose-testconfig
+
+  * easy_install nose
+  * pip install nose-testconfig
 
 We're now using nose to run our tests. There's a supplied
 test.ini.template that you can customize to match your installed
@@ -137,7 +136,6 @@ then run the following command:
 Adding coverage information is as easy as install coverage and running
 nosetests with these settings:
 
-    nosetests --tc-file=test.ini --with-coverage
---cover-package=couchbase --cover-html
+    nosetests --tc-file=test.ini --with-coverage --cover-package=couchbase --cover-html
 
 This will output coverage reports into the 'cover' directory.
