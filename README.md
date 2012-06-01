@@ -4,6 +4,15 @@ COUCHBASE PYTHON LIBRARY
 This library provides methods to connect to both the couchbase
 memcached interface and the couchbase rest api interface.
 
+This version requires Python 2.6 or later.
+
+Open Issues: http://www.couchbase.org/issues/browse/PYCBC
+
+[![Build Status](https://secure.travis-ci.org/BigBlueHat/couchbase-python-client.png?branch=master)](http://travis-ci.org/BigBlueHat/couchbase-python-client)
+
+USAGE
+=====
+
 Two simple use cases to set and get a key in the default bucket
 and then create a new bucket using the memcached and rest clients::
 
@@ -113,10 +122,6 @@ the unified client::
     for row in rows:
         print row
 
-
-This version requires Python 2.6 or later
-
-Open Issues : http://www.couchbase.org/issues/browse/PYCBC
 
 RUNNING TESTS
 =============
