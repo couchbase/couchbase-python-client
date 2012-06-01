@@ -208,7 +208,7 @@ class RestConnection(object):
                          "startkey_docid", "endkey_docid"] or \
                          params[param] is True or \
                          params[param] is False:
-                api += "%s=%s" % (param, json.dumps(params[param]))
+                api += "%s=%s" % (param, json.dumps(params[param], separators=(',',':')))
             else:
                 api += "%s=%s" % (param, params[param])
 
