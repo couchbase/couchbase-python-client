@@ -39,7 +39,8 @@ class ClientTest(unittest.TestCase):
         pass
 
     def setup_cb(self):
-        self.cb = Couchbase(self.host + ':' + self.port, self.username, self.password)
+        self.cb = Couchbase(self.host + ':' + self.port,
+                            self.username, self.password)
 
     def test_couchbase_object_construction(self):
         cb = Couchbase(self.host + ':' + self.port, self.username,

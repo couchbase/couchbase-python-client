@@ -119,7 +119,7 @@ class Couchbase(object):
         """Get a list of all buckets as Buckets"""
         rest = self._rest()
         buckets = []
-        for rest_bucket in  rest.get_buckets():
+        for rest_bucket in rest.get_buckets():
             buckets.append(Bucket(rest_bucket.name, self))
         return buckets
 

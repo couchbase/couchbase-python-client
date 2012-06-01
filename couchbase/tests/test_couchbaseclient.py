@@ -63,7 +63,7 @@ class CouchbaseClientTest(unittest.TestCase):
     def test_simple_get(self):
         try:
             self.client.get('key')
-            raise(Exception('Key existed that should not have'))
+            raise Exception('Key existed that should not have')
         except MemcachedError as e:
             if e.status != 1:
                 raise e
