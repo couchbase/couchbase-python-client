@@ -27,3 +27,11 @@ class CouchbaseClientTest(Base):
     def tearDown(self):
         self.client.flush()
         self.client.done()
+
+    def test_set_integer_value(self):
+        self.client.set('int', 0, 0, 10)
+        self.assertEqual(self.client.get('int')[2], 10,
+                         'value should be the integer 10')
+        self.client.incr('int')
+        self.assertEqual(self.client.get('int')[2], 11,
+                         'value should be the integer 11')

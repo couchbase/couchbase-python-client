@@ -55,6 +55,8 @@ class MemcachedClient(object):
                  dtype=0, vbucketId=0,
                  fmt=MemcachedConstants.REQ_PKT_FMT,
                  magic=MemcachedConstants.REQ_MAGIC_BYTE):
+        if isinstance(val, int):
+            val = str(val)
         msg = struct.pack(fmt, magic,
                           cmd, len(key), len(extraHeader), dtype, vbucketId,
                           len(key) + len(extraHeader) + len(val), opaque, cas)
@@ -167,7 +169,10 @@ class MemcachedClient(object):
 
     def _parse_get(self, data, klen=0):
         flags = struct.unpack(MemcachedConstants.GET_RES_FMT, data[-1][:4])[0]
-        return flags, data[1], data[-1][4 + klen:]
+        rv = data[-1][4 + klen:]
+        if isinstance(rv, str) and rv.isdigit():
+            rv = int(rv)
+        return flags, data[1], rv
 
     def get(self, key, vbucket=-1):
         """Get the value for a given key within the memcached server."""

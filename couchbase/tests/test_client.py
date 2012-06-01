@@ -140,13 +140,21 @@ class BucketTest(Base):
     def test_simple_decr(self):
         self.client.set('key', 0, 0, '4')
         self.client.decr('key', 1)
-        self.assertTrue(self.client.get('key')[2] == '3')
+        self.assertTrue(self.client.get('key')[2] == 3)
+        # test again using set with an int
+        self.client.set('key', 0, 0, 4)
+        self.client.decr('key', 1)
+        self.assertTrue(self.client.get('key')[2] == 3)
 
     @attr(cbv="1.0.0")
     def test_simple_incr(self):
         self.client.set('key', 0, 0, '1')
         self.client.incr('key', 1)
-        self.assertTrue(self.client.get('key')[2] == '2')
+        self.assertTrue(self.client.get('key')[2] == 2)
+        # test again using set with an int
+        self.client.set('key', 0, 0, 1)
+        self.client.incr('key', 1)
+        self.assertTrue(self.client.get('key')[2] == 2)
 
     @attr(cbv="1.0.0")
     def test_simple_get(self):
