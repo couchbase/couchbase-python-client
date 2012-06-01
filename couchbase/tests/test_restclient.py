@@ -20,7 +20,7 @@ try:
 except ImportError:
     import unittest
 from testconfig import config
-from couchbase.rest_client import RestConnection
+from couchbase.rest_client import RestConnection, RestHelper
 
 
 class RestClientTest(unittest.TestCase):
@@ -42,6 +42,34 @@ class RestClientTest(unittest.TestCase):
         self.assertEqual(rest.baseUrl, "http://%s:%s/" %
                          (self.host, self.port))
 
+
+class RestHelperTest(unittest.TestCase):
+    def setUp(self):
+        self.host = config['node-1']['host']
+        self.port = config['node-1']['port']
+        self.username = config['node-1']['username']
+        self.password = config['node-1']['password']
+
+        server_info = {"ip": self.host,
+                       "port": self.port,
+                       "username": self.username,
+                       "password": self.password}
+        self.rest = RestConnection(server_info)
+        self.rest_helper = None
+
+    def tearDown(self):
+        pass
+
+    def setup_rest_helper(self):
+        self.rest_helper = RestHelper(self.rest)
+
+    def test_rest_helper_object_creation(self):
+        self.setup_rest_helper()
+        self.assertEqual(self.rest, self.rest_helper.rest)
+
+    def test_is_ns_server_running(self):
+        self.setup_rest_helper()
+        self.assertTrue(self.rest_helper.is_ns_server_running())
 
 if __name__ == "__main__":
     unittest.main()
