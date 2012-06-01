@@ -58,7 +58,26 @@ class CouchbaseClientTest(Base):
                          'value should be the integer 11')
         self.client.delete('int')
 
-    @attr(cbv="1.0.0")
+    def test_two_client_incr(self):
+        """http://www.couchbase.com/issues/browse/PYCBC-16"""
+        key = 'test_two_client_incr'
+        client_one = self.client
+        client_two = CouchbaseClient(self.url, self.bucket_name, "", True)
+        # Client one sets a numeric key
+        client_one.set(key, 0, 0, 20)
+        # Client two tries to increment this numeric key
+        (i, cas) = client_two.incr(key)
+        self.assertEqual(i, 21)
+
+        # Client two should be able to keep incrementing this key
+        (i, cas) = client_two.incr(key)
+        self.assertEqual(i, 22)
+
+        (_, cas, i) = client_two.get(key)
+        self.assertEqual(i, 22)
+        (i, cas) = client_two.incr(key)
+        self.assertEqual(i, 23)
+
     def test_bucket_of_type_memcached(self):
         self.setup_memcached_bucket()
         self.assertIsInstance(self.client_for_memcached_bucket,
