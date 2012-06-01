@@ -5,8 +5,8 @@ python:
   - "2.7"
 
 before_install:
-  - wget -q http://packages.couchbase.com/releases/1.8.0/couchbase-server-community_x86_1.8.0.deb
-  - sudo dpkg -i couchbase-server-community_x86_1.8.0.deb
+  - wget -q http://packages.couchbase.com/releases/2.0.0-developer-preview-4/couchbase-server-community_x86_2.0.0-dev-preview-4.deb
+  - sudo dpkg -i couchbase-server-community_x86_2.0.0-dev-preview-4.deb
   - sudo chmod a+x cluster_connect
   - ./cluster_connect -n 1
   - cp test.ini.template test.ini
