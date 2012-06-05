@@ -1,5 +1,9 @@
 language: python
 
+branches:
+  except:
+    - failing-tests
+
 env:
   - CB_URL="http://packages.couchbase.com/releases/1.8.0/couchbase-server-community_x86_1.8.0.deb" CB_DEB="couchbase-server-community_x86_1.8.0.deb"
   - CB_URL="http://packages.couchbase.com/releases/2.0.0-developer-preview-4/couchbase-server-community_x86_2.0.0-dev-preview-4.deb" CB_DEB="couchbase-server-community_x86_2.0.0-dev-preview-4.deb"
