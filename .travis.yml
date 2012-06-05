@@ -1,5 +1,9 @@
 language: python
 
+notifications:
+  email:
+    - sdk_dev@couchbase.com
+
 branches:
   except:
     - failing-tests
