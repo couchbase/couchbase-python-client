@@ -94,5 +94,10 @@ class RestHelperTest(unittest.TestCase):
         self.assertTrue(self.rest_helper.bucket_exists(self.bucket_name))
         self.assertFalse(self.rest_helper.bucket_exists(str(uuid.uuid4())))
 
+    @attr(cbv="2.0.0")
+    def test_all_nodes_replicated(self):
+        self.setup_rest_helper()
+        self.assertTrue(self.rest_helper.all_nodes_replicated(debug=True))
+
 if __name__ == "__main__":
     unittest.main()
