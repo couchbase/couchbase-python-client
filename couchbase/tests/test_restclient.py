@@ -25,27 +25,6 @@ from nose.plugins.attrib import attr
 from couchbase.rest_client import RestConnection, RestHelper
 
 
-class RestConnectionTest(unittest.TestCase):
-    def setUp(self):
-        self.host = config['node-1']['host']
-        self.port = config['node-1']['port']
-        self.username = config['node-1']['username']
-        self.password = config['node-1']['password']
-
-    def tearDown(self):
-        pass
-
-    @attr(cbv="2.0.0")
-    def test_rest_client_object_creation(self):
-        server_info = {"ip": self.host,
-                       "port": self.port,
-                       "username": self.username,
-                       "password": self.password}
-        rest = RestConnection(server_info)
-        self.assertEqual(rest.baseUrl, "http://%s:%s/" %
-                         (self.host, self.port))
-
-
 class RestHelperTest(unittest.TestCase):
     def setUp(self):
         self.host = config['node-1']['host']
@@ -98,6 +77,27 @@ class RestHelperTest(unittest.TestCase):
     def test_all_nodes_replicated(self):
         self.setup_rest_helper()
         self.assertTrue(self.rest_helper.all_nodes_replicated(debug=True))
+
+
+class RestConnectionTest(unittest.TestCase):
+    def setUp(self):
+        self.host = config['node-1']['host']
+        self.port = config['node-1']['port']
+        self.username = config['node-1']['username']
+        self.password = config['node-1']['password']
+
+    def tearDown(self):
+        pass
+
+    @attr(cbv="2.0.0")
+    def test_rest_client_object_creation(self):
+        server_info = {"ip": self.host,
+                       "port": self.port,
+                       "username": self.username,
+                       "password": self.password}
+        rest = RestConnection(server_info)
+        self.assertEqual(rest.baseUrl, "http://%s:%s/" %
+                         (self.host, self.port))
 
 if __name__ == "__main__":
     unittest.main()
