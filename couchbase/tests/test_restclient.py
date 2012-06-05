@@ -19,6 +19,7 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest
+import uuid
 from testconfig import config
 from nose.plugins.attrib import attr
 from couchbase.rest_client import RestConnection, RestHelper
@@ -86,6 +87,12 @@ class RestHelperTest(unittest.TestCase):
     def test_vbucket_map_ready(self):
         self.setup_rest_helper()
         self.assertTrue(self.rest_helper.vbucket_map_ready(self.bucket_name))
+
+    @attr(cbv="2.0.0")
+    def test_bucket_exists(self):
+        self.setup_rest_helper()
+        self.assertTrue(self.rest_helper.bucket_exists(self.bucket_name))
+        self.assertFalse(self.rest_helper.bucket_exists(str(uuid.uuid4())))
 
 if __name__ == "__main__":
     unittest.main()
