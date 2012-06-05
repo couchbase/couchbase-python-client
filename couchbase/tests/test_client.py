@@ -24,6 +24,7 @@ import warnings
 
 from warnings_catcher import setup_warning_catcher
 from testconfig import config
+from nose.plugins.attrib import attr
 from couchbase.client import *
 from couchbase.couchbaseclient import *
 
@@ -42,11 +43,13 @@ class ClientTest(unittest.TestCase):
         self.cb = Couchbase(self.host + ':' + self.port,
                             self.username, self.password)
 
+    @attr(cbv="1.0.0")
     def test_couchbase_object_construction(self):
         cb = Couchbase(self.host + ':' + self.port, self.username,
                        self.password)
         self.assertIsInstance(cb.servers, types.ListType)
 
+    @attr(cbv="1.0.0")
     def test_server_object_construction(self):
         w = setup_warning_catcher()
         warnings.simplefilter("always")
@@ -55,10 +58,12 @@ class ClientTest(unittest.TestCase):
         self.assertTrue(len(w) == 1)
         self.assertTrue("deprecated" in str(w[-1].message))
 
+    @attr(cbv="1.0.0")
     def test_couchbase_object_construction_without_port(self):
         cb = Couchbase(self.host, self.username, self.password)
         self.assertIsInstance(cb.servers, types.ListType)
 
+    @attr(cbv="1.0.0")
     def test_vbucketawarecouchbaseclient_object_construction(self):
         w = setup_warning_catcher()
         warnings.simplefilter("always")
@@ -69,10 +74,12 @@ class ClientTest(unittest.TestCase):
         self.assertTrue(len(w) == 1)
         self.assertTrue("deprecated" in str(w[-1].message))
 
+    @attr(cbv="1.0.0")
     def test_bucket(self):
         self.setup_cb()
         self.assertIsInstance(self.cb.bucket('default'), Bucket)
 
+    @attr(cbv="1.0.0")
     def test_buckets(self):
         self.setup_cb()
         buckets = self.cb.buckets()

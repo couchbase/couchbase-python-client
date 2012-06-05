@@ -20,6 +20,7 @@ try:
 except ImportError:
     import unittest
 from testconfig import config
+from nose.plugins.attrib import attr
 from couchbase.rest_client import RestConnection, RestHelper
 
 
@@ -33,6 +34,7 @@ class RestClientTest(unittest.TestCase):
     def tearDown(self):
         pass
 
+    @attr(cbv="2.0.0")
     def test_rest_client_object_creation(self):
         server_info = {"ip": self.host,
                        "port": self.port,
@@ -60,13 +62,16 @@ class RestHelperTest(unittest.TestCase):
     def tearDown(self):
         pass
 
+    @attr(cbv="2.0.0")
     def setup_rest_helper(self):
         self.rest_helper = RestHelper(self.rest)
 
+    @attr(cbv="2.0.0")
     def test_rest_helper_object_creation(self):
         self.setup_rest_helper()
         self.assertEqual(self.rest, self.rest_helper.rest)
 
+    @attr(cbv="2.0.0")
     def test_is_ns_server_running(self):
         self.setup_rest_helper()
         self.assertTrue(self.rest_helper.is_ns_server_running())

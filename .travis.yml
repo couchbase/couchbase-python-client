@@ -9,8 +9,8 @@ branches:
     - failing-tests
 
 env:
-  - CB_URL="http://packages.couchbase.com/releases/1.8.0/couchbase-server-community_x86_1.8.0.deb" CB_DEB="couchbase-server-community_x86_1.8.0.deb"
-  - CB_URL="http://packages.couchbase.com/releases/2.0.0-developer-preview-4/couchbase-server-community_x86_2.0.0-dev-preview-4.deb" CB_DEB="couchbase-server-community_x86_2.0.0-dev-preview-4.deb"
+  - CB_URL="http://packages.couchbase.com/releases/1.8.0/couchbase-server-community_x86_1.8.0.deb" CB_DEB="couchbase-server-community_x86_1.8.0.deb" CB_VER="1.8.0"
+  - CB_URL="http://packages.couchbase.com/releases/2.0.0-developer-preview-4/couchbase-server-community_x86_2.0.0-dev-preview-4.deb" CB_DEB="couchbase-server-community_x86_2.0.0-dev-preview-4.deb" CB_VER="2.0.0"
 
 python:
   - "2.6"
@@ -26,4 +26,4 @@ before_install:
 install:
   - pip install nose-testconfig coverage
 
-script: nosetests --tc-file=test.ini --with-coverage --cover-package=couchbase --cover-html
+script: nosetests --tc-file=test.ini --with-coverage --cover-package=couchbase --cover-html -A "(cbv <= \"${CB_VER}\")"
