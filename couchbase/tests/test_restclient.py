@@ -90,13 +90,17 @@ class RestConnectionTest(unittest.TestCase):
         pass
 
     @attr(cbv="2.0.0")
-    def test_rest_client_object_creation(self):
+    def setup_rest_connection(self):
         server_info = {"ip": self.host,
                        "port": self.port,
                        "username": self.username,
                        "password": self.password}
-        rest = RestConnection(server_info)
-        self.assertEqual(rest.baseUrl, "http://%s:%s/" %
+        self.rest = RestConnection(server_info)
+
+    @attr(cbv="2.0.0")
+    def test_rest_connection_object_creation(self):
+        self.setup_rest_connection()
+        self.assertEqual(self.rest.baseUrl, "http://%s:%s/" %
                          (self.host, self.port))
 
 if __name__ == "__main__":
