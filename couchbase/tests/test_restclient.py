@@ -25,7 +25,7 @@ from nose.plugins.attrib import attr
 from couchbase.rest_client import RestConnection, RestHelper
 
 
-class RestClientTest(unittest.TestCase):
+class RestConnectionTest(unittest.TestCase):
     def setUp(self):
         self.host = config['node-1']['host']
         self.port = config['node-1']['port']
