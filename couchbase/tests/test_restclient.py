@@ -51,6 +51,7 @@ class RestHelperTest(unittest.TestCase):
         self.port = config['node-1']['port']
         self.username = config['node-1']['username']
         self.password = config['node-1']['password']
+        self.bucket_name = config['node-1']['bucket']
 
         server_info = {"ip": self.host,
                        "port": self.port,
@@ -75,6 +76,16 @@ class RestHelperTest(unittest.TestCase):
     def test_is_ns_server_running(self):
         self.setup_rest_helper()
         self.assertTrue(self.rest_helper.is_ns_server_running())
+
+    @attr(cbv="2.0.0")
+    def test_is_cluster_healthy(self):
+        self.setup_rest_helper()
+        self.assertTrue(self.rest_helper.is_cluster_healthy())
+
+    @attr(cbv="2.0.0")
+    def test_vbucket_map_ready(self):
+        self.setup_rest_helper()
+        self.assertTrue(self.rest_helper.vbucket_map_ready(self.bucket_name))
 
 if __name__ == "__main__":
     unittest.main()
