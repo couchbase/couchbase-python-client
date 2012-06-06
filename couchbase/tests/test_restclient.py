@@ -19,6 +19,10 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest
+try:
+    import json
+except:
+    import simplejson as json
 import uuid
 from testconfig import config
 from nose.plugins.attrib import attr
@@ -85,6 +89,7 @@ class RestConnectionTest(unittest.TestCase):
         self.port = config['node-1']['port']
         self.username = config['node-1']['username']
         self.password = config['node-1']['password']
+        self.bucket_name = config['node-1']['bucket']
 
     def tearDown(self):
         pass
@@ -94,7 +99,8 @@ class RestConnectionTest(unittest.TestCase):
         server_info = {"ip": self.host,
                        "port": self.port,
                        "username": self.username,
-                       "password": self.password}
+                       "password": self.password,
+                       "couchApiBase": "http://127.0.0.1:1984/"}
         self.rest = RestConnection(server_info)
 
     @attr(cbv="2.0.0")
@@ -102,6 +108,24 @@ class RestConnectionTest(unittest.TestCase):
         self.setup_rest_connection()
         self.assertEqual(self.rest.baseUrl, "http://%s:%s/" %
                          (self.host, self.port))
+
+    @attr(cbv="2.0.0")
+    def test_create_design_doc(self):
+        self.setup_rest_connection()
+        ddoc_name = uuid.uuid4()
+        design_doc = json.dumps({"views":
+                      {"testing":
+                       {"map":
+                        "function(doc) { emit(doc._id, null); }"
+                        }
+                       }
+                      })
+        resp = self.rest.create_design_doc(self.bucket_name, ddoc_name,
+                                           design_doc)
+        self.assertTrue(resp["ok"])
+
+        # Cleanup: delete the design doc; just gonna assume this worked
+        self.rest.delete_design_doc(self.bucket_name, ddoc_name)
 
 if __name__ == "__main__":
     unittest.main()
