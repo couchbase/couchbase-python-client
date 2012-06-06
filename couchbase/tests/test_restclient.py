@@ -147,6 +147,15 @@ class RestConnectionTest(unittest.TestCase):
         self.teardown_design_doc(ddoc_name)
 
     @attr(cbv="2.0.0")
+    def test_get_design_doc(self):
+        ddoc_name, resp = self.setup_create_design_doc()
+        ddoc = self.rest.get_design_doc(self.bucket_name, ddoc_name)
+        self.assertIn("views", ddoc.keys())
+        self.assertRaises(Exception, self.rest.get_design_doc,
+                          (self.bucket_name, str(uuid.uuid4())))
+        self.teardown_design_doc(ddoc_name)
+
+    @attr(cbv="2.0.0")
     def test_delete_design_doc(self):
         ddoc_name, resp = self.setup_create_design_doc()
         self.assertTrue(self.rest.delete_design_doc(self.bucket_name,
