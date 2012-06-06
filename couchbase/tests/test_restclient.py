@@ -99,8 +99,7 @@ class RestConnectionTest(unittest.TestCase):
         server_info = {"ip": self.host,
                        "port": self.port,
                        "username": self.username,
-                       "password": self.password,
-                       "couchApiBase": "http://127.0.0.1:1984/"}
+                       "password": self.password}
         self.rest = RestConnection(server_info)
 
     @attr(cbv="2.0.0")

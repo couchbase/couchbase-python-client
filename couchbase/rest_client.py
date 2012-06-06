@@ -25,6 +25,7 @@ import httplib2
 import socket
 import time
 import logger
+import client
 from exception import ServerAlreadyJoinedException,\
     ServerUnavailableException, InvalidArgumentException,\
     BucketCreationException, ServerJoinException, BucketUnavailableException
@@ -171,7 +172,16 @@ class RestConnection(object):
             self.username = serverInfo.rest_username
             self.password = serverInfo.rest_password
             self.port = serverInfo.port
+            self.couch_api_base = None
+
         self.baseUrl = "http://%s:%s/" % (self.ip, self.port)
+        if self.couch_api_base is None:
+            server_config_uri = "http://%s:%s/pools/default" % (self.ip, self.port)
+            config = client.ServerHelper.parse_server_config(server_config_uri,
+                                                             self.username,
+                                                             self.password)
+            #couchApiBase will not be in node config before Couchbase Server 2.0
+            self.couch_api_base = config["nodes"][0].get("couchApiBase")
 
     def create_design_doc(self, bucket, design_doc, function):
         api = self.couch_api_base + '%s/_design/%s' % (bucket, design_doc)
