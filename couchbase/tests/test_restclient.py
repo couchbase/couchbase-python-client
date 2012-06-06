@@ -109,6 +109,18 @@ class RestConnectionTest(unittest.TestCase):
                          (self.host, self.port))
 
     @attr(cbv="2.0.0")
+    def test_rest_connection_object_creation_with_server_object(self):
+        class ServerInfo:
+            ip = self.host
+            port = self.port
+            rest_username = self.username
+            rest_password = self.password
+
+        rest = RestConnection(ServerInfo())
+        self.assertEqual(rest.baseUrl, "http://%s:%s/" % (self.host,
+                                                          self.port))
+
+    @attr(cbv="2.0.0")
     def test_create_design_doc(self):
         self.setup_rest_connection()
         ddoc_name = uuid.uuid4()
