@@ -25,6 +25,7 @@ except:
     import simplejson as json
 import uuid
 from testconfig import config
+from nose.tools import nottest
 from nose.plugins.attrib import attr
 from couchbase.rest_client import RestConnection, RestHelper
 
@@ -94,13 +95,31 @@ class RestConnectionTest(unittest.TestCase):
     def tearDown(self):
         pass
 
-    @attr(cbv="2.0.0")
     def setup_rest_connection(self):
         server_info = {"ip": self.host,
                        "port": self.port,
                        "username": self.username,
                        "password": self.password}
         self.rest = RestConnection(server_info)
+
+    @nottest
+    def setup_create_design_doc(self):
+        self.setup_rest_connection()
+        ddoc_name = uuid.uuid4()
+        design_doc = json.dumps({"views":
+                      {"testing":
+                       {"map":
+                        "function(doc) { emit(doc._id, null); }"
+                        }
+                       }
+                      })
+        resp = self.rest.create_design_doc(self.bucket_name, ddoc_name,
+                                           design_doc)
+        return ddoc_name, resp
+
+    @nottest
+    def teardown_design_doc(self, ddoc_name):
+        self.rest.delete_design_doc(self.bucket_name, ddoc_name)
 
     @attr(cbv="2.0.0")
     def test_rest_connection_object_creation(self):
@@ -122,21 +141,18 @@ class RestConnectionTest(unittest.TestCase):
 
     @attr(cbv="2.0.0")
     def test_create_design_doc(self):
-        self.setup_rest_connection()
-        ddoc_name = uuid.uuid4()
-        design_doc = json.dumps({"views":
-                      {"testing":
-                       {"map":
-                        "function(doc) { emit(doc._id, null); }"
-                        }
-                       }
-                      })
-        resp = self.rest.create_design_doc(self.bucket_name, ddoc_name,
-                                           design_doc)
+        (ddoc_name, resp) = self.setup_create_design_doc()
         self.assertTrue(resp["ok"])
+        self.teardown_design_doc(ddoc_name)
 
-        # Cleanup: delete the design doc; just gonna assume this worked
-        self.rest.delete_design_doc(self.bucket_name, ddoc_name)
+    @attr(cbv="2.0.0")
+    def test_delete_design_doc(self):
+        ddoc_name, resp = self.setup_create_design_doc()
+        self.assertTrue(self.rest.delete_design_doc(self.bucket_name,
+                                                    ddoc_name))
+        self.assertRaises(Exception,
+                          self.rest.delete_design_doc,
+                          (self.bucket_name, ddoc_name))
 
 if __name__ == "__main__":
     unittest.main()

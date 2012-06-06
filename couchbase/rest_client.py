@@ -264,19 +264,23 @@ class RestConnection(object):
     def delete_design_doc(self, bucket, design_doc):
         api = self.couch_api_base + '%s/_design/%s' % (bucket, design_doc)
         design_doc = self.get_design_doc(bucket, design_doc)
-        rev = design_doc["_rev"]
-        #pass in the rev
-        api = api + "?rev=%s" % (rev)
+        if "error" in design_doc:
+            raise Exception(design_doc["error"] + " because "
+                            + design_doc["reason"])
+        else:
+            rev = design_doc["_rev"]
+            #pass in the rev
+            api = api + "?rev=%s" % (rev)
 
-        headers = self._create_capi_headers()
-        status, content = self._http_request(api, 'DELETE', headers=headers)
+            headers = self._create_capi_headers()
+            status, content = self._http_request(api, 'DELETE', headers=headers)
 
-        json_parsed = json.loads(content)
-        if not status:
+            json_parsed = json.loads(content)
+            if not status:
 
-            raise Exception("unable to delete the design doc")
+                raise Exception("unable to delete the design doc")
 
-        return json_parsed
+            return json_parsed
 
     def _create_capi_headers(self):
         return {'Content-Type': 'application/json',
