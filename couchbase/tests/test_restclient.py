@@ -24,6 +24,7 @@ try:
 except:
     import simplejson as json
 import uuid
+import base64
 from testconfig import config
 from nose.tools import nottest
 from nose.plugins.attrib import attr
@@ -153,6 +154,15 @@ class RestConnectionTest(unittest.TestCase):
         self.assertRaises(Exception,
                           self.rest.delete_design_doc,
                           (self.bucket_name, ddoc_name))
+
+    @attr(cbv="2.0.0")
+    def test_create_headers(self):
+        self.setup_rest_connection()
+        headers = self.rest._create_headers()
+        self.assertEqual(headers['Authorization'],
+                         'Basic ' + base64.encodestring("%s:%s" %
+                                                        (self.rest.username,
+                                                        self.rest.password)))
 
 if __name__ == "__main__":
     unittest.main()
