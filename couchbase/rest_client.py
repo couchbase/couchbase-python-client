@@ -176,11 +176,12 @@ class RestConnection(object):
 
         self.baseUrl = "http://%s:%s/" % (self.ip, self.port)
         if self.couch_api_base is None:
-            server_config_uri = "http://%s:%s/pools/default" % (self.ip, self.port)
+            server_config_uri = "http://%s:%s/pools/default" % (self.ip,
+                                                                self.port)
             config = client.ServerHelper.parse_server_config(server_config_uri,
                                                              self.username,
                                                              self.password)
-            #couchApiBase will not be in node config before Couchbase Server 2.0
+            #couchApiBase is not in node config before Couchbase Server 2.0
             self.couch_api_base = config["nodes"][0].get("couchApiBase")
 
     def create_design_doc(self, bucket, design_doc, function):
