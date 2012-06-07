@@ -200,6 +200,45 @@ class RestConnection(object):
 
         return json_parsed
 
+    def get_design_doc(self, bucket, design_doc):
+        api = self.couch_api_base + '%s/_design/%s' % (bucket, design_doc)
+
+        headers = self._create_capi_headers()
+        status, content = self._http_request(api, headers=headers)
+
+        json_parsed = json.loads(content)
+
+        if not status:
+            raise Exception("unable to get design doc")
+
+        return json_parsed
+
+    def delete_design_doc(self, bucket, design_doc):
+        api = self.couch_api_base + '%s/_design/%s' % (bucket, design_doc)
+        design_doc = self.get_design_doc(bucket, design_doc)
+        if "error" in design_doc:
+            raise Exception(design_doc["error"] + " because "
+                            + design_doc["reason"])
+        else:
+            rev = design_doc["_rev"]
+            #pass in the rev
+            api = api + "?rev=%s" % (rev)
+
+            headers = self._create_capi_headers()
+            status, content = self._http_request(api, 'DELETE', headers=headers)
+
+            json_parsed = json.loads(content)
+            if not status:
+
+                raise Exception("unable to delete the design doc")
+
+            return json_parsed
+
+    def get_view(self, bucket, design_doc, view):
+        warnings.warn("get_view is deprecated; use view_results instead",
+                      DeprecationWarning)
+        return self.view_results(bucket, design_doc, view, {})
+
     def view_results(self, bucket, design_doc, view, params, limit=100):
         if view:
             view_query = '{0}/_design/{1}/_view/{2}'
@@ -234,45 +273,6 @@ class RestConnection(object):
                             + repr(status) + "\n" + content)
 
         return json_parsed
-
-    def get_design_doc(self, bucket, design_doc):
-        api = self.couch_api_base + '%s/_design/%s' % (bucket, design_doc)
-
-        headers = self._create_capi_headers()
-        status, content = self._http_request(api, headers=headers)
-
-        json_parsed = json.loads(content)
-
-        if not status:
-            raise Exception("unable to get design doc")
-
-        return json_parsed
-
-    def get_view(self, bucket, design_doc, view):
-        warnings.warn("get_view is deprecated; use view_results instead",
-                      DeprecationWarning)
-        return self.view_results(bucket, design_doc, view, {})
-
-    def delete_design_doc(self, bucket, design_doc):
-        api = self.couch_api_base + '%s/_design/%s' % (bucket, design_doc)
-        design_doc = self.get_design_doc(bucket, design_doc)
-        if "error" in design_doc:
-            raise Exception(design_doc["error"] + " because "
-                            + design_doc["reason"])
-        else:
-            rev = design_doc["_rev"]
-            #pass in the rev
-            api = api + "?rev=%s" % (rev)
-
-            headers = self._create_capi_headers()
-            status, content = self._http_request(api, 'DELETE', headers=headers)
-
-            json_parsed = json.loads(content)
-            if not status:
-
-                raise Exception("unable to delete the design doc")
-
-            return json_parsed
 
     def _create_capi_headers(self):
         return {'Content-Type': 'application/json',
