@@ -35,6 +35,7 @@ class ClientTest(unittest.TestCase):
         self.port = config['node-1']['port']
         self.username = config['node-1']['username']
         self.password = config['node-1']['password']
+        self.bucket_name = config['node-1']['bucket']
 
     def tearDown(self):
         pass
@@ -69,7 +70,7 @@ class ClientTest(unittest.TestCase):
         warnings.simplefilter("always")
         cb = VBucketAwareCouchbaseClient("http://" + self.host + ':'
                                          + self.port + "/pools/default",
-                                         'default', self.password)
+                                         self.bucket_name, "")
         self.assertIsInstance(cb.servers, types.ListType)
         self.assertTrue(len(w) == 1)
         self.assertTrue("deprecated" in str(w[-1].message))
@@ -77,7 +78,7 @@ class ClientTest(unittest.TestCase):
     @attr(cbv="1.0.0")
     def test_bucket(self):
         self.setup_cb()
-        self.assertIsInstance(self.cb.bucket('default'), Bucket)
+        self.assertIsInstance(self.cb.bucket(self.bucket_name), Bucket)
 
     @attr(cbv="1.0.0")
     def test_buckets(self):
