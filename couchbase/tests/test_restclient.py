@@ -25,6 +25,8 @@ except:
     import simplejson as json
 import uuid
 import base64
+import warnings
+from warnings_catcher import setup_warning_catcher
 from testconfig import config
 from nose.tools import nottest
 from nose.plugins.attrib import attr
@@ -158,7 +160,11 @@ class RestConnectionTest(unittest.TestCase):
     @attr(cbv="2.0.0")
     def test_get_view(self):
         (ddoc_name, resp) = self.setup_create_design_doc()
+        w = setup_warning_catcher()
+        warnings.simplefilter("always")
         view = self.rest.get_view(self.bucket_name, ddoc_name, "testing")
+        self.assertTrue(len(w) == 1)
+        self.assertTrue("deprecated" in str(w[-1].message))
         self.assertIn("rows", view.keys())
         self.teardown_design_doc(ddoc_name)
         if "error" in view:

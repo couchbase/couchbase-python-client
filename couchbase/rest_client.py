@@ -25,6 +25,7 @@ import httplib2
 import socket
 import time
 import logger
+import warnings
 import client
 from exception import ServerAlreadyJoinedException,\
     ServerUnavailableException, InvalidArgumentException,\
@@ -248,18 +249,9 @@ class RestConnection(object):
         return json_parsed
 
     def get_view(self, bucket, design_doc, view):
-        api = self.couch_api_base + ('%s/_design/%s/_view/%s' %
-                                     (bucket, design_doc, view))
-
-        headers = self._create_capi_headers()
-        status, content = self._http_request(api, headers=headers)
-
-        json_parsed = json.loads(content)
-
-        if not status:
-            raise Exception("unable to get view")
-
-        return json_parsed
+        warnings.warn("get_view is deprecated; use view_results instead",
+                      DeprecationWarning)
+        return self.view_results(bucket, design_doc, view, {})
 
     def delete_design_doc(self, bucket, design_doc):
         api = self.couch_api_base + '%s/_design/%s' % (bucket, design_doc)
