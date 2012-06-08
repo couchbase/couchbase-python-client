@@ -337,7 +337,7 @@ class ServerHelper(object):
     @staticmethod
     def parse_server_config(uri, username="", password=""):
         urlopener = urllib.FancyURLopener()
-        if len(username) > 0 and len(password) > 0:
+        if username and len(username) > 0 and password and len(password) > 0:
             urlopener.prompt_user_passwd = lambda: (username, password)
         response = urlopener.open(uri)
 
