@@ -30,6 +30,7 @@ from warnings_catcher import setup_warning_catcher
 from testconfig import config
 from nose.tools import nottest
 from nose.plugins.attrib import attr
+from couchbase.client import *
 from couchbase.rest_client import RestConnection, RestHelper
 
 
@@ -124,6 +125,10 @@ class RestConnectionTest(unittest.TestCase):
     def teardown_design_doc(self, ddoc_name):
         self.rest.delete_design_doc(self.bucket_name, ddoc_name)
 
+    def setup_couchbase_object(self):
+        self.cb = Couchbase(self.host + ':' + self.port, self.username,
+                            self.password)
+
     @attr(cbv="2.0.0")
     def test_rest_connection_object_creation(self):
         self.setup_rest_connection()
@@ -174,13 +179,32 @@ class RestConnectionTest(unittest.TestCase):
         view = self.rest.get_view(self.bucket_name, ddoc_name, "testing")
         self.assertTrue(len(w) == 1)
         self.assertTrue("deprecated" in str(w[-1].message))
-        self.assertIn("rows", view.keys())
-        self.teardown_design_doc(ddoc_name)
+
+    @attr(cbv="2.0.0")
+    def test_view_results(self):
+        ddoc_name, resp = self.setup_create_design_doc()
+        view = self.rest.view_results(self.bucket_name, ddoc_name, "testing",
+                                      {})
+        if "error" in view:
+            self.fail(view)
+        else:
+            self.assertIn("rows", view.keys())
+        # let's add some sample docs
+        self.setup_couchbase_object()
+        kvs = [(str(uuid.uuid4()), str(uuid.uuid4())) for i in range(0, 100)]
+        for k, v in kvs:
+            self.cb[self.bucket_name].set(k, 0, 0, v)
+        # rerun the view
+        view = self.rest.view_results(self.bucket_name, ddoc_name, "testing",
+                                      {})
         if "error" in view:
             self.fail(view)
         else:
             self.assertIn("rows", view.keys())
         self.teardown_design_doc(ddoc_name)
+        # remove sample docs
+        for k, v in kvs:
+            self.cb[self.bucket_name].delete(k)
 
     @attr(cbv="2.0.0")
     def test_create_headers(self):
