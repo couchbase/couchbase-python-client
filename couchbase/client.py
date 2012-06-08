@@ -30,8 +30,6 @@ import logging
 from rest_client import RestConnection
 from couchbaseclient import CouchbaseClient
 
-logging.disable(logging.ERROR)
-
 
 class Couchbase(object):
     def __init__(self, host, username, password):
