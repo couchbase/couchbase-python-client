@@ -95,8 +95,12 @@ class RestConnectionTest(unittest.TestCase):
         self.username = config['node-1']['username']
         self.password = config['node-1']['password']
         self.bucket_name = config['node-1']['bucket']
+        # list of design_docs for tearDown to destroy, if they've hung around
+        self.design_docs = []
 
     def tearDown(self):
+        for ddoc in self.design_docs:
+            self.rest.delete_design_doc(self.bucket_name, ddoc)
         pass
 
     @nottest
@@ -120,11 +124,8 @@ class RestConnectionTest(unittest.TestCase):
                       })
         resp = self.rest.create_design_doc(self.bucket_name, ddoc_name,
                                            design_doc)
+        self.design_docs.append(ddoc_name)
         return ddoc_name, resp
-
-    @nottest
-    def teardown_design_doc(self, ddoc_name):
-        self.rest.delete_design_doc(self.bucket_name, ddoc_name)
 
     @nottest
     def setup_couchbase_object(self):
@@ -153,7 +154,6 @@ class RestConnectionTest(unittest.TestCase):
     def test_create_design_doc(self):
         (ddoc_name, resp) = self.setup_create_design_doc()
         self.assertTrue(resp["ok"])
-        self.teardown_design_doc(ddoc_name)
 
     @attr(cbv="2.0.0")
     def test_get_design_doc(self):
@@ -162,7 +162,6 @@ class RestConnectionTest(unittest.TestCase):
         self.assertIn("views", ddoc.keys())
         self.assertRaises(Exception, self.rest.get_design_doc,
                           (self.bucket_name, str(uuid.uuid4())))
-        self.teardown_design_doc(ddoc_name)
 
     @attr(cbv="2.0.0")
     def test_delete_design_doc(self):
@@ -203,7 +202,6 @@ class RestConnectionTest(unittest.TestCase):
             self.fail(view)
         else:
             self.assertIn("rows", view.keys())
-        self.teardown_design_doc(ddoc_name)
         # remove sample docs
         for k, v in kvs:
             self.cb[self.bucket_name].delete(k)
