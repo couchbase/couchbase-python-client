@@ -25,6 +25,7 @@ import warnings
 from warnings_catcher import setup_warning_catcher
 from testconfig import config
 from nose.plugins.attrib import attr
+from nose.tools import nottest
 from couchbase.client import *
 from couchbase.couchbaseclient import *
 
@@ -40,6 +41,7 @@ class ClientTest(unittest.TestCase):
     def tearDown(self):
         pass
 
+    @nottest
     def setup_cb(self):
         self.cb = Couchbase(self.host + ':' + self.port,
                             self.username, self.password)
