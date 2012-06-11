@@ -87,5 +87,15 @@ class ClientTest(unittest.TestCase):
         self.assertIsInstance(buckets, types.ListType)
         self.assertIsInstance(buckets[0], Bucket)
 
+    @attr(cbv="1.0.0")
+    def test_create(self):
+        self.setup_cb()
+        bucket_name = str(uuid.uuid4())
+        bucket = self.cb.create(bucket_name)
+        self.assertIsInstance(bucket, Bucket)
+        exists = [b for b in self.cb.buckets() if b.bucket_name == bucket_name]
+        self.assertTrue(len(exists))
+        self.cb.delete(bucket_name)
+
 if __name__ == "__main__":
     unittest.main()
