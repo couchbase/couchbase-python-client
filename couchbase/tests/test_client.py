@@ -102,5 +102,14 @@ class ClientTest(unittest.TestCase):
         self.assertTrue(len(exists))
         self.cb.delete(bucket_name)
 
+    @attr(cbv="1.0.0")
+    def test_delete(self):
+        self.setup_cb()
+        bucket_name = str(uuid.uuid4())
+        bucket = self.cb.create(bucket_name)
+        self.assertIsInstance(self.cb[bucket_name], Bucket)
+        self.cb.delete(bucket_name)
+        self.assertNotIn(bucket_name, self.cb)
+
 if __name__ == "__main__":
     unittest.main()
