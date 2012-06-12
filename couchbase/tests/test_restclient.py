@@ -52,37 +52,37 @@ class RestHelperTest(unittest.TestCase):
     def tearDown(self):
         pass
 
-    @attr(cbv="2.0.0")
+    @nottest
     def setup_rest_helper(self):
         self.rest_helper = RestHelper(self.rest)
 
-    @attr(cbv="2.0.0")
+    @attr(cbv="1.8.0")
     def test_rest_helper_object_creation(self):
         self.setup_rest_helper()
         self.assertEqual(self.rest, self.rest_helper.rest)
 
-    @attr(cbv="2.0.0")
+    @attr(cbv="1.8.0")
     def test_is_ns_server_running(self):
         self.setup_rest_helper()
         self.assertTrue(self.rest_helper.is_ns_server_running())
 
-    @attr(cbv="2.0.0")
+    @attr(cbv="1.8.0")
     def test_is_cluster_healthy(self):
         self.setup_rest_helper()
         self.assertTrue(self.rest_helper.is_cluster_healthy())
 
-    @attr(cbv="2.0.0")
+    @attr(cbv="1.8.0")
     def test_vbucket_map_ready(self):
         self.setup_rest_helper()
         self.assertTrue(self.rest_helper.vbucket_map_ready(self.bucket_name))
 
-    @attr(cbv="2.0.0")
+    @attr(cbv="1.8.0")
     def test_bucket_exists(self):
         self.setup_rest_helper()
         self.assertTrue(self.rest_helper.bucket_exists(self.bucket_name))
         self.assertFalse(self.rest_helper.bucket_exists(str(uuid.uuid4())))
 
-    @attr(cbv="2.0.0")
+    @attr(cbv="1.8.0")
     def test_all_nodes_replicated(self):
         self.setup_rest_helper()
         self.assertTrue(self.rest_helper.all_nodes_replicated(debug=True))
@@ -99,6 +99,7 @@ class RestConnectionTest(unittest.TestCase):
     def tearDown(self):
         pass
 
+    @nottest
     def setup_rest_connection(self):
         server_info = {"ip": self.host,
                        "port": self.port,
@@ -125,17 +126,18 @@ class RestConnectionTest(unittest.TestCase):
     def teardown_design_doc(self, ddoc_name):
         self.rest.delete_design_doc(self.bucket_name, ddoc_name)
 
+    @nottest
     def setup_couchbase_object(self):
         self.cb = Couchbase(self.host + ':' + self.port, self.username,
                             self.password)
 
-    @attr(cbv="2.0.0")
+    @attr(cbv="1.8.0")
     def test_rest_connection_object_creation(self):
         self.setup_rest_connection()
         self.assertEqual(self.rest.baseUrl, "http://%s:%s/" %
                          (self.host, self.port))
 
-    @attr(cbv="2.0.0")
+    @attr(cbv="1.8.0")
     def test_rest_connection_object_creation_with_server_object(self):
         class ServerInfo:
             ip = self.host
@@ -206,7 +208,7 @@ class RestConnectionTest(unittest.TestCase):
         for k, v in kvs:
             self.cb[self.bucket_name].delete(k)
 
-    @attr(cbv="2.0.0")
+    @attr(cbv="1.8.0")
     def test_create_headers(self):
         self.setup_rest_connection()
         headers = self.rest._create_headers()
