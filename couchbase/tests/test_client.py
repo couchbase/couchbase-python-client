@@ -25,6 +25,7 @@ import warnings
 from warnings_catcher import setup_warning_catcher
 from testconfig import config
 from nose.plugins.attrib import attr
+from nose.plugins.skip import SkipTest
 from nose.tools import nottest
 from couchbase.client import *
 from couchbase.couchbaseclient import *
@@ -63,6 +64,8 @@ class ClientTest(unittest.TestCase):
 
     @attr(cbv="1.0.0")
     def test_couchbase_object_construction_without_port(self):
+        if self.port != "8091":
+            raise SkipTest
         cb = Couchbase(self.host, self.username, self.password)
         self.assertIsInstance(cb.servers, types.ListType)
 
