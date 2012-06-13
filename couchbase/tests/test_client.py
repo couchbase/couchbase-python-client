@@ -31,7 +31,7 @@ from couchbase.client import *
 from couchbase.couchbaseclient import *
 
 
-class ClientTest(unittest.TestCase):
+class Base(unittest.TestCase):
     def setUp(self):
         self.host = config['node-1']['host']
         self.port = config['node-1']['port']
@@ -42,6 +42,19 @@ class ClientTest(unittest.TestCase):
     def tearDown(self):
         pass
 
+
+class ServerTest(Base):
+    @attr(cbv="1.0.0")
+    def test_server_object_construction(self):
+        w = setup_warning_catcher()
+        warnings.simplefilter("always")
+        cb = Server(self.host + ':' + self.port, self.username, self.password)
+        self.assertIsInstance(cb.servers, types.ListType)
+        self.assertTrue(len(w) == 1)
+        self.assertTrue("deprecated" in str(w[-1].message))
+
+
+class CouchbaseTest(Base):
     @nottest
     def setup_cb(self):
         self.cb = Couchbase(self.host + ':' + self.port,
@@ -52,15 +65,6 @@ class ClientTest(unittest.TestCase):
         cb = Couchbase(self.host + ':' + self.port, self.username,
                        self.password)
         self.assertIsInstance(cb.servers, types.ListType)
-
-    @attr(cbv="1.0.0")
-    def test_server_object_construction(self):
-        w = setup_warning_catcher()
-        warnings.simplefilter("always")
-        cb = Server(self.host + ':' + self.port, self.username, self.password)
-        self.assertIsInstance(cb.servers, types.ListType)
-        self.assertTrue(len(w) == 1)
-        self.assertTrue("deprecated" in str(w[-1].message))
 
     @attr(cbv="1.0.0")
     def test_couchbase_object_construction_without_port(self):
