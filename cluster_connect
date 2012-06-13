@@ -63,8 +63,9 @@ def main():
 
     o.open("http://127.0.0.1:8091/pools/default", "memoryQuota=" + str(memsize)).read()
     try:
+        # creating an initial bucket using half the available RAM
         o.open("http://127.0.0.1:8091/controller/setupDefaultBucket", "bucketType=" + buckettype +
-            "&ramQuotaMB=" + str(memsize) +
+            "&ramQuotaMB=" + str(memsize/2) +
             "&replicaNumber=" + str(replicas)).read()
     except HTTPError, e:
         if e.code > 100 and e.code < 300:
