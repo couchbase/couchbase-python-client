@@ -325,47 +325,6 @@ class RestConnection(object):
                     raise ServerUnavailableException(ip=self.ip)
             time.sleep(1)
 
-    def init_cluster(self, username='Administrator', password='password'):
-        api = self.baseUrl + 'settings/web'
-        params = urllib.urlencode({'port': str(self.port),
-                                   'username': username,
-                                   'password': password})
-
-        log.info('settings/web params : %s' % (params))
-
-        status, content = self._http_request(api, 'POST', params)
-        if not status:
-            return False
-        return status
-
-    def init_cluster_port(self, username='Administrator', password='password'):
-        api = self.baseUrl + 'settings/web'
-        params = urllib.urlencode({'port': '8091',
-                                   'username': username,
-                                   'password': password})
-
-        log.info('settings/web params : %s' % (params))
-
-        status, content = self._http_request(api, 'POST', params)
-        if not status:
-            return False
-        return status
-
-    def init_cluster_memoryQuota(self, username='Administrator',
-                                 password='password',
-                                 memoryQuota=256):
-        api = self.baseUrl + 'pools/default'
-        params = urllib.urlencode({'memoryQuota': memoryQuota,
-                                   'username': username,
-                                   'password': password})
-
-        log.info('pools/default params : %s' % (params))
-
-        status, content = self._http_request(api, 'POST', params)
-        if not status:
-            return False
-        return status
-
     #params serverIp : the server to add to this cluster
     #raises exceptions when
     #unauthorized user
