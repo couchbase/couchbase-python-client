@@ -21,6 +21,7 @@ try:
 except:
     import simplejson as json
 import urllib
+import requests
 import httplib2
 import socket
 import time
@@ -176,12 +177,11 @@ class RestConnection(object):
             self.couch_api_base = None
 
         self.baseUrl = "http://%s:%s/" % (self.ip, self.port)
+        # if couchApiBase is not set earlier, let's look it up
         if self.couch_api_base is None:
             server_config_uri = "http://%s:%s/pools/default" % (self.ip,
                                                                 self.port)
-            config = client.ServerHelper.parse_server_config(server_config_uri,
-                                                             self.username,
-                                                             self.password)
+            config = requests.get(server_config_uri).json
             #couchApiBase is not in node config before Couchbase Server 2.0
             self.couch_api_base = config["nodes"][0].get("couchApiBase")
 

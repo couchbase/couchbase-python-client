@@ -24,6 +24,7 @@ import time
 from copy import deepcopy
 from threading import Thread, Lock
 import urllib
+import requests
 import warnings
 import logging
 
@@ -50,10 +51,8 @@ class Couchbase(object):
         self.rest_username = username
         self.rest_password = password
 
-        server_config_uri = "http://%s:%s/pools/default" % (server['ip'],
-                                                            server['port'])
-        config = ServerHelper.parse_server_config(server_config_uri, username,
-                                                  password)
+        server_config_uri = "http://%s:%s/pools/default" % (ip, port)
+        config = requests.get(server_config_uri).json
         #couchApiBase will not be in node config before Couchbase Server 2.0
         self.couch_api_base = config["nodes"][0].get("couchApiBase")
 
@@ -331,20 +330,3 @@ class Bucket(object):
             return results['rows']
         else:
             return None
-
-
-class ServerHelper(object):
-    @staticmethod
-    def parse_server_config(uri, username="", password=""):
-        urlopener = urllib.FancyURLopener()
-        if username and len(username) > 0 and password and len(password) > 0:
-            urlopener.prompt_user_passwd = lambda: (username, password)
-        response = urlopener.open(uri)
-
-        try:
-            line = response.readline()
-            data = json.loads(line)
-            return data
-        except:
-            raise Exception("unexpected error - unable to parse server config"
-                            " at %s" % (uri))

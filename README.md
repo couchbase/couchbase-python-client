@@ -6,6 +6,10 @@ memcached interface and the couchbase rest api interface.
 
 This version requires Python 2.6 or later.
 
+You'll need to install the following Python library requirements via `pip`:
+
+    pip install requests
+
 Open Issues: http://www.couchbase.org/issues/browse/PYCBC
 
 [![Build Status](https://secure.travis-ci.org/BigBlueHat/couchbase-python-client.png?branch=master)](http://travis-ci.org/BigBlueHat/couchbase-python-client)
