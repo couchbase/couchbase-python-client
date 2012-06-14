@@ -284,9 +284,12 @@ class RestConnection(object):
 
     #authorization must be a base64 string of username:password
     def _create_headers(self):
-        authorization = base64.encodestring('%s:%s' % (self.username,
-                                                       self.password))
-        return {'Content-Type': 'application/x-www-form-urlencoded',
+        if self.username == "default":
+            return {'Content-Type': 'application/json', 'Accept': '*/*'}
+        else:
+            authorization = base64.encodestring('%s:%s' % (self.username,
+                                                self.password))
+            return {'Content-Type': 'application/x-www-form-urlencoded',
                 'Authorization': 'Basic %s' % authorization,
                 'Accept': '*/*'}
 
