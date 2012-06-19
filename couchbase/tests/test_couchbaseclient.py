@@ -16,23 +16,18 @@
 #
 
 import sys
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest
 import uuid
 import time
-from testconfig import config
 from nose.plugins.attrib import attr
 from couchbase.couchbaseclient import *
 from couchbase.exception import *
+from couchbase.tests.base import Base
 
 
-class CouchbaseClientTest(unittest.TestCase):
+class CouchbaseClientTest(Base):
     def setUp(self):
-        self.url = config['node-1']['url']
-        self.bucket = config['node-1']['bucket']
-        self.client = CouchbaseClient(self.url, self.bucket, "", True)
+        Base.setUp(self)
+        self.client = CouchbaseClient(self.url, self.bucket_name, "", True)
 
     def tearDown(self):
         self.client.flush()

@@ -32,6 +32,7 @@ class Base(unittest.TestCase):
         self.username = config['node-1']['username']
         self.password = config['node-1']['password']
         self.bucket_name = config['node-1']['bucket']
+        self.url = config['node-1']['url']
 
     def tearDown(self):
         pass
