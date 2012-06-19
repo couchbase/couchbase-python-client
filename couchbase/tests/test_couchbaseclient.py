@@ -24,14 +24,14 @@ from couchbase.exception import *
 from couchbase.tests.base import Base
 
 
-class CouchbaseClientTest(Base):
+class MemcachedClientTest(Base):
     def setUp(self):
         Base.setUp(self)
-        self.client = CouchbaseClient(self.url, self.bucket_name, "", True)
+        # TODO: pull memcached port from config
+        self.client = MemcachedClient(self.host)
 
     def tearDown(self):
         self.client.flush()
-        self.client.done()
 
     @attr(cbv="1.0.0")
     def test_simple_add(self):
@@ -107,6 +107,16 @@ class CouchbaseClientTest(Base):
             self.client.set(k, 0, 0, v)
         for k, v in kvs:
             self.client.delete(k)
+
+
+class CouchbaseClientTest(MemcachedClientTest):
+    def setUp(self):
+        MemcachedClientTest.setUp(self)
+        self.client = CouchbaseClient(self.url, self.bucket_name, "", True)
+
+    def tearDown(self):
+        self.client.flush()
+        self.client.done()
 
 if __name__ == '__main__':
     unittest.main()
