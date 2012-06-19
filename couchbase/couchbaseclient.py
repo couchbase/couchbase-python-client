@@ -24,7 +24,6 @@ import logger
 import hmac
 import socket
 import random
-import exceptions
 import zlib
 import struct
 import urllib
@@ -260,7 +259,7 @@ class MemcachedClient(object):
             data = self.s.recv(MemcachedConstants.MIN_RECV_PACKET
                                - len(response))
             if data == '':
-                raise exceptions.EOFError("Got empty data (remote died?)."
+                raise EOFError("Got empty data (remote died?)."
                                           " from %s" % (self.host))
             response += data
         assert len(response) == MemcachedConstants.MIN_RECV_PACKET
@@ -271,7 +270,7 @@ class MemcachedClient(object):
         while remaining > 0:
             data = self.s.recv(remaining)
             if data == '':
-                raise exceptions.EOFError("Got empty data (remote died?)."
+                raise EOFError("Got empty data (remote died?)."
                                           " from %s" % (self.host))
             rv += data
             remaining -= len(data)
@@ -1030,7 +1029,7 @@ class CommandDispatcher(object):
                         self.start_connection_callback(ex.vbucket)
                         item["fastforward"] = True
                         self.queue.put(item)
-                    except exceptions.EOFError, ex:
+                    except EOFError, ex:
                         # we go an EOF error, restart the connection
                         self.log.error(ex)
                         self.restart_connection_callback(ex.vbucket)
@@ -1054,7 +1053,7 @@ class CommandDispatcher(object):
             self.log.error("got not my vb error. key: %s, vbucket: %s" %
                            (item["key"], item["vbucket"]))
             raise ex
-        if isinstance(ex, exceptions.EOFError):
+        if isinstance(ex, EOFError):
             ex.vbucket = item["vbucket"]
             print ex
             self.log.error("got EOF")
