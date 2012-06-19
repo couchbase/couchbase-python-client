@@ -15,32 +15,16 @@
 # limitations under the License.
 #
 
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest
 import types
 import warnings
 
 from warnings_catcher import setup_warning_catcher
-from testconfig import config
 from nose.plugins.attrib import attr
 from nose.plugins.skip import SkipTest
 from nose.tools import nottest
 from couchbase.client import *
 from couchbase.couchbaseclient import *
-
-
-class Base(unittest.TestCase):
-    def setUp(self):
-        self.host = config['node-1']['host']
-        self.port = config['node-1']['port']
-        self.username = config['node-1']['username']
-        self.password = config['node-1']['password']
-        self.bucket_name = config['node-1']['bucket']
-
-    def tearDown(self):
-        pass
+from couchbase.tests.base import Base
 
 
 class ServerTest(Base):
