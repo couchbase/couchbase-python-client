@@ -27,6 +27,22 @@ class CouchbaseHttpExceptionTypes(object):
     BUCKET_UNAVAILABLE = 1006
 
 
+class MemcachedError(Exception):
+    """Error raised when a command fails."""
+
+    def __init__(self, status, msg):
+        supermsg = 'Memcached error #' + repr(status)
+        if msg:
+            supermsg += ":  " + msg
+        Exception.__init__(self, supermsg)
+
+        self.status = status
+        self.msg = msg
+
+    def __repr__(self):
+        return "<MemcachedError #%d ``%s''>" % (self.status, self.msg)
+
+
 class MemcachedTimeoutException(Exception):
     def __init__(self, item, timeout):
         msg = ("timeout - memcached did not return in %s second during %s"

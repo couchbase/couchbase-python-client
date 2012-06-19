@@ -17,7 +17,8 @@
 
 from Queue import Queue, Full, Empty
 from threading import Thread, Event, Lock
-from exception import MemcachedTimeoutException, InvalidArgumentException
+from exception import MemcachedTimeoutException, InvalidArgumentException, \
+                      MemcachedError
 
 import logger
 import hmac
@@ -218,22 +219,6 @@ class MemcachedConstants(object):
     ERR_EXISTS = 0x2
     ERR_AUTH = 0x20
     ERR_AUTH_CONTINUE = 0x21
-
-
-class MemcachedError(exceptions.Exception):
-    """Error raised when a command fails."""
-
-    def __init__(self, status, msg):
-        supermsg = 'Memcached error #' + repr(status)
-        if msg:
-            supermsg += ":  " + msg
-        exceptions.Exception.__init__(self, supermsg)
-
-        self.status = status
-        self.msg = msg
-
-    def __repr__(self):
-        return "<MemcachedError #%d ``%s''>" % (self.status, self.msg)
 
 
 class MemcachedClient(object):
