@@ -348,7 +348,7 @@ class MemcachedClient(object):
         return self._mutate(MemcachedConstants.CMD_REPLACE, key, exp, flags, 0,
                             val)
 
-    def __parseGet(self, data, klen=0):
+    def _parse_get(self, data, klen=0):
         flags = struct.unpack(MemcachedConstants.GET_RES_FMT, data[-1][:4])[0]
         return flags, data[1], data[-1][4 + klen:]
 
@@ -357,14 +357,14 @@ class MemcachedClient(object):
         self._set_vbucket_id(key, vbucket)
         parts = self._doCmd(MemcachedConstants.CMD_GET, key, '')
 
-        return self.__parseGet(parts)
+        return self._parse_get(parts)
 
     def getl(self, key, exp=15, vbucket=-1):
         """Get the value for a given key within the memcached server."""
         self._set_vbucket_id(key, vbucket)
         parts = self._doCmd(MemcachedConstants.CMD_GET_LOCKED, key, '',
                             struct.pack(MemcachedConstants.GETL_PKT_FMT, exp))
-        return self.__parseGet(parts)
+        return self._parse_get(parts)
 
     def cas(self, key, exp, flags, oldVal, val, vbucket=-1):
         """CAS in a new value for the given key and comparison value."""
@@ -383,7 +383,7 @@ class MemcachedClient(object):
         self._set_vbucket_id(key, vbucket)
         parts = self._doCmd(MemcachedConstants.CMD_GAT, key, '',
                             struct.pack(MemcachedConstants.GAT_PKT_FMT, exp))
-        return self.__parseGet(parts)
+        return self._parse_get(parts)
 
     def version(self):
         """Get the version of the server."""
@@ -484,7 +484,7 @@ class MemcachedClient(object):
         while not done:
             opaque, cas, data = self._handleSingleResponse(None)
             if opaque != terminal:
-                rv[opaqued[opaque]] = self.__parseGet((opaque, cas, data))
+                rv[opaqued[opaque]] = self._parse_get((opaque, cas, data))
             else:
                 done = True
 
