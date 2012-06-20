@@ -29,3 +29,10 @@ class VBucketAwareClient(MemcachedClient):
                             struct.pack(VBucketAwareConstants.GETL_PKT_FMT,
                                         exp))
         return self._parse_get(parts)
+
+    def touch(self, key, exp, vbucket=-1):
+        """Touch a key in the memcached server."""
+        self._set_vbucket_id(key, vbucket)
+        return self._doCmd(VBucketAwareConstants.CMD_TOUCH, key, '',
+                           struct.pack(VBucketAwareConstants.TOUCH_PKT_FMT,
+                                       exp))

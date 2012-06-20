@@ -16,6 +16,7 @@
 #
 
 import uuid
+import time
 
 from nose.plugins.attrib import attr
 
@@ -36,3 +37,11 @@ class VBucketAwareClientTest(MemcachedClientTest):
         self.client.set(key, 0, 0, value)
         self.assertEqual(self.client.getl(key)[2], value)
         self.assertRaises(MemcachedError, self.client.set, key, 0, 0, value)
+
+    @attr(cbv="1.0.0")
+    def test_simple_touch(self):
+        key, value = str(uuid.uuid4()), str(uuid.uuid4())
+        self.client.set(key, 2, 0, value)
+        self.client.touch(key, 5)
+        time.sleep(3)
+        self.assertTrue(self.client.get(key)[2] == value)

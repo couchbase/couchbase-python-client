@@ -195,6 +195,8 @@ class MemcachedClient(object):
 
     def touch(self, key, exp, vbucket=-1):
         """Touch a key in the memcached server."""
+        warnings.warn("MemcachedClient.touch is deprecated; use "
+                      "VBucketAwareClient.touch instead", DeprecationWarning)
         self._set_vbucket_id(key, vbucket)
         return self._doCmd(VBucketAwareConstants.CMD_TOUCH, key, '',
                            struct.pack(VBucketAwareConstants.TOUCH_PKT_FMT,
