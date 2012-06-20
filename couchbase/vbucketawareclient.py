@@ -17,13 +17,8 @@
 
 import struct
 
+from constants import VBucketAwareConstants
 from memcachedclient import MemcachedClient, MemcachedConstants
-
-
-class VBucketAwareConstants(MemcachedConstants):
-    """Constants for the vBucket aware extensions to the memcached protocol."""
-    CMD_GET_LOCKED = 0x94
-    GETL_PKT_FMT = "I"
 
 
 class VBucketAwareClient(MemcachedClient):
