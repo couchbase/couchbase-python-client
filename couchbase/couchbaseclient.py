@@ -28,9 +28,11 @@ try:
 except:
     import simplejson as json
 from copy import deepcopy
+
 from rest_client import RestHelper, RestConnection
 from exception import MemcachedError
 from memcachedclient import MemcachedClient
+from vbucketawareclient import VBucketAwareClient
 
 
 class CouchbaseClient(object):
@@ -625,11 +627,16 @@ class MemcachedClientHelper(object):
     def direct_client(rest, ip, port, bucket):
         bucket_info = rest.get_bucket(bucket)
         vBuckets = bucket_info.vbuckets
+        vbucket_count = len(vBuckets)
         for node in bucket_info.nodes:
             if node.ip == ip and node.memcached == int(port):
-                client = MemcachedClient(ip.encode('ascii', 'ignore'),
-                                         int(port))
-                client.vbucket_count = len(vBuckets)
+                if vbucket_count == 0:
+                    client = MemcachedClient(ip.encode('ascii', 'ignore'),
+                                             int(port))
+                else:
+                    client = VBucketAwareClient(ip.encode('ascii', 'ignore'),
+                                             int(port))
+                client.vbucket_count = vbucket_count
                 client.sasl_auth_plain(bucket_info.name.encode('ascii'),
                                        bucket_info.saslPassword
                                        .encode('ascii'))

@@ -15,21 +15,24 @@
 # limitations under the License.
 #
 
+import uuid
+
 from nose.plugins.attrib import attr
 
-from couchbase.couchbaseclient import *
+from couchbase.vbucketawareclient import VBucketAwareClient
 from couchbase.exception import *
-from couchbase.tests.test_vbucketawareclient import VBucketAwareClientTest
+from couchbase.tests.test_memcachedclient import MemcachedClientTest
 
 
-class CouchbaseClientTest(VBucketAwareClientTest):
+class VBucketAwareClientTest(MemcachedClientTest):
     def setUp(self):
-        VBucketAwareClientTest.setUp(self)
-        self.client = CouchbaseClient(self.url, self.bucket_name, "", True)
+        MemcachedClientTest.setUp(self)
+        # TODO: pull memcached port from config
+        self.client = VBucketAwareClient(self.host)
 
-    def tearDown(self):
-        self.client.flush()
-        self.client.done()
-
-if __name__ == '__main__':
-    unittest.main()
+    @attr(cbv="1.0.0")
+    def test_getl(self):
+        key, value = str(uuid.uuid4()), str(uuid.uuid4())
+        self.client.set(key, 0, 0, value)
+        self.assertEqual(self.client.getl(key)[2], value)
+        self.assertRaises(MemcachedError, self.client.set, key, 0, 0, value)

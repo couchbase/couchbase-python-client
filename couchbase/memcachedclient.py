@@ -21,6 +21,7 @@ import socket
 import random
 import zlib
 import struct
+import warnings
 
 from exception import MemcachedTimeoutException, InvalidArgumentException, \
                       MemcachedError
@@ -361,6 +362,8 @@ class MemcachedClient(object):
 
     def getl(self, key, exp=15, vbucket=-1):
         """Get the value for a given key within the memcached server."""
+        warnings.warn("MemcachedClient.getl is deprecated; use "
+                      "VBucketAwareClient.getl instead", DeprecationWarning)
         self._set_vbucket_id(key, vbucket)
         parts = self._doCmd(MemcachedConstants.CMD_GET_LOCKED, key, '',
                             struct.pack(MemcachedConstants.GETL_PKT_FMT, exp))

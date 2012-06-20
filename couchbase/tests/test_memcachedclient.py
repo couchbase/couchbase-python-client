@@ -17,7 +17,9 @@
 
 import time
 import uuid
+import warnings
 
+from warnings_catcher import setup_warning_catcher
 from nose.plugins.attrib import attr
 from couchbase.memcachedclient import MemcachedClient
 from couchbase.exception import *
@@ -107,3 +109,14 @@ class MemcachedClientTest(Base):
             self.client.set(k, 0, 0, v)
         for k, v in kvs:
             self.client.delete(k)
+
+    @attr(cbv="1.0.0")
+    def test_getl(self):
+        w = setup_warning_catcher()
+        warnings.simplefilter("always")
+        key, value = str(uuid.uuid4()), str(uuid.uuid4())
+        self.client.set(key, 0, 0, value)
+        self.assertEqual(self.client.getl(key)[2], value)
+        self.assertRaises(MemcachedError, self.client.set, key, 0, 0, value)
+        self.assertTrue(len(w) == 1)
+        self.assertTrue("deprecated" in str(w[-1].message))
