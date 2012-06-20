@@ -370,8 +370,8 @@ class CouchbaseClient(object):
 
 class VBucketAwareCouchbaseClient(CouchbaseClient):
     def __init__(self, host, username, password):
-        warnings.warn("Server is deprecated; use VBucketAwareCouchbaseClient"
-                      " instead", DeprecationWarning)
+        warnings.warn("VBucketAwareCouchbaseClient is deprecated; use "
+                      "CouchbaseClient instead", DeprecationWarning)
         CouchbaseClient.__init__(self, host, username, password)
 
 
