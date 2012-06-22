@@ -289,7 +289,7 @@ class Bucket(object):
             view = key.split('/')[1]
 
             rest = self.server._rest()
-            rest.create_view(self.bucket_name, view, json.dumps(value))
+            rest.create_design_doc(self.bucket_name, view, json.dumps(value))
         else:
             if '_rev' in value:
                 # couchbase works in clobber mode so for "set" _rev is useless
