@@ -65,8 +65,8 @@ class Couchbase(object):
     def _start_streaming(self):
         # this will dynamically update servers
         urlopener = urllib.FancyURLopener()
-        urlopener.prompt_user_passwd = lambda: (self.rest_username,
-                                                self.rest_password)
+        urlopener.prompt_user_passwd = lambda host, realm: (self.rest_username,
+                                                            self.rest_password)
         current_servers = True
         while current_servers:
             self.servers_lock.acquire()
@@ -338,7 +338,7 @@ class ServerHelper(object):
     def parse_server_config(uri, username="", password=""):
         urlopener = urllib.FancyURLopener()
         if username and len(username) > 0 and password and len(password) > 0:
-            urlopener.prompt_user_passwd = lambda: (username, password)
+            urlopener.prompt_user_passwd = lambda host, realm: (username, password)
         response = urlopener.open(uri)
 
         try:
