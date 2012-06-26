@@ -702,8 +702,8 @@ class CouchbaseClient(object):
         # This will dynamically update vBucketMap, vBucketMapFastForward,
         # and servers
         urlopener = urllib.FancyURLopener()
-        urlopener.prompt_user_passwd = lambda: (self.rest_username,
-                                                self.rest_password)
+        urlopener.prompt_user_passwd = lambda host, realm: (self.rest_username,
+                                                            self.rest_password)
         current_servers = True
         while current_servers:
             self.servers_lock.acquire()
