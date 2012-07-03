@@ -15,8 +15,6 @@
 # limitations under the License.
 #
 
-from nose.plugins.attrib import attr
-
 from couchbase.couchbaseclient import *
 from couchbase.exception import *
 from couchbase.tests.test_vbucketawareclient import VBucketAwareClientTest

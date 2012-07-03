@@ -24,8 +24,7 @@ import struct
 import warnings
 
 from constants import MemcachedConstants, VBucketAwareConstants
-from exception import MemcachedTimeoutException, InvalidArgumentException, \
-                      MemcachedError
+from exception import MemcachedError
 
 
 class MemcachedClient(object):

@@ -29,7 +29,6 @@ import warnings
 import requests
 import httplib2
 
-import client
 from exception import ServerAlreadyJoinedException,\
     ServerUnavailableException, InvalidArgumentException,\
     BucketCreationException, ServerJoinException, BucketUnavailableException

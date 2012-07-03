@@ -18,7 +18,7 @@
 import struct
 
 from constants import VBucketAwareConstants
-from memcachedclient import MemcachedClient, MemcachedConstants
+from memcachedclient import MemcachedClient
 
 
 class VBucketAwareClient(MemcachedClient):

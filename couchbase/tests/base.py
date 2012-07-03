@@ -21,8 +21,6 @@ except ImportError:
     import unittest
 
 from testconfig import config
-from nose.tools import nottest
-from nose.plugins.attrib import attr
 
 
 class Base(unittest.TestCase):

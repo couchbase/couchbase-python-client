@@ -25,7 +25,6 @@ from copy import deepcopy
 from threading import Thread, Lock
 import urllib
 import warnings
-import logging
 
 import requests
 

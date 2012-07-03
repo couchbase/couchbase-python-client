@@ -18,7 +18,6 @@
 # source *.json files from a zip file into destination
 
 import os
-import json
 import zipfile
 import tempfile
 import shutil
