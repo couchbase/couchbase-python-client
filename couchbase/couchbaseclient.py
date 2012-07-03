@@ -30,7 +30,8 @@ except:
 from copy import deepcopy
 
 from rest_client import RestHelper, RestConnection
-from exception import MemcachedError
+from exception import MemcachedError, MemcachedTimeoutException,\
+    InvalidArgumentException
 from memcachedclient import MemcachedClient
 from vbucketawareclient import VBucketAwareClient
 
