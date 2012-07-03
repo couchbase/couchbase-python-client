@@ -225,7 +225,8 @@ class RestConnection(object):
             api = api + "?rev=%s" % (rev)
 
             headers = self._create_capi_headers()
-            status, content = self._http_request(api, 'DELETE', headers=headers)
+            status, content = self._http_request(api, 'DELETE',
+                                                 headers=headers)
 
             json_parsed = json.loads(content)
             if not status:
