@@ -88,13 +88,6 @@ class MemcachedClientTest(Base):
         self.assertTrue(self.client.get('key')[2] == 'replaced')
 
     @attr(cbv="1.0.0")
-    def test_simple_touch(self):
-        self.client.set('key', 2, 0, 'value')
-        self.client.touch('key', 5)
-        time.sleep(3)
-        self.assertTrue(self.client.get('key')[2] == 'value')
-
-    @attr(cbv="1.0.0")
     def test_set_and_get(self):
         kvs = [(str(uuid.uuid4()), str(uuid.uuid4())) for i in range(0, 100)]
         for k, v in kvs:
