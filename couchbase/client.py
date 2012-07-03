@@ -24,9 +24,10 @@ import time
 from copy import deepcopy
 from threading import Thread, Lock
 import urllib
-import requests
 import warnings
 import logging
+
+import requests
 
 from rest_client import RestConnection
 from couchbaseclient import CouchbaseClient

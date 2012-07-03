@@ -26,10 +26,12 @@ except:
 import uuid
 import base64
 import warnings
-from warnings_catcher import setup_warning_catcher
+
 from testconfig import config
 from nose.tools import nottest
 from nose.plugins.attrib import attr
+
+from warnings_catcher import setup_warning_catcher
 from couchbase.client import *
 from couchbase.rest_client import RestConnection, RestHelper
 

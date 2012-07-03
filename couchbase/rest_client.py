@@ -21,12 +21,14 @@ try:
 except:
     import simplejson as json
 import urllib
-import requests
-import httplib2
 import socket
 import time
 import logger
 import warnings
+
+import requests
+import httplib2
+
 import client
 from exception import ServerAlreadyJoinedException,\
     ServerUnavailableException, InvalidArgumentException,\
