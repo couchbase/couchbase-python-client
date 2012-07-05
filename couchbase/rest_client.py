@@ -201,10 +201,10 @@ class RestConnection(object):
 
     def view_results(self, bucket, design_doc, view, params, limit=100):
         if view:
-            view_query = '{0}/_design/{1}/_view/{2}'
+            view_query = '%s/_design/%s/_view/%s' % (bucket, design_doc, view)
         else:
-            view_query = '{0}/{1}'
-        api = self.couch_api_base + view_query.format(bucket, design_doc, view)
+            view_query = '%s/%s' % (bucket, design_doc)
+        api = self.couch_api_base + view_query
         num_params = 0
         if limit != None:
             num_params = 1
