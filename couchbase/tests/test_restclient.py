@@ -21,7 +21,7 @@ except ImportError:
     import unittest
 try:
     import json
-except:
+except ImportError:
     import simplejson as json
 import uuid
 import base64

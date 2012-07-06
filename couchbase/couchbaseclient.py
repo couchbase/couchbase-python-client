@@ -24,7 +24,7 @@ import urllib
 import warnings
 try:
     import json
-except:
+except ImportError:
     import simplejson as json
 from copy import deepcopy
 

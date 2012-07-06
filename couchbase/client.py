@@ -18,7 +18,7 @@
 import uuid
 try:
     import json
-except:
+except ImportError:
     import simplejson as json
 import time
 from copy import deepcopy

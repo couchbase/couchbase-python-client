@@ -18,7 +18,7 @@
 import base64
 try:
     import json
-except:
+except ImportError:
     import simplejson as json
 import urllib
 import socket
