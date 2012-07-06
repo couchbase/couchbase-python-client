@@ -20,7 +20,6 @@ sources = [{'type':'couchdb', 'class':'CouchdbReader',
 destinations = [{'type':'couchdb', 'class':'CouchdbWriter',
                  'example':'couchdb://example.com:5984/database'}]
 
-import migrator
 from urlparse import urlparse
 
 try:
@@ -29,8 +28,10 @@ except:
     sources = []
     destinations = []
 
+from couchbase.migrator.migrator import Reader, Writer
 
-class CouchdbReader(migrator.Reader):
+
+class CouchdbReader(Reader):
     def __init__(self, source):
         # couchdb://example.com:5984/database
         url = urlparse(source)
@@ -70,7 +71,7 @@ class CouchdbReader(migrator.Reader):
         return record
 
 
-class CouchdbWriter(migrator.Writer):
+class CouchdbWriter(Writer):
     def __init__(self, destination):
         # couchdb://example.com:5984/database
         url = urlparse(destination)

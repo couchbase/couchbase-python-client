@@ -28,8 +28,8 @@ import warnings
 
 import requests
 
-from rest_client import RestConnection
-from couchbaseclient import CouchbaseClient
+from couchbase.rest_client import RestConnection
+from couchbase.couchbaseclient import CouchbaseClient
 
 
 class Couchbase(object):

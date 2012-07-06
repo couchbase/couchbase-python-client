@@ -32,7 +32,7 @@ from nose.tools import nottest
 from nose.plugins.attrib import attr
 from nose.plugins.skip import SkipTest
 
-from warnings_catcher import setup_warning_catcher
+from couchbase.tests.warnings_catcher import setup_warning_catcher
 from couchbase.client import *
 from couchbase.rest_client import RestConnection, RestHelper
 

@@ -33,10 +33,11 @@ destinations = [{'type':'dir', 'class':'DirWriter',
 
 import os
 import json
-import migrator
+
+from couchbase.migrator.migrator import Reader, Writer
 
 
-class DirReader(migrator.Reader):
+class DirReader(Reader):
     def __init__(self, source):
         if source[0:2] == "//":
             source = source[2:]
@@ -111,7 +112,7 @@ class DirReader(migrator.Reader):
         return record
 
 
-class DirWriter(migrator.Writer):
+class DirWriter(Writer):
     def __init__(self, destination):
         if destination[0:2] == "//":
             destination = destination[2:]

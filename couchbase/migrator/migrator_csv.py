@@ -19,10 +19,11 @@ sources = [{'type':'csv', 'class':'CSVReader', 'example':'csv://<filename>'}]
 destinations = []
 
 import csv
-import migrator
+
+from couchbase.migrator.migrator import Reader, Writer
 
 
-class CSVReader(migrator.Reader):
+class CSVReader(Reader):
     def __init__(self, source):
         if source[0:2] == "//":
             source = source[2:]
@@ -43,5 +44,5 @@ class CSVReader(migrator.Reader):
             raise StopIteration()
 
 
-class CSVWriter(migrator.Writer):
+class CSVWriter(Writer):
     pass

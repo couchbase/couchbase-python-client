@@ -2,12 +2,13 @@ __all__ = [
     'reader', 'writer',
 ]
 
-from migrator_csv import CSVReader, CSVWriter
-from migrator_json import JSONReader, JSONWriter
-from migrator_couchdb import CouchdbReader, CouchdbWriter
-from migrator_couchbase import CouchbaseReader, CouchbaseWriter
-from migrator_dir import DirReader, DirWriter
-from migrator_zip import ZipReader, ZipWriter
+from couchbase.migrator.migrator_csv import CSVReader, CSVWriter
+from couchbase.migrator.migrator_json import JSONReader, JSONWriter
+from couchbase.migrator.migrator_couchdb import CouchdbReader, CouchdbWriter
+from couchbase.migrator.migrator_couchbase \
+    import CouchbaseReader, CouchbaseWriter
+from couchbase.migrator.migrator_dir import DirReader, DirWriter
+from couchbase.migrator.migrator_zip import ZipReader, ZipWriter
 
 sources = []
 destinations = []

@@ -15,7 +15,6 @@
 # limitations under the License.
 #
 
-import logger
 import hmac
 import socket
 import random
@@ -23,8 +22,9 @@ import zlib
 import struct
 import warnings
 
-from constants import MemcachedConstants, VBucketAwareConstants
-from exception import MemcachedError
+import couchbase.logger as logger
+from couchbase.constants import MemcachedConstants, VBucketAwareConstants
+from couchbase.exception import MemcachedError
 
 
 class MemcachedClient(object):

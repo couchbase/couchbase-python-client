@@ -15,7 +15,8 @@
 # limitations under the License.
 #
 import json
-import migrator
+
+from couchbase.migrator.migrator import Reader, Writer
 
 sources = [{'type':'json', 'class':'JSONReader',
             'example':'json://<filename>'}]
@@ -23,7 +24,7 @@ destinations = [{'type':'json', 'class':'JSONWriter',
                  'example':'json://<filename>'}]
 
 
-class JSONReader(migrator.Reader):
+class JSONReader(Reader):
     def __init__(self, source):
         if source[0:2] == "//":
             source = source[2:]
@@ -48,7 +49,7 @@ class JSONReader(migrator.Reader):
             raise StopIteration()
 
 
-class JSONWriter(migrator.Writer):
+class JSONWriter(Writer):
     def __init__(self, destination):
         if destination[0:2] == "//":
             destination = destination[2:]

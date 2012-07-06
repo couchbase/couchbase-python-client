@@ -18,7 +18,6 @@
 from Queue import Queue, Full, Empty
 from threading import Thread, Event, Lock
 
-import logger
 import socket
 import zlib
 import urllib
@@ -29,11 +28,12 @@ except:
     import simplejson as json
 from copy import deepcopy
 
-from rest_client import RestHelper, RestConnection
-from exception import MemcachedError, MemcachedTimeoutException,\
+import couchbase.logger as logger
+from couchbase.rest_client import RestHelper, RestConnection
+from couchbase.exception import MemcachedError, MemcachedTimeoutException, \
     InvalidArgumentException
-from memcachedclient import MemcachedClient
-from vbucketawareclient import VBucketAwareClient
+from couchbase.memcachedclient import MemcachedClient
+from couchbase.vbucketawareclient import VBucketAwareClient
 
 
 class CouchbaseClient(object):

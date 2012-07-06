@@ -22,7 +22,7 @@ import zipfile
 import tempfile
 import shutil
 
-from migrator_dir import DirReader, DirWriter
+from couchbase.migrator.migrator_dir import DirReader, DirWriter
 
 sources = [{'type':'zip', 'class':'ZipReader', 'example':'zip://<zipfile>'}]
 destinations = [{'type':'zip', 'class':'ZipWriter',

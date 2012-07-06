@@ -22,11 +22,12 @@ destinations = [{'type':'couchbase', 'class':'CouchbaseWriter',\
 
 from urlparse import urlparse
 import urllib
+
 import couchbase
-import migrator
+from couchbase.migrator.migrator import Reader, Writer
 
 
-class CouchbaseReader(migrator.Reader):
+class CouchbaseReader(Reader):
     def __init__(self, source):
         # couchbase://username:password@example.com:8091/bucket
         url = urlparse(source)
@@ -75,7 +76,7 @@ class CouchbaseReader(migrator.Reader):
         return record
 
 
-class CouchbaseWriter(migrator.Writer):
+class CouchbaseWriter(Writer):
     def __init__(self, destination):
         # couchbase://username:password@example.com:8091/bucket
         url = urlparse(destination)

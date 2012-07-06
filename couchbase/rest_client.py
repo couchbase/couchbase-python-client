@@ -23,14 +23,14 @@ except:
 import urllib
 import socket
 import time
-import logger
 import warnings
 
 import requests
 import httplib2
 
-from exception import ServerAlreadyJoinedException,\
-    ServerUnavailableException, InvalidArgumentException,\
+import couchbase.logger as logger
+from couchbase.exception import ServerAlreadyJoinedException, \
+    ServerUnavailableException, InvalidArgumentException, \
     BucketCreationException, ServerJoinException, BucketUnavailableException
 
 log = logger.logger("rest_client")
