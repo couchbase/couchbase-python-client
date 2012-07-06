@@ -23,7 +23,7 @@ from nose.plugins.attrib import attr
 
 from couchbase.tests.warnings_catcher import setup_warning_catcher
 from couchbase.memcachedclient import MemcachedClient
-from couchbase.exception import *
+from couchbase.exception import MemcachedError
 from couchbase.tests.base import Base
 
 

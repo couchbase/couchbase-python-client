@@ -17,15 +17,19 @@
 
 import types
 import warnings
+import uuid
+import time
 
 from nose.plugins.attrib import attr
 from nose.plugins.skip import SkipTest
 from nose.tools import nottest
 
 from couchbase.tests.warnings_catcher import setup_warning_catcher
-from couchbase.client import *
-from couchbase.couchbaseclient import *
+from couchbase.client import Couchbase, Server, Bucket
+from couchbase.couchbaseclient \
+    import CouchbaseClient, VBucketAwareCouchbaseClient
 from couchbase.tests.base import Base
+from couchbase.exception import MemcachedError
 
 
 class ServerTest(Base):

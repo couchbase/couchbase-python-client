@@ -21,7 +21,7 @@ import time
 from nose.plugins.attrib import attr
 
 from couchbase.vbucketawareclient import VBucketAwareClient
-from couchbase.exception import *
+from couchbase.exception import MemcachedError
 from couchbase.tests.test_memcachedclient import MemcachedClientTest
 
 

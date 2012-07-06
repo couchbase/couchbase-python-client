@@ -16,8 +16,7 @@
 #
 
 from couchbase.tests.base import Base
-from couchbase.couchbaseclient import *
-from couchbase.exception import *
+from couchbase.couchbaseclient import CouchbaseClient
 from couchbase.tests.test_vbucketawareclient import VBucketAwareClientTest
 
 

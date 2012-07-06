@@ -33,7 +33,7 @@ from nose.plugins.attrib import attr
 from nose.plugins.skip import SkipTest
 
 from couchbase.tests.warnings_catcher import setup_warning_catcher
-from couchbase.client import *
+from couchbase.client import Couchbase
 from couchbase.rest_client import RestConnection, RestHelper
 
 
