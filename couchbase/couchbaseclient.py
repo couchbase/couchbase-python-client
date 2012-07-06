@@ -28,7 +28,7 @@ except:
     import simplejson as json
 from copy import deepcopy
 
-import couchbase.logger as logger
+from couchbase.logger import logger
 from couchbase.rest_client import RestHelper, RestConnection
 from couchbase.exception import MemcachedError, MemcachedTimeoutException, \
     InvalidArgumentException
@@ -40,7 +40,7 @@ class CouchbaseClient(object):
     #poll server every few seconds to see if the vbucket-map
     #has changes
     def __init__(self, url, bucket, password="", verbose=False):
-        self.log = logger.logger("CouchbaseClient")
+        self.log = logger("CouchbaseClient")
         self.bucket = bucket
         self.rest_username = bucket
         self.rest_password = password
@@ -392,7 +392,7 @@ class CommandDispatcher(object):
         self.restart_connection_callback =\
             self.vbaware.restart_vbucket_connection
         self.verbose = verbose
-        self.log = logger.logger("CommandDispatcher")
+        self.log = logger("CommandDispatcher")
         self._dispatcher_stopped_event = Event()
 
     def put(self, item):

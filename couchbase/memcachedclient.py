@@ -22,7 +22,7 @@ import zlib
 import struct
 import warnings
 
-import couchbase.logger as logger
+from couchbase.logger import logger
 from couchbase.constants import MemcachedConstants, VBucketAwareConstants
 from couchbase.exception import MemcachedError
 
@@ -38,7 +38,7 @@ class MemcachedClient(object):
         self.s = socket.socket()
         self.s.connect_ex((host, port))
         self.r = random.Random()
-        self.log = logger.logger("MemcachedClient")
+        self.log = logger("MemcachedClient")
         self.vbucket_count = 1024
 
     def close(self):

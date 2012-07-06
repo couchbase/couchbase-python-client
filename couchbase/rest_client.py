@@ -28,12 +28,12 @@ import warnings
 import requests
 import httplib2
 
-import couchbase.logger as logger
+from couchbase.logger import logger
 from couchbase.exception import ServerAlreadyJoinedException, \
     ServerUnavailableException, InvalidArgumentException, \
     BucketCreationException, ServerJoinException, BucketUnavailableException
 
-log = logger.logger("rest_client")
+log = logger("rest_client")
 
 
 #helper library methods built on top of RestConnection interface
