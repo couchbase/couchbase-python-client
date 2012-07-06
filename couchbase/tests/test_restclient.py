@@ -30,6 +30,7 @@ import warnings
 from testconfig import config
 from nose.tools import nottest
 from nose.plugins.attrib import attr
+from nose.plugins.skip import SkipTest
 
 from warnings_catcher import setup_warning_catcher
 from couchbase.client import *
@@ -116,6 +117,8 @@ class RestConnectionTest(unittest.TestCase):
     @nottest
     def setup_create_design_doc(self):
         self.setup_rest_connection()
+        if self.rest.couch_api_base == None:
+            raise SkipTest
         ddoc_name = uuid.uuid4()
         design_doc = json.dumps({"views":
                       {"testing":
