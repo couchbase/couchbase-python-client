@@ -33,6 +33,9 @@ from couchbase.couchbaseclient import CouchbaseClient
 
 
 class Couchbase(object):
+    """This is the primary class through which the Python "smart client"
+    communicates with the cluster. It combines and simplifies access to both
+    the memcached and HTTP protocols used in Couchbase Server."""
     def __init__(self, host, username, password):
         if (':' in host):
             [ip, port] = host.split(':')
@@ -177,6 +180,8 @@ class Couchbase(object):
 
 
 class Server(Couchbase):
+    """This is the earlier name of the Couchbase() class. It is now deprecated.
+    """
     def __init__(self, host, username, password):
         warnings.warn("Server is deprecated; use Couchbase instead",
                       DeprecationWarning)
@@ -184,6 +189,7 @@ class Server(Couchbase):
 
 
 class BucketIterator(object):
+    """Pythonic Iterator for Bucket objects."""
     def __init__(self, buckets):
         self.buckets = buckets
 
@@ -198,6 +204,8 @@ class BucketIterator(object):
 
 
 class Bucket(object):
+    """Handles Bucket management as well as key/value access for a specific
+    bucket."""
     def __init__(self, bucket_name, server):
         self.server = server
 
