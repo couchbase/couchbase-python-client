@@ -15,12 +15,13 @@
 # limitations under the License.
 #
 
+from couchbase.tests.base import Base
 from couchbase.couchbaseclient import *
 from couchbase.exception import *
 from couchbase.tests.test_vbucketawareclient import VBucketAwareClientTest
 
 
-class CouchbaseClientTest(VBucketAwareClientTest):
+class CouchbaseClientTest(Base):
     def setUp(self):
         VBucketAwareClientTest.setUp(self)
         self.client = CouchbaseClient(self.url, self.bucket_name, "", True)
