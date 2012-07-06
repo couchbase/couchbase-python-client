@@ -139,3 +139,7 @@ class MemcachedClientTest(Base):
         self.assertTrue(self.client.get(key)[2] == value)
         self.assertTrue(len(w) == 1)
         self.assertTrue("deprecated" in str(w[-1].message))
+
+    @attr(cbv="1.0.0")
+    def test_version(self):
+        self.assertIsInstance(self.client.version()[2], str)
