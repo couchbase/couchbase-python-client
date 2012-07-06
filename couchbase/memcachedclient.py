@@ -203,6 +203,8 @@ class MemcachedClient(object):
 
     def gat(self, key, exp, vbucket=-1):
         """Get the value for a given key and touch it."""
+        warnings.warn("MemcachedClient.gat is deprecated; use "
+                      "VBucketAwareClient.gat instead", DeprecationWarning)
         self._set_vbucket_id(key, vbucket)
         parts = self._doCmd(VBucketAwareConstants.CMD_GAT, key, '',
                             struct.pack(VBucketAwareConstants.GAT_PKT_FMT,

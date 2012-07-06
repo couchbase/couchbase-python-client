@@ -235,9 +235,6 @@ class Bucket(object):
     def get(self, key):
         return self.mc_client.get(key)
 
-    def send_get(self, key):
-        return self.mc_client.send_get(key)
-
     def getl(self, key, exp=15):
         return self.mc_client.getl(key, exp)
 

@@ -36,3 +36,11 @@ class VBucketAwareClient(MemcachedClient):
         return self._doCmd(VBucketAwareConstants.CMD_TOUCH, key, '',
                            struct.pack(VBucketAwareConstants.TOUCH_PKT_FMT,
                                        exp))
+
+    def gat(self, key, exp, vbucket=-1):
+        """Get the value for a given key and touch it."""
+        self._set_vbucket_id(key, vbucket)
+        parts = self._doCmd(VBucketAwareConstants.CMD_GAT, key, '',
+                            struct.pack(VBucketAwareConstants.GAT_PKT_FMT,
+                                        exp))
+        return self._parse_get(parts)

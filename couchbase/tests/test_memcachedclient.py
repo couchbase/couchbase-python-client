@@ -126,3 +126,16 @@ class MemcachedClientTest(Base):
         self.assertTrue(self.client.get(key)[2] == value)
         self.assertTrue(len(w) == 1)
         self.assertTrue("deprecated" in str(w[-1].message))
+
+    @attr(cbv="1.0.0")
+    def test_gat(self):
+        w = setup_warning_catcher()
+        warnings.simplefilter("always")
+        key, value = str(uuid.uuid4()), str(uuid.uuid4())
+        self.client.set(key, 2, 0, value)
+        set_value = self.client.gat(key, 5)[2]
+        self.assertTrue(set_value == value)
+        time.sleep(3)
+        self.assertTrue(self.client.get(key)[2] == value)
+        self.assertTrue(len(w) == 1)
+        self.assertTrue("deprecated" in str(w[-1].message))
