@@ -15,12 +15,23 @@
 # limitations under the License.
 #
 
-from distutils.core import setup
+
+import os
 import subprocess
+try:
+    from setuptools import setup
+except ImportError:
+    from distutils.core import setup
+
+
+here = os.path.dirname(os.path.abspath(__file__))
+long_description = open(os.path.join(here, 'README.md')).read()
+
 
 def get_version():
     try:
-        p = subprocess.Popen('git describe', stdout=subprocess.PIPE, shell=True)
+        p = subprocess.Popen('git describe', stdout=subprocess.PIPE,
+                             shell=True)
         version = p.communicate()[0].strip()
     except:
         version = ''
@@ -31,11 +42,13 @@ setup(
     name = "couchbase-python",
     version = get_version(),
     description = "Couchbase Python SDK",
-    author = "Couchbase Inc",
+    author = "Couchbase, Inc.",
     author_email = "info@couchbase.com",
-    packages = ["couchbase", "httplib2", "couchbase/utils", "couchbase/migrator"],
-    url = "http://couchbase.org/",
-    download_url = "http://.../pysdk.tar.gz",
+    packages = ["couchbase", "couchbase/utils", "couchbase/migrator"],
+    install_requires = ["httplib2", "requests", "unittest2", "simplejson"],
+    setup_requires = ["nose>=1.0"],
+    tests_require = ["nose-testconfig"],
+    url = "http://www.couchbase.com/develop/python/next",
     license = "LICENSE.txt",
     keywords = ["encoding", "i18n", "xml"],
     classifiers = [
@@ -48,5 +61,5 @@ setup(
         "Operating System :: OS Independent",
         "Topic :: Software Development :: Libraries :: Python Modules",
         ],
-    long_description = open('README.md').read(),
+    long_description = long_description,
 )
