@@ -216,10 +216,10 @@ class MemcachedClient(object):
         return self._doCmd(MemcachedConstants.CMD_VERSION, '', '')
 
     def sasl_mechanisms(self):
-        """Get the supported SASL methods."""
+        """Return an immutable, fronzenset of the supported SASL methods."""
 
-        return set(self._doCmd(MemcachedConstants.CMD_SASL_LIST_MECHS,
-                               '', '')[2].split(' '))
+        return frozenset(self._doCmd(MemcachedConstants.CMD_SASL_LIST_MECHS,
+                                     '', '')[2].split(' '))
 
     def sasl_auth_start(self, mech, data):
         """Start a sasl auth session."""

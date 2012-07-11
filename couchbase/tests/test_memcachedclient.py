@@ -143,3 +143,7 @@ class MemcachedClientTest(Base):
     @attr(cbv="1.0.0")
     def test_version(self):
         self.assertIsInstance(self.client.version()[2], str)
+
+    @attr(cbv="1.0.0")
+    def test_sasl_mechanisms(self):
+        self.assertIsInstance(self.client.sasl_mechanisms(), frozenset)
