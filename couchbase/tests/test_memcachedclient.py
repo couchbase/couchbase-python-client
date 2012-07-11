@@ -147,3 +147,31 @@ class MemcachedClientTest(Base):
     @attr(cbv="1.0.0")
     def test_sasl_mechanisms(self):
         self.assertIsInstance(self.client.sasl_mechanisms(), frozenset)
+
+    @attr(cbv="1.0.0")
+    def test_getMulti(self):
+        w = setup_warning_catcher()
+        warnings.simplefilter("always")
+        for kv in [{'key1': 'value1', 'key2': 'value2'}]:
+            for k in kv:
+                self.client.set(k, 0, 0, kv[k])
+
+            rv = self.client.getMulti(kv.keys())
+            self.assertTrue(len(w) == 1)
+            self.assertTrue("deprecated" in str(w[-1].message))
+
+            for k in kv:
+                self.assertIn(k, rv)
+                self.assertEqual(rv[k][2], kv[k])
+
+    @attr(cbv="1.0.0")
+    def test_get_multi(self):
+        for kv in [{'key1': 'value1', 'key2': 'value2'}]:
+            for k in kv:
+                self.client.set(k, 0, 0, kv[k])
+
+            rv = self.client.get_multi(kv.keys())
+
+            for k in kv:
+                self.assertIn(k, rv)
+                self.assertEqual(rv[k][2], kv[k])

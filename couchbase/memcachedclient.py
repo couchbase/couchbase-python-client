@@ -293,6 +293,12 @@ class MemcachedClient(object):
         return self._doCmd(MemcachedConstants.CMD_EVICT_KEY, key, '')
 
     def getMulti(self, keys):
+        """Deprecated. See get_multi()"""
+        warnings.warn("MemcachedClient.getMulti is deprecated; use "
+                      "MemcachedClient.get_multi instead", DeprecationWarning)
+        return self.get_multi(keys)
+
+    def get_multi(self, keys):
         """Get values for any available keys in the given iterable.
 
         Returns a dict of matched keys to their values."""
