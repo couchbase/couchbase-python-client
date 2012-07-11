@@ -195,5 +195,21 @@ class BucketTest(Base):
         for k, v in kvs:
             self.client.delete(k)
 
+    @attr(cbv="1.0.0")
+    def test_getl(self):
+        key, value = str(uuid.uuid4()), str(uuid.uuid4())
+        self.client.set(key, 0, 0, value)
+        self.assertEqual(self.client.getl(key)[2], value)
+        self.assertRaises(MemcachedError, self.client.set, key, 0, 0, value)
+
+    @attr(cbv="1.0.0")
+    def test_gat(self):
+        key, value = str(uuid.uuid4()), str(uuid.uuid4())
+        self.client.set(key, 2, 0, value)
+        set_value = self.client.gat(key, 5)[2]
+        self.assertTrue(set_value == value)
+        time.sleep(3)
+        self.assertTrue(self.client.get(key)[2] == value)
+
 if __name__ == "__main__":
     unittest.main()
