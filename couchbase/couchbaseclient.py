@@ -16,7 +16,7 @@
 #
 
 from Queue import Queue, Full, Empty
-from threading import Thread, Event, Lock
+from threading import Thread, Lock
 
 import socket
 import zlib
@@ -34,6 +34,7 @@ from couchbase.exception import MemcachedError, MemcachedTimeoutException, \
     InvalidArgumentException
 from couchbase.memcachedclient import MemcachedClient
 from couchbase.vbucketawareclient import VBucketAwareClient
+from couchbase.event import Event
 
 
 class CouchbaseClient(object):
@@ -419,7 +420,7 @@ class CommandDispatcher(object):
             if self.status == "vbucketmap-configuration":
                 continue
             try:
-                item = self.queue.get(block=True, timeout=1)
+                item = self.queue.get(block=False, timeout=1)
                 if item:
                     try:
                         self.do(item)
