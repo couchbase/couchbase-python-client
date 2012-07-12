@@ -29,7 +29,7 @@ from couchbase.tests.base import Base
 
 class MemcachedClientTest(Base):
     def setUp(self):
-        Base.setUp(self)
+        super(MemcachedClientTest, self).setUp()
         # TODO: pull memcached port from config
         self.client = MemcachedClient(self.host)
 

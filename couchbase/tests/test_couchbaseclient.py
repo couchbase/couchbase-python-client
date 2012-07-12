@@ -17,17 +17,13 @@
 
 from couchbase.tests.base import Base
 from couchbase.couchbaseclient import CouchbaseClient
-from couchbase.tests.test_vbucketawareclient import VBucketAwareClientTest
 
 
 class CouchbaseClientTest(Base):
     def setUp(self):
-        VBucketAwareClientTest.setUp(self)
+        super(CouchbaseClientTest, self).setUp()
         self.client = CouchbaseClient(self.url, self.bucket_name, "", True)
 
     def tearDown(self):
         self.client.flush()
         self.client.done()
-
-if __name__ == '__main__':
-    unittest.main()

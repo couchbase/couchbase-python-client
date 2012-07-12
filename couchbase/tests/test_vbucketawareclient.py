@@ -22,12 +22,13 @@ from nose.plugins.attrib import attr
 
 from couchbase.vbucketawareclient import VBucketAwareClient
 from couchbase.exception import MemcachedError
+from couchbase.tests.base import Base
 from couchbase.tests.test_memcachedclient import MemcachedClientTest
 
 
 class VBucketAwareClientTest(MemcachedClientTest):
     def setUp(self):
-        MemcachedClientTest.setUp(self)
+        Base.setUp(self)
         # TODO: pull memcached port from config
         self.client = VBucketAwareClient(self.host)
 
