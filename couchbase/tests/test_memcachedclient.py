@@ -158,13 +158,13 @@ class MemcachedClientTest(Base):
 
     @attr(cbv="1.0.0")
     def test_getMulti(self):
-        w = setup_warning_catcher()
-        warnings.simplefilter("always")
         for kv in [{'key1': 'value1', 'key2': 'value2'},
                    {'int1': 1, 'int2': 2}]:
             for k in kv:
                 self.client.set(k, 0, 0, kv[k])
 
+            w = setup_warning_catcher()
+            warnings.simplefilter("always")
             rv = self.client.getMulti(kv.keys())
             self.assertTrue(len(w) == 1)
             self.assertTrue("deprecated" in str(w[-1].message))
