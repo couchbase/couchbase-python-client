@@ -182,7 +182,10 @@ class RestConnection(object):
                                                              self.username,
                                                              self.password)
             #couchApiBase is not in node config before Couchbase Server 2.0
-            self.couch_api_base = config["nodes"][0].get("couchApiBase")
+            try:
+                self.couch_api_base = config["nodes"][0].get("couchApiBase")
+            except TypeError:
+                self.couch_api_base = "http://%s:8092/" % self.ip
 
     def create_design_doc(self, bucket, design_doc, function):
         api = self.couch_api_base + '%s/_design/%s' % (bucket, design_doc)

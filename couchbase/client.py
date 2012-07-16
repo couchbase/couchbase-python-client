@@ -55,7 +55,10 @@ class Couchbase(object):
         config = ServerHelper.parse_server_config(server_config_uri, username,
                                                   password)
         #couchApiBase will not be in node config before Couchbase Server 2.0
-        self.couch_api_base = config["nodes"][0].get("couchApiBase")
+        try:
+            self.couch_api_base = config["nodes"][0].get("couchApiBase")
+        except TypeError:
+            self.couch_api_base = "http://%s:8092/" % server['ip']
 
         self.streaming_thread = Thread(name="streaming",
                                        target=self._start_streaming, args=())
