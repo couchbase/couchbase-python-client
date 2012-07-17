@@ -32,7 +32,6 @@ from nose.tools import nottest
 from nose.plugins.attrib import attr
 from nose.plugins.skip import SkipTest
 
-from couchbase.tests.warnings_catcher import setup_warning_catcher
 from couchbase.client import Couchbase
 from couchbase.rest_client import RestConnection, RestHelper
 
@@ -180,11 +179,13 @@ class RestConnectionTest(unittest.TestCase):
     @attr(cbv="2.0.0")
     def test_get_view(self):
         (ddoc_name, resp) = self.setup_create_design_doc()
-        w = setup_warning_catcher()
-        warnings.simplefilter("always")
-        view = self.rest.get_view(self.bucket_name, ddoc_name, "testing")
-        self.assertTrue(len(w) == 1)
-        self.assertTrue("deprecated" in str(w[-1].message))
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            # Trigger a warning.
+            view = self.rest.get_view(self.bucket_name, ddoc_name, "testing")
+            # Verify some things
+            self.assertTrue(len(w) == 1)
+            self.assertTrue("deprecated" in str(w[-1].message))
 
     @attr(cbv="2.0.0")
     def test_view_results(self):

@@ -24,7 +24,6 @@ from nose.plugins.attrib import attr
 from nose.plugins.skip import SkipTest
 from nose.tools import nottest
 
-from couchbase.tests.warnings_catcher import setup_warning_catcher
 from couchbase.client import Couchbase, Server, Bucket
 from couchbase.couchbaseclient \
     import CouchbaseClient, VBucketAwareCouchbaseClient
@@ -35,12 +34,15 @@ from couchbase.exception import MemcachedError
 class ServerTest(Base):
     @attr(cbv="1.0.0")
     def test_server_object_construction(self):
-        w = setup_warning_catcher()
-        warnings.simplefilter("always")
-        cb = Server(self.host + ':' + self.port, self.username, self.password)
-        self.assertIsInstance(cb.servers, types.ListType)
-        self.assertTrue(len(w) == 1)
-        self.assertTrue("deprecated" in str(w[-1].message))
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            # Trigger a warning.
+            cb = Server(self.host + ':' + self.port, self.username,
+                        self.password)
+            self.assertIsInstance(cb.servers, types.ListType)
+            # Verify some things
+            self.assertTrue(len(w) == 1)
+            self.assertTrue("deprecated" in str(w[-1].message))
 
 
 class CouchbaseTest(Base):
@@ -64,14 +66,16 @@ class CouchbaseTest(Base):
 
     @attr(cbv="1.0.0")
     def test_vbucketawarecouchbaseclient_object_construction(self):
-        w = setup_warning_catcher()
-        warnings.simplefilter("always")
-        cb = VBucketAwareCouchbaseClient("http://" + self.host + ':'
-                                         + self.port + "/pools/default",
-                                         self.bucket_name, "")
-        self.assertIsInstance(cb.servers, types.ListType)
-        self.assertTrue(len(w) == 1)
-        self.assertTrue("deprecated" in str(w[-1].message))
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            # Trigger a warning.
+            cb = VBucketAwareCouchbaseClient("http://" + self.host + ':'
+                                             + self.port + "/pools/default",
+                                             self.bucket_name, "")
+            self.assertIsInstance(cb.servers, types.ListType)
+            # Verify some things
+            self.assertTrue(len(w) == 1)
+            self.assertTrue("deprecated" in str(w[-1].message))
 
     @attr(cbv="1.0.0")
     def test_bucket(self):
