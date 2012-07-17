@@ -42,7 +42,6 @@ class CouchbaseClient(object):
     #has changes
     def __init__(self, url, bucket, password="", verbose=False):
         self.log = logger("CouchbaseClient")
-        self.bucket = bucket
         self.rest_username = bucket
         self.rest_password = password
         self._memcacheds = {}
@@ -71,17 +70,20 @@ class CouchbaseClient(object):
         self.servers = [server]
         self.servers_lock = Lock()
         self.rest = RestConnection(server)
-        self.reconfig_vbucket_map()
-        self.init_vbucket_connections()
+        self.bucket = self.rest.get_bucket(bucket)
+        if self.bucket.vbuckets:
+            self.reconfig_vbucket_map()
+            self.init_vbucket_connections()
+            self.streaming_thread = Thread(name="streaming",
+                                           target=self._start_streaming,
+                                           args=())
+            self.streaming_thread.daemon = True
+            self.streaming_thread.start()
         self.dispatcher = CommandDispatcher(self)
         self.dispatcher_thread = Thread(name="dispatcher-thread",
                                         target=self._start_dispatcher)
         self.dispatcher_thread.daemon = True
         self.dispatcher_thread.start()
-        self.streaming_thread = Thread(name="streaming",
-                                       target=self._start_streaming, args=())
-        self.streaming_thread.daemon = True
-        self.streaming_thread.start()
         self.verbose = verbose
 
     def _start_dispatcher(self):
@@ -101,7 +103,7 @@ class CouchbaseClient(object):
             for server in current_servers:
                 response = urlopener.open("http://%s:%s/pools/default/bucketsS"
                                           "treaming/%s" % (server["ip"],
-                                          server["port"], self.bucket))
+                                          server["port"], self.bucket.name))
                 while response:
                     try:
                         line = response.readline()
@@ -177,7 +179,8 @@ class CouchbaseClient(object):
         if not server in self._memcacheds:
             self._memcacheds[server] =\
                 MemcachedClientHelper.direct_client(self.rest, serverIp,
-                                                    serverPort, self.bucket)
+                                                    serverPort,
+                                                    self.bucket.name)
 
     def start_vbucket_fastforward_connection(self, vbucket):
         self._vBucketMapFastForward_lock.acquire()
@@ -190,7 +193,8 @@ class CouchbaseClient(object):
         if not server in self._memcacheds:
             self._memcacheds[server] =\
                 MemcachedClientHelper.direct_client(self.rest, serverIp,
-                                                    serverPort, self.bucket)
+                                                    serverPort,
+                                                    self.bucket.name)
 
     def restart_vbucket_connection(self, vbucket):
         self._vBucketMap_lock.acquire()
@@ -201,14 +205,16 @@ class CouchbaseClient(object):
             self._memcacheds[server].close()
         self._memcacheds[server] =\
             MemcachedClientHelper.direct_client(self.rest, serverIp,
-                                                serverPort, self.bucket)
+                                                serverPort,
+                                                self.bucket.name)
 
     def reconfig_vbucket_map(self, vbucket=-1):
-        vb_ready = RestHelper(self.rest).vbucket_map_ready(self.bucket, 60)
+        vb_ready = RestHelper(self.rest).vbucket_map_ready(self.bucket.name,
+                                                           60)
         if not vb_ready:
             raise Exception("vbucket map is not ready for bucket %s" %
-                            (self.bucket))
-        vBuckets = self.rest.get_vbuckets(self.bucket)
+                            (self.bucket.name))
+        vBuckets = self.rest.get_vbuckets(self.bucket.name)
         self.vbucket_count = len(vBuckets)
 
         self._vBucketMap_lock.acquire()

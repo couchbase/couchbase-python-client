@@ -17,6 +17,7 @@
 
 from couchbase.tests.base import Base
 from couchbase.couchbaseclient import CouchbaseClient
+from couchbase.rest_client import RestConnection
 
 
 class CouchbaseClientTest(Base):
@@ -35,3 +36,23 @@ class CouchbaseClientTest(Base):
         self.client.incr('int')
         self.assertEqual(self.client.get('int')[2], 11,
                          'value should be the integer 11')
+
+    def test_bucket_of_type_memcached(self):
+        """Our code used to be very vBucket-only. This tests to be sure we can
+        work with our other database type: memcached"""
+        temp_bucket_name = 'testing-memcached'
+        self.rest_client = RestConnection({'ip': self.host,
+                                           'port': self.port,
+                                           'username': self.username,
+                                           'password': self.password})
+        self.rest_client.create_bucket(temp_bucket_name,
+                                       bucketType='memcached',
+                                       authType='sasl', ramQuotaMB=64)
+
+        self.client_for_memcached_bucket = CouchbaseClient(self.url,
+                                                           temp_bucket_name,
+                                                           verbose=True)
+        self.assertIsInstance(self.client_for_memcached_bucket,
+                              CouchbaseClient)
+
+        self.rest_client.delete_bucket(temp_bucket_name)
