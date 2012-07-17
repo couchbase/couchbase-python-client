@@ -206,18 +206,17 @@ class BucketIterator(object):
 class Bucket(object):
     """Handles Bucket management as well as key/value access for a specific
     bucket."""
-    def __init__(self, bucket_name, server):
+    def __init__(self, name, server):
         self.server = server
 
-        self.bucket_name = bucket_name
+        self.name = name
         rest = server._rest()
-        self.bucket_password = rest.get_bucket(bucket_name).saslPassword
+        self.password = rest.get_bucket(self.name).saslPassword
 
         ip, port, rest_username, rest_password = server._rest_info()
         formatter_uri = "http://%s:%s/pools/default"
-        self.mc_client = CouchbaseClient(formatter_uri % (ip, port),
-                                         self.bucket_name,
-                                         self.bucket_password)
+        self.mc_client = CouchbaseClient(formatter_uri % (ip, port), self.name,
+                                         self.password)
 
     def append(self, key, value, cas=0):
         return self.mc_client.append(key, value, cas)
@@ -267,7 +266,7 @@ class Bucket(object):
             view = key.split('/')[1]
 
             rest = self.server._rest()
-            rest.delete_view(self.bucket_name, view)
+            rest.delete_view(self.name, view)
         else:
             return self.mc_client.delete(key, cas)
 
@@ -294,7 +293,7 @@ class Bucket(object):
             view = key.split('/')[1]
 
             rest = self.server._rest()
-            rest.create_design_doc(self.bucket_name, view, json.dumps(value))
+            rest.create_design_doc(self.name, view, json.dumps(value))
         else:
             if '_rev' in value:
                 # couchbase works in clobber mode so for "set" _rev is useless
@@ -329,7 +328,7 @@ class Bucket(object):
 
         rest = self.server._rest()
 
-        results = rest.view_results(self.bucket_name, view_doc, view_map,
+        results = rest.view_results(self.name, view_doc, view_map,
                                     params, limit)
         if 'rows' in results:
             return results['rows']

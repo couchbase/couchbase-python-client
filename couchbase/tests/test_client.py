@@ -91,7 +91,7 @@ class CouchbaseTest(Base):
         bucket_name = str(uuid.uuid4())
         bucket = self.cb.create(bucket_name)
         self.assertIsInstance(bucket, Bucket)
-        exists = [b for b in self.cb.buckets() if b.bucket_name == bucket_name]
+        exists = [b for b in self.cb.buckets() if b.name == bucket_name]
         self.assertTrue(len(exists))
         self.cb.delete(bucket_name)
 
