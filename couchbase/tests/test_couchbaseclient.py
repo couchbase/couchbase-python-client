@@ -15,6 +15,9 @@
 # limitations under the License.
 #
 
+from nose.plugins.attrib import attr
+from nose.tools import nottest
+
 from couchbase.tests.base import Base
 from couchbase.couchbaseclient import CouchbaseClient
 from couchbase.rest_client import RestConnection
@@ -29,6 +32,24 @@ class CouchbaseClientTest(Base):
         self.client.flush()
         self.client.done()
 
+    @nottest
+    def setup_memcached_bucket(self):
+        self.memcached_bucket = 'testing-memcached'
+        self.rest_client = RestConnection({'ip': self.host,
+                                           'port': self.port,
+                                           'username': self.username,
+                                           'password': self.password})
+        self.rest_client.create_bucket(self.memcached_bucket,
+                                       bucketType='memcached',
+                                       authType='sasl', ramQuotaMB=64)
+        self.client_for_memcached_bucket = \
+            CouchbaseClient(self.url, self.memcached_bucket, verbose=True)
+
+    @nottest
+    def teardown_memcached_bucket(self):
+        self.rest_client.delete_bucket(self.memcached_bucket)
+
+    @attr(cbv="1.0.0")
     def test_set_integer_value(self):
         self.client.set('int', 0, 0, 10)
         self.assertEqual(self.client.get('int')[2], 10,
@@ -37,22 +58,9 @@ class CouchbaseClientTest(Base):
         self.assertEqual(self.client.get('int')[2], 11,
                          'value should be the integer 11')
 
+    @attr(cbv="1.0.0")
     def test_bucket_of_type_memcached(self):
-        """Our code used to be very vBucket-only. This tests to be sure we can
-        work with our other database type: memcached"""
-        temp_bucket_name = 'testing-memcached'
-        self.rest_client = RestConnection({'ip': self.host,
-                                           'port': self.port,
-                                           'username': self.username,
-                                           'password': self.password})
-        self.rest_client.create_bucket(temp_bucket_name,
-                                       bucketType='memcached',
-                                       authType='sasl', ramQuotaMB=64)
-
-        self.client_for_memcached_bucket = CouchbaseClient(self.url,
-                                                           temp_bucket_name,
-                                                           verbose=True)
+        self.setup_memcached_bucket()
         self.assertIsInstance(self.client_for_memcached_bucket,
                               CouchbaseClient)
-
-        self.rest_client.delete_bucket(temp_bucket_name)
+        self.teardown_memcached_bucket()
