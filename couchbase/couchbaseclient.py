@@ -22,6 +22,8 @@ import socket
 import zlib
 import urllib
 import warnings
+import time
+
 try:
     import json
 except ImportError:
