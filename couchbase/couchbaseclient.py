@@ -22,6 +22,8 @@ import socket
 import zlib
 import urllib
 import warnings
+import time
+
 try:
     import json
 except ImportError:
@@ -446,6 +448,7 @@ class CommandDispatcher(object):
                         self.queue.put(item)
 
             except Empty:
+                time.sleep(0.5)
                 pass
         if self.verbose:
             self.log.info("dispatcher stopped")
