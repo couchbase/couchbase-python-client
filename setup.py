@@ -39,7 +39,7 @@ def get_version():
 
 
 setup(
-    name = "couchbase-python",
+    name = "couchbase",
     version = get_version(),
     description = "Couchbase Python SDK",
     author = "Couchbase, Inc.",
