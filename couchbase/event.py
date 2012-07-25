@@ -48,9 +48,6 @@ class Event:
     def set(self):
         self.__state = True
 
-    def isSet(self):
-        return self.__state
-
     def is_set(self):
         return self.__state
 

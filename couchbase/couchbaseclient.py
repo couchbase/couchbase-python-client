@@ -269,7 +269,7 @@ class CouchbaseClient(object):
     def _respond(self, item, event):
         timeout = 30
         event.wait(timeout)
-        if not event.isSet():
+        if not event.is_set():
             # if we timeout, then try to reconnect to the server
             # responsible for this vbucket
             self.restart_vbucket_connection(self.vbucketid(item['key']))
