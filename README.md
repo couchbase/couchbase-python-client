@@ -46,10 +46,10 @@ and then create a new bucket using the memcached and rest clients::
 Example code that creates buckets and then does sets, gets and views using
 the unified client::
 
-    import couchbase
+    from couchbase import Couchbase
 
     # connect to a couchbase server
-    cb = couchbase.Server('localhost:8091',
+    cb = Couchbase('localhost:8091',
                           username='Administrator',
                           password='password')
 
@@ -61,12 +61,12 @@ the unified client::
 
     # fetch a Bucket with subscript
     default_bucket = cb['default']
-    # set a value with subscript (equivilent to .set)
+    # set a value with subscript (nearly equivalent to .set)
     default_bucket['key1'] = 'value1'
 
     # fetch a bucket with a function
     default_bucket2 = cb.bucket('default')
-    # set a json value with subscript (equivilent to .set)
+    # set a json value with subscript (nearly equivalent to .set)
     default_bucket2['key2'] = {'value':'value2','expiration':0,'flags':10}
 
     # set a value with a function

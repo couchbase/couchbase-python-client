@@ -1,1 +1,1 @@
-from couchbase.client import Server, Bucket
+from couchbase.client import Couchbase, Server, Bucket
