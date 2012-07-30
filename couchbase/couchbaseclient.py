@@ -151,7 +151,7 @@ class CouchbaseClient(object):
                     nodes = data["nodes"]
                     for node in nodes:
                         if (node["clusterMembership"] == "active" and
-                            node["status"] == "healthy"):
+                            node["status"] in ["healthy", "warmup"]):
                             ip, port = node["hostname"].split(":")
                             new_servers.append({"ip": ip,
                                                 "port": port,
