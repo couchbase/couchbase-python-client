@@ -1083,7 +1083,7 @@ class RestParser(object):
         if 'diskFetches' in stats:
             bucketStats.diskFetches = stats['diskFetches']
         bucketStats.itemCount = stats['itemCount']
-        bucketStats.diskUsed = stats['diskUsed']
+        bucketStats.diskUsed = stats.get('diskUsed', bucketStats.diskUsed)
         bucketStats.memUsed = stats['memUsed']
         quota = parsed['quota']
         bucketStats.ram = quota['ram']
