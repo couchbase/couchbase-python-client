@@ -269,7 +269,7 @@ class CouchbaseClient(object):
     def _respond(self, item, event):
         timeout = 30
         event.wait(timeout)
-        if not event.is_set():
+        if not event.is_set() and 'key' in item:
             # if we timeout, then try to reconnect to the server
             # responsible for this vbucket
             self.restart_vbucket_connection(self.vbucketid(item['key']))
@@ -436,19 +436,28 @@ class CommandDispatcher(object):
                         # if we get a not_my_vbucket then requeue item
                         #  with fast forward map vbucket
                         self.log.error(ex)
-                        self.reconfig_callback(ex.vbucket)
-                        self.start_connection_callback(ex.vbucket)
+                        if 'vbucket' in ex:
+                            self.reconfig_callback(ex.vbucket)
+                            self.start_connection_callback(ex.vbucket)
+                        else:
+                            raise Empty
                         item["fastforward"] = True
                         self.queue.put(item)
                     except EOFError, ex:
                         # we go an EOF error, restart the connection
                         self.log.error(ex)
-                        self.restart_connection_callback(ex.vbucket)
+                        if 'vbucket' in ex:
+                            self.restart_connection_callback(ex.vbucket)
+                        else:
+                            raise Empty
                         self.queue.put(item)
                     except socket.error, ex:
                         # we got a socket error, restart the connection
                         self.log.error(ex)
-                        self.restart_connection_callback(ex.vbucket)
+                        if 'vbucket' in ex:
+                            self.restart_connection_callback(ex.vbucket)
+                        else:
+                            raise Empty
                         self.queue.put(item)
 
             except Empty:
