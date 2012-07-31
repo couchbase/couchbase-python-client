@@ -27,4 +27,4 @@ before_install:
 install:
   - pip install nose-testconfig coverage requests
 
-script: nosetests --tc-file=test.ini --with-coverage --cover-package=couchbase --cover-html -A "(cbv <= \"${CB_VER}\")"
+script: python setup.py nosetests
