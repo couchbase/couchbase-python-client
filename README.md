@@ -30,10 +30,10 @@ and then create a new bucket using the memcached and rest clients::
     client.set("key1", 0, 0, "value1")
     client.get("key1")
 
-    server_info = {"ip":"localhost",
-                   "port":8091,
-                   "username":"Administrator",
-                   "password":"password"}
+    server_info = {"ip": "localhost",
+                   "port": 8091,
+                   "username": "Administrator",
+                   "password": "password"}
     rest = RestConnection(server_info)
     rest.create_bucket(bucket='newbucket',
                        ramQuotaMB=100,
@@ -50,8 +50,8 @@ the unified client::
 
     # connect to a couchbase server
     cb = Couchbase('localhost:8091',
-                          username='Administrator',
-                          password='password')
+                   username='Administrator',
+                   password='password')
 
     # create default bucket if it doesn't exist
     try:
@@ -67,7 +67,8 @@ the unified client::
     # fetch a bucket with a function
     default_bucket2 = cb.bucket('default')
     # set a json value with subscript (nearly equivalent to .set)
-    default_bucket2['key2'] = {'value':'value2','expiration':0,'flags':10}
+    default_bucket2['key2'] = {'value': 'value2', 'expiration': 0,
+                               'flags': 10}
 
     # set a value with a function
     default_bucket.set('key3', 0, 0, 'value3')
@@ -105,15 +106,14 @@ the unified client::
                              '$flags':25})
     print doc_id + ' ' + str(newbucket[doc_id])
 
-    design = {
-        "_id" : "_design/testing",
-        "language" : "javascript",
-        "views" : {
-            "all" : {
-                "map" : '''function (doc) {\n    emit(doc, null);\n}'''
+    design = {"_id": "_design/testing",
+              "language": "javascript",
+              "views":
+              {"all":
+               {"map": '''function (doc) {\n    emit(doc, null);\n}'''
                 },
-            },
-        }
+               },
+              }
     # save a design document
     # right now with no _rev, we can only create, we can't update
     try:
