@@ -116,7 +116,7 @@ class RestConnectionTest(unittest.TestCase):
     @nottest
     def setup_create_design_doc(self):
         self.setup_rest_connection()
-        if self.rest.couch_api_base == None:
+        if self.rest.couch_api_base is None:
             raise SkipTest
         ddoc_name = uuid.uuid4()
         design_doc = json.dumps({"views":

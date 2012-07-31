@@ -245,7 +245,7 @@ class RestConnection(object):
         view_query = '%s/_design/%s/_view/%s' % (bucket, design_doc, view)
         api = self.couch_api_base + view_query
         num_params = 0
-        if limit != None:
+        if limit is not None:
             num_params = 1
             api += "?limit=%s" % (limit)
         for param in params:
