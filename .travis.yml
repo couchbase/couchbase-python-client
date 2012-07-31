@@ -23,6 +23,7 @@ before_install:
   - sudo chmod a+x cluster_connect
   - ./cluster_connect -n 1
   - cp test.ini.template test.ini
+  - $CB_CONFIG_CMD
 
 install:
   - pip install nose-testconfig coverage requests
