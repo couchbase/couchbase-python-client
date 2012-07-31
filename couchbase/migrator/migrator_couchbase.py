@@ -17,8 +17,9 @@
 
 sources = [{'type':'couchbase', 'class':'CouchbaseReader',
             'example':'couchbase://bucket:password@example.com:8091/bucket'}]
-destinations = [{'type':'couchbase', 'class':'CouchbaseWriter',\
-    'example': 'couchbase://bucket:password@example.com:8091/bucket'}]
+destinations = [{'type':'couchbase', 'class':'CouchbaseWriter',
+                 'example':
+                 'couchbase://bucket:password@example.com:8091/bucket'}]
 
 from urlparse import urlparse
 import urllib

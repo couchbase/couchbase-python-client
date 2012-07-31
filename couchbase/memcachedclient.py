@@ -69,18 +69,18 @@ class MemcachedClient(object):
                                - len(response))
             if data == '':
                 raise EOFError("Got empty data (remote died?)."
-                                          " from %s" % (self.host))
+                               " from %s" % (self.host))
             response += data
         assert len(response) == MemcachedConstants.MIN_RECV_PACKET
         magic, cmd, keylen, extralen, dtype, errcode, remaining, opaque, cas =\
-        struct.unpack(MemcachedConstants.RES_PKT_FMT, response)
+            struct.unpack(MemcachedConstants.RES_PKT_FMT, response)
 
         rv = ""
         while remaining > 0:
             data = self.s.recv(remaining)
             if data == '':
                 raise EOFError("Got empty data (remote died?)."
-                                          " from %s" % (self.host))
+                               " from %s" % (self.host))
             rv += data
             remaining -= len(data)
 
@@ -92,7 +92,7 @@ class MemcachedClient(object):
     def _handleKeyedResponse(self, myopaque):
         cmd, errcode, opaque, cas, keylen, extralen, rv = self._recvMsg()
         assert myopaque is None or opaque == myopaque, \
-        "expected opaque %x, got %x" % (myopaque, opaque)
+            "expected opaque %x, got %x" % (myopaque, opaque)
         if errcode:
             raise MemcachedError(errcode, rv)
         return cmd, opaque, cas, keylen, extralen, rv
@@ -128,7 +128,7 @@ class MemcachedClient(object):
         something, cas, val =\
             self._doCmd(cmd, key, '',
                         struct.pack(MemcachedConstants.INCRDECR_PKT_FMT,
-                                amt, init, exp))
+                                    amt, init, exp))
         return struct.unpack(MemcachedConstants.INCRDECR_RES_FMT, val)[0], cas
 
     def incr(self, key, amt=1, init=0, exp=0, vbucket=-1):
@@ -379,16 +379,16 @@ class MemcachedClient(object):
         return opaque, cas, self._parse_sync_response(data)
 
     def sync_replication_or_persistence(self, numReplicas, keyspecs):
-        payload = self._build_sync_payload(((numReplicas & 0x0f) << 4) |
-                                            0x8, keyspecs)
+        payload = self._build_sync_payload(((numReplicas & 0x0f) << 4) | 0x8,
+                                           keyspecs)
 
         opaque, cas, data = self._doCmd(MemcachedConstants.CMD_SYNC, "",
                                         payload)
         return opaque, cas, self._parse_sync_response(data)
 
     def sync_replication_and_persistence(self, numReplicas, keyspecs):
-        payload = self._build_sync_payload(((numReplicas & 0x0f) << 4) |
-                                            0xA, keyspecs)
+        payload = self._build_sync_payload(((numReplicas & 0x0f) << 4) | 0xA,
+                                           keyspecs)
 
         opaque, cas, data = self._doCmd(MemcachedConstants.CMD_SYNC, "",
                                         payload)

@@ -98,7 +98,7 @@ class Couchbase(object):
                     nodes = data["nodes"]
                     for node in nodes:
                         if (node["clusterMembership"] == "active" and
-                            node["status"] in ["healthy", "warmup"]):
+                                node["status"] in ["healthy", "warmup"]):
                             ip, port = node["hostname"].split(":")
                             couch_api_base = node.get("couchApiBase")
                             new_servers.append({"ip": ip,

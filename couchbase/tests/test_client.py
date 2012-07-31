@@ -113,7 +113,7 @@ class BucketTest(Base):
     def setUp(self):
         super(BucketTest, self).setUp()
         self.cb = Couchbase(self.host + ':' + self.port, self.username,
-                       self.password)
+                            self.password)
         self.client = self.cb[self.bucket_name]
 
     @attr(cbv="1.0.0")

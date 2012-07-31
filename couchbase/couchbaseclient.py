@@ -58,7 +58,7 @@ class CouchbaseClient(object):
             raise InvalidArgumentException("url can not be an empty string",
                                            parameters="url")
         if (url.find("http://") != -1 and url.rfind(":") != -1 and
-            url.find("/pools/default") != -1):
+                url.find("/pools/default") != -1):
             server["ip"] = (url[url.find("http://")
                             + len("http://"):url.rfind(":")])
             server["port"] = url[url.rfind(":") + 1:url.find("/pools/default")]
@@ -125,7 +125,7 @@ class CouchbaseClient(object):
                     index = 0
                     if 'vBucketMapForward' in data['vBucketServerMap']:
                         for vbucket in\
-                            data['vBucketServerMap']['vBucketMapForward']:
+                                data['vBucketServerMap']['vBucketMapForward']:
                             vbucketmapfastforward[index] =\
                                 serverlist[vbucket[0]]
                             index += 1
@@ -151,7 +151,7 @@ class CouchbaseClient(object):
                     nodes = data["nodes"]
                     for node in nodes:
                         if (node["clusterMembership"] == "active" and
-                            node["status"] in ["healthy", "warmup"]):
+                                node["status"] in ["healthy", "warmup"]):
                             ip, port = node["hostname"].split(":")
                             new_servers.append({"ip": ip,
                                                 "port": port,
@@ -652,7 +652,7 @@ class MemcachedClientHelper(object):
                                              int(port))
                 else:
                     client = VBucketAwareClient(ip.encode('ascii', 'ignore'),
-                                             int(port))
+                                                int(port))
                 client.vbucket_count = vbucket_count
                 client.sasl_auth_plain(bucket_info.name.encode('ascii'),
                                        bucket_info.saslPassword

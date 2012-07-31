@@ -168,21 +168,20 @@ class MemcachedConstants(object):
     # The header sizes don't deviate
     assert struct.calcsize(REQ_PKT_FMT) == struct.calcsize(RES_PKT_FMT)
 
-    EXTRA_HDR_FMTS = {
-        CMD_SET: SET_PKT_FMT,
-        CMD_ADD: SET_PKT_FMT,
-        CMD_REPLACE: SET_PKT_FMT,
-        CMD_INCR: INCRDECR_PKT_FMT,
-        CMD_DECR: INCRDECR_PKT_FMT,
-        CMD_DELETE: DEL_PKT_FMT,
-        CMD_FLUSH: FLUSH_PKT_FMT,
-        CMD_TAP_MUTATION: TAP_MUTATION_PKT_FMT,
-        CMD_TAP_DELETE: TAP_GENERAL_PKT_FMT,
-        CMD_TAP_FLUSH: TAP_GENERAL_PKT_FMT,
-        CMD_TAP_OPAQUE: TAP_GENERAL_PKT_FMT,
-        CMD_TAP_VBUCKET_SET: TAP_GENERAL_PKT_FMT,
-        CMD_SET_VBUCKET_STATE: VB_SET_PKT_FMT,
-        }
+    EXTRA_HDR_FMTS = {CMD_SET: SET_PKT_FMT,
+                      CMD_ADD: SET_PKT_FMT,
+                      CMD_REPLACE: SET_PKT_FMT,
+                      CMD_INCR: INCRDECR_PKT_FMT,
+                      CMD_DECR: INCRDECR_PKT_FMT,
+                      CMD_DELETE: DEL_PKT_FMT,
+                      CMD_FLUSH: FLUSH_PKT_FMT,
+                      CMD_TAP_MUTATION: TAP_MUTATION_PKT_FMT,
+                      CMD_TAP_DELETE: TAP_GENERAL_PKT_FMT,
+                      CMD_TAP_FLUSH: TAP_GENERAL_PKT_FMT,
+                      CMD_TAP_OPAQUE: TAP_GENERAL_PKT_FMT,
+                      CMD_TAP_VBUCKET_SET: TAP_GENERAL_PKT_FMT,
+                      CMD_SET_VBUCKET_STATE: VB_SET_PKT_FMT,
+                      }
 
     EXTRA_HDR_SIZES = dict(
         [(k, struct.calcsize(v)) for (k, v) in EXTRA_HDR_FMTS.items()])

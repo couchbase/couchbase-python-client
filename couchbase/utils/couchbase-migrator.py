@@ -88,16 +88,15 @@ class Config(object):
 def parse_args(argv):
     config = Config()
     try:
-        opts, args = getopt.getopt(argv[1:],
-                                     'hs:d:ovq', [
-                'help',
-                'source=',
-                'destination=',
-                'overwrite',
-                'dry-run',
-                'verbose',
-                'quiet',
-                ])
+        opts, args = getopt.getopt(argv[1:], 'hs:d:ovq',
+                                   ['help',
+                                    'source=',
+                                    'destination=',
+                                    'overwrite',
+                                    'dry-run',
+                                    'verbose',
+                                    'quiet',
+                                    ])
         for o, a in opts:
             if o == '-h' or o == '--help':
                 usage()

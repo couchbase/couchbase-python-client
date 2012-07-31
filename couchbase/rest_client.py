@@ -256,8 +256,8 @@ class RestConnection(object):
             num_params += 1
             if param in ["key", "start_key", "end_key",
                          "startkey_docid", "endkey_docid"] or \
-                         params[param] is True or \
-                         params[param] is False:
+                params[param] is True or \
+                    params[param] is False:
                 api += "%s=%s" % (param, json.dumps(params[param]))
             else:
                 api += "%s=%s" % (param, params[param])
@@ -285,8 +285,8 @@ class RestConnection(object):
             authorization = base64.encodestring('%s:%s' % (self.username,
                                                 self.password))
             return {'Content-Type': 'application/x-www-form-urlencoded',
-                'Authorization': 'Basic %s' % authorization,
-                'Accept': '*/*'}
+                    'Authorization': 'Basic %s' % authorization,
+                    'Accept': '*/*'}
 
     def _http_request(self, api, method='GET', params='', headers=None,
                       timeout=120):
@@ -336,8 +336,8 @@ class RestConnection(object):
     #returns otpNode
     def add_node(self, user='', password='', remoteIp='', port='8091'):
         otpNode = None
-        log.info('adding remote node : %s to this cluster @ : %s'\
-        % (remoteIp, self.ip))
+        log.info('adding remote node : %s to this cluster @ : %s'
+                 % (remoteIp, self.ip))
         api = self.baseUrl + 'controller/addNode'
         params = urllib.urlencode({'hostname': "%s:%s" % (remoteIp, port),
                                    'user': user,
@@ -883,9 +883,9 @@ class NodeDataStorage(object):
 
     def __str__(self):
         return '%s' % ({'type': self.type,
-                             'path': self.path,
-                             'quotaMb': self.quotaMb,
-                             'state': self.state})
+                        'path': self.path,
+                        'quotaMb': self.quotaMb,
+                        'state': self.state})
 
 
 class NodeDiskStorage(object):
@@ -993,7 +993,7 @@ class RestParser(object):
                 #let's assume there is only one disk in each noce
                 dict_parsed = parsed['availableStorage']
                 if 'path' in dict_parsed and 'sizeKBytes' in dict_parsed and\
-                    'usagePercent' in dict_parsed:
+                        'usagePercent' in dict_parsed:
                     diskStorage = NodeDiskStorage()
                     diskStorage.path = dict_parsed['path']
                     diskStorage.sizeKBytes = dict_parsed['sizeKBytes']
@@ -1008,7 +1008,7 @@ class RestParser(object):
                 disk_storage_list = storage[key]
                 for dict_parsed in disk_storage_list:
                     if 'path' in dict_parsed and 'state' in dict_parsed and\
-                        'quotaMb' in dict_parsed:
+                            'quotaMb' in dict_parsed:
                         dataStorage = NodeDataStorage()
                         dataStorage.path = dict_parsed['path']
                         dataStorage.quotaMb = dict_parsed['quotaMb']

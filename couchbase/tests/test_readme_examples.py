@@ -48,8 +48,8 @@ class ReadmeTest(Base):
 
         # connect to a couchbase server
         cb = Couchbase(self.host + ':' + self.port,
-                              username=self.username,
-                              password=self.password)
+                       username=self.username,
+                       password=self.password)
 
         # create default bucket if it doesn't exist
         #try:
@@ -97,15 +97,14 @@ class ReadmeTest(Base):
                                  '$flags': 25})
         print doc_id + ' ' + str(newbucket[doc_id])
 
-        design = {
-            "_id": "_design/testing",
-            "language": "javascript",
-            "views": {
-                "all": {
-                    "map": '''function (doc) {\n    emit(doc, null);\n}'''
+        design = {"_id": "_design/testing",
+                  "language": "javascript",
+                  "views":
+                  {"all":
+                   {"map": '''function (doc) {\n    emit(doc, null);\n}'''
                     },
-                },
-            }
+                   },
+                  }
         # save a design document
         # right now with no _rev, we can only create, we can't update
         try:

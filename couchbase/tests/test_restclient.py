@@ -120,12 +120,12 @@ class RestConnectionTest(unittest.TestCase):
             raise SkipTest
         ddoc_name = uuid.uuid4()
         design_doc = json.dumps({"views":
-                      {"testing":
-                       {"map":
-                        "function(doc) { emit(doc._id, null); }"
-                        }
-                       }
-                      })
+                                 {"testing":
+                                  {"map":
+                                   "function(doc) { emit(doc._id, null); }"
+                                   }
+                                  }
+                                 })
         resp = self.rest.create_design_doc(self.bucket_name, ddoc_name,
                                            design_doc)
         self.design_docs.append(ddoc_name)
