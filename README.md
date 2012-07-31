@@ -134,16 +134,21 @@ Requirements:
   * easy_install nose
   * pip install nose-testconfig
 
-We're now using nose to run our tests. There's a supplied
-test.ini.template that you can customize to match your installed
-environment. Copy test.ini.template to test.ini, customize, and
-then run the following command:
+Thanks to nose's setup.py integration, test running is as simple as
 
-    nosetests --tc-file=test.ini
+    python setup.py nosetests
 
-Adding coverage information is as easy as install coverage and running
-nosetests with these settings:
+If you want to customize the nose settings which are stored in setup.cfg. The
+default will generate coverage reports (placed in './cover'), and stop on the
+first error found.
 
-    nosetests --tc-file=test.ini --with-coverage --cover-package=couchbase --cover-html
+Additionally, to run these tests on a version of Couchbase Server greater than
+1.8, you'll need to enable the `flush_all` setting.
 
-This will output coverage reports into the 'cover' directory.
+In 1.8.1 use `cbflushctl`:
+
+    cbflushctl localhost:11210 set flushall_enabled true
+
+In 2.0.0 use `cbepctl`:
+
+    cbepctl localhost:11210 set flush_param flushall_enabled true
