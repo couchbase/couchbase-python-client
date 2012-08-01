@@ -10,8 +10,8 @@ branches:
 
 env:
   - CB_URL="http://packages.couchbase.com/releases/1.8.0/couchbase-server-community_x86_1.8.0.deb" CB_DEB="couchbase-server-community_x86_1.8.0.deb" CB_VER="1.8.0" CB_CONFIG_CMD=""
-  - CB_URL="http://builds.hq.northscale.net/latestbuilds/couchbase-server-community_x86_1.8.1-916-rel.deb" CB_DEB="couchbase-server-community_x86_1.8.1-916-rel.deb" CB_VER="1.8.1" CB_CONFIG_CMD="cbflushctl localhost:11210 set flushall_enabled true"
-  - CB_URL="http://packages.couchbase.com/builds/1482/couchbase-server-community_x86_2.0.0-1482-rel.deb" CB_DEB="couchbase-server-community_x86_2.0.0-1482-rel.deb" CB_VER="2.0.0" CB_CONFIG_CMD="cbepctl localhost:11210 set flush_param flushall_enabled true"
+  - CB_URL="http://builds.hq.northscale.net/latestbuilds/couchbase-server-community_x86_1.8.1-916-rel.deb" CB_DEB="couchbase-server-community_x86_1.8.1-916-rel.deb" CB_VER="1.8.1" CB_CONFIG_CMD="/opt/couchbase/bin/cbflushctl localhost:11210 set flushall_enabled true"
+  - CB_URL="http://packages.couchbase.com/builds/1482/couchbase-server-community_x86_2.0.0-1482-rel.deb" CB_DEB="couchbase-server-community_x86_2.0.0-1482-rel.deb" CB_VER="2.0.0" CB_CONFIG_CMD="/opt/couchbase/bin/cbepctl localhost:11210 set flush_param flushall_enabled true"
 
 python:
   - "2.6"
