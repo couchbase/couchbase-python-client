@@ -18,6 +18,7 @@ python:
   - "2.7"
 
 before_install:
+  - sudo service memcached stop
   - wget -q $CB_URL
   - sudo dpkg -i $CB_DEB
   - sudo chmod a+x cluster_connect
