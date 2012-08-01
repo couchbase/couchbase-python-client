@@ -254,9 +254,6 @@ class Bucket(object):
     def gat(self, key, exp):
         return self.mc_client.gat(key, exp)
 
-    def getMulti(self, keys):
-        return self.mc_client.getMulti(keys)
-
     def stats(self, sub=''):
         return self.mc_client.stats(sub)
 
