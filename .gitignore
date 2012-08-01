@@ -8,3 +8,4 @@ test.ini
 .coverage
 cover
 *.egg*
+RELEASE-VERSION

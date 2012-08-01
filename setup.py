@@ -17,30 +17,19 @@
 
 
 import os
-import subprocess
 try:
     from setuptools import setup
 except ImportError:
     from distutils.core import setup
 
+from version import get_git_version
 
 here = os.path.dirname(os.path.abspath(__file__))
 long_description = open(os.path.join(here, 'README.md')).read()
 
-
-def get_version():
-    try:
-        p = subprocess.Popen('git describe', stdout=subprocess.PIPE,
-                             shell=True)
-        version = p.communicate()[0].strip()
-    except:
-        version = ''
-    return version
-
-
 setup(
     name="couchbase",
-    version=get_version(),
+    version=get_git_version(),
     description="Couchbase Python SDK",
     author="Couchbase, Inc.",
     author_email="info@couchbase.com",
