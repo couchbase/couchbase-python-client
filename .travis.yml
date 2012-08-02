@@ -19,6 +19,8 @@ python:
 
 before_install:
   - sudo service memcached stop
+  - sudo cp ./conf/couchbase.conf /etc/security/limits.d/
+  - sudo chmod 644 /etc/security/limits.d/couchbase.conf
   - wget -q $CB_URL
   - sudo dpkg -i $CB_DEB
   - sudo chmod a+x cluster_connect
