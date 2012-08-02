@@ -175,6 +175,8 @@ class RestConnectionTest(unittest.TestCase):
         self.assertRaises(Exception,
                           self.rest.delete_design_doc,
                           (self.bucket_name, ddoc_name))
+        self.design_docs = filter(lambda id: id is not ddoc_name,
+                                  self.design_docs)
 
     @attr(cbv="2.0.0")
     def test_get_view(self):
