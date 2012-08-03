@@ -12,7 +12,7 @@ You'll need to install the following Python library requirements via `pip`:
 
 Open Issues: http://www.couchbase.org/issues/browse/PYCBC
 
-[![Build Status](https://secure.travis-ci.org/BigBlueHat/couchbase-python-client.png?branch=master)](http://travis-ci.org/BigBlueHat/couchbase-python-client)
+[![Build Status](https://secure.travis-ci.org/couchbase/couchbase-python-client.png?branch=master)](http://travis-ci.org/couchbase/couchbase-python-client)
 
 USAGE
 =====
