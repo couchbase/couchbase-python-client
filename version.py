@@ -111,7 +111,8 @@ def pep386adapt(version):
         parts[-2] = 'post' + parts[-2]
         version = '.'.join(parts[:-1])
         return version
-
+    else:
+        return version
 
 if __name__ == "__main__":
     print get_git_version()
