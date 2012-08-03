@@ -19,10 +19,7 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest
-try:
-    import json
-except ImportError:
-    import simplejson as json
+import json
 import uuid
 import base64
 import warnings

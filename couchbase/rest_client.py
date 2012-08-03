@@ -16,10 +16,7 @@
 #
 
 import base64
-try:
-    import json
-except ImportError:
-    import simplejson as json
+import json
 import urllib
 import socket
 import time

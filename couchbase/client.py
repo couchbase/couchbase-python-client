@@ -16,10 +16,7 @@
 #
 
 import uuid
-try:
-    import json
-except ImportError:
-    import simplejson as json
+import json
 import time
 from copy import deepcopy
 from threading import Thread, Lock

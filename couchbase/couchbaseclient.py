@@ -22,10 +22,7 @@ import socket
 import zlib
 import urllib
 import warnings
-try:
-    import json
-except ImportError:
-    import simplejson as json
+import json
 from copy import deepcopy
 
 from couchbase.logger import logger
