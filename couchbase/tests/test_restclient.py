@@ -220,5 +220,39 @@ class RestConnectionTest(unittest.TestCase):
                                                         (self.rest.username,
                                                         self.rest.password)))
 
+    @attr(cbv="1.0.0")
+    def test_create_bucket(self):
+        self.setup_rest_connection()
+        # test membase/couchbase creation defaults
+        status = self.rest.create_bucket('newbucket')
+        self.assertTrue(status)
+        bucket = self.rest.get_bucket('newbucket')
+        self.assertEqual(bucket.stats.ram/1024/1024, 100)
+        self.assertEqual(bucket.authType, 'sasl')
+        self.assertEqual(bucket.type, 'membase')
+        self.assertEqual(bucket.numReplicas, 1)
+        self.rest.delete_bucket('newbucket')
+        # test memcached creation defaults
+        status = self.rest.create_bucket(bucket='newbucket',
+                                         bucketType='memcached')
+        self.assertTrue(status)
+        bucket = self.rest.get_bucket('newbucket')
+        self.assertEqual(bucket.stats.ram/1024/1024, 100)
+        self.assertEqual(bucket.authType, 'sasl')
+        self.assertEqual(bucket.type, 'memcached')
+        self.assertEqual(bucket.numReplicas, 0)
+        # make sure creating an existing bucket fails properly
+        self.assertRaises(Exception, self.rest.create_bucket,
+                          bucket='newbucket', bucketType='memcached')
+        self.rest.delete_bucket('newbucket')
+        # test setting ramQuotaMB too low
+        self.assertRaises(AssertionError,
+                          self.rest.create_bucket,
+                          bucket='newbucket', bucketType='memcached',
+                          ramQuotaMB=10)
+        self.assertRaises(AssertionError,
+                          self.rest.create_bucket,
+                          bucket='newbucket', ramQuotaMB=90)
+
 if __name__ == "__main__":
     unittest.main()

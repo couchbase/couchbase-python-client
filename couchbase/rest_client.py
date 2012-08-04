@@ -706,45 +706,55 @@ class RestConnection(object):
         return status
 
     # figure out the proxy port
-    def create_bucket(self, bucket='',
-                      ramQuotaMB=1,
-                      authType='none',
+    def create_bucket(self, bucket,
+                      ramQuotaMB=100,
+                      authType='sasl',
                       saslPassword='',
                       replicaNumber=1,
-                      proxyPort=11211,
+                      proxyPort=11212,
                       bucketType='membase'):
-        api = '%s%s' % (self.baseUrl, '/pools/default/buckets')
-        params = urllib.urlencode({})
-        #this only works for default bucket ?
-        if bucket == 'default':
-            params = urllib.urlencode({'name': bucket,
-                                       'authType': 'sasl',
-                                       'saslPassword': saslPassword,
-                                       'ramQuotaMB': ramQuotaMB,
-                                       'replicaNumber': replicaNumber,
-                                       'proxyPort': proxyPort,
-                                       'bucketType': bucketType})
+        api = '%s%s' % (self.baseUrl, 'pools/default/buckets')
 
-        elif authType == 'none':
-            params = urllib.urlencode({'name': bucket,
-                                       'ramQuotaMB': ramQuotaMB,
-                                       'authType': authType,
-                                       'replicaNumber': replicaNumber,
-                                       'proxyPort': proxyPort,
-                                       'bucketType': bucketType})
+        assert authType in ['none', 'sasl']
+
+        if bucketType == 'memcached':
+            assert ramQuotaMB >= 64
+        else:
+            assert ramQuotaMB >= 100
+
+        params = {'name': bucket,
+                  'ramQuotaMB': ramQuotaMB,
+                  'authType': authType,
+                  'saslPassword': saslPassword,
+                  'proxyPort': proxyPort,
+                  'replicaNumber': replicaNumber,
+                  'bucketType': bucketType}
+        # 'default' has some special requirements (even when being recreated)
+        if bucket == 'default':
+            assert authType is 'none'
+            assert proxyPort is 11211
+
+        if authType == 'none':
+            del params['saslPassword']
 
         elif authType == 'sasl':
-            params = urllib.urlencode({'name': bucket,
-                                       'ramQuotaMB': ramQuotaMB,
-                                       'authType': authType,
-                                       'saslPassword': saslPassword,
-                                       'replicaNumber': replicaNumber,
-                                       'proxyPort': self.get_nodes_self().moxi,
-                                       'bucketType': bucketType})
+            del params['proxyPort']
 
-        log.info("%s with param: %s" % (api, params))
+        log.info("%s with param: %s" % (api, urllib.urlencode(params)))
 
-        status, content = self._http_request(api, 'POST', params)
+        # server-side validation
+        r = requests.post(api, params={'just_validate': 1}, data=params,
+                          auth=(self.username, self.password))
+        if r.json is not None and len(r.json['errors']) > 0:
+            for key, error in r.json['errors'].items():
+                if key == 'replicaNumber':
+                    log.warn(error)
+                else:
+                    log.error(error)
+                    raise Exception(error)
+
+        status, content = self._http_request(api, 'POST',
+                                             urllib.urlencode(params))
 
         if not status:
             raise BucketCreationException(ip=self.ip, bucket_name=bucket,
