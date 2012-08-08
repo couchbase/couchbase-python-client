@@ -9,3 +9,4 @@ test.ini
 cover
 *.egg*
 RELEASE-VERSION
+couchbase/benchmarks/profiles

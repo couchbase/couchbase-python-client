@@ -152,3 +152,24 @@ In 1.8.1 use `cbflushctl`:
 In 2.0.0 use `cbepctl`:
 
     cbepctl localhost:11210 set flush_param flushall_enabled true
+
+
+BASIC BENCHMARKING
+==================
+
+We like things to go fast, and we can't know how fast they're going
+without measuring them. To check the various Python SDK pieces against
+python-memcached and pylibc, we've created a simple cProfile-based
+performance reporting tool.
+
+To run this (on a *testing* cluster, *not* on dev or production), do:
+
+    python couchbase/benchmarks/benchmark.py
+
+To read the profile output do:
+
+    python couchbase/benchmarks/profiles/{name_of_profile_output_file}
+
+It's early stage stuff as yet, but it should be helpful for quick
+progress comparison, and to help track down places the SDK can improve.
+
