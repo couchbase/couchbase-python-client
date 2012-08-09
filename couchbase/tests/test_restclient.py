@@ -21,7 +21,6 @@ except ImportError:
     import unittest
 import json
 import uuid
-import base64
 import warnings
 
 from testconfig import config
@@ -181,7 +180,7 @@ class RestConnectionTest(unittest.TestCase):
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             # Trigger a warning.
-            view = self.rest.get_view(self.bucket_name, ddoc_name, "testing")
+            self.rest.get_view(self.bucket_name, ddoc_name, "testing")
             # Verify some things
             self.assertTrue(len(w) == 1)
             self.assertTrue("deprecated" in str(w[-1].message))
@@ -225,7 +224,7 @@ class RestConnectionTest(unittest.TestCase):
         status = self.rest.create_bucket('newbucket')
         self.assertTrue(status)
         bucket = self.rest.get_bucket('newbucket')
-        self.assertEqual(bucket.stats.ram/1024/1024, 100)
+        self.assertEqual(bucket.stats.ram / 1024 / 1024, 100)
         self.assertEqual(bucket.authType, 'sasl')
         self.assertEqual(bucket.type, 'membase')
         self.assertEqual(bucket.numReplicas, 1)
@@ -235,7 +234,7 @@ class RestConnectionTest(unittest.TestCase):
                                          bucketType='memcached')
         self.assertTrue(status)
         bucket = self.rest.get_bucket('newbucket')
-        self.assertEqual(bucket.stats.ram/1024/1024, 100)
+        self.assertEqual(bucket.stats.ram / 1024 / 1024, 100)
         self.assertEqual(bucket.authType, 'sasl')
         self.assertEqual(bucket.type, 'memcached')
         self.assertEqual(bucket.numReplicas, 0)
