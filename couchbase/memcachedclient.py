@@ -23,7 +23,7 @@ import struct
 import warnings
 
 from couchbase.logger import logger
-from couchbase.constants import MemcachedConstants, VBucketAwareConstants
+from couchbase.constants import MemcachedConstants
 from couchbase.exception import MemcachedError
 
 
@@ -181,40 +181,11 @@ class MemcachedClient(object):
 
         return self._parse_get(parts)
 
-    def getl(self, key, exp=15, vbucket=-1):
-        """Get the value for a given key within the memcached server."""
-        warnings.warn("MemcachedClient.getl is deprecated; use "
-                      "VBucketAwareClient.getl instead", DeprecationWarning)
-        self._set_vbucket_id(key, vbucket)
-        parts = self._doCmd(VBucketAwareConstants.CMD_GET_LOCKED, key, '',
-                            struct.pack(VBucketAwareConstants.GETL_PKT_FMT,
-                                        exp))
-        return self._parse_get(parts)
-
     def cas(self, key, exp, flags, oldVal, val, vbucket=-1):
         """CAS in a new value for the given key and comparison value."""
         self._set_vbucket_id(key, vbucket)
         self._mutate(MemcachedConstants.CMD_SET, key, exp, flags,
                      oldVal, val)
-
-    def touch(self, key, exp, vbucket=-1):
-        """Touch a key in the memcached server."""
-        warnings.warn("MemcachedClient.touch is deprecated; use "
-                      "VBucketAwareClient.touch instead", DeprecationWarning)
-        self._set_vbucket_id(key, vbucket)
-        return self._doCmd(VBucketAwareConstants.CMD_TOUCH, key, '',
-                           struct.pack(VBucketAwareConstants.TOUCH_PKT_FMT,
-                                       exp))
-
-    def gat(self, key, exp, vbucket=-1):
-        """Get the value for a given key and touch it."""
-        warnings.warn("MemcachedClient.gat is deprecated; use "
-                      "VBucketAwareClient.gat instead", DeprecationWarning)
-        self._set_vbucket_id(key, vbucket)
-        parts = self._doCmd(VBucketAwareConstants.CMD_GAT, key, '',
-                            struct.pack(VBucketAwareConstants.GAT_PKT_FMT,
-                                        exp))
-        return self._parse_get(parts)
 
     def version(self):
         """Get the version of the server."""

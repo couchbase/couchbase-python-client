@@ -112,49 +112,6 @@ class MemcachedClientTest(Base):
             self.client.delete(k)
 
     @attr(cbv="1.0.0")
-    def test_getl(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            # Trigger a warning.
-            key, value = str(uuid.uuid4()), str(uuid.uuid4())
-            self.client.set(key, 0, 0, value)
-            self.assertEqual(self.client.getl(key)[2], value)
-            self.assertRaises(MemcachedError, self.client.set, key, 0, 0,
-                              value)
-            # Verify some things
-            self.assertTrue(len(w) == 1)
-            self.assertTrue("deprecated" in str(w[-1].message))
-
-    @attr(cbv="1.0.0")
-    def test_simple_touch(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            # Trigger a warning.
-            key, value = str(uuid.uuid4()), str(uuid.uuid4())
-            self.client.set(key, 2, 0, value)
-            self.client.touch(key, 5)
-            time.sleep(3)
-            self.assertTrue(self.client.get(key)[2] == value)
-            # Verify some things
-            self.assertTrue(len(w) == 1)
-            self.assertTrue("deprecated" in str(w[-1].message))
-
-    @attr(cbv="1.0.0")
-    def test_gat(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            # Trigger a warning.
-            key, value = str(uuid.uuid4()), str(uuid.uuid4())
-            self.client.set(key, 2, 0, value)
-            set_value = self.client.gat(key, 5)[2]
-            self.assertTrue(set_value == value)
-            time.sleep(3)
-            self.assertTrue(self.client.get(key)[2] == value)
-            # Verify some things
-            self.assertTrue(len(w) == 1)
-            self.assertTrue("deprecated" in str(w[-1].message))
-
-    @attr(cbv="1.0.0")
     def test_version(self):
         self.assertIsInstance(self.client.version()[2], str)
 
