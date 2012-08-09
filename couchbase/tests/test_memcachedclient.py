@@ -49,6 +49,7 @@ class MemcachedClientTest(Base):
     def test_simple_delete(self):
         self.client.set('key', 0, 0, 'value')
         self.client.delete('key')
+        self.assertRaises(MemcachedError, self.client.get, 'key')
 
     @attr(cbv="1.0.0")
     def test_simple_decr(self):
