@@ -23,7 +23,6 @@ import time
 import warnings
 
 import requests
-import httplib2
 
 from couchbase.logger import logger
 from couchbase.exception import ServerAlreadyJoinedException, \
@@ -279,10 +278,7 @@ class RestConnection(object):
         if self.username == "default":
             return {'Content-Type': 'application/json', 'Accept': '*/*'}
         else:
-            authorization = base64.encodestring('%s:%s' % (self.username,
-                                                self.password))
             return {'Content-Type': 'application/x-www-form-urlencoded',
-                    'Authorization': 'Basic %s' % authorization,
                     'Accept': '*/*'}
 
     def _http_request(self, api, method='GET', params='', headers=None,
@@ -292,33 +288,43 @@ class RestConnection(object):
         end_time = time.time() + timeout
         while True:
             try:
-                response, content = httplib2.Http().request(api, method,
-                                                            params, headers)
-                if response['status'] in ['200', '201', '202']:
-                    return True, content
+                if method == 'GET':
+                    r = requests.get(api, headers=headers, params=params,
+                                     auth=(self.username, self.password))
+                elif method in ['POST', 'PUT']:
+                    r = getattr(requests, method.lower())(api,
+                                                          headers=headers,
+                                                          data=params,
+                                                          auth=(self.username,
+                                                                self.password))
+                elif method in ['DELETE']:
+                    r = requests.delete(api, headers=headers,
+                                        auth=(self.username, self.password))
+
+                if r.status_code in [200, 201, 202]:
+                    return True, r.content
                 else:
-                    try:
-                        json_parsed = json.loads(content)
-                    except:
-                        json_parsed = {}
                     reason = "unknown"
                     status = False
-                    if "error" in json_parsed:
-                        reason = json_parsed["error"]
-                        status = reason
-                    elif "errors" in json_parsed:
+                    if r.json is None:
+                        reason = r.text
+                        status = False
+                    elif "error" in r.json:
+                        reason = r.json["error"]
+                        status = False
+                    elif "errors" in r.json:
                         errors = [error for _, error in
-                                  json_parsed["errors"].iteritems()]
+                                  r.json["errors"].iteritems()]
                         reason = ", ".join(errors)
-                        status = reason
+                        status = False
                     log.error('%s error %s reason: %s %s' %
-                              (api, response['status'], reason, content))
-                    return status, content
+                              (api, r.status_code, reason, r.content))
+                    return status, r.content
             except socket.error, e:
                 log.error(e)
                 if time.time() > end_time:
                     raise ServerUnavailableException(ip=self.ip)
-            except httplib2.ServerNotFoundError, e:
+            except requests.ConnectionError, e:
                 log.error(e)
                 if time.time() > end_time:
                     raise ServerUnavailableException(ip=self.ip)
@@ -751,7 +757,8 @@ class RestConnection(object):
                     log.warn(error)
                 else:
                     log.error(error)
-                    raise Exception(error)
+                    raise BucketCreationException(self.ip, self.username,
+                                                  error)
 
         status, content = self._http_request(api, 'POST',
                                              urllib.urlencode(params))

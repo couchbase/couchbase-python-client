@@ -215,10 +215,8 @@ class RestConnectionTest(unittest.TestCase):
     def test_create_headers(self):
         self.setup_rest_connection()
         headers = self.rest._create_headers()
-        self.assertEqual(headers['Authorization'],
-                         'Basic ' + base64.encodestring("%s:%s" %
-                                                        (self.rest.username,
-                                                        self.rest.password)))
+        self.assertEqual(headers['Content-Type'],
+                         'application/x-www-form-urlencoded')
 
     @attr(cbv="1.0.0")
     def test_create_bucket(self):

@@ -25,8 +25,12 @@ import warnings
 
 import requests
 
+from couchbase.logger import logger
 from couchbase.rest_client import RestConnection
 from couchbase.couchbaseclient import CouchbaseClient
+from couchbase.exception import BucketCreationException
+
+log = logger("client")
 
 
 class Couchbase(object):
@@ -129,6 +133,7 @@ class Couchbase(object):
                            saslPassword=bucket_password,
                            replicaNumber=replica,
                            bucketType='membase')
+
         ip, port, _, _ = self._rest_info()
 
         while True:
@@ -139,9 +144,10 @@ class Couchbase(object):
                                                      (ip, port, bucket_name),
                                                      method='GET', params='',
                                                      headers=None, timeout=120)
+                content = json.loads(content)
             except ValueError:
                 pass
-            if json.loads(content)['basicStats']['quotaPercentUsed'] > 0.0:
+            if content['basicStats']['quotaPercentUsed'] > 0.0:
                 time.sleep(2)
                 break
             time.sleep(1)
