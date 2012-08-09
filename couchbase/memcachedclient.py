@@ -33,6 +33,7 @@ class MemcachedClient(object):
     vbucketId = 0
 
     def __init__(self, host='127.0.0.1', port=11211):
+        """Memcached Binary Protocol Client"""
         self.host = host
         self.port = port
         self.s = socket.socket()
