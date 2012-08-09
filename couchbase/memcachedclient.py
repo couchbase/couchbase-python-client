@@ -193,7 +193,6 @@ class MemcachedClient(object):
 
     def sasl_mechanisms(self):
         """Return an immutable, fronzenset of the supported SASL methods."""
-
         return frozenset(self._doCmd(MemcachedConstants.CMD_SASL_LIST_MECHS,
                                      '', '')[2].split(' '))
 

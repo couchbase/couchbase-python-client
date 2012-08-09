@@ -22,7 +22,7 @@ import warnings
 from nose.plugins.attrib import attr
 
 from couchbase.memcachedclient import MemcachedClient
-from couchbase.exception import MemcachedError
+from couchbase.exception import MemcachedError, MemcachedConfigurationError
 from couchbase.tests.base import Base
 
 
@@ -117,7 +117,12 @@ class MemcachedClientTest(Base):
 
     @attr(cbv="1.0.0")
     def test_sasl_mechanisms(self):
-        self.assertIsInstance(self.client.sasl_mechanisms(), frozenset)
+        try:
+            # testing for SASL enabled Memcached servers
+            self.assertIsInstance(self.client.sasl_mechanisms(), frozenset)
+        except MemcachedConfigurationError:
+            self.assertRaises(MemcachedConfigurationError,
+                              self.client.sasl_mechanisms)
 
     @attr(cbv="1.0.0")
     def test_getMulti(self):
