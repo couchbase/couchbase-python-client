@@ -70,48 +70,43 @@ class Couchbase(object):
         urlopener = urllib.FancyURLopener()
         urlopener.prompt_user_passwd = lambda: (self.rest_username,
                                                 self.rest_password)
-        current_servers = True
-        while current_servers:
-            self.servers_lock.acquire()
-            current_servers = deepcopy(self.servers)
-            self.servers_lock.release()
-            for server in current_servers:
-                url = "http://%s:%s/poolsStreaming/default" % (server["ip"],
-                                                               server["port"])
-                f = urlopener.open(url)
-                while f:
-                    try:
-                        d = f.readline()
-                        if not d:
-                            # try next server if we get an EOF
-                            f.close()
-                            break
-                    except:
-                        # try next server if we fail to read
-                        f.close()
-                        break
-                    try:
-                        data = json.loads(d)
-                    except:
-                        continue
 
-                    new_servers = []
-                    nodes = data["nodes"]
-                    for node in nodes:
-                        if (node["clusterMembership"] == "active" and
-                                node["status"] in ["healthy", "warmup"]):
-                            ip, port = node["hostname"].split(":")
-                            couch_api_base = node.get("couchApiBase")
-                            new_servers.append({"ip": ip,
-                                                "port": port,
-                                                "username": self.rest_username,
-                                                "password": self.rest_password,
-                                                "couchApiBase": couch_api_base
-                                                })
-                    new_servers.sort()
-                    self.servers_lock.acquire()
-                    self.servers = deepcopy(new_servers)
-                    self.servers_lock.release()
+        url = "http://%s:%s/poolsStreaming/default" % (self.servers[0]["ip"],
+                                                       self.servers[0]["port"])
+        f = urlopener.open(url)
+        while f:
+            try:
+                d = f.readline()
+                if not d:
+                    # try next server if we get an EOF
+                    f.close()
+                    break
+            except:
+                # try next server if we fail to read
+                f.close()
+                break
+            try:
+                data = json.loads(d)
+            except:
+                continue
+
+            new_servers = []
+            nodes = data["nodes"]
+            for node in nodes:
+                if (node["clusterMembership"] == "active" and
+                        node["status"] in ["healthy", "warmup"]):
+                    ip, port = node["hostname"].split(":")
+                    couch_api_base = node.get("couchApiBase")
+                    new_servers.append({"ip": ip,
+                                        "port": port,
+                                        "username": self.rest_username,
+                                        "password": self.rest_password,
+                                        "couchApiBase": couch_api_base
+                                        })
+            new_servers.sort()
+            self.servers_lock.acquire()
+            self.servers = deepcopy(new_servers)
+            self.servers_lock.release()
 
     def bucket(self, bucket_name):
         return Bucket(bucket_name, self)

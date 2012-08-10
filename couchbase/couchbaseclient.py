@@ -92,73 +92,68 @@ class CouchbaseClient(object):
         urlopener = urllib.FancyURLopener()
         urlopener.prompt_user_passwd = lambda: (self.rest_username,
                                                 self.rest_password)
-        current_servers = True
-        while current_servers:
+
+        response = urlopener.open("http://%s:%s/pools/default/bucketsS"
+                                  "treaming/%s" % (self.servers[0]["ip"],
+                                  self.servers[0]["port"], self.bucket.name))
+        while response:
+            try:
+                line = response.readline()
+                if not line:
+                    # try next server if we get an EOF
+                    response.close()
+                    break
+            except:
+                # try next server if we fail to read
+                response.close()
+                break
+            try:
+                data = json.loads(line)
+            except:
+                continue
+
+            serverlist = data['vBucketServerMap']['serverList']
+            vbucketmapfastforward = {}
+            index = 0
+            if 'vBucketMapForward' in data['vBucketServerMap']:
+                for vbucket in\
+                        data['vBucketServerMap']['vBucketMapForward']:
+                    vbucketmapfastforward[index] =\
+                        serverlist[vbucket[0]]
+                    index += 1
+                self._vBucketMapFastForward_lock.acquire()
+                self._vBucketMapFastForward =\
+                    deepcopy(vbucketmapfastforward)
+                self._vBucketMapFastForward_lock.release()
+            vbucketmap = {}
+            index = 0
+            for vbucket in data['vBucketServerMap']['vBucketMap']:
+                vbucketmap[index] = serverlist[vbucket[0]]
+                index += 1
+
+            # only update vBucketMap if we don't have a fastforward
+            # on a not_mb_vbucket error, we already update the
+            # vBucketMap from the fastforward map
+            if not vbucketmapfastforward:
+                self._vBucketMap_lock.acquire()
+                self._vBucketMap = deepcopy(vbucketmap)
+                self._vBucketMap_lock.release()
+
+            new_servers = []
+            nodes = data["nodes"]
+            for node in nodes:
+                if (node["clusterMembership"] == "active" and
+                        node["status"] in ["healthy", "warmup"]):
+                    ip, port = node["hostname"].split(":")
+                    new_servers.append({"ip": ip,
+                                        "port": port,
+                                        "username": self.rest_username,
+                                        "password": self.rest_password
+                                        })
+            new_servers.sort()
             self.servers_lock.acquire()
-            current_servers = deepcopy(self.servers)
+            self.servers = deepcopy(new_servers)
             self.servers_lock.release()
-            for server in current_servers:
-                response = urlopener.open("http://%s:%s/pools/default/bucketsS"
-                                          "treaming/%s" % (server["ip"],
-                                          server["port"], self.bucket.name))
-                while response:
-                    try:
-                        line = response.readline()
-                        if not line:
-                            # try next server if we get an EOF
-                            response.close()
-                            break
-                    except:
-                        # try next server if we fail to read
-                        response.close()
-                        break
-                    try:
-                        data = json.loads(line)
-                    except:
-                        continue
-
-                    serverlist = data['vBucketServerMap']['serverList']
-                    vbucketmapfastforward = {}
-                    index = 0
-                    if 'vBucketMapForward' in data['vBucketServerMap']:
-                        for vbucket in\
-                                data['vBucketServerMap']['vBucketMapForward']:
-                            vbucketmapfastforward[index] =\
-                                serverlist[vbucket[0]]
-                            index += 1
-                        self._vBucketMapFastForward_lock.acquire()
-                        self._vBucketMapFastForward =\
-                            deepcopy(vbucketmapfastforward)
-                        self._vBucketMapFastForward_lock.release()
-                    vbucketmap = {}
-                    index = 0
-                    for vbucket in data['vBucketServerMap']['vBucketMap']:
-                        vbucketmap[index] = serverlist[vbucket[0]]
-                        index += 1
-
-                    # only update vBucketMap if we don't have a fastforward
-                    # on a not_mb_vbucket error, we already update the
-                    # vBucketMap from the fastforward map
-                    if not vbucketmapfastforward:
-                        self._vBucketMap_lock.acquire()
-                        self._vBucketMap = deepcopy(vbucketmap)
-                        self._vBucketMap_lock.release()
-
-                    new_servers = []
-                    nodes = data["nodes"]
-                    for node in nodes:
-                        if (node["clusterMembership"] == "active" and
-                                node["status"] in ["healthy", "warmup"]):
-                            ip, port = node["hostname"].split(":")
-                            new_servers.append({"ip": ip,
-                                                "port": port,
-                                                "username": self.rest_username,
-                                                "password": self.rest_password
-                                                })
-                    new_servers.sort()
-                    self.servers_lock.acquire()
-                    self.servers = deepcopy(new_servers)
-                    self.servers_lock.release()
 
     def init_vbucket_connections(self):
         # start up all vbucket connections
