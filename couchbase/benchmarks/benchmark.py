@@ -32,7 +32,11 @@ HOST = "127.0.0.1"
 ITEMS = 50000  # Total number of documents to create/read
 VALUES_PER_DOC = 1
 VALUE_LENGTH = 92  # together with previous parameter it defines document size
-PROFILES = os.path.join(here, 'profiles')
+PROFILES = os.path.join(here, 'profiles', time.strftime('%Y-%m-%d_%H-%M-%S',
+                                                        time.localtime()))
+
+if not os.path.exists(PROFILES):
+    os.makedirs(PROFILES)
 
 
 def prepare_data():
