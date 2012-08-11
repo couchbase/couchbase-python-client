@@ -135,8 +135,8 @@ class RestConnectionTest(unittest.TestCase):
     @attr(cbv="1.8.0")
     def test_rest_connection_object_creation(self):
         self.setup_rest_connection()
-        self.assertEqual(self.rest.baseUrl, "http://%s:%s/" %
-                         (self.host, self.port))
+        self.assertEqual(self.rest.base_url,
+                         "http://{0}:{1}".format(self.host, self.port))
 
     @attr(cbv="1.8.0")
     def test_rest_connection_object_creation_with_server_object(self):
@@ -147,8 +147,8 @@ class RestConnectionTest(unittest.TestCase):
             rest_password = self.password
 
         rest = RestConnection(ServerInfo())
-        self.assertEqual(rest.baseUrl, "http://%s:%s/" % (self.host,
-                                                          self.port))
+        self.assertEqual(rest.base_url,
+                         "http://{0}:{1}".format(self.host, self.port))
 
     @attr(cbv="2.0.0")
     def test_create_design_doc(self):

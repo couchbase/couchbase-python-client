@@ -118,9 +118,8 @@ class Couchbase(object):
         while True:
             try:
                 content = '{"basicStats":{"quotaPercentUsed":0.0}}'
-                formatter_uri = "http://%s:%s/pools/default/buckets/%s"
-                status, content = rest._http_request(formatter_uri %
-                                                     (ip, port, bucket_name),
+                api = "/pools/default/buckets/{0}".format(bucket_name)
+                status, content = rest._http_request(api,
                                                      method='GET', params='',
                                                      headers=None, timeout=120)
                 content = json.loads(content)
