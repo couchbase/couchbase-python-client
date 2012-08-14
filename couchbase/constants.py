@@ -192,6 +192,11 @@ class MemcachedConstants(object):
     ERR_AUTH = 0x20
     ERR_AUTH_CONTINUE = 0x21
 
+    FLAG_PICKLE = 0x1  # 1<<0 in python-memcache
+    FLAG_INTEGER = 0x2  # 1<<1 in python-memcache
+    FLAG_LONG = 0x4  # 1<<2 in python-memcache
+    FLAG_COMPRESSED = 0x8  # 1<<3 in python-memcache
+
 
 class VBucketAwareConstants(MemcachedConstants):
     """Constants for the vBucket aware extensions to the memcached protocol."""

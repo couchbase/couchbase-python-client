@@ -282,7 +282,16 @@ class Bucket(object):
 
     def __setitem__(self, key, value):
         if isinstance(value, dict):
-            self.set(key, value['expiration'], value['flags'], value['value'])
+            if 'expiration' in value or 'flags' in value:
+                assert 'value' in value
+                if isinstance(value['value'], dict):
+                    v = json.dumps(value['value'])
+                else:
+                    v = value['value']
+                self.set(key, value.get('expiration', 0),
+                         value.get('flags', 0), v)
+            else:
+                self.set(key, 0, 0, json.dumps(value))
         else:
             self.set(key, 0, 0, value)
 

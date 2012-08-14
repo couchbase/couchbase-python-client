@@ -21,10 +21,15 @@ import random
 import zlib
 import struct
 import warnings
+import json
+import cPickle as pickle
+import cStringIO as StringIO
 
 from couchbase.logger import logger
 from couchbase.constants import MemcachedConstants
 from couchbase.exception import MemcachedError
+
+log = logger("client")
 
 
 class MemcachedClient(object):
@@ -150,8 +155,32 @@ class MemcachedClient(object):
         else:
             self.vbucketId = vbucket
 
+    def _val_to_store_info(self, val):
+        """Using some prior art from python-memcache
+
+        Transform val to a storable representation, returning a tuple of the
+        flags, the length of the new value, and the new value itself."""
+        flags = 0
+        if isinstance(val, str):
+            pass
+        elif isinstance(val, int):
+            flags |= MemcachedConstants.FLAG_INTEGER
+            val = "%d" % val
+        elif isinstance(val, long):
+            flags |= MemcachedConstants.FLAG_LONG
+            val = "%d" % val
+        else:
+            flags |= MemcachedConstants.FLAG_PICKLE
+            file = StringIO()
+            pickler = pickle.Pickler(file)
+            pickler.dump(val)
+            val = file.getvalue()
+
+        return (flags, len(val), val)
+
     def set(self, key, exp, flags, val, vbucket=-1):
         """Set a value in the memcached server."""
+        flags, len, val = self._val_to_store_info(val)
         self._set_vbucket_id(key, vbucket)
         return self._mutate(MemcachedConstants.CMD_SET, key, exp, flags, 0,
                             val)
@@ -168,10 +197,35 @@ class MemcachedClient(object):
         return self._mutate(MemcachedConstants.CMD_REPLACE, key, exp, flags, 0,
                             val)
 
+    def _recv_value(self, val, flags=None):
+        """python-memcache flag parsing. Including here for compatibility with
+        prior art in the Python world.
+
+        From that baseline, a JSON flag (0x0) and handling/parsing has been
+        added."""
+        if flags & MemcachedConstants.FLAG_INTEGER:
+            val = int(val)
+        elif flags & MemcachedConstants.FLAG_LONG:
+            val = long(val)
+        elif flags & MemcachedConstants.FLAG_PICKLE:
+            try:
+                file = StringIO(val)
+                unpickler = pickle.Unpickler(file)
+                val = unpickler.load()
+            except Exception, e:
+                log.error('Pickle error: %s\n' % e)
+                return None
+        else:
+            log.warn("unknown flags on get: %x\n" % flags)
+
+        return val
+
     def _parse_get(self, data, klen=0):
         flags = struct.unpack(MemcachedConstants.GET_RES_FMT, data[-1][:4])[0]
         rv = data[-1][4 + klen:]
-        if isinstance(rv, str) and rv.isdigit():
+        if flags:
+            rv = self._recv_value(rv, flags)
+        elif isinstance(rv, str) and rv.isdigit():
             rv = int(rv)
         return flags, data[1], rv
 

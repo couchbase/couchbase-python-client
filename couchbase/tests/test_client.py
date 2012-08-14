@@ -19,6 +19,7 @@ import types
 import warnings
 import uuid
 import time
+import json
 
 from nose.plugins.attrib import attr
 from nose.plugins.skip import SkipTest
@@ -223,6 +224,23 @@ class BucketTest(Base):
         self.assertTrue(set_value == value)
         time.sleep(3)
         self.assertTrue(self.client.get(key)[2] == value)
+
+    @attr(cbv="1.0.0")
+    def test_setitem(self):
+        # test int
+        self.client['int'] = 10
+        self.assertEqual(self.client['int'][2], 10)
+        # test long
+        self.client['long'] = long(10)
+        self.assertEqual(self.client['long'][2], long(10))
+        # test string
+        self.client['str'] = 'string'
+        self.assertEqual(self.client['str'][2], 'string')
+        # test json
+        # dictionaries are serialized to JSON objects
+        self.client['json'] = {'json':'obj'}
+        # but come out as strings for now
+        self.assertEqual(self.client['json'][2], json.dumps({'json':'obj'}))
 
 if __name__ == "__main__":
     unittest.main()
