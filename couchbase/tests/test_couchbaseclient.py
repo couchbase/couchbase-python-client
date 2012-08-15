@@ -29,7 +29,6 @@ class CouchbaseClientTest(Base):
         self.client = CouchbaseClient(self.url, self.bucket_name, "", True)
 
     def tearDown(self):
-        self.client.flush()
         self.client.done()
 
     @nottest
@@ -57,6 +56,7 @@ class CouchbaseClientTest(Base):
         self.client.incr('int')
         self.assertEqual(self.client.get('int')[2], 11,
                          'value should be the integer 11')
+        self.client.delete('int')
 
     @attr(cbv="1.0.0")
     def test_bucket_of_type_memcached(self):

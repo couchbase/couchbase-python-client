@@ -32,7 +32,7 @@ class MemcachedClientTest(Base):
         self.client = MemcachedClient(self.host)
 
     def tearDown(self):
-        self.client.flush()
+        pass
 
     @attr(cbv="1.0.0")
     def test_simple_add(self):
@@ -59,6 +59,7 @@ class MemcachedClientTest(Base):
         self.client.set('key', 0, 0, 'value')
         self.client.append('key', 'appended')
         self.assertTrue(self.client.get('key')[2] == 'valueappended')
+        self.client.delete('key')
 
     @attr(cbv="1.0.0")
     def test_simple_delete(self):
@@ -75,6 +76,7 @@ class MemcachedClientTest(Base):
         self.client.set('key', 0, 0, 4)
         self.client.decr('key', 1)
         self.assertTrue(self.client.get('key')[2] == 3)
+        self.client.delete('key')
 
     @attr(cbv="1.0.0")
     def test_simple_incr(self):
@@ -85,6 +87,7 @@ class MemcachedClientTest(Base):
         self.client.set('key', 0, 0, 1)
         self.client.incr('key', 1)
         self.assertTrue(self.client.get('key')[2] == 2)
+        self.client.delete('key')
 
     @attr(cbv="1.0.0")
     def test_simple_get(self):
@@ -96,18 +99,21 @@ class MemcachedClientTest(Base):
                 raise e
         self.client.set('key', 0, 0, 'value')
         self.assertTrue(self.client.get('key')[2] == 'value')
+        self.client.delete('key')
 
     @attr(cbv="1.0.0")
     def test_simple_prepend(self):
         self.client.set('key', 0, 0, 'value')
         self.client.prepend('key', 'prepend')
         self.assertTrue(self.client.get('key')[2] == 'prependvalue')
+        self.client.delete('key')
 
     @attr(cbv="1.0.0")
     def test_simple_replace(self):
         self.client.set('key', 0, 0, 'value')
         self.client.replace('key', 0, 0, 'replaced')
         self.assertTrue(self.client.get('key')[2] == 'replaced')
+        self.client.delete('key')
 
     @attr(cbv="1.0.0")
     def test_set_and_get(self):
@@ -162,6 +168,7 @@ class MemcachedClientTest(Base):
             for k in kv:
                 self.assertIn(k, rv)
                 self.assertEqual(rv[k][2], kv[k])
+                self.client.delete(k)
 
     @attr(cbv="1.0.0")
     def test_get_multi(self):
@@ -175,3 +182,4 @@ class MemcachedClientTest(Base):
             for k in kv:
                 self.assertIn(k, rv)
                 self.assertEqual(rv[k][2], kv[k])
+                self.client.delete(k)
