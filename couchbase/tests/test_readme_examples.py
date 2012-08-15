@@ -61,8 +61,7 @@ class ReadmeTest(Base):
         default_bucket['key1'] = 'value1'
 
         default_bucket2 = cb.bucket(self.bucket_name)
-        default_bucket2['key2'] = {'value': 'value2', 'expiration': 0,
-                                   'flags': 10}
+        default_bucket2['key2'] = {'value': 'value2', 'expiration': 0}
 
         default_bucket.set('key3', 0, 0, 'value3')
 
@@ -84,17 +83,14 @@ class ReadmeTest(Base):
             newbucket = cb['newbucket']
 
         # set a json document with a function
-        # this will translate $flags and $expiration to memcached protocol
-        # automatically generate the _id
+        # automatically generate the key
         doc_id = newbucket.save({'type': 'item',
-                                 'value': 'json test',
-                                 '$flags': 25})
+                                 'value': 'json test'})
         print doc_id + ' ' + str(newbucket[doc_id])
         # use a provided _id
         doc_id = newbucket.save({'_id': 'key4',
                                  'type': 'item',
-                                 'value': 'json test',
-                                 '$flags': 25})
+                                 'value': 'json test'})
         print doc_id + ' ' + str(newbucket[doc_id])
 
         design = {"_id": "_design/testing",
