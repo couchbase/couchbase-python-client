@@ -116,7 +116,11 @@ class MemcachedClientTest(Base):
             self.client.set(k, 0, 0, v)
 
         for k, v in kvs:
-            self.client.get(k)
+            value = self.client.get(k)[2]
+            self.assertEqual(v, value)
+
+        for k, v in kvs:
+            self.client.delete(k)
 
     @attr(cbv="1.0.0")
     def test_set_and_delete(self):
@@ -124,7 +128,8 @@ class MemcachedClientTest(Base):
         for k, v in kvs:
             self.client.set(k, 0, 0, v)
         for k, v in kvs:
-            self.client.delete(k)
+            self.assertTrue(isinstance(self.client.delete(k), tuple))
+            self.assertRaises(MemcachedError, self.client.get, k)
 
     @attr(cbv="1.0.0")
     def test_version(self):
