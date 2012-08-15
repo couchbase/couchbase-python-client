@@ -28,7 +28,7 @@ from nose.tools import nottest
 from nose.plugins.attrib import attr
 from nose.plugins.skip import SkipTest
 
-from couchbase.client import Couchbase
+from couchbase.vbucketawareclient import VBucketAwareClient
 from couchbase.rest_client import RestConnection, RestHelper
 
 
@@ -128,9 +128,8 @@ class RestConnectionTest(unittest.TestCase):
         return ddoc_name, resp
 
     @nottest
-    def setup_couchbase_object(self):
-        self.cb = Couchbase(self.host + ':' + self.port, self.username,
-                            self.password)
+    def setup_vbucketawareclient(self):
+        self.client = VBucketAwareClient(self.host, 11210)
 
     @attr(cbv="1.8.0")
     def test_rest_connection_object_creation(self):
@@ -195,10 +194,10 @@ class RestConnectionTest(unittest.TestCase):
         else:
             self.assertIn("rows", view.keys())
         # let's add some sample docs
-        self.setup_couchbase_object()
+        self.setup_vbucketawareclient()
         kvs = [(str(uuid.uuid4()), str(uuid.uuid4())) for i in range(0, 100)]
         for k, v in kvs:
-            self.cb[self.bucket_name].set(k, 0, 0, v)
+            self.client.set(k, 0, 0, v)
         # rerun the view
         view = self.rest.view_results(self.bucket_name, ddoc_name, "testing",
                                       {})
@@ -208,7 +207,7 @@ class RestConnectionTest(unittest.TestCase):
             self.assertIn("rows", view.keys())
         # remove sample docs
         for k, v in kvs:
-            self.cb[self.bucket_name].delete(k)
+            self.client.delete(k)
 
     @attr(cbv="1.8.0")
     def test_create_headers(self):
