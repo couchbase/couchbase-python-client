@@ -36,8 +36,23 @@ class MemcachedClientTest(Base):
 
     @attr(cbv="1.0.0")
     def test_simple_add(self):
+        try:
+            # delete the key we want to use, so we don't get a conflict while
+            # running the test
+            self.client.delete('key')
+        except MemcachedError as err:
+            if err.status == 1:
+                # if the above fails, the key didn't exist, and we can continue
+                pass
+            else:
+                raise err
         self.client.add('key', 0, 0, 'value')
         self.assertTrue(self.client.get('key')[2] == 'value')
+        # now let's try and add one on purpose that we know exist and make sure
+        # we're throwing the error properly
+        self.assertRaises(MemcachedError, self.client.add, 'key', 0, 0,
+                          'other value')
+        self.client.delete('key')
 
     @attr(cbv="1.0.0")
     def test_simple_append(self):
