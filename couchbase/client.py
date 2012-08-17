@@ -27,7 +27,6 @@ import requests
 from couchbase.logger import logger
 from couchbase.rest_client import RestConnection
 from couchbase.couchbaseclient import CouchbaseClient
-from couchbase.exception import BucketCreationException
 
 log = logger("client")
 
@@ -198,6 +197,9 @@ class Bucket(object):
         formatter_uri = "http://%s:%s/pools/default"
         self.mc_client = CouchbaseClient(formatter_uri % (ip, port), self.name,
                                          self.password)
+
+    def __del__(self):
+        self.mc_client.done()
 
     def append(self, key, value, cas=0):
         return self.mc_client.append(key, value, cas)
