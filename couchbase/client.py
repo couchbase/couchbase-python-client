@@ -379,3 +379,46 @@ class DesignDoc(object):
 
     def __neq__(self, other):
         return not self.__eq__(other)
+
+    def views(self):
+        return [View(view, self.ddoc['views'][view], self)
+                for view in self.ddoc['views']]
+
+
+class View(object):
+    def __init__(self, name, view, ddoc=None):
+        """Object for holding View information.
+
+        Keyword arguments:
+        name (str):  Name of the View within the Design Doc
+        view (dict): View dictionary containing a 'map' and/or 'reduce' key
+                     who's value should be of type string or unicode and
+                     contain the JS MapReduce function
+        """
+        assert isinstance(name, (str, unicode)), \
+            "name parameter must be of type string or unicode"
+        assert isinstance(view, dict), \
+            "view parameter must be of type dictionary"
+        assert 'map' in view, \
+            "name parameter must be of type string or unicode"
+        assert isinstance(view['map'], (str, unicode)), \
+            "name parameter must be of type string or unicode"
+        self.name = name
+        self.view = view
+        self.ddoc = ddoc
+
+    def __str__(self):
+        """Return the name of the View when using print"""
+        return self.name
+
+    def __eq__(self, other):
+        """Compare name or "views" section of the Design Doc. This allows the
+        use of "for ddoc in" style syntax when used with
+        Bucket().design_docs()"""
+        if isinstance(other, str) and "{" not in other and "}" not in other:
+            return other == self.name
+        elif isinstance(other, dict):
+            return other == {self.name: self.view}
+
+    def __neq__(self, other):
+        return not self.__eq__(other)

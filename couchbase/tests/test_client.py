@@ -264,6 +264,38 @@ class BucketTest(Base):
         self.assertIsInstance(ddocs, types.ListType)
         self.assertIn('test_ddoc', [ddoc for ddoc in ddocs])
         self.assertIn(design_doc, [ddoc for ddoc in ddocs])
+        rest.delete_design_doc(self.client.name, 'test_ddoc')
+
+
+class DesignDocTest(Base):
+    def setUp(self):
+        super(DesignDocTest, self).setUp()
+        self.cb = Couchbase(self.host + ':' + self.port, self.username,
+                            self.password)
+        self.client = self.cb[self.bucket_name]
+        self.rest = self.client.server._rest()
+        if self.rest.couch_api_base is None:
+            raise SkipTest
+
+        self.ddoc = {"views":
+                     {"testing":
+                      {"map":
+                       "function(doc) { emit(doc.name, doc.num); }"
+                       }
+                      }
+                     }
+        self.rest.create_design_doc(self.client.name, 'test_ddoc',
+                               json.dumps(self.ddoc))
+        self.design_docs = self.client.design_docs()
+
+    def tearDown(self):
+        self.rest.delete_design_doc(self.client.name, 'test_ddoc')
+
+    def test_views(self):
+        views = self.design_docs[0].views()
+        self.assertIsInstance(views, types.ListType)
+        self.assertIn('testing', views)
+        self.assertIn(self.ddoc['views'], views)
 
 if __name__ == "__main__":
     unittest.main()
