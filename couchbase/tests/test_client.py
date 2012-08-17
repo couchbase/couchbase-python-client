@@ -248,20 +248,22 @@ class BucketTest(Base):
         for i in range(0, 10):
             self.client['doc' + str(i)] = {'name': 'doc' + str(i), 'num': i}
 
-        design_doc = json.dumps({"views":
-                                 {"testing":
-                                  {"map":
-                                   "function(doc) { emit(doc.name, doc.num); }"
-                                   }
-                                  }
-                                 })
+        design_doc = {"views":
+                      {"testing":
+                       {"map":
+                        "function(doc) { emit(doc.name, doc.num); }"
+                        }
+                       }
+                      }
         rest = self.client.server._rest()
         if rest.couch_api_base is None:
             raise SkipTest
-        rest.create_design_doc(self.client.name, 'test_ddoc', design_doc)
+        rest.create_design_doc(self.client.name, 'test_ddoc',
+                               json.dumps(design_doc))
         ddocs = self.client.design_docs()
         self.assertIsInstance(ddocs, types.ListType)
-        self.assertEqual(ddocs[0].keys()[0], '_design/test_ddoc')
+        self.assertIn('test_ddoc', [ddoc for ddoc in ddocs])
+        self.assertIn(design_doc, [ddoc for ddoc in ddocs])
 
 if __name__ == "__main__":
     unittest.main()

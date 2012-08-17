@@ -333,6 +333,49 @@ class Bucket(object):
                                     self.server.rest_password))
         ddocs = []
         for ddoc in r.json.get('rows'):
-            ddocs.append({ddoc['doc']['meta']['id']: ddoc['doc']['json']})
+            ddocs.append(DesignDoc(ddoc['doc']['meta']['id'],
+                                   ddoc['doc']['json'], bucket=self))
 
         return ddocs
+
+
+class DesignDoc(object):
+    """Object representation of a Couchbase Server Design Document--the thing
+    that holds the MapReduce Views.
+
+    This Object handles the core logic behind creating and updating views to
+    a specific design doc. It also handles copying/publishing a design doc into
+    (or out of) production."""
+    def __init__(self, name, ddoc=None, bucket=None):
+        assert isinstance(name, (str, unicode)), \
+            "name parameter must be of type string or unicode"
+        assert isinstance(ddoc, (str, unicode, dict)), \
+            "ddoc parameter must be of type string, unicode, or dictionary"
+
+        if name.startswith('_design/'):
+            name = name[8:]
+        self.name = name
+        self.bucket = bucket
+
+        if ddoc is None:
+            self.ddoc = {'type': 'javascript', 'views': {}}
+        elif isinstance(ddoc, unicode):
+            self.ddoc = json.loads(ddoc)
+        else:
+            self.ddoc = ddoc
+
+    def __str__(self):
+        """Return the name of the Design Doc when using print"""
+        return self.name
+
+    def __eq__(self, other):
+        """Compare name or "views" section of the Design Doc. This allows the
+        use of "for ddoc in" style syntax when used with
+        Bucket().design_docs()"""
+        if isinstance(other, str) and "{" not in other and "}" not in other:
+            return other == self.name
+        elif isinstance(other, dict):
+            return other['views'] == self.ddoc['views']
+
+    def __neq__(self, other):
+        return not self.__eq__(other)
