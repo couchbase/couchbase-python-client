@@ -405,7 +405,7 @@ class CommandDispatcher(object):
             if self.status == "vbucketmap-configuration":
                 continue
             try:
-                item = self.queue.get(block=False, timeout=1)
+                item = self.queue.get(block=True, timeout=5)
                 if item:
                     try:
                         self.do(item)
