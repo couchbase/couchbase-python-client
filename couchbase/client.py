@@ -321,3 +321,16 @@ class Bucket(object):
             return results['rows']
         else:
             return None
+
+    def design_docs(self):
+        """List all design documents and return DesignDoc objects for each"""
+        (ip, port, _, _) = self.server._rest_info()
+        api = ''.join(['http://{0}:{1}/pools/default/buckets/{2}/ddocs' \
+                       .format(ip, port, self.name)])
+        r = requests.get(api, auth=(self.server.rest_username,
+                                    self.server.rest_password))
+        ddocs = []
+        for ddoc in r.json.get('rows'):
+            ddocs.append({ddoc['doc']['meta']['id']: ddoc['doc']['json']})
+
+        return ddocs

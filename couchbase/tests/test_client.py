@@ -242,5 +242,26 @@ class BucketTest(Base):
         # but come out as strings for now
         self.assertEqual(self.client['json'][2], json.dumps({'json':'obj'}))
 
+    @attr(cbv="2.0.0")
+    def test_design_docs(self):
+        # set up some docs we can find
+        for i in range(0, 10):
+            self.client['doc' + str(i)] = {'name': 'doc' + str(i), 'num': i}
+
+        design_doc = json.dumps({"views":
+                                 {"testing":
+                                  {"map":
+                                   "function(doc) { emit(doc.name, doc.num); }"
+                                   }
+                                  }
+                                 })
+        rest = self.client.server._rest()
+        if rest.couch_api_base is None:
+            raise SkipTest
+        rest.create_design_doc(self.client.name, 'test_ddoc', design_doc)
+        ddocs = self.client.design_docs()
+        self.assertIsInstance(ddocs, types.ListType)
+        self.assertEqual(ddocs[0].keys()[0], '_design/test_ddoc')
+
 if __name__ == "__main__":
     unittest.main()

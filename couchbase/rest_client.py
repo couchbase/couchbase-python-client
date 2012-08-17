@@ -219,10 +219,6 @@ class RestConnection(object):
             raise Exception(design_doc["error"] + " because "
                             + design_doc["reason"])
         else:
-            rev = design_doc["_rev"]
-            #pass in the rev
-            api = api + "?rev=%s" % (rev)
-
             headers = self._create_capi_headers()
             status, content = self._http_request(api, 'DELETE',
                                                  headers=headers,
