@@ -35,10 +35,265 @@ from couchbase.vbucketawareclient import VBucketAwareClient
 from couchbase.event import Event
 
 
+class CommandDispatcher(object):
+    #this class contains a queue where request
+
+    def __init__(self, vbaware, verbose=False):
+        #have a queue , in case of not my vbucket error
+        #let's reinitialize the config/memcached socket connections ?
+        self.queue = Queue(10000)
+        self.status = "initialized"
+        self.vbaware = vbaware
+        self.reconfig_callback = self.vbaware.reconfig_vbucket_map
+        self.start_connection_callback = self.vbaware.start_vbucket_connection
+        self.restart_connection_callback =\
+            self.vbaware.restart_vbucket_connection
+        self.verbose = verbose
+        self.log = logger("CommandDispatcher")
+        self._dispatcher_stopped_event = Event()
+
+    def put(self, item):
+        try:
+            self.queue.put(item, False)
+        except Full:
+            #TODO: add a better error message here
+            raise Exception("queue is full")
+
+    def shutdown(self):
+        if self.status != "shutdown":
+            self.status = "shutdown"
+            if self.verbose:
+                self.log.info("dispatcher shutdown command received")
+        self._dispatcher_stopped_event.wait(2)
+
+    def reconfig_completed(self):
+        self.status = "ok"
+
+    def dispatch(self):
+        while (self.status != "shutdown" or (self.status == "shutdown" and
+               self.queue.qsize() > 0)):
+            #wait if its reconfiguring the vbucket-map
+            if self.status == "vbucketmap-configuration":
+                continue
+            try:
+                item = self.queue.get(block=True, timeout=5)
+                if item:
+                    try:
+                        self.do(item)
+                        # do will only raise not_my_vbucket_exception,
+                        # EOF and socket.error
+                    except MemcachedError, ex:
+                        # if we get a not_my_vbucket then requeue item
+                        #  with fast forward map vbucket
+                        self.log.error(ex)
+                        if 'vbucket' in ex:
+                            self.reconfig_callback(ex.vbucket)
+                            self.start_connection_callback(ex.vbucket)
+                        else:
+                            raise Empty
+                        item["fastforward"] = True
+                        self.queue.put(item)
+                    except EOFError, ex:
+                        # we go an EOF error, restart the connection
+                        self.log.error(ex)
+                        if 'vbucket' in ex:
+                            self.restart_connection_callback(ex.vbucket)
+                        else:
+                            raise Empty
+                        self.queue.put(item)
+                    except socket.error, ex:
+                        # we got a socket error, restart the connection
+                        self.log.error(ex)
+                        if 'vbucket' in ex:
+                            self.restart_connection_callback(ex.vbucket)
+                        else:
+                            raise Empty
+                        self.queue.put(item)
+
+            except Empty:
+                pass
+        if self.verbose:
+            self.log.info("dispatcher stopped")
+            self._dispatcher_stopped_event.set()
+
+    def _raise_if_recoverable(self, ex, item):
+        if isinstance(ex, MemcachedError) and ex.status == 7:
+            ex.vbucket = item["vbucket"]
+            print ex
+            self.log.error("got not my vb error. key: %s, vbucket: %s" %
+                           (item["key"], item["vbucket"]))
+            raise ex
+        if isinstance(ex, EOFError):
+            ex.vbucket = item["vbucket"]
+            print ex
+            self.log.error("got EOF")
+            raise ex
+        if isinstance(ex, socket.error):
+            ex.vbucket = item["vbucket"]
+            print ex
+            self.log.error("got socket.error")
+            raise ex
+        item["response"]["error"] = ex
+
+    def do(self, item):
+        #find which vbucket this belongs to and then run the operation on that
+        if "key" in item:
+            item["vbucket"] = self.vbaware.vbucketid(item["key"])
+        if not "fastforward" in item:
+            item["fastforward"] = False
+        item["response"]["return"] = None
+
+        if item["operation"] == "get":
+            key = item["key"]
+            try:
+                item["response"]["return"] =\
+                    self.vbaware.memcached(key, item["fastforward"]).get(key)
+            except Exception, ex:
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
+        elif item["operation"] == "set":
+            key = item["key"]
+            expiry = item["expiry"]
+            flags = item["flags"]
+            value = item["value"]
+            try:
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.set(key, expiry, flags,
+                                                      value)
+            except Exception, ex:
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
+        elif item["operation"] == "add":
+            key = item["key"]
+            expiry = item["expiry"]
+            flags = item["flags"]
+            value = item["value"]
+            try:
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.add(key, expiry, flags,
+                                                      value)
+            except Exception, ex:
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
+        elif item["operation"] == "replace":
+            key = item["key"]
+            expiry = item["expiry"]
+            flags = item["flags"]
+            value = item["value"]
+            try:
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.replace(key, expiry, flags,
+                                                          value)
+            except Exception, ex:
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
+        elif item["operation"] == "delete":
+            key = item["key"]
+            cas = item["cas"]
+            try:
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.delete(key, cas)
+            except Exception, ex:
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
+        elif item["operation"] == "prepend":
+            key = item["key"]
+            cas = item["cas"]
+            value = item["value"]
+            try:
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.prepend(key, value, cas)
+            except Exception, ex:
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
+        elif item["operation"] == "append":
+            key = item["key"]
+            cas = item["cas"]
+            value = item["value"]
+            try:
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.append(key, value, cas)
+            except Exception, ex:
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
+        elif item["operation"] == "getl":
+            key = item["key"]
+            expiry = item["expiry"]
+            try:
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.getl(key, expiry)
+            except Exception, ex:
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
+        elif item["operation"] == "gat":
+            key = item["key"]
+            expiry = item["expiry"]
+            try:
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.gat(key, expiry)
+            except Exception, ex:
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
+        elif item["operation"] == "touch":
+            key = item["key"]
+            expiry = item["expiry"]
+            try:
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.touch(key, expiry)
+            except Exception, ex:
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
+        elif item["operation"] == "incr":
+            key = item["key"]
+            amount = item["amount"]
+            init = item["init"]
+            expiry = item["expiry"]
+            try:
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.incr(key, amount, init,
+                                                       expiry)
+            except Exception, ex:
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
+        elif item["operation"] == "decr":
+            key = item["key"]
+            amount = item["amount"]
+            init = item["init"]
+            expiry = item["expiry"]
+            try:
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.decr(key, amount, init,
+                                                       expiry)
+            except Exception, ex:
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
+
+        elif item["operation"] == "cas":
+            key = item["key"]
+            expiry = item["expiry"]
+            flags = item["flags"]
+            old_value = item["old_value"]
+            value = item["value"]
+            try:
+                conn = self.vbaware.memcached(key, item["fastforward"])
+                item["response"]["return"] = conn.cas(key, expiry, flags,
+                                                      old_value, value)
+            except Exception, ex:
+                self._raise_if_recoverable(ex, item)
+            item["event"].set()
+        elif item["operation"] == "flush":
+            wait_time = item["expiry"]
+            for key, conn in self.vbaware._memcacheds.items():
+                conn.flush(wait_time)
+            item["response"]["return"] = True
+            item["event"].set()
+
+
 class CouchbaseClient(object):
     #poll server every few seconds to see if the vbucket-map
     #has changes
-    def __init__(self, url, bucket, password="", verbose=False):
+    def __init__(self, url, bucket, password="", verbose=False,
+                 dispatcher=CommandDispatcher):
         self.log = logger("CouchbaseClient")
         self.rest_username = bucket
         self.rest_password = password
@@ -77,7 +332,7 @@ class CouchbaseClient(object):
                                            args=())
             self.streaming_thread.daemon = True
             self.streaming_thread.start()
-        self.dispatcher = CommandDispatcher(self)
+        self.dispatcher = dispatcher(self)
         self.dispatcher_thread = Thread(name="dispatcher-thread",
                                         target=self._start_dispatcher)
         self.dispatcher_thread.daemon = True
@@ -362,260 +617,6 @@ class VBucketAwareCouchbaseClient(CouchbaseClient):
         warnings.warn("VBucketAwareCouchbaseClient is deprecated; use "
                       "CouchbaseClient instead", DeprecationWarning)
         CouchbaseClient.__init__(self, host, username, password)
-
-
-class CommandDispatcher(object):
-    #this class contains a queue where request
-
-    def __init__(self, vbaware, verbose=False):
-        #have a queue , in case of not my vbucket error
-        #let's reinitialize the config/memcached socket connections ?
-        self.queue = Queue(10000)
-        self.status = "initialized"
-        self.vbaware = vbaware
-        self.reconfig_callback = self.vbaware.reconfig_vbucket_map
-        self.start_connection_callback = self.vbaware.start_vbucket_connection
-        self.restart_connection_callback =\
-            self.vbaware.restart_vbucket_connection
-        self.verbose = verbose
-        self.log = logger("CommandDispatcher")
-        self._dispatcher_stopped_event = Event()
-
-    def put(self, item):
-        try:
-            self.queue.put(item, False)
-        except Full:
-            #TODO: add a better error message here
-            raise Exception("queue is full")
-
-    def shutdown(self):
-        if self.status != "shutdown":
-            self.status = "shutdown"
-            if self.verbose:
-                self.log.info("dispatcher shutdown command received")
-        self._dispatcher_stopped_event.wait(2)
-
-    def reconfig_completed(self):
-        self.status = "ok"
-
-    def dispatch(self):
-        while (self.status != "shutdown" or (self.status == "shutdown" and
-               self.queue.qsize() > 0)):
-            #wait if its reconfiguring the vbucket-map
-            if self.status == "vbucketmap-configuration":
-                continue
-            try:
-                item = self.queue.get(block=True, timeout=5)
-                if item:
-                    try:
-                        self.do(item)
-                        # do will only raise not_my_vbucket_exception,
-                        # EOF and socket.error
-                    except MemcachedError, ex:
-                        # if we get a not_my_vbucket then requeue item
-                        #  with fast forward map vbucket
-                        self.log.error(ex)
-                        if 'vbucket' in ex:
-                            self.reconfig_callback(ex.vbucket)
-                            self.start_connection_callback(ex.vbucket)
-                        else:
-                            raise Empty
-                        item["fastforward"] = True
-                        self.queue.put(item)
-                    except EOFError, ex:
-                        # we go an EOF error, restart the connection
-                        self.log.error(ex)
-                        if 'vbucket' in ex:
-                            self.restart_connection_callback(ex.vbucket)
-                        else:
-                            raise Empty
-                        self.queue.put(item)
-                    except socket.error, ex:
-                        # we got a socket error, restart the connection
-                        self.log.error(ex)
-                        if 'vbucket' in ex:
-                            self.restart_connection_callback(ex.vbucket)
-                        else:
-                            raise Empty
-                        self.queue.put(item)
-
-            except Empty:
-                pass
-        if self.verbose:
-            self.log.info("dispatcher stopped")
-            self._dispatcher_stopped_event.set()
-
-    def _raise_if_recoverable(self, ex, item):
-        if isinstance(ex, MemcachedError) and ex.status == 7:
-            ex.vbucket = item["vbucket"]
-            print ex
-            self.log.error("got not my vb error. key: %s, vbucket: %s" %
-                           (item["key"], item["vbucket"]))
-            raise ex
-        if isinstance(ex, EOFError):
-            ex.vbucket = item["vbucket"]
-            print ex
-            self.log.error("got EOF")
-            raise ex
-        if isinstance(ex, socket.error):
-            ex.vbucket = item["vbucket"]
-            print ex
-            self.log.error("got socket.error")
-            raise ex
-        item["response"]["error"] = ex
-
-    def do(self, item):
-        #find which vbucket this belongs to and then run the operation on that
-        if "key" in item:
-            item["vbucket"] = self.vbaware.vbucketid(item["key"])
-        if not "fastforward" in item:
-            item["fastforward"] = False
-        item["response"]["return"] = None
-
-        if item["operation"] == "get":
-            key = item["key"]
-            try:
-                item["response"]["return"] =\
-                    self.vbaware.memcached(key, item["fastforward"]).get(key)
-            except Exception, ex:
-                self._raise_if_recoverable(ex, item)
-            item["event"].set()
-        elif item["operation"] == "set":
-            key = item["key"]
-            expiry = item["expiry"]
-            flags = item["flags"]
-            value = item["value"]
-            try:
-                conn = self.vbaware.memcached(key, item["fastforward"])
-                item["response"]["return"] = conn.set(key, expiry, flags,
-                                                      value)
-            except Exception, ex:
-                self._raise_if_recoverable(ex, item)
-            item["event"].set()
-        elif item["operation"] == "add":
-            key = item["key"]
-            expiry = item["expiry"]
-            flags = item["flags"]
-            value = item["value"]
-            try:
-                conn = self.vbaware.memcached(key, item["fastforward"])
-                item["response"]["return"] = conn.add(key, expiry, flags,
-                                                      value)
-            except Exception, ex:
-                self._raise_if_recoverable(ex, item)
-            item["event"].set()
-        elif item["operation"] == "replace":
-            key = item["key"]
-            expiry = item["expiry"]
-            flags = item["flags"]
-            value = item["value"]
-            try:
-                conn = self.vbaware.memcached(key, item["fastforward"])
-                item["response"]["return"] = conn.replace(key, expiry, flags,
-                                                          value)
-            except Exception, ex:
-                self._raise_if_recoverable(ex, item)
-            item["event"].set()
-        elif item["operation"] == "delete":
-            key = item["key"]
-            cas = item["cas"]
-            try:
-                conn = self.vbaware.memcached(key, item["fastforward"])
-                item["response"]["return"] = conn.delete(key, cas)
-            except Exception, ex:
-                self._raise_if_recoverable(ex, item)
-            item["event"].set()
-        elif item["operation"] == "prepend":
-            key = item["key"]
-            cas = item["cas"]
-            value = item["value"]
-            try:
-                conn = self.vbaware.memcached(key, item["fastforward"])
-                item["response"]["return"] = conn.prepend(key, value, cas)
-            except Exception, ex:
-                self._raise_if_recoverable(ex, item)
-            item["event"].set()
-        elif item["operation"] == "append":
-            key = item["key"]
-            cas = item["cas"]
-            value = item["value"]
-            try:
-                conn = self.vbaware.memcached(key, item["fastforward"])
-                item["response"]["return"] = conn.append(key, value, cas)
-            except Exception, ex:
-                self._raise_if_recoverable(ex, item)
-            item["event"].set()
-        elif item["operation"] == "getl":
-            key = item["key"]
-            expiry = item["expiry"]
-            try:
-                conn = self.vbaware.memcached(key, item["fastforward"])
-                item["response"]["return"] = conn.getl(key, expiry)
-            except Exception, ex:
-                self._raise_if_recoverable(ex, item)
-            item["event"].set()
-        elif item["operation"] == "gat":
-            key = item["key"]
-            expiry = item["expiry"]
-            try:
-                conn = self.vbaware.memcached(key, item["fastforward"])
-                item["response"]["return"] = conn.gat(key, expiry)
-            except Exception, ex:
-                self._raise_if_recoverable(ex, item)
-            item["event"].set()
-        elif item["operation"] == "touch":
-            key = item["key"]
-            expiry = item["expiry"]
-            try:
-                conn = self.vbaware.memcached(key, item["fastforward"])
-                item["response"]["return"] = conn.touch(key, expiry)
-            except Exception, ex:
-                self._raise_if_recoverable(ex, item)
-            item["event"].set()
-        elif item["operation"] == "incr":
-            key = item["key"]
-            amount = item["amount"]
-            init = item["init"]
-            expiry = item["expiry"]
-            try:
-                conn = self.vbaware.memcached(key, item["fastforward"])
-                item["response"]["return"] = conn.incr(key, amount, init,
-                                                       expiry)
-            except Exception, ex:
-                self._raise_if_recoverable(ex, item)
-            item["event"].set()
-        elif item["operation"] == "decr":
-            key = item["key"]
-            amount = item["amount"]
-            init = item["init"]
-            expiry = item["expiry"]
-            try:
-                conn = self.vbaware.memcached(key, item["fastforward"])
-                item["response"]["return"] = conn.decr(key, amount, init,
-                                                       expiry)
-            except Exception, ex:
-                self._raise_if_recoverable(ex, item)
-            item["event"].set()
-
-        elif item["operation"] == "cas":
-            key = item["key"]
-            expiry = item["expiry"]
-            flags = item["flags"]
-            old_value = item["old_value"]
-            value = item["value"]
-            try:
-                conn = self.vbaware.memcached(key, item["fastforward"])
-                item["response"]["return"] = conn.cas(key, expiry, flags,
-                                                      old_value, value)
-            except Exception, ex:
-                self._raise_if_recoverable(ex, item)
-            item["event"].set()
-        elif item["operation"] == "flush":
-            wait_time = item["expiry"]
-            for key, conn in self.vbaware._memcacheds.items():
-                conn.flush(wait_time)
-            item["response"]["return"] = True
-            item["event"].set()
 
 
 class MemcachedClientHelper(object):
