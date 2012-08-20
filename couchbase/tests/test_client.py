@@ -129,12 +129,14 @@ class BucketTest(Base):
     def test_simple_add(self):
         self.client.add('key', 0, 0, 'value')
         self.assertTrue(self.client.get('key')[2] == 'value')
+        self.client.delete('key')
 
     @attr(cbv="1.0.0")
     def test_simple_append(self):
         self.client.set('key', 0, 0, 'value')
         self.client.append('key', 'appended')
         self.assertTrue(self.client.get('key')[2] == 'valueappended')
+        self.client.delete('key')
 
     @attr(cbv="1.0.0")
     def test_simple_delete(self):
@@ -151,6 +153,7 @@ class BucketTest(Base):
         self.client.set('key', 0, 0, 4)
         self.client.decr('key', 1)
         self.assertTrue(self.client.get('key')[2] == 3)
+        self.client.delete('key')
 
     @attr(cbv="1.0.0")
     def test_simple_incr(self):
@@ -161,6 +164,7 @@ class BucketTest(Base):
         self.client.set('key', 0, 0, 1)
         self.client.incr('key', 1)
         self.assertTrue(self.client.get('key')[2] == 2)
+        self.client.delete('key')
 
     @attr(cbv="1.0.0")
     def test_simple_get(self):
@@ -172,18 +176,21 @@ class BucketTest(Base):
                 raise e
         self.client.set('key', 0, 0, 'value')
         self.assertTrue(self.client.get('key')[2] == 'value')
+        self.client.delete('key')
 
     @attr(cbv="1.0.0")
     def test_simple_prepend(self):
         self.client.set('key', 0, 0, 'value')
         self.client.prepend('key', 'prepend')
         self.assertTrue(self.client.get('key')[2] == 'prependvalue')
+        self.client.delete('key')
 
     @attr(cbv="1.0.0")
     def test_simple_replace(self):
         self.client.set('key', 0, 0, 'value')
         self.client.replace('key', 0, 0, 'replaced')
         self.assertTrue(self.client.get('key')[2] == 'replaced')
+        self.client.delete('key')
 
     @attr(cbv="1.0.0")
     def test_simple_touch(self):
@@ -191,6 +198,7 @@ class BucketTest(Base):
         self.client.touch('key', 5)
         time.sleep(3)
         self.assertTrue(self.client.get('key')[2] == 'value')
+        self.client.delete('key')
 
     @attr(cbv="1.0.0")
     def test_set_and_get(self):
@@ -199,7 +207,11 @@ class BucketTest(Base):
             self.client.set(k, 0, 0, v)
 
         for k, v in kvs:
-            self.client.get(k)
+            value = self.client.get(k)[2]
+            self.assertEqual(v, value)
+
+        for k, v in kvs:
+            self.client.delete(k)
 
     @attr(cbv="1.0.0")
     def test_set_and_delete(self):
@@ -207,7 +219,8 @@ class BucketTest(Base):
         for k, v in kvs:
             self.client.set(k, 0, 0, v)
         for k, v in kvs:
-            self.client.delete(k)
+            self.assertTrue(isinstance(self.client.delete(k), tuple))
+            self.assertRaises(MemcachedError, self.client.get, k)
 
     @attr(cbv="1.0.0")
     def test_getl(self):
@@ -224,6 +237,7 @@ class BucketTest(Base):
         self.assertTrue(set_value == value)
         time.sleep(3)
         self.assertTrue(self.client.get(key)[2] == value)
+        self.client.delete(key)
 
     @attr(cbv="1.0.0")
     def test_setitem(self):
@@ -241,11 +255,16 @@ class BucketTest(Base):
         self.client['json'] = {'json':'obj'}
         # but come out as strings for now
         self.assertEqual(self.client['json'][2], json.dumps({'json':'obj'}))
+        # tear down
+        for key in ['int', 'long', 'str', 'json']:
+            self.client.delete(key)
 
     @attr(cbv="2.0.0")
     def test_design_docs(self):
+        doc_names = []
         # set up some docs we can find
         for i in range(0, 10):
+            doc_names.append('doc' + str(i))
             self.client['doc' + str(i)] = {'name': 'doc' + str(i), 'num': i}
 
         design_doc = {"views":
@@ -265,6 +284,8 @@ class BucketTest(Base):
         self.assertIn('test_ddoc', [ddoc for ddoc in ddocs])
         self.assertIn(design_doc, [ddoc for ddoc in ddocs])
         rest.delete_design_doc(self.client.name, 'test_ddoc')
+        for key in doc_names:
+            self.client.delete(key)
 
 
 class DesignDocTest(Base):
