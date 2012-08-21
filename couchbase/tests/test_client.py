@@ -318,5 +318,43 @@ class DesignDocTest(Base):
         self.assertIn('testing', views)
         self.assertIn(self.ddoc['views'], views)
 
+
+class ViewTest(DesignDocTest):
+    @nottest
+    def setup_sample_docs(self):
+        self.doc_names = []
+        for i in range(0, 10):
+            self.doc_names.append('doc' + str(i))
+            self.client['doc' + str(i)] = {'name': 'doc' + str(i), 'num': i}
+
+    @nottest
+    def teardown_sample_docs(self):
+        for key in self.doc_names:
+            self.client.delete(key)
+
+    @attr(cbv="2.0.0")
+    def test_results(self):
+        self.setup_sample_docs()
+        view = self.design_docs[0].views()[0]
+        results = view.results({'stale': False})
+        if "error" in results:
+            self.fail(results)
+        else:
+            self.assertIsInstance(results, types.ListType)
+            self.assertIs(len(results), 10)
+        # test again with include_docs=true
+        results = view.results({'stale': False, 'include_docs': True})
+        if "error" in results:
+            self.fail(results)
+        else:
+            self.assertIsInstance(results, types.ListType)
+            self.assertIs(len(results), 10)
+            for row in results:
+                self.assertIn('doc', row)
+                self.assertIn('meta', row['doc'])
+                self.assertIn('json', row['doc'])
+        self.teardown_sample_docs()
+
+
 if __name__ == "__main__":
     unittest.main()

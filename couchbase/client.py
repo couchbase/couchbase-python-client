@@ -422,3 +422,12 @@ class View(object):
 
     def __neq__(self, other):
         return not self.__eq__(other)
+
+    def results(self, params={}):
+        assert self.ddoc is not None, \
+            "View must be connected to a saved Design Document to retrieve" \
+            " results"
+
+        rest = self.ddoc.bucket.server._rest()
+        return rest.view_results(self.ddoc.bucket.name, self.ddoc.name,
+                                 self.name, params)['rows']
