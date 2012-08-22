@@ -292,6 +292,9 @@ class Bucket(object):
                     v = value['value']
                 self.set(key, value.get('expiration', 0),
                          value.get('flags', 0), v)
+            elif key.startswith('_design/'):
+                rest = self.server._rest()
+                rest.create_design_doc(self.name, key[8:], json.dumps(value))
             else:
                 self.set(key, 0, 0, json.dumps(value))
         else:

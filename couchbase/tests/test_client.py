@@ -287,6 +287,20 @@ class BucketTest(Base):
         for key in doc_names:
             self.client.delete(key)
 
+    @attr(cbv="2.0.0")
+    def test_design_doc_creation_via_setitem(self):
+        design_doc = {"views":
+                      {"testing":
+                       {"map":
+                        "function(doc) { emit(doc.name, doc.num); }"
+                        }
+                       }
+                      }
+        self.client['_design/testing_setitem'] = design_doc
+        self.assertIn('testing_setitem', self.client.design_docs())
+        rest = self.client.server._rest()
+        rest.delete_design_doc(self.client.name, 'testing_setitem')
+
 
 class DesignDocTest(Base):
     def setUp(self):
