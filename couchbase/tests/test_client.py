@@ -260,6 +260,23 @@ class BucketTest(Base):
             self.client.delete(key)
 
     @attr(cbv="2.0.0")
+    def test_view(self):
+        design_doc = {"views":
+                      {"testing":
+                       {"map":
+                        "function(doc) { emit(doc.name, doc.num); }"
+                        }
+                       }
+                      }
+        rest = self.client.server._rest()
+        if rest.couch_api_base is None:
+            raise SkipTest
+        rest.create_design_doc(self.client.name, 'test_ddoc',
+                               json.dumps(design_doc))
+        results = self.client.view('_design/test_ddoc/_view/testing')
+        self.assertIsInstance(results, types.ListType)
+
+    @attr(cbv="2.0.0")
     def test_design_docs(self):
         doc_names = []
         # set up some docs we can find
