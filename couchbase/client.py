@@ -301,7 +301,12 @@ class Bucket(object):
             self.set(key, 0, 0, value)
 
     def __getitem__(self, key):
-        return self.get(key)
+        if key.startswith("_design/"):
+            rest = self.server._rest()
+            doc = rest.get_design_doc(self.name, key[8:])
+            return DesignDoc(key[8:], doc, self)
+        else:
+            return self.get(key)
 
     def view(self, view, **options):
         params = deepcopy(options)

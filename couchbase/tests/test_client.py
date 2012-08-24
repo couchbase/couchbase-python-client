@@ -25,7 +25,7 @@ from nose.plugins.attrib import attr
 from nose.plugins.skip import SkipTest
 from nose.tools import nottest
 
-from couchbase.client import Couchbase, Server, Bucket
+from couchbase.client import Couchbase, Server, Bucket, DesignDoc
 from couchbase.couchbaseclient \
     import CouchbaseClient, VBucketAwareCouchbaseClient
 from couchbase.tests.base import Base
@@ -258,6 +258,23 @@ class BucketTest(Base):
         # tear down
         for key in ['int', 'long', 'str', 'json']:
             self.client.delete(key)
+
+    @attr(cbv="2.0.0")
+    def test_getitem(self):
+        """Test unique _design/doc handling in __getitem__"""
+        ddoc_name = 'test_ddoc'
+        design_doc = {"views":
+                      {"testing":
+                       {"map":
+                        "function(doc) { emit(doc.name, doc.num); }"
+                        }
+                       }
+                      }
+        rest = self.client.server._rest()
+        rest.create_design_doc(self.client.name, ddoc_name,
+                               json.dumps(design_doc))
+        self.assertIsInstance(self.client['_design/' + ddoc_name], DesignDoc)
+        rest.delete_design_doc(self.client.name, ddoc_name)
 
     @attr(cbv="2.0.0")
     def test_view(self):
