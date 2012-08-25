@@ -251,6 +251,8 @@ class Bucket(object):
             return self.mc_client.delete(key, cas)
 
     def save(self, document):
+        warnings.warn("save is deprecated; use set instead",
+                      DeprecationWarning)
         value = deepcopy(document)
         if '_id' in value:
             key = value['_id']
@@ -269,11 +271,7 @@ class Bucket(object):
             expiration = 0
 
         if key.startswith('_design/'):
-            # this is a design doc, we need to handle it differently
-            view = key.split('/')[1]
-
-            rest = self.server._rest()
-            rest.create_design_doc(self.name, view, json.dumps(value))
+            self[key] = value
         else:
             if '_rev' in value:
                 # couchbase works in clobber mode so for "set" _rev is useless

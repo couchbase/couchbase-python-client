@@ -239,6 +239,27 @@ class BucketTest(Base):
         self.assertTrue(self.client.get(key)[2] == value)
         self.client.delete(key)
 
+    @attr(cbv="2.0.0")
+    def test_save(self):
+        """Test deprecated save() method"""
+        # test memcached key/value "saving"
+        key = self.client.save({'_id': 'testing_save', 'name': 'Couchbase'})
+        self.assertEqual(key, 'testing_save')
+        self.client.delete('testing_save')
+        # test ddoc handling
+        design_doc = {"_id": "_design/testing_save_ddoc",
+                      "views":
+                      {"testing":
+                       {"map":
+                        "function(doc) { emit(doc.name, doc.num); }"
+                        }
+                       }
+                      }
+        key = self.client.save(design_doc)
+        self.assertEqual(key, '_design/testing_save_ddoc')
+        rest = self.client.server._rest()
+        rest.delete_design_doc(self.client.name, 'testing_save_ddoc')
+
     @attr(cbv="1.0.0")
     def test_setitem(self):
         # test int
