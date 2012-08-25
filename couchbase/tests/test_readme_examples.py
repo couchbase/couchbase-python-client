@@ -15,6 +15,8 @@
 # limitations under the License.
 #
 
+from nose.plugins.skip import SkipTest
+
 from couchbase.tests.base import Base
 
 
@@ -50,12 +52,8 @@ class ReadmeTest(Base):
         cb = Couchbase(self.host + ':' + self.port,
                        username=self.username,
                        password=self.password)
-
-        # create default bucket if it doesn't exist
-        #try:
-        #    cb.create(self.bucket_name)
-        #except:
-        #    pass
+        if not cb.couch_api_base:
+            raise SkipTest
 
         default_bucket = cb[self.bucket_name]
         default_bucket['key1'] = 'value1'
@@ -69,48 +67,35 @@ class ReadmeTest(Base):
         self.assertEqual(str(default_bucket2.get('key2')[2]), 'value2')
         self.assertEqual(str(default_bucket2['key3'][2]), 'value3')
 
-        # delete a bucket
-        #cb.delete(self.bucket_name)
-        #try:
-        #    cb['default']
-        #except Exception as ex:
-        #    print ex
-
         # create a new bucket
         try:
             newbucket = cb.create('newbucket', ram_quota_mb=100, replica=1)
         except:
             newbucket = cb['newbucket']
 
-        # set a json document with a function
-        # automatically generate the key
-        doc_id = newbucket.save({'type': 'item',
-                                 'value': 'json test'})
-        print doc_id + ' ' + str(newbucket[doc_id])
-        # use a provided _id
-        doc_id = newbucket.save({'_id': 'key4',
-                                 'type': 'item',
-                                 'value': 'json test'})
-        print doc_id + ' ' + str(newbucket[doc_id])
+        # set a JSON document using the more "pythonic" interface
+        newbucket['json_test'] = {'type': 'item', 'value': 'json test'}
+        print 'json_test ' + str(newbucket['json_test'])
+        # use the more verbose API which allows for setting expiration & flags
+        newbucket.set('key4', 0, 0, {'type': 'item', 'value': 'json test'})
+        print 'key4 ' + str(newbucket['key4'])
 
-        design = {"_id": "_design/testing",
-                  "language": "javascript",
-                  "views":
-                  {"all":
-                   {"map": '''function (doc) {\n    emit(doc, null);\n}'''
-                    },
-                   },
-                  }
+        design_doc = {"views":
+                      {"all_by_types":
+                       {"map":
+                        '''function (doc, meta) {
+                             emit([meta.type, doc.type, meta.id], doc.value);
+                             // row output: ['json', 'item', 'key4'], 'json test'
+                           }'''
+                        },
+                       },
+                      }
         # save a design document
-        # right now with no _rev, we can only create, we can't update
-        try:
-            doc_id = newbucket.save(design)
-        except:
-            doc_id = "_design/testing"
+        newbucket['_design/testing'] = design_doc
 
-        if cb.couch_api_base:
-            rows = newbucket.view("_design/testing/_view/all")
-            for row in rows:
-                self.assertTrue(row is not None)
+        all_by_types_view = newbucket['_design/testing'].views()[0]
+        rows = all_by_types_view.results({'stale': False})
+        for row in rows:
+            self.assertTrue(row is not None)
 
         cb.delete('newbucket')
