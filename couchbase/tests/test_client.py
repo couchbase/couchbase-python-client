@@ -384,7 +384,12 @@ class DesignDocTest(Base):
         self.ddoc = {"views":
                      {"testing":
                       {"map":
-                       "function(doc) { emit(doc.name, doc.num); }"
+                       """function(doc, meta) {
+                           if (meta.type === 'json' && doc.name) {
+                             emit(doc.name, doc.num);
+                           }
+                        }""",
+                       "reduce": "_count"
                        }
                       }
                      }
@@ -396,6 +401,7 @@ class DesignDocTest(Base):
         self.rest.delete_design_doc(self.client.name, 'test_ddoc')
 
     def test_views(self):
+        """List views from a given cluster. PYCBC-7"""
         views = self.design_docs[0].views()
         self.assertIsInstance(views, types.ListType)
         self.assertIn('testing', views)
@@ -403,7 +409,7 @@ class DesignDocTest(Base):
 
     @attr(cbv="2.0.0")
     def test_getitem(self):
-
+        """Instantiate an Object that represents a view. PYCBC-7"""
         view = self.design_docs[0]['testing']
         self.assertIsInstance(view, View)
 
@@ -423,16 +429,27 @@ class ViewTest(DesignDocTest):
 
     @attr(cbv="2.0.0")
     def test_results(self):
+        """Test retrieval of view results"""
         self.setup_sample_docs()
         view = self.design_docs[0]['testing']
+        # Retrieve reduced results from a View. PYCBC-7
+        #   (the format is the same, but there is no associated docid)
         results = view.results({'stale': False})
+        self.assertIs(results, 10)
+        # Assemble query parameters for a View. PYCBC-7
+        results = view.results({'stale': False, 'reduce': False})
         if "error" in results:
             self.fail(results)
         else:
             self.assertIsInstance(results, types.ListType)
             self.assertIs(len(results), 10)
         # test again with include_docs=true
-        results = view.results({'stale': False, 'include_docs': True})
+        # Retrieve non-reduced results from a View. PYCBC-7
+        #   Be able to get the underlying document from the non-reduced results
+        #   (this request should flow over binprot)
+        # TODO: upgrade to use binary protocol rather than HTTP-based one
+        results = view.results({'stale': False, 'include_docs': True,
+                                'reduce': False})
         if "error" in results:
             self.fail(results)
         else:

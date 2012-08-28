@@ -440,5 +440,11 @@ class View(object):
             " results"
 
         rest = self.ddoc.bucket.server._rest()
-        return rest.view_results(self.ddoc.bucket.name, self.ddoc.name,
-                                 self.name, params)['rows']
+        results = rest.view_results(self.ddoc.bucket.name, self.ddoc.name,
+                                    self.name, params)['rows']
+
+        # results were reduced, so return just the reduced value
+        if len(results) == 1 and results[0]['key'] is None:
+            return results[0]['value']
+        else:
+            return results
