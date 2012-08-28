@@ -127,78 +127,87 @@ class BucketTest(Base):
 
     @attr(cbv="1.0.0")
     def test_simple_add(self):
-        self.client.add('key', 0, 0, 'value')
-        self.assertTrue(self.client.get('key')[2] == 'value')
-        self.client.delete('key')
+        key = 'test_simple_add'
+        self.client.add(key, 0, 0, 'value')
+        self.assertTrue(self.client.get(key)[2] == 'value')
+        self.client.delete(key)
 
     @attr(cbv="1.0.0")
     def test_simple_append(self):
-        self.client.set('key', 0, 0, 'value')
-        self.client.append('key', 'appended')
-        self.assertTrue(self.client.get('key')[2] == 'valueappended')
-        self.client.delete('key')
+        key = 'test_simple_append'
+        self.client.set(key, 0, 0, 'value')
+        self.client.append(key, 'appended')
+        self.assertTrue(self.client.get(key)[2] == 'valueappended')
+        self.client.delete(key)
 
     @attr(cbv="1.0.0")
     def test_simple_delete(self):
-        self.client.set('key', 0, 0, 'value')
-        self.client.delete('key')
-        self.assertRaises(MemcachedError, self.client.get, 'key')
+        key = 'test_simple_delete'
+        self.client.set(key, 0, 0, 'value')
+        self.client.delete(key)
+        self.assertRaises(MemcachedError, self.client.get, key)
 
     @attr(cbv="1.0.0")
     def test_simple_decr(self):
-        self.client.set('key', 0, 0, '4')
-        self.client.decr('key', 1)
-        self.assertTrue(self.client.get('key')[2] == 3)
+        key = 'test_simple_decr'
+        self.client.set(key, 0, 0, '4')
+        self.client.decr(key, 1)
+        self.assertTrue(self.client.get(key)[2] == 3)
         # test again using set with an int
-        self.client.set('key', 0, 0, 4)
-        self.client.decr('key', 1)
-        self.assertTrue(self.client.get('key')[2] == 3)
-        self.client.delete('key')
+        self.client.set(key, 0, 0, 4)
+        self.client.decr(key, 1)
+        self.assertTrue(self.client.get(key)[2] == 3)
+        self.client.delete(key)
 
     @attr(cbv="1.0.0")
     def test_simple_incr(self):
-        self.client.set('key', 0, 0, '1')
-        self.client.incr('key', 1)
-        self.assertTrue(self.client.get('key')[2] == 2)
+        key = 'test_simple_incr'
+        self.client.set(key, 0, 0, '1')
+        self.client.incr(key, 1)
+        self.assertTrue(self.client.get(key)[2] == 2)
         # test again using set with an int
-        self.client.set('key', 0, 0, 1)
-        self.client.incr('key', 1)
-        self.assertTrue(self.client.get('key')[2] == 2)
-        self.client.delete('key')
+        self.client.set(key, 0, 0, 1)
+        self.client.incr(key, 1)
+        self.assertTrue(self.client.get(key)[2] == 2)
+        self.client.delete(key)
 
     @attr(cbv="1.0.0")
     def test_simple_get(self):
+        key = 'test_simple_get'
         try:
-            self.client.get('key')
+            self.client.get(key)
             raise Exception('Key existed that should not have')
         except MemcachedError as e:
             if e.status != 1:
                 raise e
-        self.client.set('key', 0, 0, 'value')
-        self.assertTrue(self.client.get('key')[2] == 'value')
-        self.client.delete('key')
+        self.client.set(key, 0, 0, 'value')
+        self.assertTrue(self.client.get(key)[2] == 'value')
+        self.client.delete(key)
 
     @attr(cbv="1.0.0")
     def test_simple_prepend(self):
-        self.client.set('key', 0, 0, 'value')
-        self.client.prepend('key', 'prepend')
-        self.assertTrue(self.client.get('key')[2] == 'prependvalue')
-        self.client.delete('key')
+        key = 'test_simple_prepend'
+        self.client.set(key, 0, 0, 'value')
+        self.client.prepend(key, 'prepend')
+        self.assertTrue(self.client.get(key)[2] == 'prependvalue')
+        self.client.delete(key)
 
     @attr(cbv="1.0.0")
     def test_simple_replace(self):
-        self.client.set('key', 0, 0, 'value')
-        self.client.replace('key', 0, 0, 'replaced')
-        self.assertTrue(self.client.get('key')[2] == 'replaced')
-        self.client.delete('key')
+        key = 'test_simple_replace'
+        self.client.set(key, 0, 0, 'value')
+        self.client.replace(key, 0, 0, 'replaced')
+        self.assertTrue(self.client.get(key)[2] == 'replaced')
+        self.client.delete(key)
 
     @attr(cbv="1.0.0")
     def test_simple_touch(self):
-        self.client.set('key', 2, 0, 'value')
-        self.client.touch('key', 5)
+        key = 'test_simple_touch'
+        self.client.set(key, 2, 0, 'value')
+        self.client.touch(key, 5)
         time.sleep(3)
-        self.assertTrue(self.client.get('key')[2] == 'value')
-        self.client.delete('key')
+        self.assertTrue(self.client.get(key)[2] == 'value')
+        self.client.delete(key)
 
     @attr(cbv="1.0.0")
     def test_set_and_get(self):
@@ -224,14 +233,19 @@ class BucketTest(Base):
 
     @attr(cbv="1.0.0")
     def test_getl(self):
-        key, value = str(uuid.uuid4()), str(uuid.uuid4())
+        key, value = 'test_getl', str(uuid.uuid4())
         self.client.set(key, 0, 0, value)
-        self.assertEqual(self.client.getl(key)[2], value)
+        _, cas, rv = self.client.getl(key)
+        self.assertEqual(rv, value)
         self.assertRaises(MemcachedError, self.client.set, key, 0, 0, value)
+        # unlock the key
+        self.client.cas(key, 0, 0, cas, value)
+        # now that it's unlocked, clean it up
+        self.client.delete(key)
 
     @attr(cbv="1.0.0")
     def test_gat(self):
-        key, value = str(uuid.uuid4()), str(uuid.uuid4())
+        key, value = 'test_gat', str(uuid.uuid4())
         self.client.set(key, 2, 0, value)
         set_value = self.client.gat(key, 5)[2]
         self.assertTrue(set_value == value)

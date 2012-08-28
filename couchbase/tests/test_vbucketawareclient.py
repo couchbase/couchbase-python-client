@@ -34,24 +34,31 @@ class VBucketAwareClientTest(MemcachedClientTest):
 
     @attr(cbv="1.0.0")
     def test_getl(self):
-        key, value = str(uuid.uuid4()), str(uuid.uuid4())
+        key, value = 'test_getl', str(uuid.uuid4())
         self.client.set(key, 0, 0, value)
-        self.assertEqual(self.client.getl(key)[2], value)
+        _, cas, rv = self.client.getl(key)
+        self.assertEqual(rv, value)
         self.assertRaises(MemcachedError, self.client.set, key, 0, 0, value)
+        # unlock the key
+        self.client.cas(key, 0, 0, cas, value)
+        # now that it's unlocked, clean it up
+        self.client.delete(key)
 
     @attr(cbv="1.0.0")
     def test_simple_touch(self):
-        key, value = str(uuid.uuid4()), str(uuid.uuid4())
+        key, value = 'test_simple_touch', str(uuid.uuid4())
         self.client.set(key, 2, 0, value)
         self.client.touch(key, 5)
         time.sleep(3)
         self.assertTrue(self.client.get(key)[2] == value)
+        self.client.delete(key)
 
     @attr(cbv="1.0.0")
     def test_gat(self):
-        key, value = str(uuid.uuid4()), str(uuid.uuid4())
+        key, value = 'test_gat', str(uuid.uuid4())
         self.client.set(key, 2, 0, value)
         set_value = self.client.gat(key, 5)[2]
         self.assertTrue(set_value == value)
         time.sleep(3)
         self.assertTrue(self.client.get(key)[2] == value)
+        self.client.delete(key)

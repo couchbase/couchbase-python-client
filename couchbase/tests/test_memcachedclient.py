@@ -36,88 +36,97 @@ class MemcachedClientTest(Base):
 
     @attr(cbv="1.0.0")
     def test_simple_add(self):
+        key = 'test_simple_add'
         try:
             # delete the key we want to use, so we don't get a conflict while
             # running the test
-            self.client.delete('key')
+            self.client.delete(key)
         except MemcachedError as err:
             if err.status == 1:
                 # if the above fails, the key didn't exist, and we can continue
                 pass
             else:
                 raise err
-        self.client.add('key', 0, 0, 'value')
-        self.assertTrue(self.client.get('key')[2] == 'value')
+        self.client.add(key, 0, 0, 'value')
+        self.assertTrue(self.client.get(key)[2] == 'value')
         # now let's try and add one on purpose that we know exist and make sure
         # we're throwing the error properly
-        self.assertRaises(MemcachedError, self.client.add, 'key', 0, 0,
+        self.assertRaises(MemcachedError, self.client.add, key, 0, 0,
                           'other value')
-        self.client.delete('key')
+        self.client.delete(key)
 
     @attr(cbv="1.0.0")
     def test_simple_append(self):
-        self.client.set('key', 0, 0, 'value')
-        self.client.append('key', 'appended')
-        self.assertTrue(self.client.get('key')[2] == 'valueappended')
-        self.client.delete('key')
+        key = 'test_simple_append'
+        self.client.set(key, 0, 0, 'value')
+        self.client.append(key, 'appended')
+        self.assertTrue(self.client.get(key)[2] == 'valueappended')
+        self.client.delete(key)
 
     @attr(cbv="1.0.0")
     def test_simple_delete(self):
-        self.client.set('key', 0, 0, 'value')
-        self.client.delete('key')
-        self.assertRaises(MemcachedError, self.client.get, 'key')
+        key = 'test_simple_delete'
+        self.client.set(key, 0, 0, 'value')
+        self.client.delete(key)
+        self.assertRaises(MemcachedError, self.client.get, key)
 
     @attr(cbv="1.0.0")
     def test_simple_decr(self):
-        self.client.set('key', 0, 0, '4')
-        self.client.decr('key', 1)
-        self.assertTrue(self.client.get('key')[2] == 3)
+        key = 'test_simple_decr'
+        self.client.set(key, 0, 0, '4')
+        self.client.decr(key, 1)
+        self.assertTrue(self.client.get(key)[2] == 3)
         # test again using set with an int
-        self.client.set('key', 0, 0, 4)
-        self.client.decr('key', 1)
-        self.assertTrue(self.client.get('key')[2] == 3)
-        self.client.delete('key')
+        self.client.set(key, 0, 0, 4)
+        self.client.decr(key, 1)
+        self.assertTrue(self.client.get(key)[2] == 3)
+        self.client.delete(key)
 
     @attr(cbv="1.0.0")
     def test_simple_incr(self):
-        self.client.set('key', 0, 0, '1')
-        self.client.incr('key', 1)
-        self.assertTrue(self.client.get('key')[2] == 2)
+        key = 'test_simple_incr'
+        self.client.set(key, 0, 0, '1')
+        self.client.incr(key, 1)
+        self.assertTrue(self.client.get(key)[2] == 2)
         # test again using set with an int
-        self.client.set('key', 0, 0, 1)
-        self.client.incr('key', 1)
-        self.assertTrue(self.client.get('key')[2] == 2)
-        self.client.delete('key')
+        self.client.set(key, 0, 0, 1)
+        self.client.incr(key, 1)
+        self.assertTrue(self.client.get(key)[2] == 2)
+        self.client.delete(key)
 
     @attr(cbv="1.0.0")
     def test_simple_get(self):
+        key = 'test_simple_get'
         try:
-            self.client.get('key')
+            self.client.get(key)
             raise Exception('Key existed that should not have')
         except MemcachedError as e:
             if e.status != 1:
                 raise e
-        self.client.set('key', 0, 0, 'value')
-        self.assertTrue(self.client.get('key')[2] == 'value')
-        self.client.delete('key')
+        self.client.set(key, 0, 0, 'value')
+        self.assertTrue(self.client.get(key)[2] == 'value')
+        self.client.delete(key)
 
     @attr(cbv="1.0.0")
     def test_simple_prepend(self):
-        self.client.set('key', 0, 0, 'value')
-        self.client.prepend('key', 'prepend')
-        self.assertTrue(self.client.get('key')[2] == 'prependvalue')
-        self.client.delete('key')
+        key = 'test_simple_prepend'
+        self.client.set(key, 0, 0, 'value')
+        self.client.prepend(key, 'prepend')
+        self.assertTrue(self.client.get(key)[2] == 'prependvalue')
+        self.client.delete(key)
 
     @attr(cbv="1.0.0")
     def test_simple_replace(self):
-        self.client.set('key', 0, 0, 'value')
-        self.client.replace('key', 0, 0, 'replaced')
-        self.assertTrue(self.client.get('key')[2] == 'replaced')
-        self.client.delete('key')
+        key = 'test_simple_replace'
+        self.client.set(key, 0, 0, 'value')
+        self.client.replace(key, 0, 0, 'replaced')
+        self.assertTrue(self.client.get(key)[2] == 'replaced')
+        self.client.delete(key)
 
     @attr(cbv="1.0.0")
     def test_set_and_get(self):
-        kvs = [(str(uuid.uuid4()), str(uuid.uuid4())) for i in range(0, 100)]
+        kvs = [('test_set_and_get_%d' % i, str(uuid.uuid4())) \
+               for i in range(0, 100)]
         for k, v in kvs:
             self.client.set(k, 0, 0, v)
 
@@ -130,7 +139,8 @@ class MemcachedClientTest(Base):
 
     @attr(cbv="1.0.0")
     def test_set_and_delete(self):
-        kvs = [(str(uuid.uuid4()), str(uuid.uuid4())) for i in range(0, 100)]
+        kvs = [('test_set_and_delete_%d' % i, str(uuid.uuid4())) \
+               for i in range(0, 100)]
         for k, v in kvs:
             self.client.set(k, 0, 0, v)
         for k, v in kvs:
@@ -152,8 +162,9 @@ class MemcachedClientTest(Base):
 
     @attr(cbv="1.0.0")
     def test_getMulti(self):
-        for kv in [{'key1': 'value1', 'key2': 'value2'},
-                   {'int1': 1, 'int2': 2}]:
+        for kv in [{'test_getMulti_key1': 'value1',
+                    'test_getMulti_key2': 'value2'},
+                   {'test_getMulti_int1': 1, 'test_getMulti_int2': 2}]:
             for k in kv:
                 self.client.set(k, 0, 0, kv[k])
 
@@ -172,8 +183,9 @@ class MemcachedClientTest(Base):
 
     @attr(cbv="1.0.0")
     def test_get_multi(self):
-        for kv in [{'key1': 'value1', 'key2': 'value2'},
-                   {'int1': 1, 'int2': 2}]:
+        for kv in [{'test_get_multi_key1': 'value1',
+                    'test_get_multi_key2': 'value2'},
+                   {'test_get_multi_int1': 1, 'test_get_multi_int2': 2}]:
             for k in kv:
                 self.client.set(k, 0, 0, kv[k])
 
