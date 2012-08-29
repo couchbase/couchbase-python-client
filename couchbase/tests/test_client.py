@@ -403,7 +403,7 @@ class DesignDocTest(Base):
 
     @attr(cbv="2.0.0")
     def test_getitem(self):
-        map = {"map": "function(doc) { emit(doc.name, doc.num); }"}
+
         view = self.design_docs[0]['testing']
         self.assertIsInstance(view, View)
 
