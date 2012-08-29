@@ -93,7 +93,7 @@ class ReadmeTest(Base):
         # save a design document
         newbucket['_design/testing'] = design_doc
 
-        all_by_types_view = newbucket['_design/testing'].views()[0]
+        all_by_types_view = newbucket['_design/testing']['all_by_types']
         rows = all_by_types_view.results({'stale': False})
         for row in rows:
             self.assertTrue(row is not None)

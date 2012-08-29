@@ -388,6 +388,9 @@ class DesignDoc(object):
     def __neq__(self, other):
         return not self.__eq__(other)
 
+    def __getitem__(self, name):
+        return View(name, self.ddoc['views'][name], self)
+
     def views(self):
         return [View(view, self.ddoc['views'][view], self)
                 for view in self.ddoc['views']]

@@ -25,7 +25,7 @@ from nose.plugins.attrib import attr
 from nose.plugins.skip import SkipTest
 from nose.tools import nottest
 
-from couchbase.client import Couchbase, Server, Bucket, DesignDoc
+from couchbase.client import Couchbase, Server, Bucket, DesignDoc, View
 from couchbase.couchbaseclient \
     import CouchbaseClient, VBucketAwareCouchbaseClient
 from couchbase.tests.base import Base
@@ -401,6 +401,12 @@ class DesignDocTest(Base):
         self.assertIn('testing', views)
         self.assertIn(self.ddoc['views'], views)
 
+    @attr(cbv="2.0.0")
+    def test_getitem(self):
+        map = {"map": "function(doc) { emit(doc.name, doc.num); }"}
+        view = self.design_docs[0]['testing']
+        self.assertIsInstance(view, View)
+
 
 class ViewTest(DesignDocTest):
     @nottest
@@ -418,7 +424,7 @@ class ViewTest(DesignDocTest):
     @attr(cbv="2.0.0")
     def test_results(self):
         self.setup_sample_docs()
-        view = self.design_docs[0].views()[0]
+        view = self.design_docs[0]['testing']
         results = view.results({'stale': False})
         if "error" in results:
             self.fail(results)
