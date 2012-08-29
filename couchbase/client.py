@@ -214,6 +214,8 @@ class Bucket(object):
         return self.mc_client.decr(key, amt, init, exp)
 
     def set(self, key, expiration, flags, value):
+        if isinstance(value, dict):
+            value = json.dumps(value)
         return self.mc_client.set(key, expiration, flags, value)
 
     def add(self, key, exp, flags, val):
