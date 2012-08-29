@@ -21,6 +21,7 @@ import time
 from copy import deepcopy
 from threading import Thread, Lock
 import warnings
+from collections import Set
 
 import requests
 
@@ -441,10 +442,40 @@ class View(object):
 
         rest = self.ddoc.bucket.server._rest()
         results = rest.view_results(self.ddoc.bucket.name, self.ddoc.name,
-                                    self.name, params)['rows']
+                                    self.name, params)
 
-        # results were reduced, so return just the reduced value
-        if len(results) == 1 and results[0]['key'] is None:
-            return results[0]['value']
+        return ViewResultsIterator(results)
+
+
+class ViewResultsIterator(Set):
+    def __init__(self, results):
+        self.results = results['rows']
+        if 'total_rows' in results:
+            self.total_rows = results['total_rows']
         else:
-            return results
+            # reduced values don't really have a "length" so setting to 1
+            self.total_rows = 1
+
+    def __eq__(self, other):
+        if len(self.results) == 1 and self.results[0]['key'] is None:
+            return self.results[0]['value'] == other
+        else:
+            return self.results == other
+
+    def __neq__(self, other):
+        return not self.__eq__(other)
+
+    def __iter__(self):
+        return self
+
+    def __len__(self):
+        return self.total_rows
+
+    def __contains__(self, item):
+        return item in self.results
+
+    def next(self):
+        try:
+            return self.results.pop(0)
+        except IndexError:
+            raise StopIteration

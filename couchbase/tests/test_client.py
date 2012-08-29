@@ -20,6 +20,7 @@ import warnings
 import uuid
 import time
 import json
+from collections import Set
 
 from nose.plugins.attrib import attr
 from nose.plugins.skip import SkipTest
@@ -435,13 +436,13 @@ class ViewTest(DesignDocTest):
         # Retrieve reduced results from a View. PYCBC-7
         #   (the format is the same, but there is no associated docid)
         results = view.results({'stale': False})
-        self.assertIs(results, 10)
+        self.assertEqual(results, 10)
         # Assemble query parameters for a View. PYCBC-7
         results = view.results({'stale': False, 'reduce': False})
         if "error" in results:
             self.fail(results)
         else:
-            self.assertIsInstance(results, types.ListType)
+            self.assertIsInstance(results, Set)
             self.assertIs(len(results), 10)
         # test again with include_docs=true
         # Retrieve non-reduced results from a View. PYCBC-7
@@ -453,7 +454,7 @@ class ViewTest(DesignDocTest):
         if "error" in results:
             self.fail(results)
         else:
-            self.assertIsInstance(results, types.ListType)
+            self.assertIsInstance(results, Set)
             self.assertIs(len(results), 10)
             for row in results:
                 self.assertIn('doc', row)
