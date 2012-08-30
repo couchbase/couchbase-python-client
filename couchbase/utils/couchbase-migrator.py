@@ -113,7 +113,6 @@ def parse_args(argv):
             elif o == '-q' or o == '--quiet':
                 config.quiet = True
 
-        msg = ""
         if not config.source or not config.destination:
             usage("missing source or destination")
 

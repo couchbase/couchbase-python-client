@@ -21,7 +21,6 @@ import random
 import zlib
 import struct
 import warnings
-import json
 import cPickle as pickle
 import cStringIO as StringIO
 

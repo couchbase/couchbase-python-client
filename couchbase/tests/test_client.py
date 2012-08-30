@@ -15,6 +15,10 @@
 # limitations under the License.
 #
 
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
 import types
 import warnings
 import uuid
@@ -105,7 +109,7 @@ class CouchbaseTest(Base):
     def test_delete(self):
         self.setup_cb()
         bucket_name = str(uuid.uuid4())
-        bucket = self.cb.create(bucket_name)
+        self.cb.create(bucket_name)
         self.assertIsInstance(self.cb[bucket_name], Bucket)
         self.cb.delete(bucket_name)
         self.assertNotIn(bucket_name, self.cb)

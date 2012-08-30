@@ -15,7 +15,6 @@
 # limitations under the License.
 #
 
-import base64
 import json
 import urllib
 import socket
