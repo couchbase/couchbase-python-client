@@ -386,6 +386,24 @@ class BucketTest(Base):
         self.assertTrue(self.cb['memcached'].flush())
         rest.delete_bucket('memcached')
 
+    @attr(cbv="2.0.0")
+    def test_pickling(self):
+        pm = PickleMe()
+        self.client['test_pickling'] = pm
+        self.assertEqual(self.client['test_pickling'][2].say_hi(), "Hi Pickle Me")
+
+
+class PickleMe(object):
+    """Completely useless little class used in the BucketTest.test_pickling()
+    test above.
+    """
+    def __init__(self):
+        self.name = "Pickle Me"
+        self.number = 10
+
+    def say_hi(self):
+        return "Hi " + self.name
+
 
 class DesignDocTest(Base):
     def setUp(self):
