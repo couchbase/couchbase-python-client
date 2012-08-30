@@ -173,10 +173,10 @@ class RestConnection(object):
             self.couch_api_base = None
 
         self.base_url = "http://{0}:{1}".format(self.ip, self.port)
+        server_config_uri = ''.join([self.base_url, '/pools/default'])
+        self.config = requests.get(server_config_uri).json
         # if couchApiBase is not set earlier, let's look it up
         if self.couch_api_base is None:
-            server_config_uri = ''.join([self.base_url, '/pools/default'])
-            self.config = requests.get(server_config_uri).json
             #couchApiBase is not in node config before Couchbase Server 2.0
             self.couch_api_base = self.config["nodes"][0].get("couchApiBase")
 
