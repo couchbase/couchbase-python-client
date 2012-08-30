@@ -41,7 +41,7 @@ class MemcachedClient(object):
         """Memcached Binary Protocol Client"""
         self.host = host
         self.port = port
-        self.s.create_connection((host, port))
+        self.s = socket.create_connection((host, port))
         self.s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self.r = random.Random()
         self.log = logger("MemcachedClient")
