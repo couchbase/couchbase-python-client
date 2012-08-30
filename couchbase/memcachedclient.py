@@ -22,7 +22,7 @@ import zlib
 import struct
 import warnings
 import cPickle as pickle
-import cStringIO as StringIO
+from cStringIO import StringIO
 
 from couchbase.logger import logger
 from couchbase.constants import MemcachedConstants
