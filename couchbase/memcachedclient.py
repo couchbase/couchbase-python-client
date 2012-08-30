@@ -60,6 +60,8 @@ class MemcachedClient(object):
                  dtype=0, vbucketId=0,
                  fmt=MemcachedConstants.REQ_PKT_FMT,
                  magic=MemcachedConstants.REQ_MAGIC_BYTE):
+        if isinstance(key, unicode):
+            key = str(key)
         if isinstance(val, int):
             val = str(val)
         msg = struct.pack(fmt, magic,
