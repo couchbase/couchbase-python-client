@@ -332,7 +332,7 @@ class CouchbaseClient(object):
                                            args=())
             self.streaming_thread.daemon = True
             self.streaming_thread.start()
-        self.dispatcher = dispatcher(self)
+        self.dispatcher = dispatcher(self, verbose)
         self.dispatcher_thread = Thread(name="dispatcher-thread",
                                         target=self._start_dispatcher)
         self.dispatcher_thread.daemon = True
