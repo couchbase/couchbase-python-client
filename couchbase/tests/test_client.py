@@ -478,5 +478,24 @@ class ViewTest(DesignDocTest):
         self.teardown_sample_docs()
 
 
+class ViewResultsIteratorTest(object):
+    def test_errors_available_on_results(self):
+        """Check that errors are available on View Results. PYCBC-1"""
+        response = {"total_rows": 0,"rows": [],
+                    "errors":[{"from": "local",
+                               "reason": """Design document
+                               `_design/testfoobar` missing in database
+                               `test_db_b`."""
+                               },
+                              {"from": "http://localhost:5984/_view_merge/",
+                               "reason": """Design document
+                               `_design/testfoobar` missing in database
+                               `test_db_c`."""}
+                              ]
+                    }
+        vr = ViewResultsIterator(response)
+        self.assertIsInstance(vr.errors, types.ListType)
+
+
 if __name__ == "__main__":
     unittest.main()

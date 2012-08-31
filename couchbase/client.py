@@ -466,6 +466,7 @@ class View(object):
 class ViewResultsIterator(Set):
     def __init__(self, results):
         self.results = results['rows']
+        self.errors = results.get('errors')
         if 'total_rows' in results:
             self.total_rows = results['total_rows']
         else:
