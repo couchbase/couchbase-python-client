@@ -338,8 +338,8 @@ class Bucket(object):
     def design_docs(self):
         """List all design documents and return DesignDoc objects for each"""
         (ip, port, _, _) = self.server._rest_info()
-        api = ''.join(['http://{0}:{1}/pools/default/buckets/{2}/ddocs' \
-                       .format(ip, port, self.name)])
+        api = ''.join(['http://{0}:{1}'.format(ip, port),
+                       self.info.ddocs['uri']])
         r = requests.get(api, auth=(self.server.rest_username,
                                     self.server.rest_password))
         ddocs = []
