@@ -375,6 +375,17 @@ class BucketTest(Base):
         rest = self.client.server._rest()
         rest.delete_design_doc(self.client.name, 'testing_setitem')
 
+    @attr(cbv="2.0.0")
+    def test_flush(self):
+        """Test RESTful bucket flushing"""
+        server = self.client.server
+        rest = server._rest()
+        rest.create_bucket('memcached', bucketType='memcached')
+        # TODO: look into making wait_for_node_status() work...
+        time.sleep(5)
+        self.assertTrue(self.cb['memcached'].flush())
+        rest.delete_bucket('memcached')
+
 
 class DesignDocTest(Base):
     def setUp(self):
@@ -399,7 +410,7 @@ class DesignDocTest(Base):
                       }
                      }
         self.rest.create_design_doc(self.client.name, 'test_ddoc',
-                               json.dumps(self.ddoc))
+                                    json.dumps(self.ddoc))
         self.design_docs = self.client.design_docs()
 
     def tearDown(self):

@@ -28,6 +28,7 @@ import requests
 from couchbase.logger import logger
 from couchbase.rest_client import RestConnection
 from couchbase.couchbaseclient import CouchbaseClient
+from couchbase.exception import BucketUnavailableException
 
 log = logger("client")
 
@@ -192,7 +193,8 @@ class Bucket(object):
 
         self.name = name
         rest = server._rest()
-        self.password = rest.get_bucket(self.name).saslPassword
+        self.info = rest.get_bucket(self.name)
+        self.password = self.info.saslPassword
 
         ip, port, rest_username, rest_password = server._rest_info()
         formatter_uri = "http://%s:%s/pools/default"
@@ -346,6 +348,20 @@ class Bucket(object):
                                    ddoc['doc']['json'], bucket=self))
 
         return ddocs
+
+    def flush(self):
+        """RESTful Bucket flushing - will destory all the data in a bucket."""
+        ip, port, rest_username, rest_password = self.server._rest_info()
+        api = ''.join(["http://{0}:{1}".format(ip, port),
+                      self.info.controllers['flush']])
+        response = requests.post(api, auth=(rest_username, rest_password))
+
+        if response.status_code is 503:
+            raise Exception("Only buckets of type 'memcached' support flush.")
+        elif response.status_code is 404:
+            raise BucketUnavailableException
+        elif response.status_code is 200:
+            return True
 
 
 class DesignDoc(object):
