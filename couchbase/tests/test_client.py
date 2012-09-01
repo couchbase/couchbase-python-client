@@ -258,6 +258,16 @@ class BucketTest(Base):
         self.assertTrue(self.client.get(key)[2] == value)
         self.client.delete(key)
 
+    @attr(cbv="1.0.0")
+    def test_cas(self):
+        key = 'test_cas'
+        cas = self.client.set(key, 0, 0, 'testing')[1]
+        self.assertEqual(cas, self.client.get(key)[1])
+        self.client.cas(key, 0, 0, cas, 'testing some more')
+        _, new_cas, value = self.client.get(key)
+        self.assertNotEqual(cas, new_cas)
+        self.assertEqual(value, 'testing some more')
+
     @attr(cbv="2.0.0")
     def test_save(self):
         """Test deprecated save() method"""
