@@ -24,6 +24,7 @@ import urllib
 import httplib2
 import socket
 import time
+import string
 import logger
 import client
 from exception import ServerAlreadyJoinedException,\
@@ -282,8 +283,12 @@ class RestConnection(object):
         return json_parsed
 
     def _create_capi_headers(self):
-        return {'Content-Type': 'application/json',
-                'Accept': '*/*'}
+        headers = {'Content-Type': 'application/json', 'Accept': '*/*'}
+        if self.username and self.username != "default":
+            auth = 'Basic ' + \
+                   string.strip(base64.encodestring(self.username + ':' + (self.password or '')))
+            headers['Authorization'] = auth
+        return headers
 
     #authorization must be a base64 string of username:password
     def _create_headers(self):
