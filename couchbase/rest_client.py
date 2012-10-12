@@ -279,7 +279,7 @@ class RestConnection(object):
             return {'Content-Type': 'application/x-www-form-urlencoded',
                     'Accept': '*/*'}
 
-    def _http_request(self, api, method='GET', params='', headers=None,
+    def _http_request(self, api, method='GET', params=None, headers=None,
                       timeout=120, base=None):
         if base is None:
             base = self.base_url
