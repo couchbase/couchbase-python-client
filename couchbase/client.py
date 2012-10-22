@@ -108,10 +108,11 @@ class Couchbase(object):
                                                 "password": self.rest_password,
                                                 "couchApiBase": couch_api_base
                                                 })
-                    new_servers.sort()
-                    self.servers_lock.acquire()
-                    self.servers = deepcopy(new_servers)
-                    self.servers_lock.release()
+                    if new_servers:
+                        new_servers.sort()
+                        self.servers_lock.acquire()
+                        self.servers = deepcopy(new_servers)
+                        self.servers_lock.release()
 
     def bucket(self, bucket_name):
         return Bucket(bucket_name, self)
