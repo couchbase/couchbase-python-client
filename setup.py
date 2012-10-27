@@ -34,7 +34,7 @@ setup(
     author="Couchbase, Inc.",
     author_email="info@couchbase.com",
     packages=["couchbase", "couchbase/utils", "couchbase/migrator"],
-    install_requires=["requests==0.14.0", "unittest2", "uuid"],
+    install_requires=["requests", "unittest2", "uuid"],
     setup_requires=["nose>=1.0"],
     tests_require=["nose-testconfig"],
     url="http://www.couchbase.com/develop/python/next",
