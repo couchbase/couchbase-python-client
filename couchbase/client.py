@@ -71,7 +71,7 @@ class Couchbase(object):
 
         url = "http://%s:%s/poolsStreaming/default" % (self.servers[0]["ip"],
                                                        self.servers[0]["port"])
-        response = requests.get(url)
+        response = requests.get(url, auth=(self.rest_username, self.rest_password))
         for line in response.iter_lines():
             if line:
                 data = json.loads(line)

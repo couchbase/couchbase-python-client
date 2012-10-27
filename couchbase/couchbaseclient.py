@@ -349,7 +349,8 @@ class CouchbaseClient(object):
         response = requests.get("http://%s:%s/pools/default/buckets"
                                 "Streaming/%s" % (self.servers[0]["ip"],
                                                   self.servers[0]["port"],
-                                                  self.bucket.name))
+                                                  self.bucket.name),
+                                auth=(self.rest_username, self.rest_password))
         for line in response.iter_lines():
             if line:
                 data = json.loads(line)
