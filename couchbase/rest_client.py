@@ -587,10 +587,8 @@ class RestConnection(object):
         api = self.baseUrl + 'nodes/self'
 
         status, content = self._http_request(api)
-
-        json_parsed = json.loads(content)
-
         if status:
+            json_parsed = json.loads(content)
             node = RestParser().parse_get_nodes_response(json_parsed)
 
         return node
@@ -762,6 +760,21 @@ class RestConnection(object):
             return False
         return status
 
+    def is_ns_server_ready(self, timeout_in_seconds=360):
+        end_time = time.time() + timeout_in_seconds
+        while time.time() <= end_time:
+            try:
+                status = self.get_nodes_self()
+                if status is not None and status.status == 'healthy':
+                    return True, None
+            except:
+                pass
+            time.sleep(1)
+
+        err = "Unable to connect to the node %s even after waiting %d seconds" % \
+             (self.rest.ip, timeout_in_seconds)
+        return False, err
+
     # figure out the proxy port
     def create_bucket(self, bucket='',
                       ramQuotaMB=1,
@@ -770,6 +783,11 @@ class RestConnection(object):
                       replicaNumber=1,
                       proxyPort=11211,
                       bucketType='membase'):
+        status, err = self.is_ns_server_ready()
+        if not status:
+            raise BucketCreationException(ip=self.ip, bucket_name=bucket,
+                                          error=err)
+
         api = '%s%s' % (self.baseUrl, '/pools/default/buckets')
         params = urllib.urlencode({})
         #this only works for default bucket ?
@@ -791,18 +809,20 @@ class RestConnection(object):
                                        'bucketType': bucketType})
 
         elif authType == 'sasl':
+            node = self.get_nodes_self()
+            if node:
+                proxyPort = node.moxi
             params = urllib.urlencode({'name': bucket,
                                        'ramQuotaMB': ramQuotaMB,
                                        'authType': authType,
                                        'saslPassword': saslPassword,
                                        'replicaNumber': replicaNumber,
-                                       'proxyPort': self.get_nodes_self().moxi,
+                                       'proxyPort': proxyPort,
                                        'bucketType': bucketType})
 
         log.info("%s with param: %s" % (api, params))
 
         status, content = self._http_request(api, 'POST', params)
-
         if not status:
             raise BucketCreationException(ip=self.ip, bucket_name=bucket,
                                           error=status)
