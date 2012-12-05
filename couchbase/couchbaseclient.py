@@ -53,11 +53,44 @@ class CommandDispatcher(object):
         self._dispatcher_stopped_event = Event()
 
     def put(self, item):
-        try:
-            self.queue.put(item, False)
-        except Full:
-            #TODO: add a better error message here
-            raise Exception("queue is full")
+        if item:
+            try:
+                self.do(item)
+                # do will only raise not_my_vbucket_exception,
+                # EOF and socket.error
+            except MemcachedError, ex:
+                # if we get a not_my_vbucket then requeue item
+                #  with fast forward map vbucket
+                self.log.error(ex)
+                if 'vbucket' in ex:
+                    self.reconfig_callback(ex.vbucket)
+                    self.start_connection_callback(ex.vbucket)
+                else:
+                    raise Empty
+                item["fastforward"] = True
+                self.queue.put(item)
+            except EOFError, ex:
+                # we go an EOF error, restart the connection
+                self.log.error(ex)
+                if 'vbucket' in ex:
+                    self.restart_connection_callback(ex.vbucket)
+                else:
+                    raise Empty
+                self.queue.put(item)
+            except socket.error, ex:
+                # we got a socket error, restart the connection
+                self.log.error(ex)
+                if 'vbucket' in ex:
+                    self.restart_connection_callback(ex.vbucket)
+                else:
+                    raise Empty
+                self.queue.put(item)
+
+        # try:
+        #     self.queue.put(item, False)
+        # except Full:
+        #     #TODO: add a better error message here
+        #     raise Exception("queue is full")
 
     def shutdown(self):
         if self.status != "shutdown":
