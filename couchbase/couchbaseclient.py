@@ -86,7 +86,7 @@ class CommandDispatcher(object):
                         # if we get a not_my_vbucket then requeue item
                         #  with fast forward map vbucket
                         self.log.error(ex)
-                        if 'vbucket' in ex:
+                        if hasattr(ex, 'vbucket'):
                             self.reconfig_callback(ex.vbucket)
                             self.start_connection_callback(ex.vbucket)
                         else:
