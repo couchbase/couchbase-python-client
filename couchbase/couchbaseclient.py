@@ -122,6 +122,7 @@ class CommandDispatcher(object):
             print ex
             self.log.error("got not my vb error. key: %s, vbucket: %s" %
                            (item["key"], item["vbucket"]))
+            self.restart_vbucket_connection(self.vbucketid(item['key']))
             raise ex
         if isinstance(ex, EOFError):
             ex.vbucket = item["vbucket"]
