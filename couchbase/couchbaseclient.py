@@ -87,7 +87,6 @@ class CommandDispatcher(object):
                         #  with fast forward map vbucket
                         self.log.error(ex)
                         if hasattr(ex, 'vbucket'):
-                            print "HERE!"
                             self.reconfig_callback(ex.vbucket)
                             self.start_connection_callback(ex.vbucket)
                         else:
