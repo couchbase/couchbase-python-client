@@ -87,6 +87,7 @@ class CommandDispatcher(object):
                         #  with fast forward map vbucket
                         self.log.error(ex)
                         if 'vbucket' in ex:
+                            print "HERE!"
                             self.reconfig_callback(ex.vbucket)
                             self.start_connection_callback(ex.vbucket)
                         else:
@@ -122,7 +123,6 @@ class CommandDispatcher(object):
             print ex
             self.log.error("got not my vb error. key: %s, vbucket: %s" %
                            (item["key"], item["vbucket"]))
-            self.restart_vbucket_connection(self.vbucketid(item['key']))
             raise ex
         if isinstance(ex, EOFError):
             ex.vbucket = item["vbucket"]
@@ -507,7 +507,7 @@ class CouchbaseClient(object):
         if not event.is_set() and 'key' in item:
             # if we timeout, then try to reconnect to the server
             # responsible for this vbucket
-            self.dispatcher.restart_vbucket_connection(self.vbucketid(item['key']))
+            self.restart_vbucket_connection(self.vbucketid(item['key']))
             raise MemcachedTimeoutException(item, timeout)
         if "error" in item["response"]:
             raise item["response"]["error"]
