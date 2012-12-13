@@ -507,7 +507,7 @@ class CouchbaseClient(object):
         if not event.is_set() and 'key' in item:
             # if we timeout, then try to reconnect to the server
             # responsible for this vbucket
-            self.restart_vbucket_connection(self.vbucketid(item['key']))
+            self.dispatcher.restart_vbucket_connection(self.vbucketid(item['key']))
             raise MemcachedTimeoutException(item, timeout)
         if "error" in item["response"]:
             raise item["response"]["error"]
