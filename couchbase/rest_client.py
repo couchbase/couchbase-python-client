@@ -243,25 +243,19 @@ class RestConnection(object):
         return self.view_results(bucket, design_doc, view, {})
 
     def view_results(self, bucket, design_doc, view, params, limit=100):
-        api = '{0}/_design/{1}/_view/{2}'.format(bucket, design_doc, view)
-        num_params = 0
+        myparams = dict()
         if limit is not None:
-            num_params = 1
-            api += "?limit=%s" % (limit)
-        for param in params:
-            if num_params > 0:
-                api += "&"
-            else:
-                api += "?"
-            num_params += 1
-            if param in ["key", "start_key", "end_key",
-                         "startkey_docid", "endkey_docid"] or \
-                params[param] is True or \
+            myparams['limit'] = str(limit)
+        args_needing_jsonify = ["key", "start_key", "end_key", "startkey_docid",
+                                "endkey_docid", "startkey", "endkey", "keys"]
+        for param, value in params.iteritems():
+            if param in args_needing_jsonify or  params[param] is True or \
                     params[param] is False:
-                api += "%s=%s" % (param, json.dumps(params[param]))
-            else:
-                api += "%s=%s" % (param, params[param])
+                value = json.dumps(value)
+            myparams[param] = value
 
+        api = '{0}/_design/{1}/_view/{2}?{3}'.format(bucket, design_doc, view,
+                                                     urllib.urlencode(myparams))
         headers = self._create_capi_headers()
         status, content = self._http_request(api, headers=headers,
                                              base=self.couch_api_base)
