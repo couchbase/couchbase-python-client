@@ -31,6 +31,10 @@ from couchbase.exception import ServerAlreadyJoinedException, \
 log = logger("rest_client")
 
 
+class DesignDocNotFoundError(Exception):
+    pass
+
+
 #helper library methods built on top of RestConnection interface
 class RestHelper(object):
     def __init__(self, rest_connection):
@@ -207,7 +211,10 @@ class RestConnection(object):
         json_parsed = json.loads(content)
 
         if not status:
-            raise Exception("unable to get design doc")
+            if json_parsed['reason'] == 'missing':
+                raise DesignDocNotFoundError(json_parsed)
+            else:
+                raise Exception("unable to get design doc")
 
         return json_parsed
 
