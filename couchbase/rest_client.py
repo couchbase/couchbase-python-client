@@ -246,8 +246,8 @@ class RestConnection(object):
         myparams = dict()
         if limit is not None:
             myparams['limit'] = str(limit)
-        args_needing_jsonify = ["key", "start_key", "end_key", "startkey_docid",
-                                "endkey_docid", "startkey", "endkey", "keys"]
+        args_needing_jsonify = ["key", "start_key", "end_key",
+                                "startkey", "endkey", "keys"]
         for param, value in params.iteritems():
             if param in args_needing_jsonify or  params[param] is True or \
                     params[param] is False:
