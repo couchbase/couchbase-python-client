@@ -307,16 +307,17 @@ class RestConnection(object):
                 else:
                     reason = "unknown"
                     status = False
-                    if r.json() is None:
+                    try:
+                        if "error" in r.json():
+                            reason = r.json()["error"]
+                            status = False
+                        elif "errors" in r.json():
+                            errors = [error for _, error in
+                                      r.json()["errors"].iteritems()]
+                            reason = ", ".join(errors)
+                            status = False
+                    except:
                         reason = r.text
-                        status = False
-                    elif "error" in r.json():
-                        reason = r.json()["error"]
-                        status = False
-                    elif "errors" in r.json():
-                        errors = [error for _, error in
-                                  r.json()["errors"].iteritems()]
-                        reason = ", ".join(errors)
                         status = False
                     log.error('%s error %s reason: %s %s' %
                               (api, r.status_code, reason, r.content))
@@ -752,14 +753,19 @@ class RestConnection(object):
         r = requests.post("".join([self.base_url, api]),
                           params={'just_validate': 1}, data=params,
                           auth=(self.username, self.password))
-        if r.json() is not None and len(r.json()['errors']) > 0:
-            for key, error in r.json()['errors'].items():
-                if key == 'replicaNumber':
-                    log.warn(error)
-                else:
-                    log.error(error)
-                    raise BucketCreationException(self.ip, self.username,
-                                                  error)
+        try:
+            json_val = r.json()
+        except:
+            pass
+        else:
+            if json_val is not None and len(json_val['errors']) > 0:
+                for key, error in json_val['errors'].items():
+                    if key == 'replicaNumber':
+                        log.warn(error)
+                    else:
+                        log.error(error)
+                        raise BucketCreationException(self.ip, self.username,
+                                                      error)
 
         status, content = self._http_request(api, 'POST',
                                              urllib.urlencode(params))
