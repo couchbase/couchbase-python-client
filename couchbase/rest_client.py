@@ -213,8 +213,11 @@ class RestConnection(object):
         if not status:
             if json_parsed['reason'] == 'missing':
                 raise DesignDocNotFoundError(json_parsed)
+            elif json_parsed['reason'] == 'deleted':
+                raise DesignDocNotFoundError(json_parsed)
             else:
-                raise Exception("unable to get design doc")
+                raise Exception("unable to get design doc: {0}".format(
+                    json_parsed))
 
         return json_parsed
 
