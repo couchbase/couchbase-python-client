@@ -343,7 +343,7 @@ class Bucket(object):
         r = requests.get(api, auth=(self.server.rest_username,
                                     self.server.rest_password))
         ddocs = []
-        for ddoc in r.json.get('rows'):
+        for ddoc in r.json().get('rows'):
             ddocs.append(DesignDoc(ddoc['doc']['meta']['id'],
                                    ddoc['doc']['json'], bucket=self))
 

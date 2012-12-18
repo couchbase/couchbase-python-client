@@ -174,7 +174,7 @@ class RestConnection(object):
 
         self.base_url = "http://{0}:{1}".format(self.ip, self.port)
         server_config_uri = ''.join([self.base_url, '/pools/default'])
-        self.config = requests.get(server_config_uri).json
+        self.config = requests.get(server_config_uri).json()
         # if couchApiBase is not set earlier, let's look it up
         if self.couch_api_base is None:
             #couchApiBase is not in node config before Couchbase Server 2.0
@@ -307,15 +307,15 @@ class RestConnection(object):
                 else:
                     reason = "unknown"
                     status = False
-                    if r.json is None:
+                    if r.json() is None:
                         reason = r.text
                         status = False
-                    elif "error" in r.json:
-                        reason = r.json["error"]
+                    elif "error" in r.json():
+                        reason = r.json()["error"]
                         status = False
-                    elif "errors" in r.json:
+                    elif "errors" in r.json():
                         errors = [error for _, error in
-                                  r.json["errors"].iteritems()]
+                                  r.json()["errors"].iteritems()]
                         reason = ", ".join(errors)
                         status = False
                     log.error('%s error %s reason: %s %s' %
@@ -752,8 +752,8 @@ class RestConnection(object):
         r = requests.post("".join([self.base_url, api]),
                           params={'just_validate': 1}, data=params,
                           auth=(self.username, self.password))
-        if r.json is not None and len(r.json['errors']) > 0:
-            for key, error in r.json['errors'].items():
+        if r.json() is not None and len(r.json()['errors']) > 0:
+            for key, error in r.json()['errors'].items():
                 if key == 'replicaNumber':
                     log.warn(error)
                 else:
