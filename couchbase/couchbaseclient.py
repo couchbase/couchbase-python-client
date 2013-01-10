@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-from Queue import Queue, Full, Empty
+from Queue import Queue
 from threading import Thread, Lock
 
 import time
@@ -306,7 +306,8 @@ class CouchbaseClient(object):
                                 "Streaming/%s" % (self.servers[0]["ip"],
                                                   self.servers[0]["port"],
                                                   self.bucket.name),
-                                auth=(self.rest_username, self.rest_password))
+                                auth=(self.rest_username, self.rest_password),
+                                prefetch=False)
         for line in response.iter_lines():
             if line:
                 data = json.loads(line)
@@ -353,6 +354,7 @@ class CouchbaseClient(object):
                 self.servers_lock.acquire()
                 self.servers = deepcopy(new_servers)
                 self.servers_lock.release()
+                del(line)
 
     def init_vbucket_connections(self):
         # start up all vbucket connections
