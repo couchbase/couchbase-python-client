@@ -56,7 +56,7 @@ class Couchbase(object):
         self.rest_password = password
 
         server_config_uri = "http://%s:%s/pools/default" % (ip, port)
-        config = requests.get(server_config_uri).json
+        config = requests.get(server_config_uri).json()
         #couchApiBase will not be in node config before Couchbase Server 2.0
         self.couch_api_base = config["nodes"][0].get("couchApiBase")
 
@@ -343,7 +343,7 @@ class Bucket(object):
         r = requests.get(api, auth=(self.server.rest_username,
                                     self.server.rest_password))
         ddocs = []
-        for ddoc in r.json.get('rows'):
+        for ddoc in r.json().get('rows'):
             ddocs.append(DesignDoc(ddoc['doc']['meta']['id'],
                                    ddoc['doc']['json'], bucket=self))
 
