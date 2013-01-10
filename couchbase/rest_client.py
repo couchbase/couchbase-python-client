@@ -174,7 +174,8 @@ class RestConnection(object):
 
         self.base_url = "http://{0}:{1}".format(self.ip, self.port)
         server_config_uri = ''.join([self.base_url, '/pools/default'])
-        self.config = requests.get(server_config_uri).json
+        self.config = requests.get(server_config_uri,
+                                   auth=(self.username, self.password)).json
         # if couchApiBase is not set earlier, let's look it up
         if self.couch_api_base is None:
             #couchApiBase is not in node config before Couchbase Server 2.0
@@ -247,8 +248,7 @@ class RestConnection(object):
             else:
                 api += "?"
             num_params += 1
-            if param in ["key", "start_key", "end_key",
-                         "startkey_docid", "endkey_docid"] or \
+            if param in ["key", "start_key", "end_key"] or \
                 params[param] is True or \
                     params[param] is False:
                 api += "%s=%s" % (param, json.dumps(params[param]))

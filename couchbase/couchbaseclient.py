@@ -15,8 +15,10 @@
 # limitations under the License.
 #
 
-from Queue import Queue, Full, Empty
+from Queue import Queue
 from threading import Thread, Lock
+
+import time
 
 import socket
 import zlib
@@ -50,71 +52,33 @@ class CommandDispatcher(object):
             self.vbaware.restart_vbucket_connection
         self.verbose = verbose
         self.log = logger("CommandDispatcher")
-        self._dispatcher_stopped_event = Event()
 
     def put(self, item):
-        try:
-            self.queue.put(item, False)
-        except Full:
-            #TODO: add a better error message here
-            raise Exception("queue is full")
-
-    def shutdown(self):
-        if self.status != "shutdown":
-            self.status = "shutdown"
-            if self.verbose:
-                self.log.info("dispatcher shutdown command received")
-        self._dispatcher_stopped_event.wait(2)
-
-    def reconfig_completed(self):
-        self.status = "ok"
-
-    def dispatch(self):
-        while (self.status != "shutdown" or (self.status == "shutdown" and
-               self.queue.qsize() > 0)):
-            #wait if its reconfiguring the vbucket-map
-            if self.status == "vbucketmap-configuration":
-                continue
+        maxTime = time.time() + 60 * 1000
+        while time.time() < maxTime:
             try:
-                item = self.queue.get(block=True, timeout=5)
-                if item:
-                    try:
-                        self.do(item)
-                        # do will only raise not_my_vbucket_exception,
-                        # EOF and socket.error
-                    except MemcachedError, ex:
-                        # if we get a not_my_vbucket then requeue item
-                        #  with fast forward map vbucket
-                        self.log.error(ex)
-                        if 'vbucket' in ex:
-                            self.reconfig_callback(ex.vbucket)
-                            self.start_connection_callback(ex.vbucket)
-                        else:
-                            raise Empty
-                        item["fastforward"] = True
-                        self.queue.put(item)
-                    except EOFError, ex:
-                        # we go an EOF error, restart the connection
-                        self.log.error(ex)
-                        if 'vbucket' in ex:
-                            self.restart_connection_callback(ex.vbucket)
-                        else:
-                            raise Empty
-                        self.queue.put(item)
-                    except socket.error, ex:
-                        # we got a socket error, restart the connection
-                        self.log.error(ex)
-                        if 'vbucket' in ex:
-                            self.restart_connection_callback(ex.vbucket)
-                        else:
-                            raise Empty
-                        self.queue.put(item)
-
-            except Empty:
-                pass
-        if self.verbose:
-            self.log.info("dispatcher stopped")
-            self._dispatcher_stopped_event.set()
+                self.do(item)
+                # do will only raise not_my_vbucket_exception,
+                # EOF and socket.error
+            except MemcachedError as ex:
+                # if we get a not_my_vbucket then try item
+                # again with fast forward map vbucket
+                self.log.error(ex)
+                if 'vbucket' in ex:
+                    self.reconfig_callback(ex.vbucket)
+                    self.start_connection_callback(ex.vbucket)
+                else:
+                    break
+                item["fastforward"] = True
+            except (socket.error, EOFError) as ex:
+                # for EOF or socket error, restart the connection
+                self.log.error(ex)
+                if 'vbucket' in ex:
+                    self.restart_connection_callback(ex.vbucket)
+                else:
+                    break
+            else:
+                break
 
     def _raise_if_recoverable(self, ex, item):
         if isinstance(ex, MemcachedError) and ex.status == 7:
@@ -292,8 +256,7 @@ class CommandDispatcher(object):
 class CouchbaseClient(object):
     #poll server every few seconds to see if the vbucket-map
     #has changes
-    def __init__(self, url, bucket, password="", verbose=False,
-                 dispatcher=CommandDispatcher):
+    def __init__(self, url, bucket, password="", verbose=False):
         self.log = logger("CouchbaseClient")
         self.rest_username = bucket
         self.rest_password = password
@@ -332,15 +295,8 @@ class CouchbaseClient(object):
                                            args=())
             self.streaming_thread.daemon = True
             self.streaming_thread.start()
-        self.dispatcher = dispatcher(self, verbose)
-        self.dispatcher_thread = Thread(name="dispatcher-thread",
-                                        target=self._start_dispatcher)
-        self.dispatcher_thread.daemon = True
-        self.dispatcher_thread.start()
+        self.dispatcher = CommandDispatcher(self, verbose)
         self.verbose = verbose
-
-    def _start_dispatcher(self):
-        self.dispatcher.dispatch()
 
     def _start_streaming(self):
         # This will dynamically update vBucketMap, vBucketMapFastForward,
@@ -349,7 +305,9 @@ class CouchbaseClient(object):
         response = requests.get("http://%s:%s/pools/default/buckets"
                                 "Streaming/%s" % (self.servers[0]["ip"],
                                                   self.servers[0]["port"],
-                                                  self.bucket.name))
+                                                  self.bucket.name),
+                                auth=(self.rest_username, self.rest_password),
+                                prefetch=False)
         for line in response.iter_lines():
             if line:
                 data = json.loads(line)
@@ -396,6 +354,7 @@ class CouchbaseClient(object):
                 self.servers_lock.acquire()
                 self.servers = deepcopy(new_servers)
                 self.servers_lock.release()
+                del(line)
 
     def init_vbucket_connections(self):
         # start up all vbucket connections
@@ -491,14 +450,9 @@ class CouchbaseClient(object):
         return r
 
     def done(self):
-        if self.dispatcher:
-            self.dispatcher.shutdown()
-            if self.verbose:
-                self.log.info("dispatcher shutdown invoked")
-            [self._memcacheds[ip].close() for ip in self._memcacheds]
-            if self.verbose:
-                self.log.info("closed all memcached open connections")
-            self.dispatcher = None
+        [self._memcacheds[ip].close() for ip in self._memcacheds]
+        if self.verbose:
+            self.log.info("closed all memcached open connections")
 
     def _respond(self, item, event):
         timeout = 30
