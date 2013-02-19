@@ -8,3 +8,5 @@ test.ini
 .coverage
 cover
 *.egg*
+RELEASE-VERSION
+couchbase/benchmarks/profiles

@@ -17,49 +17,38 @@
 
 
 import os
-import subprocess
 try:
     from setuptools import setup
 except ImportError:
     from distutils.core import setup
 
+from version import get_git_version
 
 here = os.path.dirname(os.path.abspath(__file__))
 long_description = open(os.path.join(here, 'README.md')).read()
 
-
-def get_version():
-    try:
-        p = subprocess.Popen('git describe', stdout=subprocess.PIPE,
-                             shell=True)
-        version = p.communicate()[0].strip()
-    except:
-        version = ''
-    return version
-
-
 setup(
-    name = "couchbase-python",
-    version = get_version(),
-    description = "Couchbase Python SDK",
-    author = "Couchbase, Inc.",
-    author_email = "info@couchbase.com",
-    packages = ["couchbase", "couchbase/utils", "couchbase/migrator"],
-    install_requires = ["httplib2", "requests", "unittest2", "simplejson"],
-    setup_requires = ["nose>=1.0"],
-    tests_require = ["nose-testconfig"],
-    url = "http://www.couchbase.com/develop/python/next",
-    license = "LICENSE.txt",
-    keywords = ["encoding", "i18n", "xml"],
-    classifiers = [
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 2.6",
-        "Development Status :: 4 - Beta",
-        "Environment :: Other Environment",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: Apache Software License",
-        "Operating System :: OS Independent",
-        "Topic :: Software Development :: Libraries :: Python Modules",
-        ],
-    long_description = long_description,
+    name="couchbase",
+    version=get_git_version(),
+    description="Couchbase Python SDK",
+    author="Couchbase, Inc.",
+    author_email="info@couchbase.com",
+    packages=["couchbase", "couchbase/utils", "couchbase/migrator"],
+    install_requires=["requests==1.1.0", "unittest2", "uuid"],
+    setup_requires=["nose>=1.0"],
+    tests_require=["nose-testconfig"],
+    url="http://www.couchbase.com/develop/python/next",
+    license="LICENSE.txt",
+    keywords=["encoding", "i18n", "xml"],
+    classifiers=["Programming Language :: Python",
+                 "Programming Language :: Python :: 2.6",
+                 "Development Status :: 4 - Beta",
+                 "Environment :: Other Environment",
+                 "Intended Audience :: Developers",
+                 "License :: OSI Approved :: Apache Software License",
+                 "Operating System :: OS Independent",
+                 "Topic :: Software Development :: Libraries :: " +
+                 "Python Modules",
+                 ],
+    long_description=long_description,
 )

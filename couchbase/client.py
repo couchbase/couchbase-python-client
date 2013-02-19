@@ -16,20 +16,21 @@
 #
 
 import uuid
-try:
-    import json
-except ImportError:
-    import simplejson as json
+import json
 import time
 from copy import deepcopy
 from threading import Thread, Lock
-import urllib
 import warnings
+from collections import Set
 
 import requests
 
+from couchbase.logger import logger
 from couchbase.rest_client import RestConnection
 from couchbase.couchbaseclient import CouchbaseClient
+from couchbase.exception import BucketUnavailableException
+
+log = logger("client")
 
 
 class Couchbase(object):
@@ -55,7 +56,7 @@ class Couchbase(object):
         self.rest_password = password
 
         server_config_uri = "http://%s:%s/pools/default" % (ip, port)
-        config = requests.get(server_config_uri).json
+        config = requests.get(server_config_uri).json()
         #couchApiBase will not be in node config before Couchbase Server 2.0
         self.couch_api_base = config["nodes"][0].get("couchApiBase")
 
@@ -66,51 +67,31 @@ class Couchbase(object):
 
     def _start_streaming(self):
         # this will dynamically update servers
-        urlopener = urllib.FancyURLopener()
-        urlopener.prompt_user_passwd = lambda: (self.rest_username,
-                                                self.rest_password)
-        current_servers = True
-        while current_servers:
-            self.servers_lock.acquire()
-            current_servers = deepcopy(self.servers)
-            self.servers_lock.release()
-            for server in current_servers:
-                url = "http://%s:%s/poolsStreaming/default" % (server["ip"],
-                                                               server["port"])
-                f = urlopener.open(url)
-                while f:
-                    try:
-                        d = f.readline()
-                        if not d:
-                            # try next server if we get an EOF
-                            f.close()
-                            break
-                    except:
-                        # try next server if we fail to read
-                        f.close()
-                        break
-                    try:
-                        data = json.loads(d)
-                    except:
-                        continue
 
-                    new_servers = []
-                    nodes = data["nodes"]
-                    for node in nodes:
-                        if (node["clusterMembership"] == "active" and
-                            node["status"] == "healthy"):
-                            ip, port = node["hostname"].split(":")
-                            couch_api_base = node.get("couchApiBase")
-                            new_servers.append({"ip": ip,
-                                                "port": port,
-                                                "username": self.rest_username,
-                                                "password": self.rest_password,
-                                                "couchApiBase": couch_api_base
-                                                })
-                    new_servers.sort()
-                    self.servers_lock.acquire()
-                    self.servers = deepcopy(new_servers)
-                    self.servers_lock.release()
+        url = "http://%s:%s/poolsStreaming/default" % (self.servers[0]["ip"],
+                                                       self.servers[0]["port"])
+        response = requests.get(url)
+        for line in response.iter_lines():
+            if line:
+                data = json.loads(line)
+
+                new_servers = []
+                nodes = data["nodes"]
+                for node in nodes:
+                    if (node["clusterMembership"] == "active" and
+                            node["status"] in ["healthy", "warmup"]):
+                        ip, port = node["hostname"].split(":")
+                        couch_api_base = node.get("couchApiBase")
+                        new_servers.append({"ip": ip,
+                                            "port": port,
+                                            "username": self.rest_username,
+                                            "password": self.rest_password,
+                                            "couchApiBase": couch_api_base
+                                            })
+                new_servers.sort()
+                self.servers_lock.acquire()
+                self.servers = deepcopy(new_servers)
+                self.servers_lock.release()
 
     def bucket(self, bucket_name):
         return Bucket(bucket_name, self)
@@ -132,19 +113,20 @@ class Couchbase(object):
                            saslPassword=bucket_password,
                            replicaNumber=replica,
                            bucketType='membase')
+
         ip, port, _, _ = self._rest_info()
 
         while True:
             try:
                 content = '{"basicStats":{"quotaPercentUsed":0.0}}'
-                formatter_uri = "http://%s:%s/pools/default/buckets/%s"
-                status, content = rest._http_request(formatter_uri %
-                                                     (ip, port, bucket_name),
+                api = "/pools/default/buckets/{0}".format(bucket_name)
+                status, content = rest._http_request(api,
                                                      method='GET', params='',
                                                      headers=None, timeout=120)
+                content = json.loads(content)
             except ValueError:
                 pass
-            if json.loads(content)['basicStats']['quotaPercentUsed'] > 0.0:
+            if content['basicStats']['quotaPercentUsed'] > 0.0:
                 time.sleep(2)
                 break
             time.sleep(1)
@@ -206,18 +188,21 @@ class BucketIterator(object):
 class Bucket(object):
     """Handles Bucket management as well as key/value access for a specific
     bucket."""
-    def __init__(self, bucket_name, server):
+    def __init__(self, name, server):
         self.server = server
 
-        self.bucket_name = bucket_name
+        self.name = name
         rest = server._rest()
-        self.bucket_password = rest.get_bucket(bucket_name).saslPassword
+        self.info = rest.get_bucket(self.name)
+        self.password = self.info.saslPassword
 
         ip, port, rest_username, rest_password = server._rest_info()
         formatter_uri = "http://%s:%s/pools/default"
-        self.mc_client = CouchbaseClient(formatter_uri % (ip, port),
-                                         self.bucket_name,
-                                         self.bucket_password)
+        self.mc_client = CouchbaseClient(formatter_uri % (ip, port), self.name,
+                                         self.password)
+
+    def __del__(self):
+        self.mc_client.done()
 
     def append(self, key, value, cas=0):
         return self.mc_client.append(key, value, cas)
@@ -232,7 +217,9 @@ class Bucket(object):
         return self.mc_client.decr(key, amt, init, exp)
 
     def set(self, key, expiration, flags, value):
-        self.mc_client.set(key, expiration, flags, value)
+        if isinstance(value, dict):
+            value = json.dumps(value)
+        return self.mc_client.set(key, expiration, flags, value)
 
     def add(self, key, exp, flags, val):
         return self.mc_client.add(key, exp, flags, val)
@@ -255,9 +242,6 @@ class Bucket(object):
     def gat(self, key, exp):
         return self.mc_client.gat(key, exp)
 
-    def getMulti(self, keys):
-        return self.mc_client.getMulti(keys)
-
     def stats(self, sub=''):
         return self.mc_client.stats(sub)
 
@@ -267,11 +251,13 @@ class Bucket(object):
             view = key.split('/')[1]
 
             rest = self.server._rest()
-            rest.delete_view(self.bucket_name, view)
+            rest.delete_view(self.name, view)
         else:
             return self.mc_client.delete(key, cas)
 
     def save(self, document):
+        warnings.warn("save is deprecated; use set instead",
+                      DeprecationWarning)
         value = deepcopy(document)
         if '_id' in value:
             key = value['_id']
@@ -290,11 +276,7 @@ class Bucket(object):
             expiration = 0
 
         if key.startswith('_design/'):
-            # this is a design doc, we need to handle it differently
-            view = key.split('/')[1]
-
-            rest = self.server._rest()
-            rest.create_design_doc(self.bucket_name, view, json.dumps(value))
+            self[key] = value
         else:
             if '_rev' in value:
                 # couchbase works in clobber mode so for "set" _rev is useless
@@ -305,12 +287,29 @@ class Bucket(object):
 
     def __setitem__(self, key, value):
         if isinstance(value, dict):
-            self.set(key, value['expiration'], value['flags'], value['value'])
+            if 'expiration' in value or 'flags' in value:
+                assert 'value' in value
+                if isinstance(value['value'], dict):
+                    v = json.dumps(value['value'])
+                else:
+                    v = value['value']
+                self.set(key, value.get('expiration', 0),
+                         value.get('flags', 0), v)
+            elif key.startswith('_design/'):
+                rest = self.server._rest()
+                rest.create_design_doc(self.name, key[8:], json.dumps(value))
+            else:
+                self.set(key, 0, 0, json.dumps(value))
         else:
             self.set(key, 0, 0, value)
 
     def __getitem__(self, key):
-        return self.get(key)
+        if key.startswith("_design/"):
+            rest = self.server._rest()
+            doc = rest.get_design_doc(self.name, key[8:])
+            return DesignDoc(key[8:], doc, self)
+        else:
+            return self.get(key)
 
     def view(self, view, **options):
         params = deepcopy(options)
@@ -329,9 +328,171 @@ class Bucket(object):
 
         rest = self.server._rest()
 
-        results = rest.view_results(self.bucket_name, view_doc, view_map,
+        results = rest.view_results(self.name, view_doc, view_map,
                                     params, limit)
         if 'rows' in results:
             return results['rows']
         else:
             return None
+
+    def design_docs(self):
+        """List all design documents and return DesignDoc objects for each"""
+        (ip, port, _, _) = self.server._rest_info()
+        api = ''.join(['http://{0}:{1}'.format(ip, port),
+                       self.info.ddocs['uri']])
+        r = requests.get(api, auth=(self.server.rest_username,
+                                    self.server.rest_password))
+        ddocs = []
+        for ddoc in r.json().get('rows'):
+            ddocs.append(DesignDoc(ddoc['doc']['meta']['id'],
+                                   ddoc['doc']['json'], bucket=self))
+
+        return ddocs
+
+    def flush(self):
+        """RESTful Bucket flushing - will destory all the data in a bucket."""
+        ip, port, rest_username, rest_password = self.server._rest_info()
+        api = ''.join(["http://{0}:{1}".format(ip, port),
+                      self.info.controllers['flush']])
+        response = requests.post(api, auth=(rest_username, rest_password))
+
+        if response.status_code is 503:
+            raise Exception("Only buckets of type 'memcached' support flush.")
+        elif response.status_code is 404:
+            raise BucketUnavailableException
+        elif response.status_code is 200:
+            return True
+
+
+class DesignDoc(object):
+    """Object representation of a Couchbase Server Design Document--the thing
+    that holds the MapReduce Views.
+
+    This Object handles the core logic behind creating and updating views to
+    a specific design doc. It also handles copying/publishing a design doc into
+    (or out of) production."""
+    def __init__(self, name, ddoc=None, bucket=None):
+        assert isinstance(name, (str, unicode)), \
+            "name parameter must be of type string or unicode"
+        assert isinstance(ddoc, (str, unicode, dict)), \
+            "ddoc parameter must be of type string, unicode, or dictionary"
+
+        if name.startswith('_design/'):
+            name = name[8:]
+        self.name = name
+        self.bucket = bucket
+
+        if ddoc is None:
+            self.ddoc = {'type': 'javascript', 'views': {}}
+        elif isinstance(ddoc, unicode):
+            self.ddoc = json.loads(ddoc)
+        else:
+            self.ddoc = ddoc
+
+    def __str__(self):
+        """Return the name of the Design Doc when using print"""
+        return self.name
+
+    def __eq__(self, other):
+        """Compare name or "views" section of the Design Doc. This allows the
+        use of "for ddoc in" style syntax when used with
+        Bucket().design_docs()"""
+        if isinstance(other, str) and "{" not in other and "}" not in other:
+            return other == self.name
+        elif isinstance(other, dict):
+            return other['views'] == self.ddoc['views']
+
+    def __neq__(self, other):
+        return not self.__eq__(other)
+
+    def __getitem__(self, name):
+        return View(name, self.ddoc['views'][name], self)
+
+    def views(self):
+        return [View(view, self.ddoc['views'][view], self)
+                for view in self.ddoc['views']]
+
+
+class View(object):
+    def __init__(self, name, view, ddoc=None):
+        """Object for holding View information.
+
+        Keyword arguments:
+        name (str):  Name of the View within the Design Doc
+        view (dict): View dictionary containing a 'map' and/or 'reduce' key
+                     who's value should be of type string or unicode and
+                     contain the JS MapReduce function
+        """
+        assert isinstance(name, (str, unicode)), \
+            "name parameter must be of type string or unicode"
+        assert isinstance(view, dict), \
+            "view parameter must be of type dictionary"
+        assert 'map' in view, \
+            "name parameter must be of type string or unicode"
+        assert isinstance(view['map'], (str, unicode)), \
+            "name parameter must be of type string or unicode"
+        self.name = name
+        self.view = view
+        self.ddoc = ddoc
+
+    def __str__(self):
+        """Return the name of the View when using print"""
+        return self.name
+
+    def __eq__(self, other):
+        """Compare name or "views" section of the Design Doc. This allows the
+        use of "for ddoc in" style syntax when used with
+        Bucket().design_docs()"""
+        if isinstance(other, str) and "{" not in other and "}" not in other:
+            return other == self.name
+        elif isinstance(other, dict):
+            return other == {self.name: self.view}
+
+    def __neq__(self, other):
+        return not self.__eq__(other)
+
+    def results(self, params={}):
+        assert self.ddoc is not None, \
+            "View must be connected to a saved Design Document to retrieve" \
+            " results"
+
+        rest = self.ddoc.bucket.server._rest()
+        results = rest.view_results(self.ddoc.bucket.name, self.ddoc.name,
+                                    self.name, params)
+
+        return ViewResultsIterator(results)
+
+
+class ViewResultsIterator(Set):
+    def __init__(self, results):
+        self.results = results['rows']
+        self.errors = results.get('errors')
+        if 'total_rows' in results:
+            self.total_rows = results['total_rows']
+        else:
+            # reduced values don't really have a "length" so setting to 1
+            self.total_rows = 1
+
+    def __eq__(self, other):
+        if len(self.results) == 1 and self.results[0]['key'] is None:
+            return self.results[0]['value'] == other
+        else:
+            return self.results == other
+
+    def __neq__(self, other):
+        return not self.__eq__(other)
+
+    def __iter__(self):
+        return self
+
+    def __len__(self):
+        return self.total_rows
+
+    def __contains__(self, item):
+        return item in self.results
+
+    def next(self):
+        try:
+            return self.results.pop(0)
+        except IndexError:
+            raise StopIteration

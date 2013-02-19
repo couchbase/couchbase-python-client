@@ -15,19 +15,71 @@
 # limitations under the License.
 #
 
+from nose.plugins.attrib import attr
+from nose.tools import nottest
+
 from couchbase.tests.base import Base
 from couchbase.couchbaseclient import CouchbaseClient
-from couchbase.tests.test_vbucketawareclient import VBucketAwareClientTest
+from couchbase.rest_client import RestConnection
 
 
 class CouchbaseClientTest(Base):
     def setUp(self):
-        VBucketAwareClientTest.setUp(self)
+        super(CouchbaseClientTest, self).setUp()
         self.client = CouchbaseClient(self.url, self.bucket_name, "", True)
 
     def tearDown(self):
-        self.client.flush()
         self.client.done()
 
-if __name__ == '__main__':
-    unittest.main()
+    @nottest
+    def setup_memcached_bucket(self):
+        self.memcached_bucket = 'testing-memcached'
+        self.rest_client = RestConnection({'ip': self.host,
+                                           'port': self.port,
+                                           'username': self.username,
+                                           'password': self.password})
+        self.rest_client.create_bucket(self.memcached_bucket,
+                                       bucketType='memcached',
+                                       authType='sasl', ramQuotaMB=64)
+        self.client_for_memcached_bucket = \
+            CouchbaseClient(self.url, self.memcached_bucket, verbose=True)
+
+    @nottest
+    def teardown_memcached_bucket(self):
+        self.rest_client.delete_bucket(self.memcached_bucket)
+
+    @attr(cbv="1.0.0")
+    def test_set_integer_value(self):
+        self.client.set('int', 0, 0, 10)
+        self.assertEqual(self.client.get('int')[2], 10,
+                         'value should be the integer 10')
+        self.client.incr('int')
+        self.assertEqual(self.client.get('int')[2], 11,
+                         'value should be the integer 11')
+        self.client.delete('int')
+
+    def test_two_client_incr(self):
+        """http://www.couchbase.com/issues/browse/PYCBC-16"""
+        key = 'test_two_client_incr'
+        client_one = self.client
+        client_two = CouchbaseClient(self.url, self.bucket_name, "", True)
+        # Client one sets a numeric key
+        client_one.set(key, 0, 0, 20)
+        # Client two tries to increment this numeric key
+        (i, cas) = client_two.incr(key)
+        self.assertEqual(i, 21)
+
+        # Client two should be able to keep incrementing this key
+        (i, cas) = client_two.incr(key)
+        self.assertEqual(i, 22)
+
+        (_, cas, i) = client_two.get(key)
+        self.assertEqual(i, 22)
+        (i, cas) = client_two.incr(key)
+        self.assertEqual(i, 23)
+
+    def test_bucket_of_type_memcached(self):
+        self.setup_memcached_bucket()
+        self.assertIsInstance(self.client_for_memcached_bucket,
+                              CouchbaseClient)
+        self.teardown_memcached_bucket()

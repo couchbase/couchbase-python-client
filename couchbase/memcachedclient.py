@@ -21,10 +21,14 @@ import random
 import zlib
 import struct
 import warnings
+import cPickle as pickle
+from cStringIO import StringIO
 
 from couchbase.logger import logger
-from couchbase.constants import MemcachedConstants, VBucketAwareConstants
+from couchbase.constants import MemcachedConstants
 from couchbase.exception import MemcachedError
+
+log = logger("client")
 
 
 class MemcachedClient(object):
@@ -33,10 +37,11 @@ class MemcachedClient(object):
     vbucketId = 0
 
     def __init__(self, host='127.0.0.1', port=11211):
+        """Memcached Binary Protocol Client"""
         self.host = host
         self.port = port
-        self.s = socket.socket()
-        self.s.connect_ex((host, port))
+        self.s = socket.create_connection((host, port))
+        self.s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self.r = random.Random()
         self.log = logger("MemcachedClient")
         self.vbucket_count = 1024
@@ -55,6 +60,10 @@ class MemcachedClient(object):
                  dtype=0, vbucketId=0,
                  fmt=MemcachedConstants.REQ_PKT_FMT,
                  magic=MemcachedConstants.REQ_MAGIC_BYTE):
+        if isinstance(key, unicode):
+            key = str(key)
+        if isinstance(val, int):
+            val = str(val)
         msg = struct.pack(fmt, magic,
                           cmd, len(key), len(extraHeader), dtype, vbucketId,
                           len(key) + len(extraHeader) + len(val), opaque, cas)
@@ -67,18 +76,18 @@ class MemcachedClient(object):
                                - len(response))
             if data == '':
                 raise EOFError("Got empty data (remote died?)."
-                                          " from %s" % (self.host))
+                               " from %s" % (self.host))
             response += data
         assert len(response) == MemcachedConstants.MIN_RECV_PACKET
         magic, cmd, keylen, extralen, dtype, errcode, remaining, opaque, cas =\
-        struct.unpack(MemcachedConstants.RES_PKT_FMT, response)
+            struct.unpack(MemcachedConstants.RES_PKT_FMT, response)
 
         rv = ""
         while remaining > 0:
             data = self.s.recv(remaining)
             if data == '':
                 raise EOFError("Got empty data (remote died?)."
-                                          " from %s" % (self.host))
+                               " from %s" % (self.host))
             rv += data
             remaining -= len(data)
 
@@ -90,7 +99,7 @@ class MemcachedClient(object):
     def _handleKeyedResponse(self, myopaque):
         cmd, errcode, opaque, cas, keylen, extralen, rv = self._recvMsg()
         assert myopaque is None or opaque == myopaque, \
-        "expected opaque %x, got %x" % (myopaque, opaque)
+            "expected opaque %x, got %x" % (myopaque, opaque)
         if errcode:
             raise MemcachedError(errcode, rv)
         return cmd, opaque, cas, keylen, extralen, rv
@@ -126,7 +135,7 @@ class MemcachedClient(object):
         something, cas, val =\
             self._doCmd(cmd, key, '',
                         struct.pack(MemcachedConstants.INCRDECR_PKT_FMT,
-                                amt, init, exp))
+                                    amt, init, exp))
         return struct.unpack(MemcachedConstants.INCRDECR_RES_FMT, val)[0], cas
 
     def incr(self, key, amt=1, init=0, exp=0, vbucket=-1):
@@ -147,8 +156,32 @@ class MemcachedClient(object):
         else:
             self.vbucketId = vbucket
 
+    def _val_to_store_info(self, val):
+        """Using some prior art from python-memcache
+
+        Transform val to a storable representation, returning a tuple of the
+        flags, the length of the new value, and the new value itself."""
+        flags = 0
+        if isinstance(val, str):
+            pass
+        elif isinstance(val, int):
+            flags |= MemcachedConstants.FLAG_INTEGER
+            val = "%d" % val
+        elif isinstance(val, long):
+            flags |= MemcachedConstants.FLAG_LONG
+            val = "%d" % val
+        else:
+            flags |= MemcachedConstants.FLAG_PICKLE
+            file = StringIO()
+            pickler = pickle.Pickler(file)
+            pickler.dump(val)
+            val = file.getvalue()
+
+        return (flags, len(val), val)
+
     def set(self, key, exp, flags, val, vbucket=-1):
         """Set a value in the memcached server."""
+        flags, len, val = self._val_to_store_info(val)
         self._set_vbucket_id(key, vbucket)
         return self._mutate(MemcachedConstants.CMD_SET, key, exp, flags, 0,
                             val)
@@ -165,9 +198,37 @@ class MemcachedClient(object):
         return self._mutate(MemcachedConstants.CMD_REPLACE, key, exp, flags, 0,
                             val)
 
+    def _recv_value(self, val, flags=None):
+        """python-memcache flag parsing. Including here for compatibility with
+        prior art in the Python world.
+
+        From that baseline, a JSON flag (0x0) and handling/parsing has been
+        added."""
+        if flags & MemcachedConstants.FLAG_INTEGER:
+            val = int(val)
+        elif flags & MemcachedConstants.FLAG_LONG:
+            val = long(val)
+        elif flags & MemcachedConstants.FLAG_PICKLE:
+            try:
+                file = StringIO(val)
+                unpickler = pickle.Unpickler(file)
+                val = unpickler.load()
+            except Exception, e:
+                log.error('Pickle error: %s\n' % e)
+                return None
+        else:
+            log.warn("unknown flags on get: %x\n" % flags)
+
+        return val
+
     def _parse_get(self, data, klen=0):
         flags = struct.unpack(MemcachedConstants.GET_RES_FMT, data[-1][:4])[0]
-        return flags, data[1], data[-1][4 + klen:]
+        rv = data[-1][4 + klen:]
+        if flags:
+            rv = self._recv_value(rv, flags)
+        elif isinstance(rv, str) and rv.isdigit():
+            rv = int(rv)
+        return flags, data[1], rv
 
     def get(self, key, vbucket=-1):
         """Get the value for a given key within the memcached server."""
@@ -176,40 +237,11 @@ class MemcachedClient(object):
 
         return self._parse_get(parts)
 
-    def getl(self, key, exp=15, vbucket=-1):
-        """Get the value for a given key within the memcached server."""
-        warnings.warn("MemcachedClient.getl is deprecated; use "
-                      "VBucketAwareClient.getl instead", DeprecationWarning)
-        self._set_vbucket_id(key, vbucket)
-        parts = self._doCmd(VBucketAwareConstants.CMD_GET_LOCKED, key, '',
-                            struct.pack(VBucketAwareConstants.GETL_PKT_FMT,
-                                        exp))
-        return self._parse_get(parts)
-
     def cas(self, key, exp, flags, oldVal, val, vbucket=-1):
         """CAS in a new value for the given key and comparison value."""
         self._set_vbucket_id(key, vbucket)
         self._mutate(MemcachedConstants.CMD_SET, key, exp, flags,
                      oldVal, val)
-
-    def touch(self, key, exp, vbucket=-1):
-        """Touch a key in the memcached server."""
-        warnings.warn("MemcachedClient.touch is deprecated; use "
-                      "VBucketAwareClient.touch instead", DeprecationWarning)
-        self._set_vbucket_id(key, vbucket)
-        return self._doCmd(VBucketAwareConstants.CMD_TOUCH, key, '',
-                           struct.pack(VBucketAwareConstants.TOUCH_PKT_FMT,
-                                       exp))
-
-    def gat(self, key, exp, vbucket=-1):
-        """Get the value for a given key and touch it."""
-        warnings.warn("MemcachedClient.gat is deprecated; use "
-                      "VBucketAwareClient.gat instead", DeprecationWarning)
-        self._set_vbucket_id(key, vbucket)
-        parts = self._doCmd(VBucketAwareConstants.CMD_GAT, key, '',
-                            struct.pack(VBucketAwareConstants.GAT_PKT_FMT,
-                                        exp))
-        return self._parse_get(parts)
 
     def version(self):
         """Get the version of the server."""
@@ -217,7 +249,6 @@ class MemcachedClient(object):
 
     def sasl_mechanisms(self):
         """Return an immutable, fronzenset of the supported SASL methods."""
-
         return frozenset(self._doCmd(MemcachedConstants.CMD_SASL_LIST_MECHS,
                                      '', '')[2].split(' '))
 
@@ -374,16 +405,16 @@ class MemcachedClient(object):
         return opaque, cas, self._parse_sync_response(data)
 
     def sync_replication_or_persistence(self, numReplicas, keyspecs):
-        payload = self._build_sync_payload(((numReplicas & 0x0f) << 4) |
-                                            0x8, keyspecs)
+        payload = self._build_sync_payload(((numReplicas & 0x0f) << 4) | 0x8,
+                                           keyspecs)
 
         opaque, cas, data = self._doCmd(MemcachedConstants.CMD_SYNC, "",
                                         payload)
         return opaque, cas, self._parse_sync_response(data)
 
     def sync_replication_and_persistence(self, numReplicas, keyspecs):
-        payload = self._build_sync_payload(((numReplicas & 0x0f) << 4) |
-                                            0xA, keyspecs)
+        payload = self._build_sync_payload(((numReplicas & 0x0f) << 4) | 0xA,
+                                           keyspecs)
 
         opaque, cas, data = self._doCmd(MemcachedConstants.CMD_SYNC, "",
                                         payload)

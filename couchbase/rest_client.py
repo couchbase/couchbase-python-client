@@ -15,18 +15,13 @@
 # limitations under the License.
 #
 
-import base64
-try:
-    import json
-except ImportError:
-    import simplejson as json
+import json
 import urllib
 import socket
 import time
 import warnings
 
 import requests
-import httplib2
 
 from couchbase.logger import logger
 from couchbase.exception import ServerAlreadyJoinedException, \
@@ -177,22 +172,23 @@ class RestConnection(object):
             self.port = serverInfo.port
             self.couch_api_base = None
 
-        self.baseUrl = "http://%s:%s/" % (self.ip, self.port)
+        self.base_url = "http://{0}:{1}".format(self.ip, self.port)
+        server_config_uri = ''.join([self.base_url, '/pools/default'])
+        self.config = requests.get(server_config_uri).json()
         # if couchApiBase is not set earlier, let's look it up
         if self.couch_api_base is None:
-            server_config_uri = "http://%s:%s/pools/default" % (self.ip,
-                                                                self.port)
-            config = json.loads(requests.get(server_config_uri).content)
             #couchApiBase is not in node config before Couchbase Server 2.0
-            self.couch_api_base = config["nodes"][0].get("couchApiBase")
+            self.couch_api_base = self.config["nodes"][0].get("couchApiBase")
 
     def create_design_doc(self, bucket, design_doc, function):
-        api = self.couch_api_base + '%s/_design/%s' % (bucket, design_doc)
+        assert self.couch_api_base is not None
+        api = '{0}/_design/{1}'.format(bucket, design_doc)
         #check if this view exists and update the rev
 
         headers = self._create_capi_headers()
         status, content = self._http_request(api, 'PUT', function,
-                                             headers=headers)
+                                             headers=headers,
+                                             base=self.couch_api_base)
 
         json_parsed = json.loads(content)
 
@@ -202,10 +198,11 @@ class RestConnection(object):
         return json_parsed
 
     def get_design_doc(self, bucket, design_doc):
-        api = self.couch_api_base + '%s/_design/%s' % (bucket, design_doc)
+        api = '{0}/_design/{1}'.format(bucket, design_doc)
 
         headers = self._create_capi_headers()
-        status, content = self._http_request(api, headers=headers)
+        status, content = self._http_request(api, headers=headers,
+                                             base=self.couch_api_base)
 
         json_parsed = json.loads(content)
 
@@ -215,19 +212,16 @@ class RestConnection(object):
         return json_parsed
 
     def delete_design_doc(self, bucket, design_doc):
-        api = self.couch_api_base + '%s/_design/%s' % (bucket, design_doc)
+        api = '{0}/_design/{1}'.format(bucket, design_doc)
         design_doc = self.get_design_doc(bucket, design_doc)
         if "error" in design_doc:
             raise Exception(design_doc["error"] + " because "
                             + design_doc["reason"])
         else:
-            rev = design_doc["_rev"]
-            #pass in the rev
-            api = api + "?rev=%s" % (rev)
-
             headers = self._create_capi_headers()
             status, content = self._http_request(api, 'DELETE',
-                                                 headers=headers)
+                                                 headers=headers,
+                                                 base=self.couch_api_base)
 
             json_parsed = json.loads(content)
             if not status:
@@ -242,10 +236,9 @@ class RestConnection(object):
         return self.view_results(bucket, design_doc, view, {})
 
     def view_results(self, bucket, design_doc, view, params, limit=100):
-        view_query = '%s/_design/%s/_view/%s' % (bucket, design_doc, view)
-        api = self.couch_api_base + view_query
+        api = '{0}/_design/{1}/_view/{2}'.format(bucket, design_doc, view)
         num_params = 0
-        if limit != None:
+        if limit is not None:
             num_params = 1
             api += "?limit=%s" % (limit)
         for param in params:
@@ -256,14 +249,15 @@ class RestConnection(object):
             num_params += 1
             if param in ["key", "start_key", "end_key",
                          "startkey_docid", "endkey_docid"] or \
-                         params[param] is True or \
-                         params[param] is False:
+                params[param] is True or \
+                    params[param] is False:
                 api += "%s=%s" % (param, json.dumps(params[param]))
             else:
                 api += "%s=%s" % (param, params[param])
 
         headers = self._create_capi_headers()
-        status, content = self._http_request(api, headers=headers)
+        status, content = self._http_request(api, headers=headers,
+                                             base=self.couch_api_base)
 
         json_parsed = json.loads(content)
 
@@ -282,46 +276,56 @@ class RestConnection(object):
         if self.username == "default":
             return {'Content-Type': 'application/json', 'Accept': '*/*'}
         else:
-            authorization = base64.encodestring('%s:%s' % (self.username,
-                                                self.password))
             return {'Content-Type': 'application/x-www-form-urlencoded',
-                'Authorization': 'Basic %s' % authorization,
-                'Accept': '*/*'}
+                    'Accept': '*/*'}
 
-    def _http_request(self, api, method='GET', params='', headers=None,
-                      timeout=120):
+    def _http_request(self, api, method='GET', params=None, headers=None,
+                      timeout=120, base=None):
+        if base is None:
+            base = self.base_url
         if not headers:
             headers = self._create_headers()
         end_time = time.time() + timeout
         while True:
             try:
-                response, content = httplib2.Http().request(api, method,
-                                                            params, headers)
-                if response['status'] in ['200', '201', '202']:
-                    return True, content
+                api = ''.join([base, api])
+                if method == 'GET':
+                    r = requests.get(api, headers=headers, params=params,
+                                     auth=(self.username, self.password))
+                elif method in ['POST', 'PUT']:
+                    r = getattr(requests, method.lower())(api,
+                                                          headers=headers,
+                                                          data=params,
+                                                          auth=(self.username,
+                                                                self.password))
+                elif method in ['DELETE']:
+                    r = requests.delete(api, headers=headers,
+                                        auth=(self.username, self.password))
+
+                if r.status_code in [200, 201, 202]:
+                    return True, r.content
                 else:
-                    try:
-                        json_parsed = json.loads(content)
-                    except:
-                        json_parsed = {}
                     reason = "unknown"
                     status = False
-                    if "error" in json_parsed:
-                        reason = json_parsed["error"]
-                        status = reason
-                    elif "errors" in json_parsed:
+                    if r.json() is None:
+                        reason = r.text
+                        status = False
+                    elif "error" in r.json():
+                        reason = r.json()["error"]
+                        status = False
+                    elif "errors" in r.json():
                         errors = [error for _, error in
-                                  json_parsed["errors"].iteritems()]
+                                  r.json()["errors"].iteritems()]
                         reason = ", ".join(errors)
-                        status = reason
+                        status = False
                     log.error('%s error %s reason: %s %s' %
-                              (api, response['status'], reason, content))
-                    return status, content
+                              (api, r.status_code, reason, r.content))
+                    return status, r.content
             except socket.error, e:
                 log.error(e)
                 if time.time() > end_time:
                     raise ServerUnavailableException(ip=self.ip)
-            except httplib2.ServerNotFoundError, e:
+            except requests.ConnectionError, e:
                 log.error(e)
                 if time.time() > end_time:
                     raise ServerUnavailableException(ip=self.ip)
@@ -336,9 +340,9 @@ class RestConnection(object):
     #returns otpNode
     def add_node(self, user='', password='', remoteIp='', port='8091'):
         otpNode = None
-        log.info('adding remote node : %s to this cluster @ : %s'\
-        % (remoteIp, self.ip))
-        api = self.baseUrl + 'controller/addNode'
+        log.info('adding remote node : %s to this cluster @ : %s'
+                 % (remoteIp, self.ip))
+        api = self.config['controllers']['addNode']['uri']
         params = urllib.urlencode({'hostname': "%s:%s" % (remoteIp, port),
                                    'user': user,
                                    'password': password})
@@ -372,7 +376,7 @@ class RestConnection(object):
             log.error('otpNode parameter required')
             return False
 
-        api = self.baseUrl + 'controller/ejectNode'
+        api = self.config['controllers']['ejectNode']['uri']
         params = urllib.urlencode({'otpNode': otpNode,
                                    'user': user,
                                    'password': password})
@@ -396,7 +400,7 @@ class RestConnection(object):
             log.error('otpNode parameter required')
             return False
 
-        api = self.baseUrl + 'controller/failOver'
+        api = self.config['controllers']['failOver']['uri']
         params = urllib.urlencode({'otpNode': otpNode})
 
         status, content = self._http_request(api, 'POST', params)
@@ -434,7 +438,7 @@ class RestConnection(object):
                                    'password': self.password})
         log.info('rebalanace params : %s' % (params))
 
-        api = self.baseUrl + "controller/rebalance"
+        api = self.config['controllers']['rebalance']['uri']
 
         status, content = self._http_request(api, 'POST', params)
 
@@ -477,7 +481,7 @@ class RestConnection(object):
 
     def _rebalance_progress(self):
         percentage = -1
-        api = self.baseUrl + "pools/default/rebalanceProgress"
+        api = self.config['rebalanceProgressUri']
 
         status, content = self._http_request(api)
 
@@ -508,7 +512,7 @@ class RestConnection(object):
     #convoluted logic which figures out if the rebalance failed or suceeded
     def rebalance_statuses(self):
         rebalanced = None
-        api = self.baseUrl + 'pools/rebalanceStatuses'
+        api = '/pools/rebalanceStatuses'
 
         status, content = self._http_request(api)
 
@@ -520,7 +524,7 @@ class RestConnection(object):
         return rebalanced
 
     def log_client_error(self, post):
-        api = self.baseUrl + 'logClientError'
+        api = '/logClientError'
 
         status, content = self._http_request(api, 'POST', post)
 
@@ -530,7 +534,7 @@ class RestConnection(object):
     #returns node data for this host
     def get_nodes_self(self):
         node = None
-        api = self.baseUrl + 'nodes/self'
+        api = '/nodes/self'
 
         status, content = self._http_request(api)
 
@@ -543,7 +547,7 @@ class RestConnection(object):
 
     def node_statuses(self):
         nodes = []
-        api = self.baseUrl + 'nodeStatuses'
+        api = '/nodeStatuses'
 
         status, content = self._http_request(api)
 
@@ -566,7 +570,7 @@ class RestConnection(object):
 
     def cluster_status(self):
         parsed = {}
-        api = self.baseUrl + 'pools/default'
+        api = '/pools/default'
 
         status, content = self._http_request(api)
 
@@ -579,7 +583,7 @@ class RestConnection(object):
 
     def get_pools_info(self):
         parsed = {}
-        api = self.baseUrl + 'pools'
+        api = '/pools'
 
         status, content = self._http_request(api)
 
@@ -592,7 +596,7 @@ class RestConnection(object):
 
     def get_pools(self):
         version = None
-        api = self.baseUrl + 'pools'
+        api = '/pools'
 
         status, content = self._http_request(api)
 
@@ -608,7 +612,7 @@ class RestConnection(object):
     def get_buckets(self):
         #get all the buckets
         buckets = []
-        api = '%s%s' % (self.baseUrl, 'pools/default/buckets/')
+        api = '/pools/default/buckets/'
 
         status, content = self._http_request(api)
 
@@ -627,8 +631,8 @@ class RestConnection(object):
             return None
 
         stats = {}
-        api = "%s%s%s%s%s%s" % (self.baseUrl, 'pools/default/buckets/',
-                                bucket, "/nodes/", node_ip, ":8091/stats")
+        api = "/pools/default/buckets/{0}/nodes/{1}:8091/stats".format(bucket,
+                                                                       node_ip)
 
         status, content = self._http_request(api)
 
@@ -644,7 +648,7 @@ class RestConnection(object):
 
     def get_nodes(self):
         nodes = []
-        api = self.baseUrl + 'pools/default'
+        api = '/pools/default'
 
         status, content = self._http_request(api)
 
@@ -665,8 +669,7 @@ class RestConnection(object):
 
     def get_bucket_stats(self, bucket='default'):
         stats = {}
-        api = "".join([self.baseUrl, 'pools/default/buckets/', bucket,
-                      "/stats"])
+        api = 'pools/default/buckets/{0}/stats'.format(bucket)
 
         status, content = self._http_request(api)
 
@@ -685,7 +688,7 @@ class RestConnection(object):
 
     def get_bucket(self, bucket='default'):
         bucketInfo = None
-        api = '%s%s%s' % (self.baseUrl, 'pools/default/buckets/', bucket)
+        api = '/pools/default/buckets/{0}'.format(bucket)
         status, content = self._http_request(api)
 
         if status:
@@ -701,7 +704,7 @@ class RestConnection(object):
         return self.get_bucket(bucket).vbuckets
 
     def delete_bucket(self, bucket='default'):
-        api = '%s%s%s' % (self.baseUrl, '/pools/default/buckets/', bucket)
+        api = '/pools/default/buckets/{0}'.format(bucket)
 
         status, content = self._http_request(api, 'DELETE')
         if not status:
@@ -709,45 +712,57 @@ class RestConnection(object):
         return status
 
     # figure out the proxy port
-    def create_bucket(self, bucket='',
-                      ramQuotaMB=1,
-                      authType='none',
+    def create_bucket(self, bucket,
+                      ramQuotaMB=100,
+                      authType='sasl',
                       saslPassword='',
                       replicaNumber=1,
-                      proxyPort=11211,
+                      proxyPort=11212,
                       bucketType='membase'):
-        api = '%s%s' % (self.baseUrl, '/pools/default/buckets')
-        params = urllib.urlencode({})
-        #this only works for default bucket ?
-        if bucket == 'default':
-            params = urllib.urlencode({'name': bucket,
-                                       'authType': 'sasl',
-                                       'saslPassword': saslPassword,
-                                       'ramQuotaMB': ramQuotaMB,
-                                       'replicaNumber': replicaNumber,
-                                       'proxyPort': proxyPort,
-                                       'bucketType': bucketType})
+        api = '/pools/default/buckets'
 
-        elif authType == 'none':
-            params = urllib.urlencode({'name': bucket,
-                                       'ramQuotaMB': ramQuotaMB,
-                                       'authType': authType,
-                                       'replicaNumber': replicaNumber,
-                                       'proxyPort': proxyPort,
-                                       'bucketType': bucketType})
+        assert authType in ['none', 'sasl']
+
+        if bucketType == 'memcached':
+            assert ramQuotaMB >= 64
+        else:
+            assert ramQuotaMB >= 100
+
+        params = {'name': bucket,
+                  'ramQuotaMB': ramQuotaMB,
+                  'authType': authType,
+                  'saslPassword': saslPassword,
+                  'proxyPort': proxyPort,
+                  'replicaNumber': replicaNumber,
+                  'bucketType': bucketType}
+        # 'default' has some special requirements (even when being recreated)
+        if bucket == 'default':
+            assert authType is 'none'
+            assert proxyPort is 11211
+
+        if authType == 'none':
+            del params['saslPassword']
 
         elif authType == 'sasl':
-            params = urllib.urlencode({'name': bucket,
-                                       'ramQuotaMB': ramQuotaMB,
-                                       'authType': authType,
-                                       'saslPassword': saslPassword,
-                                       'replicaNumber': replicaNumber,
-                                       'proxyPort': self.get_nodes_self().moxi,
-                                       'bucketType': bucketType})
+            del params['proxyPort']
 
-        log.info("%s with param: %s" % (api, params))
+        log.info("%s with param: %s" % (api, urllib.urlencode(params)))
 
-        status, content = self._http_request(api, 'POST', params)
+        # server-side validation
+        r = requests.post("".join([self.base_url, api]),
+                          params={'just_validate': 1}, data=params,
+                          auth=(self.username, self.password))
+        if r.json() is not None and len(r.json()['errors']) > 0:
+            for key, error in r.json()['errors'].items():
+                if key == 'replicaNumber':
+                    log.warn(error)
+                else:
+                    log.error(error)
+                    raise BucketCreationException(self.ip, self.username,
+                                                  error)
+
+        status, content = self._http_request(api, 'POST',
+                                             urllib.urlencode(params))
 
         if not status:
             raise BucketCreationException(ip=self.ip, bucket_name=bucket,
@@ -758,7 +773,7 @@ class RestConnection(object):
     #return AutoFailoverSettings
     def get_autofailover_settings(self):
         settings = None
-        api = self.baseUrl + 'settings/autoFailover'
+        api = '/settings/autoFailover'
 
         status, content = self._http_request(api)
 
@@ -781,7 +796,7 @@ class RestConnection(object):
             params = urllib.urlencode({'enabled': 'false',
                                        'timeout': timeout,
                                        'maxNodes': max_nodes})
-        api = self.baseUrl + 'settings/autoFailover'
+        api = '/settings/autoFailover'
         log.info('settings/autoFailover params : %s' % (params))
 
         status, content = self._http_request(api, 'POST', params)
@@ -790,7 +805,7 @@ class RestConnection(object):
         return status
 
     def reset_autofailover(self):
-        api = self.baseUrl + 'settings/autoFailover/resetCount'
+        api = '/settings/autoFailover/resetCount'
 
         status, content = self._http_request(api, 'POST', '')
         if not status:
@@ -802,7 +817,7 @@ class RestConnection(object):
                                    email_port=25, email_encrypt='false',
                                    alerts=('auto_failover_node,'
                                            'auto_failover_maximum_reached')):
-        api = self.baseUrl + 'settings/alerts'
+        api = '/settings/alerts'
         params = urllib.urlencode({'enabled': 'true',
                                    'recipients': recipients,
                                    'sender': sender,
@@ -820,7 +835,7 @@ class RestConnection(object):
         return status
 
     def disable_autofailover_alerts(self):
-        api = self.baseUrl + 'settings/alerts'
+        api = '/settings/alerts'
         params = urllib.urlencode({'enabled': 'false'})
         log.info('settings/alerts params : %s' % (params))
 
@@ -830,7 +845,7 @@ class RestConnection(object):
         return status
 
     def stop_rebalance(self):
-        api = self.baseUrl + '/controller/stopRebalance'
+        api = self.config['controllers']['stopRebalanceUri']
 
         status, content = self._http_request(api, 'POST')
         if not status:
@@ -838,7 +853,7 @@ class RestConnection(object):
         return status
 
     def set_data_path(self, data_path):
-        api = self.baseUrl + '/nodes/self/controller/settings'
+        api = '/nodes/self/controller/settings'
         params = urllib.urlencode({'path': data_path})
         log.info('/nodes/self/controller/settings params : %s' % (params))
 
@@ -883,9 +898,9 @@ class NodeDataStorage(object):
 
     def __str__(self):
         return '%s' % ({'type': self.type,
-                             'path': self.path,
-                             'quotaMb': self.quotaMb,
-                             'state': self.state})
+                        'path': self.path,
+                        'quotaMb': self.quotaMb,
+                        'state': self.state})
 
 
 class NodeDiskStorage(object):
@@ -993,7 +1008,7 @@ class RestParser(object):
                 #let's assume there is only one disk in each noce
                 dict_parsed = parsed['availableStorage']
                 if 'path' in dict_parsed and 'sizeKBytes' in dict_parsed and\
-                    'usagePercent' in dict_parsed:
+                        'usagePercent' in dict_parsed:
                     diskStorage = NodeDiskStorage()
                     diskStorage.path = dict_parsed['path']
                     diskStorage.sizeKBytes = dict_parsed['sizeKBytes']
@@ -1008,7 +1023,7 @@ class RestParser(object):
                 disk_storage_list = storage[key]
                 for dict_parsed in disk_storage_list:
                     if 'path' in dict_parsed and 'state' in dict_parsed and\
-                        'quotaMb' in dict_parsed:
+                            'quotaMb' in dict_parsed:
                         dataStorage = NodeDataStorage()
                         dataStorage.path = dict_parsed['path']
                         dataStorage.quotaMb = dict_parsed['quotaMb']
@@ -1036,6 +1051,8 @@ class RestParser(object):
         bucket.port = parsed['proxyPort']
         bucket.authType = parsed["authType"]
         bucket.saslPassword = parsed["saslPassword"]
+        bucket.controllers = parsed['controllers']
+        bucket.ddocs = parsed['ddocs']
         bucket.nodes = list()
         if 'vBucketServerMap' in parsed:
             vBucketServerMap = parsed['vBucketServerMap']
@@ -1083,7 +1100,7 @@ class RestParser(object):
         if 'diskFetches' in stats:
             bucketStats.diskFetches = stats['diskFetches']
         bucketStats.itemCount = stats['itemCount']
-        bucketStats.diskUsed = stats['diskUsed']
+        bucketStats.diskUsed = stats.get('diskUsed', bucketStats.diskUsed)
         bucketStats.memUsed = stats['memUsed']
         quota = parsed['quota']
         bucketStats.ram = quota['ram']

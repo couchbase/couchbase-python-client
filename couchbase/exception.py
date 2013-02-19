@@ -56,6 +56,16 @@ class MemcachedTimeoutException(Exception):
         return string
 
 
+class MemcachedConfigurationError(MemcachedError):
+    """MemcachedError "upgrading" for any error that can be "fixed" by a
+    configuration change"""
+    def __init__(self, status, msg):
+        super(MemcachedError, self)
+        if self.status is 129:
+            self.msg = 'SASL Authentication is not enabled for this' \
+                       ' memcached server.'
+
+
 #base exception class for couchbase apis
 class CouchbaseHttpException(Exception):
     def __init__(self, message='', errorType='', parameters=dict()):

@@ -168,21 +168,20 @@ class MemcachedConstants(object):
     # The header sizes don't deviate
     assert struct.calcsize(REQ_PKT_FMT) == struct.calcsize(RES_PKT_FMT)
 
-    EXTRA_HDR_FMTS = {
-        CMD_SET: SET_PKT_FMT,
-        CMD_ADD: SET_PKT_FMT,
-        CMD_REPLACE: SET_PKT_FMT,
-        CMD_INCR: INCRDECR_PKT_FMT,
-        CMD_DECR: INCRDECR_PKT_FMT,
-        CMD_DELETE: DEL_PKT_FMT,
-        CMD_FLUSH: FLUSH_PKT_FMT,
-        CMD_TAP_MUTATION: TAP_MUTATION_PKT_FMT,
-        CMD_TAP_DELETE: TAP_GENERAL_PKT_FMT,
-        CMD_TAP_FLUSH: TAP_GENERAL_PKT_FMT,
-        CMD_TAP_OPAQUE: TAP_GENERAL_PKT_FMT,
-        CMD_TAP_VBUCKET_SET: TAP_GENERAL_PKT_FMT,
-        CMD_SET_VBUCKET_STATE: VB_SET_PKT_FMT,
-        }
+    EXTRA_HDR_FMTS = {CMD_SET: SET_PKT_FMT,
+                      CMD_ADD: SET_PKT_FMT,
+                      CMD_REPLACE: SET_PKT_FMT,
+                      CMD_INCR: INCRDECR_PKT_FMT,
+                      CMD_DECR: INCRDECR_PKT_FMT,
+                      CMD_DELETE: DEL_PKT_FMT,
+                      CMD_FLUSH: FLUSH_PKT_FMT,
+                      CMD_TAP_MUTATION: TAP_MUTATION_PKT_FMT,
+                      CMD_TAP_DELETE: TAP_GENERAL_PKT_FMT,
+                      CMD_TAP_FLUSH: TAP_GENERAL_PKT_FMT,
+                      CMD_TAP_OPAQUE: TAP_GENERAL_PKT_FMT,
+                      CMD_TAP_VBUCKET_SET: TAP_GENERAL_PKT_FMT,
+                      CMD_SET_VBUCKET_STATE: VB_SET_PKT_FMT,
+                      }
 
     EXTRA_HDR_SIZES = dict(
         [(k, struct.calcsize(v)) for (k, v) in EXTRA_HDR_FMTS.items()])
@@ -192,6 +191,11 @@ class MemcachedConstants(object):
     ERR_EXISTS = 0x2
     ERR_AUTH = 0x20
     ERR_AUTH_CONTINUE = 0x21
+
+    FLAG_PICKLE = 0x1  # 1<<0 in python-memcache
+    FLAG_INTEGER = 0x2  # 1<<1 in python-memcache
+    FLAG_LONG = 0x4  # 1<<2 in python-memcache
+    FLAG_COMPRESSED = 0x8  # 1<<3 in python-memcache
 
 
 class VBucketAwareConstants(MemcachedConstants):

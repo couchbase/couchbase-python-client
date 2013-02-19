@@ -88,16 +88,15 @@ class Config(object):
 def parse_args(argv):
     config = Config()
     try:
-        opts, args = getopt.getopt(argv[1:],
-                                     'hs:d:ovq', [
-                'help',
-                'source=',
-                'destination=',
-                'overwrite',
-                'dry-run',
-                'verbose',
-                'quiet',
-                ])
+        opts, args = getopt.getopt(argv[1:], 'hs:d:ovq',
+                                   ['help',
+                                    'source=',
+                                    'destination=',
+                                    'overwrite',
+                                    'dry-run',
+                                    'verbose',
+                                    'quiet',
+                                    ])
         for o, a in opts:
             if o == '-h' or o == '--help':
                 usage()
@@ -114,7 +113,6 @@ def parse_args(argv):
             elif o == '-q' or o == '--quiet':
                 config.quiet = True
 
-        msg = ""
         if not config.source or not config.destination:
             usage("missing source or destination")
 

@@ -19,12 +19,8 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest
-try:
-    import json
-except ImportError:
-    import simplejson as json
+import json
 import uuid
-import base64
 import warnings
 
 from testconfig import config
@@ -32,8 +28,7 @@ from nose.tools import nottest
 from nose.plugins.attrib import attr
 from nose.plugins.skip import SkipTest
 
-from couchbase.tests.warnings_catcher import setup_warning_catcher
-from couchbase.client import Couchbase
+from couchbase.vbucketawareclient import VBucketAwareClient
 from couchbase.rest_client import RestConnection, RestHelper
 
 
@@ -117,31 +112,30 @@ class RestConnectionTest(unittest.TestCase):
     @nottest
     def setup_create_design_doc(self):
         self.setup_rest_connection()
-        if self.rest.couch_api_base == None:
+        if self.rest.couch_api_base is None:
             raise SkipTest
         ddoc_name = uuid.uuid4()
         design_doc = json.dumps({"views":
-                      {"testing":
-                       {"map":
-                        "function(doc) { emit(doc._id, null); }"
-                        }
-                       }
-                      })
+                                 {"testing":
+                                  {"map":
+                                   "function(doc) { emit(doc._id, null); }"
+                                   }
+                                  }
+                                 })
         resp = self.rest.create_design_doc(self.bucket_name, ddoc_name,
                                            design_doc)
         self.design_docs.append(ddoc_name)
         return ddoc_name, resp
 
     @nottest
-    def setup_couchbase_object(self):
-        self.cb = Couchbase(self.host + ':' + self.port, self.username,
-                            self.password)
+    def setup_vbucketawareclient(self):
+        self.client = VBucketAwareClient(self.host, 11210)
 
     @attr(cbv="1.8.0")
     def test_rest_connection_object_creation(self):
         self.setup_rest_connection()
-        self.assertEqual(self.rest.baseUrl, "http://%s:%s/" %
-                         (self.host, self.port))
+        self.assertEqual(self.rest.base_url,
+                         "http://{0}:{1}".format(self.host, self.port))
 
     @attr(cbv="1.8.0")
     def test_rest_connection_object_creation_with_server_object(self):
@@ -152,8 +146,8 @@ class RestConnectionTest(unittest.TestCase):
             rest_password = self.password
 
         rest = RestConnection(ServerInfo())
-        self.assertEqual(rest.baseUrl, "http://%s:%s/" % (self.host,
-                                                          self.port))
+        self.assertEqual(rest.base_url,
+                         "http://{0}:{1}".format(self.host, self.port))
 
     @attr(cbv="2.0.0")
     def test_create_design_doc(self):
@@ -176,15 +170,19 @@ class RestConnectionTest(unittest.TestCase):
         self.assertRaises(Exception,
                           self.rest.delete_design_doc,
                           (self.bucket_name, ddoc_name))
+        self.design_docs = filter(lambda id: id is not ddoc_name,
+                                  self.design_docs)
 
     @attr(cbv="2.0.0")
     def test_get_view(self):
         (ddoc_name, resp) = self.setup_create_design_doc()
-        w = setup_warning_catcher()
-        warnings.simplefilter("always")
-        view = self.rest.get_view(self.bucket_name, ddoc_name, "testing")
-        self.assertTrue(len(w) == 1)
-        self.assertTrue("deprecated" in str(w[-1].message))
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            # Trigger a warning.
+            self.rest.get_view(self.bucket_name, ddoc_name, "testing")
+            # Verify some things
+            self.assertTrue(len(w) == 1)
+            self.assertTrue("deprecated" in str(w[-1].message))
 
     @attr(cbv="2.0.0")
     def test_view_results(self):
@@ -196,10 +194,10 @@ class RestConnectionTest(unittest.TestCase):
         else:
             self.assertIn("rows", view.keys())
         # let's add some sample docs
-        self.setup_couchbase_object()
+        self.setup_vbucketawareclient()
         kvs = [(str(uuid.uuid4()), str(uuid.uuid4())) for i in range(0, 100)]
         for k, v in kvs:
-            self.cb[self.bucket_name].set(k, 0, 0, v)
+            self.client.set(k, 0, 0, v)
         # rerun the view
         view = self.rest.view_results(self.bucket_name, ddoc_name, "testing",
                                       {})
@@ -209,16 +207,48 @@ class RestConnectionTest(unittest.TestCase):
             self.assertIn("rows", view.keys())
         # remove sample docs
         for k, v in kvs:
-            self.cb[self.bucket_name].delete(k)
+            self.client.delete(k)
 
     @attr(cbv="1.8.0")
     def test_create_headers(self):
         self.setup_rest_connection()
         headers = self.rest._create_headers()
-        self.assertEqual(headers['Authorization'],
-                         'Basic ' + base64.encodestring("%s:%s" %
-                                                        (self.rest.username,
-                                                        self.rest.password)))
+        self.assertEqual(headers['Content-Type'],
+                         'application/x-www-form-urlencoded')
+
+    @attr(cbv="1.0.0")
+    def test_create_bucket(self):
+        self.setup_rest_connection()
+        # test membase/couchbase creation defaults
+        status = self.rest.create_bucket('newbucket')
+        self.assertTrue(status)
+        bucket = self.rest.get_bucket('newbucket')
+        self.assertEqual(bucket.stats.ram / 1024 / 1024, 100)
+        self.assertEqual(bucket.authType, 'sasl')
+        self.assertEqual(bucket.type, 'membase')
+        self.assertEqual(bucket.numReplicas, 1)
+        self.rest.delete_bucket('newbucket')
+        # test memcached creation defaults
+        status = self.rest.create_bucket(bucket='newbucket',
+                                         bucketType='memcached')
+        self.assertTrue(status)
+        bucket = self.rest.get_bucket('newbucket')
+        self.assertEqual(bucket.stats.ram / 1024 / 1024, 100)
+        self.assertEqual(bucket.authType, 'sasl')
+        self.assertEqual(bucket.type, 'memcached')
+        self.assertEqual(bucket.numReplicas, 0)
+        # make sure creating an existing bucket fails properly
+        self.assertRaises(Exception, self.rest.create_bucket,
+                          bucket='newbucket', bucketType='memcached')
+        self.rest.delete_bucket('newbucket')
+        # test setting ramQuotaMB too low
+        self.assertRaises(AssertionError,
+                          self.rest.create_bucket,
+                          bucket='newbucket', bucketType='memcached',
+                          ramQuotaMB=10)
+        self.assertRaises(AssertionError,
+                          self.rest.create_bucket,
+                          bucket='newbucket', ramQuotaMB=90)
 
 if __name__ == "__main__":
     unittest.main()

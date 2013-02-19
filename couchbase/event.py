@@ -17,6 +17,7 @@
 
 from time import sleep as _sleep, time as _time
 
+
 class Stopwatch:
     """Timeout checker with very low polling rate (~ once per second)
     """
@@ -47,14 +48,11 @@ class Event:
     def set(self):
         self.__state = True
 
-    def isSet(self):
-        return self.__state
-
     def is_set(self):
         return self.__state
 
     def wait(self, timeout=30.0):
-        DELAY = 0.0001 # 0.1 ms
+        DELAY = 0.0001  # 0.1 ms
 
         stopwatch = Stopwatch(timeout=timeout)
 
