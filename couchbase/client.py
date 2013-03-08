@@ -56,7 +56,8 @@ class Couchbase(object):
         self.rest_password = password
 
         server_config_uri = "http://%s:%s/pools/default" % (ip, port)
-        config = requests.get(server_config_uri).json()
+        response = requests.get(server_config_uri, auth=(self.rest_username, self.rest_password))
+        config = response.json()
         #couchApiBase will not be in node config before Couchbase Server 2.0
         self.couch_api_base = config["nodes"][0].get("couchApiBase")
 
@@ -70,7 +71,7 @@ class Couchbase(object):
 
         url = "http://%s:%s/poolsStreaming/default" % (self.servers[0]["ip"],
                                                        self.servers[0]["port"])
-        response = requests.get(url)
+        response = requests.get(url, auth=(self.rest_username, self.rest_password))
         for line in response.iter_lines():
             if line:
                 data = json.loads(line)
