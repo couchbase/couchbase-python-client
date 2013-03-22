@@ -49,6 +49,12 @@ If you ran it on a different platform and it worked, please let me know and
 I'll add it to the list.
 
 
+License
+-------
+
+pylibcouchbase is licensed under the Apache License 2.0.
+
+
 
 [1]: https://github.com/couchbase/libcouchbase
 [2]: https://github.com/geggo/cwrap
