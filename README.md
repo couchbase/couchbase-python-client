@@ -40,10 +40,16 @@ Tested platforms
 
 So far the code has been tested on the following platforms/environments.
 
-Linux 64-bit:
+Linux 64-bit (with GCC):
 
  - Python 2.7.3
  - Python 3.2.3
+ - PyPy 1.9
+
+OSX (with clang):
+
+ - Python 2.7
+
 
 If you ran it on a different platform and it worked, please let me know and
 I'll add it to the list.
