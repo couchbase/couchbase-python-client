@@ -1,4 +1,4 @@
-from lcb import Couchbase, CB_FMT_PICKLE
+from couchbase import Couchbase, CB_FMT_PICKLE
 
 cb = Couchbase('127.0.0.1:8091')
 #cb.default_format = CB_FMT_PICKLE

@@ -1,3 +1,4 @@
 build
 lcb*.so
 lcb.h
+__pycache__
