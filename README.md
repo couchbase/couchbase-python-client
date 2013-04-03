@@ -4,7 +4,9 @@ pylibcouchbase
 This is an experimental repository for the next generation Couchbase Python
 SDK which is based on [libcouchbase][1].
 
-The lcb.c was automatically generate by a [cwrap branch that uses libclang][2].
+The couchbase.pxd was automatically generate by a [cwrap branch that uses
+libclang][2]. To generate the lcb.c you need a very recent version of
+Cython (>0.18).
 
 
 Prerequisites

@@ -127,7 +127,7 @@ cdef extern from "libcouchbase/couchbase.h":
         int tm_yday
         int tm_isdst
         long tm_gmtoff
-        char *tm_zone
+        const char *tm_zone
 
     cdef struct itimerspec:
         timespec it_interval
@@ -146,7 +146,7 @@ cdef extern from "libcouchbase/couchbase.h":
 
     time_t mktime(tm *__tp)
 
-    int strftime(char *__s, int __maxsize, char *__format, tm *__tp)
+    int strftime(char *__s, int __maxsize, const char *__format, tm *__tp)
 
     cdef struct ____locale_struct___locale_data:
         pass
@@ -155,32 +155,32 @@ cdef extern from "libcouchbase/couchbase.h":
 
     cdef struct __locale_struct:
         ____locale_struct___locale_data *__locales[13]
-        unsigned short *__ctype_b
-        int *__ctype_tolower
-        int *__ctype_toupper
-        char *__names[13]
+        const unsigned short *__ctype_b
+        const int *__ctype_tolower
+        const int *__ctype_toupper
+        const char *__names[13]
 
     ctypedef __locale_struct *__locale_t
 
     ctypedef __locale_t locale_t
 
-    int strftime_l(char *__s, int __maxsize, char *__format, tm *__tp, __locale_t __loc)
+    int strftime_l(char *__s, int __maxsize, const char *__format, tm *__tp, __locale_t __loc)
 
-    tm *gmtime(time_t *__timer)
+    tm *gmtime(const time_t *__timer)
 
-    tm *localtime(time_t *__timer)
+    tm *localtime(const time_t *__timer)
 
-    tm *gmtime_r(time_t *__timer, tm *__tp)
+    tm *gmtime_r(const time_t *__timer, tm *__tp)
 
-    tm *localtime_r(time_t *__timer, tm *__tp)
+    tm *localtime_r(const time_t *__timer, tm *__tp)
 
     char *asctime(tm *__tp)
 
-    char *ctime(time_t *__timer)
+    char *ctime(const time_t *__timer)
 
     char *asctime_r(tm *__tp, char *__buf)
 
-    char *ctime_r(time_t *__timer, char *__buf)
+    char *ctime_r(const time_t *__timer, char *__buf)
 
     char *__tzname[2]
     int __daylight
@@ -190,7 +190,7 @@ cdef extern from "libcouchbase/couchbase.h":
 
     int daylight
     long timezone
-    int stime(time_t *__when)
+    int stime(const time_t *__when)
 
     time_t timegm(tm *__tp)
 
@@ -308,7 +308,7 @@ cdef extern from "libcouchbase/couchbase.h":
 
     int select(int __nfds, fd_set *__readfds, fd_set *__writefds, fd_set *__exceptfds, timeval *__timeout)
 
-    int pselect(int __nfds, fd_set *__readfds, fd_set *__writefds, fd_set *__exceptfds, timespec *__timeout, __sigset_t *__sigmask)
+    int pselect(int __nfds, fd_set *__readfds, fd_set *__writefds, fd_set *__exceptfds, timespec *__timeout, const __sigset_t *__sigmask)
 
     unsigned int gnu_dev_major(unsigned long long __dev)
 
@@ -609,7 +609,7 @@ cdef extern from "libcouchbase/couchbase.h":
         int (*socket)(lcb_io_opt_st *, int, int, int)
         int (*connect)(lcb_io_opt_st *, int, sockaddr *, unsigned int)
         long (*recv)(lcb_io_opt_st *, int, void *, int, int)
-        long (*send)(lcb_io_opt_st *, int, void *, int, int)
+        long (*send)(lcb_io_opt_st *, int, const void *, int, int)
         long (*recvv)(lcb_io_opt_st *, int, lcb_iovec_st *, int)
         long (*sendv)(lcb_io_opt_st *, int, lcb_iovec_st *, int)
         void (*close)(lcb_io_opt_st *, int)
@@ -716,19 +716,19 @@ cdef extern from "libcouchbase/couchbase.h":
 
 
     cdef struct ____lcb_create_st_v_v0:
-        char *host
-        char *user
-        char *passwd
-        char *bucket
+        const char *host
+        const char *user
+        const char *passwd
+        const char *bucket
         lcb_io_opt_st *io
 
     ctypedef ____lcb_create_st_v_v0 ____lcb_create_st_v_v0_t
 
     cdef struct ____lcb_create_st_v_v1:
-        char *host
-        char *user
-        char *passwd
-        char *bucket
+        const char *host
+        const char *user
+        const char *passwd
+        const char *bucket
         lcb_io_opt_st *io
         lcb_type_t type
 
@@ -751,8 +751,8 @@ cdef extern from "libcouchbase/couchbase.h":
     ctypedef ____lcb_create_io_ops_st_v_v0 ____lcb_create_io_ops_st_v_v0_t
 
     cdef struct ____lcb_create_io_ops_st_v_v1:
-        char *sofile
-        char *symbol
+        const char *sofile
+        const char *symbol
         void *cookie
 
     ctypedef ____lcb_create_io_ops_st_v_v1 ____lcb_create_io_ops_st_v_v1_t
@@ -768,11 +768,11 @@ cdef extern from "libcouchbase/couchbase.h":
         __lcb_create_io_ops_st_v_t v
 
     cdef struct ____lcb_get_cmd_st_v_v0:
-        void *key
+        const void *key
         lcb_size_t nkey
         lcb_time_t exptime
         int lock
-        void *hashkey
+        const void *hashkey
         lcb_size_t nhashkey
 
     ctypedef ____lcb_get_cmd_st_v_v0 ____lcb_get_cmd_st_v_v0_t
@@ -789,9 +789,9 @@ cdef extern from "libcouchbase/couchbase.h":
     ctypedef lcb_get_cmd_st lcb_get_cmd_t
 
     cdef struct ____lcb_get_replica_cmd_st_v_v0:
-        void *key
+        const void *key
         lcb_size_t nkey
-        void *hashkey
+        const void *hashkey
         lcb_size_t nhashkey
 
     ctypedef ____lcb_get_replica_cmd_st_v_v0 ____lcb_get_replica_cmd_st_v_v0_t
@@ -808,10 +808,10 @@ cdef extern from "libcouchbase/couchbase.h":
     ctypedef lcb_get_replica_cmd_st lcb_get_replica_cmd_t
 
     cdef struct ____lcb_unlock_cmd_st_v_v0:
-        void *key
+        const void *key
         lcb_size_t nkey
         lcb_cas_t cas
-        void *hashkey
+        const void *hashkey
         lcb_size_t nhashkey
 
     ctypedef ____lcb_unlock_cmd_st_v_v0 ____lcb_unlock_cmd_st_v_v0_t
@@ -830,16 +830,16 @@ cdef extern from "libcouchbase/couchbase.h":
     ctypedef lcb_get_cmd_t lcb_touch_cmd_t
 
     cdef struct ____lcb_store_cmd_st_v_v0:
-        void *key
+        const void *key
         lcb_size_t nkey
-        void *bytes
+        const void *bytes
         lcb_size_t nbytes
         lcb_uint32_t flags
         lcb_cas_t cas
         lcb_datatype_t datatype
         lcb_time_t exptime
         lcb_storage_t operation
-        void *hashkey
+        const void *hashkey
         lcb_size_t nhashkey
 
     ctypedef ____lcb_store_cmd_st_v_v0 ____lcb_store_cmd_st_v_v0_t
@@ -856,13 +856,13 @@ cdef extern from "libcouchbase/couchbase.h":
     ctypedef lcb_store_cmd_st lcb_store_cmd_t
 
     cdef struct ____lcb_arithmetic_cmd_st_v_v0:
-        void *key
+        const void *key
         lcb_size_t nkey
         lcb_time_t exptime
         int create
         lcb_int64_t delta
         lcb_uint64_t initial
-        void *hashkey
+        const void *hashkey
         lcb_size_t nhashkey
 
     ctypedef ____lcb_arithmetic_cmd_st_v_v0 ____lcb_arithmetic_cmd_st_v_v0_t
@@ -879,9 +879,9 @@ cdef extern from "libcouchbase/couchbase.h":
     ctypedef lcb_arithmetic_cmd_st lcb_arithmetic_cmd_t
 
     cdef struct ____lcb_observe_cmd_st_v_v0:
-        void *key
+        const void *key
         lcb_size_t nkey
-        void *hashkey
+        const void *hashkey
         lcb_size_t nhashkey
 
     ctypedef ____lcb_observe_cmd_st_v_v0 ____lcb_observe_cmd_st_v_v0_t
@@ -898,10 +898,10 @@ cdef extern from "libcouchbase/couchbase.h":
     ctypedef lcb_observe_cmd_st lcb_observe_cmd_t
 
     cdef struct ____lcb_remove_cmd_st_v_v0:
-        void *key
+        const void *key
         lcb_size_t nkey
         lcb_cas_t cas
-        void *hashkey
+        const void *hashkey
         lcb_size_t nhashkey
 
     ctypedef ____lcb_remove_cmd_st_v_v0 ____lcb_remove_cmd_st_v_v0_t
@@ -918,27 +918,27 @@ cdef extern from "libcouchbase/couchbase.h":
     ctypedef lcb_remove_cmd_st lcb_remove_cmd_t
 
     cdef struct ____lcb_http_cmd_st_v_v0:
-        char *path
+        const char *path
         lcb_size_t npath
-        void *body
+        const void *body
         lcb_size_t nbody
         lcb_http_method_t method
         int chunked
-        char *content_type
+        const char *content_type
 
     ctypedef ____lcb_http_cmd_st_v_v0 ____lcb_http_cmd_st_v_v0_t
 
     cdef struct ____lcb_http_cmd_st_v_v1:
-        char *path
+        const char *path
         lcb_size_t npath
-        void *body
+        const void *body
         lcb_size_t nbody
         lcb_http_method_t method
         int chunked
-        char *content_type
-        char *host
-        char *username
-        char *password
+        const char *content_type
+        const char *host
+        const char *username
+        const char *password
 
     ctypedef ____lcb_http_cmd_st_v_v1 ____lcb_http_cmd_st_v_v1_t
 
@@ -955,7 +955,7 @@ cdef extern from "libcouchbase/couchbase.h":
     ctypedef lcb_http_cmd_st lcb_http_cmd_t
 
     cdef struct ____lcb_server_stats_cmd_st_v_v0:
-        void *name
+        const void *name
         lcb_size_t nname
 
     ctypedef ____lcb_server_stats_cmd_st_v_v0 ____lcb_server_stats_cmd_st_v_v0_t
@@ -972,7 +972,7 @@ cdef extern from "libcouchbase/couchbase.h":
     ctypedef lcb_server_stats_cmd_st lcb_server_stats_cmd_t
 
     cdef struct ____lcb_server_version_cmd_st_v_v0:
-        void *notused
+        const void *notused
 
     ctypedef ____lcb_server_version_cmd_st_v_v0 ____lcb_server_version_cmd_st_v_v0_t
 
@@ -988,7 +988,7 @@ cdef extern from "libcouchbase/couchbase.h":
     ctypedef lcb_server_version_cmd_st lcb_server_version_cmd_t
 
     cdef struct ____lcb_verbosity_cmd_st_v_v0:
-        char *server
+        const char *server
         lcb_verbosity_level_t level
 
     ctypedef ____lcb_verbosity_cmd_st_v_v0 ____lcb_verbosity_cmd_st_v_v0_t
@@ -1021,9 +1021,9 @@ cdef extern from "libcouchbase/couchbase.h":
     ctypedef lcb_flush_cmd_st lcb_flush_cmd_t
 
     cdef struct ____lcb_get_resp_t_v_v0:
-        void *key
+        const void *key
         lcb_size_t nkey
-        void *bytes
+        const void *bytes
         lcb_size_t nbytes
         lcb_uint32_t flags
         lcb_cas_t cas
@@ -1042,7 +1042,7 @@ cdef extern from "libcouchbase/couchbase.h":
 
 
     cdef struct ____lcb_store_resp_t_v_v0:
-        void *key
+        const void *key
         lcb_size_t nkey
         lcb_cas_t cas
 
@@ -1059,7 +1059,7 @@ cdef extern from "libcouchbase/couchbase.h":
 
 
     cdef struct ____lcb_remove_resp_t_v_v0:
-        void *key
+        const void *key
         lcb_size_t nkey
         lcb_cas_t cas
 
@@ -1076,7 +1076,7 @@ cdef extern from "libcouchbase/couchbase.h":
 
 
     cdef struct ____lcb_touch_resp_t_v_v0:
-        void *key
+        const void *key
         lcb_size_t nkey
         lcb_cas_t cas
 
@@ -1093,7 +1093,7 @@ cdef extern from "libcouchbase/couchbase.h":
 
 
     cdef struct ____lcb_unlock_resp_t_v_v0:
-        void *key
+        const void *key
         lcb_size_t nkey
 
     ctypedef ____lcb_unlock_resp_t_v_v0 ____lcb_unlock_resp_t_v_v0_t
@@ -1109,7 +1109,7 @@ cdef extern from "libcouchbase/couchbase.h":
 
 
     cdef struct ____lcb_arithmetic_resp_t_v_v0:
-        void *key
+        const void *key
         lcb_size_t nkey
         lcb_uint64_t value
         lcb_cas_t cas
@@ -1127,7 +1127,7 @@ cdef extern from "libcouchbase/couchbase.h":
 
 
     cdef struct ____lcb_observe_resp_t_v_v0:
-        void *key
+        const void *key
         lcb_size_t nkey
         lcb_cas_t cas
         lcb_observe_t status
@@ -1149,10 +1149,10 @@ cdef extern from "libcouchbase/couchbase.h":
 
     cdef struct ____lcb_http_resp_t_v_v0:
         lcb_http_status_t status
-        char *path
+        const char *path
         lcb_size_t npath
-        char **headers
-        void *bytes
+        const char *const *headers
+        const void *bytes
         lcb_size_t nbytes
 
     ctypedef ____lcb_http_resp_t_v_v0 ____lcb_http_resp_t_v_v0_t
@@ -1168,10 +1168,10 @@ cdef extern from "libcouchbase/couchbase.h":
 
 
     cdef struct ____lcb_server_stat_resp_st_v_v0:
-        char *server_endpoint
-        void *key
+        const char *server_endpoint
+        const void *key
         lcb_size_t nkey
-        void *bytes
+        const void *bytes
         lcb_size_t nbytes
 
     ctypedef ____lcb_server_stat_resp_st_v_v0 ____lcb_server_stat_resp_st_v_v0_t
@@ -1188,8 +1188,8 @@ cdef extern from "libcouchbase/couchbase.h":
     ctypedef lcb_server_stat_resp_st lcb_server_stat_resp_t
 
     cdef struct ____lcb_server_version_resp_st_v_v0:
-        char *server_endpoint
-        char *vstring
+        const char *server_endpoint
+        const char *vstring
         lcb_size_t nvstring
 
     ctypedef ____lcb_server_version_resp_st_v_v0 ____lcb_server_version_resp_st_v_v0_t
@@ -1206,7 +1206,7 @@ cdef extern from "libcouchbase/couchbase.h":
     ctypedef lcb_server_version_resp_st lcb_server_version_resp_t
 
     cdef struct ____lcb_verbosity_resp_st_v_v0:
-        char *server_endpoint
+        const char *server_endpoint
 
     ctypedef ____lcb_verbosity_resp_st_v_v0 ____lcb_verbosity_resp_st_v_v0_t
 
@@ -1222,7 +1222,7 @@ cdef extern from "libcouchbase/couchbase.h":
     ctypedef lcb_verbosity_resp_st lcb_verbosity_resp_t
 
     cdef struct ____lcb_flush_resp_st_v_v0:
-        char *server_endpoint
+        const char *server_endpoint
 
     ctypedef ____lcb_flush_resp_st_v_v0 ____lcb_flush_resp_st_v_v0_t
 
@@ -1242,12 +1242,12 @@ cdef extern from "libcouchbase/couchbase.h":
     cdef enum lcb_cluster_t:
         LCB_MEMCACHED_CLUSTER
 
-    lcb_error_t lcb_create_compat(lcb_cluster_t type, void *specific, lcb_t *instance, lcb_io_opt_st *io)
+    lcb_error_t lcb_create_compat(lcb_cluster_t type, const void *specific, lcb_t *instance, lcb_io_opt_st *io)
 
     cdef struct lcb_memcached_st:
-        char *serverlist
-        char *username
-        char *password
+        const char *serverlist
+        const char *username
+        const char *password
 
     void lcb_behavior_set_syncmode(lcb_t instance, lcb_syncmode_t syncmode)
 
@@ -1261,37 +1261,37 @@ cdef extern from "libcouchbase/couchbase.h":
 
     lcb_size_t lcb_behavior_get_config_errors_threshold(lcb_t instance)
 
-    ctypedef void (*lcb_get_callback)(lcb_st *, void *, lcb_error_t, lcb_get_resp_t *)
+    ctypedef void (*lcb_get_callback)(lcb_st *, const void *, lcb_error_t, lcb_get_resp_t *)
 
-    ctypedef void (*lcb_store_callback)(lcb_st *, void *, lcb_storage_t, lcb_error_t, lcb_store_resp_t *)
+    ctypedef void (*lcb_store_callback)(lcb_st *, const void *, lcb_storage_t, lcb_error_t, lcb_store_resp_t *)
 
-    ctypedef void (*lcb_remove_callback)(lcb_st *, void *, lcb_error_t, lcb_remove_resp_t *)
+    ctypedef void (*lcb_remove_callback)(lcb_st *, const void *, lcb_error_t, lcb_remove_resp_t *)
 
-    ctypedef void (*lcb_touch_callback)(lcb_st *, void *, lcb_error_t, lcb_touch_resp_t *)
+    ctypedef void (*lcb_touch_callback)(lcb_st *, const void *, lcb_error_t, lcb_touch_resp_t *)
 
-    ctypedef void (*lcb_unlock_callback)(lcb_st *, void *, lcb_error_t, lcb_unlock_resp_t *)
+    ctypedef void (*lcb_unlock_callback)(lcb_st *, const void *, lcb_error_t, lcb_unlock_resp_t *)
 
-    ctypedef void (*lcb_arithmetic_callback)(lcb_st *, void *, lcb_error_t, lcb_arithmetic_resp_t *)
+    ctypedef void (*lcb_arithmetic_callback)(lcb_st *, const void *, lcb_error_t, lcb_arithmetic_resp_t *)
 
-    ctypedef void (*lcb_observe_callback)(lcb_st *, void *, lcb_error_t, lcb_observe_resp_t *)
+    ctypedef void (*lcb_observe_callback)(lcb_st *, const void *, lcb_error_t, lcb_observe_resp_t *)
 
-    ctypedef void (*lcb_stat_callback)(lcb_st *, void *, lcb_error_t, lcb_server_stat_resp_st *)
+    ctypedef void (*lcb_stat_callback)(lcb_st *, const void *, lcb_error_t, lcb_server_stat_resp_st *)
 
-    ctypedef void (*lcb_version_callback)(lcb_st *, void *, lcb_error_t, lcb_server_version_resp_st *)
+    ctypedef void (*lcb_version_callback)(lcb_st *, const void *, lcb_error_t, lcb_server_version_resp_st *)
 
-    ctypedef void (*lcb_error_callback)(lcb_st *, lcb_error_t, char *)
+    ctypedef void (*lcb_error_callback)(lcb_st *, lcb_error_t, const char *)
 
-    ctypedef void (*lcb_flush_callback)(lcb_st *, void *, lcb_error_t, lcb_flush_resp_st *)
+    ctypedef void (*lcb_flush_callback)(lcb_st *, const void *, lcb_error_t, lcb_flush_resp_st *)
 
-    ctypedef void (*lcb_timer_callback)(lcb_timer_st *, lcb_st *, void *)
+    ctypedef void (*lcb_timer_callback)(lcb_timer_st *, lcb_st *, const void *)
 
-    ctypedef void (*lcb_http_complete_callback)(lcb_http_request_st *, lcb_st *, void *, lcb_error_t, lcb_http_resp_t *)
+    ctypedef void (*lcb_http_complete_callback)(lcb_http_request_st *, lcb_st *, const void *, lcb_error_t, lcb_http_resp_t *)
 
-    ctypedef void (*lcb_http_data_callback)(lcb_http_request_st *, lcb_st *, void *, lcb_error_t, lcb_http_resp_t *)
+    ctypedef void (*lcb_http_data_callback)(lcb_http_request_st *, lcb_st *, const void *, lcb_error_t, lcb_http_resp_t *)
 
     ctypedef void (*lcb_configuration_callback)(lcb_st *, lcb_configuration_t)
 
-    ctypedef void (*lcb_verbosity_callback)(lcb_st *, void *, lcb_error_t, lcb_verbosity_resp_st *)
+    ctypedef void (*lcb_verbosity_callback)(lcb_st *, const void *, lcb_error_t, lcb_verbosity_resp_st *)
 
     lcb_get_callback lcb_set_get_callback(lcb_t, lcb_get_callback)
 
@@ -1336,11 +1336,11 @@ cdef extern from "libcouchbase/couchbase.h":
 
     lcb_error_t lcb_disable_timings(lcb_t instance)
 
-    ctypedef void (*lcb_timings_callback)(lcb_st *, void *, lcb_timeunit_t, unsigned int, unsigned int, unsigned int, unsigned int)
+    ctypedef void (*lcb_timings_callback)(lcb_st *, const void *, lcb_timeunit_t, unsigned int, unsigned int, unsigned int, unsigned int)
 
-    lcb_error_t lcb_get_timings(lcb_t instance, void *cookie, lcb_timings_callback callback)
+    lcb_error_t lcb_get_timings(lcb_t instance, const void *cookie, lcb_timings_callback callback)
 
-    char *lcb_get_version(lcb_uint32_t *version)
+    const char *lcb_get_version(lcb_uint32_t *version)
 
     lcb_error_t lcb_create_io_ops(lcb_io_opt_t *op, lcb_create_io_ops_st *options)
 
@@ -1354,21 +1354,21 @@ cdef extern from "libcouchbase/couchbase.h":
 
     lcb_uint32_t lcb_get_timeout(lcb_t instance)
 
-    char *lcb_get_host(lcb_t instance)
+    const char *lcb_get_host(lcb_t instance)
 
-    char *lcb_get_port(lcb_t instance)
+    const char *lcb_get_port(lcb_t instance)
 
     lcb_error_t lcb_connect(lcb_t instance)
 
     lcb_error_t lcb_get_last_error(lcb_t instance)
 
-    char *lcb_strerror(lcb_t instance, lcb_error_t error)
+    const char *lcb_strerror(lcb_t instance, lcb_error_t error)
 
-    void lcb_flush_buffers(lcb_t instance, void *cookie)
+    void lcb_flush_buffers(lcb_t instance, const void *cookie)
 
-    void lcb_set_cookie(lcb_t instance, void *cookie)
+    void lcb_set_cookie(lcb_t instance, const void *cookie)
 
-    void *lcb_get_cookie(lcb_t instance)
+    const void *lcb_get_cookie(lcb_t instance)
 
     lcb_error_t lcb_wait(lcb_t instance)
 
@@ -1376,35 +1376,35 @@ cdef extern from "libcouchbase/couchbase.h":
 
     void lcb_breakout(lcb_t instance)
 
-    lcb_error_t lcb_get(lcb_t instance, void *command_cookie, lcb_size_t num, lcb_get_cmd_t **commands)
+    lcb_error_t lcb_get(lcb_t instance, const void *command_cookie, lcb_size_t num, const lcb_get_cmd_t *const *commands)
 
-    lcb_error_t lcb_get_replica(lcb_t instance, void *command_cookie, lcb_size_t num, lcb_get_replica_cmd_t **commands)
+    lcb_error_t lcb_get_replica(lcb_t instance, const void *command_cookie, lcb_size_t num, const lcb_get_replica_cmd_t *const *commands)
 
-    lcb_error_t lcb_unlock(lcb_t instance, void *command_cookie, lcb_size_t num, lcb_unlock_cmd_t **commands)
+    lcb_error_t lcb_unlock(lcb_t instance, const void *command_cookie, lcb_size_t num, const lcb_unlock_cmd_t *const *commands)
 
-    lcb_error_t lcb_touch(lcb_t instance, void *command_cookie, lcb_size_t num, lcb_touch_cmd_t **commands)
+    lcb_error_t lcb_touch(lcb_t instance, const void *command_cookie, lcb_size_t num, const lcb_touch_cmd_t *const *commands)
 
-    lcb_error_t lcb_store(lcb_t instance, void *command_cookie, lcb_size_t num, lcb_store_cmd_t **commands)
+    lcb_error_t lcb_store(lcb_t instance, const void *command_cookie, lcb_size_t num, const lcb_store_cmd_t *const *commands)
 
-    lcb_error_t lcb_arithmetic(lcb_t instance, void *command_cookie, lcb_size_t num, lcb_arithmetic_cmd_t **commands)
+    lcb_error_t lcb_arithmetic(lcb_t instance, const void *command_cookie, lcb_size_t num, const lcb_arithmetic_cmd_t *const *commands)
 
-    lcb_error_t lcb_observe(lcb_t instance, void *command_cookie, lcb_size_t num, lcb_observe_cmd_t **commands)
+    lcb_error_t lcb_observe(lcb_t instance, const void *command_cookie, lcb_size_t num, const lcb_observe_cmd_t *const *commands)
 
-    lcb_error_t lcb_remove(lcb_t instance, void *command_cookie, lcb_size_t num, lcb_remove_cmd_t **commands)
+    lcb_error_t lcb_remove(lcb_t instance, const void *command_cookie, lcb_size_t num, const lcb_remove_cmd_t *const *commands)
 
-    lcb_error_t lcb_server_stats(lcb_t instance, void *command_cookie, lcb_size_t num, lcb_server_stats_cmd_t **commands)
+    lcb_error_t lcb_server_stats(lcb_t instance, const void *command_cookie, lcb_size_t num, const lcb_server_stats_cmd_t *const *commands)
 
-    lcb_error_t lcb_server_versions(lcb_t instance, void *command_cookie, lcb_size_t num, lcb_server_version_cmd_t **commands)
+    lcb_error_t lcb_server_versions(lcb_t instance, const void *command_cookie, lcb_size_t num, const lcb_server_version_cmd_t *const *commands)
 
-    lcb_error_t lcb_set_verbosity(lcb_t instance, void *command_cookie, lcb_size_t num, lcb_verbosity_cmd_t **commands)
+    lcb_error_t lcb_set_verbosity(lcb_t instance, const void *command_cookie, lcb_size_t num, const lcb_verbosity_cmd_t *const *commands)
 
-    lcb_error_t lcb_flush(lcb_t instance, void *cookie, lcb_size_t num, lcb_flush_cmd_t **commands)
+    lcb_error_t lcb_flush(lcb_t instance, const void *cookie, lcb_size_t num, const lcb_flush_cmd_t *const *commands)
 
-    lcb_error_t lcb_make_http_request(lcb_t instance, void *command_cookie, lcb_http_type_t type, lcb_http_cmd_t *cmd, lcb_http_request_t *request)
+    lcb_error_t lcb_make_http_request(lcb_t instance, const void *command_cookie, lcb_http_type_t type, const lcb_http_cmd_t *cmd, lcb_http_request_t *request)
 
     void lcb_cancel_http_request(lcb_t instance, lcb_http_request_t request)
 
-    lcb_timer_t lcb_timer_create(lcb_t instance, void *command_cookie, lcb_uint32_t usec, int periodic, lcb_timer_callback callback, lcb_error_t *error)
+    lcb_timer_t lcb_timer_create(lcb_t instance, const void *command_cookie, lcb_uint32_t usec, int periodic, lcb_timer_callback callback, lcb_error_t *error)
 
     lcb_error_t lcb_timer_destroy(lcb_t instance, lcb_timer_t timer)
 
@@ -1412,6 +1412,6 @@ cdef extern from "libcouchbase/couchbase.h":
 
     lcb_int32_t lcb_get_num_nodes(lcb_t instance)
 
-    char **lcb_get_server_list(lcb_t instance)
+    const char *const *lcb_get_server_list(lcb_t instance)
 
 

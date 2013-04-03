@@ -1,2 +1,3 @@
 build
 lcb*.so
+lcb.h
