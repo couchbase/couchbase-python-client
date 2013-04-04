@@ -1,1 +1,1 @@
-from couchbase.lcb import *
+from couchbase.couchbase import *

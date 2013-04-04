@@ -1,4 +1,5 @@
 build
-lcb*.so
-lcb.h
-__pycache__
+couchbase/couchbase*.so
+couchbase/couchbase.h
+couchbase/__pycache__
+*.pyc

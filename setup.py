@@ -3,6 +3,8 @@ from distutils.extension import Extension
 
 
 setup(
-  name = 'Couchbase Python SDK',
-  ext_modules = [Extension("couchbase/lcb", ["couchbase/lcb.c"], libraries=['couchbase'])]
+    name = 'Couchbase Python SDK',
+    ext_modules = [Extension(
+        "couchbase/couchbase", ["couchbase/couchbase.c"], libraries=['couchbase'])
+    ]
 )
