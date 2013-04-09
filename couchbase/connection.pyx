@@ -1,19 +1,4 @@
-from libc.stdlib cimport malloc, free
-from libc.string cimport memset
-
-cimport libcouchbase as lcb
-
-
-# Pure Python imports
-import json
-import pickle
-
-
-cdef public enum _cb_formats:
-    CB_FMT_JSON = 0x0
-    CB_FMT_PICKLE = 0x1
-    CB_FMT_PLAIN = 0x2
-    CB_FMT_MASK = 0x3
+import couchbase.exceptions
 
 
 cdef void cb_get_callback(lcb.lcb_t instance, const void *cookie,
@@ -30,45 +15,13 @@ cdef void cb_get_callback(lcb.lcb_t instance, const void *cookie,
     if resp.v.v0.nbytes != 0:
         raw = (<char *>resp.v.v0.bytes)[:resp.v.v0.nbytes]
         format = flags & CB_FMT_MASK
-        val = Utils.decode_value(raw, format)
+        val = Connection._decode_value(raw, format)
 
     ctx['rv'].append((key, val))
 
 
 
-class Utils:
-    @staticmethod
-    def context_dict():
-        return {
-            'rv': []
-        }
-
-    @staticmethod
-    def encode_value(raw, format):
-        if format == CB_FMT_JSON:
-           return json.dumps(raw).encode('utf-8')
-        elif format == CB_FMT_PICKLE:
-            return pickle.dumps(raw)
-        elif format == CB_FMT_PLAIN:
-            return raw
-        else:
-            # Unknown formats are treated as plain
-            return raw
-
-    @staticmethod
-    def decode_value(raw, format):
-        if format == CB_FMT_JSON:
-            return json.loads(raw.decode('utf-8'))
-        elif format == CB_FMT_PICKLE:
-            return pickle.loads(raw)
-        elif format == CB_FMT_PLAIN:
-            return raw
-        else:
-            # Unknown formats are treated as plain
-            return raw
-
-
-cdef class Couchbase:
+cdef class Connection:
     cdef lcb.lcb_t _instance
     cdef lcb.lcb_create_st _create_options
     cdef public lcb.lcb_uint32_t default_format
@@ -76,29 +29,76 @@ cdef class Couchbase:
         self.default_format = CB_FMT_JSON
         memset(&self._create_options, 0, sizeof(self._create_options))
 
-    def __init__(self, options):
-        host = options.encode('utf-8')
+    def __init__(self, host='localhost', port='8091'):
+        host = host.encode('utf-8')
         self._create_options.v.v0.host = host
-        print("options", options)
+        print("host", host)
+        print("port", port)
 
-        err = lcb.lcb_create(&self._instance, &self._create_options)
-        if err != lcb.LCB_SUCCESS:
-            print("create error", err)
+        rc = lcb.lcb_create(&self._instance, &self._create_options)
+        Utils.maybe_raise(rc, 'failed to create libcouchbase instance')
+        # XXX vmx 2013-04-09: Does it return an error?
         lcb.lcb_behavior_set_syncmode(self._instance, lcb.LCB_SYNCHRONOUS)
+        self._connect()
 
-    def connect(self):
-        err = lcb.lcb_connect(self._instance)
-        if err != lcb.LCB_SUCCESS:
-            print("connect error", err)
+    def _connect(self):
+        rc = lcb.lcb_connect(self._instance)
+        Utils.maybe_raise(
+            rc, 'failed to connect libcouchbase instance to server')
+
+    @staticmethod
+    def _encode_value(value, format):
+        """Encode some value according to a given format
+
+        The input value can be any Python object. The `format` specifies
+        whether it should be as JSON string, pickled or not encoded at all
+        (plain).
+        """
+        if format == CB_FMT_JSON:
+            return json.dumps(value).encode('utf-8')
+        elif format == CB_FMT_PICKLE:
+            return pickle.dumps(value)
+        elif format == CB_FMT_PLAIN:
+            return value
+        else:
+            # Unknown formats are treatedy as plain
+            return value
+
+    @staticmethod
+    def _decode_value(value, format):
+        """Decode some value according to a given format
+
+        The input value is either encoded as a JSON string, pickled or not
+        encoded at all (plain).
+        """
+        if format == CB_FMT_JSON:
+            return json.loads(value.decode('utf-8'))
+        elif format == CB_FMT_PICKLE:
+            return pickle.loads(value)
+        elif format == CB_FMT_PLAIN:
+            return value
+        else:
+            # Unknown formats are treated as plain
+            return value
+
+    @staticmethod
+    def _context_dict():
+        return {
+            'rv': []
+        }
 
     def set(self, key, value, format=None):
+        """Just a small docstring tests
+
+        To see if Cython includes works
+        """
         key = key.encode('utf-8')
         cdef char *c_key = key
 
         if format is None:
             format = self.default_format
 
-        value = Utils.encode_value(value, format)
+        value = self._encode_value(value, format)
         cdef char *c_value = value
 
         cdef int num_commands = 1
@@ -128,7 +128,7 @@ cdef class Couchbase:
         key = key.encode('utf-8')
         cdef char *c_key = key
 
-        ctx = Utils.context_dict()
+        ctx = self._context_dict()
         <void>lcb.lcb_set_get_callback(self._instance, cb_get_callback);
 
         cdef int num_commands = 1

@@ -1413,5 +1413,3 @@ cdef extern from "libcouchbase/couchbase.h":
     lcb_int32_t lcb_get_num_nodes(lcb_t instance)
 
     const char *const *lcb_get_server_list(lcb_t instance)
-
-
