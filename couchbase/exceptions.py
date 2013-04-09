@@ -24,7 +24,7 @@ class TooBigError(CouchbaseError):
 
 
 class BusyError(CouchbaseError):
-    """The cluster is too busdy
+    """The cluster is too busy
 
     The server is too busy to handle your request right now.
     please back off and try again at a later time.

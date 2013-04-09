@@ -16,7 +16,7 @@ class Couchbase:
         :raise: :exc:`couchbase.exceptions.BucketNotFoundError` if there is
                 no such bucket to connect to
 
-                :exc:`couchbase.exceptions.ConnectionError` if the socket
+                :exc:`couchbase.exceptions.ConnectError` if the socket
                 wasn't accessible (doesn't accept connections or doesn't
                 respond in time)
 

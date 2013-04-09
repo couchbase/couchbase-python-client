@@ -78,7 +78,19 @@ class Utils:
 
 
 class CouchbaseError(Exception):
-    """Base class for errors within the Couchbase Python SDK"""
+    # Document the init parameters here, else the output of the subclasses
+    # gets too crowded
+    """Base class for errors within the Couchbase Python SDK
+
+        :param string msg: the error message
+        :param int error: the error code
+        :param string key: the key if it one was involved in the operation that
+                           lead to the error
+        :param int status: the HTTP status code if the operation was through
+                           HTTP
+        :param cas: the CAS value
+        :param operation: TODO
+    """
     http_status_msg = {
         lcb.LCB_HTTP_STATUS_BAD_REQUEST: '(Bad Request)',
         lcb.LCB_HTTP_STATUS_UNAUTHORIZED:'(Unauthorized)',
