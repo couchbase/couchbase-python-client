@@ -28,6 +28,7 @@ import requests
 from couchbase.logger import logger
 from couchbase.rest_client import RestConnection
 from couchbase.couchbaseclient import CouchbaseClient
+from couchbase.memcachedclient import MemcachedClient
 from couchbase.exception import BucketUnavailableException
 
 log = logger("client")
@@ -200,6 +201,16 @@ class Bucket(object):
         formatter_uri = "http://%s:%s/pools/default"
         self.mc_client = CouchbaseClient(formatter_uri % (ip, port), self.name,
                                          self.password)
+        
+        # Fix based on Jon-Eric's comment in 
+        # http://www.couchbase.com/forums/thread/python-memcached-bucket-does-it-work
+        # Fixes PYCBC-55
+        if self.info.type == 'memcached':
+            self.mc_client = MemcachedClient(server.servers[0]['ip'])
+            self.mc_client.sasl_auth_plain(self.info.name.encode('ascii'),
+                                           self.info.saslPassword.encode('ascii'))
+            self.mc_client.vbucket_count = 1
+            self.mc_client.done = self.mc_client.close
 
     def __del__(self):
         self.mc_client.done()

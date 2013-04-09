@@ -247,7 +247,7 @@ class RestConnection(object):
             else:
                 api += "?"
             num_params += 1
-            if param in ["key", "start_key", "end_key",
+            if param in ["key", "startkey", "endkey", "start_key", "end_key",
                          "startkey_docid", "endkey_docid"] or \
                 params[param] is True or \
                     params[param] is False:
