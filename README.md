@@ -48,6 +48,18 @@ To build the documentation, go into the `docs` directory and run:
 The HTML output can be found in `docs/build/html/`.
 
 
+Running tests
+-------------
+
+If you have Python >=2.7 or >=3.2 you can run:
+
+    python -m unittest discover -s tests
+
+Or if you have `nose` installed, you can also run:
+
+    nosetests
+
+
 Tested platforms
 ----------------
 

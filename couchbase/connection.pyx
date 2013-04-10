@@ -30,10 +30,8 @@ cdef class Connection:
         memset(&self._create_options, 0, sizeof(self._create_options))
 
     def __init__(self, host='localhost', port='8091'):
-        host = host.encode('utf-8')
+        host = host.encode('utf-8') + (':%d' % port)
         self._create_options.v.v0.host = host
-        print("host", host)
-        print("port", port)
 
         rc = lcb.lcb_create(&self._instance, &self._create_options)
         Utils.maybe_raise(rc, 'failed to create libcouchbase instance')
