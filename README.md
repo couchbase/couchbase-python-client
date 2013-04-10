@@ -37,6 +37,17 @@ just execute:
     python basic.py
 
 
+Building documentaion
+---------------------
+
+The documentation is using Sphinx and also needs the numpydoc Sphinx extension.
+To build the documentation, go into the `docs` directory and run:
+
+    make html
+
+The HTML output can be found in `docs/build/html/`.
+
+
 Tested platforms
 ----------------
 
