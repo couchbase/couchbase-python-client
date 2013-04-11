@@ -7,7 +7,8 @@ try:
     from distutils.version import StrictVersion
 
     if StrictVersion(cython_version) <= StrictVersion("0.18"):
-        print "You need a Cython version newer than 0.18 to enable 'cythonize'"
+        print("You need a Cython version newer than 0.18 to "
+              "enable 'cythonize'")
         raise ImportError
 
     from Cython.Build import cythonize

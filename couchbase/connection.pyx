@@ -30,7 +30,7 @@ cdef class Connection:
         memset(&self._create_options, 0, sizeof(self._create_options))
 
     def __init__(self, host='localhost', port='8091'):
-        host = host.encode('utf-8') + (':%d' % port)
+        host = (host + (':%d' % port)).encode('utf-8')
         self._create_options.v.v0.host = host
 
         rc = lcb.lcb_create(&self._instance, &self._create_options)
