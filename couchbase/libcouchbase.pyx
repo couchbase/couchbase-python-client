@@ -89,7 +89,7 @@ class CouchbaseError(Exception):
         :param int status: the HTTP status code if the operation was through
                            HTTP
         :param cas: the CAS value
-        :param operation: TODO
+        :param operation: The operation that was performed on Couchbase
     """
     http_status_msg = {
         lcb.LCB_HTTP_STATUS_BAD_REQUEST: '(Bad Request)',
@@ -127,7 +127,7 @@ class CouchbaseError(Exception):
         lcb.LCB_HTTP_STATUS_INSUFFICIENT_STORAGE: '(Insufficient Storage)'
     }
 
-    def __init__(self, msg, error, key=None, status=0, cas=None,
+    def __init__(self, msg, error=0, key=None, status=0, cas=None,
                  operation=None):
         self.msg = msg
         self.error = error

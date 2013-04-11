@@ -57,7 +57,18 @@ The HTML output can be found in `docs/build/html/`.
 Running tests
 -------------
 
-If you have Python >=2.7 or >=3.2 you can run:
+The tests need a running Couchbase instance. The values to connect to the
+instance can be found in the test configuration file `tests/tests.ini`.
+
+The test suite need several buckets which need to be created before the tests
+are run. They will all have the common prefix as specified in the test
+configuration file. To create them, run:
+
+    python tests/setup_tests.py
+
+If the buckets already exist, they will be recreated.
+
+Now you can run the test. If you have Python >=2.7 or >=3.2 you can run:
 
     python -m unittest discover -s tests
 

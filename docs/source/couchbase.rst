@@ -20,6 +20,12 @@ Exceptions
 
 
 .. autoclass:: couchbase.libcouchbase.CouchbaseError
+.. autoclass:: ArgumentError
+   :show-inheritance:
+
+
+The following exceptions are caused by the underlying libcouchbase.
+
 .. autoclass:: AuthError
    :show-inheritance:
 .. autoexception:: DeltaBadvalError

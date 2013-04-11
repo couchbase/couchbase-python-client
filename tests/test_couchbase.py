@@ -1,13 +1,18 @@
-import unittest
-
 from couchbase import Couchbase
 from couchbase.libcouchbase import Connection
 
+from tests.base import CouchbaseTestCase
 
-class CouchbaseTest(unittest.TestCase):
+
+BUCKET_NAME = 'test_bucket_for_pythonsdk'
+
+
+class CouchbaseTest(CouchbaseTestCase):
     def test_is_instance_of_connection(self):
-        self.assertIsInstance(Couchbase.connect('localhost', 8091),
-                              Connection)
+        self.assertIsInstance(
+            Couchbase.connect(self.host, self.port, self.username,
+                              self.password, self.bucket_prefix),
+            Connection)
 
 
 if __name__ == '__main__':

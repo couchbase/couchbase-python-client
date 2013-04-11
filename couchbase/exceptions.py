@@ -1,6 +1,15 @@
 from couchbase.libcouchbase import CouchbaseError
 
 
+class ArgumentError(CouchbaseError):
+    """Invalid argument
+
+    A given argument is invalid or must be set
+    """
+
+
+# The following exceptions are derived from libcouchbase
+
 class AuthError(CouchbaseError):
     """Authentication failed
 

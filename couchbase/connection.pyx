@@ -1,4 +1,5 @@
 import couchbase.exceptions
+from couchbase.exceptions import ArgumentError
 
 
 cdef void cb_get_callback(lcb.lcb_t instance, const void *cookie,
@@ -29,9 +30,32 @@ cdef class Connection:
         self.default_format = CB_FMT_JSON
         memset(&self._create_options, 0, sizeof(self._create_options))
 
-    def __init__(self, host='localhost', port='8091'):
+    def __init__(self, host='localhost', port=8091, username=None,
+                 password=None, bucket=None):
+        """Connection to a bucket
+
+        Normally it's initialized through
+        :meth:`couchbase.Couchbase.connect`
+        """
+        if password is None:
+            raise ArgumentError("A password must be given")
+        if bucket is None:
+            raise ArgumentError("A bucket name must be given")
+
         host = (host + (':%d' % port)).encode('utf-8')
+        password = password.encode('utf-8')
+        bucket = bucket.encode('utf-8')
+
+        if username is None:
+            # Try to connect to a protected bucket
+            username = bucket
+        else:
+            username = username.encode('utf-8')
+
         self._create_options.v.v0.host = host
+        self._create_options.v.v0.bucket = bucket
+        self._create_options.v.v0.user = username
+        self._create_options.v.v0.passwd = password
 
         rc = lcb.lcb_create(&self._instance, &self._create_options)
         Utils.maybe_raise(rc, 'failed to create libcouchbase instance')
