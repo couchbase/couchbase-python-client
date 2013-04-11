@@ -31,9 +31,10 @@ except ImportError:
     cmdclass = {}
 
 setup(
-    name = 'Couchbase Python SDK',
+    name="couchbase-python-sdk",
+    version="0.9",
     cmdclass=cmdclass,
-    ext_modules = [Extension(
+    ext_modules=[Extension(
         "couchbase/libcouchbase", ["couchbase/libcouchbase.c"],
         libraries=['couchbase'])
     ],
