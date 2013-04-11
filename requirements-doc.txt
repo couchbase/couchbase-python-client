@@ -1,0 +1,2 @@
+sphinx==1.2b1
+numpydoc==0.4
