@@ -45,8 +45,8 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Couchbase Python SDK'
-copyright = u'2013, Volker Mische'
+project = 'Couchbase Python SDK'
+copyright = '2013, Volker Mische'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -188,8 +188,8 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'CouchbasePythonSDK.tex', u'Couchbase Python SDK Documentation',
-   u'Volker Mische', 'manual'),
+  ('index', 'CouchbasePythonSDK.tex', 'Couchbase Python SDK Documentation',
+   'Volker Mische', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -218,8 +218,8 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'couchbasepythonsdk', u'Couchbase Python SDK Documentation',
-     [u'Volker Mische'], 1)
+    ('index', 'couchbasepythonsdk', 'Couchbase Python SDK Documentation',
+     ['Volker Mische'], 1)
 ]
 
 # If true, show URL addresses after external links.
@@ -232,8 +232,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'CouchbasePythonSDK', u'Couchbase Python SDK Documentation',
-   u'Volker Mische', 'CouchbasePythonSDK', 'One line description of project.',
+  ('index', 'CouchbasePythonSDK', 'Couchbase Python SDK Documentation',
+   'Volker Mische', 'CouchbasePythonSDK', 'One line description of project.',
    'Miscellaneous'),
 ]
 
