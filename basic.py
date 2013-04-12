@@ -1,6 +1,6 @@
 from couchbase import Couchbase, FMT_PICKLE
 
-cb = Couchbase.connect('127.0.0.1', 8091)
+cb = Couchbase.connect('127.0.0.1', 8091, '', '', 'default')
 #cb.default_format = FMT_PICKLE
 
 for i in range(0, 10):
