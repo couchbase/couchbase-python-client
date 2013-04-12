@@ -1,5 +1,5 @@
 build
-couchbase/couchbase*.so
-couchbase/couchbase.h
+couchbase/libcouchbase*.so
+couchbase/libcouchbase.h
 couchbase/__pycache__
 *.pyc
