@@ -8,10 +8,10 @@ import pickle
 
 
 cdef public enum _cb_formats:
-    CB_FMT_JSON = 0x0
-    CB_FMT_PICKLE = 0x1
-    CB_FMT_PLAIN = 0x2
-    CB_FMT_MASK = 0x3
+    FMT_JSON = 0x0
+    FMT_PICKLE = 0x1
+    FMT_PLAIN = 0x2
+    FMT_MASK = 0x3
 
 
 class Const:

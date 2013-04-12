@@ -1,7 +1,7 @@
 import couchbase
 
 # Import a few things into the root of the module
-from couchbase.libcouchbase import CB_FMT_JSON, CB_FMT_PICKLE, CB_FMT_PLAIN
+from couchbase.libcouchbase import FMT_JSON, FMT_PICKLE, FMT_PLAIN
 
 
 class Couchbase:

@@ -27,7 +27,7 @@ cdef void cb_get_callback(lcb.lcb_t instance, const void *cookie,
 
     if resp.v.v0.nbytes != 0:
         raw = (<char *>resp.v.v0.bytes)[:resp.v.v0.nbytes]
-        format = flags & CB_FMT_MASK
+        format = flags & FMT_MASK
         val = Connection._decode_value(raw, format)
 
     ctx['rv'].append((key, val))
@@ -39,7 +39,7 @@ cdef class Connection:
     cdef lcb.lcb_create_st _create_options
     cdef public lcb.lcb_uint32_t default_format
     def __cinit__(self):
-        self.default_format = CB_FMT_JSON
+        self.default_format = FMT_JSON
         memset(&self._create_options, 0, sizeof(self._create_options))
 
     def __init__(self, host='localhost', port=8091, username=None,
@@ -51,14 +51,14 @@ cdef class Connection:
 
         **Class attributes**
 
-          **default_format** = `Couchbase.CB_FMT_JSON`
+          **default_format** = `Couchbase.FMT_JSON`
             It uses the flags field to store the format. Possible values
             are:
-             * `couchbase.CB_FMT_JSON`: Converts the Python object to
+             * `couchbase.FMT_JSON`: Converts the Python object to
                JSON and stores it as JSON in Couchbase
-             * `couchbase.CB_FMT_PICKLE`: Pickles the Python object and
+             * `couchbase.FMT_PICKLE`: Pickles the Python object and
                stores it as binary in Couchbase
-             * `couchbase.CB_FMT_PLAIN`: Stores the Python object as is
+             * `couchbase.FMT_PLAIN`: Stores the Python object as is
                in Couchbase. If it is a string containing valid JSON it
                will be stored as JSON, else binary.
             On a :meth:`couchbase.libcouchbase.Connection.get` the
@@ -106,11 +106,11 @@ cdef class Connection:
         whether it should be as JSON string, pickled or not encoded at all
         (plain).
         """
-        if format == CB_FMT_JSON:
+        if format == FMT_JSON:
             return json.dumps(value).encode('utf-8')
-        elif format == CB_FMT_PICKLE:
+        elif format == FMT_PICKLE:
             return pickle.dumps(value)
-        elif format == CB_FMT_PLAIN:
+        elif format == FMT_PLAIN:
             return value
         else:
             # Unknown formats are treatedy as plain
@@ -123,11 +123,11 @@ cdef class Connection:
         The input value is either encoded as a JSON string, pickled or not
         encoded at all (plain).
         """
-        if format == CB_FMT_JSON:
+        if format == FMT_JSON:
             return json.loads(value.decode('utf-8'))
-        elif format == CB_FMT_PICKLE:
+        elif format == FMT_PICKLE:
             return pickle.loads(value)
-        elif format == CB_FMT_PLAIN:
+        elif format == FMT_PLAIN:
             return value
         else:
             # Unknown formats are treated as plain
@@ -165,7 +165,7 @@ cdef class Connection:
 
         Force JSON document format for value::
 
-            c.set('foo', {'bar': 'baz'}, format=couchbase.CB_FMT_JSON)
+            c.set('foo', {'bar': 'baz'}, format=couchbase.FMT_JSON)
         """
         if self._instance == NULL:
             Utils.raise_not_connected(lcb.LCB_SET)
