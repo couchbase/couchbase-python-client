@@ -139,11 +139,16 @@ cdef class Connection:
             'rv': []
         }
 
-    def set(self, key, value, format=None):
+    def set(self, key, value, cas=None, format=None):
         """Unconditionally store the object in the Couchbase
 
         :param string key: key used to reference the value
         :param any value: value to be stored
+        :param int cas: the CAS value for an object. This value is created
+          on the server and is guaranteed to be unique for each value of
+          a given key. This value is used to provide simple optimistic
+          concurrency control when multiple clients or threads try to
+          update an item simultaneously.
         :param format: the representation for storing the value in the
           bucket. If none is specified it will use the `default_format`.
           For more info see
@@ -165,7 +170,11 @@ cdef class Connection:
 
         Force JSON document format for value::
 
-            c.set('foo', {'bar': 'baz'}, format=couchbase.FMT_JSON)
+            cb.set('foo', {'bar': 'baz'}, format=couchbase.FMT_JSON)
+
+        Perform optimistic locking by specifying last known CAS version
+
+            cb.set('foo', 'bar', cas=8835713818674332672)
         """
         if self._instance == NULL:
             Utils.raise_not_connected(lcb.LCB_SET)
@@ -197,6 +206,9 @@ cdef class Connection:
             cmd.v.v0.bytes = c_value
             cmd.v.v0.nbytes = len(value)
             cmd.v.v0.flags = format
+            if cas is not None:
+                cmd.v.v0.cas = cas
+
             rc = lcb.lcb_store(self._instance, <void *>ctx, 1, commands)
             Utils.maybe_raise(rc, 'failed to schedule set request')
 
