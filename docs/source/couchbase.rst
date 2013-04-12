@@ -19,66 +19,66 @@ Exceptions
 .. module:: couchbase.exceptions
 
 
-.. autoclass:: couchbase.libcouchbase.CouchbaseError
-.. autoclass:: ArgumentError
+.. autoexception:: couchbase.libcouchbase.CouchbaseError
+.. autoexception:: ArgumentError
    :show-inheritance:
-.. autoclass:: ValueFormatError
+.. autoexception:: ValueFormatError
    :show-inheritance:
 
 
 The following exceptions are caused by the underlying libcouchbase.
 
-.. autoclass:: AuthError
+.. autoexception:: AuthError
    :show-inheritance:
 .. autoexception:: DeltaBadvalError
    :show-inheritance:
-.. autoclass:: TooBigError
+.. autoexception:: TooBigError
    :show-inheritance:
-.. autoclass:: BusyError
+.. autoexception:: BusyError
    :show-inheritance:
-.. autoclass:: InternalError
+.. autoexception:: InternalError
    :show-inheritance:
-.. autoclass:: InvalidError
+.. autoexception:: InvalidError
    :show-inheritance:
-.. autoclass:: NoMemoryError
+.. autoexception:: NoMemoryError
    :show-inheritance:
-.. autoclass:: RangeError
+.. autoexception:: RangeError
    :show-inheritance:
-.. autoclass:: LibcouchbaseError
+.. autoexception:: LibcouchbaseError
    :show-inheritance:
-.. autoclass:: TemporaryFailError
+.. autoexception:: TemporaryFailError
    :show-inheritance:
-.. autoclass:: KeyExistsError
+.. autoexception:: KeyExistsError
    :show-inheritance:
-.. autoclass:: NotFoundError
+.. autoexception:: NotFoundError
    :show-inheritance:
-.. autoclass:: DlopenFailedError
+.. autoexception:: DlopenFailedError
    :show-inheritance:
-.. autoclass:: DlsymFailedError
+.. autoexception:: DlsymFailedError
    :show-inheritance:
-.. autoclass:: NetworkError
+.. autoexception:: NetworkError
    :show-inheritance:
-.. autoclass:: NotMyVbucketError
+.. autoexception:: NotMyVbucketError
    :show-inheritance:
-.. autoclass:: NotStoredError
+.. autoexception:: NotStoredError
    :show-inheritance:
-.. autoclass:: NotSupportedError
+.. autoexception:: NotSupportedError
    :show-inheritance:
-.. autoclass:: UnknownCommandError
+.. autoexception:: UnknownCommandError
    :show-inheritance:
-.. autoclass:: UnknownHostError
+.. autoexception:: UnknownHostError
    :show-inheritance:
-.. autoclass:: ProtocolError
+.. autoexception:: ProtocolError
    :show-inheritance:
-.. autoclass:: TimeoutError
+.. autoexception:: TimeoutError
    :show-inheritance:
-.. autoclass:: ConnectError
+.. autoexception:: ConnectError
    :show-inheritance:
-.. autoclass:: BucketNotFoundError
+.. autoexception:: BucketNotFoundError
    :show-inheritance:
-.. autoclass:: ClientNoMemoryError
+.. autoexception:: ClientNoMemoryError
    :show-inheritance:
-.. autoclass:: ClientTemporaryFailError
+.. autoexception:: ClientTemporaryFailError
    :show-inheritance:
-.. autoclass:: BadHandleError
+.. autoexception:: BadHandleError
    :show-inheritance:
