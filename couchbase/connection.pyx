@@ -42,7 +42,7 @@ cdef class Connection:
         if bucket is None:
             raise ArgumentError("A bucket name must be given")
 
-        host = (host + (':%d' % port)).encode('utf-8')
+        host = ('%s:%d' % (host, port)).encode('utf-8')
         password = password.encode('utf-8')
         bucket = bucket.encode('utf-8')
 
