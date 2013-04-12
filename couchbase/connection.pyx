@@ -59,7 +59,6 @@ cdef class Connection:
 
         rc = lcb.lcb_create(&self._instance, &self._create_options)
         Utils.maybe_raise(rc, 'failed to create libcouchbase instance')
-        # XXX vmx 2013-04-09: Does it return an error?
         lcb.lcb_behavior_set_syncmode(self._instance, lcb.LCB_SYNCHRONOUS)
         self._connect()
 
