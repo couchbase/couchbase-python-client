@@ -34,6 +34,15 @@ except ImportError:
 setup(
     name="couchbase-python-sdk",
     version="0.9",
+    url="https://github.com/couchbaselabs/pylibcouchbase",
+    author="Volker Mische",
+    author_email="volker.mische@gmail.com",
+    classifiers=["Development Status :: 3 - Alpha",
+                 "Intended Audience :: Developers",
+                 "Operating System :: OS Independent",
+                 "Programming Language :: Python",
+                 "Topic :: Software Development :: Libraries",
+                 "Topic :: Software Development :: Libraries :: Python Modules"],
     cmdclass=cmdclass,
     ext_modules=[Extension(
         "couchbase/libcouchbase", ["couchbase/libcouchbase.c"],
