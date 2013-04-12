@@ -1,4 +1,4 @@
-from couchbase import libcouchbase
+import couchbase
 
 # Import a few things into the root of the module
 from couchbase.libcouchbase import CB_FMT_JSON, CB_FMT_PICKLE, CB_FMT_PLAIN
@@ -57,4 +57,5 @@ class Couchbase:
             cb = Couchbase.connect('example.com', username='admin',
                                    password='secret', bucket='mybucket')
         """
-        return libcouchbase.Connection(host, port, username, password, bucket)
+        return couchbase.libcouchbase.Connection(host, port, username,
+                                                 password, bucket)

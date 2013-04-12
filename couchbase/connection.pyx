@@ -1,5 +1,17 @@
-import couchbase.exceptions
-from couchbase.exceptions import ArgumentError
+cdef void cb_store_callback(lcb.lcb_t instance, const void *cookie,
+                            lcb.lcb_storage_t operation, lcb.lcb_error_t rc,
+                            const lcb.lcb_store_resp_t *resp):
+    ctx = <object>cookie
+    cas = None
+    key = (<char *>resp.v.v0.key)[:resp.v.v0.nkey].decode('utf-8')
+
+    if resp.v.v0.cas > 0:
+        cas = resp.v.v0.cas
+    ctx['operation'] = Const.store_names[operation]
+
+    Utils.maybe_raise(rc, 'failed to store value', key=key, cas=cas,
+                      operation=operation)
+    ctx['rv'].append((key, cas))
 
 
 cdef void cb_get_callback(lcb.lcb_t instance, const void *cookie,
@@ -36,11 +48,27 @@ cdef class Connection:
 
         Normally it's initialized through
         :meth:`couchbase.Couchbase.connect`
+
+        **Class attributes**
+
+          **default_format** = `Couchbase.CB_FMT_JSON`
+            It uses the flags field to store the format. Possible values
+            are:
+             * `couchbase.CB_FMT_JSON`: Converts the Python object to
+               JSON and stores it as JSON in Couchbase
+             * `couchbase.CB_FMT_PICKLE`: Pickles the Python object and
+               stores it as binary in Couchbase
+             * `couchbase.CB_FMT_PLAIN`: Stores the Python object as is
+               in Couchbase. If it is a string containing valid JSON it
+               will be stored as JSON, else binary.
+            On a :meth:`couchbase.libcouchbase.Connection.get` the
+            original value will be returned. This means the JSON will be
+            decoded, respectively the object will be unpickled.
         """
         if password is None:
-            raise ArgumentError("A password must be given")
+            raise exceptions.ArgumentError("A password must be given")
         if bucket is None:
-            raise ArgumentError("A bucket name must be given")
+            raise exceptions.ArgumentError("A bucket name must be given")
 
         host = ('%s:%d' % (host, port)).encode('utf-8')
         password = password.encode('utf-8')
@@ -60,6 +88,9 @@ cdef class Connection:
         rc = lcb.lcb_create(&self._instance, &self._create_options)
         Utils.maybe_raise(rc, 'failed to create libcouchbase instance')
         lcb.lcb_behavior_set_syncmode(self._instance, lcb.LCB_SYNCHRONOUS)
+
+        <void>lcb.lcb_set_store_callback(self._instance, cb_store_callback);
+
         self._connect()
 
     def _connect(self):
@@ -109,10 +140,36 @@ cdef class Connection:
         }
 
     def set(self, key, value, format=None):
-        """Just a small docstring tests
+        """Unconditionally store the object in the Couchbase
 
-        To see if Cython includes works
+        :param string key: key used to reference the value
+        :param any value: value to be stored
+        :param format: the representation for storing the value in the
+          bucket. If none is specified it will use the `default_format`.
+          For more info see
+          :attr:`couchbase.libcouchbase.Connection.default_format`.
+
+        :raise: :exc:`couchbase.exceptions.ConnectError` if the
+          connection closed
+        :raise: :exc:`couchbase.exceptions.ValueFormatError` if the value
+          cannot be serialized with chosen encoder, e.g. if you try to
+          store a dictionaty in plain mode.
+        :raise :exc:1couchbase.exceptions.TimoutError` if timeout
+          interval for observe exceeds
+
+        :return: (*int*) the CAS value of the object
+
+        Simple set::
+
+            cb.set('key', 'value')
+
+        Force JSON document format for value::
+
+            c.set('foo', {'bar': 'baz'}, format=couchbase.CB_FMT_JSON)
         """
+        if self._instance == NULL:
+            Utils.raise_not_connected(lcb.LCB_SET)
+
         key = key.encode('utf-8')
         cdef char *c_key = key
 
@@ -121,6 +178,7 @@ cdef class Connection:
 
         value = self._encode_value(value, format)
         cdef char *c_value = value
+        ctx = self._context_dict()
 
         cdef int num_commands = 1
         cdef lcb.lcb_store_cmd_t cmd
@@ -139,9 +197,17 @@ cdef class Connection:
             cmd.v.v0.bytes = c_value
             cmd.v.v0.nbytes = len(value)
             cmd.v.v0.flags = format
-            err = lcb.lcb_store(self._instance, NULL, 1, commands)
-            if err != lcb.LCB_SUCCESS:
-                print("store error", err)
+            rc = lcb.lcb_store(self._instance, <void *>ctx, 1, commands)
+            Utils.maybe_raise(rc, 'failed to schedule set request')
+
+            # TODO vmx 2013-04-12: Wait for all operations to be processed
+            #    This should already be the case in sync mode, but I'm not
+            #    sure
+
+            if num_commands > 1:
+                return ctx['rv']
+            else:
+                return ctx['rv'][0][1]
         finally:
             free(commands)
 

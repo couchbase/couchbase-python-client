@@ -8,6 +8,10 @@ class ArgumentError(CouchbaseError):
     """
 
 
+class ValueFormatError(CouchbaseError):
+    """Failed to decode or encode value"""
+
+
 # The following exceptions are derived from libcouchbase
 
 class AuthError(CouchbaseError):

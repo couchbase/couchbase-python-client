@@ -14,6 +14,15 @@ cdef public enum _cb_formats:
     CB_FMT_MASK = 0x3
 
 
+class Const:
+    store_names = {
+        lcb.LCB_ADD: 'ADD',
+        lcb.LCB_REPLACE: 'REPLACE',
+        lcb.LCB_SET: 'SET',
+        lcb.LCB_APPEND:'APPEND',
+        lcb.LCB_PREPEND: 'PREPEND'
+    }
+
 class Utils:
     exc_names = {
         lcb.LCB_AUTH_ERROR: 'AuthError',
@@ -47,24 +56,27 @@ class Utils:
 
 
     @staticmethod
-    def maybe_raise(rc, msg, key=None, status=0):
+    def maybe_raise(rc, msg, key=None, status=0, cas=0, operation=0):
         """Raise meaningful exception
 
         Helper to raise a meaningful exception based on the return code
-        from libcouchbase. If a success was returned, no expection will be
-        thrown
+        from libcouchbase. If a success was returned, no expection will
+        be raised.
 
         :param int rc: return code from libcouchbase
         :param string msg: the error message
         :param string key: the key that was part of the operation
-        :param int status: the HTTP status code if the operation was through
-                           HTTP
+        :param int status: the HTTP status code if the operation was
+          through HTTP
+        :param cas: the CAS value
+        :param int peration: The operation that was performed on
+          Couchbase (ADD, SET, REPLACE, APPEND or PREPEND)
 
         :raise: Any of the exceptions from :mod:`couchbase.exceptions`
         :return: no treturn value
         """
         if ((rc == lcb.LCB_SUCCESS and (status == 0 or status/100 == 2)) or
-            rc == LCB_AUTH_CONTINUE):
+            rc == lcb.LCB_AUTH_CONTINUE):
             return
 
         if status > 0:
@@ -72,9 +84,21 @@ class Utils:
         else:
             exc_name = Utils.exc_names.get(rc, 'LibcouchbaseError')
 
-        exception = getattr(couchbase.exceptions, exc_name)(
-            msg, rc, key, status)
+        # `exceptions` is the couchbase.exceptions module
+        exception = getattr(exceptions, exc_name)(
+            msg, rc, key, status, cas, operation)
         raise exception
+
+    @staticmethod
+    def raise_not_connected(operation):
+        """Raise a not connected to the server error
+
+        :param int operation: the operation that causes the error (ADD,
+          SET, REPLACE, APPEND or PREPEND)
+        """
+        raise exceptions.CouchbaseConnectError(
+            "not connected to the server",
+            operation=Const.store_names[lcb.LCB_SET])
 
 
 class CouchbaseError(Exception):
@@ -89,7 +113,8 @@ class CouchbaseError(Exception):
         :param int status: the HTTP status code if the operation was through
                            HTTP
         :param cas: the CAS value
-        :param operation: The operation that was performed on Couchbase
+        :param operation: The operation that was performed on Couchbase (ADD,
+          SET, REPLACE, APPEND or PREPEND)
     """
     http_status_msg = {
         lcb.LCB_HTTP_STATUS_BAD_REQUEST: '(Bad Request)',
@@ -149,5 +174,8 @@ class CouchbaseError(Exception):
             info.append('operation={0}'.format(self.operation))
         return '{0} ({1})'.format(self.msg, ', '.join(info))
 
+
+# The exceptions need CouchbaseError(), hence import it afterwards
+from couchbase import exceptions
 
 include "connection.pyx"
