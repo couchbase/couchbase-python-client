@@ -162,7 +162,9 @@ class CouchbaseError(Exception):
         self.operation = operation
 
     def __str__(self):
-        info = ['error=0x{0:02x}'.format(self.error)]
+        info = []
+        if self.error:
+            info.append('error=0x{0:02x}'.format(self.error))
         if self.key:
             info.append('key={0}'.format(self.key))
         if self.status:
