@@ -156,11 +156,11 @@ cdef class Connection:
 
         :raise: :exc:`couchbase.exceptions.ConnectError` if the
           connection closed
+        :raise: :exc:`couchbase.exceptions.KeyExistsError` if the key
+          already exists on the server with a different CAS value.
         :raise: :exc:`couchbase.exceptions.ValueFormatError` if the value
           cannot be serialized with chosen encoder, e.g. if you try to
           store a dictionaty in plain mode.
-        :raise :exc:1couchbase.exceptions.TimoutError` if timeout
-          interval for observe exceeds
 
         :return: (*int*) the CAS value of the object
 
