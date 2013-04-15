@@ -126,8 +126,15 @@ cdef class Connection:
         whether it should be as JSON string, pickled or not encoded at all
         (plain).
         """
+        if format == FMT_PLAIN and not isinstance(value, bytes):
+            raise exceptions.ValueFormatError("FMT_PLAIN expects a byte array")
+
         if format == FMT_JSON:
-            return json.dumps(value).encode('utf-8')
+            try:
+                return json.dumps(value).encode('utf-8')
+            except TypeError:
+                raise exceptions.ValueFormatError(
+                    "FMT_JSON expects a JSON serializable object")
         elif format == FMT_PICKLE:
             return pickle.dumps(value)
         elif format == FMT_PLAIN:
@@ -207,18 +214,13 @@ cdef class Connection:
         if format is None:
             format = self.default_format
 
-        if format == FMT_PLAIN and not isinstance(value, bytes):
-            raise exceptions.ValueFormatError(
-                "unable to convert value for key '{0}': {1}. "
-                "FMT_PLAIN expects a byte array".format(
-                    key.decode('utf-8'), value))
         try:
             value = self._encode_value(value, format)
-        except TypeError:
-            raise exceptions.ValueFormatError(
-                "unable to convert value for key '{0}': {1}. "
-                "FMT_JSON expects a JSON serializable object".format(
-                    key.decode('utf-8'), value))
+        except exceptions.ValueFormatError as e:
+            e.msg = "unable to convert value for key '{0}': {1}. ".format(
+                key.decode('utf-8'), value) + e.msg
+            e.key = key
+            raise e
         cdef char *c_value = value
         ctx = self._context_dict()
 
