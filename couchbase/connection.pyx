@@ -9,8 +9,12 @@ cdef void cb_store_callback(lcb.lcb_t instance, const void *cookie,
         cas = resp.v.v0.cas
     ctx['operation'] = Const.store_names[operation]
 
-    Utils.maybe_raise(rc, 'failed to store value', key=key, cas=cas,
-                      operation=operation)
+    try:
+        Utils.maybe_raise(rc, 'failed to store value', key=key, cas=cas,
+                          operation=operation)
+    except CouchbaseError as e:
+        ctx['exception'] = e
+
     ctx['rv'].append((key, cas))
 
 
@@ -244,6 +248,9 @@ cdef class Connection:
             # TODO vmx 2013-04-12: Wait for all operations to be processed
             #    This should already be the case in sync mode, but I'm not
             #    sure
+
+            if ctx['exception']:
+                raise ctx['exception']
 
             if num_commands > 1:
                 return ctx['rv']
