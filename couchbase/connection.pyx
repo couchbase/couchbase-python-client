@@ -185,7 +185,18 @@ cdef class Connection:
         if format is None:
             format = self.default_format
 
-        value = self._encode_value(value, format)
+        if format == FMT_PLAIN and not isinstance(value, bytes):
+            raise exceptions.ValueFormatError(
+                "unable to convert value for key '{0}': {1}. "
+                "FMT_PLAIN expects a byte array".format(
+                    key.decode('utf-8'), value))
+        try:
+            value = self._encode_value(value, format)
+        except TypeError:
+            raise exceptions.ValueFormatError(
+                "unable to convert value for key '{0}': {1}. "
+                "FMT_JSON expects a JSON serializable object".format(
+                    key.decode('utf-8'), value))
         cdef char *c_value = value
         ctx = self._context_dict()
 
