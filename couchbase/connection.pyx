@@ -49,7 +49,7 @@ cdef void cb_get_callback(lcb.lcb_t instance, const void *cookie,
         except Exception as e:
             ctx['exception'] = exceptions.ValueFormatError(
                 "unable to convert value for key '{0}': {1}. ".format(
-                    key, val))
+                    key, val), key=key)
 
     ctx['rv'].append((key, val))
 
