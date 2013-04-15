@@ -15,23 +15,39 @@ cdef void cb_store_callback(lcb.lcb_t instance, const void *cookie,
 
 
 cdef void cb_get_callback(lcb.lcb_t instance, const void *cookie,
-                          lcb.lcb_error_t error,
+                          lcb.lcb_error_t rc,
                           const lcb.lcb_get_resp_t *resp):
     # A lot of error handling is missing here, but you get at least your
     # values back
     ctx = <object>cookie
 
     key = (<char *>resp.v.v0.key)[:resp.v.v0.nkey].decode('utf-8')
+
+    if rc != lcb.LCB_KEY_ENOENT:
+        try:
+            Utils.maybe_raise(rc, 'failed to get value', key=key,
+                              operation='GET')
+        except CouchbaseError as e:
+            ctx['exception'] = e
+
     flags = resp.v.v0.flags
+    cas = resp.v.v0.cas
     val = None
 
     if resp.v.v0.nbytes != 0:
         raw = (<char *>resp.v.v0.bytes)[:resp.v.v0.nbytes]
-        format = flags & FMT_MASK
-        val = Connection._decode_value(raw, format)
+        if ctx['force_format'] is not None:
+            format = ctx['force_format']
+        else:
+            format = flags & FMT_MASK
+        try:
+            val = Connection._decode_value(raw, format)
+        except Exception as e:
+            ctx['exception'] = exceptions.ValueFormatError(
+                "unable to convert value for key '{0}': {1}. ".format(
+                    key, val))
 
     ctx['rv'].append((key, val))
-
 
 
 cdef class Connection:
@@ -136,6 +152,8 @@ cdef class Connection:
     @staticmethod
     def _context_dict():
         return {
+            'exception': None,
+            'force_format': None,
             'rv': []
         }
 
@@ -234,11 +252,39 @@ cdef class Connection:
         finally:
             free(commands)
 
-    def get(self, key):
+    def get(self, key, format=None):
+        """Obtain an object stored in Couchbase by given key
+
+        :param string key: key used to reference the value
+        :param format: explicitly choose the decoer for this key. If
+          none is specified the decoder will automaticall be choosen
+          based on the encoder that was used to store the value. For
+          more information about the formats, see
+          :attr:`couchbase.libcouchbase.Connection.default_format`.
+
+        :raise: :exc:`couchbase.exceptions.NotFoundError` if the key
+          is missing in the bucket
+        :raise: :exc:`couchbase.exceptions.ConnectError` if the
+          connection closed
+        :raise: :exc:`couchbase.exceptions.ValueFormatError` if the
+          value cannot be deserialized with chosen decoder, e.g. if you
+          try to retreive a pickled object in JSON mode.
+
+        :return: the value associated with the key
+
+        Simple get::
+
+            value = cb.get('key')
+        """
+        if self._instance == NULL:
+            Utils.raise_not_connected(lcb.LCB_SET)
+
         key = key.encode('utf-8')
         cdef char *c_key = key
 
         ctx = self._context_dict()
+        ctx['force_format'] = format
+
         <void>lcb.lcb_set_get_callback(self._instance, cb_get_callback);
 
         cdef int num_commands = 1
@@ -254,10 +300,17 @@ cdef class Connection:
             memset(&cmd, 0, sizeof(cmd))
             cmd.v.v0.key = c_key
             cmd.v.v0.nkey = len(key)
-            err = lcb.lcb_get(self._instance, <void *>ctx, 1, commands)
-            if err != lcb.LCB_SUCCESS:
-                print("get error", err)
+            rc = lcb.lcb_get(self._instance, <void *>ctx, 1, commands)
 
-            return ctx['rv']
+            Utils.maybe_raise(rc, 'failed to schedule get request')
+
+            # TODO vmx 2013-04-12: Wait for all operations to be processed
+            #    This should already be the case in sync mode, but I'm not
+            #    sure
+
+            if ctx['exception']:
+                raise ctx['exception']
+
+            return ctx['rv'][0][1]
         finally:
             free(commands)
