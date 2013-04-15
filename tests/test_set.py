@@ -8,8 +8,8 @@ from tests.base import CouchbaseTestCase
 class ConnectionSetTest(CouchbaseTestCase):
     def setUp(self):
         super(ConnectionSetTest, self).setUp()
-        self.cb = Connection(self.host, self.port, self.username, self.password,
-                             self.bucket_prefix)
+        self.cb = Connection(self.host, self.port, self.username,
+                             self.password, self.bucket_prefix)
 
     def test_trivial_set(self):
         cas = self.cb.set('key_trivial1', 'value1')
