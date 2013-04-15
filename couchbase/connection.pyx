@@ -110,6 +110,7 @@ cdef class Connection:
         lcb.lcb_behavior_set_syncmode(self._instance, lcb.LCB_SYNCHRONOUS)
 
         <void>lcb.lcb_set_store_callback(self._instance, cb_store_callback);
+        <void>lcb.lcb_set_get_callback(self._instance, cb_get_callback);
 
         self._connect()
 
@@ -293,8 +294,6 @@ cdef class Connection:
 
         ctx = self._context_dict()
         ctx['force_format'] = format
-
-        <void>lcb.lcb_set_get_callback(self._instance, cb_get_callback);
 
         cdef int num_commands = 1
         cdef lcb.lcb_get_cmd_t cmd
