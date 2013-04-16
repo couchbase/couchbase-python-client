@@ -12,7 +12,7 @@ class Couchbase:
         """Connect to a bucket
 
         The parameters `password` and `bucket` are **not** optional and
-        will cause a :exc:`couchbase.excpetions.ArgumentError`
+        will cause a :exc:`couchbase.exceptions.ArgumentError`
         exception if they are not specified.
         If `username` is not given, it will automatically set to the
         bucket name, as it is expected that you try to connect to a SASL

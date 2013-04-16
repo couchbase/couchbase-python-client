@@ -74,6 +74,7 @@ cdef class Connection:
           **default_format** = `Couchbase.FMT_JSON`
             It uses the flags field to store the format. Possible values
             are:
+
              * `couchbase.FMT_JSON`: Converts the Python object to
                JSON and stores it as JSON in Couchbase
              * `couchbase.FMT_PICKLE`: Pickles the Python object and
@@ -81,6 +82,7 @@ cdef class Connection:
              * `couchbase.FMT_PLAIN`: Stores the Python object as is
                in Couchbase. If it is a string containing valid JSON it
                will be stored as JSON, else binary.
+
             On a :meth:`couchbase.libcouchbase.Connection.get` the
             original value will be returned. This means the JSON will be
             decoded, respectively the object will be unpickled.
