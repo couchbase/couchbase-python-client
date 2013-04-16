@@ -1,5 +1,6 @@
 from couchbase import FMT_JSON, FMT_PICKLE, FMT_PLAIN
-from couchbase.exceptions import KeyExistsError, ValueFormatError
+from couchbase.exceptions import (KeyExistsError, ValueFormatError,
+                                  ArgumentError)
 from couchbase.libcouchbase import Connection
 
 from tests.base import CouchbaseTestCase
@@ -49,6 +50,17 @@ class ConnectionSetTest(CouchbaseTestCase):
                           'key_format5', {'some': 'value5'}, format=FMT_PLAIN)
         cas6 = self.cb.set('key_format6', b'some value6', format=FMT_PLAIN)
         self.assertTrue(cas6 > 0)
+
+    def test_multi_set(self):
+        set1 = self.cb.set({'key_multi1': 'value1', 'key_multi3': 'value3',
+                            'key_multi2': 'value2'})
+        self.assertTrue(set1['key_multi1'] > 0)
+        self.assertTrue(set1['key_multi2'] > 0)
+        self.assertTrue(set1['key_multi3'] > 0)
+
+        self.assertRaises(ArgumentError, self.cb.set,
+                          {'key_multi4': 'value4', 'key_multi5': 'value5'},
+                          cas = 123)
 
 
 if __name__ == '__main__':

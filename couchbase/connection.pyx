@@ -15,7 +15,7 @@ cdef void cb_store_callback(lcb.lcb_t instance, const void *cookie,
     except CouchbaseError as e:
         ctx['exception'] = e
 
-    ctx['rv'].append((key, cas))
+    ctx['rv'][key] = cas
 
 
 cdef void cb_get_callback(lcb.lcb_t instance, const void *cookie,
@@ -171,10 +171,13 @@ cdef class Connection:
             'rv': []
         }
 
-    def set(self, key, value, cas=None, format=None):
+    def set(self, key, value=None, cas=None, format=None):
         """Unconditionally store the object in the Couchbase
 
-        :param string key: key used to reference the value
+        :param key: if it's a string it's the key used to reference the
+          value. In case of a dict, it's a multi-set where the key-value
+          pairs will be stored.
+        :type key: string or dict
         :param any value: value to be stored
         :param int cas: the CAS value for an object. This value is created
           on the server and is guaranteed to be unique for each value of
@@ -186,6 +189,9 @@ cdef class Connection:
           For more info see
           :attr:`couchbase.libcouchbase.Connection.default_format`.
 
+        :raise: :exc:`couchbase.exceptions.ArgumentError` if an
+          argument is supplied that is not applicable in this context.
+          For example setting the CAS value on a multi set.
         :raise: :exc:`couchbase.exceptions.ConnectError` if the
           connection closed
         :raise: :exc:`couchbase.exceptions.KeyExistsError` if the key
@@ -204,50 +210,73 @@ cdef class Connection:
 
             cb.set('foo', {'bar': 'baz'}, format=couchbase.FMT_JSON)
 
-        Perform optimistic locking by specifying last known CAS version
+        Perform optimistic locking by specifying last known CAS version::
 
             cb.set('foo', 'bar', cas=8835713818674332672)
+
+        Several sets at the same time (mutli-set)::
+
+            cb.set({'foo': 'bar', 'baz': 'value'})
         """
         if self._instance == NULL:
             Utils.raise_not_connected(lcb.LCB_SET)
 
-        key = key.encode('utf-8')
-        cdef char *c_key = key
+        # A single key
+        if not isinstance(key, dict):
+            data = {key: value}
+        else:
+            if cas:
+                raise exceptions.ArgumentError(
+                    "setting `cas` is not applicable on a multi-set operation")
+            data = key
 
-        if format is None:
-            format = self.default_format
-
-        try:
-            value = self._encode_value(value, format)
-        except exceptions.ValueFormatError as e:
-            e.msg = "unable to convert value for key '{0}': {1}. ".format(
-                key.decode('utf-8'), value) + e.msg
-            e.key = key
-            raise e
-        cdef char *c_value = value
         ctx = self._context_dict()
+        ctx['rv'] = {}
+        cdef int num_commands = len(data)
+        cdef int i = 0
 
-        cdef int num_commands = 1
-        cdef lcb.lcb_store_cmd_t cmd
-        cdef const lcb.lcb_store_cmd_t **commands = \
+        cdef lcb.lcb_store_cmd_t *cmds = <lcb.lcb_store_cmd_t *>malloc(
+            num_commands * sizeof(lcb.lcb_store_cmd_t))
+        if not cmds:
+            raise MemoryError()
+        cdef const lcb.lcb_store_cmd_t **ptr_cmds = \
             <const lcb.lcb_store_cmd_t **>malloc(
                 num_commands * sizeof(lcb.lcb_store_cmd_t *))
-        if not commands:
+        if not ptr_cmds:
             raise MemoryError()
 
-        try:
-            commands[0] = &cmd
-            memset(&cmd, 0, sizeof(cmd))
-            cmd.v.v0.operation = lcb.LCB_SET
-            cmd.v.v0.key = c_key
-            cmd.v.v0.nkey = len(key)
-            cmd.v.v0.bytes = c_value
-            cmd.v.v0.nbytes = len(value)
-            cmd.v.v0.flags = format
-            if cas is not None:
-                cmd.v.v0.cas = cas
+        # Those lists are needed as there must be a reference to the string
+        # in the Python space
+        keys = []
+        values = []
 
-            rc = lcb.lcb_store(self._instance, <void *>ctx, 1, commands)
+        try:
+            for key, value in data.items():
+                keys.append(key.encode('utf-8'))
+                if format is None:
+                    format = self.default_format
+                try:
+                    values.append(self._encode_value(value, format))
+                except exceptions.ValueFormatError as e:
+                    e.msg = ("unable to convert value for key "
+                             "'{0}': {1}. ").format(key, value) + e.msg
+                    e.key = key
+                    raise e
+
+                ptr_cmds[i] = &cmds[i];
+                memset(&cmds[i], 0, sizeof(lcb.lcb_store_cmd_t))
+                cmds[i].v.v0.operation = lcb.LCB_SET
+                cmds[i].v.v0.key = <char *>keys[i]
+                cmds[i].v.v0.nkey = len(keys[i])
+                cmds[i].v.v0.bytes = <char *>values[i]
+                cmds[i].v.v0.nbytes = len(values[i])
+                cmds[i].v.v0.flags = format
+                if cas is not None:
+                    cmds[i].v.v0.cas = cas
+                i += 1
+
+            rc = lcb.lcb_store(self._instance, <void *>ctx, num_commands,
+                               ptr_cmds)
             Utils.maybe_raise(rc, 'failed to schedule set request')
 
             # TODO vmx 2013-04-12: Wait for all operations to be processed
@@ -260,9 +289,10 @@ cdef class Connection:
             if num_commands > 1:
                 return ctx['rv']
             else:
-                return ctx['rv'][0][1]
+                return list(ctx['rv'].values())[0]
         finally:
-            free(commands)
+            free(cmds)
+            free(ptr_cmds)
 
     def get(self, key, format=None):
         """Obtain an object stored in Couchbase by given key
