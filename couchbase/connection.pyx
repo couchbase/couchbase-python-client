@@ -1,3 +1,6 @@
+Result = namedtuple('Result', ['value', 'flags', 'cas'])
+
+
 cdef void cb_store_callback(lcb.lcb_t instance, const void *cookie,
                             lcb.lcb_storage_t operation, lcb.lcb_error_t rc,
                             const lcb.lcb_store_resp_t *resp):
@@ -51,7 +54,7 @@ cdef void cb_get_callback(lcb.lcb_t instance, const void *cookie,
                     key, val), key=key)
 
     if ctx['extended']:
-        ctx['rv'].append((key, (val, flags, cas)))
+        ctx['rv'].append((key, Result(val, flags, cas)))
     else:
         ctx['rv'].append(val)
 
@@ -304,8 +307,8 @@ cdef class Connection:
         :param keys: One or several keys to fetch
         :type key: string or list
         :param boolean extended: If set to `True`, the operation will
-          return a tuple with `value`, `flags` and `cas`, otherwise (by
-          default) it returns just the value.
+          return a named tuple with `value`, `flags` and `cas`,
+          otherwise (by default) it returns just the value.
         :param format: explicitly choose the decoder for this key. If
           none is specified the decoder will automaticall be choosen
           based on the encoder that was used to store the value. For
@@ -337,6 +340,11 @@ cdef class Connection:
         Extended get::
 
             value, flags, cas = cb.get('key', extended=True)
+
+        Extended get using named tuples::
+
+            result = cb.get('key', extended=True)
+            # result.value, result.flags, result.cas
 
         Get multiple values in extended mode::
 

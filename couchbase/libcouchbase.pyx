@@ -5,6 +5,7 @@ cimport libcouchbase as lcb
 
 import json
 import pickle
+from collections import namedtuple
 
 
 cdef public enum _cb_formats:

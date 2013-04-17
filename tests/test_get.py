@@ -71,13 +71,25 @@ class ConnectionGetTest(CouchbaseTestCase):
         self.assertEqual(flags1, 0x0)
         self.assertEqual(cas1, orig_cas1)
 
+        # Test named tuples
+        result = self.cb.get('key_extended1', extended=True)
+        self.assertEqual(result.value, 'value1')
+        self.assertEqual(result.flags, 0x0)
+        self.assertEqual(result.cas, orig_cas1)
+
         cas2 = self.cb.set('key_extended2', 'value2')
         cas3 = self.cb.set('key_extended3', 'value3')
         results = self.cb.get(['key_extended2', 'key_extended3'],
                               extended=True)
         self.assertEqual(results['key_extended2'], ('value2', 0x0, cas2))
-        self.assertEqual(results['key_extended3'], ('value3', 0x0, cas3))
+        self.assertEqual(results['key_extended3'].value, 'value3')
+        self.assertEqual(results['key_extended3'].flags, 0x0)
+        self.assertEqual(results['key_extended3'].cas, cas3)
 
+        val4, flags4, cas4 = self.cb.get('missing_key', extended=True)
+        self.assertEqual(val4, None)
+        self.assertEqual(flags1, 0x0)
+        self.assertEqual(cas4, 0)
 
 if __name__ == '__main__':
     unittest.main()
