@@ -27,10 +27,9 @@ cdef void cb_get_callback(lcb.lcb_t instance, const void *cookie,
 
     key = (<char *>resp.v.v0.key)[:resp.v.v0.nkey].decode('utf-8')
 
-    if rc != lcb.LCB_KEY_ENOENT:
+    if rc != lcb.LCB_KEY_ENOENT or not ctx['quiet']:
         try:
-            Utils.maybe_raise(rc, 'failed to get value', key=key,
-                              operation='GET')
+            Utils.maybe_raise(rc, 'failed to get value', key=key, operation='GET')
         except CouchbaseError as e:
             ctx['exception'] = e
 
@@ -264,7 +263,7 @@ cdef class Connection:
                     e.key = key
                     raise e
 
-                ptr_cmds[i] = &cmds[i];
+                ptr_cmds[i] = &cmds[i]
                 memset(&cmds[i], 0, sizeof(lcb.lcb_store_cmd_t))
                 cmds[i].v.v0.operation = lcb.LCB_SET
                 cmds[i].v.v0.key = <char *>keys[i]
@@ -295,16 +294,18 @@ cdef class Connection:
             free(cmds)
             free(ptr_cmds)
 
-    def get(self, keys, format=None):
+    def get(self, keys, format=None, quiet=True):
         """Obtain an object stored in Couchbase by given key
 
         :param keys: One or several keys to fetch
         :type key: string or list
-        :param format: explicitly choose the decoer for this key. If
+        :param format: explicitly choose the decoder for this key. If
           none is specified the decoder will automaticall be choosen
           based on the encoder that was used to store the value. For
           more information about the formats, see
           :attr:`couchbase.libcouchbase.Connection.default_format`.
+        :param quiet: causes `get` to return None instead of raising
+         an exception when the key is not found
 
         :raise: :exc:`couchbase.exceptions.NotFoundError` if the key
           is missing in the bucket
@@ -333,6 +334,7 @@ cdef class Connection:
         ctx = self._context_dict()
         ctx['rv'] = []
         ctx['force_format'] = format
+        ctx['quiet'] = quiet
         cdef int num_cmds = len(keys)
         cdef int i = 0
 
@@ -357,7 +359,8 @@ cdef class Connection:
                 cmds[i].v.v0.nkey = len(keys[i])
 
             rc = lcb.lcb_get(self._instance, <void *>ctx, num_cmds, ptr_cmds)
-            Utils.maybe_raise(rc, 'failed to schedule get request')
+            if rc != lcb.LCB_KEY_ENOENT or not ctx['quiet']:
+                Utils.maybe_raise(rc, 'failed to schedule get request')
 
             # TODO vmx 2013-04-12: Wait for all operations to be processed
             #    This should already be the case in sync mode, but I'm not
