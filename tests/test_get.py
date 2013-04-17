@@ -49,6 +49,14 @@ class ConnectionGetTest(CouchbaseTestCase):
         self.assertRaises(ValueFormatError, self.cb.get, 'key_format7',
                           format=FMT_JSON)
 
+    def test_multi_get(self):
+        self.cb.set({'key_multi1': 'value1', 'key_multi3': 'value3',
+                            'key_multi2': 'value2'})
+        val1 = self.cb.get(['key_multi2', 'key_multi3'])
+        self.assertEqual(val1, ['value2', 'value3'])
+        val2 = self.cb.get(['key_multi3', 'key_multi1', 'key_multi2'])
+        self.assertEqual(val2, ['value3', 'value1', 'value2'])
+
 
 if __name__ == '__main__':
     unittest.main()

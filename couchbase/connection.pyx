@@ -168,7 +168,7 @@ cdef class Connection:
         return {
             'exception': None,
             'force_format': None,
-            'rv': []
+            'rv': None
         }
 
     def set(self, key, value=None, cas=None, format=None):
@@ -295,7 +295,7 @@ cdef class Connection:
             free(cmds)
             free(ptr_cmds)
 
-    def get(self, key, format=None):
+    def get(self, keys, format=None):
         """Obtain an object stored in Couchbase by given key
 
         :param string key: key used to reference the value
@@ -320,29 +320,38 @@ cdef class Connection:
             value = cb.get('key')
         """
         if self._instance == NULL:
-            Utils.raise_not_connected(lcb.LCB_SET)
+            Utils.raise_not_connected(lcb.LCB_GET)
 
-        key = key.encode('utf-8')
-        cdef char *c_key = key
+        if not isinstance(keys, list):
+            keys = [keys]
 
         ctx = self._context_dict()
+        ctx['rv'] = []
         ctx['force_format'] = format
+        cdef int num_cmds = len(keys)
+        cdef int i = 0
 
-        cdef int num_commands = 1
-        cdef lcb.lcb_get_cmd_t cmd
-        cdef const lcb.lcb_get_cmd_t **commands = \
+        cdef lcb.lcb_get_cmd_t *cmds = <lcb.lcb_get_cmd_t *>malloc(
+            num_cmds * sizeof(lcb.lcb_get_cmd_t))
+        if not cmds:
+            raise MemoryError()
+        cdef const lcb.lcb_get_cmd_t **ptr_cmds = \
             <const lcb.lcb_get_cmd_t **>malloc(
-                num_commands * sizeof(lcb.lcb_get_cmd_t *))
-        if not commands:
+                num_cmds * sizeof(lcb.lcb_get_cmd_t *))
+        if not ptr_cmds:
+            free(cmds)
             raise MemoryError()
 
         try:
-            commands[0] = &cmd
-            memset(&cmd, 0, sizeof(cmd))
-            cmd.v.v0.key = c_key
-            cmd.v.v0.nkey = len(key)
-            rc = lcb.lcb_get(self._instance, <void *>ctx, 1, commands)
+            for i in range(len(keys)):
+                keys[i] = keys[i].encode('utf-8')
 
+                ptr_cmds[i] = &cmds[i]
+                memset(&cmds[i], 0, sizeof(lcb.lcb_get_cmd_t))
+                cmds[i].v.v0.key = <char *>keys[i]
+                cmds[i].v.v0.nkey = len(keys[i])
+
+            rc = lcb.lcb_get(self._instance, <void *>ctx, num_cmds, ptr_cmds)
             Utils.maybe_raise(rc, 'failed to schedule get request')
 
             # TODO vmx 2013-04-12: Wait for all operations to be processed
@@ -352,6 +361,10 @@ cdef class Connection:
             if ctx['exception']:
                 raise ctx['exception']
 
-            return ctx['rv'][0][1]
+            if num_cmds > 1:
+                return [val for key, val in ctx['rv']]
+            else:
+                return ctx['rv'][0][1]
         finally:
-            free(commands)
+            free(cmds)
+            free(ptr_cmds)
