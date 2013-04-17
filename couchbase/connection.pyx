@@ -50,7 +50,10 @@ cdef void cb_get_callback(lcb.lcb_t instance, const void *cookie,
                 "unable to convert value for key '{0}': {1}. ".format(
                     key, val), key=key)
 
-    ctx['rv'].append((key, val))
+    if ctx['extended']:
+        ctx['rv'].append((key, (val, flags, cas)))
+    else:
+        ctx['rv'].append(val)
 
 
 cdef class Connection:
@@ -166,6 +169,7 @@ cdef class Connection:
     def _context_dict():
         return {
             'exception': None,
+            'extended': False,
             'force_format': None,
             'rv': None
         }
@@ -294,11 +298,14 @@ cdef class Connection:
             free(cmds)
             free(ptr_cmds)
 
-    def get(self, keys, format=None, quiet=True):
+    def get(self, keys, extended=False, format=None, quiet=True):
         """Obtain an object stored in Couchbase by given key
 
         :param keys: One or several keys to fetch
         :type key: string or list
+        :param boolean extended: If set to `True`, the operation will
+          return a tuple with `value`, `flags` and `cas`, otherwise (by
+          default) it returns just the value.
         :param format: explicitly choose the decoder for this key. If
           none is specified the decoder will automaticall be choosen
           based on the encoder that was used to store the value. For
@@ -315,7 +322,8 @@ cdef class Connection:
           value cannot be deserialized with chosen decoder, e.g. if you
           try to retreive a pickled object in JSON mode.
 
-        :return: the value associated with the key
+        :return: the value associated with the key or a dict on a
+          multi-get in `extended` mode.
 
         Simple get::
 
@@ -323,7 +331,17 @@ cdef class Connection:
 
         Get multiple values::
 
-            values = cb.get(['foo', 'bar', 'baz'])
+            cb.get(['foo', 'bar', 'baz'])
+            # [val1, val2, val3]
+
+        Extended get::
+
+            value, flags, cas = cb.get('key', extended=True)
+
+        Get multiple values in extended mode::
+
+            cb.get(['foo', 'bar'], extended=True)
+            # {'foo': (val1, flags1, cas1), 'bar': (val2, flags2, cas2)}
         """
         if self._instance == NULL:
             Utils.raise_not_connected(lcb.LCB_GET)
@@ -335,6 +353,7 @@ cdef class Connection:
         ctx['rv'] = []
         ctx['force_format'] = format
         ctx['quiet'] = quiet
+        ctx['extended'] = extended
         cdef int num_cmds = len(keys)
         cdef int i = 0
 
@@ -370,9 +389,13 @@ cdef class Connection:
                 raise ctx['exception']
 
             if num_cmds > 1:
-                return [val for key, val in ctx['rv']]
+                if extended:
+                    return dict(ctx['rv'])
+                return ctx['rv']
             else:
-                return ctx['rv'][0][1]
+                if extended:
+                    return ctx['rv'][0][1]
+                return ctx['rv'][0]
         finally:
             free(cmds)
             free(ptr_cmds)
