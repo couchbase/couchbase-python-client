@@ -1,7 +1,7 @@
 import pickle
 
 from couchbase import FMT_JSON, FMT_PICKLE, FMT_PLAIN
-from couchbase.exceptions import ValueFormatError
+from couchbase.exceptions import ValueFormatError, NotFoundError
 from couchbase.libcouchbase import Connection
 
 from tests.base import CouchbaseTestCase
@@ -17,6 +17,21 @@ class ConnectionGetTest(CouchbaseTestCase):
         self.cb.set('key_trivial1', 'value1')
         val = self.cb.get('key_trivial1')
         self.assertEqual(val, 'value1')
+
+    def test_get_missing_key(self):
+        val = self.cb.get('key_missing_1')
+        self.assertIsNone(val)
+        # Get with quiet=False
+        self.assertRaises(NotFoundError, self.cb.get, 'key_missing_1', quiet=False)
+
+    def test_multi_get(self):
+        self.cb.set({'key_multi1': 'value1', 'key_multi3': 'value3',
+                          'key_multi2': 'value2'})
+        val1 = self.cb.get(['key_multi2', 'key_multi3'])
+        self.assertEqual(val1, ['value2', 'value3'])
+        val2 = self.cb.get(['key_multi3', 'key_multi1', 'key_multi2'])
+        self.assertEqual(val2, ['value3', 'value1', 'value2'])
+
 
     def test_get_format(self):
         self.cb.set('key_format1', {'some': 'value1'}, format=FMT_JSON)
@@ -48,14 +63,6 @@ class ConnectionGetTest(CouchbaseTestCase):
         self.cb.set('key_format7', {'some': 'value7'}, format=FMT_PICKLE)
         self.assertRaises(ValueFormatError, self.cb.get, 'key_format7',
                           format=FMT_JSON)
-
-    def test_multi_get(self):
-        self.cb.set({'key_multi1': 'value1', 'key_multi3': 'value3',
-                            'key_multi2': 'value2'})
-        val1 = self.cb.get(['key_multi2', 'key_multi3'])
-        self.assertEqual(val1, ['value2', 'value3'])
-        val2 = self.cb.get(['key_multi3', 'key_multi1', 'key_multi2'])
-        self.assertEqual(val2, ['value3', 'value1', 'value2'])
 
 
 if __name__ == '__main__':
