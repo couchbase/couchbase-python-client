@@ -181,7 +181,7 @@ cdef class Connection:
             'rv': None
         }
 
-    def set(self, key, value=None, cas=None, format=None):
+    def set(self, key, value=None, cas=None, ttl=None, format=None):
         """Unconditionally store the object in the Couchbase
 
         :param key: if it's a string it's the key used to reference the
@@ -194,6 +194,9 @@ cdef class Connection:
           a given key. This value is used to provide simple optimistic
           concurrency control when multiple clients or threads try to
           update an item simultaneously.
+        :param int ttl: the time to live for an object. Values larger than
+         30*24*60*60 seconds (30 days) are interpreted as absolute times
+         (from the epoch).
         :param format: the representation for storing the value in the
           bucket. If none is specified it will use the `default_format`.
           For more info see
@@ -284,6 +287,8 @@ cdef class Connection:
                 cmds[i].v.v0.flags = format
                 if cas is not None:
                     cmds[i].v.v0.cas = cas
+                if ttl is not None:
+                    cmds[i].v.v0.exptime = ttl
                 i += 1
 
             rc = lcb.lcb_store(self._instance, <void *>ctx, num_commands,

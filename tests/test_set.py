@@ -1,3 +1,5 @@
+from time import sleep
+
 from couchbase import FMT_JSON, FMT_PICKLE, FMT_PLAIN
 from couchbase.exceptions import (KeyExistsError, ValueFormatError,
                                   ArgumentError)
@@ -33,6 +35,15 @@ class ConnectionSetTest(CouchbaseTestCase):
         self.assertTrue(cas3 > 0)
         self.assertNotEqual(cas3, cas2)
         self.assertNotEqual(cas3, cas1)
+
+    def test_set_with_ttl(self):
+        self.cb.set('key_ttl', 'value_ttl', ttl=2)
+        val = self.cb.get('key_ttl')
+        self.assertEqual(val, 'value_ttl')
+        # Make sure the key expires
+        sleep(3)
+        val = self.cb.get('key_ttl')
+        self.assertIsNone(val)
 
     def test_set_format(self):
         cas1 = self.cb.set('key_format1', {'some': 'value1'}, format=FMT_JSON)
