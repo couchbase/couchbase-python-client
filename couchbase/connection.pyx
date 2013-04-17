@@ -243,6 +243,7 @@ cdef class Connection:
             <const lcb.lcb_store_cmd_t **>malloc(
                 num_commands * sizeof(lcb.lcb_store_cmd_t *))
         if not ptr_cmds:
+            free(cmds)
             raise MemoryError()
 
         # Those lists are needed as there must be a reference to the string
