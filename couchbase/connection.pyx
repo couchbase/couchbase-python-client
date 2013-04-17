@@ -298,7 +298,8 @@ cdef class Connection:
     def get(self, keys, format=None):
         """Obtain an object stored in Couchbase by given key
 
-        :param string key: key used to reference the value
+        :param keys: One or several keys to fetch
+        :type key: string or list
         :param format: explicitly choose the decoer for this key. If
           none is specified the decoder will automaticall be choosen
           based on the encoder that was used to store the value. For
@@ -318,6 +319,10 @@ cdef class Connection:
         Simple get::
 
             value = cb.get('key')
+
+        Get multiple values::
+
+            values = cb.get(['foo', 'bar', 'baz'])
         """
         if self._instance == NULL:
             Utils.raise_not_connected(lcb.LCB_GET)
