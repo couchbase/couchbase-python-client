@@ -77,9 +77,11 @@ cdef class Connection:
 
         **Class attributes**
 
-          **default_format** = `Couchbase.FMT_JSON`
-            It uses the flags field to store the format. Possible values
-            are:
+          .. py:attribute:: default_format
+
+            Specify the default format (default: `Couchbase.FMT_JSON')
+            to encode your data before storing in Couchbase. It uses the
+            flags field to store the format. Possible values are:
 
              * `couchbase.FMT_JSON`: Converts the Python object to
                JSON and stores it as JSON in Couchbase
@@ -93,12 +95,13 @@ cdef class Connection:
             original value will be returned. This means the JSON will be
             decoded, respectively the object will be unpickled.
 
-          **quiet** = `False`
+          .. py:attribute:: quiet
+
             It controlls whether to raise an exception when the client
-            executes operations on non-existent keys. If it is `False`
-            it will raise :exc:`couchbase.exceptions.NotFoundError`
-            exceptions. When set to `True` the operations will return
-            `None` silently.
+            executes operations on non-existent keys (default: `False`).
+            If it is `False` it will raise
+            :exc:`couchbase.exceptions.NotFoundError` exceptions. When
+            set to `True` the operations will return `None` silently.
         """
         if password is None:
             raise exceptions.ArgumentError("A password must be given")
