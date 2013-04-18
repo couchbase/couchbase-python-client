@@ -18,6 +18,12 @@ class ConnectionGetTest(CouchbaseTestCase):
         val = self.cb.get('key_trivial1')
         self.assertEqual(val, 'value1')
 
+        val = self.cb.get(['key_trivial1'])
+        self.assertEqual(type(val), list)
+        self.assertEqual(len(val), 1)
+        self.assertEqual(val[0], 'value1')
+
+
     def test_get_missing_key(self):
         val = self.cb.get('key_missing_1')
         self.assertIsNone(val)
@@ -72,10 +78,17 @@ class ConnectionGetTest(CouchbaseTestCase):
         self.assertEqual(cas1, orig_cas1)
 
         # Test named tuples
-        result = self.cb.get('key_extended1', extended=True)
-        self.assertEqual(result.value, 'value1')
-        self.assertEqual(result.flags, 0x0)
-        self.assertEqual(result.cas, orig_cas1)
+        result1 = self.cb.get('key_extended1', extended=True)
+        self.assertEqual(result1.value, 'value1')
+        self.assertEqual(result1.flags, 0x0)
+        self.assertEqual(result1.cas, orig_cas1)
+
+        # Single get as array
+        result2 = self.cb.get(['key_extended1'], extended=True)
+        self.assertTrue('key_extended1' in result2)
+        self.assertEqual(result2['key_extended1'].value, 'value1')
+        self.assertEqual(result2['key_extended1'].flags, 0x0)
+        self.assertEqual(result2['key_extended1'].cas, orig_cas1)
 
         cas2 = self.cb.set('key_extended2', 'value2')
         cas3 = self.cb.set('key_extended3', 'value3')

@@ -354,8 +354,11 @@ cdef class Connection:
         if self._instance == NULL:
             Utils.raise_not_connected(lcb.LCB_GET)
 
-        if not isinstance(keys, list):
+        if isinstance(keys, list):
+            single_key = False
+        else:
             keys = [keys]
+            single_key = True
 
         ctx = self._context_dict()
         ctx['rv'] = []
@@ -396,14 +399,14 @@ cdef class Connection:
             if ctx['exception']:
                 raise ctx['exception']
 
-            if num_cmds > 1:
-                if extended:
-                    return dict(ctx['rv'])
-                return ctx['rv']
-            else:
+            if single_key:
                 if extended:
                     return ctx['rv'][0][1]
                 return ctx['rv'][0]
+            else:
+                if extended:
+                    return dict(ctx['rv'])
+                return ctx['rv']
         finally:
             free(cmds)
             free(ptr_cmds)
