@@ -63,12 +63,13 @@ cdef class Connection:
     cdef lcb.lcb_t _instance
     cdef lcb.lcb_create_st _create_options
     cdef public lcb.lcb_uint32_t default_format
+    cdef public bint quiet
     def __cinit__(self):
         self.default_format = FMT_JSON
         memset(&self._create_options, 0, sizeof(self._create_options))
 
     def __init__(self, host='localhost', port=8091, username=None,
-                 password=None, bucket=None):
+                 password=None, bucket=None, quiet=False):
         """Connection to a bucket
 
         Normally it's initialized through
@@ -91,11 +92,20 @@ cdef class Connection:
             On a :meth:`couchbase.libcouchbase.Connection.get` the
             original value will be returned. This means the JSON will be
             decoded, respectively the object will be unpickled.
+
+          **quiet** = `False`
+            It controlls whether to raise an exception when the client
+            executes operations on non-existent keys. If it is `False`
+            it will raise :exc:`couchbase.exceptions.NotFoundError`
+            exceptions. When set to `True` the operations will return
+            `None` silently.
         """
         if password is None:
             raise exceptions.ArgumentError("A password must be given")
         if bucket is None:
             raise exceptions.ArgumentError("A bucket name must be given")
+
+        self.quiet = quiet
 
         host = '{0}:{1}'.format(host, port).encode('utf-8')
         password = password.encode('utf-8')
@@ -310,7 +320,7 @@ cdef class Connection:
             free(cmds)
             free(ptr_cmds)
 
-    def get(self, keys, extended=False, format=None, quiet=True):
+    def get(self, keys, extended=False, format=None, quiet=None):
         """Obtain an object stored in Couchbase by given key
 
         :param keys: One or several keys to fetch
@@ -323,8 +333,10 @@ cdef class Connection:
           based on the encoder that was used to store the value. For
           more information about the formats, see
           :attr:`couchbase.libcouchbase.Connection.default_format`.
-        :param quiet: causes `get` to return None instead of raising
-         an exception when the key is not found
+        :param boolean quiet: causes `get` to return None instead of
+          raising an exception when the key is not found. It defaults
+          to the value set by
+          :attr:`couchbase.libcouchbase.Connection.quiet`.
 
         :raise: :exc:`couchbase.exceptions.NotFoundError` if the key
           is missing in the bucket
@@ -372,6 +384,8 @@ cdef class Connection:
         ctx = self._context_dict()
         ctx['rv'] = []
         ctx['force_format'] = format
+        if quiet is None:
+            quiet = self.quiet
         ctx['quiet'] = quiet
         ctx['extended'] = extended
         cdef int num_cmds = len(keys)

@@ -8,7 +8,7 @@ class Couchbase:
     """The base class for interacting with Couchbase"""
     @staticmethod
     def connect(host='localhost', port=8091, username=None, password=None,
-                bucket=None):
+                bucket=None, quiet=False):
         """Connect to a bucket
 
         The parameters `password` and `bucket` are **not** optional and
@@ -28,6 +28,11 @@ class Couchbase:
                                 be used instead.
         :param string password: the password of the user or bucket
         :param string bucket: the bucket name
+        :param boolean quiet: the flag controlling whether to raise an
+          exception when the client executes operations on non-existent
+          keys. If it is `False` it will raise
+          :exc:`couchbase.exceptions.NotFoundError` exceptions. When set
+          to `True` the operations will return `None` silently.
 
         :raise: :exc:`couchbase.exceptions.BucketNotFoundError` if there
                 is no such bucket to connect to

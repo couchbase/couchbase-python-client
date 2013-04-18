@@ -25,10 +25,11 @@ class ConnectionGetTest(CouchbaseTestCase):
 
 
     def test_get_missing_key(self):
-        val = self.cb.get('key_missing_1')
+        val = self.cb.get('key_missing_1', quiet=True)
         self.assertIsNone(val)
         # Get with quiet=False
-        self.assertRaises(NotFoundError, self.cb.get, 'key_missing_1', quiet=False)
+        self.assertRaises(NotFoundError, self.cb.get, 'key_missing_1',
+                          quiet=False)
 
     def test_multi_get(self):
         self.cb.set({'key_multi1': 'value1', 'key_multi3': 'value3',
@@ -99,7 +100,8 @@ class ConnectionGetTest(CouchbaseTestCase):
         self.assertEqual(results['key_extended3'].flags, 0x0)
         self.assertEqual(results['key_extended3'].cas, cas3)
 
-        val4, flags4, cas4 = self.cb.get('missing_key', extended=True)
+        val4, flags4, cas4 = self.cb.get('missing_key', extended=True,
+                                         quiet=True)
         self.assertEqual(val4, None)
         self.assertEqual(flags1, 0x0)
         self.assertEqual(cas4, 0)

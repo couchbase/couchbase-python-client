@@ -2,7 +2,7 @@ from time import sleep
 
 from couchbase import FMT_JSON, FMT_PICKLE, FMT_PLAIN
 from couchbase.exceptions import (KeyExistsError, ValueFormatError,
-                                  ArgumentError)
+                                  ArgumentError, NotFoundError)
 from couchbase.libcouchbase import Connection
 
 from tests.base import CouchbaseTestCase
@@ -42,8 +42,7 @@ class ConnectionSetTest(CouchbaseTestCase):
         self.assertEqual(val, 'value_ttl')
         # Make sure the key expires
         sleep(3)
-        val = self.cb.get('key_ttl')
-        self.assertIsNone(val)
+        self.assertRaises(NotFoundError, self.cb.get, 'key_ttl')
 
     def test_set_format(self):
         cas1 = self.cb.set('key_format1', {'some': 'value1'}, format=FMT_JSON)

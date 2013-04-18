@@ -1,5 +1,6 @@
-from couchbase.exceptions import (AuthError, BucketNotFoundError, ConnectError,
-                                  ArgumentError)
+from couchbase.exceptions import (AuthError, ArgumentError,
+                                  BucketNotFoundError, ConnectError,
+                                  NotFoundError)
 from couchbase.libcouchbase import Connection
 
 from tests.base import CouchbaseTestCase
@@ -51,6 +52,20 @@ class ConnectionTest(CouchbaseTestCase):
 
         self.assertRaises(ArgumentError, Connection, self.host, self.port,
                           bucket=self.bucket_prefix + '_sasl')
+
+    def test_quiet(self):
+        cb = Connection(username=self.username, password=self.password,
+                        bucket=self.bucket_prefix)
+        self.assertRaises(NotFoundError, cb.get, 'missing_key')
+
+        cb = Connection(username=self.username, password=self.password,
+                        bucket=self.bucket_prefix, quiet=True)
+        val1 = cb.get('missing_key')
+        self.assertIsNone(val1)
+
+        cb = Connection(username=self.username, password=self.password,
+                        bucket=self.bucket_prefix, quiet=False)
+        self.assertRaises(NotFoundError, cb.get, 'missing_key')
 
 
 if __name__ == '__main__':
