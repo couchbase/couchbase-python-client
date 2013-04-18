@@ -121,6 +121,10 @@ cdef class Connection:
 
         self._connect()
 
+    def __dealloc__(self):
+        if self._instance:
+            lcb.lcb_destroy(self._instance)
+
     def _connect(self):
         rc = lcb.lcb_connect(self._instance)
         Utils.maybe_raise(
