@@ -97,7 +97,7 @@ cdef class Connection:
         if bucket is None:
             raise exceptions.ArgumentError("A bucket name must be given")
 
-        host = ('%s:%d' % (host, port)).encode('utf-8')
+        host = '{0}:{1}'.format(host, port).encode('utf-8')
         password = password.encode('utf-8')
         bucket = bucket.encode('utf-8')
 
