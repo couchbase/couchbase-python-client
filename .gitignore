@@ -1,5 +1,8 @@
 build
+dist
+MANIFEST
 couchbase/libcouchbase*.so
+couchbase/libcouchbase.c
 couchbase/libcouchbase.h
 couchbase/__pycache__
 *.pyc

@@ -17,6 +17,10 @@ Install libcouchbase.
 Building
 --------
 
+If you have a source checkout via Git you need to have Cython (>=0.19)
+installed in order to generate the `couchbase/libcouchbase.c` file. If you've
+downloaded the source package the file is already included.
+
 As the target audience is currently developers, you probably want to install
 the module locally. You can run:
 
@@ -24,16 +28,6 @@ the module locally. You can run:
 
 If you have compile libcouchbase yourself at a custom location, you can pass
 it in via the `CFLAGS` and `LDFLAGS` environment variables.
-
-
-Building for development
-------------------------
-
-The build process uses a pre-generated `libcouchbase.c` file, if you want to
-make changes to the code base you need to have Cython (> 0.18) installed in
-order to generate the `libcouchbase.c` file:
-
-    python setup.py cythonize
 
 
 Running sample application
