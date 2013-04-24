@@ -1,11 +1,11 @@
-from libc.stdlib cimport malloc, free
+from libc.stdlib cimport malloc, calloc, free
 from libc.string cimport memset
 
 cimport libcouchbase as lcb
 
 import json
 import pickle
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 
 
 cdef public enum _cb_formats:

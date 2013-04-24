@@ -59,6 +59,26 @@ cdef void cb_get_callback(lcb.lcb_t instance, const void *cookie,
         ctx['rv'].append(val)
 
 
+cdef void cb_stat_callback(lcb.lcb_t instance, const void *cookie,
+                           lcb.lcb_error_t rc,
+                           const lcb.lcb_server_stat_resp_t *resp):
+    ctx = <object>cookie
+
+    node = None
+    if resp.v.v0.server_endpoint:
+        node = (<char *>resp.v.v0.server_endpoint).decode('utf-8')
+    try:
+        Utils.maybe_raise(rc, 'failed to fetch value', key=node,
+                          operation='STATS')
+    except CouchbaseError as e:
+        ctx['exception'] = e
+
+    if node:
+        key = (<char *>resp.v.v0.key)[:resp.v.v0.nkey].decode('utf-8')
+        val = (<char *>resp.v.v0.bytes)[:resp.v.v0.nbytes].decode('utf-8')
+        ctx['rv'][key][node] = val
+
+
 cdef class Connection:
     cdef lcb.lcb_t _instance
     cdef lcb.lcb_create_st _create_options
@@ -131,6 +151,7 @@ cdef class Connection:
 
         <void>lcb.lcb_set_store_callback(self._instance, cb_store_callback);
         <void>lcb.lcb_set_get_callback(self._instance, cb_get_callback);
+        <void>lcb.lcb_set_stat_callback(self._instance, cb_stat_callback);
 
         self._connect()
 
@@ -433,6 +454,77 @@ cdef class Connection:
                 if extended:
                     return dict(ctx['rv'])
                 return ctx['rv']
+        finally:
+            free(cmds)
+            free(ptr_cmds)
+
+    def stats(self, stats=''):
+        """Request server statistics
+
+        Fetches stats from each node in the cluster. Without a key
+        specified the server will respond with a default set of
+        statistical information. It returns the a `dict` with stats keys
+        and node-value pairs as a value.
+
+        :param stats: One or several stats to query
+        :type stats: string or list of string
+
+        :raise: :exc:`couchbase.exceptions.ConnectError` if the
+          connection closed
+
+        :return: `dict` where keys are stat keys and values are
+          host-value pairs
+
+        Find out how many items are in the bucket::
+
+            total = 0
+            for key, value in cb.stats()['total_items'].items():
+                total += value
+
+        Get memory stats (works on couchbase buckets)::
+
+            cb.stats('memory')
+            # {'mem_used': {...}, ...}
+        """
+        if self._instance == NULL:
+            Utils.raise_not_connected(lcb.LCB_GET)
+
+        if not isinstance(stats, list):
+            stats = [stats]
+
+        ctx = self._context_dict()
+        ctx['rv'] = defaultdict(dict)
+        cdef int num_cmds = len(stats)
+        cdef int i = 0
+
+        cdef lcb.lcb_server_stats_cmd_t *cmds = \
+            <lcb.lcb_server_stats_cmd_t *>calloc(
+                num_cmds, sizeof(lcb.lcb_server_stats_cmd_t))
+        if not cmds:
+            raise MemoryError()
+        cdef const lcb.lcb_server_stats_cmd_t **ptr_cmds = \
+            <const lcb.lcb_server_stats_cmd_t **>malloc(
+                num_cmds * sizeof(lcb.lcb_server_stats_cmd_t *))
+        if not ptr_cmds:
+            free(cmds)
+            raise MemoryError()
+
+        try:
+            for i in range(len(stats)):
+                stats[i] = stats[i].encode('ascii')
+
+                ptr_cmds[i] = &cmds[i]
+                cmds[i].v.v0.name = <char *>stats[i]
+                cmds[i].v.v0.nname = len(stats[i])
+
+            rc = lcb.lcb_server_stats(self._instance, <void *>ctx, num_cmds,
+                                      ptr_cmds)
+            Utils.maybe_raise(rc, 'failed to schedule get request')
+
+            if ctx['exception']:
+                raise ctx['exception']
+
+            return ctx['rv']
         finally:
             free(cmds)
             free(ptr_cmds)
