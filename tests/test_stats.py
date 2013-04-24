@@ -19,7 +19,9 @@ class ConnectionStatsTest(CouchbaseTestCase):
     def test_trivial_stats_without_argument(self):
         stats = self.cb.stats()
         self.assertIsInstance(stats, dict)
-        self.assertTrue('pid' in stats)
+        self.assertTrue('curr_connections' in stats)
+        val = list(stats['curr_connections'].values())[0]
+        self.assertIsInstance(val, int)
         key, info = list(stats.items())[0]
         self.assertIsInstance(key, basestring)
         self.assertIsInstance(info, dict)

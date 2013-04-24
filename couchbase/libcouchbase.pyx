@@ -101,6 +101,24 @@ class Utils:
             "not connected to the server",
             operation=Const.store_names[lcb.LCB_SET])
 
+    @staticmethod
+    def string_to_num(string):
+        """Tries to convert a string to a number
+
+        If the string can't be converted to an integer or float,
+        return the original one
+
+        :param string string: the string that should be converted
+        :return: the string converted to a number or the original string
+        """
+        try:
+            return int(string)
+        except ValueError:
+            try:
+                return float(string)
+            except ValueError:
+                return string
+
 
 class CouchbaseError(Exception):
     # Document the init parameters here, else the output of the subclasses

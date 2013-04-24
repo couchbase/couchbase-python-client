@@ -76,7 +76,7 @@ cdef void cb_stat_callback(lcb.lcb_t instance, const void *cookie,
     if node:
         key = (<char *>resp.v.v0.key)[:resp.v.v0.nkey].decode('utf-8')
         val = (<char *>resp.v.v0.bytes)[:resp.v.v0.nbytes].decode('utf-8')
-        ctx['rv'][key][node] = val
+        ctx['rv'][key][node] = Utils.string_to_num(val)
 
 
 cdef class Connection:
