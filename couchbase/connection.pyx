@@ -58,6 +58,22 @@ cdef void cb_get_callback(lcb.lcb_t instance, const void *cookie,
     else:
         ctx['rv'].append(val)
 
+cdef void cb_remove_callback(lcb.lcb_t instance, const void *cookie,
+                             lcb.lcb_error_t rc,
+                             const lcb.lcb_remove_resp_t *resp):
+    ctx = <object>cookie;
+    key = (<char *>resp.v.v0.key)[:resp.v.v0.nkey].decode('utf-8')
+    try:
+        if rc != lcb.LCB_KEY_ENOENT or not ctx['quiet']:
+            Utils.maybe_raise(rc, 'failed to remove value', key=key)
+    except CouchbaseError as e:
+        ctx['exception'] = e
+
+    if rc == lcb.LCB_SUCCESS:
+        ctx['rv'][key] = True
+    else:
+        ctx['rv'][key] = False
+
 
 cdef void cb_stat_callback(lcb.lcb_t instance, const void *cookie,
                            lcb.lcb_error_t rc,
@@ -152,6 +168,7 @@ cdef class Connection:
         <void>lcb.lcb_set_store_callback(self._instance, cb_store_callback);
         <void>lcb.lcb_set_get_callback(self._instance, cb_get_callback);
         <void>lcb.lcb_set_stat_callback(self._instance, cb_stat_callback);
+        <void>lcb.lcb_set_remove_callback(self._instance, cb_remove_callback);
 
         self._connect()
 
@@ -528,3 +545,135 @@ cdef class Connection:
         finally:
             free(cmds)
             free(ptr_cmds)
+
+
+    def delete(self, key, cas=None, quiet=False):
+        """Remove the key-value entry for a given key in Couchbase
+
+        :param key: This can be a single string which is the key to delete,
+          a list of strings, or a dict of strings, with the values being
+          CAS values for each key (see below)
+
+        :type key: string, dict, or tuple/list
+        :param int cas: The CAS to use for the removal operation.
+          If specified, the key will only be deleted from the server if
+          it has the same CAS as specified. This is useful to delete a
+          key only if its value has not been changed from the version
+          currently visible to the client.
+          If the CAS on the server does not match the one specified,
+          an exception is thrown.
+        :param boolean quiet:
+          Follows the same semantics as `quiet` in `get`
+
+        :raise: :exc:`couchbase.exceptions.NotFoundError` if the key
+          does not exist on the bucket
+        :raise: :exc:`couchbase.exceptions.KeyExistsError` if a CAS
+          was specified, but the CAS on the server had changed
+        :raise: :exc:`couchbase.exceptions.ConnectError` if the
+          connection was closed
+
+        :return: a boolean value or a dictionary of boolean values,
+          depending on whether the `key` parameter was a string or a collection.
+
+
+        Simple delete::
+
+            ok = cb.delete("key")
+
+        Don't complain if key does not exist::
+
+            ok = cb.delete("key", quiet = True)
+
+        Only delete if CAS matches our version::
+
+            value, flags, cas = cb.get("key", extended = True)
+            cb.delete("key", cas = cas)
+
+        Remove multiple keys::
+
+            oks = cb.delete(["key1", "key2", "key3"])
+
+        Remove multiple keys with CAS::
+
+            oks = cb.delete({
+                "key1" : cas1,
+                "key2" : cas2,
+                "key3" : cas3
+            })
+        """
+
+        if self._instance == NULL:
+            Utils.raise_not_connected()
+
+        ctx = self._context_dict()
+
+        ctx['rv'] = {}
+
+        if quiet is None:
+            quiet = self.quiet
+        ctx['quiet'] = quiet
+
+        keys = {}
+
+        cdef lcb.lcb_remove_cmd_t *cmds
+        cdef const lcb.lcb_remove_cmd_t **cmdlist
+        cdef int ii = 0
+
+        is_single_key = False
+
+        if isinstance(key, dict):
+            keys = key
+
+        elif isinstance(key, (list, tuple)):
+            for k in key:
+                keys[k] = None
+        else:
+            keys[key] = cas
+            is_single_key = True
+
+        cmds = <lcb.lcb_remove_cmd_t*>\
+                calloc(len(keys), sizeof(lcb.lcb_remove_cmd_t))
+        if not cmds:
+            raise MemoryError()
+
+        cmdlist = <const lcb.lcb_remove_cmd_t**>\
+                malloc(sizeof(lcb.lcb_remove_cmd_t*) * len(keys));
+        if not cmdlist:
+            free(cmds)
+            raise MemoryError()
+
+        utf8_keys = []
+        for cur_key, cur_cas in keys.items():
+            try:
+                utf8_keys.append(cur_key.encode('utf-8'))
+                cmds[ii].v.v0.key = <const char*>utf8_keys[ii]
+                cmds[ii].v.v0.nkey = len(utf8_keys[ii])
+
+                if cur_cas:
+                    cmds[ii].v.v0.cas = cur_cas
+
+                cmdlist[ii] = &cmds[ii]
+
+                ii += 1
+
+            except:
+                free(cmds)
+                free(cmdlist)
+                raise
+
+        try:
+            rc = lcb.lcb_remove(self._instance, <void*>ctx, ii, cmdlist)
+            if rc != lcb.LCB_KEY_ENOENT or not ctx['quiet']:
+                Utils.maybe_raise(rc, 'failed to schedule remove request')
+
+            if ctx['exception']:
+                raise ctx['exception']
+
+            if is_single_key:
+                return list(ctx['rv'].values())[0]
+            else:
+                return ctx['rv']
+
+        finally:
+            free(cmds)
+            free(cmdlist)
