@@ -36,7 +36,7 @@ else:
 
 
 setup(
-    name="couchbase-python-sdk",
+    name="couchbase",
     version="0.9",
     url="https://github.com/couchbase/couchbase-python-client",
     author="Volker Mische",
