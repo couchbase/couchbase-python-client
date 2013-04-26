@@ -232,6 +232,87 @@ cdef class Connection:
             'rv': None
         }
 
+    def __set(self, operation, key, value=None, cas=None, ttl=None, format=None):
+        if self._instance == NULL:
+            Utils.raise_not_connected(operation)
+
+        # A single key
+        if not isinstance(key, dict):
+            data = {key: value}
+        else:
+            if cas:
+                raise exceptions.ArgumentError(
+                    "setting `cas` is not applicable on a multi-set operation")
+            data = key
+
+        ctx = self._context_dict()
+        ctx['rv'] = {}
+        cdef int num_commands = len(data)
+        cdef int i = 0
+
+        cdef lcb.lcb_store_cmd_t *cmds = <lcb.lcb_store_cmd_t *>malloc(
+            num_commands * sizeof(lcb.lcb_store_cmd_t))
+        if not cmds:
+            raise MemoryError()
+        cdef const lcb.lcb_store_cmd_t **ptr_cmds = \
+            <const lcb.lcb_store_cmd_t **>malloc(
+                num_commands * sizeof(lcb.lcb_store_cmd_t *))
+        if not ptr_cmds:
+            free(cmds)
+            raise MemoryError()
+
+        # Those lists are needed as there must be a reference to the string
+        # in the Python space
+        keys = []
+        values = []
+
+        try:
+            for key, value in data.items():
+                keys.append(key.encode('utf-8'))
+                if format is None:
+                    format = self.default_format
+                try:
+                    values.append(self._encode_value(value, format))
+                except exceptions.ValueFormatError as e:
+                    e.msg = ("unable to convert value for key "
+                             "'{0}': {1}. ").format(key, value) + e.msg
+                    e.key = key
+                    raise e
+
+                ptr_cmds[i] = &cmds[i]
+                memset(&cmds[i], 0, sizeof(lcb.lcb_store_cmd_t))
+                cmds[i].v.v0.operation = operation
+                cmds[i].v.v0.key = <char *>keys[i]
+                cmds[i].v.v0.nkey = len(keys[i])
+                cmds[i].v.v0.bytes = <char *>values[i]
+                cmds[i].v.v0.nbytes = len(values[i])
+                cmds[i].v.v0.flags = format
+                if cas is not None:
+                    cmds[i].v.v0.cas = cas
+                if ttl is not None:
+                    cmds[i].v.v0.exptime = ttl
+                i += 1
+
+            rc = lcb.lcb_store(self._instance, <void *>ctx, num_commands,
+                               ptr_cmds)
+            Utils.maybe_raise(rc, 'failed to schedule set request')
+
+            # TODO vmx 2013-04-12: Wait for all operations to be processed
+            #    This should already be the case in sync mode, but I'm not
+            #    sure
+
+            if ctx['exception']:
+                raise ctx['exception']
+
+            if num_commands > 1:
+                return ctx['rv']
+            else:
+                return list(ctx['rv'].values())[0]
+        finally:
+            free(cmds)
+            free(ptr_cmds)
+
+
     def set(self, key, value=None, cas=None, ttl=None, format=None):
         """Unconditionally store the object in the Couchbase
 
@@ -282,84 +363,49 @@ cdef class Connection:
 
             cb.set({'foo': 'bar', 'baz': 'value'})
         """
-        if self._instance == NULL:
-            Utils.raise_not_connected(lcb.LCB_SET)
+        return self.__set(lcb.LCB_SET, key, value, cas, ttl, format)
 
-        # A single key
-        if not isinstance(key, dict):
-            data = {key: value}
-        else:
-            if cas:
-                raise exceptions.ArgumentError(
-                    "setting `cas` is not applicable on a multi-set operation")
-            data = key
+    def append(self, key, value=None, cas=None, ttl=None):
+        """
+        Append a string to an existing value in Couchbase
 
-        ctx = self._context_dict()
-        ctx['rv'] = {}
-        cdef int num_commands = len(data)
-        cdef int i = 0
+        This follows the same conventions as `set`, with the caveat that
+        the `format` argument is unavailable and will always be `FMT_PLAIN`.
 
-        cdef lcb.lcb_store_cmd_t *cmds = <lcb.lcb_store_cmd_t *>malloc(
-            num_commands * sizeof(lcb.lcb_store_cmd_t))
-        if not cmds:
-            raise MemoryError()
-        cdef const lcb.lcb_store_cmd_t **ptr_cmds = \
-            <const lcb.lcb_store_cmd_t **>malloc(
-                num_commands * sizeof(lcb.lcb_store_cmd_t *))
-        if not ptr_cmds:
-            free(cmds)
-            raise MemoryError()
+        :raise: :exc:`couchbase.exceptions.NotStoredError` if the key does
+          not exist
+        """
+        return self.__set(lcb.LCB_APPEND, key, value, cas, ttl, FMT_PLAIN)
 
-        # Those lists are needed as there must be a reference to the string
-        # in the Python space
-        keys = []
-        values = []
+    def prepend(self, key, value=None, cas=None, ttl=None):
+        """
+        Prepend a string to an existing value in Couchbase
+        This follows the same conventions as `append`
+        """
+        return self.__set(lcb.LCB_PREPEND, key, value, cas, ttl, FMT_PLAIN)
 
-        try:
-            for key, value in data.items():
-                keys.append(key.encode('utf-8'))
-                if format is None:
-                    format = self.default_format
-                try:
-                    values.append(self._encode_value(value, format))
-                except exceptions.ValueFormatError as e:
-                    e.msg = ("unable to convert value for key "
-                             "'{0}': {1}. ").format(key, value) + e.msg
-                    e.key = key
-                    raise e
+    def add(self, key, value=None, ttl=None, format=None):
+        """
+        Store an object in Couchbase unless it already exists.
+        Follows the same conventions as `set`, but the value is stored
+        only if it does not exist already. Conversely, the value is not
+        stored if the key already exists.
 
-                ptr_cmds[i] = &cmds[i]
-                memset(&cmds[i], 0, sizeof(lcb.lcb_store_cmd_t))
-                cmds[i].v.v0.operation = lcb.LCB_SET
-                cmds[i].v.v0.key = <char *>keys[i]
-                cmds[i].v.v0.nkey = len(keys[i])
-                cmds[i].v.v0.bytes = <char *>values[i]
-                cmds[i].v.v0.nbytes = len(values[i])
-                cmds[i].v.v0.flags = format
-                if cas is not None:
-                    cmds[i].v.v0.cas = cas
-                if ttl is not None:
-                    cmds[i].v.v0.exptime = ttl
-                i += 1
+        :raise: :exc:`couchbase.exceptions.KeyExistsError` if the key already
+          exists
+        """
+        return self.__set(lcb.LCB_ADD, key, value, None, ttl, format)
 
-            rc = lcb.lcb_store(self._instance, <void *>ctx, num_commands,
-                               ptr_cmds)
-            Utils.maybe_raise(rc, 'failed to schedule set request')
+    def replace(self, key, value=None, cas=None, ttl=None, format=None):
+        """
+        Store an object in Couchbase only if it already exists.
+        Follows the same conventions as `set`, but the value is stored
+        only if a previous value already exists.
 
-            # TODO vmx 2013-04-12: Wait for all operations to be processed
-            #    This should already be the case in sync mode, but I'm not
-            #    sure
-
-            if ctx['exception']:
-                raise ctx['exception']
-
-            if num_commands > 1:
-                return ctx['rv']
-            else:
-                return list(ctx['rv'].values())[0]
-        finally:
-            free(cmds)
-            free(ptr_cmds)
+        :raise: :exc:`couchbase.exceptions.NotFoundError` if the key does
+          not exist
+        """
+        return self.__set(lcb.LCB_REPLACE, key, value, cas, ttl, format)
 
     def get(self, keys, extended=False, format=None, quiet=None):
         """Obtain an object stored in Couchbase by given key
