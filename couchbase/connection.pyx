@@ -74,6 +74,24 @@ cdef void cb_remove_callback(lcb.lcb_t instance, const void *cookie,
     else:
         ctx['rv'][key] = False
 
+cdef void cb_arithmetic_callback(lcb.lcb_t instance, const void *cookie,
+                                 lcb.lcb_error_t rc,
+                                 const lcb.lcb_arithmetic_resp_t *resp):
+    ctx = <object>cookie;
+    key = (<char *>resp.v.v0.key)[:resp.v.v0.nkey].decode('utf-8')
+    try:
+        Utils.maybe_raise(rc, 'failed to incr/decr value', key=key)
+    except CouchbaseError as e:
+        ctx['exception'] = e
+
+    rv = None
+    if rc == lcb.LCB_SUCCESS:
+        if ctx['extended']:
+            rv = Result(resp.v.v0.value, 0, resp.v.v0.cas)
+        else:
+            rv = resp.v.v0.value
+
+    ctx['rv'][key] = rv
 
 cdef void cb_stat_callback(lcb.lcb_t instance, const void *cookie,
                            lcb.lcb_error_t rc,
@@ -169,6 +187,8 @@ cdef class Connection:
         <void>lcb.lcb_set_get_callback(self._instance, cb_get_callback);
         <void>lcb.lcb_set_stat_callback(self._instance, cb_stat_callback);
         <void>lcb.lcb_set_remove_callback(self._instance, cb_remove_callback);
+        <void>lcb.lcb_set_arithmetic_callback(self._instance,
+                                              cb_arithmetic_callback);
 
         self._connect()
 
@@ -723,3 +743,138 @@ cdef class Connection:
         finally:
             free(cmds)
             free(cmdlist)
+
+    def _arithmetic(self, key, delta, initial=None, ttl=None, extended=False):
+        if self._instance == NULL:
+            Utils.raise_not_connected()
+
+        ctx = self._context_dict()
+        ctx['rv'] = {}
+        ctx['extended'] = extended
+
+        cdef lcb.lcb_arithmetic_cmd_t *cmds
+        cdef const lcb.lcb_arithmetic_cmd_t **cmdlist
+        cdef ii
+        is_single_key = True
+        keys = []
+
+        if isinstance(key, (list, tuple)):
+            keys = key
+            is_single_key = False
+        else:
+            keys = (key,)
+
+        cmds = <lcb.lcb_arithmetic_cmd_t*>calloc(len(keys),
+                sizeof(lcb.lcb_arithmetic_cmd_t))
+        if not cmds:
+            raise MemoryError()
+
+        cmdlist = <const lcb.lcb_arithmetic_cmd_t**>malloc(
+                len(keys) * sizeof(lcb.lcb_arithmetic_cmd_t*))
+        if not cmdlist:
+            free(cmds)
+            raise MemoryError()
+
+        utf8_keys = []
+        ii = 0
+        for cur_key in keys:
+            try:
+                utf8_keys.append(cur_key.encode('utf-8'))
+                cmds[ii].v.v0.key = <const char*>utf8_keys[ii]
+                cmds[ii].v.v0.nkey = len(utf8_keys[ii])
+                cmds[ii].v.v0.delta = delta
+
+                if isinstance(ttl, int):
+                    cmds[ii].v.v0.exptime = ttl
+
+                if isinstance(initial, int):
+                    cmds[ii].v.v0.create = 1
+                    cmds[ii].v.v0.initial = initial
+
+                cmdlist[ii] = &cmds[ii]
+                ii += 1
+
+            except:
+                free(cmds)
+                free(cmdlist)
+                raise
+
+
+        try:
+            rc = lcb.lcb_arithmetic(self._instance, <void*>ctx, ii, cmdlist)
+            if rc != lcb.LCB_SUCCESS:
+                Utils.maybe_raise(rc, 'failed to schedule arithmetic request')
+
+            if ctx['exception']:
+                raise ctx['exception']
+
+            if is_single_key:
+                return list(ctx['rv'].values())[0]
+            else:
+                return ctx['rv']
+
+        finally:
+            free(cmds)
+            free(cmdlist)
+
+
+    def incr(self, key, amount=1, initial=None, ttl=None, extended=False):
+        """
+        Increment the numeric value of a key
+        :param key: A key or a collection of keys which are to be incremented
+        :type key: string or list of strings
+
+        :param int amount: an amount by which the key should be incremented
+
+        :param initial: The initial value for the key, if it does not exist.
+          If the key does not exist, this value is used, and `amount` is
+          ignored. If this parameter is `None` then no initial value is used
+        :type initial: int or `None`
+
+        :param int ttl: The lifetime for the key, after which it will expire
+
+        :param boolean extended: If set to true, the return value will be a
+          `Result` object (similar to whatever
+          :meth:`couchbase.Couchbase.Connection.get`) returns.
+
+        :raise: :exc:`couchbase.exceptions.NotFoundError` if the key does
+          not exist on the bucket (and `initial` was `None`)
+
+        :raise: :exc:`couchbase.exceptions.DeltaBadvalError` if the key
+          exists, but the existing value is not numeric
+
+        :return:
+          An integer or dictionary of keys and integers, indicating the current
+          value of the counter. If `extended` was true, a `Result` object is
+          used rather than a simple integer.
+          If an operation failed, the value will be `None`. Check for this as
+          a counter's value may be `0` (but would not be a failure)
+
+        Simple increment::
+
+            ok = cb.incr("key")
+
+        Increment by 10::
+
+            ok = cb.incr("key", amount=10)
+
+        Increment by 20, set initial value to 5 if it does not exist::
+
+            ok = cb.incr("key", amount=20, initial=5)
+
+        Increment three keys, and use the 'extended' return value::
+
+            kv = cb.incr(["foo", "bar", "baz"], extended=True)
+            for key, result in kv.items():
+                print "Key %s has value %d now" % (key, result.value)
+        """
+        return self._arithmetic(key, amount, initial=initial, ttl=ttl, extended=extended)
+
+    def decr(self, key, amount=1, initial=None, ttl=None, extended=False):
+        """
+        Decrement a key in couchbase. This follows the same conventions as
+        `incr`, except the `amount` is the value which is subtracted rather
+        than added to the existing value
+        """
+        amount = -amount
+        return self._arithmetic(key, amount, initial=initial, ttl=ttl, extended=extended)
