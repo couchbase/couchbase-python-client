@@ -52,6 +52,22 @@ class CouchbaseTestCase(unittest.TestCase):
         self.nosleep = os.environ.get('PYCBC_TESTS_NOSLEEP', False)
 
         self._key_counter = 0
+        self.extra_buckets = bool(int(config.get('node-1', 'extra_buckets')))
+
+
+    def get_sasl_params(self):
+        if not self.bucket_password:
+            return None
+        ret = self.make_connargs()
+        ret = { 'password' : self.bucket_password, 'bucket' : self.bucket_prefix }
+        if self.extra_buckets:
+            ret['bucket'] += "_sasl"
+        return ret
+
+    def skipUnlessSasl(self):
+        sasl_params = self.get_sasl_params()
+        if not sasl_params:
+            raise SkipTest("No SASL buckets configured")
 
     def tearDown(self):
         pass

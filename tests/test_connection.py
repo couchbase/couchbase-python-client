@@ -50,8 +50,14 @@ class ConnectionTest(CouchbaseTestCase):
         cb = Connection(**self.make_connargs())
         self.assertIsInstance(cb, Connection)
 
+    def test_sasl_bucket(self):
+        self.skipUnlessSasl()
         connargs = self.make_connargs()
-        connargs['bucket'] = self.bucket_prefix + '_sasl'
+        sasl_params = self.get_sasl_params()
+
+        del connargs['username']
+        connargs['bucket'] = sasl_params['bucket']
+        connargs['password'] = sasl_params['password']
         cb = Connection(**connargs)
         self.assertIsInstance(cb, Connection)
 
@@ -66,9 +72,13 @@ class ConnectionTest(CouchbaseTestCase):
 
         self.assertRaises(AuthError, Connection,
                           **self.make_connargs(password='wrong_password'))
+
+    def test_sasl_bucket_wrong_credentials(self):
+        self.skipUnlessSasl()
+        sasl_bucket = self.get_sasl_params()['bucket']
         self.assertRaises(AuthError, Connection,
                           **self.make_connargs(password='wrong_password',
-                                               bucket=self.bucket_prefix + '_sasl'))
+                                               bucket=sasl_bucket))
 
     def test_quiet(self):
         connparams = self.make_connargs()

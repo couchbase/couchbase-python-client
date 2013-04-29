@@ -2,7 +2,18 @@
 host = localhost
 port = 8091
 username = Administrator
-password = asdasd
-; Several buckets will be create, all of them will have this prefix
-bucket_prefix = test_bucket_for_python_sdk
-bucket_password = secret
+
+; The administrative password. This is the password used to
+; log into the admin console
+password = opensesame
+
+bucket_prefix = default
+; If a SASL bucket is being used (i.e. buckets are set up
+; per the script, then this is the *bucket* password
+; bucket_password sasl_password
+bucket_password =
+
+; If using an existing cluster with the simple 'default' bucket,
+; set this to 0. If your cluster was set up with the 'setup_tests.py'
+; script, you may set this to 1
+extra_buckets = 0

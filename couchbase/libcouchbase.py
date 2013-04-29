@@ -74,7 +74,7 @@ class Connection(_Base):
         kwargs['bucket'] = bucket
 
         if password and not username:
-            username = bucket
+            kwargs['username'] = bucket
 
         kwargs['_errors'] = deque(maxlen=1000)
         kwargs['_flags'] = 0
