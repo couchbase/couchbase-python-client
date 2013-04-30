@@ -1,5 +1,5 @@
 from libc.stdlib cimport malloc, calloc, free
-from libc.string cimport memset
+from libc.string cimport memset, memcpy
 
 cimport libcouchbase as lcb
 

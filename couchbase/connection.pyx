@@ -116,6 +116,7 @@ cdef void cb_stat_callback(lcb.lcb_t instance, const void *cookie,
 cdef class Connection:
     cdef lcb.lcb_t _instance
     cdef lcb.lcb_create_st _create_options
+    cdef lcb.lcb_cached_config_st _cached_options
     cdef public lcb.lcb_uint32_t default_format
     cdef public bint quiet
     def __cinit__(self):
@@ -123,7 +124,7 @@ cdef class Connection:
         memset(&self._create_options, 0, sizeof(self._create_options))
 
     def __init__(self, host='localhost', port=8091, username=None,
-                 password=None, bucket=None, quiet=False):
+                 password=None, bucket=None, quiet=False, conncache=None):
         """Connection to a bucket.
 
         Normally it's initialized through
@@ -180,7 +181,24 @@ cdef class Connection:
         self._create_options.v.v0.user = username
         self._create_options.v.v0.passwd = password
 
-        rc = lcb.lcb_create(&self._instance, &self._create_options)
+        rc = -1
+
+        if conncache:
+            conncache = conncache.encode("utf-8")
+            memset(&self._cached_options, 0, sizeof(lcb_cached_config_st));
+
+            memcpy(&self._cached_options.createopt,
+                   &self._create_options,
+                   sizeof(lcb_create_st))
+
+            self._cached_options.cachefile = <const char*>conncache
+            rc = lcb.lcb_create_compat(lcb.LCB_CACHED_CONFIG,
+                                        &self._cached_options,
+                                        &self._instance,
+                                        NULL)
+        else:
+            rc = lcb.lcb_create(&self._instance, &self._create_options)
+
         Utils.maybe_raise(rc, 'failed to create libcouchbase instance')
         lcb.lcb_behavior_set_syncmode(self._instance, lcb.LCB_SYNCHRONOUS)
 

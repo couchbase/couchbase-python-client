@@ -527,6 +527,7 @@ cdef extern from "libcouchbase/couchbase.h":
         LCB_SERVER_BUG
         LCB_PLUGIN_VERSION_MISMATCH
         LCB_INVALID_HOST_FORMAT
+        LCB_INVALID_CHAR
 
 
     cdef struct lcb_st:
@@ -1239,15 +1240,22 @@ cdef extern from "libcouchbase/couchbase.h":
 
     lcb_error_t lcb_verify_struct_size(lcb_uint32_t id, lcb_uint32_t version, lcb_size_t size)
 
-    cdef enum lcb_cluster_t:
+    cdef enum lcb_compat_t:
         LCB_MEMCACHED_CLUSTER
+        LCB_CACHED_CONFIG
 
-    lcb_error_t lcb_create_compat(lcb_cluster_t type, const void *specific, lcb_t *instance, lcb_io_opt_st *io)
+    ctypedef lcb_compat_t lcb_cluster_t
+
+    lcb_error_t lcb_create_compat(lcb_compat_t type, const void *specific, lcb_t *instance, lcb_io_opt_st *io)
 
     cdef struct lcb_memcached_st:
         const char *serverlist
         const char *username
         const char *password
+
+    cdef struct lcb_cached_config_st:
+        lcb_create_st createopt
+        const char *cachefile
 
     void lcb_behavior_set_syncmode(lcb_t instance, lcb_syncmode_t syncmode)
 
@@ -1413,3 +1421,5 @@ cdef extern from "libcouchbase/couchbase.h":
     lcb_int32_t lcb_get_num_nodes(lcb_t instance)
 
     const char *const *lcb_get_server_list(lcb_t instance)
+
+

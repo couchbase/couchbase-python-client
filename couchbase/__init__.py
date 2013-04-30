@@ -8,7 +8,7 @@ class Couchbase:
     """The base class for interacting with Couchbase"""
     @staticmethod
     def connect(host='localhost', port=8091, username=None, password=None,
-                bucket=None, quiet=False):
+                bucket=None, quiet=False, conncache=None):
         """Connect to a bucket.
 
         The parameters `password` and `bucket` are **not** optional and
@@ -33,6 +33,11 @@ class Couchbase:
           keys. If it is `False` it will raise
           :exc:`couchbase.exceptions.NotFoundError` exceptions. When set
           to `True` the operations will return `None` silently.
+        :param string conncache: If set, this will refer to a path on the
+          filesystem where cached "bootstrap" information may be stored. This
+          path may be shared among multiple instance of the Couchbase client.
+          Using this option may reduce overhead when using many short-lived
+          instances of the client.
 
         :raise: :exc:`couchbase.exceptions.BucketNotFoundError` if there
                 is no such bucket to connect to
@@ -64,4 +69,5 @@ class Couchbase:
 
         """
         return couchbase.libcouchbase.Connection(host, port, username,
-                                                 password, bucket)
+                                                 password, bucket,
+                                                 conncache=conncache)

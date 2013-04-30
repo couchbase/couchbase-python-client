@@ -1,3 +1,6 @@
+import tempfile
+import os
+
 from couchbase.exceptions import (AuthError, ArgumentError,
                                   BucketNotFoundError, ConnectError,
                                   NotFoundError)
@@ -67,6 +70,25 @@ class ConnectionTest(CouchbaseTestCase):
                         bucket=self.bucket_prefix, quiet=False)
         self.assertRaises(NotFoundError, cb.get, 'missing_key')
 
+
+    def test_conncache(self):
+        cachefile = tempfile.NamedTemporaryFile()
+        cb = Connection(username=self.username, password=self.password,
+                        bucket=self.bucket_prefix, conncache=cachefile.name)
+        self.assertTrue(cb.set("foo", "bar"))
+
+        cb2 = Connection(username=self.username, password=self.password,
+                         bucket=self.bucket_prefix, conncache=cachefile.name)
+        self.assertTrue(cb2.set("foo", "bar"))
+        self.assertEquals("bar", cb.get("foo"))
+
+        sb = os.stat(cachefile.name)
+        self.assertTrue(sb.st_size > 0)
+
+        print("Filename is", cachefile.name)
+
+        # TODO, see what happens when bad path is used
+        # apparently libcouchbase does not report this failure.
 
 if __name__ == '__main__':
     unittest.main()
