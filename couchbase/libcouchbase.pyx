@@ -58,7 +58,7 @@ class Utils:
 
     @staticmethod
     def maybe_raise(rc, msg, key=None, status=0, cas=0, operation=0):
-        """Raise meaningful exception
+        """Raise meaningful exception.
 
         Helper to raise a meaningful exception based on the return code
         from libcouchbase. If a success was returned, no expection will
@@ -75,6 +75,7 @@ class Utils:
 
         :raise: Any of the exceptions from :mod:`couchbase.exceptions`
         :return: no treturn value
+
         """
         if ((rc == lcb.LCB_SUCCESS and (status == 0 or status/100 == 2)) or
             rc == lcb.LCB_AUTH_CONTINUE):
@@ -92,10 +93,11 @@ class Utils:
 
     @staticmethod
     def raise_not_connected(operation):
-        """Raise a not connected to the server error
+        """Raise a not connected to the server error.
 
         :param int operation: the operation that causes the error (ADD,
           SET, REPLACE, APPEND or PREPEND)
+
         """
         raise exceptions.CouchbaseConnectError(
             "not connected to the server",
@@ -103,13 +105,14 @@ class Utils:
 
     @staticmethod
     def string_to_num(string):
-        """Tries to convert a string to a number
+        """Tries to convert a string to a number.
 
         If the string can't be converted to an integer or float,
         return the original one
 
         :param string string: the string that should be converted
         :return: the string converted to a number or the original string
+
         """
         try:
             return int(string)
@@ -125,15 +128,16 @@ class CouchbaseError(Exception):
     # gets too crowded
     """Base class for errors within the Couchbase Python SDK
 
-        :param string msg: the error message
-        :param int error: the error code
-        :param string key: the key if it one was involved in the operation that
-                           lead to the error
-        :param int status: the HTTP status code if the operation was through
-                           HTTP
-        :param cas: the CAS value
-        :param operation: The operation that was performed on Couchbase (ADD,
-          SET, REPLACE, APPEND or PREPEND)
+    :param string msg: the error message
+    :param int error: the error code
+    :param string key: the key if it one was involved in the operation
+      that lead to the error
+    :param int status: the HTTP status code if the operation was through
+      HTTP
+    :param cas: the CAS value
+    :param operation: The operation that was performed on Couchbase (ADD,
+      SET, REPLACE, APPEND or PREPEND)
+
     """
     http_status_msg = {
         lcb.LCB_HTTP_STATUS_BAD_REQUEST: '(Bad Request)',

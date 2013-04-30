@@ -9,7 +9,7 @@ class Couchbase:
     @staticmethod
     def connect(host='localhost', port=8091, username=None, password=None,
                 bucket=None, quiet=False):
-        """Connect to a bucket
+        """Connect to a bucket.
 
         The parameters `password` and `bucket` are **not** optional and
         will cause a :exc:`couchbase.exceptions.ArgumentError`
@@ -61,6 +61,7 @@ class Couchbase:
 
             cb = Couchbase.connect('example.com', username='admin',
                                    password='secret', bucket='mybucket')
+
         """
         return couchbase.libcouchbase.Connection(host, port, username,
                                                  password, bucket)

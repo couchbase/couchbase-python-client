@@ -124,7 +124,7 @@ cdef class Connection:
 
     def __init__(self, host='localhost', port=8091, username=None,
                  password=None, bucket=None, quiet=False):
-        """Connection to a bucket
+        """Connection to a bucket.
 
         Normally it's initialized through
         :meth:`couchbase.Couchbase.connect`
@@ -156,6 +156,7 @@ cdef class Connection:
             If it is `False` it will raise
             :exc:`couchbase.exceptions.NotFoundError` exceptions. When
             set to `True` the operations will return `None` silently.
+
         """
         if password is None:
             raise exceptions.ArgumentError("A password must be given")
@@ -203,11 +204,12 @@ cdef class Connection:
 
     @staticmethod
     def _encode_value(value, format):
-        """Encode some value according to a given format
+        """Encode some value according to a given format.
 
         The input value can be any Python object. The `format` specifies
-        whether it should be as JSON string, pickled or not encoded at all
-        (plain).
+        whether it should be as JSON string, pickled or not encoded at
+        all (plain).
+
         """
         if format == FMT_PLAIN and not isinstance(value, bytes):
             raise exceptions.ValueFormatError("FMT_PLAIN expects a byte array")
@@ -228,10 +230,11 @@ cdef class Connection:
 
     @staticmethod
     def _decode_value(value, format):
-        """Decode some value according to a given format
+        """Decode some value according to a given format.
 
-        The input value is either encoded as a JSON string, pickled or not
-        encoded at all (plain).
+        The input value is either encoded as a JSON string, pickled or
+        not encoded at all (plain).
+
         """
         if format == FMT_JSON:
             return json.loads(value.decode('utf-8'))
@@ -334,21 +337,21 @@ cdef class Connection:
 
 
     def set(self, key, value=None, cas=None, ttl=None, format=None):
-        """Unconditionally store the object in the Couchbase
+        """Unconditionally store the object in Couchbase.
 
         :param key: if it's a string it's the key used to reference the
           value. In case of a dict, it's a multi-set where the key-value
           pairs will be stored.
         :type key: string or dict
         :param any value: value to be stored
-        :param int cas: the CAS value for an object. This value is created
-          on the server and is guaranteed to be unique for each value of
-          a given key. This value is used to provide simple optimistic
-          concurrency control when multiple clients or threads try to
-          update an item simultaneously.
-        :param int ttl: the time to live for an object. Values larger than
-         30*24*60*60 seconds (30 days) are interpreted as absolute times
-         (from the epoch).
+        :param int cas: the CAS value for an object. This value is
+          created on the server and is guaranteed to be unique for each
+          value of a given key. This value is used to provide simple
+          optimistic concurrency control when multiple clients or
+          threads try to update an item simultaneously.
+        :param int ttl: the time to live for an object. Values larger
+          than 30*24*60*60 seconds (30 days) are interpreted as absolute
+          times (from midnight, January 1, 1970, a.k.a. the epoch).
         :param format: the representation for storing the value in the
           bucket. If none is specified it will use the `default_format`.
           For more info see
@@ -361,9 +364,9 @@ cdef class Connection:
           connection closed
         :raise: :exc:`couchbase.exceptions.KeyExistsError` if the key
           already exists on the server with a different CAS value.
-        :raise: :exc:`couchbase.exceptions.ValueFormatError` if the value
-          cannot be serialized with chosen encoder, e.g. if you try to
-          store a dictionaty in plain mode.
+        :raise: :exc:`couchbase.exceptions.ValueFormatError` if the
+          value cannot be serialized with chosen encoder, e.g. if you
+          try to store a dictionaty in plain mode.
 
         :return: (*int*) the CAS value of the object
 
@@ -382,53 +385,66 @@ cdef class Connection:
         Several sets at the same time (mutli-set)::
 
             cb.set({'foo': 'bar', 'baz': 'value'})
+
         """
         return self.__set(lcb.LCB_SET, key, value, cas, ttl, format)
 
     def append(self, key, value=None, cas=None, ttl=None):
         """
-        Append a string to an existing value in Couchbase
+        Append a string to an existing value in Couchbase.
 
-        This follows the same conventions as `set`, with the caveat that
-        the `format` argument is unavailable and will always be `FMT_PLAIN`.
+        This follows the same conventions as
+        :meth:`~couchbase.libcouchbase.Connection.set`, with the caveat
+        that the `format` argument is unavailable and will always be
+        `FMT_PLAIN`.
 
         :raise: :exc:`couchbase.exceptions.NotStoredError` if the key does
           not exist
+
         """
         return self.__set(lcb.LCB_APPEND, key, value, cas, ttl, FMT_PLAIN)
 
     def prepend(self, key, value=None, cas=None, ttl=None):
         """
-        Prepend a string to an existing value in Couchbase
-        This follows the same conventions as `append`
+        Prepend a string to an existing value in Couchbase.
+
+        This follows the same conventions as
+        :meth:`~couchbase.libcouchbase.Connection.append`
+
         """
         return self.__set(lcb.LCB_PREPEND, key, value, cas, ttl, FMT_PLAIN)
 
     def add(self, key, value=None, ttl=None, format=None):
         """
         Store an object in Couchbase unless it already exists.
-        Follows the same conventions as `set`, but the value is stored
-        only if it does not exist already. Conversely, the value is not
-        stored if the key already exists.
 
-        :raise: :exc:`couchbase.exceptions.KeyExistsError` if the key already
-          exists
+        Follows the same conventions as
+        :meth:`~couchbase.libcouchbase.Connection.set` but the value is
+        stored only if it does not exist already. Conversely, the value
+        is not stored if the key already exists.
+
+        :raise: :exc:`couchbase.exceptions.KeyExistsError` if the key
+          already exists
+
         """
         return self.__set(lcb.LCB_ADD, key, value, None, ttl, format)
 
     def replace(self, key, value=None, cas=None, ttl=None, format=None):
         """
         Store an object in Couchbase only if it already exists.
-        Follows the same conventions as `set`, but the value is stored
-        only if a previous value already exists.
 
-        :raise: :exc:`couchbase.exceptions.NotFoundError` if the key does
-          not exist
+        Follows the same conventions as
+        :meth:`~couchbase.libcouchbase.Connection.set`, but the value is
+        stored only if a previous value already exists.
+
+        :raise: :exc:`couchbase.exceptions.NotFoundError` if the key
+          does not exist
+
         """
         return self.__set(lcb.LCB_REPLACE, key, value, cas, ttl, format)
 
     def get(self, keys, extended=False, format=None, quiet=None):
-        """Obtain an object stored in Couchbase by given key
+        """Obtain an object stored in Couchbase by given key.
 
         :param keys: One or several keys to fetch
         :type key: string or list
@@ -478,6 +494,7 @@ cdef class Connection:
 
             cb.get(['foo', 'bar'], extended=True)
             # {'foo': (val1, flags1, cas1), 'bar': (val2, flags2, cas2)}
+
         """
         if self._instance == NULL:
             Utils.raise_not_connected(lcb.LCB_GET)
@@ -614,11 +631,11 @@ cdef class Connection:
 
 
     def delete(self, key, cas=None, quiet=False):
-        """Remove the key-value entry for a given key in Couchbase
+        """Remove the key-value entry for a given key in Couchbase.
 
-        :param key: This can be a single string which is the key to delete,
-          a list of strings, or a dict of strings, with the values being
-          CAS values for each key (see below)
+        :param key: This can be a single string which is the key to
+          delete, a list of strings, or a dict of strings, with the
+          values being CAS values for each key (see below)
 
         :type key: string, dict, or tuple/list
         :param int cas: The CAS to use for the removal operation.
@@ -629,7 +646,8 @@ cdef class Connection:
           If the CAS on the server does not match the one specified,
           an exception is thrown.
         :param boolean quiet:
-          Follows the same semantics as `quiet` in `get`
+          Follows the same semantics as `quiet` in
+          :meth:`~couchbase.libcouchbase.Connection.get`
 
         :raise: :exc:`couchbase.exceptions.NotFoundError` if the key
           does not exist on the bucket
@@ -639,7 +657,8 @@ cdef class Connection:
           connection was closed
 
         :return: a boolean value or a dictionary of boolean values,
-          depending on whether the `key` parameter was a string or a collection.
+          depending on whether the `key` parameter was a string or a
+          collection.
 
 
         Simple delete::
@@ -666,6 +685,7 @@ cdef class Connection:
                 "key2" : cas2,
                 "key3" : cas3
             })
+
         """
 
         if self._instance == NULL:
@@ -820,35 +840,41 @@ cdef class Connection:
 
     def incr(self, key, amount=1, initial=None, ttl=None, extended=False):
         """
-        Increment the numeric value of a key
-        :param key: A key or a collection of keys which are to be incremented
+        Increment the numeric value of a key.
+
+        :param key: A key or a collection of keys which are to be
+          incremented
         :type key: string or list of strings
 
-        :param int amount: an amount by which the key should be incremented
+        :param int amount: an amount by which the key should be
+          incremented
 
-        :param initial: The initial value for the key, if it does not exist.
-          If the key does not exist, this value is used, and `amount` is
-          ignored. If this parameter is `None` then no initial value is used
+        :param initial: The initial value for the key, if it does not
+          exist. If the key does not exist, this value is used, and
+          `amount` is ignored. If this parameter is `None` then no
+          initial value is used
         :type initial: int or `None`
 
-        :param int ttl: The lifetime for the key, after which it will expire
+        :param int ttl: The lifetime for the key, after which it will
+          expire
 
-        :param boolean extended: If set to true, the return value will be a
-          `Result` object (similar to whatever
-          :meth:`couchbase.Couchbase.Connection.get`) returns.
+        :param boolean extended: If set to true, the return value will
+          be a `Result` object (similar to whatever
+          :meth:`~couchbase.Couchbase.Connection.get`) returns.
 
-        :raise: :exc:`couchbase.exceptions.NotFoundError` if the key does
-          not exist on the bucket (and `initial` was `None`)
+        :raise: :exc:`couchbase.exceptions.NotFoundError` if the key
+          does not exist on the bucket (and `initial` was `None`)
 
         :raise: :exc:`couchbase.exceptions.DeltaBadvalError` if the key
           exists, but the existing value is not numeric
 
         :return:
-          An integer or dictionary of keys and integers, indicating the current
-          value of the counter. If `extended` was true, a `Result` object is
-          used rather than a simple integer.
-          If an operation failed, the value will be `None`. Check for this as
-          a counter's value may be `0` (but would not be a failure)
+          An integer or dictionary of keys and integers, indicating the
+          current value of the counter. If `extended` was true, a
+          `Result` object is used rather than a simple integer.
+          If an operation failed, the value will be `None`. Check for
+          this as a counter's value may be `0` (but would not be a
+          failure)
 
         Simple increment::
 
@@ -867,14 +893,19 @@ cdef class Connection:
             kv = cb.incr(["foo", "bar", "baz"], extended=True)
             for key, result in kv.items():
                 print "Key %s has value %d now" % (key, result.value)
+
         """
         return self._arithmetic(key, amount, initial=initial, ttl=ttl, extended=extended)
 
     def decr(self, key, amount=1, initial=None, ttl=None, extended=False):
         """
-        Decrement a key in couchbase. This follows the same conventions as
-        `incr`, except the `amount` is the value which is subtracted rather
-        than added to the existing value
+        Decrement a key in Couchbase.
+
+        This follows the same conventions as
+        :meth:`~couchbase.libcouchbase.Connection.incr`, except the
+        `amount` is the value which is subtracted ratherthan added to
+        the existing value
+
         """
         amount = -amount
         return self._arithmetic(key, amount, initial=initial, ttl=ttl, extended=extended)
