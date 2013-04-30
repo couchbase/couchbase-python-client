@@ -17,7 +17,11 @@ class Couchbase:
         protected bucket, where the username is equal to the bucket
         name.
 
-        :param string host: the hostname or IP address of the node
+        :param host: the hostname or IP address of the node.
+          This can be a list or tuple of multiple nodes; the nodes can either
+          be simple strings, or (host, port) tuples (in which case the `port`
+          parameter from the method arguments is ignored).
+        :type host: string or list
         :param number port: port of the management API
         :param string username: the user name to connect to the cluster.
                                 It's the username of the management API.

@@ -101,7 +101,21 @@ class ConnectionTest(CouchbaseTestCase):
                         bucket=self.bucket_prefix)
         self.assertFalse(len(cb.errors()))
 
+    def test_multi_hosts(self):
+        kwargs = {
+            'username' : self.username,
+            'password' : self.password,
+            'bucket' : self.bucket_prefix
+        }
 
+        cb = Connection(host=['localhost'], **kwargs)
+        self.assertTrue(cb.set("foo", "bar"))
+
+        cb = Connection(host=[('localhost', 8091)], **kwargs)
+        self.assertTrue(cb.set("foo", "bar"))
+
+        cb = Connection(host=[('localhost', 1), ('localhost', 8091)], **kwargs)
+        self.assertTrue(cb.set("foo", "bar"))
 
 if __name__ == '__main__':
     unittest.main()

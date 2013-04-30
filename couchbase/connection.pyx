@@ -172,8 +172,23 @@ cdef class Connection:
 
         self.quiet = quiet
         self._errors = deque(maxlen=1000)
+        if isinstance(host, (tuple,list)):
+            hosts_tmp = []
+            for curhost in host:
+                cur_hname = None
+                cur_hport = None
+                if isinstance(curhost, (list,tuple)):
+                    cur_hname, cur_hport = curhost
+                else:
+                    cur_hname = curhost
+                    cur_hport = port
 
-        host = '{0}:{1}'.format(host, port).encode('utf-8')
+                hosts_tmp.append("{0}:{1}".format(cur_hname, cur_hport))
+
+            host = ";".join(hosts_tmp).encode('utf-8')
+
+        else:
+            host = '{0}:{1}'.format(host, port).encode('utf-8')
 
         if password:
             password = password.encode('utf-8')
