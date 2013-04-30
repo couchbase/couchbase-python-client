@@ -1,6 +1,7 @@
+from collections import deque
+
 from libc.stdlib cimport malloc, calloc, free
 from libc.string cimport memset, memcpy
-
 cimport libcouchbase as lcb
 
 import json

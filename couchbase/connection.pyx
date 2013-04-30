@@ -112,6 +112,11 @@ cdef void cb_stat_callback(lcb.lcb_t instance, const void *cookie,
         val = (<char *>resp.v.v0.bytes)[:resp.v.v0.nbytes].decode('utf-8')
         ctx['rv'][key][node] = Utils.string_to_num(val)
 
+cdef void cb_error_callback(lcb.lcb_t instance,
+                            lcb.lcb_error_t err,
+                            const char *desc):
+    obj = <object>lcb.lcb_get_cookie(instance)
+    obj._errors.append((err, desc))
 
 cdef class Connection:
     cdef lcb.lcb_t _instance
@@ -119,12 +124,15 @@ cdef class Connection:
     cdef lcb.lcb_cached_config_st _cached_options
     cdef public lcb.lcb_uint32_t default_format
     cdef public bint quiet
+    cdef public object _errors
+
     def __cinit__(self):
         self.default_format = FMT_JSON
         memset(&self._create_options, 0, sizeof(self._create_options))
 
     def __init__(self, host='localhost', port=8091, username=None,
-                 password=None, bucket=None, quiet=False, conncache=None):
+                 password=None, bucket=None, quiet=False, conncache=None,
+                 _no_connect_exceptions=False):
         """Connection to a bucket.
 
         Normally it's initialized through
@@ -163,6 +171,7 @@ cdef class Connection:
             raise exceptions.ArgumentError("A bucket name must be given")
 
         self.quiet = quiet
+        self._errors = deque(maxlen=1000)
 
         host = '{0}:{1}'.format(host, port).encode('utf-8')
 
@@ -212,6 +221,13 @@ cdef class Connection:
         <void>lcb.lcb_set_remove_callback(self._instance, cb_remove_callback);
         <void>lcb.lcb_set_arithmetic_callback(self._instance,
                                               cb_arithmetic_callback);
+        <void>lcb.lcb_set_error_callback(self._instance, cb_error_callback);
+
+        lcb.lcb_set_cookie(self._instance, <void*>self);
+
+        if _no_connect_exceptions:
+            lcb.lcb_connect(self._instance)
+            return
 
         self._connect()
 
@@ -223,6 +239,26 @@ cdef class Connection:
         rc = lcb.lcb_connect(self._instance)
         Utils.maybe_raise(
             rc, 'failed to connect libcouchbase instance to server')
+
+    def errors(self, clear_existing=True):
+        """
+        Get miscellaneous error information.
+
+        This function returns error information relating to the client instance.
+        This will contain error information not related to any specific operation
+        and may also provide insight as to what caused a specific operation to
+        fail.
+
+        :param boolean clear_existing: If set to true, the errors will be
+          cleared once they are returned. The client will keep a history of
+          the last 1000 errors which were received.
+
+        :return: a tuple of ((errnum, errdesc), ...) (which may be empty)
+        """
+        ret = tuple(self._errors)
+        if clear_existing:
+            self._errors.clear()
+        return ret
 
     @staticmethod
     def _encode_value(value, format):

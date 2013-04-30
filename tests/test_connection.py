@@ -87,5 +87,21 @@ class ConnectionTest(CouchbaseTestCase):
         # TODO, see what happens when bad path is used
         # apparently libcouchbase does not report this failure.
 
+    def test_connection_errors(self):
+        cb = Connection(username='bad',
+                        password='bad',
+                        bucket='meh',
+                        host='localhost', port=1,
+                        _no_connect_exceptions=True)
+        errors = cb.errors()
+        self.assertTrue(len(errors))
+        self.assertEqual(len(errors[0]), 2)
+
+        cb = Connection(username=self.username, password=self.password,
+                        bucket=self.bucket_prefix)
+        self.assertFalse(len(cb.errors()))
+
+
+
 if __name__ == '__main__':
     unittest.main()
