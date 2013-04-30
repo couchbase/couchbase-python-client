@@ -53,9 +53,6 @@ class ConnectionTest(CouchbaseTestCase):
                           password='wrong_password',
                           bucket=self.bucket_prefix + '_sasl')
 
-        self.assertRaises(ArgumentError, Connection, self.host, self.port,
-                          bucket=self.bucket_prefix + '_sasl')
-
     def test_quiet(self):
         cb = Connection(username=self.username, password=self.password,
                         bucket=self.bucket_prefix)

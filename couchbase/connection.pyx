@@ -159,22 +159,26 @@ cdef class Connection:
             set to `True` the operations will return `None` silently.
 
         """
-        if password is None:
-            raise exceptions.ArgumentError("A password must be given")
         if bucket is None:
             raise exceptions.ArgumentError("A bucket name must be given")
 
         self.quiet = quiet
 
         host = '{0}:{1}'.format(host, port).encode('utf-8')
-        password = password.encode('utf-8')
-        bucket = bucket.encode('utf-8')
 
-        if username is None:
-            # Try to connect to a protected bucket
-            username = bucket
+        if password:
+            password = password.encode('utf-8')
+            if not username:
+                username = bucket
         else:
+            password = "".encode('utf-8')
+
+        if username:
             username = username.encode('utf-8')
+        else:
+            username = "".encode('utf-8')
+
+        bucket = bucket.encode('utf-8')
 
         self._create_options.v.v0.host = host
         self._create_options.v.v0.bucket = bucket

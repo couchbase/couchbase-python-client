@@ -11,11 +11,9 @@ class Couchbase:
                 bucket=None, quiet=False, conncache=None):
         """Connect to a bucket.
 
-        The parameters `password` and `bucket` are **not** optional and
-        will cause a :exc:`couchbase.exceptions.ArgumentError`
-        exception if they are not specified.
-        If `username` is not given, it will automatically set to the
-        bucket name, as it is expected that you try to connect to a SASL
+        If `username` is not given but `password` is specified,
+        it will automatically set to the bucket name, as it is
+        expected that you try to connect to a SASL
         protected bucket, where the username is equal to the bucket
         name.
 
@@ -46,8 +44,8 @@ class Couchbase:
                 wasn't accessible (doesn't accept connections or doesn't
                 respond in time)
 
-                :exc:`couchbase.exceptions.ArgumentError` if either the
-                password or the bucket wasn't specified
+                :exc:`couchbase.exceptions.ArgumentError`
+                if the bucket wasn't specified
 
         :return: instance of :class:`couchbase.libcouchbase.Connection`
 
@@ -55,8 +53,7 @@ class Couchbase:
         Initialize connection using default options::
 
             from couchbase import Couchbase
-            cb = Couchbase.connect(username='admin', password='secret',
-                                   bucket='mybucket')
+            cb = Couchbase.connect(bucket='mybucket')
 
         Connect to protected bucket::
 
