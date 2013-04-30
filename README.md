@@ -37,7 +37,7 @@ To run the small sample application that inserts one million documents into
 a local Couchbase at the default port 8091 and a bucket called "default",
 just execute:
 
-    python basic.py
+    python examples/basic.py
 
 
 Building documentaion
