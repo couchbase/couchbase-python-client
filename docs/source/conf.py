@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Couchbase Python SDK documentation build configuration file, created by
+# Couchbase Python Client Library documentation build configuration file, created by
 # sphinx-quickstart on Fri Apr  5 17:46:04 2013.
 #
 # This file is execfile()d with the current directory set to its containing dir.
@@ -21,7 +21,6 @@ import sys
 sys.path.insert(0, os.path.abspath('../..'))
 #sys.path.insert(0, os.path.abspath('../../couchbase'))
 #sys.path.insert(0, os.path.abspath(os.path.join(os.pardir, os.pardir, 'couchbase')))
-#sys.path.insert(0, '/home/vmx/src/couchbase/pythonsdk/cython/python3')
 
 # -- General configuration -----------------------------------------------------
 
@@ -46,7 +45,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'Couchbase Python SDK'
+project = 'Couchbase Python Client Library'
 copyright = '2013, Couchbase, Inc.'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -170,7 +169,7 @@ html_static_path = ['_static']
 #html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'CouchbasePythonSDKdoc'
+htmlhelp_basename = 'CouchbasePythonClientLibrarydoc'
 
 
 # -- Options for LaTeX output --------------------------------------------------
@@ -189,8 +188,8 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-    ('index', 'CouchbasePythonSDK.tex', 'Couchbase Python SDK Documentation',
-     'Volker Mische', 'manual'),
+    ('index', 'CouchbasePythonClientLibrary.tex', 'Couchbase Python Client Library Documentation',
+     'Couchbase, Inc.', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -219,8 +218,8 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'couchbasepythonsdk', 'Couchbase Python SDK Documentation',
-     ['Volker Mische'], 1)
+    ('index', 'couchbasepythonclientlibrary', 'Couchbase Python Client Library Documentation',
+     ['Couchbase, Inc.'], 1)
 ]
 
 # If true, show URL addresses after external links.
@@ -233,8 +232,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    ('index', 'CouchbasePythonSDK', 'Couchbase Python SDK Documentation',
-     'Volker Mische', 'CouchbasePythonSDK', 'One line description of project.',
+    ('index', 'CouchbasePythonClientLibrary', 'Couchbase Python Client Library Documentation',
+     'Couchbase, Inc.', 'CouchbasePythonClientLibrary', 'A python client library to store, retrieve and query data from a Couchbase cluster.',
      'Miscellaneous'),
 ]
 
