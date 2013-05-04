@@ -1378,7 +1378,7 @@ cdef extern from "libcouchbase/couchbase.h":
 
     const void *lcb_get_cookie(lcb_t instance)
 
-    lcb_error_t lcb_wait(lcb_t instance)
+    lcb_error_t lcb_wait(lcb_t instance) nogil
 
     int lcb_is_waiting(lcb_t instance)
 

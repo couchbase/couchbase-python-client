@@ -3,7 +3,7 @@ Result = namedtuple('Result', ['value', 'flags', 'cas'])
 
 cdef void cb_store_callback(lcb.lcb_t instance, const void *cookie,
                             lcb.lcb_storage_t operation, lcb.lcb_error_t rc,
-                            const lcb.lcb_store_resp_t *resp):
+                            const lcb.lcb_store_resp_t *resp) with gil:
     ctx = <object>cookie
     cas = None
     key = (<char *>resp.v.v0.key)[:resp.v.v0.nkey].decode('utf-8')
@@ -23,7 +23,7 @@ cdef void cb_store_callback(lcb.lcb_t instance, const void *cookie,
 
 cdef void cb_get_callback(lcb.lcb_t instance, const void *cookie,
                           lcb.lcb_error_t rc,
-                          const lcb.lcb_get_resp_t *resp):
+                          const lcb.lcb_get_resp_t *resp) with gil:
     # A lot of error handling is missing here, but you get at least your
     # values back
     ctx = <object>cookie
@@ -60,7 +60,7 @@ cdef void cb_get_callback(lcb.lcb_t instance, const void *cookie,
 
 cdef void cb_remove_callback(lcb.lcb_t instance, const void *cookie,
                              lcb.lcb_error_t rc,
-                             const lcb.lcb_remove_resp_t *resp):
+                             const lcb.lcb_remove_resp_t *resp) with gil:
     ctx = <object>cookie;
     key = (<char *>resp.v.v0.key)[:resp.v.v0.nkey].decode('utf-8')
     try:
@@ -76,7 +76,7 @@ cdef void cb_remove_callback(lcb.lcb_t instance, const void *cookie,
 
 cdef void cb_arithmetic_callback(lcb.lcb_t instance, const void *cookie,
                                  lcb.lcb_error_t rc,
-                                 const lcb.lcb_arithmetic_resp_t *resp):
+                                 const lcb.lcb_arithmetic_resp_t *resp) with gil:
     ctx = <object>cookie;
     key = (<char *>resp.v.v0.key)[:resp.v.v0.nkey].decode('utf-8')
     try:
@@ -95,7 +95,7 @@ cdef void cb_arithmetic_callback(lcb.lcb_t instance, const void *cookie,
 
 cdef void cb_stat_callback(lcb.lcb_t instance, const void *cookie,
                            lcb.lcb_error_t rc,
-                           const lcb.lcb_server_stat_resp_t *resp):
+                           const lcb.lcb_server_stat_resp_t *resp) with gil:
     ctx = <object>cookie
 
     node = None
@@ -114,7 +114,7 @@ cdef void cb_stat_callback(lcb.lcb_t instance, const void *cookie,
 
 cdef void cb_error_callback(lcb.lcb_t instance,
                             lcb.lcb_error_t err,
-                            const char *desc):
+                            const char *desc) with gil:
     obj = <object>lcb.lcb_get_cookie(instance)
     obj._errors.append((err, desc))
 
@@ -228,7 +228,6 @@ cdef class Connection:
             rc = lcb.lcb_create(&self._instance, &self._create_options)
 
         Utils.maybe_raise(rc, 'failed to create libcouchbase instance')
-        lcb.lcb_behavior_set_syncmode(self._instance, lcb.LCB_SYNCHRONOUS)
 
         <void>lcb.lcb_set_store_callback(self._instance, cb_store_callback);
         <void>lcb.lcb_set_get_callback(self._instance, cb_get_callback);
@@ -242,9 +241,9 @@ cdef class Connection:
 
         if _no_connect_exceptions:
             lcb.lcb_connect(self._instance)
-            return
-
-        self._connect()
+            self._wait_common()
+        else:
+            self._connect()
 
     def __dealloc__(self):
         if self._instance:
@@ -252,8 +251,22 @@ cdef class Connection:
 
     def _connect(self):
         rc = lcb.lcb_connect(self._instance)
+
         Utils.maybe_raise(
-            rc, 'failed to connect libcouchbase instance to server')
+            rc, 'failed to schedule connection to server')
+
+        self._wait_common()
+        errors = self.errors()
+        if errors:
+            Utils.maybe_raise(errors[0][0],
+                    "failed to connect to server")
+
+
+    def _wait_common(self):
+        cdef int rv
+        with nogil:
+            rv = lcb.lcb_wait(self._instance)
+        return rv
 
     def errors(self, clear_existing=True):
         """
@@ -392,10 +405,8 @@ cdef class Connection:
             rc = lcb.lcb_store(self._instance, <void *>ctx, num_commands,
                                ptr_cmds)
             Utils.maybe_raise(rc, 'failed to schedule set request')
-
-            # TODO vmx 2013-04-12: Wait for all operations to be processed
-            #    This should already be the case in sync mode, but I'm not
-            #    sure
+            if (rc == lcb.LCB_SUCCESS):
+                rc = self._wait_common()
 
             if ctx['exception']:
                 raise ctx['exception']
@@ -609,12 +620,12 @@ cdef class Connection:
                 cmds[i].v.v0.nkey = len(keys[i])
 
             rc = lcb.lcb_get(self._instance, <void *>ctx, num_cmds, ptr_cmds)
-            if rc != lcb.LCB_KEY_ENOENT or not ctx['quiet']:
+            if rc != lcb.LCB_SUCCESS:
                 Utils.maybe_raise(rc, 'failed to schedule get request')
-
-            # TODO vmx 2013-04-12: Wait for all operations to be processed
-            #    This should already be the case in sync mode, but I'm not
-            #    sure
+            else:
+                rc = self._wait_common()
+                if rc != lcb.LCB_SUCCESS:
+                    Utils.maybe_raise(rc, "couldn't wait for get operation")
 
             if ctx['exception']:
                 raise ctx['exception']
@@ -693,6 +704,9 @@ cdef class Connection:
             rc = lcb.lcb_server_stats(self._instance, <void *>ctx, num_cmds,
                                       ptr_cmds)
             Utils.maybe_raise(rc, 'failed to schedule get request')
+            if rc == lcb.LCB_SUCCESS:
+                rc = self._wait_common()
+                Utils.maybe_raise(rc, 'failed to wait for stats')
 
             if ctx['exception']:
                 raise ctx['exception']
@@ -822,8 +836,10 @@ cdef class Connection:
 
         try:
             rc = lcb.lcb_remove(self._instance, <void*>ctx, ii, cmdlist)
-            if rc != lcb.LCB_KEY_ENOENT or not ctx['quiet']:
-                Utils.maybe_raise(rc, 'failed to schedule remove request')
+            Utils.maybe_raise(rc, 'failed to schedule remove request')
+            if rc == lcb.LCB_SUCCESS:
+                rc = self._wait_common()
+                Utils.maybe_raise(rc, 'failed to wait for remove request')
 
             if ctx['exception']:
                 raise ctx['exception']
@@ -897,6 +913,9 @@ cdef class Connection:
             rc = lcb.lcb_arithmetic(self._instance, <void*>ctx, ii, cmdlist)
             if rc != lcb.LCB_SUCCESS:
                 Utils.maybe_raise(rc, 'failed to schedule arithmetic request')
+            else:
+                rc = self._wait_common()
+                Utils.maybe_raise(rc, 'failed to wait for arithmetic request')
 
             if ctx['exception']:
                 raise ctx['exception']
