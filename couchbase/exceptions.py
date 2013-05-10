@@ -1,5 +1,95 @@
-from couchbase.libcouchbase import CouchbaseError
+import couchbase._libcouchbase as C
 
+class CouchbaseError(Exception):
+    """Base exception for Couchbase errors
+
+    This is the base class for all exceptions thrown by Couchbase
+
+    **Exception Attributes**
+
+      .. py:attribute:: rc
+
+      The return code which caused the error
+
+      .. py:attribute:: all_results
+
+        A :class:`~couchbase.libcouchbase.MultiResult` object, if this
+        exception was thrown as part of a multi-operation. This contains
+        all the operations (including ones which may not have failed)
+
+      .. py:attribute:: inner_cause
+
+        If this exception was triggered by another exception, it is
+        present here.
+
+      .. py:attribute:: key
+
+        If applicable, this is the key which failed.
+
+      .. py:attribute:: csrc_info
+
+        A tuple of (`file`, `line`) pointing to a location in the C
+        source code where the exception was thrown (if applicable)
+
+
+    """
+
+    @classmethod
+    def rc_to_exctype(cls, rc):
+        """
+        Map an error code to an exception
+
+        :param int rc: The error code received for an operation
+
+        :return: a subclass of :class:`CouchbaseError`
+        """
+        return _LCB_ERRNO_MAP.get(rc, cls)
+
+    def __init__(self, params):
+        if isinstance(params, str):
+            params = { 'message' : params }
+
+        self.rc = params.get('rc', 0)
+        self.all_results = params.get('all_results', {})
+        self.result = params.get('result', None)
+        self.inner_cause = params.get('inner_cause', None)
+        self.csrc_info = params.get('csrc_info', ())
+        self.key = params.get('key', None)
+        self.objextra = params.get('objextra', None)
+        self.message = params.get('message', None)
+
+    def __str__(self):
+        extra = "<"
+
+        if self.key:
+            extra += "Key={0}, ".format(repr(self.key))
+
+        errstr = "RC=0x{0:X}".format(self.rc)
+        if self.rc != 0:
+            errstr += "[{0}]".format(C._strerror(self.rc))
+
+        extra += "{errstr}, Results={nres}".format(errstr = errstr,
+                                                  nres = len(self.all_results))
+        if self.message:
+            extra += ', {0}'.format(self.message)
+
+        if self.inner_cause:
+            extra += ", inner_cause={0}".format(self.inner_cause)
+
+        if self.csrc_info:
+            extra += ", C Source=({0},{1})".format(*self.csrc_info)
+
+        if self.objextra:
+            extra += ", OBJ={0}".format(repr(self.objextra))
+
+        extra += ">"
+        return extra
+
+class CouchbaseNetworkError(CouchbaseError):
+    """
+    Base class for network-related errors. These indicate issues in the low
+    level connectivity
+    """
 
 class ArgumentError(CouchbaseError):
     """Invalid argument
@@ -73,11 +163,24 @@ class TemporaryFailError(CouchbaseError):
 
     The server tried to perform the requested operation, but failed
     due to a temporary constraint. Retrying the operation may work.
+
+    This error may also be delivered if the key being accessed was
+    locked.
+
+    .. seealso::
+
+        :meth:`couchbase.libcouchbase.Connection.lock`
+        :meth:`couchbase.libcouchbase.Connection.unlock`
     """
 
 
 class KeyExistsError(CouchbaseError):
-    """The key already exists (with another CAS value)"""
+    """The key already exists (with another CAS value)
+
+    This exception may be thrown during an ``add()`` operation
+    (if the key already exists), or when a CAS is supplied
+    and the server-side CAS differs.
+    """
 
 
 class NotFoundError(CouchbaseError):
@@ -92,7 +195,7 @@ class DlsymFailedError(CouchbaseError):
     """Failed to locate the requested symbol in the shared object"""
 
 
-class NetworkError(CouchbaseError):
+class NetworkError(CouchbaseNetworkError):
     """Network error
 
     A network related problem occured (name lookup,
@@ -127,7 +230,7 @@ class UnknownCommandError(CouchbaseError):
     """The server doesn't know what that command is"""
 
 
-class UnknownHostError(CouchbaseError):
+class UnknownHostError(CouchbaseNetworkError):
     """The server failed to resolve the requested hostname"""
 
 
@@ -143,7 +246,7 @@ class TimeoutError(CouchbaseError):
     """The operation timed out"""
 
 
-class ConnectError(CouchbaseError):
+class ConnectError(CouchbaseNetworkError):
     """Failed to connect to the requested server"""
 
 
@@ -172,3 +275,35 @@ class BadHandleError(CouchbaseError):
 
 class HTTPError(CouchbaseError):
     """HTTP error"""
+
+
+_LCB_ERRNO_MAP = {
+    C.LCB_AUTH_ERROR : AuthError,
+    C.LCB_DELTA_BADVAL : DeltaBadvalError,
+    C.LCB_E2BIG : TooBigError,
+    C.LCB_EBUSY : BusyError,
+    C.LCB_ENOMEM : NoMemoryError,
+    C.LCB_ETMPFAIL : TemporaryFailError,
+    C.LCB_KEY_EEXISTS : KeyExistsError,
+    C.LCB_KEY_ENOENT : NotFoundError,
+    C.LCB_DLOPEN_FAILED : DlopenFailedError,
+    C.LCB_DLSYM_FAILED : DlsymFailedError,
+    C.LCB_NETWORK_ERROR : NetworkError,
+    C.LCB_NOT_MY_VBUCKET : NotMyVbucketError,
+    C.LCB_NOT_STORED : NotStoredError,
+    C.LCB_NOT_SUPPORTED : NotSupportedError,
+    C.LCB_UNKNOWN_HOST : UnknownHostError,
+    C.LCB_PROTOCOL_ERROR : ProtocolError,
+    C.LCB_ETIMEDOUT : TimeoutError,
+    C.LCB_CONNECT_ERROR : ConnectError,
+    C.LCB_BUCKET_ENOENT : BucketNotFoundError,
+    C.LCB_EBADHANDLE : BadHandleError,
+    # LCB.SERVER_BUG,
+    C.LCB_INVALID_HOST_FORMAT : InvalidError,
+    C.LCB_INVALID_CHAR : InvalidError,
+}
+
+_EXCTYPE_MAP = {
+    C.PYCBC_EXC_ARGUMENTS : ArgumentError,
+    C.PYCBC_EXC_ENCODING : ValueFormatError
+}

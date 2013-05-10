@@ -1,15 +1,19 @@
+#!/usr/bin/env python
+
 from couchbase import Couchbase, FMT_PICKLE
 from couchbase.exceptions import KeyExistsError
 
+
 # Connect to the default bucket on local host
-cb = Couchbase.connect('127.0.0.1', 8091, '', '', 'default')
+cb = Couchbase.connect(host='127.0.0.1', bucket='default')
 
 # If you want to store the Python objects pickled and not as JSON
 #cb.default_format = FMT_PICKLE
 
 # Store a document
-cas = cb.set('first', {'hello': 'world'})
-print(cas)
+rv = cb.set('first', {'hello': 'world'})
+cas = rv.cas
+print(rv)
 
 # Get the document
 item = cb.get('first')
@@ -22,15 +26,16 @@ try:
     cb.set('first', {'hello': 'world', 'additional': True}, cas=wrong_cas)
 except KeyExistsError:
     # Get the correct current CAS value
-    item, flags, correct_cas = cb.get('first', extended=True)
+    rv = cb.get('first')
+    item, flags, correct_cas = rv.value, rv.flags, rv.cas
     # Set it again, this time with the correct CAS value
-    cas = cb.set('first', {'hello': 'world', 'additional': True},
+    rv = cb.set('first', {'hello': 'world', 'additional': True},
                  cas=correct_cas)
-    print(cas)
+    print(rv)
 
 # Delete the document only if the CAS value matches (it would also
 # work without a cas value)
-cb.delete('first', cas=cas)
+cb.delete('first', cas=rv.cas)
 
 # Make sure the document really got deleted
-assert cb.get('first', quiet=True) is None
+assert cb.get('first', quiet=True).success is False

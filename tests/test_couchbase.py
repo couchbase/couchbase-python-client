@@ -10,8 +10,11 @@ BUCKET_NAME = 'test_bucket_for_pythonsdk'
 class CouchbaseTest(CouchbaseTestCase):
     def test_is_instance_of_connection(self):
         self.assertIsInstance(
-            Couchbase.connect(self.host, self.port, self.username,
-                              self.password, self.bucket_prefix),
+            Couchbase.connect(host=self.host,
+                              port=self.port,
+                              username=self.username,
+                              password=self.password,
+                              bucket=self.bucket_prefix),
             Connection)
 
 

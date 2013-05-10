@@ -1,27 +1,16 @@
-couchbase Package
 =================
-
-:mod:`couchbase` Package
-------------------------
-
-.. module:: couchbase
-.. autoclass:: Couchbase
-   :members:
-
-.. module:: couchbase.libcouchbase
-.. autoclass:: Connection
-   :members:
-
-
-Exceptions
-~~~~~~~~~~
+Exception Objects
+=================
 
 .. module:: couchbase.exceptions
 
 
-.. autoexception:: couchbase.libcouchbase.CouchbaseError
+.. autoexception:: couchbase.exceptions.CouchbaseError
+   :no-members:
+
 .. autoexception:: ArgumentError
    :show-inheritance:
+
 .. autoexception:: ValueFormatError
    :show-inheritance:
 

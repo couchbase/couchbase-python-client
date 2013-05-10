@@ -6,3 +6,12 @@ couchbase/libcouchbase.c
 couchbase/libcouchbase.h
 couchbase/__pycache__
 *.pyc
+*.pdb
+*.swp
+*.out
+*.log
+*.so
+*.dylib
+*.pyd
+*.dll
+*.exe

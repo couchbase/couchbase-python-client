@@ -11,78 +11,75 @@ from tests.base import CouchbaseTestCase
 
 class ConnectionTest(CouchbaseTestCase):
     def test_connection_host_port(self):
-        cb = Connection(self.host, self.port, self.username, self.password,
-                        self.bucket_prefix)
+        cb = Connection(host=self.host,
+                        port=self.port,
+                        username=self.username,
+                        password=self.password,
+                        bucket=self.bucket_prefix)
         # Connection didn't throw an error
         self.assertIsInstance(cb, Connection)
 
     def test_server_not_found(self):
-        self.assertRaises(ConnectError, Connection, 'example.com', self.port,
-                          self.username, self.password, self.bucket_prefix)
-        self.assertRaises(ConnectError, Connection, self.host, 34567,
-                          self.username, self.password, self.bucket_prefix)
+        connargs = self.make_connargs()
+        connargs['host'] = 'example.com'
+        self.assertRaises(ConnectError, Connection, **connargs)
+
+        connargs['host'] = self.host
+        connargs['port'] = 34567
+        self.assertRaises(ConnectError, Connection, **connargs)
 
     def test_bucket(self):
-        cb = Connection(username=self.username, password=self.password,
-                        bucket=self.bucket_prefix)
+        cb = Connection(**self.make_connargs())
         self.assertIsInstance(cb, Connection)
 
-        cb = Connection(self.host, self.port, self.username, self.password,
-                        self.bucket_prefix)
-        self.assertIsInstance(cb, Connection)
-
-        cb = Connection(self.host, self.port,
-                        bucket=self.bucket_prefix + '_sasl',
-                        password=self.bucket_password)
+        connargs = self.make_connargs()
+        connargs['bucket'] = self.bucket_prefix + '_sasl'
+        cb = Connection(**connargs)
         self.assertIsInstance(cb, Connection)
 
     def test_bucket_not_found(self):
-        self.assertRaises(BucketNotFoundError, Connection, self.host,
-                          self.port, self.username, self.password,
-                          'this_bucket_does_not_exist')
+        connargs = self.make_connargs(bucket='this_bucket_does_not_exist')
+        self.assertRaises(BucketNotFoundError, Connection, **connargs)
 
     def test_bucket_wrong_credentials(self):
-        self.assertRaises(AuthError, Connection, self.host, self.port,
-                          bucket=self.bucket_prefix,
-                          username='wrong_username',
-                          password='wrong_password')
-        self.assertRaises(AuthError, Connection, self.host, self.port,
-                          bucket=self.bucket_prefix, password='wrong_password')
+        self.assertRaises(AuthError, Connection,
+                          **self.make_connargs(username='bad_user',
+                                               password='bad_pass'))
 
-        self.assertRaises(AuthError, Connection, self.host, self.port,
-                          password='wrong_password',
-                          bucket=self.bucket_prefix + '_sasl')
+        self.assertRaises(AuthError, Connection,
+                          **self.make_connargs(password='wrong_password'))
+        self.assertRaises(AuthError, Connection,
+                          **self.make_connargs(password='wrong_password',
+                                               bucket=self.bucket_prefix + '_sasl'))
 
     def test_quiet(self):
-        cb = Connection(username=self.username, password=self.password,
-                        bucket=self.bucket_prefix)
+        connparams = self.make_connargs()
+        cb = Connection(**connparams)
         self.assertRaises(NotFoundError, cb.get, 'missing_key')
 
-        cb = Connection(username=self.username, password=self.password,
-                        bucket=self.bucket_prefix, quiet=True)
+        cb = Connection(quiet=True, **connparams)
+        cb.delete('missing_key', quiet=True)
         val1 = cb.get('missing_key')
-        self.assertIsNone(val1)
+        self.assertFalse(val1.success)
 
-        cb = Connection(username=self.username, password=self.password,
-                        bucket=self.bucket_prefix, quiet=False)
+        cb = Connection(quiet=False, **connparams)
         self.assertRaises(NotFoundError, cb.get, 'missing_key')
 
 
     def test_conncache(self):
         cachefile = tempfile.NamedTemporaryFile()
-        cb = Connection(username=self.username, password=self.password,
-                        bucket=self.bucket_prefix, conncache=cachefile.name)
-        self.assertTrue(cb.set("foo", "bar"))
+        cb = Connection(conncache=cachefile.name, **self.make_connargs())
+        self.assertTrue(cb.set("foo", "bar").success)
 
-        cb2 = Connection(username=self.username, password=self.password,
-                         bucket=self.bucket_prefix, conncache=cachefile.name)
-        self.assertTrue(cb2.set("foo", "bar"))
-        self.assertEquals("bar", cb.get("foo"))
+        cb2 = Connection(conncache=cachefile.name, **self.make_connargs())
+
+        self.assertTrue(cb2.set("foo", "bar").success)
+        self.assertEquals("bar", cb.get("foo").value)
 
         sb = os.stat(cachefile.name)
-        self.assertTrue(sb.st_size > 0)
 
-        print("Filename is", cachefile.name)
+        # For some reason this fails on Windows?
+        self.assertTrue(sb.st_size > 0)
 
         # TODO, see what happens when bad path is used
         # apparently libcouchbase does not report this failure.
@@ -91,14 +88,14 @@ class ConnectionTest(CouchbaseTestCase):
         cb = Connection(username='bad',
                         password='bad',
                         bucket='meh',
-                        host='localhost', port=1,
+                        host='localhost',
+                        port=1,
                         _no_connect_exceptions=True)
         errors = cb.errors()
         self.assertTrue(len(errors))
         self.assertEqual(len(errors[0]), 2)
 
-        cb = Connection(username=self.username, password=self.password,
-                        bucket=self.bucket_prefix)
+        cb = Connection(**self.make_connargs())
         self.assertFalse(len(cb.errors()))
 
     def test_multi_hosts(self):
@@ -108,14 +105,14 @@ class ConnectionTest(CouchbaseTestCase):
             'bucket' : self.bucket_prefix
         }
 
-        cb = Connection(host=['localhost'], **kwargs)
-        self.assertTrue(cb.set("foo", "bar"))
+        cb = Connection(host=[self.host], **kwargs)
+        self.assertTrue(cb.set("foo", "bar").success)
 
-        cb = Connection(host=[('localhost', 8091)], **kwargs)
-        self.assertTrue(cb.set("foo", "bar"))
+        cb = Connection(host=[(self.host, self.port)], **kwargs)
+        self.assertTrue(cb.set("foo", "bar").success)
 
-        cb = Connection(host=[('localhost', 1), ('localhost', 8091)], **kwargs)
-        self.assertTrue(cb.set("foo", "bar"))
+        cb = Connection(host=[('localhost', 1), (self.host, self.port)], **kwargs)
+        self.assertTrue(cb.set("foo", "bar").success)
 
 if __name__ == '__main__':
     unittest.main()

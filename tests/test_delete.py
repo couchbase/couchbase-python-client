@@ -1,22 +1,21 @@
 from couchbase.exceptions import (KeyExistsError, NotFoundError)
-from couchbase.libcouchbase import Connection
 from tests.base import CouchbaseTestCase
 
 class ConnectionDeleteTest(CouchbaseTestCase):
     def setUp(self):
         super(ConnectionDeleteTest, self).setUp()
-        self.cb = Connection(self.host, self.port, self.username,
-                             self.password, self.bucket_prefix)
+        self.cb = self.make_connection()
 
     def test_trivial_delete(self):
         """
         Try to delete a key that exists. Ensure that the operation
         succeeds
         """
-        cas = self.cb.set('trivial_key', 'value')
-        self.assertTrue(cas > 0)
+        rv = self.cb.set('trivial_key', 'value')
+        self.assertTrue(rv.success)
+        self.assertTrue(rv.cas > 0)
         rv = self.cb.delete('trivial_key')
-        self.assertTrue(rv)
+        self.assertTrue(rv.success)
 
     def test_delete_notfound(self):
         """
@@ -26,17 +25,17 @@ class ConnectionDeleteTest(CouchbaseTestCase):
         """
         self.cb.delete("foo", quiet = True)
         rv = self.cb.delete("foo", quiet = True)
-        self.assertFalse(rv)
+        self.assertFalse(rv.success)
         self.assertRaises(NotFoundError, self.cb.delete, 'foo')
 
     def test_delete_cas(self):
         """
         Delete with a CAS value. Ensure that it returns OK
         """
-        cas = self.cb.set('foo', 'bar')
-        self.assertTrue(cas > 0)
-        rv = self.cb.delete("foo", cas = cas)
-        self.assertTrue(rv)
+        rv1 = self.cb.set('foo', 'bar')
+        self.assertTrue(rv1.cas > 0)
+        rv2 = self.cb.delete("foo", cas = rv1.cas)
+        self.assertTrue(rv2.success)
 
     def test_delete_badcas(self):
         """
@@ -46,7 +45,7 @@ class ConnectionDeleteTest(CouchbaseTestCase):
         self.assertRaises(KeyExistsError,
                 self.cb.delete, 'foo', cas = 0xdeadbeef)
 
-    def test_delete_list(self):
+    def test_delete_multi(self):
         """
         Delete passing a list of keys
         """
@@ -55,14 +54,15 @@ class ConnectionDeleteTest(CouchbaseTestCase):
         for i in range(num_keys):
             kvlist["key_" + str(i)] = str(i)
 
-        rvs = self.cb.set(kvlist)
+        rvs = self.cb.set_multi(kvlist)
         self.assertTrue(len(rvs) == num_keys)
-        rm_rvs = self.cb.delete(list(rvs.keys()))
+        rm_rvs = self.cb.delete_multi(list(rvs.keys()))
         self.assertTrue(len(rm_rvs) == num_keys)
+        self.assertTrue(rm_rvs.all_ok)
 
         for k, v in rm_rvs.items():
             self.assertTrue(k in kvlist)
-            self.assertTrue(v)
+            self.assertTrue(v.success)
 
     def test_delete_dict(self):
         """
@@ -73,12 +73,14 @@ class ConnectionDeleteTest(CouchbaseTestCase):
         for i in range(num_keys):
             kvlist["key_" + str(i)] = str(i)
 
-        rvs = self.cb.set(kvlist)
+        rvs = self.cb.set_multi(kvlist)
+        self.assertTrue(rvs.all_ok)
 
         # We should just be able to pass it to 'delete'
-        rm_rvs = self.cb.delete(rvs)
+        rm_rvs = self.cb.delete_multi(rvs)
+        self.assertTrue(rm_rvs.all_ok)
         for k, v in rm_rvs.items():
-            self.assertTrue(v)
+            self.assertTrue(v.success)
 
     def test_delete_mixed(self):
         """
@@ -90,29 +92,29 @@ class ConnectionDeleteTest(CouchbaseTestCase):
         self.cb.set("bar", "a_value")
         # foo does not exit,
 
-        rvs = self.cb.delete(('foo', 'bar'), quiet = True)
-        self.assertTrue(rvs['bar'])
-        self.assertFalse(rvs['foo'])
+        rvs = self.cb.delete_multi(('foo', 'bar'), quiet = True)
+        self.assertFalse(rvs.all_ok)
+        self.assertTrue(rvs['bar'].success)
+        self.assertFalse(rvs['foo'].success)
 
         # Now see what happens if we delete those with a bad CAS
         keys = [ "key1", "key2", "key3" ]
         kvs = {}
         for k in keys:
             kvs[k] = "value_" + k
-        cas_rvs = self.cb.set(kvs)
+        cas_rvs = self.cb.set_multi(kvs)
 
         # Ensure set had no errors
         set_errors = []
         for k, v in cas_rvs.items():
-            if not v:
+            if not v.success:
                 set_errors.append([k, v])
         self.assertTrue(len(set_errors) == 0)
 
         # Set one to have a bad CAS
         cas_rvs[keys[0]] = 0xdeadbeef
-        self.assertRaises(KeyExistsError, self.cb.delete, cas_rvs)
-
-
+        self.assertRaises(KeyExistsError,
+                          self.cb.delete_multi, cas_rvs)
 
 if __name__ == '__main__':
     unittest.main()

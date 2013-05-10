@@ -20,6 +20,8 @@ except ImportError:
     from ConfigParser import SafeConfigParser as ConfigParser
 import os
 import unittest
+import types
+from couchbase.libcouchbase import Connection
 
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'tests.ini')
@@ -36,6 +38,28 @@ class CouchbaseTestCase(unittest.TestCase):
         self.password = config.get('node-1', 'password')
         self.bucket_prefix = config.get('node-1', 'bucket_prefix')
         self.bucket_password = config.get('node-1', 'bucket_password')
+        if not hasattr(self, 'assertIsInstance'):
+            def tmp(self, a, *bases):
+                self.assertTrue(isinstance(a, bases))
+            self.assertIsInstance = types.MethodType(tmp, self)
+        if not hasattr(self, 'assertIsNone'):
+            def tmp(self, a):
+                self.assertTrue(a is None)
+            self.assertIsNone = types.MethodType(tmp, self)
 
     def tearDown(self):
         pass
+
+    def make_connargs(self, **overrides):
+        ret = {
+            'host' : self.host,
+            'port' : self.port,
+            'username' : self.username,
+            'password' : self.password,
+            'bucket' : self.bucket_prefix
+        }
+        ret.update(overrides)
+        return ret
+
+    def make_connection(self):
+        return Connection(**self.make_connargs())

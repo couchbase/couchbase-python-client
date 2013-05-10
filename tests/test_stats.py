@@ -13,8 +13,7 @@ except NameError:
 class ConnectionStatsTest(CouchbaseTestCase):
     def setUp(self):
         super(ConnectionStatsTest, self).setUp()
-        self.cb = Connection(self.host, self.port, self.username,
-                             self.password, self.bucket_prefix)
+        self.cb = self.make_connection()
 
     def test_trivial_stats_without_argument(self):
         stats = self.cb.stats()

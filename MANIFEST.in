@@ -1,6 +1,8 @@
-include *.txt *.py *.md LICENSE
-include couchbase/libcouchbase.c couchbase/libcouchbase.h
+include *.txt *.md LICENSE
+recursive-include couchbase *.py
+recursive-include src *.c *.h
 recursive-include docs *
 recursive-exclude docs/build *
 recursive-include tests *.py *.ini
+recursive-include examples *.py
 exclude MANIFEST.in

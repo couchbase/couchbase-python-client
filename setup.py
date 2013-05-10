@@ -1,46 +1,69 @@
-from distutils.core import setup, Command
-from distutils.extension import Extension
-from distutils.version import StrictVersion
-import os
+#!/usr/bin/env python
 import sys
+import os.path
+import platform
+import warnings
 
-# Use Cython if available.
-try:
-    from Cython import __version__ as cython_version
-    from Cython.Build import cythonize
-except ImportError:
-    print('importerror')
-    cythonize = None
+from distutils.core import setup, Extension
 
-# When building from a repo, Cython is required.
-if os.path.exists("MANIFEST.in"):
-    print("MANIFEST.in found, presume a repo, cythonizing...")
-    if not cythonize:
-        print(
-            "Error: Cython.Build.cythonize not found. "
-            "Cython is required to build from a repo.")
-        sys.exit(1)
-    elif StrictVersion(cython_version) <= StrictVersion("0.18"):
-        print("Error: You need a Cython version newer than 0.18")
-        sys.exit(1)
-    ext_modules = cythonize([
-        Extension(
-            'couchbase/libcouchbase', ['couchbase/libcouchbase.pyx'],
-            libraries=['couchbase'])])
-# If there's no manifest template, as in an sdist, we just specify .c files.
+extoptions = {}
+
+LCB_NAME = None
+if sys.platform != 'win32':
+    extoptions['libraries'] = ['couchbase']
 else:
-    ext_modules = [
-        Extension(
-            'couchbase/libcouchbase', ['couchbase/libcouchbase.c'],
-            libraries=['couchbase'])]
+    warnings.warn("I'm detecting you're running windows."
+                  "You might want to modify "
+                  "the 'setup.py' script to use appropriate paths")
 
+
+    # The layout i have here is an ..\lcb-winbuild, in which there are subdirs
+    # called 'x86' and 'x64', for x86 and x64 architectures. The default
+    # 'nmake install' on libcouchbase will install them to 'deps'
+    bit_type = platform.architecture()[0]
+    lcb_root = os.path.join(os.path.pardir, 'lcb-winbuild')
+
+    if bit_type.startswith('32'):
+        lcb_root = os.path.join(lcb_root, 'x86')
+    else:
+        lcb_root = os.path.join(lcb_root, 'x64')
+
+    lcb_root = os.path.join(lcb_root, 'deps')
+
+    extoptions['libraries'] = ['libcouchbase']
+    ## Enable these lines for debug builds
+    #extoptions['extra_compile_args'] = ['/Zi']
+    #extoptions['extra_link_args'] = ['/DEBUG']
+    extoptions['library_dirs'] = [os.path.join(lcb_root, 'lib')]
+    extoptions['include_dirs'] = [os.path.join(lcb_root, 'include')]
+
+
+SOURCEMODS = (
+        'argument',
+        'exceptions',
+        'ext',
+        'result',
+        'callbacks',
+        'convert',
+        'connection',
+        'store',
+        'constants',
+        'multiresult',
+        'miscops',
+        'numutil',
+        'oputil',
+        'get',
+        'arithmetic'
+        )
+
+extoptions['sources'] = [ os.path.join("src", m + ".c") for m in SOURCEMODS ]
+module = Extension('couchbase._libcouchbase', **extoptions)
 
 setup(
-    name="couchbase",
-    version="0.9",
+    name = 'couchbase', version = '0.10',
     url="https://github.com/couchbase/couchbase-python-client",
-    author="Volker Mische",
-    author_email="volker@couchbase.com",
+    author="Couchbase, Inc.",
+    author_email="mark.nunberg@couchbase.com",
     license="Apache License 2.0",
     classifiers=[
         "Development Status :: 3 - Alpha",
@@ -50,6 +73,6 @@ setup(
         "Programming Language :: Python",
         "Topic :: Software Development :: Libraries",
         "Topic :: Software Development :: Libraries :: Python Modules"],
-    ext_modules=ext_modules,
-    packages=['couchbase']
+    ext_modules = [module],
+    packages = ['couchbase']
 )

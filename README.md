@@ -20,17 +20,20 @@ Install libcouchbase.
 Building
 --------
 
-If you have a source checkout via Git you need to have Cython (>=0.19)
-installed in order to generate the `couchbase/libcouchbase.c` file. If you've
-downloaded the source package the file is already included.
-
-As the target audience is currently developers, you probably want to install
-the module locally. You can run:
+In order to build this client, you need to have `libcouchbase` installed. Once
+this is done, you can now build the extension.
 
     python setup.py build_ext --inplace
 
-If you have compile libcouchbase yourself at a custom location, you can pass
-it in via the `CFLAGS` and `LDFLAGS` environment variables.
+
+If your libcouchbase install is in an alternate location (for example,
+`/opt/local/libcouchbase'), you may add extra directives, like so:
+
+    python setup.py build_ext --inplace \
+        --library-dir /opt/local/libcouchbase/lib \
+        --include-dir /opt/local/libcouchbase/include
+
+Or you can modify the environment `CFLAGS` and `LDFLAGS` variables.
 
 
 Running sample application
@@ -66,16 +69,9 @@ configuration file. To create them, run:
 
     python tests/setup_tests.py
 
-If the buckets already exist, they will be recreated.
-
-Now you can run the test. If you have Python >=2.7 or >=3.2 you can run:
-
-    python -m unittest discover -s tests
-
-Or if you have `nose` installed, you can also run:
+To run the tests:
 
     nosetests
-
 
 Tested platforms
 ----------------
@@ -83,14 +79,17 @@ Tested platforms
 So far the code has been tested on the following platforms/environments.
 
 Linux 64-bit (with GCC):
-
  - Python 2.7.3
  - Python 3.2.3
- - PyPy 1.9
+ - Python 2.6.6
 
-OSX (with clang):
+Mac OS X 10.6.8
+ - Python 2.6.1
+ - Python 3.3.1
 
- - Python 2.7
+Microsoft Windows 2008 R2 (MSVC 2008/VC9)
+ - Python 2.7.3 (x86)
+ - Python 2.7.4 (x64)
 
 
 If you ran it on a different platform and it worked, please let me know and
@@ -105,4 +104,3 @@ pylibcouchbase is licensed under the Apache License 2.0.
 
 
 [1]: https://github.com/couchbase/libcouchbase
-[2]: https://github.com/geggo/cwrap
