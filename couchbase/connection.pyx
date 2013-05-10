@@ -54,9 +54,9 @@ cdef void cb_get_callback(lcb.lcb_t instance, const void *cookie,
                     key, val), key=key)
 
     if ctx['extended']:
-        ctx['rv'].append((key, Result(val, flags, cas)))
+        ctx['rv'][key] = Result(val, flags, cas)
     else:
-        ctx['rv'].append(val)
+        ctx['rv'][key] = val
 
 cdef void cb_remove_callback(lcb.lcb_t instance, const void *cookie,
                              lcb.lcb_error_t rc,
@@ -590,7 +590,7 @@ cdef class Connection:
             single_key = True
 
         ctx = self._context_dict()
-        ctx['rv'] = []
+        ctx['rv'] = {}
         ctx['force_format'] = format
         if quiet is None:
             quiet = self.quiet
@@ -631,13 +631,14 @@ cdef class Connection:
                 raise ctx['exception']
 
             if single_key:
-                if extended:
-                    return ctx['rv'][0][1]
-                return ctx['rv'][0]
+                # For 'extended', this is the named tuple, otherwise it's the value
+                return ctx['rv'][keys[0]]
             else:
                 if extended:
-                    return dict(ctx['rv'])
-                return ctx['rv']
+                    return ctx['rv']
+                else:
+                    # Make sure the keys are in the order they've been requested in
+                    return [ctx['rv'][key] for key in keys] 
         finally:
             free(cmds)
             free(ptr_cmds)
