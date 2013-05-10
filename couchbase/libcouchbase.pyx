@@ -56,6 +56,12 @@ class Utils:
         lcb.LCB_EBADHANDLE: 'BadHandleError'
     }
 
+    http_method = {
+            'GET': lcb.LCB_HTTP_METHOD_GET,
+            'POST': lcb.LCB_HTTP_METHOD_POST,
+            'PUT': lcb.LCB_HTTP_METHOD_PUT,
+            'DELETE': lcb.LCB_HTTP_METHOD_DELETE,
+    }
 
     @staticmethod
     def maybe_raise(rc, msg, key=None, status=0, cas=0, operation=0):

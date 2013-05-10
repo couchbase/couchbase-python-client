@@ -118,6 +118,65 @@ cdef void cb_error_callback(lcb.lcb_t instance,
     obj = <object>lcb.lcb_get_cookie(instance)
     obj._errors.append((err, desc))
 
+cdef void cb_http_complete_callback(lcb.lcb_http_request_t request,
+                                    lcb.lcb_t instance, const void *cookie,
+                                    lcb.lcb_error_t rc,
+                                    lcb.lcb_http_resp_t *resp) with gil:
+    ctx = <object>cookie
+    cdef char* _err_bytes  # In case of an error
+    try:
+        Utils.maybe_raise(rc, 'failed to make http request',
+                          status=resp.v.v0.status)
+    except CouchbaseError as e:
+        # Try to capture a bit more error information, from the returned bytes
+        _err_bytes = <char*>resp.v.v0.bytes
+        err_bytes = _err_bytes[:resp.v.v0.nbytes].decode("utf-8")
+        e.msg += ": " + err_bytes
+        ctx['exception'] = e
+
+
+    # cdef struct ____lcb_http_resp_t_v_v0:
+    #     lcb_http_status_t status
+    #     const char *path
+    #     lcb_size_t npath
+    #     const char *const *headers
+    #     const void *bytes
+    #     lcb_size_t nbytes
+
+    status = int(resp.v.v0.status)
+    cdef const char* _path = resp.v.v0.path
+    path = _path[:resp.v.v0.npath].decode("utf-8")
+    cdef char* _resp_bytes = <char*>resp.v.v0.bytes
+    resp_bytes = _resp_bytes[:resp.v.v0.nbytes].decode("utf-8")
+
+    # Pulling out the headers is a bit of a chore, but it has to be done...
+    cdef char* _hdr
+    headers = []
+    i = 0
+    while True:
+        _hdr = <char *>resp.v.v0.headers[i]
+        if _hdr == NULL:
+            break
+        headers.append(_hdr.decode("utf-8"))
+        i += 1
+
+    headers_dict = {}
+    for i in range(0, len(headers), 2):
+        hdr_key = headers[i]
+        hdr_val = headers[i + 1]
+        headers_dict[hdr_key] = hdr_val
+
+    # Assemble the response dictionary
+    response_data = {
+        'status': status,
+        'path': path,
+        'content': resp_bytes,
+        'headers': headers_dict,
+    }
+
+    ctx['rv'] = response_data
+
+
 cdef class Connection:
     cdef lcb.lcb_t _instance
     cdef lcb.lcb_create_st _create_options
@@ -236,6 +295,9 @@ cdef class Connection:
         <void>lcb.lcb_set_arithmetic_callback(self._instance,
                                               cb_arithmetic_callback);
         <void>lcb.lcb_set_error_callback(self._instance, cb_error_callback);
+        <void>lcb.lcb_set_http_complete_callback(
+            self._instance,
+            <lcb.lcb_http_complete_callback>cb_http_complete_callback);
 
         lcb.lcb_set_cookie(self._instance, <void*>self);
 
@@ -1001,3 +1063,95 @@ cdef class Connection:
         """
         amount = -amount
         return self._arithmetic(key, amount, initial=initial, ttl=ttl, extended=extended)
+
+    def _make_http_request(self, request_type, method, path, body,
+                            content_type):
+        """
+        Perform an HTTP request to the Couchbase REST API.
+        """
+        if self._instance == NULL:
+            Utils.raise_not_connected()
+
+        ctx = self._context_dict()
+        ctx['rv'] = {}
+
+        cdef lcb_http_cmd_t *cmd = <lcb.lcb_http_cmd_t*>malloc(
+            sizeof(lcb.lcb_http_cmd_t))
+        if not cmd:
+            raise MemoryError()
+
+        cdef lcb_http_request_t *request = <lcb.lcb_http_request_t*>malloc(
+            sizeof(lcb.lcb_http_request_t))
+        if not request:
+            raise MemoryError()
+
+        # ctypedef enum lcb_http_type_t:
+        #     LCB_HTTP_TYPE_VIEW
+        #     LCB_HTTP_TYPE_MANAGEMENT
+        #     LCB_HTTP_TYPE_RAW
+        #     LCB_HTTP_TYPE_MAX
+        cdef lcb_http_type_t req_type = request_type
+
+        # ctypedef enum lcb_http_method_t:
+        #     LCB_HTTP_METHOD_GET
+        #     LCB_HTTP_METHOD_POST
+        #     LCB_HTTP_METHOD_PUT
+        #     LCB_HTTP_METHOD_DELETE
+        #     LCB_HTTP_METHOD_MAX
+        cdef lcb_http_method_t req_method
+        try:
+            req_method = Utils.http_method[method]
+        except KeyError:
+            raise ValueError("Invalid HTTP method: {0}".format(method))
+
+        cdef int chunked = 0  # For now, don't support chunked transfer
+
+        # Set up the HTTP request according to the libcouchbase C API:
+        # cdef struct ____lcb_http_cmd_st_v_v0:
+        #     const char *path
+        #     lcb_size_t npath
+        #     const void *body
+        #     lcb_size_t nbody
+        #     lcb_http_method_t method
+        #     int chunked
+        #     const char *content_type
+
+        # These values need references Python-side, so give them names.
+        _encoded_path = path.encode("utf-8")
+        if content_type:
+            _encoded_content_type = content_type.encode("utf-8")
+
+        memset(cmd, 0, sizeof(lcb.lcb_http_cmd_t))
+        cmd.v.v0.path = _encoded_path
+        cmd.v.v0.npath = len(_encoded_path)
+        if body:
+            _encoded_body = body.encode("utf-8")
+            cmd.v.v0.body = <char *>_encoded_body
+            cmd.v.v0.nbody = len(_encoded_body)
+        else:
+            cmd.v.v0.body = NULL
+            cmd.v.v0.nbody = 0
+        cmd.v.v0.method = req_method
+        cmd.v.v0.chunked = chunked
+        if content_type:
+            cmd.v.v0.content_type = _encoded_content_type
+        else:
+            cmd.v.v0.content_type = NULL
+
+        try:
+            rc = lcb.lcb_make_http_request(self._instance, <void*>ctx,
+                                           req_type, cmd, request)
+            if rc != lcb.LCB_SUCCESS:
+                Utils.maybe_raise(rc, 'failed to schedule http request')
+            else:
+                rc = self._wait_common()
+                Utils.maybe_raise(rc, 'failed to wait for http request')
+
+            if ctx['exception']:
+                raise ctx['exception']
+
+            return ctx['rv']
+
+        finally:
+            free(cmd)
+            free(request)
