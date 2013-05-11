@@ -1361,27 +1361,13 @@ cdef class Connection:
         # it's a low-level method and the client can deal with interpreting
         # errors.
 
-        # Now construct the call to _make_http_request. `method` is already
-        # defined.
-        request_type = lcb.LCB_HTTP_TYPE_VIEW
-        content_type = None
-        if params:
-            if method in ("GET", "DELETE", "HEAD"):
-                path = path + "?" + urllib.urlencode(params)
-                content_type = "application/x-www-form-urlencoded"
-            elif method in ("POST", "PUT"):
-                body = json.dumps(params)
-                content_type = "application/json"
-            else:
-                raise ValueError("Invalid HTTP method: {0}".format(method))
-        elif body:
-            if not isinstance(body, str):
-                body = json.dumps(body)
-            content_type = "application/json"
+        # Now use the lower-level method to make the actual request, handling
+        # the marshaling of arguments and so on for us.
+        result = self._http_view(lcb.LCB_HTTP_TYPE_VIEW,
+                                 method, path, body, **params)
 
-        # Call the lower-level method to do the real work
-        result = self._make_http_request(request_type, method, path, body,
-                                         content_type)
-        if 'content' in result:
-            return json.loads(result['content'])
+        # Finally, pull out the interesting part of the result (if available)
+        # as the return value.
+        if 'json' in result:
+            return result['json']
         return None
