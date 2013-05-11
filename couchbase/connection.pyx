@@ -1266,7 +1266,19 @@ cdef class Connection:
 
           If there is no response data, return None.
 
-        TODO: Examples!
+        Simple view request::
+
+            result = cb._http_view("_design/dev_test/_view/test",
+                                  keys=["key1", "key2"])
+            for r in result['rows']:
+                print("%r is a matching row!" % r)
+
+        Uploading a design document::
+
+            design_doc = {"views": {"map": "function(doc, meta) { ... }"}}
+            result = cb._http_view("_design/dev_test", body=design_doc,
+                                   method="PUT")
+            print("Uploaded a new design document with ID %r" % result['id'])
         """
         # Some parameters need to be treated specially, and encoded as JSON
         # even when passed as query arguments.
