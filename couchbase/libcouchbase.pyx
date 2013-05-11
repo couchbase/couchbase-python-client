@@ -7,6 +7,11 @@ cimport libcouchbase as lcb
 import json
 import pickle
 from collections import defaultdict, namedtuple
+try:
+    import urllib.parse as urllib
+except ImportError:
+    # Python 2.x
+    import urllib
 
 
 cdef public enum _cb_formats:
