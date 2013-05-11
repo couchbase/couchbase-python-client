@@ -1371,3 +1371,20 @@ cdef class Connection:
         if 'json' in result:
             return result['json']
         return None
+
+    def management_view(self, path, method="GET", body=None, **params):
+        """
+        Query view in the Couchbase management REST API.
+
+        This follows the same conventions as
+        :meth:`~couchbase.libcouchbase.Connection.bucket_view`. For more
+        information on the ways that the management API can be used, see
+        http://www.couchbase.com/docs/couchbase-manual-2.0/couchbase-admin-restapi.html
+        """
+        # Since the management API is more complex than the view API, it's
+        # most sensible just to pass requests through -- construct the call.
+        result = self._http_view(lcb.LCB_HTTP_TYPE_MANAGEMENT,
+                                 method, path, body, **params)
+        if 'json' in result:
+            return result['json']
+        return result
