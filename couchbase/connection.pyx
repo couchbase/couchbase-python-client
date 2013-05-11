@@ -1068,6 +1068,23 @@ cdef class Connection:
                             content_type):
         """
         Perform an HTTP request to the Couchbase REST API.
+
+        :param request_type: The type of request (lcb_http_type_t in
+          libcouchbase).
+        :type request_type: integer
+
+        :param method: The HTTP method to use (GET, POST, PUT, DELETE, HEAD).
+        :type method: string
+
+        :param path: The path to make the request against (passed through
+          directly to libcouchbase).
+        :type path: string
+
+        :param body: The body of the HTTP request. Can be None.
+        :type body: string or None
+
+        :param content_type: The HTTP content type, e.g. application/json.
+        :type content_type: string
         """
         if self._instance == NULL:
             Utils.raise_not_connected()
