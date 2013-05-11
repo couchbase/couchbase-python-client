@@ -1173,9 +1173,63 @@ cdef class Connection:
             free(cmd)
             free(request)
 
-    def _http_view(self, path, method="GET", body=None, **params):
+    def _http_view(self, request_type, method, path, body=None,
+                   content_type=None, **params):
         """
-        Query a Couchbase data view.
+        Marshal / unmarshal calls to the lower-level _make_http_request method.
+
+        Provides a slightly friendlier API to the lower-level method by making
+        guesses about the desired interpretation of the content_type and body
+        of the request, and providing automatic unmarshaling of results (i.e.
+        parsing of response JSON).
+
+        Most parameters are the same as
+        :meth:`couchbase.libcouchbase.Connection._make_http_request`, except
+        that some are optional, and any other keyword arguments (`**params`)
+        will be interpreted as arguments to the REST API and sent through.
+
+        If the method is GET (or DELETE or HEAD), the parameters are sent as
+        query arguments and content_type will be guessed as
+        "application/x-www-form-urlencoded" if it is not provided.
+
+        If the method is POST or PUT and there is no body, the parameters are
+        sent as the request body -- by default they are encoded as JSON, but
+        if content_type is set to "application/x-www-form-urlencoded" they will
+        be sent as a standard HTTP payload instead.
+
+        If the method is POST and there *is* a body, the parameters are sent
+        as query arguments.
+        """
+        if method in ("GET", "DELETE", "HEAD"):
+            if params:
+                path = path + "?" + urllib.urlencode(params)
+            content_type = (content_type or "application/x-www-form-urlencoded")
+        elif method in ("POST", "PUT"):
+            if params and not body:
+                if content_type == "application/x-www-form-urlencoded":
+                    body = urllib.urlencode(params)
+                elif not content_type:
+                    body = json.dumps(params)
+                    content_type = "application/json"
+                else:
+                    raise ValueError(
+                        "Don't know how to encode parameters as %r"
+                        % content_type)
+            elif params:
+                path = path + "?" + urllib.urlencode(params)
+                content_type = (content_type or
+                                "application/x-www-form-urlencoded")
+
+        # Call the lower-level method to do the real work
+        result = self._make_http_request(request_type, method, path, body,
+                                         content_type)
+        if 'content' in result:
+            result['json'] = json.loads(result['content'])
+        return result
+
+    def bucket_view(self, path, method="GET", body=None, **params):
+        """
+        Query a view on the currently connected Couchbase bucket.
 
         :param path: The base HTTP path to query (for instance, the path to the
           map/reduce view)
@@ -1194,8 +1248,8 @@ cdef class Connection:
           as query arguments -- if POST, they will be encoded as JSON and sent
           in the body of the request.
 
-        The following parameters are currently accepted by the Couchbase REST
-        API:
+        The following parameters are currently accepted by the Couchbase view
+        REST API:
 
         :param descending: Return the documents in descending order by key.
           Optional.
