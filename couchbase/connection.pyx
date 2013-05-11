@@ -1155,3 +1155,150 @@ cdef class Connection:
         finally:
             free(cmd)
             free(request)
+
+    def _http_view(self, path, method="GET", body=None, **params):
+        """
+        Query a Couchbase data view.
+
+        :param path: The base HTTP path to query (for instance, the path to the
+          map/reduce view)
+        :type path: string
+
+        :param method: The HTTP method to use. This defaults to HTTP GET.
+        :type method: string, one of "GET", "POST", "PUT", or "DELETE"
+
+        :param body: The HTTP payload for this request, typically in the case
+          of a PUT or POST request. Optional. If this is supplied, it must be
+          either a string containing valid JSON or JSON-serializable.
+        :type body: anything JSON-serializable
+
+        :param **params: Any further keyword arguments will be passed through
+          the REST API. If the method is GET (the default) they will be sent
+          as query arguments -- if POST, they will be encoded as JSON and sent
+          in the body of the request.
+
+        The following parameters are currently accepted by the Couchbase REST
+        API:
+
+        :param descending: Return the documents in descending order by key.
+          Optional.
+        :type descending: boolean
+
+        :param endkey: Stop returning records when the given key is reached.
+          Optional. If specified, must be JSON-serializable (e.g. list, dict).
+        :type endkey: anything JSON-serializable
+
+        :param endkey_docid: Stop returning records when the given document ID
+          is reached. Optional.
+        :type endkey_docid: string
+
+        :param full_set: Use the full cluster data set (only in development
+          views). Optional.
+        :type full_set: boolean
+
+        :param group: Group the results using the reduce function. Optional.
+        :type group: boolean
+
+        :param group_level: Specify the level at which to group results (i.e.
+          if the key has multiple elements, how many should be counted as the
+          key for a group). Optional.
+        :type group_level: int
+
+        :param inclusive_end: Whether the specified end_key should be included
+          in the results. Optional.
+        :type inclusive_end: boolean
+
+        :param key: Return only documents that match the given key. Optional.
+          If this is supplied, it must be JSON-serializable.
+        :type key: anything JSON-serializable
+
+        :param keys: Return only documents that match keys specified within the
+          given array. Optional. if this is supplied, it must be a list or
+          tuple of strings or JSON-serializable types. Note that if this
+          argument is given, sorting will not be applied to the results.
+        :type keys: list of JSON-serializable types
+
+        :param limit: Limit the number of returned rows to the given number.
+          Optional.
+        :type limit: integer
+
+        :param on_error: Set the response in the event of an error occurring.
+          Optional. Supported values are:
+            "continue" -- continues to generate view information, and simply
+              includes the error information in the response stream.
+            "stop" -- stops immediately when an error condition occurs, and
+              returns no further view information.
+        :type on_error: string, one of "continue" or "stop"
+
+        :param reduce: Use the reduce function. Optional.
+        :type reduce: boolean
+
+        :param skip: Skip this number of records before starting to return
+          results. Optional.
+        :type skip: integer
+
+        :param stale: Allow the results from a view to be stale -- that is,
+          not necessarily fully up to date. Optional. Supported values are:
+            "false" -- forces a view update before returning any data
+            "ok" -- allow stale view data to be returned
+            "update_after" -- allow stale view data to be returned, but update
+              the view immediately after it has returned.
+        :type stale: string, one of "false", "ok", or "update_after"
+
+        :param startkey: Return records with a key value equal to or greater
+          than the given key. Optional. If supplied, this must be a valid JSON
+          string or JSON-serializable.
+        :type startkey: anything JSON-serializable
+
+        :param startkey_docid: Return records starting with the given document
+          ID. Optional.
+        :type startkey_docid: string
+
+        :raise: :exc:`couchbase.exceptions.HTTPError` if anything went wrong
+          while processing the request. Error information will be available as
+          the `status` attribute and in the `msg` attribute of the exception.
+
+        :return:
+          The decoded JSON response from Couchbase, if there is a response. In
+          the case of querying a map/reduce view, this is typically a JSON
+          object (decoded as a dictionary) with fields `rows` (a list of result
+          rows) and `total_rows` (the count of results).
+
+          If there is no response data, return None.
+
+        TODO: Examples!
+        """
+        # Some parameters need to be treated specially, and encoded as JSON
+        # even when passed as query arguments.
+        for param in ("endkey", "startkey", "key", "keys"):
+            if param in params:
+                params[param] = json.dumps(params[param])
+
+        # Apart from the above, do no further validation on the parameters --
+        # it's a low-level method and the client can deal with interpreting
+        # errors.
+
+        # Now construct the call to _make_http_request. `method` is already
+        # defined.
+        request_type = lcb.LCB_HTTP_TYPE_VIEW
+        content_type = None
+        if params:
+            if method in ("GET", "DELETE", "HEAD"):
+                path = path + "?" + urllib.urlencode(params)
+                content_type = "application/x-www-form-urlencoded"
+            elif method in ("POST", "PUT"):
+                body = json.dumps(params)
+                content_type = "application/json"
+            else:
+                raise ValueError("Invalid HTTP method: {0}".format(method))
+        elif body:
+            if not isinstance(body, str):
+                body = json.dumps(body)
+            content_type = "application/json"
+
+        # Call the lower-level method to do the real work
+        result = self._make_http_request(request_type, method, path, body,
+                                         content_type)
+        if 'content' in result:
+            return json.loads(result['content'])
+        return None
