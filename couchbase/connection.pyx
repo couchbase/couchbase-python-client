@@ -1206,10 +1206,14 @@ cdef class Connection:
         as query arguments.
         """
         if method in ("GET", "DELETE", "HEAD"):
+            # Try to send any parameters through as query arguments, and set
+            # content-type accordingly.
             if params:
                 path = path + "?" + urllib.urlencode(params)
             content_type = (content_type or "application/x-www-form-urlencoded")
         elif method in ("POST", "PUT"):
+            # If parameters are provided and there is no body, send them as the
+            # body -- using JSON by default but URL-encoded if specified.
             if params and not body:
                 if content_type == "application/x-www-form-urlencoded":
                     body = urllib.urlencode(params)
