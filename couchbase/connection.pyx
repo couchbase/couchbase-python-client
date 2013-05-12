@@ -1230,7 +1230,13 @@ cdef class Connection:
                 path = path + "?" + urllib.urlencode(params)
                 content_type = (content_type or
                                 "application/x-www-form-urlencoded")
-
+            # No parameters here, but in case there's a body, make sure it's
+            # encoded properly, i.e. as JSON if it's not already bytes ready
+            # to go out.
+            elif body and not isinstance(body, bytes):
+                if not content_type or content_type == "application/json":
+                    body = json.dumps(body)
+                    content_type = "application/json"
         # Call the lower-level method to do the real work
         result = self._make_http_request(request_type, method, path, body,
                                          content_type)
