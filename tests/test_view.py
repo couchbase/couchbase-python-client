@@ -13,11 +13,11 @@ class ConnectionViewTest(CouchbaseTestCase):
                              self.password, self.bucket_prefix)
 
     def test_bucket_view(self):
-        '''
+        """
         Simple test for retrieving view results via HTTP -- based on the
         tests from pylcb. First creates a simple view using the lower-level
         _make_http_request API, then queries it.
-        '''
+        """
         design_doc = {
             'views': {
                 'test': {
