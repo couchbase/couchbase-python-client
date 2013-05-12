@@ -1142,7 +1142,12 @@ cdef class Connection:
         cmd.v.v0.path = _encoded_path
         cmd.v.v0.npath = len(_encoded_path)
         if body:
-            _encoded_body = body.encode("utf-8")
+            if hasattr(body, "encode"):
+                # Strings need to be encoded to their constituent bytes
+                _encoded_body = body.encode("utf-8")
+            else:
+                # Otherwise assume it's properly encoded bytes already
+                _encoded_body = body
             cmd.v.v0.body = <char *>_encoded_body
             cmd.v.v0.nbody = len(_encoded_body)
         else:
