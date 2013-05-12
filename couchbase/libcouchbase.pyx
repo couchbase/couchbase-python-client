@@ -89,7 +89,7 @@ class Utils:
         :return: no treturn value
 
         """
-        if ((rc == lcb.LCB_SUCCESS and (status == 0 or status/100 == 2)) or
+        if ((rc == lcb.LCB_SUCCESS and (status == 0 or status // 100 == 2)) or
             rc == lcb.LCB_AUTH_CONTINUE):
             return
 
