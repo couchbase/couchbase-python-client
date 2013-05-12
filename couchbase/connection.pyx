@@ -1240,8 +1240,11 @@ cdef class Connection:
         # Call the lower-level method to do the real work
         result = self._make_http_request(request_type, method, path, body,
                                          content_type)
-        if 'content' in result:
-            result['json'] = json.loads(result['content'])
+        if 'content' in result and result['content']:
+            try:
+                result['json'] = json.loads(result['content'])
+            except:
+                pass
         return result
 
     def bucket_view(self, path, method="GET", body=None, **params):
