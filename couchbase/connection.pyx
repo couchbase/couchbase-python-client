@@ -410,7 +410,7 @@ cdef class Connection:
         if not key and key != 0 and key != "":
             # The number 0 and the empty string *might* be acceptable keys,
             # but anything else that evaluates false isn't
-            raise exceptions.InvalidError("Invalid ID to set: {0}".format(key))
+            raise exceptions.ArgumentError("Invalid ID: {0}".format(key))
 
         # A single key
         if not isinstance(key, dict):
