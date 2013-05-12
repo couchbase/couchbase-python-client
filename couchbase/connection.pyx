@@ -1372,8 +1372,10 @@ cdef class Connection:
             print("Uploaded a new design document with ID %r" % result['id'])
         """
         # Some parameters need to be treated specially, and encoded as JSON
-        # even when passed as query arguments.
-        for param in ("endkey", "startkey", "key", "keys"):
+        # even when passed as query arguments. Also, some types need to be
+        # turned from Python to JSON.
+        for param in ("endkey", "startkey", "key", "keys", "descending",
+                      "full_set", "group", "inclusive_end", "reduce"):
             if param in params:
                 params[param] = json.dumps(params[param])
 
