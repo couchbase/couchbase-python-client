@@ -407,6 +407,11 @@ cdef class Connection:
         if self._instance == NULL:
             Utils.raise_not_connected(operation)
 
+        if not key and key != 0 and key != "":
+            # The number 0 and the empty string *might* be acceptable keys,
+            # but anything else that evaluates false isn't
+            raise exceptions.InvalidError("Invalid ID to set: {0}".format(key))
+
         # A single key
         if not isinstance(key, dict):
             data = {key: value}
