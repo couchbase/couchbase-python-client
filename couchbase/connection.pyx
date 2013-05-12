@@ -1224,6 +1224,8 @@ cdef class Connection:
                     raise ValueError(
                         "Don't know how to encode parameters as %r"
                         % content_type)
+            # When there are both parameters and a body, send the parameters
+            # as query arguments.
             elif params:
                 path = path + "?" + urllib.urlencode(params)
                 content_type = (content_type or
