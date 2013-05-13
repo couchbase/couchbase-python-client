@@ -63,22 +63,25 @@ int pycbc_common_vars_init(struct pycbc_common_vars *cv,
     return 0;
 }
 
+#define _is_not_strtype(o) \
+    (PyBytes_Check(o) == 0 && PyByteArray_Check(o) == 0 && PyUnicode_Check(o) == 0)
+
 int pycbc_oputil_check_sequence(PyObject *sequence,
                            int allow_list,
                            int *ncmds,
-                           int *is_dict)
+                           pycbc_seqtype_t *seqtype)
 {
-    int ret;
-    int dummy;
-    if (!is_dict) {
-        is_dict = &dummy;
+    int ret = 0;
+    pycbc_seqtype_t dummy;
+    if (!seqtype) {
+        seqtype = &dummy;
     }
 
     *ncmds = 0;
 
     if (PyDict_Check(sequence)) {
         *ncmds = PyDict_Size(sequence);
-        *is_dict = 1;
+        *seqtype = PYCBC_SEQTYPE_DICT;
         ret = 0;
 
     } else if (!allow_list) {
@@ -87,22 +90,31 @@ int pycbc_oputil_check_sequence(PyObject *sequence,
         ret = -1;
 
     } else if (PyList_Check(sequence)) {
+        *seqtype = PYCBC_SEQTYPE_LIST;
         *ncmds = PyList_GET_SIZE(sequence);
-        *is_dict = 0;
-        ret = 0;
 
     } else if (PyTuple_Check(sequence)) {
+        *seqtype = PYCBC_SEQTYPE_TUPLE;
         *ncmds = PyTuple_GET_SIZE(sequence);
-        *is_dict = 0;
-        ret = 0;
+
+    } else if (_is_not_strtype(sequence)) {
+        *seqtype = PYCBC_SEQTYPE_GENERIC;
+        *ncmds = PyObject_Length(sequence);
+
+        if (*ncmds == -1) {
+            PyErr_Clear();
+            PyErr_SetString(PyExc_ValueError,
+                            "Argument must be iterable and have known length");
+            ret = -1;
+        }
 
     } else {
         PyErr_SetString(PyExc_ValueError,
-                        "Argument must be a tuple, list, or dict");
+                        "Argument must be a non-string/bytes sequence");
         ret = -1;
     }
 
-    if (ret == 0 && *ncmds == 0) {
+    if (ret == 0 && *ncmds < 1) {
         PyErr_SetString(PyExc_ValueError, "parameter list is empty");
         ret = -1;
     }
@@ -134,4 +146,56 @@ PyObject* pycbc_ret_to_single(pycbc_MultiResultObject *mres)
     Py_INCREF(value);
     Py_DECREF(mres);
     return value;
+}
+
+
+PyObject *
+pycbc_oputil_iter_prepare(pycbc_seqtype_t seqtype,
+                          PyObject *sequence,
+                          PyObject **iter,
+                          Py_ssize_t *dictpos)
+{
+    if (seqtype == PYCBC_SEQTYPE_GENERIC) {
+        *iter = PyObject_GetIter(sequence);
+        if (!*iter) {
+            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Couldn't attain iterator");
+        }
+        return *iter;
+    }
+    *iter = NULL;
+    return sequence;
+}
+
+int
+pycbc_oputil_sequence_next(pycbc_seqtype_t seqtype,
+                           PyObject *seqobj,
+                           Py_ssize_t *dictpos,
+                           int ii,
+                           PyObject **key,
+                           PyObject **value)
+{
+    if (seqtype == PYCBC_SEQTYPE_DICT) {
+        int rv = PyDict_Next(seqobj, dictpos, key, value);
+        if (rv < 0) {
+            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Couldn't iterate");
+        }
+        return 0;
+    }
+
+    *value = NULL;
+    if (seqtype == PYCBC_SEQTYPE_LIST) {
+        *key = PyList_GET_ITEM(seqobj, ii);
+
+    } else if (seqtype == PYCBC_SEQTYPE_TUPLE) {
+        *key = PyTuple_GET_ITEM(seqobj, ii);
+
+    } else {
+        *key = PyIter_Next(seqobj);
+        if (!*key) {
+            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Bad iterator");
+            return -1;
+        }
+    }
+
+    return 0;
 }

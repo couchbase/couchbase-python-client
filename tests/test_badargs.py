@@ -20,6 +20,9 @@ class ConnectionBadArgsTest(CouchbaseTestCase):
             ("key",),
             {"key":"value"},
             [],
+            set(),
+            {}.keys(),
+            {}.values(),
             ["key"],
             None,
             True,
@@ -45,6 +48,9 @@ class ConnectionBadArgsTest(CouchbaseTestCase):
             None,
             [],
             {},
+            set(),
+            {}.keys(),
+            {}.values(),
             0,
             object()):
             print("Testing with keys (%r)" % (k,))
@@ -93,7 +99,7 @@ class ConnectionBadArgsTest(CouchbaseTestCase):
         self.assertRaises(ArgumentError, _set_fmt, object())
 
         # TODO: Stricter format handling
-        
+
         #self.assertRaises(ArgumentError, self.cb.set,
         #                  "foo", "bar", format=-1)
 

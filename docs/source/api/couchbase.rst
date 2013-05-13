@@ -13,6 +13,7 @@ Connection object
     :no-undoc-members:
 
 
+.. _argtypes:
 
 Passing Arguments
 =================
@@ -35,6 +36,18 @@ and never like ::
 
     obj.foo(key, fooval, barval, bazval)
 
+Arguments To ``*_multi`` Methods
+--------------------------------
+
+Arguments passed to ``*_multi`` methods involves passing an iterable of keys.
+The iterable must have ``__len__`` and ``__iter__`` implemented.
+
+For operations which require values (i.e. the
+:meth:`~couchbase.libcouchbase.Connection.set_multi` family), a ``dict`` must
+be passed with the values set as the values which should be stored for the keys.
+
+Some of the multi methods accept keyword arguments; these arguments apply to
+*all* the keys within the iterable passed.
 
 
 .. _format_info:

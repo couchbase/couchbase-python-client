@@ -567,7 +567,7 @@ class Connection(_Base):
         Multi variant of :meth:`get`
 
         :param keys: keys the keys to fetch
-        :type keys: tuple or list
+        :type keys: :ref:`iterable<argtypes>`
 
         :param int ttl: Set the expiration for all keys when retrieving
 

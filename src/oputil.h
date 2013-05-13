@@ -30,6 +30,13 @@ union pycbc_u_ppcmd {
 #undef X
 };
 
+typedef enum {
+    PYCBC_SEQTYPE_GENERIC = 0,
+    PYCBC_SEQTYPE_DICT,
+    PYCBC_SEQTYPE_TUPLE,
+    PYCBC_SEQTYPE_LIST
+} pycbc_seqtype_t;
+
 /**
  * Structure containing variables needed for commands.
  * As a bonus, this also contains optimizations for single command situations.
@@ -44,7 +51,6 @@ struct pycbc_common_vars {
     PyObject **enckeys;
     PyObject **encvals;
     int ncmds;
-
 };
 
 #define PYCBC_COMMON_VARS_STATIC_INIT { { { 0 } } }
@@ -58,7 +64,32 @@ int pycbc_maybe_set_quiet(pycbc_MultiResultObject *mres, PyObject *quiet);
 int pycbc_oputil_check_sequence(PyObject *sequence,
                           int allow_list,
                           int *ncmds,
-                          int *is_dict);
+                          pycbc_seqtype_t *seqtype);
+
+
+/**
+ * 'Prepares' the sequence object for iteration. This may happen
+ * if we need an actual Iterator object. Otherwise it doesn't do anything.
+ *
+ * Returns the actual sequence item to be passed to 'sequence_next'
+ */
+
+PyObject *pycbc_oputil_iter_prepare(pycbc_seqtype_t seqtype,
+                                    PyObject *sequence,
+                                    PyObject **iter,
+                                    Py_ssize_t *dictpos);
+
+
+/**
+ * Iterates over a sequence. Call this in a loop.
+ * Returns 1 on completion, 0 for next item, -1 f
+ */
+int pycbc_oputil_sequence_next(pycbc_seqtype_t seqtype,
+                               PyObject *seqobj,
+                               Py_ssize_t *dictpos,
+                               int ii,
+                               PyObject **key,
+                               PyObject **value);
 
 void pycbc_common_vars_free(struct pycbc_common_vars *cv);
 

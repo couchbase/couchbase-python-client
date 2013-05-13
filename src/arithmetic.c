@@ -98,15 +98,11 @@ arithmetic_common(pycbc_ConnectionObject *self,
     int rv;
     int ii;
     int ncmds;
-    int is_dict;
     struct arithmetic_common_vars global_params = { 0 };
+    pycbc_seqtype_t seqtype;
     PyObject *all_initial_O = NULL;
-
-    Py_ssize_t dictpos = 0;
     PyObject *collection;
     PyObject *ret = NULL;
-    PyObject *curkey = NULL;
-    PyObject *curvalue = NULL;
     pycbc_MultiResultObject *mres = NULL;
     lcb_error_t err;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
@@ -127,7 +123,7 @@ arithmetic_common(pycbc_ConnectionObject *self,
         rv = pycbc_oputil_check_sequence(collection,
                             optype != PYCBC_CMD_ARITH,
                             &ncmds,
-                            &is_dict);
+                            &seqtype);
         if (rv < 0) {
             PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "bad argument type");
             return NULL;
@@ -149,15 +145,20 @@ arithmetic_common(pycbc_ConnectionObject *self,
     rv = pycbc_common_vars_init(&cv, ncmds, sizeof(lcb_arithmetic_cmd_t), 0);
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
+        Py_ssize_t dictpos;
+        PyObject *curseq, *iter;
+        curseq = pycbc_oputil_iter_prepare(seqtype, collection, &iter, &dictpos);
+        if (!curseq) {
+            rv = -1;
+            goto GT_ITER_DONE;
+        }
 
         for (ii = 0; ii < ncmds; ii++) {
-            if (!is_dict) {
-                curkey = PySequence_GetItem(collection, ii);
-                curvalue = NULL;
-
-            } else {
-                rv = PyDict_Next(collection, &dictpos, &curkey, &curvalue);
-                assert(rv);
+            PyObject *curkey, *curvalue;
+            rv = pycbc_oputil_sequence_next(seqtype, curseq, &dictpos, ii,
+                                            &curkey, &curvalue);
+            if (rv < 0) {
+                goto GT_ITER_DONE;
             }
 
             rv = handle_single_arith(self,
@@ -170,6 +171,12 @@ arithmetic_common(pycbc_ConnectionObject *self,
             if (rv < 0) {
                 goto GT_DONE;
             }
+        }
+
+        GT_ITER_DONE:
+        Py_XDECREF(iter);
+        if (rv < 0) {
+            goto GT_DONE;
         }
 
     } else {

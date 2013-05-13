@@ -79,7 +79,7 @@ keyop_common(pycbc_ConnectionObject *self,
     int rv;
     int ii;
     int ncmds = 0;
-    int is_dict = 1;
+    pycbc_seqtype_t seqtype;
     PyObject *casobj = NULL;
 
     PyObject *ret = NULL;
@@ -105,7 +105,7 @@ keyop_common(pycbc_ConnectionObject *self,
     }
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
-        rv = pycbc_oputil_check_sequence(kobj, 1, &ncmds, &is_dict);
+        rv = pycbc_oputil_check_sequence(kobj, 1, &ncmds, &seqtype);
         if (rv < 0) {
             PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "bad parameter type");
             return NULL;
@@ -126,23 +126,37 @@ keyop_common(pycbc_ConnectionObject *self,
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
         Py_ssize_t dictpos = 0;
+        PyObject *curseq, *iter = NULL;
+        curseq = pycbc_oputil_iter_prepare(seqtype, kobj, &iter, &dictpos);
+
+        if (!curseq) {
+            goto GT_DONE;
+        }
 
         for (ii = 0; ii < ncmds; ii++) {
-            PyObject *curkey;
-            PyObject *curvalue;
+            PyObject *curkey, *curvalue;
 
-            if (!is_dict) {
-                curkey = PySequence_GetItem(kobj, ii);
-                curvalue = NULL;
-
-            } else {
-                rv = PyDict_Next(kobj, &dictpos, &curkey, &curvalue);
+            rv = pycbc_oputil_sequence_next(seqtype,
+                                            curseq,
+                                            &dictpos,
+                                            ii,
+                                            &curkey,
+                                            &curvalue);
+            if (rv < 0) {
+                goto GT_ITER_DONE;
             }
 
             rv = handle_single_keyop(self, curkey, curvalue, ii, optype, &cv);
             if (rv < 0) {
-                goto GT_DONE;
+                goto GT_ITER_DONE;
             }
+        }
+
+        GT_ITER_DONE:
+        Py_XDECREF(iter);
+
+        if (rv < 0) {
+            goto GT_DONE;
         }
 
     } else {
