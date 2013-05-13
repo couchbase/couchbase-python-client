@@ -1078,7 +1078,7 @@ cdef class Connection:
           libcouchbase).
         :type request_type: integer
 
-        :param method: The HTTP method to use (GET, POST, PUT, DELETE, HEAD).
+        :param method: The HTTP method to use (GET, POST, PUT, DELETE).
         :type method: string
 
         :param path: The path to make the request against (passed through
@@ -1198,7 +1198,7 @@ cdef class Connection:
         that some are optional, and any other keyword arguments (`**params`)
         will be interpreted as arguments to the REST API and sent through.
 
-        If the method is GET (or DELETE or HEAD), the parameters are sent as
+        If the method is GET (or DELETE), the parameters are sent as
         query arguments and content_type will be guessed as
         "application/x-www-form-urlencoded" if it is not provided.
 
@@ -1210,7 +1210,7 @@ cdef class Connection:
         If the method is POST and there *is* a body, the parameters are sent
         as query arguments.
         """
-        if method in ("GET", "DELETE", "HEAD"):
+        if method in ("GET", "DELETE"):
             # Try to send any parameters through as query arguments, and set
             # content-type accordingly.
             if params:
@@ -1261,7 +1261,7 @@ cdef class Connection:
         :type path: string
 
         :param method: The HTTP method to use. This defaults to HTTP GET.
-        :type method: string, one of "GET", "POST", "PUT", or "DELETE"
+        :type method: string, one of "GET", "POST", "PUT", "DELETE", "HEAD"
 
         :param body: The HTTP payload for this request, typically in the case
           of a PUT or POST request. Optional. If this is supplied, it must be
