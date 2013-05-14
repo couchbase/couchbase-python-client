@@ -20,6 +20,7 @@ except ImportError:
     from ConfigParser import SafeConfigParser as ConfigParser
 import os
 import unittest
+from nose.exc import SkipTest
 import types
 from couchbase.libcouchbase import Connection
 
@@ -47,6 +48,8 @@ class CouchbaseTestCase(unittest.TestCase):
                 self.assertTrue(a is None)
             self.assertIsNone = types.MethodType(tmp, self)
 
+        self.nosleep = os.environ.get('PYCBC_TESTS_NOSLEEP', False)
+
     def tearDown(self):
         pass
 
@@ -60,6 +63,10 @@ class CouchbaseTestCase(unittest.TestCase):
         }
         ret.update(overrides)
         return ret
+
+    def slowTest(self):
+        if self.nosleep:
+            raise SkipTest("Skipping slow/sleep-based test")
 
     def make_connection(self):
         return Connection(**self.make_connargs())

@@ -197,6 +197,8 @@ class ConnectionGetTest(CouchbaseTestCase):
         self.assertEqual(cas4, 0)
 
     def test_get_ttl(self):
+        self.slowTest()
+
         self.cb.delete("key", quiet=True)
         self.cb.set("ttl_key", "a_value")
         rv = self.cb.get("ttl_key", ttl=1)
@@ -207,6 +209,8 @@ class ConnectionGetTest(CouchbaseTestCase):
         self.assertEqual(NotFoundError, CouchbaseError.rc_to_exctype(rv.rc))
 
     def test_get_multi_ttl(self):
+        self.slowTest()
+
         kvs = { "ttlkey_1" : "ttlvalue_1", "ttlkey_2" : "ttlvalue_2" }
         self.cb.set_multi(kvs)
         rvs = self.cb.get_multi(list(kvs.keys()), ttl=1)

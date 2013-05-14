@@ -58,6 +58,8 @@ class ConnectionLockTest(CouchbaseTestCase):
         self.assertTrue(rv.success)
 
     def test_timed_lock(self):
+        self.slowTest()
+
         k = "locked_key"
         v = "locked_value"
         self.cb.set(k, v)

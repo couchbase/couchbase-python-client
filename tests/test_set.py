@@ -55,6 +55,8 @@ class ConnectionSetTest(CouchbaseTestCase):
         self.assertNotEqual(rv3.cas, rv1.cas)
 
     def test_set_with_ttl(self):
+        self.slowTest()
+
         self.cb.set('key_ttl', 'value_ttl', ttl=2)
         rv = self.cb.get('key_ttl')
         self.assertEqual(rv.value, 'value_ttl')
