@@ -181,6 +181,10 @@ or duration.
 
     .. automethod:: delete
 
+    .. automethod:: lock
+
+    .. automethod:: unlock
+
 
 Counter Operations
 ------------------
@@ -226,6 +230,10 @@ values for its keys
     .. automethod:: incr_multi
 
     .. automethod:: decr_multi
+
+    .. automethod:: lock_multi
+
+    .. automethod:: unlock_multi
 
 
 Informational Methods

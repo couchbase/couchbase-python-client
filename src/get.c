@@ -125,7 +125,7 @@ get_common(pycbc_ConnectionObject *self,
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
         rv = pycbc_oputil_check_sequence(kobj,
-                                         optype == PYCBC_CMD_GET,
+                                         optype,
                                          &ncmds,
                                          &seqtype);
         if (rv < 0) {

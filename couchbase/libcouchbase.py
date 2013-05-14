@@ -315,6 +315,104 @@ class Connection(_Base):
 
         return _Base.get(self, key, ttl, quiet)
 
+    def lock(self, key, ttl=0):
+        """Lock and retrieve a key-value entry in Couchbase.
+
+        :param key: A string which is the key to lock.
+        :param int: a TTL for which the lock should be valid. If set to
+          `0` it will use the default lock timeout on the server.
+          While the lock is active, attempts to access the key (via
+          other :meth:`lock`, :meth:`set` or other mutation calls) will
+          fail with an :exc:`couchbase.exceptions.TemporaryFailError`
+
+
+        This function otherwise functions similarly to :meth:`get`;
+        specifically, it will return the value upon success.
+        Note the :attr:`~Result.cas` value from the :class:`Result`
+        object. This will be needed to :meth:`unlock` the key.
+
+        Note the lock will also be implicitly released if modified by one
+        of the :meth:`set` family of functions when the valid CAS is
+        supplied
+
+        :raise: :exc:`couchbase.exceptions.TemporaryFailError` if the key
+          was already locked.
+
+        :raise: See :meth:`get` for possible exceptions
+
+
+        Lock a key ::
+
+            rv = cb.lock("locked_key", ttl=100)
+            # This key is now locked for the next 100 seconds.
+            # attempts to access this key will fail until the lock
+            # is released.
+
+            # do important stuff...
+
+            cb.unlock("locked_key", rv.cas)
+
+        Lock a key, implicitly unlocking with :meth:`set` with CAS ::
+
+            rv = self.cb.lock("locked_key", ttl=100)
+            new_value = rv.value.upper()
+            cb.set("locked_key", new_value, rv.cas)
+
+
+        Poll and Lock ::
+
+            rv = None
+            begin_time = time.time()
+            while time.time() - begin_time < 15:
+                try:
+                    rv = cb.lock("key")
+                except TemporaryFailError:
+                    print("Key is currently locked.. waiting")
+                    time.sleep(0)
+
+            if not rv:
+                raise Exception("Waited too long..")
+
+            # Do stuff..
+
+            cb.unlock("key", rv.cas)
+
+        .. seealso::
+
+        :meth:`get`
+        :meth:`lock_multi`
+        :meth:`unlock`
+
+        """
+        return _Base.lock(self, key, ttl=ttl)
+
+    def unlock(self, key, cas):
+        """Unlock a Locked Key in Couchbase.
+
+        :param key: The key to unlock
+        :param cas: The cas returned from
+          :meth:`lock`'s :class:`Result` object.
+
+
+        Unlock a previously-locked key in Couchbase. A key is
+        locked by a call to :meth:`lock`.
+
+
+        See :meth:`lock` for an example.
+
+        :raise: :exc:`couchbase.exceptions.KeyExistsError` if the CAS
+          supplied does not match the CAS on the server (possibly because
+          it was unlocked by previous call).
+
+        .. seealso::
+
+        :meth:`lock`
+        :meth:`unlock_multi`
+
+        """
+        return _Base.unlock(self, key, cas=cas)
+
+
     def delete(self, key, cas=0, quiet=None):
         """Remove the key-value entry for a given key in Couchbase.
 
@@ -374,9 +472,6 @@ class Connection(_Base):
 
         """
         return _Base.delete(self, key, cas, quiet)
-
-    def unlock(self, key, cas=0):
-        return _Base.unlock(self, key, cas)
 
     def incr(self, key, amount=1, initial=None, ttl=0):
         """
@@ -578,3 +673,49 @@ class Connection(_Base):
 
         """
         return _Base.get_multi(self, keys, ttl=ttl, quiet=quiet)
+
+    def lock_multi(self, keys, ttl=0):
+        """Lock multiple keys
+        
+        Multi variant of :meth:`lock`
+
+        :param keys: the keys to lock
+        :type keys: :ref:`iterable<argtypes>`
+        :param int ttl: The lock timeout for all keys
+
+        :return: a :class:`MultiResult` object
+
+        .. seealso::
+
+        :meth:`lock`
+
+        """
+        return _Base.lock_multi(self, keys, ttl=ttl)
+
+    def unlock_multi(self, keys):
+        """Unlock multiple keys
+
+        Multi variant of :meth:`unlock`
+
+        :param dict keys: the keys to unlock
+
+        :return: a :class:`MultiResult` object
+
+        The value of the ``keys`` argument should be either the CAS, or a
+        previously returned :class:`Result` object from a :meth:`lock` call.
+        Effectively, this means you may pass a :class:`MultiResult` as the
+        ``keys`` argument.
+
+        Thus, you can do something like ::
+
+            keys = (....)
+            rvs = cb.lock_multi(keys, ttl=5)
+            # do something with rvs
+            cb.unlock_multi(rvs)
+
+
+        .. seealso::
+
+        :meth:`unlock`
+        """
+        return _Base.unlock_multi(self, keys)
