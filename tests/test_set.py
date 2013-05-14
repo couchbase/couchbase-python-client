@@ -1,3 +1,4 @@
+import unittest
 from time import sleep
 
 from couchbase import FMT_JSON, FMT_PICKLE, FMT_PLAIN

@@ -1,5 +1,9 @@
-from distutils.core import setup, Command
-from distutils.extension import Extension
+# Initialize distribute
+import distribute_setup
+distribute_setup.use_setuptools()
+# Now use `setuptools`, which should be wrapped by distribute
+from setuptools import setup
+from setuptools import Extension
 from distutils.version import StrictVersion
 import os
 import sys

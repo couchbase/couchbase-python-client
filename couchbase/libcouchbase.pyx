@@ -7,6 +7,11 @@ cimport libcouchbase as lcb
 import json
 import pickle
 from collections import defaultdict, namedtuple
+try:
+    import urllib.parse as urllib
+except ImportError:
+    # Python 2.x
+    import urllib
 
 
 cdef public enum _cb_formats:
@@ -56,6 +61,12 @@ class Utils:
         lcb.LCB_EBADHANDLE: 'BadHandleError'
     }
 
+    http_method = {
+            'GET': lcb.LCB_HTTP_METHOD_GET,
+            'POST': lcb.LCB_HTTP_METHOD_POST,
+            'PUT': lcb.LCB_HTTP_METHOD_PUT,
+            'DELETE': lcb.LCB_HTTP_METHOD_DELETE,
+    }
 
     @staticmethod
     def maybe_raise(rc, msg, key=None, status=0, cas=0, operation=0):
@@ -78,7 +89,7 @@ class Utils:
         :return: no treturn value
 
         """
-        if ((rc == lcb.LCB_SUCCESS and (status == 0 or status/100 == 2)) or
+        if ((rc == lcb.LCB_SUCCESS and (status == 0 or status // 100 == 2)) or
             rc == lcb.LCB_AUTH_CONTINUE):
             return
 

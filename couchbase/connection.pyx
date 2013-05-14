@@ -118,6 +118,65 @@ cdef void cb_error_callback(lcb.lcb_t instance,
     obj = <object>lcb.lcb_get_cookie(instance)
     obj._errors.append((err, desc))
 
+cdef void cb_http_complete_callback(lcb.lcb_http_request_t request,
+                                    lcb.lcb_t instance, const void *cookie,
+                                    lcb.lcb_error_t rc,
+                                    lcb.lcb_http_resp_t *resp) with gil:
+    ctx = <object>cookie
+    cdef char* _err_bytes  # In case of an error
+    try:
+        Utils.maybe_raise(rc, 'failed to make http request',
+                          status=resp.v.v0.status)
+    except CouchbaseError as e:
+        # Try to capture a bit more error information, from the returned bytes
+        _err_bytes = <char*>resp.v.v0.bytes
+        err_bytes = _err_bytes[:resp.v.v0.nbytes].decode("utf-8")
+        e.msg += ": " + err_bytes
+        ctx['exception'] = e
+
+
+    # cdef struct ____lcb_http_resp_t_v_v0:
+    #     lcb_http_status_t status
+    #     const char *path
+    #     lcb_size_t npath
+    #     const char *const *headers
+    #     const void *bytes
+    #     lcb_size_t nbytes
+
+    status = int(resp.v.v0.status)
+    cdef const char* _path = resp.v.v0.path
+    path = _path[:resp.v.v0.npath].decode("utf-8")
+    cdef char* _resp_bytes = <char*>resp.v.v0.bytes
+    resp_bytes = _resp_bytes[:resp.v.v0.nbytes].decode("utf-8")
+
+    # Pulling out the headers is a bit of a chore, but it has to be done...
+    cdef char* _hdr
+    headers = []
+    i = 0
+    while True:
+        _hdr = <char *>resp.v.v0.headers[i]
+        if _hdr == NULL:
+            break
+        headers.append(_hdr.decode("utf-8"))
+        i += 1
+
+    headers_dict = {}
+    for i in range(0, len(headers), 2):
+        hdr_key = headers[i]
+        hdr_val = headers[i + 1]
+        headers_dict[hdr_key] = hdr_val
+
+    # Assemble the response dictionary
+    response_data = {
+        'status': status,
+        'path': path,
+        'content': resp_bytes,
+        'headers': headers_dict,
+    }
+
+    ctx['rv'] = response_data
+
+
 cdef class Connection:
     cdef lcb.lcb_t _instance
     cdef lcb.lcb_create_st _create_options
@@ -236,6 +295,9 @@ cdef class Connection:
         <void>lcb.lcb_set_arithmetic_callback(self._instance,
                                               cb_arithmetic_callback);
         <void>lcb.lcb_set_error_callback(self._instance, cb_error_callback);
+        <void>lcb.lcb_set_http_complete_callback(
+            self._instance,
+            <lcb.lcb_http_complete_callback>cb_http_complete_callback);
 
         lcb.lcb_set_cookie(self._instance, <void*>self);
 
@@ -344,6 +406,11 @@ cdef class Connection:
     def __set(self, operation, key, value=None, cas=None, ttl=None, format=None):
         if self._instance == NULL:
             Utils.raise_not_connected(operation)
+
+        if not key and key != 0 and key != "":
+            # The number 0 and the empty string *might* be acceptable keys,
+            # but anything else that evaluates false isn't
+            raise exceptions.ArgumentError("Invalid ID: {0}".format(key))
 
         # A single key
         if not isinstance(key, dict):
@@ -1001,3 +1068,350 @@ cdef class Connection:
         """
         amount = -amount
         return self._arithmetic(key, amount, initial=initial, ttl=ttl, extended=extended)
+
+    def _make_http_request(self, request_type, method, path, body,
+                            content_type):
+        """
+        Perform an HTTP request to the Couchbase REST API.
+
+        :param request_type: The type of request (lcb_http_type_t in
+          libcouchbase).
+        :type request_type: integer
+
+        :param method: The HTTP method to use (GET, POST, PUT, DELETE).
+        :type method: string
+
+        :param path: The path to make the request against (passed through
+          directly to libcouchbase).
+        :type path: string
+
+        :param body: The body of the HTTP request. Can be None.
+        :type body: string or None
+
+        :param content_type: The HTTP content type, e.g. application/json.
+        :type content_type: string
+        """
+        if self._instance == NULL:
+            Utils.raise_not_connected()
+
+        ctx = self._context_dict()
+        ctx['rv'] = {}
+
+        cdef lcb_http_cmd_t *cmd = <lcb.lcb_http_cmd_t*>malloc(
+            sizeof(lcb.lcb_http_cmd_t))
+        if not cmd:
+            raise MemoryError()
+
+        cdef lcb_http_request_t *request = <lcb.lcb_http_request_t*>malloc(
+            sizeof(lcb.lcb_http_request_t))
+        if not request:
+            raise MemoryError()
+
+        # ctypedef enum lcb_http_type_t:
+        #     LCB_HTTP_TYPE_VIEW
+        #     LCB_HTTP_TYPE_MANAGEMENT
+        #     LCB_HTTP_TYPE_RAW
+        #     LCB_HTTP_TYPE_MAX
+        cdef lcb_http_type_t req_type = request_type
+
+        # ctypedef enum lcb_http_method_t:
+        #     LCB_HTTP_METHOD_GET
+        #     LCB_HTTP_METHOD_POST
+        #     LCB_HTTP_METHOD_PUT
+        #     LCB_HTTP_METHOD_DELETE
+        #     LCB_HTTP_METHOD_MAX
+        cdef lcb_http_method_t req_method
+        try:
+            req_method = Utils.http_method[method]
+        except KeyError:
+            raise ValueError("Invalid HTTP method: {0}".format(method))
+
+        cdef int chunked = 0  # For now, don't support chunked transfer
+
+        # Set up the HTTP request according to the libcouchbase C API:
+        # cdef struct ____lcb_http_cmd_st_v_v0:
+        #     const char *path
+        #     lcb_size_t npath
+        #     const void *body
+        #     lcb_size_t nbody
+        #     lcb_http_method_t method
+        #     int chunked
+        #     const char *content_type
+
+        # These values need references Python-side, so give them names.
+        _encoded_path = path.encode("utf-8")
+        if content_type:
+            _encoded_content_type = content_type.encode("utf-8")
+
+        memset(cmd, 0, sizeof(lcb.lcb_http_cmd_t))
+        cmd.v.v0.path = _encoded_path
+        cmd.v.v0.npath = len(_encoded_path)
+        if body:
+            if hasattr(body, "encode"):
+                # Strings need to be encoded to their constituent bytes
+                _encoded_body = body.encode("utf-8")
+            else:
+                # Otherwise assume it's properly encoded bytes already
+                _encoded_body = body
+            cmd.v.v0.body = <char *>_encoded_body
+            cmd.v.v0.nbody = len(_encoded_body)
+        else:
+            cmd.v.v0.body = NULL
+            cmd.v.v0.nbody = 0
+        cmd.v.v0.method = req_method
+        cmd.v.v0.chunked = chunked
+        if content_type:
+            cmd.v.v0.content_type = _encoded_content_type
+        else:
+            cmd.v.v0.content_type = NULL
+
+        try:
+            rc = lcb.lcb_make_http_request(self._instance, <void*>ctx,
+                                           req_type, cmd, request)
+            if rc != lcb.LCB_SUCCESS:
+                Utils.maybe_raise(rc, 'failed to schedule http request')
+            else:
+                rc = self._wait_common()
+                Utils.maybe_raise(rc, 'failed to wait for http request')
+
+            if ctx['exception']:
+                raise ctx['exception']
+
+            return ctx['rv']
+
+        finally:
+            free(cmd)
+            free(request)
+
+    def _http_view(self, request_type, method, path, body=None,
+                   content_type=None, **params):
+        """
+        Marshal / unmarshal calls to the lower-level _make_http_request method.
+
+        Provides a slightly friendlier API to the lower-level method by making
+        guesses about the desired interpretation of the content_type and body
+        of the request, and providing automatic unmarshaling of results (i.e.
+        parsing of response JSON).
+
+        Most parameters are the same as
+        :meth:`couchbase.libcouchbase.Connection._make_http_request`, except
+        that some are optional, and any other keyword arguments (`**params`)
+        will be interpreted as arguments to the REST API and sent through.
+
+        If the method is GET (or DELETE), the parameters are sent as
+        query arguments and content_type will be guessed as
+        "application/x-www-form-urlencoded" if it is not provided.
+
+        If the method is POST or PUT and there is no body, the parameters are
+        sent as the request body -- by default they are encoded as JSON, but
+        if content_type is set to "application/x-www-form-urlencoded" they will
+        be sent as a standard HTTP payload instead.
+
+        If the method is POST and there *is* a body, the parameters are sent
+        as query arguments.
+        """
+        if method in ("GET", "DELETE"):
+            # Try to send any parameters through as query arguments, and set
+            # content-type accordingly.
+            if params:
+                path = path + "?" + urllib.urlencode(params)
+            content_type = (content_type or "application/x-www-form-urlencoded")
+        elif method in ("POST", "PUT"):
+            # If parameters are provided and there is no body, send them as the
+            # body -- using JSON by default but URL-encoded if specified.
+            if params and not body:
+                if content_type == "application/x-www-form-urlencoded":
+                    body = urllib.urlencode(params)
+                elif not content_type:
+                    body = json.dumps(params)
+                    content_type = "application/json"
+                else:
+                    raise ValueError(
+                        "Don't know how to encode parameters as %r"
+                        % content_type)
+            # When there are both parameters and a body, send the parameters
+            # as query arguments.
+            elif params:
+                path = path + "?" + urllib.urlencode(params)
+                content_type = (content_type or
+                                "application/x-www-form-urlencoded")
+            # No parameters here, but in case there's a body, make sure it's
+            # encoded properly, i.e. as JSON if it's not already bytes ready
+            # to go out.
+            elif body and not isinstance(body, bytes):
+                if not content_type or content_type == "application/json":
+                    body = json.dumps(body)
+                    content_type = "application/json"
+        # Call the lower-level method to do the real work
+        result = self._make_http_request(request_type, method, path, body,
+                                         content_type)
+        if 'content' in result and result['content']:
+            try:
+                result['json'] = json.loads(result['content'])
+            except:
+                pass
+        return result
+
+    def bucket_view(self, path, method="GET", body=None, **params):
+        """
+        Query a view on the currently connected Couchbase bucket.
+
+        :param path: The base HTTP path to query (for instance, the path to the
+          map/reduce view)
+        :type path: string
+
+        :param method: The HTTP method to use. This defaults to HTTP GET.
+        :type method: string, one of "GET", "POST", "PUT", "DELETE", "HEAD"
+
+        :param body: The HTTP payload for this request, typically in the case
+          of a PUT or POST request. Optional. If this is supplied, it must be
+          either a string containing valid JSON or JSON-serializable.
+        :type body: anything JSON-serializable
+
+        :param **params: Any further keyword arguments will be passed through
+          the REST API. If the method is GET (the default) they will be sent
+          as query arguments -- if POST, they will be encoded as JSON and sent
+          in the body of the request.
+
+        The following parameters are currently accepted by the Couchbase view
+        REST API:
+
+        :param descending: Return the documents in descending order by key.
+          Optional.
+        :type descending: boolean
+
+        :param endkey: Stop returning records when the given key is reached.
+          Optional. If specified, must be JSON-serializable (e.g. list, dict).
+        :type endkey: anything JSON-serializable
+
+        :param endkey_docid: Stop returning records when the given document ID
+          is reached. Optional.
+        :type endkey_docid: string
+
+        :param full_set: Use the full cluster data set (only in development
+          views). Optional.
+        :type full_set: boolean
+
+        :param group: Group the results using the reduce function. Optional.
+        :type group: boolean
+
+        :param group_level: Specify the level at which to group results (i.e.
+          if the key has multiple elements, how many should be counted as the
+          key for a group). Optional.
+        :type group_level: int
+
+        :param inclusive_end: Whether the specified end_key should be included
+          in the results. Optional.
+        :type inclusive_end: boolean
+
+        :param key: Return only documents that match the given key. Optional.
+          If this is supplied, it must be JSON-serializable.
+        :type key: anything JSON-serializable
+
+        :param keys: Return only documents that match keys specified within the
+          given array. Optional. if this is supplied, it must be a list or
+          tuple of strings or JSON-serializable types. Note that if this
+          argument is given, sorting will not be applied to the results.
+        :type keys: list of JSON-serializable types
+
+        :param limit: Limit the number of returned rows to the given number.
+          Optional.
+        :type limit: integer
+
+        :param on_error: Set the response in the event of an error occurring.
+          Optional. Supported values are:
+            "continue" -- continues to generate view information, and simply
+              includes the error information in the response stream.
+            "stop" -- stops immediately when an error condition occurs, and
+              returns no further view information.
+        :type on_error: string, one of "continue" or "stop"
+
+        :param reduce: Use the reduce function. Optional.
+        :type reduce: boolean
+
+        :param skip: Skip this number of records before starting to return
+          results. Optional.
+        :type skip: integer
+
+        :param stale: Allow the results from a view to be stale -- that is,
+          not necessarily fully up to date. Optional. Supported values are:
+            "false" -- forces a view update before returning any data
+            "ok" -- allow stale view data to be returned
+            "update_after" -- allow stale view data to be returned, but update
+              the view immediately after it has returned.
+        :type stale: string, one of "false", "ok", or "update_after"
+
+        :param startkey: Return records with a key value equal to or greater
+          than the given key. Optional. If supplied, this must be a valid JSON
+          string or JSON-serializable.
+        :type startkey: anything JSON-serializable
+
+        :param startkey_docid: Return records starting with the given document
+          ID. Optional.
+        :type startkey_docid: string
+
+        :raise: :exc:`couchbase.exceptions.HTTPError` if anything went wrong
+          while processing the request. Error information will be available as
+          the `status` attribute and in the `msg` attribute of the exception.
+
+        :return:
+          The decoded JSON response from Couchbase, if there is a response. In
+          the case of querying a map/reduce view, this is typically a JSON
+          object (decoded as a dictionary) with fields `rows` (a list of result
+          rows) and `total_rows` (the count of results).
+
+          If there is no response data, return None.
+
+        Simple view request::
+
+            result = cb.bucket_view("_design/dev_test/_view/test",
+                                    keys=["key1", "key2"])
+            for r in result['rows']:
+                print("%r is a matching row!" % r)
+
+        Uploading a design document::
+
+            design_doc = {"views": {"map": "function(doc, meta) { ... }"}}
+            result = cb.bucket_view("_design/dev_test", body=design_doc,
+                                    method="PUT")
+            print("Uploaded a new design document with ID %r" % result['id'])
+        """
+        # Some parameters need to be treated specially, and encoded as JSON
+        # even when passed as query arguments. Also, some types need to be
+        # turned from Python to JSON.
+        for param in ("endkey", "startkey", "key", "keys", "descending",
+                      "full_set", "group", "inclusive_end", "reduce"):
+            if param in params:
+                params[param] = json.dumps(params[param])
+
+        # Apart from the above, do no further validation on the parameters --
+        # it's a low-level method and the client can deal with interpreting
+        # errors.
+
+        # Now use the lower-level method to make the actual request, handling
+        # the marshaling of arguments and so on for us.
+        result = self._http_view(lcb.LCB_HTTP_TYPE_VIEW,
+                                 method, path, body, **params)
+
+        # Finally, pull out the interesting part of the result (if available)
+        # as the return value.
+        if 'json' in result:
+            return result['json']
+        return None
+
+    def management_view(self, path, method="GET", body=None, **params):
+        """
+        Query view in the Couchbase management REST API.
+
+        This follows the same conventions as
+        :meth:`~couchbase.libcouchbase.Connection.bucket_view`. For more
+        information on the ways that the management API can be used, see
+        http://www.couchbase.com/docs/couchbase-manual-2.0/couchbase-admin-restapi.html
+        """
+        # Since the management API is more complex than the view API, it's
+        # most sensible just to pass requests through -- construct the call.
+        result = self._http_view(lcb.LCB_HTTP_TYPE_MANAGEMENT,
+                                 method, path, body, **params)
+        if 'json' in result:
+            return result['json']
+        return result
