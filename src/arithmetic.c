@@ -209,7 +209,6 @@ arithmetic_common(pycbc_ConnectionObject *self,
     }
 
     mres = (pycbc_MultiResultObject*)pycbc_multiresult_new(self);
-    Py_INCREF(mres);
 
     err = lcb_arithmetic(self->instance, mres, ncmds, cv.cmdlist.arith);
     if (err != LCB_SUCCESS) {
@@ -233,14 +232,8 @@ arithmetic_common(pycbc_ConnectionObject *self,
 
     GT_DONE:
     pycbc_common_vars_free(&cv);
+    ret = pycbc_make_retval(argopts, &ret, &mres);
     Py_XDECREF(mres);
-
-    if (argopts & PYCBC_ARGOPT_SINGLE) {
-        if (mres && (void*)ret == (void*)mres) {
-            ret = pycbc_ret_to_single(mres);
-        }
-    }
-
     return ret;
 }
 

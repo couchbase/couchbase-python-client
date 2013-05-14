@@ -236,10 +236,33 @@ int pycbc_common_vars_init(struct pycbc_common_vars *cv,
  */
 void pycbc_common_vars_free(struct pycbc_common_vars *cv);
 
+
 /**
- * Extracts a Result from a MultiResult
+ * Convers the MultiResult object into a return value.
+ *
+ * @param argopts the argument options passed
+ * @params ret a pointer to the return value (which should be == *mres)
+ * @params mres a multi result object.
+ *
+ * @return the return value.
+ *
+ * If *ret != *mres, then it is assumed that an error condition occured, i.e.
+ * it is expected that code assign ret to mres once all operations have
+ * succeeded.
+ *
+ * If *ret == *mres, then *mres' refcount is decremented (and the pointer
+ * set to NULL), and *ret will contain *mres.
+ *
+ * If argopt & PYCBC_ARGOPT_SINGLE, the single Result object is
+ * extracted from it, and mres is freed (i.e. XDECREF'd)
+ *
+ * Since *mret is set to NULL, a future DECREF will not affect us :) - the
+ * idea being that Py_XDECREF(mres) is called if ret != mres, but
+ * Py_XDECREF(NULL) is called otherwise.
  */
-PyObject* pycbc_ret_to_single(pycbc_MultiResultObject *mres);
+PyObject *pycbc_make_retval(int argopts,
+                            PyObject **ret,
+                            pycbc_MultiResultObject **mres);
 
 
 /**
