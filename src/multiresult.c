@@ -114,7 +114,7 @@ int pycbc_multiresult_maybe_raise(pycbc_MultiResultObject *self)
         PyErr_NormalizeException(&type, &value, &traceback);
 
     } else {
-        pycbc_ResultObject *res = (pycbc_ResultObject*)self->errop;
+        pycbc_ResultBaseObject *res = (pycbc_ResultBaseObject*)self->errop;
         /** Craft an exception based on the operation */
         PYCBC_EXC_WRAP_KEY(PYCBC_EXC_LCBERR, res->rc, "Operational Error", res->key);
         PyErr_Fetch(&type, &value, &traceback);

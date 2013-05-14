@@ -130,25 +130,30 @@ typedef struct {
     unsigned int flags;
 
 } pycbc_ConnectionObject;
-/**
- * Result object to be used with callbacks
- */
-typedef struct {
-    PyObject_HEAD
-    lcb_uint64_t cas;
-    lcb_uint32_t flags;
-    lcb_error_t rc;
 
-    /** Actual value */
-    PyObject *value;
-
-    /** Raw Value */
-    PyObject *raw_value;
-
-    /** Key */
+#define pycbc_Result_HEAD \
+    PyObject_HEAD \
+    lcb_error_t rc; \
     PyObject *key;
 
-} pycbc_ResultObject;
+#define pycbc_OpResult_HEAD \
+    pycbc_Result_HEAD \
+    lcb_uint64_t cas;
+
+typedef struct {
+    pycbc_Result_HEAD
+} pycbc_ResultBaseObject;
+
+typedef struct {
+    pycbc_OpResult_HEAD
+} pycbc_OperationResultObject;
+
+typedef struct {
+    pycbc_OpResult_HEAD
+
+    PyObject *value;
+    lcb_uint32_t flags;
+} pycbc_ValueResultObject;
 
 /**
  * Object containing the result of a 'Multi' operation. It's the same as a
@@ -184,7 +189,16 @@ typedef struct {
 } pycbc_ArgumentObject;
 
 extern PyTypeObject pycbc_MultiResultType;
-extern PyTypeObject pycbc_ResultType;
+extern PyTypeObject pycbc_ResultBaseType;
+extern PyTypeObject pycbc_OperationResultType;
+extern PyTypeObject pycbc_ValueResultType;
+
+#define PYCBC_VALRES_CHECK(o) \
+        PyObject_IsInstance(o, &pycbc_ValueResultType)
+
+#define PYCBC_OPRES_CHECK(o) \
+    PyObject_IsInstance(o, (PyObject*)&pycbc_OperationResultType)
+
 extern PyTypeObject pycbc_ArgumentType;
 extern PyObject *pycbc_ExceptionType;
 
@@ -243,6 +257,8 @@ int pycbc_ResultType_init(PyObject **ptr);
 int pycbc_ConnectionType_init(PyObject **ptr);
 int pycbc_MultiResultType_init(PyObject **ptr);
 int pycbc_ArgumentType_init(PyObject **ptr);
+int pycbc_ValueResultType_init(PyObject **ptr);
+int pycbc_OperationResultType_init(PyObject **ptr);
 
 
 
@@ -250,6 +266,14 @@ PyObject *pycbc_result_new(pycbc_ConnectionObject *parent);
 
 PyObject *pycbc_multiresult_new(pycbc_ConnectionObject *parent);
 int pycbc_multiresult_maybe_raise(pycbc_MultiResultObject *self);
+
+pycbc_ValueResultObject *
+pycbc_valresult_new(pycbc_ConnectionObject *parent);
+
+pycbc_OperationResultObject *
+pycbc_opresult_new(pycbc_ConnectionObject *parent);
+
+void pycbc_ResultBase_dealloc(pycbc_ResultBaseObject *self);
 
 void pycbc_callbacks_init(lcb_t instance);
 

@@ -84,6 +84,8 @@ init_libcouchbase(void)
     PyObject *result_type;
     PyObject *connection_type;
     PyObject *mresult_type;
+    PyObject *valresult_type;
+    PyObject *opresult_type;
     PyObject *arg_type;
 
     if (pycbc_ConnectionType_init(&connection_type) < 0) {
@@ -91,6 +93,14 @@ init_libcouchbase(void)
     }
 
     if (pycbc_ResultType_init(&result_type) < 0) {
+        INITERROR;
+    }
+
+    if (pycbc_OperationResultType_init(&opresult_type) < 0) {
+        INITERROR;
+    }
+
+    if (pycbc_ValueResultType_init(&valresult_type) < 0) {
         INITERROR;
     }
 
@@ -117,6 +127,8 @@ init_libcouchbase(void)
      */
     PyModule_AddObject(m, "Connection", connection_type);
     PyModule_AddObject(m, "Result", result_type);
+    PyModule_AddObject(m, "ValueResult", valresult_type);
+    PyModule_AddObject(m, "OperationResult", opresult_type);
     PyModule_AddObject(m, "MultiResult", mresult_type);
     PyModule_AddObject(m, "Arguments", arg_type);
 
