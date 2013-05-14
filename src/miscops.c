@@ -16,6 +16,18 @@
 
 #include "oputil.h"
 
+/**
+ * This file contains 'miscellaneous' operations. Functions contained here
+ * might move to other files if they become more complex.
+ *
+ * More specifically, this contains 'key-only' operations that don't
+ * require a value.
+ */
+
+
+/**
+ * This is called during each iteration of delete/unlock
+ */
 static int handle_single_keyop(pycbc_ConnectionObject *self,
                                PyObject *curkey,
                                PyObject *curval,
@@ -46,6 +58,7 @@ static int handle_single_keyop(pycbc_ConnectionObject *self,
             cas = pycbc_IntAsULL(curval);
 
         } else if (PYCBC_OPRES_CHECK(curval)) {
+            /* If we're passed a Result object, just extract its CAS */
             cas = ((pycbc_OperationResultObject*)curval)->cas;
 
         } else if (PyNumber_Check(curval)) {
@@ -81,6 +94,7 @@ static int handle_single_keyop(pycbc_ConnectionObject *self,
         rcmd->v.v0.nkey = nkey;
         rcmd->v.v0.cas = cas;
         cv->cmdlist.remove[ii] = rcmd;
+
         return 0;
     }
 }

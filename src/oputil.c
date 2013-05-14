@@ -31,6 +31,10 @@ void pycbc_common_vars_free(struct pycbc_common_vars *cv)
         }
     }
 
+    /**
+     * We only free the other malloc'd structures if we had more than
+     * one command.
+     */
     if (cv->ncmds > 1) {
         free(cv->cmds.get);
         free((void*)cv->cmdlist.get);
@@ -47,6 +51,9 @@ int pycbc_common_vars_init(struct pycbc_common_vars *cv,
     int ok;
     cv->ncmds = ncmds;
 
+    /**
+     * If we have a single command, use the stack-allocated space.
+     */
     if (ncmds == 1) {
         cv->cmds.get = &cv->_single_cmd.get;
         cv->cmdlist.get = (void*)&cv->cmds.get;
@@ -55,6 +62,9 @@ int pycbc_common_vars_init(struct pycbc_common_vars *cv,
         return 0;
     }
 
+    /**
+     * TODO: Maybe Python has a memory pool we can use?
+     */
     cv->cmds.get = calloc(ncmds, tsize);
     cv->cmdlist.get = malloc(ncmds * sizeof(void*));
     cv->enckeys = calloc(ncmds, sizeof(PyObject*));
@@ -79,6 +89,9 @@ int pycbc_common_vars_init(struct pycbc_common_vars *cv,
     return 0;
 }
 
+/**
+ * Check that the object is not one of Python's typical string types
+ */
 #define _is_not_strtype(o) \
     (PyBytes_Check(o) == 0 && PyByteArray_Check(o) == 0 && PyUnicode_Check(o) == 0)
 
@@ -114,6 +127,11 @@ int pycbc_oputil_check_sequence(PyObject *sequence,
         *ncmds = PyTuple_GET_SIZE(sequence);
 
     } else if (_is_not_strtype(sequence)) {
+        /**
+         * Previously we used PySequence_Check, but this failed on things
+         * which didn't have __getitem__ (they had a length, but the elements
+         * were not ordered, but we don't care about that here
+         */
         *seqtype = PYCBC_SEQTYPE_GENERIC;
         *ncmds = PyObject_Length(sequence);
 
@@ -140,6 +158,9 @@ int pycbc_oputil_check_sequence(PyObject *sequence,
 
 int pycbc_maybe_set_quiet(pycbc_MultiResultObject *mres, PyObject *quiet)
 {
+    /**
+     * If quiet is 'None', then we default to Connection.quiet
+     */
     if (quiet == NULL || quiet == Py_None) {
         mres->no_raise_enoent = mres->parent->quiet;
         return 0;
@@ -182,6 +203,10 @@ pycbc_oputil_iter_prepare(pycbc_seqtype_t seqtype,
     return sequence;
 }
 
+/**
+ * I thought it better to make the function call a bit more complex, so as to
+ * have the iteration logic unified in a single place
+ */
 int
 pycbc_oputil_sequence_next(pycbc_seqtype_t seqtype,
                            PyObject *seqobj,

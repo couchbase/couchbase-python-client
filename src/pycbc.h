@@ -18,10 +18,18 @@
 #define PYCBC_H_
 #undef NDEBUG
 
+/**
+ * This file contains the base header for the Python Couchbase Client
+ * @author Mark Nunberg
+ */
+
 #include <Python.h>
 #include <libcouchbase/couchbase.h>
 
-
+/**
+ * See http://docs.python.org/2/c-api/arg.html for an explanation of this
+ * definition.
+ */
 #ifdef PY_SSIZE_T_CLEAN
 typedef Py_ssize_t pycbc_strlen_t;
 #else
@@ -32,25 +40,48 @@ typedef int pycbc_strlen_t;
 #define PYCBC_MODULE_NAME "_libcouchbase"
 #define PYCBC_FQNAME PYCBC_PACKAGE_NAME "." PYCBC_MODULE_NAME
 
-
+/**
+ * Python 2.x and Python 3.x have different ideas of what a basic string
+ * and int types are. These blocks help us sort things out if we just want a
+ * "plain" integer or string
+ */
 #if PY_MAJOR_VERSION == 3
 #define PYCBC_POBJ_HEAD_INIT(t) { PyObject_HEAD_INIT(t) },
 
+/**
+ * The IntFrom* macros get us a 'default' integer type from a long, etc.
+ * Implemented (if not a simple macro) in numutil.c
+ */
 #define pycbc_IntFromL PyLong_FromLong
 #define pycbc_IntFromUL PyLong_FromUnsignedLong
 #define pycbc_IntFromULL PyLong_FromUnsignedLongLong
+
+/**
+ * The IntAs* convert the integer type (long, int) into something we want
+ */
 #define pycbc_IntAsULL PyLong_AsUnsignedLongLong
 #define pycbc_IntAsLL PyLong_AsLongLong
 #define pycbc_IntAsUL PyLong_AsUnsignedLong
 #define pycbc_IntAsL PyLong_AsLong
+
+/**
+ * The SimpleString macros generate strings for us. The 'Z' variant takes a
+ * NUL-terminated string, while the 'N' variant accepts a length specifier
+ */
 #define pycbc_SimpleStringZ(c) PyUnicode_FromString(c)
 #define pycbc_SimpleStringN(c, n) PyUnicode_FromStringAndSize(c, n)
 
 
 #else
+
+/**
+ * This defines the PyObject head for our types
+ */
 #define PYCBC_POBJ_HEAD_INIT(t) PyObject_HEAD_INIT(t)
 
-
+/**
+ * See above block for explanation of these macros
+ */
 #define pycbc_IntFromL PyInt_FromLong
 #define pycbc_IntFromUL PyLong_FromUnsignedLong
 #define pycbc_IntFromULL PyLong_FromUnsignedLong
@@ -65,7 +96,21 @@ unsigned long pycbc_IntAsUL(PyObject *o);
 
 #endif
 
+/**
+ * Converts the object into an PyInt (2.x only) or PyLong (2.x or 3.x)
+ */
 PyObject *pycbc_maybe_convert_to_int(PyObject *o);
+
+/**
+ * Gives us a C buffer from a Python string.
+ * @param orig the original object containg a string thing. This is something
+ * we can convert into a byte buffer
+ *
+ * @param buf out, the C buffer, out, set to the new buffer
+ * @param nbuf, out, the length of the new buffer
+ * @param newkey, out, the new PyObject, which will back the buffer.
+ * This should not be DECREF'd until the @c buf is no longer needed
+ */
 int pycbc_BufFromString(PyObject *orig,
                         char **buf,
                         Py_ssize_t *nbuf,
@@ -73,7 +118,11 @@ int pycbc_BufFromString(PyObject *orig,
 
 
 /**
- * 'GET' operations:
+ * These constants are used internally to figure out the high level
+ * operation being performed.
+ *
+ * Note that not all operations are defined here; it is only those operations
+ * where a single C function can handle multiple entry points.
  */
 enum {
     PYCBC_CMD_GET = 500,
@@ -91,14 +140,22 @@ enum {
  * Various exception types to be thrown
  */
 enum {
+    /** Argument Error. User passed the wrong arguments */
     PYCBC_EXC_ARGUMENTS,
+
+    /** Couldn't encode/decode something */
     PYCBC_EXC_ENCODING,
+
+    /** Operational error returned from LCB */
     PYCBC_EXC_LCBERR
 };
 
 /* Argument options */
 enum {
+    /** Entry point is a single key variant */
     PYCBC_ARGOPT_SINGLE = 0x1,
+
+    /** Entry point is a multi key variant */
     PYCBC_ARGOPT_MULTI = 0x2
 };
 
@@ -130,22 +187,39 @@ typedef struct {
     /** Connection Errors */
     PyObject *errors;
 
-    /** Thread state */
+    /** Thread state. Used to lock/unlock the GIL */
     PyThreadState *thrstate;
 
     /** Whether to not raise any exceptions */
     unsigned int quiet;
 
+    /** Whether GIL handling is in effect */
     unsigned int unlock_gil;
 
+    /** Don't decode anything */
     unsigned int data_passthrough;
 
     /** whether __init__ has already been called */
     unsigned char init_called;
 
+    /**
+     * XXX:
+     * No use for this yet
+     */
     unsigned int flags;
 
 } pycbc_ConnectionObject;
+
+
+/*****************
+ * Result Objects.
+ *****************
+ *
+ * These objects are returned to indicate the status/value of operations.
+ * The following defines a 'base' class and several 'subclasses'.
+ *
+ * See result.c and opresult.c
+ */
 
 #define pycbc_Result_HEAD \
     PyObject_HEAD \
@@ -175,40 +249,104 @@ typedef struct {
  * Object containing the result of a 'Multi' operation. It's the same as a
  * normal dict, except we add an 'all_ok' field, so a user doesn't need to
  * skim through all the pairs to determine if something failed.
+ *
+ * See multiresult.c
  */
 typedef struct {
+    /** base dict */
     PyDictObject dict;
+
+    /** parent Connection object */
     pycbc_ConnectionObject *parent;
+
+    /**
+     * A list of fatal exceptions, i.e. ones not resulting from a bad
+     * LCB error code
+     */
     PyObject *exceptions;
+
+    /** A failed LCB operation, if any */
     PyObject *errop;
+
+    /** Quick-check value to see if everything went well */
     int all_ok;
+
+    /** Equivalent to 'quiet' in the API. Don't raise exceptions on ENOENT */
     int no_raise_enoent;
 } pycbc_MultiResultObject;
 
+
+/**
+ * This structure is passed to our exception throwing function, it's
+ * usually wrapped by one of the macros below
+ */
 struct pycbc_exception_params {
+    /** C Source file at which the error was thrown (populated by macro */
     const char *file;
+
+    /** C Source line, as above */
     int line;
+
+    /** LCB Error code, if any */
     lcb_error_t err;
+
+    /** Error message, if any */
     const char *msg;
+
+    /** Key at which the error occurred. Not always present */
     PyObject *key;
+
+    /** Single result which triggered the error, if present */
     PyObject *result;
+
+    /**
+     * A MultiResult object. This contains other operations which may
+     * or may not have failed. This allows a user to check the status
+     * of multi operations in which one of the keys resulted in an
+     * exception
+     */
     PyObject *all_results;
+
+    /**
+     * Extra info which caused the error. This is usually some kind of
+     * bad parameter.
+     */
     PyObject *objextra;
 };
 
+/**
+ * Initializes a pycbc_exception_params to contain the proper
+ * source context info
+ */
 #define PYCBC_EXC_STATIC_INIT { __FILE__, __LINE__ }
 
-
+/**
+ * Argument object, used for passing more information to the
+ * multi functions. This isn't documented API yest.
+ */
 typedef struct {
     PyDictObject dict;
     int dummy; /* avoid sizing issues */
 } pycbc_ArgumentObject;
 
+
+/**
+ * Extern PyTypeObject declaraions.
+ */
+
+/* multiresult.c */
 extern PyTypeObject pycbc_MultiResultType;
+
+/* result.c */
 extern PyTypeObject pycbc_ResultBaseType;
+
+/* opresult.c */
 extern PyTypeObject pycbc_OperationResultType;
 extern PyTypeObject pycbc_ValueResultType;
 
+/**
+ * Result type check macros
+ */
 #define PYCBC_VALRES_CHECK(o) \
         PyObject_IsInstance(o, &pycbc_ValueResultType)
 
@@ -216,8 +354,18 @@ extern PyTypeObject pycbc_ValueResultType;
     PyObject_IsInstance(o, (PyObject*)&pycbc_OperationResultType)
 
 extern PyTypeObject pycbc_ArgumentType;
+
+/**
+ * XXX: This isn't used.
+ */
 extern PyObject *pycbc_ExceptionType;
 
+/**
+ * X-macro to define the helpers we pass from _bootstrap.py along to
+ * the module's '_init_helpers' function. We use an xmacro here because
+ * the parameters may change and the argument handling is rather complex.
+ * See below (in the pycbc_helpers structure) and in ext.c for more usages.
+ */
 #define PYCBC_XHELPERS(X) \
     X(result_reprfunc) \
     X(fmt_utf8_flags) \
@@ -230,18 +378,24 @@ extern PyObject *pycbc_ExceptionType;
     X(misc_errno_map) \
     X(default_exception)
 
+/**
+ * Definition of global helpers. This is only instantiated once as
+ * pycbc_helpers.
+ */
 struct pycbc_helpers_ST {
     #define X(n) PyObject *n;
     PYCBC_XHELPERS(X)
     #undef X
 };
 
+/**
+ * We use this one a lot. This is defined in ext.c
+ */
 extern struct pycbc_helpers_ST pycbc_helpers;
 
 /**
  * Threading macros
  */
-
 #define PYCBC_USE_THREADS
 
 #ifdef PYCBC_USE_THREADS
@@ -263,9 +417,18 @@ extern struct pycbc_helpers_ST pycbc_helpers;
 #define PYCBC_CONN_THR_END(X)
 #endif
 
-/**
- * Initializes the constants
+/*******************************
+ * Type Initialization Functions
+ *******************************
+ *
+ * These functions are called once from the extension's import method.
+ * See ext.c
+ *
+ * They basically initialize the corresponding Python type so that
+ * we can use them further on.
  */
+
+/** Initializes the constants, constants. */
 void pycbc_init_pyconstants(PyObject *module);
 PyObject *pycbc_lcb_errstr(lcb_t instance, lcb_error_t err);
 
@@ -277,25 +440,52 @@ int pycbc_ValueResultType_init(PyObject **ptr);
 int pycbc_OperationResultType_init(PyObject **ptr);
 
 
-
+/**
+ * Allocators for result functions. See callbacks.c:get_common
+ */
 PyObject *pycbc_result_new(pycbc_ConnectionObject *parent);
-
 PyObject *pycbc_multiresult_new(pycbc_ConnectionObject *parent);
-int pycbc_multiresult_maybe_raise(pycbc_MultiResultObject *self);
+pycbc_ValueResultObject *pycbc_valresult_new(pycbc_ConnectionObject *parent);
+pycbc_OperationResultObject *pycbc_opresult_new(pycbc_ConnectionObject *parent);
 
-pycbc_ValueResultObject *
-pycbc_valresult_new(pycbc_ConnectionObject *parent);
-
-pycbc_OperationResultObject *
-pycbc_opresult_new(pycbc_ConnectionObject *parent);
-
+/**
+ * Simple function, here because it's defined in result.c but needed in
+ * opresult.c
+ */
 void pycbc_ResultBase_dealloc(pycbc_ResultBaseObject *self);
 
+/**
+ * Raise an exception from a multi result. This will raise an exception if:
+ * 1) There is a 'fatal' error in the 'exceptions' list
+ * 2) There is an 'operr'. 'operr' can be a failed LCB code (if no_raise_enoent
+ * is on, this is not present if the failed code was LCB_KEY_ENOENT)
+ */
+int pycbc_multiresult_maybe_raise(pycbc_MultiResultObject *self);
+
+/**
+ * Initialize the callbacks for the lcb_t
+ */
 void pycbc_callbacks_init(lcb_t instance);
 
 
+/**
+ * "Real" exception handler.
+ * @param mode one of the PYCBC_EXC_* constants
+ * @param p a struct of exception parameters
+ */
 void pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p);
 
+
+/**
+ * Throws an exception. If an exception is pending, it is caught and wrapped,
+ * delivered into the CouchbaseError's 'inner_cause' field
+ *
+ * @param e_mode one of the PYCBC_EXC_* constants
+ * @param e_err the LCB error code (use 0 if none)
+ * @param e_msg a string message, if any
+ * @param e_key the key during the handling of which the error occurred
+ * @param e_objextra the problematic object which actually caused the errror
+ */
 #define PYCBC_EXC_WRAP_EX(e_mode, e_err, e_msg, e_key, e_objextra) { \
     struct pycbc_exception_params __pycbc_ep = {0}; \
     __pycbc_ep.file = __FILE__; \
@@ -317,13 +507,6 @@ void pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p);
     PYCBC_EXC_WRAP_EX(mode, err, msg, key, NULL)
 
 #define PYCBC_EXC_WRAP_VALUE PYCBC_EXC_WRAP_KEY
-
-#define pycbc_exc_wrap_value PYCBC_EXC_WRAP_KEY
-
-#define pycbc_exc_wrap_bytes(mode, err, msg, bytes, nbytes) \
-    PYCBC_EXC_WRAP(mode, err, msg)
-
-
 
 
 /**
