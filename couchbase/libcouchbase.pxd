@@ -62,7 +62,13 @@ cdef extern from "libcouchbase/couchbase.h":
 
     ctypedef unsigned int __id_t
 
-    ctypedef long __time_t
+    # Likely because this was generated on a Linux box, this code defines
+    # __time_t and that definition is not respected on OS X, which expects
+    # __darwin_time_t. Fix that here:
+    IF UNAME_SYSNAME == "Darwin":
+        ctypedef long __darwin_time_t
+    ELSE:
+       ctypedef long __time_t
 
     ctypedef unsigned int __useconds_t
 
@@ -106,15 +112,29 @@ cdef extern from "libcouchbase/couchbase.h":
 
     ctypedef __clock_t clock_t
 
-    ctypedef __time_t time_t
+    # Likely because this was generated on a Linux box, this code defines
+    # __time_t and that definition is not respected on OS X, which expects
+    # __darwin_time_t. Fix that here:
+    IF UNAME_SYSNAME == "Darwin":
+       ctypedef __darwin_time_t time_t
+    ELSE:
+       ctypedef __time_t time_t
 
     ctypedef __clockid_t clockid_t
 
     ctypedef __timer_t timer_t
 
-    cdef struct timespec:
-        __time_t tv_sec
-        long tv_nsec
+    # Likely because this was generated on a Linux box, this code defines
+    # __time_t and that definition is not respected on OS X, which expects
+    # __darwin_time_t. Fix that here:
+    IF UNAME_SYSNAME == "Darwin":
+        cdef struct timespec:
+            __darwin_time_t tv_sec
+            long tv_nsec
+    ELSE:
+        cdef struct timespec:
+            __time_t tv_sec
+            long tv_nsec
 
     cdef struct tm:
         int tm_sec
@@ -292,9 +312,19 @@ cdef extern from "libcouchbase/couchbase.h":
 
     ctypedef __sigset_t sigset_t
 
-    cdef struct timeval:
-        __time_t tv_sec
-        __suseconds_t tv_usec
+
+    # Likely because this was generated on a Linux box, this code defines
+    # __time_t and that definition is not respected on OS X, which expects
+    # __darwin_time_t. Fix that here:
+    IF UNAME_SYSNAME == "Darwin":
+        cdef struct timeval:
+            __darwin_time_t tv_sec
+            __suseconds_t tv_usec
+    ELSE:
+        cdef struct timeval:
+            __time_t tv_sec
+            __suseconds_t tv_usec
+
 
     ctypedef __suseconds_t suseconds_t
 
@@ -1421,5 +1451,3 @@ cdef extern from "libcouchbase/couchbase.h":
     lcb_int32_t lcb_get_num_nodes(lcb_t instance)
 
     const char *const *lcb_get_server_list(lcb_t instance)
-
-
