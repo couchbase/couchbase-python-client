@@ -4,7 +4,7 @@ from couchbase.exceptions import *
 import couchbase.exceptions as exceptions
 
 from couchbase._libcouchbase import (
-    Result, MultiResult, Arguments,
+    Result, ValueResult, OperationResult, MultiResult, Arguments,
     FMT_JSON, FMT_PICKLE, FMT_BYTES, FMT_UTF8, FMT_MASK)
 
 
@@ -676,7 +676,7 @@ class Connection(_Base):
 
     def lock_multi(self, keys, ttl=0):
         """Lock multiple keys
-        
+
         Multi variant of :meth:`lock`
 
         :param keys: the keys to lock

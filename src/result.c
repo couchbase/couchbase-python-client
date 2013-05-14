@@ -1,119 +1,121 @@
 #include "pycbc.h"
 #include "structmember.h"
 
-static PyObject *Result_success(pycbc_ResultObject *self, void *closure)
+static PyObject *ResultBase_success(pycbc_ResultBaseObject *self, void *closure)
 {
     (void)closure;
     return PyBool_FromLong(self->rc == LCB_SUCCESS);
 }
 
-static PyObject *Result_repr(pycbc_ResultObject *self)
+static PyObject *ResultBase_repr(pycbc_ResultBaseObject *self)
 {
     return PyObject_CallFunction(pycbc_helpers.result_reprfunc, "O", self);
 }
 
-static PyObject *Result_value(pycbc_ResultObject *self, void *closure)
+
+static PyObject *ResultBase_retnone(pycbc_ResultBaseObject *self, void *closure)
 {
     (void)closure;
-    if (!self->value) {
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-    Py_INCREF(self->value);
-    return self->value;
+    Py_INCREF(Py_None);
+    return Py_None;
 }
 
-static PyObject *Result_errstr(pycbc_ResultObject *self, void *closure)
+static PyObject *ResultBase_int0(pycbc_ResultBaseObject *self, void *closure)
+{
+    (void)closure;
+    return pycbc_IntFromL(0);
+}
+
+static PyObject *ResultBase_errstr(pycbc_ResultBaseObject *self, void *closure)
 {
     (void)closure;
     return pycbc_lcb_errstr(NULL, self->rc);
 }
 
-static struct PyMemberDef Result_members[] = {
-        { "cas",
-                T_ULONGLONG, offsetof(pycbc_ResultObject, cas),
-                READONLY, "The CAS of the operation. Returned for every operation"
-        },
-        { "flags",
-                T_ULONG, offsetof(pycbc_ResultObject, flags),
-                READONLY, "Flags with which the value were stored (if available)"
-        },
+static struct PyMemberDef ResultBase_members[] = {
         { "rc",
-                T_INT, offsetof(pycbc_ResultObject, rc),
+                T_INT, offsetof(pycbc_ResultBaseObject, rc),
                 READONLY, "libcouchbase error code"
         },
-        { "key", T_OBJECT_EX, offsetof(pycbc_ResultObject, key),
+        { "key", T_OBJECT_EX, offsetof(pycbc_ResultBaseObject, key),
                 READONLY, "Key for the operation"
         },
 
         { NULL }
 };
 
-struct PyGetSetDef Result_getset[] = {
+struct PyGetSetDef ResultBase_getset[] = {
         { "success",
-                (getter)Result_success,
+                (getter)ResultBase_success,
                 NULL,
                 "Determine whether operation succeeded or not"
         },
         { "value",
-                (getter)Result_value,
-                NULL,
-                "Value of the operation (if any)"
+                (getter)ResultBase_retnone,
+                NULL, NULL,
         },
         { "errstr",
-                (getter)Result_errstr,
+                (getter)ResultBase_errstr,
                 NULL,
                 "Returns a textual representation of the error"
+        },
+        { "cas", (getter)ResultBase_int0,
+                NULL, NULL
         },
         { NULL }
 };
 
-PyTypeObject pycbc_ResultType = {
+PyTypeObject pycbc_ResultBaseType = {
         PYCBC_POBJ_HEAD_INIT(NULL)
         0
 };
 
-static PyMethodDef Result_methods[] = {
+static PyMethodDef ResultBase_methods[] = {
         { NULL }
 };
 
-static void Result_dealloc(pycbc_ResultObject *self)
+static void Result_dealloc(pycbc_ResultBaseObject *self)
 {
-    Py_XDECREF(self->value);
     Py_XDECREF(self->key);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
+void pycbc_ResultBase_dealloc(pycbc_ResultBaseObject *self)
+{
+    Result_dealloc(self);
+}
+
 int pycbc_ResultType_init(PyObject **ptr)
 {
-    *ptr = (PyObject*)&pycbc_ResultType;
+    PyTypeObject *p = &pycbc_ResultBaseType;
+    *ptr = (PyObject*)p;
 
-    if (pycbc_ResultType.tp_name) {
+    if (p->tp_name) {
         return 0;
     }
 
-    pycbc_ResultType.tp_name = "Result";
-    pycbc_ResultType.tp_doc =
+    p->tp_name = "Result";
+    p->tp_doc =
             "The standard return type for Couchbase operations.\n"
             "\n"
             "This is a lightweight object and may be subclassed by other\n"
             "operations which may required additional fields.";
 
-    pycbc_ResultType.tp_new = PyType_GenericNew;
-    pycbc_ResultType.tp_dealloc = (destructor)Result_dealloc;
-    pycbc_ResultType.tp_basicsize = sizeof(pycbc_ResultObject);
-    pycbc_ResultType.tp_members = Result_members;
-    pycbc_ResultType.tp_methods = Result_methods;
-    pycbc_ResultType.tp_getset = Result_getset;
-    pycbc_ResultType.tp_repr = (reprfunc)Result_repr;
-    pycbc_ResultType.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+    p->tp_new = PyType_GenericNew;
+    p->tp_dealloc = (destructor)Result_dealloc;
+    p->tp_basicsize = sizeof(pycbc_ResultBaseObject);
+    p->tp_members = ResultBase_members;
+    p->tp_methods = ResultBase_methods;
+    p->tp_getset = ResultBase_getset;
+    p->tp_repr = (reprfunc)ResultBase_repr;
+    p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
 
-    return PyType_Ready(&pycbc_ResultType);
+    return PyType_Ready(p);
 }
 
 PyObject *pycbc_result_new(pycbc_ConnectionObject *parent)
 {
-    PyObject *obj = PyObject_CallFunction((PyObject*) &pycbc_ResultType,
+    PyObject *obj = PyObject_CallFunction((PyObject*) &pycbc_ResultBaseType,
                                           NULL,
                                           NULL);
     return obj;

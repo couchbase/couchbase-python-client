@@ -29,8 +29,8 @@ static int handle_single_keyop(pycbc_ConnectionObject *self,
             }
             cas = pycbc_IntAsULL(curval);
 
-        } else if (PyObject_IsInstance(curval, (PyObject*)&pycbc_ResultType)) {
-            cas = ((pycbc_ResultObject*)curval)->cas;
+        } else if (PYCBC_OPRES_CHECK(curval)) {
+            cas = ((pycbc_OperationResultObject*)curval)->cas;
 
         } else if (PyNumber_Check(curval)) {
             cas = pycbc_IntAsULL(curval);

@@ -43,6 +43,7 @@ SOURCEMODS = (
         'exceptions',
         'ext',
         'result',
+        'opresult',
         'callbacks',
         'convert',
         'connection',

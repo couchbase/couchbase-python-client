@@ -10,6 +10,13 @@
 #define CB_THR_BEGIN(x)
 #endif
 
+
+enum {
+    RESTYPE_BASE = 1,
+    RESTYPE_VALUE,
+    RESTYPE_OPERATION
+};
+
 static PyObject *make_error_tuple(void)
 {
     PyObject *type, *value, *traceback;
@@ -35,7 +42,7 @@ static void push_fatal_error(pycbc_MultiResultObject* mres)
 }
 
 static void maybe_push_operr(pycbc_MultiResultObject *mres,
-                             pycbc_ResultObject *res,
+                             pycbc_ResultBaseObject *res,
                              lcb_error_t err,
                              int check_enoent)
 {
@@ -56,7 +63,8 @@ static int get_common_objects(PyObject *cookie,
                               size_t nkey,
                               lcb_error_t err,
                               pycbc_ConnectionObject **conn,
-                              pycbc_ResultObject **res,
+                              pycbc_ResultBaseObject **res,
+                              int restype,
                               pycbc_MultiResultObject **mres)
 
 {
@@ -79,7 +87,18 @@ static int get_common_objects(PyObject *cookie,
     /**
      * Now, get/set the result object
      */
-    *res = (pycbc_ResultObject*)pycbc_result_new(*conn);
+    if (restype == RESTYPE_BASE) {
+        *res = (pycbc_ResultBaseObject*)pycbc_result_new(*conn);
+
+    } else if (restype == RESTYPE_OPERATION) {
+        *res = (pycbc_ResultBaseObject*)pycbc_opresult_new(*conn);
+
+    } else if (restype == RESTYPE_VALUE) {
+        *res = (pycbc_ResultBaseObject*)pycbc_valresult_new(*conn);
+
+    } else {
+        abort();
+    }
     assert(PyDict_Contains((PyObject*)*mres, hkey) == 0);
 
     PyDict_SetItem((PyObject*)*mres, hkey, (PyObject*)*res);
@@ -102,7 +121,7 @@ static void store_callback(lcb_t instance,
                            const lcb_store_resp_t *resp)
 {
     pycbc_ConnectionObject *conn;
-    pycbc_ResultObject *res;
+    pycbc_OperationResultObject *res;
     pycbc_MultiResultObject *mres;
     int rv;
 
@@ -111,7 +130,8 @@ static void store_callback(lcb_t instance,
                             resp->v.v0.nkey,
                             err,
                             &conn,
-                            &res,
+                            (pycbc_ResultBaseObject**)&res,
+                            RESTYPE_OPERATION,
                             &mres);
 
     if (rv == -1) {
@@ -121,7 +141,7 @@ static void store_callback(lcb_t instance,
 
     res->rc = err;
     res->cas = resp->v.v0.cas;
-    maybe_push_operr(mres, res, err, 0);
+    maybe_push_operr(mres, (pycbc_ResultBaseObject*)res, err, 0);
     CB_THR_BEGIN(conn);
 }
 
@@ -132,7 +152,7 @@ static void get_callback(lcb_t instance, const void *cookie,
 
     int rv;
     pycbc_ConnectionObject *conn = NULL;
-    pycbc_ResultObject *res = NULL;
+    pycbc_ValueResultObject *res = NULL;
     pycbc_MultiResultObject *mres = NULL;
 
     rv = get_common_objects((PyObject*)cookie,
@@ -140,7 +160,8 @@ static void get_callback(lcb_t instance, const void *cookie,
                             resp->v.v0.nkey,
                             err,
                             &conn,
-                            &res,
+                            (pycbc_ResultBaseObject**)&res,
+                            RESTYPE_VALUE,
                             &mres);
 
     if (rv < 0) {
@@ -151,7 +172,7 @@ static void get_callback(lcb_t instance, const void *cookie,
     res->flags = resp->v.v0.flags;
     res->cas = resp->v.v0.cas;
 
-    maybe_push_operr(mres, res, err, 1);
+    maybe_push_operr(mres, (pycbc_ResultBaseObject*)res, err, 1);
 
     if (err != LCB_SUCCESS) {
         CB_THR_BEGIN(conn);
@@ -176,16 +197,19 @@ static void delete_callback(lcb_t instance, const void *cookie,
 {
     int rv;
     pycbc_ConnectionObject *conn = NULL;
-    pycbc_ResultObject *res = NULL;
+    pycbc_OperationResultObject *res = NULL;
     pycbc_MultiResultObject *mres = NULL;
     rv = get_common_objects((PyObject*)cookie,
                             resp->v.v0.key, resp->v.v0.nkey, err,
-                            &conn, &res, &mres);
+                            &conn,
+                            (pycbc_ResultBaseObject**)&res,
+                            RESTYPE_OPERATION,
+                            &mres);
     if (rv == 0) {
         res->cas = resp->v.v0.cas;
     }
 
-    maybe_push_operr(mres, res, err, 1);
+    maybe_push_operr(mres, (pycbc_ResultBaseObject*)res, err, 1);
 
     CB_THR_BEGIN(conn);
 }
@@ -196,14 +220,17 @@ static void arithmetic_callback(lcb_t instance, const void *cookie,
 {
     int rv;
     pycbc_ConnectionObject *conn = NULL;
-    pycbc_ResultObject *res = NULL;
+    pycbc_ValueResultObject *res = NULL;
     pycbc_MultiResultObject *mres = NULL;
 
     rv = get_common_objects((PyObject*)cookie,
                             resp->v.v0.key,
                             resp->v.v0.nkey,
                             err,
-                            &conn, &res, &mres);
+                            &conn,
+                            (pycbc_ResultBaseObject**)&res,
+                            RESTYPE_VALUE,
+                            &mres);
     if (rv == 0) {
         res->cas = resp->v.v0.cas;
         res->rc = err;
@@ -211,7 +238,7 @@ static void arithmetic_callback(lcb_t instance, const void *cookie,
             res->value = pycbc_IntFromULL(resp->v.v0.value);
         }
 
-        maybe_push_operr(mres, res, err, 0);
+        maybe_push_operr(mres, (pycbc_ResultBaseObject*)res, err, 0);
     }
 
     CB_THR_BEGIN(conn);
@@ -223,17 +250,20 @@ static void unlock_callback(lcb_t instance, const void *cookie,
 {
     int rv;
     pycbc_ConnectionObject *conn = NULL;
-    pycbc_ResultObject *res = NULL;
+    pycbc_OperationResultObject *res = NULL;
     pycbc_MultiResultObject *mres = NULL;
 
     rv = get_common_objects((PyObject*)cookie,
                             resp->v.v0.key,
                             resp->v.v0.nkey,
                             err,
-                            &conn, &res, &mres);
+                            &conn,
+                            (pycbc_ResultBaseObject**)&res,
+                            RESTYPE_OPERATION,
+                            &mres);
     if (rv == 0) {
         res->rc = err;
-        maybe_push_operr(mres, res, err, 0);
+        maybe_push_operr(mres, (pycbc_ResultBaseObject*)res, err, 0);
     }
     CB_THR_BEGIN(conn);
 }
@@ -244,7 +274,7 @@ static void touch_callback(lcb_t isntance, const void *cookie,
 {
     int rv;
     pycbc_ConnectionObject *conn = NULL;
-    pycbc_ResultObject *res = NULL;
+    pycbc_OperationResultObject *res = NULL;
     pycbc_MultiResultObject *mres = NULL;
 
     rv = get_common_objects((PyObject*) cookie,
@@ -252,12 +282,13 @@ static void touch_callback(lcb_t isntance, const void *cookie,
                             resp->v.v0.nkey,
                             err,
                             &conn,
-                            &res,
+                            (pycbc_ResultBaseObject**)&res,
+                            RESTYPE_OPERATION,
                             &mres);
     if (rv == 0) {
         res->cas = resp->v.v0.cas;
         res->rc = err;
-        maybe_push_operr(mres, res, err, 1);
+        maybe_push_operr(mres, (pycbc_ResultBaseObject*)res, err, 1);
     }
 
     CB_THR_BEGIN(conn);
@@ -278,7 +309,8 @@ static void stat_callback(lcb_t instance,
 
     if (err != LCB_SUCCESS) {
         if (mres->errop == NULL) {
-            pycbc_ResultObject *res = (pycbc_ResultObject*)pycbc_result_new(mres->parent);
+            pycbc_ResultBaseObject *res =
+                    (pycbc_ResultBaseObject*)pycbc_result_new(mres->parent);
             res->rc = err;
             res->key = Py_None; Py_INCREF(res->key);
             maybe_push_operr(mres, res, err, 0);
