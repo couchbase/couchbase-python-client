@@ -230,13 +230,7 @@ keyop_common(pycbc_ConnectionObject *self,
 
     GT_DONE:
     pycbc_common_vars_free(&cv);
-
-    if (argopts & PYCBC_ARGOPT_SINGLE) {
-        if (mres && (void*)ret == (void*)mres) {
-            ret = pycbc_ret_to_single(mres);
-        }
-    }
-
+    ret = pycbc_make_retval(argopts, &ret, &mres);
     Py_XDECREF(mres);
 
     return ret;
@@ -322,7 +316,6 @@ pycbc_Connection__stats(pycbc_ConnectionObject *self, PyObject *args, PyObject *
 
 
     mres = (pycbc_MultiResultObject*)pycbc_multiresult_new(self);
-    Py_INCREF(mres);
 
     err = lcb_server_stats(self->instance, mres, ncmds, cv.cmdlist.stats);
     if (err != LCB_SUCCESS) {
@@ -343,6 +336,9 @@ pycbc_Connection__stats(pycbc_ConnectionObject *self, PyObject *args, PyObject *
 
     GT_DONE:
     pycbc_common_vars_free(&cv);
+
+    /* Force multi, it's always a MultiResult */
+    pycbc_make_retval(PYCBC_ARGOPT_MULTI, &ret, &mres);
     Py_XDECREF(mres);
     return ret;
 }

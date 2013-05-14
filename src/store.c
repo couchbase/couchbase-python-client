@@ -244,15 +244,9 @@ set_common(pycbc_ConnectionObject *self,
     }
 
 GT_DONE:
+    ret = pycbc_make_retval(argopts, &ret, &mres);
     pycbc_common_vars_free(&cv);
     Py_XDECREF(mres);
-
-    if (argopts & PYCBC_ARGOPT_SINGLE) {
-        if (mres && (void*)ret == (void*)mres) {
-            ret = pycbc_ret_to_single(mres);
-        }
-    }
-
     return ret;
 }
 

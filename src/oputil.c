@@ -175,14 +175,30 @@ int pycbc_maybe_set_quiet(pycbc_MultiResultObject *mres, PyObject *quiet)
     return 0;
 }
 
-PyObject* pycbc_ret_to_single(pycbc_MultiResultObject *mres)
+PyObject *pycbc_make_retval(int argopts,
+                            PyObject **ret,
+                            pycbc_MultiResultObject **mres)
 {
     Py_ssize_t dictpos = 0;
     PyObject *key, *value;
-    PyDict_Next((PyObject*)mres, &dictpos, &key, &value);
+
+    if (*ret == NULL || *mres == NULL) {
+        return NULL;
+    }
+
+    if (!(argopts & PYCBC_ARGOPT_SINGLE)) {
+        *ret = (PyObject*)*mres;
+        *mres = NULL;
+        return *ret;
+    }
+
+
+    PyDict_Next((PyObject*)*mres, &dictpos, &key, &value);
     Py_INCREF(value);
-    Py_DECREF(mres);
-    return value;
+    Py_DECREF(*mres);
+    *mres = NULL;
+    *ret = value;
+    return *ret;
 }
 
 
