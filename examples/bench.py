@@ -53,7 +53,7 @@ class Worker(Thread):
         self.delay = options.delay
         self.iterations = options.iterations
         self.key = 'K' * options.ksize
-        self.value = 'V' * options.vsize
+        self.value = b'V' * options.vsize
         self.wait_time = 0
         self.cb = Connection(bucket='default',
                         host=options.hostname,
