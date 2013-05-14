@@ -37,6 +37,7 @@ class ConnectionTest(CouchbaseTestCase):
         self.assertIsInstance(cb, Connection)
 
     def test_server_not_found(self):
+        self.slowTest()
         connargs = self.make_connargs()
         connargs['host'] = 'example.com'
         self.assertRaises(ConnectError, Connection, **connargs)
