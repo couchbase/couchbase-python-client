@@ -265,6 +265,8 @@ Attributes
 
     .. autoattribute:: timeout
 
+    .. autoattribute:: server_nodes
+
     .. attribute:: default_format
 
         Specify the default format (default: const:`~couchbase.FMT_JSON`)

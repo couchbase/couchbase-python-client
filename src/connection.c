@@ -55,6 +55,34 @@ Connection_set_format(pycbc_ConnectionObject *self, PyObject *value, void *unuse
     return 0;
 }
 
+static PyObject *
+Connection_server_nodes(pycbc_ConnectionObject *self, PyObject *value,
+                        void *unused)
+{
+    const char * const *cnodes;
+    const char **curnode;
+    PyObject *ret_list;
+    cnodes = lcb_get_server_list(self->instance);
+
+    if (!cnodes) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Can't get server nodes");
+        return NULL;
+    }
+
+    ret_list = PyList_New(0);
+    if (!ret_list) {
+        return NULL;
+    }
+
+    for (curnode = (const char**)cnodes; *curnode; curnode++) {
+        PyObject *tmpstr = pycbc_SimpleStringZ(*curnode);
+        PyList_Append(ret_list, tmpstr);
+        Py_DECREF(tmpstr);
+    }
+
+    return ret_list;
+}
+
 
 static PyGetSetDef Connection_getset[] = {
         { "timeout",
@@ -68,6 +96,11 @@ static PyGetSetDef Connection_getset[] = {
                 (setter)Connection_set_format,
                 "The default format to use for encoding values "
                 "(passed to transcoder)"
+        },
+        { "server_nodes",
+                (getter)Connection_server_nodes,
+                NULL,
+                "Get a list of the current nodes in the cluster"
         },
         { NULL }
 };
