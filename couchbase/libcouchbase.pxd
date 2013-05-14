@@ -68,7 +68,7 @@ cdef extern from "libcouchbase/couchbase.h":
     IF UNAME_SYSNAME == "Darwin":
         ctypedef long __darwin_time_t
     ELSE:
-       ctypedef long __time_t
+        ctypedef long __time_t
 
     ctypedef unsigned int __useconds_t
 
@@ -116,9 +116,9 @@ cdef extern from "libcouchbase/couchbase.h":
     # __time_t and that definition is not respected on OS X, which expects
     # __darwin_time_t. Fix that here:
     IF UNAME_SYSNAME == "Darwin":
-       ctypedef __darwin_time_t time_t
+        ctypedef __darwin_time_t time_t
     ELSE:
-       ctypedef __time_t time_t
+        ctypedef __time_t time_t
 
     ctypedef __clockid_t clockid_t
 
