@@ -30,17 +30,18 @@ class ConnectionAppendTest(CouchbaseTestCase):
         self.cb = self.make_connection()
 
     def test_append_prepend(self):
+        key = self.gen_key("appendprepend")
         vbase = "middle"
-        self.cb.set("append_key", vbase, format=FMT_UTF8)
-        self.cb.prepend("append_key", "begin ")
-        self.cb.append("append_key", " end")
-        self.assertEquals(self.cb.get("append_key").value,
+        self.cb.set(key, vbase, format=FMT_UTF8)
+        self.cb.prepend(key, "begin ")
+        self.cb.append(key, " end")
+        self.assertEquals(self.cb.get(key).value,
                           "begin middle end")
 
 
     def test_append_binary(self):
+        kname = self.gen_key("binary_append")
         initial = b'\x10'
-        kname = "binary_append"
         self.cb.set(kname, initial, format=FMT_BYTES)
         self.cb.append(kname, b'\x20', format=FMT_BYTES)
         self.cb.prepend(kname, b'\x00', format=FMT_BYTES)
@@ -49,22 +50,22 @@ class ConnectionAppendTest(CouchbaseTestCase):
         self.assertEqual(res.value, b'\x00\x10\x20')
 
     def test_append_nostr(self):
-        self.cb.set("key", "value")
-        rv = self.cb.append("key", "a_string")
+        key = self.gen_key("append_nostr")
+        self.cb.set(key, "value")
+        rv = self.cb.append(key, "a_string")
         self.assertTrue(rv.cas)
 
         self.assertRaises(ValueFormatError,
                           self.cb.append, "key", { "some" : "object" })
 
     def test_append_enoent(self):
-        self.cb.delete("key", quiet=True)
+        key = self.gen_key("append_enoent")
+        self.cb.delete(key, quiet=True)
         self.assertRaises(NotStoredError,
-                          self.cb.append,"key", "value")
+                          self.cb.append, key, "value")
 
     def test_append_multi(self):
-        kv = { }
-        for x in range(4):
-            kv["append_" + str(x)] = "middle_" + str(x)
+        kv = self.gen_kv_dict(amount=4, prefix="append_multi")
 
         self.cb.set_multi(kv, format=FMT_UTF8)
         self.cb.append_multi(kv)

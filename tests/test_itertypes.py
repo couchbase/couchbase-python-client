@@ -25,13 +25,8 @@ class ConnectionItertypeTest(CouchbaseTestCase):
         self.cb = self.make_connection()
 
     def test_itertypes(self):
-        kvs = {}
-        for x in range(10):
-            k = "key_" + str(x)
-            v = "value_" + str(x)
-            kvs[k] = v
-
-        intlist = set(["k1", "k2", "k3"])
+        kvs = self.gen_kv_dict(amount=10, prefix='itertypes')
+        intlist = set(self.gen_key_list(amount=3, prefix='setobject'))
 
         self.cb.delete_multi(kvs.keys(), quiet=True)
         self.cb.set_multi(kvs)
