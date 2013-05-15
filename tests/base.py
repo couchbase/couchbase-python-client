@@ -23,6 +23,7 @@ import unittest
 from nose.exc import SkipTest
 import types
 from couchbase.libcouchbase import Connection
+from couchbase.admin import Admin
 
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'tests.ini')
@@ -72,6 +73,9 @@ class CouchbaseTestCase(unittest.TestCase):
 
     def make_connection(self):
         return Connection(**self.make_connargs())
+
+    def make_admin_connection(self):
+        return Admin(self.username, self.password, self.host, self.port)
 
     def gen_key(self, prefix=None):
         if not prefix:

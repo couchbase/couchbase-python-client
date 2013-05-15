@@ -194,6 +194,8 @@ static PyMethodDef Connection_methods[] = {
         OPFUNC(decr_multi, NULL),
         OPFUNC(_stats, "Get various server statistics"),
 
+        OPFUNC(_http_request, "Internal routine for HTTP requests"),
+
 #undef OPFUNC
 
         { NULL, NULL, 0, NULL }
@@ -239,6 +241,7 @@ Connection__init__(pycbc_ConnectionObject *self,
                        PyObject *args, PyObject *kwargs)
 {
     int rv;
+    int conntype = LCB_TYPE_BUCKET;
     lcb_error_t err;
     char *conncache = NULL;
     PyObject *unlock_gil_O = NULL;
@@ -256,16 +259,17 @@ Connection__init__(pycbc_ConnectionObject *self,
 #define XCTOR_ARGS(X) \
     X("_errors", &self->errors, "O") \
     X("_flags", &self->flags, "I") \
-    X("bucket", &create_opts.v.v0.bucket, "z") \
-    X("username", &create_opts.v.v0.user, "z") \
-    X("password", &create_opts.v.v0.passwd, "z") \
-    X("host", &create_opts.v.v0.host, "z") \
+    X("bucket", &create_opts.v.v1.bucket, "z") \
+    X("username", &create_opts.v.v1.user, "z") \
+    X("password", &create_opts.v.v1.passwd, "z") \
+    X("host", &create_opts.v.v1.host, "z") \
     X("conncache", &conncache, "z") \
     X("quiet", &self->quiet, "I") \
     X("unlock_gil", &unlock_gil_O, "O") \
     X("transcoder", &self->tc, "O") \
     X("timeout", &timeout, "O") \
-    X("default_format", &self->dfl_fmt, "O")
+    X("default_format", &self->dfl_fmt, "O") \
+    X("_conntype", &conntype, "i")
 
     static char *kwlist[] = {
         #define X(s, target, type) s,
@@ -304,9 +308,18 @@ Connection__init__(pycbc_ConnectionObject *self,
 
     self->unlock_gil = (unlock_gil_O && PyObject_IsTrue(unlock_gil_O));
 
+    create_opts.version = 1;
+    create_opts.v.v1.type = conntype;
+
     Py_INCREF(self->errors);
 
     if (conncache) {
+        if (conntype != LCB_TYPE_BUCKET) {
+            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
+                           "Cannot use connection cache with "
+                           "management connection");
+            return -1;
+        }
         cached_config.cachefile = conncache;
         memcpy(&cached_config.createopt, &create_opts, sizeof(create_opts));
         err = lcb_create_compat(LCB_CACHED_CONFIG,

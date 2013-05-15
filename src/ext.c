@@ -104,6 +104,7 @@ init_libcouchbase(void)
     PyObject *mresult_type = NULL;
     PyObject *valresult_type = NULL;
     PyObject *opresult_type = NULL;
+    PyObject *htresult_type = NULL;
     PyObject *arg_type = NULL;
 
     if (pycbc_ConnectionType_init(&connection_type) < 0) {
@@ -123,6 +124,10 @@ init_libcouchbase(void)
     }
 
     if (pycbc_MultiResultType_init(&mresult_type) < 0) {
+        INITERROR;
+    }
+
+    if (pycbc_HttpResultType_init(&htresult_type) < 0) {
         INITERROR;
     }
 
@@ -150,6 +155,7 @@ init_libcouchbase(void)
     PyModule_AddObject(m, "ValueResult", valresult_type);
     PyModule_AddObject(m, "OperationResult", opresult_type);
     PyModule_AddObject(m, "MultiResult", mresult_type);
+    PyModule_AddObject(m, "HttpResult", htresult_type);
     PyModule_AddObject(m, "Arguments", arg_type);
 #endif /* PYCBC_CPYCHECKER */
 

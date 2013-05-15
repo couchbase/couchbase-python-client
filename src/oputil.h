@@ -315,4 +315,7 @@ PYCBC_DECL_OP(get_multi);
 PYCBC_DECL_OP(touch_multi);
 PYCBC_DECL_OP(lock_multi);
 
+/* http.c */
+PYCBC_DECL_OP(_http_request);
+
 #endif /* PYCBC_OPUTIL_H */

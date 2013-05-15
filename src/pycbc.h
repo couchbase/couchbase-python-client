@@ -245,6 +245,14 @@ typedef struct {
     lcb_uint32_t flags;
 } pycbc_ValueResultObject;
 
+typedef struct {
+    pycbc_Result_HEAD
+    PyObject *http_data;
+    pycbc_ConnectionObject *parent;
+    unsigned short htcode;
+    unsigned short format;
+} pycbc_HttpResultObject;
+
 /**
  * Object containing the result of a 'Multi' operation. It's the same as a
  * normal dict, except we add an 'all_ok' field, so a user doesn't need to
@@ -343,6 +351,7 @@ extern PyTypeObject pycbc_ResultBaseType;
 /* opresult.c */
 extern PyTypeObject pycbc_OperationResultType;
 extern PyTypeObject pycbc_ValueResultType;
+extern PyTypeObject pycbc_HttpResultType;
 
 /**
  * Result type check macros
@@ -438,6 +447,7 @@ int pycbc_MultiResultType_init(PyObject **ptr);
 int pycbc_ArgumentType_init(PyObject **ptr);
 int pycbc_ValueResultType_init(PyObject **ptr);
 int pycbc_OperationResultType_init(PyObject **ptr);
+int pycbc_HttpResultType_init(PyObject **ptr);
 
 
 /**
@@ -447,6 +457,7 @@ PyObject *pycbc_result_new(pycbc_ConnectionObject *parent);
 PyObject *pycbc_multiresult_new(pycbc_ConnectionObject *parent);
 pycbc_ValueResultObject *pycbc_valresult_new(pycbc_ConnectionObject *parent);
 pycbc_OperationResultObject *pycbc_opresult_new(pycbc_ConnectionObject *parent);
+pycbc_HttpResultObject *pycbc_httpresult_new(pycbc_ConnectionObject *parent);
 
 /**
  * Simple function, here because it's defined in result.c but needed in
@@ -575,5 +586,23 @@ int pycbc_tc_decode_value(pycbc_ConnectionObject *conn,
                            size_t nvalue,
                            lcb_uint32_t flags,
                            PyObject **pobj);
+
+
+
+/**
+ * Like encode_value, but only uses built-in encoders
+ */
+int pycbc_tc_simple_encode(PyObject **p,
+                           void *buf,
+                           size_t *nbuf,
+                           lcb_uint32_t flags);
+
+/**
+ * Like decode_value, but only uses built-in decoders
+ */
+int pycbc_tc_simple_decode(PyObject **vp,
+                           const char *buf,
+                           size_t nbuf,
+                           lcb_uint32_t flags);
 
 #endif /* PYCBC_H_ */

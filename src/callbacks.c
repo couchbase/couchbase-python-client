@@ -383,6 +383,44 @@ static void stat_callback(lcb_t instance,
     CB_THR_BEGIN(mres->parent);
 }
 
+
+/**
+ * This callback does things a bit differently.
+ * Instead of using a MultiResult, we use a single HttpResult object.
+ * We won't ever have "multiple" http objects.
+ */
+static void http_complete_callback(lcb_http_request_t req,
+                                   lcb_t instance,
+                                   const void *cookie,
+                                   lcb_error_t err,
+                                   const lcb_http_resp_t *resp)
+{
+    pycbc_HttpResultObject *htres = (pycbc_HttpResultObject*)cookie;
+    htres->rc = err;
+    htres->htcode = resp->v.v0.status;
+
+    CB_THR_END(htres->parent);
+
+    if (resp->v.v0.nbytes) {
+        pycbc_tc_simple_decode(&htres->http_data,
+                               resp->v.v0.bytes,
+                               resp->v.v0.nbytes,
+                               htres->format);
+        if (!htres->http_data) {
+            PyErr_Clear();
+            htres->http_data = PyBytes_FromStringAndSize(resp->v.v0.bytes,
+                                                         resp->v.v0.nbytes);
+        }
+
+    } else {
+        htres->http_data = Py_None;
+        Py_INCREF(Py_None);
+    }
+
+    CB_THR_BEGIN(htres->parent);
+
+}
+
 static void error_callback(lcb_t instance, lcb_error_t err, const char *msg)
 {
     PyObject *errtuple;
@@ -415,4 +453,5 @@ void pycbc_callbacks_init(lcb_t instance)
     lcb_set_remove_callback(instance, delete_callback);
     lcb_set_stat_callback(instance, stat_callback);
     lcb_set_error_callback(instance, error_callback);
+    lcb_set_http_complete_callback(instance, http_complete_callback);
 }

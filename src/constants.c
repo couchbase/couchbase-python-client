@@ -50,6 +50,13 @@
     X(INVALID_HOST_FORMAT) \
     X(INVALID_CHAR)
 
+#define XHTTP(X) \
+    X(HTTP_METHOD_GET) \
+    X(HTTP_METHOD_POST) \
+    X(HTTP_METHOD_PUT) \
+    X(HTTP_METHOD_DELETE)
+
+
 
 #define XSTORAGE(X) \
     X(ADD) \
@@ -64,6 +71,7 @@ void pycbc_init_pyconstants(PyObject *module)
     PyModule_AddIntMacro(module, LCB_##b);
     XERR(X);
     XSTORAGE(X);
+    XHTTP(X);
 #undef X
 
     PyModule_AddIntMacro(module, PYCBC_CMD_GET);
@@ -76,6 +84,11 @@ void pycbc_init_pyconstants(PyObject *module)
     PyModule_AddIntMacro(module, PYCBC_EXC_ARGUMENTS);
     PyModule_AddIntMacro(module, PYCBC_EXC_ENCODING);
     PyModule_AddIntMacro(module, PYCBC_EXC_LCBERR);
+
+    PyModule_AddIntMacro(module, LCB_TYPE_BUCKET);
+    PyModule_AddIntMacro(module, LCB_TYPE_CLUSTER);
+    PyModule_AddIntMacro(module, LCB_HTTP_TYPE_VIEW);
+    PyModule_AddIntMacro(module, LCB_HTTP_TYPE_MANAGEMENT);
 
     PyModule_AddIntConstant(module, "FMT_JSON", PYCBC_FMT_JSON);
     PyModule_AddIntConstant(module, "FMT_BYTES", PYCBC_FMT_BYTES);

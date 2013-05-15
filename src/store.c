@@ -228,6 +228,7 @@ set_common(pycbc_ConnectionObject *self,
 
     err = lcb_store(self->instance, mres, ncmds, cv.cmdlist.store);
     if (err != LCB_SUCCESS) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't schedule command");
         goto GT_DONE;
     }
 
@@ -236,6 +237,7 @@ set_common(pycbc_ConnectionObject *self,
     PYCBC_CONN_THR_END(self);
 
     if (err != LCB_SUCCESS) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't wait");
         goto GT_DONE;
     }
 

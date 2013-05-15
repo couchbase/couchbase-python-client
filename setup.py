@@ -54,7 +54,9 @@ SOURCEMODS = (
         'numutil',
         'oputil',
         'get',
-        'arithmetic'
+        'arithmetic',
+        'http',
+        'htresult'
         )
 
 extoptions['sources'] = [ os.path.join("src", m + ".c") for m in SOURCEMODS ]
