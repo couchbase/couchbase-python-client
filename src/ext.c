@@ -31,13 +31,13 @@ static PyObject *_libcouchbase_init_helpers(PyObject *self, PyObject *args, PyOb
     if (!pycbc_helpers.n) { \
         PyErr_SetString(PyExc_EnvironmentError, "Can't find " #n); \
         return NULL; \
-    }
+    } \
 
     PYCBC_XHELPERS(X);
 #undef X
 
 #define X(n) \
-    Py_INCREF(pycbc_helpers.n);
+    Py_XINCREF(pycbc_helpers.n);
     PYCBC_XHELPERS(X)
 #undef X
 
@@ -96,13 +96,15 @@ PyMODINIT_FUNC
 init_libcouchbase(void)
 #endif
 {
-    PyObject *m;
-    PyObject *result_type;
-    PyObject *connection_type;
-    PyObject *mresult_type;
-    PyObject *valresult_type;
-    PyObject *opresult_type;
-    PyObject *arg_type;
+    PyObject *m = NULL;
+
+#ifndef PYCBC_CPYCHECKER
+    PyObject *result_type = NULL;
+    PyObject *connection_type = NULL;
+    PyObject *mresult_type = NULL;
+    PyObject *valresult_type = NULL;
+    PyObject *opresult_type = NULL;
+    PyObject *arg_type = NULL;
 
     if (pycbc_ConnectionType_init(&connection_type) < 0) {
         INITERROR;
@@ -127,6 +129,7 @@ init_libcouchbase(void)
     if (pycbc_ArgumentType_init(&arg_type) < 0) {
         INITERROR;
     }
+#endif /* PYCBC_CPYCHECKER */
 
 #if PY_MAJOR_VERSION >= 3
     moduledef.m_methods = _libcouchbase_methods;
@@ -138,6 +141,7 @@ init_libcouchbase(void)
         INITERROR;
     }
 
+#ifndef PYCBC_CPYCHECKER
     /**
      * Add the type:
      */
@@ -147,6 +151,7 @@ init_libcouchbase(void)
     PyModule_AddObject(m, "OperationResult", opresult_type);
     PyModule_AddObject(m, "MultiResult", mresult_type);
     PyModule_AddObject(m, "Arguments", arg_type);
+#endif /* PYCBC_CPYCHECKER */
 
     pycbc_init_pyconstants(m);
 

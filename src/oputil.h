@@ -205,9 +205,10 @@ PyObject *pycbc_oputil_iter_prepare(pycbc_seqtype_t seqtype,
  * @param dictpos the dictionary position variable initialized by 'iter_prepare'
  * @param ii the current position (should be incremented by used by one for
  * each iteration)
- * @param key the key for the current iteration
+ * @param key the key for the current iteration. This is populated with a
+ * new reference.
  * @param value the value for the current iteration. If the sequence is not
- * a dictionary, this is always NULL.
+ * a dictionary, this is always NULL. This is populated with a new referenced
  * @return 0 on success, -1 on failure (with a CouchbaseError set)
  */
 int pycbc_oputil_sequence_next(pycbc_seqtype_t seqtype,

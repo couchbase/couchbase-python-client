@@ -82,6 +82,8 @@ void pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p)
 
     ctor_args = Py_BuildValue("(O)", excparams);
     excinstance = PyObject_CallObject(excls, ctor_args);
+    Py_XDECREF(ctor_args);
+    Py_XDECREF(excparams);
 
     if (!excinstance) {
         fprintf(stderr, "Warning. Problems in exception constructor\n");
@@ -90,4 +92,5 @@ void pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p)
         Py_INCREF(Py_TYPE(excinstance));
         PyErr_Restore((PyObject*)Py_TYPE(excinstance), excinstance, traceback);
     }
+    assert(Py_REFCNT(excinstance) == 1);
 }

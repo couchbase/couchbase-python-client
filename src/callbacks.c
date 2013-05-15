@@ -36,25 +36,40 @@ enum {
 static PyObject *make_error_tuple(void)
 {
     PyObject *type, *value, *traceback;
+    PyObject *ret;
+
     assert(PyErr_Occurred());
+
     PyErr_Fetch(&type, &value, &traceback);
+    PyErr_Clear();
 
     if (value == NULL) {
         value = Py_None; Py_INCREF(value);
     }
+    if (traceback == NULL) {
+        traceback = Py_None; Py_INCREF(traceback);
+    }
 
-    return PyTuple_Pack(3, type, value, traceback);
+    ret = PyTuple_New(3);
+    /** Steal references from PyErr_Fetch() */
+    PyTuple_SET_ITEM(ret, 0, type);
+    PyTuple_SET_ITEM(ret, 1, value);
+    PyTuple_SET_ITEM(ret, 2, traceback);
+
+    return ret;
 }
 
 static void push_fatal_error(pycbc_MultiResultObject* mres)
 {
+    PyObject *etuple;
     mres->all_ok = 0;
     if (!mres->exceptions) {
         mres->exceptions = PyList_New(0);
     }
 
-    PyList_Append(mres->exceptions, make_error_tuple());
-    PyErr_Clear();
+    etuple = make_error_tuple();
+    PyList_Append(mres->exceptions, etuple);
+    Py_DECREF(etuple);
 }
 
 static void maybe_push_operr(pycbc_MultiResultObject *mres,

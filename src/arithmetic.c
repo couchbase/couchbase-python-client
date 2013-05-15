@@ -170,7 +170,7 @@ arithmetic_common(pycbc_ConnectionObject *self,
         }
 
         for (ii = 0; ii < ncmds; ii++) {
-            PyObject *curkey, *curvalue;
+            PyObject *curkey = NULL, *curvalue = NULL;
             rv = pycbc_oputil_sequence_next(seqtype, curseq, &dictpos, ii,
                                             &curkey, &curvalue);
             if (rv < 0) {
@@ -184,6 +184,9 @@ arithmetic_common(pycbc_ConnectionObject *self,
                                      ii,
                                      optype,
                                      &cv);
+
+            Py_XDECREF(curkey);
+            Py_XDECREF(curvalue);
             if (rv < 0) {
                 goto GT_DONE;
             }
