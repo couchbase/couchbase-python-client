@@ -1,6 +1,23 @@
 # Initialize distribute
 import distribute_setup
-distribute_setup.use_setuptools()
+# Assume they're using a virtual env, and force installation if so -- this is
+# something of a hack but distribute is a Good Thing anyway so don't quibble
+# for now
+try:
+    import sys
+    import os
+    _virtual_env = os.environ.get('VIRTUAL_ENV', "__NONE__")
+    _lib_path = [p for p in sys.path if p.startswith(_virtual_env) and not
+                 (p.endswith('egg') or p.endswith('egg-info'))]
+    # now _lib_path should be a site-packages or similar directory
+    _to_dir = _lib_path[0]
+    _no_fake = True
+except:
+    _to_dir = os.curdir
+    _no_fake = False
+
+distribute_setup.use_setuptools(no_fake=_no_fake, to_dir=_to_dir)
+
 # Now use `setuptools`, which should be wrapped by distribute
 from setuptools import setup
 from setuptools import Extension
