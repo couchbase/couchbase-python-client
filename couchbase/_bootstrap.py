@@ -61,13 +61,16 @@ def _result__repr__(self):
     ret += ">"
     return ret
 
+def _json_encode_wrapper(*args):
+    return json.dumps(*args, ensure_ascii=False)
+
 C._init_helpers(
                 result_reprfunc = _result__repr__,
                 fmt_utf8_flags = C.FMT_UTF8,
                 fmt_bytes_flags = C.FMT_BYTES,
                 pickle_encode = pickle.dumps,
                 pickle_decode = pickle.loads,
-                json_encode = json.dumps,
+                json_encode = _json_encode_wrapper,
                 json_decode = json.loads,
                 lcb_errno_map = E._LCB_ERRNO_MAP,
                 misc_errno_map = E._EXCTYPE_MAP,

@@ -48,6 +48,21 @@ class ConnectionEncodingTest(CouchbaseTestCase):
         self.assertEqual(rv.value, uc)
         self.assertEqual(rv.key, uc)
 
+    def test_json_compact(self):
+        # This ensures our JSON encoder doesn't store huge blobs of data in the
+        # server. This was added as a result of PYCBC-108
+        self.assertEqual(self.cb.default_format, FMT_JSON)
+        uc = BLOB_ORIG.decode('utf-16')
+        key = self.gen_key('json_compact')
+        self.cb.set(key, uc, format=FMT_JSON)
+        self.cb.data_passthrough = 1
+        rv = self.cb.get(key)
+
+        expected = '"'.encode('utf-8') + uc.encode('utf-8') + '"'.encode('utf-8')
+        self.assertEqual(expected, rv.value)
+
+        self.cb.data_passthrough = 0
+
     def test_blob(self):
         blob = b'\x00\x01\x00\xfe\xff\x01\x42'
         for f in (FMT_BYTES, FMT_PICKLE):
