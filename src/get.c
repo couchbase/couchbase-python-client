@@ -230,6 +230,7 @@ get_common(pycbc_ConnectionObject *self,
     }
 
     if (err != LCB_SUCCESS) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't schedule command");
         goto GT_DONE;
     }
 
@@ -241,6 +242,8 @@ get_common(pycbc_ConnectionObject *self,
         if (!pycbc_multiresult_maybe_raise(mres)) {
             ret = (PyObject*)mres;
         }
+    } else {
+        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't wait");
     }
 
 GT_DONE:

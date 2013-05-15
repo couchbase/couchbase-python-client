@@ -28,3 +28,10 @@ This object is returned by multi-key operations
 .. autoclass:: couchbase.libcouchbase.MultiResult
    :members:
    :no-inherited-members:
+
+This object is returned by generic HTTP operations
+
+.. autoclass:: couchbase.libcouchbase.HttpResult
+    :show-inheritance:
+    :members:
+    :no-inherited-members:

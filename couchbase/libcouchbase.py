@@ -21,7 +21,7 @@ from couchbase.exceptions import *
 import couchbase.exceptions as exceptions
 
 from couchbase._libcouchbase import (
-    Result, ValueResult, OperationResult, MultiResult, Arguments,
+    Result, ValueResult, OperationResult, MultiResult, HttpResult, Arguments,
     FMT_JSON, FMT_PICKLE, FMT_BYTES, FMT_UTF8, FMT_MASK)
 
 

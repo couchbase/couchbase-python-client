@@ -221,6 +221,22 @@ static int decode_common(PyObject **vp,
     return 0;
 }
 
+int pycbc_tc_simple_encode(PyObject **p,
+                           void *buf,
+                           size_t *nbuf,
+                           lcb_uint32_t flags)
+{
+    return encode_common(p, buf, nbuf, flags);
+}
+
+int pycbc_tc_simple_decode(PyObject **vp,
+                           const char *buf,
+                           size_t nbuf,
+                           lcb_uint32_t flags)
+{
+    return decode_common(vp, buf, nbuf, flags);
+}
+
 int pycbc_tc_encode_key(pycbc_ConnectionObject *conn,
                         PyObject **key,
                         void **buf,
