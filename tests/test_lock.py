@@ -29,7 +29,7 @@ class ConnectionLockTest(CouchbaseTestCase):
         self.cb = self.make_connection()
 
     def test_simple_lock(self):
-        k = "locked_key"
+        k = self.gen_key('lock')
         v = "locked_value"
         self.cb.set(k, v)
         rv = self.cb.lock(k, ttl=5)
@@ -60,7 +60,7 @@ class ConnectionLockTest(CouchbaseTestCase):
     def test_timed_lock(self):
         self.slowTest()
 
-        k = "locked_key"
+        k = self.gen_key('lock')
         v = "locked_value"
         self.cb.set(k, v)
         rv = self.cb.lock(k, ttl=1)
@@ -68,11 +68,7 @@ class ConnectionLockTest(CouchbaseTestCase):
         self.cb.set(k, v)
 
     def test_multi_lock(self):
-        kvs = {}
-        for x in range(5):
-            k = "key_" + str(x)
-            v = "val_ " + str(k)
-            kvs[k] = v
+        kvs = self.gen_kv_dict(prefix='lock_multi')
 
         self.cb.set_multi(kvs)
         rvs = self.cb.lock_multi(kvs.keys(), ttl=5)
@@ -84,7 +80,7 @@ class ConnectionLockTest(CouchbaseTestCase):
         rvs = self.cb.unlock_multi(rvs)
 
     def test_unlock_multi(self):
-        key = "lock_key"
+        key = self.gen_key(prefix='unlock_multi')
         val = "lock_value"
         self.cb.set(key, val)
 

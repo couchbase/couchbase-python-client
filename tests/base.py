@@ -50,6 +50,8 @@ class CouchbaseTestCase(unittest.TestCase):
 
         self.nosleep = os.environ.get('PYCBC_TESTS_NOSLEEP', False)
 
+        self._key_counter = 0
+
     def tearDown(self):
         pass
 
@@ -70,3 +72,22 @@ class CouchbaseTestCase(unittest.TestCase):
 
     def make_connection(self):
         return Connection(**self.make_connargs())
+
+    def gen_key(self, prefix=None):
+        if not prefix:
+            prefix = "python-couchbase-key_"
+
+        ret = "{0}{1}".format(prefix, self._key_counter)
+        self._key_counter += 1
+        return ret
+
+    def gen_key_list(self, amount=5, prefix=None):
+        ret = [ self.gen_key(prefix) for x in range(amount) ]
+        return ret
+
+    def gen_kv_dict(self, amount=5, prefix=None):
+        ret = {}
+        keys = self.gen_key_list(amount=amount, prefix=prefix)
+        for k in keys:
+            ret[k] = "Value_For_" + k
+        return ret

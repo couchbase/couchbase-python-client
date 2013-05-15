@@ -31,10 +31,11 @@ class ConnectionItemSyntaxTest(CouchbaseTestCase):
     def test_simple_accessors(self):
         cb = self.cb
         cb.quiet = True
+        k = self.gen_key('__getitem__')
 
-        del cb['foo']
-        cb['foo'] = "bar"
-        self.assertEqual(cb['foo'].value, 'bar')
+        del cb[k]
+        cb[k] = "bar"
+        self.assertEqual(cb[k].value, 'bar')
 
         del cb['blah']
 

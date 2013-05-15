@@ -36,14 +36,15 @@ class ConnectionGetTest(CouchbaseTestCase):
         self.cb = self.make_connection()
 
     def test_trivial_get(self):
-        self.cb.set('key_trivial1', 'value1')
-        rv = self.cb.get('key_trivial1')
+        key = self.gen_key('trivial_get')
+        self.cb.set(key, 'value1')
+        rv = self.cb.get(key)
         self.assertEqual(rv.value, 'value1')
 
-        rvs = self.cb.get_multi(['key_trivial1'])
+        rvs = self.cb.get_multi([key])
         self.assertEqual(type(rvs), MultiResult)
         self.assertEqual(len(rvs), 1)
-        self.assertEqual(rvs['key_trivial1'].value, 'value1')
+        self.assertEqual(rvs[key].value, 'value1')
 
 
     def test_get_missing_key(self):
@@ -56,27 +57,24 @@ class ConnectionGetTest(CouchbaseTestCase):
                           quiet=False)
 
     def test_multi_get(self):
-        kv = {'key_multi1': 'value1', 'key_multi3': 'value3',
-                          'key_multi2': 'value2'}
+        kv = self.gen_kv_dict(amount=3, prefix='get_multi')
         rvs = self.cb.set_multi(kv)
         self.assertTrue(rvs.all_ok)
 
-        rvs1 = self.cb.get_multi(['key_multi2', 'key_multi3'])
-        self.assertEqual(len(rvs1), 2)
-        self.assertEqual(rvs1['key_multi2'].value, 'value2')
-        self.assertEqual(rvs1['key_multi3'].value, 'value3')
+        k_subset = list(kv.keys())[:2]
 
-        rv2 = self.cb.get_multi(['key_multi3', 'key_multi1', 'key_multi2'])
+        rvs1 = self.cb.get_multi(k_subset)
+        self.assertEqual(len(rvs1), 2)
+        self.assertEqual(rvs1[k_subset[0]].value, kv[k_subset[0]])
+        self.assertEqual(rvs1[k_subset[1]].value, kv[k_subset[1]])
+
+        rv2 = self.cb.get_multi(kv.keys())
         self.assertEqual(rv2.keys(), kv.keys())
 
 
     def test_multi_mixed(self):
-        kv_missing = { }
-        kv_existing = { }
-
-        for x in range(3):
-            kv_missing["missing_key_" + str(x)] = "missing_value_" + str(x)
-            kv_existing["existing_key_" + str(x)] = "existing_Value_" + str(x)
+        kv_missing = self.gen_kv_dict(amount=3, prefix='multi_missing_mixed')
+        kv_existing = self.gen_kv_dict(amount=3, prefix='multi_existing_mixed')
 
         self.cb.delete_multi(list(kv_missing.keys()) + list(kv_existing.keys()),
                              quiet=True)
@@ -161,34 +159,38 @@ class ConnectionGetTest(CouchbaseTestCase):
                           format=FMT_JSON)
 
     def test_extended_get(self):
-        orig_cas1 = self.cb.set('key_extended1', 'value1').cas
-        rv = self.cb.get('key_extended1')
+        key = self.gen_key(prefix='key_extended')
+        orig_cas1 = self.cb.set(key, 'value1').cas
+        rv = self.cb.get(key)
         val1, flags1, cas1 = rv.value, rv.flags, rv.cas
         self.assertEqual(val1, 'value1')
         self.assertEqual(flags1, 0x0)
         self.assertEqual(cas1, orig_cas1)
 
         # Test named tuples
-        result1 = self.cb.get('key_extended1')
+        result1 = self.cb.get(key)
         self.assertEqual(result1.value, 'value1')
         self.assertEqual(result1.flags, 0x0)
         self.assertEqual(result1.cas, orig_cas1)
 
         # Single get as array
-        result2 = self.cb.get_multi(['key_extended1'])
+        result2 = self.cb.get_multi([key])
         self.assertEqual(type(result2), MultiResult)
-        self.assertTrue('key_extended1' in result2)
-        self.assertEqual(result2['key_extended1'].value, 'value1')
-        self.assertEqual(result2['key_extended1'].flags, 0x0)
-        self.assertEqual(result2['key_extended1'].cas, orig_cas1)
+        self.assertTrue(key in result2)
+        self.assertEqual(result2[key].value, 'value1')
+        self.assertEqual(result2[key].flags, 0x0)
+        self.assertEqual(result2[key].cas, orig_cas1)
 
-        cas2 = self.cb.set('key_extended2', 'value2').cas
-        cas3 = self.cb.set('key_extended3', 'value3').cas
-        results = self.cb.get_multi(['key_extended2', 'key_extended3'])
+        key2 = self.gen_key('key_extended_2')
+        cas2 = self.cb.set(key2, 'value2').cas
 
-        self.assertEqual(results['key_extended3'].value, 'value3')
-        self.assertEqual(results['key_extended3'].flags, 0x0)
-        self.assertEqual(results['key_extended3'].cas, cas3)
+        key3 = self.gen_key('key_extended_3')
+        cas3 = self.cb.set(key3, 'value3').cas
+        results = self.cb.get_multi([key2, key3])
+
+        self.assertEqual(results[key3].value, 'value3')
+        self.assertEqual(results[key3].flags, 0x0)
+        self.assertEqual(results[key3].cas, cas3)
 
         rv = self.cb.get('missing_key', quiet=True)
         val4, flags4, cas4 = rv.value, rv.flags, rv.cas
@@ -198,20 +200,20 @@ class ConnectionGetTest(CouchbaseTestCase):
 
     def test_get_ttl(self):
         self.slowTest()
-
-        self.cb.delete("key", quiet=True)
-        self.cb.set("ttl_key", "a_value")
-        rv = self.cb.get("ttl_key", ttl=1)
+        key = self.gen_key('get_ttl')
+        self.cb.delete(key, quiet=True)
+        self.cb.set(key, "a_value")
+        rv = self.cb.get(key, ttl=1)
         self.assertEqual(rv.value, "a_value")
         sleep(2)
-        rv = self.cb.get("ttl_key", quiet=True)
+        rv = self.cb.get(key, quiet=True)
         self.assertFalse(rv.success)
         self.assertEqual(NotFoundError, CouchbaseError.rc_to_exctype(rv.rc))
 
     def test_get_multi_ttl(self):
         self.slowTest()
+        kvs = self.gen_kv_dict(amount=2, prefix='get_multi_ttl')
 
-        kvs = { "ttlkey_1" : "ttlvalue_1", "ttlkey_2" : "ttlvalue_2" }
         self.cb.set_multi(kvs)
         rvs = self.cb.get_multi(list(kvs.keys()), ttl=1)
         for k, v in rvs.items():
