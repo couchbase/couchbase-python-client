@@ -26,17 +26,23 @@ def _result__repr__(self):
     if self.rc != 0:
         errdesc = "[{0}]".format(self.errstr)
 
-    return ("{cls}<"
-            "RC=0x{rc:x}{errdesc}, "
-            "Value={val}, "
-            "Flags=0x{flags:x}, "
-            "CAS=0x{cas:x}"
-            ">").format(rc = self.rc,
-                        val = self.value,
-                        flags = self.flags,
-                        cas = self.cas,
-                        errdesc = errdesc,
-                        cls=self.__class__.__name__)
+    ret = "{cls}<".format(cls = self.__class__.__name__)
+    ret += "RC=0x{rc:x}{errdesc}".format(rc=self.rc, errdesc=errdesc)
+
+    if hasattr(self, 'key'):
+        ret += ", Key={0}".format(self.key)
+
+    if hasattr(self, 'value'):
+        ret += ", Value={0}".format(repr(self.value))
+
+    if hasattr(self, 'cas'):
+        ret += ", CAS=0x{cas:x}".format(cas=self.cas)
+
+    if hasattr(self, 'flags'):
+        ret += ", Flags=0x{flags:x}".format(flags=self.flags)
+
+    ret += ">"
+    return ret
 
 C._init_helpers(
                 result_reprfunc = _result__repr__,
