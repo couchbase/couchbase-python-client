@@ -3,6 +3,6 @@ recursive-include couchbase *.py
 recursive-include src *.c *.h
 recursive-include docs *
 recursive-exclude docs/build *
-recursive-include tests *.py *.ini
+recursive-include tests *.py *.sample
 recursive-include examples *.py
 exclude MANIFEST.in

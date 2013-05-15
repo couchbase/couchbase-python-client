@@ -60,8 +60,10 @@ The HTML output can be found in `docs/build/html/`.
 Running tests
 -------------
 
-The tests need a running Couchbase instance. The values to connect to the
-instance can be found in the test configuration file `tests/tests.ini`.
+The tests need a running Couchbase instance. For this, a `tests/tests.ini`
+file must be present, containing various connection parameters.
+ An example of this file may be found in `tests/tests.ini.sample`.
+You may copy this file to `tests/tests.ini` and modify the values as needed.
 
 The test suite need several buckets which need to be created before the tests
 are run. They will all have the common prefix as specified in the test
