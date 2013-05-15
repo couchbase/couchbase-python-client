@@ -15,3 +15,4 @@ couchbase/__pycache__
 *.pyd
 *.dll
 *.exe
+tests/tests.ini
