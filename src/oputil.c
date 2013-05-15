@@ -236,16 +236,19 @@ pycbc_oputil_sequence_next(pycbc_seqtype_t seqtype,
         if (rv < 0) {
             PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Couldn't iterate");
         }
+
+        Py_XINCREF(*key);
+        Py_XINCREF(*value);
         return 0;
     }
 
     *value = NULL;
     if (seqtype == PYCBC_SEQTYPE_LIST) {
         *key = PyList_GET_ITEM(seqobj, ii);
-
+        Py_INCREF(*key);
     } else if (seqtype == PYCBC_SEQTYPE_TUPLE) {
         *key = PyTuple_GET_ITEM(seqobj, ii);
-
+        Py_INCREF(*key);
     } else {
         *key = PyIter_Next(seqobj);
         if (!*key) {

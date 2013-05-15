@@ -123,16 +123,23 @@ int pycbc_multiresult_maybe_raise(pycbc_MultiResultObject *self)
         assert(tuple);
         assert(PyTuple_Size(tuple) == 3);
 
-        type = PyTuple_GetItem(tuple, 0); Py_INCREF(type);
-        value = PyTuple_GetItem(tuple, 1); Py_INCREF(value);
-        traceback = PyTuple_GetItem(tuple, 2); Py_INCREF(traceback);
-
+        type = PyTuple_GetItem(tuple, 0);
+        value = PyTuple_GetItem(tuple, 1);
+        traceback = PyTuple_GetItem(tuple, 2);
         PyErr_NormalizeException(&type, &value, &traceback);
+        Py_XINCREF(type);
+        Py_XINCREF(value);
+        Py_XINCREF(traceback);
+
+        assert(PyObject_IsInstance(value, pycbc_helpers.default_exception));
 
     } else {
         pycbc_ResultBaseObject *res = (pycbc_ResultBaseObject*)self->errop;
+
         /** Craft an exception based on the operation */
         PYCBC_EXC_WRAP_KEY(PYCBC_EXC_LCBERR, res->rc, "Operational Error", res->key);
+
+        /** Now we have an exception. Let's fetch it back */
         PyErr_Fetch(&type, &value, &traceback);
         PyObject_SetAttrString(value, "result", (PyObject*)res);
     }

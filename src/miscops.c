@@ -164,7 +164,7 @@ keyop_common(pycbc_ConnectionObject *self,
         }
 
         for (ii = 0; ii < ncmds; ii++) {
-            PyObject *curkey, *curvalue;
+            PyObject *curkey = NULL, *curvalue = NULL;
 
             rv = pycbc_oputil_sequence_next(seqtype,
                                             curseq,
@@ -177,6 +177,10 @@ keyop_common(pycbc_ConnectionObject *self,
             }
 
             rv = handle_single_keyop(self, curkey, curvalue, ii, optype, &cv);
+
+            Py_XDECREF(curkey);
+            Py_XDECREF(curvalue);
+
             if (rv < 0) {
                 goto GT_ITER_DONE;
             }
@@ -197,7 +201,6 @@ keyop_common(pycbc_ConnectionObject *self,
     }
 
     mres = (pycbc_MultiResultObject*)pycbc_multiresult_new(self);
-    Py_INCREF(mres);
 
 
     if (optype == PYCBC_CMD_DELETE) {

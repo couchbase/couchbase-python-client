@@ -72,6 +72,10 @@ PyObject *pycbc_maybe_convert_to_int(PyObject *o)
     PyObject *args, *result;
     args = Py_BuildValue("(O)", o);
 
+    if (!args) {
+        return NULL;
+    }
+
 #if PY_MAJOR_VERSION == 2
     result = PyObject_CallObject((PyObject*)&PyInt_Type, args);
     if (result) {
