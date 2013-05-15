@@ -238,21 +238,6 @@ static int
 Connection__init__(pycbc_ConnectionObject *self,
                        PyObject *args, PyObject *kwargs)
 {
-    static char *kwlist[] = {
-            /** Private  parameters */
-            "_errors", "_flags",
-
-            /** Public: Required */
-            "bucket",
-
-            /** Public: Optional */
-            "username", "password", "host", "conncache",
-
-            "quiet", "unlock_gil", "transcoder", "timeout",
-            "default_format",
-            NULL
-    };
-
     int rv;
     lcb_error_t err;
     char *conncache = NULL;
@@ -262,6 +247,38 @@ Connection__init__(pycbc_ConnectionObject *self,
     struct lcb_create_st create_opts = { 0 };
     struct lcb_cached_config_st cached_config = { { 0 } };
 
+
+    /**
+     * This xmacro enumerates the constructor keywords, targets, and types.
+     * This was converted into an xmacro to ease the process of adding or
+     * removing various parameters.
+     */
+#define XCTOR_ARGS(X) \
+    X("_errors", &self->errors, "O") \
+    X("_flags", &self->flags, "I") \
+    X("bucket", &create_opts.v.v0.bucket, "z") \
+    X("username", &create_opts.v.v0.user, "z") \
+    X("password", &create_opts.v.v0.passwd, "z") \
+    X("host", &create_opts.v.v0.host, "z") \
+    X("conncache", &conncache, "z") \
+    X("quiet", &self->quiet, "I") \
+    X("unlock_gil", &unlock_gil_O, "O") \
+    X("transcoder", &self->tc, "O") \
+    X("timeout", &timeout, "O") \
+    X("default_format", &self->dfl_fmt, "O")
+
+    static char *kwlist[] = {
+        #define X(s, target, type) s,
+            XCTOR_ARGS(X)
+        #undef X
+
+            NULL
+    };
+
+    #define X(s, target, type) type
+    static char *argspec = "|" XCTOR_ARGS(X);
+    #undef X
+
     if (self->init_called) {
         PyErr_SetString(PyExc_RuntimeError, "__init__ was already called");
         return -1;
@@ -270,32 +287,14 @@ Connection__init__(pycbc_ConnectionObject *self,
     self->init_called = 1;
     self->flags = 0;
 
+    #define X(s, target, type) target,
     rv = PyArg_ParseTupleAndKeywords(args,
                                      kwargs,
-                                     "OIs|"
-                                     "zzzz"
-                                     "I"
-                                     "OOOO",
+                                     argspec,
                                      kwlist,
-                                     /* Required */
-                                     &self->errors,
-                                     &self->flags,
-                                     &create_opts.v.v0.bucket,
+                                     XCTOR_ARGS(X) NULL);
+    #undef X
 
-                                     /* Optional, String */
-                                     &create_opts.v.v0.user,
-                                     &create_opts.v.v0.passwd,
-                                     &create_opts.v.v0.host,
-                                     &conncache,
-
-                                     /** Optional, Boolean */
-                                     &self->quiet,
-
-                                     /** Optional, PyObject */
-                                     &unlock_gil_O,
-                                     &self->tc,
-                                     &timeout,
-                                     &self->dfl_fmt);
     if (!rv) {
         PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS,
                        0,
