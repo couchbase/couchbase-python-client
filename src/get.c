@@ -58,6 +58,10 @@ static int handle_single_key(pycbc_ConnectionObject *self,
         } else {
             ttl = pycbc_IntAsUL(curval);
             if (ttl == -1 && PyErr_Occurred()) {
+                PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS,
+                                   0,
+                                   "Couldn't convert TTL",
+                                   curval);
                 return -1;
             }
         }

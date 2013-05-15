@@ -98,6 +98,15 @@ class ConnectionBadArgsTest(CouchbaseTestCase):
         _set_quiet(True)
         _set_quiet(False)
 
+    def test_badargs_get(self):
+        self.assertRaises(ArgumentError, self.cb.get_multi,
+                          {"key" : "string"})
+        self.assertRaises(ArgumentError, self.cb.get_multi,
+                          { "key" : object()} )
+        self.assertRaises(ArgumentError, self.cb.get, "string", ttl="string")
+        self.assertRaises(ArgumentError, self.cb.lock, "string", ttl="string")
+        self.assertRaises(ArgumentError, self.cb.get, "string", ttl=object())
+
     def test_bad_default_format(self):
         def _set_fmt(x):
             self.cb.default_format = x
