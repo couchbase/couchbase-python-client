@@ -214,6 +214,8 @@ pycbc_oputil_iter_prepare(pycbc_seqtype_t seqtype,
             PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Couldn't attain iterator");
         }
         return *iter;
+    } else if (seqtype == PYCBC_SEQTYPE_DICT) {
+        *dictpos = 0;
     }
     *iter = NULL;
     return sequence;
@@ -233,8 +235,9 @@ pycbc_oputil_sequence_next(pycbc_seqtype_t seqtype,
 {
     if (seqtype == PYCBC_SEQTYPE_DICT) {
         int rv = PyDict_Next(seqobj, dictpos, key, value);
-        if (rv < 0) {
+        if (rv < 1) {
             PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Couldn't iterate");
+            return -1;
         }
 
         Py_XINCREF(*key);
