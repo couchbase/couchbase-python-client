@@ -86,11 +86,11 @@ void pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p)
     Py_XDECREF(excparams);
 
     if (!excinstance) {
-        fprintf(stderr, "Warning. Problems in exception constructor\n");
+        Py_XDECREF(traceback);
 
     } else {
         Py_INCREF(Py_TYPE(excinstance));
         PyErr_Restore((PyObject*)Py_TYPE(excinstance), excinstance, traceback);
+        assert(Py_REFCNT(excinstance) == 1);
     }
-    assert(Py_REFCNT(excinstance) == 1);
 }
