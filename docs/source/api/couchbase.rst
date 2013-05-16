@@ -253,6 +253,8 @@ information about things
 
     .. automethod:: errors
 
+    .. automethod:: lcb_version
+
 Attributes
 ==========
 
