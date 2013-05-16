@@ -99,6 +99,18 @@ Connection_server_nodes(pycbc_ConnectionObject *self, PyObject *value,
     return ret_list;
 }
 
+static PyObject *
+Connection_lcb_version(pycbc_ConnectionObject *self)
+{
+    const char *verstr;
+    lcb_uint32_t vernum;
+    PyObject *ret;
+
+    verstr = lcb_get_version(&vernum);
+    ret = Py_BuildValue("(s,k)", verstr, vernum);
+    return ret;
+}
+
 
 static PyGetSetDef Connection_getset[] = {
         { "timeout",
@@ -197,6 +209,26 @@ static PyMethodDef Connection_methods[] = {
         OPFUNC(_http_request, "Internal routine for HTTP requests"),
 
 #undef OPFUNC
+
+        { "lcb_version",
+                (PyCFunction)Connection_lcb_version,
+                METH_VARARGS|METH_KEYWORDS|METH_STATIC,
+                "Get `libcouchbase` version information\n"
+                "\n"
+                ":return: a tuple of ``(version_string, version_number)``\n"
+                "  corresponding to the underlying libcouchbase version\n"
+
+                "Show the versions ::\n" \
+                "   \n"
+                "   verstr, vernum = Connection.lcb_version()\n"
+                "   print('0x{0:x}'.format(vernum))\n"
+                "   # 0x020005\n"
+                "   \n"
+                "   print(verstr)\n"
+                "   # 2.0.5\n"
+                "\n"
+                "\n"
+        },
 
         { NULL, NULL, 0, NULL }
 };

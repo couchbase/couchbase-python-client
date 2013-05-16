@@ -16,6 +16,7 @@
 #
 
 from tests.base import CouchbaseTestCase
+from couchbase.libcouchbase import Connection
 
 class ConnectionMiscTest(CouchbaseTestCase):
     def setUp(self):
@@ -32,3 +33,8 @@ class ConnectionMiscTest(CouchbaseTestCase):
         def _set_nodes():
             self.cb.server_nodes = 'sdf'
         self.assertRaises(AttributeError, _set_nodes)
+
+    def test_lcb_version(self):
+        verstr, vernum = Connection.lcb_version()
+        self.assertIsInstance(verstr, str)
+        self.assertIsInstance(vernum, int)
