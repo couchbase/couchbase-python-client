@@ -44,7 +44,7 @@ void pycbc_common_vars_free(struct pycbc_common_vars *cv)
 }
 
 int pycbc_common_vars_init(struct pycbc_common_vars *cv,
-                            int ncmds,
+                            Py_ssize_t ncmds,
                             size_t tsize,
                             int want_vals)
 {
@@ -97,7 +97,7 @@ int pycbc_common_vars_init(struct pycbc_common_vars *cv,
 
 int pycbc_oputil_check_sequence(PyObject *sequence,
                            int allow_list,
-                           int *ncmds,
+                           Py_ssize_t *ncmds,
                            pycbc_seqtype_t *seqtype)
 {
     int ret = 0;

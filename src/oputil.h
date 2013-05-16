@@ -125,7 +125,7 @@ struct pycbc_common_vars {
      * List of backing PyObject* for values. Only used for storage operations.
      */
     PyObject **encvals;
-    int ncmds;
+    Py_ssize_t ncmds;
 };
 
 #define PYCBC_COMMON_VARS_STATIC_INIT { { { 0 } } }
@@ -164,7 +164,7 @@ int pycbc_maybe_set_quiet(pycbc_MultiResultObject *mres, PyObject *quiet);
  */
 int pycbc_oputil_check_sequence(PyObject *sequence,
                           int allow_list,
-                          int *ncmds,
+                          Py_ssize_t *ncmds,
                           pycbc_seqtype_t *seqtype);
 
 
@@ -227,7 +227,7 @@ int pycbc_oputil_sequence_next(pycbc_seqtype_t seqtype,
  * used to determine if the 'encvals' field should be allocated
  */
 int pycbc_common_vars_init(struct pycbc_common_vars *cv,
-                            int ncmds,
+                            Py_ssize_t ncmds,
                             size_t tsize,
                             int want_vals);
 

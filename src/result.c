@@ -32,6 +32,7 @@ static PyObject *ResultBase_repr(pycbc_ResultBaseObject *self)
 static PyObject *ResultBase_retnone(pycbc_ResultBaseObject *self, void *closure)
 {
     (void)closure;
+    (void)self;
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -39,6 +40,7 @@ static PyObject *ResultBase_retnone(pycbc_ResultBaseObject *self, void *closure)
 static PyObject *ResultBase_int0(pycbc_ResultBaseObject *self, void *closure)
 {
     (void)closure;
+    (void)self;
     return pycbc_IntFromL(0);
 }
 
@@ -134,5 +136,6 @@ PyObject *pycbc_result_new(pycbc_ConnectionObject *parent)
     PyObject *obj = PyObject_CallFunction((PyObject*) &pycbc_ResultBaseType,
                                           NULL,
                                           NULL);
+    (void)parent;
     return obj;
 }

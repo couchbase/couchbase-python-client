@@ -113,7 +113,7 @@ arithmetic_common(pycbc_ConnectionObject *self,
 {
     int rv;
     int ii;
-    int ncmds;
+    Py_ssize_t ncmds;
     struct arithmetic_common_vars global_params = { 0 };
     pycbc_seqtype_t seqtype;
     PyObject *all_initial_O = NULL;
@@ -246,10 +246,10 @@ arithmetic_common(pycbc_ConnectionObject *self,
     return arithmetic_common(self, args, kwargs, operation, mode); \
 }
 
-DECLFUNC(arithmetic, PYCBC_CMD_ARITH, PYCBC_ARGOPT_SINGLE);
-DECLFUNC(incr, PYCBC_CMD_INCR, PYCBC_ARGOPT_SINGLE);
-DECLFUNC(decr, PYCBC_CMD_DECR, PYCBC_ARGOPT_SINGLE);
+DECLFUNC(arithmetic, PYCBC_CMD_ARITH, PYCBC_ARGOPT_SINGLE)
+DECLFUNC(incr, PYCBC_CMD_INCR, PYCBC_ARGOPT_SINGLE)
+DECLFUNC(decr, PYCBC_CMD_DECR, PYCBC_ARGOPT_SINGLE)
 
-DECLFUNC(arithmetic_multi, PYCBC_CMD_ARITH, PYCBC_ARGOPT_MULTI);
-DECLFUNC(incr_multi, PYCBC_CMD_INCR, PYCBC_ARGOPT_MULTI);
-DECLFUNC(decr_multi, PYCBC_CMD_DECR, PYCBC_ARGOPT_MULTI);
+DECLFUNC(arithmetic_multi, PYCBC_CMD_ARITH, PYCBC_ARGOPT_MULTI)
+DECLFUNC(incr_multi, PYCBC_CMD_INCR, PYCBC_ARGOPT_MULTI)
+DECLFUNC(decr_multi, PYCBC_CMD_DECR, PYCBC_ARGOPT_MULTI)

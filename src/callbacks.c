@@ -174,6 +174,9 @@ static void store_callback(lcb_t instance,
     res->cas = resp->v.v0.cas;
     maybe_push_operr(mres, (pycbc_ResultBaseObject*)res, err, 0);
     CB_THR_BEGIN(conn);
+
+    (void)instance;
+    (void)op;
 }
 
 static void get_callback(lcb_t instance, const void *cookie,
@@ -220,6 +223,7 @@ static void get_callback(lcb_t instance, const void *cookie,
     }
 
     CB_THR_BEGIN(conn);
+    (void)instance;
 }
 
 static void delete_callback(lcb_t instance, const void *cookie,
@@ -243,6 +247,7 @@ static void delete_callback(lcb_t instance, const void *cookie,
     maybe_push_operr(mres, (pycbc_ResultBaseObject*)res, err, 1);
 
     CB_THR_BEGIN(conn);
+    (void)instance;
 }
 
 static void arithmetic_callback(lcb_t instance, const void *cookie,
@@ -273,6 +278,7 @@ static void arithmetic_callback(lcb_t instance, const void *cookie,
     }
 
     CB_THR_BEGIN(conn);
+    (void)instance;
 }
 
 static void unlock_callback(lcb_t instance, const void *cookie,
@@ -297,9 +303,10 @@ static void unlock_callback(lcb_t instance, const void *cookie,
         maybe_push_operr(mres, (pycbc_ResultBaseObject*)res, err, 0);
     }
     CB_THR_BEGIN(conn);
+    (void)instance;
 }
 
-static void touch_callback(lcb_t isntance, const void *cookie,
+static void touch_callback(lcb_t instance, const void *cookie,
                            lcb_error_t err,
                            const lcb_touch_resp_t *resp)
 {
@@ -323,6 +330,7 @@ static void touch_callback(lcb_t isntance, const void *cookie,
     }
 
     CB_THR_BEGIN(conn);
+    (void)instance;
 }
 
 static void stat_callback(lcb_t instance,
@@ -381,6 +389,7 @@ static void stat_callback(lcb_t instance,
     Py_DECREF(value);
 
     CB_THR_BEGIN(mres->parent);
+    (void)instance;
 }
 
 
@@ -418,7 +427,8 @@ static void http_complete_callback(lcb_http_request_t req,
     }
 
     CB_THR_BEGIN(htres->parent);
-
+    (void)instance;
+    (void)req;
 }
 
 static void error_callback(lcb_t instance, lcb_error_t err, const char *msg)

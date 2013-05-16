@@ -18,14 +18,20 @@
 #include "structmember.h"
 
 static PyObject *
-HttpResult_success(pycbc_HttpResultObject *self, void *closure)
+HttpResult_success(pycbc_HttpResultObject *self, void *unused)
 {
+    PyObject *ret = NULL;
     if (self->rc == LCB_SUCCESS && self->htcode < 300 && self->htcode > 199) {
-        Py_INCREF(Py_True);
+        ret = Py_True;
         return Py_True;
+    } else {
+        ret = Py_False;
     }
-    Py_INCREF(Py_False);
-    return Py_False;
+
+    Py_INCREF(ret);
+
+    (void)unused;
+    return ret;
 }
 
 static void

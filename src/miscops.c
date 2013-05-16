@@ -66,7 +66,7 @@ static int handle_single_keyop(pycbc_ConnectionObject *self,
 
         }
 
-        if (cas == -1 && PyErr_Occurred()) {
+        if (cas == (lcb_uint64_t)-1 && PyErr_Occurred()) {
             PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Invalid CAS specified");
             return -1;
         }
@@ -108,7 +108,7 @@ keyop_common(pycbc_ConnectionObject *self,
 {
     int rv;
     int ii;
-    int ncmds = 0;
+    Py_ssize_t ncmds = 0;
     pycbc_seqtype_t seqtype;
     PyObject *casobj = NULL;
 
@@ -247,10 +247,10 @@ keyop_common(pycbc_ConnectionObject *self,
     return keyop_common(self, args, kwargs, operation, mode); \
 }
 
-DECLFUNC(delete, PYCBC_CMD_DELETE, PYCBC_ARGOPT_SINGLE);
-DECLFUNC(unlock, PYCBC_CMD_UNLOCK, PYCBC_ARGOPT_SINGLE);
-DECLFUNC(delete_multi, PYCBC_CMD_DELETE, PYCBC_ARGOPT_MULTI);
-DECLFUNC(unlock_multi, PYCBC_CMD_UNLOCK, PYCBC_ARGOPT_MULTI);
+DECLFUNC(delete, PYCBC_CMD_DELETE, PYCBC_ARGOPT_SINGLE)
+DECLFUNC(unlock, PYCBC_CMD_UNLOCK, PYCBC_ARGOPT_SINGLE)
+DECLFUNC(delete_multi, PYCBC_CMD_DELETE, PYCBC_ARGOPT_MULTI)
+DECLFUNC(unlock_multi, PYCBC_CMD_UNLOCK, PYCBC_ARGOPT_MULTI)
 
 
 PyObject *
@@ -258,7 +258,7 @@ pycbc_Connection__stats(pycbc_ConnectionObject *self, PyObject *args, PyObject *
 {
     int rv;
     int ii;
-    int ncmds;
+    Py_ssize_t ncmds;
     lcb_error_t err;
     PyObject *keys = NULL;
     PyObject *ret = NULL;

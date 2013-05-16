@@ -41,6 +41,9 @@ static PyObject *_libcouchbase_init_helpers(PyObject *self, PyObject *args, PyOb
     PYCBC_XHELPERS(X)
 #undef X
 
+    (void)self;
+    (void)args;
+
     Py_RETURN_NONE;
 }
 
@@ -52,6 +55,10 @@ static PyObject *_libcouchbase_strerror(PyObject *self, PyObject *args, PyObject
     if (!rv) {
         return NULL;
     }
+
+    (void)self;
+    (void)kw;
+
     return pycbc_lcb_errstr(NULL, rc);
 }
 
