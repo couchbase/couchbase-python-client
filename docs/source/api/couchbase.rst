@@ -185,6 +185,8 @@ or duration.
 
     .. automethod:: unlock
 
+    .. automethod:: touch
+
 
 Counter Operations
 ------------------
@@ -234,6 +236,8 @@ values for its keys
     .. automethod:: lock_multi
 
     .. automethod:: unlock_multi
+
+    .. automethod:: touch_multi
 
 
 Informational Methods

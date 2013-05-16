@@ -332,6 +332,32 @@ class Connection(_Base):
 
         return _Base.get(self, key, ttl, quiet)
 
+    def touch(self, key, ttl=0):
+        """Update a key's expiration time
+
+        :param string key: The key whose expiration time should be modified
+        :param int ttl: The new expiration time. If the expiration time is ``0``
+          then the key never expires (and any existing expiration is removed)
+
+        :return: :class:`OperationResult`
+
+        Update the expiration time of a key ::
+
+            cb.set("key", ttl=100)
+            # expires in 100 seconds
+            cb.touch("key", ttl=0)
+            # key should never expire now
+
+        :raise: The same things that :meth:`get` does
+
+        .. seealso::
+
+        :meth:`get` - which can be used to get *and* update the expiration
+
+        :meth:`touch_multi`
+        """
+        return _Base.touch(self, key, ttl=ttl)
+
     def lock(self, key, ttl=0):
         """Lock and retrieve a key-value entry in Couchbase.
 
@@ -690,6 +716,37 @@ class Connection(_Base):
 
         """
         return _Base.get_multi(self, keys, ttl=ttl, quiet=quiet)
+
+    def touch_multi(self, keys, ttl=0):
+        """Touch multiple keys
+
+        Multi variant of :meth:`touch`
+
+        :param keys: the keys to touch
+        :type keys: :ref:`iterable<argtypes>`
+
+        ``keys`` can also be a dictionary with values being integers, in
+        whic case the value for each key will be used as the TTL instead
+        of the global one (i.e. the one passed to this function)
+
+        :param int ttl: The new expiration time
+
+        :return: A :class:`~couchbase.libcouchbase.MultiResult` object
+
+
+        Update three keys to expire in 10 seconds ::
+
+            cb.touch_multi(("key1", "key2", "key3"), ttl=10)
+
+        Update three keys with different expiration times ::
+
+            cb.touch_multi({"foo" : 1, "bar" : 5, "baz" : 10})
+
+        .. seealso::
+
+            :meth:`touch`
+        """
+        return _Base.touch_multi(self, keys, ttl=ttl)
 
     def lock_multi(self, keys, ttl=0):
         """Lock multiple keys
