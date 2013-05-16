@@ -86,6 +86,9 @@ class ConnectionResultsTest(CouchbaseTestCase):
         rv = self.cb.get(key)
         self.__test_valresult(rv, 10)
 
+        rv = self.cb.touch(key)
+        self.__test_oprsesult(rv)
+
     def test_multi_results(self):
         kvs = self.gen_kv_dict(prefix="multi_results")
         rvs = self.cb.set_multi(kvs)
