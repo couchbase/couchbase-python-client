@@ -72,8 +72,7 @@ Connection_set_format(pycbc_ConnectionObject *self, PyObject *value, void *unuse
 }
 
 static PyObject *
-Connection_server_nodes(pycbc_ConnectionObject *self, PyObject *value,
-                        void *unused)
+Connection_server_nodes(pycbc_ConnectionObject *self, void *unused)
 {
     const char * const *cnodes;
     const char **curnode;
