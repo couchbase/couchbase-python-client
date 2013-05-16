@@ -122,6 +122,7 @@ int pycbc_OperationResultType_init(PyObject **ptr)
 pycbc_ValueResultObject *
 pycbc_valresult_new(pycbc_ConnectionObject *parent)
 {
+    (void)parent;
     return (pycbc_ValueResultObject*)
             PyObject_CallFunction((PyObject*)&pycbc_ValueResultType, NULL, NULL);
 }
@@ -129,6 +130,7 @@ pycbc_valresult_new(pycbc_ConnectionObject *parent)
 pycbc_OperationResultObject *
 pycbc_opresult_new(pycbc_ConnectionObject *parent)
 {
+    (void)parent;
     return (pycbc_OperationResultObject*)
             PyObject_CallFunction((PyObject*)&pycbc_OperationResultType, NULL, NULL);
 }

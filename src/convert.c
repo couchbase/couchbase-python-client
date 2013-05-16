@@ -333,7 +333,7 @@ int pycbc_tc_encode_value(pycbc_ConnectionObject *conn,
 
     if (!conn->tc) {
         lcb_uint32_t flags_priv = pycbc_IntAsUL(flag_v);
-        if (flags_priv == -1 && PyErr_Occurred()) {
+        if (flags_priv == (lcb_uint32_t)-1 && PyErr_Occurred()) {
             PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Bad value for flags");
         }
         *flags = flags_priv & PYCBC_FMT_MASK;
@@ -366,7 +366,7 @@ int pycbc_tc_encode_value(pycbc_ConnectionObject *conn,
     }
 
     flags_stackval = pycbc_IntAsUL(flags_obj);
-    if (flags_stackval == -1 && PyErr_Occurred()) {
+    if (flags_stackval == (lcb_uint32_t)-1 && PyErr_Occurred()) {
         Py_XDECREF(result_tuple);
         PYCBC_EXC_WRAP_VALUE(PYCBC_EXC_ENCODING, 0, "Bad type for returned flags",
                              orig_value);

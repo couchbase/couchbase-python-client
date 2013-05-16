@@ -97,7 +97,7 @@ static int handle_append_flags(pycbc_ConnectionObject *self,
     }
 
     val = pycbc_IntAsUL(*flagsobj);
-    if (val == -1) {
+    if (val == (unsigned long)-1) {
         PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0, "invalid flags",
                            *flagsobj);
         return -1;
@@ -126,7 +126,7 @@ set_common(pycbc_ConnectionObject *self,
 {
     int rv;
     int ii;
-    int ncmds = 0;
+    Py_ssize_t ncmds = 0;
     unsigned long ttl = 0;
     Py_ssize_t dictpos = 0;
     lcb_uint64_t single_cas = 0;
@@ -258,16 +258,16 @@ GT_DONE:
     return set_common(self, args, kwargs, operation, mode); \
 }
 
-DECLFUNC(set_multi, LCB_SET, PYCBC_ARGOPT_MULTI);
-DECLFUNC(add_multi, LCB_ADD, PYCBC_ARGOPT_MULTI);
-DECLFUNC(replace_multi, LCB_REPLACE, PYCBC_ARGOPT_MULTI);
+DECLFUNC(set_multi, LCB_SET, PYCBC_ARGOPT_MULTI)
+DECLFUNC(add_multi, LCB_ADD, PYCBC_ARGOPT_MULTI)
+DECLFUNC(replace_multi, LCB_REPLACE, PYCBC_ARGOPT_MULTI)
 
-DECLFUNC(append_multi, LCB_APPEND, PYCBC_ARGOPT_MULTI);
-DECLFUNC(prepend_multi, LCB_PREPEND, PYCBC_ARGOPT_MULTI);
+DECLFUNC(append_multi, LCB_APPEND, PYCBC_ARGOPT_MULTI)
+DECLFUNC(prepend_multi, LCB_PREPEND, PYCBC_ARGOPT_MULTI)
 
-DECLFUNC(set, LCB_SET, PYCBC_ARGOPT_SINGLE);
-DECLFUNC(add, LCB_ADD, PYCBC_ARGOPT_SINGLE);
-DECLFUNC(replace, LCB_REPLACE, PYCBC_ARGOPT_SINGLE);
+DECLFUNC(set, LCB_SET, PYCBC_ARGOPT_SINGLE)
+DECLFUNC(add, LCB_ADD, PYCBC_ARGOPT_SINGLE)
+DECLFUNC(replace, LCB_REPLACE, PYCBC_ARGOPT_SINGLE)
 
-DECLFUNC(append, LCB_APPEND, PYCBC_ARGOPT_SINGLE);
-DECLFUNC(prepend, LCB_PREPEND, PYCBC_ARGOPT_SINGLE);
+DECLFUNC(append, LCB_APPEND, PYCBC_ARGOPT_SINGLE)
+DECLFUNC(prepend, LCB_PREPEND, PYCBC_ARGOPT_SINGLE)

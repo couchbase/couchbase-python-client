@@ -84,7 +84,7 @@ typedef int pycbc_strlen_t;
  */
 #define pycbc_IntFromL PyInt_FromLong
 #define pycbc_IntFromUL PyLong_FromUnsignedLong
-#define pycbc_IntFromULL PyLong_FromUnsignedLong
+#define pycbc_IntFromULL PyLong_FromUnsignedLongLong
 #define pycbc_SimpleStringZ(c) PyString_FromString(c)
 #define pycbc_SimpleStringN(c, n) PyString_FromStringAndSize(c, n)
 

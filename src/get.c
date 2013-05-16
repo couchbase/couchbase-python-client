@@ -57,7 +57,7 @@ static int handle_single_key(pycbc_ConnectionObject *self,
             }
         } else {
             ttl = pycbc_IntAsUL(curval);
-            if (ttl == -1 && PyErr_Occurred()) {
+            if (ttl == (unsigned long)-1 && PyErr_Occurred()) {
                 PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS,
                                    0,
                                    "Couldn't convert TTL",
@@ -115,7 +115,7 @@ get_common(pycbc_ConnectionObject *self,
 {
     int rv;
     int ii;
-    int ncmds = 0;
+    Py_ssize_t ncmds = 0;
     size_t cmdsize;
 
     pycbc_seqtype_t seqtype;

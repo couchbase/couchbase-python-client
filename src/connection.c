@@ -95,6 +95,8 @@ Connection_server_nodes(pycbc_ConnectionObject *self, void *unused)
         Py_DECREF(tmpstr);
     }
 
+    (void)unused;
+
     return ret_list;
 }
 
@@ -107,6 +109,9 @@ Connection_lcb_version(pycbc_ConnectionObject *self)
 
     verstr = lcb_get_version(&vernum);
     ret = Py_BuildValue("(s,k)", verstr, vernum);
+
+    (void)self;
+
     return ret;
 }
 
@@ -250,7 +255,7 @@ Connection_set_timeout(pycbc_ConnectionObject *self,
         return -1;
     }
 
-    usecs = newval * 1000000;
+    usecs = (lcb_uint32_t)(newval * 1000000);
     lcb_set_timeout(self->instance, usecs);
 
     (void)unused;
