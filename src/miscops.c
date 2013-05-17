@@ -55,7 +55,7 @@ static int handle_single_keyop(pycbc_ConnectionObject *self,
             if (!cas_o) {
                 PyErr_Clear();
             }
-            cas = pycbc_IntAsULL(curval);
+            cas = pycbc_IntAsULL(cas_o);
 
         } else if (PYCBC_OPRES_CHECK(curval)) {
             /* If we're passed a Result object, just extract its CAS */
@@ -67,6 +67,7 @@ static int handle_single_keyop(pycbc_ConnectionObject *self,
         }
 
         if (cas == (lcb_uint64_t)-1 && PyErr_Occurred()) {
+            PyErr_Clear();
             PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Invalid CAS specified");
             return -1;
         }
@@ -130,14 +131,13 @@ keyop_common(pycbc_ConnectionObject *self,
                                      &is_quiet);
 
     if (!rv) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "couldn't parse arguments");
+        PYCBC_EXCTHROW_ARGS();
         return NULL;
     }
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
         rv = pycbc_oputil_check_sequence(kobj, 1, &ncmds, &seqtype);
         if (rv < 0) {
-            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "bad parameter type");
             return NULL;
         }
 
@@ -214,7 +214,7 @@ keyop_common(pycbc_ConnectionObject *self,
     }
 
     if (err != LCB_SUCCESS) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't schedule command");
+        PYCBC_EXCTHROW_SCHED(err);
         goto GT_DONE;
     }
 
@@ -223,7 +223,7 @@ keyop_common(pycbc_ConnectionObject *self,
     PYCBC_CONN_THR_END(self);
 
     if (err != LCB_SUCCESS) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't wait for operation");
+        PYCBC_EXCTHROW_WAIT(err);
         goto GT_DONE;
     }
 
@@ -269,7 +269,7 @@ pycbc_Connection__stats(pycbc_ConnectionObject *self, PyObject *args, PyObject *
     rv = PyArg_ParseTupleAndKeywords(args, kwargs, "|O", kwlist, &keys);
 
     if (!rv) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "couldn't parse arguments");
+        PYCBC_EXCTHROW_ARGS();
         return NULL;
     }
 
@@ -322,7 +322,7 @@ pycbc_Connection__stats(pycbc_ConnectionObject *self, PyObject *args, PyObject *
 
     err = lcb_server_stats(self->instance, mres, ncmds, cv.cmdlist.stats);
     if (err != LCB_SUCCESS) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "couldn't schedule command");
+        PYCBC_EXCTHROW_SCHED(err);
         goto GT_DONE;
     }
 
@@ -331,7 +331,7 @@ pycbc_Connection__stats(pycbc_ConnectionObject *self, PyObject *args, PyObject *
     PYCBC_CONN_THR_END(self);
 
     if (err != LCB_SUCCESS) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "couldn't wait for command");
+        PYCBC_EXCTHROW_WAIT(err);
         goto GT_DONE;
     }
 

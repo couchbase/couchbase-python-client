@@ -60,7 +60,7 @@ static int handle_single_key(pycbc_ConnectionObject *self,
             if (ttl == (unsigned long)-1 && PyErr_Occurred()) {
                 PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS,
                                    0,
-                                   "Couldn't convert TTL",
+                                   "Bad value for TTL",
                                    curval);
                 return -1;
             }
@@ -139,7 +139,7 @@ get_common(pycbc_ConnectionObject *self,
                                      &is_quiet);
 
     if (!rv) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "couldn't parse arguments");
+        PYCBC_EXCTHROW_ARGS()
         return NULL;
     }
 
@@ -149,8 +149,6 @@ get_common(pycbc_ConnectionObject *self,
                                          &ncmds,
                                          &seqtype);
         if (rv < 0) {
-            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS,
-                               0, "bad argument type", kobj);
             return NULL;
         }
 
@@ -234,7 +232,7 @@ get_common(pycbc_ConnectionObject *self,
     }
 
     if (err != LCB_SUCCESS) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't schedule command");
+        PYCBC_EXCTHROW_SCHED(err);
         goto GT_DONE;
     }
 
@@ -247,7 +245,7 @@ get_common(pycbc_ConnectionObject *self,
             ret = (PyObject*)mres;
         }
     } else {
-        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't wait");
+        PYCBC_EXCTHROW_WAIT(err);
     }
 
 GT_DONE:

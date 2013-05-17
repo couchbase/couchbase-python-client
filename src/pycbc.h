@@ -147,7 +147,10 @@ enum {
     PYCBC_EXC_ENCODING,
 
     /** Operational error returned from LCB */
-    PYCBC_EXC_LCBERR
+    PYCBC_EXC_LCBERR,
+
+    /** Internal error. There's something wrong with our code */
+    PYCBC_EXC_INTERNAL
 };
 
 /* Argument options */
@@ -519,6 +522,21 @@ void pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p);
 
 #define PYCBC_EXC_WRAP_VALUE PYCBC_EXC_WRAP_KEY
 
+/**
+ * EXCTHROW macros. These provide error messages for common stages.
+ */
+#define PYCBC_EXCTHROW_WAIT(err) PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, \
+       "There was a problem while trying to send/receive " \
+       "your request over the network. This may be a result of a " \
+       "bad network or a misconfigured client or server.")
+
+#define PYCBC_EXCTHROW_SCHED(err) PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, \
+        "There was a problem scheduling your request, or determining " \
+        "the appropriate server or vBucket for the key(s) requested. "\
+        "This may also be a bug in the SDK if there are no network issues.")
+
+#define PYCBC_EXCTHROW_ARGS() PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, \
+                                           "Bad/insufficient arguments provided.")
 
 /**
  * Encodes a key into a buffer.

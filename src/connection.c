@@ -80,7 +80,7 @@ Connection_server_nodes(pycbc_ConnectionObject *self, void *unused)
     cnodes = lcb_get_server_list(self->instance);
 
     if (!cnodes) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Can't get server nodes");
+        PYCBC_EXC_WRAP(PYCBC_EXC_INTERNAL, 0, "Can't get server nodes");
         return NULL;
     }
 
@@ -336,9 +336,7 @@ Connection__init__(pycbc_ConnectionObject *self,
     #undef X
 
     if (!rv) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS,
-                       0,
-                       "Couldn't parse constructor arguments");
+        PYCBC_EXCTHROW_ARGS();
         return -1;
     }
 
@@ -367,7 +365,11 @@ Connection__init__(pycbc_ConnectionObject *self,
     }
 
     if (err != LCB_SUCCESS) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't create instance");
+        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err,
+                       "Couldn't create instance. Either bad "
+                       "credentials/hosts/bucket names were "
+                       "passed, or there was an internal error in creating the "
+                       "object");
         return -1;
     }
 
@@ -385,7 +387,9 @@ Connection__init__(pycbc_ConnectionObject *self,
     PYCBC_CONN_THR_END(self);
 
     if (err != LCB_SUCCESS) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't schedule connection");
+        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err,
+                       "Couldn't schedule connection. This might be a result of "
+                       "an invalid hostname.");
         return -1;
     }
 
@@ -395,14 +399,15 @@ Connection__init__(pycbc_ConnectionObject *self,
     PYCBC_CONN_THR_END(self);
 
     if (err != LCB_SUCCESS) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "couldn't wait");
+        PYCBC_EXCTHROW_WAIT(err);
         return -1;
     }
 
     if (self->dfl_fmt) {
         if (self->dfl_fmt != Py_None) {
             if (!PyNumber_Check(self->dfl_fmt)) {
-                PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Flags must be number or None");
+                PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err,
+                               "default_format must be number or None");
                 return -1;
             }
         } else {

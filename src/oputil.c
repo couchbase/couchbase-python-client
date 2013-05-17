@@ -114,8 +114,9 @@ int pycbc_oputil_check_sequence(PyObject *sequence,
         ret = 0;
 
     } else if (!allow_list) {
-        PyErr_SetString(PyExc_ValueError,
-                        "Only dictionaries are supported for this method");
+        PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0,
+                           "Keys must be a dictionary",
+                           sequence);
         ret = -1;
 
     } else if (PyList_Check(sequence)) {
@@ -137,19 +138,21 @@ int pycbc_oputil_check_sequence(PyObject *sequence,
 
         if (*ncmds == -1) {
             PyErr_Clear();
-            PyErr_SetString(PyExc_ValueError,
-                            "Argument must be iterable and have known length");
+            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0,
+                               "Keys must be iterable and have known length",
+                               sequence);
             ret = -1;
         }
 
     } else {
-        PyErr_SetString(PyExc_ValueError,
-                        "Argument must be a non-string/bytes sequence");
+        PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0,
+                           "Keys must be iterable and have known length",
+                           sequence);
         ret = -1;
     }
 
     if (ret == 0 && *ncmds < 1) {
-        PyErr_SetString(PyExc_ValueError, "parameter list is empty");
+        PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0, "Key list is empty", sequence);
         ret = -1;
     }
 
@@ -169,7 +172,7 @@ int pycbc_maybe_set_quiet(pycbc_MultiResultObject *mres, PyObject *quiet)
 
     if (mres->no_raise_enoent == -1) {
         PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS,
-                           0, "bad value for 'quiet'", quiet);
+                           0, "quiet must be True, False, or None'", quiet);
         return -1;
     }
     return 0;
@@ -211,7 +214,10 @@ pycbc_oputil_iter_prepare(pycbc_seqtype_t seqtype,
     if (seqtype == PYCBC_SEQTYPE_GENERIC) {
         *iter = PyObject_GetIter(sequence);
         if (!*iter) {
-            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Couldn't attain iterator");
+            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0,
+                               "Couldn't get iterator from object. Object "
+                               "should implement __iter__",
+                               sequence);
         }
         return *iter;
     } else if (seqtype == PYCBC_SEQTYPE_DICT) {
@@ -236,7 +242,8 @@ pycbc_oputil_sequence_next(pycbc_seqtype_t seqtype,
     if (seqtype == PYCBC_SEQTYPE_DICT) {
         int rv = PyDict_Next(seqobj, dictpos, key, value);
         if (rv < 1) {
-            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Couldn't iterate");
+            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_INTERNAL,
+                               0, "Couldn't iterate", seqobj);
             return -1;
         }
 
@@ -255,7 +262,8 @@ pycbc_oputil_sequence_next(pycbc_seqtype_t seqtype,
     } else {
         *key = PyIter_Next(seqobj);
         if (!*key) {
-            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Bad iterator");
+            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0,
+                               "PyIter_Next returned NULL", seqobj);
             return -1;
         }
     }
