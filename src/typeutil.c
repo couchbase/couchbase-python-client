@@ -136,3 +136,31 @@ int pycbc_BufFromString(PyObject *obj, char **key, Py_ssize_t *nkey, PyObject **
 }
 
 #endif /* PY_MAJOR_VERSION == 3*/
+
+
+int pycbc_get_ttl(PyObject *obj, unsigned long *ttl, int nonzero)
+{
+    if (obj == NULL || PyObject_IsTrue(obj) == 0) {
+        if (!nonzero) {
+            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0, "TTL must be specified "
+                           "and must not be 0 or False or None",
+                           obj);
+            return -1;
+        }
+        *ttl = 0;
+        return 0;
+    }
+
+    if (!PyNumber_Check(obj)) {
+        PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0, "TTL must be numeric", obj);
+        return -1;
+    }
+
+    *ttl = pycbc_IntAsUL(obj);
+    if (*ttl == (unsigned long)-1) {
+        PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0,
+                           "TTL must be a valid Unix timestamp ", obj);
+        return -1;
+    }
+    return 0;
+}

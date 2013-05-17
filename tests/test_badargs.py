@@ -128,6 +128,32 @@ class ConnectionBadArgsTest(CouchbaseTestCase):
         #self.assertRaises(ArgumentError, self.cb.set,
         #                  "foo", "bar", format=-1)
 
+    def test_negative_ttl(self):
+        for bad_ttl in (-1,
+                        "ttl",
+                        object(),
+                        [1],
+                        {'foo':'bar'},
+                        2**100):
+            
+            print(bad_ttl)
+            self.assertRaises(ArgumentError, self.cb.get, "key", ttl=bad_ttl)
+            self.assertRaises(ArgumentError, self.cb.set, "key", "value",
+                              ttl=bad_ttl)
+            self.assertRaises(ArgumentError, self.cb.touch, "key", ttl=bad_ttl)
+            self.assertRaises(ArgumentError, self.cb.incr, "key", ttl=bad_ttl)
+            self.assertRaises(ArgumentError, self.cb.lock, "key", ttl=bad_ttl)
+
+            self.assertRaises(ArgumentError, self.cb.get_multi,
+                              ["key"], ttl=bad_ttl)
+            self.assertRaises(ArgumentError, self.cb.get_multi,
+                              { "key" : { 'ttl' : bad_ttl } })
+            self.assertRaises(ArgumentError, self.cb.get_multi,
+                              { "key" : bad_ttl } )
+            self.assertRaises(ArgumentError, self.cb.incr_multi,
+                              "key", ttl=bad_ttl)
+            self.assertRaises(ArgumentError, self.cb.lock_multi,
+                              "key", ttl=bad_ttl)
 
 
 if __name__ == '__main__':

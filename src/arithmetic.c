@@ -115,6 +115,7 @@ arithmetic_common(pycbc_ConnectionObject *self,
     struct arithmetic_common_vars global_params = { 0 };
     pycbc_seqtype_t seqtype;
     PyObject *all_initial_O = NULL;
+    PyObject *all_ttl_O = NULL;
     PyObject *collection;
     PyObject *ret = NULL;
     pycbc_MultiResultObject *mres = NULL;
@@ -123,13 +124,18 @@ arithmetic_common(pycbc_ConnectionObject *self,
 
     static char *kwlist[] = { "keys", "delta", "initial", "ttl", NULL };
 
-    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "O|LOI", kwlist,
+    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "O|LOO", kwlist,
                                      &collection,
                                      &global_params.delta,
                                      &all_initial_O,
-                                     &global_params.ttl);
+                                     &all_ttl_O);
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
+        return NULL;
+    }
+
+    rv = pycbc_get_ttl(all_ttl_O, &global_params.ttl, 1);
+    if (rv < 0) {
         return NULL;
     }
 

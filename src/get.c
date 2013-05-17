@@ -32,7 +32,6 @@ static int handle_single_key(pycbc_ConnectionObject *self,
     char *key;
     size_t nkey;
     unsigned int lock = 0;
-    static char *kwlist[] = { "ttl", NULL };
 
     rv = pycbc_tc_encode_key(self, &curkey, (void**)&key, &nkey);
     if (rv == -1) {
@@ -42,6 +41,8 @@ static int handle_single_key(pycbc_ConnectionObject *self,
     cv->enckeys[ii] = curkey;
 
     if (curval) {
+        static char *kwlist[] = { "ttl", NULL };
+        PyObject *ttl_O = NULL;
         if (ttl) {
             PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS,
                            0,
@@ -51,19 +52,20 @@ static int handle_single_key(pycbc_ConnectionObject *self,
 
         if (PyDict_Check(curval)) {
             rv = PyArg_ParseTupleAndKeywords(pycbc_DummyTuple, curval,
-                                             "|k", kwlist, &ttl);
+                                             "|O", kwlist, &ttl_O);
             if (!rv) {
+                PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ARGUMENTS, 0,
+                                   "Couldn't get sub-parmeters for key",
+                                   curkey);
                 return -1;
             }
         } else {
-            ttl = pycbc_IntAsUL(curval);
-            if (ttl == (unsigned long)-1 && PyErr_Occurred()) {
-                PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS,
-                                   0,
-                                   "Bad value for TTL",
-                                   curval);
-                return -1;
-            }
+            ttl_O = curval;
+        }
+
+        rv = pycbc_get_ttl(ttl_O, &ttl, 1);
+        if (rv < 0) {
+            return -1;
         }
     }
     switch (optype) {
@@ -124,6 +126,7 @@ get_common(pycbc_ConnectionObject *self,
     PyObject *is_quiet = NULL;
     pycbc_MultiResultObject *mres = NULL;
     lcb_error_t err;
+    PyObject *ttl_O = NULL;
     unsigned long ttl = 0;
 
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
@@ -132,14 +135,19 @@ get_common(pycbc_ConnectionObject *self,
 
     rv = PyArg_ParseTupleAndKeywords(args,
                                      kwargs,
-                                     "O|kO",
+                                     "O|OO",
                                      kwlist,
                                      &kobj,
-                                     &ttl,
+                                     &ttl_O,
                                      &is_quiet);
 
     if (!rv) {
         PYCBC_EXCTHROW_ARGS()
+        return NULL;
+    }
+
+    rv = pycbc_get_ttl(ttl_O, &ttl, 1);
+    if (rv < 0) {
         return NULL;
     }
 
