@@ -51,7 +51,7 @@ SOURCEMODS = (
         'constants',
         'multiresult',
         'miscops',
-        'numutil',
+        'typeutil',
         'oputil',
         'get',
         'arithmetic',
