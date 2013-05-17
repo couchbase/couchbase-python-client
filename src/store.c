@@ -128,6 +128,7 @@ set_common(pycbc_ConnectionObject *self,
     int ii;
     Py_ssize_t ncmds = 0;
     unsigned long ttl = 0;
+    PyObject *ttl_O = NULL;
     Py_ssize_t dictpos = 0;
     lcb_uint64_t single_cas = 0;
     PyObject *ret = NULL;
@@ -146,25 +147,30 @@ set_common(pycbc_ConnectionObject *self,
     if (argopts & PYCBC_ARGOPT_MULTI) {
         rv = PyArg_ParseTupleAndKeywords(args,
                                          kwargs,
-                                         "O|kO",
+                                         "O|OO",
                                          kwlist_multi,
                                          &dict,
-                                         &ttl,
+                                         &ttl_O,
                                          &flagsobj);
 
     } else {
         rv = PyArg_ParseTupleAndKeywords(args,
                                          kwargs,
-                                         "OO|KkO",
+                                         "OO|KOO",
                                          kwlist_single,
                                          &curkey,
                                          &curvalue,
                                          &single_cas,
-                                         &ttl,
+                                         &ttl_O,
                                          &flagsobj);
     }
     if (!rv) {
         PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "couldn't parse arguments");
+        return NULL;
+    }
+
+    rv = pycbc_get_ttl(ttl_O, &ttl, 1);
+    if (rv < 0) {
         return NULL;
     }
 

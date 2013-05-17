@@ -97,6 +97,15 @@ unsigned long pycbc_IntAsUL(PyObject *o);
 #endif
 
 /**
+ * Fetches a valid TTL from the object
+ * @param obj an object to be parsed as the TTL
+ * @param ttl a pointer to the TTL itself
+ * @param nonzero whether to allow a value of 0 for the TTL
+ * @return 0 on success, nonzero on error.
+ */
+int pycbc_get_ttl(PyObject *obj, unsigned long *ttl, int nonzero);
+
+/**
  * Converts the object into an PyInt (2.x only) or PyLong (2.x or 3.x)
  */
 PyObject *pycbc_maybe_convert_to_int(PyObject *o);
