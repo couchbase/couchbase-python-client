@@ -95,19 +95,28 @@ class ConnectionTest(CouchbaseTestCase):
 
 
     def test_conncache(self):
-        cachefile = tempfile.NamedTemporaryFile()
-        cb = Connection(conncache=cachefile.name, **self.make_connargs())
-        self.assertTrue(cb.set("foo", "bar").success)
+        cachefile = None
+        # On Windows, the NamedTemporaryFile is deleted right when it's
+        # created. So we need to ensure it's not deleted, and delete it
+        # ourselves when it's closed
+        try:
+            cachefile = tempfile.NamedTemporaryFile(delete=False)
+            cb = Connection(conncache=cachefile.name, **self.make_connargs())
+            self.assertTrue(cb.set("foo", "bar").success)
 
-        cb2 = Connection(conncache=cachefile.name, **self.make_connargs())
+            cb2 = Connection(conncache=cachefile.name, **self.make_connargs())
 
-        self.assertTrue(cb2.set("foo", "bar").success)
-        self.assertEquals("bar", cb.get("foo").value)
+            self.assertTrue(cb2.set("foo", "bar").success)
+            self.assertEquals("bar", cb.get("foo").value)
 
-        sb = os.stat(cachefile.name)
+            sb = os.stat(cachefile.name)
 
-        # For some reason this fails on Windows?
-        self.assertTrue(sb.st_size > 0)
+            # For some reason this fails on Windows?
+            self.assertTrue(sb.st_size > 0)
+        finally:
+            # On windows, we can't delete if the file is still being used
+            cachefile.close()
+            os.unlink(cachefile.name)
 
         # TODO, see what happens when bad path is used
         # apparently libcouchbase does not report this failure.
