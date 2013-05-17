@@ -112,6 +112,7 @@ init_libcouchbase(void)
     PyObject *valresult_type = NULL;
     PyObject *opresult_type = NULL;
     PyObject *htresult_type = NULL;
+    PyObject *transcoder_type = NULL;
     PyObject *arg_type = NULL;
 
     if (pycbc_ConnectionType_init(&connection_type) < 0) {
@@ -141,6 +142,11 @@ init_libcouchbase(void)
     if (pycbc_ArgumentType_init(&arg_type) < 0) {
         INITERROR;
     }
+
+    if (pycbc_TranscoderType_init(&transcoder_type) < 0) {
+        INITERROR;
+    }
+
 #endif /* PYCBC_CPYCHECKER */
 
 #if PY_MAJOR_VERSION >= 3
@@ -164,7 +170,16 @@ init_libcouchbase(void)
     PyModule_AddObject(m, "MultiResult", mresult_type);
     PyModule_AddObject(m, "HttpResult", htresult_type);
     PyModule_AddObject(m, "Arguments", arg_type);
+    PyModule_AddObject(m, "Transcoder", transcoder_type);
 #endif /* PYCBC_CPYCHECKER */
+
+    /**
+     * Initialize the helper names
+     */
+    pycbc_helpers.tcname_decode_key = pycbc_SimpleStringZ(PYCBC_TCNAME_DECODE_KEY);
+    pycbc_helpers.tcname_encode_key = pycbc_SimpleStringZ(PYCBC_TCNAME_ENCODE_KEY);
+    pycbc_helpers.tcname_decode_value = pycbc_SimpleStringZ(PYCBC_TCNAME_DECODE_VALUE);
+    pycbc_helpers.tcname_encode_value = pycbc_SimpleStringZ(PYCBC_TCNAME_ENCODE_VALUE);
 
     pycbc_init_pyconstants(m);
 

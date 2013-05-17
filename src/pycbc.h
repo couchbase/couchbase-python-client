@@ -40,6 +40,11 @@ typedef int pycbc_strlen_t;
 #define PYCBC_MODULE_NAME "_libcouchbase"
 #define PYCBC_FQNAME PYCBC_PACKAGE_NAME "." PYCBC_MODULE_NAME
 
+#define PYCBC_TCNAME_ENCODE_KEY "encode_key"
+#define PYCBC_TCNAME_ENCODE_VALUE "encode_value"
+#define PYCBC_TCNAME_DECODE_KEY "decode_key"
+#define PYCBC_TCNAME_DECODE_VALUE "decode_value"
+
 /**
  * Python 2.x and Python 3.x have different ideas of what a basic string
  * and int types are. These blocks help us sort things out if we just want a
@@ -104,6 +109,16 @@ unsigned long pycbc_IntAsUL(PyObject *o);
  * @return 0 on success, nonzero on error.
  */
 int pycbc_get_ttl(PyObject *obj, unsigned long *ttl, int nonzero);
+
+/**
+ * Fetches a valid 32 bit integer from the object. The object must be a long
+ * or int.
+ * @param obj the object containing the number
+ * @param out a pointer to a 32 bit integer to be populated
+ * @return 0 on success, -1 on failure. On failure, the error indicator is also
+ * set
+ */
+int pycbc_get_u32(PyObject *obj, unsigned long *out);
 
 /**
  * Converts the object into an PyInt (2.x only) or PyLong (2.x or 3.x)
@@ -407,6 +422,14 @@ struct pycbc_helpers_ST {
     #define X(n) PyObject *n;
     PYCBC_XHELPERS(X)
     #undef X
+
+    /**
+     * Transcoder names
+     */
+    PyObject *tcname_encode_key;
+    PyObject *tcname_encode_value;
+    PyObject *tcname_decode_key;
+    PyObject *tcname_decode_value;
 };
 
 /**
@@ -460,6 +483,7 @@ int pycbc_ArgumentType_init(PyObject **ptr);
 int pycbc_ValueResultType_init(PyObject **ptr);
 int pycbc_OperationResultType_init(PyObject **ptr);
 int pycbc_HttpResultType_init(PyObject **ptr);
+int pycbc_TranscoderType_init(PyObject **ptr);
 
 
 /**

@@ -14,6 +14,11 @@
  *   limitations under the License.
  **/
 
+/**
+ * This file contains various conversion utilities between C and Python
+ * types. This also does a lot of the porting and handling between Python
+ * major versions as well.
+ */
 #include "pycbc.h"
 #if PY_MAJOR_VERSION == 2
 
@@ -155,7 +160,6 @@ int pycbc_get_ttl(PyObject *obj, unsigned long *ttl, int nonzero)
         PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0, "TTL must be numeric", obj);
         return -1;
     }
-
     *ttl = pycbc_IntAsUL(obj);
     if (*ttl == (unsigned long)-1) {
         PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0,
@@ -163,4 +167,29 @@ int pycbc_get_ttl(PyObject *obj, unsigned long *ttl, int nonzero)
         return -1;
     }
     return 0;
+}
+
+int pycbc_get_u32(PyObject *obj, unsigned long *out)
+{
+
+    unsigned long val = pycbc_IntAsUL(obj);
+    if (PyErr_Occurred()) {
+        return -1;
+    }
+
+    /**
+     * Python won't check for an overflow if our long type is not 32 bits,
+     * so we need to do it ourselves
+     */
+#if LONG_MAX > 0xFFFFFFFFUL
+    if ( (val & 0xFFFFFFFFUL) != val) {
+        PyErr_SetString(PyExc_OverflowError, "Value must be smaller " \
+                        "than 32 bits");
+        return -1;
+    }
+#endif
+
+    *out = val;
+    return 0;
+
 }

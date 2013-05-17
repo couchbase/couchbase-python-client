@@ -71,6 +71,35 @@ Connection_set_format(pycbc_ConnectionObject *self, PyObject *value, void *unuse
     return 0;
 }
 
+static int
+Connection_set_transcoder(pycbc_ConnectionObject *self,
+                                     PyObject *value,
+                                     void *unused)
+{
+    Py_XDECREF(self->tc);
+    if (PyObject_IsTrue(value)) {
+        self->tc = value;
+        Py_INCREF(self->tc);
+    } else {
+        self->tc = NULL;
+    }
+    (void)unused;
+    return 0;
+}
+
+static PyObject*
+Connection_get_transcoder(pycbc_ConnectionObject *self, void *unused)
+{
+    if (self->tc) {
+        Py_INCREF(self->tc);
+        return self->tc;
+    }
+    Py_INCREF(Py_None);
+
+    (void)unused;
+    return Py_None;
+}
+
 static PyObject *
 Connection_server_nodes(pycbc_ConnectionObject *self, void *unused)
 {
@@ -134,15 +163,16 @@ static PyGetSetDef Connection_getset[] = {
                 NULL,
                 "Get a list of the current nodes in the cluster"
         },
+
+        { "transcoder",
+                (getter)Connection_get_transcoder,
+                (setter)Connection_set_transcoder,
+                ":type transcoder: `couchbase.transcoder.Transcoder`"
+        },
         { NULL }
 };
 
 static struct PyMemberDef Connection_members[] = {
-        { "transcoder", T_OBJECT_EX, offsetof(pycbc_ConnectionObject, tc),
-                0,
-                ":type transcoder: `couchbase.transcoder.Transcoder`\n"
-        },
-
         { "_errors", T_OBJECT_EX, offsetof(pycbc_ConnectionObject, errors),
                 READONLY,
                 "List of connection errors"
