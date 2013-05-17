@@ -20,6 +20,7 @@ import argparse
 from threading import Thread
 from time import sleep, time
 from couchbase.libcouchbase import Connection, FMT_BYTES
+from couchbase.transcoder import Transcoder
 
 ap = argparse.ArgumentParser()
 
@@ -37,6 +38,10 @@ ap.add_argument('-p', '--password', default="123456", type=str)
 ap.add_argument('-H', '--hostname', default='localhost', type=str)
 ap.add_argument('-D', '--duration', default=10, type=int,
                 help = "Duration of run (in seconds)")
+ap.add_argument('-T', '--transcoder', default=False,
+                action='store_true',
+                help = "Use the Transcoder object rather than built-in "
+                "conversion routines")
 
 ap.add_argument('--ksize', default=12, type=int,
                 help = "Key size to use")
@@ -46,6 +51,7 @@ ap.add_argument('--vsize', default=128, type=int,
 
 options = ap.parse_args()
 DO_UNLOCK_GIL = options.threads > 0
+TC = Transcoder()
 
 class Worker(Thread):
     def __init__(self):
@@ -57,6 +63,8 @@ class Worker(Thread):
         self.cb = Connection(bucket='default',
                         host=options.hostname,
                         unlock_gil=DO_UNLOCK_GIL)
+        if options.transcoder:
+            self.cb.transcoder = TC
         self.end_time = time() + options.duration
         super(Worker, self).__init__()
 
