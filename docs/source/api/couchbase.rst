@@ -239,6 +239,20 @@ values for its keys
 
     .. automethod:: touch_multi
 
+MapReduce/View Methods
+======================
+
+.. currentmodule:: couchbase.libcouchbase
+.. class:: Connection
+
+    .. warning::
+
+        The view API is not considered stable. It will likely change in
+        the future
+
+    .. automethod:: _view
+
+    .. automethod:: _design
 
 Informational Methods
 =====================
