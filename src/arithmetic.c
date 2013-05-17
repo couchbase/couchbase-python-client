@@ -82,12 +82,10 @@ static int handle_single_arith(pycbc_ConnectionObject *self,
             }
 
         } else {
-            PyErr_SetString(PyExc_ValueError,
-                            "value for key must be long or dict");
-
             PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ARGUMENTS,
                                0,
-                               "bad value for key",
+                               "value for key must be an integer amount "
+                               "or a dict of parameters",
                                curkey);
             return -1;
         }
@@ -131,7 +129,7 @@ arithmetic_common(pycbc_ConnectionObject *self,
                                      &all_initial_O,
                                      &global_params.ttl);
     if (!rv) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "couldn't parse arguments");
+        PYCBC_EXCTHROW_ARGS();
         return NULL;
     }
 
@@ -141,7 +139,6 @@ arithmetic_common(pycbc_ConnectionObject *self,
                             &ncmds,
                             &seqtype);
         if (rv < 0) {
-            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "bad argument type");
             return NULL;
         }
     } else {
@@ -215,7 +212,7 @@ arithmetic_common(pycbc_ConnectionObject *self,
 
     err = lcb_arithmetic(self->instance, mres, ncmds, cv.cmdlist.arith);
     if (err != LCB_SUCCESS) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "couldn't schedule command");
+        PYCBC_EXCTHROW_SCHED(err);
         goto GT_DONE;
     }
 
@@ -224,7 +221,7 @@ arithmetic_common(pycbc_ConnectionObject *self,
     PYCBC_CONN_THR_END(self);
 
     if (err != LCB_SUCCESS) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't wait for operation");
+        PYCBC_EXCTHROW_WAIT(err);
         goto GT_DONE;
     }
 

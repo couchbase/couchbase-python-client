@@ -52,7 +52,7 @@ static int handle_single_kv(pycbc_ConnectionObject *self,
         if (!rv) {
             PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ARGUMENTS,
                                0,
-                               "couldn't parse sub-args",
+                               "couldn't extract sub-args",
                                curkey);
             return -1;
         }
@@ -171,8 +171,6 @@ set_common(pycbc_ConnectionObject *self,
     if (argopts & PYCBC_ARGOPT_MULTI) {
         rv = pycbc_oputil_check_sequence(dict, 0, &ncmds, NULL);
         if (rv < 0) {
-            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS,
-                               0, "bad parameter type", dict);
             return NULL;
         }
 
@@ -228,7 +226,7 @@ set_common(pycbc_ConnectionObject *self,
 
     err = lcb_store(self->instance, mres, ncmds, cv.cmdlist.store);
     if (err != LCB_SUCCESS) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't schedule command");
+        PYCBC_EXCTHROW_SCHED(err);
         goto GT_DONE;
     }
 
@@ -237,7 +235,7 @@ set_common(pycbc_ConnectionObject *self,
     PYCBC_CONN_THR_END(self);
 
     if (err != LCB_SUCCESS) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't wait");
+        PYCBC_EXCTHROW_WAIT(err);
         goto GT_DONE;
     }
 

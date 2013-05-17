@@ -53,7 +53,7 @@ pycbc_Connection__http_request(pycbc_ConnectionObject *self,
                                      &nbody,
                                      &value_format);
     if (!rv) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Couldn't parse arguments");
+        PYCBC_EXCTHROW_ARGS();
         return NULL;
     }
 
@@ -76,13 +76,13 @@ pycbc_Connection__http_request(pycbc_ConnectionObject *self,
                                 &htreq);
 
     if (err != LCB_SUCCESS) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't schedule request");
+        PYCBC_EXCTHROW_SCHED(err);
         goto GT_DONE;
     }
 
     err = lcb_wait(self->instance);
     if (err != LCB_SUCCESS) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't wait");
+        PYCBC_EXCTHROW_WAIT(err);
         goto GT_DONE;
     }
 

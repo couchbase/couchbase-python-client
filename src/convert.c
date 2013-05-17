@@ -258,10 +258,6 @@ int pycbc_tc_encode_key(pycbc_ConnectionObject *conn,
     new_key = PyObject_CallMethod(conn->tc, "encode_key", "(O)", orig_key);
 
     if (new_key == NULL) {
-        PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ENCODING,
-                           0,
-                           "Couldn't call encode method",
-                           orig_key);
         return -1;
     }
 
@@ -270,7 +266,9 @@ int pycbc_tc_encode_key(pycbc_ConnectionObject *conn,
     if (rv == -1) {
         PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ENCODING,
                            0,
-                           "Couldn't convert encoded key to bytes",
+                           "Couldn't convert encoded key to bytes. It is "
+                           "possible that the Transcoder.decode_key method "
+                           "returned an unexpected value",
                            new_key);
 
         Py_XDECREF(new_key);
@@ -303,7 +301,6 @@ int pycbc_tc_decode_key(pycbc_ConnectionObject *conn,
     }
 
     if (*pobj == NULL) {
-        PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ENCODING, 0, "couldn't decode key", bobj);
         return -1;
     }
 
@@ -334,7 +331,9 @@ int pycbc_tc_encode_value(pycbc_ConnectionObject *conn,
     if (!conn->tc) {
         lcb_uint32_t flags_priv = pycbc_IntAsUL(flag_v);
         if (flags_priv == (lcb_uint32_t)-1 && PyErr_Occurred()) {
-            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Bad value for flags");
+            PyErr_Clear();
+            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS,
+                               0, "format must be an integer", flag_v);
         }
         *flags = flags_priv & PYCBC_FMT_MASK;
         return encode_common(value, buf, nbuf, flags_priv);
@@ -346,8 +345,6 @@ int pycbc_tc_encode_value(pycbc_ConnectionObject *conn,
                                        orig_value,
                                        flag_v);
     if (!result_tuple) {
-        PYCBC_EXC_WRAP_VALUE(PYCBC_EXC_ENCODING, 0, "couldn't call encode_value",
-                             orig_value);
         return -1;
     }
 
@@ -355,10 +352,9 @@ int pycbc_tc_encode_value(pycbc_ConnectionObject *conn,
     flags_obj = PyTuple_GetItem(result_tuple, 1);
 
     if (new_value == NULL || flags_obj == NULL) {
-        if (!PyErr_Occurred()) {
-            PyErr_SetString(PyExc_ValueError, "expected return of (bytes, flags)");
-        }
-        PYCBC_EXC_WRAP_VALUE(PYCBC_EXC_ENCODING, 0, "Bad return from encode function",
+        PYCBC_EXC_WRAP_VALUE(PYCBC_EXC_ENCODING, 0,
+                             "Bad return from Transcoder.encode_value()."
+                             "Expected (bytes, flags)",
                              orig_value);
 
         Py_XDECREF(result_tuple);
@@ -368,8 +364,9 @@ int pycbc_tc_encode_value(pycbc_ConnectionObject *conn,
     flags_stackval = pycbc_IntAsUL(flags_obj);
     if (flags_stackval == (lcb_uint32_t)-1 && PyErr_Occurred()) {
         Py_XDECREF(result_tuple);
-        PYCBC_EXC_WRAP_VALUE(PYCBC_EXC_ENCODING, 0, "Bad type for returned flags",
-                             orig_value);
+        PYCBC_EXC_WRAP_VALUE(PYCBC_EXC_ENCODING, 0,
+                             "Transcoder.encode_value() returned a bad "
+                             "value for flags", orig_value);
         return -1;
     }
 
@@ -378,7 +375,9 @@ int pycbc_tc_encode_value(pycbc_ConnectionObject *conn,
     if (rv == -1) {
         Py_XDECREF(result_tuple);
 
-        PYCBC_EXC_WRAP_VALUE(PYCBC_EXC_ENCODING, 0, "Couldn't convert encoded value to bytes",
+        PYCBC_EXC_WRAP_VALUE(PYCBC_EXC_ENCODING, 0,
+                             "Value returned by Transcoder.encode_value() "
+                             "could not be converted to bytes",
                 orig_value);
         return -1;
     }
@@ -426,7 +425,6 @@ int pycbc_tc_decode_value(pycbc_ConnectionObject *conn,
     Py_XDECREF(pbuf);
 
     if (result == NULL) {
-        PYCBC_EXC_WRAP_VALUE(PYCBC_EXC_ENCODING, 0, "Couldn't decode value", pbuf);
         return -1;
     }
 
