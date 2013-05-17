@@ -14,11 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+try:
+    from urllib import urlencode
+except ImportError:
+    from urllib.parse import urlencode
+
+import json
 
 import couchbase._bootstrap
+import couchbase._libcouchbase as _LCB
 from couchbase._libcouchbase import Connection as _Base
 from couchbase.exceptions import *
 import couchbase.exceptions as exceptions
+
 
 from couchbase._libcouchbase import (
     Result, ValueResult, OperationResult, MultiResult, HttpResult, Arguments,
@@ -793,3 +801,62 @@ class Connection(_Base):
         :meth:`unlock`
         """
         return _Base.unlock_multi(self, keys)
+
+    def _view(self, ddoc, view, params=None):
+        """
+        .. warning:: This method's API is not stable
+
+        Execute a view (MapReduce) query
+
+        :param string ddoc: Name of the design document
+        :param string view: Name of the view function to execute
+        :param params: Extra options to pass to the view engine
+        :type params: string or dict
+
+        :return: a :class:`HttpResult` object.
+        """
+
+        if params:
+            if not isinstance(params, str):
+                params = urlencode(params)
+        else:
+            params = ""
+
+        url = "_design/{ddoc}/_view/{view}?{params}".format(
+            ddoc=ddoc,
+            view=view,
+            params=params)
+
+        ret = self._http_request(type=_LCB.LCB_HTTP_TYPE_VIEW,
+                                 path=url,
+                                 method=_LCB.LCB_HTTP_METHOD_GET,
+                                 response_format=FMT_JSON)
+        return ret
+
+    def _design(self, name, ddoc):
+        """
+        .. warning:: This method's API is not stable
+
+        Store a design document
+
+        :param string name: The name of the design
+        :param ddoc: The actual contents of the design document
+        :type ddoc: string or dict
+
+        If ``ddoc`` is a string, it is passed, as-is, to the server. Otherwise
+        it is serialized as JSON, and its ``_id`` field is set to
+        ``_design/{name}``.
+
+        """
+
+        fqname = "_design/{0}".format(name)
+        if isinstance(ddoc, dict):
+            ddoc = ddoc.copy()
+            ddoc['_id'] = fqname
+            ddoc = json.dumps(ddoc)
+
+        return self._http_request(type=_LCB.LCB_HTTP_TYPE_VIEW,
+                                  path=fqname,
+                                  method=_LCB.LCB_HTTP_METHOD_PUT,
+                                  post_data=ddoc,
+                                  content_type="application/json")
