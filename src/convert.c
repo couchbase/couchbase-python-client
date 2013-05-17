@@ -237,6 +237,67 @@ int pycbc_tc_simple_decode(PyObject **vp,
     return decode_common(vp, buf, nbuf, flags);
 }
 
+enum {
+    ENCODE_KEY = 1,
+    ENCODE_VALUE,
+    DECODE_KEY,
+    DECODE_VALUE
+};
+static int do_call_tc(pycbc_ConnectionObject *conn,
+                          PyObject *obj,
+                          PyObject *flags,
+                          PyObject **result,
+                          int mode)
+{
+    PyObject *meth = NULL;
+    PyObject *args = NULL;
+    PyObject *strlookup = NULL;
+    int ret = -1;
+
+    switch (mode) {
+    case ENCODE_KEY:
+        strlookup = pycbc_helpers.tcname_encode_key;
+        args = PyTuple_Pack(1, obj);
+        break;
+    case DECODE_KEY:
+        strlookup = pycbc_helpers.tcname_decode_key;
+        args = PyTuple_Pack(1, obj);
+        break;
+
+    case ENCODE_VALUE:
+        strlookup = pycbc_helpers.tcname_encode_value;
+        args = PyTuple_Pack(2, obj, flags);
+        break;
+
+    case DECODE_VALUE:
+        strlookup = pycbc_helpers.tcname_decode_value;
+        args = PyTuple_Pack(2, obj, flags);
+        break;
+    }
+    if (args == NULL) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_INTERNAL, 0, "Couldn't build arguments");
+        goto GT_DONE;
+    }
+
+    meth = PyObject_GetAttr(conn->tc, strlookup);
+    if (!meth) {
+        PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ENCODING, 0,
+                           "Couldn't find transcoder method",
+                           conn->tc);
+        goto GT_DONE;
+    }
+    *result = PyObject_Call(meth, args, NULL);
+    if (*result) {
+        ret = 0;
+    }
+
+    GT_DONE:
+    Py_XDECREF(meth);
+    Py_XDECREF(args);
+    return ret;
+}
+
+
 int pycbc_tc_encode_key(pycbc_ConnectionObject *conn,
                         PyObject **key,
                         void **buf,
@@ -246,7 +307,7 @@ int pycbc_tc_encode_key(pycbc_ConnectionObject *conn,
     Py_ssize_t plen;
 
     PyObject *orig_key;
-    PyObject *new_key;
+    PyObject *new_key = NULL;
 
     if (!conn->tc) {
         return encode_common(key, buf, nbuf, PYCBC_FMT_UTF8);
@@ -255,9 +316,9 @@ int pycbc_tc_encode_key(pycbc_ConnectionObject *conn,
     orig_key = *key;
     assert(orig_key);
 
-    new_key = PyObject_CallMethod(conn->tc, "encode_key", "(O)", orig_key);
+    rv = do_call_tc(conn, orig_key, NULL, &new_key, ENCODE_KEY);
 
-    if (new_key == NULL) {
+    if (new_key == NULL || rv < 0) {
         return -1;
     }
 
@@ -267,10 +328,19 @@ int pycbc_tc_encode_key(pycbc_ConnectionObject *conn,
         PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ENCODING,
                            0,
                            "Couldn't convert encoded key to bytes. It is "
-                           "possible that the Transcoder.decode_key method "
+                           "possible that the Transcoder.encode_key method "
                            "returned an unexpected value",
                            new_key);
 
+        Py_XDECREF(new_key);
+        return -1;
+    }
+
+    if (plen == 0) {
+        PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ENCODING,
+                           0,
+                           "Transcoder.encode_key returned an empty string",
+                           new_key);
         Py_XDECREF(new_key);
         return -1;
     }
@@ -286,7 +356,7 @@ int pycbc_tc_decode_key(pycbc_ConnectionObject *conn,
                          PyObject **pobj)
 {
     PyObject *bobj;
-
+    int rv = 0;
     if (conn->data_passthrough) {
         bobj = PyBytes_FromStringAndSize(key, nkey);
         *pobj = bobj;
@@ -296,11 +366,28 @@ int pycbc_tc_decode_key(pycbc_ConnectionObject *conn,
 
     } else {
         bobj = PyBytes_FromStringAndSize(key, nkey);
-        *pobj = PyObject_CallMethod(conn->tc, "decode_key", "(O)", bobj);
-        Py_XDECREF(bobj);
+        if (bobj) {
+            rv = do_call_tc(conn, bobj, NULL, pobj, DECODE_KEY);
+            Py_XDECREF(bobj);
+
+        } else {
+            rv = -1;
+        }
+
+        if (rv < 0) {
+            return -1;
+        }
     }
 
     if (*pobj == NULL) {
+        return -1;
+    }
+
+    if (PyObject_Hash(*pobj) == -1) {
+        PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ENCODING, 0,
+                           "Transcoder.decode_key must return a hashable object",
+                           *pobj);
+        Py_XDECREF(*pobj);
         return -1;
     }
 
@@ -316,8 +403,8 @@ int pycbc_tc_encode_value(pycbc_ConnectionObject *conn,
 {
     PyObject *flags_obj;
     PyObject *orig_value;
-    PyObject *new_value;
-    PyObject *result_tuple;
+    PyObject *new_value = NULL;
+    PyObject *result_tuple = NULL;
     unsigned long flags_stackval;
     int rv;
     Py_ssize_t plen;
@@ -328,41 +415,52 @@ int pycbc_tc_encode_value(pycbc_ConnectionObject *conn,
         flag_v = conn->dfl_fmt;
     }
 
+
     if (!conn->tc) {
-        lcb_uint32_t flags_priv = pycbc_IntAsUL(flag_v);
-        if (flags_priv == (lcb_uint32_t)-1 && PyErr_Occurred()) {
-            PyErr_Clear();
-            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS,
-                               0, "format must be an integer", flag_v);
+        rv = pycbc_get_u32(flag_v, &flags_stackval);
+        if (rv < 0) {
+            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0,
+                               "Bad value for flags",
+                               flag_v);
         }
-        *flags = flags_priv & PYCBC_FMT_MASK;
-        return encode_common(value, buf, nbuf, flags_priv);
+
+        *flags = flags_stackval & PYCBC_FMT_MASK;
+        return encode_common(value, buf, nbuf, flags_stackval);
     }
 
-    result_tuple = PyObject_CallMethod(conn->tc,
-                                       "encode_value",
-                                       "(O,O)",
-                                       orig_value,
-                                       flag_v);
-    if (!result_tuple) {
+    /**
+     * Calling into Transcoder
+     */
+
+    rv = do_call_tc(conn, orig_value, flag_v, &result_tuple, ENCODE_VALUE);
+    if (rv < 0) {
         return -1;
     }
 
-    new_value = PyTuple_GetItem(result_tuple, 0);
-    flags_obj = PyTuple_GetItem(result_tuple, 1);
+    if (!PyTuple_Check(result_tuple) || PyTuple_GET_SIZE(result_tuple) != 2) {
+        PYCBC_EXC_WRAP_EX(PYCBC_EXC_ENCODING, 0,
+                          "Expected return of (bytes, flags)",
+                          orig_value,
+                          result_tuple);
+
+        Py_XDECREF(result_tuple);
+        return -1;
+
+    }
+
+    new_value = PyTuple_GET_ITEM(result_tuple, 0);
+    flags_obj = PyTuple_GET_ITEM(result_tuple, 1);
 
     if (new_value == NULL || flags_obj == NULL) {
-        PYCBC_EXC_WRAP_VALUE(PYCBC_EXC_ENCODING, 0,
-                             "Bad return from Transcoder.encode_value()."
-                             "Expected (bytes, flags)",
-                             orig_value);
+        PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_INTERNAL, 0, "Tuple GET_ITEM had NULL",
+                           result_tuple);
 
         Py_XDECREF(result_tuple);
         return -1;
     }
 
-    flags_stackval = pycbc_IntAsUL(flags_obj);
-    if (flags_stackval == (lcb_uint32_t)-1 && PyErr_Occurred()) {
+    rv = pycbc_get_u32(flags_obj, &flags_stackval);
+    if (rv < 0) {
         Py_XDECREF(result_tuple);
         PYCBC_EXC_WRAP_VALUE(PYCBC_EXC_ENCODING, 0,
                              "Transcoder.encode_value() returned a bad "
@@ -397,9 +495,10 @@ int pycbc_tc_decode_value(pycbc_ConnectionObject *conn,
                            lcb_uint32_t flags,
                            PyObject **pobj)
 {
-    PyObject *result;
-    PyObject *pint;
-    PyObject *pbuf;
+    PyObject *result = NULL;
+    PyObject *pint = NULL;
+    PyObject *pbuf = NULL;
+    int rv;
 
     if (conn->data_passthrough == 0 && conn->tc == NULL) {
         return decode_common(pobj, value, nvalue, flags);
@@ -414,17 +513,24 @@ int pycbc_tc_decode_value(pycbc_ConnectionObject *conn,
     }
 
     pbuf = PyBytes_FromStringAndSize(value, nvalue);
-    pint = pycbc_IntFromUL(flags);
+    if (!pbuf) {
+        pbuf = PyBytes_FromString("");
+    }
 
-    result = PyObject_CallMethod(conn->tc,
-                                 "decode_value",
-                                 "(O,O)",
-                                 pbuf,
-                                 pint);
+    pint = pycbc_IntFromUL(flags);
+    if (!pint) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_INTERNAL, 0, "Couldn't create flags object");
+        rv = -1;
+        goto GT_DONE;
+    }
+
+    rv = do_call_tc(conn, pbuf, pint, &result, DECODE_VALUE);
+
+    GT_DONE:
     Py_XDECREF(pint);
     Py_XDECREF(pbuf);
 
-    if (result == NULL) {
+    if (rv < 0) {
         return -1;
     }
 

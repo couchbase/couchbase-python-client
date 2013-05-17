@@ -56,7 +56,8 @@ SOURCEMODS = (
         'get',
         'arithmetic',
         'http',
-        'htresult'
+        'htresult',
+        'ctranscoder'
         )
 
 extoptions['sources'] = [ os.path.join("src", m + ".c") for m in SOURCEMODS ]
