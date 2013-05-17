@@ -35,9 +35,8 @@ ap.add_argument('-u', '--username', default='Administrator', type=str)
 ap.add_argument('-b', '--bucket', default='default', type=str)
 ap.add_argument('-p', '--password', default="123456", type=str)
 ap.add_argument('-H', '--hostname', default='localhost', type=str)
-
-ap.add_argument('-n', '--iterations', default=10000, type=int,
-                help = "Number of operations, per thread, to perform")
+ap.add_argument('-D', '--duration', default=10, type=int,
+                help = "Duration of run (in seconds)")
 
 ap.add_argument('--ksize', default=12, type=int,
                 help = "Key size to use")
@@ -51,28 +50,29 @@ DO_UNLOCK_GIL = options.threads > 0
 class Worker(Thread):
     def __init__(self):
         self.delay = options.delay
-        self.iterations = options.iterations
         self.key = 'K' * options.ksize
         self.value = b'V' * options.vsize
         self.wait_time = 0
+        self.opcount = 0
         self.cb = Connection(bucket='default',
                         host=options.hostname,
                         unlock_gil=DO_UNLOCK_GIL)
+        self.end_time = time() + options.duration
         super(Worker, self).__init__()
 
     def run(self, *args, **kwargs):
-        iterations = self.iterations
         cb = self.cb
 
-        while iterations:
+        while time() < self.end_time:
             begin_time = time()
             rv = cb.set(self.key, self.value, format=FMT_BYTES)
             assert rv.rc == 0, "Operation failed: " + str(rv.rc)
             self.wait_time += time() - begin_time
 
-            iterations -= 1
             if self.delay:
                 sleep(self.delay)
+
+            self.opcount += 1
 
 
 global_begin = None
@@ -97,7 +97,7 @@ else:
 
 
 global_duration = time() - global_begin
-total_ops = options.iterations * len(worker_threads)
+total_ops = sum([w.opcount for w in worker_threads])
 total_time = 0
 for t in worker_threads:
     total_time += t.wait_time
