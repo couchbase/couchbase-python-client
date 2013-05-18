@@ -16,3 +16,10 @@ couchbase/__pycache__
 *.dll
 *.exe
 tests/tests.ini
+*.out*
+# My personal development stuff
+p3
+p2
+p3_nose
+p2_nose
+build*.sh
