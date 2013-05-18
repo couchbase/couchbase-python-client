@@ -285,6 +285,8 @@ Attributes
 
     .. autoattribute:: timeout
 
+    .. autoattribute:: bucket
+
     .. autoattribute:: server_nodes
 
     .. attribute:: default_format

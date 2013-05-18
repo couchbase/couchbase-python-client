@@ -208,6 +208,11 @@ static struct PyMemberDef Connection_TABLE_members[] = {
                 "This attribute can only be set from the constructor.\n")
         },
 
+        { "bucket", T_OBJECT_EX, offsetof(pycbc_Connection, bucket),
+                READONLY,
+                PyDoc_STR("Name of the bucket this object is connected to")
+        },
+
         { NULL }
 };
 
@@ -381,6 +386,9 @@ Connection__init__(pycbc_Connection *self,
     }
 
     self->unlock_gil = (unlock_gil_O && PyObject_IsTrue(unlock_gil_O));
+    if (create_opts.v.v1.bucket) {
+        self->bucket = pycbc_SimpleStringZ(create_opts.v.v1.bucket);
+    }
 
     create_opts.version = 1;
     create_opts.v.v1.type = conntype;
