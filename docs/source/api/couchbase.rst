@@ -246,7 +246,7 @@ MapReduce/View Methods
 .. class:: Connection
 
     .. warning::
-    
+
         The view API is not considered stable. It will likely change in
         the future
 
@@ -284,6 +284,8 @@ Attributes
     .. autoattribute:: unlock_gil
 
     .. autoattribute:: timeout
+
+    .. autoattribute:: bucket
 
     .. autoattribute:: server_nodes
 

@@ -38,3 +38,7 @@ class ConnectionMiscTest(CouchbaseTestCase):
         verstr, vernum = Connection.lcb_version()
         self.assertIsInstance(verstr, str)
         self.assertIsInstance(vernum, int)
+
+    def test_bucket(self):
+        bucket_str = self.cb.bucket
+        self.assertEqual(bucket_str, self.make_connargs()['bucket'])

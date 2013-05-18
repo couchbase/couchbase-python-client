@@ -214,6 +214,9 @@ typedef struct {
     /** Connection Errors */
     PyObject *errors;
 
+    /** String bucket */
+    PyObject *bucket;
+
     /** Thread state. Used to lock/unlock the GIL */
     PyThreadState *thrstate;
 
