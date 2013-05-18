@@ -18,7 +18,7 @@
 #include "oputil.h"
 
 PyObject *
-pycbc_Connection__http_request(pycbc_ConnectionObject *self,
+pycbc_Connection__http_request(pycbc_Connection *self,
                                PyObject *args,
                                PyObject *kwargs)
 {
@@ -33,7 +33,7 @@ pycbc_Connection__http_request(pycbc_ConnectionObject *self,
     pycbc_strlen_t nbody = 0;
     const char *path = NULL;
     const char *content_type = NULL;
-    pycbc_HttpResultObject *htres;
+    pycbc_HttpResult *htres;
 
     lcb_http_request_t htreq = NULL;
     lcb_http_cmd_t htcmd = { 0 };

@@ -22,7 +22,8 @@
 #include "pycbc.h"
 #if PY_MAJOR_VERSION == 2
 
-unsigned PY_LONG_LONG pycbc_IntAsULL(PyObject *o)
+unsigned PY_LONG_LONG
+pycbc_IntAsULL(PyObject *o)
 {
     if (PyLong_Check(o)) {
         return PyLong_AsUnsignedLongLong(o);
@@ -38,7 +39,8 @@ unsigned PY_LONG_LONG pycbc_IntAsULL(PyObject *o)
     }
 }
 
-PY_LONG_LONG pycbc_IntAsLL(PyObject *o)
+PY_LONG_LONG
+pycbc_IntAsLL(PyObject *o)
 {
     if (PyLong_Check(o)) {
         return PyLong_AsLongLong(o);
@@ -47,7 +49,8 @@ PY_LONG_LONG pycbc_IntAsLL(PyObject *o)
     }
 }
 
-long pycbc_IntAsL(PyObject *o)
+long
+pycbc_IntAsL(PyObject *o)
 {
     if (PyInt_Check(o)) {
         return PyInt_AsLong(o);
@@ -55,7 +58,8 @@ long pycbc_IntAsL(PyObject *o)
     return PyLong_AsLong(o);
 }
 
-unsigned long pycbc_IntAsUL(PyObject *o)
+unsigned long
+pycbc_IntAsUL(PyObject *o)
 {
     if (PyInt_Check(o)) {
         long l = PyInt_AsLong(o);
@@ -72,7 +76,8 @@ unsigned long pycbc_IntAsUL(PyObject *o)
 
 #endif /* PY_MAJOR_VERSION == 2 */
 
-PyObject *pycbc_maybe_convert_to_int(PyObject *o)
+PyObject *
+pycbc_maybe_convert_to_int(PyObject *o)
 {
     PyObject *args, *result;
     args = Py_BuildValue("(O)", o);
@@ -106,7 +111,8 @@ PyObject *pycbc_maybe_convert_to_int(PyObject *o)
  */
 
 #if PY_MAJOR_VERSION == 3
-int pycbc_BufFromString(PyObject *obj, char **key, Py_ssize_t *nkey, PyObject **newkey)
+int
+pycbc_BufFromString(PyObject *obj, char **key, Py_ssize_t *nkey, PyObject **newkey)
 {
     int rv;
     if (PyBytes_Check(obj)) {
@@ -127,7 +133,8 @@ int pycbc_BufFromString(PyObject *obj, char **key, Py_ssize_t *nkey, PyObject **
 }
 
 #else
-int pycbc_BufFromString(PyObject *obj, char **key, Py_ssize_t *nkey, PyObject **newkey)
+int
+pycbc_BufFromString(PyObject *obj, char **key, Py_ssize_t *nkey, PyObject **newkey)
 {
     int rv;
     rv = PyBytes_AsStringAndSize(obj, key, nkey);
@@ -143,7 +150,8 @@ int pycbc_BufFromString(PyObject *obj, char **key, Py_ssize_t *nkey, PyObject **
 #endif /* PY_MAJOR_VERSION == 3*/
 
 
-int pycbc_get_ttl(PyObject *obj, unsigned long *ttl, int nonzero)
+int
+pycbc_get_ttl(PyObject *obj, unsigned long *ttl, int nonzero)
 {
     if (obj == NULL || PyObject_IsTrue(obj) == 0) {
         if (!nonzero) {
@@ -169,7 +177,8 @@ int pycbc_get_ttl(PyObject *obj, unsigned long *ttl, int nonzero)
     return 0;
 }
 
-int pycbc_get_u32(PyObject *obj, unsigned long *out)
+int
+pycbc_get_u32(PyObject *obj, unsigned long *out)
 {
 
     unsigned long val = pycbc_IntAsUL(obj);

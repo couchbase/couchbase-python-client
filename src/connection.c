@@ -22,18 +22,18 @@ PyObject *pycbc_DummyTuple;
 PyObject *pycbc_DummyKeywords;
 
 static int
-Connection__init__(pycbc_ConnectionObject *self,
+Connection__init__(pycbc_Connection *self,
                    PyObject *args,
                    PyObject *kwargs);
 
 static void
-Connection_dtor(pycbc_ConnectionObject *self);
+Connection_dtor(pycbc_Connection *self);
 
 static PyObject *
-Connection_get_timeout(pycbc_ConnectionObject *self, void *);
+Connection_get_timeout(pycbc_Connection *self, void *);
 
 static int
-Connection_set_timeout(pycbc_ConnectionObject *self, PyObject *value, void *);
+Connection_set_timeout(pycbc_Connection *self, PyObject *value, void *);
 
 static PyTypeObject ConnectionType = {
         PYCBC_POBJ_HEAD_INIT(NULL)
@@ -41,18 +41,19 @@ static PyTypeObject ConnectionType = {
 };
 
 static PyObject *
-Connection_get_format(pycbc_ConnectionObject *self, void * unused)
+Connection_get_format(pycbc_Connection *self, void * unused)
 {
     if (self->dfl_fmt) {
         Py_INCREF(self->dfl_fmt);
         return self->dfl_fmt;
     }
+
     (void)unused;
     Py_RETURN_NONE;
 }
 
 static int
-Connection_set_format(pycbc_ConnectionObject *self, PyObject *value, void *unused)
+Connection_set_format(pycbc_Connection *self, PyObject *value, void *unused)
 {
     if (!PyNumber_Check(value)) {
         PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Format must be a number");
@@ -67,14 +68,15 @@ Connection_set_format(pycbc_ConnectionObject *self, PyObject *value, void *unuse
     Py_XDECREF(self->dfl_fmt);
     Py_INCREF(value);
     self->dfl_fmt = value;
+
     (void)unused;
     return 0;
 }
 
 static int
-Connection_set_transcoder(pycbc_ConnectionObject *self,
-                                     PyObject *value,
-                                     void *unused)
+Connection_set_transcoder(pycbc_Connection *self,
+                          PyObject *value,
+                          void *unused)
 {
     Py_XDECREF(self->tc);
     if (PyObject_IsTrue(value)) {
@@ -88,7 +90,7 @@ Connection_set_transcoder(pycbc_ConnectionObject *self,
 }
 
 static PyObject*
-Connection_get_transcoder(pycbc_ConnectionObject *self, void *unused)
+Connection_get_transcoder(pycbc_Connection *self, void *unused)
 {
     if (self->tc) {
         Py_INCREF(self->tc);
@@ -101,7 +103,7 @@ Connection_get_transcoder(pycbc_ConnectionObject *self, void *unused)
 }
 
 static PyObject *
-Connection_server_nodes(pycbc_ConnectionObject *self, void *unused)
+Connection_server_nodes(pycbc_Connection *self, void *unused)
 {
     const char * const *cnodes;
     const char **curnode;
@@ -130,7 +132,7 @@ Connection_server_nodes(pycbc_ConnectionObject *self, void *unused)
 }
 
 static PyObject *
-Connection_lcb_version(pycbc_ConnectionObject *self)
+Connection_lcb_version(pycbc_Connection *self)
 {
     const char *verstr;
     lcb_uint32_t vernum;
@@ -145,68 +147,75 @@ Connection_lcb_version(pycbc_ConnectionObject *self)
 }
 
 
-static PyGetSetDef Connection_getset[] = {
+static PyGetSetDef Connection_TABLE_getset[] = {
         { "timeout",
                 (getter)Connection_get_timeout,
                 (setter)Connection_set_timeout,
-                "The timeout value for operations, in seconds"
+                PyDoc_STR("The timeout value for operations, in seconds")
         },
 
         { "default_format",
                 (getter)Connection_get_format,
                 (setter)Connection_set_format,
-                "The default format to use for encoding values "
-                "(passed to transcoder)"
+                PyDoc_STR("The default format to use for encoding values "
+                "(passed to transcoder)")
         },
         { "server_nodes",
                 (getter)Connection_server_nodes,
                 NULL,
-                "Get a list of the current nodes in the cluster"
+                PyDoc_STR("Get a list of the current nodes in the cluster")
         },
 
         { "transcoder",
                 (getter)Connection_get_transcoder,
                 (setter)Connection_set_transcoder,
-                ":type transcoder: `couchbase.transcoder.Transcoder`"
+                PyDoc_STR("The :class:`~couchbase.transcoder.Transcoder` "
+                        "object being used.\n\n"
+                        ""
+                        "This is normally ``None`` unless a custom "
+                        ":class:`couchbase.transcoder.Transcoder` "
+                        "is being used\n")
         },
         { NULL }
 };
 
-static struct PyMemberDef Connection_members[] = {
-        { "_errors", T_OBJECT_EX, offsetof(pycbc_ConnectionObject, errors),
+static struct PyMemberDef Connection_TABLE_members[] = {
+        { "_errors", T_OBJECT_EX, offsetof(pycbc_Connection, errors),
                 READONLY,
-                "List of connection errors"
+                PyDoc_STR("List of connection errors")
         },
 
-        { "quiet", T_UINT, offsetof(pycbc_ConnectionObject, quiet),
+        { "quiet", T_UINT, offsetof(pycbc_Connection, quiet),
                 0,
-                "Whether to suppress errors when keys are not found (in \n"
-                ":meth:`get` and :meth:`delete` operations).\n"
+                PyDoc_STR("Whether to suppress errors when keys are not found "
+                "(in :meth:`get` and :meth:`delete` operations).\n"
                 "\n"
                 "An error is still returned within the :class:`Result`\n"
-                "object"
+                "object")
         },
 
-        { "data_passthrough", T_UINT, offsetof(pycbc_ConnectionObject, data_passthrough),
+        { "data_passthrough", T_UINT, offsetof(pycbc_Connection, data_passthrough),
                 0,
-                "When this flag is set, values are always returned as raw bytes\n"
-                "\n"
+                PyDoc_STR("When this flag is set, values are always returned "
+                        "as raw bytes\n")
         },
 
-        { "unlock_gil", T_UINT, offsetof(pycbc_ConnectionObject, unlock_gil),
+        { "unlock_gil", T_UINT, offsetof(pycbc_Connection, unlock_gil),
                 READONLY,
-                "Whether GIL manipulation is enabeld for this connection object.\n"
+                PyDoc_STR("Whether GIL manipulation is enabeld for "
+                "this connection object.\n"
                 "\n"
-                "This attribute can only be set from the constructor.\n"
+                "This attribute can only be set from the constructor.\n")
         },
 
         { NULL }
 };
 
-static PyMethodDef Connection_methods[] = {
+static PyMethodDef Connection_TABLE_methods[] = {
 
 #define OPFUNC(name, doc) \
-{ #name, (PyCFunction)pycbc_Connection_##name, METH_VARARGS|METH_KEYWORDS, doc }
+{ #name, (PyCFunction)pycbc_Connection_##name, METH_VARARGS|METH_KEYWORDS, \
+    PyDoc_STR(doc) }
 
         /** Basic Operations */
         OPFUNC(set, "Unconditionally store a key in Couchbase"),
@@ -247,6 +256,7 @@ static PyMethodDef Connection_methods[] = {
         { "lcb_version",
                 (PyCFunction)Connection_lcb_version,
                 METH_VARARGS|METH_KEYWORDS|METH_STATIC,
+                PyDoc_STR(
                 "Get `libcouchbase` version information\n"
                 "\n"
                 ":return: a tuple of ``(version_string, version_number)``\n"
@@ -261,14 +271,14 @@ static PyMethodDef Connection_methods[] = {
                 "   print(verstr)\n"
                 "   # 2.0.5\n"
                 "\n"
-                "\n"
+                "\n")
         },
 
         { NULL, NULL, 0, NULL }
 };
 
 static int
-Connection_set_timeout(pycbc_ConnectionObject *self,
+Connection_set_timeout(pycbc_Connection *self,
                        PyObject *other, void *unused)
 {
     double newval;
@@ -293,7 +303,7 @@ Connection_set_timeout(pycbc_ConnectionObject *self,
 }
 
 static PyObject *
-Connection_get_timeout(pycbc_ConnectionObject *self, void *unused)
+Connection_get_timeout(pycbc_Connection *self, void *unused)
 {
     lcb_uint32_t usecs = lcb_get_timeout(self->instance);
 
@@ -303,7 +313,7 @@ Connection_get_timeout(pycbc_ConnectionObject *self, void *unused)
 
 
 static int
-Connection__init__(pycbc_ConnectionObject *self,
+Connection__init__(pycbc_Connection *self,
                        PyObject *args, PyObject *kwargs)
 {
     int rv;
@@ -469,7 +479,7 @@ Connection__init__(pycbc_ConnectionObject *self,
 }
 
 static void
-Connection_dtor(pycbc_ConnectionObject *self)
+Connection_dtor(pycbc_Connection *self)
 {
     if (self->instance) {
         lcb_destroy(self->instance);
@@ -493,31 +503,32 @@ Connection_dtor(pycbc_ConnectionObject *self)
 }
 
 
-int pycbc_ConnectionType_init(PyObject **ptr)
+int
+pycbc_ConnectionType_init(PyObject **ptr)
 {
-    *ptr = (PyObject*)&ConnectionType;
+    PyTypeObject *p = &ConnectionType;
+    *ptr = (PyObject*)p;
 
-    if (ConnectionType.tp_name) {
+    if (p->tp_name) {
         return 0;
     }
 
-    ConnectionType.tp_name = "Connection";
+    p->tp_name = "Connection";
+    p->tp_new = PyType_GenericNew;
+    p->tp_init = (initproc)Connection__init__;
+    p->tp_dealloc = (destructor)Connection_dtor;
 
-    ConnectionType.tp_new = PyType_GenericNew;
-    ConnectionType.tp_init = (initproc)Connection__init__;
-    ConnectionType.tp_dealloc = (destructor)Connection_dtor;
+    p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+    p->tp_doc = PyDoc_STR("The connection object");
 
-    ConnectionType.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-    ConnectionType.tp_doc = "The connection object";
+    p->tp_basicsize = sizeof(pycbc_Connection);
 
-    ConnectionType.tp_basicsize = sizeof(pycbc_ConnectionObject);
-
-    ConnectionType.tp_methods = Connection_methods;
-    ConnectionType.tp_members = Connection_members;
-    ConnectionType.tp_getset = Connection_getset;
+    p->tp_methods = Connection_TABLE_methods;
+    p->tp_members = Connection_TABLE_members;
+    p->tp_getset = Connection_TABLE_getset;
 
     pycbc_DummyTuple = PyTuple_New(0);
     pycbc_DummyKeywords = PyDict_New();
 
-    return PyType_Ready(&ConnectionType);
+    return PyType_Ready(p);
 }

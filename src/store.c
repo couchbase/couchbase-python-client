@@ -16,21 +16,24 @@
 
 #include "oputil.h"
 
-static int handle_single_kv(pycbc_ConnectionObject *self,
-                            PyObject *curkey,
-                            PyObject *curvalue,
-                            PyObject *flagsobj,
-                            unsigned long ttl,
-                            int ii,
-                            int operation,
-                            struct pycbc_common_vars *cv)
+static int
+handle_single_kv(pycbc_Connection *self,
+                 PyObject *curkey,
+                 PyObject *curvalue,
+                 PyObject *flagsobj,
+                 unsigned long ttl,
+                 int ii,
+                 int operation,
+                 struct pycbc_common_vars *cv)
 {
     int rv;
     unsigned long cur_ttl = ttl;
     PyObject *opval = NULL;
     lcb_uint64_t cas = 0;
-    lcb_store_cmd_t *scmd = cv->cmds.store + ii;
     static char *opt_kwlist[] = { "value", "cas", "ttl", NULL };
+    lcb_store_cmd_t *scmd;
+
+    scmd = cv->cmds.store + ii;
 
     rv = pycbc_tc_encode_key(self,
                              &curkey,
@@ -82,8 +85,8 @@ static int handle_single_kv(pycbc_ConnectionObject *self,
 }
 
 
-static int handle_append_flags(pycbc_ConnectionObject *self,
-                               PyObject **flagsobj)
+static int
+handle_append_flags(pycbc_Connection *self, PyObject **flagsobj)
 {
     unsigned long val = 0;
 
@@ -118,7 +121,7 @@ static int handle_append_flags(pycbc_ConnectionObject *self,
 }
 
 static PyObject *
-set_common(pycbc_ConnectionObject *self,
+set_common(pycbc_Connection *self,
            PyObject *args,
            PyObject *kwargs,
            lcb_storage_t operation,
@@ -135,7 +138,7 @@ set_common(pycbc_ConnectionObject *self,
     PyObject *dict = NULL;
     PyObject *curkey;
     PyObject *curvalue;
-    pycbc_MultiResultObject *mres = NULL;
+    pycbc_MultiResult *mres = NULL;
     lcb_error_t err;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
 
@@ -225,7 +228,7 @@ set_common(pycbc_ConnectionObject *self,
         cv.cmds.store->v.v0.cas = single_cas;
     }
 
-    mres = (pycbc_MultiResultObject*)pycbc_multiresult_new(self);
+    mres = (pycbc_MultiResult*)pycbc_multiresult_new(self);
 
     /* we decrement this later */
     Py_INCREF(mres);
@@ -257,7 +260,7 @@ GT_DONE:
 }
 
 #define DECLFUNC(name, operation, mode) \
-    PyObject *pycbc_Connection_##name(pycbc_ConnectionObject *self, \
+    PyObject *pycbc_Connection_##name(pycbc_Connection *self, \
                                       PyObject *args, PyObject *kwargs) { \
     return set_common(self, args, kwargs, operation, mode); \
 }

@@ -18,7 +18,7 @@
 #include "structmember.h"
 
 static PyObject *
-HttpResult_success(pycbc_HttpResultObject *self, void *unused)
+HttpResult_success(pycbc_HttpResult *self, void *unused)
 {
     PyObject *ret = NULL;
     if (self->rc == LCB_SUCCESS && self->htcode < 300 && self->htcode > 199) {
@@ -35,34 +35,34 @@ HttpResult_success(pycbc_HttpResultObject *self, void *unused)
 }
 
 static void
-HttpResult_dealloc(pycbc_HttpResultObject *self)
+HttpResult_dealloc(pycbc_HttpResult *self)
 {
     Py_XDECREF(self->http_data);
     Py_XDECREF(self->parent);
-    pycbc_ResultBase_dealloc((pycbc_ResultBaseObject*)self);
+    pycbc_Result_dealloc((pycbc_Result*)self);
 }
 
-static struct PyMemberDef HttpResult_members[] = {
+static struct PyMemberDef HttpResult_TABLE_members[] = {
         { "http_status",
-                T_USHORT, offsetof(pycbc_HttpResultObject, htcode),
-                READONLY, "HTTP Status Code"
+                T_USHORT, offsetof(pycbc_HttpResult, htcode),
+                READONLY, PyDoc_STR("HTTP Status Code")
         },
         { "value",
-                T_OBJECT_EX, offsetof(pycbc_HttpResultObject, http_data),
-                READONLY, "HTTP Payload"
+                T_OBJECT_EX, offsetof(pycbc_HttpResult, http_data),
+                READONLY, PyDoc_STR("HTTP Payload")
         },
         { "url",
-                T_OBJECT_EX, offsetof(pycbc_HttpResultObject, key),
-                READONLY, "HTTP URI"
+                T_OBJECT_EX, offsetof(pycbc_HttpResult, key),
+                READONLY, PyDoc_STR("HTTP URI")
         },
         { NULL }
 };
 
-static PyGetSetDef HttpResult_getset[] = {
+static PyGetSetDef HttpResult_TABLE_getset[] = {
         { "success",
                 (getter)HttpResult_success,
                 NULL,
-                "Whether the HTTP request was successful"
+                PyDoc_STR("Whether the HTTP request was successful")
         },
         { NULL }
 };
@@ -72,7 +72,8 @@ PyTypeObject pycbc_HttpResultType = {
         0
 };
 
-int pycbc_HttpResultType_init(PyObject **ptr)
+int
+pycbc_HttpResultType_init(PyObject **ptr)
 {
     PyTypeObject *p = &pycbc_HttpResultType;
     *ptr = (PyObject*)p;
@@ -81,21 +82,21 @@ int pycbc_HttpResultType_init(PyObject **ptr)
         return 0;
     }
     p->tp_name = "HttpResult";
-    p->tp_doc = "Generic object returned for HTTP operations\n";
+    p->tp_doc = PyDoc_STR("Generic object returned for HTTP operations\n");
     p->tp_new = PyType_GenericNew;
-    p->tp_basicsize = sizeof(pycbc_HttpResultObject);
-    p->tp_base = &pycbc_ResultBaseType;
-    p->tp_getset = HttpResult_getset;
-    p->tp_members = HttpResult_members;
+    p->tp_basicsize = sizeof(pycbc_HttpResult);
+    p->tp_base = &pycbc_ResultType;
+    p->tp_getset = HttpResult_TABLE_getset;
+    p->tp_members = HttpResult_TABLE_members;
     p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
     p->tp_dealloc = (destructor)HttpResult_dealloc;
     return PyType_Ready(p);
 }
 
-pycbc_HttpResultObject *
-pycbc_httpresult_new(pycbc_ConnectionObject *parent)
+pycbc_HttpResult *
+pycbc_httpresult_new(pycbc_Connection *parent)
 {
-    pycbc_HttpResultObject* ret = (pycbc_HttpResultObject*)
+    pycbc_HttpResult* ret = (pycbc_HttpResult*)
             PyObject_CallFunction((PyObject*)&pycbc_HttpResultType, NULL, NULL);
     ret->parent = parent;
     Py_INCREF(parent);

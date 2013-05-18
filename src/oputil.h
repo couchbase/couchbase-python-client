@@ -142,7 +142,7 @@ extern PyObject *pycbc_DummyKeywords;
  * Examine the 'quiet' parameter and see if we should set the MultiResult's
  * 'no_raise_enoent' flag.
  */
-int pycbc_maybe_set_quiet(pycbc_MultiResultObject *mres, PyObject *quiet);
+int pycbc_maybe_set_quiet(pycbc_MultiResult *mres, PyObject *quiet);
 
 
 /**
@@ -263,7 +263,7 @@ void pycbc_common_vars_free(struct pycbc_common_vars *cv);
  */
 PyObject *pycbc_make_retval(int argopts,
                             PyObject **ret,
-                            pycbc_MultiResultObject **mres);
+                            pycbc_MultiResult **mres);
 
 
 /**
@@ -274,7 +274,7 @@ PyObject *pycbc_make_retval(int argopts,
  * We might want to expand this in the future.
  */
 #define PYCBC_DECL_OP(name) \
-        PyObject* pycbc_Connection_##name(pycbc_ConnectionObject*, PyObject*, PyObject*)
+        PyObject* pycbc_Connection_##name(pycbc_Connection*, PyObject*, PyObject*)
 
 
 /* store.c */

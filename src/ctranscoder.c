@@ -21,7 +21,8 @@
 #include "pycbc.h"
 #include "structmember.h"
 
-static PyObject *encode_key(PyObject *self, PyObject *args)
+static PyObject *
+encode_key(PyObject *self, PyObject *args)
 {
     int rv;
     char *buf;
@@ -42,7 +43,8 @@ static PyObject *encode_key(PyObject *self, PyObject *args)
     return kobj;
 }
 
-static PyObject *decode_key(PyObject *self, PyObject *args)
+static PyObject *
+decode_key(PyObject *self, PyObject *args)
 {
     int rv;
     char *buf;
@@ -68,7 +70,8 @@ static PyObject *decode_key(PyObject *self, PyObject *args)
     return bobj;
 }
 
-static PyObject *encode_value(PyObject *self, PyObject *args)
+static PyObject *
+encode_value(PyObject *self, PyObject *args)
 {
     unsigned long flags;
     int rv;
@@ -104,7 +107,8 @@ static PyObject *encode_value(PyObject *self, PyObject *args)
     return ret;
 }
 
-static PyObject *decode_value(PyObject *self, PyObject *args)
+static PyObject *
+decode_value(PyObject *self, PyObject *args)
 {
     PyObject *flagsobj;
     PyObject *vobj;
@@ -209,12 +213,14 @@ static PyMethodDef cTranscoder_methods[] = {
         { NULL }
 };
 
-void transcoder_dealloc(PyObject *o)
+static void
+transcoder_dealloc(PyObject *o)
 {
     Py_TYPE(o)->tp_free(o);
 }
 
-int pycbc_TranscoderType_init(PyObject **ptr)
+int
+pycbc_TranscoderType_init(PyObject **ptr)
 {
     PyTypeObject *p = &TranscoderType;
 
@@ -224,7 +230,7 @@ int pycbc_TranscoderType_init(PyObject **ptr)
     }
 
     p->tp_name = "Transcoder";
-    p->tp_doc = "Efficient, subclassable transcoder interface/class";
+    p->tp_doc = PyDoc_STR("Efficient, subclassable transcoder interface/class");
     p->tp_dealloc = transcoder_dealloc;
     p->tp_basicsize = sizeof(TranscoderObject);
     p->tp_methods = cTranscoder_methods;

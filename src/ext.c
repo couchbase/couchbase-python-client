@@ -23,8 +23,8 @@
 struct pycbc_helpers_ST pycbc_helpers;
 
 
-static PyObject *_libcouchbase_init_helpers(PyObject *self, PyObject *args, PyObject *kwargs)
-{
+static PyObject *
+_libcouchbase_init_helpers(PyObject *self, PyObject *args, PyObject *kwargs) {
 
 #define X(n) \
     pycbc_helpers.n = PyDict_GetItemString(kwargs, #n); \
@@ -47,7 +47,8 @@ static PyObject *_libcouchbase_init_helpers(PyObject *self, PyObject *args, PyOb
     Py_RETURN_NONE;
 }
 
-static PyObject *_libcouchbase_strerror(PyObject *self, PyObject *args, PyObject *kw)
+static PyObject *
+_libcouchbase_strerror(PyObject *self, PyObject *args, PyObject *kw)
 {
     int rv;
     int rc = 0;

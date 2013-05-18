@@ -18,10 +18,11 @@
 #include "structmember.h"
 
 
-static struct PyMemberDef MultiResult_members[] = {
+static struct PyMemberDef MultiResult_TABLE_members[] = {
         { "all_ok",
-                T_INT, offsetof(pycbc_MultiResultObject, all_ok),
-                READONLY, "Whether all the items in this result are successful"
+                T_INT, offsetof(pycbc_MultiResult, all_ok),
+                READONLY,
+                PyDoc_STR("Whether all the items in this result are successful")
         },
         { NULL }
 };
@@ -31,14 +32,13 @@ PyTypeObject pycbc_MultiResultType = {
         0
 };
 
-static PyMethodDef methods_dummy[] = {
+static PyMethodDef MultiResult_TABLE_methods[] = {
         { NULL }
 };
 
 
-static int MultiResultType__init__(pycbc_MultiResultObject *self,
-                                   PyObject *args,
-                                   PyObject *kwargs)
+static int
+MultiResultType__init__(pycbc_MultiResult *self, PyObject *args, PyObject *kwargs)
 {
     if (PyDict_Type.tp_init((PyObject*)self, args, kwargs) < 0) {
         PyErr_Print();
@@ -53,7 +53,8 @@ static int MultiResultType__init__(pycbc_MultiResultObject *self,
     return 0;
 }
 
-static void MultiResult_dealloc(pycbc_MultiResultObject *self)
+static void
+MultiResult_dealloc(pycbc_MultiResult *self)
 {
     Py_XDECREF(self->parent);
     Py_XDECREF(self->exceptions);
@@ -61,19 +62,22 @@ static void MultiResult_dealloc(pycbc_MultiResultObject *self)
     PyDict_Type.tp_dealloc((PyObject*)self);
 }
 
-int pycbc_MultiResultType_init(PyObject **ptr)
+int
+pycbc_MultiResultType_init(PyObject **ptr)
 {
-    *ptr = (PyObject*)&pycbc_MultiResultType;
-    if (pycbc_MultiResultType.tp_name) {
+    PyTypeObject *p = &pycbc_MultiResultType;
+
+    *ptr = (PyObject*)p;
+    if (p->tp_name) {
         return 0;
     }
 
-    pycbc_MultiResultType.tp_base = &PyDict_Type;
-    pycbc_MultiResultType.tp_init = (initproc)MultiResultType__init__;
-    pycbc_MultiResultType.tp_dealloc = (destructor)MultiResult_dealloc;
+    p->tp_base = &PyDict_Type;
+    p->tp_init = (initproc)MultiResultType__init__;
+    p->tp_dealloc = (destructor)MultiResult_dealloc;
 
-    pycbc_MultiResultType.tp_name = "MultiResult";
-    pycbc_MultiResultType.tp_doc =
+    p->tp_name = "MultiResult";
+    p->tp_doc = PyDoc_STR(
             ":class:`dict` subclass to hold :class:`Result` objects\n"
             "\n"
             "This object also contains some of the heavy lifting, but this\n"
@@ -81,20 +85,21 @@ int pycbc_MultiResultType_init(PyObject **ptr)
             "\n"
             "An additional method is :meth:`all_ok`, which allows to see\n"
             "if all commands completed successfully\n"
-            "\n";
+            "\n");
 
-    pycbc_MultiResultType.tp_basicsize = sizeof(pycbc_MultiResultObject);
-    pycbc_MultiResultType.tp_members = MultiResult_members;
-    pycbc_MultiResultType.tp_methods = methods_dummy;
-    pycbc_MultiResultType.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+    p->tp_basicsize = sizeof(pycbc_MultiResult);
+    p->tp_members = MultiResult_TABLE_members;
+    p->tp_methods = MultiResult_TABLE_methods;
+    p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
 
-    return PyType_Ready(&pycbc_MultiResultType);
+    return PyType_Ready(p);
 }
 
-PyObject* pycbc_multiresult_new(pycbc_ConnectionObject *parent)
+PyObject *
+pycbc_multiresult_new(pycbc_Connection *parent)
 {
-    pycbc_MultiResultObject *ret =
-            (pycbc_MultiResultObject*) PyObject_CallFunction((PyObject*) &pycbc_MultiResultType,
+    pycbc_MultiResult *ret =
+            (pycbc_MultiResult*) PyObject_CallFunction((PyObject*) &pycbc_MultiResultType,
                                                              NULL,
                                                              NULL);
     if (!ret) {
@@ -110,7 +115,8 @@ PyObject* pycbc_multiresult_new(pycbc_ConnectionObject *parent)
 /**
  * This function raises exceptions from the MultiResult object, as required
  */
-int pycbc_multiresult_maybe_raise(pycbc_MultiResultObject *self)
+int
+pycbc_multiresult_maybe_raise(pycbc_MultiResult *self)
 {
     PyObject *type = NULL, *value = NULL, *traceback = NULL;
 
@@ -120,6 +126,7 @@ int pycbc_multiresult_maybe_raise(pycbc_MultiResultObject *self)
 
     if (self->exceptions) {
         PyObject *tuple = PyList_GetItem(self->exceptions, 0);
+
         assert(tuple);
         assert(PyTuple_Size(tuple) == 3);
 
@@ -134,7 +141,7 @@ int pycbc_multiresult_maybe_raise(pycbc_MultiResultObject *self)
         assert(PyObject_IsInstance(value, pycbc_helpers.default_exception));
 
     } else {
-        pycbc_ResultBaseObject *res = (pycbc_ResultBaseObject*)self->errop;
+        pycbc_Result *res = (pycbc_Result*)self->errop;
 
         /** Craft an exception based on the operation */
         PYCBC_EXC_WRAP_KEY(PYCBC_EXC_LCBERR, res->rc, "Operational Error", res->key);

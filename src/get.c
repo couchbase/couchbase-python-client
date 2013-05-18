@@ -20,13 +20,14 @@
  */
 
 
-static int handle_single_key(pycbc_ConnectionObject *self,
-                            PyObject *curkey,
-                            PyObject *curval,
-                            unsigned long ttl,
-                            int ii,
-                            int optype,
-                            struct pycbc_common_vars *cv)
+static int
+handle_single_key(pycbc_Connection *self,
+                  PyObject *curkey,
+                  PyObject *curval,
+                  unsigned long ttl,
+                  int ii,
+                  int optype,
+                  struct pycbc_common_vars *cv)
 {
     int rv;
     char *key;
@@ -109,7 +110,7 @@ static int handle_single_key(pycbc_ConnectionObject *self,
 
 
 static PyObject*
-get_common(pycbc_ConnectionObject *self,
+get_common(pycbc_Connection *self,
            PyObject *args,
            PyObject *kwargs,
            int optype,
@@ -119,12 +120,11 @@ get_common(pycbc_ConnectionObject *self,
     int ii;
     Py_ssize_t ncmds = 0;
     size_t cmdsize;
-
     pycbc_seqtype_t seqtype;
     PyObject *ret = NULL;
     PyObject *kobj = NULL;
     PyObject *is_quiet = NULL;
-    pycbc_MultiResultObject *mres = NULL;
+    pycbc_MultiResult *mres = NULL;
     lcb_error_t err;
     PyObject *ttl_O = NULL;
     unsigned long ttl = 0;
@@ -226,7 +226,7 @@ get_common(pycbc_ConnectionObject *self,
         }
     }
 
-    mres = (pycbc_MultiResultObject*)pycbc_multiresult_new(self);
+    mres = (pycbc_MultiResult*)pycbc_multiresult_new(self);
 
     if (pycbc_maybe_set_quiet(mres, is_quiet) == -1) {
         goto GT_DONE;
@@ -265,7 +265,7 @@ GT_DONE:
 }
 
 #define DECLFUNC(name, operation, mode) \
-    PyObject *pycbc_Connection_##name(pycbc_ConnectionObject *self, \
+    PyObject *pycbc_Connection_##name(pycbc_Connection *self, \
                                       PyObject *args, PyObject *kwargs) { \
     return get_common(self, args, kwargs, operation, mode); \
 }

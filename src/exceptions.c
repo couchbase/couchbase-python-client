@@ -16,7 +16,8 @@
 
 #include "pycbc.h"
 
-void pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p)
+void
+pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p)
 {
     PyObject *type = NULL, *value = NULL, *traceback = NULL;
     PyObject *ikey;
