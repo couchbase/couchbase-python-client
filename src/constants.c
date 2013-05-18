@@ -65,7 +65,8 @@
     X(APPEND) \
     X(PREPEND)
 
-void pycbc_init_pyconstants(PyObject *module)
+void
+pycbc_init_pyconstants(PyObject *module)
 {
 #define X(b) \
     PyModule_AddIntMacro(module, LCB_##b);
@@ -99,7 +100,8 @@ void pycbc_init_pyconstants(PyObject *module)
 }
 
 
-PyObject *pycbc_lcb_errstr(lcb_t instance, lcb_error_t err)
+PyObject *
+pycbc_lcb_errstr(lcb_t instance, lcb_error_t err)
 {
 #if PY_MAJOR_VERSION == 3
 

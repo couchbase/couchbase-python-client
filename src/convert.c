@@ -22,7 +22,8 @@
 /**
  * This is only called if 'o' is not bytes
  */
-static PyObject* convert_to_bytesobj(PyObject *o)
+static PyObject*
+convert_to_bytesobj(PyObject *o)
 {
     PyObject *bytesobj = NULL;
     assert(!PyBytes_Check(o));
@@ -45,7 +46,8 @@ enum {
     CONVERT_MODE_BYTES_ONLY
 };
 
-static PyObject *convert_to_string(const char *buf, size_t nbuf, int mode)
+static PyObject *
+convert_to_string(const char *buf, size_t nbuf, int mode)
 {
     PyObject *ret = NULL;
 
@@ -70,11 +72,11 @@ static PyObject *convert_to_string(const char *buf, size_t nbuf, int mode)
     return PyBytes_FromStringAndSize(buf, nbuf);
 }
 
-static int encode_common(PyObject **o, void **buf, size_t *nbuf, lcb_uint32_t flags)
+static int
+encode_common(PyObject **o, void **buf, size_t *nbuf, lcb_uint32_t flags)
 {
     PyObject *bytesobj;
     Py_ssize_t plen;
-
     int rv;
 
     if ((flags & PYCBC_FMT_UTF8) == PYCBC_FMT_UTF8) {
@@ -160,10 +162,8 @@ static int encode_common(PyObject **o, void **buf, size_t *nbuf, lcb_uint32_t fl
     return 0;
 }
 
-static int decode_common(PyObject **vp,
-                         const char *buf,
-                         size_t nbuf,
-                         lcb_uint32_t flags)
+static int
+decode_common(PyObject **vp, const char *buf, size_t nbuf, lcb_uint32_t flags)
 {
     PyObject *decoded = NULL;
 
@@ -221,18 +221,20 @@ static int decode_common(PyObject **vp,
     return 0;
 }
 
-int pycbc_tc_simple_encode(PyObject **p,
-                           void *buf,
-                           size_t *nbuf,
-                           lcb_uint32_t flags)
+int
+pycbc_tc_simple_encode(PyObject **p,
+                       void *buf,
+                       size_t *nbuf,
+                       lcb_uint32_t flags)
 {
     return encode_common(p, buf, nbuf, flags);
 }
 
-int pycbc_tc_simple_decode(PyObject **vp,
-                           const char *buf,
-                           size_t nbuf,
-                           lcb_uint32_t flags)
+int
+pycbc_tc_simple_decode(PyObject **vp,
+                       const char *buf,
+                       size_t nbuf,
+                       lcb_uint32_t flags)
 {
     return decode_common(vp, buf, nbuf, flags);
 }
@@ -243,11 +245,12 @@ enum {
     DECODE_KEY,
     DECODE_VALUE
 };
-static int do_call_tc(pycbc_ConnectionObject *conn,
-                          PyObject *obj,
-                          PyObject *flags,
-                          PyObject **result,
-                          int mode)
+static int
+do_call_tc(pycbc_Connection *conn,
+          PyObject *obj,
+          PyObject *flags,
+          PyObject **result,
+          int mode)
 {
     PyObject *meth = NULL;
     PyObject *args = NULL;
@@ -298,10 +301,11 @@ static int do_call_tc(pycbc_ConnectionObject *conn,
 }
 
 
-int pycbc_tc_encode_key(pycbc_ConnectionObject *conn,
-                        PyObject **key,
-                        void **buf,
-                        size_t *nbuf)
+int
+pycbc_tc_encode_key(pycbc_Connection *conn,
+                    PyObject **key,
+                    void **buf,
+                    size_t *nbuf)
 {
     int rv;
     Py_ssize_t plen;
@@ -350,10 +354,11 @@ int pycbc_tc_encode_key(pycbc_ConnectionObject *conn,
     return 0;
 }
 
-int pycbc_tc_decode_key(pycbc_ConnectionObject *conn,
-                         const void *key,
-                         size_t nkey,
-                         PyObject **pobj)
+int
+pycbc_tc_decode_key(pycbc_Connection *conn,
+                     const void *key,
+                     size_t nkey,
+                     PyObject **pobj)
 {
     PyObject *bobj;
     int rv = 0;
@@ -394,12 +399,13 @@ int pycbc_tc_decode_key(pycbc_ConnectionObject *conn,
     return 0;
 }
 
-int pycbc_tc_encode_value(pycbc_ConnectionObject *conn,
-                           PyObject **value,
-                           PyObject *flag_v,
-                           void **buf,
-                           size_t *nbuf,
-                           lcb_uint32_t *flags)
+int
+pycbc_tc_encode_value(pycbc_Connection *conn,
+                       PyObject **value,
+                       PyObject *flag_v,
+                       void **buf,
+                       size_t *nbuf,
+                       lcb_uint32_t *flags)
 {
     PyObject *flags_obj;
     PyObject *orig_value;
@@ -489,11 +495,12 @@ int pycbc_tc_encode_value(pycbc_ConnectionObject *conn,
     return 0;
 }
 
-int pycbc_tc_decode_value(pycbc_ConnectionObject *conn,
-                           const void *value,
-                           size_t nvalue,
-                           lcb_uint32_t flags,
-                           PyObject **pobj)
+int
+pycbc_tc_decode_value(pycbc_Connection *conn,
+                       const void *value,
+                       size_t nvalue,
+                       lcb_uint32_t flags,
+                       PyObject **pobj)
 {
     PyObject *result = NULL;
     PyObject *pint = NULL;

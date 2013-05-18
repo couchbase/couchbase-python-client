@@ -235,7 +235,7 @@ typedef struct {
      */
     unsigned int flags;
 
-} pycbc_ConnectionObject;
+} pycbc_Connection;
 
 
 /*****************
@@ -259,26 +259,26 @@ typedef struct {
 
 typedef struct {
     pycbc_Result_HEAD
-} pycbc_ResultBaseObject;
+} pycbc_Result;
 
 typedef struct {
     pycbc_OpResult_HEAD
-} pycbc_OperationResultObject;
+} pycbc_OperationResult;
 
 typedef struct {
     pycbc_OpResult_HEAD
 
     PyObject *value;
     lcb_uint32_t flags;
-} pycbc_ValueResultObject;
+} pycbc_ValueResult;
 
 typedef struct {
     pycbc_Result_HEAD
     PyObject *http_data;
-    pycbc_ConnectionObject *parent;
+    pycbc_Connection *parent;
     unsigned short htcode;
     unsigned short format;
-} pycbc_HttpResultObject;
+} pycbc_HttpResult;
 
 /**
  * Object containing the result of a 'Multi' operation. It's the same as a
@@ -292,7 +292,7 @@ typedef struct {
     PyDictObject dict;
 
     /** parent Connection object */
-    pycbc_ConnectionObject *parent;
+    pycbc_Connection *parent;
 
     /**
      * A list of fatal exceptions, i.e. ones not resulting from a bad
@@ -308,7 +308,7 @@ typedef struct {
 
     /** Equivalent to 'quiet' in the API. Don't raise exceptions on ENOENT */
     int no_raise_enoent;
-} pycbc_MultiResultObject;
+} pycbc_MultiResult;
 
 
 /**
@@ -373,7 +373,7 @@ typedef struct {
 extern PyTypeObject pycbc_MultiResultType;
 
 /* result.c */
-extern PyTypeObject pycbc_ResultBaseType;
+extern PyTypeObject pycbc_ResultType;
 
 /* opresult.c */
 extern PyTypeObject pycbc_OperationResultType;
@@ -489,17 +489,17 @@ int pycbc_TranscoderType_init(PyObject **ptr);
 /**
  * Allocators for result functions. See callbacks.c:get_common
  */
-PyObject *pycbc_result_new(pycbc_ConnectionObject *parent);
-PyObject *pycbc_multiresult_new(pycbc_ConnectionObject *parent);
-pycbc_ValueResultObject *pycbc_valresult_new(pycbc_ConnectionObject *parent);
-pycbc_OperationResultObject *pycbc_opresult_new(pycbc_ConnectionObject *parent);
-pycbc_HttpResultObject *pycbc_httpresult_new(pycbc_ConnectionObject *parent);
+PyObject *pycbc_result_new(pycbc_Connection *parent);
+PyObject *pycbc_multiresult_new(pycbc_Connection *parent);
+pycbc_ValueResult *pycbc_valresult_new(pycbc_Connection *parent);
+pycbc_OperationResult *pycbc_opresult_new(pycbc_Connection *parent);
+pycbc_HttpResult *pycbc_httpresult_new(pycbc_Connection *parent);
 
 /**
  * Simple function, here because it's defined in result.c but needed in
  * opresult.c
  */
-void pycbc_ResultBase_dealloc(pycbc_ResultBaseObject *self);
+void pycbc_Result_dealloc(pycbc_Result *self);
 
 /**
  * Raise an exception from a multi result. This will raise an exception if:
@@ -507,7 +507,7 @@ void pycbc_ResultBase_dealloc(pycbc_ResultBaseObject *self);
  * 2) There is an 'operr'. 'operr' can be a failed LCB code (if no_raise_enoent
  * is on, this is not present if the failed code was LCB_KEY_ENOENT)
  */
-int pycbc_multiresult_maybe_raise(pycbc_MultiResultObject *self);
+int pycbc_multiresult_maybe_raise(pycbc_MultiResult *self);
 
 /**
  * Initialize the callbacks for the lcb_t
@@ -585,10 +585,10 @@ void pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p);
  * @return
  * 0 on success, nonzero on error
  */
-int pycbc_tc_encode_key(pycbc_ConnectionObject *conn,
-                         PyObject **key,
-                         void **buf,
-                         size_t *nbuf);
+int pycbc_tc_encode_key(pycbc_Connection *conn,
+                        PyObject **key,
+                        void **buf,
+                        size_t *nbuf);
 
 /**
  * Decodes a key buffer into a python object.
@@ -601,10 +601,10 @@ int pycbc_tc_encode_key(pycbc_ConnectionObject *conn,
  * @return
  * 0 on success, nonzero on error
  */
-int pycbc_tc_decode_key(pycbc_ConnectionObject *conn,
-                         const void *key,
-                         size_t nkey,
-                         PyObject **pobj);
+int pycbc_tc_decode_key(pycbc_Connection *conn,
+                        const void *key,
+                        size_t nkey,
+                        PyObject **pobj);
 
 /**
  * Encode a value with flags
@@ -617,12 +617,12 @@ int pycbc_tc_decode_key(pycbc_ConnectionObject *conn,
  * @param flags pointer to a flags variable, will be set with the appropriate
  * flags
  */
-int pycbc_tc_encode_value(pycbc_ConnectionObject *conn,
-                           PyObject **value,
-                           PyObject *flag_v,
-                           void **buf,
-                           size_t *nbuf,
-                           lcb_uint32_t *flags);
+int pycbc_tc_encode_value(pycbc_Connection *conn,
+                          PyObject **value,
+                          PyObject *flag_v,
+                          void **buf,
+                          size_t *nbuf,
+                          lcb_uint32_t *flags);
 
 /**
  * Decode a value with flags
@@ -632,11 +632,11 @@ int pycbc_tc_encode_value(pycbc_ConnectionObject *conn,
  * @param flags flags as received from the server
  * @param pobj the pythonized value
  */
-int pycbc_tc_decode_value(pycbc_ConnectionObject *conn,
-                           const void *value,
-                           size_t nvalue,
-                           lcb_uint32_t flags,
-                           PyObject **pobj);
+int pycbc_tc_decode_value(pycbc_Connection *conn,
+                          const void *value,
+                          size_t nvalue,
+                          lcb_uint32_t flags,
+                          PyObject **pobj);
 
 
 

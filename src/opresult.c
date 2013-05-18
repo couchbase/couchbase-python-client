@@ -18,9 +18,11 @@
 #include "structmember.h"
 
 
-static PyObject *ValueResult_value(pycbc_ValueResultObject *self, void *closure)
+static PyObject *
+ValueResult_value(pycbc_ValueResult *self, void *closure)
 {
     (void)closure;
+
     if (!self->value) {
         Py_INCREF(Py_None);
         return Py_None;
@@ -29,39 +31,41 @@ static PyObject *ValueResult_value(pycbc_ValueResultObject *self, void *closure)
     return self->value;
 }
 
-static void OperationResult_dealloc(pycbc_OperationResultObject *self)
+static void
+OperationResult_dealloc(pycbc_OperationResult *self)
 {
-    pycbc_ResultBase_dealloc((pycbc_ResultBaseObject*)self);
+    pycbc_Result_dealloc((pycbc_Result*)self);
 }
 
-static void ValueResult_dealloc(pycbc_ValueResultObject *self)
+static void
+ValueResult_dealloc(pycbc_ValueResult *self)
 {
     Py_XDECREF(self->value);
-    OperationResult_dealloc((pycbc_OperationResultObject*)self);
+    OperationResult_dealloc((pycbc_OperationResult*)self);
 }
 
 
-static struct PyMemberDef OperationResult_members[] = {
+static struct PyMemberDef OperationResult_TABLE_members[] = {
         { "cas",
-                T_ULONGLONG, offsetof(pycbc_OperationResultObject, cas),
-                READONLY, "CAS For the key"
+                T_ULONGLONG, offsetof(pycbc_OperationResult, cas),
+                READONLY, PyDoc_STR("CAS For the key")
         },
         { NULL }
 };
 
-static struct PyMemberDef ValueResult_members[] = {
+static struct PyMemberDef ValueResult_TABLE_members[] = {
         { "flags",
-                T_ULONG, offsetof(pycbc_ValueResultObject, flags),
-                READONLY, "Flags for the value"
+                T_ULONG, offsetof(pycbc_ValueResult, flags),
+                READONLY, PyDoc_STR("Flags for the value")
         },
         { NULL }
 };
 
-static PyGetSetDef ValueResult_getset[] = {
+static PyGetSetDef ValueResult_TABLE_getset[] = {
         { "value",
                 (getter)ValueResult_value,
                 NULL,
-                "Value for the operation"
+                PyDoc_STR("Value for the operation")
         },
         { NULL }
 };
@@ -76,7 +80,8 @@ PyTypeObject pycbc_ValueResultType = {
         0
 };
 
-int pycbc_ValueResultType_init(PyObject **ptr)
+int
+pycbc_ValueResultType_init(PyObject **ptr)
 {
     PyTypeObject *p = &pycbc_ValueResultType;
     *ptr = (PyObject*)p;
@@ -87,19 +92,21 @@ int pycbc_ValueResultType_init(PyObject **ptr)
     }
 
     p->tp_name = "ValueResult";
-    p->tp_doc =  "The result type returned for operations which retrieve a value\n";
+    p->tp_doc =  PyDoc_STR(
+            "The result type returned for operations which retrieve a value\n");
     p->tp_new = PyType_GenericNew;
-    p->tp_basicsize = sizeof(pycbc_ValueResultObject);
+    p->tp_basicsize = sizeof(pycbc_ValueResult);
     p->tp_base = &pycbc_OperationResultType;
-    p->tp_getset = ValueResult_getset;
+    p->tp_getset = ValueResult_TABLE_getset;
     p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-    p->tp_members = ValueResult_members;
+    p->tp_members = ValueResult_TABLE_members;
     p->tp_dealloc = (destructor)ValueResult_dealloc;
 
     return PyType_Ready(p);
 }
 
-int pycbc_OperationResultType_init(PyObject **ptr)
+int
+pycbc_OperationResultType_init(PyObject **ptr)
 {
     PyTypeObject *p = &pycbc_OperationResultType;
 
@@ -109,28 +116,29 @@ int pycbc_OperationResultType_init(PyObject **ptr)
     }
 
     p->tp_name = "OperationResult";
-    p->tp_doc = "Result type returned for operations which do not fetch data\n";
-    p->tp_basicsize = sizeof(pycbc_OperationResultObject);
-    p->tp_base = &pycbc_ResultBaseType;
-    p->tp_members = OperationResult_members;
+    p->tp_doc = PyDoc_STR(
+            "Result type returned for operations which do not fetch data\n");
+    p->tp_basicsize = sizeof(pycbc_OperationResult);
+    p->tp_base = &pycbc_ResultType;
+    p->tp_members = OperationResult_TABLE_members;
     p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
     p->tp_dealloc = (destructor)OperationResult_dealloc;
 
     return PyType_Ready(p);
 }
 
-pycbc_ValueResultObject *
-pycbc_valresult_new(pycbc_ConnectionObject *parent)
+pycbc_ValueResult *
+pycbc_valresult_new(pycbc_Connection *parent)
 {
     (void)parent;
-    return (pycbc_ValueResultObject*)
+    return (pycbc_ValueResult*)
             PyObject_CallFunction((PyObject*)&pycbc_ValueResultType, NULL, NULL);
 }
 
-pycbc_OperationResultObject *
-pycbc_opresult_new(pycbc_ConnectionObject *parent)
+pycbc_OperationResult *
+pycbc_opresult_new(pycbc_Connection *parent)
 {
     (void)parent;
-    return (pycbc_OperationResultObject*)
+    return (pycbc_OperationResult*)
             PyObject_CallFunction((PyObject*)&pycbc_OperationResultType, NULL, NULL);
 }

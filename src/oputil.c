@@ -16,7 +16,8 @@
 
 #include "oputil.h"
 
-void pycbc_common_vars_free(struct pycbc_common_vars *cv)
+void
+pycbc_common_vars_free(struct pycbc_common_vars *cv)
 {
     int ii;
 
@@ -43,12 +44,14 @@ void pycbc_common_vars_free(struct pycbc_common_vars *cv)
     }
 }
 
-int pycbc_common_vars_init(struct pycbc_common_vars *cv,
-                            Py_ssize_t ncmds,
-                            size_t tsize,
-                            int want_vals)
+int
+pycbc_common_vars_init(struct pycbc_common_vars *cv,
+                        Py_ssize_t ncmds,
+                        size_t tsize,
+                        int want_vals)
 {
     int ok;
+
     cv->ncmds = ncmds;
 
     /**
@@ -95,10 +98,11 @@ int pycbc_common_vars_init(struct pycbc_common_vars *cv,
 #define _is_not_strtype(o) \
     (PyBytes_Check(o) == 0 && PyByteArray_Check(o) == 0 && PyUnicode_Check(o) == 0)
 
-int pycbc_oputil_check_sequence(PyObject *sequence,
-                           int allow_list,
-                           Py_ssize_t *ncmds,
-                           pycbc_seqtype_t *seqtype)
+int
+pycbc_oputil_check_sequence(PyObject *sequence,
+                            int allow_list,
+                            Py_ssize_t *ncmds,
+                            pycbc_seqtype_t *seqtype)
 {
     int ret = 0;
     pycbc_seqtype_t dummy;
@@ -159,7 +163,8 @@ int pycbc_oputil_check_sequence(PyObject *sequence,
     return ret;
 }
 
-int pycbc_maybe_set_quiet(pycbc_MultiResultObject *mres, PyObject *quiet)
+int
+pycbc_maybe_set_quiet(pycbc_MultiResult *mres, PyObject *quiet)
 {
     /**
      * If quiet is 'None', then we default to Connection.quiet
@@ -178,9 +183,8 @@ int pycbc_maybe_set_quiet(pycbc_MultiResultObject *mres, PyObject *quiet)
     return 0;
 }
 
-PyObject *pycbc_make_retval(int argopts,
-                            PyObject **ret,
-                            pycbc_MultiResultObject **mres)
+PyObject *
+pycbc_make_retval(int argopts, PyObject **ret, pycbc_MultiResult **mres)
 {
     Py_ssize_t dictpos = 0;
     PyObject *key, *value;

@@ -28,12 +28,13 @@
 /**
  * This is called during each iteration of delete/unlock
  */
-static int handle_single_keyop(pycbc_ConnectionObject *self,
-                               PyObject *curkey,
-                               PyObject *curval,
-                               int ii,
-                               int optype,
-                               struct pycbc_common_vars *cv)
+static int
+handle_single_keyop(pycbc_Connection *self,
+                    PyObject *curkey,
+                    PyObject *curval,
+                    int ii,
+                    int optype,
+                    struct pycbc_common_vars *cv)
 {
     int rv;
     char *key;
@@ -59,7 +60,7 @@ static int handle_single_keyop(pycbc_ConnectionObject *self,
 
         } else if (PYCBC_OPRES_CHECK(curval)) {
             /* If we're passed a Result object, just extract its CAS */
-            cas = ((pycbc_OperationResultObject*)curval)->cas;
+            cas = ((pycbc_OperationResult*)curval)->cas;
 
         } else if (PyNumber_Check(curval)) {
             cas = pycbc_IntAsULL(curval);
@@ -100,12 +101,12 @@ static int handle_single_keyop(pycbc_ConnectionObject *self,
     }
 }
 
-PyObject *
-keyop_common(pycbc_ConnectionObject *self,
-                         PyObject *args,
-                         PyObject *kwargs,
-                         int optype,
-                         int argopts)
+static PyObject *
+keyop_common(pycbc_Connection *self,
+             PyObject *args,
+             PyObject *kwargs,
+             int optype,
+             int argopts)
 {
     int rv;
     int ii;
@@ -116,7 +117,7 @@ keyop_common(pycbc_ConnectionObject *self,
     PyObject *ret = NULL;
     PyObject *is_quiet = NULL;
     PyObject *kobj = NULL;
-    pycbc_MultiResultObject *mres = NULL;
+    pycbc_MultiResult *mres = NULL;
     lcb_error_t err;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
 
@@ -200,7 +201,7 @@ keyop_common(pycbc_ConnectionObject *self,
         }
     }
 
-    mres = (pycbc_MultiResultObject*)pycbc_multiresult_new(self);
+    mres = (pycbc_MultiResult*)pycbc_multiresult_new(self);
 
 
     if (optype == PYCBC_CMD_DELETE) {
@@ -242,7 +243,7 @@ keyop_common(pycbc_ConnectionObject *self,
 
 
 #define DECLFUNC(name, operation, mode) \
-    PyObject *pycbc_Connection_##name(pycbc_ConnectionObject *self, \
+    PyObject *pycbc_Connection_##name(pycbc_Connection *self, \
                                       PyObject *args, PyObject *kwargs) { \
     return keyop_common(self, args, kwargs, operation, mode); \
 }
@@ -254,7 +255,9 @@ DECLFUNC(unlock_multi, PYCBC_CMD_UNLOCK, PYCBC_ARGOPT_MULTI)
 
 
 PyObject *
-pycbc_Connection__stats(pycbc_ConnectionObject *self, PyObject *args, PyObject *kwargs)
+pycbc_Connection__stats(pycbc_Connection *self,
+                        PyObject *args,
+                        PyObject *kwargs)
 {
     int rv;
     int ii;
@@ -262,7 +265,7 @@ pycbc_Connection__stats(pycbc_ConnectionObject *self, PyObject *args, PyObject *
     lcb_error_t err;
     PyObject *keys = NULL;
     PyObject *ret = NULL;
-    pycbc_MultiResultObject *mres = NULL;
+    pycbc_MultiResult *mres = NULL;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
     static char *kwlist[] = {  "keys", NULL };
 
@@ -318,7 +321,7 @@ pycbc_Connection__stats(pycbc_ConnectionObject *self, PyObject *args, PyObject *
     }
 
 
-    mres = (pycbc_MultiResultObject*)pycbc_multiresult_new(self);
+    mres = (pycbc_MultiResult*)pycbc_multiresult_new(self);
 
     err = lcb_server_stats(self->instance, mres, ncmds, cv.cmdlist.stats);
     if (err != LCB_SUCCESS) {

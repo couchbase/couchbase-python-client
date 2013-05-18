@@ -23,13 +23,14 @@ struct arithmetic_common_vars {
     int create;
 };
 
-static int handle_single_arith(pycbc_ConnectionObject *self,
-                               PyObject *curkey,
-                               PyObject *curvalue,
-                               struct arithmetic_common_vars *av,
-                               int ii,
-                               int optype,
-                               struct pycbc_common_vars *cv)
+static int
+handle_single_arith(pycbc_Connection *self,
+                    PyObject *curkey,
+                    PyObject *curvalue,
+                    struct arithmetic_common_vars *av,
+                    int ii,
+                    int optype,
+                    struct pycbc_common_vars *cv)
 {
     void *key;
     size_t nkey;
@@ -103,7 +104,7 @@ static int handle_single_arith(pycbc_ConnectionObject *self,
 }
 
 PyObject *
-arithmetic_common(pycbc_ConnectionObject *self,
+arithmetic_common(pycbc_Connection *self,
                                    PyObject *args,
                                    PyObject *kwargs,
                                    int optype,
@@ -118,7 +119,7 @@ arithmetic_common(pycbc_ConnectionObject *self,
     PyObject *all_ttl_O = NULL;
     PyObject *collection;
     PyObject *ret = NULL;
-    pycbc_MultiResultObject *mres = NULL;
+    pycbc_MultiResult *mres = NULL;
     lcb_error_t err;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
 
@@ -214,7 +215,7 @@ arithmetic_common(pycbc_ConnectionObject *self,
         }
     }
 
-    mres = (pycbc_MultiResultObject*)pycbc_multiresult_new(self);
+    mres = (pycbc_MultiResult*)pycbc_multiresult_new(self);
 
     err = lcb_arithmetic(self->instance, mres, ncmds, cv.cmdlist.arith);
     if (err != LCB_SUCCESS) {
@@ -244,7 +245,7 @@ arithmetic_common(pycbc_ConnectionObject *self,
 }
 
 #define DECLFUNC(name, operation, mode) \
-    PyObject *pycbc_Connection_##name(pycbc_ConnectionObject *self, \
+    PyObject *pycbc_Connection_##name(pycbc_Connection *self, \
                                       PyObject *args, PyObject *kwargs) { \
     return arithmetic_common(self, args, kwargs, operation, mode); \
 }
