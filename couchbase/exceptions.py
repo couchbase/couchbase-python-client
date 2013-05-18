@@ -102,6 +102,13 @@ class CouchbaseError(Exception):
         extra += ">"
         return extra
 
+class InternalSDKError(CouchbaseError):
+    """
+    This means the SDK has done something wrong. Get support.
+    (this doesn't mean *you* didn't do anything wrong, it does mean you should
+    not be seeing this message)
+    """
+
 class CouchbaseNetworkError(CouchbaseError):
     """
     Base class for network-related errors. These indicate issues in the low
@@ -322,5 +329,6 @@ _LCB_ERRNO_MAP = {
 
 _EXCTYPE_MAP = {
     C.PYCBC_EXC_ARGUMENTS : ArgumentError,
-    C.PYCBC_EXC_ENCODING : ValueFormatError
+    C.PYCBC_EXC_ENCODING : ValueFormatError,
+    C.PYCBC_EXC_INTERNAL : InternalSDKError
 }
