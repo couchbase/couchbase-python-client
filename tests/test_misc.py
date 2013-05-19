@@ -42,3 +42,6 @@ class ConnectionMiscTest(CouchbaseTestCase):
     def test_bucket(self):
         bucket_str = self.cb.bucket
         self.assertEqual(bucket_str, self.make_connargs()['bucket'])
+
+    def test_conn_repr(self):
+        repr(self.cb)

@@ -860,3 +860,13 @@ class Connection(_Base):
                                   method=_LCB.LCB_HTTP_METHOD_PUT,
                                   post_data=ddoc,
                                   content_type="application/json")
+
+
+    def __repr__(self):
+        return ("<{modname}.{cls} bucket={bucket}, "
+                "nodes={nodes}> at 0x{oid:x}>").format(
+            modname = __name__,
+            cls = self.__class__.__name__,
+            nodes = self.server_nodes,
+            bucket = self.bucket,
+            oid = id(self))
