@@ -1,5 +1,5 @@
-pylibcouchbase
-==============
+Official Couchbase Python Client
+================================
 
 This is the new and improved Couchbase Python SDK. It is still in stages
 of development but is making rapid progress. It is based on the common
