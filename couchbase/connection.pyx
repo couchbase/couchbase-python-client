@@ -42,7 +42,7 @@ cdef void cb_get_callback(lcb.lcb_t instance, const void *cookie,
 
     if resp.v.v0.nbytes != 0:
         raw = (<char *>resp.v.v0.bytes)[:resp.v.v0.nbytes]
-        if ctx['force_format'] is not None:
+        if 'force_format' in ctx and ctx['force_format'] is not None:
             format = ctx['force_format']
         else:
             format = flags & FMT_MASK
@@ -1381,7 +1381,7 @@ cdef class Connection:
         _jsonify_params = ("endkey", "startkey", "key", "keys")
         # Also, some types need to be turned from Python to JSON.
         _convert_params = ("descending", "full_set", "group", "reduce",
-                           "inclusive_end")
+                           "inclusive_end", "include_docs")
         for param in _convert_params:
             if param in params:
                 params[param] = json.dumps(params[param])
