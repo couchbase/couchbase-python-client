@@ -7,7 +7,8 @@ try:
     import sys
     import os
     _virtual_env = os.environ.get('VIRTUAL_ENV', "__NONE__")
-    _lib_path = [p for p in sys.path if p.startswith(_virtual_env) and not
+    _lib_path = [p for p in sys.path if p.startswith(_virtual_env) and
+                 "site-packages" in p and not
                  (p.endswith('egg') or p.endswith('egg-info'))]
     # now _lib_path should be a site-packages or similar directory
     _to_dir = _lib_path[0]
