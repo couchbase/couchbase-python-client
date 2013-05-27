@@ -453,26 +453,25 @@ Connection__init__(pycbc_Connection *self,
         return -1;
     }
 
-    if (self->dfl_fmt) {
-        if (self->dfl_fmt != Py_None) {
-            if (!PyNumber_Check(self->dfl_fmt)) {
-                PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err,
-                               "default_format must be number or None");
-                return -1;
-            }
-        } else {
-            self->dfl_fmt = NULL;
-        }
-    }
-
-    if (!self->dfl_fmt) {
+    if (self->dfl_fmt == Py_None || self->dfl_fmt == NULL) {
+        /**
+         * If it's NULL or None, we simply make the default format a '0'
+         */
         self->dfl_fmt = pycbc_IntFromL(0);
 
     } else {
-        Py_INCREF(self->dfl_fmt);
-    }
+        /**
+         * Otherwise, we need to validate it's a number:
+         */
+        if (!PyNumber_Check(self->dfl_fmt)) {
+            PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err,
+                           "default_format must be number or None");
+            return -1;
+        }
 
-    if (self->dfl_fmt && self->dfl_fmt != Py_None) {
+        /**
+         * If validation passes, we increment its reference count
+         */
         Py_INCREF(self->dfl_fmt);
     }
 
