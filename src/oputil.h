@@ -266,6 +266,14 @@ PyObject *pycbc_make_retval(int argopts,
                             pycbc_MultiResult **mres);
 
 
+
+/**
+ * Wrapper around lcb_wait(). This ensures threading contexts are properly
+ * initialized.
+ */
+lcb_error_t
+pycbc_oputil_wait_common(pycbc_Connection *self);
+
 /**
  * Macro to declare prototypes for entry points.
  * If the entry point is foo, then it is expected that there exist a C

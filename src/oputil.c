@@ -274,3 +274,13 @@ pycbc_oputil_sequence_next(pycbc_seqtype_t seqtype,
 
     return 0;
 }
+
+lcb_error_t
+pycbc_oputil_wait_common(pycbc_Connection *self)
+{
+    lcb_error_t ret;
+    PYCBC_CONN_THR_BEGIN(self);
+    ret = lcb_wait(self->instance);
+    PYCBC_CONN_THR_END(self);
+    return ret;
+}
