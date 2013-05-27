@@ -219,9 +219,7 @@ keyop_common(pycbc_Connection *self,
         goto GT_DONE;
     }
 
-    PYCBC_CONN_THR_BEGIN(self);
-    err = lcb_wait(self->instance);
-    PYCBC_CONN_THR_END(self);
+    err = pycbc_oputil_wait_common(self);
 
     if (err != LCB_SUCCESS) {
         PYCBC_EXCTHROW_WAIT(err);
@@ -329,9 +327,7 @@ pycbc_Connection__stats(pycbc_Connection *self,
         goto GT_DONE;
     }
 
-    PYCBC_CONN_THR_BEGIN(self);
-    err = lcb_wait(self->instance);
-    PYCBC_CONN_THR_END(self);
+    err = pycbc_oputil_wait_common(self);
 
     if (err != LCB_SUCCESS) {
         PYCBC_EXCTHROW_WAIT(err);

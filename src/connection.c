@@ -442,9 +442,7 @@ Connection__init__(pycbc_Connection *self,
     }
 
 
-    PYCBC_CONN_THR_BEGIN(self);
-    err = lcb_wait(self->instance);
-    PYCBC_CONN_THR_END(self);
+    err = pycbc_oputil_wait_common(self);
 
     if (err != LCB_SUCCESS) {
         PYCBC_EXCTHROW_WAIT(err);
