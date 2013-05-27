@@ -371,6 +371,7 @@ Connection__init__(pycbc_Connection *self,
 
     self->init_called = 1;
     self->flags = 0;
+    self->unlock_gil = 1;
 
     #define X(s, target, type) target,
     rv = PyArg_ParseTupleAndKeywords(args,
@@ -385,7 +386,10 @@ Connection__init__(pycbc_Connection *self,
         return -1;
     }
 
-    self->unlock_gil = (unlock_gil_O && PyObject_IsTrue(unlock_gil_O));
+    if (unlock_gil_O && PyObject_IsTrue(unlock_gil_O) == 0) {
+        self->unlock_gil = 0;
+    }
+
     if (create_opts.v.v1.bucket) {
         self->bucket = pycbc_SimpleStringZ(create_opts.v.v1.bucket);
     }
