@@ -16,7 +16,8 @@
 #
 
 from tests.base import CouchbaseTestCase
-from couchbase.libcouchbase import Connection
+from couchbase.libcouchbase import Connection, FMT_JSON
+from couchbase import Couchbase
 
 class ConnectionMiscTest(CouchbaseTestCase):
     def setUp(self):
@@ -45,3 +46,25 @@ class ConnectionMiscTest(CouchbaseTestCase):
 
     def test_conn_repr(self):
         repr(self.cb)
+
+
+    def test_connection_defaults(self):
+        ctor_params = self.make_connargs()
+        # XXX: Change these if any of the defaults change
+        defaults = {
+            'timeout' : 2.5,
+            'quiet' : False,
+            'default_format' : FMT_JSON,
+            'unlock_gil' : True,
+            'transcoder' : None
+        }
+
+        cb_ctor = Connection(**ctor_params)
+        cb_connect = Couchbase.connect(**ctor_params)
+
+        for option, value in defaults.items():
+            actual = getattr(cb_ctor, option)
+            self.assertEqual(actual, value)
+
+            actual = getattr(cb_connect, option)
+            self.assertEqual(actual, value)
