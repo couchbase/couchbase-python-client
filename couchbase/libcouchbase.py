@@ -36,6 +36,26 @@ from couchbase._libcouchbase import (
 from collections import deque
 
 class Connection(_Base):
+
+    def _gen_host_string(self, host, port):
+        if not isinstance(host, (tuple, list)):
+            return "{0}:{1}".format(host, port)
+
+        hosts_tmp = []
+        for curhost in host:
+            cur_hname = None
+            cur_hport = None
+            if isinstance(curhost, (list, tuple)):
+                cur_hname, cur_hport = curhost
+            else:
+                cur_hname = curhost
+                cur_hport = port
+
+            hosts_tmp.append("{0}:{1}".format(cur_hname, cur_hport))
+
+        host = ";".join(hosts_tmp)
+
+
     def __init__(self, **kwargs):
         """Connection to a bucket.
 
@@ -48,11 +68,6 @@ class Connection(_Base):
         host = kwargs.get('host', 'localhost')
         username = kwargs.get('username', None)
         password = kwargs.get('password', None)
-        conncache = kwargs.get('conncache', None)
-        quiet = kwargs.get('quiet', False)
-        unlock_gil = kwargs.get('unlock_gil', False)
-        timeout = kwargs.get('timeout', 2.5)
-        transcoder = kwargs.get('transcoder', None)
 
         # We don't pass this to the actual constructor
         port = kwargs.pop('port', 8091)
@@ -61,31 +76,16 @@ class Connection(_Base):
         if not bucket:
             raise exceptions.ArgumentError("A bucket name must be given")
 
-        if isinstance(host, (tuple, list)):
-            hosts_tmp = []
-            for curhost in host:
-                cur_hname = None
-                cur_hport = None
-                if isinstance(curhost, (list, tuple)):
-                    cur_hname, cur_hport = curhost
-                else:
-                    cur_hname = curhost
-                    cur_hport = port
 
-                hosts_tmp.append("{0}:{1}".format(cur_hname, cur_hport))
-
-            host = ";".join(hosts_tmp)
-        else:
-            host = "{0}:{1}".format(host, port)
-
-        kwargs['host'] = host
+        kwargs['host'] = self._gen_host_string(host, port)
         kwargs['bucket'] = bucket
 
         if password and not username:
             kwargs['username'] = bucket
 
+
+        # Internal parameters
         kwargs['_errors'] = deque(maxlen=1000)
-        kwargs['_flags'] = 0
 
         try:
             super(Connection, self).__init__(**kwargs)
