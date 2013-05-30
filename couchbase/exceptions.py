@@ -75,6 +75,13 @@ class CouchbaseError(Exception):
         self.objextra = params.get('objextra', None)
         self.message = params.get('message', None)
 
+
+    @classmethod
+    def pyexc(cls, message=None, obj=None, inner=None):
+        return cls({'message':message,
+                    'objextra':obj,
+                    'inner_cause' : inner})
+
     def __str__(self):
         extra = "<"
 
