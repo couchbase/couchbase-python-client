@@ -23,7 +23,6 @@ HttpResult_success(pycbc_HttpResult *self, void *unused)
     PyObject *ret = NULL;
     if (self->rc == LCB_SUCCESS && self->htcode < 300 && self->htcode > 199) {
         ret = Py_True;
-        return Py_True;
     } else {
         ret = Py_False;
     }
