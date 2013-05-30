@@ -14,11 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-try:
-    from urllib import urlencode
-except ImportError:
-    from urllib.parse import urlencode
-
 import json
 
 import couchbase._bootstrap
@@ -26,7 +21,7 @@ import couchbase._libcouchbase as _LCB
 from couchbase._libcouchbase import Connection as _Base
 from couchbase.exceptions import *
 import couchbase.exceptions as exceptions
-
+from couchbase.views.params import make_dvpath, make_options_string
 
 from couchbase._libcouchbase import (
     Result, ValueResult, OperationResult, MultiResult, HttpResult, Arguments,
@@ -803,7 +798,10 @@ class Connection(_Base):
         """
         return _Base.unlock_multi(self, keys)
 
-    def _view(self, ddoc, view, params=None):
+    def _view(self, ddoc, view,
+              params=None,
+              unrecognized_ok=False,
+              passthrough=False):
         """
         .. warning:: This method's API is not stable
 
@@ -819,14 +817,14 @@ class Connection(_Base):
 
         if params:
             if not isinstance(params, str):
-                params = urlencode(params)
+                params = make_options_string(
+                    params,
+                    unrecognized_ok=unrecognized_ok,
+                    passthrough=passthrough)
         else:
             params = ""
 
-        url = "_design/{ddoc}/_view/{view}?{params}".format(
-            ddoc=ddoc,
-            view=view,
-            params=params)
+        url = make_dvpath(ddoc, view) + params
 
         ret = self._http_request(type=_LCB.LCB_HTTP_TYPE_VIEW,
                                  path=url,
@@ -861,7 +859,6 @@ class Connection(_Base):
                                   method=_LCB.LCB_HTTP_METHOD_PUT,
                                   post_data=ddoc,
                                   content_type="application/json")
-
 
     def __repr__(self):
         return ("<{modname}.{cls} bucket={bucket}, "

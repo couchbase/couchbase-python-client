@@ -17,6 +17,7 @@ Contents:
    api/transcoder
    api/threads
    api/convertfuncs
+   api/views
 
 Indices and tables
 ==================

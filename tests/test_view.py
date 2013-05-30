@@ -87,12 +87,11 @@ class ConnectionViewTest(ConnectionTestCase):
 
     def test_with_jparams(self):
         jkey_pure = '2009/01/15 15:52:20'
-        jkey = json.dumps(jkey_pure)
 
         ret = self.cb._view("blog", "recent_posts",
                             params={
-                                'startkey' : jkey,
-                                'endkey' : jkey,
+                                'startkey' : jkey_pure,
+                                'endkey' : jkey_pure,
                                 'inclusive_end' : 'true'
                             })
         print(ret)
@@ -109,11 +108,9 @@ class ConnectionViewTest(ConnectionTestCase):
             curdate = v['date']
             jkey_pure.append(curdate)
 
-        jkey = json.dumps(jkey_pure)
-
         ret = self.cb._view("blog", "recent_posts",
                             params={
-                                'keys' : jkey
+                                'keys' : jkey_pure
                             })
         self.assertTrue(ret.success)
         self.assertTrue(len(ret.value['rows']), 3)
