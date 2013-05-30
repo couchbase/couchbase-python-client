@@ -417,6 +417,12 @@ extern PyObject *pycbc_ExceptionType;
     X(misc_errno_map) \
     X(default_exception)
 
+#define PYCBC_XHELPERS_STRS(X) \
+    X(tcname_encode_key, PYCBC_TCNAME_ENCODE_KEY) \
+    X(tcname_encode_value, PYCBC_TCNAME_ENCODE_VALUE) \
+    X(tcname_decode_key, PYCBC_TCNAME_DECODE_KEY) \
+    X(tcname_decode_value, PYCBC_TCNAME_DECODE_VALUE)
+
 /**
  * Definition of global helpers. This is only instantiated once as
  * pycbc_helpers.
@@ -426,13 +432,9 @@ struct pycbc_helpers_ST {
     PYCBC_XHELPERS(X)
     #undef X
 
-    /**
-     * Transcoder names
-     */
-    PyObject *tcname_encode_key;
-    PyObject *tcname_encode_value;
-    PyObject *tcname_decode_key;
-    PyObject *tcname_decode_value;
+    #define X(n, s) PyObject *n;
+    PYCBC_XHELPERS_STRS(X)
+    #undef X
 };
 
 /**
