@@ -177,10 +177,9 @@ init_libcouchbase(void)
     /**
      * Initialize the helper names
      */
-    pycbc_helpers.tcname_decode_key = pycbc_SimpleStringZ(PYCBC_TCNAME_DECODE_KEY);
-    pycbc_helpers.tcname_encode_key = pycbc_SimpleStringZ(PYCBC_TCNAME_ENCODE_KEY);
-    pycbc_helpers.tcname_decode_value = pycbc_SimpleStringZ(PYCBC_TCNAME_DECODE_VALUE);
-    pycbc_helpers.tcname_encode_value = pycbc_SimpleStringZ(PYCBC_TCNAME_ENCODE_VALUE);
+#define X(var, val) pycbc_helpers.var = pycbc_SimpleStringZ(val);
+    PYCBC_XHELPERS_STRS(X);
+#undef X
 
     pycbc_init_pyconstants(m);
 
