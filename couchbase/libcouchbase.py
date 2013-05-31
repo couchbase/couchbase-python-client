@@ -53,7 +53,8 @@ class Connection(_Base):
 
             hosts_tmp.append("{0}:{1}".format(cur_hname, cur_hport))
 
-        host = ";".join(hosts_tmp)
+        return ";".join(hosts_tmp)
+
 
 
     def __init__(self, **kwargs):
