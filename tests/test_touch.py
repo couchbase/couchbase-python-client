@@ -16,11 +16,11 @@
 #
 import time
 
-from tests.base import CouchbaseTestCase
+from tests.base import ConnectionTestCase
 import couchbase.exceptions as E
 
 
-class ConnectionTouchTest(CouchbaseTestCase):
+class ConnectionTouchTest(ConnectionTestCase):
     def setUp(self):
         super(ConnectionTouchTest, self).setUp()
         self.cb = self.make_connection()

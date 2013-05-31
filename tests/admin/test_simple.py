@@ -14,10 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+
+import sys
+
 from couchbase.admin import Admin
 from couchbase.libcouchbase import HttpResult
 from couchbase.exceptions import (
-    BadHandleError, ArgumentError, AuthError, ConnectError)
+    BadHandleError, ArgumentError, AuthError, ConnectError, CouchbaseError)
 
 from tests.base import CouchbaseTestCase
 
@@ -25,6 +28,12 @@ class AdminSimpleSet(CouchbaseTestCase):
     def setUp(self):
         super(AdminSimpleSet, self).setUp()
         self.admin = self.make_admin_connection()
+
+    def tearDown(self):
+        super(AdminSimpleSet, self).tearDown()
+        rc = sys.getrefcount(self.admin)
+        self.assertEqual(rc, 2)
+        del self.admin
 
     def test_http_request(self):
         htres = self.admin.http_request('pools/')
@@ -63,3 +72,4 @@ class AdminSimpleSet(CouchbaseTestCase):
         self.assertRaises(BadHandleError, self.admin.append, "foo", "bar")
         self.assertRaises(BadHandleError, self.admin.delete, "foo")
         self.assertRaises(BadHandleError, self.admin.unlock, "foo", 1)
+        str(None)

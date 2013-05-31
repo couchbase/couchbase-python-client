@@ -20,13 +20,10 @@ from time import sleep
 from couchbase.exceptions import (ValueFormatError,
                                   ArgumentError, NotFoundError)
 
-from tests.base import CouchbaseTestCase
+from tests.base import ConnectionTestCase
 
 
-class ConnectionItemSyntaxTest(CouchbaseTestCase):
-    def setUp(self):
-        super(ConnectionItemSyntaxTest, self).setUp()
-        self.cb = self.make_connection()
+class ConnectionItemSyntaxTest(ConnectionTestCase):
 
     def test_simple_accessors(self):
         cb = self.cb

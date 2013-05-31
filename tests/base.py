@@ -19,10 +19,13 @@ except ImportError:
     # Python <3.0 fallback
     from ConfigParser import SafeConfigParser as ConfigParser
 import os
+import sys
+
 import unittest
 from nose.exc import SkipTest
 import types
 from couchbase.libcouchbase import Connection
+from couchbase.exceptions import CouchbaseError
 from couchbase.admin import Admin
 
 
@@ -111,3 +114,15 @@ class CouchbaseTestCase(unittest.TestCase):
         for k in keys:
             ret[k] = "Value_For_" + k
         return ret
+
+
+class ConnectionTestCase(CouchbaseTestCase):
+    def setUp(self):
+        super(ConnectionTestCase, self).setUp()
+        self.cb = self.make_connection()
+
+    def tearDown(self):
+        super(ConnectionTestCase, self).tearDown()
+        oldrc = sys.getrefcount(self.cb)
+        self.assertEqual(oldrc, 2)
+        del self.cb

@@ -18,7 +18,7 @@
 from couchbase.libcouchbase import (
     MultiResult, Result, ValueResult, OperationResult)
 
-from tests.base import CouchbaseTestCase
+from tests.base import ConnectionTestCase
 
 INT_TYPES = None
 try:
@@ -26,10 +26,7 @@ try:
 except:
     INT_TYPES = (int,)
 
-class ConnectionResultsTest(CouchbaseTestCase):
-    def setUp(self):
-        super(ConnectionResultsTest, self).setUp()
-        self.cb = self.make_connection()
+class ConnectionResultsTest(ConnectionTestCase):
 
     def __test_oprsesult(self, rv, check_exact=True, exprc=0):
         # Ensure they can be stringified

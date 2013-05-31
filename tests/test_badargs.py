@@ -5,7 +5,7 @@ from couchbase.exceptions import (KeyExistsError, ValueFormatError,
                                   ArgumentError, NotFoundError,
                                   NotStoredError)
 
-from tests.base import CouchbaseTestCase
+from tests.base import ConnectionTestCase
 
 #
 # Copyright 2013, Couchbase, Inc.
@@ -24,10 +24,7 @@ from tests.base import CouchbaseTestCase
 # limitations under the License.
 #
 
-class ConnectionBadArgsTest(CouchbaseTestCase):
-    def setUp(self):
-        super(ConnectionBadArgsTest, self).setUp()
-        self.cb = self.make_connection()
+class ConnectionBadArgsTest(ConnectionTestCase):
 
     def test_bad_single(self):
 

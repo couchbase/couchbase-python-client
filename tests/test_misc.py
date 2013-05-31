@@ -15,14 +15,11 @@
 # limitations under the License.
 #
 
-from tests.base import CouchbaseTestCase
+from tests.base import ConnectionTestCase
 from couchbase.libcouchbase import Connection, FMT_JSON
 from couchbase import Couchbase
 
-class ConnectionMiscTest(CouchbaseTestCase):
-    def setUp(self):
-        super(ConnectionMiscTest, self).setUp()
-        self.cb = self.make_connection()
+class ConnectionMiscTest(ConnectionTestCase):
 
     def test_server_nodes(self):
         nodes = self.cb.server_nodes
