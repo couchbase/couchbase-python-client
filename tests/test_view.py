@@ -16,7 +16,7 @@
 #
 import json
 
-from tests.base import CouchbaseTestCase
+from tests.base import ConnectionTestCase
 from couchbase.libcouchbase import FMT_JSON
 
 DESIGN_JSON = {
@@ -55,10 +55,9 @@ DOCS_JSON = {
     }
 }
 
-class ConnectionViewTest(CouchbaseTestCase):
+class ConnectionViewTest(ConnectionTestCase):
     def setUp(self):
         super(ConnectionViewTest, self).setUp()
-        self.cb = self.make_connection()
         ret = self.cb._design('blog', DESIGN_JSON)
         self.assertTrue(ret.success)
         self.assertTrue(self.cb.set_multi(DOCS_JSON, format=FMT_JSON).all_ok)

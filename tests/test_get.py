@@ -27,13 +27,10 @@ from couchbase.exceptions import (
 from couchbase.libcouchbase import (
     Connection, MultiResult, Result)
 
-from tests.base import CouchbaseTestCase
+from tests.base import ConnectionTestCase
 from nose.exc import SkipTest
 
-class ConnectionGetTest(CouchbaseTestCase):
-    def setUp(self):
-        super(ConnectionGetTest, self).setUp()
-        self.cb = self.make_connection()
+class ConnectionGetTest(ConnectionTestCase):
 
     def test_trivial_get(self):
         key = self.gen_key('trivial_get')
@@ -123,6 +120,8 @@ class ConnectionGetTest(CouchbaseTestCase):
             self.assertTrue(k in all_res)
             self.assertFalse(all_res[k].success)
             self.assertTrue(all_res[k].value is None)
+
+        del cb_exc
 
     def test_get_format(self):
 

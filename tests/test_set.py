@@ -23,13 +23,10 @@ from couchbase.exceptions import (KeyExistsError, ValueFormatError,
                                   ArgumentError, NotFoundError,
                                   NotStoredError)
 
-from tests.base import CouchbaseTestCase
+from tests.base import ConnectionTestCase
 
 
-class ConnectionSetTest(CouchbaseTestCase):
-    def setUp(self):
-        super(ConnectionSetTest, self).setUp()
-        self.cb = self.make_connection()
+class ConnectionSetTest(ConnectionTestCase):
 
     def test_trivial_set(self):
         rv = self.cb.set(self.gen_key(), 'value1')

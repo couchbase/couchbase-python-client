@@ -16,17 +16,14 @@
 #
 
 import couchbase.exceptions as E
-from tests.base import CouchbaseTestCase
+from tests.base import ConnectionTestCase
 from couchbase.libcouchbase import (
     MultiResult, Result, ValueResult, OperationResult)
 
 # These tests try to see if the 'result' and 'all_results' appear properly
 # also verify that other documented exception fields are present
 
-class ConnectionExcExtraTest(CouchbaseTestCase):
-    def setUp(self):
-        super(ConnectionExcExtraTest, self).setUp()
-        self.cb = self.make_connection()
+class ConnectionExcExtraTest(ConnectionTestCase):
 
     def test_simple_excextra(self):
         exc = None
@@ -50,6 +47,7 @@ class ConnectionExcExtraTest(CouchbaseTestCase):
 
         str(exc)
         repr(exc)
+        del exc
 
     def test_multi_exc(self):
         kv_missing = self.gen_kv_dict(prefix="multi_exc_missing")
@@ -80,3 +78,4 @@ class ConnectionExcExtraTest(CouchbaseTestCase):
 
         str(exc)
         repr(exc)
+        del exc

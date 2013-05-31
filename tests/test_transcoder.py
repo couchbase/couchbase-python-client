@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from tests.base import CouchbaseTestCase
+from tests.base import ConnectionTestCase
 
 from couchbase.transcoder import Transcoder
 import couchbase.exceptions as E
@@ -50,10 +50,7 @@ class MangledTranscoder(object):
     decode_value = gen_func('decode_value')
     encode_value = gen_func('encode_value')
 
-class ConnectionTranscoderTest(CouchbaseTestCase):
-    def setUp(self):
-        super(ConnectionTranscoderTest, self).setUp()
-        self.cb = self.make_connection()
+class ConnectionTranscoderTest(ConnectionTestCase):
 
     def test_simple_transcoder(self):
         tc = Transcoder()

@@ -16,12 +16,9 @@
 #
 
 from couchbase.exceptions import (KeyExistsError, NotFoundError)
-from tests.base import CouchbaseTestCase
+from tests.base import ConnectionTestCase
 
-class ConnectionDeleteTest(CouchbaseTestCase):
-    def setUp(self):
-        super(ConnectionDeleteTest, self).setUp()
-        self.cb = self.make_connection()
+class ConnectionDeleteTest(ConnectionTestCase):
 
     def test_trivial_delete(self):
         """

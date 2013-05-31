@@ -20,13 +20,10 @@ from time import sleep
 from couchbase.exceptions import (
     CouchbaseError, TemporaryFailError, KeyExistsError)
 
-from tests.base import CouchbaseTestCase
+from tests.base import ConnectionTestCase
 
 
-class ConnectionLockTest(CouchbaseTestCase):
-    def setUp(self):
-        super(ConnectionLockTest, self).setUp()
-        self.cb = self.make_connection()
+class ConnectionLockTest(ConnectionTestCase):
 
     def test_simple_lock(self):
         k = self.gen_key('lock')

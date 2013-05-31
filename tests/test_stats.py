@@ -17,7 +17,7 @@
 
 from couchbase.libcouchbase import Connection
 
-from tests.base import CouchbaseTestCase
+from tests.base import ConnectionTestCase
 
 
 # For Python 2/3 compatibility
@@ -27,10 +27,7 @@ except NameError:
     basestring = str
 
 
-class ConnectionStatsTest(CouchbaseTestCase):
-    def setUp(self):
-        super(ConnectionStatsTest, self).setUp()
-        self.cb = self.make_connection()
+class ConnectionStatsTest(ConnectionTestCase):
 
     def test_trivial_stats_without_argument(self):
         stats = self.cb.stats()

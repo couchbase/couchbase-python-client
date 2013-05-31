@@ -15,14 +15,11 @@
 # limitations under the License.
 #
 
-from tests.base import CouchbaseTestCase
+from tests.base import ConnectionTestCase
 from couchbase.exceptions import ArgumentError, ValueFormatError
 from couchbase.libcouchbase import FMT_UTF8
 
-class ConnectionItertypeTest(CouchbaseTestCase):
-    def setUp(self):
-        super(ConnectionItertypeTest, self).setUp()
-        self.cb = self.make_connection()
+class ConnectionItertypeTest(ConnectionTestCase):
 
     def test_itertypes(self):
         kvs = self.gen_kv_dict(amount=10, prefix='itertypes')

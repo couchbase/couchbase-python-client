@@ -18,16 +18,13 @@
 from couchbase import FMT_BYTES, FMT_JSON, FMT_PICKLE, FMT_UTF8
 from couchbase.libcouchbase import Connection
 from couchbase.exceptions import ValueFormatError, CouchbaseError
-from tests.base import CouchbaseTestCase
+from tests.base import ConnectionTestCase
 from nose.exc import SkipTest
 
 
 BLOB_ORIG =  b'\xff\xfe\xe9\x05\xdc\x05\xd5\x05\xdd\x05'
 
-class ConnectionEncodingTest(CouchbaseTestCase):
-    def setUp(self):
-        super(ConnectionEncodingTest, self).setUp()
-        self.cb = self.make_connection()
+class ConnectionEncodingTest(ConnectionTestCase):
 
     def test_default_format(self):
         self.assertEqual(self.cb.default_format, FMT_JSON)
@@ -78,18 +75,17 @@ class ConnectionEncodingTest(CouchbaseTestCase):
         self.assertEqual(ba, rv.value)
 
     def test_passthrough(self):
-        cb = self.make_connection()
-        cb.data_passthrough = True
-        cb.set("malformed", "some json")
-        cb.append("malformed", "blobs")
-        rv = cb.get("malformed")
+        self.cb.data_passthrough = True
+        self.cb.set("malformed", "some json")
+        self.cb.append("malformed", "blobs")
+        rv = self.cb.get("malformed")
 
         self.assertTrue(rv.success)
         self.assertEqual(rv.flags, FMT_JSON)
         self.assertEqual(rv.value, b'"some json"blobs')
 
-        cb.data_passthrough = False
-        self.assertRaises(ValueFormatError, cb.get, "malformed")
+        self.cb.data_passthrough = False
+        self.assertRaises(ValueFormatError, self.cb.get, "malformed")
 
     def test_zerolength(self):
         rv = self.cb.set("key", b"", format=FMT_BYTES)

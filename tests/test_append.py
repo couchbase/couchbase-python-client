@@ -21,13 +21,10 @@ from couchbase.exceptions import (KeyExistsError, ValueFormatError,
                                   ArgumentError, NotFoundError,
                                   NotStoredError)
 
-from tests.base import CouchbaseTestCase
+from tests.base import ConnectionTestCase
 
 
-class ConnectionAppendTest(CouchbaseTestCase):
-    def setUp(self):
-        super(ConnectionAppendTest, self).setUp()
-        self.cb = self.make_connection()
+class ConnectionAppendTest(ConnectionTestCase):
 
     def test_append_prepend(self):
         key = self.gen_key("appendprepend")
