@@ -64,7 +64,7 @@ extoptions['sources'] = [ os.path.join("src", m + ".c") for m in SOURCEMODS ]
 module = Extension('couchbase._libcouchbase', **extoptions)
 
 setup(
-    name = 'couchbase', version = '0.10',
+    name = 'couchbase', version = '0.11',
     url="https://github.com/couchbase/couchbase-python-client",
     author="Couchbase, Inc.",
     author_email="mark.nunberg@couchbase.com",
