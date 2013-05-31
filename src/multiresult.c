@@ -154,5 +154,16 @@ pycbc_multiresult_maybe_raise(pycbc_MultiResult *self)
     PyObject_SetAttrString(value, "all_results", (PyObject*)self);
     PyErr_Restore(type, value, traceback);
 
+    /**
+     * This is needed since the exception object will later contain
+     * a reference to ourselves. If we don't free the original exception,
+     * then we'll be stuck with a circular reference
+     */
+    Py_XDECREF(self->exceptions);
+    Py_XDECREF(self->errop);
+    self->exceptions = NULL;
+    self->errop = NULL;
+
+
     return 1;
 }
