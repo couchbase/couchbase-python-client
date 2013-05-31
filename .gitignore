@@ -7,3 +7,14 @@ build
 test.ini
 .coverage
 cover
+/Makefile
+/Makefile.in
+/aclocal.m4
+/autom4te.cache/
+/config.cache
+/config.log
+/config.status
+/config/install-sh
+/config/missing
+/configure
+/m4/
