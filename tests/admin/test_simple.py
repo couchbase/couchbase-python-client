@@ -51,7 +51,7 @@ class AdminSimpleSet(CouchbaseTestCase):
 
     def test_bad_auth(self):
         self.assertRaises(AuthError, Admin,
-                          'baduser', 'badpass')
+                          'baduser', 'badpass', host=self.host)
 
     def test_bad_host(self):
         self.assertRaises(ConnectError, Admin,
