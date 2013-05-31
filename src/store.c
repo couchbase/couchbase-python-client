@@ -230,9 +230,6 @@ set_common(pycbc_Connection *self,
 
     mres = (pycbc_MultiResult*)pycbc_multiresult_new(self);
 
-    /* we decrement this later */
-    Py_INCREF(mres);
-
     err = lcb_store(self->instance, mres, ncmds, cv.cmdlist.store);
     if (err != LCB_SUCCESS) {
         PYCBC_EXCTHROW_SCHED(err);
