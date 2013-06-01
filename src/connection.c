@@ -495,18 +495,11 @@ Connection_dtor(pycbc_Connection *self)
         self->instance = NULL;
     }
 
-    if (self->dfl_fmt) {
-        Py_DECREF(self->dfl_fmt);
-        self->dfl_fmt = NULL;
-    }
-
-    if (self->errors) {
-        Py_DECREF(self->errors);
-        self->errors = NULL;
-    }
-
+    Py_XDECREF(self->dfl_fmt);
+    Py_XDECREF(self->errors);
     Py_XDECREF(self->tc);
     Py_XDECREF(self->dfl_fmt);
+    Py_XDECREF(self->bucket);
 
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
