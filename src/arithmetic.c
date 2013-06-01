@@ -192,7 +192,7 @@ arithmetic_common(pycbc_Connection *self,
             Py_XDECREF(curkey);
             Py_XDECREF(curvalue);
             if (rv < 0) {
-                goto GT_DONE;
+                goto GT_ITER_DONE;
             }
         }
 
