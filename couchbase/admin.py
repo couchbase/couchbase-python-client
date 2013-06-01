@@ -130,14 +130,10 @@ class Admin(LCB.Connection):
         :return: a :class:`~couchbase.libcouchbase.HttpResult` object.
         """
         imeth = None
-        try:
-            imeth = METHMAP[method]
-        except KeyError:
-            raise E.ArgumentError({
-                "message" : "unknown HTTP method",
-                "objextra" : method
-            })
+        if not method in METHMAP:
+            raise E.ArgumentError.pyexc("Unknown HTTP Method", method)
 
+        imeth = METHMAP[method]
         return self._http_request(type=LCB.LCB_HTTP_TYPE_MANAGEMENT,
                                   path=path,
                                   method=imeth,
