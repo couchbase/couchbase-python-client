@@ -83,31 +83,30 @@ class CouchbaseError(Exception):
                     'inner_cause' : inner})
 
     def __str__(self):
-        extra = "<"
+        details = []
 
         if self.key:
-            extra += "Key={0}, ".format(repr(self.key))
+            details.append("Key={0}".format(repr(self.key)))
 
-        errstr = "RC=0x{0:X}".format(self.rc)
-        if self.rc != 0:
-            errstr += "[{0}]".format(C._strerror(self.rc))
+        if self.rc:
+            details.append("RC=0x{0:X}[{1}]".format(
+                self.rc, C._strerror(self.rc)))
 
-        extra += "{errstr}, Results={nres}".format(errstr = errstr,
-                                                  nres = len(self.all_results))
-        if self.message:
-            extra += ', {0}'.format(self.message)
+        details.append(self.message)
+        if self.all_results:
+            details.append("Results={0}".format(len(self.all_results)))
 
         if self.inner_cause:
-            extra += ", inner_cause={0}".format(self.inner_cause)
+            details.append("inner_cause={0}".format(self.inner_cause))
 
         if self.csrc_info:
-            extra += ", C Source=({0},{1})".format(*self.csrc_info)
+            details.append("C Source=({0},{1})".format(*self.csrc_info))
 
         if self.objextra:
-            extra += ", OBJ={0}".format(repr(self.objextra))
+            details.append("OBJ={0}".format(repr(self.objextra)))
 
-        extra += ">"
-        return extra
+        s = "<{0}>".format(", ".join(details))
+        return s
 
 class InternalSDKError(CouchbaseError):
     """
