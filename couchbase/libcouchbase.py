@@ -865,7 +865,7 @@ class Connection(_Base):
 
     def __repr__(self):
         return ("<{modname}.{cls} bucket={bucket}, "
-                "nodes={nodes}> at 0x{oid:x}>").format(
+                "nodes={nodes} at 0x{oid:x}>").format(
             modname = __name__,
             cls = self.__class__.__name__,
             nodes = self.server_nodes,
