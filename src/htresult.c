@@ -89,7 +89,7 @@ pycbc_HttpResultType_init(PyObject **ptr)
     p->tp_members = HttpResult_TABLE_members;
     p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
     p->tp_dealloc = (destructor)HttpResult_dealloc;
-    return PyType_Ready(p);
+    return pycbc_ResultType_ready(p, PYCBC_HTRESULT_BASEFLDS);
 }
 
 pycbc_HttpResult *

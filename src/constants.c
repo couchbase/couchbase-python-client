@@ -92,6 +92,14 @@ pycbc_init_pyconstants(PyObject *module)
     PyModule_AddIntMacro(module, LCB_HTTP_TYPE_VIEW);
     PyModule_AddIntMacro(module, LCB_HTTP_TYPE_MANAGEMENT);
 
+    PyModule_AddIntMacro(module, PYCBC_RESFLD_CAS);
+    PyModule_AddIntMacro(module, PYCBC_RESFLD_FLAGS);
+    PyModule_AddIntMacro(module, PYCBC_RESFLD_KEY);
+    PyModule_AddIntMacro(module, PYCBC_RESFLD_VALUE);
+    PyModule_AddIntMacro(module, PYCBC_RESFLD_RC);
+    PyModule_AddIntMacro(module, PYCBC_RESFLD_HTCODE);
+    PyModule_AddIntMacro(module, PYCBC_RESFLD_URL);
+
     PyModule_AddIntConstant(module, "FMT_JSON", PYCBC_FMT_JSON);
     PyModule_AddIntConstant(module, "FMT_BYTES", PYCBC_FMT_BYTES);
     PyModule_AddIntConstant(module, "FMT_UTF8", PYCBC_FMT_UTF8);

@@ -101,8 +101,7 @@ pycbc_ValueResultType_init(PyObject **ptr)
     p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
     p->tp_members = ValueResult_TABLE_members;
     p->tp_dealloc = (destructor)ValueResult_dealloc;
-
-    return PyType_Ready(p);
+    return pycbc_ResultType_ready(p, PYCBC_VALRESULT_BASEFLDS);
 }
 
 int
@@ -123,8 +122,7 @@ pycbc_OperationResultType_init(PyObject **ptr)
     p->tp_members = OperationResult_TABLE_members;
     p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
     p->tp_dealloc = (destructor)OperationResult_dealloc;
-
-    return PyType_Ready(p);
+    return pycbc_ResultType_ready(p, PYCBC_OPRESULT_BASEFLDS);
 }
 
 pycbc_ValueResult *

@@ -138,7 +138,7 @@ pycbc_ResultType_init(PyObject **ptr)
     p->tp_repr = (reprfunc)Result_repr;
     p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
 
-    return PyType_Ready(p);
+    return pycbc_ResultType_ready(p, PYCBC_RESULT_BASEFLDS);
 }
 
 PyObject *
@@ -149,4 +149,22 @@ pycbc_result_new(pycbc_Connection *parent)
                                           NULL);
     (void)parent;
     return obj;
+}
+
+int
+pycbc_ResultType_ready(PyTypeObject *p, int flags)
+{
+    int rv;
+    PyObject *flags_o;
+
+    rv = PyType_Ready(p);
+    if (rv) {
+        return rv;
+    }
+
+    flags_o = pycbc_IntFromUL(flags);
+    PyDict_SetItemString(p->tp_dict, PYCBC_RESPROPS_NAME, flags_o);
+    Py_DECREF(flags_o);
+
+    return rv;
 }

@@ -369,6 +369,43 @@ typedef struct {
 
 
 /**
+ * Flags to use for each type to indicate which subfields are relevant to
+ * print out.
+ */
+enum {
+    PYCBC_RESFLD_RC     = 1 << 0,
+    PYCBC_RESFLD_CAS    = 1 << 1,
+    PYCBC_RESFLD_KEY    = 1 << 2,
+    PYCBC_RESFLD_FLAGS  = 1 << 3,
+    PYCBC_RESFLD_HTCODE = 1 << 4,
+    PYCBC_RESFLD_VALUE  = 1 << 5,
+    PYCBC_RESFLD_URL    = 1 << 6
+};
+
+#define PYCBC_RESULT_BASEFLDS (PYCBC_RESFLD_RC)
+#define PYCBC_OPRESULT_BASEFLDS \
+    (PYCBC_RESULT_BASEFLDS| \
+            PYCBC_RESFLD_CAS| \
+            PYCBC_RESFLD_KEY)
+
+#define PYCBC_VALRESULT_BASEFLDS (PYCBC_OPRESULT_BASEFLDS| \
+        PYCBC_RESFLD_VALUE| \
+        PYCBC_RESFLD_FLAGS)
+
+#define PYCBC_HTRESULT_BASEFLDS \
+    (       PYCBC_RESULT_BASEFLDS   | \
+            PYCBC_RESFLD_HTCODE     | \
+            PYCBC_RESFLD_URL        | \
+            PYCBC_RESFLD_VALUE)
+
+#define PYCBC_RESPROPS_NAME "_fldprops"
+/**
+ * Wrapper around PyType_Ready which also injects the common flags properties
+ */
+int pycbc_ResultType_ready(PyTypeObject *p, int flags);
+
+
+/**
  * Extern PyTypeObject declaraions.
  */
 
