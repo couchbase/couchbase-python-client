@@ -174,7 +174,10 @@ enum {
     PYCBC_EXC_LCBERR,
 
     /** Internal error. There's something wrong with our code */
-    PYCBC_EXC_INTERNAL
+    PYCBC_EXC_INTERNAL,
+
+    /** HTTP Error */
+    PYCBC_EXC_HTTP
 };
 
 /* Argument options */
@@ -536,6 +539,11 @@ PyObject *pycbc_multiresult_new(pycbc_Connection *parent);
 pycbc_ValueResult *pycbc_valresult_new(pycbc_Connection *parent);
 pycbc_OperationResult *pycbc_opresult_new(pycbc_Connection *parent);
 pycbc_HttpResult *pycbc_httpresult_new(pycbc_Connection *parent);
+
+/**
+ * If an HTTP result was successful or not
+ */
+int pycbc_httpresult_ok(pycbc_HttpResult *self);
 
 /**
  * Simple function, here because it's defined in result.c but needed in

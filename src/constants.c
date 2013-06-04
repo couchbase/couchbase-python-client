@@ -86,6 +86,7 @@ pycbc_init_pyconstants(PyObject *module)
     PyModule_AddIntMacro(module, PYCBC_EXC_ENCODING);
     PyModule_AddIntMacro(module, PYCBC_EXC_LCBERR);
     PyModule_AddIntMacro(module, PYCBC_EXC_INTERNAL);
+    PyModule_AddIntMacro(module, PYCBC_EXC_HTTP);
 
     PyModule_AddIntMacro(module, LCB_TYPE_BUCKET);
     PyModule_AddIntMacro(module, LCB_TYPE_CLUSTER);

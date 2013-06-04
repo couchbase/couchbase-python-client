@@ -17,11 +17,20 @@
 #include "pycbc.h"
 #include "structmember.h"
 
+int
+pycbc_httpresult_ok(pycbc_HttpResult *self)
+{
+    if (self->rc == LCB_SUCCESS && self->htcode < 300 && self->htcode > 199) {
+        return 1;
+    }
+    return 0;
+}
+
 static PyObject *
 HttpResult_success(pycbc_HttpResult *self, void *unused)
 {
     PyObject *ret = NULL;
-    if (self->rc == LCB_SUCCESS && self->htcode < 300 && self->htcode > 199) {
+    if (pycbc_httpresult_ok(self)) {
         ret = Py_True;
     } else {
         ret = Py_False;

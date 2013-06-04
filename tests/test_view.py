@@ -18,6 +18,7 @@ import json
 
 from tests.base import ConnectionTestCase
 from couchbase.libcouchbase import FMT_JSON
+from couchbase.exceptions import HTTPError
 
 DESIGN_JSON = {
     '_id' : '_design/blog',
@@ -118,4 +119,9 @@ class ConnectionViewTest(ConnectionTestCase):
         self.assertTrue(len(ret.value['rows']), 3)
         for row in ret.value['rows']:
             self.assertTrue(row['id'] in DOCS_JSON)
-            self.assertTrue(row['key'] in jkey)
+            self.assertTrue(row['key'] in jkey_pure)
+
+    def test_missing_view(self):
+        self.assertRaises(HTTPError,
+                          self.cb._view,
+                          "nonexist", "designdoc")

@@ -20,7 +20,8 @@ import sys
 from couchbase.admin import Admin
 from couchbase.libcouchbase import HttpResult
 from couchbase.exceptions import (
-    BadHandleError, ArgumentError, AuthError, ConnectError, CouchbaseError)
+    BadHandleError, ArgumentError, AuthError, ConnectError, CouchbaseError,
+    HTTPError)
 
 from tests.base import CouchbaseTestCase
 
@@ -44,9 +45,18 @@ class AdminSimpleSet(CouchbaseTestCase):
         self.assertTrue(htres.success)
 
     def test_bad_request(self):
-        htres = self.admin.http_request('/badpath')
-        self.assertIsInstance(htres, HttpResult)
-        self.assertFalse(htres.success)
+        self.assertRaises(HTTPError,
+                          self.admin.http_request,
+                          '/badpath')
+
+        excraised = 0
+        try:
+            self.admin.http_request("/badpath")
+        except HTTPError as e:
+            excraised = 1
+            self.assertIsInstance(e.objextra, HttpResult)
+
+        self.assertTrue(excraised)
 
     def test_bad_args(self):
         self.assertRaises(ArgumentError,

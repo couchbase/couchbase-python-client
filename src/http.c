@@ -25,11 +25,13 @@ pycbc_Connection__http_request(pycbc_Connection *self,
     int rv;
     int method;
     int reqtype;
+    int quiet = 0;
     unsigned short value_format = 0;
     lcb_error_t err;
 
     const char *body = NULL;
     PyObject *ret = NULL;
+    PyObject *quiet_O = NULL;
     pycbc_strlen_t nbody = 0;
     const char *path = NULL;
     const char *content_type = NULL;
@@ -40,21 +42,29 @@ pycbc_Connection__http_request(pycbc_Connection *self,
 
     static char *kwlist[] = {
             "type", "method", "path", "content_type", "post_data",
-            "response_format", NULL
+            "response_format", "quiet", NULL
     };
 
     rv = PyArg_ParseTupleAndKeywords(args, kwargs,
-                                     "iis|zz#H", kwlist,
+                                     "iis|zz#HO", kwlist,
                                      &reqtype,
                                      &method,
                                      &path,
                                      &content_type,
                                      &body,
                                      &nbody,
-                                     &value_format);
+                                     &value_format,
+                                     &quiet_O);
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;
+    }
+    if (quiet_O != NULL) {
+        if (quiet_O == Py_None) {
+            quiet = 0;
+        } else {
+            quiet = PyObject_IsTrue(quiet_O);
+        }
     }
 
     htres = pycbc_httpresult_new(self);
@@ -84,6 +94,16 @@ pycbc_Connection__http_request(pycbc_Connection *self,
 
     if (err != LCB_SUCCESS) {
         PYCBC_EXCTHROW_WAIT(err);
+        goto GT_DONE;
+    }
+
+    if (quiet == 0 && pycbc_httpresult_ok(htres) == 0) {
+        PYCBC_EXC_WRAP_EX(htres->rc ? PYCBC_EXC_LCBERR : PYCBC_EXC_HTTP,
+                          htres->rc,
+                          "HTTP Request failed. Examine 'objextra' for "
+                          "full result",
+                          htres->key,
+                          (PyObject*)htres);
         goto GT_DONE;
     }
 

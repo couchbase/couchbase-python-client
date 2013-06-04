@@ -336,5 +336,6 @@ _LCB_ERRNO_MAP = {
 _EXCTYPE_MAP = {
     C.PYCBC_EXC_ARGUMENTS : ArgumentError,
     C.PYCBC_EXC_ENCODING : ValueFormatError,
-    C.PYCBC_EXC_INTERNAL : InternalSDKError
+    C.PYCBC_EXC_INTERNAL : InternalSDKError,
+    C.PYCBC_EXC_HTTP : HTTPError
 }
