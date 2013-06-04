@@ -304,6 +304,10 @@ information about things
 
     .. automethod:: lcb_version
 
+    .. automethod:: observe
+
+    .. automethod:: observe_multi
+
 Attributes
 ==========
 

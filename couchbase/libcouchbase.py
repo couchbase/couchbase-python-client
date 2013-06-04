@@ -26,7 +26,9 @@ from couchbase.views.params import make_dvpath, make_options_string
 
 from couchbase._libcouchbase import (
     Result, ValueResult, OperationResult, MultiResult, HttpResult, Arguments,
-    FMT_JSON, FMT_PICKLE, FMT_BYTES, FMT_UTF8, FMT_MASK)
+    FMT_JSON, FMT_PICKLE, FMT_BYTES, FMT_UTF8, FMT_MASK,
+    ObserveInfo,
+    OBS_MASK, OBS_FOUND, OBS_PERSISTED, OBS_NOTFOUND)
 
 
 from collections import deque
@@ -622,6 +624,26 @@ class Connection(_Base):
             keys = (keys,)
         return self._stats(keys)
 
+    def observe(self, key):
+        """
+        Return storage information for a key.
+        The ``observe`` function maps to the low-level ``OBSERVE``
+        command.
+
+        It returns a :class:`ValueResult` object with the ``value`` field
+        set to a list of :class:`ObserveInfo` objects. Each element in the list
+        responds to the storage status for the key on the given node. The
+        length of the list (and thus the number of :class:`ObserveInfo` objects)
+        are equal to the number of online replicas plus the master for the
+        given key.
+        :param string key: The key to inspect
+
+        .. seealso::
+            :ref:`observe_info`
+
+        """
+        return _Base.observe(self, key)
+
     def set_multi(self, keys, ttl=0, format=None):
         """Set multiple keys
 
@@ -798,6 +820,12 @@ class Connection(_Base):
         :meth:`unlock`
         """
         return _Base.unlock_multi(self, keys)
+
+    def observe_multi(self, keys):
+        """
+        Multi-variant of :meth:`observe`
+        """
+        return _Base.observe_multi(self, keys)
 
     def _view(self, ddoc, view,
               use_devmode=False,

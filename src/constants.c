@@ -106,6 +106,14 @@ pycbc_init_pyconstants(PyObject *module)
     PyModule_AddIntConstant(module, "FMT_UTF8", PYCBC_FMT_UTF8);
     PyModule_AddIntConstant(module, "FMT_PICKLE", PYCBC_FMT_PICKLE);
     PyModule_AddIntConstant(module, "FMT_MASK", PYCBC_FMT_MASK);
+
+    PyModule_AddIntConstant(module, "OBS_PERSISTED", LCB_OBSERVE_PERSISTED);
+    PyModule_AddIntConstant(module, "OBS_FOUND", LCB_OBSERVE_FOUND);
+    PyModule_AddIntConstant(module, "OBS_NOTFOUND", LCB_OBSERVE_NOT_FOUND);
+    PyModule_AddIntConstant(module, "OBS_MASK",
+                            LCB_OBSERVE_PERSISTED|
+                            LCB_OBSERVE_FOUND|
+                            LCB_OBSERVE_NOT_FOUND);
 }
 
 

@@ -223,6 +223,7 @@ init_libcouchbase(void)
     PyObject *htresult_type = NULL;
     PyObject *transcoder_type = NULL;
     PyObject *arg_type = NULL;
+    PyObject *obsinfo_type = NULL;
 
     if (pycbc_ConnectionType_init(&connection_type) < 0) {
         INITERROR;
@@ -256,6 +257,10 @@ init_libcouchbase(void)
         INITERROR;
     }
 
+    if (pycbc_ObserveInfoType_init(&obsinfo_type) < 0) {
+        INITERROR;
+    }
+
 #endif /* PYCBC_CPYCHECKER */
 
 #if PY_MAJOR_VERSION >= 3
@@ -280,6 +285,7 @@ init_libcouchbase(void)
     PyModule_AddObject(m, "HttpResult", htresult_type);
     PyModule_AddObject(m, "Arguments", arg_type);
     PyModule_AddObject(m, "Transcoder", transcoder_type);
+    PyModule_AddObject(m, "ObserveInfo", obsinfo_type);
 #endif /* PYCBC_CPYCHECKER */
 
     /**

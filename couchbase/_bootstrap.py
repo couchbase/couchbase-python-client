@@ -69,6 +69,25 @@ def _result__repr__(self):
     ret = "{0}<{1}>".format(self.__class__.__name__, ', '.join(details))
     return ret
 
+
+def _observeinfo__repr__(self):
+    constants = ('OBS_PERSISTED', 'OBS_REPLICATED', 'OBS_NOTFOUND')
+
+    if self.flags == C.OBS_FOUND:
+        flag_bits = ('OBS_FOUND',)
+
+    else:
+        flag_bits = tuple(f for f in constants if self.flags & getattr(C, f))
+
+    flag_bits = '|'.join(flag_bits)
+
+    return "{cls}<Status={status}, Master={mstr}, CAS={cas:X}>".format(
+        cls=self.__class__.__name__,
+        status=flag_bits,
+        cas=self.cas,
+        mstr=self.from_master
+    )
+
 def _json_encode_wrapper(*args):
     return json.dumps(*args, ensure_ascii=False)
 
@@ -82,4 +101,5 @@ C._init_helpers(
                 json_decode = json.loads,
                 lcb_errno_map = E._LCB_ERRNO_MAP,
                 misc_errno_map = E._EXCTYPE_MAP,
-                default_exception = E.CouchbaseError)
+                default_exception = E.CouchbaseError,
+                obsinfo_reprfunc = _observeinfo__repr__)

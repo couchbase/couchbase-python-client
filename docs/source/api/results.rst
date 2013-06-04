@@ -35,3 +35,37 @@ This object is returned by generic HTTP operations
     :show-inheritance:
     :members:
     :no-inherited-members:
+
+.. _observe_info:
+
+Observe Results
+===============
+
+Observe Constants
+-----------------
+
+.. currentmodule:: couchbase.libcouchbase
+
+These constants are returned as bits in the :attr:`ObserveInfo.flags`
+field.
+
+.. data:: OBS_FOUND
+
+    The key exists on the given node's cache, though it may not have been
+    stored to disk yet.
+
+.. data:: OBS_PERSISTED
+
+    The key is persisted to the given node's disk.
+
+.. data:: OBS_NOTFOUND
+
+    The key is not present in the node's cache.
+
+`ObserveInfo` Object
+----------------------
+
+.. module:: couchbase.libcouchbase
+
+.. autoclass:: couchbase.libcouchbase.ObserveInfo
+    :members:

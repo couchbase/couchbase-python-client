@@ -373,6 +373,16 @@ typedef struct {
 
 
 /**
+ * Object used as the 'value' for observe responses
+ */
+typedef struct {
+    PyObject_HEAD
+    unsigned int flags;
+    int from_master;
+    unsigned PY_LONG_LONG cas;
+} pycbc_ObserveInfo;
+
+/**
  * Flags to use for each type to indicate which subfields are relevant to
  * print out.
  */
@@ -456,7 +466,8 @@ extern PyObject *pycbc_ExceptionType;
     X(json_decode) \
     X(lcb_errno_map) \
     X(misc_errno_map) \
-    X(default_exception)
+    X(default_exception) \
+    X(obsinfo_reprfunc)
 
 #define PYCBC_XHELPERS_STRS(X) \
     X(tcname_encode_key, PYCBC_TCNAME_ENCODE_KEY) \
@@ -530,6 +541,7 @@ int pycbc_ValueResultType_init(PyObject **ptr);
 int pycbc_OperationResultType_init(PyObject **ptr);
 int pycbc_HttpResultType_init(PyObject **ptr);
 int pycbc_TranscoderType_init(PyObject **ptr);
+int pycbc_ObserveInfoType_init(PyObject **ptr);
 
 
 /**
@@ -540,6 +552,9 @@ PyObject *pycbc_multiresult_new(pycbc_Connection *parent);
 pycbc_ValueResult *pycbc_valresult_new(pycbc_Connection *parent);
 pycbc_OperationResult *pycbc_opresult_new(pycbc_Connection *parent);
 pycbc_HttpResult *pycbc_httpresult_new(pycbc_Connection *parent);
+
+/* For observe info */
+pycbc_ObserveInfo * pycbc_observeinfo_new(pycbc_Connection *parent);
 
 /**
  * If an HTTP result was successful or not

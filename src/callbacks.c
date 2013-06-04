@@ -28,9 +28,12 @@
 
 
 enum {
-    RESTYPE_BASE = 1,
-    RESTYPE_VALUE,
-    RESTYPE_OPERATION
+    RESTYPE_BASE = 1 << 0,
+    RESTYPE_VALUE = 1 << 1,
+    RESTYPE_OPERATION = 1 << 2,
+
+    /* Extra flag indicating it's ok if it already exists */
+    RESTYPE_EXISTS_OK = 1 << 3
 };
 
 static PyObject *
@@ -119,28 +122,42 @@ get_common_objects(PyObject *cookie,
         return -1;
     }
 
-    /**
-     * Now, get/set the result object
-     */
-    if (restype == RESTYPE_BASE) {
-        *res = (pycbc_Result*)pycbc_result_new(*conn);
-
-    } else if (restype == RESTYPE_OPERATION) {
-        *res = (pycbc_Result*)pycbc_opresult_new(*conn);
-
-    } else if (restype == RESTYPE_VALUE) {
-        *res = (pycbc_Result*)pycbc_valresult_new(*conn);
+    if (restype & RESTYPE_EXISTS_OK) {
+        *res = (pycbc_Result*)PyDict_GetItem((PyObject*)*mres, hkey);
+        if (*res) {
+            Py_XDECREF(hkey);
+        }
 
     } else {
-        abort();
+        assert(PyDict_Contains((PyObject*)*mres, hkey) == 0);
     }
-    assert(PyDict_Contains((PyObject*)*mres, hkey) == 0);
 
-    PyDict_SetItem((PyObject*)*mres, hkey, (PyObject*)*res);
-    Py_DECREF(*res);
+    if (*res == NULL) {
+        /**
+         * Now, get/set the result object
+         */
+        if (restype & RESTYPE_BASE) {
+            *res = (pycbc_Result*)pycbc_result_new(*conn);
 
-    (*res)->key = hkey;
-    (*res)->rc = err;
+        } else if (restype & RESTYPE_OPERATION) {
+            *res = (pycbc_Result*)pycbc_opresult_new(*conn);
+
+        } else if (restype & RESTYPE_VALUE) {
+            *res = (pycbc_Result*)pycbc_valresult_new(*conn);
+
+        } else {
+            abort();
+        }
+
+        PyDict_SetItem((PyObject*)*mres, hkey, (PyObject*)*res);
+
+        (*res)->key = hkey;
+        Py_DECREF(*res);
+    }
+
+    if (err) {
+        (*res)->rc = err;
+    }
 
     if (err != LCB_SUCCESS) {
         (*mres)->all_ok = 0;
@@ -157,7 +174,7 @@ store_callback(lcb_t instance,
                const lcb_store_resp_t *resp)
 {
     pycbc_Connection *conn;
-    pycbc_OperationResult *res;
+    pycbc_OperationResult *res = NULL;
     pycbc_MultiResult *mres;
     int rv;
 
@@ -460,6 +477,60 @@ http_complete_callback(lcb_http_request_t req,
 }
 
 static void
+observe_callback(lcb_t instance,
+                 const void *cookie,
+                 lcb_error_t err,
+                 const lcb_observe_resp_t *resp)
+{
+    int rv;
+    pycbc_ObserveInfo *oi;
+    pycbc_Connection *conn;
+    pycbc_ValueResult *vres;
+    pycbc_MultiResult *mres;
+
+    if (!resp->v.v0.key) {
+        return;
+    }
+
+    rv = get_common_objects((PyObject*)cookie,
+                            resp->v.v0.key,
+                            resp->v.v0.nkey,
+                            err,
+                            &conn,
+                            (pycbc_Result**)&vres,
+                            RESTYPE_VALUE|RESTYPE_EXISTS_OK,
+                            &mres);
+    if (rv < 0) {
+        goto GT_DONE;
+    }
+
+    if (err != LCB_SUCCESS) {
+        maybe_push_operr(mres, (pycbc_Result*)vres, err, 0);
+        goto GT_DONE;
+    }
+
+    if (!vres->value) {
+        vres->value = PyList_New(0);
+    }
+
+    oi = pycbc_observeinfo_new(conn);
+    if (oi == NULL) {
+        push_fatal_error(mres);
+        goto GT_DONE;
+    }
+
+    oi->from_master = resp->v.v0.from_master;
+    oi->flags = resp->v.v0.status;
+    oi->cas = resp->v.v0.cas;
+    PyList_Append(vres->value, (PyObject*)oi);
+    Py_DECREF(oi);
+
+    GT_DONE:
+    CB_THR_BEGIN(conn);
+    (void)instance;
+}
+
+static void
 error_callback(lcb_t instance, lcb_error_t err, const char *msg)
 {
     PyObject *errtuple;
@@ -492,4 +563,5 @@ pycbc_callbacks_init(lcb_t instance)
     lcb_set_stat_callback(instance, stat_callback);
     lcb_set_error_callback(instance, error_callback);
     lcb_set_http_complete_callback(instance, http_complete_callback);
+    lcb_set_observe_callback(instance, observe_callback);
 }

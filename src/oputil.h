@@ -35,7 +35,8 @@
     X(lcb_remove_cmd_t, remove) \
     X(lcb_arithmetic_cmd_t, arith) \
     X(lcb_unlock_cmd_t, unlock) \
-    X(lcb_server_stats_cmd_t, stats)
+    X(lcb_server_stats_cmd_t, stats) \
+    X(lcb_observe_cmd_t, obs)
 
 /**
  * Union for 'common_vars'; actual commands
@@ -325,5 +326,9 @@ PYCBC_DECL_OP(lock_multi);
 
 /* http.c */
 PYCBC_DECL_OP(_http_request);
+
+/* observe.c */
+PYCBC_DECL_OP(observe);
+PYCBC_DECL_OP(observe_multi);
 
 #endif /* PYCBC_OPUTIL_H */

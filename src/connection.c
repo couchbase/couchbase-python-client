@@ -256,6 +256,10 @@ static PyMethodDef Connection_TABLE_methods[] = {
 
         OPFUNC(_http_request, "Internal routine for HTTP requests"),
 
+        OPFUNC(observe, "Get replication/persistence status for keys"),
+        OPFUNC(observe_multi, "multi-key variant of observe"),
+
+
 #undef OPFUNC
 
         { "lcb_version",
