@@ -47,6 +47,106 @@ _libcouchbase_init_helpers(PyObject *self, PyObject *args, PyObject *kwargs) {
     Py_RETURN_NONE;
 }
 
+static void
+get_helper_field(const char *s, PyObject *key, PyObject **cand, PyObject ***out)
+{
+    PyObject *sk = pycbc_SimpleStringZ(s);
+    if (PyUnicode_Compare(sk, key) == 0) {
+        *out = cand;
+    }
+    Py_DECREF(sk);
+}
+
+static PyObject *
+_libcouchbase_modify_helpers(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+    Py_ssize_t dictpos = 0;
+    PyObject *curkey;
+    PyObject *curval;
+    PyObject *ret;
+
+    if (kwargs == NULL || PyDict_Check(kwargs) == 0) {
+        PYCBC_EXCTHROW_ARGS();
+        return NULL;
+    }
+
+    ret = PyDict_New();
+
+    while (PyDict_Next(kwargs, &dictpos, &curkey, &curval)) {
+        PyObject **field = NULL;
+        PyObject *dent = curval;
+
+        #define X(name) \
+        if (!field) { \
+            get_helper_field(#name, \
+                             curkey, \
+                             &pycbc_helpers.name, \
+                             &field); \
+        }
+
+        PYCBC_XHELPERS(X)
+        #undef X
+
+        if (!field) {
+            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0, "Unknown helper", curkey);
+            Py_DECREF(ret);
+            return NULL;
+        }
+
+        if (*field) {
+            dent = *field;
+        } else {
+            dent = Py_None;
+            Py_INCREF(dent);
+        }
+
+        PyDict_SetItem(ret, curkey, dent);
+        Py_DECREF(dent);
+
+        Py_INCREF(curval);
+        *field = curval;
+    }
+
+    (void)args;
+    (void)self;
+    return ret;
+}
+
+static PyObject *
+_libcouchbase_get_helper(PyObject *self, PyObject *arg)
+{
+    PyObject *key = NULL;
+    PyObject **field = NULL;
+    int rv;
+    (void)self;
+
+    rv = PyArg_ParseTuple(arg, "O", &key);
+    if (!rv) {
+        PYCBC_EXCTHROW_ARGS();
+        return NULL;
+    }
+
+    #define X(name) \
+    if (!field) { \
+        get_helper_field(#name, key, &pycbc_helpers.name, &field); \
+    }
+
+    PYCBC_XHELPERS(X)
+    #undef X
+
+    if (!field) {
+        PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0, "Unknown helper", key);
+        return NULL;
+    }
+    if (*field) {
+        Py_INCREF(*field);
+        return *field;
+    } else {
+        Py_RETURN_NONE;
+    }
+
+}
+
 static PyObject *
 _libcouchbase_strerror(PyObject *self, PyObject *args, PyObject *kw)
 {
@@ -71,6 +171,14 @@ static PyMethodDef _libcouchbase_methods[] = {
         { "_strerror", (PyCFunction)_libcouchbase_strerror,
                 METH_VARARGS|METH_KEYWORDS,
                 "Internal function to map errors"
+        },
+        { "_modify_helpers", (PyCFunction)_libcouchbase_modify_helpers,
+                METH_VARARGS|METH_KEYWORDS,
+                "Internal function to modify helpers during runtime"
+        },
+        { "_get_helper", (PyCFunction)_libcouchbase_get_helper,
+                METH_VARARGS,
+                "Get a helper by name"
         },
 
         { NULL }

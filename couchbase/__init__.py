@@ -16,8 +16,63 @@
 #
 
 import couchbase.libcouchbase
+import couchbase._libcouchbase as _LCB
+
 from couchbase.libcouchbase import (
     FMT_UTF8, FMT_BYTES, FMT_JSON, FMT_PICKLE, FMT_MASK)
+
+def set_json_converters(encode, decode):
+    """
+    Modify the default JSON conversion functions. This affects all
+    :class:`~couchbase.libcouchbase.Connection` instances.
+
+    These functions will called instead of the default ones (``json.dumps``
+    and ``json.loads``) to encode and decode JSON (when :const:`FMT_JSON` is
+    used).
+
+    :param callable encode: Callable to invoke when encoding an object to JSON.
+        This should have the same prototype as ``json.dumps``, with the
+        exception that it is only ever passed a single argument.
+
+    :param callable decode: Callable to invoke when decoding an object to JSON.
+        This should have the same prototype and behavior
+        as ``json.loads`` with the exception that it is only ever
+        passed a single argument.
+
+    :return: A tuple of ``(old encoder, old decoder)``
+
+    No exceptions are raised, and it is the responsibility of the caller to
+    ensure that the provided functions operate correctly, otherwise exceptions
+    may be thrown randomly when encoding and decoding values
+    """
+    ret = _LCB._modify_helpers(json_encode=encode, json_decode=decode)
+    return (ret['json_encode'], ret['json_decode'])
+
+def set_pickle_converters(encode, decode):
+    """
+    Modify the default Pickle conversion functions. This affects all
+    :class:`~couchbase.libcouchbase.Connection` instances.
+
+    These functions will be called instead of the default ones (``pickle.dumps``
+    and ``pickle.loads``) to encode and decode values to and from the Pickle
+    format (when :const:`FMT_PICKLE` is used).
+
+    :param callable encode: Callable to invoke when encoding an object to
+        Pickle. This should have the same prototype as ``pickle.dumps`` with
+        the exception that it is only ever called with a single argument
+
+    :param callable decode: Callable to invoke when decoding a Pickle encoded
+        object to a Python object. Should have the same prototype as
+        ``pickle.loads`` with the exception that it is only ever passed a
+        single argument
+
+    :return: A tuple of ``(old encoder, old decoder)``
+
+    No exceptions are raised and it is the responsibility of the caller to
+    ensure that the provided functions operate correctly.
+    """
+    ret = _LCB._modify_helpers(pickle_encode=encode, pickle_decode=decode)
+    return (ret['pickle_encode'], ret['pickle_decode'])
 
 class Couchbase:
     """The base class for interacting with Couchbase"""
