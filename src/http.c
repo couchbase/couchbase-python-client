@@ -32,6 +32,7 @@ pycbc_Connection__http_request(pycbc_Connection *self,
     const char *body = NULL;
     PyObject *ret = NULL;
     PyObject *quiet_O = NULL;
+    PyObject *fetch_headers_O = Py_False;
     pycbc_strlen_t nbody = 0;
     const char *path = NULL;
     const char *content_type = NULL;
@@ -42,11 +43,11 @@ pycbc_Connection__http_request(pycbc_Connection *self,
 
     static char *kwlist[] = {
             "type", "method", "path", "content_type", "post_data",
-            "response_format", "quiet", NULL
+            "response_format", "quiet", "fetch_headers", NULL
     };
 
     rv = PyArg_ParseTupleAndKeywords(args, kwargs,
-                                     "iis|zz#HO", kwlist,
+                                     "iis|zz#HOO", kwlist,
                                      &reqtype,
                                      &method,
                                      &path,
@@ -54,7 +55,8 @@ pycbc_Connection__http_request(pycbc_Connection *self,
                                      &body,
                                      &nbody,
                                      &value_format,
-                                     &quiet_O);
+                                     &quiet_O,
+                                     &fetch_headers_O);
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;
@@ -70,6 +72,10 @@ pycbc_Connection__http_request(pycbc_Connection *self,
     htres = pycbc_httpresult_new(self);
     htres->key = pycbc_SimpleStringZ(path);
     htres->format = value_format;
+
+    if (fetch_headers_O && PyObject_IsTrue(fetch_headers_O)) {
+        htres->headers = PyDict_New();
+    }
 
     htcmd.v.v1.body = body;
     htcmd.v.v1.nbody = nbody;

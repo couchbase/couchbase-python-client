@@ -42,11 +42,23 @@ HttpResult_success(pycbc_HttpResult *self, void *unused)
     return ret;
 }
 
+static PyObject *
+HttpResult_headers(pycbc_HttpResult *self, void *unused)
+{
+    (void)unused;
+    if (!self->headers) {
+        Py_RETURN_NONE;
+    }
+    Py_INCREF(self->headers);
+    return self->headers;
+}
+
 static void
 HttpResult_dealloc(pycbc_HttpResult *self)
 {
     Py_XDECREF(self->http_data);
     Py_XDECREF(self->parent);
+    Py_XDECREF(self->headers);
     pycbc_Result_dealloc((pycbc_Result*)self);
 }
 
@@ -72,6 +84,14 @@ static PyGetSetDef HttpResult_TABLE_getset[] = {
                 NULL,
                 PyDoc_STR("Whether the HTTP request was successful")
         },
+
+        { "headers",
+                (getter)HttpResult_headers,
+                NULL,
+                PyDoc_STR("Headers dict for the request. "
+                        "None unless 'fetch_headers' was passed to the request")
+        },
+
         { NULL }
 };
 

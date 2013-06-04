@@ -254,6 +254,43 @@ MapReduce/View Methods
 
     .. automethod:: _design
 
+
+Design Document Management
+==========================
+
+.. note::
+    Design document management functions are async. This means that any
+    successful return value simply means that the operation was *scheduled*
+    successfuly on the server. It is possible that the view or design will
+    still not yet exist after creating, deleting, or publishing a design
+    document. Therefore it may be recommended to verify that the view exists
+    by "polling" until the view does not fail. This may be accomplished by
+    specifying the ``syncwait`` parameter to the various design methods which
+    accept them.
+
+.. note::
+    The normal process for dealing with views and design docs is to first
+    create a `development` design document. Such design documents are
+    prefixed with the string ``dev_``. They operate on a small subset of
+    cluster data and as such are ideal for testing as they do not impact
+    load very much.
+
+    Once you are satisfied with the behavior of the development design doc,
+    you can `publish` it into a production mode design doc. Such design
+    documents always operate on the full cluster dataset.
+
+    The view and design functions accept a ``use_devmode`` parameter which
+    prefixes the design name with ``dev_`` if not already prefixed.
+
+.. currentmodule:: couchbase.libcouchbase
+.. class:: Connection
+
+
+    .. automethod:: design_create
+    .. automethod:: design_get
+    .. automethod:: design_publish
+    .. automethod:: design_delete
+
 Informational Methods
 =====================
 

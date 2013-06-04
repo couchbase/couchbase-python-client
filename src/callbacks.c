@@ -444,6 +444,16 @@ http_complete_callback(lcb_http_request_t req,
         Py_INCREF(Py_None);
     }
 
+    if (resp->v.v0.headers && htres->headers) {
+        const char * const *p;
+        PyObject *hval;
+        for (p = resp->v.v0.headers; *p; p += 2) {
+            hval = pycbc_SimpleStringZ(p[1]);
+            PyDict_SetItemString(htres->headers, p[0], hval);
+            Py_DECREF(hval);
+        }
+    }
+
     CB_THR_BEGIN(htres->parent);
     (void)instance;
     (void)req;

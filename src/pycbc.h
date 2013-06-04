@@ -281,6 +281,7 @@ typedef struct {
 typedef struct {
     pycbc_Result_HEAD
     PyObject *http_data;
+    PyObject *headers;
     pycbc_Connection *parent;
     unsigned short htcode;
     unsigned short format;

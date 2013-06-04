@@ -15,6 +15,7 @@
 # limitations under the License.
 #
 import json
+import time
 
 import couchbase._bootstrap
 import couchbase._libcouchbase as _LCB
@@ -799,6 +800,7 @@ class Connection(_Base):
         return _Base.unlock_multi(self, keys)
 
     def _view(self, ddoc, view,
+              use_devmode=False,
               params=None,
               unrecognized_ok=False,
               passthrough=False):
@@ -824,6 +826,7 @@ class Connection(_Base):
         else:
             params = ""
 
+        ddoc = self._mk_devmode(ddoc, use_devmode)
         url = make_dvpath(ddoc, view) + params
 
         ret = self._http_request(type=_LCB.LCB_HTTP_TYPE_VIEW,
@@ -832,33 +835,218 @@ class Connection(_Base):
                                  response_format=FMT_JSON)
         return ret
 
-    def _design(self, name, ddoc):
+    def _doc_rev(self, res):
         """
-        .. warning:: This method's API is not stable
+        Returns the rev id from the header
+        """
+        jstr = res.headers['X-Couchbase-Meta']
+        jobj = json.loads(jstr)
+        return jobj['rev']
 
+    def _design_poll(self, name, mode, oldres, timeout=5):
+        """
+        Poll for an 'async' action to be complete.
+        :param string name: The name of the design document
+        :param string mode: One of ``add`` or ``del`` to indicate whether
+            we should check for addition or deletion of the document
+        :param oldres: The old result from the document's previous state, if
+            any
+        :param float timeout: How long to poll for. If this is 0 then this
+            function returns immediately
+        :type oldres: :class:`HttpResult`
+        """
+
+        if not timeout:
+            return True
+
+        if timeout < 0:
+            raise ArgumentError.pyexc("Interval must not be negative")
+
+        t_end = time.time() + timeout
+        old_rev = None
+
+        if oldres:
+            old_rev = self._doc_rev(oldres)
+
+        while time.time() < t_end:
+            try:
+                cur_resp = self.design_get(name, use_devmode=False)
+                if old_rev and self._doc_rev(cur_resp) == old_rev:
+                    continue
+
+                # Try to execute a view..
+                vname = list(cur_resp.value['views'].keys())[0]
+                try:
+                    self._view(name, vname, use_devmode=False,
+                               params={'limit':1, 'stale':'ok'})
+                    # We're able to query it? whoopie!
+                    return True
+
+                except CouchbaseError:
+                    continue
+
+            except CouchbaseError as e:
+                if mode == 'del':
+                    # Deleted, whopee!
+                    return True
+                cur_resp = e.objextra
+
+        raise exceptions.TimeoutError.pyexc(
+            "Wait time for design action completion exceeded")
+
+
+    def _mk_devmode(self, n, use_devmode):
+        if n.startswith("dev_") or not use_devmode:
+            return n
+        return "dev_" + n
+
+    def design_create(self, name, ddoc, use_devmode=True, syncwait=0):
+        """
         Store a design document
 
         :param string name: The name of the design
         :param ddoc: The actual contents of the design document
-        :type ddoc: string or dict
 
-        If ``ddoc`` is a string, it is passed, as-is, to the server. Otherwise
-        it is serialized as JSON, and its ``_id`` field is set to
-        ``_design/{name}``.
+        :type ddoc: string or dict
+            If ``ddoc`` is a string, it is passed, as-is, to the server.
+            Otherwise it is serialized as JSON, and its ``_id`` field is set to
+            ``_design/{name}``.
+
+        :param bool use_devmode:
+            Whether a *development* mode view should be used. Development-mode
+            views are less resource demanding with the caveat that by default
+            they only operate on a subset of the data. Normally a view will
+            initially be created in 'development mode', and then published
+            using :meth:`design_publish`
+
+        :param float syncwait:
+            How long to poll for the action to complete. Server side design
+            operations are scheduled and thus this function may return before
+            the operation is actually completed. Specifying the timeout here
+            ensures the client polls during this interval to ensure the
+            operation has completed.
+
+        :raise: :exc:`couchbase.exceptions.TimeoutError` if ``syncwait`` was
+            specified and the operation could not be verified within the
+            interval specified.
+
+        :return: An :class:`HttpResult` object.
 
         """
+        name = self._mk_devmode(name, use_devmode)
 
         fqname = "_design/{0}".format(name)
         if isinstance(ddoc, dict):
             ddoc = ddoc.copy()
             ddoc['_id'] = fqname
             ddoc = json.dumps(ddoc)
+        else:
+            if use_devmode:
+                raise ArgumentError.pyexc("devmode can only be used "
+                                          "with dict type design docs")
 
-        return self._http_request(type=_LCB.LCB_HTTP_TYPE_VIEW,
+        existing = None
+        if syncwait:
+            try:
+                existing = self.design_get(name, use_devmode=False)
+            except CouchbaseError:
+                pass
+
+        ret = self._http_request(type=_LCB.LCB_HTTP_TYPE_VIEW,
                                   path=fqname,
                                   method=_LCB.LCB_HTTP_METHOD_PUT,
                                   post_data=ddoc,
-                                  content_type="application/json")
+                                  content_type="application/json",
+                                  fetch_headers=True)
+
+        self._design_poll(name, 'add', existing, syncwait)
+        return ret
+
+    def design_get(self, name, use_devmode=True):
+        """
+        Retrieve a design document
+
+        :param string name: The name of the design document
+        :param bool use_devmode: Whether this design document is still in
+            "development" mode
+
+        :return: A dict representing the format of the design document
+
+        :raise: :exc:`couchbase.exceptions.HTTPError` if the design does not
+            exist.
+
+        """
+        name = self._mk_devmode(name, use_devmode)
+
+        existing = self._http_request(type=_LCB.LCB_HTTP_TYPE_VIEW,
+                              path="_design/"+name,
+                              method=_LCB.LCB_HTTP_METHOD_GET,
+                              content_type="application/json",
+                              fetch_headers=True)
+        return existing
+
+    def design_publish(self, name, syncwait=0):
+        """
+        Convert a development mode view into a production mode views. Production
+        mode views, as opposed to development views, operate on the entire
+        cluster data (rather than a restricted subset thereof).
+
+        :param string name: The name of the view to convert.
+
+        Once the view has been converted, ensure that all functions (such as
+        :meth:`design_get`) have the ``use_devmode`` parameter disabled,
+        otherwise an error will be raised when those functions are used.
+
+        Note that the ``use_devmode`` option is missing. This is intentional
+        as the design document must currently be a development view.
+
+        :return: An :class:`HttpResult` object.
+
+        :raise: :exc:`couchbase.exceptions.HTTPError` if the design does not
+            exist
+        """
+        existing = self.design_get(name, use_devmode=True)
+        rv = self.design_create(name, existing.value, use_devmode=False,
+                                syncwait=syncwait)
+        self.design_delete(name, use_devmode=True,
+                           syncwait=syncwait)
+        return rv
+
+    def design_delete(self, name, use_devmode=True, syncwait=0):
+        """
+        Delete a design document
+
+        :param string name: The name of the design document to delete
+        :param bool use_devmode: Whether the design to delete is a development
+            mode design doc.
+
+        :param float syncwait: Timeout for operation verification. See
+            :meth:`design_create` for more information on this parameter.
+
+        :return: An :class:`HttpResult` object.
+
+        :raise: :exc:`couchbase.exceptions.HTTPError` if the design does not
+            exist
+        :raise: :exc:`couchbase.exceptions.TimeoutError` if ``syncwait`` was
+            specified and the operation could not be verified within the
+            specified interval.
+
+        """
+        name = self._mk_devmode(name, use_devmode)
+        existing = None
+        if syncwait:
+            try:
+                existing = self.design_get(name, use_devmode=False)
+            except CouchbaseError:
+                pass
+
+        ret = self._http_request(type=_LCB.LCB_HTTP_TYPE_VIEW,
+                                  path="_design/"+name,
+                                  method=_LCB.LCB_HTTP_METHOD_DELETE,
+                                  fetch_headers=True)
+
+        self._design_poll(name, 'del', existing, syncwait)
+        return ret
 
     def __repr__(self):
         return ("<{modname}.{cls} bucket={bucket}, "
