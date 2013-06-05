@@ -1,0 +1,33 @@
+language: python
+
+python:
+  - "2.7"
+  - "2.6"
+  - "3.2"
+  - "3.3"
+
+before_install:
+  - sudo rm -rf /etc/apt/sources.list.d/couchdb-ppa-source.list
+  - sudo rm -rf /etc/apt/sources.list.d/mongodb.list
+  - sudo rm -rf /etc/apt/sources.list.d/datastax-source.list
+  - sudo rm -rf /etc/apt/sources.list.d/rabbitmq-source.list
+  - sudo rm -rf /etc/apt/sources.list.d/mapopa-source.list
+  - sudo rm -rf /etc/apt/sources.list.d/webupd8team-java-ppa-source.list
+  - sudo rm -rf /etc/apt/sources.list.d/maven3-ppa-source.list
+  - wget -O- http://packages.couchbase.com/ubuntu/couchbase.key | sudo apt-key add -
+  - echo deb http://packages.couchbase.com/snapshot/ubuntu oneiric oneiric/main | sudo tee /etc/apt/sources.list.d/couchbase.list
+  - sudo apt-get update
+  - sudo apt-cache search libcouchbase
+  - sudo apt-get -y install libcouchbase2-dev || sudo apt-get install libcouchbase-dev
+
+install:
+  - export CFLAGS='-std=c89 -pedantic -Wextra -Werror -Wno-long-long -Wno-missing-field-initializers'
+  - python setup.py build_ext --inplace
+  - sudo $(which python) setup.py install
+
+script:
+  - python -m couchbase.libcouchbase
+
+notifications:
+  email:
+    - sdk_dev@couchbase.com
