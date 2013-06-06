@@ -17,18 +17,18 @@
 #include "oputil.h"
 
 void
-pycbc_common_vars_free(struct pycbc_common_vars *cv)
+pycbc_common_vars_finalize(struct pycbc_common_vars *cv)
 {
     int ii;
-
-    for (ii = 0; ii < cv->ncmds; ii++) {
-
-        if (cv->enckeys && cv->enckeys[ii]) {
-            Py_DECREF(cv->enckeys[ii]);
+    if (cv->enckeys) {
+        for (ii = 0; ii < cv->ncmds; ii++) {
+            Py_XDECREF(cv->enckeys[ii]);
         }
+    }
 
-        if (cv->encvals && cv->encvals[ii]) {
-            Py_DECREF(cv->encvals[ii]);
+    if (cv->encvals) {
+        for (ii = 0; ii < cv->ncmds; ii++) {
+            Py_XDECREF(cv->encvals[ii]);
         }
     }
 
@@ -42,17 +42,65 @@ pycbc_common_vars_free(struct pycbc_common_vars *cv)
         free(cv->enckeys);
         free(cv->encvals);
     }
+
+    Py_XDECREF(cv->mres);
+}
+
+int
+pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Connection *self)
+{
+    lcb_error_t err;
+
+    err = pycbc_oputil_wait_common(self);
+
+    if (err != LCB_SUCCESS) {
+        PYCBC_EXCTHROW_WAIT(err);
+        return -1;
+    }
+
+    if (pycbc_multiresult_maybe_raise(cv->mres)) {
+        return -1;
+    }
+
+    if (cv->argopts & PYCBC_ARGOPT_SINGLE) {
+        PyObject *key, *value;
+        Py_ssize_t dictpos = 0;
+        int rv;
+        rv = PyDict_Next((PyObject*)cv->mres, &dictpos, &key, &value);
+        if (!rv) {
+            PYCBC_EXC_WRAP(PYCBC_EXC_INTERNAL, 0, "No objects in mres");
+            return -1;
+        }
+        cv->ret = value;
+        Py_INCREF(value);
+        Py_DECREF(cv->mres);
+        cv->mres = NULL;
+
+    } else {
+        cv->ret = (PyObject*)cv->mres;
+        cv->mres = NULL;
+    }
+
+    return 0;
 }
 
 int
 pycbc_common_vars_init(struct pycbc_common_vars *cv,
-                        Py_ssize_t ncmds,
-                        size_t tsize,
-                        int want_vals)
+                       pycbc_Connection *self,
+                       int argopts,
+                       Py_ssize_t ncmds,
+                       size_t tsize,
+                       int want_vals)
 {
     int ok;
 
     cv->ncmds = ncmds;
+    cv->mres = (pycbc_MultiResult*)pycbc_multiresult_new(self);
+    cv->argopts = argopts;
+
+    if (!cv->mres) {
+        return -1;
+    }
 
     /**
      * If we have a single command, use the stack-allocated space.
@@ -85,10 +133,12 @@ pycbc_common_vars_init(struct pycbc_common_vars *cv,
     }
 
     if (!ok) {
-        pycbc_common_vars_free(cv);
+        pycbc_common_vars_finalize(cv);
         PyErr_SetNone(PyExc_MemoryError);
         return -1;
     }
+
+
     return 0;
 }
 
@@ -182,32 +232,6 @@ pycbc_maybe_set_quiet(pycbc_MultiResult *mres, PyObject *quiet)
     }
     return 0;
 }
-
-PyObject *
-pycbc_make_retval(int argopts, PyObject **ret, pycbc_MultiResult **mres)
-{
-    Py_ssize_t dictpos = 0;
-    PyObject *key, *value;
-
-    if (*ret == NULL || *mres == NULL) {
-        return NULL;
-    }
-
-    if (!(argopts & PYCBC_ARGOPT_SINGLE)) {
-        *ret = (PyObject*)*mres;
-        *mres = NULL;
-        return *ret;
-    }
-
-
-    PyDict_Next((PyObject*)*mres, &dictpos, &key, &value);
-    Py_INCREF(value);
-    Py_DECREF(*mres);
-    *mres = NULL;
-    *ret = value;
-    return *ret;
-}
-
 
 PyObject *
 pycbc_oputil_iter_prepare(pycbc_seqtype_t seqtype,

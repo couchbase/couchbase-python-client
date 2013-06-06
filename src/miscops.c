@@ -113,11 +113,8 @@ keyop_common(pycbc_Connection *self,
     Py_ssize_t ncmds = 0;
     pycbc_seqtype_t seqtype;
     PyObject *casobj = NULL;
-
-    PyObject *ret = NULL;
     PyObject *is_quiet = NULL;
     PyObject *kobj = NULL;
-    pycbc_MultiResult *mres = NULL;
     lcb_error_t err;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
 
@@ -150,7 +147,12 @@ keyop_common(pycbc_Connection *self,
         ncmds = 1;
     }
 
-    rv = pycbc_common_vars_init(&cv, ncmds, sizeof(lcb_remove_cmd_t), 0);
+    rv = pycbc_common_vars_init(&cv,
+                                self,
+                                argopts,
+                                ncmds,
+                                sizeof(lcb_remove_cmd_t),
+                                0);
     if (rv < 0) {
         return NULL;
     }
@@ -201,17 +203,15 @@ keyop_common(pycbc_Connection *self,
         }
     }
 
-    mres = (pycbc_MultiResult*)pycbc_multiresult_new(self);
-
 
     if (optype == PYCBC_CMD_DELETE) {
-        if (pycbc_maybe_set_quiet(mres, is_quiet) == -1) {
+        if (pycbc_maybe_set_quiet(cv.mres, is_quiet) == -1) {
             goto GT_DONE;
         }
-        err = lcb_remove(self->instance, mres, ncmds, cv.cmdlist.remove);
+        err = lcb_remove(self->instance, cv.mres, ncmds, cv.cmdlist.remove);
 
     } else {
-        err = lcb_unlock(self->instance, mres, ncmds, cv.cmdlist.unlock);
+        err = lcb_unlock(self->instance, cv.mres, ncmds, cv.cmdlist.unlock);
     }
 
     if (err != LCB_SUCCESS) {
@@ -219,23 +219,13 @@ keyop_common(pycbc_Connection *self,
         goto GT_DONE;
     }
 
-    err = pycbc_oputil_wait_common(self);
-
-    if (err != LCB_SUCCESS) {
-        PYCBC_EXCTHROW_WAIT(err);
+    if (-1 == pycbc_common_vars_wait(&cv, self)) {
         goto GT_DONE;
     }
 
-    if (!pycbc_multiresult_maybe_raise(mres)) {
-        ret = (PyObject*)mres;
-    }
-
     GT_DONE:
-    pycbc_common_vars_free(&cv);
-    ret = pycbc_make_retval(argopts, &ret, &mres);
-    Py_XDECREF(mres);
-
-    return ret;
+    pycbc_common_vars_finalize(&cv);
+    return cv.ret;
 }
 
 
@@ -262,8 +252,6 @@ pycbc_Connection__stats(pycbc_Connection *self,
     Py_ssize_t ncmds;
     lcb_error_t err;
     PyObject *keys = NULL;
-    PyObject *ret = NULL;
-    pycbc_MultiResult *mres = NULL;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
     static char *kwlist[] = {  "keys", NULL };
 
@@ -286,7 +274,12 @@ pycbc_Connection__stats(pycbc_Connection *self,
         ncmds = PySequence_Size(keys);
     }
 
-    rv = pycbc_common_vars_init(&cv, ncmds, sizeof(lcb_server_stats_cmd_t), 0);
+    rv = pycbc_common_vars_init(&cv,
+                                self,
+                                PYCBC_ARGOPT_MULTI,
+                                ncmds,
+                                sizeof(lcb_server_stats_cmd_t),
+                                0);
     if (rv < 0) {
         return NULL;
     }
@@ -318,29 +311,17 @@ pycbc_Connection__stats(pycbc_Connection *self,
         cv.cmdlist.stats[0] = cv.cmds.stats;
     }
 
-
-    mres = (pycbc_MultiResult*)pycbc_multiresult_new(self);
-
-    err = lcb_server_stats(self->instance, mres, ncmds, cv.cmdlist.stats);
+    err = lcb_server_stats(self->instance, cv.mres, ncmds, cv.cmdlist.stats);
     if (err != LCB_SUCCESS) {
         PYCBC_EXCTHROW_SCHED(err);
         goto GT_DONE;
     }
 
-    err = pycbc_oputil_wait_common(self);
-
-    if (err != LCB_SUCCESS) {
-        PYCBC_EXCTHROW_WAIT(err);
+    if (-1 == pycbc_common_vars_wait(&cv, self)) {
         goto GT_DONE;
     }
 
-    ret = (PyObject*)mres;
-
     GT_DONE:
-    pycbc_common_vars_free(&cv);
-
-    /* Force multi, it's always a MultiResult */
-    pycbc_make_retval(PYCBC_ARGOPT_MULTI, &ret, &mres);
-    Py_XDECREF(mres);
-    return ret;
+    pycbc_common_vars_finalize(&cv);
+    return cv.ret;
 }

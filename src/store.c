@@ -134,11 +134,9 @@ set_common(pycbc_Connection *self,
     PyObject *ttl_O = NULL;
     Py_ssize_t dictpos = 0;
     lcb_uint64_t single_cas = 0;
-    PyObject *ret = NULL;
     PyObject *dict = NULL;
     PyObject *curkey;
     PyObject *curvalue;
-    pycbc_MultiResult *mres = NULL;
     lcb_error_t err;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
 
@@ -199,7 +197,13 @@ set_common(pycbc_Connection *self,
 
     ii = 0;
 
-    rv = pycbc_common_vars_init(&cv, ncmds, sizeof(lcb_store_cmd_t), 1);
+    rv = pycbc_common_vars_init(&cv,
+                                self,
+                                argopts,
+                                ncmds,
+                                sizeof(lcb_store_cmd_t),
+                                1);
+
     if (rv < 0) {
         return NULL;
     }
@@ -228,30 +232,19 @@ set_common(pycbc_Connection *self,
         cv.cmds.store->v.v0.cas = single_cas;
     }
 
-    mres = (pycbc_MultiResult*)pycbc_multiresult_new(self);
-
-    err = lcb_store(self->instance, mres, ncmds, cv.cmdlist.store);
+    err = lcb_store(self->instance, cv.mres, ncmds, cv.cmdlist.store);
     if (err != LCB_SUCCESS) {
         PYCBC_EXCTHROW_SCHED(err);
         goto GT_DONE;
     }
 
-    err = pycbc_oputil_wait_common(self);
-
-    if (err != LCB_SUCCESS) {
-        PYCBC_EXCTHROW_WAIT(err);
+    if (-1 == pycbc_common_vars_wait(&cv, self)) {
         goto GT_DONE;
     }
 
-    if (!pycbc_multiresult_maybe_raise(mres)) {
-        ret = (PyObject*)mres;
-    }
-
 GT_DONE:
-    ret = pycbc_make_retval(argopts, &ret, &mres);
-    pycbc_common_vars_free(&cv);
-    Py_XDECREF(mres);
-    return ret;
+    pycbc_common_vars_finalize(&cv);
+    return cv.ret;
 }
 
 #define DECLFUNC(name, operation, mode) \

@@ -121,10 +121,8 @@ get_common(pycbc_Connection *self,
     Py_ssize_t ncmds = 0;
     size_t cmdsize;
     pycbc_seqtype_t seqtype;
-    PyObject *ret = NULL;
     PyObject *kobj = NULL;
     PyObject *is_quiet = NULL;
-    pycbc_MultiResult *mres = NULL;
     lcb_error_t err;
     PyObject *ttl_O = NULL;
     unsigned long ttl = 0;
@@ -176,7 +174,7 @@ get_common(pycbc_Connection *self,
         break;
     }
 
-    rv = pycbc_common_vars_init(&cv, ncmds, cmdsize, 0);
+    rv = pycbc_common_vars_init(&cv, self, argopts, ncmds, cmdsize, 0);
 
     if (rv < 0) {
         return NULL;
@@ -226,17 +224,15 @@ get_common(pycbc_Connection *self,
         }
     }
 
-    mres = (pycbc_MultiResult*)pycbc_multiresult_new(self);
-
-    if (pycbc_maybe_set_quiet(mres, is_quiet) == -1) {
+    if (pycbc_maybe_set_quiet(cv.mres, is_quiet) == -1) {
         goto GT_DONE;
     }
 
     if (optype == PYCBC_CMD_TOUCH) {
-        err = lcb_touch(self->instance, mres, ncmds, cv.cmdlist.touch);
+        err = lcb_touch(self->instance, cv.mres, ncmds, cv.cmdlist.touch);
 
     } else {
-        err = lcb_get(self->instance, mres, ncmds, cv.cmdlist.get);
+        err = lcb_get(self->instance, cv.mres, ncmds, cv.cmdlist.get);
     }
 
     if (err != LCB_SUCCESS) {
@@ -244,22 +240,13 @@ get_common(pycbc_Connection *self,
         goto GT_DONE;
     }
 
-    err = pycbc_oputil_wait_common(self);
-
-    if (err == LCB_SUCCESS) {
-        if (!pycbc_multiresult_maybe_raise(mres)) {
-            ret = (PyObject*)mres;
-        }
-    } else {
-        PYCBC_EXCTHROW_WAIT(err);
+    if (-1 == pycbc_common_vars_wait(&cv, self)) {
+        goto GT_DONE;
     }
 
 GT_DONE:
-
-    pycbc_common_vars_free(&cv);
-    ret = pycbc_make_retval(argopts, &ret, &mres);
-    Py_XDECREF(mres);
-    return ret;
+    pycbc_common_vars_finalize(&cv);
+    return cv.ret;
 }
 
 #define DECLFUNC(name, operation, mode) \

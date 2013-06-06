@@ -126,6 +126,30 @@ struct pycbc_common_vars {
      * List of backing PyObject* for values. Only used for storage operations.
      */
     PyObject **encvals;
+
+    /**
+     * Return value information. The MultiResult object is always allocated,
+     * however. If we need to return a single result, we extract it out of
+     * the MultiResult object and decref the latter.
+     *
+     * The MultiResult object can be considered as an async handle in the
+     * future as it allows us to maintain metadata about a result -- the
+     * actual info being populated by the callbacks which use the MultiResult
+     * as a generic 'context' object.
+     */
+    int argopts;
+
+    /**
+     * This is decref'd by finalize()
+     */
+    pycbc_MultiResult *mres;
+
+    /**
+     * When 'wait' is called successfuly, this is set to the mres (and the mres
+     * field itself is set to NULL. This way, finalize() doesn't decref it
+     */
+    PyObject *ret;
+
     Py_ssize_t ncmds;
 };
 
@@ -228,44 +252,23 @@ int pycbc_oputil_sequence_next(pycbc_seqtype_t seqtype,
  * used to determine if the 'encvals' field should be allocated
  */
 int pycbc_common_vars_init(struct pycbc_common_vars *cv,
-                            Py_ssize_t ncmds,
-                            size_t tsize,
-                            int want_vals);
+                           pycbc_Connection *self,
+                           int argopts,
+                           Py_ssize_t ncmds,
+                           size_t tsize,
+                           int want_vals);
 
 /**
  * Clean up the 'common_vars' structure and free/decref any data. This
  * automatically DECREFs any PyObject enckeys and encvaks.
  */
-void pycbc_common_vars_free(struct pycbc_common_vars *cv);
-
+void pycbc_common_vars_finalize(struct pycbc_common_vars *cv);
 
 /**
- * Convers the MultiResult object into a return value.
- *
- * @param argopts the argument options passed
- * @params ret a pointer to the return value (which should be == *mres)
- * @params mres a multi result object.
- *
- * @return the return value.
- *
- * If *ret != *mres, then it is assumed that an error condition occured, i.e.
- * it is expected that code assign ret to mres once all operations have
- * succeeded.
- *
- * If *ret == *mres, then *mres' refcount is decremented (and the pointer
- * set to NULL), and *ret will contain *mres.
- *
- * If argopt & PYCBC_ARGOPT_SINGLE, the single Result object is
- * extracted from it, and mres is freed (i.e. XDECREF'd)
- *
- * Since *mret is set to NULL, a future DECREF will not affect us :) - the
- * idea being that Py_XDECREF(mres) is called if ret != mres, but
- * Py_XDECREF(NULL) is called otherwise.
+ * Wait for the operation to complete
+ * @return 0 on success, -1 on failure.
  */
-PyObject *pycbc_make_retval(int argopts,
-                            PyObject **ret,
-                            pycbc_MultiResult **mres);
-
+int pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Connection *self);
 
 
 /**
