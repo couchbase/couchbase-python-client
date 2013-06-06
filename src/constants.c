@@ -15,6 +15,7 @@
  **/
 
 #include "pycbc.h"
+#include "iops.h"
 
 /**
  * Very simple file that simply adds LCB constants to the module
@@ -127,6 +128,18 @@ pycbc_init_pyconstants(PyObject *module)
     PyModule_AddIntConstant(module, "LOCKMODE_NONE", PYCBC_LOCKMODE_NONE);
 
     PyModule_AddIntMacro(module, PYCBC_CONN_F_WARNEXPLICIT);
+    PyModule_AddIntMacro(module, PYCBC_EVACTION_WATCH);
+    PyModule_AddIntMacro(module, PYCBC_EVACTION_UNWATCH);
+    PyModule_AddIntMacro(module, PYCBC_EVACTION_SUSPEND);
+    PyModule_AddIntMacro(module, PYCBC_EVACTION_RESUME);
+    PyModule_AddIntMacro(module, PYCBC_EVSTATE_INITIALIZED);
+    PyModule_AddIntMacro(module, PYCBC_EVSTATE_ACTIVE);
+    PyModule_AddIntMacro(module, PYCBC_EVSTATE_SUSPENDED);
+    PyModule_AddIntMacro(module, PYCBC_EVTYPE_IO);
+    PyModule_AddIntMacro(module, PYCBC_EVTYPE_TIMER);
+    PyModule_AddIntMacro(module, LCB_READ_EVENT);
+    PyModule_AddIntMacro(module, LCB_WRITE_EVENT);
+    PyModule_AddIntMacro(module, LCB_RW_EVENT);
 }
 
 

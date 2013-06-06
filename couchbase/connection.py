@@ -22,6 +22,7 @@ from collections import deque
 import couchbase._bootstrap
 import couchbase._libcouchbase as _LCB
 from couchbase._libcouchbase import Connection as _Base
+from couchbase.iops.select import SelectIOPS
 
 from couchbase.exceptions import *
 from couchbase.user_constants import *
@@ -67,6 +68,7 @@ class Connection(_Base):
         # We don't pass this to the actual constructor
         port = kwargs.pop('port', 8091)
         _no_connect_exceptions = kwargs.pop('_no_connect_exceptions', False)
+        _gevent_support = kwargs.pop('experimental_gevent_support', False)
 
         if not bucket:
             raise exceptions.ArgumentError("A bucket name must be given")
@@ -83,6 +85,9 @@ class Connection(_Base):
         tc = kwargs.get('transcoder')
         if isinstance(tc, type):
             kwargs['transcoder'] = tc()
+
+        if _gevent_support:
+            kwargs['_iops'] = SelectIOPS()
 
         try:
             super(Connection, self).__init__(**kwargs)

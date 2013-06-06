@@ -171,6 +171,23 @@ class Couchbase:
           The *lockmode* for threaded access. See :ref:`multiple_threads`
           for more information.
 
+        :param boolean experimental_gevent_support:
+          This boolean value specifies whether *experimental*
+          support for `gevent` should be used. Experimental support is supplied
+          by substituting the built-in libcouchbase I/O functions with their
+          monkey-patched `gevent` equivalents. Note that
+          `gevent.monkey_patch_all` (or similar) must have already been called
+          in order to ensure that the cooperative socket methods are called.
+
+          .. warning::
+
+            As the parameter name implies, this feature is experimental. This
+            means it may crash or hang your application. While no known issues
+            have been discovered at the time of writing, it has not been
+            sufficiently tested and as such is marked as experimental.
+
+            API and implementation of this feature are subject to change.
+
         :raise: :exc:`couchbase.exceptions.BucketNotFoundError` if there
                 is no such bucket to connect to
 

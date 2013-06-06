@@ -392,6 +392,7 @@ Connection__init__(pycbc_Connection *self,
     lcb_error_t err;
     char *conncache = NULL;
     PyObject *unlock_gil_O = NULL;
+    PyObject *iops_O = NULL;
     PyObject *timeout = NULL;
     PyObject *dfl_fmt = NULL;
     PyObject *tc = NULL;
@@ -420,6 +421,7 @@ Connection__init__(pycbc_Connection *self,
     X("default_format", &dfl_fmt, "O") \
     X("lockmode", &self->lockmode, "i") \
     X("_conntype", &conntype, "i") \
+    X("_iops", &iops_O, "O")
 
     static char *kwlist[] = {
         #define X(s, target, type) s,
@@ -466,6 +468,12 @@ Connection__init__(pycbc_Connection *self,
 
     create_opts.version = 1;
     create_opts.v.v1.type = conntype;
+
+    if (iops_O && iops_O != Py_None) {
+        self->iops = pycbc_iops_new(self, iops_O);
+        create_opts.v.v1.io = self->iops;
+        self->unlock_gil = 0;
+    }
 
     Py_INCREF(self->errors);
 
@@ -569,6 +577,11 @@ Connection_dtor(pycbc_Connection *self)
     Py_XDECREF(self->errors);
     Py_XDECREF(self->tc);
     Py_XDECREF(self->bucket);
+
+    if (self->iops) {
+        pycbc_iops_free(self->iops);
+        self->iops = NULL;
+    }
 
 #ifdef WITH_THREAD
     if (self->lock) {

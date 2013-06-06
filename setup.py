@@ -78,6 +78,7 @@ SOURCEMODS = (
         'htresult',
         'ctranscoder',
         'observe',
+        'iops',
         os.path.join('viewrow', 'viewrow'),
         os.path.join('contrib', 'jsonsl', 'jsonsl')
         )
@@ -110,6 +111,6 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules"],
 
     ext_modules = [module],
-    packages = ['couchbase', 'couchbase.views'],
+    packages = ['couchbase', 'couchbase.views', 'couchbase.iops'],
     package_data = pkgdata
 )

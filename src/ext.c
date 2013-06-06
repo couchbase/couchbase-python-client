@@ -234,7 +234,10 @@ init_libcouchbase(void)
     X(HttpResult,       pycbc_HttpResultType_init) \
     X(Transcoder,       pycbc_TranscoderType_init) \
     X(ObserveInfo,      pycbc_ObserveInfoType_init) \
-    X(Item,             pycbc_ItemType_init)
+    X(Item,             pycbc_ItemType_init) \
+    X(Event,            pycbc_EventType_init) \
+    X(IOEvent,          pycbc_IOEventType_init) \
+    X(TimerEvent,       pycbc_TimerEventType_init)
 
 #define X(name, inf) PyObject *cls_##name;
     X_PYTYPES(X)
@@ -244,7 +247,6 @@ init_libcouchbase(void)
     if (infunc(&cls_##name) < 0) { INITERROR; }
     X_PYTYPES(X)
 #undef X
-
 
 #endif /* PYCBC_CPYCHECKER */
 

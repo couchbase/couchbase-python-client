@@ -241,6 +241,9 @@ typedef struct {
     /** String bucket */
     PyObject *bucket;
 
+    /** If using a custom IOPS, this contains it */
+    lcb_io_opt_t iops;
+
     /** Thread state. Used to lock/unlock the GIL */
     PyThreadState *thrstate;
 
@@ -557,7 +560,11 @@ extern PyObject *pycbc_ExceptionType;
     X(tcname_encode_key, PYCBC_TCNAME_ENCODE_KEY) \
     X(tcname_encode_value, PYCBC_TCNAME_ENCODE_VALUE) \
     X(tcname_decode_key, PYCBC_TCNAME_DECODE_KEY) \
-    X(tcname_decode_value, PYCBC_TCNAME_DECODE_VALUE)
+    X(tcname_decode_value, PYCBC_TCNAME_DECODE_VALUE) \
+    X(ioname_modevent, "update_event") \
+    X(ioname_modtimer, "update_timer") \
+    X(ioname_startwatch, "start_watching") \
+    X(ioname_stopwatch, "stop_watching")
 
 /**
  * Definition of global helpers. This is only instantiated once as
@@ -629,6 +636,15 @@ int pycbc_HttpResultType_init(PyObject **ptr);
 int pycbc_TranscoderType_init(PyObject **ptr);
 int pycbc_ObserveInfoType_init(PyObject **ptr);
 int pycbc_ItemType_init(PyObject **ptr);
+int pycbc_EventType_init(PyObject **ptr);
+int pycbc_TimerEventType_init(PyObject **ptr);
+int pycbc_IOEventType_init(PyObject **ptr);
+
+
+/**
+ * Calls the type's constructor with no arguments:
+ */
+#define PYCBC_TYPE_CTOR(t) PyObject_CallFunction((PyObject*)t, NULL, NULL)
 
 
 /**
@@ -827,5 +843,9 @@ int pycbc_tc_simple_decode(PyObject **vp,
  */
 PyObject *
 pycbc_tc_determine_format(PyObject *value);
+
+/** IOPS Initializer */
+lcb_io_opt_t pycbc_iops_new(pycbc_Connection *conn, PyObject *pyio);
+void pycbc_iops_free(lcb_io_opt_t io);
 
 #endif /* PYCBC_H_ */
