@@ -252,8 +252,6 @@ MapReduce/View Methods
 
     .. automethod:: _view
 
-    .. automethod:: _design
-
 
 Design Document Management
 ==========================
