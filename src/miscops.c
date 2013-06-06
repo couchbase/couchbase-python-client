@@ -224,7 +224,7 @@ keyop_common(pycbc_Connection *self,
     }
 
     GT_DONE:
-    pycbc_common_vars_finalize(&cv);
+    pycbc_common_vars_finalize(&cv, self);
     return cv.ret;
 }
 
@@ -322,6 +322,6 @@ pycbc_Connection__stats(pycbc_Connection *self,
     }
 
     GT_DONE:
-    pycbc_common_vars_finalize(&cv);
+    pycbc_common_vars_finalize(&cv, self);
     return cv.ret;
 }

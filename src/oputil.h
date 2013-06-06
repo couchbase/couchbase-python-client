@@ -262,7 +262,7 @@ int pycbc_common_vars_init(struct pycbc_common_vars *cv,
  * Clean up the 'common_vars' structure and free/decref any data. This
  * automatically DECREFs any PyObject enckeys and encvaks.
  */
-void pycbc_common_vars_finalize(struct pycbc_common_vars *cv);
+void pycbc_common_vars_finalize(struct pycbc_common_vars *cv, pycbc_Connection *self);
 
 /**
  * Wait for the operation to complete
@@ -277,6 +277,18 @@ int pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Connection *self)
  */
 lcb_error_t
 pycbc_oputil_wait_common(pycbc_Connection *self);
+
+
+/**
+ * Lock the connection (if a lockmode has been set)
+ * @return 0 on success, nonzero on failure
+ */
+int pycbc_oputil_conn_lock(pycbc_Connection *self);
+
+/**
+ * Unlock the connection previously acquired by conn_lock()
+ */
+void pycbc_oputil_conn_unlock(pycbc_Connection *self);
 
 /**
  * Macro to declare prototypes for entry points.

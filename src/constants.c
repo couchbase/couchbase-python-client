@@ -87,6 +87,7 @@ pycbc_init_pyconstants(PyObject *module)
     PyModule_AddIntMacro(module, PYCBC_EXC_LCBERR);
     PyModule_AddIntMacro(module, PYCBC_EXC_INTERNAL);
     PyModule_AddIntMacro(module, PYCBC_EXC_HTTP);
+    PyModule_AddIntMacro(module, PYCBC_EXC_THREADING);
 
     PyModule_AddIntMacro(module, LCB_TYPE_BUCKET);
     PyModule_AddIntMacro(module, LCB_TYPE_CLUSTER);
@@ -114,6 +115,10 @@ pycbc_init_pyconstants(PyObject *module)
                             LCB_OBSERVE_PERSISTED|
                             LCB_OBSERVE_FOUND|
                             LCB_OBSERVE_NOT_FOUND);
+
+    PyModule_AddIntConstant(module, "LOCKMODE_WAIT", PYCBC_LOCKMODE_WAIT);
+    PyModule_AddIntConstant(module, "LOCKMODE_EXC", PYCBC_LOCKMODE_EXC);
+    PyModule_AddIntConstant(module, "LOCKMODE_NONE", PYCBC_LOCKMODE_NONE);
 }
 
 

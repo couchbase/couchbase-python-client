@@ -90,8 +90,8 @@ class CouchbaseTestCase(unittest.TestCase):
         if self.nosleep:
             raise SkipTest("Skipping slow/sleep-based test")
 
-    def make_connection(self):
-        return Connection(**self.make_connargs())
+    def make_connection(self, **kwargs):
+        return Connection(**self.make_connargs(**kwargs))
 
     def make_admin_connection(self):
         return Admin(self.username, self.password, self.host, self.port)

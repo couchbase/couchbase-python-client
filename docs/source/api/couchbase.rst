@@ -352,3 +352,5 @@ Attributes
         :exc:`couchbase.exceptions.NotFoundError` exceptions. When
         set to `True` the operations will not raise an exception, but
         still set an error inside the :class:`Result` object.
+
+    .. autoattribute:: lockmode

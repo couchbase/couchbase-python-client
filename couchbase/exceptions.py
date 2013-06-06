@@ -306,6 +306,8 @@ class BadHandleError(CouchbaseError):
 class HTTPError(CouchbaseError):
     """HTTP error"""
 
+class ObjectThreadError(CouchbaseError):
+    """Thrown when access from multiple threads is detected"""
 
 _LCB_ERRNO_MAP = {
     C.LCB_AUTH_ERROR : AuthError,
@@ -337,5 +339,6 @@ _EXCTYPE_MAP = {
     C.PYCBC_EXC_ARGUMENTS : ArgumentError,
     C.PYCBC_EXC_ENCODING : ValueFormatError,
     C.PYCBC_EXC_INTERNAL : InternalSDKError,
-    C.PYCBC_EXC_HTTP : HTTPError
+    C.PYCBC_EXC_HTTP : HTTPError,
+    C.PYCBC_EXC_THREADING : ObjectThreadError
 }

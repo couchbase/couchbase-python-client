@@ -25,7 +25,7 @@
 
 #include <Python.h>
 #include <libcouchbase/couchbase.h>
-
+#include <pythread.h>
 /**
  * See http://docs.python.org/2/c-api/arg.html for an explanation of this
  * definition.
@@ -177,7 +177,10 @@ enum {
     PYCBC_EXC_INTERNAL,
 
     /** HTTP Error */
-    PYCBC_EXC_HTTP
+    PYCBC_EXC_HTTP,
+
+    /** ObjectThreadError */
+    PYCBC_EXC_THREADING
 };
 
 /* Argument options */
@@ -202,6 +205,13 @@ enum {
     PYCBC_FMT_MASK = 0x7
 };
 
+typedef enum {
+    PYCBC_LOCKMODE_NONE = 0,
+    PYCBC_LOCKMODE_EXC = 1,
+    PYCBC_LOCKMODE_WAIT = 2,
+    PYCBC_LOCKMODE_MAX
+} pycbc_lockmode_t;
+
 typedef struct {
     PyObject_HEAD
 
@@ -222,6 +232,9 @@ typedef struct {
 
     /** Thread state. Used to lock/unlock the GIL */
     PyThreadState *thrstate;
+
+    PyThread_type_lock lock;
+    unsigned int lockmode;
 
     /** Whether to not raise any exceptions */
     unsigned int quiet;

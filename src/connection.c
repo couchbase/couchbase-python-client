@@ -146,6 +146,34 @@ Connection_lcb_version(pycbc_Connection *self)
     return ret;
 }
 
+static PyObject *
+Connection__thr_lockop(pycbc_Connection *self, PyObject *arg)
+{
+    int rv;
+    int is_unlock = 0;
+    rv = PyArg_ParseTuple(arg, "i:is_unlock", &is_unlock);
+
+    if (!rv) {
+        return NULL;
+    }
+
+    if (!self->lockmode) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_THREADING, 0, "lockmode is LOCKMODE_NONE");
+        return NULL;
+    }
+
+    if (is_unlock) {
+        PyThread_release_lock(self->lock);
+    } else {
+        if (!PyThread_acquire_lock(self->lock, WAIT_LOCK)) {
+            PYCBC_EXC_WRAP(PYCBC_EXC_THREADING, 0, "Couldn't lock");
+            return NULL;
+        }
+    }
+
+    Py_RETURN_NONE;
+}
+
 
 static PyGetSetDef Connection_TABLE_getset[] = {
         { "timeout",
@@ -211,6 +239,12 @@ static struct PyMemberDef Connection_TABLE_members[] = {
         { "bucket", T_OBJECT_EX, offsetof(pycbc_Connection, bucket),
                 READONLY,
                 PyDoc_STR("Name of the bucket this object is connected to")
+        },
+
+        { "lockmode", T_INT, offsetof(pycbc_Connection, lockmode),
+                READONLY,
+                PyDoc_STR("How access from multiple threads is handled.\n"
+                        "See :ref:`multiple_threads` for more information\n")
         },
 
         { NULL }
@@ -281,6 +315,13 @@ static PyMethodDef Connection_TABLE_methods[] = {
                 "   # 2.0.5\n"
                 "\n"
                 "\n")
+        },
+
+        { "_thr_lockop",
+                (PyCFunction)Connection__thr_lockop,
+                METH_VARARGS,
+                PyDoc_STR("Unconditionally lock/unlock the connection object "
+                        "if 'lockmode' has been set. For testing uses only")
         },
 
         { NULL, NULL, 0, NULL }
@@ -354,7 +395,8 @@ Connection__init__(pycbc_Connection *self,
     X("transcoder", &self->tc, "O") \
     X("timeout", &timeout, "O") \
     X("default_format", &self->dfl_fmt, "O") \
-    X("_conntype", &conntype, "i")
+    X("lockmode", &self->lockmode, "i") \
+    X("_conntype", &conntype, "i") \
 
     static char *kwlist[] = {
         #define X(s, target, type) s,
@@ -376,6 +418,7 @@ Connection__init__(pycbc_Connection *self,
     self->init_called = 1;
     self->flags = 0;
     self->unlock_gil = 1;
+    self->lockmode = PYCBC_LOCKMODE_EXC;
 
     #define X(s, target, type) target,
     rv = PyArg_ParseTupleAndKeywords(args,
@@ -488,6 +531,16 @@ Connection__init__(pycbc_Connection *self,
         }
     }
 
+#ifdef WITH_THREAD
+    if (!self->unlock_gil) {
+        self->lockmode = PYCBC_LOCKMODE_NONE;
+    }
+
+    if (self->lockmode != PYCBC_LOCKMODE_NONE) {
+        self->lock = PyThread_allocate_lock();
+    }
+#endif
+
     return 0;
 }
 
@@ -504,6 +557,13 @@ Connection_dtor(pycbc_Connection *self)
     Py_XDECREF(self->tc);
     Py_XDECREF(self->dfl_fmt);
     Py_XDECREF(self->bucket);
+
+#ifdef WITH_THREAD
+    if (self->lock) {
+        PyThread_free_lock(self->lock);
+        self->lock = NULL;
+    }
+#endif
 
     Py_TYPE(self)->tp_free((PyObject*)self);
 }

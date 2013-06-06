@@ -61,6 +61,11 @@ pycbc_Connection__http_request(pycbc_Connection *self,
         PYCBC_EXCTHROW_ARGS();
         return NULL;
     }
+
+    if (-1 == pycbc_oputil_conn_lock(self)) {
+        return NULL;
+    }
+
     if (quiet_O != NULL) {
         if (quiet_O == Py_None) {
             quiet = 0;
@@ -118,5 +123,7 @@ pycbc_Connection__http_request(pycbc_Connection *self,
 
     GT_DONE:
     Py_XDECREF(htres);
+    pycbc_oputil_conn_unlock(self);
+
     return ret;
 }

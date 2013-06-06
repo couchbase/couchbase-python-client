@@ -17,7 +17,7 @@
 #include "oputil.h"
 
 void
-pycbc_common_vars_finalize(struct pycbc_common_vars *cv)
+pycbc_common_vars_finalize(struct pycbc_common_vars *cv, pycbc_Connection *conn)
 {
     int ii;
     if (cv->enckeys) {
@@ -44,6 +44,10 @@ pycbc_common_vars_finalize(struct pycbc_common_vars *cv)
     }
 
     Py_XDECREF(cv->mres);
+
+    if (conn->lockmode) {
+        pycbc_oputil_conn_unlock(conn);
+    }
 }
 
 int
@@ -94,11 +98,17 @@ pycbc_common_vars_init(struct pycbc_common_vars *cv,
 {
     int ok;
 
+
+    if (-1 == pycbc_oputil_conn_lock(self)) {
+        return -1;
+    }
+
     cv->ncmds = ncmds;
     cv->mres = (pycbc_MultiResult*)pycbc_multiresult_new(self);
     cv->argopts = argopts;
 
     if (!cv->mres) {
+        pycbc_oputil_conn_unlock(self);
         return -1;
     }
 
@@ -133,7 +143,7 @@ pycbc_common_vars_init(struct pycbc_common_vars *cv,
     }
 
     if (!ok) {
-        pycbc_common_vars_finalize(cv);
+        pycbc_common_vars_finalize(cv, self);
         PyErr_SetNone(PyExc_MemoryError);
         return -1;
     }
@@ -299,12 +309,74 @@ pycbc_oputil_sequence_next(pycbc_seqtype_t seqtype,
     return 0;
 }
 
+int
+pycbc_oputil_conn_lock(pycbc_Connection *self)
+{
+    int status;
+    int mode;
+
+    if (!self->lockmode) {
+        return 0;
+    }
+
+    mode = self->lockmode == PYCBC_LOCKMODE_WAIT ? WAIT_LOCK : NOWAIT_LOCK;
+    if (mode == WAIT_LOCK) {
+        /**
+         * We need to unlock the GIL here so that other objects can potentially
+         * access the Connection (and thus unlock it).
+         */
+        Py_BEGIN_ALLOW_THREADS
+        status = PyThread_acquire_lock(self->lock, mode);
+        Py_END_ALLOW_THREADS
+    } else {
+        status = PyThread_acquire_lock(self->lock, mode);
+    }
+
+    if (!status) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_THREADING,
+                       0,
+                       "Couldn't lock. If LOCKMODE_WAIT was passed, "
+                       "then this means that something has gone wrong "
+                       "internally. Otherwise, this means you are using "
+                       "the Connection object from multiple threads. This "
+                       "is not allowed (without an explicit "
+                       "lockmode=LOCKMODE_WAIT constructor argument");
+        return -1;
+    }
+    return 0;
+}
+
+void
+pycbc_oputil_conn_unlock(pycbc_Connection *self)
+{
+    if (!self->lockmode) {
+        return;
+    }
+    PyThread_release_lock(self->lock);
+}
+
 lcb_error_t
 pycbc_oputil_wait_common(pycbc_Connection *self)
 {
     lcb_error_t ret;
+    /**
+     * If we have a 'lockmode' specified, check to see that nothing else is
+     * using us. We lock in any event.
+     *
+     * We have two modes:
+     *  - LOCKMODE_WAIT explicitly allows access from multiple threads.
+     *      In this mode, we actually wait to acquire the lock.
+     *
+     *  - LOCKMODE_EXC  will raise an exception if it cannot lock immediately
+     *
+     * Note that LOCKMODE_EXC won't do strict checking - i.e. it's perfectly
+     * possible
+     */
+
     PYCBC_CONN_THR_BEGIN(self);
     ret = lcb_wait(self->instance);
     PYCBC_CONN_THR_END(self);
+
+
     return ret;
 }

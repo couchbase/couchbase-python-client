@@ -19,7 +19,8 @@ import couchbase.libcouchbase
 import couchbase._libcouchbase as _LCB
 
 from couchbase.libcouchbase import (
-    FMT_UTF8, FMT_BYTES, FMT_JSON, FMT_PICKLE, FMT_MASK)
+    FMT_UTF8, FMT_BYTES, FMT_JSON, FMT_PICKLE, FMT_MASK,
+    LOCKMODE_WAIT, LOCKMODE_EXC, LOCKMODE_NONE)
 
 def set_json_converters(encode, decode):
     """
@@ -87,6 +88,7 @@ class Couchbase:
                 unlock_gil=True,
                 timeout=2.5,
                 transcoder=None,
+                lockmode=LOCKMODE_EXC,
                 **kwargs):
         """Connect to a bucket.
 
@@ -146,6 +148,10 @@ class Couchbase:
           Set the transcoder object to use. This should conform to the interface
           in the documentation (it need not actually be a subclass)
         :type transcoder: :class:`couchbase.transcoder.Transcoder`
+
+        :param lockmode:
+          The *lockmode* for threaded access. See :ref:`multiple_threads`
+          for more information.
 
         :raise: :exc:`couchbase.exceptions.BucketNotFoundError` if there
                 is no such bucket to connect to

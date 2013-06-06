@@ -2,12 +2,12 @@
 Using With and Without Threads
 ==============================
 
-.. module:: couchbase.threads
+.. module:: couchbase.libcouchbase
 
 You can use a single :class:`~couchbase.libcouchbase.Connection` object in
 a single thread, and attain reasonable performance by having one
 `Connection` object per thread. However, you **cannot** use the same object
-from multiple threads concurrently.
+from multiple threads concurrently (but see below)
 
 As `couchbase` is a C extension, it is helpful to know how Python
 deals with threads in general, and how it handles C extensions in
@@ -44,3 +44,48 @@ of time.
 
 This behavior itself can be controlled by the
 :attr:`~couchbase.libcouchbase.Connection.unlock_gil` attribute
+
+
+.. _multiple_threads:
+
+Using a :class:`Connection` from multiple threads
+---------------------------------------------------
+
+Sometimes it may be necessary to use a :class:`Connection` object from
+multiple threads. This is normally not a good option as there is no concurrency
+gained from multiple Python threads (as they do not run in parallel, as above)
+it might be necessary to have a single object which is being used from
+an already-existing framework using threads, where there is typically little
+contention between them.
+
+You may utilize the ``lockmode`` constructor option to enforce a specific
+behavior when the :class:`Connection` object is accessed from multiple
+threads
+
+.. data:: LOCKMODE_EXC
+
+This is the default lockmode. If it is detected that the object is being used
+from multiple threads, an exception will be raised indicating such.
+
+Internally this uses the C equivalent of the ``threading.Lock`` object (i.e.
+``PyThread_allocate_lock()``). Upon each entry to a function it will try
+to acquire the lock (without waiting). If the acquisition fails, the
+exception is raised.
+
+.. data:: LOCKMODE_WAIT
+
+In this mode, a lock is also used, only in this case an exception is not
+raised. Rather, the current thread patiently waits until the other thread
+has completed its operation and the lock is then acquired. It is released once
+the current thread has finished performing the operation.
+
+*This is the default lockmode*
+
+Without this option, odd behavior may be exhibited (including some crashes).
+If you are sure that the :class:`Connection` object will never be used from
+multiple threads, or if you have some other locking mechanism in place, then
+you may use :const:`LOCKMODE_NONE`
+
+.. data:: LOCKMODE_NONE
+
+No thread safety checks

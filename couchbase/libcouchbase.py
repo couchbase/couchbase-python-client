@@ -28,7 +28,8 @@ from couchbase._libcouchbase import (
     Result, ValueResult, OperationResult, MultiResult, HttpResult, Arguments,
     FMT_JSON, FMT_PICKLE, FMT_BYTES, FMT_UTF8, FMT_MASK,
     ObserveInfo,
-    OBS_MASK, OBS_FOUND, OBS_PERSISTED, OBS_NOTFOUND)
+    OBS_MASK, OBS_FOUND, OBS_PERSISTED, OBS_NOTFOUND,
+    LOCKMODE_WAIT, LOCKMODE_EXC, LOCKMODE_NONE)
 
 
 from collections import deque
