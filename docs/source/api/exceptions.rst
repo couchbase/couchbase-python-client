@@ -71,3 +71,5 @@ The following exceptions are caused by the underlying libcouchbase.
    :show-inheritance:
 .. autoexception:: BadHandleError
    :show-inheritance:
+.. autoexception:: HTTPError
+   :show-inheritance:
