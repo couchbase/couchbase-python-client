@@ -26,7 +26,7 @@ install:
   - sudo $(which python) setup.py install
 
 script:
-  - python -m couchbase.libcouchbase
+  - python -m couchbase.connection
 
 notifications:
   email:

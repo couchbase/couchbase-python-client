@@ -16,23 +16,19 @@
 #
 import json
 import time
+from collections import deque
+
 
 import couchbase._bootstrap
 import couchbase._libcouchbase as _LCB
 from couchbase._libcouchbase import Connection as _Base
+
 from couchbase.exceptions import *
+from couchbase.user_constants import *
+from couchbase.result import *
+
 import couchbase.exceptions as exceptions
 from couchbase.views.params import make_dvpath, make_options_string
-
-from couchbase._libcouchbase import (
-    Result, ValueResult, OperationResult, MultiResult, HttpResult, Arguments,
-    FMT_JSON, FMT_PICKLE, FMT_BYTES, FMT_UTF8, FMT_MASK,
-    ObserveInfo,
-    OBS_MASK, OBS_FOUND, OBS_PERSISTED, OBS_NOTFOUND,
-    LOCKMODE_WAIT, LOCKMODE_EXC, LOCKMODE_NONE)
-
-
-from collections import deque
 
 class Connection(_Base):
 
@@ -135,7 +131,8 @@ class Connection(_Base):
 
         :param key: The key to set the value with. By default, the key must be
           either a :class:`bytes` or :class:`str` object encodable as UTF-8.
-          If a custom `transcoder` class is used (see :meth:`__init__`), then
+          If a custom `transcoder` class is used
+          (see :meth:`couchbase.Couchbase.connect`), then
           the key object is passed directly to the transcoder, which may
           serialize it how it wishes.
         :type key: string or bytes
@@ -153,7 +150,7 @@ class Connection(_Base):
           encoding the value. If none is specified, it will use the
           `default_format`
           For more info see
-          :attr:`~couchbase.libcouchbase.Connection.default_format`
+          :attr:`~couchbase.connection.Connection.default_format`
 
         :raise: :exc:`couchbase.exceptions.ArgumentError` if an
           argument is supplied that is not applicable in this context.
@@ -166,7 +163,7 @@ class Connection(_Base):
           value cannot be serialized with chosen encoder, e.g. if you
           try to store a dictionaty in plain mode.
 
-        :return: :class:`~couchbase.libcouchbase.Result`
+        :return: :class:`~couchbase.result.Result`
 
         Simple set::
 
@@ -196,7 +193,7 @@ class Connection(_Base):
         Store an object in Couchbase unless it already exists.
 
         Follows the same conventions as
-        :meth:`~couchbase.libcouchbase.Connection.set` but the value is
+        :meth:`~couchbase.connection.Connection.set` but the value is
         stored only if it does not exist already. Conversely, the value
         is not stored if the key already exists.
 
@@ -220,7 +217,7 @@ class Connection(_Base):
         Store an object in Couchbase only if it already exists.
 
         Follows the same conventions as
-        :meth:`~couchbase.libcouchbase.Connection.set`, but the value is
+        :meth:`~couchbase.connection.Connection.set`, but the value is
         stored only if a previous value already exists.
 
         :raise: :exc:`couchbase.exceptions.NotFoundError` if the key
@@ -239,7 +236,7 @@ class Connection(_Base):
         Append a string to an existing value in Couchbase.
 
         This follows the same conventions as
-        :meth:`~couchbase.libcouchbase.Connection.set`.
+        :meth:`~couchbase.connection.Connection.set`.
 
         The `format` argument must be one of :const:`~couchbase.FMT_UTF8` or
         :const:`~couchbase.FMT_BYTES`. If not specified, it will be
@@ -294,14 +291,15 @@ class Connection(_Base):
         :param boolean quiet: causes `get` to return None instead of
           raising an exception when the key is not found. It defaults
           to the value set by
-          :attr:`~couchbase.libcouchbase.Connection.quiet` on the instance.
+          :attr:`~couchbase.connection.Connection.quiet` on the instance.
           In `quiet` mode, the error may still be obtained by inspecting
-          the :attr:`~couchbase.libcouchbase.Result.rc` attribute of the
-          :class:`Result` object, or checking :attr:`Result.success`.
+          the :attr:`~couchbase.result.Result.rc` attribute of the
+          :class:`couchbase.result.Result` object, or
+          checking :attr:`couchbase.result.Result.success`.
 
           Note that the default value is `None`, which means to use
           the :attr:`quiet`. If it is a boolean (i.e. `True` or `False) it will
-          override the `Connection`-level `quiet` attribute.
+          override the :class:`Connection`-level :attr:`quiet` attribute.
 
         :raise: :exc:`couchbase.exceptions.NotFoundError` if the key
           is missing in the bucket
@@ -310,7 +308,7 @@ class Connection(_Base):
         :raise: :exc:`couchbase.exceptions.ValueFormatError` if the
           value cannot be deserialized with chosen decoder, e.g. if you
           try to retreive an object stored with an unrecognized format
-        :return: A :class:`~couchbase.libcouchbase.Result` object
+        :return: A :class:`~couchbase.result.Result` object
 
         Simple get::
 
@@ -347,7 +345,7 @@ class Connection(_Base):
         :param int ttl: The new expiration time. If the expiration time is ``0``
           then the key never expires (and any existing expiration is removed)
 
-        :return: :class:`OperationResult`
+        :return: :class:`couchbase.result.OperationResult`
 
         Update the expiration time of a key ::
 
@@ -379,7 +377,8 @@ class Connection(_Base):
 
         This function otherwise functions similarly to :meth:`get`;
         specifically, it will return the value upon success.
-        Note the :attr:`~Result.cas` value from the :class:`Result`
+        Note the :attr:`~couchbase.result.Result.cas` value from the
+        :class:`couchbase.result.Result`
         object. This will be needed to :meth:`unlock` the key.
 
         Note the lock will also be implicitly released if modified by one
@@ -442,7 +441,7 @@ class Connection(_Base):
 
         :param key: The key to unlock
         :param cas: The cas returned from
-          :meth:`lock`'s :class:`Result` object.
+          :meth:`lock`'s :class:`couchbase.result.Result` object.
 
 
         Unlock a previously-locked key in Couchbase. A key is
@@ -488,7 +487,7 @@ class Connection(_Base):
         :raise: :exc:`couchbase.exceptions.ConnectError` if the
           connection was closed
 
-        :return: A :class:`~couchbase.libcouchbase.Result` object.
+        :return: A :class:`~couchbase.result.Result` object.
 
 
         Simple delete::
@@ -549,7 +548,7 @@ class Connection(_Base):
           exists, but the existing value is not numeric
 
         :return:
-          A :class:`couchbase.libcouchbase.Result` object. The current value
+          A :class:`couchbase.result.Result` object. The current value
           of the counter may be obtained by inspecting the return value's
           `value` attribute.
 
@@ -631,12 +630,16 @@ class Connection(_Base):
         The ``observe`` function maps to the low-level ``OBSERVE``
         command.
 
-        It returns a :class:`ValueResult` object with the ``value`` field
-        set to a list of :class:`ObserveInfo` objects. Each element in the list
+        It returns a :class:`couchbase.result.ValueResult`
+        object with the ``value`` field
+        set to a list of :class:`~couchbase.result.ObserveInfo`
+        objects. Each element in the list
         responds to the storage status for the key on the given node. The
-        length of the list (and thus the number of :class:`ObserveInfo` objects)
+        length of the list (and thus the number of
+        :class:`~couchbase.result.ObserveInfo` objects)
         are equal to the number of online replicas plus the master for the
         given key.
+
         :param string key: The key to inspect
 
         .. seealso::
@@ -649,7 +652,7 @@ class Connection(_Base):
         """Set multiple keys
 
         This follows the same semantics as
-        :meth:`~couchbase.libcouchbase.Connection.set`
+        :meth:`~couchbase.connection.Connection.set`
 
         :param dict keys: A dictionary of keys to set. The keys are the keys
           as they should be on the server, and the values are the values for
@@ -662,7 +665,7 @@ class Connection(_Base):
           If specified, this is the conversion format which will be used for
           _all_ the keys.
 
-        :return: A :class:`~couchbase.libcouchbase.MultiResult` object, which
+        :return: A :class:`~couchbase.result.MultiResult` object, which
           is a `dict` subclass.
 
         The multi methods are more than just a convenience, they also save on
@@ -678,7 +681,7 @@ class Connection(_Base):
 
     def add_multi(self, keys, ttl=0, format=None):
         """Add multiple keys.
-        Multi variant of :meth:`~couchbase.libcouchbase.Connection.add`
+        Multi variant of :meth:`~couchbase.connection.Connection.add`
 
         .. seealso::
 
@@ -737,10 +740,10 @@ class Connection(_Base):
 
         :param int ttl: Set the expiration for all keys when retrieving
 
-        :return: A `~couchbase.libcouchbase.MultiResult` object.
+        :return: A :class:`~couchbase.result.MultiResult` object.
           This object is a subclass of dict and contains the keys (passed as)
           `keys` as the dictionary keys, and
-          :class:`~couchbase.libcouchbase.Result` objects as values
+          :class:`~couchbase.result.Result` objects as values
 
         """
         return _Base.get_multi(self, keys, ttl=ttl, quiet=quiet)
@@ -759,7 +762,7 @@ class Connection(_Base):
 
         :param int ttl: The new expiration time
 
-        :return: A :class:`~couchbase.libcouchbase.MultiResult` object
+        :return: A :class:`~couchbase.result.MultiResult` object
 
 
         Update three keys to expire in 10 seconds ::
@@ -785,7 +788,7 @@ class Connection(_Base):
         :type keys: :ref:`iterable<argtypes>`
         :param int ttl: The lock timeout for all keys
 
-        :return: a :class:`MultiResult` object
+        :return: a :class:`~couchbase.result.MultiResult` object
 
         .. seealso::
 
@@ -801,12 +804,12 @@ class Connection(_Base):
 
         :param dict keys: the keys to unlock
 
-        :return: a :class:`MultiResult` object
+        :return: a :class:`~couchbase.result.MultiResult` object
 
         The value of the ``keys`` argument should be either the CAS, or a
         previously returned :class:`Result` object from a :meth:`lock` call.
-        Effectively, this means you may pass a :class:`MultiResult` as the
-        ``keys`` argument.
+        Effectively, this means you may pass a
+        :class:`~couchbase.result.MultiResult` as the ``keys`` argument.
 
         Thus, you can do something like ::
 
@@ -843,7 +846,7 @@ class Connection(_Base):
         :param params: Extra options to pass to the view engine
         :type params: string or dict
 
-        :return: a :class:`HttpResult` object.
+        :return: a :class:`~couchbase.result.HttpResult` object.
         """
 
         if params:
@@ -882,7 +885,7 @@ class Connection(_Base):
             any
         :param float timeout: How long to poll for. If this is 0 then this
             function returns immediately
-        :type oldres: :class:`HttpResult`
+        :type oldres: :class:`~couchbase.result.HttpResult`
         """
 
         if not timeout:
@@ -959,7 +962,7 @@ class Connection(_Base):
             specified and the operation could not be verified within the
             interval specified.
 
-        :return: An :class:`HttpResult` object.
+        :return: An :class:`~couchbase.result.HttpResult` object.
 
         """
         name = self._mk_devmode(name, use_devmode)
@@ -999,7 +1002,8 @@ class Connection(_Base):
         :param bool use_devmode: Whether this design document is still in
             "development" mode
 
-        :return: A dict representing the format of the design document
+        :return: A :class:`~couchbase.result.HttpResult` containing
+            a dict representing the format of the design document
 
         :raise: :exc:`couchbase.exceptions.HTTPError` if the design does not
             exist.
@@ -1029,7 +1033,7 @@ class Connection(_Base):
         Note that the ``use_devmode`` option is missing. This is intentional
         as the design document must currently be a development view.
 
-        :return: An :class:`HttpResult` object.
+        :return: An :class:`~couchbase.result.HttpResult` object.
 
         :raise: :exc:`couchbase.exceptions.HTTPError` if the design does not
             exist

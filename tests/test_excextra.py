@@ -17,7 +17,7 @@
 
 import couchbase.exceptions as E
 from tests.base import ConnectionTestCase
-from couchbase.libcouchbase import (
+from couchbase.result import (
     MultiResult, Result, ValueResult, OperationResult)
 
 # These tests try to see if the 'result' and 'all_results' appear properly

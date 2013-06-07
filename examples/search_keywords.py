@@ -27,7 +27,7 @@ from argparse import ArgumentParser
 import random
 import pprint
 
-from couchbase.libcouchbase import Connection
+from couchbase.connection import Connection
 
 ap = ArgumentParser()
 

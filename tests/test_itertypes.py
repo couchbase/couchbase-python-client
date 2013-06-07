@@ -17,7 +17,7 @@
 
 from tests.base import ConnectionTestCase
 from couchbase.exceptions import ArgumentError, ValueFormatError
-from couchbase.libcouchbase import FMT_UTF8
+from couchbase.user_constants import FMT_UTF8
 
 class ConnectionItertypeTest(ConnectionTestCase):
 

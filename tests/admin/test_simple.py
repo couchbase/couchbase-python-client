@@ -18,7 +18,7 @@
 import sys
 
 from couchbase.admin import Admin
-from couchbase.libcouchbase import HttpResult
+from couchbase.result import HttpResult
 from couchbase.exceptions import (
     BadHandleError, ArgumentError, AuthError, ConnectError, CouchbaseError,
     HTTPError)

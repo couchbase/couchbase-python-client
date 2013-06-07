@@ -24,7 +24,7 @@ import sys
 import unittest
 from nose.exc import SkipTest
 import types
-from couchbase.libcouchbase import Connection
+from couchbase.connection import Connection
 from couchbase.exceptions import CouchbaseError
 from couchbase.admin import Admin
 

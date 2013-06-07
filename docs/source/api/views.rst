@@ -184,7 +184,7 @@ These parameters affect the sorting, ordering, and filtering of rows.
     .. data:: DOCKEY_RANGE
 
         Specify the range based on the contents of the keys as they are stored
-        by :meth:`~couchbase.libcouchbase.Connection.set`. These are
+        by :meth:`~couchbase.connection.Connection.set`. These are
         returned as the "Document IDs" in each view result.
 
         :Server Option: Maps to both ``startkey_docid`` and ``endkey_docid``

@@ -15,8 +15,6 @@
 # limitations under the License.
 #
 
-from couchbase.libcouchbase import Connection
-
 from tests.base import ConnectionTestCase
 
 

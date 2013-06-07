@@ -20,10 +20,10 @@ change
 """
 from collections import deque
 
-import couchbase.libcouchbase
+import couchbase.connection
 import couchbase._libcouchbase as LCB
 import couchbase.exceptions as E
-from couchbase.libcouchbase import FMT_JSON
+from couchbase.user_constants import FMT_JSON
 
 
 METHMAP = {
@@ -41,7 +41,7 @@ class Admin(LCB.Connection):
     the cluster.
 
     This object should **not** be used to perform Key/Value operations. The
-    :class:`couchbase.libcouchbase.Connection` is used for that.
+    :class:`couchbase.connection.Connection` is used for that.
     """
     def __init__(self, username, password, host='localhost', port=8091,
                  **kwargs):
@@ -109,9 +109,9 @@ class Admin(LCB.Connection):
 
         :param int response_format:
           Hint about how to format the response. This goes into the
-          :attr:`~couchbase.libcouchbase.HttpResult.value` field of the
-          :class:`~couchbase.libcouchbase.HttpResult` object. The default is
-          :const:`~couchbase.libcouchbase.FMT_JSON`.
+          :attr:`~couchbase.result.HttpResult.value` field of the
+          :class:`~couchbase.result.HttpResult` object. The default is
+          :const:`~couchbase.connection.FMT_JSON`.
 
           Note that if the conversion fails, the content will be returned as
           ``bytes``
@@ -127,7 +127,7 @@ class Admin(LCB.Connection):
           :exc:`couchbase.exceptions.HTTPError` if the server responded with a
             negative reply
 
-        :return: a :class:`~couchbase.libcouchbase.HttpResult` object.
+        :return: a :class:`~couchbase.result.HttpResult` object.
         """
         imeth = None
         if not method in METHMAP:

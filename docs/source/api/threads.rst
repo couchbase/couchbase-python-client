@@ -2,9 +2,9 @@
 Using With and Without Threads
 ==============================
 
-.. module:: couchbase.libcouchbase
+.. module:: couchbase.connection
 
-You can use a single :class:`~couchbase.libcouchbase.Connection` object in
+You can use a single :class:`~couchbase.connection.Connection` object in
 a single thread, and attain reasonable performance by having one
 `Connection` object per thread. However, you **cannot** use the same object
 from multiple threads concurrently (but see below)
@@ -43,7 +43,7 @@ other threads in the case where an I/O operation takes a prolonged amount
 of time.
 
 This behavior itself can be controlled by the
-:attr:`~couchbase.libcouchbase.Connection.unlock_gil` attribute
+:attr:`~couchbase.connection.Connection.unlock_gil` attribute
 
 
 .. _multiple_threads:

@@ -15,17 +15,14 @@
 # limitations under the License.
 #
 
-import couchbase.libcouchbase
+from couchbase.connection import Connection
+from couchbase.user_constants import *
 import couchbase._libcouchbase as _LCB
-
-from couchbase.libcouchbase import (
-    FMT_UTF8, FMT_BYTES, FMT_JSON, FMT_PICKLE, FMT_MASK,
-    LOCKMODE_WAIT, LOCKMODE_EXC, LOCKMODE_NONE)
 
 def set_json_converters(encode, decode):
     """
     Modify the default JSON conversion functions. This affects all
-    :class:`~couchbase.libcouchbase.Connection` instances.
+    :class:`~couchbase.connection.Connection` instances.
 
     These functions will called instead of the default ones (``json.dumps``
     and ``json.loads``) to encode and decode JSON (when :const:`FMT_JSON` is
@@ -52,7 +49,7 @@ def set_json_converters(encode, decode):
 def set_pickle_converters(encode, decode):
     """
     Modify the default Pickle conversion functions. This affects all
-    :class:`~couchbase.libcouchbase.Connection` instances.
+    :class:`~couchbase.connection.Connection` instances.
 
     These functions will be called instead of the default ones (``pickle.dumps``
     and ``pickle.loads``) to encode and decode values to and from the Pickle
@@ -163,7 +160,7 @@ class Couchbase:
                 :exc:`couchbase.exceptions.ArgumentError`
                 if the bucket wasn't specified
 
-        :return: instance of :class:`couchbase.libcouchbase.Connection`
+        :return: instance of :class:`couchbase.connection.Connection`
 
 
         Initialize connection using default options::
@@ -181,13 +178,13 @@ class Couchbase:
                                    password='secret', bucket='mybucket')
 
         """
-        return couchbase.libcouchbase.Connection(host=host,
-                                                 port=port,
-                                                 username=username,
-                                                 password=password,
-                                                 bucket=bucket,
-                                                 conncache=conncache,
-                                                 unlock_gil=unlock_gil,
-                                                 timeout=timeout,
-                                                 transcoder=transcoder,
-                                                 **kwargs)
+        return Connection(host=host,
+                          port=port,
+                          username=username,
+                          password=password,
+                          bucket=bucket,
+                          conncache=conncache,
+                          unlock_gil=unlock_gil,
+                          timeout=timeout,
+                          transcoder=transcoder,
+                          **kwargs)

@@ -18,14 +18,11 @@
 import pickle
 from time import sleep
 
-from couchbase import (
-    FMT_JSON, FMT_PICKLE, FMT_UTF8, FMT_BYTES)
+from couchbase import FMT_JSON, FMT_PICKLE, FMT_UTF8, FMT_BYTES
 
 from couchbase.exceptions import (
     CouchbaseError, ValueFormatError, NotFoundError)
-
-from couchbase.libcouchbase import (
-    Connection, MultiResult, Result)
+from couchbase.result import MultiResult, Result
 
 from tests.base import ConnectionTestCase
 from nose.exc import SkipTest

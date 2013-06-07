@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from couchbase.transcoder import Transcoder
-from couchbase.libcouchbase import Connection
+from couchbase.connection import Connection
 
 class ReverseTranscoder(Transcoder):
     def encode_key(self, key):

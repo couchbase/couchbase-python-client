@@ -16,7 +16,7 @@
 #
 
 from couchbase import Couchbase
-from couchbase.libcouchbase import Connection
+from couchbase.connection import Connection
 
 from tests.base import CouchbaseTestCase
 

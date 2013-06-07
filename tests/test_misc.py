@@ -16,7 +16,9 @@
 #
 
 from tests.base import ConnectionTestCase
-from couchbase.libcouchbase import Connection, FMT_JSON
+
+from couchbase.connection import Connection
+from couchbase.user_constants import FMT_JSON
 from couchbase import Couchbase
 
 class ConnectionMiscTest(ConnectionTestCase):

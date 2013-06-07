@@ -17,7 +17,7 @@
 import json
 
 from tests.base import ConnectionTestCase
-from couchbase.libcouchbase import FMT_JSON
+from couchbase.user_constants import FMT_JSON
 from couchbase.exceptions import HTTPError
 
 DESIGN_JSON = {

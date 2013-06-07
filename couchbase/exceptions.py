@@ -30,7 +30,7 @@ class CouchbaseError(Exception):
 
       .. py:attribute:: all_results
 
-        A :class:`~couchbase.libcouchbase.MultiResult` object, if this
+        A :class:`~couchbase.result.MultiResult` object, if this
         exception was thrown as part of a multi-operation. This contains
         all the operations (including ones which may not have failed)
 
@@ -199,8 +199,8 @@ class TemporaryFailError(CouchbaseError):
 
     .. seealso::
 
-        :meth:`couchbase.libcouchbase.Connection.lock`
-        :meth:`couchbase.libcouchbase.Connection.unlock`
+        :meth:`couchbase.connection.Connection.lock`
+        :meth:`couchbase.connection.Connection.unlock`
     """
 
 

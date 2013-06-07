@@ -16,7 +16,6 @@
 #
 
 from couchbase.exceptions import (NotFoundError, DeltaBadvalError)
-from couchbase.libcouchbase import Connection
 
 from tests.base import ConnectionTestCase
 

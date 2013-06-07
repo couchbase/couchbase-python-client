@@ -15,9 +15,7 @@
 # limitations under the License.
 #
 
-from couchbase.libcouchbase import (
-    MultiResult, Result, ValueResult, OperationResult)
-
+from couchbase.result import MultiResult, Result, ValueResult, OperationResult
 from tests.base import ConnectionTestCase
 
 INT_TYPES = None

@@ -21,7 +21,7 @@ import os
 from couchbase.exceptions import (AuthError, ArgumentError,
                                   BucketNotFoundError, ConnectError,
                                   NotFoundError)
-from couchbase.libcouchbase import Connection
+from couchbase.connection import Connection
 
 from tests.base import CouchbaseTestCase
 

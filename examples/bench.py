@@ -19,7 +19,7 @@
 import argparse
 from threading import Thread
 from time import sleep, time
-from couchbase.libcouchbase import Connection, FMT_BYTES
+from couchbase.connection import Connection, FMT_BYTES
 from couchbase.transcoder import Transcoder
 
 ap = argparse.ArgumentParser()

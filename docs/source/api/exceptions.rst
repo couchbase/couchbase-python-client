@@ -15,7 +15,7 @@ Exception Objects
    :show-inheritance:
 
 
-The following exceptions are caused by the underlying libcouchbase.
+The following exceptions are caused by the underlying connection.
 
 .. autoexception:: AuthError
    :show-inheritance:

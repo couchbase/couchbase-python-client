@@ -3,22 +3,19 @@ Connection object
 =================
 
 .. module:: couchbase
-.. autoclass:: Couchbase
-    :members:
-    :no-undoc-members:
+.. class:: Couchbase
+    
+    .. automethod:: connect
 
-.. module:: couchbase.libcouchbase
 
-.. autoclass:: Connection
-    :no-undoc-members:
-
+.. module:: couchbase.connection
 
 .. _argtypes:
 
 Passing Arguments
 =================
 
-.. currentmodule:: couchbase.libcouchbase
+.. currentmodule:: couchbase.connection
 
 All keyword arguments passed to methods should be specified as keyword
 arguments, and the user should not rely on their position within the keyword
@@ -43,7 +40,7 @@ Arguments passed to ``*_multi`` methods involves passing an iterable of keys.
 The iterable must have ``__len__`` and ``__iter__`` implemented.
 
 For operations which require values (i.e. the
-:meth:`~couchbase.libcouchbase.Connection.set_multi` family), a ``dict`` must
+:meth:`~couchbase.connection.Connection.set_multi` family), a ``dict`` must
 be passed with the values set as the values which should be stored for the keys.
 
 Some of the multi methods accept keyword arguments; these arguments apply to
@@ -67,9 +64,9 @@ Format Options
 
 The following constants may be used as values to the `format` option
 in methods where this is supported. This is also the value returned in the
-:attr:`~couchbase.libcouchbase.Result.flags` attribute of the
-:class:`~couchbase.libcouchbase.Result` object from a
-:meth:`~couchbase.libcouchbase.Connection.get` operation.
+:attr:`~couchbase.result.ValueResult.flags` attribute of the
+:class:`~couchbase.result.ValueResult` object from a
+:meth:`~couchbase.connection.Connection.get` operation.
 
 Each format specifier has specific rules about what data types it accepts.
 
@@ -117,23 +114,23 @@ Key Format
 ----------
 
 The above format options are only valid for *values* being passed to one
-of the storage methods (see :meth:`couchbase.libcouchbase.Connection.set`).
+of the storage methods (see :meth:`couchbase.connection.Connection.set`).
 
 For *keys*, the acceptable inputs are those for :const:`FMT_UTF8`
 
 Single-Key Data Methods
 =======================
 
-These methods all return a :class:`Result` object containing
+These methods all return a :class:`~couchbase.result.Result` object containing
 information about the operation (such as status and value).
 
-.. currentmodule:: couchbase.libcouchbase
+.. currentmodule:: couchbase.connection
 
 
 Storing Data
 ------------
 
-.. currentmodule:: couchbase.libcouchbase
+.. currentmodule:: couchbase.connection
 .. class:: Connection
 
     These methods set the contents of a key in Couchbase. If successful,
@@ -150,7 +147,7 @@ Storing Data
 Retrieving Data
 ---------------
 
-.. currentmodule:: couchbase.libcouchbase
+.. currentmodule:: couchbase.connection
 .. class:: Connection
 
     .. automethod:: get
@@ -160,7 +157,7 @@ Modifying Data
 
 These methods modify existing values in Couchbase
 
-.. currentmodule:: couchbase.libcouchbase
+.. currentmodule:: couchbase.connection
 .. class:: Connection
 
 
@@ -176,7 +173,7 @@ directly modify the value, but may affect the entry's accessibility
 or duration.
 
 
-.. currentmodule:: couchbase.libcouchbase
+.. currentmodule:: couchbase.connection
 .. class:: Connection
 
     .. automethod:: delete
@@ -194,9 +191,10 @@ Counter Operations
 These are atomic counter operations for Couchbase. They increment
 or decrement a counter. A counter is a key whose value can be parsed
 as an integer. Counter values may be retrieved (without modification)
-using the :meth:`get` method
+using the :meth:`Connection.get` method
 
-.. currentmodule:: couchbase.libcouchbase
+.. currentmodule:: couchbase.connection
+
 .. class:: Connection
 
     .. automethod:: incr
@@ -208,11 +206,11 @@ Multi-Key Data Methods
 ======================
 
 These methods tend to be more efficient than their single-key
-equivalents. They return a :class:`MultiResult` object (which is
-a dict subclass) which contains clasS:`Result` objects as the
+equivalents. They return a :class:`couchbase.result.MultiResult` object (which is
+a dict subclass) which contains class:`couchbase.result.Result` objects as the
 values for its keys
 
-.. currentmodule:: couchbase.libcouchbase
+.. currentmodule:: couchbase.connection
 .. class:: Connection
 
     .. automethod:: set_multi
@@ -242,7 +240,7 @@ values for its keys
 MapReduce/View Methods
 ======================
 
-.. currentmodule:: couchbase.libcouchbase
+.. currentmodule:: couchbase.connection
 .. class:: Connection
 
     .. warning::
@@ -280,7 +278,7 @@ Design Document Management
     The view and design functions accept a ``use_devmode`` parameter which
     prefixes the design name with ``dev_`` if not already prefixed.
 
-.. currentmodule:: couchbase.libcouchbase
+.. currentmodule:: couchbase.connection
 .. class:: Connection
 
 
@@ -295,7 +293,7 @@ Informational Methods
 These methods do not operate on keys directly, but offer various
 information about things
 
-.. currentmodule:: couchbase.libcouchbase
+.. currentmodule:: couchbase.connection
 .. class:: Connection
 
     .. automethod:: stats
@@ -311,7 +309,7 @@ information about things
 Attributes
 ==========
 
-.. currentmodule:: couchbase.libcouchbase
+.. currentmodule:: couchbase.connection
 .. class:: Connection
 
     .. autoattribute:: quiet
@@ -330,13 +328,13 @@ Attributes
 
     .. attribute:: default_format
 
-        Specify the default format (default: const:`~couchbase.FMT_JSON`)
+        Specify the default format (default: :const:`~couchbase.FMT_JSON`)
         to encode your data before storing in Couchbase. It uses the
         flags field to store the format.
 
         See :ref:`format_info` for the possible values
 
-        On a :meth:`~couchbase.libcouchbase.Connection.get` the
+        On a :meth:`~couchbase.connection.Connection.get` the
         original value will be returned. This means the JSON will be
         decoded, respectively the object will be unpickled.
 
@@ -351,6 +349,6 @@ Attributes
         If it is `False` it will raise
         :exc:`couchbase.exceptions.NotFoundError` exceptions. When
         set to `True` the operations will not raise an exception, but
-        still set an error inside the :class:`Result` object.
+        still set an error inside the :class:`~couchbase.result.Result` object.
 
     .. autoattribute:: lockmode

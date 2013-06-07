@@ -15,7 +15,8 @@
 #
 
 from tests.base import ConnectionTestCase
-from couchbase.libcouchbase import ObserveInfo, OBS_MASK, OBS_FOUND, OBS_PERSISTED
+from couchbase.result import ObserveInfo
+from couchbase.user_constants import OBS_MASK, OBS_FOUND, OBS_PERSISTED
 
 class ConnectionObserveTest(ConnectionTestCase):
 

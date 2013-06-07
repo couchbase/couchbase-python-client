@@ -1,11 +1,12 @@
+##############
 Result Objects
-===============
+##############
 
-.. module:: couchbase.libcouchbase
+.. currentmodule:: couchbase.result
 
 This is the base class for all result operations
 
-.. autoclass:: couchbase.libcouchbase.Result
+.. autoclass:: Result
 
    .. autoattribute:: rc
 
@@ -15,36 +16,37 @@ This is the base class for all result operations
 
    .. autoattribute:: key
 
-.. autoclass:: couchbase.libcouchbase.OperationResult
+
+.. autoclass:: OperationResult
+   :show-inheritance:
+   :no-undoc-members:
+
+
+.. autoclass:: ValueResult
    :show-inheritance:
    :members:
 
-.. autoclass:: couchbase.libcouchbase.ValueResult
-   :show-inheritance:
-   :members:
 
-This object is returned by multi-key operations
-
-.. autoclass:: couchbase.libcouchbase.MultiResult
-   :members:
-   :no-inherited-members:
-
-This object is returned by generic HTTP operations
-
-.. autoclass:: couchbase.libcouchbase.HttpResult
+.. autoclass:: HttpResult
     :show-inheritance:
     :members:
     :no-inherited-members:
 
+
+.. class:: MultiResult
+
+    .. autoattribute:: all_ok
+
+
 .. _observe_info:
 
+===============
 Observe Results
 ===============
 
+-----------------
 Observe Constants
 -----------------
-
-.. currentmodule:: couchbase.libcouchbase
 
 These constants are returned as bits in the :attr:`ObserveInfo.flags`
 field.
@@ -62,10 +64,11 @@ field.
 
     The key is not present in the node's cache.
 
+--------------------
 `ObserveInfo` Object
-----------------------
+--------------------
 
-.. module:: couchbase.libcouchbase
+.. module:: couchbase.result
 
-.. autoclass:: couchbase.libcouchbase.ObserveInfo
+.. autoclass:: couchbase.result.ObserveInfo
     :members:

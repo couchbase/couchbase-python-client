@@ -16,7 +16,7 @@
 #
 
 from couchbase import FMT_BYTES, FMT_JSON, FMT_PICKLE, FMT_UTF8
-from couchbase.libcouchbase import Connection
+from couchbase.connection import Connection
 from couchbase.exceptions import ValueFormatError, CouchbaseError
 from tests.base import ConnectionTestCase
 from nose.exc import SkipTest
