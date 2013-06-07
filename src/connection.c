@@ -464,6 +464,7 @@ Connection__init__(pycbc_Connection *self,
     }
 
     if (err != LCB_SUCCESS) {
+        self->instance = NULL;
         PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err,
                        "Couldn't create instance. Either bad "
                        "credentials/hosts/bucket names were "

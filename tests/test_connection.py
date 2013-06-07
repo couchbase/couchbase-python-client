@@ -20,7 +20,7 @@ import os
 
 from couchbase.exceptions import (AuthError, ArgumentError,
                                   BucketNotFoundError, ConnectError,
-                                  NotFoundError)
+                                  NotFoundError, InvalidError)
 from couchbase.connection import Connection
 
 from tests.base import CouchbaseTestCase
@@ -134,6 +134,11 @@ class ConnectionTest(CouchbaseTestCase):
 
         cb = Connection(**self.make_connargs())
         self.assertFalse(len(cb.errors()))
+
+    def test_invalid_hostname(self):
+        self.assertRaises(InvalidError,
+                          Connection,
+                          bucket='default', host='12345:qwer###')
 
     def test_multi_hosts(self):
         kwargs = {
