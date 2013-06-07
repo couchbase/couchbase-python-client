@@ -181,9 +181,7 @@ class Connection(_Base):
 
             cb.set_multi({'foo': 'bar', 'baz': 'value'})
 
-        .. seealso::
-
-        :meth:`set_multi`
+        .. seealso:: :meth:`set_multi`
 
         """
         return _Base.set(self, key, value, cas, ttl, format)
@@ -204,10 +202,7 @@ class Connection(_Base):
         :raise: :exc:`couchbase.exceptions.KeyExistsError` if the key
           already exists
 
-        .. seealso::
-
-        :meth:`set`
-        :meth:`add_multi`
+        .. seealso:: :meth:`set`, :meth:`add_multi`
 
         """
         return _Base.add(self, key, value, ttl=ttl, format=format)
@@ -223,10 +218,7 @@ class Connection(_Base):
         :raise: :exc:`couchbase.exceptions.NotFoundError` if the key
           does not exist
 
-        .. seealso::
-
-        :meth:`set`
-        :meth:`replace_multi`
+        .. seealso:: :meth:`set`, :meth:`replace_multi`
 
         """
         return _Base.replace(self, key, value, ttl=ttl, cas=cas, format=format)
@@ -259,9 +251,7 @@ class Connection(_Base):
           not exist
 
         .. seealso::
-
-        :meth:`set`
-        :meth:`append_multi`
+            :meth:`set`, :meth:`append_multi`
 
         """
         return _Base.append(self, key, value, ttl=ttl, cas=cas, format=format)
@@ -271,9 +261,7 @@ class Connection(_Base):
         Prepend a string to an existing value in Couchbase.
 
         .. seealso::
-
-        :meth:`append`
-        :meth:`prepend_multi`
+            :meth:`append`, :meth:`prepend_multi`
 
         """
         return _Base.prepend(self, key, value, ttl=ttl, cas=cas, format=format)
@@ -331,8 +319,7 @@ class Connection(_Base):
 
 
         .. seealso::
-
-        :meth:`get_multi`
+            :meth:`get_multi`
 
         """
 
@@ -357,10 +344,8 @@ class Connection(_Base):
         :raise: The same things that :meth:`get` does
 
         .. seealso::
-
-        :meth:`get` - which can be used to get *and* update the expiration
-
-        :meth:`touch_multi`
+            :meth:`get` - which can be used to get *and* update the expiration,
+            :meth:`touch_multi`
         """
         return _Base.touch(self, key, ttl=ttl)
 
@@ -428,10 +413,7 @@ class Connection(_Base):
             cb.unlock("key", rv.cas)
 
         .. seealso::
-
-        :meth:`get`
-        :meth:`lock_multi`
-        :meth:`unlock`
+            :meth:`get`, :meth:`lock_multi`, :meth:`unlock`
 
         """
         return _Base.lock(self, key, ttl=ttl)
@@ -516,9 +498,7 @@ class Connection(_Base):
             })
 
 
-        .. seealso::
-
-        :meth:`delete_multi`
+        .. seealso:: :meth:`delete_multi`
 
         """
         return _Base.delete(self, key, cas, quiet)
@@ -572,10 +552,7 @@ class Connection(_Base):
             for key, result in kv.items():
                 print "Key %s has value %d now" % (key, result.value)
 
-        .. seealso::
-
-        :meth:`decr`
-        :meth:`incr_multi`
+        .. seealso:: :meth:`decr`, :meth:`incr_multi`
 
         """
         return _Base.incr(self, key, amount, initial, ttl)
@@ -585,10 +562,7 @@ class Connection(_Base):
         Like :meth:`incr`, but decreases, rather than increaes the
         counter value
 
-        .. seealso::
-
-        :meth:`incr`
-        :meth:`decr_multi`
+        .. seealso:: :meth:`incr`, :meth:`decr_multi`
 
         """
         return _Base.decr(self, key, amount, initial, ttl)
@@ -642,8 +616,7 @@ class Connection(_Base):
 
         :param string key: The key to inspect
 
-        .. seealso::
-            :ref:`observe_info`
+        .. seealso:: :ref:`observe_info`
 
         """
         return _Base.observe(self, key)
@@ -672,9 +645,7 @@ class Connection(_Base):
         network performance by batch-scheduling operations, reducing latencies.
         This is especially noticeable on smaller value sizes.
 
-        .. seealso::
-
-        :meth:`set`
+        .. seealso:: :meth:`set`
 
         """
         return _Base.set_multi(self, keys, ttl=ttl, format=format)
@@ -683,11 +654,7 @@ class Connection(_Base):
         """Add multiple keys.
         Multi variant of :meth:`~couchbase.connection.Connection.add`
 
-        .. seealso::
-
-        :meth:`add`
-        :meth:`set_multi`
-        :meth:`set`
+        .. seealso:: :meth:`add`, :meth:`set_multi`, :meth:`set`
 
         """
         return _Base.add_multi(self, keys, ttl=ttl, format=format)
@@ -696,11 +663,7 @@ class Connection(_Base):
         """Replace multiple keys.
         Multi variant of :meth:`replace`
 
-        .. seealso::
-
-        :meth:`replace`
-        :meth:`set_multi`
-        :meth:`set`
+        .. seealso:: :meth:`replace`, :meth:`set_multi`, :meth:`set`
 
         """
         return _Base.replace_multi(self, keys, ttl=ttl, format=format)
@@ -709,11 +672,7 @@ class Connection(_Base):
         """Append to multiple keys.
         Multi variant of :meth:`append`
 
-        .. seealso::
-
-        :meth:`append`
-        :meth:`set_multi`
-        :meth:`set`
+        .. seealso:: :meth:`append`, :meth:`set_multi`, :meth:`set`
 
         """
         return _Base.append_multi(self, keys, ttl=ttl, format=format)
@@ -722,11 +681,7 @@ class Connection(_Base):
         """Prepend to multiple keys.
         Multi variant of :meth:`prepend`
 
-        .. seealso::
-
-        :meth:`prepend`
-        :meth:`set_multi`
-        :meth:`set`
+        .. seealso:: :meth:`prepend`, :meth:`set_multi`, :meth:`set`
 
         """
         return _Base.prepend_multi(self, keys, ttl=ttl, format=format)
@@ -773,9 +728,7 @@ class Connection(_Base):
 
             cb.touch_multi({"foo" : 1, "bar" : 5, "baz" : 10})
 
-        .. seealso::
-
-            :meth:`touch`
+        .. seealso:: :meth:`touch`
         """
         return _Base.touch_multi(self, keys, ttl=ttl)
 
@@ -790,9 +743,7 @@ class Connection(_Base):
 
         :return: a :class:`~couchbase.result.MultiResult` object
 
-        .. seealso::
-
-        :meth:`lock`
+        .. seealso:: :meth:`lock`
 
         """
         return _Base.lock_multi(self, keys, ttl=ttl)
@@ -819,9 +770,7 @@ class Connection(_Base):
             cb.unlock_multi(rvs)
 
 
-        .. seealso::
-
-        :meth:`unlock`
+        .. seealso:: :meth:`unlock`
         """
         return _Base.unlock_multi(self, keys)
 
@@ -964,6 +913,9 @@ class Connection(_Base):
 
         :return: An :class:`~couchbase.result.HttpResult` object.
 
+        .. seealso:: :meth:`design_get`, :meth:`design_delete`,
+            :meth:`design_publish`
+
         """
         name = self._mk_devmode(name, use_devmode)
 
@@ -1008,6 +960,8 @@ class Connection(_Base):
         :raise: :exc:`couchbase.exceptions.HTTPError` if the design does not
             exist.
 
+        .. seealso:: :meth:`design_create`
+
         """
         name = self._mk_devmode(name, use_devmode)
 
@@ -1037,6 +991,9 @@ class Connection(_Base):
 
         :raise: :exc:`couchbase.exceptions.HTTPError` if the design does not
             exist
+
+        .. seealso:: :meth:`design_create`, :meth:`design_delete`,
+            :meth:`design_get`
         """
         existing = self.design_get(name, use_devmode=True)
         rv = self.design_create(name, existing.value, use_devmode=False,
@@ -1063,6 +1020,8 @@ class Connection(_Base):
         :raise: :exc:`couchbase.exceptions.TimeoutError` if ``syncwait`` was
             specified and the operation could not be verified within the
             specified interval.
+
+        .. seealso:: :meth:`design_create`, :meth:`design_get`
 
         """
         name = self._mk_devmode(name, use_devmode)
