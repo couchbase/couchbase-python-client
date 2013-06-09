@@ -1,9 +1,139 @@
-============
-View Options
-============
+##############
+Querying Views
+##############
+
+===============
+``View`` Object
+===============
+
+.. module:: couchbase.views.iterator
+
+.. class:: View
+
+    .. automethod:: __init__
+
+    .. automethod:: __iter__
+
+^^^^^^^^^^
+Attributes
+^^^^^^^^^^
+
+    .. attribute:: errors
+
+        Errors returned from the view engine itself
+
+
+    .. attribute:: indexed_rows
+
+        Number of total rows indexed by the view. This is the number of results
+        before any filters or limitations applied.
+        This is only valid once the iteration has started
+
+
+    .. attribute:: row_processor
+
+        An object to handle a single page of the paginated results. This
+        object should be an instance of a class conforming to the
+        :class:`RowProcessor` interface. By default, it is an instance of
+        :class:`RowProcessor` itself.
+
+
+    .. attribute:: raw
+
+        The actual :class:`couchbase.connection.HttpResult` object.
+        Note that this is only the *last* result returned. If using paginated
+        views, the view comprises several such objects, and is cleared each
+        time a new page is fetched.
+
+
+    .. attribute:: design
+
+        Name of the design document being used
+
+
+    .. attribute:: view
+
+        Name of the view being queired
+
+
+    .. attribute:: include_docs
+
+        Whether documents are fetched along with each row
+
+
+    .. attribute:: rows_returned
+
+        How many actual rows were returned from the server.
+
+        This is incremented each time a new request is made. Note this may
+        be different from the amount of rows yielded by iterator from
+        :meth:`RowProcessor.handle_rows` if a custom :attr:`row_processor`
+        is being used
+
+
+^^^^^^^^^^^^^^
+Row Processing
+^^^^^^^^^^^^^^
+
+.. class:: RowProcessor
+
+    .. automethod:: handle_rows
+
+
+.. class:: ViewRow
+
+    This is the default class returned by the :class:`RowProcessor`
+
+    .. attribute:: key
+
+        The key emitted by the view's ``map`` function (first argument to ``emit``)
+
+
+    .. attribute:: value
+
+        The value emitted by the view's ``map`` function (second argument to
+        ``emit``). If the view was queried with ``reduce`` enabled, then this
+        contains the reduced value after being processed by the ``reduce``
+        function.
+
+
+    .. attribute:: docid
+
+        This is the document ID for the row. This is always ``None`` if
+        ``reduce`` was specified. Otherwise it may be passed to one of the
+        ``get`` or ``set`` method to retrieve or otherwise access the
+        underlying document. Note that if ``include_docs`` was specified,
+        the :attr:`doc` already contains the document
+
+
+    .. attribute:: doc
+
+        If ``include_docs`` was specified, contains the actual
+        :class:`couchbase.connection.Result` object for the document.
+
+
+
+================
+``Query`` Object
+================
 
 .. module:: couchbase.views.params
 
+
+.. class:: Query
+
+    .. automethod:: __init__
+
+    .. automethod:: update
+
+    .. autoattribute:: encoded
+
+
+.. _view_options:
+
+-----------------
+View Options
+-----------------
 
 This document explains the various view options, and how they are treated
 by the Couchbase library.
@@ -16,7 +146,350 @@ http://www.couchbase.com/docs/couchbase-manual-2.0/couchbase-views-querying-rest
 Note that these explain the view options and their values as they are passed
 along to the server.
 
+.. _param_listings:
 
+These attributes are available as properties (with get and set)
+and can also be used as keys within a constructor.
+
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Result Range and Sorting Properties
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The following properties allow you to
+
+* Define a range to limit your results (i.e. `between foo and bar`)
+* Define a specific subset of keys for which results should be yielded
+* Reverse the sort order
+
+.. class:: Query
+
+
+    .. attribute:: mapkey_range
+
+        Specify the range based on the contents of the keys emitted by the
+        view's ``map`` function.
+
+        :Server Option: Maps to both ``startkey`` and ``endkey``
+        :Value Type:
+            :ref:`viewtype_range` of :ref:`viewtype_jsonvalue` elements
+
+        The result output depends on the type of keys and ranges used.
+
+        One may specify a "full" range (that is, an exact match of the first
+        and/or last key to use), or a partial range where the start and end
+        ranges specify a *subset* of the key to be used as the start and end.
+        In such a case, the results begin with the first key which matches
+        the partial start key, and ends with the first key that matches the
+        partial end key.
+
+        Additionally, keys may be *compound* keys, i.e. complex data types
+        such as lists.
+
+        You may use the :const:`STRING_RANGE_END` to specify a wildcard
+        for an end range.
+
+        Match all keys that start with "a" through keys starting with "f"::
+
+            q.mapkey_range = ["a", "f"+q.STRING_RANGE_END]
+            q.inclusive_end = True
+
+        If you have a view function that looks something like this::
+
+            function(doc, meta) {
+                if (doc.city && doc.event) {
+                    emit(doc.city, doc.event)
+                }
+            }
+
+        Then you may query for all events in a specific city by using::
+
+            q.mapkey_range = [["Reno"], ["Reno", q.STRING_RANGE_END]]
+
+        The empty element ``r[0][1]`` means to match the lowest string value
+        for each result. The special last element ``r[1][1]`` is a constant
+        which expands to the highest acceptable unicode value. This means
+        to match any string in the second element as long as it is below this
+        value (which effectively means any string).
+
+        As such, the results may look like::
+
+            ViewRow(key=["Reno", "Air Races"], ...),
+            ViewRow(key=["Reno", "Street Vibrations"], ...)
+
+            # etc.
+
+    .. autoattribute:: STRING_RANGE_END
+
+    .. attribute:: dockey_range
+
+        :Server Option: Maps to both ``startkey_docid`` and ``endkey_docid``
+        :Value Type:
+            :ref:`viewtype_range` of :ref:`viewtype_string` elements.
+
+        Specify the range based on the contents of the keys as they are stored
+        by :meth:`~couchbase.connection.Connection.set`. These are
+        returned as the "Document IDs" in each view result.
+
+        You *must* use this attribute in conjunction with
+        :attr:`mapkey_range` option. Additionally, this option only has
+        any effect if you are emitting duplicate keys for different
+        document IDs. An example of this follows:
+
+        Documents::
+
+            c.set("id_1", { "type" : "dummy" })
+            c.set("id_2", { "type" : "dummy" })
+            # ...
+            c.set("id_9", { "type" : "dummy" })
+
+
+        View::
+
+            // This will emit "dummy" for ids 1..9
+
+            function map(doc, meta) {
+                emit(doc.type);
+            }
+
+
+
+        Only get information about ``"dummy"`` docs for IDs 3 through 6::
+
+            q = Query()
+            q.mapkey_range = ["dummy", "dummy" + Query.STRING_RANGE_END]
+            q.dockey_range = ["id_3", "id_6"]
+            q.inclusive_end = True
+
+        .. warning::
+
+            Apparently, only the first element of this parameter has any
+            effect. Currently the example above will start returning rows
+            from ``id_3`` (as expected), but does not stop after reaching
+            ``id_6``.
+
+    .. attribute:: key
+
+    .. attribute:: mapkey_single
+
+        :Server Option: ``key``
+        :Value Type: :ref:`viewtype_jsonvalue`
+
+        Limit the view results to those keys which match the value to this
+        option exactly.
+
+        View::
+
+            function(doc, meta) {
+                if (doc.type == "brewery") {
+                    emit([meta.id]);
+                } else {
+                    emit([doc.brewery_id, meta.id]);
+                }
+            }
+
+        Example::
+
+            q.mapkey_single = ["abbaye_de_maredsous"]
+
+
+        Note that as the ``map`` function can return more than one result with
+        the same key, you may still get more than one result back.
+
+
+    .. attribute:: keys
+
+    .. attribute:: mapkey_multi
+
+        :Server Option: ``keys``
+        :Value Type: :ref:`viewtype_jsonarray`
+
+        Like :attr:`mapkey_single`, but specify a sequence of keys.
+        Only rows whose emitted keys match any of the keys specified here
+        will be returned.
+
+        Example::
+
+            q.mapkey_multi = [
+                ["abbaye_de_maresdous"],
+                ["abbaye_de_maresdous", "abbaye_de_maresdous-8"],
+                ["abbaye_do_maresdous", "abbaye_de_maresdous-10"]
+            ]
+
+
+    .. attribute:: inclusive_end
+
+        :Server Option: ``inclusive_end``
+        :Value Type: :ref:`viewtype_boolean`
+
+        Declare that the range parameters' (for e.g. :attr:`mapkey_range` and
+        :attr:`dockey_range`) end key should also be returned for rows that
+        match it. By default, the resultset is terminated once the first key
+        matching the end range is found.
+
+    .. attribute:: descending
+
+        :Server Option: ``descending``
+        :Value Type: :ref:`viewtype_boolean`
+
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+Reduce Function Parameters
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+These options are valid only for views which have a ``reduce`` function,
+and for which the ``reduce`` value is enabled
+
+.. class:: Query
+
+    .. attribute:: reduce
+
+        :Server Option: ``reduce``
+        :Value Type: :ref:`viewtype_boolean`
+
+        Note that if the view specified in the query (to e.g.
+        :meth:`couchbase.connection.Connection.query`) does not have a
+        reduce function specified, an exception will be thrown once the query
+        begins.
+
+    .. attribute:: group
+
+        :Server Option: ``group``
+        :Value Type: :ref:`viewtype_boolean`
+
+        Specify this option to have the results contain a breakdown of the
+        ``reduce`` function based on keys produced by ``map``. By default,
+        only a single row is returned indicating the aggregate value from all
+        the ``reduce`` invocations.
+
+        Specifying this option will show a breakdown of the aggregate ``reduce``
+        value based on keys. Each unique key in the result set will have its
+        own value.
+
+        Setting this property will also set :attr:`reduce` to ``True``
+
+    .. attribute:: group_level
+
+        :Server Option: ``group_level``
+        :Value Type: :ref:`viewtype_num`
+
+        This is analoguous to ``group``, except that it places a constraint
+        on how many elements of the compound key produced by ``map`` should be
+        displayed in the summary. For example if this parameter is set to
+        ``1`` then the results are returned for each unique first element in
+        the mapped keys.
+
+        Setting this property will also set :attr:`reduce` to ``True``
+
+^^^^^^^^^^^^^^^^^^^^^^^
+Pagination and Sampling
+^^^^^^^^^^^^^^^^^^^^^^^
+
+These options limit or paginate through the results
+
+.. class:: Query
+
+    .. attribute:: skip
+
+        :Server Option: ``skip``
+        :Value Type: :ref:`viewtype_num`
+
+        .. warning::
+            Consider using :attr:`mapkey_range` instead. Using this property
+            with high values is typically inefficient.
+
+    .. attribute:: limit
+
+        :Server Option: ``limit``
+        :Value Type: :ref:`viewtype_num`
+
+        Set an absolute limit on how many rows should be returned in this
+        query. The number of rows returned will always be less or equal to
+        this number.
+
+^^^^^^^^^^^^^^^
+Control Options
+^^^^^^^^^^^^^^^
+
+These do not particularly affect the actual query behavior, but may
+control some other behavior which may indirectly impact performance or
+indexing operations.
+
+.. class:: Query
+
+    .. attribute:: stale
+
+        :Server Option: ``stale``
+
+        Specify the (re)-indexing behavior for the view itself. Views return
+        results based on indexes - which are not updated for each query by
+        default. Updating the index for each query would cause much performance
+        issues. However it is sometimes desirable to ensure consistency of data
+        (as sometimes there may be a delay between recently-updated keys and
+        the view index).
+
+        This option allows to specify indexing behavior. It accepts a string
+        which can have one of the following values:
+
+        * ``ok``
+
+            Stale indexes are allowable. This is the default. The constant
+            :data:`STALE_OK` may be used instead.
+
+        * ``false``
+
+            Stale indexes are not allowable. Re-generate the index before
+            returning the results. Note that if there are many results, this
+            may take a considerable amount of time (on the order of several
+            seconds, typically).
+            The constant :data:`STALE_UPDATE_BEFORE` may be used instead.
+
+        * ``update_after``
+
+            Return stale indexes for this result (so that the query does not
+            take a long time), but re-generated the index immediately after
+            returning.
+            The constant :data:`STALE_UPDATE_AFTER` may be used instead.
+
+        A :ref:`viewtype_boolean` may be used as well, in which case
+        ``True`` is converted to ``"ok"``, and ``False``
+        is converted to ``"false"``
+
+    .. attribute:: on_error
+
+        :Server Option: ``on_error``
+        :Value Type:
+            A string of either ``"stop"`` or ``"continue"``. You may use
+            the symbolic constants :data:`ONERROR_STOP` or
+            :data:`ONERROR_CONTINUE`
+
+    .. attribute:: connection_timeout
+
+        This parameter is a server-side option indicating how long
+        a given node should wait for another node to respond. This does
+        *not* directly set the client-side timeout.
+
+        :Server Option: ``connection_timeout``
+        :Value Type: :ref:`viewtype_num`
+
+    .. attribute:: debug
+
+        :Server Option: ``debug``
+        :Value Type: :ref:`viewtype_boolean`
+
+        If enabled, various debug output will be dumped in the resultset.
+
+    .. attribute:: full_set
+
+        :Server Option: ``full_set``
+        :Value Type: :ref:`viewtype_boolean`
+
+        If enabled, development views will operate over the entire data within
+        the bucket (and not just a limited subset).
+
+
+
+----------------------
 Value Type For Options
 ----------------------
 
@@ -27,6 +500,7 @@ Different options accept different types, which shall be enumerated here
 
 .. _viewtype_boolean:
 
+^^^^^^^^^^^^
 Boolean Type
 ^^^^^^^^^^^^
 
@@ -44,6 +518,7 @@ perhaps it was passed accidentally due to a bug in the application.
 
 .. _viewtype_num:
 
+^^^^^^^^^^^^
 Numeric Type
 ^^^^^^^^^^^^
 
@@ -60,6 +535,7 @@ It is an error to pass a ``bool`` as a number, despite the fact that in Python,
 
 .. _viewtype_jsonvalue:
 
+^^^^^^^^^^
 JSON Value
 ^^^^^^^^^^
 
@@ -78,6 +554,7 @@ strings, and booleans).
 
 .. _viewtype_jsonarray:
 
+^^^^^^^^^^
 JSON Array
 ^^^^^^^^^^
 
@@ -92,6 +569,7 @@ at the option handling layer
 
 .. _viewtype_string:
 
+^^^^^^
 String
 ^^^^^^
 
@@ -112,6 +590,7 @@ use it as a string, you must explicitly do so prior to passing it as an option.
 
 .. _viewtype_range:
 
+^^^^^^^^^^^
 Range Value
 ^^^^^^^^^^^
 
@@ -134,6 +613,7 @@ The type of each element is parameter-specific.
 
 .. _viewtype_unspec:
 
+^^^^^^^^^^^^^^^^^
 Unspecified Value
 ^^^^^^^^^^^^^^^^^
 
@@ -149,208 +629,9 @@ As an alternative, a special constant is provided as
 option. When the view processing code encounters this value, it will
 discard the option-value pair.
 
-
-Common View Parameters
-======================
-
-.. currentmodule:: couchbase.views.params
-
-
-Note that only view parameters which are client-only are documented here.
-More documentation as to the meaning of each parameter may be found in the
-server manual.
-
-.. class:: Params
-
-Range Parameters
-----------------
-
-These parameters affect the sorting, ordering, and filtering of rows.
-
-.. currentmodule:: couchbase.views.params
-
-.. class:: Params
-
-    .. data:: MAPKEY_RANGE
-
-        Specify the range based on the contents of the keys emitted by the
-        view's ``map`` function.
-
-        :Server Option: Maps to both ``startkey`` and ``endkey``
-        :String Literal: ``"mapkey_range"``
-        :Value Type:
-            :ref:`viewtype_range` of :ref:`viewtype_jsonvalue` elements
-
-    .. data:: DOCKEY_RANGE
-
-        Specify the range based on the contents of the keys as they are stored
-        by :meth:`~couchbase.connection.Connection.set`. These are
-        returned as the "Document IDs" in each view result.
-
-        :Server Option: Maps to both ``startkey_docid`` and ``endkey_docid``
-        :String Literal: ``"dockey_range"``
-        :Value Type:
-            :ref:`viewtype_range` of :ref:`viewtype_string` elements.
-
-    .. data:: MAPKEY_SINGLE
-
-        Limit the view results to those keys which match the value to this
-        option
-
-        :String Literal: ``"mapkey_single"``
-        :Server Option: Maps to ``key``
-        :Value Type: :ref:`viewtype_jsonvalue`
-
-    .. data:: MAPKEY_MULTI
-
-        Like :data:`MAPKEY_SINGLE`, but specify a sequence of keys.
-        Only rows whose emitted keys match any of the keys specified here
-        will be returned.
-
-        :String Literal: ``"mapkey_multi"``
-        :Server Option: ``keys``
-        :Value Type: :ref:`viewtype_jsonarray`
-
-    .. data:: INCLUSIVE_END
-
-        :Server Option: ``inclusive_end``
-        :Value Type: :ref:`viewtype_boolean`
-
-    .. data:: DESCENDING
-
-        :Server Option: ``descending``
-        :Value Type: :ref:`viewtype_boolean`
-
-
-Reduce Function Parameters
---------------------------
-
-.. currentmodule:: couchbase.views.params
-
-These options are valid only for views which have a ``reduce`` function,
-and for which the :attr:`Params.REDUCE` value is enabled
-
-.. class:: Params
-
-    .. data:: REDUCE
-
-        :Server Option: ``reduce``
-        :Value Type: :ref:`viewtype_boolean`
-
-    .. data:: GROUP
-
-        :Server Option: ``group``
-        :Value Type: :ref:`viewtype_boolean`
-
-    .. data:: GROUP_LEVEL
-
-        :Server Option: ``group_level``
-        :Value Type: :ref:`viewtype_num`
-
-Pagination and Sampling
------------------------
-.. currentmodule:: couchbase.views.params
-
-These options limit or paginate through the results
-
-.. class:: Params
-
-    .. data:: SKIP
-
-        :Server Option: ``skip``
-        :Value Type: :ref:`viewtype_num`
-
-    .. data:: LIMIT
-
-        :Server Option: ``limit``
-        :Value Type: :ref:`viewtype_num`
-
-
-Miscellaneous Options
----------------------
-
-.. currentmodule:: couchbase.views.params
-
-These do not particularly affect the actual query behavior, but may
-control some other behavior which may indirectly impact performance or
-indexing operations.
-
-.. class:: Params
-
-    .. data:: STALE
-
-        :Server Option: ``stale``
-        :Value Type:
-            A string containing either ``"ok"``, ``"false"`` or
-            ``"update_after"``.
-            The constants :data:`STALE_OK`, :data:`STALE_UPDATE_BEFORE`, and
-            :data:`STALE_UPDATE_AFTER` may be used as well
-
-            A :ref:`viewtype_boolean` may be used as well, in which case
-            ``True`` is converted to ``"ok"``
-
-    .. data:: ON_ERROR
-
-        :Server Option: ``on_error``
-        :Value Type:
-            A string of either ``"stop"`` or ``"continue"``. You may use
-            the symbolic constants :data:`ONERROR_STOP` or
-            :data:`ONERROR_CONTINUE`
-
-    .. data:: CONNECTION_TIMEOUT
-
-        This parameter is a server-side option indicating how long
-        a given node should wait for another node to respond. This does
-        *not* directly set the client-side timeout.
-
-        :Server Option: ``connection_timeout``
-        :Value Type: :ref:`viewtype_num`
-
-    .. data:: DEBUG
-
-        :Server Option: ``debug``
-        :Value Type: :ref:`viewtype_boolean`
-
-    .. data:: FULL_SET
-
-        :Server Option: ``full_set``
-        :Value Type: :ref:`viewtype_boolean`
-
-
-Raw Server Parameters
----------------------
-
-.. currentmodule:: couchbase.views.params
-
-These constants are present in the view API but are wrapped by various
-other options above. Nevertheless, using the raw options are supported.
-
-.. class:: Params
-
-    .. data:: STARTKEY
-
-        :Server Option: ``startkey``
-        :Value Type: :ref:`viewtype_jsonvalue`
-
-    .. data:: ENDKEY
-
-        :Server Option: ``endkey``
-        :Value Type: :ref:`viewtype_jsonvalue`
-
-    .. data:: STARTKEY_DOCID
-
-        :Server Option: ``startkey_docid``
-        :Value Type: :ref:`viewtype_string`
-
-    .. data:: ENDKEY_DOCID
-
-        :Server Option: ``endkey_docid``
-        :Value Type: :ref:`viewtype_string`
-
-
-
+^^^^^^^^^^^^^^^^^^^^^
 Convenience Constants
----------------------
+^^^^^^^^^^^^^^^^^^^^^
 
 .. currentmodule:: couchbase.views.params
 
@@ -368,6 +649,7 @@ These are convenience *value* constants for some of the options
 
 .. _passthrough_values:
 
+-----------------------------------
 Circumventing Parameter Constraints
 -----------------------------------
 

@@ -309,6 +309,9 @@ class HTTPError(CouchbaseError):
 class ObjectThreadError(CouchbaseError):
     """Thrown when access from multiple threads is detected"""
 
+class ViewEngineError(CouchbaseError):
+    """Thrown for inline errors during view queries"""
+
 _LCB_ERRNO_MAP = {
     C.LCB_AUTH_ERROR : AuthError,
     C.LCB_DELTA_BADVAL : DeltaBadvalError,

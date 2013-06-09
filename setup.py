@@ -59,6 +59,8 @@ SOURCEMODS = (
         'htresult',
         'ctranscoder',
         'observe',
+        os.path.join('viewrow', 'viewrow'),
+        os.path.join('contrib', 'jsonsl', 'jsonsl')
         )
 
 extoptions['sources'] = [ os.path.join("src", m + ".c") for m in SOURCEMODS ]

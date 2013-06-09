@@ -55,12 +55,16 @@ pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Connection *self)
 {
     lcb_error_t err;
 
+    self->nremaining += cv->ncmds;
     err = pycbc_oputil_wait_common(self);
 
     if (err != LCB_SUCCESS) {
+        self->nremaining -= cv->ncmds;
         PYCBC_EXCTHROW_WAIT(err);
         return -1;
     }
+
+    assert(self->nremaining == 0);
 
     if (pycbc_multiresult_maybe_raise(cv->mres)) {
         return -1;

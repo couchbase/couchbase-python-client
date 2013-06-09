@@ -12,12 +12,12 @@ Contents:
    :maxdepth: 2
 
    api/couchbase
+   api/views
    api/results
    api/exceptions
    api/transcoder
    api/threads
    api/convertfuncs
-   api/views
 
 Indices and tables
 ==================

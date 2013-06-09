@@ -21,7 +21,7 @@
 import json
 from copy import deepcopy
 
-from couchbase._pyport import (long, xrange, ulp)
+from couchbase._pyport import long, xrange, ulp, basestring
 from couchbase.exceptions import ArgumentError
 
 # Some constants
@@ -53,7 +53,7 @@ def _bool_param_handler(input):
         else:
             return "false"
 
-    if isinstance(input, str):
+    if isinstance(input, basestring):
         if input not in ("true", "false"):
             raise ArgumentError.pyexc("String for boolean must be "
                                       "'true' or 'false'", input)
@@ -88,7 +88,7 @@ def _string_param_common(input, do_quote=False):
     do_quote = False
 
     s = None
-    if isinstance(input, str):
+    if isinstance(input, basestring):
         s = input
 
     elif isinstance(input, bool):
@@ -194,6 +194,12 @@ _HANDLER_MAP = {
     Params.CONNECTION_TIMEOUT: _num_param_handler
 }
 
+def _gendoc(param):
+    for k, v in Params.__dict__.items():
+        if param == v:
+            return "\n:data:`Params.{0}`".format(k)
+
+
 class Query(object):
     def _set_common(self, param, value, set_user=True):
         # Invalidate encoded string
@@ -277,8 +283,8 @@ class Query(object):
         def setter(self, value):
             self._set_range_common(k_sugar, k_start, k_end, value)
 
-        return property(getter, setter)
-
+        return property(getter, setter, fdel=None,
+                        doc = _gendoc(k_sugar))
 
     def __genprop(p):
         def getter(self):
@@ -287,7 +293,8 @@ class Query(object):
         def setter(self, value):
             self._set_common(p, value)
 
-        return property(getter, setter)
+        return property(getter, setter, fdel=None,
+                        doc = _gendoc(p))
 
 
     descending          = __genprop(Params.DESCENDING)
@@ -323,7 +330,36 @@ class Query(object):
     dockey_range = __rangeprop(Params.DOCKEY_RANGE,
                                Params.STARTKEY_DOCID, Params.ENDKEY_DOCID)
 
+
+    STRING_RANGE_END = json.loads('"\u0FFF"')
+    """
+    Highest acceptable unicode value
+    """
+
     def __init__(self, passthrough=False, unrecognized_ok=False, **params):
+        """
+        Create a new Query object.
+
+        A Query object is used as a container for the various view options.
+        It can be used as a standalone object to encode queries but is typically
+        passed as the ``query`` value to :class:`~couchbase.views.iterator.View`.
+
+        :param boolean passthrough:
+            Whether *passthrough* mode is enabled
+
+        :param boolean unrecognized_ok:
+            Whether unrecognized options are acceptable. See
+            :ref:`passthrough_values`.
+
+        :param params:
+            Key-value pairs for view options. See :ref:`view_options` for
+            a list of acceptable options and their values.
+
+
+        :raise: :exc:`couchbase.exceptions.ArgumentError` if a view option
+            or a combination of view options were deemed invalid.
+
+        """
         self.passthrough = passthrough
         self.unrecognized_ok = unrecognized_ok
         self._real_options = {}
@@ -332,24 +368,89 @@ class Query(object):
 
         self._encoded = None
 
-        if params:
-            for k, v in params.items():
-                if not hasattr(self, k):
-                    if not unrecognized_ok:
-                        raise ArgumentError.pyexc("Unknown option", k)
-                    self._set_common(k, v)
+        # String literal to pass along with the query
+        self._base_str = ""
+        self.update(**params)
 
-                else:
-                    setattr(self, k, v)
+    def update(self, copy=False, **params):
+        """
+        Chained assignment operator.
+
+        This may be used to quickly assign extra parameters to the
+        :class:`Query` object.
+
+        Example::
+
+            q = Query(reduce=True, full_sec=True)
+
+            # Someplace later
+
+            v = View(design, view, query=q.update(mapkey_range=["foo"]))
+
+        Its primary use is to easily modify the query object (in-place).
+
+        :param boolean copy:
+            If set to true, the original object is copied before new attributes
+            are added to it
+        :param params: Extra arguments. These must be valid query options.
+
+        :return: A :class:`Query` object. If ``copy`` was set to true, this
+            will be a new instance, otherwise it is the same instance on which
+            this method was called
+
+        """
+        if copy:
+            self = deepcopy(self)
+
+        for k, v in params.items():
+            if not hasattr(self, k):
+                if not self.unrecognized_ok:
+                    raise ArgumentError.pyexc("Unknown option", k)
+                self._set_common(k, v)
+
+            else:
+                setattr(self, k, v)
+
+        return self
 
     @classmethod
-    def from_any(cls, params, passthrough, unrecognized):
+    def from_any(cls, params):
+        """
+        Creates a new Query object from input.
+
+        :param params: Parameter to convert to query
+        :type params: dict, string, or :class:`Query`
+
+        If ``params`` is a :class:`Query` object already, a deep copy is made
+        and a new :class:`Query` object is returned.
+
+        If ``params`` is a string, then a :class:`Query` object is contructed
+        from it. The string itself is not parsed, but rather prepended to
+        any additional parameters (defined via the object's methods)
+        with an additional ``&`` characted.
+
+        If ``params`` is a dictionary, it is passed to the :class:`Query`
+        constructor.
+
+        :return: a new :class:`Query` object
+        :raise: :exc:`ArgumentError` if the input is none of the acceptable
+            types mentioned above. Also raises any exceptions possibly thrown
+            by the constructor.
+
+        """
         if isinstance(params, cls):
             return deepcopy(params)
 
-        return cls(passthrough=passthrough,
-                   unrecognized_ok=unrecognized,
-                   **params)
+        elif isinstance(params, dict):
+            return cls(**params)
+
+        elif isinstance(params, basestring):
+            ret = cls()
+            ret._base_str = params
+            return ret
+
+        else:
+            raise ArgumentError.pyexc("Params must be Query, dict, or string")
 
     def _encode(self):
         res_d = []
@@ -371,10 +472,30 @@ class Query(object):
 
     @property
     def encoded(self):
+        """
+        Returns an encoded form of the query
+        """
         if not self._encoded:
             self._encoded = self._encode()
-        return self._encoded
 
+        if self._base_str:
+            return '&'.join((self._base_str, self._encoded))
+
+        else:
+            return self._encoded
+
+    @property
+    def has_blob(self):
+        """
+        Whether this query object is 'dirty'.
+
+        A 'dirty' object is one which
+        contains parameters unrecognized by the internal handling methods.
+        A dirty query may be constructed by using the ``passthrough``
+        or ``unrecognized_ok`` options, or by passing a string to
+        :meth:`from_any`
+        """
+        return self._base_str or self.unrecognized_ok or self.passthrough
 
     def __repr__(self):
         return "Query:'{0}'".format(self.encoded)

@@ -26,6 +26,8 @@
 #include <Python.h>
 #include <libcouchbase/couchbase.h>
 #include <pythread.h>
+#include "viewrow/viewrow.h"
+
 /**
  * See http://docs.python.org/2/c-api/arg.html for an explanation of this
  * definition.
@@ -248,6 +250,9 @@ typedef struct {
     /** whether __init__ has already been called */
     unsigned char init_called;
 
+    /** How many operations are waiting for a reply */
+    Py_ssize_t nremaining;
+
     /**
      * XXX:
      * No use for this yet
@@ -295,10 +300,36 @@ typedef struct {
     pycbc_Result_HEAD
     PyObject *http_data;
     PyObject *headers;
+
+    /**
+     * Metadata about the result
+     */
+    PyObject *rowsbuf;
+
+    /**
+     * Row parser context.
+     */
+    lcbex_vrow_ctx_t *rctx;
+
+    /**
+     * HTTP Request handle
+     */
+    lcb_http_request_t htreq;
+
+
     pycbc_Connection *parent;
     unsigned short htcode;
     unsigned short format;
+    unsigned short htflags;
 } pycbc_HttpResult;
+
+enum {
+    PYCBC_HTRES_F_CHUNKED   = 1 << 0,
+    PYCBC_HTRES_F_QUIET     = 1 << 1,
+    PYCBC_HTRES_F_COMPLETE  = 1 << 2
+};
+
+PyObject* pycbc_HttpResult__fetch(pycbc_HttpResult *self);
 
 /**
  * Object containing the result of a 'Multi' operation. It's the same as a
@@ -592,6 +623,7 @@ int pycbc_multiresult_maybe_raise(pycbc_MultiResult *self);
  * Initialize the callbacks for the lcb_t
  */
 void pycbc_callbacks_init(lcb_t instance);
+void pycbc_http_callbacks_init(lcb_t instance);
 
 
 /**

@@ -32,3 +32,8 @@ try:
     xrange = xrange
 except NameError:
     xrange = range
+
+try:
+    basestring = basestring
+except NameError:
+    basestring = str

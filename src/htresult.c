@@ -20,7 +20,8 @@
 int
 pycbc_httpresult_ok(pycbc_HttpResult *self)
 {
-    if (self->rc == LCB_SUCCESS && self->htcode < 300 && self->htcode > 199) {
+    if (self->rc == LCB_SUCCESS &&
+            ((self->htcode < 300 && self->htcode > 199) || self->htcode == 0)) {
         return 1;
     }
     return 0;
@@ -56,25 +57,44 @@ HttpResult_headers(pycbc_HttpResult *self, void *unused)
 static void
 HttpResult_dealloc(pycbc_HttpResult *self)
 {
+    pycbc_Connection *parent = self->parent;
+
+    self->parent = NULL;
+
+    if (self->htreq) {
+        lcb_cancel_http_request(parent->instance, self->htreq);
+        self->htreq = NULL;
+    }
+
     Py_XDECREF(self->http_data);
-    Py_XDECREF(self->parent);
+    Py_XDECREF(parent);
     Py_XDECREF(self->headers);
+    Py_XDECREF(self->rowsbuf);
+
+    if (self->rctx) {
+        lcbex_vrow_free(self->rctx);
+        self->rctx = NULL;
+    }
     pycbc_Result_dealloc((pycbc_Result*)self);
 }
+
 
 static struct PyMemberDef HttpResult_TABLE_members[] = {
         { "http_status",
                 T_USHORT, offsetof(pycbc_HttpResult, htcode),
                 READONLY, PyDoc_STR("HTTP Status Code")
         },
+
         { "value",
                 T_OBJECT_EX, offsetof(pycbc_HttpResult, http_data),
                 READONLY, PyDoc_STR("HTTP Payload")
         },
+
         { "url",
                 T_OBJECT_EX, offsetof(pycbc_HttpResult, key),
                 READONLY, PyDoc_STR("HTTP URI")
         },
+
         { NULL }
 };
 
@@ -91,6 +111,12 @@ static PyGetSetDef HttpResult_TABLE_getset[] = {
                 PyDoc_STR("Headers dict for the request. "
                         "None unless 'fetch_headers' was passed to the request")
         },
+
+        { NULL }
+};
+
+static PyMethodDef HttpResult_TABLE_methods[] = {
+        { "_fetch", (PyCFunction)pycbc_HttpResult__fetch, METH_NOARGS, NULL },
 
         { NULL }
 };
@@ -116,6 +142,7 @@ pycbc_HttpResultType_init(PyObject **ptr)
     p->tp_base = &pycbc_ResultType;
     p->tp_getset = HttpResult_TABLE_getset;
     p->tp_members = HttpResult_TABLE_members;
+    p->tp_methods = HttpResult_TABLE_methods;
     p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
     p->tp_dealloc = (destructor)HttpResult_dealloc;
     return pycbc_ResultType_ready(p, PYCBC_HTRESULT_BASEFLDS);

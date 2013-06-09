@@ -29,6 +29,7 @@ from couchbase.result import *
 
 import couchbase.exceptions as exceptions
 from couchbase.views.params import make_dvpath, make_options_string
+from couchbase.views.iterator import View
 
 class Connection(_Base):
 
@@ -1039,6 +1040,39 @@ class Connection(_Base):
 
         self._design_poll(name, 'del', existing, syncwait)
         return ret
+
+    def query(self, design, view, use_devmode=False, **kwargs):
+        """
+        Query a pre-defined MapReduce view, passing parameters.
+
+        This method executes a view on the cluster. It accepts various
+        parameters for the view and returns an iterable object (specifically,
+        a :class:`~couchbase.views.iterator.View`).
+
+        :param string design: The design document
+        :param string view: The view function contained within the design
+            document
+        :param boolean use_devmode: Whether the view name should be transformed
+            into a development-mode view. See documentation on
+            :meth:`design_create` for more explanation.
+
+        :param kwargs: Extra arguments passedd to the
+            :class:`~couchbase.views.iterator.View` object constructor.
+
+        .. seealso::
+
+            * :class:`~couchbase.views.iterator.View`
+
+                which contains more extensive documentation and examples
+
+            * :class:`~couchbase.views.params.Query`
+
+                which contains documentation on the available query options
+
+        """
+        design = self._mk_devmode(design, use_devmode)
+        return View(self, design, view, **kwargs)
+
 
     def __repr__(self):
         return ("<{modname}.{cls} bucket={bucket}, "

@@ -95,6 +95,16 @@ maybe_push_operr(pycbc_MultiResult *mres,
     Py_INCREF(mres->errop);
 }
 
+static void
+maybe_breakout(pycbc_Connection *self)
+{
+    assert(self->nremaining);
+
+    if (!--self->nremaining) {
+        lcb_breakout(self->instance);
+    }
+}
+
 static int
 get_common_objects(PyObject *cookie,
                    const void *key,
@@ -112,6 +122,8 @@ get_common_objects(PyObject *cookie,
     assert(Py_TYPE(cookie) == &pycbc_MultiResultType);
     *mres = (pycbc_MultiResult*)cookie;
     *conn = (*mres)->parent;
+
+    maybe_breakout(*conn);
 
     CB_THR_END(*conn);
 
@@ -380,6 +392,10 @@ stat_callback(lcb_t instance,
     mres = (pycbc_MultiResult*)cookie;
     CB_THR_END(mres->parent);
 
+    if (!resp->v.v0.server_endpoint) {
+        maybe_breakout(mres->parent);
+    }
+
     if (err != LCB_SUCCESS) {
         if (mres->errop == NULL) {
             pycbc_Result *res =
@@ -427,54 +443,6 @@ stat_callback(lcb_t instance,
 }
 
 
-/**
- * This callback does things a bit differently.
- * Instead of using a MultiResult, we use a single HttpResult object.
- * We won't ever have "multiple" http objects.
- */
-static void
-http_complete_callback(lcb_http_request_t req,
-                       lcb_t instance,
-                       const void *cookie,
-                       lcb_error_t err,
-                       const lcb_http_resp_t *resp)
-{
-    pycbc_HttpResult *htres = (pycbc_HttpResult*)cookie;
-    htres->rc = err;
-    htres->htcode = resp->v.v0.status;
-
-    CB_THR_END(htres->parent);
-
-    if (resp->v.v0.nbytes) {
-        pycbc_tc_simple_decode(&htres->http_data,
-                               resp->v.v0.bytes,
-                               resp->v.v0.nbytes,
-                               htres->format);
-        if (!htres->http_data) {
-            PyErr_Clear();
-            htres->http_data = PyBytes_FromStringAndSize(resp->v.v0.bytes,
-                                                         resp->v.v0.nbytes);
-        }
-
-    } else {
-        htres->http_data = Py_None;
-        Py_INCREF(Py_None);
-    }
-
-    if (resp->v.v0.headers && htres->headers) {
-        const char * const *p;
-        PyObject *hval;
-        for (p = resp->v.v0.headers; *p; p += 2) {
-            hval = pycbc_SimpleStringZ(p[1]);
-            PyDict_SetItemString(htres->headers, p[0], hval);
-            Py_DECREF(hval);
-        }
-    }
-
-    CB_THR_BEGIN(htres->parent);
-    (void)instance;
-    (void)req;
-}
 
 static void
 observe_callback(lcb_t instance,
@@ -489,6 +457,7 @@ observe_callback(lcb_t instance,
     pycbc_MultiResult *mres;
 
     if (!resp->v.v0.key) {
+        vres = (pycbc_ValueResult*)cookie;
         return;
     }
 
@@ -562,6 +531,7 @@ pycbc_callbacks_init(lcb_t instance)
     lcb_set_remove_callback(instance, delete_callback);
     lcb_set_stat_callback(instance, stat_callback);
     lcb_set_error_callback(instance, error_callback);
-    lcb_set_http_complete_callback(instance, http_complete_callback);
     lcb_set_observe_callback(instance, observe_callback);
+
+    pycbc_http_callbacks_init(instance);
 }

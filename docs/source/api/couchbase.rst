@@ -243,13 +243,7 @@ MapReduce/View Methods
 .. currentmodule:: couchbase.connection
 .. class:: Connection
 
-    .. warning::
-
-        The view API is not considered stable. It will likely change in
-        the future
-
-    .. automethod:: _view
-
+    .. automethod:: query
 
 Design Document Management
 ==========================
