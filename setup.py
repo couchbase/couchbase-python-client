@@ -78,5 +78,5 @@ setup(
         "Topic :: Software Development :: Libraries",
         "Topic :: Software Development :: Libraries :: Python Modules"],
     ext_modules = [module],
-    packages = ['couchbase']
+    packages = ['couchbase', 'couchbase.views']
 )
