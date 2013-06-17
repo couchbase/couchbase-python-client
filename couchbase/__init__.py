@@ -190,4 +190,5 @@ class Couchbase:
                           unlock_gil=unlock_gil,
                           timeout=timeout,
                           transcoder=transcoder,
+                          quiet=quiet,
                           **kwargs)
