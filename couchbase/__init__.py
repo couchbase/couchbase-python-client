@@ -144,9 +144,10 @@ class Couchbase:
           higher if you have slow network conditions.
 
         :param transcoder:
-          (*EXPERIMENTAL*)
           Set the transcoder object to use. This should conform to the
-          interface in the documentation (it need not actually be a subclass)
+          interface in the documentation (it need not actually be a subclass).
+          This can be either a class type to instantiate, or an initialized
+          instance.
         :type transcoder: :class:`couchbase.transcoder.Transcoder`
 
         :param lockmode:

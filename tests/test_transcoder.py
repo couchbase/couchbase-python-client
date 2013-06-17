@@ -17,6 +17,8 @@
 from tests.base import ConnectionTestCase
 
 from couchbase.transcoder import Transcoder
+from couchbase import Couchbase
+from couchbase.connection import Connection
 import couchbase.exceptions as E
 
 # This won't test every single permutation of the transcoder, but will check
@@ -167,3 +169,12 @@ class ConnectionTranscoderTest(ConnectionTestCase):
             mangled._op_next['decode_key'] = o
             mangled._op_next['decode_value'] = o
             self.assertRaises(E.ValueFormatError, self.cb.set, o, o)
+
+    def test_transcoder_class(self):
+        # Test whether we can pass a class for a transcoder
+        key = self.gen_key("transcoder_class")
+        c = Connection(**self.make_connargs(transcoder=Transcoder))
+        c.set(key, "value")
+
+        c = Couchbase.connect(**self.make_connargs(transcoder=Transcoder))
+        c.set(key, "value")

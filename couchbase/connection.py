@@ -80,6 +80,10 @@ class Connection(_Base):
         # Internal parameters
         kwargs['_errors'] = deque(maxlen=1000)
 
+        tc = kwargs.get('transcoder')
+        if isinstance(tc, type):
+            kwargs['transcoder'] = tc()
+
         try:
             super(Connection, self).__init__(**kwargs)
 
