@@ -31,6 +31,7 @@ STALE_OK = "ok"
 ONERROR_CONTINUE = "continue"
 ONERROR_STOP = "stop"
 
+
 class _Unspec(object):
     def __nonzero__(self):
         return False
@@ -45,6 +46,7 @@ class _Unspec(object):
         return "<Placeholder>"
 
 UNSPEC = _Unspec()
+
 
 def _bool_param_handler(input):
     if isinstance(input, bool):
@@ -82,6 +84,7 @@ def _num_param_handler(input):
     except Exception as e:
         raise ArgumentError.pyexc("Expected a numeric argument", input, e)
 
+
 def _string_param_common(input, do_quote=False):
     # TODO, if we pass this to urlencode, do we ever need to quote?
     # For the moment, i'm always forcing non-quote behavior
@@ -106,11 +109,14 @@ def _string_param_common(input, do_quote=False):
 
     return s
 
+
 def _string_param_handler(input):
     return _string_param_common(input, do_quote=True)
 
+
 def _generic_param_handler(input):
     return _string_param_handler(input, do_quote=False)
+
 
 def _stale_param_handler(input):
     if input in (STALE_UPDATE_AFTER, STALE_OK, STALE_UPDATE_BEFORE):
@@ -121,10 +127,14 @@ def _stale_param_handler(input):
         ret = STALE_OK
     return ret
 
+
 def _onerror_param_handler(input):
     if input not in (ONERROR_CONTINUE, ONERROR_STOP):
-        raise ArgumentError.pyexc("on_error must be 'continue' or 'stop'", input)
+        raise ArgumentError.pyexc(
+            "on_error must be 'continue' or 'stop'", input)
+
     return input
+
 
 def _jval_param_handler(input):
     try:
@@ -133,11 +143,15 @@ def _jval_param_handler(input):
     except Exception as e:
         raise ArgumentError.pyexc("Couldn't convert value to JSON", input, e)
 
+
 def _jarry_param_handler(input):
     ret = _jval_param_handler(input)
     if not ret.startswith('['):
-        raise ArgumentError.pyexc("Value must be converted to JSON array", input)
+        raise ArgumentError.pyexc(
+            "Value must be converted to JSON array", input)
+
     return ret
+
 
 # Some more constants. Yippie!
 class Params(object):
@@ -194,6 +208,7 @@ _HANDLER_MAP = {
     Params.CONNECTION_TIMEOUT: _num_param_handler
 }
 
+
 def _gendoc(param):
     for k, v in Params.__dict__.items():
         if param == v:
@@ -237,11 +252,14 @@ class Query(object):
     def _set_range_common(self, k_sugar, k_start, k_end, value):
         """
         Checks to see if the client-side convenience key is present, and if so
-        converts the sugar convenience key into its real server-side equivalents.
+        converts the sugar convenience key into its real server-side
+        equivalents.
+
         :param string k_sugar: The client-side convenience key
         :param string k_start: The server-side key specifying the beginning of
             the range
-        :param string k_end: The server-side key specifying the end of the range
+        :param string k_end: The server-side key specifying the end of the
+            range
         """
 
         if not isinstance(value, (list, tuple, _Unspec)):
@@ -250,7 +268,7 @@ class Query(object):
                 .format(k_sugar))
 
         if self._user_options.get(k_start, UNSPEC) is not UNSPEC or (
-            self._user_options.get(k_end, UNSPEC) is not UNSPEC):
+                self._user_options.get(k_end, UNSPEC) is not UNSPEC):
 
             raise ArgumentError.pyexc(
                 "Cannot specify {0} with either {1} or {2}"
@@ -262,7 +280,7 @@ class Query(object):
             self._user_options[k_sugar] = UNSPEC
             return
 
-        if len(value) not in (1,2):
+        if len(value) not in (1, 2):
             raise ArgumentError.pyexc("Range specification "
                                       "must have one or two elements",
                                       value)
@@ -283,8 +301,7 @@ class Query(object):
         def setter(self, value):
             self._set_range_common(k_sugar, k_start, k_end, value)
 
-        return property(getter, setter, fdel=None,
-                        doc = _gendoc(k_sugar))
+        return property(getter, setter, fdel=None, doc=_gendoc(k_sugar))
 
     def __genprop(p):
         def getter(self):
@@ -293,8 +310,7 @@ class Query(object):
         def setter(self, value):
             self._set_common(p, value)
 
-        return property(getter, setter, fdel=None,
-                        doc = _gendoc(p))
+        return property(getter, setter, fdel=None, doc=_gendoc(p))
 
 
     descending          = __genprop(Params.DESCENDING)
@@ -324,11 +340,12 @@ class Query(object):
     mapkey_single       = __genprop(Params.KEY)
     mapkey_multi        = __genprop(Params.KEYS)
 
-    mapkey_range = __rangeprop(Params.MAPKEY_RANGE,
-                               Params.STARTKEY, Params.ENDKEY)
+    mapkey_range        = __rangeprop(Params.MAPKEY_RANGE,
+                                      Params.STARTKEY, Params.ENDKEY)
 
-    dockey_range = __rangeprop(Params.DOCKEY_RANGE,
-                               Params.STARTKEY_DOCID, Params.ENDKEY_DOCID)
+    dockey_range        = __rangeprop(Params.DOCKEY_RANGE,
+                                      Params.STARTKEY_DOCID,
+                                      Params.ENDKEY_DOCID)
 
 
     STRING_RANGE_END = json.loads('"\u0FFF"')
@@ -500,12 +517,14 @@ class Query(object):
     def __repr__(self):
         return "Query:'{0}'".format(self.encoded)
 
+
 def make_options_string(input, unrecognized_ok=False, passthrough=False):
     if not isinstance(input, Query):
         input = Query(passthrough=passthrough,
                       unrecognized_ok=unrecognized_ok,
                       **input)
     return input.encoded
+
 
 def make_dvpath(doc, view):
     return "_design/{0}/_view/{1}?".format(doc, view)

@@ -17,6 +17,7 @@
 
 import couchbase._libcouchbase as C
 
+
 class CouchbaseError(Exception):
     """Base exception for Couchbase errors
 
@@ -64,7 +65,7 @@ class CouchbaseError(Exception):
 
     def __init__(self, params):
         if isinstance(params, str):
-            params = { 'message' : params }
+            params = {'message': params}
 
         self.rc = params.get('rc', 0)
         self.all_results = params.get('all_results', {})
@@ -75,12 +76,11 @@ class CouchbaseError(Exception):
         self.objextra = params.get('objextra', None)
         self.message = params.get('message', None)
 
-
     @classmethod
     def pyexc(cls, message=None, obj=None, inner=None):
-        return cls({'message':message,
-                    'objextra':obj,
-                    'inner_cause' : inner})
+        return cls({'message': message,
+                    'objextra': obj,
+                    'inner_cause': inner})
 
     def __str__(self):
         details = []
@@ -108,6 +108,7 @@ class CouchbaseError(Exception):
         s = "<{0}>".format(", ".join(details))
         return s
 
+
 class InternalSDKError(CouchbaseError):
     """
     This means the SDK has done something wrong. Get support.
@@ -115,11 +116,13 @@ class InternalSDKError(CouchbaseError):
     not be seeing this message)
     """
 
+
 class CouchbaseNetworkError(CouchbaseError):
     """
     Base class for network-related errors. These indicate issues in the low
     level connectivity
     """
+
 
 class ArgumentError(CouchbaseError):
     """Invalid argument
@@ -133,7 +136,6 @@ class ValueFormatError(CouchbaseError):
 
 
 # The following exceptions are derived from libcouchbase
-
 class AuthError(CouchbaseError):
     """Authentication failed
 
@@ -306,42 +308,45 @@ class BadHandleError(CouchbaseError):
 class HTTPError(CouchbaseError):
     """HTTP error"""
 
+
 class ObjectThreadError(CouchbaseError):
     """Thrown when access from multiple threads is detected"""
+
 
 class ViewEngineError(CouchbaseError):
     """Thrown for inline errors during view queries"""
 
+
 _LCB_ERRNO_MAP = {
-    C.LCB_AUTH_ERROR : AuthError,
-    C.LCB_DELTA_BADVAL : DeltaBadvalError,
-    C.LCB_E2BIG : TooBigError,
-    C.LCB_EBUSY : BusyError,
-    C.LCB_ENOMEM : NoMemoryError,
-    C.LCB_ETMPFAIL : TemporaryFailError,
-    C.LCB_KEY_EEXISTS : KeyExistsError,
-    C.LCB_KEY_ENOENT : NotFoundError,
-    C.LCB_DLOPEN_FAILED : DlopenFailedError,
-    C.LCB_DLSYM_FAILED : DlsymFailedError,
-    C.LCB_NETWORK_ERROR : NetworkError,
-    C.LCB_NOT_MY_VBUCKET : NotMyVbucketError,
-    C.LCB_NOT_STORED : NotStoredError,
-    C.LCB_NOT_SUPPORTED : NotSupportedError,
-    C.LCB_UNKNOWN_HOST : UnknownHostError,
-    C.LCB_PROTOCOL_ERROR : ProtocolError,
-    C.LCB_ETIMEDOUT : TimeoutError,
-    C.LCB_CONNECT_ERROR : ConnectError,
-    C.LCB_BUCKET_ENOENT : BucketNotFoundError,
-    C.LCB_EBADHANDLE : BadHandleError,
+    C.LCB_AUTH_ERROR:       AuthError,
+    C.LCB_DELTA_BADVAL:     DeltaBadvalError,
+    C.LCB_E2BIG:            TooBigError,
+    C.LCB_EBUSY:            BusyError,
+    C.LCB_ENOMEM:           NoMemoryError,
+    C.LCB_ETMPFAIL:         TemporaryFailError,
+    C.LCB_KEY_EEXISTS:      KeyExistsError,
+    C.LCB_KEY_ENOENT:       NotFoundError,
+    C.LCB_DLOPEN_FAILED:    DlopenFailedError,
+    C.LCB_DLSYM_FAILED:     DlsymFailedError,
+    C.LCB_NETWORK_ERROR:    NetworkError,
+    C.LCB_NOT_MY_VBUCKET:   NotMyVbucketError,
+    C.LCB_NOT_STORED:       NotStoredError,
+    C.LCB_NOT_SUPPORTED:    NotSupportedError,
+    C.LCB_UNKNOWN_HOST:     UnknownHostError,
+    C.LCB_PROTOCOL_ERROR:   ProtocolError,
+    C.LCB_ETIMEDOUT:        TimeoutError,
+    C.LCB_CONNECT_ERROR:    ConnectError,
+    C.LCB_BUCKET_ENOENT:    BucketNotFoundError,
+    C.LCB_EBADHANDLE:       BadHandleError,
     # LCB.SERVER_BUG,
-    C.LCB_INVALID_HOST_FORMAT : InvalidError,
-    C.LCB_INVALID_CHAR : InvalidError,
+    C.LCB_INVALID_HOST_FORMAT: InvalidError,
+    C.LCB_INVALID_CHAR:     InvalidError,
 }
 
 _EXCTYPE_MAP = {
-    C.PYCBC_EXC_ARGUMENTS : ArgumentError,
-    C.PYCBC_EXC_ENCODING : ValueFormatError,
-    C.PYCBC_EXC_INTERNAL : InternalSDKError,
-    C.PYCBC_EXC_HTTP : HTTPError,
-    C.PYCBC_EXC_THREADING : ObjectThreadError
+    C.PYCBC_EXC_ARGUMENTS:  ArgumentError,
+    C.PYCBC_EXC_ENCODING:   ValueFormatError,
+    C.PYCBC_EXC_INTERNAL:   InternalSDKError,
+    C.PYCBC_EXC_HTTP:       HTTPError,
+    C.PYCBC_EXC_THREADING:  ObjectThreadError
 }

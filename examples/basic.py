@@ -45,8 +45,9 @@ except KeyExistsError:
     rv = cb.get('first')
     item, flags, correct_cas = rv.value, rv.flags, rv.cas
     # Set it again, this time with the correct CAS value
-    rv = cb.set('first', {'hello': 'world', 'additional': True},
-                 cas=correct_cas)
+    rv = cb.set('first',
+                {'hello': 'world', 'additional': True},
+                cas=correct_cas)
     print(rv)
 
 # Delete the document only if the CAS value matches (it would also

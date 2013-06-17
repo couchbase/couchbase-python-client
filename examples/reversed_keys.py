@@ -3,6 +3,7 @@
 from couchbase.transcoder import Transcoder
 from couchbase.connection import Connection
 
+
 class ReverseTranscoder(Transcoder):
     def encode_key(self, key):
         return super(ReverseTranscoder, self).encode_key(key[::-1])

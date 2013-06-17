@@ -23,6 +23,7 @@ from couchbase import (FMT_JSON, FMT_BYTES, FMT_UTF8, FMT_PICKLE, FMT_MASK)
 from couchbase.exceptions import ValueFormatError
 from couchbase._libcouchbase import Transcoder
 
+
 class TranscoderPP(object):
     """
     This is a pure-python Transcoder class. It is here only to show a reference
@@ -30,6 +31,7 @@ class TranscoderPP(object):
     the :class:`Transcoder` object instead if all the methods are not
     implemented.
     """
+
     def encode_key(self, key):
         ret = (self.encode_value(key, FMT_UTF8))[0]
         return ret

@@ -25,13 +25,16 @@ from couchbase.views.params import Query, UNSPEC, make_dvpath
 from couchbase._pyport import ulp
 import couchbase._libcouchbase as C
 
+
 class AlreadyQueriedError(CouchbaseError):
     """Thrown when iterating over a View which was already iterated over"""
+
 
 ViewRow = namedtuple('ViewRow', ['key', 'value', 'docid', 'doc'])
 """
 Default class for a single row.
 """
+
 
 class RowProcessor(object):
     """
@@ -116,8 +119,8 @@ class RowProcessor(object):
                 try:
                     doc = self._docs[ret['id']]
                 except KeyError:
-                    warn("Error encountered when executing view. Inspect 'errors' "
-                         "for more information")
+                    warn("Error encountered when executing view. "
+                         "Inspect 'errors' for more information")
 
             yield self.rowclass(ret['key'],
                                 ret['value'],
@@ -136,8 +139,8 @@ class View(object):
                  design,
                  view,
                  row_processor=None,
-                 streaming = 0,
-                 include_docs = False,
+                 streaming=0,
+                 include_docs=False,
                  query=None,
                  **params):
         """
@@ -148,7 +151,8 @@ class View(object):
         :type parent: :class:`~couchbase.connection.Connection`
         :param string ddoc: The design document
         :param string view: The name of the view within the design document
-        :param callable row_processor: See :attr:`row_processor` for more details.
+        :param callable row_processor: See :attr:`row_processor` for more
+            details.
 
         :param boolean include_docs: If set, the document itself will be
             retrieved for each row in the result. The default algorithm
@@ -249,9 +253,9 @@ class View(object):
         self._rp_iter = None
 
         if query and params:
-            raise ArgumentError.pyexc("Extra parameters are mutually exclusive "
-                                      "with the 'query' argument. "
-                                      "use query.update() to add extra arguments")
+            raise ArgumentError.pyexc(
+                "Extra parameters are mutually exclusive with the "
+                "'query' argument. Use query.update() to add extra arguments")
 
         if query:
             self._query = deepcopy(query)

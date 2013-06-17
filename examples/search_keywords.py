@@ -43,29 +43,29 @@ options = ap.parse_args()
 c = Connection(bucket='default')
 
 DESIGN = {
-        '_id' : '_design/search_keywords',
-        'language' : 'javascript',
-        'views' : {
-            'top_keywords' : {
-                'map' :
-                """
-                function(doc) {
-                    if (typeof doc === 'number') {
-                        emit(doc, null);
-                    }
+    '_id': '_design/search_keywords',
+    'language': 'javascript',
+    'views': {
+        'top_keywords': {
+            'map':
+            """
+            function(doc) {
+                if (typeof doc === 'number') {
+                    emit(doc, null);
                 }
-                """
             }
+            """
         }
     }
+}
 
 if options.create_design:
     c._design('search_keywords', DESIGN)
 
-NOUNS = [ 'cow', 'cat', 'dog', 'computer', 'WMD' ]
-ADJECTIVES = [ 'happy', 'sad', 'thoughtful', 'extroverted']
+NOUNS = ['cow', 'cat', 'dog', 'computer', 'WMD']
+ADJECTIVES = ['happy', 'sad', 'thoughtful', 'extroverted']
 
-kv = { }
+kv = {}
 
 for x in range(options.number_of_terms):
     n = random.choice(NOUNS)
@@ -75,7 +75,7 @@ for x in range(options.number_of_terms):
 c.set_multi(kv)
 
 vret = c._view('search_keywords', 'top_keywords',
-        { 'limit' : 10, 'descending' : True })
+               {'limit': 10, 'descending': True})
 
 pprint.pprint(vret.value['rows'], indent=4)
 

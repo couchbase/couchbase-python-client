@@ -25,11 +25,11 @@ from couchbase.transcoder import Transcoder
 ap = argparse.ArgumentParser()
 
 ap.add_argument('-t', '--threads', default=4, type=int,
-                help = "Number of threads to spawn. 0 means no threads "
+                help="Number of threads to spawn. 0 means no threads "
                 "but workload will still run in the main thread")
 
 ap.add_argument('-d', '--delay', default=0, type=float,
-                help = "Number of seconds to wait between each op. "
+                help="Number of seconds to wait between each op. "
                 "may be a fraction")
 
 ap.add_argument('-u', '--username', default='Administrator', type=str)
@@ -37,21 +37,22 @@ ap.add_argument('-b', '--bucket', default='default', type=str)
 ap.add_argument('-p', '--password', default="123456", type=str)
 ap.add_argument('-H', '--hostname', default='localhost', type=str)
 ap.add_argument('-D', '--duration', default=10, type=int,
-                help = "Duration of run (in seconds)")
+                help="Duration of run (in seconds)")
 ap.add_argument('-T', '--transcoder', default=False,
                 action='store_true',
-                help = "Use the Transcoder object rather than built-in "
+                help="Use the Transcoder object rather than built-in "
                 "conversion routines")
 
 ap.add_argument('--ksize', default=12, type=int,
-                help = "Key size to use")
+                help="Key size to use")
 
 ap.add_argument('--vsize', default=128, type=int,
-                help = "Value size to use")
+                help="Value size to use")
 
 options = ap.parse_args()
 DO_UNLOCK_GIL = options.threads > 0
 TC = Transcoder()
+
 
 class Worker(Thread):
     def __init__(self):
@@ -61,8 +62,9 @@ class Worker(Thread):
         self.wait_time = 0
         self.opcount = 0
         self.cb = Connection(bucket='default',
-                        host=options.hostname,
-                        unlock_gil=DO_UNLOCK_GIL)
+                             host=options.hostname,
+                             unlock_gil=DO_UNLOCK_GIL)
+
         if options.transcoder:
             self.cb.transcoder = TC
         self.end_time = time() + options.duration
@@ -101,8 +103,6 @@ else:
 
     for t in worker_threads:
         t.join()
-
-
 
 global_duration = time() - global_begin
 total_ops = sum([w.opcount for w in worker_threads])

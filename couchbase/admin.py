@@ -27,11 +27,12 @@ from couchbase.user_constants import FMT_JSON
 
 
 METHMAP = {
-    'GET' : LCB.LCB_HTTP_METHOD_GET,
-    'PUT' : LCB.LCB_HTTP_METHOD_PUT,
-    'POST' : LCB.LCB_HTTP_METHOD_POST,
-    'DELETE' : LCB.LCB_HTTP_METHOD_DELETE
+    'GET': LCB.LCB_HTTP_METHOD_GET,
+    'PUT': LCB.LCB_HTTP_METHOD_PUT,
+    'POST': LCB.LCB_HTTP_METHOD_POST,
+    'DELETE': LCB.LCB_HTTP_METHOD_DELETE
 }
+
 
 class Admin(LCB.Connection):
     """An administrative connection to a Couchbase cluster.
@@ -67,11 +68,11 @@ class Admin(LCB.Connection):
         :return: an instance of :class:`Admin`
         """
         kwargs = {
-            'username' : username,
-            'password' : password,
-            'host' : "{0}:{1}".format(host, port),
-            '_conntype' : LCB.LCB_TYPE_CLUSTER,
-            '_errors' : deque()
+            'username': username,
+            'password': password,
+            'host': "{0}:{1}".format(host, port),
+            '_conntype': LCB.LCB_TYPE_CLUSTER,
+            '_errors': deque()
         }
 
         return super(Admin, self).__init__(**kwargs)

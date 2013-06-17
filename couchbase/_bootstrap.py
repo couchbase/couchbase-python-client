@@ -34,6 +34,7 @@ import pickle
 import couchbase.exceptions as E
 import couchbase._libcouchbase as C
 
+
 def _result__repr__(self):
     """
     This is used as the `__repr__` function for the :class:`Result`
@@ -85,21 +86,23 @@ def _observeinfo__repr__(self):
         cls=self.__class__.__name__,
         status=flag_bits,
         cas=self.cas,
-        mstr=self.from_master
-    )
+        mstr=self.from_master)
+
 
 def _json_encode_wrapper(*args):
     return json.dumps(*args, ensure_ascii=False)
 
-C._init_helpers(
-                result_reprfunc = _result__repr__,
-                fmt_utf8_flags = C.FMT_UTF8,
-                fmt_bytes_flags = C.FMT_BYTES,
-                pickle_encode = pickle.dumps,
-                pickle_decode = pickle.loads,
-                json_encode = _json_encode_wrapper,
-                json_decode = json.loads,
-                lcb_errno_map = E._LCB_ERRNO_MAP,
-                misc_errno_map = E._EXCTYPE_MAP,
-                default_exception = E.CouchbaseError,
-                obsinfo_reprfunc = _observeinfo__repr__)
+
+# TODO: Make this more readable and have PEP8 ignore it.
+
+C._init_helpers(result_reprfunc=_result__repr__,
+                fmt_utf8_flags=C.FMT_UTF8,
+                fmt_bytes_flags=C.FMT_BYTES,
+                pickle_encode=pickle.dumps,
+                pickle_decode=pickle.loads,
+                json_encode=_json_encode_wrapper,
+                json_decode=json.loads,
+                lcb_errno_map=E._LCB_ERRNO_MAP,
+                misc_errno_map=E._EXCTYPE_MAP,
+                default_exception=E.CouchbaseError,
+                obsinfo_reprfunc=_observeinfo__repr__)

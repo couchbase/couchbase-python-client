@@ -31,6 +31,7 @@ import couchbase.exceptions as exceptions
 from couchbase.views.params import make_dvpath, make_options_string
 from couchbase.views.iterator import View
 
+
 class Connection(_Base):
 
     def _gen_host_string(self, host, port):
@@ -51,8 +52,6 @@ class Connection(_Base):
 
         return ";".join(hosts_tmp)
 
-
-
     def __init__(self, **kwargs):
         """Connection to a bucket.
 
@@ -60,7 +59,6 @@ class Connection(_Base):
 
         See :meth:`couchbase.Couchbase.connect` for constructor options
         """
-
         bucket = kwargs.get('bucket', None)
         host = kwargs.get('host', 'localhost')
         username = kwargs.get('username', None)
@@ -73,13 +71,11 @@ class Connection(_Base):
         if not bucket:
             raise exceptions.ArgumentError("A bucket name must be given")
 
-
         kwargs['host'] = self._gen_host_string(host, port)
         kwargs['bucket'] = bucket
 
         if password and not username:
             kwargs['username'] = bucket
-
 
         # Internal parameters
         kwargs['_errors'] = deque(maxlen=1000)
@@ -99,8 +95,6 @@ class Connection(_Base):
 
     def __delitem__(self, key):
         return self.delete(key)
-
-
 
     def errors(self, clear_existing=True):
         """
@@ -141,8 +135,8 @@ class Connection(_Base):
         :param value: The value to set for the key. The type for `value`
           follows the same rules as for `key`
 
-        :param int cas: The _CAS_ value to use. If supplied, the value will only
-          be stored if it already exists with the supplied CAS
+        :param int cas: The _CAS_ value to use. If supplied, the value will
+          only be stored if it already exists with the supplied CAS
 
         :param int ttl: If specified, the key will expire after this many
           seconds
@@ -330,8 +324,9 @@ class Connection(_Base):
         """Update a key's expiration time
 
         :param string key: The key whose expiration time should be modified
-        :param int ttl: The new expiration time. If the expiration time is ``0``
-          then the key never expires (and any existing expiration is removed)
+        :param int ttl: The new expiration time. If the expiration time is
+          ``0`` then the key never expires (and any existing expiration is
+          removed)
 
         :return: :class:`couchbase.result.OperationResult`
 
@@ -444,7 +439,6 @@ class Connection(_Base):
 
         """
         return _Base.unlock(self, key, cas=cas)
-
 
     def delete(self, key, cas=0, quiet=None):
         """Remove the key-value entry for a given key in Couchbase.
@@ -860,7 +854,7 @@ class Connection(_Base):
                 vname = list(cur_resp.value['views'].keys())[0]
                 try:
                     self._view(name, vname, use_devmode=False,
-                               params={'limit':1, 'stale':'ok'})
+                               params={'limit': 1, 'stale': 'ok'})
                     # We're able to query it? whoopie!
                     return True
 
@@ -875,7 +869,6 @@ class Connection(_Base):
 
         raise exceptions.TimeoutError.pyexc(
             "Wait time for design action completion exceeded")
-
 
     def _mk_devmode(self, n, use_devmode):
         if n.startswith("dev_") or not use_devmode:
@@ -938,11 +931,11 @@ class Connection(_Base):
                 pass
 
         ret = self._http_request(type=_LCB.LCB_HTTP_TYPE_VIEW,
-                                  path=fqname,
-                                  method=_LCB.LCB_HTTP_METHOD_PUT,
-                                  post_data=ddoc,
-                                  content_type="application/json",
-                                  fetch_headers=True)
+                                 path=fqname,
+                                 method=_LCB.LCB_HTTP_METHOD_PUT,
+                                 post_data=ddoc,
+                                 content_type="application/json",
+                                 fetch_headers=True)
 
         self._design_poll(name, 'add', existing, syncwait)
         return ret
@@ -967,17 +960,17 @@ class Connection(_Base):
         name = self._mk_devmode(name, use_devmode)
 
         existing = self._http_request(type=_LCB.LCB_HTTP_TYPE_VIEW,
-                              path="_design/"+name,
-                              method=_LCB.LCB_HTTP_METHOD_GET,
-                              content_type="application/json",
-                              fetch_headers=True)
+                                      path="_design/" + name,
+                                      method=_LCB.LCB_HTTP_METHOD_GET,
+                                      content_type="application/json",
+                                      fetch_headers=True)
         return existing
 
     def design_publish(self, name, syncwait=0):
         """
-        Convert a development mode view into a production mode views. Production
-        mode views, as opposed to development views, operate on the entire
-        cluster data (rather than a restricted subset thereof).
+        Convert a development mode view into a production mode views.
+        Production mode views, as opposed to development views, operate on the
+        entire cluster data (rather than a restricted subset thereof).
 
         :param string name: The name of the view to convert.
 
@@ -1034,9 +1027,9 @@ class Connection(_Base):
                 pass
 
         ret = self._http_request(type=_LCB.LCB_HTTP_TYPE_VIEW,
-                                  path="_design/"+name,
-                                  method=_LCB.LCB_HTTP_METHOD_DELETE,
-                                  fetch_headers=True)
+                                 path="_design/" + name,
+                                 method=_LCB.LCB_HTTP_METHOD_DELETE,
+                                 fetch_headers=True)
 
         self._design_poll(name, 'del', existing, syncwait)
         return ret
@@ -1073,12 +1066,11 @@ class Connection(_Base):
         design = self._mk_devmode(design, use_devmode)
         return View(self, design, view, **kwargs)
 
-
     def __repr__(self):
         return ("<{modname}.{cls} bucket={bucket}, "
-                "nodes={nodes} at 0x{oid:x}>").format(
-            modname = __name__,
-            cls = self.__class__.__name__,
-            nodes = self.server_nodes,
-            bucket = self.bucket,
-            oid = id(self))
+                "nodes={nodes} at 0x{oid:x}>"
+                ).format(modname=__name__,
+                         cls=self.__class__.__name__,
+                         nodes=self.server_nodes,
+                         bucket=self.bucket,
+                         oid=id(self))

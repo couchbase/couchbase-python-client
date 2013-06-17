@@ -19,6 +19,7 @@ from couchbase.connection import Connection
 from couchbase.user_constants import *
 import couchbase._libcouchbase as _LCB
 
+
 def set_json_converters(encode, decode):
     """
     Modify the default JSON conversion functions. This affects all
@@ -46,14 +47,15 @@ def set_json_converters(encode, decode):
     ret = _LCB._modify_helpers(json_encode=encode, json_decode=decode)
     return (ret['json_encode'], ret['json_decode'])
 
+
 def set_pickle_converters(encode, decode):
     """
     Modify the default Pickle conversion functions. This affects all
     :class:`~couchbase.connection.Connection` instances.
 
-    These functions will be called instead of the default ones (``pickle.dumps``
-    and ``pickle.loads``) to encode and decode values to and from the Pickle
-    format (when :const:`FMT_PICKLE` is used).
+    These functions will be called instead of the default ones
+    (``pickle.dumps`` and ``pickle.loads``) to encode and decode values to and
+    from the Pickle format (when :const:`FMT_PICKLE` is used).
 
     :param callable encode: Callable to invoke when encoding an object to
         Pickle. This should have the same prototype as ``pickle.dumps`` with
@@ -71,6 +73,7 @@ def set_pickle_converters(encode, decode):
     """
     ret = _LCB._modify_helpers(pickle_encode=encode, pickle_decode=decode)
     return (ret['pickle_encode'], ret['pickle_decode'])
+
 
 class Couchbase:
     """The base class for interacting with Couchbase"""
@@ -125,12 +128,12 @@ class Couchbase:
           Using this option may reduce overhead when using many short-lived
           instances of the client.
 
-        :param boolean unlock_gil: If set (which is the default), the connection
-          object will release the python GIL when possible, allowing other
-          (Python) threads to function in the background. This should be set to
-          true if you are using threads in your application (and is the default),
-          as otherwise all threads will be blocked while couchbase functions
-          execute.
+        :param boolean unlock_gil: If set (which is the default), the
+          connection object will release the python GIL when possible, allowing
+          other (Python) threads to function in the background. This should be
+          set to true if you are using threads in your application (and is the
+          default), as otherwise all threads will be blocked while couchbase
+          functions execute.
 
           You may turn this off for some performance boost and you are certain
           your application is not using threads
@@ -142,8 +145,8 @@ class Couchbase:
 
         :param transcoder:
           (*EXPERIMENTAL*)
-          Set the transcoder object to use. This should conform to the interface
-          in the documentation (it need not actually be a subclass)
+          Set the transcoder object to use. This should conform to the
+          interface in the documentation (it need not actually be a subclass)
         :type transcoder: :class:`couchbase.transcoder.Transcoder`
 
         :param lockmode:
