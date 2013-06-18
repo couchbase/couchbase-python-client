@@ -49,6 +49,12 @@ handle_single_arith(pycbc_Connection *self,
 
     cv->enckeys[ii] = curkey;
 
+    if (!nkey) {
+        PYCBC_EXCTHROW_EMPTYKEY();
+        return -1;
+    }
+
+
     if (curvalue) {
         if (PyDict_Check(curvalue)) {
             PyObject *initial_O = NULL;

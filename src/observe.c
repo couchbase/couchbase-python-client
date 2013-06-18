@@ -103,7 +103,15 @@ handle_single_observe(pycbc_Connection *self,
         return -1;
     }
 
+
     cv->enckeys[ii] = curkey;
+
+    if (!nkey) {
+        PYCBC_EXCTHROW_EMPTYKEY();
+        return -1;
+    }
+
+
     ocmd->v.v0.key = key;
     ocmd->v.v0.nkey = nkey;
 

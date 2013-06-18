@@ -41,6 +41,12 @@ handle_single_key(pycbc_Connection *self,
 
     cv->enckeys[ii] = curkey;
 
+    if (!nkey) {
+        PYCBC_EXCTHROW_EMPTYKEY();
+        return -1;
+    }
+
+
     if (curval) {
         static char *kwlist[] = { "ttl", NULL };
         PyObject *ttl_O = NULL;

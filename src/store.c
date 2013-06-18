@@ -45,6 +45,11 @@ handle_single_kv(pycbc_Connection *self,
 
     cv->enckeys[ii] = curkey;
 
+    if (!scmd->v.v0.nkey) {
+        PYCBC_EXCTHROW_EMPTYKEY();
+        return -1;
+    }
+
     if (PyObject_IsInstance(curvalue, (PyObject*)&pycbc_ArgumentType)) {
         rv = PyArg_ParseTupleAndKeywords(pycbc_DummyTuple, curvalue,
                                          "O|Kk",

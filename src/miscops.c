@@ -53,6 +53,11 @@ handle_single_keyop(pycbc_Connection *self,
 
     cv->enckeys[ii] = curkey;
 
+    if (!nkey) {
+        PYCBC_EXCTHROW_EMPTYKEY();
+        return -1;
+    }
+
     if (curval) {
 
         if (PyDict_Check(curval)) {

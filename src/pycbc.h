@@ -687,6 +687,9 @@ void pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p);
 #define PYCBC_EXCTHROW_ARGS() PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, \
                                            "Bad/insufficient arguments provided.")
 
+#define PYCBC_EXCTHROW_EMPTYKEY() PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, \
+        "Empty key (i.e. '', empty string) passed")
+
 /**
  * Encodes a key into a buffer.
  * @param conn the connection object
