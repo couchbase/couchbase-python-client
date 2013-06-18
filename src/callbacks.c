@@ -134,14 +134,33 @@ get_common_objects(PyObject *cookie,
         return -1;
     }
 
-    if (restype & RESTYPE_EXISTS_OK) {
-        *res = (pycbc_Result*)PyDict_GetItem((PyObject*)*mres, hkey);
-        if (*res) {
+    *res = (pycbc_Result*)PyDict_GetItem((PyObject*)*mres, hkey);
+
+    if (*res) {
+
+        if (! (restype & RESTYPE_EXISTS_OK)) {
+            if ((*conn)->flags & PYCBC_CONN_F_WARNEXPLICIT) {
+                PyErr_WarnExplicit(PyExc_RuntimeWarning,
+                                   "Found duplicate key",
+                                   __FILE__, __LINE__,
+                                   "couchbase._libcouchbase",
+                                   NULL);
+
+            } else {
+                PyErr_WarnEx(PyExc_RuntimeWarning,
+                             "Found duplicate key",
+                             1);
+            }
+            /**
+             * We need to destroy the existing object and re-create it.
+             */
+            PyDict_DelItem((PyObject*)*mres, hkey);
+            *res = NULL;
+
+        } else {
             Py_XDECREF(hkey);
         }
 
-    } else {
-        assert(PyDict_Contains((PyObject*)*mres, hkey) == 0);
     }
 
     if (*res == NULL) {

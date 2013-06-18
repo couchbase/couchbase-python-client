@@ -247,6 +247,11 @@ static struct PyMemberDef Connection_TABLE_members[] = {
                         "See :ref:`multiple_threads` for more information\n")
         },
 
+        { "_privflags", T_UINT, offsetof(pycbc_Connection, flags),
+                0,
+                PyDoc_STR("Internal flags.")
+        },
+
         { NULL }
 };
 

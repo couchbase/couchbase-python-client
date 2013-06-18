@@ -214,6 +214,11 @@ typedef enum {
     PYCBC_LOCKMODE_MAX
 } pycbc_lockmode_t;
 
+enum {
+    PYCBC_CONN_F_WARNEXPLICIT = 1 << 0
+    /** more flags will follow.. */
+};
+
 typedef struct {
     PyObject_HEAD
 
