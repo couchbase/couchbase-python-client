@@ -41,6 +41,11 @@ handle_single_keyop(pycbc_Connection *self,
     size_t nkey;
     lcb_uint64_t cas = 0;
 
+    if (optype == PYCBC_CMD_UNLOCK && PYCBC_OPRES_CHECK(curkey)) {
+        curval = curkey;
+        curkey = ((pycbc_OperationResult*)curkey)->key;
+    }
+
     rv = pycbc_tc_encode_key(self, &curkey, (void**)&key, &nkey);
     if (rv == -1) {
         return -1;
@@ -81,6 +86,7 @@ handle_single_keyop(pycbc_Connection *self,
             PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS,
                            0,
                            "CAS must be specified for unlock");
+            return -1;
         }
 
         ucmd->v.v0.key = key;

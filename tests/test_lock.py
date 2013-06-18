@@ -18,7 +18,7 @@
 from time import sleep
 
 from couchbase.exceptions import (
-    CouchbaseError, TemporaryFailError, KeyExistsError)
+    CouchbaseError, TemporaryFailError, KeyExistsError, ArgumentError)
 
 from tests.base import ConnectionTestCase
 
@@ -49,7 +49,7 @@ class ConnectionLockTest(ConnectionTestCase):
         self.assertRaises(TemporaryFailError,
                           self.cb.unlock,
                           k,
-                          rv.cas)
+                          1234)
 
         rv = self.cb.set(k, v)
         self.assertTrue(rv.success)
@@ -91,3 +91,30 @@ class ConnectionLockTest(ConnectionTestCase):
         rvs = self.cb.unlock_multi({key:rv})
         self.assertTrue(rvs.all_ok)
         self.assertTrue(rvs[key].success)
+
+    def test_missing_expiry(self):
+        self.assertRaises(ArgumentError,
+                          self.cb.lock, "foo")
+        self.assertRaises(ArgumentError, self.cb.lock_multi,
+                          ("foo", "bar"))
+
+    def test_missing_cas(self):
+        self.assertRaises(ArgumentError,
+                          self.cb.unlock_multi,
+                          ("foo", "bar"))
+        self.assertRaises(ArgumentError,
+                          self.cb.unlock_multi,
+                          {"foo":0, "bar":0})
+
+    def test_resobjs(self):
+        keys = self.gen_kv_dict(prefix="Lock_test_resobjs")
+        self.cb.set_multi(keys)
+        rvs = self.cb.lock_multi(keys.keys(), ttl=5)
+        self.cb.unlock_multi(rvs)
+
+        kv_single = list(keys.keys())[0]
+
+        rv = self.cb.lock(kv_single, ttl=5)
+        self.assertTrue(rv.cas)
+
+        self.cb.unlock_multi([rv])

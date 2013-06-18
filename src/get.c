@@ -80,6 +80,7 @@ handle_single_key(pycbc_Connection *self,
     case PYCBC_CMD_LOCK:
         if (!ttl) {
             PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Lock must have an expiry");
+            return -1;
         }
         lock = 1;
         goto GT_GET;
