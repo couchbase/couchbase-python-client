@@ -39,7 +39,7 @@ handle_single_arith(pycbc_Connection *self,
     struct arithmetic_common_vars my_params;
     static char *kwlist[] = { "delta", "initial", "ttl", NULL };
 
-    memcpy(&my_params, av, sizeof(my_params));
+    my_params = *av;
     acmd = cv->cmds.arith + ii;
 
     rv = pycbc_tc_encode_key(self, &curkey, &key, &nkey);
@@ -121,7 +121,9 @@ arithmetic_common(pycbc_Connection *self,
     lcb_error_t err;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
 
-    static char *kwlist[] = { "keys", "delta", "initial", "ttl", NULL };
+    static char *kwlist[] = { "keys", "amount", "initial", "ttl", NULL };
+
+    global_params.delta = 1;
 
     rv = PyArg_ParseTupleAndKeywords(args, kwargs, "O|LOO", kwlist,
                                      &collection,

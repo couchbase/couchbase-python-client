@@ -57,11 +57,26 @@ class ConnectionArithmeticTest(ConnectionTestCase):
     def test_incr_multi(self):
         keys = self.gen_key_list(amount=5, prefix="incr_multi")
 
+        def _multi_lim_assert(expected):
+            for k, v in self.cb.get_multi(keys).items():
+                self.assertTrue(k in keys)
+                self.assertEqual(v.value, expected)
+
         self.cb.delete_multi(keys, quiet=True)
         self.cb.incr_multi(keys, initial=5)
-        for k in keys:
-            rv = self.cb.get(k)
-            self.assertEquals(int(rv.value), 5)
+        _multi_lim_assert(5)
+
+        self.cb.incr_multi(keys)
+        _multi_lim_assert(6)
+
+        self.cb.decr_multi(keys)
+        _multi_lim_assert(5)
+
+        self.cb.incr_multi(keys, amount=10)
+        _multi_lim_assert(15)
+
+        self.cb.decr_multi(keys, amount=6)
+        _multi_lim_assert(9)
 
         self.cb.delete(keys[0])
 
