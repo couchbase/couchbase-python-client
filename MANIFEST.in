@@ -5,4 +5,5 @@ recursive-include docs *
 recursive-exclude docs/build *
 recursive-include tests *.py *.sample
 recursive-include examples *.py
+include couchbase libcouchbase.dll
 exclude MANIFEST.in

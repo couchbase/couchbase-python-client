@@ -7,6 +7,7 @@ import warnings
 from distutils.core import setup, Extension
 
 extoptions = {}
+pkgdata = {}
 
 LCB_NAME = None
 if sys.platform != 'win32':
@@ -36,6 +37,7 @@ else:
     #extoptions['extra_link_args'] = ['/DEBUG']
     extoptions['library_dirs'] = [os.path.join(lcb_root, 'lib')]
     extoptions['include_dirs'] = [os.path.join(lcb_root, 'include')]
+    pkgdata['couchbase'] = ['libcouchbase.dll']
 
 
 SOURCEMODS = (
@@ -81,5 +83,6 @@ setup(
         "Topic :: Software Development :: Libraries",
         "Topic :: Software Development :: Libraries :: Python Modules"],
     ext_modules = [module],
-    packages = ['couchbase', 'couchbase.views']
+    packages = ['couchbase', 'couchbase.views'],
+    package_data = pkgdata
 )
