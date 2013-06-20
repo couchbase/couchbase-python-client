@@ -60,7 +60,10 @@ DESIGN = {
 }
 
 if options.create_design:
-    c._design('search_keywords', DESIGN)
+    c.design_create('search_keywords',
+                    DESIGN,
+                    use_devmode=False,
+                    syncwait=5)
 
 NOUNS = ['cow', 'cat', 'dog', 'computer', 'WMD']
 ADJECTIVES = ['happy', 'sad', 'thoughtful', 'extroverted']
@@ -74,10 +77,13 @@ for x in range(options.number_of_terms):
 
 c.set_multi(kv)
 
-vret = c._view('search_keywords', 'top_keywords',
-               {'limit': 10, 'descending': True})
+vret = c.query('search_keywords',
+               'top_keywords',
+               limit=10,
+               descending=True)
 
-pprint.pprint(vret.value['rows'], indent=4)
+for row in vret:
+    pprint.pprint(row, indent=4)
 
 # Sample output:
 #[   {   u'id': u'WMD sad', u'key': 92772, u'value': None},
