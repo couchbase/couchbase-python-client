@@ -1,4 +1,4 @@
-include *.txt *.md LICENSE
+include *.txt *.rst LICENSE
 recursive-include couchbase *.py
 recursive-include src *.c *.h
 recursive-include docs *
