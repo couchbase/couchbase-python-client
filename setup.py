@@ -72,19 +72,29 @@ extoptions['sources'] = [ os.path.join("src", m + ".c") for m in SOURCEMODS ]
 module = Extension('couchbase._libcouchbase', **extoptions)
 
 setup(
-    name = 'couchbase', version = '1.0.0-beta',
+    name = 'couchbase',
+    version = '1.0.0-beta',
     url="https://github.com/couchbase/couchbase-python-client",
     author="Couchbase, Inc.",
     author_email="mark.nunberg@couchbase.com",
     license="Apache License 2.0",
+    description="Python Client for Couchbase",
+    long_description=open("README.rst", "r").read(),
+    keywords=["couchbase", "nosql", "pycouchbase", "libcouchbase"],
+
     classifiers=[
         "Development Status :: 4 - Beta",
         "License :: OSI Approved :: Apache Software License",
         "Intended Audience :: Developers",
         "Operating System :: OS Independent",
         "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: Implementation :: CPython",
+        "Topic :: Database",
         "Topic :: Software Development :: Libraries",
         "Topic :: Software Development :: Libraries :: Python Modules"],
+
     ext_modules = [module],
     packages = ['couchbase', 'couchbase.views'],
     package_data = pkgdata
