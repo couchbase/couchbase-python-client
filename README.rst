@@ -1,19 +1,24 @@
-#######################
+=======================
 Couchbase Python Client
-#######################
+=======================
 
-This is the new and improved Couchbase Python SDK. It is based on the common
-C-based library libcouchbase_.
+Client for Couchbase_.
 
--------------
+-----------------------
+Building and Installing
+-----------------------
+
+This only applies to building from source. If you are using a Windows
+installer then everything (other than the server) is already included.
+See below for windows snapshot releases.
+
+Also note that these instructions apply to building from source.
+You can always get the latest supported release version from
+`PyPi <http://pypi.python.org/pypi/couchbase>`_
+
+~~~~~~~~~~~~~
 Prerequisites
--------------
-
-.. note::
-
-    This only applies to building from source. If you are using a Windows
-    installer then everything (other than the server) is already included.
-
+~~~~~~~~~~~~~
 
 - Couchbase Server (http://couchbase.com/download)
 - libcouchbase_. version 2.0.5 or greater (Bundled in Windows installer)
@@ -21,12 +26,9 @@ Prerequisites
 - Python development files
 - A C compiler.
 
---------
+~~~~~~~~
 Building
---------
-
-In order to build this client, you need to have `libcouchbase` installed.
-Once this is done, you can now build the extension
+~~~~~~~~
 
 .. code-block:: sh
 
@@ -34,7 +36,7 @@ Once this is done, you can now build the extension
 
 
 If your libcouchbase install is in an alternate location (for example,
-``/opt/local/libcouchbase``), you may add extra directives, like so
+`/opt/local/libcouchbase`), you may add extra directives, like so
 
 .. code-block:: sh
 
@@ -44,30 +46,20 @@ If your libcouchbase install is in an alternate location (for example,
 
 Or you can modify the environment ``CFLAGS`` and ``LDFLAGS`` variables.
 
---------------------------
-Running sample application
---------------------------
+.. _windowsbuilds:
 
-To run the small sample application that inserts one million documents into
-a local Couchbase at the default port 8091 and a bucket called "default",
-just execute
+~~~~~~~~~~~~~~~~~
+Windows Snapshots
+~~~~~~~~~~~~~~~~~
 
-.. code-block:: sh
+A list of recent snapshot builds for Windows may be found
+`here <http://packages.couchbase.com/clients/python/snapshots>`.
 
-    python examples/basic.py
+You can always get release binaries from PyPi (as above).
 
-If you do not with to install the package just yet, remember to set the
-``$PYTHONPATH`` environment variable so the example scripts can load the
-module:
-
-.. code-block:: sh
-
-    PYTHONPATH=$PWD python examples/basic.py
-
-
--------------
-Example Usage
--------------
+-----
+Using
+-----
 
 Here's an example code snippet which sets a key and then reads it
 
@@ -104,24 +96,31 @@ You can also use views
     [u'21st_amendment_brewery_cafe', u'21st_amendment_brewery_cafe-bitter_american']
 
 
+~~~~~~~~~~~~~~
+Other Examples
+~~~~~~~~~~~~~~
+
+There are other examples in the `examples` directory.
+
 ---------------------
 Building documentaion
 ---------------------
 
+
 The documentation is using Sphinx and also needs the numpydoc Sphinx extension.
-To build the documentation, go into the ``docs`` directory and run
+To build the documentation, go into the `docs` directory and run
 
 .. code-block:: sh
 
     make html
 
-The HTML output can be found in ``docs/build/html/``.
+The HTML output can be found in `docs/build/html/`.
 
--------------
-Running tests
--------------
+-------
+Testing
+-------
 
-The tests need a running Couchbase instance. For this, a ``tests/tests.ini``
+The tests need a running Couchbase instance. For this, a `tests/tests.ini`
 file must be present, containing various connection parameters.
 An example of this file may be found in `tests/tests.ini.sample`.
 You may copy this file to `tests/tests.ini` and modify the values as needed.
@@ -144,7 +143,7 @@ Support
 -------
 
 If you found an issue, please file it in our JIRA_. You may also ask in the
-``#libcouchbase`` IRC channel at freenode_. (which is where the author(s)
+`#libcouchbase` IRC channel at freenode_. (which is where the author(s)
 of this module may be found).
 
 -------
@@ -153,6 +152,7 @@ License
 
 The Couchbase Python SDK is licensed under the Apache License 2.0.
 
+.. _Couchbase: http://couchbase.com
 .. _libcouchbase: http://couchbase.com/develop/c/current
 .. _JIRA: http://couchbase.com/issues/browse/pycbc
 .. _freenode: http://freenode.net/irc_servers.shtml
