@@ -4,7 +4,10 @@ import os.path
 import platform
 import warnings
 
-from distutils.core import setup, Extension
+try:
+    from setuptools import setup, Extension
+except ImportError:
+    from disutils.core import setup, Extension
 
 extoptions = {}
 pkgdata = {}
