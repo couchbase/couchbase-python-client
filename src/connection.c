@@ -377,6 +377,8 @@ Connection__init__(pycbc_Connection *self,
     char *conncache = NULL;
     PyObject *unlock_gil_O = NULL;
     PyObject *timeout = NULL;
+    PyObject *dfl_fmt = NULL;
+    PyObject *tc = NULL;
 
     struct lcb_create_st create_opts = { 0 };
     struct lcb_cached_config_st cached_config = { { 0 } };
@@ -397,9 +399,9 @@ Connection__init__(pycbc_Connection *self,
     X("conncache", &conncache, "z") \
     X("quiet", &self->quiet, "I") \
     X("unlock_gil", &unlock_gil_O, "O") \
-    X("transcoder", &self->tc, "O") \
+    X("transcoder", &tc, "O") \
     X("timeout", &timeout, "O") \
-    X("default_format", &self->dfl_fmt, "O") \
+    X("default_format", &dfl_fmt, "O") \
     X("lockmode", &self->lockmode, "i") \
     X("_conntype", &conntype, "i") \
 
@@ -450,6 +452,36 @@ Connection__init__(pycbc_Connection *self,
     create_opts.v.v1.type = conntype;
 
     Py_INCREF(self->errors);
+
+
+    if (dfl_fmt == Py_None || dfl_fmt == NULL) {
+        /** Set to 0 if None or NULL */
+        dfl_fmt = pycbc_IntFromL(0);
+
+    } else {
+        Py_INCREF(dfl_fmt); /* later decref */
+    }
+
+    rv = Connection_set_format(self, dfl_fmt, NULL);
+    Py_XDECREF(dfl_fmt);
+    if (rv == -1) {
+        return rv;
+    }
+
+    /** Set the transcoder */
+    if (Connection_set_transcoder(self, tc, NULL) == -1) {
+        return -1;
+    }
+
+#ifdef WITH_THREAD
+    if (!self->unlock_gil) {
+        self->lockmode = PYCBC_LOCKMODE_NONE;
+    }
+
+    if (self->lockmode != PYCBC_LOCKMODE_NONE) {
+        self->lock = PyThread_allocate_lock();
+    }
+#endif
 
     if (conncache) {
         if (conntype != LCB_TYPE_BUCKET) {
@@ -506,47 +538,6 @@ Connection__init__(pycbc_Connection *self,
         return -1;
     }
 
-    if (self->dfl_fmt == Py_None || self->dfl_fmt == NULL) {
-        /**
-         * If it's NULL or None, we simply make the default format a '0'
-         */
-        self->dfl_fmt = pycbc_IntFromL(0);
-
-    } else {
-        /**
-         * Otherwise, we need to validate it's a number:
-         */
-        if (!PyNumber_Check(self->dfl_fmt)) {
-            PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err,
-                           "default_format must be number or None");
-            return -1;
-        }
-
-        /**
-         * If validation passes, we increment its reference count
-         */
-        Py_INCREF(self->dfl_fmt);
-    }
-
-    if (self->tc) {
-        if (!PyObject_IsTrue(self->tc)) {
-            self->tc = NULL;
-
-        } else {
-            Py_INCREF(self->tc);
-        }
-    }
-
-#ifdef WITH_THREAD
-    if (!self->unlock_gil) {
-        self->lockmode = PYCBC_LOCKMODE_NONE;
-    }
-
-    if (self->lockmode != PYCBC_LOCKMODE_NONE) {
-        self->lock = PyThread_allocate_lock();
-    }
-#endif
-
     return 0;
 }
 
@@ -561,7 +552,6 @@ Connection_dtor(pycbc_Connection *self)
     Py_XDECREF(self->dfl_fmt);
     Py_XDECREF(self->errors);
     Py_XDECREF(self->tc);
-    Py_XDECREF(self->dfl_fmt);
     Py_XDECREF(self->bucket);
 
 #ifdef WITH_THREAD
