@@ -1,13 +1,17 @@
 #!/usr/bin/env python
 import sys
 import os.path
+import os
 import platform
 import warnings
 
 try:
+    if os.environ.get('PYCBC_NO_DISTRIBUTE'):
+        raise ImportError()
+
     from setuptools import setup, Extension
 except ImportError:
-    from disutils.core import setup, Extension
+    from distutils.core import setup, Extension
 
 extoptions = {}
 pkgdata = {}
