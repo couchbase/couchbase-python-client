@@ -142,7 +142,6 @@ Storing Data
 
     .. automethod:: replace
 
-    .. automethod:: add
 
 Retrieving Data
 ---------------
