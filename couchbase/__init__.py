@@ -104,7 +104,18 @@ class Couchbase:
           parameter from the method arguments is ignored).
         :type host: string or list
 
-        :param number port: port of the management API
+        :param number port: port of the management API.
+
+          .. note::
+
+            The value specified here is the same port used to access
+            The couchbase REST UI (typically `8091`). If you have selcted
+            an alternate port for your bucket, do *not* put it here. The
+            configuration information obtained via the REST interface will
+            automatically instruct the client (one ``connect()`` is called)
+            about which bucket port to connect to. Note that bucket ports
+            are typically ``112xx`` - don't use these for the `port`
+            parameter.
 
         :param string username: the user name to connect to the cluster.
                                 It's the username of the management API.
