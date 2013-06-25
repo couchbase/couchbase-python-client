@@ -469,7 +469,7 @@ Connection__init__(pycbc_Connection *self,
     }
 
     /** Set the transcoder */
-    if (Connection_set_transcoder(self, tc, NULL) == -1) {
+    if (tc && Connection_set_transcoder(self, tc, NULL) == -1) {
         return -1;
     }
 
