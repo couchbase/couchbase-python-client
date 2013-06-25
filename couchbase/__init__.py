@@ -19,6 +19,12 @@ from couchbase.connection import Connection
 from couchbase.user_constants import *
 import couchbase._libcouchbase as _LCB
 
+try:
+    from couchbase._version import __version__
+
+except ImportError:
+    __version__ = "0.0.0-could-not-find-git"
+
 
 def set_json_converters(encode, decode):
     """

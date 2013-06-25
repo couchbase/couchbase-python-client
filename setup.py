@@ -4,6 +4,7 @@ import os.path
 import os
 import platform
 import warnings
+import couchbase_version
 
 try:
     if os.environ.get('PYCBC_NO_DISTRIBUTE'):
@@ -15,6 +16,15 @@ except ImportError:
 
 extoptions = {}
 pkgdata = {}
+pkgversion = None
+
+try:
+    couchbase_version.gen_version()
+except couchbase_version.CantInvokeGit:
+    pass
+
+pkgversion = couchbase_version.get_version()
+
 
 LCB_NAME = None
 if sys.platform != 'win32':
@@ -77,7 +87,7 @@ module = Extension('couchbase._libcouchbase', **extoptions)
 
 setup(
     name = 'couchbase',
-    version = '1.0.0-beta',
+    version = pkgversion,
     url="https://github.com/couchbase/couchbase-python-client",
     author="Couchbase, Inc.",
     author_email="mark.nunberg@couchbase.com",

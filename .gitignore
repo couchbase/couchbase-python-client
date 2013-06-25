@@ -24,3 +24,4 @@ p3_nose
 p2_nose
 build*.sh
 BUILD*
+couchbase/_version.py
