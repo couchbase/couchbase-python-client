@@ -151,6 +151,13 @@ struct pycbc_common_vars {
     PyObject *ret;
 
     Py_ssize_t ncmds;
+
+    /**
+     * Whether this command is expected to be received in sequence with a
+     * 'NUL' delimiter. If so, the remaining count will be modified by one
+     * only, with the callback decrementing it as needed
+     */
+    char is_seqcmd;
 };
 
 #define PYCBC_COMMON_VARS_STATIC_INIT { { { 0 } } }

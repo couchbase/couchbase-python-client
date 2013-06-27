@@ -54,12 +54,12 @@ int
 pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Connection *self)
 {
     lcb_error_t err;
-
-    self->nremaining += cv->ncmds;
+    Py_ssize_t nsched = cv->is_seqcmd ? 1 : cv->ncmds;
+    self->nremaining += nsched;
     err = pycbc_oputil_wait_common(self);
 
     if (err != LCB_SUCCESS) {
-        self->nremaining -= cv->ncmds;
+        self->nremaining -= nsched;
         PYCBC_EXCTHROW_WAIT(err);
         return -1;
     }

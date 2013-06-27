@@ -33,7 +33,10 @@ enum {
     RESTYPE_OPERATION = 1 << 2,
 
     /* Extra flag indicating it's ok if it already exists */
-    RESTYPE_EXISTS_OK = 1 << 3
+    RESTYPE_EXISTS_OK = 1 << 3,
+
+    /* Don't modify "remaining" count */
+    RESTYPE_VARCOUNT = 1 << 4,
 };
 
 static PyObject *
@@ -123,7 +126,9 @@ get_common_objects(PyObject *cookie,
     *mres = (pycbc_MultiResult*)cookie;
     *conn = (*mres)->parent;
 
-    maybe_breakout(*conn);
+    if (!(restype & RESTYPE_VARCOUNT)) {
+        maybe_breakout(*conn);
+    }
 
     CB_THR_END(*conn);
 
@@ -476,7 +481,8 @@ observe_callback(lcb_t instance,
     pycbc_MultiResult *mres;
 
     if (!resp->v.v0.key) {
-        vres = (pycbc_ValueResult*)cookie;
+        mres = (pycbc_MultiResult*)cookie;;
+        maybe_breakout(mres->parent);
         return;
     }
 
@@ -486,7 +492,7 @@ observe_callback(lcb_t instance,
                             err,
                             &conn,
                             (pycbc_Result**)&vres,
-                            RESTYPE_VALUE|RESTYPE_EXISTS_OK,
+                            RESTYPE_VALUE|RESTYPE_EXISTS_OK|RESTYPE_VARCOUNT,
                             &mres);
     if (rv < 0) {
         goto GT_DONE;

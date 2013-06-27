@@ -210,6 +210,7 @@ observe_common(pycbc_Connection *self,
         goto GT_DONE;
     }
 
+    cv.is_seqcmd = 1;
     if (-1 == pycbc_common_vars_wait(&cv, self)) {
         goto GT_DONE;
     }
