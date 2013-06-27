@@ -111,6 +111,10 @@ pycbc_init_pyconstants(PyObject *module)
     PyModule_AddIntConstant(module, "OBS_PERSISTED", LCB_OBSERVE_PERSISTED);
     PyModule_AddIntConstant(module, "OBS_FOUND", LCB_OBSERVE_FOUND);
     PyModule_AddIntConstant(module, "OBS_NOTFOUND", LCB_OBSERVE_NOT_FOUND);
+    PyModule_AddIntConstant(module, "OBS_LOGICALLY_DELETED",
+                            LCB_OBSERVE_PERSISTED|
+                            LCB_OBSERVE_NOT_FOUND);
+
     PyModule_AddIntConstant(module, "OBS_MASK",
                             LCB_OBSERVE_PERSISTED|
                             LCB_OBSERVE_FOUND|

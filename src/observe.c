@@ -75,7 +75,7 @@ pycbc_ObserveInfoType_init(PyObject **ptr)
     p->tp_members = ObserveInfo_TABLE_members;
     p->tp_flags = Py_TPFLAGS_DEFAULT;
     p->tp_dealloc = (destructor)ObserveInfo_dealloc;
-    p->tp_str = ObserveInfo_repr;
+    p->tp_repr = ObserveInfo_repr;
     return PyType_Ready(p);
 }
 

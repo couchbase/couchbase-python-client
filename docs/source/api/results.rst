@@ -48,7 +48,7 @@ Observe Results
 Observe Constants
 -----------------
 
-These constants are returned as bits in the :attr:`ObserveInfo.flags`
+These constants are returned as values for :attr:`ObserveInfo.flags`
 field.
 
 .. data:: OBS_FOUND
@@ -63,6 +63,14 @@ field.
 .. data:: OBS_NOTFOUND
 
     The key is not present in the node's cache.
+
+.. data:: OBS_LOGICALLY_DELETED
+
+    The key is not present in the node's cache, however it is still present
+    on the persistent store. If the node would crash at this moment, the key
+    would still be present when it starts up again.
+
+    This is equivalent to ``OBS_NOTFOUND | OBS_PERSISTED``
 
 --------------------
 `ObserveInfo` Object

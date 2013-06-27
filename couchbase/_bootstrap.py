@@ -72,22 +72,27 @@ def _result__repr__(self):
 
 
 def _observeinfo__repr__(self):
-    constants = ('OBS_PERSISTED', 'OBS_REPLICATED', 'OBS_NOTFOUND')
+    constants = ('OBS_PERSISTED',
+                 'OBS_FOUND',
+                 'OBS_NOTFOUND',
+                 'OBS_LOGICALLY_DELETED')
 
-    if self.flags == C.OBS_FOUND:
-        flag_bits = ('OBS_FOUND',)
 
-    else:
-        flag_bits = tuple(f for f in constants if self.flags & getattr(C, f))
+    flag_str = ''
+    for c in constants:
+        if self.flags == getattr(C, c):
+            flag_str = c
+            break
 
-    flag_bits = '|'.join(flag_bits)
-
-    return "{cls}<Status={status}, Master={mstr}, CAS={cas:X}>".format(
-        cls=self.__class__.__name__,
-        status=flag_bits,
-        cas=self.cas,
-        mstr=self.from_master)
-
+    fmstr = ("{cls}<Status=[{status_s} (0x{flags:X})], "
+             "Master={is_master}, "
+             "CAS=0x{cas:X}>")
+    ret = fmstr.format(cls=self.__class__.__name__,
+                       status_s=flag_str,
+                       flags=self.flags,
+                       is_master=bool(self.from_master),
+                       cas=self.cas)
+    return ret
 
 def _json_encode_wrapper(*args):
     return json.dumps(*args, ensure_ascii=False)
