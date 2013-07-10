@@ -16,8 +16,6 @@
 
 #ifndef PYCBC_H_
 #define PYCBC_H_
-#undef NDEBUG
-
 /**
  * This file contains the base header for the Python Couchbase Client
  * @author Mark Nunberg
@@ -551,13 +549,13 @@ extern struct pycbc_helpers_ST pycbc_helpers;
 #ifdef PYCBC_USE_THREADS
 #define PYCBC_CONN_THR_BEGIN(conn) \
     if ((conn)->unlock_gil) { \
-        assert((conn)->thrstate == NULL); \
+        pycbc_assert((conn)->thrstate == NULL); \
         (conn)->thrstate = PyEval_SaveThread(); \
     }
 
 #define PYCBC_CONN_THR_END(conn) \
     if ((conn)->unlock_gil) { \
-        assert((conn)->thrstate); \
+        pycbc_assert((conn)->thrstate); \
         PyEval_RestoreThread((conn)->thrstate); \
         (conn)->thrstate = NULL; \
     }
@@ -670,6 +668,14 @@ void pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p);
     PYCBC_EXC_WRAP_EX(mode, err, msg, key, NULL)
 
 #define PYCBC_EXC_WRAP_VALUE PYCBC_EXC_WRAP_KEY
+
+int pycbc_handle_assert(const char *msg, const char* file, int line);
+
+/**
+ * This macro can be used as an 'if' structure. It returns false if the
+ * condition fails and try otherwise
+ */
+#define pycbc_assert(e) ((e) ? 1 : pycbc_handle_assert(#e, __FILE__, __LINE__))
 
 /**
  * EXCTHROW macros. These provide error messages for common stages.

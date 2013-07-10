@@ -127,8 +127,8 @@ pycbc_multiresult_maybe_raise(pycbc_MultiResult *self)
     if (self->exceptions) {
         PyObject *tuple = PyList_GetItem(self->exceptions, 0);
 
-        assert(tuple);
-        assert(PyTuple_Size(tuple) == 3);
+        pycbc_assert(tuple);
+        pycbc_assert(PyTuple_Size(tuple) == 3);
 
         type = PyTuple_GetItem(tuple, 0);
         value = PyTuple_GetItem(tuple, 1);
@@ -138,7 +138,8 @@ pycbc_multiresult_maybe_raise(pycbc_MultiResult *self)
         Py_XINCREF(value);
         Py_XINCREF(traceback);
 
-        assert(PyObject_IsInstance(value, pycbc_helpers.default_exception));
+        pycbc_assert(PyObject_IsInstance(value,
+                                         pycbc_helpers.default_exception));
 
     } else {
         pycbc_Result *res = (pycbc_Result*)self->errop;

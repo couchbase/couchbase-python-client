@@ -104,7 +104,10 @@ http_complete_callback(lcb_http_request_t req,
 
     if (htres->htflags & PYCBC_HTRES_F_CHUNKED) {
         /** No data here */
-        assert(resp->v.v0.nbytes == 0);
+        if (!pycbc_assert(resp->v.v0.nbytes == 0)) {
+            fprintf(stderr, "Unexpected payload in HTTP response callback\n");
+        }
+
         if (!htres->parent->nremaining) {
             lcb_breakout(instance);
         }
@@ -385,7 +388,10 @@ pycbc_HttpResult__fetch(pycbc_HttpResult *self)
         self->rowsbuf = NULL;
     }
 
-    assert(!self->parent->nremaining);
+    if (!pycbc_assert(self->parent->nremaining == 0)) {
+        fprintf(stderr, "Remaining count unexpected. Adjusting");
+        self->parent->nremaining = 0;
+    }
 
     GT_RET:
     pycbc_oputil_conn_unlock(self->parent);

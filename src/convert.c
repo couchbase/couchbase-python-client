@@ -26,7 +26,7 @@ static PyObject*
 convert_to_bytesobj(PyObject *o)
 {
     PyObject *bytesobj = NULL;
-    assert(!PyBytes_Check(o));
+    pycbc_assert(!PyBytes_Check(o));
 
     if (PyUnicode_Check(o)) {
         bytesobj = PyUnicode_AsUTF8String(o);
@@ -176,7 +176,7 @@ decode_common(PyObject **vp, const char *buf, size_t nbuf, lcb_uint32_t flags)
     } else if ((flags & PYCBC_FMT_BYTES) == PYCBC_FMT_BYTES) {
         GT_BYTES:
         decoded = convert_to_string(buf, nbuf, CONVERT_MODE_BYTES_ONLY);
-        assert(decoded);
+        pycbc_assert(decoded);
 
     } else {
         PyObject *converter = NULL;
@@ -186,7 +186,7 @@ decode_common(PyObject **vp, const char *buf, size_t nbuf, lcb_uint32_t flags)
         if ((flags & PYCBC_FMT_PICKLE) == PYCBC_FMT_PICKLE) {
             converter = pycbc_helpers.pickle_decode;
             first_arg = convert_to_string(buf, nbuf, CONVERT_MODE_BYTES_ONLY);
-            assert(first_arg);
+            pycbc_assert(first_arg);
 
         } else if ((flags & PYCBC_FMT_JSON) == PYCBC_FMT_JSON) {
             converter = pycbc_helpers.json_decode;
@@ -201,7 +201,7 @@ decode_common(PyObject **vp, const char *buf, size_t nbuf, lcb_uint32_t flags)
             goto GT_BYTES;
         }
 
-        assert(first_arg);
+        pycbc_assert(first_arg);
         args = PyTuple_Pack(1, first_arg);
         decoded = PyObject_CallObject(converter, args);
 
@@ -318,7 +318,7 @@ pycbc_tc_encode_key(pycbc_Connection *conn,
     }
 
     orig_key = *key;
-    assert(orig_key);
+    pycbc_assert(orig_key);
 
     rv = do_call_tc(conn, orig_key, NULL, &new_key, ENCODE_KEY);
 

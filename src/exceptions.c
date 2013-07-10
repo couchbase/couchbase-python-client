@@ -16,6 +16,27 @@
 
 #include "pycbc.h"
 
+int pycbc_handle_assert(const char *msg, const char* file, int line)
+{
+    const char *assert_props = getenv("PYCBC_ASSERT_CONTINUE");
+    if (assert_props == NULL || *assert_props == '\0') {
+        fprintf(stderr,
+                "python-couchbase: %s at %s:%d. Abort", msg, file, line);
+        abort();
+    }
+
+    fprintf(stderr,
+            "!!! python-couchbase: Assertion failure detected.. \n"
+            "!!! Not aborting because os.environ['PYCBC_ASSERT_CONTINUE'] was set\n"
+            "!!! Depending on what went wrong, further exceptions may \n"
+            "!!! still be raised, or the program may abort due to \n"
+            "!!! invalid state\n"
+            "!!! (debuggers should break at pycbc_handle_assert in exceptions.c)\n");
+
+    fprintf(stderr, "!!! Assertion: '%s' at %s:%d\n", msg, file, line);
+    return 0;
+}
+
 void
 pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p)
 {
@@ -46,7 +67,7 @@ pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p)
     PyErr_Clear();
 
     excparams = PyDict_New();
-    assert(excparams);
+    pycbc_assert(excparams);
 
     if (p->err) {
         PyObject *errtmp = pycbc_IntFromL(p->err);
@@ -92,6 +113,6 @@ pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p)
     } else {
         Py_INCREF(Py_TYPE(excinstance));
         PyErr_Restore((PyObject*)Py_TYPE(excinstance), excinstance, traceback);
-        assert(Py_REFCNT(excinstance) == 1);
+        pycbc_assert(Py_REFCNT(excinstance) == 1);
     }
 }

@@ -45,7 +45,7 @@ make_error_tuple(void)
     PyObject *type, *value, *traceback;
     PyObject *ret;
 
-    assert(PyErr_Occurred());
+    pycbc_assert(PyErr_Occurred());
 
     PyErr_Fetch(&type, &value, &traceback);
     PyErr_Clear();
@@ -101,7 +101,7 @@ maybe_push_operr(pycbc_MultiResult *mres,
 static void
 maybe_breakout(pycbc_Connection *self)
 {
-    assert(self->nremaining);
+    pycbc_assert(self->nremaining);
 
     if (!--self->nremaining) {
         lcb_breakout(self->instance);
@@ -122,7 +122,7 @@ get_common_objects(PyObject *cookie,
     PyObject *hkey;
     int rv;
 
-    assert(Py_TYPE(cookie) == &pycbc_MultiResultType);
+    pycbc_assert(Py_TYPE(cookie) == &pycbc_MultiResultType);
     *mres = (pycbc_MultiResult*)cookie;
     *conn = (*mres)->parent;
 
@@ -533,11 +533,11 @@ error_callback(lcb_t instance, lcb_error_t err, const char *msg)
 
     CB_THR_END(self);
 
-    assert(self->errors);
+    pycbc_assert(self->errors);
     errtuple = Py_BuildValue("(i,s)", err, msg);
-    assert(errtuple);
+    pycbc_assert(errtuple);
     result = PyObject_CallMethod(self->errors, "append", "(O)", errtuple);
-    assert(result);
+    pycbc_assert(result);
     Py_DECREF(errtuple);
     Py_DECREF(result);
 
