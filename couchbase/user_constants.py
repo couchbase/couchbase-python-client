@@ -29,6 +29,8 @@ from couchbase._libcouchbase import (
     OBS_PERSISTED,
     OBS_FOUND,
     OBS_NOTFOUND,
+    OBS_LOGICALLY_DELETED,
+
     OBS_MASK,
 
     LOCKMODE_WAIT,
