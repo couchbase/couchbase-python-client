@@ -51,20 +51,20 @@ Observe Constants
 These constants are returned as values for :attr:`ObserveInfo.flags`
 field.
 
-.. data:: OBS_FOUND
+.. data:: couchbase.OBS_FOUND
 
     The key exists on the given node's cache, though it may not have been
     stored to disk yet.
 
-.. data:: OBS_PERSISTED
+.. data:: couchbase.OBS_PERSISTED
 
     The key is persisted to the given node's disk.
 
-.. data:: OBS_NOTFOUND
+.. data:: couchbase.OBS_NOTFOUND
 
     The key is not present in the node's cache.
 
-.. data:: OBS_LOGICALLY_DELETED
+.. data:: couchbase.OBS_LOGICALLY_DELETED
 
     The key is not present in the node's cache, however it is still present
     on the persistent store. If the node would crash at this moment, the key
