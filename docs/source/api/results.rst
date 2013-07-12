@@ -21,10 +21,14 @@ This is the base class for all result operations
    :show-inheritance:
    :no-undoc-members:
 
+   .. autoattribute cas
+
 
 .. autoclass:: ValueResult
    :show-inheritance:
    :members:
+
+   .. autoattribute:: cas
 
 
 .. autoclass:: HttpResult
