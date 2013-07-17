@@ -132,6 +132,13 @@ Connection_server_nodes(pycbc_Connection *self, void *unused)
 }
 
 static PyObject *
+Connection_get_configured_replica_count(pycbc_Connection *self, void *unused)
+{
+    PyObject *iret = pycbc_IntFromUL(lcb_get_num_replicas(self->instance));
+    return iret;
+}
+
+static PyObject *
 Connection_lcb_version(pycbc_Connection *self)
 {
     const char *verstr;
@@ -192,6 +199,11 @@ static PyGetSetDef Connection_TABLE_getset[] = {
                 (getter)Connection_server_nodes,
                 NULL,
                 PyDoc_STR("Get a list of the current nodes in the cluster")
+        },
+        { "configured_replica_count",
+                (getter)Connection_get_configured_replica_count,
+                NULL,
+                PyDoc_STR("Get the number of configured replicas for the bucket")
         },
 
         { "transcoder",
@@ -279,6 +291,8 @@ static PyMethodDef Connection_TABLE_methods[] = {
         OPFUNC(get_multi, NULL),
         OPFUNC(touch_multi, NULL),
         OPFUNC(lock_multi, NULL),
+        OPFUNC(_rget, NULL),
+        OPFUNC(_rgetix, NULL),
 
         OPFUNC(delete, "Delete a key in Couchbase"),
         OPFUNC(unlock, "Unlock a previously-locked key in Couchbase"),

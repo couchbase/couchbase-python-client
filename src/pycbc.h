@@ -157,7 +157,11 @@ enum {
     PYCBC_CMD_DECR,
     PYCBC_CMD_ARITH,
     PYCBC_CMD_DELETE,
-    PYCBC_CMD_UNLOCK
+    PYCBC_CMD_UNLOCK,
+    PYCBC_CMD_GETREPLICA,
+    /** "Extended" get replica, provides for more options */
+    PYCBC_CMD_GETREPLICA_INDEX,
+    PYCBC_CMD_GETREPLICA_ALL
 };
 
 /**

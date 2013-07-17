@@ -30,7 +30,7 @@ from couchbase.result import *
 import couchbase.exceptions as exceptions
 from couchbase.views.params import make_dvpath, make_options_string
 from couchbase.views.iterator import View
-
+from couchbase._pyport import basestring
 
 class Connection(_Base):
 
@@ -265,7 +265,7 @@ class Connection(_Base):
         """
         return _Base.prepend(self, key, value, ttl=ttl, cas=cas, format=format)
 
-    def get(self, key, ttl=0, quiet=None):
+    def get(self, key, ttl=0, quiet=None, replica=False):
         """Obtain an object stored in Couchbase by given key.
 
         :param string key: The key to fetch. The type of key is the same
@@ -287,6 +287,19 @@ class Connection(_Base):
           Note that the default value is `None`, which means to use
           the :attr:`quiet`. If it is a boolean (i.e. `True` or `False) it will
           override the :class:`Connection`-level :attr:`quiet` attribute.
+
+        :param bool replica: Whether to fetch this key from a replica
+          rather than querying the master server. This is primarily useful
+          when operations with the master fail (possibly due to a configuration
+          change). It should normally be used in an exception handler like so
+
+          Using the ``replica`` option::
+
+            try:
+                res = c.get("key", quiet=True) # suppress not-found errors
+            catch CouchbaseError:
+                res = c.get("key", replica=True, quiet=True)
+
 
         :raise: :exc:`couchbase.exceptions.NotFoundError` if the key
           is missing in the bucket
@@ -322,7 +335,7 @@ class Connection(_Base):
 
         """
 
-        return _Base.get(self, key, ttl, quiet)
+        return _Base.get(self, key, ttl, quiet, replica)
 
     def touch(self, key, ttl=0):
         """Update a key's expiration time
@@ -685,7 +698,7 @@ class Connection(_Base):
         """
         return _Base.prepend_multi(self, keys, ttl=ttl, format=format)
 
-    def get_multi(self, keys, ttl=0, quiet=None):
+    def get_multi(self, keys, ttl=0, quiet=None, replica=False):
         """Get multiple keys
         Multi variant of :meth:`get`
 
@@ -694,13 +707,17 @@ class Connection(_Base):
 
         :param int ttl: Set the expiration for all keys when retrieving
 
+        :param boolean replica:
+          Whether the results should be obtained from a replica instead of the
+          master. See :meth:`get` for more information about this parameter.
+
         :return: A :class:`~couchbase.result.MultiResult` object.
           This object is a subclass of dict and contains the keys (passed as)
           `keys` as the dictionary keys, and
           :class:`~couchbase.result.Result` objects as values
 
         """
-        return _Base.get_multi(self, keys, ttl=ttl, quiet=quiet)
+        return _Base.get_multi(self, keys, ttl=ttl, quiet=quiet, replica=replica)
 
     def touch_multi(self, keys, ttl=0):
         """Touch multiple keys
@@ -778,6 +795,37 @@ class Connection(_Base):
         Multi-variant of :meth:`observe`
         """
         return _Base.observe_multi(self, keys)
+
+    def rget(self, key, replica_index=None, quiet=None):
+        """
+        Get a key from a replica
+
+        :param string key: The key to fetch
+
+        :param int replica_index: The replica index to fetch.
+          If this is ``None`` then this method will return once any replica
+          responds. Use :attr:`configured_replica_count` to figure out the
+          upper bound for this parameter.
+
+          The value for this parameter must be a number between 0 and the
+          value of :attr:`configured_replica_count`-1.
+
+        :param boolean quiet: Whether to suppress errors when the key is not
+          found
+
+        This function (if `replica_index` is not supplied) functions like
+        the :meth:`get` method that has been passed the `replica` parameter::
+
+            c.get(key, replica=True)
+
+        .. seealso::
+            :meth:`get` :meth:`rget_multi`
+        """
+        if replica_index is not None:
+            return _Base._rgetix(self, key, replica=replica_index, quiet=quiet)
+        else:
+            return _Base._rget(self, key, quiet=quiet)
+
 
     def _view(self, ddoc, view,
               use_devmode=False,

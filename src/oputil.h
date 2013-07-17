@@ -36,7 +36,8 @@
     X(lcb_arithmetic_cmd_t, arith) \
     X(lcb_unlock_cmd_t, unlock) \
     X(lcb_server_stats_cmd_t, stats) \
-    X(lcb_observe_cmd_t, obs)
+    X(lcb_observe_cmd_t, obs) \
+    X(lcb_get_replica_cmd_t, replica)
 
 /**
  * Union for 'common_vars'; actual commands
@@ -345,6 +346,14 @@ PYCBC_DECL_OP(lock);
 PYCBC_DECL_OP(get_multi);
 PYCBC_DECL_OP(touch_multi);
 PYCBC_DECL_OP(lock_multi);
+
+/* get.c (replicas) */
+PYCBC_DECL_OP(_rget);
+PYCBC_DECL_OP(_rget_multi);
+PYCBC_DECL_OP(_rgetix);
+PYCBC_DECL_OP(_rgetix_multi);
+PYCBC_DECL_OP(_rgetall);
+PYCBC_DECL_OP(_rgetall_multi);
 
 /* http.c */
 PYCBC_DECL_OP(_http_request);
