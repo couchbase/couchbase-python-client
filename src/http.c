@@ -250,6 +250,7 @@ pycbc_Connection__http_request(pycbc_Connection *self,
     const char *path = NULL;
     const char *content_type = NULL;
     pycbc_HttpResult *htres;
+    lcb_http_request_t l_htreq;
 
     lcb_http_cmd_t htcmd = { 0 };
 
@@ -314,12 +315,14 @@ pycbc_Connection__http_request(pycbc_Connection *self,
                                 htres,
                                 reqtype,
                                 &htcmd,
-                                &htres->htreq);
+                                &l_htreq);
 
     if (err != LCB_SUCCESS) {
         PYCBC_EXCTHROW_SCHED(err);
         goto GT_DONE;
     }
+
+    htres->htreq = l_htreq;
 
     if (htcmd.v.v0.chunked) {
         ret = (PyObject*)htres;
