@@ -28,6 +28,7 @@ from couchbase.connection import Connection
 from couchbase.exceptions import CouchbaseError
 from couchbase.admin import Admin
 from couchbase.mockserver import CouchbaseMock, BucketSpec
+from couchbase._pyport import basestring
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'tests.ini')
 
@@ -108,7 +109,35 @@ class CouchbaseTestCase(unittest.TestCase):
 
 
     def skipLcbMin(self, vstr):
-        pass
+        """
+        Test requires a libcouchbase version of at least vstr.
+        This may be a hex number (e.g. 0x020007) or a string (e.g. "2.0.7")
+        """
+
+        if isinstance(vstr, basestring):
+            components = vstr.split('.')
+            hexstr = "0x"
+            for comp in components:
+                if len(comp) > 2:
+                    raise ValueError("Version component cannot be larger than 99")
+                hexstr += "{0:02}".format(int(comp))
+
+            vernum = int(hexstr, 16)
+        else:
+            vernum = vstr
+            components = []
+            # Get the display
+            for x in range(0, 3):
+                comp = (vernum & 0xff << (x*8)) >> x*8
+                comp = "{0:x}".format(comp)
+                components = [comp] + components
+            vstr = ".".join(components)
+
+        rtstr, rtnum = Connection.lcb_version()
+        if rtnum < vernum:
+            raise SkipTest(("Test requires {0} to run (have {1})")
+                            .format(vstr, rtstr))
+
 
     def tearDown(self):
         pass
