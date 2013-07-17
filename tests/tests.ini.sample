@@ -17,3 +17,11 @@ bucket_password =
 ; set this to 0. If your cluster was set up with the 'setup_tests.py'
 ; script, you may set this to 1
 extra_buckets = 0
+
+[mock]
+; Set this to enabled to use the mock
+enabled = 0
+; Local path for the mock
+path = /tmp/CouchbaseMock-0.5-SNAPSHOT.jar
+; Where to download it, if not available
+url = http://packages.couchbase.com/clients/python/snapshots/CouchbaseMock-0.6-SNAPSHOT.jar

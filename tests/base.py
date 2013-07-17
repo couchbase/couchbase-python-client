@@ -27,22 +27,59 @@ import types
 from couchbase.connection import Connection
 from couchbase.exceptions import CouchbaseError
 from couchbase.admin import Admin
-
+from couchbase.mockserver import CouchbaseMock, BucketSpec
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'tests.ini')
 
 
 class CouchbaseTestCase(unittest.TestCase):
-    def setUp(self):
+    @classmethod
+    def _setup_mock(self, mockpath, mockurl):
+
+        bspec_dfl = BucketSpec('default', 'couchbase')
+        bspec_sasl = BucketSpec('default_sasl', 'couchbase', 'secret')
+
+        self.mock = CouchbaseMock([bspec_dfl, bspec_sasl],
+                                  mockpath,
+                                  mockurl,
+                                  replicas=2,
+                                  nodes=4)
+        self.mock.start()
+        self.bucket_prefix = "default"
+        self.bucket_password = "secret"
+        self.port = self.mock.rest_port
+        self.host = "127.0.0.1"
+        self.username = "Administrator"
+        self.password = "password"
+        self.extra_buckets = True
+
+    @classmethod
+    def setupClass(self):
         config = ConfigParser()
         config.read(CONFIG_FILE)
-
         self.host = config.get('node-1', 'host')
         self.port = config.getint('node-1', 'port')
         self.username = config.get('node-1', 'username')
         self.password = config.get('node-1', 'password')
         self.bucket_prefix = config.get('node-1', 'bucket_prefix')
         self.bucket_password = config.get('node-1', 'bucket_password')
+        self.nosleep = os.environ.get('PYCBC_TESTS_NOSLEEP', False)
+        self.extra_buckets = bool(int(config.get('node-1', 'extra_buckets')))
+
+        self.mock = None
+        if config.has_option("mock", "enabled"):
+            if config.getboolean("mock", "enabled"):
+                mockpath = config.get("mock", "path")
+                if config.has_option("mock", "url"):
+                    mockurl = config.get("mock", "url")
+                else:
+                    mockurl = None
+
+                self._setup_mock(mockpath, mockurl)
+
+
+
+    def setUp(self):
         if not hasattr(self, 'assertIsInstance'):
             def tmp(self, a, *bases):
                 self.assertTrue(isinstance(a, bases))
@@ -52,10 +89,7 @@ class CouchbaseTestCase(unittest.TestCase):
                 self.assertTrue(a is None)
             self.assertIsNone = types.MethodType(tmp, self)
 
-        self.nosleep = os.environ.get('PYCBC_TESTS_NOSLEEP', False)
-
         self._key_counter = 0
-        self.extra_buckets = bool(int(config.get('node-1', 'extra_buckets')))
 
 
     def get_sasl_params(self):
@@ -72,8 +106,20 @@ class CouchbaseTestCase(unittest.TestCase):
         if not sasl_params:
             raise SkipTest("No SASL buckets configured")
 
+
+    def skipLcbMin(self, vstr):
+        pass
+
     def tearDown(self):
         pass
+
+    def skipIfMock(self):
+        if self.mock:
+            raise SkipTest("Test not supported on Mock")
+
+    def skipUnlessMock(self):
+        if not self.mock:
+            raise SkipTest("Test requires CouchbaseMock")
 
     def make_connargs(self, **overrides):
         ret = {

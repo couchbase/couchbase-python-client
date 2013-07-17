@@ -38,6 +38,8 @@ class ConnectionStatsTest(ConnectionTestCase):
         self.assertIsInstance(info, dict)
 
     def test_stats_with_argument(self):
+        self.skipIfMock()
+
         stats = self.cb.stats('memory')
         self.assertIsInstance(stats, dict)
         self.assertTrue('mem_used' in stats)
@@ -47,6 +49,8 @@ class ConnectionStatsTest(ConnectionTestCase):
         self.assertIsInstance(info, dict)
 
     def test_stats_with_argument_list(self):
+        self.skipIfMock()
+
         stats = self.cb.stats(['memory', 'tap'])
         self.assertIsInstance(stats, dict)
         self.assertTrue('mem_used' in stats)

@@ -20,8 +20,10 @@
 
 try:
     import urllib.parse as ulp
+    from urllib.request import urlopen
 except ImportError:
     import urllib as ulp
+    from urllib2 import urlopen
 
 try:
     long = long

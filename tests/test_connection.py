@@ -66,6 +66,8 @@ class ConnectionTest(CouchbaseTestCase):
         self.assertRaises(BucketNotFoundError, Connection, **connargs)
 
     def test_bucket_wrong_credentials(self):
+        self.skipIfMock()
+
         self.assertRaises(AuthError, Connection,
                           **self.make_connargs(username='bad_user',
                                                password='bad_pass'))
@@ -147,8 +149,9 @@ class ConnectionTest(CouchbaseTestCase):
             'bucket' : self.bucket_prefix
         }
 
-        cb = Connection(host=[self.host], **kwargs)
-        self.assertTrue(cb.set("foo", "bar").success)
+        if not self.mock:
+            cb = Connection(host=[self.host], **kwargs)
+            self.assertTrue(cb.set("foo", "bar").success)
 
         cb = Connection(host=[(self.host, self.port)], **kwargs)
         self.assertTrue(cb.set("foo", "bar").success)

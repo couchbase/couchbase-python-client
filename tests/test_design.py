@@ -34,6 +34,8 @@ DESIGN_JSON = {
 class DesignDocManagementTest(ConnectionTestCase):
     def setUp(self):
         super(DesignDocManagementTest, self).setUp()
+        self.skipIfMock()
+
         try:
             self.cb.design_delete(DNAME, use_devmode=False, syncwait=5)
         except HTTPError:

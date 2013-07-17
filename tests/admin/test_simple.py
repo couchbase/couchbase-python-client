@@ -28,6 +28,7 @@ from tests.base import CouchbaseTestCase
 class AdminSimpleSet(CouchbaseTestCase):
     def setUp(self):
         super(AdminSimpleSet, self).setUp()
+        self.skipIfMock()
         self.admin = self.make_admin_connection()
 
     def tearDown(self):

@@ -156,6 +156,10 @@ class BreweryBeerRowProcessor(object):
 
 
 class ViewIteratorTest(ConnectionTestCase):
+    def setUp(self):
+        super(ViewIteratorTest, self).setUp()
+        self.skipIfMock()
+
     def make_connection(self):
         try:
             return super(ViewIteratorTest,

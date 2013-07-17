@@ -58,6 +58,8 @@ DOCS_JSON = {
 class ConnectionViewTest(ConnectionTestCase):
     def setUp(self):
         super(ConnectionViewTest, self).setUp()
+        self.skipIfMock()
+
         ret = self.cb.design_create('blog', DESIGN_JSON, use_devmode=False)
         self.assertTrue(ret.success)
         self.assertTrue(self.cb.set_multi(DOCS_JSON, format=FMT_JSON).all_ok)
