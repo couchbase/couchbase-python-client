@@ -25,3 +25,5 @@ p2_nose
 build*.sh
 BUILD*
 couchbase/_version.py
+ci/
+buildall.py
