@@ -90,7 +90,9 @@ maybe_push_operr(pycbc_MultiResult *mres,
         return;
     }
 
-    if (check_enoent && mres->no_raise_enoent != 0 && err == LCB_KEY_ENOENT) {
+    if (check_enoent &&
+            (mres->mropts & PYCBC_MRES_F_QUIET) &&
+            err == LCB_KEY_ENOENT) {
         return;
     }
 
@@ -142,8 +144,10 @@ get_common_objects(PyObject *cookie,
     *res = (pycbc_Result*)PyDict_GetItem((PyObject*)*mres, hkey);
 
     if (*res) {
+        int exists_ok = (restype & RESTYPE_EXISTS_OK) ||
+                ( (*mres)->mropts & PYCBC_MRES_F_UALLOCED);
 
-        if (! (restype & RESTYPE_EXISTS_OK)) {
+        if (!exists_ok) {
             if ((*conn)->flags & PYCBC_CONN_F_WARNEXPLICIT) {
                 PyErr_WarnExplicit(PyExc_RuntimeWarning,
                                    "Found duplicate key",
@@ -172,7 +176,10 @@ get_common_objects(PyObject *cookie,
         /**
          * Now, get/set the result object
          */
-        if (restype & RESTYPE_BASE) {
+        if ( (*mres)->mropts & PYCBC_MRES_F_ITEMS) {
+            *res = (pycbc_Result*)pycbc_item_new(*conn);
+
+        } else if (restype & RESTYPE_BASE) {
             *res = (pycbc_Result*)pycbc_result_new(*conn);
 
         } else if (restype & RESTYPE_OPERATION) {

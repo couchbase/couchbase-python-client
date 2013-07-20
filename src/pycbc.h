@@ -217,7 +217,8 @@ typedef enum {
 } pycbc_lockmode_t;
 
 enum {
-    PYCBC_CONN_F_WARNEXPLICIT = 1 << 0
+    PYCBC_CONN_F_WARNEXPLICIT = 1 << 0,
+    PYCBC_CONN_F_USEITEMRESULT = 1 << 1
     /** more flags will follow.. */
 };
 
@@ -260,10 +261,6 @@ typedef struct {
     /** How many operations are waiting for a reply */
     Py_ssize_t nremaining;
 
-    /**
-     * XXX:
-     * No use for this yet
-     */
     unsigned int flags;
 
 } pycbc_Connection;
@@ -296,12 +293,23 @@ typedef struct {
     pycbc_OpResult_HEAD
 } pycbc_OperationResult;
 
-typedef struct {
-    pycbc_OpResult_HEAD
 
-    PyObject *value;
+#define pycbc_ValResult_HEAD \
+    pycbc_OpResult_HEAD \
+    PyObject *value; \
     lcb_uint32_t flags;
+
+typedef struct {
+    pycbc_ValResult_HEAD
 } pycbc_ValueResult;
+
+/**
+ * Item or 'Document' object
+ */
+typedef struct {
+    pycbc_ValResult_HEAD
+    PyObject* vdict;
+} pycbc_Item;
 
 typedef struct {
     pycbc_Result_HEAD
@@ -338,6 +346,17 @@ enum {
 
 PyObject* pycbc_HttpResult__fetch(pycbc_HttpResult *self);
 
+
+enum {
+    /** 'quiet' boolean set */
+    PYCBC_MRES_F_QUIET      = 1 << 0,
+
+    /** We're using a user-created Item; Don't create our own results */
+    PYCBC_MRES_F_ITEMS      = 1 << 1,
+
+    /** Items are already allocated and present within the dictionary. */
+    PYCBC_MRES_F_UALLOCED   = 1 << 2
+};
 /**
  * Object containing the result of a 'Multi' operation. It's the same as a
  * normal dict, except we add an 'all_ok' field, so a user doesn't need to
@@ -364,8 +383,8 @@ typedef struct {
     /** Quick-check value to see if everything went well */
     int all_ok;
 
-    /** Equivalent to 'quiet' in the API. Don't raise exceptions on ENOENT */
-    int no_raise_enoent;
+    /** Options for 'MultiResult' */
+    int mropts;
 } pycbc_MultiResult;
 
 
@@ -518,7 +537,10 @@ extern PyObject *pycbc_ExceptionType;
     X(lcb_errno_map) \
     X(misc_errno_map) \
     X(default_exception) \
-    X(obsinfo_reprfunc)
+    X(obsinfo_reprfunc) \
+    X(itmcoll_base_type) \
+    X(itmopts_dict_type) \
+    X(itmopts_seq_type)
 
 #define PYCBC_XHELPERS_STRS(X) \
     X(tcname_encode_key, PYCBC_TCNAME_ENCODE_KEY) \
@@ -587,12 +609,12 @@ PyObject *pycbc_lcb_errstr(lcb_t instance, lcb_error_t err);
 int pycbc_ResultType_init(PyObject **ptr);
 int pycbc_ConnectionType_init(PyObject **ptr);
 int pycbc_MultiResultType_init(PyObject **ptr);
-int pycbc_ArgumentType_init(PyObject **ptr);
 int pycbc_ValueResultType_init(PyObject **ptr);
 int pycbc_OperationResultType_init(PyObject **ptr);
 int pycbc_HttpResultType_init(PyObject **ptr);
 int pycbc_TranscoderType_init(PyObject **ptr);
 int pycbc_ObserveInfoType_init(PyObject **ptr);
+int pycbc_ItemType_init(PyObject **ptr);
 
 
 /**
@@ -603,6 +625,7 @@ PyObject *pycbc_multiresult_new(pycbc_Connection *parent);
 pycbc_ValueResult *pycbc_valresult_new(pycbc_Connection *parent);
 pycbc_OperationResult *pycbc_opresult_new(pycbc_Connection *parent);
 pycbc_HttpResult *pycbc_httpresult_new(pycbc_Connection *parent);
+pycbc_Item *pycbc_item_new(pycbc_Connection *parent);
 
 /* For observe info */
 pycbc_ObserveInfo * pycbc_observeinfo_new(pycbc_Connection *parent);

@@ -25,12 +25,14 @@ struct arithmetic_common_vars {
 
 static int
 handle_single_arith(pycbc_Connection *self,
+                    struct pycbc_common_vars *cv,
+                    int optype,
                     PyObject *curkey,
                     PyObject *curvalue,
-                    struct arithmetic_common_vars *av,
+                    PyObject *options,
+                    pycbc_Item *item,
                     int ii,
-                    int optype,
-                    struct pycbc_common_vars *cv)
+                    void *arg)
 {
     void *key;
     size_t nkey;
@@ -38,8 +40,7 @@ handle_single_arith(pycbc_Connection *self,
     lcb_arithmetic_cmd_t *acmd;
     struct arithmetic_common_vars my_params;
     static char *kwlist[] = { "delta", "initial", "ttl", NULL };
-
-    my_params = *av;
+    my_params = *(struct arithmetic_common_vars *)arg;
     acmd = cv->cmds.arith + ii;
 
     rv = pycbc_tc_encode_key(self, &curkey, &key, &nkey);
@@ -54,6 +55,9 @@ handle_single_arith(pycbc_Connection *self,
         return -1;
     }
 
+    if (options) {
+        curvalue = options;
+    }
 
     if (curvalue) {
         if (PyDict_Check(curvalue)) {
@@ -117,7 +121,6 @@ arithmetic_common(pycbc_Connection *self,
                                    int argopts)
 {
     int rv;
-    int ii;
     Py_ssize_t ncmds;
     struct arithmetic_common_vars global_params = { 0 };
     pycbc_seqtype_t seqtype;
@@ -176,55 +179,24 @@ arithmetic_common(pycbc_Connection *self,
                                 0);
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
-        Py_ssize_t dictpos;
-        PyObject *curseq, *iter;
-        curseq = pycbc_oputil_iter_prepare(seqtype, collection, &iter, &dictpos);
-        if (!curseq) {
-            rv = -1;
-            goto GT_ITER_DONE;
-        }
-
-        for (ii = 0; ii < ncmds; ii++) {
-            PyObject *curkey = NULL, *curvalue = NULL;
-            rv = pycbc_oputil_sequence_next(seqtype, curseq, &dictpos, ii,
-                                            &curkey, &curvalue);
-            if (rv < 0) {
-                goto GT_ITER_DONE;
-            }
-
-            rv = handle_single_arith(self,
-                                     curkey,
-                                     curvalue,
-                                     &global_params,
-                                     ii,
+        rv = pycbc_oputil_iter_multi(self,
+                                     seqtype,
+                                     collection,
+                                     &cv,
                                      optype,
-                                     &cv);
-
-            Py_XDECREF(curkey);
-            Py_XDECREF(curvalue);
-            if (rv < 0) {
-                goto GT_ITER_DONE;
-            }
-        }
-
-        GT_ITER_DONE:
-        Py_XDECREF(iter);
-        if (rv < 0) {
-            goto GT_DONE;
-        }
+                                     handle_single_arith,
+                                     &global_params);
 
     } else {
         rv = handle_single_arith(self,
-                                 collection,
-                                 NULL,
-                                 &global_params,
-                                 0,
-                                 optype,
-                                 &cv);
-        if (rv < 0) {
-            goto GT_DONE;
-        }
+                                 &cv, optype, collection, NULL, NULL, NULL, 0,
+                                 &global_params);
     }
+
+    if (rv < 0) {
+        goto GT_DONE;
+    }
+
 
     err = lcb_arithmetic(self->instance, cv.mres, ncmds, cv.cmdlist.arith);
     if (err != LCB_SUCCESS) {

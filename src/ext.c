@@ -215,51 +215,36 @@ init_libcouchbase(void)
     PyObject *m = NULL;
 
 #ifndef PYCBC_CPYCHECKER
-    PyObject *result_type = NULL;
-    PyObject *connection_type = NULL;
-    PyObject *mresult_type = NULL;
-    PyObject *valresult_type = NULL;
-    PyObject *opresult_type = NULL;
-    PyObject *htresult_type = NULL;
-    PyObject *transcoder_type = NULL;
-    PyObject *arg_type = NULL;
-    PyObject *obsinfo_type = NULL;
 
-    if (pycbc_ConnectionType_init(&connection_type) < 0) {
-        INITERROR;
-    }
+    /**
+     * Each of our types has an initializer function that accepts a single
+     * PyObject** pointer which is set to the newly created class object.
+     *
+     * More types should be added to this list. The first field is the type
+     * name (not a string but a literal) and the second is the name of the
+     * function used to initialize it
+     */
+#define X_PYTYPES(X) \
+    X(Connection,       pycbc_ConnectionType_init) \
+    /** Remember to keep base classes in order */ \
+    X(Result,           pycbc_ResultType_init) \
+    X(OperationResult,  pycbc_OperationResultType_init) \
+    X(ValueResult,      pycbc_ValueResultType_init) \
+    X(MultiResult,      pycbc_MultiResultType_init) \
+    X(HttpResult,       pycbc_HttpResultType_init) \
+    X(Transcoder,       pycbc_TranscoderType_init) \
+    X(ObserveInfo,      pycbc_ObserveInfoType_init) \
+    X(Item,             pycbc_ItemType_init)
 
-    if (pycbc_ResultType_init(&result_type) < 0) {
-        INITERROR;
-    }
+#define X(name, inf) PyObject *cls_##name;
+    X_PYTYPES(X)
+#undef X
 
-    if (pycbc_OperationResultType_init(&opresult_type) < 0) {
-        INITERROR;
-    }
+#define X(name, infunc) \
+    if (infunc(&cls_##name) < 0) { INITERROR; }
+    X_PYTYPES(X)
+#undef X
 
-    if (pycbc_ValueResultType_init(&valresult_type) < 0) {
-        INITERROR;
-    }
-
-    if (pycbc_MultiResultType_init(&mresult_type) < 0) {
-        INITERROR;
-    }
-
-    if (pycbc_HttpResultType_init(&htresult_type) < 0) {
-        INITERROR;
-    }
-
-    if (pycbc_ArgumentType_init(&arg_type) < 0) {
-        INITERROR;
-    }
-
-    if (pycbc_TranscoderType_init(&transcoder_type) < 0) {
-        INITERROR;
-    }
-
-    if (pycbc_ObserveInfoType_init(&obsinfo_type) < 0) {
-        INITERROR;
-    }
 
 #endif /* PYCBC_CPYCHECKER */
 
@@ -277,15 +262,10 @@ init_libcouchbase(void)
     /**
      * Add the type:
      */
-    PyModule_AddObject(m, "Connection", connection_type);
-    PyModule_AddObject(m, "Result", result_type);
-    PyModule_AddObject(m, "ValueResult", valresult_type);
-    PyModule_AddObject(m, "OperationResult", opresult_type);
-    PyModule_AddObject(m, "MultiResult", mresult_type);
-    PyModule_AddObject(m, "HttpResult", htresult_type);
-    PyModule_AddObject(m, "Arguments", arg_type);
-    PyModule_AddObject(m, "Transcoder", transcoder_type);
-    PyModule_AddObject(m, "ObserveInfo", obsinfo_type);
+#define X(name, infunc) \
+    PyModule_AddObject(m, #name, cls_##name);
+    X_PYTYPES(X)
+#undef X
 #endif /* PYCBC_CPYCHECKER */
 
     /**

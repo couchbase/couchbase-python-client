@@ -22,5 +22,4 @@ from couchbase._libcouchbase import (
     OperationResult,
     HttpResult,
     MultiResult,
-    Arguments,
     ObserveInfo)

@@ -184,7 +184,8 @@ pycbc_oputil_check_sequence(PyObject *sequence,
         *seqtype = PYCBC_SEQTYPE_DICT;
         ret = 0;
 
-    } else if (!allow_list) {
+    } else if (allow_list == 0 &&
+            PyObject_IsInstance(sequence, pycbc_helpers.itmcoll_base_type) == 0) {
         PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0,
                            "Keys must be a dictionary",
                            sequence);
@@ -197,6 +198,19 @@ pycbc_oputil_check_sequence(PyObject *sequence,
     } else if (PyTuple_Check(sequence)) {
         *seqtype = PYCBC_SEQTYPE_TUPLE;
         *ncmds = PyTuple_GET_SIZE(sequence);
+
+    } else if (PyObject_IsInstance(sequence, pycbc_helpers.itmcoll_base_type)) {
+        *ncmds = PyObject_Length(sequence);
+        if (*ncmds == -1) {
+            PYCBC_EXC_WRAP(PYCBC_EXC_INTERNAL, 0,
+                           "ItemCollection subclass did not return proper length");
+            ret = -1;
+        }
+        *seqtype = PYCBC_SEQTYPE_GENERIC | PYCBC_SEQTYPE_F_ITM;
+        if (PyObject_IsInstance(sequence, pycbc_helpers.itmopts_dict_type)) {
+            *seqtype |= PYCBC_SEQTYPE_F_OPTS;
+        }
+
 
     } else if (_is_not_strtype(sequence)) {
         /**
@@ -236,17 +250,22 @@ pycbc_maybe_set_quiet(pycbc_MultiResult *mres, PyObject *quiet)
     /**
      * If quiet is 'None', then we default to Connection.quiet
      */
+    int tmp = 0;
     if (quiet == NULL || quiet == Py_None) {
-        mres->no_raise_enoent = mres->parent->quiet;
+        mres->mropts |= (mres->parent->quiet) ? PYCBC_MRES_F_QUIET : 0;
         return 0;
     }
-    mres->no_raise_enoent = PyObject_IsTrue(quiet);
 
-    if (mres->no_raise_enoent == -1) {
+    tmp |= PyObject_IsTrue(quiet);
+
+    if (tmp == -1) {
         PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS,
                            0, "quiet must be True, False, or None'", quiet);
         return -1;
     }
+
+    mres->mropts |= tmp ? PYCBC_MRES_F_QUIET : 0;
+
     return 0;
 }
 
@@ -256,7 +275,7 @@ pycbc_oputil_iter_prepare(pycbc_seqtype_t seqtype,
                           PyObject **iter,
                           Py_ssize_t *dictpos)
 {
-    if (seqtype == PYCBC_SEQTYPE_GENERIC) {
+    if (seqtype & PYCBC_SEQTYPE_GENERIC) {
         *iter = PyObject_GetIter(sequence);
         if (!*iter) {
             PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0,
@@ -265,7 +284,7 @@ pycbc_oputil_iter_prepare(pycbc_seqtype_t seqtype,
                                sequence);
         }
         return *iter;
-    } else if (seqtype == PYCBC_SEQTYPE_DICT) {
+    } else if (seqtype & PYCBC_SEQTYPE_DICT) {
         *dictpos = 0;
     }
     *iter = NULL;
@@ -284,7 +303,7 @@ pycbc_oputil_sequence_next(pycbc_seqtype_t seqtype,
                            PyObject **key,
                            PyObject **value)
 {
-    if (seqtype == PYCBC_SEQTYPE_DICT) {
+    if (seqtype & PYCBC_SEQTYPE_DICT) {
         int rv = PyDict_Next(seqobj, dictpos, key, value);
         if (rv < 1) {
             PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_INTERNAL,
@@ -298,10 +317,10 @@ pycbc_oputil_sequence_next(pycbc_seqtype_t seqtype,
     }
 
     *value = NULL;
-    if (seqtype == PYCBC_SEQTYPE_LIST) {
+    if (seqtype & PYCBC_SEQTYPE_LIST) {
         *key = PyList_GET_ITEM(seqobj, ii);
         Py_INCREF(*key);
-    } else if (seqtype == PYCBC_SEQTYPE_TUPLE) {
+    } else if (seqtype & PYCBC_SEQTYPE_TUPLE) {
         *key = PyTuple_GET_ITEM(seqobj, ii);
         Py_INCREF(*key);
     } else {
@@ -314,6 +333,113 @@ pycbc_oputil_sequence_next(pycbc_seqtype_t seqtype,
     }
 
     return 0;
+}
+
+static int
+extract_item_params(struct pycbc_common_vars *cv,
+                    PyObject *k,
+                    pycbc_Item **itm,
+                    PyObject **options)
+{
+    /** Key will always be an item */
+    Py_ssize_t tsz;
+
+    if (!PyTuple_Check(k)) {
+        PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0, "Expected Tuple", k);
+        return -1;
+    }
+
+    tsz = PyTuple_GET_SIZE(k);
+    if (tsz != 2 && tsz != 1) {
+        PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0,
+                           "Tuple from __iter__ must return 1 or 2 items", k);
+        return -1;
+    }
+
+    *itm = (pycbc_Item *) PyTuple_GET_ITEM(k, 0);
+
+    if (tsz == 2) {
+        *options = PyTuple_GET_ITEM(k, 1);
+
+        if (*options == Py_None) {
+            *options = NULL;
+
+        } else if (!PyDict_Check(*options)) {
+            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS,
+                               0, "Options must be None or dict", *options);
+            return -1;
+        }
+    }
+
+    if (! (*itm)->key) {
+        PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0,
+                           "Item is missing key", (PyObject *)*itm);
+        return -1;
+    }
+
+    /** Store the item inside the mres dictionary */
+    PyDict_SetItem((PyObject *)&cv->mres->dict, (*itm)->key, (PyObject *)*itm);
+    cv->mres->mropts |= PYCBC_MRES_F_UALLOCED;
+    return 0;
+}
+
+int
+pycbc_oputil_iter_multi(pycbc_Connection *self,
+                        pycbc_seqtype_t seqtype,
+                        PyObject *collection,
+                        struct pycbc_common_vars *cv,
+                        int optype,
+                        pycbc_oputil_keyhandler handler,
+                        void *arg)
+{
+    int rv = 0;
+    int ii;
+    PyObject *iterobj;
+    PyObject *seqobj;
+    Py_ssize_t dictpos = 0;
+
+    seqobj = pycbc_oputil_iter_prepare(seqtype,
+                                       collection,
+                                       &iterobj,
+                                       &dictpos);
+    if (seqobj == NULL) {
+        return -1;
+    }
+
+    for (ii = 0; ii < cv->ncmds; ii++) {
+        PyObject *k, *v = NULL, *options = NULL;
+        PyObject *arg_k = NULL;
+        pycbc_Item *itm = NULL;
+
+        rv = pycbc_oputil_sequence_next(seqtype,
+                                        seqobj, &dictpos, ii, &k, &v);
+        if (rv < 0) {
+            goto GT_ITER_DONE;
+        }
+
+        if (seqtype & PYCBC_SEQTYPE_F_ITM) {
+            if ((rv = extract_item_params(cv, k, &itm, &options)) != 0) {
+                goto GT_ITER_DONE;
+            }
+            arg_k = itm->key;
+
+        } else {
+            arg_k = k;
+        }
+
+        rv = handler(self, cv, optype, arg_k, v, options, itm, ii, arg);
+
+        GT_ITER_DONE:
+        Py_XDECREF(k);
+        Py_XDECREF(v);
+
+        if (rv == -1) {
+            break;
+        }
+    }
+
+    Py_XDECREF(iterobj);
+    return rv;
 }
 
 int

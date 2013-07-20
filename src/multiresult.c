@@ -48,7 +48,7 @@ MultiResultType__init__(pycbc_MultiResult *self, PyObject *args, PyObject *kwarg
     self->all_ok = 1;
     self->exceptions = NULL;
     self->errop = NULL;
-    self->no_raise_enoent = 0;
+    self->mropts = 0;
 
     return 0;
 }

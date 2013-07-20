@@ -74,19 +74,25 @@ union pycbc_u_ppcmd {
  * access methods.
  */
 typedef enum {
-
     /** Generic sequence. A PyObject_Iter is used to make an iterator */
-    PYCBC_SEQTYPE_GENERIC = 0,
+    PYCBC_SEQTYPE_GENERIC   = 1 << 0,
 
     /** Dictionary. We use PyDict_Next */
-    PYCBC_SEQTYPE_DICT,
+    PYCBC_SEQTYPE_DICT      = 1 << 1,
 
     /** Tuple. PyTuple_GET_ITEM */
-    PYCBC_SEQTYPE_TUPLE,
+    PYCBC_SEQTYPE_TUPLE     = 1 << 2,
 
     /** List, PyList_GET_ITEM */
-    PYCBC_SEQTYPE_LIST
+    PYCBC_SEQTYPE_LIST      = 1 << 3,
+
+    /** Special sequence classes for Items */
+    PYCBC_SEQTYPE_F_ITM     = 1 << 4,
+    PYCBC_SEQTYPE_F_OPTS    = 1 << 5
 } pycbc_seqtype_t;
+
+
+
 
 /**
  * Structure containing variables needed for commands.
@@ -162,6 +168,21 @@ struct pycbc_common_vars {
 };
 
 #define PYCBC_COMMON_VARS_STATIC_INIT { { { 0 } } }
+
+/**
+ * Handler for iterations
+ */
+typedef int (*pycbc_oputil_keyhandler)
+        (pycbc_Connection *self,
+                struct pycbc_common_vars *cv,
+                int optype,
+                PyObject *key,
+                PyObject *value,
+                PyObject *options,
+                pycbc_Item *item,
+                int ii,
+                void *arg);
+
 
 /**
  * Dummy tuple/keywords, used for PyArg_ParseTupleAndKeywordArgs, which dies
@@ -265,6 +286,27 @@ int pycbc_common_vars_init(struct pycbc_common_vars *cv,
                            Py_ssize_t ncmds,
                            size_t tsize,
                            int want_vals);
+
+
+/**
+ * Iterate over a sequence of command objects
+ * @param self the connection object
+ * @param seqtype a Sequence Type. Initialized by seqtype_check
+ * @param collection the actual iterable of keys (verified by seqtype_check)
+ * @param cv Common vars structure
+ * @param optype the operation type. Passed to handler
+ * @param handler the actual handler to call for each key-value-item pair
+ * @param arg an opaque pointer passed to the handler
+ */
+int
+pycbc_oputil_iter_multi(pycbc_Connection *self,
+                        pycbc_seqtype_t seqtype,
+                        PyObject *collection,
+                        struct pycbc_common_vars *cv,
+                        int optype,
+                        pycbc_oputil_keyhandler handler,
+                        void *arg);
+
 
 /**
  * Clean up the 'common_vars' structure and free/decref any data. This

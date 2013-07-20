@@ -18,6 +18,7 @@ Contents:
    api/transcoder
    api/threads
    api/convertfuncs
+   api/items
 
 Indices and tables
 ==================

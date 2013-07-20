@@ -33,6 +33,7 @@ import pickle
 
 import couchbase.exceptions as E
 import couchbase._libcouchbase as C
+from couchbase.items import ItemCollection, ItemOptionDict, ItemSequence
 
 
 def _result__repr__(self):
@@ -110,4 +111,7 @@ C._init_helpers(result_reprfunc=_result__repr__,
                 lcb_errno_map=E._LCB_ERRNO_MAP,
                 misc_errno_map=E._EXCTYPE_MAP,
                 default_exception=E.CouchbaseError,
-                obsinfo_reprfunc=_observeinfo__repr__)
+                obsinfo_reprfunc=_observeinfo__repr__,
+                itmcoll_base_type=ItemCollection,
+                itmopts_dict_type=ItemOptionDict,
+                itmopts_seq_type=ItemSequence)

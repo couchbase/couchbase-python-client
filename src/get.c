@@ -33,16 +33,20 @@ struct getcmd_vars_st {
 
 static int
 handle_single_key(pycbc_Connection *self,
+                  struct pycbc_common_vars *cv,
+                  int optype,
                   PyObject *curkey,
                   PyObject *curval,
+                  PyObject *options,
+                  pycbc_Item *itm,
                   int ii,
-                  struct getcmd_vars_st *gv,
-                  struct pycbc_common_vars *cv)
+                  void *arg)
 {
     int rv;
     char *key;
     size_t nkey;
     unsigned int lock = 0;
+    struct getcmd_vars_st *gv = (struct getcmd_vars_st *)arg;
     unsigned long ttl = gv->u.ttl;
 
     rv = pycbc_tc_encode_key(self, &curkey, (void**)&key, &nkey);
@@ -57,7 +61,10 @@ handle_single_key(pycbc_Connection *self,
         return -1;
     }
 
-    if (curval && gv->allow_dval) {
+    if (curval && gv->allow_dval && options == NULL) {
+        options = curval;
+    }
+    if (options) {
         static char *kwlist[] = { "ttl", NULL };
         PyObject *ttl_O = NULL;
         if (gv->u.ttl) {
@@ -210,7 +217,6 @@ get_common(pycbc_Connection *self,
            int argopts)
 {
     int rv;
-    int ii;
     Py_ssize_t ncmds = 0;
     size_t cmdsize;
     pycbc_seqtype_t seqtype;
@@ -299,48 +305,22 @@ get_common(pycbc_Connection *self,
     }
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
-        Py_ssize_t dictpos;
-        PyObject *curseq, *iter = NULL;
-
-        curseq = pycbc_oputil_iter_prepare(seqtype, kobj, &iter, &dictpos);
-        if (!curseq) {
-            rv = -1;
-            goto GT_ITER_DONE;
-        }
-
-        for (ii = 0; ii < ncmds; ii++) {
-            PyObject *curkey = NULL, *curvalue = NULL;
-            rv = pycbc_oputil_sequence_next(seqtype,
-                                            curseq,
-                                            &dictpos,
-                                            ii,
-                                            &curkey,
-                                            &curvalue);
-            if (rv < 0) {
-                goto GT_ITER_DONE;
-            }
-
-            rv = handle_single_key(self, curkey, curvalue, ii, &gv, &cv);
-            Py_XDECREF(curkey);
-            Py_XDECREF(curvalue);
-
-            if (rv < 0) {
-                goto GT_ITER_DONE;
-            }
-        }
-
-        GT_ITER_DONE:
-        Py_XDECREF(iter);
-        if (rv < 0) {
-            goto GT_DONE;
-        }
+        rv = pycbc_oputil_iter_multi(self,
+                                     seqtype,
+                                     kobj,
+                                     &cv,
+                                     optype,
+                                     handle_single_key,
+                                     &gv);
 
     } else {
-        rv = handle_single_key(self, kobj, NULL, 0, &gv, &cv);
-        if (rv < 0) {
-            goto GT_DONE;
-        }
+        rv = handle_single_key(self,
+                               &cv, optype, kobj, NULL, NULL, NULL, 0, &gv);
     }
+    if (rv < 0) {
+        goto GT_DONE;
+    }
+
 
     if (pycbc_maybe_set_quiet(cv.mres, is_quiet) == -1) {
         goto GT_DONE;

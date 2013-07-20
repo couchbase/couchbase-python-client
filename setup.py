@@ -58,7 +58,6 @@ else:
 
 
 SOURCEMODS = (
-        'argument',
         'exceptions',
         'ext',
         'result',

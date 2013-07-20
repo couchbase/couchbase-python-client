@@ -16,23 +16,31 @@
 
 #include "oputil.h"
 
+struct storecmd_vars {
+    int operation;
+    unsigned long ttl;
+    PyObject *flagsobj;
+};
+
 static int
 handle_single_kv(pycbc_Connection *self,
+                 struct pycbc_common_vars *cv,
+                 int optype,
                  PyObject *curkey,
                  PyObject *curvalue,
-                 PyObject *flagsobj,
-                 unsigned long ttl,
+                 PyObject *options,
+                 pycbc_Item *itm,
                  int ii,
-                 int operation,
-                 struct pycbc_common_vars *cv)
+                 void *arg)
 {
     int rv;
-    unsigned long cur_ttl = ttl;
-    PyObject *opval = NULL;
-    lcb_uint64_t cas = 0;
-    static char *opt_kwlist[] = { "value", "cas", "ttl", NULL };
     lcb_store_cmd_t *scmd;
 
+    PyObject *opval = curvalue;
+    lcb_uint64_t cas = 0;
+    const struct storecmd_vars *scv = (struct storecmd_vars *)arg;
+    unsigned long cur_ttl = scv->ttl;
+    PyObject *flagsobj = scv->flagsobj;
     scmd = cv->cmds.store + ii;
 
     rv = pycbc_tc_encode_key(self,
@@ -50,25 +58,53 @@ handle_single_kv(pycbc_Connection *self,
         return -1;
     }
 
-    if (PyObject_IsInstance(curvalue, (PyObject*)&pycbc_ArgumentType)) {
-        rv = PyArg_ParseTupleAndKeywords(pycbc_DummyTuple, curvalue,
-                                         "O|Kk",
-                                         opt_kwlist,
-                                         &opval,
-                                         &cas,
-                                         &cur_ttl);
-        if (!rv) {
-            PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ARGUMENTS,
-                               0,
-                               "couldn't extract sub-args",
-                               curkey);
+    if (itm) {
+        opval = itm->value;
+        lcb_cas_t itmcas = itm->cas;
+
+        if (!opval) {
+            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS,
+                               0, "Value is empty", curvalue);
             return -1;
         }
-        if (!cur_ttl) {
-            cur_ttl = ttl;
+
+        if (options) {
+            PyObject *ttl_O = NULL, *flagsobj_Oalt = NULL, *igncas_O = NULL;
+            static char *itm_optlist[] = {
+                    "ttl", "format", "ignore_cas", NULL };
+
+            rv = PyArg_ParseTupleAndKeywords(pycbc_DummyTuple,
+                                             options,
+                                             "|OOO",
+                                             itm_optlist,
+                                             &ttl_O,
+                                             &flagsobj_Oalt,
+                                             &igncas_O);
+            if (!rv) {
+                PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
+                               "Couldn't parse item options");
+                return -1;
+            }
+
+            if (ttl_O) {
+                if (-1 == pycbc_get_ttl(ttl_O, &cur_ttl, 1)) {
+                    return -1;
+                }
+
+                if (!cur_ttl) {
+                    cur_ttl = scv->ttl;
+                }
+            }
+
+            if (flagsobj_Oalt && flagsobj_Oalt != Py_None) {
+                flagsobj = flagsobj_Oalt;
+            }
+
+            if (igncas_O && PyObject_IsTrue(igncas_O)) {
+                itmcas = 0;
+            }
         }
-    } else {
-        opval = curvalue;
+        cas = itmcas;
     }
 
     rv = pycbc_tc_encode_value(self,
@@ -81,7 +117,7 @@ handle_single_kv(pycbc_Connection *self,
         return -1;
     }
 
-    scmd->v.v0.operation = operation;
+    scmd->v.v0.operation = scv->operation;
     scmd->v.v0.cas = cas;
     scmd->v.v0.exptime = cur_ttl;
     cv->encvals[ii] = opval;
@@ -129,26 +165,26 @@ static PyObject *
 set_common(pycbc_Connection *self,
            PyObject *args,
            PyObject *kwargs,
-           lcb_storage_t operation,
+           const lcb_storage_t operation,
            int argopts)
 {
     int rv;
-    int ii;
     Py_ssize_t ncmds = 0;
-    unsigned long ttl = 0;
     PyObject *ttl_O = NULL;
-    Py_ssize_t dictpos = 0;
     lcb_uint64_t single_cas = 0;
     PyObject *dict = NULL;
-    PyObject *curkey;
-    PyObject *curvalue;
+    PyObject *key;
+    PyObject *value;
     lcb_error_t err;
+    pycbc_seqtype_t seqtype;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
+    struct storecmd_vars scv = { 0 };
 
-    PyObject *flagsobj = NULL;
 
     static char *kwlist_multi[] = { "kv", "ttl", "format", NULL };
     static char *kwlist_single[] = { "key", "value", "cas", "ttl", "format", NULL };
+
+    scv.operation = operation;
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
         rv = PyArg_ParseTupleAndKeywords(args,
@@ -157,31 +193,32 @@ set_common(pycbc_Connection *self,
                                          kwlist_multi,
                                          &dict,
                                          &ttl_O,
-                                         &flagsobj);
+                                         &scv.flagsobj);
 
     } else {
         rv = PyArg_ParseTupleAndKeywords(args,
                                          kwargs,
                                          "OO|KOO",
                                          kwlist_single,
-                                         &curkey,
-                                         &curvalue,
+                                         &key,
+                                         &value,
                                          &single_cas,
                                          &ttl_O,
-                                         &flagsobj);
+                                         &scv.flagsobj);
     }
+
     if (!rv) {
         PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "couldn't parse arguments");
         return NULL;
     }
 
-    rv = pycbc_get_ttl(ttl_O, &ttl, 1);
+    rv = pycbc_get_ttl(ttl_O, &scv.ttl, 1);
     if (rv < 0) {
         return NULL;
     }
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
-        rv = pycbc_oputil_check_sequence(dict, 0, &ncmds, NULL);
+        rv = pycbc_oputil_check_sequence(dict, 0, &ncmds, &seqtype);
         if (rv < 0) {
             return NULL;
         }
@@ -191,16 +228,14 @@ set_common(pycbc_Connection *self,
     }
 
     if (operation == LCB_APPEND || operation == LCB_PREPEND) {
-        rv = handle_append_flags(self, &flagsobj);
+        rv = handle_append_flags(self, &scv.flagsobj);
         if (rv < 0) {
             return NULL;
         }
 
-    } else if (flagsobj == NULL || flagsobj == Py_None) {
-        flagsobj = self->dfl_fmt;
+    } else if (scv.flagsobj == NULL || scv.flagsobj == Py_None) {
+        scv.flagsobj = self->dfl_fmt;
     }
-
-    ii = 0;
 
     rv = pycbc_common_vars_init(&cv,
                                 self,
@@ -208,33 +243,26 @@ set_common(pycbc_Connection *self,
                                 ncmds,
                                 sizeof(lcb_store_cmd_t),
                                 1);
-
     if (rv < 0) {
         return NULL;
     }
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
-        while (PyDict_Next(dict, &dictpos, &curkey, &curvalue)) {
-            rv = handle_single_kv(self,
-                                  curkey,
-                                  curvalue,
-                                  flagsobj,
-                                  ttl,
-                                  ii,
-                                  operation,
-                                  &cv);
-            if (rv < 0) {
-                goto GT_DONE;
-            }
+        rv = pycbc_oputil_iter_multi(self,
+                                seqtype,
+                                dict,
+                                &cv,
+                                0,
+                                handle_single_kv,
+                                &scv);
 
-            ii++;
-        }
     } else {
-        rv = handle_single_kv(self, curkey, curvalue, flagsobj, ttl, 0, operation, &cv);
-        if (rv < 0) {
-            goto GT_DONE;
-        }
+        rv = handle_single_kv(self, &cv, 0, key, value, NULL, NULL, 0, &scv);
         cv.cmds.store->v.v0.cas = single_cas;
+    }
+
+    if (rv < 0) {
+        goto GT_DONE;
     }
 
     err = lcb_store(self->instance, cv.mres, ncmds, cv.cmdlist.store);

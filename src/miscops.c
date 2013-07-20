@@ -30,11 +30,14 @@
  */
 static int
 handle_single_keyop(pycbc_Connection *self,
+                    struct pycbc_common_vars *cv,
+                    int optype,
                     PyObject *curkey,
                     PyObject *curval,
+                    PyObject *options,
+                    pycbc_Item *item,
                     int ii,
-                    int optype,
-                    struct pycbc_common_vars *cv)
+                    void *arg)
 {
     int rv;
     char *key;
@@ -58,11 +61,12 @@ handle_single_keyop(pycbc_Connection *self,
         return -1;
     }
 
-    if (curval) {
+    if (item) {
+        cas = item->cas;
 
+    } else if (curval) {
         if (PyDict_Check(curval)) {
             PyObject *cas_o = PyDict_GetItemString(curval, "cas");
-
             if (!cas_o) {
                 PyErr_Clear();
             }
@@ -120,7 +124,6 @@ keyop_common(pycbc_Connection *self,
              int argopts)
 {
     int rv;
-    int ii;
     Py_ssize_t ncmds = 0;
     pycbc_seqtype_t seqtype;
     PyObject *casobj = NULL;
@@ -169,50 +172,17 @@ keyop_common(pycbc_Connection *self,
     }
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
-        Py_ssize_t dictpos = 0;
-        PyObject *curseq, *iter = NULL;
-        curseq = pycbc_oputil_iter_prepare(seqtype, kobj, &iter, &dictpos);
-
-        if (!curseq) {
-            goto GT_DONE;
-        }
-
-        for (ii = 0; ii < ncmds; ii++) {
-            PyObject *curkey = NULL, *curvalue = NULL;
-
-            rv = pycbc_oputil_sequence_next(seqtype,
-                                            curseq,
-                                            &dictpos,
-                                            ii,
-                                            &curkey,
-                                            &curvalue);
-            if (rv < 0) {
-                goto GT_ITER_DONE;
-            }
-
-            rv = handle_single_keyop(self, curkey, curvalue, ii, optype, &cv);
-
-            Py_XDECREF(curkey);
-            Py_XDECREF(curvalue);
-
-            if (rv < 0) {
-                goto GT_ITER_DONE;
-            }
-        }
-
-        GT_ITER_DONE:
-        Py_XDECREF(iter);
-
-        if (rv < 0) {
-            goto GT_DONE;
-        }
-
+        rv = pycbc_oputil_iter_multi(self, seqtype, kobj, &cv, optype,
+                                     handle_single_keyop, NULL);
     } else {
-        rv = handle_single_keyop(self, kobj, casobj, 0, optype, &cv);
-        if (rv < 0) {
-            goto GT_DONE;
-        }
+        rv = handle_single_keyop(self,
+                                 &cv, optype, kobj, casobj, NULL, NULL, 0, NULL);
     }
+
+    if (rv < 0) {
+        goto GT_DONE;
+    }
+
 
 
     if (optype == PYCBC_CMD_DELETE) {
