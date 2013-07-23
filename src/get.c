@@ -226,19 +226,23 @@ get_common(pycbc_Connection *self,
 
     PyObject *ttl_O = NULL;
     PyObject *replica_O = NULL;
+    PyObject *nofmt_O = NULL;
 
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
     struct getcmd_vars_st gv = { 0 };
-    static char *kwlist[] = { "keys", "ttl", "quiet", "replica", NULL };
+    static char *kwlist[] = {
+            "keys", "ttl", "quiet", "replica", "no_format", NULL
+    };
 
     rv = PyArg_ParseTupleAndKeywords(args,
                                      kwargs,
-                                     "O|OOO",
+                                     "O|OOOO",
                                      kwlist,
                                      &kobj,
                                      &ttl_O,
                                      &is_quiet,
-                                     &replica_O);
+                                     &replica_O,
+                                     &nofmt_O);
 
     if (!rv) {
         PYCBC_EXCTHROW_ARGS()
@@ -302,6 +306,11 @@ get_common(pycbc_Connection *self,
 
     if (rv < 0) {
         return NULL;
+    }
+
+    if (nofmt_O && nofmt_O != Py_None) {
+        cv.mres->mropts |= PyObject_IsTrue(nofmt_O)
+                ? PYCBC_MRES_F_FORCEBYTES : 0;
     }
 
     if (argopts & PYCBC_ARGOPT_MULTI) {

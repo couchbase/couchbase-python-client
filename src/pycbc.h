@@ -355,7 +355,10 @@ enum {
     PYCBC_MRES_F_ITEMS      = 1 << 1,
 
     /** Items are already allocated and present within the dictionary. */
-    PYCBC_MRES_F_UALLOCED   = 1 << 2
+    PYCBC_MRES_F_UALLOCED   = 1 << 2,
+
+    /** For GET (and possibly others), force FMT_BYTES */
+    PYCBC_MRES_F_FORCEBYTES = 1 << 3
 };
 /**
  * Object containing the result of a 'Multi' operation. It's the same as a

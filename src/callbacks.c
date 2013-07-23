@@ -255,6 +255,7 @@ get_callback(lcb_t instance,
     pycbc_Connection *conn = NULL;
     pycbc_ValueResult *res = NULL;
     pycbc_MultiResult *mres = NULL;
+    lcb_uint32_t eflags;
 
     rv = get_common_objects((PyObject*)cookie,
                             resp->v.v0.key,
@@ -280,10 +281,16 @@ get_callback(lcb_t instance,
         return;
     }
 
+    if (mres->mropts & PYCBC_MRES_F_FORCEBYTES) {
+        eflags = PYCBC_FMT_BYTES;
+    } else {
+        eflags = resp->v.v0.flags;
+    }
+
     rv = pycbc_tc_decode_value(mres->parent,
                                resp->v.v0.bytes,
                                resp->v.v0.nbytes,
-                               resp->v.v0.flags,
+                               eflags,
                                &res->value);
     if (rv < 0) {
         push_fatal_error(mres);

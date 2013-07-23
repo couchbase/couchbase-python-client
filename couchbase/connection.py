@@ -265,7 +265,7 @@ class Connection(_Base):
         """
         return _Base.prepend(self, key, value, ttl=ttl, cas=cas, format=format)
 
-    def get(self, key, ttl=0, quiet=None, replica=False):
+    def get(self, key, ttl=0, quiet=None, replica=False, no_format=False):
         """Obtain an object stored in Couchbase by given key.
 
         :param string key: The key to fetch. The type of key is the same
@@ -299,6 +299,16 @@ class Connection(_Base):
                 res = c.get("key", quiet=True) # suppress not-found errors
             catch CouchbaseError:
                 res = c.get("key", replica=True, quiet=True)
+
+
+        :param bool no_format:
+
+          .. versionadded:: 1.1.0
+
+          If set to ``True``, then the value will always be
+          delivered in the :class:`~couchbase.result.Result` object as being of
+          :data:`~couchbase.FMT_BYTES`. This is a item-local equivalent of using
+          the :attr:`data_passthrough` option
 
 
         :raise: :exc:`couchbase.exceptions.NotFoundError` if the key
@@ -335,7 +345,7 @@ class Connection(_Base):
 
         """
 
-        return _Base.get(self, key, ttl, quiet, replica)
+        return _Base.get(self, key, ttl, quiet, replica, no_format)
 
     def touch(self, key, ttl=0):
         """Update a key's expiration time
@@ -698,7 +708,7 @@ class Connection(_Base):
         """
         return _Base.prepend_multi(self, keys, ttl=ttl, format=format)
 
-    def get_multi(self, keys, ttl=0, quiet=None, replica=False):
+    def get_multi(self, keys, ttl=0, quiet=None, replica=False, no_format=False):
         """Get multiple keys
         Multi variant of :meth:`get`
 
@@ -717,7 +727,7 @@ class Connection(_Base):
           :class:`~couchbase.result.Result` objects as values
 
         """
-        return _Base.get_multi(self, keys, ttl=ttl, quiet=quiet, replica=replica)
+        return _Base.get_multi(self, keys, ttl=ttl, quiet=quiet, replica=replica, no_format=no_format)
 
     def touch_multi(self, keys, ttl=0):
         """Touch multiple keys

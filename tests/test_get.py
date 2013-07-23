@@ -120,6 +120,23 @@ class ConnectionGetTest(ConnectionTestCase):
 
         del cb_exc
 
+    def test_get_noformat(self):
+        k = self.gen_key("get_noformat")
+        self.cb.set(k, {"foo":"bar"}, format=FMT_JSON)
+        rv = self.cb.get(k, no_format=True)
+        self.assertEqual(rv.value, b'{"foo": "bar"}')
+
+        kl = self.gen_key_list(prefix="get_noformat")
+        kv = {}
+        for k in kl:
+            kv[k] = {"foo" : "bar"}
+
+        self.cb.set_multi(kv)
+        rvs = self.cb.get_multi(kv.keys(), no_format=True)
+        for k, v in rvs.items():
+            self.assertEqual(v.value, b'{"foo": "bar"}')
+
+
     def test_get_format(self):
 
         raise(SkipTest("get-with-format not implemented"))
