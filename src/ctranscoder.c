@@ -141,6 +141,21 @@ decode_value(PyObject *self, PyObject *args)
     return vobj;
 }
 
+static PyObject*
+determine_format(PyObject *self, PyObject *args)
+{
+    int rv;
+    PyObject *orig;
+
+    rv = PyArg_ParseTuple(args, "O", &orig);
+    if (!rv) {
+        return NULL;
+    }
+
+    (void)self;
+    return pycbc_tc_determine_format(orig);
+}
+
 static PyTypeObject TranscoderType = {
         PYCBC_POBJ_HEAD_INIT(NULL)
         0
@@ -197,6 +212,23 @@ PyDoc_STRVAR(decode_value_doc,
 "   application\n"
 "\n");
 
+PyDoc_STRVAR(determine_format_doc,
+"Guess the suitable format for the object specified.\n"
+"  .. versionadded:: 1.1.0\n"
+"\n"
+"Used primarily if received a :data:`~couchbase.FMT_AUTO` for the\n"
+"`format` parameter in one of the encode methods\n"
+"\n"
+":param object value: The value whose format should be guessed\n"
+":return: An integer representing the guessed format.\n"
+"\n"
+"Note that this function is provided as a convenience. It is not called\n"
+"by the Connection object\n"
+"\n"
+"This function always succeeds\n"
+""
+);
+
 static PyMethodDef cTranscoder_methods[] = {
         { PYCBC_TCNAME_ENCODE_KEY, (PyCFunction)encode_key,
                 METH_VARARGS, encode_key_doc
@@ -209,6 +241,9 @@ static PyMethodDef cTranscoder_methods[] = {
         },
         { PYCBC_TCNAME_DECODE_VALUE, (PyCFunction)decode_value,
                 METH_VARARGS, decode_value_doc
+        },
+        { "determine_format", (PyCFunction)determine_format,
+                METH_VARARGS, determine_format_doc
         },
         { NULL }
 };

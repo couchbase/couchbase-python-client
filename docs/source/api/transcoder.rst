@@ -56,5 +56,6 @@ is the default.
     .. automethod:: encode_value(value, flags)
     .. automethod:: decode_key(key)
     .. automethod:: decode_value(value, flags)
+    .. automethod:: determine_format(value)
 
 .. autoclass:: TranscoderPP

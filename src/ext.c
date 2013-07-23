@@ -275,6 +275,10 @@ init_libcouchbase(void)
     PYCBC_XHELPERS_STRS(X);
 #undef X
 
+    pycbc_helpers.fmt_auto =
+            PyObject_CallFunction((PyObject*)&PyBaseObject_Type, NULL, NULL);
+    PyModule_AddObject(m, "FMT_AUTO", pycbc_helpers.fmt_auto);
+
     pycbc_init_pyconstants(m);
 
 #if PY_MAJOR_VERSION >= 3

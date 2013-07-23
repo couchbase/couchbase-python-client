@@ -4,7 +4,7 @@ Connection object
 
 .. module:: couchbase
 .. class:: Couchbase
-    
+
     .. automethod:: connect
 
 
@@ -108,6 +108,20 @@ Each format specifier has specific rules about what data types it accepts.
 
     Values with `FMT_UTF8` are retrieved as `unicode` objects (for Python 3
     `unicode` objects are plain `str` objects).
+
+.. data:: FMT_AUTO
+
+    .. versionadded:: 1.1.0
+
+    Automatically determine the format of the input type. The value of this
+    constant is an opaque object.
+
+    The rules are as follows:
+
+    If the value is a ``str``, :const:`FMT_UTF8` is used. If it is a ``bytes``
+    object then :const:`FMT_BYTES` is used. If it is a ``list``, ``tuple``
+    or ``dict``, ``bool``, or ``None`` then :const:`FMT_JSON` is used.
+    For anything else :const:`FMT_PICKLE` is used.
 
 
 Key Format

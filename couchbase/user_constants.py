@@ -24,6 +24,7 @@ from couchbase._libcouchbase import (
     FMT_BYTES,
     FMT_UTF8,
     FMT_PICKLE,
+    FMT_AUTO,
     FMT_MASK,
 
     OBS_PERSISTED,

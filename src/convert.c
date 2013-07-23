@@ -399,6 +399,28 @@ pycbc_tc_decode_key(pycbc_Connection *conn,
     return 0;
 }
 
+PyObject *
+pycbc_tc_determine_format(PyObject *value)
+{
+    if (PyUnicode_Check(value)) {
+        return pycbc_helpers.fmt_utf8_flags;
+
+    } else if (PyBytes_Check(value) || PyByteArray_Check(value)) {
+        return pycbc_helpers.fmt_bytes_flags;
+
+    } else if (PyList_Check(value) ||
+            PyTuple_Check(value) ||
+            PyDict_Check(value) ||
+            value == Py_True ||
+            value == Py_False ||
+            value == Py_None) {
+        return pycbc_helpers.fmt_json_flags;
+
+    } else {
+        return pycbc_helpers.fmt_pickle_flags;
+    }
+}
+
 int
 pycbc_tc_encode_value(pycbc_Connection *conn,
                        PyObject **value,
@@ -421,8 +443,12 @@ pycbc_tc_encode_value(pycbc_Connection *conn,
         flag_v = conn->dfl_fmt;
     }
 
-
     if (!conn->tc) {
+
+        if (flag_v == pycbc_helpers.fmt_auto) {
+            flag_v = pycbc_tc_determine_format(*value);
+        }
+
         rv = pycbc_get_u32(flag_v, &flags_stackval);
         if (rv < 0) {
             PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0,

@@ -533,6 +533,8 @@ extern PyObject *pycbc_ExceptionType;
     X(result_reprfunc) \
     X(fmt_utf8_flags) \
     X(fmt_bytes_flags) \
+    X(fmt_json_flags) \
+    X(fmt_pickle_flags) \
     X(pickle_encode) \
     X(pickle_decode) \
     X(json_encode) \
@@ -563,6 +565,9 @@ struct pycbc_helpers_ST {
     #define X(n, s) PyObject *n;
     PYCBC_XHELPERS_STRS(X)
     #undef X
+
+    /** Defined inside the module */
+    PyObject *fmt_auto;
 };
 
 /**
@@ -810,5 +815,11 @@ int pycbc_tc_simple_decode(PyObject **vp,
                            const char *buf,
                            size_t nbuf,
                            lcb_uint32_t flags);
+
+/**
+ * Automatically determine the format for the object.
+ */
+PyObject *
+pycbc_tc_determine_format(PyObject *value);
 
 #endif /* PYCBC_H_ */
