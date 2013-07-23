@@ -428,6 +428,7 @@ pycbc_tc_encode_value(pycbc_Connection *conn,
             PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0,
                                "Bad value for flags",
                                flag_v);
+            return -1;
         }
 
         *flags = flags_stackval & PYCBC_FMT_MASK;
