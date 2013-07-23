@@ -149,7 +149,7 @@ class View(object):
 
         :param parent: The parent Connection object
         :type parent: :class:`~couchbase.connection.Connection`
-        :param string ddoc: The design document
+        :param string design: The design document
         :param string view: The name of the view within the design document
         :param callable row_processor: See :attr:`row_processor` for more
             details.
