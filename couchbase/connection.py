@@ -125,7 +125,8 @@ class Connection(_Base):
     # We have these wrappers so that IDEs can do param tooltips and the like.
     # we might move this directly into C some day
 
-    def set(self, key, value, cas=0, ttl=0, format=None):
+    def set(self, key, value, cas=0, ttl=0, format=None,
+            persist_to=0, replicate_to=0):
         """Unconditionally store the object in Couchbase.
 
         :param key: The key to set the value with. By default, the key must be
@@ -150,6 +151,20 @@ class Connection(_Base):
           `default_format`
           For more info see
           :attr:`~couchbase.connection.Connection.default_format`
+
+        :param int persist_to: Perform durability checking on this many
+
+          .. versionadded:: 1.1.0
+
+          nodes for persistence to disk.
+          See :meth:`endure` for more information
+
+        :param int replicate_to: Perform durability checking on this many
+
+          .. versionadded:: 1.1.0
+
+          replicas for presence in memory. See :meth:`endure` for more
+          information.
 
         :raise: :exc:`couchbase.exceptions.ArgumentError` if an
           argument is supplied that is not applicable in this context.
@@ -183,9 +198,10 @@ class Connection(_Base):
         .. seealso:: :meth:`set_multi`
 
         """
-        return _Base.set(self, key, value, cas, ttl, format)
+        return _Base.set(self, key, value, cas, ttl, format,
+                         replicate_to, persist_to)
 
-    def add(self, key, value, ttl=0, format=None):
+    def add(self, key, value, ttl=0, format=None, persist_to=0, replicate_to=0):
         """
         Store an object in Couchbase unless it already exists.
 
@@ -204,9 +220,11 @@ class Connection(_Base):
         .. seealso:: :meth:`set`, :meth:`add_multi`
 
         """
-        return _Base.add(self, key, value, ttl=ttl, format=format)
+        return _Base.add(self, key, value, ttl=ttl, format=format,
+                         persist_to=persist_to, replicate_to=replicate_to)
 
-    def replace(self, key, value, cas=0, ttl=0, format=None):
+    def replace(self, key, value, cas=0, ttl=0, format=None,
+                persist_to=0, replicate_to=0):
         """
         Store an object in Couchbase only if it already exists.
 
@@ -220,9 +238,11 @@ class Connection(_Base):
         .. seealso:: :meth:`set`, :meth:`replace_multi`
 
         """
-        return _Base.replace(self, key, value, ttl=ttl, cas=cas, format=format)
+        return _Base.replace(self, key, value, ttl=ttl, cas=cas, format=format,
+                             persist_to=persist_to, replicate_to=replicate_to)
 
-    def append(self, key, value, cas=0, ttl=0, format=None):
+    def append(self, key, value, cas=0, ttl=0, format=None,
+               persist_to=0, replicate_to=0):
         """
         Append a string to an existing value in Couchbase.
 
@@ -253,9 +273,11 @@ class Connection(_Base):
             :meth:`set`, :meth:`append_multi`
 
         """
-        return _Base.append(self, key, value, ttl=ttl, cas=cas, format=format)
+        return _Base.append(self, key, value, ttl=ttl, cas=cas, format=format,
+                            persist_to=persist_to, replicate_to=replicate_to)
 
-    def prepend(self, key, value, cas=0, ttl=0, format=None):
+    def prepend(self, key, value, cas=0, ttl=0, format=None,
+                persist_to=0, replicate_to=0):
         """
         Prepend a string to an existing value in Couchbase.
 
@@ -263,7 +285,8 @@ class Connection(_Base):
             :meth:`append`, :meth:`prepend_multi`
 
         """
-        return _Base.prepend(self, key, value, ttl=ttl, cas=cas, format=format)
+        return _Base.prepend(self, key, value, ttl=ttl, cas=cas, format=format,
+                             persist_to=persist_to, replicate_to=replicate_to)
 
     def get(self, key, ttl=0, quiet=None, replica=False, no_format=False):
         """Obtain an object stored in Couchbase by given key.
@@ -643,7 +666,96 @@ class Connection(_Base):
         """
         return _Base.observe(self, key)
 
-    def set_multi(self, keys, ttl=0, format=None):
+    def endure(self, key, persist_to=-1, replicate_to=-1,
+               cas=0,
+               check_removed=False,
+               timeout=5.0,
+               interval=0.010):
+        """
+        Wait until a key has been distributed to one or more nodes
+
+        .. versionadded:: 1.1.0
+
+        By default, when items are stored to Couchbase, the operation is
+        considered successful if the vBucket master (i.e. the "primary" node)
+        for the key has successfuly stored the item in its memory.
+
+        In most situations, this is sufficient to assume that the item has
+        successfuly been stored. However the possibility remains that the
+        "master" server will go offline as soon as it sends back the successful
+        response and the data is lost.
+
+        The ``endure`` function allows you to provide stricter criteria for
+        success. The criteria may be expressed in terms of number of nodes
+        for which the item must exist in that node's RAM and/or on that node's
+        disk. Ensuring that an item exists in more than one place is a safer
+        way to guarantee against possible data loss.
+
+        We call these requirements `Durability Constraints`, and thus the
+        method is called `endure`.
+
+        :param string key: The key to endure.
+        :param int persist_to: The minimum number of nodes which must contain
+            this item on their disk before this function returns. Ensure that
+            you do not specify too many nodes; otherwise this function will
+            fail. Use the :attr:`server_nodes` to determine how many nodes
+            exist in the cluster.
+
+            The maximum number of nodes an item can reside on is currently
+            fixed to 4 (i.e. the "master" node, and up to three "replica"
+            nodes). This limitation is current as of Couchbase Server version
+            2.1.0.
+
+            If this parameter is set to a negative value, the maximum number
+            of possible nodes the key can reside on will be used.
+
+        :param int replicate_to: The minimum number of replicas which must
+            contain this item in their memory for this method to succeed.
+            As with ``persist_to``, you may specify a negative value in which
+            case the requirement will be set to the maximum number possible.
+
+        :param float timeout: A timeout value in seconds before this function
+            fails with an exception. Typically it should take no longer than
+            several milliseconds on a functioning cluster for durability
+            requirements to be satisfied (unless something has gone wrong).
+
+        :param float interval: The polling interval in secods
+            to use for checking the
+            key status on the respective nodes. Internally, ``endure`` is
+            implemented by polling each server individually to see if the
+            key exists on that server's disk and memory. Once the status
+            request is sent to all servers, the client will check if their
+            replies are satisfactory; if they are then this function succeeds,
+            otherwise the client will wait a short amount of time and try
+            again. This parameter sets this "wait time".
+
+        :param bool check_removed: This flag inverts the check. Instead of
+            checking that a given key *exists* on the nodes, this changes
+            the behavior to check that the key is *removed* from the nodes.
+
+        :param long cas: The CAS value to check against. It is possible for
+            an item to exist on a node but have a CAS value from a prior
+            operation. Passing the CAS ensures that only replies from servers
+            with a CAS matching this parameter are accepted
+
+        :return: A :class:`~couchbase.result.OperationResult`
+
+        :raise: :exc:`~couchbase.exceptions.CouchbaseError`.
+            see :meth:`set` and :meth:`get` for possible errors
+
+        .. seealso:: :meth:`set`, :meth:`endure_multi`
+        """
+        # We really just wrap 'endure_multi'
+        kv = { key : cas }
+        rvs = self.endure_multi(keys=kv,
+                                persist_to=persist_to,
+                                replicate_to=replicate_to,
+                                check_removed=check_removed,
+                                timeout=timeout,
+                                interval=interval)
+        return rvs[key]
+
+    def set_multi(self, keys, ttl=0, format=None, persist_to=0, replicate_to=0):
         """Set multiple keys
 
         This follows the same semantics as
@@ -660,6 +772,16 @@ class Connection(_Base):
           If specified, this is the conversion format which will be used for
           _all_ the keys.
 
+        :param int persist_to: Durability constraint for persistence.
+          Note that it is more efficient to use :meth:`endure_multi`
+          on the returned :class:`~couchbase.result.MultiResult` than
+          using these parameters for a high volume of keys. Using these
+          parameters however does save on latency as the constraint checking
+          for each item is performed as soon as it is successfully stored.
+ 
+        :param int replicate_to: Durability constraints for replication.
+          See notes on the `persist_to` parameter for usage.
+
         :return: A :class:`~couchbase.result.MultiResult` object, which
           is a `dict` subclass.
 
@@ -670,43 +792,54 @@ class Connection(_Base):
         .. seealso:: :meth:`set`
 
         """
-        return _Base.set_multi(self, keys, ttl=ttl, format=format)
+        return _Base.set_multi(self, keys, ttl=ttl, format=format,
+                               persist_to=persist_to, replicate_to=replicate_to)
 
-    def add_multi(self, keys, ttl=0, format=None):
+    def add_multi(self, keys, ttl=0, format=None, persist_to=0, replicate_to=0):
         """Add multiple keys.
         Multi variant of :meth:`~couchbase.connection.Connection.add`
 
         .. seealso:: :meth:`add`, :meth:`set_multi`, :meth:`set`
 
         """
-        return _Base.add_multi(self, keys, ttl=ttl, format=format)
+        return _Base.add_multi(self, keys, ttl=ttl, format=format,
+                               persist_to=persist_to, replicate_to=replicate_to)
 
-    def replace_multi(self, keys, ttl=0, format=None):
+    def replace_multi(self, keys, ttl=0, format=None,
+                      persist_to=0, replicate_to=0):
         """Replace multiple keys.
         Multi variant of :meth:`replace`
 
         .. seealso:: :meth:`replace`, :meth:`set_multi`, :meth:`set`
 
         """
-        return _Base.replace_multi(self, keys, ttl=ttl, format=format)
+        return _Base.replace_multi(self, keys, ttl=ttl, format=format,
+                                   persist_to=persist_to,
+                                   replicate_to=replicate_to)
 
-    def append_multi(self, keys, ttl=0, format=None):
+    def append_multi(self, keys, ttl=0, format=None,
+                     persist_to=0, replicate_to=0):
         """Append to multiple keys.
         Multi variant of :meth:`append`
 
         .. seealso:: :meth:`append`, :meth:`set_multi`, :meth:`set`
 
         """
-        return _Base.append_multi(self, keys, ttl=ttl, format=format)
+        return _Base.append_multi(self, keys, ttl=ttl, format=format,
+                                  persist_to=persist_to,
+                                  replicate_to=replicate_to)
 
-    def prepend_multi(self, keys, ttl=0, format=None):
+    def prepend_multi(self, keys, ttl=0, format=None,
+                      persist_to=0, replicate_to=0):
         """Prepend to multiple keys.
         Multi variant of :meth:`prepend`
 
         .. seealso:: :meth:`prepend`, :meth:`set_multi`, :meth:`set`
 
         """
-        return _Base.prepend_multi(self, keys, ttl=ttl, format=format)
+        return _Base.prepend_multi(self, keys, ttl=ttl, format=format,
+                                   persist_to=persist_to,
+                                   replicate_to=replicate_to)
 
     def get_multi(self, keys, ttl=0, quiet=None, replica=False, no_format=False):
         """Get multiple keys
@@ -805,6 +938,35 @@ class Connection(_Base):
         Multi-variant of :meth:`observe`
         """
         return _Base.observe_multi(self, keys)
+
+    def endure_multi(self, keys, persist_to=-1, replicate_to=-1,
+                     timeout=5.0,
+                     interval=0.010,
+                     check_removed=False):
+        """
+        .. versionadded:: 1.1.0
+
+        Check durability requirements for multiple keys
+
+        :param keys: The keys to check
+
+        The type of keys may be one of the following:
+
+            * Sequence of keys
+            * A :class:`~couchbase.result.MultiResult` object
+            * A ``dict`` with CAS values as the dictionary value
+            * A sequence of :class:`~couchbase.result.Result` objects
+
+        :return: A :class:`~couchbase.result.MultiResult` object of
+            :class:`~couchbase.result.OperationResult` items.
+
+        .. seealso:: :meth:`endure`
+        """
+        return _Base.endure_multi(self, keys, persist_to, replicate_to,
+                                  timeout=timeout,
+                                  interval=interval,
+                                  check_removed=check_removed)
+
 
     def rget(self, key, replica_index=None, quiet=None):
         """

@@ -161,7 +161,8 @@ enum {
     PYCBC_CMD_GETREPLICA,
     /** "Extended" get replica, provides for more options */
     PYCBC_CMD_GETREPLICA_INDEX,
-    PYCBC_CMD_GETREPLICA_ALL
+    PYCBC_CMD_GETREPLICA_ALL,
+    PYCBC_CMD_ENDURE
 };
 
 /**
@@ -358,7 +359,10 @@ enum {
     PYCBC_MRES_F_UALLOCED   = 1 << 2,
 
     /** For GET (and possibly others), force FMT_BYTES */
-    PYCBC_MRES_F_FORCEBYTES = 1 << 3
+    PYCBC_MRES_F_FORCEBYTES = 1 << 3,
+
+    /** The commands have durability requirements */
+    PYCBC_MRES_F_DURABILITY = 1 << 4
 };
 /**
  * Object containing the result of a 'Multi' operation. It's the same as a
@@ -382,6 +386,8 @@ typedef struct {
 
     /** A failed LCB operation, if any */
     PyObject *errop;
+
+    char durability_reqs[2];
 
     /** Quick-check value to see if everything went well */
     int all_ok;

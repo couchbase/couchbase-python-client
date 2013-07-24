@@ -210,6 +210,42 @@ get_common_objects(PyObject *cookie,
 }
 
 static void
+durability_callback(lcb_t instance,
+                    const void *cookie,
+                    lcb_error_t err,
+                    const lcb_durability_resp_t *resp)
+{
+    pycbc_Connection *conn;
+    pycbc_OperationResult *res;
+    pycbc_MultiResult *mres;
+    int rv;
+    lcb_error_t effective_err;
+
+    if (err != LCB_SUCCESS) {
+        effective_err = err;
+    } else {
+        effective_err = resp->v.v0.err;
+    }
+
+    rv = get_common_objects((PyObject *)cookie,
+                            resp->v.v0.key,
+                            resp->v.v0.nkey,
+                            effective_err,
+                            &conn,
+                            (pycbc_Result**)&res,
+                            RESTYPE_OPERATION|RESTYPE_EXISTS_OK,
+                            &mres);
+    if (rv == -1) {
+        CB_THR_BEGIN(conn);
+        return;
+    }
+    res->rc = effective_err;
+
+    maybe_push_operr(mres, (pycbc_Result*)res, effective_err, 0);
+    CB_THR_BEGIN(conn);
+}
+
+static void
 store_callback(lcb_t instance,
                const void *cookie,
                lcb_storage_t op,
@@ -227,10 +263,11 @@ store_callback(lcb_t instance,
                             err,
                             &conn,
                             (pycbc_Result**)&res,
-                            RESTYPE_OPERATION,
+                            RESTYPE_OPERATION|RESTYPE_VARCOUNT,
                             &mres);
 
     if (rv == -1) {
+        maybe_breakout(conn);
         CB_THR_BEGIN(conn);
         return;
     }
@@ -238,6 +275,31 @@ store_callback(lcb_t instance,
     res->rc = err;
     res->cas = resp->v.v0.cas;
     maybe_push_operr(mres, (pycbc_Result*)res, err, 0);
+
+    if (err == LCB_SUCCESS && (mres->mropts & PYCBC_MRES_F_DURABILITY)) {
+        lcb_durability_opts_t dopts = { 0 };
+        lcb_durability_cmd_t dcmd = { 0 };
+        lcb_durability_cmd_t *dcmd_p = &dcmd;
+
+        dopts.v.v0.persist_to = mres->durability_reqs[0];
+        dopts.v.v0.replicate_to = mres->durability_reqs[1];
+        dcmd.v.v0.cas = resp->v.v0.cas;
+        dcmd.v.v0.key = resp->v.v0.key;
+        dcmd.v.v0.nkey = resp->v.v0.nkey;
+
+        err = lcb_durability_poll(instance,
+                                  mres,
+                                  &dopts,
+                                  1,
+                                  (const lcb_durability_cmd_t * const *)&dcmd_p);
+        if (err != LCB_SUCCESS) {
+            res->rc = err;
+            maybe_push_operr(mres, (pycbc_Result*)res, err, 0);
+        }
+    } else {
+        maybe_breakout(conn);
+    }
+
     CB_THR_BEGIN(conn);
 
     (void)instance;
@@ -571,6 +633,7 @@ pycbc_callbacks_init(lcb_t instance)
     lcb_set_stat_callback(instance, stat_callback);
     lcb_set_error_callback(instance, error_callback);
     lcb_set_observe_callback(instance, observe_callback);
+    lcb_set_durability_callback(instance, durability_callback);
 
     pycbc_http_callbacks_init(instance);
 }

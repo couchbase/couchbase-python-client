@@ -313,6 +313,17 @@ information about things
 
     .. automethod:: observe_multi
 
+Durability Constraints
+======================
+
+Durability constraints ensure safer protection against data loss.
+
+.. currentmodule:: couchbase.connection
+.. class:: Connection
+
+    .. automethod:: endure
+    .. automethod:: endure_multi
+
 Attributes
 ==========
 

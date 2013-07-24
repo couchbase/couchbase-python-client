@@ -27,7 +27,9 @@ import types
 from couchbase.connection import Connection
 from couchbase.exceptions import CouchbaseError
 from couchbase.admin import Admin
-from couchbase.mockserver import CouchbaseMock, BucketSpec
+from couchbase.mockserver import (
+    CouchbaseMock, BucketSpec, MockControlClient)
+
 from couchbase._pyport import basestring
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'tests.ini')
@@ -201,3 +203,10 @@ class ConnectionTestCase(CouchbaseTestCase):
         oldrc = sys.getrefcount(self.cb)
         self.assertEqual(oldrc, 2)
         del self.cb
+
+# Class which sets up all the necessary Mock stuff
+class MockTestCase(ConnectionTestCase):
+    def setUp(self):
+        super(MockTestCase, self).setUp()
+        self.skipUnlessMock()
+        self.mockclient = MockControlClient(self.mock.rest_port)

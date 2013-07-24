@@ -341,6 +341,8 @@ _LCB_ERRNO_MAP = {
     # LCB.SERVER_BUG,
     C.LCB_INVALID_HOST_FORMAT: InvalidError,
     C.LCB_INVALID_CHAR:     InvalidError,
+    C.LCB_DURABILITY_ETOOMANY: ArgumentError,
+    C.LCB_DUPLICATE_COMMANDS: ArgumentError
 }
 
 _EXCTYPE_MAP = {

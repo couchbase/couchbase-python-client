@@ -37,7 +37,8 @@
     X(lcb_unlock_cmd_t, unlock) \
     X(lcb_server_stats_cmd_t, stats) \
     X(lcb_observe_cmd_t, obs) \
-    X(lcb_get_replica_cmd_t, replica)
+    X(lcb_get_replica_cmd_t, replica) \
+    X(lcb_durability_cmd_t, durability)
 
 /**
  * Union for 'common_vars'; actual commands
@@ -379,6 +380,8 @@ PYCBC_DECL_OP(delete_multi);
 PYCBC_DECL_OP(unlock_multi);
 
 PYCBC_DECL_OP(_stats);
+
+PYCBC_DECL_OP(endure_multi);
 
 
 /* get.c */

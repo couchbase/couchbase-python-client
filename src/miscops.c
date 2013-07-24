@@ -44,7 +44,8 @@ handle_single_keyop(pycbc_Connection *self,
     size_t nkey;
     lcb_uint64_t cas = 0;
 
-    if (optype == PYCBC_CMD_UNLOCK && PYCBC_OPRES_CHECK(curkey)) {
+    if ( (optype == PYCBC_CMD_UNLOCK || optype == PYCBC_CMD_ENDURE)
+            && PYCBC_OPRES_CHECK(curkey)) {
         curval = curkey;
         curkey = ((pycbc_OperationResult*)curkey)->key;
     }
@@ -103,6 +104,14 @@ handle_single_keyop(pycbc_Connection *self,
         ucmd->v.v0.cas = cas;
         cv->cmdlist.unlock[ii] = ucmd;
 
+        return 0;
+
+    } else if (optype == PYCBC_CMD_ENDURE) {
+        lcb_durability_cmd_t *dcmd = cv->cmds.durability + ii;
+        dcmd->v.v0.cas = cas;
+        dcmd->v.v0.key = key;
+        dcmd->v.v0.nkey = nkey;
+        cv->cmdlist.durability[ii] = dcmd;
         return 0;
 
     } else {
@@ -210,6 +219,91 @@ keyop_common(pycbc_Connection *self,
 }
 
 
+PyObject *
+pycbc_Connection_endure_multi(pycbc_Connection *self,
+                              PyObject *args,
+                              PyObject *kwargs)
+{
+    int rv;
+    Py_ssize_t ncmds;
+    pycbc_seqtype_t seqtype;
+    char persist_to = 0, replicate_to = 0;
+    lcb_durability_opts_t dopts = { 0 };
+    PyObject *keys;
+    PyObject *is_delete_O = Py_False;
+    lcb_error_t err;
+    float timeout = 0.0;
+    float interval = 0.0;
+
+    struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
+
+    static char *kwlist[] = {
+            "keys",
+            "persist_to",
+            "replicate_to",
+            "check_removed",
+            "timeout",
+            "interval",
+            NULL
+    };
+
+    rv = PyArg_ParseTupleAndKeywords(args,
+                                     kwargs,
+                                     "OBB|Off",
+                                     kwlist,
+                                     &keys,
+                                     &persist_to,
+                                     &replicate_to,
+                                     &is_delete_O,
+                                     &timeout,
+                                     &interval);
+    if (!rv) {
+        PYCBC_EXCTHROW_ARGS();
+        return NULL;
+    }
+
+    rv = pycbc_oputil_check_sequence(keys, 1, &ncmds, &seqtype);
+    if (rv < 0) {
+        return NULL;
+    }
+    rv = pycbc_common_vars_init(&cv, self, PYCBC_ARGOPT_MULTI, ncmds,
+                                sizeof(lcb_durability_cmd_t), 0);
+    if (rv < 0) {
+        return NULL;
+    }
+
+    rv = pycbc_oputil_iter_multi(self, seqtype, keys, &cv, PYCBC_CMD_ENDURE,
+                                 handle_single_keyop, NULL);
+    if (rv < 0) {
+        goto GT_DONE;
+    }
+
+    dopts.v.v0.cap_max = persist_to < 0 || replicate_to < 0;
+    dopts.v.v0.check_delete = is_delete_O && PyObject_IsTrue(is_delete_O);
+    dopts.v.v0.timeout = (lcb_uint32_t)(timeout * 1000000.0);
+    dopts.v.v0.interval = (lcb_uint32_t)(interval * 1000000.0);
+    dopts.v.v0.persist_to = persist_to;
+    dopts.v.v0.replicate_to = replicate_to;
+
+    err = lcb_durability_poll(self->instance,
+                              cv.mres,
+                              &dopts,
+                              ncmds,
+                              cv.cmdlist.durability);
+
+    if (err != LCB_SUCCESS) {
+        PYCBC_EXCTHROW_SCHED(err);
+        goto GT_DONE;
+    }
+    if (-1 == pycbc_common_vars_wait(&cv, self)) {
+        goto GT_DONE;
+    }
+
+    GT_DONE:
+    pycbc_common_vars_finalize(&cv, self);
+    return cv.ret;
+
+}
 
 #define DECLFUNC(name, operation, mode) \
     PyObject *pycbc_Connection_##name(pycbc_Connection *self, \

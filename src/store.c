@@ -179,32 +179,44 @@ set_common(pycbc_Connection *self,
     pycbc_seqtype_t seqtype;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
     struct storecmd_vars scv = { 0 };
+    char persist_to = 0, replicate_to = 0;
 
 
-    static char *kwlist_multi[] = { "kv", "ttl", "format", NULL };
-    static char *kwlist_single[] = { "key", "value", "cas", "ttl", "format", NULL };
+    static char *kwlist_multi[] = {
+            "kv", "ttl", "format",
+            "persist_to", "replicate_to",
+            NULL
+    };
+
+    static char *kwlist_single[] = {
+            "key", "value", "cas", "ttl", "format",
+            "persist_to", "replicate_to",
+            NULL
+    };
 
     scv.operation = operation;
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
         rv = PyArg_ParseTupleAndKeywords(args,
                                          kwargs,
-                                         "O|OO",
+                                         "O|OOBB",
                                          kwlist_multi,
                                          &dict,
                                          &ttl_O,
-                                         &scv.flagsobj);
+                                         &scv.flagsobj,
+                                         &persist_to, &replicate_to);
 
     } else {
         rv = PyArg_ParseTupleAndKeywords(args,
                                          kwargs,
-                                         "OO|KOO",
+                                         "OO|KOOBB",
                                          kwlist_single,
                                          &key,
                                          &value,
                                          &single_cas,
                                          &ttl_O,
-                                         &scv.flagsobj);
+                                         &scv.flagsobj,
+                                         &persist_to, &replicate_to);
     }
 
     if (!rv) {
@@ -245,6 +257,19 @@ set_common(pycbc_Connection *self,
                                 1);
     if (rv < 0) {
         return NULL;
+    }
+
+    if (persist_to || replicate_to) {
+        unsigned int nreplicas = lcb_get_num_replicas(self->instance);
+        cv.mres->mropts |= PYCBC_MRES_F_DURABILITY;
+        cv.mres->durability_reqs[0] = persist_to;
+        cv.mres->durability_reqs[1] = replicate_to;
+        if (replicate_to > nreplicas || persist_to > (nreplicas+1)) {
+            PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR,
+                           LCB_DURABILITY_ETOOMANY,
+                           "Durability requirements will never be satisfied");
+            return NULL;
+        }
     }
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
