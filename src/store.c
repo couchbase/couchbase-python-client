@@ -62,24 +62,21 @@ handle_single_kv(pycbc_Connection *self,
         opval = itm->value;
         lcb_cas_t itmcas = itm->cas;
 
-        if (!opval) {
-            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS,
-                               0, "Value is empty", curvalue);
-            return -1;
-        }
-
         if (options) {
             PyObject *ttl_O = NULL, *flagsobj_Oalt = NULL, *igncas_O = NULL;
+            PyObject *frag_O = NULL;
+
             static char *itm_optlist[] = {
-                    "ttl", "format", "ignore_cas", NULL };
+                    "ttl", "format", "ignore_cas", "fragment", NULL };
 
             rv = PyArg_ParseTupleAndKeywords(pycbc_DummyTuple,
                                              options,
-                                             "|OOO",
+                                             "|OOOO",
                                              itm_optlist,
                                              &ttl_O,
                                              &flagsobj_Oalt,
-                                             &igncas_O);
+                                             &igncas_O,
+                                             &frag_O);
             if (!rv) {
                 PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
                                "Couldn't parse item options");
@@ -103,7 +100,41 @@ handle_single_kv(pycbc_Connection *self,
             if (igncas_O && PyObject_IsTrue(igncas_O)) {
                 itmcas = 0;
             }
+
+            if (frag_O == NULL) {
+                if (scv->operation == LCB_APPEND || scv->operation == LCB_PREPEND) {
+                    PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
+                                   "append/prepend must provide options with 'fragment' "
+                                   "specifier");
+                    return -1;
+                }
+
+            } else {
+                if (scv->operation != LCB_APPEND && scv->operation != LCB_PREPEND) {
+                    PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
+                                   "'fragment' only valid for append/prepend");
+                    return -1;
+                }
+
+                opval = frag_O;
+            }
+
+        } else {
+            if (scv->operation == LCB_APPEND || scv->operation == LCB_PREPEND) {
+                PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
+                               "append/prepend must provide options "
+                               "with 'fragment' specifier");
+                return -1;
+            }
         }
+
+        if (!opval) {
+            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS,
+                               0, "Value is empty", curvalue);
+            return -1;
+        }
+
+
         cas = itmcas;
     }
 

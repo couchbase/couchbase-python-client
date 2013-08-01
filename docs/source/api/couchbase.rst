@@ -313,6 +313,19 @@ information about things
 
     .. automethod:: observe_multi
 
+Item API Methods
+================
+
+These methods are specifically for the :class:`~couchbase.items.Item`
+API. Most of the `multi` methods will accept `Item` objects as well,
+however there are some special methods for this interface
+
+.. currentmodule:: couchbase.connection
+.. class:: Connection
+
+    .. automethod:: append_items
+    .. automethod:: prepend_items
+
 Durability Constraints
 ======================
 

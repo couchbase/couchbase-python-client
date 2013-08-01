@@ -820,7 +820,15 @@ class Connection(_Base):
     def append_multi(self, keys, ttl=0, format=None,
                      persist_to=0, replicate_to=0):
         """Append to multiple keys.
-        Multi variant of :meth:`append`
+        Multi variant of :meth:`append`.
+
+
+        .. warning::
+
+            If using the `Item` interface, use the :meth:`append_items`
+            and :meth:`prepend_items` instead, as those will automatically
+            update the :attr:`couchbase.items.Item.value` property upon
+            successful completion.
 
         .. seealso:: :meth:`append`, :meth:`set_multi`, :meth:`set`
 
@@ -1298,3 +1306,46 @@ class Connection(_Base):
                          nodes=self.server_nodes,
                          bucket=self.bucket,
                          oid=id(self))
+
+
+    # "items" interface
+    def append_items(self, items, **kwargs):
+        """
+        Method to append data to multiple :class:`~couchbase.items.Item` objects.
+
+        This method differs from the normal :meth:`append_multi` in that each
+        `Item`'s `value` field is updated with the appended data upon successful
+        completion of the operation.
+
+        :param items: The item dictionary. The value for each key should contain
+          a ``fragment`` field containing the object to append to the value on
+          the server.
+
+        :type items: :class:`~couchbase.items.ItemOptionDict`.
+
+        The rest of the options are passed verbatim to :meth:`append_multi`
+
+        .. seealso:: :meth:`append_multi`, :meth:`append`
+        """
+        rv = self.append_multi(items, **kwargs)
+        # Assume this is an 'ItemOptionDict'
+        for k, v in items.dict.items():
+            if k.success:
+                k.value += v["fragment"]
+
+        return rv
+
+    def prepend_items(self, items, **kwargs):
+        """
+        Method to prepend data to multiple :class:`~couchbase.items.Item` objects.
+
+        See :meth:`append_items` for more information
+
+        .. seealso:: :meth:`append_items`
+        """
+        rv = self.prepend_multi(items, **kwargs)
+        for k, v in items.dict.items():
+            if k.success:
+                k.value = v["fragment"] + k.value
+
+        return rv

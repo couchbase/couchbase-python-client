@@ -17,8 +17,8 @@
 
 from tests.base import ConnectionTestCase
 from couchbase.items import Item, ItemSequence, ItemOptionDict
-from couchbase.exceptions import NotFoundError, ValueFormatError
-from couchbase.user_constants import FMT_BYTES
+from couchbase.exceptions import NotFoundError, ValueFormatError, ArgumentError
+from couchbase.user_constants import FMT_BYTES, FMT_UTF8
 
 class ConnectionItemTest(ConnectionTestCase):
     """
@@ -79,3 +79,31 @@ class ConnectionItemTest(ConnectionTestCase):
         itcoll = ItemOptionDict()
         itcoll.dict[it] = { "format" : FMT_BYTES }
         self.assertRaises(ValueFormatError, self.cb.set_multi, itcoll)
+
+    def test_items_append(self):
+        k = self.gen_key("itm_append")
+        it = Item()
+        it.key = k
+        it.value = "MIDDLE"
+        itcoll = ItemOptionDict()
+        itcoll.add(it)
+
+        self.cb.set_multi(itcoll, format=FMT_UTF8)
+
+        itcoll.add(it, fragment="_END")
+        self.cb.append_items(itcoll, format=FMT_UTF8)
+        self.assertEqual(it.value, "MIDDLE_END")
+
+        itcoll.add(it, fragment="BEGIN_")
+        self.cb.prepend_items(itcoll, format=FMT_UTF8)
+        self.assertEqual(it.value, "BEGIN_MIDDLE_END")
+
+        rv = self.cb.get(it.key)
+        self.assertEqual(rv.value, "BEGIN_MIDDLE_END")
+
+        # Try without a 'fragment' specifier
+        self.assertRaises(ArgumentError,
+                          self.cb.append_items, ItemSequence([it]))
+        itcoll.add(it)
+        self.assertRaises(ArgumentError,
+                          self.cb.append_items, itcoll)
