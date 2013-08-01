@@ -77,7 +77,11 @@ Class Reference
 .. autoclass:: Item
     :members:
 
+.. autoclass:: ItemCollection
+
 .. autoclass:: ItemOptionDict
+    :show-inheritance:
     :members:
 
 .. autoclass:: ItemSequence
+    :show-inheritance:

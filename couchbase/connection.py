@@ -763,7 +763,15 @@ class Connection(_Base):
 
         :param dict keys: A dictionary of keys to set. The keys are the keys
           as they should be on the server, and the values are the values for
-          the keys to be stored
+          the keys to be stored.
+
+
+          From version 1.1.0, `keys` may also be a
+          :class:`~couchbase.items.ItemCollection`. If using a dictionary
+          variant for item collections, an additional `ignore_cas` parameter
+          may be supplied with a boolean value. If not specified, the operation
+          will fail if the CAS value on the server does not match the one
+          specified in the `Item`'s `cas` field.
 
         :param int ttl: If specified, sets the expiration value for all
           keys

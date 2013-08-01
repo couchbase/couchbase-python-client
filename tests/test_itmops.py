@@ -17,7 +17,8 @@
 
 from tests.base import ConnectionTestCase
 from couchbase.items import Item, ItemSequence, ItemOptionDict
-from couchbase.exceptions import NotFoundError, ValueFormatError, ArgumentError
+from couchbase.exceptions import (
+    NotFoundError, ValueFormatError, ArgumentError, KeyExistsError)
 from couchbase.user_constants import FMT_BYTES, FMT_UTF8
 
 class ConnectionItemTest(ConnectionTestCase):
@@ -107,3 +108,27 @@ class ConnectionItemTest(ConnectionTestCase):
         itcoll.add(it)
         self.assertRaises(ArgumentError,
                           self.cb.append_items, itcoll)
+
+    def test_items_ignorecas(self):
+        k = self.gen_key("itm_ignorecas")
+        it = Item()
+        it.key = k
+        it.value = "a value"
+        itcoll = ItemOptionDict()
+        itcoll.add(it)
+        self.cb.set_multi(itcoll)
+        self.assertTrue(it.cas)
+
+        # Set it again
+        rv = self.cb.set(it.key, it.value)
+        self.assertTrue(rv.cas)
+        self.assertFalse(rv.cas == it.cas)
+
+        # Should raise an error without ignore_cas
+        self.assertRaises(KeyExistsError, self.cb.set_multi, itcoll)
+        self.assertTrue(it.cas)
+
+        itcoll.add(it, ignore_cas=True)
+        self.cb.set_multi(itcoll)
+        rv = self.cb.get(it.key)
+        self.assertEqual(rv.cas, it.cas)
