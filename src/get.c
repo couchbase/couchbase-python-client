@@ -184,7 +184,7 @@ static int handle_replica_options(int *optype,
                            0, "rgetix must have a valid replica index");
             return -1;
         }
-        gv->u.replica.index = pycbc_IntAsL(replica_O);
+        gv->u.replica.index = (short)pycbc_IntAsL(replica_O);
         if (PyErr_Occurred()) {
             return -1;
         }

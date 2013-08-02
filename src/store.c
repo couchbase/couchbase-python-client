@@ -59,8 +59,8 @@ handle_single_kv(pycbc_Connection *self,
     }
 
     if (itm) {
-        opval = itm->value;
         lcb_cas_t itmcas = itm->cas;
+        opval = itm->value;
 
         if (options) {
             PyObject *ttl_O = NULL, *flagsobj_Oalt = NULL, *igncas_O = NULL;
@@ -291,7 +291,7 @@ set_common(pycbc_Connection *self,
     }
 
     if (persist_to || replicate_to) {
-        unsigned int nreplicas = lcb_get_num_replicas(self->instance);
+        int nreplicas = lcb_get_num_replicas(self->instance);
         cv.mres->mropts |= PYCBC_MRES_F_DURABILITY;
         cv.mres->durability_reqs[0] = persist_to;
         cv.mres->durability_reqs[1] = replicate_to;
