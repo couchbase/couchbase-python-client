@@ -54,6 +54,7 @@ else:
     #extoptions['extra_link_args'] = ['/DEBUG']
     extoptions['library_dirs'] = [os.path.join(lcb_root, 'lib')]
     extoptions['include_dirs'] = [os.path.join(lcb_root, 'include')]
+    extoptions['define_macros'] = [('_CRT_SECURE_NO_WARNINGS', 1)]
     pkgdata['couchbase'] = ['libcouchbase.dll']
 
 
