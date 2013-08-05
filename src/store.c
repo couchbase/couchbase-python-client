@@ -22,6 +22,98 @@ struct storecmd_vars {
     PyObject *flagsobj;
 };
 
+struct single_key_context {
+    PyObject *value;
+    PyObject *flagsobj;
+    lcb_uint64_t cas;
+    unsigned long ttl;
+
+};
+
+static int handle_item_kv(pycbc_Item *itm,
+                          PyObject *options,
+                          const struct storecmd_vars *scv,
+                          struct single_key_context *skc)
+{
+    int rv;
+    PyObject *ttl_O = NULL, *flagsobj_Oalt = NULL, *igncas_O = NULL;
+    PyObject *frag_O = NULL;
+    static char *itm_optlist[] = {
+            "ttl", "format", "ignore_cas", "fragment", NULL };
+
+    lcb_cas_t itmcas = itm->cas;
+    skc->value = itm->value;
+
+    if (options) {
+        rv = PyArg_ParseTupleAndKeywords(pycbc_DummyTuple,
+                                         options,
+                                         "|OOOO",
+                                         itm_optlist,
+                                         &ttl_O,
+                                         &flagsobj_Oalt,
+                                         &igncas_O,
+                                         &frag_O);
+        if (!rv) {
+            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
+                           "Couldn't parse item options");
+            return -1;
+        }
+
+        if (ttl_O) {
+            if (-1 == pycbc_get_ttl(ttl_O, &skc->ttl, 1)) {
+                return -1;
+            }
+
+            if (!skc->ttl) {
+                skc->ttl = scv->ttl;
+            }
+        }
+
+        if (flagsobj_Oalt && flagsobj_Oalt != Py_None) {
+            skc->flagsobj = flagsobj_Oalt;
+        }
+
+        if (igncas_O && PyObject_IsTrue(igncas_O)) {
+            itmcas = 0;
+        }
+
+        if (frag_O == NULL) {
+            if (scv->operation == LCB_APPEND || scv->operation == LCB_PREPEND) {
+                PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
+                               "append/prepend must provide options with 'fragment' "
+                               "specifier");
+                return -1;
+            }
+
+        } else {
+            if (scv->operation != LCB_APPEND && scv->operation != LCB_PREPEND) {
+                PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
+                               "'fragment' only valid for append/prepend");
+                return -1;
+            }
+
+            skc->value = frag_O;
+        }
+
+    } else {
+        if (scv->operation == LCB_APPEND || scv->operation == LCB_PREPEND) {
+            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
+                           "append/prepend must provide options "
+                           "with 'fragment' specifier");
+            return -1;
+        }
+    }
+
+    if (!skc->value) {
+        PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS,
+                           0, "Value is empty", skc->value);
+        return -1;
+    }
+
+    skc->cas = itmcas;
+    return 0;
+}
+
 static int
 handle_single_kv(pycbc_Connection *self,
                  struct pycbc_common_vars *cv,
@@ -35,12 +127,14 @@ handle_single_kv(pycbc_Connection *self,
 {
     int rv;
     lcb_store_cmd_t *scmd;
-
-    PyObject *opval = curvalue;
-    lcb_uint64_t cas = 0;
     const struct storecmd_vars *scv = (struct storecmd_vars *)arg;
-    unsigned long cur_ttl = scv->ttl;
-    PyObject *flagsobj = scv->flagsobj;
+    struct single_key_context skc;
+
+    skc.ttl = scv->ttl;
+    skc.flagsobj = scv->flagsobj;
+    skc.value = curvalue;
+    skc.cas = 0;
+
     scmd = cv->cmds.store + ii;
 
     rv = pycbc_tc_encode_key(self,
@@ -59,88 +153,15 @@ handle_single_kv(pycbc_Connection *self,
     }
 
     if (itm) {
-        lcb_cas_t itmcas = itm->cas;
-        opval = itm->value;
-
-        if (options) {
-            PyObject *ttl_O = NULL, *flagsobj_Oalt = NULL, *igncas_O = NULL;
-            PyObject *frag_O = NULL;
-
-            static char *itm_optlist[] = {
-                    "ttl", "format", "ignore_cas", "fragment", NULL };
-
-            rv = PyArg_ParseTupleAndKeywords(pycbc_DummyTuple,
-                                             options,
-                                             "|OOOO",
-                                             itm_optlist,
-                                             &ttl_O,
-                                             &flagsobj_Oalt,
-                                             &igncas_O,
-                                             &frag_O);
-            if (!rv) {
-                PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
-                               "Couldn't parse item options");
-                return -1;
-            }
-
-            if (ttl_O) {
-                if (-1 == pycbc_get_ttl(ttl_O, &cur_ttl, 1)) {
-                    return -1;
-                }
-
-                if (!cur_ttl) {
-                    cur_ttl = scv->ttl;
-                }
-            }
-
-            if (flagsobj_Oalt && flagsobj_Oalt != Py_None) {
-                flagsobj = flagsobj_Oalt;
-            }
-
-            if (igncas_O && PyObject_IsTrue(igncas_O)) {
-                itmcas = 0;
-            }
-
-            if (frag_O == NULL) {
-                if (scv->operation == LCB_APPEND || scv->operation == LCB_PREPEND) {
-                    PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
-                                   "append/prepend must provide options with 'fragment' "
-                                   "specifier");
-                    return -1;
-                }
-
-            } else {
-                if (scv->operation != LCB_APPEND && scv->operation != LCB_PREPEND) {
-                    PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
-                                   "'fragment' only valid for append/prepend");
-                    return -1;
-                }
-
-                opval = frag_O;
-            }
-
-        } else {
-            if (scv->operation == LCB_APPEND || scv->operation == LCB_PREPEND) {
-                PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
-                               "append/prepend must provide options "
-                               "with 'fragment' specifier");
-                return -1;
-            }
-        }
-
-        if (!opval) {
-            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS,
-                               0, "Value is empty", curvalue);
+        rv = handle_item_kv(itm, options, scv, &skc);
+        if (rv < 0) {
             return -1;
         }
-
-
-        cas = itmcas;
     }
 
     rv = pycbc_tc_encode_value(self,
-                               &opval,
-                               flagsobj,
+                               &skc.value,
+                               skc.flagsobj,
                                (void**)&scmd->v.v0.bytes,
                                &scmd->v.v0.nbytes,
                                &scmd->v.v0.flags);
@@ -149,9 +170,9 @@ handle_single_kv(pycbc_Connection *self,
     }
 
     scmd->v.v0.operation = scv->operation;
-    scmd->v.v0.cas = cas;
-    scmd->v.v0.exptime = cur_ttl;
-    cv->encvals[ii] = opval;
+    scmd->v.v0.cas = skc.cas;
+    scmd->v.v0.exptime = skc.ttl;
+    cv->encvals[ii] = skc.value;
     cv->cmdlist.store[ii] = scmd;
     return 0;
 }
