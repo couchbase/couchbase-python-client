@@ -27,9 +27,7 @@ class ConnectionItemTest(ConnectionTestCase):
     """
     def test_construction(self):
         # Test whether we can construct a simple Item
-        it = Item()
-        it.key = "some_key"
-        it.value = "some_value"
+        it = Item("some_key", "some_value")
         it.cas = 123456
         it.flags = 1000
 
@@ -41,10 +39,7 @@ class ConnectionItemTest(ConnectionTestCase):
 
     def test_simple_get(self):
         k = self.gen_key("itm_simple_get")
-
-        it = Item()
-        it.key = k
-        it.value = "simple_value"
+        it = Item(k, "simple_value")
 
         rvs = self.cb.set_multi(ItemSequence([it]))
         self.assertTrue(rvs.all_ok)
@@ -74,18 +69,14 @@ class ConnectionItemTest(ConnectionTestCase):
     def test_item_format(self):
         # Tests whether things like 'CAS' and 'format' are honored
         k = self.gen_key("itm_format_options")
-        it = Item()
-        it.key = k
-        it.value = {}
+        it = Item(k, {})
         itcoll = ItemOptionDict()
         itcoll.dict[it] = { "format" : FMT_BYTES }
         self.assertRaises(ValueFormatError, self.cb.set_multi, itcoll)
 
     def test_items_append(self):
         k = self.gen_key("itm_append")
-        it = Item()
-        it.key = k
-        it.value = "MIDDLE"
+        it = Item(k, "MIDDLE")
         itcoll = ItemOptionDict()
         itcoll.add(it)
 
@@ -111,9 +102,7 @@ class ConnectionItemTest(ConnectionTestCase):
 
     def test_items_ignorecas(self):
         k = self.gen_key("itm_ignorecas")
-        it = Item()
-        it.key = k
-        it.value = "a value"
+        it = Item(k, "a value")
         itcoll = ItemOptionDict()
         itcoll.add(it)
         self.cb.set_multi(itcoll)
@@ -132,3 +121,23 @@ class ConnectionItemTest(ConnectionTestCase):
         self.cb.set_multi(itcoll)
         rv = self.cb.get(it.key)
         self.assertEqual(rv.cas, it.cas)
+
+
+    def test_subclass_descriptors(self):
+        class MyItem(Item):
+            def __init__(self):
+                pass
+            @property
+            def value(self):
+                return "This should not be present!!!"
+            @value.setter
+            def value(self, other):
+                return
+
+        k = self.gen_key("itm_desc")
+        it = MyItem()
+        it.key = k
+        it.value = "hi!"
+        self.assertRaises(ArgumentError,
+                          self.cb.set_multi,
+                          ItemSequence([it]))

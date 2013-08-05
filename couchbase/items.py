@@ -23,7 +23,51 @@
 # The CAS, Format, and Value are all expected to be inside the Item itself;
 
 
-from couchbase._libcouchbase import Item
+from couchbase._libcouchbase import Item as _Item
+
+class Item(_Item):
+    def __init__(self, key=None, value=None):
+        """
+        Construct a new `Item` object.
+
+        :param string key: The key to initialize this item with
+        :param object value: The value to initialize this item with
+
+        The `Item` class is a sublcass of a
+        :class:`~couchbase.result.ValueResult`.
+        Its members are all writeable and accessible from this object.
+
+        .. warning::
+
+            As the item build-in properties (such as ``key``, ``value``,
+            ``cas``, etc.)
+            are implemented directly in C and are not exposed in the item's
+            ``__dict__`` field, you cannot override these fields in a subclass
+            to be a ``property`` or some other custom data descriptor.
+
+            To confuse matters even more, if you do implement these properties
+            as descriptors, they will be visible from your own code, but *not*
+            from the implementation code. You have been warned.
+
+            In short, don't override these properties.
+
+            Here's an example of what you should *not* do::
+
+                class MyItem(Item):
+                    # ...
+                    @property
+                    def key(self):
+                        return self._key
+
+                    @key.setter
+                    def key(self, newkey):
+                        self._key = key
+
+        """
+
+        super(Item, self).__init__()
+        self.key = key
+        self.value = value
 
 class ItemCollection(object):
     """
@@ -59,9 +103,9 @@ class ItemOptionDict(ItemCollection):
         Convenience method to add an item together with a series of options.
 
         :param itm: The item to add
-        :param options: keyword arguments which will be placed in the item's 
+        :param options: keyword arguments which will be placed in the item's
             option entry.
-        
+
         If the item already exists, it (and its options) will be overidden. Use
         :attr:`dict` instead to update options
 
