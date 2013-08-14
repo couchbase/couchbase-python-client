@@ -47,6 +47,14 @@ Some of the multi methods accept keyword arguments; these arguments apply to
 *all* the keys within the iterable passed.
 
 
+Starting in version 1.1.0, you can pass an
+:class:`~couchbase.items.ItemCollection` as the ``keys`` or ``kv`` parameter.
+The `Item` interfaces allows in-place modifications to an object across multiple
+operations avoiding the need for copying the result into your own data structure.
+
+See the documentation for :class:`~couchbase.items.Item` for more information.
+
+
 .. _format_info:
 
 Key and Value Format
