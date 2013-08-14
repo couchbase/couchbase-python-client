@@ -791,7 +791,7 @@ class Connection(_Base):
           using these parameters for a high volume of keys. Using these
           parameters however does save on latency as the constraint checking
           for each item is performed as soon as it is successfully stored.
- 
+
         :param int replicate_to: Durability constraints for replication.
           See notes on the `persist_to` parameter for usage.
 
@@ -1362,3 +1362,10 @@ class Connection(_Base):
                 k.value = v["fragment"] + k.value
 
         return rv
+
+    @property
+    def closed(self):
+        """
+        Returns True if the object has been closed with :meth:`_close`
+        """
+        return self._privflags & _LCB.PYCBC_CONN_F_CLOSED

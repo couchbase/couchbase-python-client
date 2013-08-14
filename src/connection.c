@@ -181,6 +181,30 @@ Connection__thr_lockop(pycbc_Connection *self, PyObject *arg)
     Py_RETURN_NONE;
 }
 
+static PyObject *
+Connection__close(pycbc_Connection *self)
+{
+    lcb_error_t err;
+
+    if (self->flags & PYCBC_CONN_F_CLOSED) {
+        Py_RETURN_NONE;
+    }
+
+    self->flags |= PYCBC_CONN_F_CLOSED;
+
+    lcb_destroy(self->instance);
+    err = lcb_create(&self->instance, NULL);
+    pycbc_assert(err == LCB_SUCCESS);
+    if (err != LCB_SUCCESS) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR,
+                       err,
+                       "Internal error while closing object");
+        return NULL;
+    }
+
+    Py_RETURN_NONE;
+}
+
 
 static PyGetSetDef Connection_TABLE_getset[] = {
         { "timeout",
@@ -343,6 +367,17 @@ static PyMethodDef Connection_TABLE_methods[] = {
                 METH_VARARGS,
                 PyDoc_STR("Unconditionally lock/unlock the connection object "
                         "if 'lockmode' has been set. For testing uses only")
+        },
+
+        { "_close",
+                (PyCFunction)Connection__close,
+                METH_NOARGS,
+                PyDoc_STR(
+                "Close the instance's underlying socket resources\n"
+                "\n"
+                "Note that operations pending on the connection may\n"
+                "fail.\n"
+                "\n")
         },
 
         { NULL, NULL, 0, NULL }

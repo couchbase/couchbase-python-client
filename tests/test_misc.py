@@ -19,6 +19,7 @@ from tests.base import ConnectionTestCase
 
 from couchbase.connection import Connection
 from couchbase.user_constants import FMT_JSON
+from couchbase.exceptions import ClientTemporaryFailError
 from couchbase import Couchbase
 
 class ConnectionMiscTest(ConnectionTestCase):
@@ -67,3 +68,10 @@ class ConnectionMiscTest(ConnectionTestCase):
 
             actual = getattr(cb_connect, option)
             self.assertEqual(actual, value)
+
+    def test_closed(self):
+        cb = self.cb
+        self.assertFalse(cb.closed)
+        cb._close()
+        self.assertTrue(cb.closed)
+        self.assertRaises(ClientTemporaryFailError, self.cb.get, "foo")

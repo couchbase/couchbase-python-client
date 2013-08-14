@@ -219,7 +219,8 @@ typedef enum {
 
 enum {
     PYCBC_CONN_F_WARNEXPLICIT = 1 << 0,
-    PYCBC_CONN_F_USEITEMRESULT = 1 << 1
+    PYCBC_CONN_F_USEITEMRESULT = 1 << 1,
+    PYCBC_CONN_F_CLOSED = 1 << 2
     /** more flags will follow.. */
 };
 

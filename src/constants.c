@@ -32,6 +32,7 @@
     X(ERANGE) \
     X(ERROR) \
     X(ETMPFAIL) \
+    X(CLIENT_ETMPFAIL) \
     X(KEY_EEXISTS) \
     X(KEY_ENOENT) \
     X(DLOPEN_FAILED) \
@@ -128,6 +129,7 @@ pycbc_init_pyconstants(PyObject *module)
     PyModule_AddIntConstant(module, "LOCKMODE_NONE", PYCBC_LOCKMODE_NONE);
 
     PyModule_AddIntMacro(module, PYCBC_CONN_F_WARNEXPLICIT);
+    PyModule_AddIntMacro(module, PYCBC_CONN_F_CLOSED);
     PyModule_AddIntMacro(module, PYCBC_EVACTION_WATCH);
     PyModule_AddIntMacro(module, PYCBC_EVACTION_UNWATCH);
     PyModule_AddIntMacro(module, PYCBC_EVACTION_SUSPEND);
