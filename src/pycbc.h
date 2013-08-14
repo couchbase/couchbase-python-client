@@ -555,7 +555,8 @@ extern PyObject *pycbc_ExceptionType;
     X(obsinfo_reprfunc) \
     X(itmcoll_base_type) \
     X(itmopts_dict_type) \
-    X(itmopts_seq_type)
+    X(itmopts_seq_type) \
+    X(fmt_auto)
 
 #define PYCBC_XHELPERS_STRS(X) \
     X(tcname_encode_key, PYCBC_TCNAME_ENCODE_KEY) \
@@ -579,9 +580,6 @@ struct pycbc_helpers_ST {
     #define X(n, s) PyObject *n;
     PYCBC_XHELPERS_STRS(X)
     #undef X
-
-    /** Defined inside the module */
-    PyObject *fmt_auto;
 };
 
 /**

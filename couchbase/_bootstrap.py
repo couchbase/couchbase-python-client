@@ -99,7 +99,11 @@ def _json_encode_wrapper(*args):
     return json.dumps(*args, ensure_ascii=False)
 
 
+class FMT_AUTO_object_not_a_number(object):
+    pass
+
 # TODO: Make this more readable and have PEP8 ignore it.
+_FMT_AUTO = FMT_AUTO_object_not_a_number()
 
 C._init_helpers(result_reprfunc=_result__repr__,
                 fmt_utf8_flags=C.FMT_UTF8,
@@ -116,4 +120,7 @@ C._init_helpers(result_reprfunc=_result__repr__,
                 obsinfo_reprfunc=_observeinfo__repr__,
                 itmcoll_base_type=ItemCollection,
                 itmopts_dict_type=ItemOptionDict,
-                itmopts_seq_type=ItemSequence)
+                itmopts_seq_type=ItemSequence,
+                fmt_auto=_FMT_AUTO)
+
+C.FMT_AUTO = _FMT_AUTO

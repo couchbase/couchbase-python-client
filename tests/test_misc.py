@@ -18,7 +18,7 @@
 from tests.base import ConnectionTestCase
 
 from couchbase.connection import Connection
-from couchbase.user_constants import FMT_JSON
+from couchbase.user_constants import FMT_JSON, FMT_AUTO, FMT_JSON, FMT_PICKLE
 from couchbase.exceptions import ClientTemporaryFailError
 from couchbase import Couchbase
 
@@ -75,3 +75,15 @@ class ConnectionMiscTest(ConnectionTestCase):
         cb._close()
         self.assertTrue(cb.closed)
         self.assertRaises(ClientTemporaryFailError, self.cb.get, "foo")
+
+
+    def test_fmt_args(self):
+        # Regression
+        cb = self.make_connection(default_format=123)
+        self.assertEqual(cb.default_format, 123)
+
+        key = self.gen_key("fmt_auto_ctor")
+        cb = self.make_connection(default_format = FMT_AUTO)
+        cb.set("foo", set([]))
+        rv = cb.get("foo")
+        self.assertEqual(rv.flags, FMT_PICKLE)

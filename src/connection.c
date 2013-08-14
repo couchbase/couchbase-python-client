@@ -55,14 +55,18 @@ Connection_get_format(pycbc_Connection *self, void * unused)
 static int
 Connection_set_format(pycbc_Connection *self, PyObject *value, void *unused)
 {
-    if (!PyNumber_Check(value)) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Format must be a number");
-        return -1;
-    }
+    if (value != pycbc_helpers.fmt_auto) {
+        if (!PyNumber_Check(value)) {
+            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
+                           "Format must be a number");
+            return -1;
+        }
 
-    if (Py_TYPE(value) == &PyBool_Type) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Format must not be a boolean");
-        return -1;
+        if (Py_TYPE(value) == &PyBool_Type) {
+            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
+                           "Format must not be a boolean");
+            return -1;
+        }
     }
 
     Py_XDECREF(self->dfl_fmt);
