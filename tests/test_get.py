@@ -120,56 +120,6 @@ class ConnectionGetTest(ConnectionTestCase):
 
         del cb_exc
 
-    def test_get_noformat(self):
-        k = self.gen_key("get_noformat")
-        self.cb.set(k, {"foo":"bar"}, format=FMT_JSON)
-        rv = self.cb.get(k, no_format=True)
-        self.assertEqual(rv.value, b'{"foo": "bar"}')
-
-        kl = self.gen_key_list(prefix="get_noformat")
-        kv = {}
-        for k in kl:
-            kv[k] = {"foo" : "bar"}
-
-        self.cb.set_multi(kv)
-        rvs = self.cb.get_multi(kv.keys(), no_format=True)
-        for k, v in rvs.items():
-            self.assertEqual(v.value, b'{"foo": "bar"}')
-
-
-    def test_get_format(self):
-
-        raise(SkipTest("get-with-format not implemented"))
-
-        self.cb.set('key_format1', {'some': 'value1'}, format=FMT_JSON)
-        val1 = self.cb.get('key_format1')
-        self.assertEqual(val1, {'some': 'value1'})
-
-        self.cb.set('key_format2', {'some': 'value2'}, format=FMT_PICKLE)
-        val2 = self.cb.get('key_format2')
-        self.assertEqual(val2, {'some': 'value2'})
-
-        self.cb.set('key_format3', b'some value3', format=FMT_BYTES)
-        val3 = self.cb.get('key_format3')
-        self.assertEqual(val3, b'some value3')
-
-
-        self.cb.set('key_format4', {'some': 'value4'}, format=FMT_JSON)
-        val4 = self.cb.get('key_format4', format=FMT_BYTES)
-        self.assertEqual(val4, b'{"some": "value4"}')
-
-        self.cb.set('key_format5', {'some': 'value5'}, format=FMT_PICKLE)
-        val5 = self.cb.get('key_format5', format=FMT_BYTES)
-        self.assertEqual(pickle.loads(val5), {'some': 'value5'})
-
-
-        self.cb.set('key_format6', {'some': 'value6'}, format=FMT_JSON)
-        self.assertRaises(ValueFormatError, self.cb.get, 'key_format6',
-                          format=FMT_PICKLE)
-
-        self.cb.set('key_format7', {'some': 'value7'}, format=FMT_PICKLE)
-        self.assertRaises(ValueFormatError, self.cb.get, 'key_format7',
-                          format=FMT_JSON)
 
     def test_extended_get(self):
         key = self.gen_key(prefix='key_extended')

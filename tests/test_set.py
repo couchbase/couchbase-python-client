@@ -16,10 +16,8 @@
 #
 
 from time import sleep
-import json
-import pickle
 
-from couchbase import FMT_JSON, FMT_PICKLE, FMT_BYTES, FMT_UTF8, FMT_AUTO
+from couchbase import FMT_JSON, FMT_PICKLE, FMT_BYTES, FMT_UTF8
 from couchbase.exceptions import (KeyExistsError, ValueFormatError,
                                   ArgumentError, NotFoundError,
                                   NotStoredError)
@@ -62,66 +60,6 @@ class ConnectionSetTest(ConnectionTestCase):
         # Make sure the key expires
         sleep(3)
         self.assertRaises(NotFoundError, self.cb.get, key)
-
-    def test_set_format(self):
-        key = self.gen_key('set_format')
-        rv1 = self.cb.set(key, {'some': 'value1'}, format=FMT_JSON)
-        self.assertTrue(rv1.cas > 0)
-
-        self.assertRaises(ValueFormatError, self.cb.set,
-                          key, object(), format=FMT_JSON)
-
-        rv3 = self.cb.set(key, {'some': 'value3'},
-                           format=FMT_PICKLE)
-        self.assertTrue(rv3.cas > 0)
-        rv4 = self.cb.set(key, object(), format=FMT_PICKLE)
-        self.assertTrue(rv4.cas > 0)
-
-        self.assertRaises(ValueFormatError, self.cb.set,
-                          key, {'some': 'value5'},
-                          format=FMT_BYTES)
-        self.assertRaises(ValueFormatError, self.cb.set,
-                          key, { 'some' : 'value5.1'},
-                          format=FMT_UTF8)
-
-        rv6 = self.cb.set(key, b'some value6', format=FMT_BYTES)
-        self.assertTrue(rv6.cas > 0)
-
-        rv7 = self.cb.set(key, b"\x42".decode('utf-8'),
-                          format=FMT_UTF8)
-        self.assertTrue(rv7.success)
-
-    def test_set_autoformat(self):
-        key = self.gen_key("set_autoformat")
-        jvals = (None, True, False, {}, [], tuple() )
-        bvals = (b"\x01", bytearray([1,2,3]))
-        uvals = (b"\x42".decode('utf-8'), b'\xea\x80\x80'.decode("utf-8"))
-        pvals = (set([]), object())
-
-        for jv in jvals:
-            self.cb.set(key, jv, format=FMT_AUTO)
-            rv = self.cb.get(key, no_format=True)
-            self.assertEqual(rv.flags, FMT_JSON)
-            # We need 'decode' because Python3's byte type
-            self.assertEqual(rv.value.decode("utf-8"), json.dumps(jv))
-
-        for bv in bvals:
-            self.cb.set(key, bv, format=FMT_AUTO)
-            rv = self.cb.get(key, no_format=True)
-            self.assertEqual(rv.flags, FMT_BYTES)
-            self.assertEqual(rv.value, bv)
-
-        for uv in uvals:
-            self.cb.set(key, uv, format=FMT_AUTO)
-            rv = self.cb.get(key, no_format=True)
-            self.assertEqual(rv.flags, FMT_UTF8)
-            self.assertEqual(rv.value, uv.encode("utf-8"))
-
-        for pv in pvals:
-            self.cb.set(key, pv, format=FMT_AUTO)
-            rv = self.cb.get(key, no_format=True)
-            self.assertEqual(rv.flags, FMT_PICKLE)
-            self.assertEqual(rv.value, pickle.dumps(pv))
 
     def test_set_objects(self):
         key = self.gen_key('set_objects')
