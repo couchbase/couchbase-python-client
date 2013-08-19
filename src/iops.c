@@ -398,14 +398,14 @@ pycbc_iops_new(pycbc_Connection *conn, PyObject *pyio)
     Py_INCREF(pyio);
 
     /**
-     * We create the libevent 'iops' handle and copy over its functionality
-     * from there (if it's not libevent, then it's win32 -- in any event, we
-     * use the default).
+     * We create the select 'iops' handle and copy over its functionality
+     * from there. Now that libcouchbase has the 'select' iops build in, we use
+     * that instead.
      *
      * We discard the default iops loop data at the expense of leaking a
      * dlhandle.
      */
-    options.v.v0.type = LCB_IO_OPS_DEFAULT;
+    options.v.v0.type = LCB_IO_OPS_SELECT;
     err = lcb_create_io_ops(&dfl, &options);
     if (err != LCB_SUCCESS) {
         PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't create IOPS");
