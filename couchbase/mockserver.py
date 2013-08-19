@@ -173,4 +173,4 @@ class CouchbaseMock(object):
         self._invoke()
 
     def stop(self):
-        self._po.kill()
+        self.po.kill()

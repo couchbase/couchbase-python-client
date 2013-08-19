@@ -80,6 +80,12 @@ class CouchbaseTestCase(unittest.TestCase):
 
                 self._setup_mock(mockpath, mockurl)
 
+    @classmethod
+    def teardownClass(self):
+        if self.mock:
+            self.mock.stop()
+        self.mock = None
+
 
 
     def setUp(self):
