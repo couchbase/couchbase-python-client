@@ -118,7 +118,7 @@ int pycbc_get_ttl(PyObject *obj, unsigned long *ttl, int nonzero);
  * @return 0 on success, -1 on failure. On failure, the error indicator is also
  * set
  */
-int pycbc_get_u32(PyObject *obj, unsigned long *out);
+int pycbc_get_u32(PyObject *obj, lcb_uint32_t *out);
 
 /**
  * Converts the object into an PyInt (2.x only) or PyLong (2.x or 3.x)

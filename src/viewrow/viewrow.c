@@ -242,7 +242,7 @@ initial_pop_callback(jsonsl_t jsn,
 {
     lcbex_vrow_ctx_t *ctx = (lcbex_vrow_ctx_t*)jsn->data;
     char *key;
-    int len;
+    unsigned long len;
 
     if (ctx->have_error) {
         return;

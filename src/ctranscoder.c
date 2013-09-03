@@ -73,7 +73,7 @@ decode_key(PyObject *self, PyObject *args)
 static PyObject *
 encode_value(PyObject *self, PyObject *args)
 {
-    unsigned long flags;
+    lcb_uint32_t flags;
     int rv;
     PyObject *vobj;
     PyObject *flagsobj;
@@ -115,7 +115,7 @@ decode_value(PyObject *self, PyObject *args)
     char *buf;
     Py_ssize_t nbuf;
     int rv;
-    unsigned long flags;
+    lcb_uint32_t flags;
 
     rv = PyArg_ParseTuple(args, "OO", &vobj, &flagsobj);
     if (!rv) {

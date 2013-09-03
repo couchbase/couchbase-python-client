@@ -71,7 +71,7 @@ Event_on_ready(pycbc_Event *ev, PyObject *args)
     }
 
     if (ev->type == PYCBC_EVTYPE_IO) {
-        fd = ((pycbc_IOEvent*)ev)->fd;
+        fd = (lcb_socket_t)((pycbc_IOEvent*)ev)->fd;
     }
 
     ev->cb.handler(fd, flags, ev->cb.data);
@@ -82,7 +82,7 @@ static PyObject *
 IOEvent_fileno(pycbc_IOEvent *self, PyObject *args)
 {
     (void)args;
-    return pycbc_IntFromL(self->fd);
+    return pycbc_IntFromL((lcb_socket_t)self->fd);
 }
 
 static PyObject *

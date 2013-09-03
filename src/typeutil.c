@@ -178,7 +178,7 @@ pycbc_get_ttl(PyObject *obj, unsigned long *ttl, int nonzero)
 }
 
 int
-pycbc_get_u32(PyObject *obj, unsigned long *out)
+pycbc_get_u32(PyObject *obj, lcb_uint32_t *out)
 {
 
     unsigned long val = pycbc_IntAsUL(obj);
@@ -198,7 +198,7 @@ pycbc_get_u32(PyObject *obj, unsigned long *out)
     }
 #endif
 
-    *out = val;
+    *out = (lcb_uint32_t)val;
     return 0;
 
 }

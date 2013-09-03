@@ -433,7 +433,7 @@ pycbc_tc_encode_value(pycbc_Connection *conn,
     PyObject *orig_value;
     PyObject *new_value = NULL;
     PyObject *result_tuple = NULL;
-    unsigned long flags_stackval;
+    lcb_uint32_t flags_stackval;
     int rv;
     Py_ssize_t plen;
 
