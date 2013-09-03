@@ -1,11 +1,11 @@
 [node-1]
 host = localhost
 port = 8091
-username = Administrator
+admin_username = Administrator
 
 ; The administrative password. This is the password used to
 ; log into the admin console
-password = opensesame
+admin_password = opensesame
 
 bucket_prefix = default
 ; If a SASL bucket is being used (i.e. buckets are set up

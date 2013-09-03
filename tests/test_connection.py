@@ -30,8 +30,7 @@ class ConnectionTest(CouchbaseTestCase):
     def test_connection_host_port(self):
         cb = Connection(host=self.host,
                         port=self.port,
-                        username=self.username,
-                        password=self.password,
+                        password=self.bucket_password,
                         bucket=self.bucket_prefix)
         # Connection didn't throw an error
         self.assertIsInstance(cb, Connection)
@@ -55,7 +54,6 @@ class ConnectionTest(CouchbaseTestCase):
         connargs = self.make_connargs()
         sasl_params = self.get_sasl_params()
 
-        del connargs['username']
         connargs['bucket'] = sasl_params['bucket']
         connargs['password'] = sasl_params['password']
         cb = Connection(**connargs)
@@ -69,8 +67,7 @@ class ConnectionTest(CouchbaseTestCase):
         self.skipIfMock()
 
         self.assertRaises(AuthError, Connection,
-                          **self.make_connargs(username='bad_user',
-                                               password='bad_pass'))
+                          **self.make_connargs(password='bad_pass'))
 
         self.assertRaises(AuthError, Connection,
                           **self.make_connargs(password='wrong_password'))
@@ -124,8 +121,7 @@ class ConnectionTest(CouchbaseTestCase):
         # apparently libcouchbase does not report this failure.
 
     def test_connection_errors(self):
-        cb = Connection(username='bad',
-                        password='bad',
+        cb = Connection(password='bad',
                         bucket='meh',
                         host='localhost',
                         port=1,
@@ -144,8 +140,7 @@ class ConnectionTest(CouchbaseTestCase):
 
     def test_multi_hosts(self):
         kwargs = {
-            'username' : self.username,
-            'password' : self.password,
+            'password' : self.bucket_password,
             'bucket' : self.bucket_prefix
         }
 

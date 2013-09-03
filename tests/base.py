@@ -52,8 +52,8 @@ class CouchbaseTestCase(unittest.TestCase):
         self.bucket_password = "secret"
         self.port = self.mock.rest_port
         self.host = "127.0.0.1"
-        self.username = "Administrator"
-        self.password = "password"
+        self.admin_username = "Administrator"
+        self.admin_password = "password"
         self.extra_buckets = True
 
     @classmethod
@@ -62,8 +62,8 @@ class CouchbaseTestCase(unittest.TestCase):
         config.read(CONFIG_FILE)
         self.host = config.get('node-1', 'host')
         self.port = config.getint('node-1', 'port')
-        self.username = config.get('node-1', 'username')
-        self.password = config.get('node-1', 'password')
+        self.admin_username = config.get('node-1', 'admin_username')
+        self.admin_password = config.get('node-1', 'admin_password')
         self.bucket_prefix = config.get('node-1', 'bucket_prefix')
         self.bucket_password = config.get('node-1', 'bucket_password')
         self.nosleep = os.environ.get('PYCBC_TESTS_NOSLEEP', False)
@@ -162,8 +162,7 @@ class CouchbaseTestCase(unittest.TestCase):
         ret = {
             'host' : self.host,
             'port' : self.port,
-            'username' : self.username,
-            'password' : self.password,
+            'password' : self.bucket_password,
             'bucket' : self.bucket_prefix
         }
         ret.update(overrides)
@@ -177,7 +176,7 @@ class CouchbaseTestCase(unittest.TestCase):
         return Connection(**self.make_connargs(**kwargs))
 
     def make_admin_connection(self):
-        return Admin(self.username, self.password, self.host, self.port)
+        return Admin(self.admin_username, self.admin_password, self.host, self.port)
 
     def gen_key(self, prefix=None):
         if not prefix:

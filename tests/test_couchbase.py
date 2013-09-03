@@ -29,8 +29,7 @@ class CouchbaseTest(CouchbaseTestCase):
         self.assertIsInstance(
             Couchbase.connect(host=self.host,
                               port=self.port,
-                              username=self.username,
-                              password=self.password,
+                              password=self.bucket_password,
                               bucket=self.bucket_prefix),
             Connection)
 

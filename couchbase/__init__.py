@@ -87,7 +87,6 @@ class Couchbase:
     def connect(bucket=None,
                 host='localhost',
                 port=8091,
-                username=None,
                 password=None,
                 quiet=False,
                 conncache=None,
@@ -97,12 +96,6 @@ class Couchbase:
                 lockmode=LOCKMODE_EXC,
                 **kwargs):
         """Connect to a bucket.
-
-        If `username` is not given but `password` is specified,
-        it will automatically set to the bucket name, as it is
-        expected that you try to connect to a SASL
-        protected bucket, where the username is equal to the bucket
-        name.
 
         :param host: the hostname or IP address of the node.
           This can be a list or tuple of multiple nodes; the nodes can either
@@ -123,13 +116,7 @@ class Couchbase:
             are typically ``112xx`` - don't use these for the `port`
             parameter.
 
-        :param string username: the user name to connect to the cluster.
-                                It's the username of the management API.
-                                The username could be skipped for
-                                protected buckets, the bucket name will
-                                be used instead.
-
-        :param string password: the password of the user or bucket
+        :param string password: the password of the bucket
 
         :param string bucket: the bucket name
 
@@ -212,13 +199,12 @@ class Couchbase:
 
         Connect to a different server on the default port 8091::
 
-            cb = Couchbase.connect(host='example.com', username='admin',
+            cb = Couchbase.connect(host='example.com',
                                    password='secret', bucket='mybucket')
 
         """
         return Connection(host=host,
                           port=port,
-                          username=username,
                           password=password,
                           bucket=bucket,
                           conncache=conncache,

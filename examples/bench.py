@@ -32,9 +32,8 @@ ap.add_argument('-d', '--delay', default=0, type=float,
                 help="Number of seconds to wait between each op. "
                 "may be a fraction")
 
-ap.add_argument('-u', '--username', default='Administrator', type=str)
 ap.add_argument('-b', '--bucket', default='default', type=str)
-ap.add_argument('-p', '--password', default="123456", type=str)
+ap.add_argument('-p', '--password', default=None, type=str)
 ap.add_argument('-H', '--hostname', default='localhost', type=str)
 ap.add_argument('-D', '--duration', default=10, type=int,
                 help="Duration of run (in seconds)")
