@@ -273,7 +273,9 @@ store_callback(lcb_t instance,
     }
 
     res->rc = err;
-    res->cas = resp->v.v0.cas;
+    if (err == LCB_SUCCESS) {
+        res->cas = resp->v.v0.cas;
+    }
     maybe_push_operr(mres, (pycbc_Result*)res, err, 0);
 
     if (err == LCB_SUCCESS && (mres->mropts & PYCBC_MRES_F_DURABILITY)) {
@@ -333,12 +335,15 @@ get_callback(lcb_t instance,
         return;
     }
 
-    res->flags = resp->v.v0.flags;
-    res->cas = resp->v.v0.cas;
-
     maybe_push_operr(mres, (pycbc_Result*)res, err, 1);
 
-    if (err != LCB_SUCCESS) {
+
+
+    if (err == LCB_SUCCESS) {
+        res->flags = resp->v.v0.flags;
+        res->cas = resp->v.v0.cas;
+
+    } else {
         CB_THR_BEGIN(conn);
         return;
     }
@@ -378,7 +383,8 @@ delete_callback(lcb_t instance,
                             (pycbc_Result**)&res,
                             RESTYPE_OPERATION,
                             &mres);
-    if (rv == 0) {
+
+    if (rv == 0 && err == LCB_SUCCESS) {
         res->cas = resp->v.v0.cas;
     }
 
@@ -409,9 +415,9 @@ arithmetic_callback(lcb_t instance,
                             RESTYPE_VALUE,
                             &mres);
     if (rv == 0) {
-        res->cas = resp->v.v0.cas;
         res->rc = err;
         if (err == LCB_SUCCESS) {
+            res->cas = resp->v.v0.cas;
             res->value = pycbc_IntFromULL(resp->v.v0.value);
         }
 
@@ -469,7 +475,9 @@ touch_callback(lcb_t instance,
                             RESTYPE_OPERATION,
                             &mres);
     if (rv == 0) {
-        res->cas = resp->v.v0.cas;
+        if (err == LCB_SUCCESS) {
+            res->cas = resp->v.v0.cas;
+        }
         res->rc = err;
         maybe_push_operr(mres, (pycbc_Result*)res, err, 1);
     }
