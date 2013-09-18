@@ -47,6 +47,8 @@ ap.add_argument('--ksize', default=12, type=int,
 
 ap.add_argument('--vsize', default=128, type=int,
                 help="Value size to use")
+ap.add_argument('--iops', default=False, action='store_true',
+                help="Use Pure-Python IOPS plugin")
 
 options = ap.parse_args()
 DO_UNLOCK_GIL = options.threads > 0
@@ -60,9 +62,13 @@ class Worker(Thread):
         self.value = b'V' * options.vsize
         self.wait_time = 0
         self.opcount = 0
-        self.cb = Connection(bucket='default',
-                             host=options.hostname,
-                             unlock_gil=DO_UNLOCK_GIL)
+        connopts = { "bucket" : "default",
+                     "host" : options.hostname,
+                     "unlock_gil": DO_UNLOCK_GIL }
+        if options.iops:
+            connopts["experimental_gevent_support"] = True
+
+        self.cb = Connection(**connopts)
 
         if options.transcoder:
             self.cb.transcoder = TC
