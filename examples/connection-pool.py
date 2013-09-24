@@ -21,12 +21,13 @@ This file shows how to make a simple connection pool using Couchbase.
 from couchbase.connection import Connection
 from Queue import Queue, Empty
 from threading import Lock, Thread
-from time import time, sleep
+from time import time
 from argparse import ArgumentParser
 
-import random
 
-class ClientUnavailableError(Exception): pass
+class ClientUnavailableError(Exception):
+    pass
+
 
 class ConnectionWrapper(Connection):
     """
@@ -44,6 +45,7 @@ class ConnectionWrapper(Connection):
     def stop_using(self):
         self.use_time += time() - self.last_use_time
         self.use_count += 1
+
 
 class Pool(object):
     def __init__(self, initial=4, max_clients=10, **connargs):
@@ -112,6 +114,7 @@ class Pool(object):
         cb.stop_using()
         self._q.put(cb, True)
 
+
 class CbThread(Thread):
     def __init__(self, pool, opcount=10, remaining=10000):
         super(CbThread, self).__init__()
@@ -122,15 +125,15 @@ class CbThread(Thread):
     def run(self):
         while self.remaining:
             cb = self.pool.get_client()
-            kv = {}
-            for x in range(self.opcount):
-                kv["Key_" + str(x)] = str(x)
+            kv = dict(
+                ("Key_{0}".format(x), str(x)) for x in range(self.opcount)
+            )
             cb.set_multi(kv)
             self.pool.release_client(cb)
             self.remaining -= 1
 
 
-def runme():
+def main():
 
     ap = ArgumentParser()
     ap.add_argument('-H', '--host', help="Host to connect to",
@@ -149,24 +152,23 @@ def runme():
 
     options = ap.parse_args()
 
-
     pool = Pool(initial=options.pool_min,
                 max_clients=options.pool_max,
                 bucket=options.bucket,
                 host=options.host)
-    thrs = []
-    for x in range(options.threads):
-        thrs.append(CbThread(pool, opcount=options.opcount))
 
-    for thr in thrs:
-        thr.start()
+    thrs = [
+        CbThread(pool, opcount=options.opcount) for _ in range(options.threads)
+    ]
 
-    for thr in thrs:
-        thr.join()
+    map(lambda thr: thr.start(), thrs)
+    map(lambda thr: thr.join(), thrs)
 
     for c in pool._l:
-        print "Have client " + str(c)
-        print "    Time In Use: {0}, use count: {1}".format(c.use_time, c.use_count)
+        print "Have client {0}".format(c)
+        print "\tTime In Use: {0}, use count: {1}".format(c.use_time,
+                                                          c.use_count)
 
 
-runme()
+if __name__ == "__main__":
+    main()
