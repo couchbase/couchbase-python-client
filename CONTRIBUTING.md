@@ -49,7 +49,7 @@ name. Don't worry, all you need to do is to add the following to your
 ## Contributing Using Plain Git
 
 If you not so familiar with repo tool and its workflow there is an
-alternative way to do the same job. Just complete the GGerrit
+alternative way to do the same job. Just complete the Gerrit
 registration steps above and clone the source repository
 (remember the repository on github.com is just a mirror):
 
