@@ -128,7 +128,6 @@ handle_single_key(pycbc_Connection *self,
         break;
     }
 
-#if LCB_VERSION >= 0x020007
     case PYCBC_CMD_GETREPLICA:
     case PYCBC_CMD_GETREPLICA_INDEX:
     case PYCBC_CMD_GETREPLICA_ALL: {
@@ -143,13 +142,6 @@ handle_single_key(pycbc_Connection *self,
         cv->cmdlist.replica[ii] = rcmd;
         break;
     }
-#else
-        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
-                       "Need libcouchbase 2.0.7 or "
-                       "greater for replica functionality");
-        return -1;
-#endif
-
 
     }
 
@@ -160,8 +152,6 @@ static int handle_replica_options(int *optype,
                                   struct getcmd_vars_st *gv,
                                   PyObject *replica_O)
 {
-
-#if LCB_VERSION >= 0x020007
     switch (*optype) {
     case PYCBC_CMD_GET:
         *optype = PYCBC_CMD_GETREPLICA;
@@ -199,12 +189,6 @@ static int handle_replica_options(int *optype,
                        "Replica option not supported for this operation");
         return -1;
     }
-#else
-    PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Need libcouchbase >= 2.0.7");
-    (void)optype;
-    (void)gv;
-    (void)replica_O;
-#endif
     return -1;
 }
 
