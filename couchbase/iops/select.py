@@ -67,8 +67,8 @@ class SelectIOPS(object):
             self._unregister_timer(timer)
             return
 
-        # Otherwise, usecs are already there
         self._timers.add(timer)
+        timer.pydata = time.time() + usecs / 1000000
 
     def update_event(self, event, action, flags, fd=None):
         if action == PYCBC_EVACTION_UNWATCH:
@@ -97,7 +97,6 @@ class SelectIOPS(object):
         win = self._evwr
         ein = list(rin) + list(win)
 
-        now = time.time()
         rout, wout, eout = select.select(rin, win, ein)
         now = time.time()
 
@@ -123,7 +122,7 @@ class SelectIOPS(object):
             if not ev.state == PYCBC_EVSTATE_ACTIVE:
                 continue
 
-            if ev.usecs / 1000000 > now:
+            if ev.pydata > now:
                 continue
 
             ev.ready(0)
