@@ -35,7 +35,7 @@ static PyTypeObject pycbc_TimerEventType = {
 
 static struct PyMemberDef pycbc_Event_TABLE_members[] = {
 
-        { "pydata", T_OBJECT_EX, offsetof(pycbc_Event, pypriv), 0 },
+        { "__dict__", T_OBJECT_EX, offsetof(pycbc_Event, vdict), 0 },
         { "evtype", T_INT, offsetof(pycbc_Event, type), READONLY },
         { "state", T_INT, offsetof(pycbc_Event, state), READONLY },
         { NULL }
@@ -49,7 +49,6 @@ static struct PyMemberDef pycbc_IOEvent_TABLE_members[] = {
 
 
 static struct PyMemberDef pycbc_TimerEvent_TABLE_members[] = {
-        { "usecs", T_ULONGLONG, offsetof(pycbc_TimerEvent, usecs), READONLY },
         { NULL }
 };
 
@@ -109,10 +108,22 @@ static struct PyMethodDef pycbc_IOEvent_TABLE_methods[] = {
         { NULL }
 };
 
+static int
+Event__init__(pycbc_Event *self, PyObject *args, PyObject *kwargs)
+{
+    if (PyBaseObject_Type.tp_init((PyObject *)self, args, kwargs) != 0) {
+        return -1;
+    }
+    if (!self->vdict) {
+        self->vdict = PyDict_New();
+    }
+    return 0;
+}
+
 static void
 Event_dealloc(pycbc_Event *self)
 {
-    Py_XDECREF(self->pypriv);
+    Py_XDECREF(self->vdict);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -133,7 +144,9 @@ pycbc_EventType_init(PyObject **ptr)
     p->tp_members = pycbc_Event_TABLE_members;
     p->tp_methods = pycbc_Event_TABLE_methods;
     p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+    p->tp_init = (initproc)Event__init__;
     p->tp_dealloc = (destructor)Event_dealloc;
+    p->tp_dictoffset = offsetof(pycbc_Event, vdict);
     return PyType_Ready(p);
 }
 
@@ -192,7 +205,8 @@ modify_event_python(pycbc_iops_t *pio,
 
     if (ev->type == PYCBC_EVTYPE_IO) {
         flags = *(short*)arg;
-        argtuple = Py_BuildValue("(O,i,i,i)", ev, action, flags, newsock);
+        argtuple = Py_BuildValue("(O,i,i)", ev, action, flags);
+        ((pycbc_IOEvent *)ev)->fd = newsock;
         meth = PyObject_GetAttr(pio->pyio, pycbc_helpers.ioname_modevent);
 
     } else {
@@ -210,7 +224,6 @@ modify_event_python(pycbc_iops_t *pio,
 
     if (ev->type == PYCBC_EVTYPE_IO) {
         pycbc_IOEvent *evio = (pycbc_IOEvent*)ev;
-        evio->fd = newsock;
         evio->flags = flags;
     }
 
@@ -233,28 +246,46 @@ modify_event_python(pycbc_iops_t *pio,
 /**
  * Begin GLUE
  */
+static void *create_event_python(lcb_io_opt_t io, pycbc_evtype_t evtype)
+{
+    PyObject *meth, *ret, *lookup;
+    PyTypeObject *defltype;
+    pycbc_iops_t *pio = (pycbc_iops_t *)io;
+
+    if (evtype == PYCBC_EVTYPE_IO) {
+        defltype = &pycbc_IOEventType;
+        lookup = pycbc_helpers.ioname_mkevent;
+
+    } else {
+        defltype = &pycbc_TimerEventType;
+        lookup = pycbc_helpers.ioname_mktimer;
+    }
+
+    meth = PyObject_GetAttr(pio->pyio, lookup);
+
+    if (meth) {
+        ret = PyObject_CallObject(meth, NULL);
+
+    } else {
+        PyErr_Clear();
+        ret = PYCBC_TYPE_CTOR(defltype);
+    }
+
+    ((pycbc_Event *)ret)->type = evtype;
+    return ret;
+}
 static void *
 create_event(lcb_io_opt_t io)
 {
-    PyObject *ret;
-
-    ret = PYCBC_TYPE_CTOR(&pycbc_IOEventType);
-    ((pycbc_IOEvent*)ret)->type = PYCBC_EVTYPE_IO;
-
     (void)io;
-    return ret;
+    return create_event_python(io, PYCBC_EVTYPE_IO);
 }
 
 static void *
 create_timer(lcb_io_opt_t io)
 {
-    pycbc_TimerEvent *ret;
-
-    ret = (pycbc_TimerEvent*)PYCBC_TYPE_CTOR(&pycbc_TimerEventType);
-    ret->type = PYCBC_EVTYPE_TIMER;
-
     (void)io;
-    return ret;
+    return create_event_python(io, PYCBC_EVTYPE_TIMER);
 }
 
 static void
@@ -335,11 +366,6 @@ update_timer(lcb_io_opt_t io,
     pycbc_TimerEvent *ev = (pycbc_TimerEvent*)timer;
     ev->cb.data = data;
     ev->cb.handler = handler;
-    ev->usecs = usec;
-
-    if (((pycbc_TimerEvent*)ev)->usecs == usec) {
-        return 0;
-    }
 
     return modify_event_python((pycbc_iops_t*)io,
                                (pycbc_Event*)ev,

@@ -44,9 +44,9 @@ typedef void (*pycbc_lcb_cb_t)(lcb_socket_t,short,void*);
         pycbc_lcb_cb_t handler; \
         void *data; \
     } cb; \
-    PyObject *pypriv; \
+    PyObject *vdict; \
     pycbc_evstate_t state; \
-    pycbc_evtype_t type;
+    pycbc_evtype_t type; \
 
 
 typedef struct {
@@ -61,7 +61,6 @@ typedef struct {
 
 typedef struct {
     pycbc_Event_HEAD
-    unsigned PY_LONG_LONG usecs;
 } pycbc_TimerEvent;
 
 /**

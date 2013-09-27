@@ -566,7 +566,9 @@ extern PyObject *pycbc_ExceptionType;
     X(ioname_modevent, "update_event") \
     X(ioname_modtimer, "update_timer") \
     X(ioname_startwatch, "start_watching") \
-    X(ioname_stopwatch, "stop_watching")
+    X(ioname_stopwatch, "stop_watching") \
+    X(ioname_mkevent, "io_event_factory") \
+    X(ioname_mktimer, "timer_event_factory")
 
 /**
  * Definition of global helpers. This is only instantiated once as
