@@ -100,13 +100,27 @@ maybe_push_operr(pycbc_MultiResult *mres,
     Py_INCREF(mres->errop);
 }
 
+
 static void
-maybe_breakout(pycbc_Connection *self)
+operation_completed(pycbc_Connection *self, pycbc_MultiResult *mres)
 {
     pycbc_assert(self->nremaining);
+    --self->nremaining;
 
-    if (!--self->nremaining) {
-        lcb_breakout(self->instance);
+    if ((self->flags & PYCBC_CONN_F_ASYNC) == 0) {
+        if (!self->nremaining) {
+            lcb_breakout(self->instance);
+        }
+        return;
+    }
+
+    if (mres) {
+        pycbc_AsyncResult *ares;
+        ares = (pycbc_AsyncResult *)mres;
+        if (--ares->nops) {
+            return;
+        }
+        pycbc_asyncresult_invoke(ares);
     }
 }
 
@@ -124,13 +138,10 @@ get_common_objects(PyObject *cookie,
     PyObject *hkey;
     int rv;
 
-    pycbc_assert(Py_TYPE(cookie) == &pycbc_MultiResultType);
+    pycbc_assert(Py_TYPE(cookie) == &pycbc_MultiResultType ||
+                 Py_TYPE(cookie) == &pycbc_AsyncResultType);
     *mres = (pycbc_MultiResult*)cookie;
     *conn = (*mres)->parent;
-
-    if (!(restype & RESTYPE_VARCOUNT)) {
-        maybe_breakout(*conn);
-    }
 
     CB_THR_END(*conn);
 
@@ -235,13 +246,17 @@ durability_callback(lcb_t instance,
                             (pycbc_Result**)&res,
                             RESTYPE_OPERATION|RESTYPE_EXISTS_OK,
                             &mres);
+
     if (rv == -1) {
         CB_THR_BEGIN(conn);
-        return;
-    }
-    res->rc = effective_err;
 
-    maybe_push_operr(mres, (pycbc_Result*)res, effective_err, 0);
+    } else {
+        res->rc = effective_err;
+        maybe_push_operr(mres, (pycbc_Result*)res, effective_err, 0);
+    }
+
+    operation_completed(conn, mres);
+
     CB_THR_BEGIN(conn);
 }
 
@@ -267,7 +282,7 @@ store_callback(lcb_t instance,
                             &mres);
 
     if (rv == -1) {
-        maybe_breakout(conn);
+        operation_completed(conn, mres);
         CB_THR_BEGIN(conn);
         return;
     }
@@ -299,7 +314,7 @@ store_callback(lcb_t instance,
             maybe_push_operr(mres, (pycbc_Result*)res, err, 0);
         }
     } else {
-        maybe_breakout(conn);
+        operation_completed(conn, mres);
     }
 
     CB_THR_BEGIN(conn);
@@ -331,6 +346,7 @@ get_callback(lcb_t instance,
                             &mres);
 
     if (rv < 0) {
+        operation_completed(conn, mres);
         CB_THR_BEGIN(conn);
         return;
     }
@@ -344,6 +360,7 @@ get_callback(lcb_t instance,
         res->cas = resp->v.v0.cas;
 
     } else {
+        operation_completed(conn, mres);
         CB_THR_BEGIN(conn);
         return;
     }
@@ -363,6 +380,7 @@ get_callback(lcb_t instance,
         push_fatal_error(mres);
     }
 
+    operation_completed(conn, mres);
     CB_THR_BEGIN(conn);
     (void)instance;
 }
@@ -389,6 +407,7 @@ delete_callback(lcb_t instance,
     }
 
     maybe_push_operr(mres, (pycbc_Result*)res, err, 1);
+    operation_completed(conn, mres);
 
     CB_THR_BEGIN(conn);
     (void)instance;
@@ -424,6 +443,7 @@ arithmetic_callback(lcb_t instance,
         maybe_push_operr(mres, (pycbc_Result*)res, err, 0);
     }
 
+    operation_completed(conn, mres);
     CB_THR_BEGIN(conn);
     (void)instance;
 }
@@ -451,6 +471,8 @@ unlock_callback(lcb_t instance,
         res->rc = err;
         maybe_push_operr(mres, (pycbc_Result*)res, err, 0);
     }
+
+    operation_completed(conn, mres);
     CB_THR_BEGIN(conn);
     (void)instance;
 }
@@ -482,6 +504,7 @@ touch_callback(lcb_t instance,
         maybe_push_operr(mres, (pycbc_Result*)res, err, 1);
     }
 
+    operation_completed(conn, mres);
     CB_THR_BEGIN(conn);
     (void)instance;
 }
@@ -501,7 +524,7 @@ stat_callback(lcb_t instance,
     CB_THR_END(mres->parent);
 
     if (!resp->v.v0.server_endpoint) {
-        maybe_breakout(mres->parent);
+        operation_completed(mres->parent, mres);
     }
 
     if (err != LCB_SUCCESS) {
@@ -566,7 +589,7 @@ observe_callback(lcb_t instance,
 
     if (!resp->v.v0.key) {
         mres = (pycbc_MultiResult*)cookie;;
-        maybe_breakout(mres->parent);
+        operation_completed(mres->parent, mres);
         return;
     }
 
@@ -608,24 +631,55 @@ observe_callback(lcb_t instance,
     (void)instance;
 }
 
+static int
+start_global_callback(lcb_t instance, pycbc_Connection **selfptr)
+{
+    *selfptr = (pycbc_Connection *)lcb_get_cookie(instance);
+    if (!*selfptr) {
+        return 0;
+    }
+    CB_THR_END(*selfptr);
+    Py_INCREF((PyObject *)*selfptr);
+    return 1;
+}
+
+static void
+end_global_callback(lcb_t instance, pycbc_Connection *self)
+{
+    Py_DECREF((PyObject *)(self));
+
+    self = (pycbc_Connection *)lcb_get_cookie(instance);
+    if (self) {
+        CB_THR_BEGIN(self);
+    }
+}
+
 static void
 error_callback(lcb_t instance, lcb_error_t err, const char *msg)
 {
-    PyObject *errtuple;
-    PyObject *result;
-    pycbc_Connection *self = (pycbc_Connection*) lcb_get_cookie(instance);
+    pycbc_Connection *self;
 
-    CB_THR_END(self);
+    if (!start_global_callback(instance, &self)) {
+        return;
+    }
 
-    pycbc_assert(self->errors);
-    errtuple = Py_BuildValue("(i,s)", err, msg);
-    pycbc_assert(errtuple);
-    result = PyObject_CallMethod(self->errors, "append", "(O)", errtuple);
-    pycbc_assert(result);
-    Py_DECREF(errtuple);
-    Py_DECREF(result);
+    pycbc_invoke_error_callback(self, err, msg);
+    pycbc_invoke_connected_event(self, err);
 
-    CB_THR_BEGIN(self);
+    end_global_callback(instance, self);
+}
+
+static void config_callback(lcb_t instance, lcb_configuration_t config)
+{
+    pycbc_Connection *self;
+
+    if (!start_global_callback(instance, &self)) {
+        return;
+    }
+
+    pycbc_invoke_connected_event(self, LCB_SUCCESS);
+
+    end_global_callback(instance, self);
 }
 
 
@@ -642,6 +696,7 @@ pycbc_callbacks_init(lcb_t instance)
     lcb_set_error_callback(instance, error_callback);
     lcb_set_observe_callback(instance, observe_callback);
     lcb_set_durability_callback(instance, durability_callback);
+    lcb_set_configuration_callback(instance, config_callback);
 
     pycbc_http_callbacks_init(instance);
 }

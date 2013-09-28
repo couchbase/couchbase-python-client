@@ -80,6 +80,7 @@ HttpResult_dealloc(pycbc_HttpResult *self)
     Py_XDECREF(parent);
     Py_XDECREF(self->headers);
     Py_XDECREF(self->rowsbuf);
+    Py_XDECREF(self->callback);
 
     if (self->rctx) {
         lcbex_vrow_free(self->rctx);
@@ -103,6 +104,21 @@ static struct PyMemberDef HttpResult_TABLE_members[] = {
         { "url",
                 T_OBJECT_EX, offsetof(pycbc_HttpResult, key),
                 READONLY, PyDoc_STR("HTTP URI")
+        },
+
+        { "_callback",
+                T_OBJECT_EX, offsetof(pycbc_HttpResult, callback),
+                0, PyDoc_STR("Callback to be invoked with row data")
+        },
+
+        { "_rows",
+                T_OBJECT_EX, offsetof(pycbc_HttpResult, rowsbuf),
+                READONLY, PyDoc_STR("List containing raw strings of rows")
+        },
+
+        { "done",
+                T_UBYTE, offsetof(pycbc_HttpResult, done),
+                READONLY, PyDoc_STR("Boolean. True if result is done")
         },
 
         { NULL }
@@ -135,6 +151,9 @@ static PyGetSetDef HttpResult_TABLE_getset[] = {
 
 static PyMethodDef HttpResult_TABLE_methods[] = {
         { "_fetch", (PyCFunction)pycbc_HttpResult__fetch, METH_NOARGS, NULL },
+        { "_maybe_raise",
+                (PyCFunction)pycbc_HttpResult__maybe_raise,
+                METH_NOARGS, NULL },
 
         { NULL }
 };

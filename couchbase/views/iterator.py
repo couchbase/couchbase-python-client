@@ -301,14 +301,18 @@ class View(object):
         if not errors:
             return
 
-        self.errors += errors
+        self.errors += [ errors ]
 
         if self._query.on_error != 'continue':
-            ViewEngineError.pyexc("Error while executing view.",
-                                  self.errors)
+            raise ViewEngineError.pyexc("Error while executing view.",
+                                        self.errors)
         else:
             warn("Error encountered when executing view. Inspect 'errors' "
                  "for more information")
+
+    def _handle_meta(self, value):
+        self.indexed_rows = value.get('total_rows', 0)
+        self._handle_errors(value.get('errors'))
 
     def _process_page(self, rows):
         if not rows:
@@ -327,14 +331,6 @@ class View(object):
         self.raw = self._create_raw()
         self._process_page(self.raw.value['rows'])
         self._handle_meta(self.raw.value)
-
-    def _handle_meta(self, value):
-        if not self.raw.done:
-            return
-
-        self.indexed_rows = value.get('total_rows', 0)
-        self._handle_errors(value.get('errors'))
-
 
     def _create_raw(self, **kwargs):
         """
@@ -367,6 +363,22 @@ class View(object):
         d.update(**kwargs)
         return self._parent._http_request(**d)
 
+    def _setup_streaming_request(self):
+        """
+        Sets up the streaming request. This contains a streaming
+        :class:`couchbase.results.HttpResult` object
+        """
+        self.raw = self._create_raw(chunked=True)
+
+    def _process_payload(self, rows):
+        if rows:
+            rows = tuple(json.loads(r) for r in rows)
+            self._process_page(rows)
+
+        if self.raw.done:
+            self._handle_meta(self.raw.value)
+            self._do_iter = False
+
     def _get_page(self):
         if not self._streaming:
             self._handle_single_view()
@@ -374,18 +386,11 @@ class View(object):
             return
 
         if not self.raw:
-            self.raw = self._create_raw(chunked=True)
+            self._setup_streaming_request()
 
         # Fetch the rows:
         rows = self.raw._fetch()
-
-        if not rows:
-            self._handle_meta(self.raw.value)
-            self._do_iter = False
-            return
-
-        rows = tuple(json.loads(r) for r in rows)
-        self._process_page(rows)
+        self._process_payload(rows)
 
     def __iter__(self):
         """

@@ -28,3 +28,4 @@ couchbase/_version.py
 ci/
 buildall.py
 *egg-info*
+_trial*

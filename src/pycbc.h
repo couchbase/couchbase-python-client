@@ -190,7 +190,10 @@ enum {
     PYCBC_EXC_HTTP,
 
     /** ObjectThreadError */
-    PYCBC_EXC_THREADING
+    PYCBC_EXC_THREADING,
+
+    /** Object destroyed before it could connect */
+    PYCBC_EXC_DESTROYED
 };
 
 /* Argument options */
@@ -225,8 +228,23 @@ typedef enum {
 enum {
     PYCBC_CONN_F_WARNEXPLICIT = 1 << 0,
     PYCBC_CONN_F_USEITEMRESULT = 1 << 1,
-    PYCBC_CONN_F_CLOSED = 1 << 2
-    /** more flags will follow.. */
+    PYCBC_CONN_F_CLOSED = 1 << 2,
+
+    /**
+     * For use with (but not limited to) Twisted.
+     *
+     * Deliver results asynchronously. This means:
+     * 1) Don't call lcb_wait()
+     * 2) Return an AsyncContainer (i.e. a MultiResult)
+     * 3) Invoke the MultiResult (AsyncContainer)'s callback as needed
+     */
+    PYCBC_CONN_F_ASYNC = 1 << 3,
+
+    /** Whether this instance has been connected */
+    PYCBC_CONN_F_CONNECTED = 1 << 4,
+
+    /** Schedule destruction of iops and lcb instance for later */
+    PYCBC_CONN_F_ASYNC_DTOR = 1 << 5
 };
 
 typedef struct {
@@ -243,6 +261,18 @@ typedef struct {
 
     /** Connection Errors */
     PyObject *errors;
+
+    /** Callback to be invoked when connected */
+    PyObject *conncb;
+
+    /**
+     * Callback to be invoked upon destruction. Because we can fall out
+     * of scope in middle of an LCB function, this is required.
+     *
+     * The dtorcb is first called when the refcount of the connection
+     */
+    PyObject *dtorcb;
+
 
     /** String bucket */
     PyObject *bucket;
@@ -332,6 +362,11 @@ typedef struct {
     PyObject *rowsbuf;
 
     /**
+     * Callback to invoke upon receipt of data
+     */
+    PyObject *callback;
+
+    /**
      * Row parser context.
      */
     lcbex_vrow_ctx_t *rctx;
@@ -346,6 +381,7 @@ typedef struct {
     unsigned short htcode;
     unsigned short format;
     unsigned short htflags;
+    unsigned char done;
 } pycbc_HttpResult;
 
 enum {
@@ -355,6 +391,7 @@ enum {
 };
 
 PyObject* pycbc_HttpResult__fetch(pycbc_HttpResult *self);
+PyObject* pycbc_HttpResult__maybe_raise(pycbc_HttpResult *self);
 
 
 enum {
@@ -371,7 +408,13 @@ enum {
     PYCBC_MRES_F_FORCEBYTES = 1 << 3,
 
     /** The commands have durability requirements */
-    PYCBC_MRES_F_DURABILITY = 1 << 4
+    PYCBC_MRES_F_DURABILITY = 1 << 4,
+
+    /** The command is an async subclass. Do we need this? */
+    PYCBC_MRES_F_ASYNC = 1 << 5,
+
+    /** This result is from a call to one of the single-item APIs */
+    PYCBC_MRES_F_SINGLE = 1 << 6
 };
 /**
  * Object containing the result of a 'Multi' operation. It's the same as a
@@ -404,6 +447,19 @@ typedef struct {
     /** Options for 'MultiResult' */
     int mropts;
 } pycbc_MultiResult;
+
+typedef struct {
+    pycbc_MultiResult base;
+
+    /* How many operations do we have remaining */
+    unsigned int nops;
+
+    /* Object for the callback */
+    PyObject *callback;
+
+    /* Object to be invoked with errors */
+    PyObject *errback;
+} pycbc_AsyncResult;
 
 
 /**
@@ -513,6 +569,7 @@ int pycbc_ResultType_ready(PyTypeObject *p, int flags);
 
 /* multiresult.c */
 extern PyTypeObject pycbc_MultiResultType;
+extern PyTypeObject pycbc_AsyncResultType;
 
 /* result.c */
 extern PyTypeObject pycbc_ResultType;
@@ -645,7 +702,7 @@ int pycbc_ItemType_init(PyObject **ptr);
 int pycbc_EventType_init(PyObject **ptr);
 int pycbc_TimerEventType_init(PyObject **ptr);
 int pycbc_IOEventType_init(PyObject **ptr);
-
+int pycbc_AsyncResultType_init(PyObject **ptr);
 
 /**
  * Calls the type's constructor with no arguments:
@@ -686,6 +743,21 @@ void pycbc_Result_dealloc(pycbc_Result *self);
 int pycbc_multiresult_maybe_raise(pycbc_MultiResult *self);
 
 /**
+ * Return the effective user-facing value from this MultiResult object.
+ * This should only be called if 'maybe_raise' returns false.
+ * @param self the object
+ * @return a new reference to the final result, or NULL on error.
+ */
+PyObject* pycbc_multiresult_get_result(pycbc_MultiResult *self);
+
+/**
+ * Invokes a callback when an operation has been completed. This will either
+ * invoke the operation's "error callback" or the operation's "result callback"
+ * depending on the state.
+ */
+void pycbc_asyncresult_invoke(pycbc_AsyncResult *mres);
+
+/**
  * Initialize the callbacks for the lcb_t
  */
 void pycbc_callbacks_init(lcb_t instance);
@@ -698,6 +770,20 @@ void pycbc_http_callbacks_init(lcb_t instance);
  * @param p a struct of exception parameters
  */
 void pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p);
+
+/**
+ * Get the appropriate Couchbase exception object.
+ * @param mode one of the PYCBC_EXC_* constants
+ * @param err the libcouchbase error, if any
+ * @return a borrowed reference to the appropriate exception class
+ */
+PyObject* pycbc_exc_map(int mode, lcb_error_t err);
+
+/**
+ * Creates a simple exception with a given message. The exception
+ * is not thrown.
+ */
+PyObject* pycbc_exc_message(int mode, lcb_error_t err, const char *msg);
 
 
 /**
@@ -853,5 +939,21 @@ pycbc_tc_determine_format(PyObject *value);
 /** IOPS Initializer */
 lcb_io_opt_t pycbc_iops_new(pycbc_Connection *conn, PyObject *pyio);
 void pycbc_iops_free(lcb_io_opt_t io);
+PyObject * pycbc_event_new(void);
 
+/**
+ * Event callback handling
+ */
+void pycbc_invoke_connected_event(pycbc_Connection *conn, lcb_error_t err);
+
+/**
+ * Schedule the dtor event
+ */
+void pycbc_schedule_dtor_event(pycbc_Connection *self);
+
+/**
+ * Invoke the error callback to log messages
+ */
+void pycbc_invoke_error_callback(pycbc_Connection *self,
+                                 lcb_error_t err, const char *msg);
 #endif /* PYCBC_H_ */

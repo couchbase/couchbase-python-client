@@ -17,6 +17,7 @@
 #include "pycbc.h"
 #include "structmember.h"
 #include "oputil.h"
+#include "iops.h"
 
 PyObject *pycbc_DummyTuple;
 PyObject *pycbc_DummyKeywords;
@@ -25,6 +26,9 @@ static int
 Connection__init__(pycbc_Connection *self,
                    PyObject *args,
                    PyObject *kwargs);
+
+static PyObject*
+Connection__connect(pycbc_Connection *self);
 
 static void
 Connection_dtor(pycbc_Connection *self);
@@ -143,6 +147,28 @@ Connection_get_configured_replica_count(pycbc_Connection *self, void *unused)
 }
 
 static PyObject *
+Connection_connected(pycbc_Connection *self, void *unused)
+{
+    PyObject* ret = self->flags & PYCBC_CONN_F_CONNECTED ? Py_True : Py_False;
+
+    if (ret == Py_False) {
+        void *handle = NULL;
+        lcb_error_t err;
+        err = lcb_cntl(self->instance, LCB_CNTL_GET, LCB_CNTL_VBCONFIG, &handle);
+        if (err == LCB_SUCCESS && handle != NULL) {
+            self->flags |= PYCBC_CONN_F_CONNECTED;
+            ret = Py_True;
+        }
+    }
+
+    Py_INCREF(ret);
+
+    (void)unused;
+
+    return ret;
+}
+
+static PyObject *
 Connection_lcb_version(pycbc_Connection *self)
 {
     const char *verstr;
@@ -244,6 +270,17 @@ static PyGetSetDef Connection_TABLE_getset[] = {
                         ":class:`couchbase.transcoder.Transcoder` "
                         "is being used\n")
         },
+
+        { "connected",
+                (getter)Connection_connected,
+                NULL,
+                PyDoc_STR("Boolean read only property indicating whether\n"
+                        "this instance has been connected.\n"
+                        "\n"
+                        "Note that this will still return true even if\n"
+                        "it is subsequently closed via :meth:`_close`\n")
+        },
+
         { NULL }
 };
 
@@ -290,6 +327,16 @@ static struct PyMemberDef Connection_TABLE_members[] = {
         { "_privflags", T_UINT, offsetof(pycbc_Connection, flags),
                 0,
                 PyDoc_STR("Internal flags.")
+        },
+
+        { "_conncb", T_OBJECT_EX, offsetof(pycbc_Connection, conncb),
+                0,
+                PyDoc_STR("Internal connection callback.")
+        },
+
+        { "_dtorcb", T_OBJECT_EX, offsetof(pycbc_Connection, dtorcb),
+                0,
+                PyDoc_STR("Internal destruction callback")
         },
 
         { NULL }
@@ -382,6 +429,14 @@ static PyMethodDef Connection_TABLE_methods[] = {
                 "Note that operations pending on the connection may\n"
                 "fail.\n"
                 "\n")
+        },
+
+        { "_connect",
+                (PyCFunction)Connection__connect,
+                METH_NOARGS,
+                PyDoc_STR(
+                "Connect this instance. This is typically called by one of\n"
+                "the wrapping constructors\n")
         },
 
         { NULL, NULL, 0, NULL }
@@ -582,44 +637,59 @@ Connection__init__(pycbc_Connection *self,
         }
     }
 
-    PYCBC_CONN_THR_BEGIN(self);
+    return 0;
+}
+
+static PyObject*
+Connection__connect(pycbc_Connection *self)
+{
+    lcb_error_t err;
+
+    if (self->flags & PYCBC_CONN_F_CONNECTED) {
+        Py_RETURN_NONE;
+    }
+
     err = lcb_connect(self->instance);
-    PYCBC_CONN_THR_END(self);
 
     if (err != LCB_SUCCESS) {
         PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err,
                        "Couldn't schedule connection. This might be a result of "
                        "an invalid hostname.");
-        return -1;
+        return NULL;
     }
-
 
     err = pycbc_oputil_wait_common(self);
 
     if (err != LCB_SUCCESS) {
         PYCBC_EXCTHROW_WAIT(err);
-        return -1;
+        return NULL;
     }
 
-    return 0;
+    Py_RETURN_NONE;
 }
 
 static void
 Connection_dtor(pycbc_Connection *self)
 {
     if (self->instance) {
-        lcb_destroy(self->instance);
-        self->instance = NULL;
+        lcb_set_cookie(self->instance, NULL);
     }
 
+    pycbc_schedule_dtor_event(self);
+
+    Py_XDECREF(self->dtorcb);
     Py_XDECREF(self->dfl_fmt);
     Py_XDECREF(self->errors);
     Py_XDECREF(self->tc);
     Py_XDECREF(self->bucket);
+    Py_XDECREF(self->conncb);
+
+    if (self->instance) {
+        lcb_destroy(self->instance);
+    }
 
     if (self->iops) {
         pycbc_iops_free(self->iops);
-        self->iops = NULL;
     }
 
 #ifdef WITH_THREAD
@@ -631,7 +701,6 @@ Connection_dtor(pycbc_Connection *self)
 
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
-
 
 int
 pycbc_ConnectionType_init(PyObject **ptr)

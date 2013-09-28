@@ -41,30 +41,15 @@ void
 pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p)
 {
     PyObject *type = NULL, *value = NULL, *traceback = NULL;
-    PyObject *ikey;
     PyObject *excls;
     PyObject *excparams;
     PyObject *excinstance;
     PyObject *ctor_args;
 
     PyErr_Fetch(&type, &value, &traceback);
-
-    if (mode == PYCBC_EXC_LCBERR) {
-        ikey = pycbc_IntFromL(p->err);
-        excls = PyDict_GetItem(pycbc_helpers.lcb_errno_map, ikey);
-
-    } else {
-        ikey = pycbc_IntFromL(mode);
-        excls = PyDict_GetItem(pycbc_helpers.misc_errno_map, ikey);
-    }
-
-    Py_DECREF(ikey);
-
-    if (!excls) {
-        excls = pycbc_helpers.default_exception;
-    }
-
     PyErr_Clear();
+
+    excls = pycbc_exc_map(mode, p->err);
 
     excparams = PyDict_New();
     pycbc_assert(excparams);
@@ -115,4 +100,43 @@ pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p)
         PyErr_Restore((PyObject*)Py_TYPE(excinstance), excinstance, traceback);
         pycbc_assert(Py_REFCNT(excinstance) == 1);
     }
+}
+
+PyObject *
+pycbc_exc_map(int mode, lcb_error_t err)
+{
+    PyObject *ikey;
+    PyObject *excls;
+
+    if (mode == PYCBC_EXC_LCBERR) {
+        ikey = pycbc_IntFromL(err);
+        excls = PyDict_GetItem(pycbc_helpers.lcb_errno_map, ikey);
+    } else {
+        ikey = pycbc_IntFromL(mode);
+        excls = PyDict_GetItem(pycbc_helpers.misc_errno_map, ikey);
+    }
+
+    if (!excls) {
+        excls = pycbc_helpers.default_exception;
+    }
+
+    Py_DECREF(ikey);
+    return excls;
+}
+
+PyObject *
+pycbc_exc_message(int mode, lcb_error_t err, const char *msg)
+{
+    PyObject *instance;
+    PyObject *args;
+    PyObject *excls = pycbc_exc_map(mode, err);
+
+    args = PyTuple_New(1);
+    PyTuple_SET_ITEM(args, 0, pycbc_SimpleStringZ(msg));
+
+    instance = PyObject_CallObject(excls, args);
+    Py_DECREF(args);
+
+    pycbc_assert(instance);
+    return instance;
 }

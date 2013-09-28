@@ -36,6 +36,83 @@ static PyMethodDef MultiResult_TABLE_methods[] = {
         { NULL }
 };
 
+PyTypeObject pycbc_AsyncResultType = {
+        PYCBC_POBJ_HEAD_INIT(NULL)
+        0
+};
+
+static struct PyMemberDef AsyncResult_TABLE_members[] = {
+        { "remaining",
+                T_UINT, offsetof(pycbc_AsyncResult, nops),
+                READONLY,
+                PyDoc_STR("Number of operations remaining for this 'AsyncResult")
+        },
+
+        { "callback",
+                T_OBJECT_EX, offsetof(pycbc_AsyncResult, callback),
+                0,
+                PyDoc_STR("Callback to be invoked with this result")
+        },
+
+        { "errback",
+                T_OBJECT_EX, offsetof(pycbc_AsyncResult, errback),
+                0,
+                PyDoc_STR("Callback to be invoked with any errors")
+        },
+
+        { NULL }
+};
+
+static PyObject *
+AsyncResult_set_callbacks(pycbc_AsyncResult *self, PyObject *args)
+{
+    PyObject *errcb = NULL;
+    PyObject *okcb = NULL;
+
+    if (!PyArg_ParseTuple(args, "OO", &okcb, &errcb)) {
+        PYCBC_EXCTHROW_ARGS();
+        return NULL;
+    }
+
+    Py_XINCREF(errcb);
+    Py_XINCREF(okcb);
+
+    Py_XDECREF(self->callback);
+    Py_XDECREF(self->errback);
+
+    self->callback = okcb;
+    self->errback = errcb;
+    Py_RETURN_NONE;
+}
+
+static PyObject *
+AsyncResult_set_single(pycbc_AsyncResult *self)
+{
+    if (self->nops != 1) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
+                       "Cannot set mode to single. "
+                       "AsyncResult has more than one operation");
+        return NULL;
+    }
+
+    self->base.mropts |= PYCBC_MRES_F_SINGLE;
+    Py_RETURN_NONE;
+}
+
+static struct PyMethodDef AsyncResult_TABLE_methods[] = {
+        { "set_callbacks", (PyCFunction)AsyncResult_set_callbacks,
+                METH_VARARGS,
+                PyDoc_STR("Set the ok and error callbacks")
+        },
+
+        { "_set_single", (PyCFunction)AsyncResult_set_single,
+                METH_NOARGS,
+                PyDoc_STR("Indicate that this is a 'single' result to be "
+                        "wrapped")
+        },
+
+        { NULL }
+};
 
 static int
 MultiResultType__init__(pycbc_MultiResult *self, PyObject *args, PyObject *kwargs)
@@ -95,13 +172,68 @@ pycbc_MultiResultType_init(PyObject **ptr)
     return PyType_Ready(p);
 }
 
+/**
+ * AsyncResult
+ */
+static int
+AsyncResult__init__(pycbc_AsyncResult *self, PyObject *args, PyObject *kwargs)
+{
+    if (MultiResultType__init__((pycbc_MultiResult *)self, args, kwargs) != 0) {
+        return -1;
+    }
+
+    self->nops = 0;
+    self->callback = NULL;
+    self->errback = NULL;
+    self->base.mropts |= PYCBC_MRES_F_ASYNC;
+    return 0;
+}
+
+static void
+AsyncResult_dealloc(pycbc_AsyncResult *self)
+{
+    Py_XDECREF(self->callback);
+    Py_XDECREF(self->errback);
+    MultiResult_dealloc(&self->base);
+}
+
+int
+pycbc_AsyncResultType_init(PyObject **ptr)
+{
+    PyTypeObject *p = &pycbc_AsyncResultType;
+    *ptr = (PyObject *)p;
+    if (p->tp_name) {
+        return 0;
+    }
+
+    p->tp_base = &pycbc_MultiResultType;
+    p->tp_init = (initproc)AsyncResult__init__;
+    p->tp_dealloc = (destructor)AsyncResult_dealloc;
+    p->tp_members = AsyncResult_TABLE_members;
+    p->tp_basicsize = sizeof(pycbc_AsyncResult);
+    p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+    p->tp_methods = AsyncResult_TABLE_methods;
+    p->tp_name = "AsyncResult";
+
+    return PyType_Ready(p);
+}
+
 PyObject *
 pycbc_multiresult_new(pycbc_Connection *parent)
 {
-    pycbc_MultiResult *ret =
-            (pycbc_MultiResult*) PyObject_CallFunction((PyObject*) &pycbc_MultiResultType,
-                                                             NULL,
-                                                             NULL);
+    PyTypeObject *initmeth;
+    pycbc_MultiResult *ret;
+
+    if (parent->flags & PYCBC_CONN_F_ASYNC) {
+        initmeth = &pycbc_AsyncResultType;
+
+    } else {
+        initmeth = &pycbc_MultiResultType;
+    }
+
+    ret = (pycbc_MultiResult*) PyObject_CallFunction((PyObject*)initmeth,
+                                                     NULL,
+                                                     NULL);
     if (!ret) {
         PyErr_Print();
         abort();
@@ -165,6 +297,81 @@ pycbc_multiresult_maybe_raise(pycbc_MultiResult *self)
     self->exceptions = NULL;
     self->errop = NULL;
 
-
     return 1;
+}
+
+PyObject *
+pycbc_multiresult_get_result(pycbc_MultiResult *self)
+{
+    int rv;
+    Py_ssize_t dictpos = 0;
+    PyObject *key, *value;
+
+    if (!(self->mropts & PYCBC_MRES_F_SINGLE)) {
+        Py_INCREF(self);
+        return (PyObject *)self;
+    }
+
+    rv = PyDict_Next((PyObject *)self, &dictpos, &key, &value);
+    if (!rv) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_INTERNAL, 0, "No objects in MultiResult");
+        return NULL;
+    }
+
+    Py_INCREF(value);
+    return value;
+}
+
+void
+pycbc_asyncresult_invoke(pycbc_AsyncResult *ares)
+{
+    PyObject *argtuple;
+    PyObject *cbmeth;
+
+    if (!pycbc_multiresult_maybe_raise(&ares->base)) {
+        /** All OK */
+        PyObject *eres = pycbc_multiresult_get_result(&ares->base);
+        cbmeth = ares->callback;
+        argtuple = PyTuple_New(1);
+        PyTuple_SET_ITEM(argtuple, 0, (PyObject *)eres);
+
+    } else {
+        PyObject *ex_value, *ex_type, *ex_tb;
+
+        PyErr_Fetch(&ex_type, &ex_value, &ex_tb);
+
+        if (!ex_type) {
+            ex_type = Py_None; Py_INCREF(ex_type);
+        }
+        if (!ex_value) {
+            ex_value = Py_None; Py_INCREF(ex_value);
+        }
+        if (!ex_tb) {
+            ex_tb = Py_None; Py_INCREF(ex_tb);
+        }
+
+        cbmeth = ares->errback;
+        argtuple = PyTuple_New(4);
+
+        PyTuple_SET_ITEM(argtuple, 0, (PyObject *)ares);
+        Py_INCREF(ares);
+
+        PyTuple_SET_ITEM(argtuple, 1, ex_type);
+        PyTuple_SET_ITEM(argtuple, 2, ex_value);
+        PyTuple_SET_ITEM(argtuple, 3, ex_tb);
+    }
+
+    if (!cbmeth) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_INTERNAL, 0, "No callbacks provided");
+    } else {
+        PyObject *res =  PyObject_CallObject(cbmeth, argtuple);
+        if (res) {
+            Py_XDECREF(res);
+        } else {
+            PyErr_Print();
+        }
+    }
+
+    Py_DECREF(argtuple);
+    Py_DECREF(ares);
 }

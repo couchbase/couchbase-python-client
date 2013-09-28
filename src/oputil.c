@@ -56,6 +56,18 @@ pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Connection *self)
     lcb_error_t err;
     Py_ssize_t nsched = cv->is_seqcmd ? 1 : cv->ncmds;
     self->nremaining += nsched;
+
+    if (self->flags & PYCBC_CONN_F_ASYNC) {
+        /** For async, just do the right thing :) */
+        cv->ret = (PyObject *)cv->mres;
+        ((pycbc_AsyncResult *)cv->mres)->nops = nsched;
+
+        /** INCREF once more so it's alive in the event loop */
+        Py_INCREF(cv->ret);
+        cv->mres = NULL;
+        return 0;
+    }
+
     err = pycbc_oputil_wait_common(self);
 
     if (err != LCB_SUCCESS) {
@@ -73,23 +85,12 @@ pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Connection *self)
         return -1;
     }
 
-    if (cv->argopts & PYCBC_ARGOPT_SINGLE) {
-        PyObject *key, *value;
-        Py_ssize_t dictpos = 0;
-        int rv;
-        rv = PyDict_Next((PyObject*)cv->mres, &dictpos, &key, &value);
-        if (!rv) {
-            PYCBC_EXC_WRAP(PYCBC_EXC_INTERNAL, 0, "No objects in mres");
-            return -1;
-        }
-        cv->ret = value;
-        Py_INCREF(value);
-        Py_DECREF(cv->mres);
-        cv->mres = NULL;
+    cv->ret = pycbc_multiresult_get_result(cv->mres);
+    Py_DECREF(cv->mres);
+    cv->mres = NULL;
 
-    } else {
-        cv->ret = (PyObject*)cv->mres;
-        cv->mres = NULL;
+    if (cv->ret == NULL) {
+        return -1;
     }
 
     return 0;
@@ -113,6 +114,10 @@ pycbc_common_vars_init(struct pycbc_common_vars *cv,
     cv->ncmds = ncmds;
     cv->mres = (pycbc_MultiResult*)pycbc_multiresult_new(self);
     cv->argopts = argopts;
+
+    if (argopts & PYCBC_ARGOPT_SINGLE) {
+        cv->mres->mropts |= PYCBC_MRES_F_SINGLE;
+    }
 
     if (!cv->mres) {
         pycbc_oputil_conn_unlock(self);

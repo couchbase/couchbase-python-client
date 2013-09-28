@@ -13,17 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import sys
+import types
+
+try:
+    from unittest.case import SkipTest
+except ImportError:
+    from nose.exc import SkipTest
+
 try:
     from configparser import ConfigParser
 except ImportError:
     # Python <3.0 fallback
     from ConfigParser import SafeConfigParser as ConfigParser
-import os
-import sys
 
-import unittest
-from nose.exc import SkipTest
-import types
+from testresources import ResourcedTestCase, TestResourceManager
+
 from couchbase.connection import Connection
 from couchbase.exceptions import CouchbaseError
 from couchbase.admin import Admin
@@ -69,33 +75,16 @@ class ClusterInformation(object):
         return Admin(self.admin_username, self.admin_password,
                      self.host, self.port)
 
-class CouchbaseTestCase(unittest.TestCase):
-    @classmethod
-    def _setup_mock(self, mockpath, mockurl):
-        bspec_dfl = BucketSpec('default', 'couchbase')
-        bspec_sasl = BucketSpec('default_sasl', 'couchbase', 'secret')
-        self.mock = CouchbaseMock([bspec_dfl, bspec_sasl],
-                                  mockpath,
-                                  mockurl,
-                                  replicas=2,
-                                  nodes=4)
-        self.mock.start()
-        info = ClusterInformation()
-        info.bucket_prefix = "default"
-        info.bucket_password = "secret"
-        info.port = self.mock.rest_port
-        info.host = "127.0.0.1"
-        info.admin_username = "Administrator"
-        info.admin_password = "password"
-        info.extra_buckets = True
-        self._mock_info = info
+class ConnectionConfiguration(object):
+    def __init__(self, filename=CONFIG_FILE):
+        self._fname = filename
+        self.load()
 
-    @classmethod
-    def setUpClass(self):
+    def load(self):
         config = ConfigParser()
-        config.read(CONFIG_FILE)
-        info = ClusterInformation()
+        config.read(self._fname)
 
+        info = ClusterInformation()
         info.host = config.get('realserver', 'host')
         info.port = config.getint('realserver', 'port')
         info.admin_username = config.get('realserver', 'admin_username')
@@ -105,29 +94,84 @@ class CouchbaseTestCase(unittest.TestCase):
         info.extra_buckets = config.getboolean('realserver','extra_buckets')
 
         if config.getboolean('realserver', 'enabled'):
-            self._realserver_info = info
+            self.realserver_info = info
         else:
-            self._realserver_info = None
+            self.realserver_info = None
 
         self.nosleep = os.environ.get('PYCBC_TESTS_NOSLEEP', False)
-        self.mock = None
-        if (config.has_option("mock", "enabled") and config.getboolean('mock', 'enabled')):
+        if (config.has_option("mock", "enabled") and
+                              config.getboolean('mock', 'enabled')):
 
-            mockpath = config.get("mock", "path")
+            self.mock_enabled = True
+            self.mockpath = config.get("mock", "path")
             if config.has_option("mock", "url"):
-                mockurl = config.get("mock", "url")
+                self.mockurl = config.get("mock", "url")
             else:
-                mockurl = None
-
-            self._setup_mock(mockpath, mockurl)
+                self.mockurl = None
         else:
-            self._mock_info = None
+            self.mock_enabled = False
 
-    @classmethod
-    def tearDownClass(self):
-        if self.mock:
-            self.mock.stop()
-        self.mock = None
+class MockResourceManager(TestResourceManager):
+    def __init__(self, config):
+        super(MockResourceManager, self).__init__()
+        self._config = config
+        self._info = None
+
+    def _reset(self, *args, **kw):
+        pass
+
+    def make(self, *args, **kw):
+        if not self._config.mock_enabled:
+            return None
+
+        if self._info:
+            return self._info
+
+        bspec_dfl = BucketSpec('default', 'couchbase')
+        bspec_sasl = BucketSpec('default_sasl', 'couchbase', 'secret')
+        mock = CouchbaseMock([bspec_dfl, bspec_sasl],
+                             self._config.mockpath,
+                             self._config.mockurl,
+                             replicas=2,
+                             nodes=4)
+        mock.start()
+
+        info = ClusterInformation()
+        info.bucket_prefix = "default"
+        info.bucket_password = "secret"
+        info.port = mock.rest_port
+        info.host = "127.0.0.1"
+        info.admin_username = "Administrator"
+        info.admin_password = "password"
+        info.extra_buckets = True
+        info.mock = mock
+        self._info = info
+        return info
+
+    def isDirty(self):
+        return False
+
+class RealServerResourceManager(TestResourceManager):
+    def __init__(self, config):
+        super(RealServerResourceManager, self).__init__()
+        self._config = config
+
+    def make(self, *args, **kw):
+        return self._config.realserver_info
+
+    def isDirty(self):
+        return False
+
+
+GLOBAL_CONFIG = ConnectionConfiguration()
+
+class CouchbaseTestCase(ResourcedTestCase):
+    resources = [
+        ('_mock_info', MockResourceManager(GLOBAL_CONFIG)),
+        ('_realserver_info', RealServerResourceManager(GLOBAL_CONFIG))
+    ]
+
+    config = GLOBAL_CONFIG
 
     @property
     def cluster_info(self):
@@ -143,6 +187,13 @@ class CouchbaseTestCase(unittest.TestCase):
         return self._realserver_info
 
     @property
+    def mock(self):
+        try:
+            return self._mock_info.mock
+        except AttributeError:
+            return None
+
+    @property
     def mock_info(self):
         if not self._mock_info:
             raise SkipTest("Mock server required")
@@ -150,6 +201,8 @@ class CouchbaseTestCase(unittest.TestCase):
 
 
     def setUp(self):
+        super(CouchbaseTestCase, self).setUp()
+
         if not hasattr(self, 'assertIsInstance'):
             def tmp(self, a, *bases):
                 self.assertTrue(isinstance(a, bases))
@@ -208,10 +261,6 @@ class CouchbaseTestCase(unittest.TestCase):
             raise SkipTest(("Test requires {0} to run (have {1})")
                             .format(vstr, rtstr))
 
-
-    def tearDown(self):
-        pass
-
     def skipIfMock(self):
         pass
 
@@ -222,7 +271,7 @@ class CouchbaseTestCase(unittest.TestCase):
         return self.cluster_info.make_connargs(**overrides)
 
     def slowTest(self):
-        if self.nosleep:
+        if self.config.nosleep:
             raise SkipTest("Skipping slow/sleep-based test")
 
     def make_connection(self, **kwargs):
@@ -251,21 +300,35 @@ class CouchbaseTestCase(unittest.TestCase):
         return ret
 
 class ConnectionTestCase(CouchbaseTestCase):
+    def checkCbRefcount(self):
+        import gc
+        gc.collect()
+        for x in range(10):
+            oldrc = sys.getrefcount(self.cb)
+            if oldrc > 2:
+                gc.collect()
+            else:
+                break
+
+        self.assertEqual(oldrc, 2)
+
     def setUp(self):
         super(ConnectionTestCase, self).setUp()
         self.cb = self.make_connection()
 
     def tearDown(self):
         super(ConnectionTestCase, self).tearDown()
-        oldrc = sys.getrefcount(self.cb)
-        self.assertEqual(oldrc, 2)
-        del self.cb
+        try:
+            self.checkCbRefcount()
+        finally:
+            del self.cb
 
 class RealServerTestCase(ConnectionTestCase):
     def setUp(self):
+        super(RealServerTestCase, self).setUp()
+
         if not self._realserver_info:
             raise SkipTest("Need real server")
-        super(RealServerTestCase, self).setUp()
 
     @property
     def cluster_info(self):

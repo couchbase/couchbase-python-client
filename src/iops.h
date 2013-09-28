@@ -19,16 +19,27 @@
 #include "pycbc.h"
 
 typedef enum {
+    /** Activate the event so that it may fire upon the trigger */
     PYCBC_EVACTION_WATCH = 1 << 0,
+
+    /** Deactive the event; ignoring the trigger */
     PYCBC_EVACTION_UNWATCH = 1 << 1,
+
+    /** Unused for now */
     PYCBC_EVACTION_SUSPEND = 1 << 2,
-    PYCBC_EVACTION_RESUME = 1 << 3
+
+    /** Unused for now */
+    PYCBC_EVACTION_RESUME = 1 << 3,
+
+    /** Cleanup the event, removing all references of it */
+    PYCBC_EVACTION_CLEANUP = 1 << 4
 } pycbc_evaction_t;
 
 typedef enum {
     PYCBC_EVSTATE_INITIALIZED,
     PYCBC_EVSTATE_ACTIVE,
-    PYCBC_EVSTATE_SUSPENDED
+    PYCBC_EVSTATE_SUSPENDED,
+    PYCBC_EVSTATE_FREED
 } pycbc_evstate_t;
 
 typedef enum {
@@ -46,8 +57,7 @@ typedef void (*pycbc_lcb_cb_t)(lcb_socket_t,short,void*);
     } cb; \
     PyObject *vdict; \
     pycbc_evstate_t state; \
-    pycbc_evtype_t type; \
-
+    pycbc_evtype_t type;
 
 typedef struct {
     pycbc_Event_HEAD
@@ -73,11 +83,22 @@ typedef struct pycbc_iops_st {
     /** Python object being used */
     PyObject *pyio;
 
-    /** Connection object we're instantiated from */
-    pycbc_Connection *conn;
+    pycbc_Connection *parent;
 
     /** Whether the loop is currently active */
     int in_loop;
+
+    /**
+     * Cached method table..
+     */
+    struct {
+        PyObject *mkevent;
+        PyObject *mktimer;
+        PyObject *modevent;
+        PyObject *modtimer;
+        PyObject *startwatch;
+        PyObject *stopwatch;
+    } meths;
 } pycbc_iops_t;
 
 #endif

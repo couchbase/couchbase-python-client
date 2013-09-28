@@ -75,7 +75,8 @@ class Admin(LCB.Connection):
             '_errors': deque()
         }
 
-        return super(Admin, self).__init__(**kwargs)
+        super(Admin, self).__init__(**kwargs)
+        self._connect()
 
     def http_request(self,
                      path,

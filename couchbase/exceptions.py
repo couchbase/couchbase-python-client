@@ -63,9 +63,12 @@ class CouchbaseError(Exception):
         """
         return _LCB_ERRNO_MAP.get(rc, cls)
 
-    def __init__(self, params):
+    def __init__(self, params=None):
         if isinstance(params, str):
             params = {'message': params}
+        elif isinstance(params, CouchbaseError):
+            self.__dict__.update(params.__dict__)
+            return
 
         self.rc = params.get('rc', 0)
         self.all_results = params.get('all_results', {})
@@ -316,6 +319,9 @@ class ObjectThreadError(CouchbaseError):
 class ViewEngineError(CouchbaseError):
     """Thrown for inline errors during view queries"""
 
+class ObjectDestroyedError(CouchbaseError):
+    """Object has been destroyed. Pending events are invalidated"""
+
 
 _LCB_ERRNO_MAP = {
     C.LCB_AUTH_ERROR:       AuthError,
@@ -351,5 +357,6 @@ _EXCTYPE_MAP = {
     C.PYCBC_EXC_ENCODING:   ValueFormatError,
     C.PYCBC_EXC_INTERNAL:   InternalSDKError,
     C.PYCBC_EXC_HTTP:       HTTPError,
-    C.PYCBC_EXC_THREADING:  ObjectThreadError
+    C.PYCBC_EXC_THREADING:  ObjectThreadError,
+    C.PYCBC_EXC_DESTROYED:  ObjectDestroyedError
 }

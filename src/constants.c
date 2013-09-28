@@ -92,6 +92,7 @@ pycbc_init_pyconstants(PyObject *module)
     PyModule_AddIntMacro(module, PYCBC_EXC_INTERNAL);
     PyModule_AddIntMacro(module, PYCBC_EXC_HTTP);
     PyModule_AddIntMacro(module, PYCBC_EXC_THREADING);
+    PyModule_AddIntMacro(module, PYCBC_EXC_DESTROYED);
 
     PyModule_AddIntMacro(module, LCB_TYPE_BUCKET);
     PyModule_AddIntMacro(module, LCB_TYPE_CLUSTER);
@@ -130,10 +131,14 @@ pycbc_init_pyconstants(PyObject *module)
 
     PyModule_AddIntMacro(module, PYCBC_CONN_F_WARNEXPLICIT);
     PyModule_AddIntMacro(module, PYCBC_CONN_F_CLOSED);
+    PyModule_AddIntMacro(module, PYCBC_CONN_F_ASYNC);
+    PyModule_AddIntMacro(module, PYCBC_CONN_F_ASYNC_DTOR);
+
     PyModule_AddIntMacro(module, PYCBC_EVACTION_WATCH);
     PyModule_AddIntMacro(module, PYCBC_EVACTION_UNWATCH);
     PyModule_AddIntMacro(module, PYCBC_EVACTION_SUSPEND);
     PyModule_AddIntMacro(module, PYCBC_EVACTION_RESUME);
+    PyModule_AddIntMacro(module, PYCBC_EVACTION_CLEANUP);
     PyModule_AddIntMacro(module, PYCBC_EVSTATE_INITIALIZED);
     PyModule_AddIntMacro(module, PYCBC_EVSTATE_ACTIVE);
     PyModule_AddIntMacro(module, PYCBC_EVSTATE_SUSPENDED);

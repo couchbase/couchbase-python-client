@@ -89,12 +89,20 @@ class Connection(_Base):
         if _gevent_support:
             kwargs['_iops'] = SelectIOPS()
 
-        try:
-            super(Connection, self).__init__(**kwargs)
+        super(Connection, self).__init__(**kwargs)
 
+        try:
+            self._do_ctor_connect()
         except exceptions.CouchbaseError as e:
             if not _no_connect_exceptions:
                 raise
+
+    def _do_ctor_connect(self):
+        """
+        This should be overidden by subclasses which want to use a different
+        sort of connection behavior
+        """
+        self._connect()
 
     def __getitem__(self, key):
         return self.get(key)
@@ -1279,7 +1287,7 @@ class Connection(_Base):
         self._design_poll(name, 'del', existing, syncwait)
         return ret
 
-    def query(self, design, view, use_devmode=False, **kwargs):
+    def query(self, design, view, use_devmode=False, itercls=View, **kwargs):
         """
         Query a pre-defined MapReduce view, passing parameters.
 
@@ -1297,6 +1305,8 @@ class Connection(_Base):
         :param kwargs: Extra arguments passedd to the
             :class:`~couchbase.views.iterator.View` object constructor.
 
+        :param itercls: Subclass of 'view' to use.
+
         .. seealso::
 
             * :class:`~couchbase.views.iterator.View`
@@ -1309,7 +1319,7 @@ class Connection(_Base):
 
         """
         design = self._mk_devmode(design, use_devmode)
-        return View(self, design, view, **kwargs)
+        return itercls(self, design, view, **kwargs)
 
     def __repr__(self):
         return ("<{modname}.{cls} bucket={bucket}, "

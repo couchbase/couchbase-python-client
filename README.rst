@@ -95,6 +95,40 @@ You can also use views
     [u'21st_amendment_brewery_cafe', u'21st_amendment_brewery_cafe-amendment_pale_ale']
     [u'21st_amendment_brewery_cafe', u'21st_amendment_brewery_cafe-bitter_american']
 
+~~~~~~~~~~~
+Twisted API
+~~~~~~~~~~~
+
+The Python client now has support for the Twisted async network framework.
+To use with Twisted, simply import ``txcouchbase.TxCouchbase`` instead of
+``couchbase.Couchbase``
+
+.. code-block:: python
+
+    from twisted.internet import reactor
+    from txcouchbase import TxCouchbase
+
+    cb = TxCouchbase.connect(bucket='default')
+    def on_set(ret):
+        print "Set key. Result", ret
+
+    def on_get(ret):
+        print "Got key. Result", ret
+        reactor.stop()
+
+    cb.set("key", "value").addCallback(on_set)
+    cb.get("key").addCallback(on_get)
+    reactor.run()
+
+    # Output:
+    # Set key. Result OperationResult<RC=0x0, Key=key, CAS=0x9a78cf56c08c0500>
+    # Got key. Result ValueResult<RC=0x0, Key=key, Value=u'value', CAS=0x9a78cf56c08c0500, Flags=0x0>
+
+
+The ``txcouchbase`` API is identical to the ``couchbase`` API, except that where
+the synchronous API will block until it receives a result, the async API will
+return a `Deferred` which will be called later with the result or an appropriate
+error.
 
 ~~~~~~~~~~~~~~
 Other Examples
@@ -119,6 +153,11 @@ The HTML output can be found in `docs/build/html/`.
 -------
 Testing
 -------
+
+For running the tests, you need the standard `unittest` module, shipped
+with Python. Additionally, the `testresources` package is required.
+
+To run them, use either `py.test`, `unittest` or `trial`.
 
 The tests need a running Couchbase instance. For this, a `tests/tests.ini`
 file must be present, containing various connection parameters.

@@ -101,6 +101,37 @@ finalize_data(pycbc_HttpResult *htres)
     }
 }
 
+
+static void
+invoke_async_callback(pycbc_HttpResult *res, int done)
+{
+    PyObject *args, *ret;
+
+    if (done == 0 && PyList_GET_SIZE(res->rowsbuf) == 0) {
+        return;
+    }
+
+    args = Py_BuildValue("(OO)", (PyObject *)res,
+                         done ? Py_None : res->rowsbuf);
+
+    if (!res->callback) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Missing callback for HTTP");
+
+    } else {
+        ret = PyObject_CallObject(res->callback, args);
+        Py_XDECREF(ret);
+    }
+
+    Py_DECREF(args);
+
+    if (!done) {
+        Py_XDECREF(res->rowsbuf);
+        res->rowsbuf = PyList_New(0);
+    }
+}
+
+
+
 /**
  * This callback does things a bit differently.
  * Instead of using a MultiResult, we use a single HttpResult object.
@@ -116,6 +147,7 @@ http_complete_callback(lcb_http_request_t req,
     pycbc_HttpResult *htres = (pycbc_HttpResult*)cookie;
 
     htres->htreq = NULL;
+    htres->done = 1;
 
     if (!htres->parent) {
         return;
@@ -142,6 +174,11 @@ http_complete_callback(lcb_http_request_t req,
         if (!htres->parent->nremaining) {
             lcb_breakout(instance);
         }
+
+        if (htres->parent->flags & PYCBC_CONN_F_ASYNC) {
+            invoke_async_callback(htres, 1);
+        }
+
         return;
     }
 
@@ -175,7 +212,6 @@ http_vrow_callback(lcbex_vrow_ctx_t *rctx,
     (void)rctx;
 }
 
-
 static void
 http_data_callback(lcb_http_request_t req,
                    lcb_t instance,
@@ -199,6 +235,10 @@ http_data_callback(lcb_http_request_t req,
 
     if (htres->rctx) {
         lcbex_vrow_feed(htres->rctx, resp->v.v0.bytes, resp->v.v0.nbytes);
+
+        if (htres->parent->flags & PYCBC_CONN_F_ASYNC) {
+            invoke_async_callback(htres, 0);
+        }
 
     } else if (resp->v.v0.bytes) {
         add_data(htres, resp->v.v0.bytes, resp->v.v0.nbytes);
@@ -241,6 +281,15 @@ maybe_raise(pycbc_HttpResult *htres)
                       (PyObject*)htres);
 
     return 1;
+}
+
+PyObject *
+pycbc_HttpResult__maybe_raise(pycbc_HttpResult *self)
+{
+    if (maybe_raise(self)) {
+        return NULL;
+    }
+    Py_RETURN_NONE;
 }
 
 PyObject *
@@ -338,8 +387,13 @@ pycbc_Connection__http_request(pycbc_Connection *self,
     htres->htreq = l_htreq;
 
     if (htcmd.v.v0.chunked) {
+        if (self->flags & PYCBC_CONN_F_ASYNC) {
+            htres->rowsbuf = PyList_New(0);
+        }
+
         ret = (PyObject*)htres;
         htres = NULL;
+
         goto GT_DONE;
     }
 
@@ -385,9 +439,17 @@ pycbc_HttpResult__fetch(pycbc_HttpResult *self)
         goto GT_RET;
     }
 
+    if (self->parent->flags & PYCBC_CONN_F_ASYNC) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
+                       "_fetch() should not be called with an async "
+                       "connection");
+        goto GT_RET;
+    }
+
     if (!self->rowsbuf) {
         self->rowsbuf = PyList_New(0);
     }
+
 
     err = pycbc_oputil_wait_common(self->parent);
 
