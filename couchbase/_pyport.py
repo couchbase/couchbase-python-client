@@ -21,9 +21,11 @@
 try:
     import urllib.parse as ulp
     from urllib.request import urlopen
+    from urllib.parse import parse_qs
 except ImportError:
     import urllib as ulp
     from urllib2 import urlopen
+    from urlparse import parse_qs
 
 try:
     long = long

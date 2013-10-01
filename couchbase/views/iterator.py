@@ -22,7 +22,8 @@ from warnings import warn
 
 from couchbase.exceptions import ArgumentError, CouchbaseError, ViewEngineError
 from couchbase.views.params import Query, UNSPEC, make_dvpath
-from couchbase._pyport import ulp
+from couchbase._pyport import ulp, xrange
+from couchbase.user_constants import FMT_JSON
 import couchbase._libcouchbase as C
 
 
@@ -323,7 +324,7 @@ class View(object):
         self._rp_iter = iter(self._rp_iter)
 
     def _handle_single_view(self):
-        self.raw = self._parent._view(self.design, self.view, params=self._query)
+        self.raw = self._create_raw()
         self._process_page(self.raw.value['rows'])
         self._handle_meta(self.raw.value)
 
@@ -334,6 +335,38 @@ class View(object):
         self.indexed_rows = value.get('total_rows', 0)
         self._handle_errors(value.get('errors'))
 
+
+    def _create_raw(self, **kwargs):
+        """
+        Return common parameters for _libcouchbase._http_request
+        """
+        d = {
+            'type': C.LCB_HTTP_TYPE_VIEW,
+            'fetch_headers': True,
+            'quiet': False,
+            'response_format': FMT_JSON
+        }
+
+        # Figure out the path
+        qstr = self._query.encoded
+        uri = make_dvpath(self.design, self.view)
+
+        if len(uri) + len(qstr) > 200:
+            (uriparams, post_data) = self._query._long_query_encoded
+
+            d['method'] = C.LCB_HTTP_METHOD_POST
+            d['post_data'] = post_data
+            d['path'] = uri + uriparams
+            d['content_type'] = "application/json"
+
+        else:
+            d['method'] = C.LCB_HTTP_METHOD_GET
+            d['path'] = "{0}{1}".format(uri, qstr)
+
+
+        d.update(**kwargs)
+        return self._parent._http_request(**d)
+
     def _get_page(self):
         if not self._streaming:
             self._handle_single_view()
@@ -341,17 +374,7 @@ class View(object):
             return
 
         if not self.raw:
-            params = {
-                'method': C.LCB_HTTP_METHOD_GET,
-                'type': C.LCB_HTTP_TYPE_VIEW,
-                'chunked': True,
-                'path': ('{0}{1}'
-                         ).format(make_dvpath(self.design, self.view),
-                                  self._query.encoded),
-                'fetch_headers': True,
-                'quiet': False
-            }
-            self.raw = self._parent._http_request(**params)
+            self.raw = self._create_raw(chunked=True)
 
         # Fetch the rows:
         rows = self.raw._fetch()

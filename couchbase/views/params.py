@@ -21,7 +21,7 @@
 import json
 from copy import deepcopy
 
-from couchbase._pyport import long, xrange, ulp, basestring
+from couchbase._pyport import long, xrange, ulp, basestring, parse_qs
 from couchbase.exceptions import ArgumentError
 
 # Some constants
@@ -469,11 +469,14 @@ class Query(object):
         else:
             raise ArgumentError.pyexc("Params must be Query, dict, or string")
 
-    def _encode(self):
+    def _encode(self, omit_keys=False):
         res_d = []
 
         for k, v in self._real_options.items():
             if v is UNSPEC:
+                continue
+
+            if omit_keys and k == "keys":
                 continue
 
             if not self.passthrough:
@@ -500,6 +503,20 @@ class Query(object):
 
         else:
             return self._encoded
+
+    @property
+    def _long_query_encoded(self):
+        """
+        Returns the (uri_part, post_data_part) for a long query.
+        """
+        uristr = self._encode(omit_keys=True)
+        kstr = ""
+
+        klist = self._real_options.get('keys', None)
+        if klist != UNSPEC:
+            kstr = '{{"keys":{0}}}'.format(klist)
+
+        return (uristr, kstr)
 
     @property
     def has_blob(self):

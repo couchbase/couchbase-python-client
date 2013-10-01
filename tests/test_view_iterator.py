@@ -315,3 +315,24 @@ class ViewIteratorTest(ConnectionTestCase):
         ret = self.cb.query("beer", "brewery_beers", limit=0)
         for row in ret:
             raise Exception("...")
+
+
+    def test_long_uri(self):
+        qobj = Query()
+        qobj.mapkey_multi = [ str(x) for x in range(500) ]
+        ret = self.cb.query("beer", "brewery_beers", query=qobj)
+        # No assertions, just make sure it didn't break
+        for row in ret:
+            raise Exception("...")
+
+        # Apparently only the "keys" parameter is supposed to be in POST.
+        # Let's fetch 100 items now
+        keys = [r.key for r in self.cb.query("beer", "brewery_beers", limit=100)]
+        self.assertEqual(100, len(keys))
+
+        kslice = keys[90:]
+        self.assertEqual(10, len(kslice))
+        rows = [x for x in self.cb.query("beer", "brewery_beers", mapkey_multi=kslice, limit=5)]
+        self.assertEqual(5, len(rows))
+        for row in rows:
+            self.assertTrue(row.key in kslice)
