@@ -212,4 +212,5 @@ class Couchbase:
                           timeout=timeout,
                           transcoder=transcoder,
                           quiet=quiet,
+                          lockmode=lockmode,
                           **kwargs)
