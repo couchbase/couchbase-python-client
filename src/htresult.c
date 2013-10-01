@@ -54,6 +54,16 @@ HttpResult_headers(pycbc_HttpResult *self, void *unused)
     return self->headers;
 }
 
+static PyObject *
+HttpResult_done(pycbc_HttpResult *self, void *unused)
+{
+    PyObject *res = self->htflags & PYCBC_HTRES_F_COMPLETE ? Py_True : Py_False;
+    Py_INCREF(res);
+
+    (void)unused;
+    return res;
+}
+
 static void
 HttpResult_dealloc(pycbc_HttpResult *self)
 {
@@ -112,6 +122,14 @@ static PyGetSetDef HttpResult_TABLE_getset[] = {
                         "None unless 'fetch_headers' was passed to the request")
         },
 
+        { "done",
+                (getter)HttpResult_done,
+                NULL,
+                PyDoc_STR("Return true if this request has no more data.\n"
+                        "This is most useful when issuing a streaming request\n"
+                        "where multiple chunks of data may arrive.\n")
+        },
+
         { NULL }
 };
 
@@ -154,6 +172,7 @@ pycbc_httpresult_new(pycbc_Connection *parent)
     pycbc_HttpResult* ret = (pycbc_HttpResult*)
             PyObject_CallFunction((PyObject*)&pycbc_HttpResultType, NULL, NULL);
     ret->parent = parent;
+    ret->http_data = PyList_New(0);
     Py_INCREF(parent);
     return ret;
 }

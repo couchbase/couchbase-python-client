@@ -328,6 +328,9 @@ class View(object):
         self._handle_meta(self.raw.value)
 
     def _handle_meta(self, value):
+        if not self.raw.done:
+            return
+
         self.indexed_rows = value.get('total_rows', 0)
         self._handle_errors(value.get('errors'))
 

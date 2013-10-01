@@ -44,39 +44,61 @@ get_headers(pycbc_HttpResult *htres, const lcb_http_resp_t * resp)
 }
 
 static void
-get_data(pycbc_HttpResult *htres, const void *data, size_t ndata)
+add_data(pycbc_HttpResult *htres, const void *data, size_t ndata)
 {
-    PyObject *o = NULL;
+    PyObject *o;
 
-    if (data == NULL) {
-        if (!htres->http_data) {
-            htres->http_data = Py_None;
-            Py_INCREF(Py_None);
-        }
+    if (!ndata) {
         return;
     }
 
-    pycbc_tc_simple_decode(&o, data, ndata, htres->format);
-
-    if (!o) {
-        PyErr_Clear();
-        htres->http_data = PyBytes_FromStringAndSize(data, ndata);
-    }
-
-    if ((htres->htflags & PYCBC_HTRES_F_CHUNKED) &&
-            htres->http_data &&
-            PyList_Check(htres->http_data)) {
-        /**
-         * If we have a list here, then it means we got an error and have to
-         * start populating it. Otherwise, we handle as usual
-         */
-        PyList_Append(htres->http_data, o);
+    if (htres->format == PYCBC_FMT_JSON) {
+        o = PyUnicode_FromStringAndSize(data, ndata);
 
     } else {
-        Py_XDECREF(htres->http_data);
-        htres->http_data = o;
+        o = PyBytes_FromStringAndSize(data, ndata);
     }
 
+    pycbc_assert(htres->http_data);
+
+    PyList_Append(htres->http_data, o);
+    Py_XDECREF(o);
+}
+
+static void
+finalize_data(pycbc_HttpResult *htres)
+{
+    PyObject *sep;
+    PyObject *res;
+
+    if (htres->format != PYCBC_FMT_JSON && htres->format != PYCBC_FMT_UTF8) {
+        return;
+    }
+
+    if (!PyObject_IsTrue(htres->http_data)) {
+        return;
+    }
+
+    sep = pycbc_SimpleStringZ("");
+    res = PyUnicode_Join(sep, htres->http_data);
+    Py_DECREF(sep);
+
+    if (res) {
+        Py_DECREF(htres->http_data);
+        htres->http_data = res;
+    }
+
+    if (htres->format == PYCBC_FMT_JSON) {
+        PyObject *args = Py_BuildValue("(O)", htres->http_data);
+
+        res = PyObject_CallObject(pycbc_helpers.json_decode, args);
+        if (res) {
+            Py_XDECREF(htres->http_data);
+            htres->http_data = res;
+        }
+
+        Py_XDECREF(args);
+    }
 }
 
 /**
@@ -101,6 +123,15 @@ http_complete_callback(lcb_http_request_t req,
 
     htres->rc = err;
     htres->htcode = resp->v.v0.status;
+    htres->htflags |= PYCBC_HTRES_F_COMPLETE;
+
+    PYCBC_CONN_THR_END(htres->parent);
+
+    add_data(htres, resp->v.v0.bytes, resp->v.v0.nbytes);
+    get_headers(htres, resp);
+    finalize_data(htres);
+
+    PYCBC_CONN_THR_BEGIN(htres->parent);
 
     if (htres->htflags & PYCBC_HTRES_F_CHUNKED) {
         /** No data here */
@@ -115,16 +146,10 @@ http_complete_callback(lcb_http_request_t req,
     }
 
 
-    PYCBC_CONN_THR_END(htres->parent);
-
     if (!--htres->parent->nremaining) {
         lcb_breakout(instance);
     }
 
-    get_data(htres, resp->v.v0.bytes, resp->v.v0.nbytes);
-    get_headers(htres, resp);
-
-    PYCBC_CONN_THR_BEGIN(htres->parent);
     (void)instance;
     (void)req;
 }
@@ -144,9 +169,7 @@ http_vrow_callback(lcbex_vrow_ctx_t *rctx,
         }
 
     } else {
-        Py_XDECREF(htres->http_data);
-        htres->http_data = NULL;
-        get_data(htres, row->data, row->ndata);
+        add_data(htres, row->data, row->ndata);
     }
 
     (void)rctx;
@@ -170,25 +193,15 @@ http_data_callback(lcb_http_request_t req,
     get_headers(htres, resp);
 
     if (err != LCB_SUCCESS || resp->v.v0.status < 200 || resp->v.v0.status > 299) {
-        PyObject *old_data = htres->http_data;
-
         lcbex_vrow_free(htres->rctx);
         htres->rctx = NULL;
-        htres->http_data = PyList_New(0);
-
-        if (old_data) {
-            if (old_data != Py_None) {
-                PyList_Append(htres->http_data, old_data);
-            }
-            Py_DECREF(old_data);
-        }
     }
 
     if (htres->rctx) {
         lcbex_vrow_feed(htres->rctx, resp->v.v0.bytes, resp->v.v0.nbytes);
 
     } else if (resp->v.v0.bytes) {
-        get_data(htres, resp->v.v0.bytes, resp->v.v0.nbytes);
+        add_data(htres, resp->v.v0.bytes, resp->v.v0.nbytes);
     }
 
     if (!htres->parent->nremaining) {
