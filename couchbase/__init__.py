@@ -126,11 +126,13 @@ class Couchbase:
           :exc:`couchbase.exceptions.NotFoundError` exceptions. When set
           to `True` the operations will return `None` silently.
 
-        :param string conncache: If set, this will refer to a path on the
+        :param string conncache: If set, this will refer to a file on the
           filesystem where cached "bootstrap" information may be stored. This
           path may be shared among multiple instance of the Couchbase client.
           Using this option may reduce overhead when using many short-lived
           instances of the client.
+
+          If the file does not exist, it will be created.
 
         :param boolean unlock_gil: If set (which is the default), the
           connection object will release the python GIL when possible, allowing
