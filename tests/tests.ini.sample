@@ -22,6 +22,6 @@ extra_buckets = 0
 ; Set this to enabled to use the mock
 enabled = 0
 ; Local path for the mock
-path = /tmp/CouchbaseMock-0.5-SNAPSHOT.jar
+path = /tmp/CouchbaseMock-0.6-SNAPSHOT.jar
 ; Where to download it, if not available
 url = http://packages.couchbase.com/clients/python/snapshots/CouchbaseMock-0.6-SNAPSHOT.jar
