@@ -122,7 +122,6 @@ class ConnectionItemTest(ConnectionTestCase):
         rv = self.cb.get(it.key)
         self.assertEqual(rv.cas, it.cas)
 
-
     def test_subclass_descriptors(self):
         class MyItem(Item):
             def __init__(self):
@@ -141,3 +140,14 @@ class ConnectionItemTest(ConnectionTestCase):
         self.assertRaises(ArgumentError,
                           self.cb.set_multi,
                           ItemSequence([it]))
+
+    def test_apiwrap(self):
+        it = Item(self.gen_key("item_apiwrap"))
+        self.cb.set_multi(it.as_itcoll())
+        self.assertTrue(it.cas)
+
+        # Set with 'ignorecas'
+        it.cas = 1234
+        self.cb.set_multi(it.as_itcoll(ignore_cas=True))
+
+        self.cb.set_multi(ItemSequence(it))

@@ -63,11 +63,39 @@ class Item(_Item):
                     def key(self, newkey):
                         self._key = key
 
+        To use this class with the :class:`couchbase.connection.Connection`
+        API methods, you must take care to:
+
+        1. Use only the ``*_multi`` methods
+        2. Pass one of the :class:`ItemCollection` objects to these methods.
+           This will let the API know to enable special handling for
+           the :class:`Item` API.
+
         """
 
         super(Item, self).__init__()
         self.key = key
         self.value = value
+
+    def as_itcoll(self, **kwargs):
+        """
+        Convenience method to return an instance of a :class:`ItemCollection`
+        containing only this item. This would then be used like so::
+
+            cb.set_multi(itm.as_itcoll())
+
+        Or use it with options::
+
+            cb.set_multi(itm.as_itcoll(ignore_cas=True))
+
+        :param kwargs: Extra operation-specific options.
+
+        :return: An :class:`ItemCollection` instance
+        """
+        if not kwargs:
+            return ItemSequence([self])
+        else:
+            return ItemOptionDict({self: kwargs})
 
 class ItemCollection(object):
     """
@@ -75,6 +103,21 @@ class ItemCollection(object):
     """
     def __len__(self):
         raise NotImplementedError()
+
+    def __iter__(self):
+        """
+        This iterator is mainly intended for the internal API use; it
+        yields a tuple of (item, options).
+        In the case of a :class:`ItemSequence` which does not store
+        options, the second element is always `None`
+        """
+
+    def dict_items(self):
+        """
+        Iterator which returns a tuple of ``(item, options)``
+        for each item in this collection.
+        """
+        return iter(self)
 
 class ItemOptionDict(ItemCollection):
     def __init__(self, d=None):
@@ -85,7 +128,7 @@ class ItemOptionDict(ItemCollection):
         The keys and values for the options dictionary depends on the command
         being used. See the appropriate command for more options
 
-        :param dict d: A dictionary of item -> option, or None
+        :param dict d: A dictionary of item -> option, or None.
         """
         if d is None:
             d = {}
@@ -122,13 +165,14 @@ class ItemOptionDict(ItemCollection):
         return len(self._d)
 
 class ItemSequence(ItemCollection):
-    def __init__(self, seq):
+    def __init__(self, obj):
         """
         Create a new :class:`ItemSequence` object
 
-        :param iterable seq: A sequence containing the items
+        :param seq: A sequence containing the items
+        :type seq: An iterable or a single item
         """
-        self._seq = seq
+        self._seq = [ obj ] if isinstance(obj, Item) else obj
 
     @property
     def sequence(self):
