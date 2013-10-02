@@ -21,7 +21,7 @@ Prerequisites
 ~~~~~~~~~~~~~
 
 - Couchbase Server (http://couchbase.com/download)
-- libcouchbase_. version 2.0.5 or greater (Bundled in Windows installer)
+- libcouchbase_. version 2.1.0 or greater (Bundled in Windows installer)
 - libcouchbase development files.
 - Python development files
 - A C compiler.
