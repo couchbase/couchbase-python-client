@@ -89,6 +89,6 @@ if __name__ == "__main__":
         print(get_version())
     elif cmd == "make":
         gen_version()
-        print(gen_version())
+        print(get_version())
     else:
         raise Exception("Command must be 'show' or 'make'")
