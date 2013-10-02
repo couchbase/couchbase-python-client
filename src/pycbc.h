@@ -23,6 +23,11 @@
 
 #include <Python.h>
 #include <libcouchbase/couchbase.h>
+
+#if LCB_VERSION < 0x020100
+#error "Couchbase Python SDK requires libcouchbase 2.1.0 or greater"
+#endif
+
 #include <pythread.h>
 #include "viewrow/viewrow.h"
 
