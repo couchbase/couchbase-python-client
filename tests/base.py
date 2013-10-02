@@ -57,7 +57,7 @@ class CouchbaseTestCase(unittest.TestCase):
         self.extra_buckets = True
 
     @classmethod
-    def setupClass(self):
+    def setUpClass(self):
         config = ConfigParser()
         config.read(CONFIG_FILE)
         self.host = config.get('node-1', 'host')
@@ -81,7 +81,7 @@ class CouchbaseTestCase(unittest.TestCase):
                 self._setup_mock(mockpath, mockurl)
 
     @classmethod
-    def teardownClass(self):
+    def tearDownClass(self):
         if self.mock:
             self.mock.stop()
         self.mock = None
