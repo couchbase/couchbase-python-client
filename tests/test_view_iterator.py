@@ -336,3 +336,19 @@ class ViewIteratorTest(ConnectionTestCase):
         self.assertEqual(5, len(rows))
         for row in rows:
             self.assertTrue(row.key in kslice)
+
+
+    def _verify_data(self, ret):
+        list(ret)
+        data = ret.raw.value
+        self.assertTrue('rows' in data)
+        self.assertTrue('total_rows' in data)
+        self.assertTrue('debug_info' in data)
+
+
+    def test_http_data(self):
+        q = Query(limit=30, debug=True)
+        self._verify_data(self.cb.query("beer", "brewery_beers", streaming=True,
+                                        query=q))
+        self._verify_data(self.cb.query("beer", "brewery_beers", streaming=False,
+                                        query=q))
