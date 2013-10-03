@@ -18,6 +18,8 @@
 import tempfile
 import os
 
+from nose.exc import SkipTest
+
 from couchbase.exceptions import (AuthError, ArgumentError,
                                   BucketNotFoundError, ConnectError,
                                   NotFoundError, InvalidError)
@@ -28,10 +30,10 @@ from tests.base import CouchbaseTestCase
 
 class ConnectionTest(CouchbaseTestCase):
     def test_connection_host_port(self):
-        cb = Connection(host=self.host,
-                        port=self.port,
-                        password=self.bucket_password,
-                        bucket=self.bucket_prefix)
+        cb = Connection(host=self.cluster_info.host,
+                        port=self.cluster_info.port,
+                        password=self.cluster_info.bucket_password,
+                        bucket=self.cluster_info.bucket_prefix)
         # Connection didn't throw an error
         self.assertIsInstance(cb, Connection)
 
@@ -41,7 +43,7 @@ class ConnectionTest(CouchbaseTestCase):
         connargs['host'] = 'example.com'
         self.assertRaises(ConnectError, Connection, **connargs)
 
-        connargs['host'] = self.host
+        connargs['host'] = self.cluster_info.host
         connargs['port'] = 34567
         self.assertRaises(ConnectError, Connection, **connargs)
 
@@ -51,12 +53,7 @@ class ConnectionTest(CouchbaseTestCase):
 
     def test_sasl_bucket(self):
         self.skipUnlessSasl()
-        connargs = self.make_connargs()
-        sasl_params = self.get_sasl_params()
-
-        connargs['bucket'] = sasl_params['bucket']
-        connargs['password'] = sasl_params['password']
-        cb = Connection(**connargs)
+        cb = Connection(**self.get_sasl_cinfo().make_connargs())
         self.assertIsInstance(cb, Connection)
 
     def test_bucket_not_found(self):
@@ -64,7 +61,9 @@ class ConnectionTest(CouchbaseTestCase):
         self.assertRaises(BucketNotFoundError, Connection, **connargs)
 
     def test_bucket_wrong_credentials(self):
-        self.skipIfMock()
+        sasl_info = self.get_sasl_cinfo()
+        if sasl_info is self.mock_info:
+            raise SkipTest("Mock not supported")
 
         self.assertRaises(AuthError, Connection,
                           **self.make_connargs(password='bad_pass'))
@@ -74,9 +73,10 @@ class ConnectionTest(CouchbaseTestCase):
 
     def test_sasl_bucket_wrong_credentials(self):
         self.skipUnlessSasl()
-        sasl_bucket = self.get_sasl_params()['bucket']
+        sasl_info = self.get_sasl_cinfo()
+        sasl_bucket = sasl_info.get_sasl_params()['bucket']
         self.assertRaises(AuthError, Connection,
-                          **self.make_connargs(password='wrong_password',
+                          **sasl_info.make_connargs(password='wrong_password',
                                                bucket=sasl_bucket))
 
     def test_quiet(self):
@@ -140,18 +140,24 @@ class ConnectionTest(CouchbaseTestCase):
 
     def test_multi_hosts(self):
         kwargs = {
-            'password' : self.bucket_password,
-            'bucket' : self.bucket_prefix
+            'password' : self.cluster_info.bucket_password,
+            'bucket' : self.cluster_info.bucket_prefix
         }
 
         if not self.mock:
-            cb = Connection(host=[self.host], **kwargs)
+            cb = Connection(host=[self.cluster_info.host], **kwargs)
             self.assertTrue(cb.set("foo", "bar").success)
 
-        cb = Connection(host=[(self.host, self.port)], **kwargs)
+        hostspec = [(self.cluster_info.host, self.cluster_info.port)]
+        cb = Connection(host=hostspec, **kwargs)
         self.assertTrue(cb.set("foo", "bar").success)
 
-        cb = Connection(host=[('localhost', 1), (self.host, self.port)], **kwargs)
+        hostlist = [
+            ('localhost', 1),
+            (self.cluster_info.host,
+             self.cluster_info.port)
+        ]
+        cb = Connection(host=hostlist, **kwargs)
         self.assertTrue(cb.set("foo", "bar").success)
 
 if __name__ == '__main__':

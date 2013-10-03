@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-from tests.base import ConnectionTestCase
+from tests.base import ConnectionTestCase, RealServerTestCase
 
 
 # For Python 2/3 compatibility
@@ -37,9 +37,9 @@ class ConnectionStatsTest(ConnectionTestCase):
         self.assertIsInstance(key, basestring)
         self.assertIsInstance(info, dict)
 
-    def test_stats_with_argument(self):
-        self.skipIfMock()
 
+class ConnectionStatsDetailTest(RealServerTestCase):
+    def test_stats_with_argument(self):
         stats = self.cb.stats('memory')
         self.assertIsInstance(stats, dict)
         self.assertTrue('mem_used' in stats)
@@ -49,8 +49,6 @@ class ConnectionStatsTest(ConnectionTestCase):
         self.assertIsInstance(info, dict)
 
     def test_stats_with_argument_list(self):
-        self.skipIfMock()
-
         stats = self.cb.stats(['memory', 'tap'])
         self.assertIsInstance(stats, dict)
         self.assertTrue('mem_used' in stats)

@@ -17,10 +17,10 @@
 
 from couchbase.exceptions import NotFoundError, ArgumentError
 
-from tests.base import ConnectionTestCase
+from tests.base import MockTestCase
 from couchbase.mockserver import MockControlClient
 
-class ConnectionReplicaGetTest(ConnectionTestCase):
+class ConnectionReplicaGetTest(MockTestCase):
     def setUp(self):
         super(ConnectionReplicaGetTest, self).setUp()
         self.skipUnlessMock()

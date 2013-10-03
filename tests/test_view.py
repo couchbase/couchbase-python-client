@@ -16,7 +16,7 @@
 #
 import json
 
-from tests.base import ConnectionTestCase
+from tests.base import ViewTestCase
 from couchbase.user_constants import FMT_JSON
 from couchbase.exceptions import HTTPError
 
@@ -55,7 +55,7 @@ DOCS_JSON = {
     }
 }
 
-class ConnectionViewTest(ConnectionTestCase):
+class ConnectionViewTest(ViewTestCase):
     def setUp(self):
         super(ConnectionViewTest, self).setUp()
         self.skipIfMock()

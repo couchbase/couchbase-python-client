@@ -16,7 +16,7 @@
 #
 import time
 
-from tests.base import ConnectionTestCase
+from tests.base import DDocTestCase
 from couchbase.exceptions import HTTPError, CouchbaseError
 
 DNAME = "tmp"
@@ -31,7 +31,7 @@ DESIGN_JSON = {
     }
 }
 
-class DesignDocManagementTest(ConnectionTestCase):
+class DesignDocManagementTest(DDocTestCase):
     def setUp(self):
         super(DesignDocManagementTest, self).setUp()
         self.skipIfMock()

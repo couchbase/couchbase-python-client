@@ -16,7 +16,7 @@
 #
 from nose.exc import SkipTest
 
-from tests.base import ConnectionTestCase
+from tests.base import ViewTestCase
 from couchbase.views.iterator import (
     View, ViewRow, RowProcessor, AlreadyQueriedError)
 
@@ -155,7 +155,7 @@ class BreweryBeerRowProcessor(object):
         self._riter = None
 
 
-class ViewIteratorTest(ConnectionTestCase):
+class ViewIteratorTest(ViewTestCase):
     def setUp(self):
         super(ViewIteratorTest, self).setUp()
         self.skipIfMock()

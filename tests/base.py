@@ -34,51 +34,94 @@ from couchbase._pyport import basestring
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'tests.ini')
 
+class ClusterInformation(object):
+    def __init__(self):
+        self.host = "localhost"
+        self.port = 8091
+        self.admin_username = "Administrator"
+        self.admin_password = "password"
+        self.bucket_prefix = "default"
+        self.bucket_password = ""
+        self.extra_buckets = False
+
+    def make_connargs(self, **overrides):
+        ret = {
+            'host': self.host,
+            'port': self.port,
+            'password': self.bucket_password,
+            'bucket': self.bucket_prefix
+        }
+        ret.update(overrides)
+        return ret
+
+    def get_sasl_params(self):
+        if not self.bucket_password:
+            return None
+        ret = self.make_connargs()
+        if self.extra_buckets:
+            ret['bucket'] += "_sasl"
+        return ret
+
+    def make_connection(self, conncls=Connection, **kwargs):
+        return conncls(**self.make_connargs(**kwargs))
+
+    def make_admin_connection(self):
+        return Admin(self.admin_username, self.admin_password,
+                     self.host, self.port)
 
 class CouchbaseTestCase(unittest.TestCase):
     @classmethod
     def _setup_mock(self, mockpath, mockurl):
-
         bspec_dfl = BucketSpec('default', 'couchbase')
         bspec_sasl = BucketSpec('default_sasl', 'couchbase', 'secret')
-
         self.mock = CouchbaseMock([bspec_dfl, bspec_sasl],
                                   mockpath,
                                   mockurl,
                                   replicas=2,
                                   nodes=4)
         self.mock.start()
-        self.bucket_prefix = "default"
-        self.bucket_password = "secret"
-        self.port = self.mock.rest_port
-        self.host = "127.0.0.1"
-        self.admin_username = "Administrator"
-        self.admin_password = "password"
-        self.extra_buckets = True
+        info = ClusterInformation()
+        info.bucket_prefix = "default"
+        info.bucket_password = "secret"
+        info.port = self.mock.rest_port
+        info.host = "127.0.0.1"
+        info.admin_username = "Administrator"
+        info.admin_password = "password"
+        info.extra_buckets = True
+        self._mock_info = info
 
     @classmethod
     def setUpClass(self):
         config = ConfigParser()
         config.read(CONFIG_FILE)
-        self.host = config.get('node-1', 'host')
-        self.port = config.getint('node-1', 'port')
-        self.admin_username = config.get('node-1', 'admin_username')
-        self.admin_password = config.get('node-1', 'admin_password')
-        self.bucket_prefix = config.get('node-1', 'bucket_prefix')
-        self.bucket_password = config.get('node-1', 'bucket_password')
+        info = ClusterInformation()
+
+        info.host = config.get('realserver', 'host')
+        info.port = config.getint('realserver', 'port')
+        info.admin_username = config.get('realserver', 'admin_username')
+        info.admin_password = config.get('realserver', 'admin_password')
+        info.bucket_prefix = config.get('realserver', 'bucket_prefix')
+        info.bucket_password = config.get('realserver', 'bucket_password')
+        info.extra_buckets = config.getboolean('realserver','extra_buckets')
+
+        if config.getboolean('realserver', 'enabled'):
+            self._realserver_info = info
+        else:
+            self._realserver_info = None
+
         self.nosleep = os.environ.get('PYCBC_TESTS_NOSLEEP', False)
-        self.extra_buckets = bool(int(config.get('node-1', 'extra_buckets')))
-
         self.mock = None
-        if config.has_option("mock", "enabled"):
-            if config.getboolean("mock", "enabled"):
-                mockpath = config.get("mock", "path")
-                if config.has_option("mock", "url"):
-                    mockurl = config.get("mock", "url")
-                else:
-                    mockurl = None
+        if (config.has_option("mock", "enabled") and config.getboolean('mock', 'enabled')):
 
-                self._setup_mock(mockpath, mockurl)
+            mockpath = config.get("mock", "path")
+            if config.has_option("mock", "url"):
+                mockurl = config.get("mock", "url")
+            else:
+                mockurl = None
+
+            self._setup_mock(mockpath, mockurl)
+        else:
+            self._mock_info = None
 
     @classmethod
     def tearDownClass(self):
@@ -86,6 +129,24 @@ class CouchbaseTestCase(unittest.TestCase):
             self.mock.stop()
         self.mock = None
 
+    @property
+    def cluster_info(self):
+        for v in [self._realserver_info, self._mock_info]:
+            if v:
+                return v
+        raise Exception("Neither mock nor realserver available")
+
+    @property
+    def realserver_info(self):
+        if not self._realserver_info:
+            raise SkipTest("Real server required")
+        return self._realserver_info
+
+    @property
+    def mock_info(self):
+        if not self._mock_info:
+            raise SkipTest("Mock server required")
+        return self._mock_info
 
 
     def setUp(self):
@@ -100,21 +161,22 @@ class CouchbaseTestCase(unittest.TestCase):
 
         self._key_counter = 0
 
+    def get_sasl_cinfo(self):
+        for info in [self._realserver_info, self._mock_info]:
+            if info and info.bucket_password:
+                return info
+
 
     def get_sasl_params(self):
-        if not self.bucket_password:
+        einfo = self.get_sasl_cinfo()
+        if not einfo:
             return None
-        ret = self.make_connargs()
-        ret = { 'password' : self.bucket_password, 'bucket' : self.bucket_prefix }
-        if self.extra_buckets:
-            ret['bucket'] += "_sasl"
-        return ret
+        return einfo.get_sasl_params()
 
     def skipUnlessSasl(self):
         sasl_params = self.get_sasl_params()
         if not sasl_params:
             raise SkipTest("No SASL buckets configured")
-
 
     def skipLcbMin(self, vstr):
         """
@@ -151,32 +213,23 @@ class CouchbaseTestCase(unittest.TestCase):
         pass
 
     def skipIfMock(self):
-        if self.mock:
-            raise SkipTest("Test not supported on Mock")
+        pass
 
     def skipUnlessMock(self):
-        if not self.mock:
-            raise SkipTest("Test requires CouchbaseMock")
+        pass
 
     def make_connargs(self, **overrides):
-        ret = {
-            'host' : self.host,
-            'port' : self.port,
-            'password' : self.bucket_password,
-            'bucket' : self.bucket_prefix
-        }
-        ret.update(overrides)
-        return ret
+        return self.cluster_info.make_connargs(**overrides)
 
     def slowTest(self):
         if self.nosleep:
             raise SkipTest("Skipping slow/sleep-based test")
 
     def make_connection(self, **kwargs):
-        return Connection(**self.make_connargs(**kwargs))
+        return self.cluster_info.make_connection(**kwargs)
 
     def make_admin_connection(self):
-        return Admin(self.admin_username, self.admin_password, self.host, self.port)
+        return self.realserver_info.make_admin_connection()
 
     def gen_key(self, prefix=None):
         if not prefix:
@@ -197,7 +250,6 @@ class CouchbaseTestCase(unittest.TestCase):
             ret[k] = "Value_For_" + k
         return ret
 
-
 class ConnectionTestCase(CouchbaseTestCase):
     def setUp(self):
         super(ConnectionTestCase, self).setUp()
@@ -209,9 +261,35 @@ class ConnectionTestCase(CouchbaseTestCase):
         self.assertEqual(oldrc, 2)
         del self.cb
 
+class RealServerTestCase(ConnectionTestCase):
+    def setUp(self):
+        if not self._realserver_info:
+            raise SkipTest("Need real server")
+        super(RealServerTestCase, self).setUp()
+
+    @property
+    def cluster_info(self):
+        return self.realserver_info
+
+class DDocTestCase(RealServerTestCase):
+    pass
+
+class ViewTestCase(RealServerTestCase):
+    pass
+
+
+
+
 # Class which sets up all the necessary Mock stuff
 class MockTestCase(ConnectionTestCase):
     def setUp(self):
         super(MockTestCase, self).setUp()
         self.skipUnlessMock()
         self.mockclient = MockControlClient(self.mock.rest_port)
+
+    def make_connection(self, **kwargs):
+        return self.mock_info.make_connection(**kwargs)
+
+    @property
+    def cluster_info(self):
+        return self.mock_info

@@ -25,14 +25,14 @@ from couchbase.exceptions import (
 
 from tests.base import CouchbaseTestCase
 
-class AdminSimpleSet(CouchbaseTestCase):
+class AdminSimpleTest(CouchbaseTestCase):
     def setUp(self):
-        super(AdminSimpleSet, self).setUp()
+        super(AdminSimpleTest, self).setUp()
         self.skipIfMock()
         self.admin = self.make_admin_connection()
 
     def tearDown(self):
-        super(AdminSimpleSet, self).tearDown()
+        super(AdminSimpleTest, self).tearDown()
         rc = sys.getrefcount(self.admin)
         self.assertEqual(rc, 2)
         del self.admin
@@ -71,7 +71,7 @@ class AdminSimpleSet(CouchbaseTestCase):
 
     def test_bad_auth(self):
         self.assertRaises(AuthError, Admin,
-                          'baduser', 'badpass', host=self.host)
+                          'baduser', 'badpass', host=self.cluster_info.host)
 
     def test_bad_host(self):
         self.assertRaises(ConnectError, Admin,

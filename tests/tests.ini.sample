@@ -1,11 +1,11 @@
-[node-1]
+[realserver]
 host = localhost
 port = 8091
 admin_username = Administrator
 
 ; The administrative password. This is the password used to
 ; log into the admin console
-admin_password = opensesame
+admin_password = 123456
 
 bucket_prefix = default
 ; If a SASL bucket is being used (i.e. buckets are set up
@@ -14,13 +14,16 @@ bucket_prefix = default
 bucket_password =
 
 ; If using an existing cluster with the simple 'default' bucket,
-; set this to 0. If your cluster was set up with the 'setup_tests.py'
-; script, you may set this to 1
-extra_buckets = 0
+; set this to False. If your cluster was set up with the 'setup_tests.py'
+; script, you may set this to True
+extra_buckets = False
+
+; Set this to true if there is a real cluster available
+enabled = True
 
 [mock]
 ; Set this to enabled to use the mock
-enabled = 0
+enabled = True
 ; Local path for the mock
 path = /tmp/CouchbaseMock-0.6-SNAPSHOT.jar
 ; Where to download it, if not available
