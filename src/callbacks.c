@@ -19,8 +19,29 @@
 #define CB_THREADS
 
 #ifdef CB_THREADS
-#define CB_THR_END PYCBC_CONN_THR_END
-#define CB_THR_BEGIN PYCBC_CONN_THR_BEGIN
+
+static void
+cb_thr_end(pycbc_Connection *self)
+{
+    PYCBC_CONN_THR_END(self);
+    Py_INCREF((PyObject *)self);
+}
+
+static void
+cb_thr_begin(pycbc_Connection *self)
+{
+    if (Py_REFCNT(self) > 1) {
+        Py_DECREF(self);
+        PYCBC_CONN_THR_BEGIN(self);
+        return;
+    }
+
+    pycbc_assert(self->unlock_gil == 0);
+    Py_DECREF(self);
+}
+
+#define CB_THR_END cb_thr_end
+#define CB_THR_BEGIN cb_thr_begin
 #else
 #define CB_THR_END(x)
 #define CB_THR_BEGIN(x)
