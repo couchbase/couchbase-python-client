@@ -18,9 +18,7 @@
 from couchbase import FMT_BYTES, FMT_JSON, FMT_PICKLE, FMT_UTF8
 from couchbase.connection import Connection
 from couchbase.exceptions import ValueFormatError, CouchbaseError
-from tests.base import ConnectionTestCase
-from nose.exc import SkipTest
-
+from tests.base import ConnectionTestCase, SkipTest
 
 BLOB_ORIG =  b'\xff\xfe\xe9\x05\xdc\x05\xd5\x05\xdd\x05'
 

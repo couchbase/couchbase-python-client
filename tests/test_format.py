@@ -15,11 +15,10 @@
 # limitations under the License.
 #
 
-from nose.exc import SkipTest
 import json
 import pickle
 
-from tests.base import ConnectionTestCase
+from tests.base import ConnectionTestCase, SkipTest
 from couchbase.exceptions import ValueFormatError, ArgumentError
 from couchbase import FMT_AUTO, FMT_JSON, FMT_BYTES, FMT_UTF8, FMT_PICKLE
 

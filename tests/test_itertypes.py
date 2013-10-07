@@ -74,6 +74,7 @@ class ConnectionItertypeTest(ConnectionTestCase):
                     return 100
                 return self.max
 
+        self.cb.delete_multi(IterTemp(gen_ints=False), quiet=True)
         self.cb.incr_multi(IterTemp(gen_ints = False), initial=10)
         self.cb.decr_multi(IterTemp(gen_ints = False), initial=10)
         self.cb.get_multi(IterTemp(gen_ints=False))

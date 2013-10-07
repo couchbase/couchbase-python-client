@@ -14,9 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from nose.exc import SkipTest
 
-from tests.base import ViewTestCase
+from tests.base import ViewTestCase, SkipTest
 from couchbase.views.iterator import (
     View, ViewRow, RowProcessor, AlreadyQueriedError)
 

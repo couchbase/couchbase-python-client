@@ -18,14 +18,12 @@
 import tempfile
 import os
 
-from nose.exc import SkipTest
-
 from couchbase.exceptions import (AuthError, ArgumentError,
                                   BucketNotFoundError, ConnectError,
                                   NotFoundError, InvalidError)
 from couchbase.connection import Connection
 
-from tests.base import CouchbaseTestCase
+from tests.base import CouchbaseTestCase, SkipTest
 
 
 class ConnectionTest(CouchbaseTestCase):

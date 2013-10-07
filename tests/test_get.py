@@ -24,8 +24,7 @@ from couchbase.exceptions import (
     CouchbaseError, ValueFormatError, NotFoundError)
 from couchbase.result import MultiResult, Result
 
-from tests.base import ConnectionTestCase
-from nose.exc import SkipTest
+from tests.base import ConnectionTestCase, SkipTest
 
 class ConnectionGetTest(ConnectionTestCase):
 

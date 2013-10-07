@@ -75,6 +75,7 @@ class ClusterInformation(object):
         return Admin(self.admin_username, self.admin_password,
                      self.host, self.port)
 
+
 class ConnectionConfiguration(object):
     def __init__(self, filename=CONFIG_FILE):
         self._fname = filename
@@ -110,6 +111,7 @@ class ConnectionConfiguration(object):
                 self.mockurl = None
         else:
             self.mock_enabled = False
+
 
 class MockResourceManager(TestResourceManager):
     def __init__(self, config):
@@ -150,6 +152,7 @@ class MockResourceManager(TestResourceManager):
 
     def isDirty(self):
         return False
+
 
 class RealServerResourceManager(TestResourceManager):
     def __init__(self, config):
@@ -299,6 +302,7 @@ class CouchbaseTestCase(ResourcedTestCase):
             ret[k] = "Value_For_" + k
         return ret
 
+
 class ConnectionTestCase(CouchbaseTestCase):
     def checkCbRefcount(self):
         import gc
@@ -323,6 +327,7 @@ class ConnectionTestCase(CouchbaseTestCase):
         finally:
             del self.cb
 
+
 class RealServerTestCase(ConnectionTestCase):
     def setUp(self):
         super(RealServerTestCase, self).setUp()
@@ -333,14 +338,6 @@ class RealServerTestCase(ConnectionTestCase):
     @property
     def cluster_info(self):
         return self.realserver_info
-
-class DDocTestCase(RealServerTestCase):
-    pass
-
-class ViewTestCase(RealServerTestCase):
-    pass
-
-
 
 
 # Class which sets up all the necessary Mock stuff
@@ -356,3 +353,10 @@ class MockTestCase(ConnectionTestCase):
     @property
     def cluster_info(self):
         return self.mock_info
+
+class DDocTestCase(RealServerTestCase):
+    pass
+
+
+class ViewTestCase(RealServerTestCase):
+    pass
