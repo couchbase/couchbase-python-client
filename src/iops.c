@@ -139,19 +139,22 @@ static struct PyMethodDef pycbc_Event_TABLE_methods[] = {
         { "ready_r",
                 (PyCFunction)Event_on_read,
                 METH_NOARGS,
-                PyDoc_STR("Called for read events")
+                PyDoc_STR("Called for read events. This is the efficient \n"
+                          "form of ``ready(LCB_READ_EVENT)``\n")
         },
 
         { "ready_w",
                 (PyCFunction)Event_on_write,
                 METH_NOARGS,
-                PyDoc_STR("Called for write events")
+                PyDoc_STR("Called for write events. This is equivalent to\n"
+                          "``ready(LCB_WRITE_EVENT)``\n")
         },
 
         { "ready_rw",
                 (PyCFunction)Event_on_readwrite,
                 METH_NOARGS,
-                PyDoc_STR("Called for rw events")
+                PyDoc_STR("Called for rw events. This is equivalent to\n"
+                          "``ready(LCB_READ_EVENT|LCB_WRITE_EVENT)``\n")
         },
 
         { NULL }

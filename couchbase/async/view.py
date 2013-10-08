@@ -46,10 +46,10 @@ class AsyncViewBase(View):
         """
         raise NotImplementedError("Iteration not supported on async view")
 
-
     def on_error(self, ex):
         """
         Called when there is a failure with the response data
+
         :param Exception ex: The exception caught.
 
         This must be implemented in a subclass
@@ -59,8 +59,9 @@ class AsyncViewBase(View):
     def on_rows(self, rowiter):
         """
         Called when there are more processed views.
+
         :param iterable rowiter: An iterable which will yield results
-        as defined by the :class:`RowProcessor` implementation
+          as defined by the :class:`RowProcessor` implementation
 
         This method must be implemented in a subclass
         """

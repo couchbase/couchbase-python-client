@@ -19,6 +19,8 @@ Contents:
    api/threads
    api/convertfuncs
    api/items
+   api/async
+   api/txcouchbase
 
 Indices and tables
 ==================

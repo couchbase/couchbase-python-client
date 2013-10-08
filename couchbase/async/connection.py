@@ -29,24 +29,36 @@ from couchbase._libcouchbase import (
     PYCBC_CONN_F_ASYNC,
     PYCBC_CONN_F_ASYNC_DTOR)
 
+from couchbase.result import AsyncResult
+from couchbase.async.view import AsyncViewBase
 from couchbase.connection import Connection
+from couchbase.exceptions import ArgumentError
 
 class Async(Connection):
     def __init__(self, iops=None, **kwargs):
         """
-        Create a new 'Async' connection. An async connection is an object
+        Create a new Async connection. An async connection is an object
         which functions like a normal synchronous connection, except that it
-        returns future objects (i.e. :class:`couchbase.results.AsyncResult`
-        objects) instead of :class:`couchbase.results.Result`.
-        These objects are actually :class:`couchbase.results.MultiResult`
+        returns future objects (i.e. :class:`~couchbase.result.AsyncResult`
+        objects) instead of :class:`~couchbase.result.Result`.
+        These objects are actually :class:`~couchbase.result.MultiResult`
         objects which are empty upon retun. As operations complete, this
         object becomes populated with the relevant data.
 
-        Note that the 'AsyncResult' object must currently have a valid
-        'callback' and 'errback' object set *after* they are returned from
+        Note that the AsyncResult object must currently have valid
+        :attr:`~couchbase.result.AsyncResult.callback` and
+        :attr:`~couchbase.result.AsyncResult.errback` fields initialized
+        *after* they are returned from
         the API methods. If this is not the case then an exception will be
         raised when the callbacks are about to arrive. This behavior is the
         primary reason why this interface isn't public, too :)
+
+        :param iops: An :class:`~couchbase.iops.base.IOPS`-interface
+          conforming object. This object must not be used between two
+          instances, and is owned by the connection object.
+
+        :param kwargs: Additional arguments to pass to
+          the :class:`~couchbase.connection.Connection` constructor
         """
         if not iops:
             raise ValueError("Must have IOPS")
@@ -64,6 +76,24 @@ class Async(Connection):
         # This is always set to false in connection.c
 
         super(Async, self).__init__(**kwargs)
+
+    def query(self, *args, **kwargs):
+        """
+        Reimplemented from base class. This method does not add additional
+        functionality of the base class`
+        :meth:`~couchbase.connection.Connection.query` method (all the
+        functionality is encapsulated in the view class anyway). However it
+        does require one additional keyword argument
+
+        :param class itercls: A class used for instantiating the view
+          object. This should be a subclass of
+          :class:`~couchbase.async.view.AsyncViewBase`.
+        """
+        if not issubclass(kwargs.get('itercls', None), AsyncViewBase):
+            raise ArgumentError.pyexc("itercls must be defined "
+                                      "and must be derived from AsyncViewBase")
+
+        return super(Async, self).query(*args, **kwargs)
 
     def _ctor_do_connect(self):
         # Don't connect on init
