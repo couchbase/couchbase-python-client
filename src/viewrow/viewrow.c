@@ -131,8 +131,7 @@ meta_header_complete_callback(jsonsl_t jsn,
 {
 
     lcbex_vrow_ctx_t *ctx = (lcbex_vrow_ctx_t*)jsn->data;
-    buffer_append(&ctx->meta_buf,
-                  ctx->current_buf.s, state->pos_begin);
+    buffer_append(&ctx->meta_buf, ctx->current_buf.s, state->pos_begin);
 
     ctx->header_len = state->pos_begin;
     jsn->action_callback_PUSH = NULL;
@@ -157,15 +156,21 @@ row_pop_callback(jsonsl_t jsn,
 
     ctx->keep_pos = state->pos_cur;
     ctx->last_row_endpos = state->pos_cur;
-    ctx->rowcount++;
 
     if (state->data == JOBJ_ROWSET) {
-        /* don't care anymore.. */
+        /** The closing ] of "rows" : [ ... ] */
         jsn->action_callback_POP = trailer_pop_callback;
         jsn->action_callback_PUSH = NULL;
+
+        if (ctx->rowcount == 0) {
+            buffer_append(&ctx->meta_buf, ctx->current_buf.s, state->pos_cur+1);
+            ctx->header_len = state->pos_cur+1;
+        }
+
         return;
     }
 
+    ctx->rowcount++;
 
     /* must be a JSON object! */
     if (!ctx->callback) {
@@ -311,7 +316,7 @@ initial_push_callback(jsonsl_t jsn,
     }
 
     if (state->type == JSONSL_T_LIST && match == JSONSL_MATCH_POSSIBLE) {
-        /* we have a match */
+        /* we have a match, e.g. "rows:[]" */
         jsn->action_callback_POP = row_pop_callback;
         jsn->action_callback_PUSH = meta_header_complete_callback;
         state->data = JOBJ_ROWSET;
