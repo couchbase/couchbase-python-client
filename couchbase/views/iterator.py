@@ -311,6 +311,9 @@ class View(object):
                  "for more information")
 
     def _handle_meta(self, value):
+        if not isinstance(value, dict):
+            return
+
         self.indexed_rows = value.get('total_rows', 0)
         self._handle_errors(value.get('errors'))
 

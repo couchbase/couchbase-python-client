@@ -116,9 +116,9 @@ static struct PyMemberDef HttpResult_TABLE_members[] = {
                 READONLY, PyDoc_STR("List containing raw strings of rows")
         },
 
-        { "done",
-                T_UBYTE, offsetof(pycbc_HttpResult, done),
-                READONLY, PyDoc_STR("Boolean. True if result is done")
+        { "rows_per_call",
+                T_LONG, offsetof(pycbc_HttpResult, rows_per_call),
+                0, PyDoc_STR("Minimum number of rows to pass to callback")
         },
 
         { NULL }

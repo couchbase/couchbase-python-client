@@ -60,6 +60,7 @@ add_data(pycbc_HttpResult *htres, const void *data, size_t ndata)
     }
 
     pycbc_assert(htres->http_data);
+    pycbc_assert(o);
 
     PyList_Append(htres->http_data, o);
     Py_XDECREF(o);
@@ -81,20 +82,26 @@ finalize_data(pycbc_HttpResult *htres)
 
     sep = pycbc_SimpleStringZ("");
     res = PyUnicode_Join(sep, htres->http_data);
+
     Py_DECREF(sep);
 
-    if (res) {
-        Py_DECREF(htres->http_data);
-        htres->http_data = res;
-    }
+    /* Set the bytes */
+    Py_DECREF(htres->http_data);
+    htres->http_data = res;
+
 
     if (htres->format == PYCBC_FMT_JSON) {
         PyObject *args = Py_BuildValue("(O)", htres->http_data);
 
+        pycbc_assert(PyErr_Occurred() == NULL);
         res = PyObject_CallObject(pycbc_helpers.json_decode, args);
+
         if (res) {
             Py_XDECREF(htres->http_data);
             htres->http_data = res;
+
+        } else {
+            PyErr_Clear();
         }
 
         Py_XDECREF(args);
@@ -103,30 +110,51 @@ finalize_data(pycbc_HttpResult *htres)
 
 
 static void
-invoke_async_callback(pycbc_HttpResult *res, int done)
+maybe_invoke_async_callback(pycbc_HttpResult *htres)
 {
     PyObject *args, *ret;
 
-    if (done == 0 && PyList_GET_SIZE(res->rowsbuf) == 0) {
+    if (!(htres->parent->flags & PYCBC_CONN_F_ASYNC)) {
         return;
     }
 
-    args = Py_BuildValue("(OO)", (PyObject *)res,
-                         done ? Py_None : res->rowsbuf);
+    if ((htres->htflags & PYCBC_HTRES_F_COMPLETE) == 0 &&
+            PyList_GET_SIZE(htres->rowsbuf) < (unsigned long)htres->rows_per_call) {
+        return;
+    }
 
-    if (!res->callback) {
+    if (htres->htflags & PYCBC_HTRES_F_CHUNKED) {
+        args = Py_BuildValue("(OO)", (PyObject *)htres, htres->rowsbuf);
+
+    } else {
+        args = Py_BuildValue("(OO)", Py_None, Py_None);
+    }
+
+    if (!htres->callback) {
         PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Missing callback for HTTP");
 
     } else {
-        ret = PyObject_CallObject(res->callback, args);
-        Py_XDECREF(ret);
+        ret = PyObject_CallObject(htres->callback, args);
+
+        if (ret) {
+            Py_XDECREF(ret);
+
+        } else {
+            PyErr_PrintEx(0);
+        }
     }
 
     Py_DECREF(args);
 
-    if (!done) {
-        Py_XDECREF(res->rowsbuf);
-        res->rowsbuf = PyList_New(0);
+    if (htres->htflags & PYCBC_HTRES_F_COMPLETE) {
+        Py_XDECREF(htres->callback);
+        htres->callback = NULL;
+
+        Py_XDECREF(htres);
+
+    } else if (htres->htflags & PYCBC_HTRES_F_CHUNKED) {
+        Py_XDECREF(htres->rowsbuf);
+        htres->rowsbuf = PyList_New(0);
     }
 }
 
@@ -147,15 +175,14 @@ http_complete_callback(lcb_http_request_t req,
     pycbc_HttpResult *htres = (pycbc_HttpResult*)cookie;
 
     htres->htreq = NULL;
-    htres->done = 1;
+    htres->rc = err;
+    htres->htcode = resp->v.v0.status;
+    htres->htflags |= PYCBC_HTRES_F_COMPLETE;
 
     if (!htres->parent) {
         return;
     }
 
-    htres->rc = err;
-    htres->htcode = resp->v.v0.status;
-    htres->htflags |= PYCBC_HTRES_F_COMPLETE;
 
     PYCBC_CONN_THR_END(htres->parent);
 
@@ -167,25 +194,23 @@ http_complete_callback(lcb_http_request_t req,
 
     if (htres->htflags & PYCBC_HTRES_F_CHUNKED) {
         /** No data here */
-        if (!pycbc_assert(resp->v.v0.nbytes == 0)) {
-            fprintf(stderr, "Unexpected payload in HTTP response callback\n");
-        }
-
         if (!htres->parent->nremaining) {
             lcb_breakout(instance);
         }
 
-        if (htres->parent->flags & PYCBC_CONN_F_ASYNC) {
-            invoke_async_callback(htres, 1);
-        }
-
+        maybe_invoke_async_callback(htres);
         return;
     }
 
+    if (htres->parent->flags & PYCBC_CONN_F_ASYNC) {
+        maybe_invoke_async_callback(htres);
+        return;
+    }
 
     if (!--htres->parent->nremaining) {
         lcb_breakout(instance);
     }
+
 
     (void)instance;
     (void)req;
@@ -235,10 +260,7 @@ http_data_callback(lcb_http_request_t req,
 
     if (htres->rctx) {
         lcbex_vrow_feed(htres->rctx, resp->v.v0.bytes, resp->v.v0.nbytes);
-
-        if (htres->parent->flags & PYCBC_CONN_F_ASYNC) {
-            invoke_async_callback(htres, 0);
-        }
+        maybe_invoke_async_callback(htres);
 
     } else if (resp->v.v0.bytes) {
         add_data(htres, resp->v.v0.bytes, resp->v.v0.nbytes);
@@ -292,6 +314,19 @@ pycbc_HttpResult__maybe_raise(pycbc_HttpResult *self)
     Py_RETURN_NONE;
 }
 
+static void
+prepare_async_request(pycbc_Connection *conn, pycbc_HttpResult *htres)
+{
+    if (htres->htflags & PYCBC_HTRES_F_CHUNKED) {
+        htres->rowsbuf = PyList_New(0);
+    }
+
+    /**
+     * Increment the refcount to keep it alive in the loop
+     */
+    Py_INCREF(htres);
+}
+
 PyObject *
 pycbc_Connection__http_request(pycbc_Connection *self,
                                PyObject *args,
@@ -313,17 +348,18 @@ pycbc_Connection__http_request(pycbc_Connection *self,
     const char *content_type = NULL;
     pycbc_HttpResult *htres;
     lcb_http_request_t l_htreq;
+    long rows_per_call = 1;
 
     lcb_http_cmd_t htcmd = { 0 };
 
     static char *kwlist[] = {
             "type", "method", "path", "content_type", "post_data",
             "response_format", "quiet", "fetch_headers",
-            "chunked", NULL
+            "chunked", "rows_per_call", NULL
     };
 
     rv = PyArg_ParseTupleAndKeywords(args, kwargs,
-                                     "iis|zz#HOOO", kwlist,
+                                     "iis|zz#HOOOl", kwlist,
                                      &reqtype,
                                      &method,
                                      &path,
@@ -333,7 +369,8 @@ pycbc_Connection__http_request(pycbc_Connection *self,
                                      &value_format,
                                      &quiet_O,
                                      &fetch_headers_O,
-                                     &chunked_O);
+                                     &chunked_O,
+                                     &rows_per_call);
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;
@@ -348,6 +385,7 @@ pycbc_Connection__http_request(pycbc_Connection *self,
     htres->key = pycbc_SimpleStringZ(path);
     htres->format = value_format;
     htres->htflags = 0;
+    htres->rows_per_call = rows_per_call ? rows_per_call : -1;
 
     if (quiet_O != NULL && quiet_O != Py_None && PyObject_IsTrue(quiet_O)) {
         htres->htflags |= PYCBC_HTRES_F_QUIET;
@@ -386,9 +424,9 @@ pycbc_Connection__http_request(pycbc_Connection *self,
 
     htres->htreq = l_htreq;
 
-    if (htcmd.v.v0.chunked) {
+    if (htcmd.v.v0.chunked || (self->flags & PYCBC_CONN_F_ASYNC)) {
         if (self->flags & PYCBC_CONN_F_ASYNC) {
-            htres->rowsbuf = PyList_New(0);
+            prepare_async_request(self, htres);
         }
 
         ret = (PyObject*)htres;
@@ -449,7 +487,6 @@ pycbc_HttpResult__fetch(pycbc_HttpResult *self)
     if (!self->rowsbuf) {
         self->rowsbuf = PyList_New(0);
     }
-
 
     err = pycbc_oputil_wait_common(self->parent);
 

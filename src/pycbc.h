@@ -378,10 +378,10 @@ typedef struct {
 
 
     pycbc_Connection *parent;
+    long rows_per_call;
     unsigned short htcode;
     unsigned short format;
     unsigned short htflags;
-    unsigned char done;
 } pycbc_HttpResult;
 
 enum {
