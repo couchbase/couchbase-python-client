@@ -15,7 +15,7 @@ couchbase/__pycache__
 *.pyd
 *.dll
 *.exe
-tests/tests.ini
+tests.ini
 *.out*
 # My personal development stuff
 p3

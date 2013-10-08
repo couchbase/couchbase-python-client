@@ -112,6 +112,12 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules"],
 
     ext_modules = [module],
-    packages = ['couchbase', 'couchbase.views', 'couchbase.iops', 'couchbase.async'],
+    packages = [
+        'couchbase',
+        'couchbase.views',
+        'couchbase.iops',
+        'couchbase.async',
+        'couchbase.tests'
+    ],
     package_data = pkgdata
 )
