@@ -19,49 +19,61 @@
 This file contains the view implementation for Async
 """
 from couchbase.views.iterator import View
-from couchbase.exceptions import CouchbaseError
+from couchbase.exceptions import CouchbaseError, ArgumentError
 
 class AsyncViewBase(View):
     def __init__(self, *args, **kwargs):
         """
         Initialize a new AsyncViewBase object. This is intended to be
         subclassed in order to implement the require methods to be
-        invoked on error, data, and row events
+        invoked on error, data, and row events.
+
+        Usage of this class is not as a standalone, but rather as
+        an ``itercls`` parameter to the
+        :meth:`~couchbase.connection.Connection.query` method of the
+        connection object.
         """
         kwargs['streaming'] = True
         super(AsyncViewBase, self).__init__(*args, **kwargs)
+        if self.include_docs:
+            raise ArgumentError.pyexc(
+                "Include docs not supported with async views. If you "
+                "must gather docs, you should do so manually")
 
     def __iter__(self):
+        """
+        Unlike our base class, iterating does not make sense here
+        """
         raise NotImplementedError("Iteration not supported on async view")
 
 
     def on_error(self, ex):
         """
         Called when there is a failure with the response data
-        :param Exception ex: The exception caught
+        :param Exception ex: The exception caught.
+
+        This must be implemented in a subclass
         """
-        raise ex
+        raise NotImplementedError("Must be implemented in subclass")
 
     def on_rows(self, rowiter):
         """
         Called when there are more processed views.
         :param iterable rowiter: An iterable which will yield results
         as defined by the :class:`RowProcessor` implementation
-        """
-        raise NotImplementedError()
 
-    def on_data(self, data):
+        This method must be implemented in a subclass
         """
-        Called for any non-view-row HTTP data
-        :param list data: Raw HTTP data received from the request, in a list
-          form. The type of elements in the list will be either JSON objects
-          or string objects, depending on the content.
-        """
+        raise NotImplementedError("Must be implemented in subclass")
 
     def on_done(self):
         """
-        Called when this request has completed
+        Called when this request has completed. Once this method is called,
+        no other methods will be invoked on this object.
+
+        This method must be implemented in a subclass
         """
+        raise NotImplementedError("Must be implemented in subclass")
 
     def _callback(self, htres, rows):
         """
@@ -84,11 +96,13 @@ class AsyncViewBase(View):
         finally:
             self._rp_iter = None
 
-    def start_query(self):
+    def start(self):
         """
-        Initiate the callbacks for this query. These callbacks
-        will be invoked until the request has completed
+        Initiate the callbacks for this query. These callbacks will be invoked
+        until the request has completed and the :meth:`on_done`
+        method is called.
         """
         self._setup_streaming_request()
         self._do_iter = True
         self.raw._callback = self._callback
+        return self

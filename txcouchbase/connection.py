@@ -18,7 +18,7 @@
 This file contains the twisted-specific bits for the Couchbase client.
 """
 
-from twisted.internet import reactor as tx_reactor
+from twisted.internet import reactor
 from twisted.internet.defer import Deferred
 from twisted.python.failure import Failure
 
@@ -28,24 +28,56 @@ from couchbase.async.events import EventQueue
 from couchbase.exceptions import CouchbaseError
 from txcouchbase.iops import v0Iops
 
-class QAllView(AsyncViewBase):
+class BatchedView(AsyncViewBase):
     def __init__(self, *args, **kwargs):
+        """
+        Iterator/Container object for a single-call view result.
+
+        This functions as an iterator over all results of the query, once the
+        query has been completed.
+
+        Additional metadata may be obtained by examining the object. See
+        :class:`couchbase.views.iterator.Views` for more details
+        """
+        super(BatchedView, self).__init__(*args, **kwargs)
         self._d = Deferred()
-        self._rowsbuf = []
-        super(QAllView, self).__init__(*args, **kwargs)
+        self.__rows = None # likely a superlcass might have this?
+
+    def _getDeferred(self):
+        return self._d
+
+    def start(self):
+        super(BatchedView, self).start()
+        self.raw.rows_per_call = -1
+        return self
 
     def on_rows(self, rowiter):
-        self._rowsbuf += [ x for x in rowiter ]
+        """
+        Reimplemented from :meth:`AsyncViewBase.on_rows`
+        """
+        self.__rows = rowiter
+        self._d.callback(self)
+        self._d = None
 
     def on_error(self, ex):
+        """
+        Reimplemented from :meth:`AsyncViewBase.on_error`
+        """
         if self._d:
             self._d.errback()
             self._d = None
 
     def on_done(self):
+        """
+        Reimplemented from :meth:`AsyncViewBase.on_done`
+        """
         if self._d:
-            self._d.callback(self._rowsbuf)
+            self._d.callback(self)
             self._d = None
+
+    def __iter__(self):
+        return self.__rows
+
 
 class TxEventQueue(EventQueue):
     """
@@ -71,13 +103,11 @@ class ConnectionEventQueue(TxEventQueue):
         raise err
 
 class TxAsyncConnection(Async):
-    def __init__(self, reactor=None, **kwargs):
+    def __init__(self, **kwargs):
         """
         Connection subclass for Twisted. This inherits from the 'Async' class,
         but also adds some twisted-specific logic for hooking on a connection.
         """
-        if not reactor:
-            reactor = tx_reactor
 
         iops = v0Iops(reactor)
         super(TxAsyncConnection, self).__init__(iops=iops, **kwargs)
@@ -238,8 +268,40 @@ class Connection(TxAsyncConnection):
 
     unlockMulti = unlock_multi
 
-    def query(self, *args, **kwargs):
-        kwargs['itercls'] = QAllView
-        ret = super(Connection, self).query(*args, **kwargs)
-        ret.start_query()
-        return ret._d
+    def queryEx(self, viewcls, *args, **kwargs):
+        """
+        Query a view, with the ``viewcls`` instance receiving events
+        of the query as they arrive.
+
+        :param type viewcls: A class (derived from :class:`AsyncViewBase`)
+          to instantiate
+
+        Other arguments are passed to the standard `query` method
+        """
+
+        kwargs['itercls'] = viewcls
+        o = super(Connection, self).query(*args, **kwargs)
+        if not self.connected:
+            self.connect().addCallback(lambda x: o.start())
+        else:
+            o.start()
+
+        return o
+
+    def queryAll(self, *args, **kwargs):
+        """
+        Returns a :class:`Deferred` object which will have its callback invoked
+        with a :class:`BatchedView` when the results are complete.
+
+        Parameters follow conventions of
+        :meth:`couchbase.connection.Connection.query`.
+        """
+
+        if not self.connected:
+            cb = lambda x: self.queryAll(*args, **kwargs)
+            return self.connect().addCallback(cb)
+
+        kwargs['itercls'] = BatchedView
+        o = super(Connection, self).query(*args, **kwargs)
+        o.start()
+        return o._getDeferred()
