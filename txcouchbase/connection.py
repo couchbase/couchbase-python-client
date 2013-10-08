@@ -37,7 +37,9 @@ class BatchedView(AsyncViewBase):
         query has been completed.
 
         Additional metadata may be obtained by examining the object. See
-        :class:`couchbase.views.iterator.Views` for more details
+        :class:`~couchbase.views.iterator.Views` for more details.
+
+        You will normally not need to construct this object manually.
         """
         super(BatchedView, self).__init__(*args, **kwargs)
         self._d = Deferred()
@@ -53,7 +55,7 @@ class BatchedView(AsyncViewBase):
 
     def on_rows(self, rowiter):
         """
-        Reimplemented from :meth:`AsyncViewBase.on_rows`
+        Reimplemented from :meth:`~AsyncViewBase.on_rows`
         """
         self.__rows = rowiter
         self._d.callback(self)
@@ -61,7 +63,7 @@ class BatchedView(AsyncViewBase):
 
     def on_error(self, ex):
         """
-        Reimplemented from :meth:`AsyncViewBase.on_error`
+        Reimplemented from :meth:`~AsyncViewBase.on_error`
         """
         if self._d:
             self._d.errback()
@@ -69,13 +71,16 @@ class BatchedView(AsyncViewBase):
 
     def on_done(self):
         """
-        Reimplemented from :meth:`AsyncViewBase.on_done`
+        Reimplemented from :meth:`~AsyncViewBase.on_done`
         """
         if self._d:
             self._d.callback(self)
             self._d = None
 
     def __iter__(self):
+        """
+        Iterate over the rows in this resultset
+        """
         return self.__rows
 
 
@@ -276,7 +281,11 @@ class Connection(TxAsyncConnection):
         :param type viewcls: A class (derived from :class:`AsyncViewBase`)
           to instantiate
 
-        Other arguments are passed to the standard `query` method
+        Other arguments are passed to the standard `query` method.
+
+        This functions exactly like the :meth:`~couchbase.async.Connection.query`
+        method, except it automatically schedules operations if the connection
+        has not yet been negotiated.
         """
 
         kwargs['itercls'] = viewcls
@@ -294,7 +303,7 @@ class Connection(TxAsyncConnection):
         with a :class:`BatchedView` when the results are complete.
 
         Parameters follow conventions of
-        :meth:`couchbase.connection.Connection.query`.
+        :meth:`~couchbase.connection.Connection.query`.
         """
 
         if not self.connected:
