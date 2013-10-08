@@ -21,6 +21,9 @@ from couchbase.exceptions import NotFoundError, TemporaryFailError
 import couchbase._libcouchbase as LCB
 
 class DupKeyTestCase(ConnectionTestCase):
+    def setUp(self):
+        super(ConnectionTestCase, self).setUp()
+        self.skipIfPyPy()
 
     def _assertWarned(self, wlog):
         mcount = 0

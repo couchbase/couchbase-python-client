@@ -98,7 +98,7 @@ pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p)
     } else {
         Py_INCREF(Py_TYPE(excinstance));
         PyErr_Restore((PyObject*)Py_TYPE(excinstance), excinstance, traceback);
-        pycbc_assert(Py_REFCNT(excinstance) == 1);
+        PYCBC_REFCNT_ASSERT(Py_REFCNT(excinstance) == 1);
     }
 }
 

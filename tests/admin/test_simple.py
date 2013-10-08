@@ -16,6 +16,7 @@
 #
 
 import sys
+import platform
 
 from couchbase.admin import Admin
 from couchbase.result import HttpResult
@@ -33,8 +34,10 @@ class AdminSimpleTest(CouchbaseTestCase):
 
     def tearDown(self):
         super(AdminSimpleTest, self).tearDown()
-        rc = sys.getrefcount(self.admin)
-        self.assertEqual(rc, 2)
+        if platform.python_implementation() != 'PyPy':
+            rc = sys.getrefcount(self.admin)
+            self.assertEqual(rc, 2)
+
         del self.admin
 
     def test_http_request(self):

@@ -383,7 +383,8 @@ extract_item_params(struct pycbc_common_vars *cv,
     }
 
     /** Store the item inside the mres dictionary */
-    PyDict_SetItem((PyObject *)&cv->mres->dict, (*itm)->key, (PyObject *)*itm);
+    PyDict_SetItem(pycbc_multiresult_dict(cv->mres),
+                   (*itm)->key, (PyObject *)*itm);
     cv->mres->mropts |= PYCBC_MRES_F_UALLOCED;
     return 0;
 }

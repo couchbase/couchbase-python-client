@@ -157,10 +157,10 @@ get_common_objects(PyObject *cookie,
 
 {
     PyObject *hkey;
+    PyObject *mrdict;
     int rv;
 
-    pycbc_assert(Py_TYPE(cookie) == &pycbc_MultiResultType ||
-                 Py_TYPE(cookie) == &pycbc_AsyncResultType);
+    pycbc_assert(pycbc_multiresult_check(cookie));
     *mres = (pycbc_MultiResult*)cookie;
     *conn = (*mres)->parent;
 
@@ -173,7 +173,9 @@ get_common_objects(PyObject *cookie,
         return -1;
     }
 
-    *res = (pycbc_Result*)PyDict_GetItem((PyObject*)*mres, hkey);
+    mrdict = pycbc_multiresult_dict(*mres);
+
+    *res = (pycbc_Result*)PyDict_GetItem(mrdict, hkey);
 
     if (*res) {
         int exists_ok = (restype & RESTYPE_EXISTS_OK) ||
@@ -195,7 +197,7 @@ get_common_objects(PyObject *cookie,
             /**
              * We need to destroy the existing object and re-create it.
              */
-            PyDict_DelItem((PyObject*)*mres, hkey);
+            PyDict_DelItem(mrdict, hkey);
             *res = NULL;
 
         } else {
@@ -224,7 +226,7 @@ get_common_objects(PyObject *cookie,
             abort();
         }
 
-        PyDict_SetItem((PyObject*)*mres, hkey, (PyObject*)*res);
+        PyDict_SetItem(mrdict, hkey, (PyObject*)*res);
 
         (*res)->key = hkey;
         Py_DECREF(*res);
@@ -539,6 +541,7 @@ stat_callback(lcb_t instance,
     pycbc_MultiResult *mres;
     PyObject *value;
     PyObject *skey, *knodes;
+    PyObject *mrdict;
 
 
     mres = (pycbc_MultiResult*)cookie;
@@ -578,11 +581,11 @@ stat_callback(lcb_t instance,
         }
     }
 
-    knodes = PyDict_GetItem((PyObject*)mres, skey);
+    mrdict = pycbc_multiresult_dict(mres);
+    knodes = PyDict_GetItem(mrdict, skey);
     if (!knodes) {
         knodes = PyDict_New();
-        PyDict_SetItem((PyObject*)mres, skey, knodes);
-        Py_DECREF(knodes);
+        PyDict_SetItem(mrdict, skey, knodes);
     }
 
     PyDict_SetItemString(knodes, resp->v.v0.server_endpoint, value);

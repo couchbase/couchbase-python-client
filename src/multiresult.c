@@ -117,11 +117,12 @@ static struct PyMethodDef AsyncResult_TABLE_methods[] = {
 static int
 MultiResultType__init__(pycbc_MultiResult *self, PyObject *args, PyObject *kwargs)
 {
-    if (PyDict_Type.tp_init((PyObject*)self, args, kwargs) < 0) {
+    if (pycbc_multiresult_init_dict(self, args, kwargs) < 0) {
         PyErr_Print();
         abort();
         return -1;
     }
+
     self->all_ok = 1;
     self->exceptions = NULL;
     self->errop = NULL;
@@ -136,7 +137,7 @@ MultiResult_dealloc(pycbc_MultiResult *self)
     Py_XDECREF(self->parent);
     Py_XDECREF(self->exceptions);
     Py_XDECREF(self->errop);
-    PyDict_Type.tp_dealloc((PyObject*)self);
+    pycbc_multiresult_destroy_dict(self);
 }
 
 int
@@ -149,7 +150,8 @@ pycbc_MultiResultType_init(PyObject **ptr)
         return 0;
     }
 
-    p->tp_base = &PyDict_Type;
+    pycbc_multiresult_set_base(p);
+
     p->tp_init = (initproc)MultiResultType__init__;
     p->tp_dealloc = (destructor)MultiResult_dealloc;
 
@@ -308,11 +310,11 @@ pycbc_multiresult_get_result(pycbc_MultiResult *self)
     PyObject *key, *value;
 
     if (!(self->mropts & PYCBC_MRES_F_SINGLE)) {
-        Py_INCREF(self);
-        return (PyObject *)self;
+        Py_INCREF(pycbc_multiresult_dict(self));
+        return pycbc_multiresult_dict(self);
     }
 
-    rv = PyDict_Next((PyObject *)self, &dictpos, &key, &value);
+    rv = PyDict_Next(pycbc_multiresult_dict(self), &dictpos, &key, &value);
     if (!rv) {
         PYCBC_EXC_WRAP(PYCBC_EXC_INTERNAL, 0, "No objects in MultiResult");
         return NULL;

@@ -31,6 +31,15 @@
 #include <pythread.h>
 #include "viewrow/viewrow.h"
 
+#ifdef PYPY_VERSION
+#include "pypy-compat.h"
+#define PYCBC_REFCNT_ASSERT(x)
+#else
+#define PYCBC_REFCNT_ASSERT pycbc_assert
+#endif
+
+#include "mresdict.h"
+
 /**
  * See http://docs.python.org/2/c-api/arg.html for an explanation of this
  * definition.
@@ -424,8 +433,7 @@ enum {
  * See multiresult.c
  */
 typedef struct {
-    /** base dict */
-    PyDictObject dict;
+    PYCBC_MULTIRESULT_BASE;
 
     /** parent Connection object */
     pycbc_Connection *parent;

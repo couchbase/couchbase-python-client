@@ -16,6 +16,7 @@
 import os
 import sys
 import types
+import platform
 
 try:
     from unittest.case import SkipTest
@@ -270,6 +271,12 @@ class CouchbaseTestCase(ResourcedTestCase):
     def skipUnlessMock(self):
         pass
 
+    def skipIfPyPy(self):
+        import platform
+        if platform.python_implementation() == 'PyPy':
+            raise SkipTest("PyPy not supported here..")
+
+
     def make_connargs(self, **overrides):
         return self.cluster_info.make_connargs(**overrides)
 
@@ -306,6 +313,9 @@ class CouchbaseTestCase(ResourcedTestCase):
 class ConnectionTestCase(CouchbaseTestCase):
     def checkCbRefcount(self):
         import gc
+        if platform.python_implementation() == 'PyPy':
+            return
+
         gc.collect()
         for x in range(10):
             oldrc = sys.getrefcount(self.cb)

@@ -494,6 +494,7 @@ cache_io_methods(pycbc_iops_t *pio, PyObject *obj)
         *m_ent->target = PyObject_GetAttr(obj, m_ent->lookup);
         if (!*m_ent->target) {
             if (m_ent->optional) {
+                PyErr_Clear();
                 continue;
             }
 
