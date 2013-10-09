@@ -130,6 +130,27 @@ the synchronous API will block until it receives a result, the async API will
 return a `Deferred` which will be called later with the result or an appropriate
 error.
 
+~~~~~~~~~~
+GEvent API
+~~~~~~~~~~
+
+The `experimental_gevent_support` constructor flag has now been removed. Instead,
+you can import the `gcouchbase.connection` package and use the `GConnection`
+class like so:
+
+.. code-block:: python
+
+    from gcouchbase.connection import GCouchbase
+    conn = GCouchbase(bucket='default')
+    print conn.set("foo", "bar")
+    print conn.get("foo")
+
+The API functions exactly like the normal Connection API, except that the
+implementation is significantly different.
+
+Note that the new `GCouchbase` class does *not* use the same implementation
+as the experimental support featured in 1.1.0
+
 ~~~~~~~~~~~~~~
 Other Examples
 ~~~~~~~~~~~~~~
