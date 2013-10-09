@@ -181,7 +181,6 @@ class TxAsyncConnection(Async):
         opres.errback = _on_err
         return d
 
-
 class Connection(TxAsyncConnection):
     """
     This class inherits from TxAsyncConnection. In addition to the connection
@@ -206,72 +205,17 @@ class Connection(TxAsyncConnection):
         opres = meth(self, *args, **kwargs)
         return self.defer(opres)
 
-    def get(self, *args, **kwargs):
-        return self._wrap(Async.get, *args, **kwargs)
 
-    def set(self, *args, **kwargs):
-        return self._wrap(Async.set, *args, **kwargs)
+    ### Generate the methods
+    def _meth_factory(meth, name):
+        def ret(self, *args, **kwargs):
+            return self._wrap(meth, *args, **kwargs)
+        return ret
 
-    def add(self, *args, **kwargs):
-        return sef._wrap(Async.add, *args, **kwargs)
-
-    def replace(self, *args, **kwargs):
-        return self._wrap(Async.replace, *args, **kwargs)
-
-    def append(self, *args, **kwargs):
-        return self._wrap(Async.append, *args, **kwargs)
-
-    def prepend(self, *args, **kwargs):
-        return self._wrap(Async.prepend, *args, **kwargs)
-
-    def delete(self, *args, **kwargs):
-        return self._wrap(Async.delete, *args, **kwargs)
-
-    def lock(self, *args, **kwargs):
-        return self._wrap(Async.lock, *args, **kwargs)
-
-    def unlock(self, *args, **kwargs):
-        return self._wrap(Async.unlock, *args, **kwargs)
-
-    def get_multi(self, *args, **kwargs):
-        return self._wrap(Async.get_multi, *args, **kwargs)
-
-    getMulti = get_multi
-
-    def set_multi(self, *args, **kwargs):
-        return self._wrap(Async.set_multi, *args, **kwargs)
-
-    setMulti = set_multi
-
-    def add_multi(self, *args, **kwargs):
-        return self._wrap(Async.add_multi, *args, **kwargs)
-
-    addMulti = add_multi
-
-    def replace_multi(self, *args, **kwargs):
-        return self._wrap(Async.replace_multi, *args, **kwargs)
-
-    replaceMulti = replace_multi
-
-    def append_multi(self, *args, **kwargs):
-        return self._wrap(Async.append_multi, *args, **kwargs)
-
-    appendMulti = append_multi
-
-    def prepend_multi(self, *args, **kwargs):
-        return self._wrap(Async.prepend_multi, *args, **kwargs)
-
-    prependMulti = prepend_multi
-
-    def lock_multi(self, *args, **kwargs):
-        return self._wrap(Async.lock_multi, *args, **kwargs)
-
-    lockMulti = lock_multi
-
-    def unlock_multi(self, *args, **kwargs):
-        return self._wrap(Async.unlock_multi, *args, **kwargs)
-
-    unlockMulti = unlock_multi
+    locals().update(TxAsyncConnection._gen_memd_wrappers(_meth_factory))
+    for x in TxAsyncConnection._MEMCACHED_OPERATIONS:
+        if locals().get(x+'_multi', None):
+            locals().update({x+"Multi": locals()[x+"_multi"]})
 
     def queryEx(self, viewcls, *args, **kwargs):
         """
