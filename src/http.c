@@ -436,13 +436,7 @@ pycbc_Connection__http_request(pycbc_Connection *self,
     }
 
     self->nremaining++;
-    err = pycbc_oputil_wait_common(self);
-
-    if (err != LCB_SUCCESS) {
-        self->nremaining--;
-        PYCBC_EXCTHROW_WAIT(err);
-        goto GT_DONE;
-    }
+    pycbc_oputil_wait_common(self);
 
     if (maybe_raise(htres)) {
         goto GT_DONE;

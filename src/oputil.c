@@ -53,7 +53,6 @@ pycbc_common_vars_finalize(struct pycbc_common_vars *cv, pycbc_Connection *conn)
 int
 pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Connection *self)
 {
-    lcb_error_t err;
     Py_ssize_t nsched = cv->is_seqcmd ? 1 : cv->ncmds;
     self->nremaining += nsched;
 
@@ -68,13 +67,7 @@ pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Connection *self)
         return 0;
     }
 
-    err = pycbc_oputil_wait_common(self);
-
-    if (err != LCB_SUCCESS) {
-        self->nremaining -= nsched;
-        PYCBC_EXCTHROW_WAIT(err);
-        return -1;
-    }
+    pycbc_oputil_wait_common(self);
 
     if (!pycbc_assert(self->nremaining == 0)) {
         fprintf(stderr, "Remaining count != 0. Adjusting");
