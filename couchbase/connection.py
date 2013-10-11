@@ -1027,6 +1027,12 @@ class Connection(_Base):
         else:
             return _Base._rget(self, key, quiet=quiet)
 
+    def rget_multi(self, keys, replica_index=None, quite=None):
+        if replica_index is not None:
+            return _Base._rgetix_multi(self, keys, replica=replica_index, quiet=quiet)
+        else:
+            return _Base._rget_multi(self, keys, quiet=quiet)
+
 
     def _view(self, ddoc, view,
               use_devmode=False,
@@ -1379,3 +1385,39 @@ class Connection(_Base):
         Returns True if the object has been closed with :meth:`_close`
         """
         return self._privflags & _LCB.PYCBC_CONN_F_CLOSED
+
+
+    """
+    Lists the names of all the memcached operations. This is useful
+    for classes which want to wrap all the methods
+    """
+    _MEMCACHED_OPERATIONS = ('set', 'get', 'add', 'append', 'prepend',
+                             'replace', 'delete', 'incr', 'decr', 'touch',
+                             'lock', 'unlock', 'arithmetic', 'endure',
+                             'observe', 'rget', 'stats')
+
+    _MEMCACHED_NOMULTI = ('stats')
+
+    @classmethod
+    def _gen_memd_wrappers(cls, factory):
+        """
+        Generates wrappers for all the memcached operations.
+        :param factory: A function to be called to return the wrapped method.
+          It will be called with two arguments; the first is the unbound
+          method being wrapped, and the second is the name of such a method.
+
+          The factory shall return a new unbound method
+
+        :return: A dictionary of names mapping the API calls to the wrapped
+        functions
+        """
+        d = {}
+        for n in cls._MEMCACHED_OPERATIONS:
+            for variant in (n, n + "_multi"):
+                try:
+                    d[variant] = factory(getattr(cls, variant), variant)
+                except AttributeError:
+                    if n in cls._MEMCACHED_NOMULTI:
+                        continue
+                    raise
+        return d
