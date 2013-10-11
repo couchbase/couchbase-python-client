@@ -31,17 +31,19 @@ except ImportError:
 
 from testresources import ResourcedTestCase, TestResourceManager
 
-from couchbase.connection import Connection
 from couchbase.exceptions import CouchbaseError
 from couchbase.admin import Admin
-from couchbase.mockserver import (
-    CouchbaseMock, BucketSpec, MockControlClient)
+from couchbase.mockserver import CouchbaseMock, BucketSpec, MockControlClient
 
 from couchbase._pyport import basestring
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'tests.ini')
 
+DEFAULT_CONNECTION_CLASS = None
+SHOULD_CHECK_REFCOUNT = True
+
 class ClusterInformation(object):
+
     def __init__(self):
         self.host = "localhost"
         self.port = 8091
@@ -69,7 +71,9 @@ class ClusterInformation(object):
             ret['bucket'] += "_sasl"
         return ret
 
-    def make_connection(self, conncls=Connection, **kwargs):
+    def make_connection(self, conncls=None, **kwargs):
+        if not conncls:
+            conncls = DEFAULT_CONNECTION_CLASS
         return conncls(**self.make_connargs(**kwargs))
 
     def make_admin_connection(self):
@@ -203,6 +207,10 @@ class CouchbaseTestCase(ResourcedTestCase):
             raise SkipTest("Mock server required")
         return self._mock_info
 
+    @property
+    def factory(self):
+        return DEFAULT_CONNECTION_CLASS
+
 
     def setUp(self):
         super(CouchbaseTestCase, self).setUp()
@@ -260,7 +268,7 @@ class CouchbaseTestCase(ResourcedTestCase):
                 components = [comp] + components
             vstr = ".".join(components)
 
-        rtstr, rtnum = Connection.lcb_version()
+        rtstr, rtnum = DEFAULT_CONNECTION_CLASS.lcb_version()
         if rtnum < vernum:
             raise SkipTest(("Test requires {0} to run (have {1})")
                             .format(vstr, rtstr))
@@ -312,6 +320,9 @@ class CouchbaseTestCase(ResourcedTestCase):
 
 class ConnectionTestCase(CouchbaseTestCase):
     def checkCbRefcount(self):
+        if not SHOULD_CHECK_REFCOUNT:
+            return
+
         import gc
         if platform.python_implementation() == 'PyPy':
             return

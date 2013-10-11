@@ -21,72 +21,71 @@ import os
 from couchbase.exceptions import (AuthError, ArgumentError,
                                   BucketNotFoundError, ConnectError,
                                   NotFoundError, InvalidError)
-from couchbase.connection import Connection
 from couchbase.tests.base import CouchbaseTestCase, SkipTest
 
 
 class ConnectionTest(CouchbaseTestCase):
     def test_connection_host_port(self):
-        cb = Connection(host=self.cluster_info.host,
-                        port=self.cluster_info.port,
-                        password=self.cluster_info.bucket_password,
-                        bucket=self.cluster_info.bucket_prefix)
+        cb = self.factory(host=self.cluster_info.host,
+                          port=self.cluster_info.port,
+                          password=self.cluster_info.bucket_password,
+                          bucket=self.cluster_info.bucket_prefix)
         # Connection didn't throw an error
-        self.assertIsInstance(cb, Connection)
+        self.assertIsInstance(cb, self.factory)
 
     def test_server_not_found(self):
         self.slowTest()
         connargs = self.make_connargs()
         connargs['host'] = 'example.com'
-        self.assertRaises(ConnectError, Connection, **connargs)
+        self.assertRaises(ConnectError, self.factory, **connargs)
 
         connargs['host'] = self.cluster_info.host
         connargs['port'] = 34567
-        self.assertRaises(ConnectError, Connection, **connargs)
+        self.assertRaises(ConnectError, self.factory, **connargs)
 
     def test_bucket(self):
-        cb = Connection(**self.make_connargs())
-        self.assertIsInstance(cb, Connection)
+        cb = self.factory(**self.make_connargs())
+        self.assertIsInstance(cb, self.factory)
 
     def test_sasl_bucket(self):
         self.skipUnlessSasl()
-        cb = Connection(**self.get_sasl_cinfo().make_connargs())
-        self.assertIsInstance(cb, Connection)
+        cb = self.factory(**self.get_sasl_cinfo().make_connargs())
+        self.assertIsInstance(cb, self.factory)
 
     def test_bucket_not_found(self):
         connargs = self.make_connargs(bucket='this_bucket_does_not_exist')
-        self.assertRaises(BucketNotFoundError, Connection, **connargs)
+        self.assertRaises(BucketNotFoundError, self.factory, **connargs)
 
     def test_bucket_wrong_credentials(self):
         sasl_info = self.get_sasl_cinfo()
         if sasl_info is self.mock_info:
             raise SkipTest("Mock not supported")
 
-        self.assertRaises(AuthError, Connection,
+        self.assertRaises(AuthError, self.factory,
                           **self.make_connargs(password='bad_pass'))
 
-        self.assertRaises(AuthError, Connection,
+        self.assertRaises(AuthError, self.factory,
                           **self.make_connargs(password='wrong_password'))
 
     def test_sasl_bucket_wrong_credentials(self):
         self.skipUnlessSasl()
         sasl_info = self.get_sasl_cinfo()
         sasl_bucket = sasl_info.get_sasl_params()['bucket']
-        self.assertRaises(AuthError, Connection,
+        self.assertRaises(AuthError, self.factory,
                           **sasl_info.make_connargs(password='wrong_password',
                                                bucket=sasl_bucket))
 
     def test_quiet(self):
         connparams = self.make_connargs()
-        cb = Connection(**connparams)
+        cb = self.factory(**connparams)
         self.assertRaises(NotFoundError, cb.get, 'missing_key')
 
-        cb = Connection(quiet=True, **connparams)
+        cb = self.factory(quiet=True, **connparams)
         cb.delete('missing_key', quiet=True)
         val1 = cb.get('missing_key')
         self.assertFalse(val1.success)
 
-        cb = Connection(quiet=False, **connparams)
+        cb = self.factory(quiet=False, **connparams)
         self.assertRaises(NotFoundError, cb.get, 'missing_key')
 
 
@@ -97,10 +96,10 @@ class ConnectionTest(CouchbaseTestCase):
         # ourselves when it's closed
         try:
             cachefile = tempfile.NamedTemporaryFile(delete=False)
-            cb = Connection(conncache=cachefile.name, **self.make_connargs())
+            cb = self.factory(conncache=cachefile.name, **self.make_connargs())
             self.assertTrue(cb.set("foo", "bar").success)
 
-            cb2 = Connection(conncache=cachefile.name, **self.make_connargs())
+            cb2 = self.factory(conncache=cachefile.name, **self.make_connargs())
 
             self.assertTrue(cb2.set("foo", "bar").success)
             self.assertEquals("bar", cb.get("foo").value)
@@ -118,21 +117,21 @@ class ConnectionTest(CouchbaseTestCase):
         # apparently libcouchbase does not report this failure.
 
     def test_connection_errors(self):
-        cb = Connection(password='bad',
-                        bucket='meh',
-                        host='localhost',
-                        port=1,
-                        _no_connect_exceptions=True)
+        cb = self.factory(password='bad',
+                          bucket='meh',
+                          host='localhost',
+                          port=1,
+                          _no_connect_exceptions=True)
         errors = cb.errors()
         self.assertTrue(len(errors))
         self.assertEqual(len(errors[0]), 2)
 
-        cb = Connection(**self.make_connargs())
+        cb = self.factory(**self.make_connargs())
         self.assertFalse(len(cb.errors()))
 
     def test_invalid_hostname(self):
         self.assertRaises(InvalidError,
-                          Connection,
+                          self.factory,
                           bucket='default', host='12345:qwer###')
 
     def test_multi_hosts(self):
@@ -142,11 +141,11 @@ class ConnectionTest(CouchbaseTestCase):
         }
 
         if not self.mock:
-            cb = Connection(host=[self.cluster_info.host], **kwargs)
+            cb = self.factory(host=[self.cluster_info.host], **kwargs)
             self.assertTrue(cb.set("foo", "bar").success)
 
         hostspec = [(self.cluster_info.host, self.cluster_info.port)]
-        cb = Connection(host=hostspec, **kwargs)
+        cb = self.factory(host=hostspec, **kwargs)
         self.assertTrue(cb.set("foo", "bar").success)
 
         hostlist = [
@@ -154,7 +153,7 @@ class ConnectionTest(CouchbaseTestCase):
             (self.cluster_info.host,
              self.cluster_info.port)
         ]
-        cb = Connection(host=hostlist, **kwargs)
+        cb = self.factory(host=hostlist, **kwargs)
         self.assertTrue(cb.set("foo", "bar").success)
 
 if __name__ == '__main__':
