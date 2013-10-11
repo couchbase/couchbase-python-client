@@ -1,0 +1,1 @@
+from couchbase.tests import *
