@@ -95,6 +95,7 @@ class Async(Connection):
 
         return super(Async, self).query(*args, **kwargs)
 
-    def _ctor_do_connect(self):
-        # Don't connect on init
-        pass
+    def endure(self, key, *args, **kwargs):
+        res = super(Async, self).endure_multi([key], *args, **kwargs)
+        res._set_single()
+        return res
