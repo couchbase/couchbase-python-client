@@ -1,6 +1,9 @@
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, Deferred
 
+from couchbase import experimental
+experimental.enable()
+
 from txcouchbase.connection import Connection
 
 class MyClient(object):

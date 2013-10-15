@@ -22,6 +22,7 @@ from twisted.internet import reactor
 from twisted.internet.defer import Deferred
 from twisted.python.failure import Failure
 
+from couchbase import experimental
 from couchbase.async.connection import Async
 from couchbase.async.view import AsyncViewBase
 from couchbase.async.events import EventQueue
@@ -113,6 +114,8 @@ class TxAsyncConnection(Async):
         Connection subclass for Twisted. This inherits from the 'Async' class,
         but also adds some twisted-specific logic for hooking on a connection.
         """
+
+        experimental.enabled_or_raise()
 
         iops = v0Iops(reactor)
         super(TxAsyncConnection, self).__init__(iops=iops, **kwargs)

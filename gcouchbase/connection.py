@@ -3,6 +3,7 @@ from collections import deque
 from gevent.event import AsyncResult, Event
 from gevent.hub import get_hub, getcurrent, Waiter
 
+from couchbase import experimental
 from couchbase.async.connection import Async
 from couchbase.async.view import AsyncViewBase
 from couchbase.views.iterator import AlreadyQueriedError
@@ -71,6 +72,7 @@ class GConnection(Async):
         which utilizes the underlying IOPS structures and the gevent
         event primitives to efficiently utilize couroutine switching.
         """
+        experimental.enabled_or_raise()
         super(GConnection, self).__init__(IOPS(), *args, **kwargs)
 
     def _do_ctor_connect(self):

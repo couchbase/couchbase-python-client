@@ -14,23 +14,21 @@
 # limitations under the License.
 #
 
-from couchbase import experimental
-from couchbase.tests.base import SkipTest
-import sys
-import platform
+_USE_EXPERIMENTAL_APIS = False
+def enable():
+    """
+    Enable usage of experimental APIs bundled with Couchbase.
+    """
+    global _USE_EXPERIMENTAL_APIS
+    _USE_EXPERIMENTAL_APIS = True
 
-vi = sys.version_info
-if vi[0] == 3:
-    from unittest.case import SkipTest
-    raise SkipTest("Twisted support unavailable on Python3")
+def enabled_or_raise():
+    if _USE_EXPERIMENTAL_APIS:
+        return
 
-try:
-    from twisted.trial.unittest import TestCase
-except:
-    raise SkipTest("Twisted not found")
-
-
-if platform.python_implementation() == 'PyPy':
-    raise SkipTest("Twisted/Async not supported on PyPy")
-
-experimental.enable()
+    raise ImportError(
+            "Your application has requested use of an unstable couchbase "
+            "client API. Use "
+            "couchbase.experimental.enable() to enable experimental APIs. "
+            "Experimental APIs are subject to interface, behavior, and "
+            "stability changes. Use at your own risk")

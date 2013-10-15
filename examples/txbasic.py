@@ -1,4 +1,8 @@
 from twisted.internet import reactor
+
+from couchbase import experimental
+experimental.enable()
+
 from txcouchbase import TxCouchbase
 
 cb = TxCouchbase.connect(bucket='default')

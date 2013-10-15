@@ -21,6 +21,9 @@ from time import sleep, time
 
 import gevent
 
+from couchbase import experimental
+experimental.enable()
+
 from couchbase.connection import FMT_BYTES
 from gcouchbase.connection import GConnection as Connection
 

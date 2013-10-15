@@ -1,4 +1,8 @@
 from twisted.internet import reactor
+
+from couchbase import experimental
+experimental.enable()
+
 from txcouchbase.connection import Connection
 
 def on_view_rows(res):

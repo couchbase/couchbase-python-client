@@ -1,3 +1,6 @@
+from couchbase.experimental import enable as enable_experimental
+enable_experimental()
+
 from couchbase.tests.base import ApiImplementationMixin, SkipTest
 try:
     import gevent
