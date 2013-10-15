@@ -19,8 +19,26 @@ Contents:
    api/threads
    api/convertfuncs
    api/items
+
+Internal APIs
+=============
+
+These are internal APIs whose interfaces are subject to change. They may
+nevertheless be helpful for debugging or extending existing functionality.
+
+.. toctree::
+   :maxdepth: 2
+
    api/async
+
+Integration APIs
+================
+
+.. toctree::
+   :maxdepth: 2
+
    api/txcouchbase
+   api/gcouchbase
 
 Indices and tables
 ==================

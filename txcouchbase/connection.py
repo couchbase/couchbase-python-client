@@ -142,6 +142,18 @@ class TxAsyncConnection(Async):
         If this event has already fired, the deferred will be triggered
         asynchronously.
 
+        Example::
+
+          def on_connect(*args):
+              print("I'm connected")
+          def on_connect_err(*args):
+              print("Connection failed")
+
+          d = Deferred()
+          cb.registerDeferred('connect', d)
+          d.addCallback(on_connect)
+          d.addErrback(on_connect_err)
+
         :raise: :exc:`ValueError` if the event name is unrecognized
         """
         try:
@@ -168,10 +180,32 @@ class TxAsyncConnection(Async):
         Converts a raw :class:`couchbase.results.AsyncResult` object
         into a :class:`Deferred`.
 
+        This is shorthand for the following "non-idiom"::
+
+          d = Deferred()
+          opres = cb.set("foo", "bar")
+          opres.callback = d.callback
+
+          def d_err(res, ex_type, ex_val, ex_tb):
+              d.errback(opres, ex_type, ex_val, ex_tb)
+
+          opres.errback = d_err
+          return d
+
         :param opres: The operation to wrap
         :type opres: :class:`couchbase.results.AsyncResult`
 
         :return: a :class:`Deferred` object.
+
+        Example::
+
+          opres = cb.set("foo", "bar")
+          d = cb.defer(opres)
+          def on_ok(res):
+              print("Result OK. Cas: {0}".format(res.cas))
+          d.addCallback(opres)
+
+
         """
         d = Deferred()
         opres.callback = d.callback
@@ -185,11 +219,57 @@ class TxAsyncConnection(Async):
         return d
 
 class Connection(TxAsyncConnection):
-    """
-    This class inherits from TxAsyncConnection. In addition to the connection
-    methods, this class' data access methods return Deferreds instead of
-    AsyncResult objects
-    """
+    def __init__(self, *args, **kwargs):
+        """
+        This class inherits from :class:`TxAsyncConnection`.
+        In addition to the connection methods, this class' data access methods
+        return :class:`Deferreds` instead of :class:`AsyncResult` objects.
+
+        Operations such as :meth:`get` or :meth:`set` will invoke the
+        :attr:`Deferred.callback` with the result object when the result is
+        complete, or they will invoke the :attr:`Deferred.errback` with an
+        exception (or :class:`Failure`) in case of an error. The rules of the
+        :attr:`~couchbase.connection.Connection.quiet` attribute for raising
+        exceptions apply to the invocation of the ``errback``. This means that
+        in the case where the synchronous client would raise an exception,
+        the Deferred API will have its ``errback`` invoked. Otherwise, the
+        result's :attr:`~couchbase.result.Result.success` field should be
+        inspected.
+
+
+        Likewise multi operations will be invoked with a
+        :class:`~couchbase.result.MultiResult` compatible object.
+
+        Some examples:
+
+        Using single items::
+
+          d_set = cb.set("foo", "bar")
+          d_get = cb.get("foo")
+
+          def on_err_common(*args):
+              print("Got an error: {0}".format(args)),
+          def on_set_ok(res):
+              print("Successfuly set key with CAS {0}".format(res.cas))
+          def on_get_ok(res):
+              print("Successfuly got key with value {0}".format(res.value))
+
+          d_set.addCallback(on_set_ok).addErrback(on_err_common)
+          d_get.addCallback(on_get_ok).addErrback(on_get_common)
+
+          # Note that it is safe to do this as operations performed on the
+          # same key are *always* performed in the order they were scheduled.
+
+        Using multiple items::
+
+          d_get = cb.get_multi(("Foo", "bar", "baz))
+          def on_mres(mres):
+              for k, v in mres.items():
+                  print("Got result for key {0}: {1}".format(k, v.value))
+          d.addCallback(mres)
+
+        """
+        super(Connection, self).__init__(*args, **kwargs)
 
     def _connectSchedule(self, f, meth, *args, **kwargs):
         qop = Deferred()
@@ -251,6 +331,16 @@ class Connection(TxAsyncConnection):
 
         Parameters follow conventions of
         :meth:`~couchbase.connection.Connection.query`.
+
+        Example::
+
+          d = cb.queryAll("beer", "brewery_beers")
+          def on_all_rows(rows):
+              for row in rows:
+                 print("Got row {0}".format(row))
+
+          d.addCallback(on_all_rows)
+
         """
 
         if not self.connected:

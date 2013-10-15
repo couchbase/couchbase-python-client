@@ -36,6 +36,7 @@ reasons (Deferreds result in a 3x performance slowdown).
 
 .. class:: Connection
 
+    .. automethod:: __init__
     .. automethod:: queryAll
     .. automethod:: queryEx
 
