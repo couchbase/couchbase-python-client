@@ -394,7 +394,7 @@ static PyMethodDef Connection_TABLE_methods[] = {
 
         { "lcb_version",
                 (PyCFunction)Connection_lcb_version,
-                METH_VARARGS|METH_KEYWORDS|METH_STATIC,
+                METH_NOARGS|METH_STATIC,
                 PyDoc_STR(
                 "Get `libcouchbase` version information\n"
                 "\n"
