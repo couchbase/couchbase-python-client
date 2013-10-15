@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import
+
 import os
 import sys
 import types
@@ -39,11 +41,7 @@ from couchbase._pyport import basestring
 
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'tests.ini')
 
-DEFAULT_CONNECTION_CLASS = None
-SHOULD_CHECK_REFCOUNT = True
-
 class ClusterInformation(object):
-
     def __init__(self):
         self.host = "localhost"
         self.port = 8091
@@ -71,9 +69,7 @@ class ClusterInformation(object):
             ret['bucket'] += "_sasl"
         return ret
 
-    def make_connection(self, conncls=None, **kwargs):
-        if not conncls:
-            conncls = DEFAULT_CONNECTION_CLASS
+    def make_connection(self, conncls, **kwargs):
         return conncls(**self.make_connargs(**kwargs))
 
     def make_admin_connection(self):
@@ -171,7 +167,35 @@ class RealServerResourceManager(TestResourceManager):
         return False
 
 
+class ApiImplementationMixin(object):
+    """
+    This represents the interface which should be installed by an implementation
+    of the API during load-time
+    """
+    @property
+    def factory(self):
+        """
+        Return the main Connection class used for this implementation
+        """
+        raise NotImplementedError()
+
+    @property
+    def viewfactory(self):
+        """
+        Return the view subclass used for this implementation
+        """
+        raise NotImplementedError()
+
+    @property
+    def should_check_refcount(self):
+        """
+        Return whether the instance's reference cound should be checked at
+        destruction time
+        """
+        raise NotImplementedError()
+
 GLOBAL_CONFIG = ConnectionConfiguration()
+
 
 class CouchbaseTestCase(ResourcedTestCase):
     resources = [
@@ -206,10 +230,6 @@ class CouchbaseTestCase(ResourcedTestCase):
         if not self._mock_info:
             raise SkipTest("Mock server required")
         return self._mock_info
-
-    @property
-    def factory(self):
-        return DEFAULT_CONNECTION_CLASS
 
 
     def setUp(self):
@@ -268,7 +288,7 @@ class CouchbaseTestCase(ResourcedTestCase):
                 components = [comp] + components
             vstr = ".".join(components)
 
-        rtstr, rtnum = DEFAULT_CONNECTION_CLASS.lcb_version()
+        rtstr, rtnum = self.factory.lcb_version()
         if rtnum < vernum:
             raise SkipTest(("Test requires {0} to run (have {1})")
                             .format(vstr, rtstr))
@@ -293,7 +313,7 @@ class CouchbaseTestCase(ResourcedTestCase):
             raise SkipTest("Skipping slow/sleep-based test")
 
     def make_connection(self, **kwargs):
-        return self.cluster_info.make_connection(**kwargs)
+        return self.cluster_info.make_connection(self.factory, **kwargs)
 
     def make_admin_connection(self):
         return self.realserver_info.make_admin_connection()
@@ -320,7 +340,7 @@ class CouchbaseTestCase(ResourcedTestCase):
 
 class ConnectionTestCase(CouchbaseTestCase):
     def checkCbRefcount(self):
-        if not SHOULD_CHECK_REFCOUNT:
+        if not self.should_check_refcount:
             return
 
         import gc
@@ -369,7 +389,7 @@ class MockTestCase(ConnectionTestCase):
         self.mockclient = MockControlClient(self.mock.rest_port)
 
     def make_connection(self, **kwargs):
-        return self.mock_info.make_connection(**kwargs)
+        return self.mock_info.make_connection(self.factory, **kwargs)
 
     @property
     def cluster_info(self):

@@ -28,13 +28,16 @@ def gen_base(basecls):
             self.addCleanup(lambda x: d, None)
 
         def make_connection(self, **kwargs):
-            kwargs['conncls'] = Connection
             ret = super(_TxTestCase, self).make_connection(**kwargs)
             self.register_cleanup(ret)
             return ret
 
         def checkCbRefcount(self):
             pass
+
+        @property
+        def factory(self):
+            return Connection
 
         def setUp(self):
             super(_TxTestCase, self).setUp()
