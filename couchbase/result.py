@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from platform import python_implementation
 
 import couchbase._bootstrap
 from couchbase._libcouchbase import (
@@ -24,3 +25,6 @@ from couchbase._libcouchbase import (
     MultiResult,
     ObserveInfo,
     AsyncResult)
+
+if python_implementation() == 'PyPy':
+    from couchbase._bootstrap import PyPyMultiResultWrap as MultiResult

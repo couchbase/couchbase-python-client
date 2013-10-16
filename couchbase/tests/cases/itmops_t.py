@@ -25,6 +25,11 @@ class ConnectionItemTest(ConnectionTestCase):
     """
     This class tests the new 'Item' API
     """
+
+    def setUp(self):
+        super(ConnectionItemTest, self).setUp()
+        self.skipIfPyPy()
+
     def test_construction(self):
         # Test whether we can construct a simple Item
         it = Item("some_key", "some_value")

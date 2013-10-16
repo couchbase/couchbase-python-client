@@ -143,9 +143,14 @@ encode_common(PyObject **o, void **buf, size_t *nbuf, lcb_uint32_t flags)
     }
 
     if (PyByteArray_Check(bytesobj)) {
+#ifdef PYPY_VERSION
+        rv = pycbc_PyPy_ByteArrayAsBytes(&bytesobj, buf, &plen);
+#else
+
         *buf = PyByteArray_AS_STRING(bytesobj);
         plen = PyByteArray_GET_SIZE(bytesobj);
         rv = 0;
+#endif
 
     } else {
         rv = PyBytes_AsStringAndSize(bytesobj, (char**)buf, &plen);

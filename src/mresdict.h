@@ -5,7 +5,9 @@
  */
 
 #ifdef PYPY_VERSION
-#define PYCBC_MULTIRESULT_BASE PyObject *_dict_pointer
+#define PYCBC_MULTIRESULT_BASE \
+    PyObject_HEAD \
+    PyObject *_dict_pointer
 #define pycbc_multiresult_dict(mres) (mres)->_dict_pointer
 #define pycbc_multiresult_set_base(o)
 

@@ -32,7 +32,7 @@ class ConnectionMiscTest(ConnectionTestCase):
 
         def _set_nodes():
             self.cb.server_nodes = 'sdf'
-        self.assertRaises(AttributeError, _set_nodes)
+        self.assertRaises((AttributeError, TypeError), _set_nodes)
 
     def test_lcb_version(self):
         verstr, vernum = Connection.lcb_version()

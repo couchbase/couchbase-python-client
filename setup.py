@@ -58,7 +58,7 @@ else:
     pkgdata['couchbase'] = ['libcouchbase.dll']
 
 
-SOURCEMODS = (
+SOURCEMODS = [
         'exceptions',
         'ext',
         'result',
@@ -82,7 +82,10 @@ SOURCEMODS = (
         'connevents',
         os.path.join('viewrow', 'viewrow'),
         os.path.join('contrib', 'jsonsl', 'jsonsl')
-        )
+        ]
+
+if platform.python_implementation() == 'PyPy':
+    SOURCEMODS.append('pypy-compat')
 
 extoptions['sources'] = [ os.path.join("src", m + ".c") for m in SOURCEMODS ]
 module = Extension('couchbase._libcouchbase', **extoptions)

@@ -105,6 +105,20 @@ class FMT_AUTO_object_not_a_number(object):
 # TODO: Make this more readable and have PEP8 ignore it.
 _FMT_AUTO = FMT_AUTO_object_not_a_number()
 
+
+class PyPyMultiResultWrap(dict):
+    def __init__(self, mres, d):
+        super(PyPyMultiResultWrap, self).__init__()
+        self.update(d)
+        object.__setattr__(self, '_mres', mres)
+
+    def __getattr__(self, name):
+        return getattr(self._mres, name)
+
+    def __setattr__(self, name, value):
+        setattr(self._mres, name, value)
+
+
 C._init_helpers(result_reprfunc=_result__repr__,
                 fmt_utf8_flags=C.FMT_UTF8,
                 fmt_bytes_flags=C.FMT_BYTES,
@@ -121,6 +135,7 @@ C._init_helpers(result_reprfunc=_result__repr__,
                 itmcoll_base_type=ItemCollection,
                 itmopts_dict_type=ItemOptionDict,
                 itmopts_seq_type=ItemSequence,
-                fmt_auto=_FMT_AUTO)
+                fmt_auto=_FMT_AUTO,
+                pypy_mres_factory=PyPyMultiResultWrap)
 
 C.FMT_AUTO = _FMT_AUTO

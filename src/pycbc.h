@@ -36,6 +36,7 @@
 #define PYCBC_REFCNT_ASSERT(x)
 #else
 #define PYCBC_REFCNT_ASSERT pycbc_assert
+#define pycbc_multiresult_wrap(mres) (PyObject *)(mres)
 #endif
 
 #include "mresdict.h"
@@ -432,7 +433,7 @@ enum {
  *
  * See multiresult.c
  */
-typedef struct {
+typedef struct pycbc_MultiResult_st {
     PYCBC_MULTIRESULT_BASE;
 
     /** parent Connection object */
@@ -626,7 +627,8 @@ extern PyObject *pycbc_ExceptionType;
     X(itmcoll_base_type) \
     X(itmopts_dict_type) \
     X(itmopts_seq_type) \
-    X(fmt_auto)
+    X(fmt_auto) \
+    X(pypy_mres_factory)
 
 #define PYCBC_XHELPERS_STRS(X) \
     X(tcname_encode_key, PYCBC_TCNAME_ENCODE_KEY) \

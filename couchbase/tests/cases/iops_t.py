@@ -21,6 +21,10 @@ from couchbase.tests.base import CouchbaseTestCase
 # We'll definitely want to add more here before we consider it stable
 
 class ConnectionIopsTest(CouchbaseTestCase):
+    def setUp(self):
+        super(ConnectionIopsTest, self).setUp()
+        self.skipIfPyPy()
+
     def _iops_connection(self, **kwargs):
         ret = self.make_connection(
             experimental_gevent_support=True,

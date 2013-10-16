@@ -286,7 +286,7 @@ pycbc_multiresult_maybe_raise(pycbc_MultiResult *self)
         PyObject_SetAttrString(value, "result", (PyObject*)res);
     }
 
-    PyObject_SetAttrString(value, "all_results", (PyObject*)self);
+    PyObject_SetAttrString(value, "all_results", pycbc_multiresult_wrap(self));
     PyErr_Restore(type, value, traceback);
 
     /**
@@ -310,8 +310,9 @@ pycbc_multiresult_get_result(pycbc_MultiResult *self)
     PyObject *key, *value;
 
     if (!(self->mropts & PYCBC_MRES_F_SINGLE)) {
-        Py_INCREF(pycbc_multiresult_dict(self));
-        return pycbc_multiresult_dict(self);
+        PyObject *res = pycbc_multiresult_wrap(self);
+        Py_INCREF(res);
+        return res;
     }
 
     rv = PyDict_Next(pycbc_multiresult_dict(self), &dictpos, &key, &value);
