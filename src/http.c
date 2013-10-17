@@ -119,7 +119,8 @@ maybe_invoke_async_callback(pycbc_HttpResult *htres)
     }
 
     if ((htres->htflags & PYCBC_HTRES_F_COMPLETE) == 0 &&
-            PyList_GET_SIZE(htres->rowsbuf) < (unsigned long)htres->rows_per_call) {
+            (unsigned long)PyList_GET_SIZE(htres->rowsbuf) <
+            (unsigned long)htres->rows_per_call) {
         return;
     }
 
@@ -315,7 +316,7 @@ pycbc_HttpResult__maybe_raise(pycbc_HttpResult *self)
 }
 
 static void
-prepare_async_request(pycbc_Connection *conn, pycbc_HttpResult *htres)
+prepare_async_request(pycbc_HttpResult *htres)
 {
     if (htres->htflags & PYCBC_HTRES_F_CHUNKED) {
         htres->rowsbuf = PyList_New(0);
@@ -426,7 +427,7 @@ pycbc_Connection__http_request(pycbc_Connection *self,
 
     if (htcmd.v.v0.chunked || (self->flags & PYCBC_CONN_F_ASYNC)) {
         if (self->flags & PYCBC_CONN_F_ASYNC) {
-            prepare_async_request(self, htres);
+            prepare_async_request(htres);
         }
 
         ret = (PyObject*)htres;

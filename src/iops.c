@@ -460,57 +460,61 @@ stop_event_loop(lcb_io_opt_t io)
     PyObject_CallFunctionObjArgs(pio->meths.stopwatch, NULL);
 }
 
+#define XIONAME_CACHENTRIES(X) \
+    X(modevent, 0) \
+    X(modtimer, 0) \
+    X(startwatch, 0) \
+    X(stopwatch, 0) \
+    X(mkevent, 1) \
+    X(mktimer, 1)
+
 static void
 iops_destructor(lcb_io_opt_t io)
 {
     pycbc_iops_t *pio = (pycbc_iops_t *)io;
-    Py_XDECREF(pio->meths.mkevent);
-    Py_XDECREF(pio->meths.mktimer);
-    Py_XDECREF(pio->meths.modevent);
-    Py_XDECREF(pio->meths.modtimer);
-    Py_XDECREF(pio->meths.startwatch);
-    Py_XDECREF(pio->meths.stopwatch);
+#define X(b, unused) Py_XDECREF(pio->meths.b);
+    XIONAME_CACHENTRIES(X)
+#undef X
 }
 
-struct meth_entry {
-    PyObject *lookup;
-    PyObject **target;
-    int optional;
-};
+static int
+load_cached_method(PyObject *obj,
+                   PyObject *attr, PyObject **target, int optional)
+{
+    *target = PyObject_GetAttr(obj, attr);
+    if (*target) {
+        if (!PyCallable_Check(*target)) {
+            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0,
+                               "Invalid IOPS object", obj);
+            return -1;
+        }
+        return 0;
+    }
+
+    if (optional) {
+        PyErr_Clear();
+        return 0;
+    }
+
+    return -1;
+}
 
 static int
 cache_io_methods(pycbc_iops_t *pio, PyObject *obj)
 {
-    struct meth_entry entries[] = {
-            { pycbc_helpers.ioname_modevent, &pio->meths.modevent },
-            { pycbc_helpers.ioname_modtimer, &pio->meths.modtimer },
-            { pycbc_helpers.ioname_startwatch, &pio->meths.startwatch },
-            { pycbc_helpers.ioname_stopwatch, &pio->meths.stopwatch },
-            { pycbc_helpers.ioname_mkevent, &pio->meths.mkevent, 1 },
-            { pycbc_helpers.ioname_mktimer, &pio->meths.mktimer, 1 },
-            { NULL, NULL }
-    };
 
-
-    struct meth_entry *m_ent;
-    for (m_ent = entries; m_ent->lookup; m_ent++) {
-        *m_ent->target = PyObject_GetAttr(obj, m_ent->lookup);
-        if (!*m_ent->target) {
-            if (m_ent->optional) {
-                PyErr_Clear();
-                continue;
-            }
-
-            return -1;
-        }
-        if (!PyCallable_Check(*m_ent->target)) {
-            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0, "Invalid IOPS object",
-                               obj);
-            return -1;
-        }
+#define X(b, is_optional) \
+    if (load_cached_method(obj, \
+                           pycbc_helpers.ioname_##b, \
+                           &pio->meths.b,\
+                           is_optional) == -1) { \
+        return -1; \
     }
 
+    XIONAME_CACHENTRIES(X)
     return 0;
+#undef X
+#undef XIONAME_CACHENTRIES
 }
 
 lcb_io_opt_t
@@ -522,6 +526,8 @@ pycbc_iops_new(pycbc_Connection *unused, PyObject *pyio)
     lcb_error_t err;
     struct lcb_create_io_ops_st options = { 0 };
     pycbc_iops_t *pio;
+
+    (void)unused;
 
     pio = calloc(1, sizeof(*pio));
     ret = &pio->iops;

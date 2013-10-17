@@ -57,7 +57,7 @@ enum {
     RESTYPE_EXISTS_OK = 1 << 3,
 
     /* Don't modify "remaining" count */
-    RESTYPE_VARCOUNT = 1 << 4,
+    RESTYPE_VARCOUNT = 1 << 4
 };
 
 static PyObject *
@@ -281,6 +281,8 @@ durability_callback(lcb_t instance,
     operation_completed(conn, mres);
 
     CB_THR_BEGIN(conn);
+
+    (void)instance;
 }
 
 static void
@@ -704,6 +706,8 @@ static void config_callback(lcb_t instance, lcb_configuration_t config)
     pycbc_invoke_connected_event(self, LCB_SUCCESS);
 
     end_global_callback(instance, self);
+
+    (void)config;
 }
 
 

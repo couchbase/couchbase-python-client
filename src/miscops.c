@@ -44,6 +44,9 @@ handle_single_keyop(pycbc_Connection *self,
     size_t nkey;
     lcb_uint64_t cas = 0;
 
+    (void)options;
+    (void)arg;
+
     if ( (optype == PYCBC_CMD_UNLOCK || optype == PYCBC_CMD_ENDURE)
             && PYCBC_OPRES_CHECK(curkey)) {
         curval = curkey;

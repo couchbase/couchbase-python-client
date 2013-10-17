@@ -49,6 +49,8 @@ handle_single_key(pycbc_Connection *self,
     struct getcmd_vars_st *gv = (struct getcmd_vars_st *)arg;
     unsigned long ttl = gv->u.ttl;
 
+    (void)itm;
+
     rv = pycbc_tc_encode_key(self, &curkey, (void**)&key, &nkey);
     if (rv == -1) {
         return -1;
@@ -92,7 +94,7 @@ handle_single_key(pycbc_Connection *self,
             return -1;
         }
     }
-    switch (gv->optype) {
+    switch (optype) {
     case PYCBC_CMD_GAT:
         if (!ttl) {
             PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "GAT must have positive TTL");

@@ -143,6 +143,8 @@ static PyObject *
 Connection_get_configured_replica_count(pycbc_Connection *self, void *unused)
 {
     PyObject *iret = pycbc_IntFromUL(lcb_get_num_replicas(self->instance));
+
+    (void)unused;
     return iret;
 }
 

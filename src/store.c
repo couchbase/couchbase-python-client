@@ -174,6 +174,8 @@ handle_single_kv(pycbc_Connection *self,
     scmd->v.v0.exptime = skc.ttl;
     cv->encvals[ii] = skc.value;
     cv->cmdlist.store[ii] = scmd;
+
+    (void)optype;
     return 0;
 }
 

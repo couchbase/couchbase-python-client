@@ -41,6 +41,9 @@ handle_single_arith(pycbc_Connection *self,
     struct arithmetic_common_vars my_params;
     static char *kwlist[] = { "delta", "initial", "ttl", NULL };
     my_params = *(struct arithmetic_common_vars *)arg;
+
+    (void)item;
+
     acmd = cv->cmds.arith + ii;
 
     rv = pycbc_tc_encode_key(self, &curkey, &key, &nkey);
