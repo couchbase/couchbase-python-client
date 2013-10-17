@@ -120,7 +120,11 @@ setup(
         'couchbase.views',
         'couchbase.iops',
         'couchbase.async',
-        'couchbase.tests'
+        'couchbase.tests',
+        'gcouchbase',
+        'txcouchbase'
     ],
-    package_data = pkgdata
+    package_data = pkgdata,
+    tests_require = [ 'nose', 'testresources>=0.2.7' ],
+    test_suite = 'couchbase.tests.test_sync'
 )
