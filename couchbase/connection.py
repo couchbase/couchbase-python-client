@@ -64,6 +64,30 @@ class Pipeline(object):
         """
         return self._results
 
+
+class DurabilityContext(object):
+
+    def __init__(self, parent, persist_to=-1, replicate_to=-1, timeout=0.0):
+        self._parent = parent
+        self._new = {
+            '_dur_persist_to': persist_to,
+            '_dur_replicate_to': replicate_to,
+            '_dur_timeout': int(timeout * 1000000)
+        }
+
+        self._old = {}
+
+    def __enter__(self):
+        for k, v in self._new.items():
+            self._old[k] = getattr(self._parent, k)
+            setattr(self._parent, k, v)
+
+    def __exit__(self, *args):
+        for k, v in self._old.items():
+            setattr(self._parent, k, v)
+
+        return False
+
 class Connection(_Base):
 
     def _gen_host_string(self, host, port):
@@ -848,6 +872,36 @@ class Connection(_Base):
                                 timeout=timeout,
                                 interval=interval)
         return rvs[key]
+
+    def durability(self, persist_to=-1, replicate_to=-1, timeout=0.0):
+        """
+        Returns a context manager which will apply the given
+        persistence/replication settings to all mutation operations when
+        active
+
+        :param int persist_to:
+        :param int replicate_to:
+
+        See :meth:`endure` for the meaning of these two values
+
+        Thus, something like::
+
+          with cb.durability(persist_to=3):
+            cb.set("foo", "foo_value")
+            cb.set("bar", "bar_value")
+            cb.set("baz", "baz_value")
+
+        is equivalent to:
+
+          cb.set("foo", "foo_value", persist_to=3)
+          cb.set("bar", "bar_value", persist_to=3)
+          cb.set("baz", "baz_value", persist_to=3)
+
+        .. versionadded:: 1.2.0
+
+        .. seealso:: meth:`endure`
+        """
+        return DurabilityContext(self, persist_to, replicate_to, timeout)
 
     def set_multi(self, keys, ttl=0, format=None, persist_to=0, replicate_to=0):
         """Set multiple keys

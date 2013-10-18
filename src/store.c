@@ -313,16 +313,24 @@ set_common(pycbc_Connection *self,
         return NULL;
     }
 
+    if (self->dur_global.persist_to || self->dur_global.replicate_to) {
+        if (persist_to == 0 && replicate_to == 0) {
+            persist_to = self->dur_global.persist_to;
+            replicate_to = self->dur_global.replicate_to;
+        }
+    }
+
     if (persist_to || replicate_to) {
         int nreplicas = lcb_get_num_replicas(self->instance);
         cv.mres->mropts |= PYCBC_MRES_F_DURABILITY;
-        cv.mres->durability_reqs[0] = persist_to;
-        cv.mres->durability_reqs[1] = replicate_to;
+        cv.mres->dur.persist_to = persist_to;
+        cv.mres->dur.replicate_to = replicate_to;
+
         if (replicate_to > nreplicas || persist_to > (nreplicas+1)) {
             PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR,
                            LCB_DURABILITY_ETOOMANY,
                            "Durability requirements will never be satisfied");
-            return NULL;
+            goto GT_DONE;
         }
     }
 

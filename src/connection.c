@@ -341,6 +341,30 @@ static struct PyMemberDef Connection_TABLE_members[] = {
                 PyDoc_STR("Internal destruction callback")
         },
 
+        { "_dur_persist_to", T_BYTE,
+                offsetof(pycbc_Connection, dur_global.persist_to),
+                0,
+                PyDoc_STR("Internal default persistence settings")
+        },
+
+        { "_dur_replicate_to", T_BYTE,
+                offsetof(pycbc_Connection, dur_global.replicate_to),
+                0,
+                PyDoc_STR("Internal default replication settings")
+        },
+
+        { "_dur_timeout", T_ULONG,
+                offsetof(pycbc_Connection, dur_timeout),
+                0,
+                PyDoc_STR("Internal ")
+        },
+
+        { "_dur_testhook", T_OBJECT_EX,
+                offsetof(pycbc_Connection, dur_testhook),
+                0,
+                PyDoc_STR("Internal hook for durability tests")
+        },
+
         { NULL }
 };
 
@@ -698,6 +722,7 @@ Connection_dtor(pycbc_Connection *self)
     Py_XDECREF(self->tc);
     Py_XDECREF(self->bucket);
     Py_XDECREF(self->conncb);
+    Py_XDECREF(self->dur_testhook);
 
     if (self->instance) {
         lcb_destroy(self->instance);

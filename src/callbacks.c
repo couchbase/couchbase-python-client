@@ -286,6 +286,19 @@ durability_callback(lcb_t instance,
 }
 
 static void
+invoke_endure_test_notification(pycbc_Connection *self, pycbc_Result *resp)
+{
+    PyObject *ret;
+
+    PyObject *argtuple = Py_BuildValue("(O)", resp);
+    ret = PyObject_CallObject(self->dur_testhook, argtuple);
+    pycbc_assert(ret);
+
+    Py_XDECREF(ret);
+    Py_XDECREF(argtuple);
+}
+
+static void
 store_callback(lcb_t instance,
                const void *cookie,
                lcb_storage_t op,
@@ -323,11 +336,24 @@ store_callback(lcb_t instance,
         lcb_durability_cmd_t dcmd = { 0 };
         lcb_durability_cmd_t *dcmd_p = &dcmd;
 
-        dopts.v.v0.persist_to = mres->durability_reqs[0];
-        dopts.v.v0.replicate_to = mres->durability_reqs[1];
+        /**
+         * Call the hook to test this code..
+         */
+        if (conn->dur_testhook) {
+            invoke_endure_test_notification(conn, (pycbc_Result *)res);
+        }
+
+        dopts.v.v0.persist_to = mres->dur.persist_to;
+        dopts.v.v0.replicate_to = mres->dur.replicate_to;
+        dopts.v.v0.timeout = conn->dur_timeout;
+
         dcmd.v.v0.cas = resp->v.v0.cas;
         dcmd.v.v0.key = resp->v.v0.key;
         dcmd.v.v0.nkey = resp->v.v0.nkey;
+
+        if (mres->dur.persist_to < 0 || mres->dur.replicate_to < 0) {
+            dopts.v.v0.cap_max = 1;
+        }
 
         err = lcb_durability_poll(instance,
                                   mres,
@@ -337,6 +363,7 @@ store_callback(lcb_t instance,
         if (err != LCB_SUCCESS) {
             res->rc = err;
             maybe_push_operr(mres, (pycbc_Result*)res, err, 0);
+            operation_completed(conn, mres);
         }
     } else {
         operation_completed(conn, mres);

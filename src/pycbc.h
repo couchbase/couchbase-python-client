@@ -261,6 +261,11 @@ enum {
 };
 
 typedef struct {
+    char persist_to;
+    char replicate_to;
+} pycbc_dur_params;
+
+typedef struct {
     PyObject_HEAD
 
     /** LCB instance */
@@ -285,6 +290,12 @@ typedef struct {
      * The dtorcb is first called when the refcount of the connection
      */
     PyObject *dtorcb;
+
+    /**
+     * Test hook for reacting to durability/persistence settings from within
+     * mutator functions
+     */
+    PyObject *dur_testhook;
 
 
     /** String bucket */
@@ -318,6 +329,9 @@ typedef struct {
     Py_ssize_t nremaining;
 
     unsigned int flags;
+
+    pycbc_dur_params dur_global;
+    unsigned long dur_timeout;
 
 } pycbc_Connection;
 
@@ -454,7 +468,7 @@ typedef struct pycbc_MultiResult_st {
     /** A failed LCB operation, if any */
     PyObject *errop;
 
-    char durability_reqs[2];
+    pycbc_dur_params dur;
 
     /** Quick-check value to see if everything went well */
     int all_ok;

@@ -21,6 +21,34 @@ from couchbase.tests.base import MockTestCase
 class ConnectionEndureTest(MockTestCase):
     #XXX: Require LCB 2.1.0
 
+    def test_excessive(self):
+        self.assertRaises(ArgumentError,
+                          self.cb.set,
+                          "foo", "bar",
+                          persist_to=99, replicate_to=99)
+
+    def test_embedded_endure(self):
+        key = self.gen_key("embedded_endure")
+        with self.cb.durability(persist_to=-1, replicate_to=-1, timeout=0.1):
+            def cb1(res):
+                self.mockclient.endure(key,
+                                       replica_count=self.mock.replicas,
+                                       value=90,
+                                       cas=res.cas)
+
+            self.cb._dur_testhook = cb1
+            rv = self.cb.set(key, "blah blah")
+            self.assertTrue(rv.success)
+
+
+            def cb2(res):
+                self.mockclient.unpersist(key, on_master=True,
+                                          replica_count=self.mock.replicas)
+
+            self.cb._dur_testhook = cb2
+            self.assertRaises(TimeoutError, self.cb.set, key, "value")
+
+
     def test_single_poll(self):
         key = self.gen_key("endure_single_poll")
         self.mockclient.endure(key,
