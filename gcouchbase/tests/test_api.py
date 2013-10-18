@@ -16,7 +16,7 @@ class GEventImplMixin(ApiImplementationMixin):
     should_check_refcount = False
 
 
-skiplist = ('ConnectionIopsTest', 'LockmodeTest')
+skiplist = ('ConnectionIopsTest', 'LockmodeTest', 'ConnectionPipelineTest')
 
 configured_classes = get_configured_classes(GEventImplMixin,
                                             skiplist=skiplist)

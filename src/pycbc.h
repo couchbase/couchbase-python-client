@@ -203,7 +203,10 @@ enum {
     PYCBC_EXC_THREADING,
 
     /** Object destroyed before it could connect */
-    PYCBC_EXC_DESTROYED
+    PYCBC_EXC_DESTROYED,
+
+    /** Illegal operation in pipeline context */
+    PYCBC_EXC_PIPELINE
 };
 
 /* Argument options */
@@ -286,6 +289,9 @@ typedef struct {
 
     /** String bucket */
     PyObject *bucket;
+
+    /** Pipeline MultiResult container */
+    PyObject *pipeline_queue;
 
     /** If using a custom IOPS, this contains it */
     lcb_io_opt_t iops;
@@ -966,4 +972,10 @@ void pycbc_schedule_dtor_event(pycbc_Connection *self);
  */
 void pycbc_invoke_error_callback(pycbc_Connection *self,
                                  lcb_error_t err, const char *msg);
+
+/**
+ * Pipeline handlers
+ */
+PyObject* pycbc_Connection__start_pipeline(pycbc_Connection *);
+PyObject* pycbc_Connection__end_pipeline(pycbc_Connection *);
 #endif /* PYCBC_H_ */

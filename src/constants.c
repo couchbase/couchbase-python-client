@@ -93,6 +93,7 @@ pycbc_init_pyconstants(PyObject *module)
     PyModule_AddIntMacro(module, PYCBC_EXC_HTTP);
     PyModule_AddIntMacro(module, PYCBC_EXC_THREADING);
     PyModule_AddIntMacro(module, PYCBC_EXC_DESTROYED);
+    PyModule_AddIntMacro(module, PYCBC_EXC_PIPELINE);
 
     PyModule_AddIntMacro(module, LCB_TYPE_BUCKET);
     PyModule_AddIntMacro(module, LCB_TYPE_CLUSTER);

@@ -441,6 +441,19 @@ static PyMethodDef Connection_TABLE_methods[] = {
                 "the wrapping constructors\n")
         },
 
+        { "_pipeline_begin",
+                (PyCFunction)pycbc_Connection__start_pipeline,
+                METH_NOARGS,
+                PyDoc_STR("Enter pipeline mode. Internal use")
+        },
+
+        { "_pipeline_end",
+                (PyCFunction)pycbc_Connection__end_pipeline,
+                METH_NOARGS,
+                PyDoc_STR(
+                "End pipeline mode and wait for operations to complete")
+        },
+
         { NULL, NULL, 0, NULL }
 };
 

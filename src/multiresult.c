@@ -243,6 +243,10 @@ pycbc_multiresult_new(pycbc_Connection *parent)
     ret->parent = parent;
     Py_INCREF(parent);
 
+    if (parent->pipeline_queue) {
+        PyList_Append(parent->pipeline_queue, (PyObject *)ret);
+    }
+
     return (PyObject*)ret;
 }
 

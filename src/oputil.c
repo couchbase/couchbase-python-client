@@ -65,6 +65,11 @@ pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Connection *self)
         Py_INCREF(cv->ret);
         cv->mres = NULL;
         return 0;
+
+    } else if (self->pipeline_queue) {
+        cv->ret = Py_None;
+        Py_INCREF(Py_None);
+        return 0;
     }
 
     pycbc_oputil_wait_common(self);

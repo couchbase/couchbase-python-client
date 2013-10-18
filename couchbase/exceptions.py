@@ -323,6 +323,9 @@ class ObjectDestroyedError(CouchbaseError):
     """Object has been destroyed. Pending events are invalidated"""
 
 
+class PipelineError(CouchbaseError):
+    """Illegal operation within pipeline state"""
+
 _LCB_ERRNO_MAP = {
     C.LCB_AUTH_ERROR:       AuthError,
     C.LCB_DELTA_BADVAL:     DeltaBadvalError,
@@ -358,5 +361,6 @@ _EXCTYPE_MAP = {
     C.PYCBC_EXC_INTERNAL:   InternalSDKError,
     C.PYCBC_EXC_HTTP:       HTTPError,
     C.PYCBC_EXC_THREADING:  ObjectThreadError,
-    C.PYCBC_EXC_DESTROYED:  ObjectDestroyedError
+    C.PYCBC_EXC_DESTROYED:  ObjectDestroyedError,
+    C.PYCBC_EXC_PIPELINE:   PipelineError
 }

@@ -258,6 +258,22 @@ values for its keys
 
     .. automethod:: touch_multi
 
+Batch Operation Pipeline
+========================
+
+In addition to the multi methods, you may also use the `Pipeline` context
+manager to schedule multiple operations of different types
+
+.. currentmodule:: couchbase.connection
+.. class:: Connection
+
+    .. automethod:: pipeline
+
+.. class:: Pipeline
+
+    .. autoattribute:: results
+
+
 MapReduce/View Methods
 ======================
 

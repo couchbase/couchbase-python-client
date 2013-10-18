@@ -347,7 +347,7 @@ pycbc_Connection__http_request(pycbc_Connection *self,
     pycbc_strlen_t nbody = 0;
     const char *path = NULL;
     const char *content_type = NULL;
-    pycbc_HttpResult *htres;
+    pycbc_HttpResult *htres = NULL;
     lcb_http_request_t l_htreq;
     long rows_per_call = 1;
 
@@ -379,6 +379,13 @@ pycbc_Connection__http_request(pycbc_Connection *self,
 
     if (-1 == pycbc_oputil_conn_lock(self)) {
         return NULL;
+    }
+
+    if (self->pipeline_queue) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_PIPELINE, 0,
+                       "HTTP/View Requests cannot be executed in "
+                       "pipeline context");
+        goto GT_DONE;
     }
 
 
@@ -477,6 +484,9 @@ pycbc_HttpResult__fetch(pycbc_HttpResult *self)
                        "_fetch() should not be called with an async "
                        "connection");
         goto GT_RET;
+    } else if (self->parent->pipeline_queue) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_PIPELINE, 0,
+                       "HTTP requests cannot be executed in pipeline context");
     }
 
     if (!self->rowsbuf) {

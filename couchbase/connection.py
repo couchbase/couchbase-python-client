@@ -33,6 +33,37 @@ from couchbase.views.params import make_dvpath, make_options_string
 from couchbase.views.iterator import View
 from couchbase._pyport import basestring
 
+class Pipeline(object):
+    def __init__(self, parent):
+        """
+
+        .. versionadded:: 1.2.0
+
+        Creates a new pipeline context. See :meth:`~Connection.pipeline`
+        for more details
+        """
+        self._parent = parent
+        self._results = None
+
+    def __enter__(self):
+        self._parent._pipeline_begin()
+
+    def __exit__(self, *args):
+        self._results = self._parent._pipeline_end()
+        return False
+
+    @property
+    def results(self):
+        """
+        Contains a list of results for each pipelined operation executed within
+        the context. The list remains until this context is reused.
+
+        The elements in the list are either :class:`~couchbase.result.Result`
+        objects (for single operations) or
+        :class:`~couchbase.result.MultiResult` objects (for multi operations)
+        """
+        return self._results
+
 class Connection(_Base):
 
     def _gen_host_string(self, host, port):
@@ -134,6 +165,56 @@ class Connection(_Base):
         if clear_existing:
             self._errors.clear()
         return ret
+
+    def pipeline(self):
+        """
+
+        Returns a new :class:`Pipeline` context manager. When the context
+        manager is active, operations performed will return ``None``, and
+        will be sent on the network when the context leaves (in its
+        ``__exit__`` method). To get the results of the pipelined operations,
+        inspect the :attr:`Pipeline.results` property.
+
+        Operational errors (i.e. negative replies from the server, or network
+        errors) are delivered when the pipeline exits, but argument errors
+        are thrown immediately.
+
+        :return: a :class:`Pipeline` object
+
+        :raise: :exc:`couchbase.exceptions.PipelineError` if a pipeline
+          is already in progress
+
+        :raise: Other operation-specific errors.
+
+        Scheduling multiple operations, without checking results::
+
+          with cb.pipeline():
+            cb.set("key1", "value1")
+            cb.incr("counter")
+            cb.add_multi({
+              "new_key1" : "new_value_1",
+              "new_key2" : "new_value_2"
+            })
+
+        Retrieve the results for several operations::
+
+          pipeline = cb.pipeline()
+          with pipeline:
+            cb.set("foo", "bar")
+            cb.replace("something", "value")
+
+          for result in pipeline.results:
+            print("Pipeline result: CAS {0}".format(result.cas))
+
+        .. note::
+
+          When in pipeline mode, you cannot execute view queries.
+          Additionally, pipeline mode is not supported on async handles
+
+        .. versionadded:: 1.2.0
+
+        """
+        return Pipeline(self)
 
     # We have these wrappers so that IDEs can do param tooltips and the like.
     # we might move this directly into C some day

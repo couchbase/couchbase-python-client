@@ -80,6 +80,7 @@ SOURCEMODS = [
         'observe',
         'iops',
         'connevents',
+        'pipeline',
         os.path.join('viewrow', 'viewrow'),
         os.path.join('contrib', 'jsonsl', 'jsonsl')
         ]
