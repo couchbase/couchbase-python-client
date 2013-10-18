@@ -8,12 +8,19 @@
 #define PYCBC_MULTIRESULT_BASE \
     PyObject_HEAD \
     PyObject *_dict_pointer
+
 #define pycbc_multiresult_dict(mres) (mres)->_dict_pointer
-#define pycbc_multiresult_set_base(o)
+
+#define pycbc_multiresult_set_base(o) o->tp_new = PyType_GenericNew
 
 #define pycbc_multiresult_init_dict(mres, args, kwargs) \
     ( ((mres)->_dict_pointer = PyDict_New()) ? 0 : -1)
-#define pycbc_multiresult_destroy_dict(mres) Py_DECREF((mres)->_dict_pointer)
+
+#define pycbc_multiresult_destroy_dict(mres)  { \
+    Py_XDECREF((mres)->_dict_pointer); \
+    Py_TYPE(self)->tp_free(self); \
+}
+
 #define pycbc_multiresult_check(opj) 1
 
 #else
