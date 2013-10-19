@@ -289,7 +289,6 @@ static void
 invoke_endure_test_notification(pycbc_Connection *self, pycbc_Result *resp)
 {
     PyObject *ret;
-
     PyObject *argtuple = Py_BuildValue("(O)", resp);
     ret = PyObject_CallObject(self->dur_testhook, argtuple);
     pycbc_assert(ret);
@@ -298,23 +297,23 @@ invoke_endure_test_notification(pycbc_Connection *self, pycbc_Result *resp)
     Py_XDECREF(argtuple);
 }
 
+/**
+ * Common handler for durability
+ */
 static void
-store_callback(lcb_t instance,
-               const void *cookie,
-               lcb_storage_t op,
-               lcb_error_t err,
-               const lcb_store_resp_t *resp)
+dur_opres_common(const void *cookie, lcb_error_t err,
+                 const void *key, lcb_size_t nkey, lcb_cas_t cas, int is_delete)
 {
     pycbc_Connection *conn;
     pycbc_OperationResult *res = NULL;
     pycbc_MultiResult *mres;
+    lcb_durability_opts_t dopts = { 0 };
+    lcb_durability_cmd_t dcmd = { 0 };
+    const lcb_durability_cmd_t * const dcmd_p = &dcmd;
     int rv;
 
     rv = get_common_objects((PyObject*)cookie,
-                            resp->v.v0.key,
-                            resp->v.v0.nkey,
-                            err,
-                            &conn,
+                            key, nkey, err, &conn,
                             (pycbc_Result**)&res,
                             RESTYPE_OPERATION|RESTYPE_VARCOUNT,
                             &mres);
@@ -327,49 +326,54 @@ store_callback(lcb_t instance,
 
     res->rc = err;
     if (err == LCB_SUCCESS) {
-        res->cas = resp->v.v0.cas;
+        res->cas = cas;
     }
-    maybe_push_operr(mres, (pycbc_Result*)res, err, 0);
 
-    if (err == LCB_SUCCESS && (mres->mropts & PYCBC_MRES_F_DURABILITY)) {
-        lcb_durability_opts_t dopts = { 0 };
-        lcb_durability_cmd_t dcmd = { 0 };
-        lcb_durability_cmd_t *dcmd_p = &dcmd;
+    /** For remove, we check quiet */
+    maybe_push_operr(mres, (pycbc_Result*)res, err, is_delete ? 1 : 0);
 
-        /**
-         * Call the hook to test this code..
-         */
-        if (conn->dur_testhook) {
-            invoke_endure_test_notification(conn, (pycbc_Result *)res);
-        }
+    if ((mres->mropts & PYCBC_MRES_F_DURABILITY) == 0 || err != LCB_SUCCESS) {
+        operation_completed(conn, mres);
+        CB_THR_BEGIN(conn);
+        return;
+    }
 
-        dopts.v.v0.persist_to = mres->dur.persist_to;
-        dopts.v.v0.replicate_to = mres->dur.replicate_to;
-        dopts.v.v0.timeout = conn->dur_timeout;
+    if (conn->dur_testhook && conn->dur_testhook != Py_None) {
+        invoke_endure_test_notification(conn, (pycbc_Result *)res);
+    }
 
-        dcmd.v.v0.cas = resp->v.v0.cas;
-        dcmd.v.v0.key = resp->v.v0.key;
-        dcmd.v.v0.nkey = resp->v.v0.nkey;
+    /** Setup global options */
+    dopts.v.v0.persist_to = mres->dur.persist_to;
+    dopts.v.v0.replicate_to = mres->dur.replicate_to;
+    dopts.v.v0.timeout = conn->dur_timeout;
+    dopts.v.v0.check_delete = is_delete;
 
-        if (mres->dur.persist_to < 0 || mres->dur.replicate_to < 0) {
-            dopts.v.v0.cap_max = 1;
-        }
+    /** Setup key specifics */
+    dcmd.v.v0.cas = cas;
+    dcmd.v.v0.key = key;
+    dcmd.v.v0.nkey = nkey;
 
-        err = lcb_durability_poll(instance,
-                                  mres,
-                                  &dopts,
-                                  1,
-                                  (const lcb_durability_cmd_t * const *)&dcmd_p);
-        if (err != LCB_SUCCESS) {
-            res->rc = err;
-            maybe_push_operr(mres, (pycbc_Result*)res, err, 0);
-            operation_completed(conn, mres);
-        }
-    } else {
+    if (mres->dur.persist_to < 0 || mres->dur.replicate_to < 0) {
+        dopts.v.v0.cap_max = 1;
+    }
+
+    err = lcb_durability_poll(conn->instance, mres, &dopts, 1, &dcmd_p);
+
+    if (err != LCB_SUCCESS) {
+        res->rc = err;
+        maybe_push_operr(mres, (pycbc_Result*)res, err, 0);
         operation_completed(conn, mres);
     }
 
     CB_THR_BEGIN(conn);
+}
+
+static void
+store_callback(lcb_t instance, const void *cookie, lcb_storage_t op,
+               lcb_error_t err, const lcb_store_resp_t *resp)
+{
+    dur_opres_common(cookie, err,
+                     resp->v.v0.key, resp->v.v0.nkey, resp->v.v0.cas, 0);
 
     (void)instance;
     (void)op;
@@ -438,30 +442,11 @@ get_callback(lcb_t instance,
 }
 
 static void
-delete_callback(lcb_t instance,
-                const void *cookie,
-                lcb_error_t err,
+delete_callback(lcb_t instance, const void *cookie, lcb_error_t err,
                 const lcb_remove_resp_t *resp)
 {
-    int rv;
-    pycbc_Connection *conn = NULL;
-    pycbc_OperationResult *res = NULL;
-    pycbc_MultiResult *mres = NULL;
-    rv = get_common_objects((PyObject*)cookie,
-                            resp->v.v0.key, resp->v.v0.nkey, err,
-                            &conn,
-                            (pycbc_Result**)&res,
-                            RESTYPE_OPERATION,
-                            &mres);
-
-    if (rv == 0 && err == LCB_SUCCESS) {
-        res->cas = resp->v.v0.cas;
-    }
-
-    maybe_push_operr(mres, (pycbc_Result*)res, err, 1);
-    operation_completed(conn, mres);
-
-    CB_THR_BEGIN(conn);
+    dur_opres_common(cookie, err,
+                     resp->v.v0.key, resp->v.v0.nkey, resp->v.v0.cas, 1);
     (void)instance;
 }
 

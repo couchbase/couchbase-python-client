@@ -630,7 +630,7 @@ Connection__init__(pycbc_Connection *self,
         return -1;
     }
 
-#ifdef WITH_THREAD
+#if defined(WITH_THREAD) && !defined(PYPY_VERSION)
     if (!self->unlock_gil) {
         self->lockmode = PYCBC_LOCKMODE_NONE;
     }
@@ -638,6 +638,9 @@ Connection__init__(pycbc_Connection *self,
     if (self->lockmode != PYCBC_LOCKMODE_NONE) {
         self->lock = PyThread_allocate_lock();
     }
+#else
+    self->unlock_gil = 0;
+    self->lockmode = PYCBC_LOCKMODE_NONE;
 #endif
 
     if (conncache) {

@@ -27,7 +27,7 @@ class ConnectionEndureTest(MockTestCase):
                           "foo", "bar",
                           persist_to=99, replicate_to=99)
 
-    def test_embedded_endure(self):
+    def test_embedded_endure_set(self):
         key = self.gen_key("embedded_endure")
         with self.cb.durability(persist_to=-1, replicate_to=-1, timeout=0.1):
             def cb1(res):
@@ -47,6 +47,35 @@ class ConnectionEndureTest(MockTestCase):
 
             self.cb._dur_testhook = cb2
             self.assertRaises(TimeoutError, self.cb.set, key, "value")
+
+    def test_embedded_endure_delete(self):
+        key = self.gen_key("embedded_endure_delete")
+        cas = 12345
+
+        # Store it first
+        self.mockclient.endure(key, replica_count=self.mock.replicas,
+                               on_master=True,
+                               value=666666, cas=cas)
+
+        with self.cb.durability(persist_to=-1, replicate_to=-1, timeout=0.1):
+            def cb1(res):
+                self.mockclient.purge(key, on_master=True,
+                                      replica_count=self.mock.replicas)
+
+            res = self.cb.get(key)
+
+            self.cb._dur_testhook = cb1
+            rv_rm = self.cb.delete(key)
+            self.assertTrue(rv_rm.success)
+
+
+
+            self.mockclient.endure(key, on_master=True,
+                                   replica_count=self.mock.replicas,
+                                   cas=cas, value="blah")
+
+            self.cb._dur_testhook =  None
+            self.assertRaises(TimeoutError, self.cb.delete, key)
 
 
     def test_single_poll(self):

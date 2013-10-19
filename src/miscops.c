@@ -141,18 +141,22 @@ keyop_common(pycbc_Connection *self,
     PyObject *casobj = NULL;
     PyObject *is_quiet = NULL;
     PyObject *kobj = NULL;
+    char persist_to = 0, replicate_to = 0;
     lcb_error_t err;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
 
-    static char *kwlist[] = { "keys", "cas", "quiet", NULL };
+    static char *kwlist[] = {
+            "keys", "cas", "quiet", "persist_to", "replicate_to", NULL
+    };
 
     rv = PyArg_ParseTupleAndKeywords(args,
                                      kwargs,
-                                     "O|OO",
+                                     "O|OOBB",
                                      kwlist,
                                      &kobj,
                                      &casobj,
-                                     &is_quiet);
+                                     &is_quiet,
+                                     &persist_to, &replicate_to);
 
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
@@ -198,6 +202,15 @@ keyop_common(pycbc_Connection *self,
 
 
     if (optype == PYCBC_CMD_DELETE) {
+        rv = pycbc_handle_durability_args(self, &cv.mres->dur,
+                                          persist_to, replicate_to);
+        if (rv == 1) {
+            cv.mres->mropts |= PYCBC_MRES_F_DURABILITY;
+
+        } else if (rv == -1) {
+            goto GT_DONE;
+        }
+
         if (pycbc_maybe_set_quiet(cv.mres, is_quiet) == -1) {
             goto GT_DONE;
         }

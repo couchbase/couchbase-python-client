@@ -517,3 +517,36 @@ pycbc_oputil_wait_common(pycbc_Connection *self)
 
     return ret;
 }
+
+/**
+ * Returns 1 if durability was found, 0 if durability was not found, and -1
+ * on error.
+ */
+int
+pycbc_handle_durability_args(pycbc_Connection *self,
+                             pycbc_dur_params *params,
+                             char persist_to,
+                             char replicate_to)
+{
+    if (self->dur_global.persist_to || self->dur_global.replicate_to) {
+        if (persist_to == 0 && replicate_to == 0) {
+            persist_to = self->dur_global.persist_to;
+            replicate_to = self->dur_global.replicate_to;
+        }
+    }
+
+    if (persist_to || replicate_to) {
+        int nreplicas = lcb_get_num_replicas(self->instance);
+        params->persist_to = persist_to;
+        params->replicate_to = replicate_to;
+        if (replicate_to > nreplicas || persist_to > (nreplicas + 1)) {
+            PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, LCB_DURABILITY_ETOOMANY,
+                           "Durability requirements will never be satisfied");
+            return -1;
+        }
+
+        return 1;
+    }
+
+    return 0;
+}

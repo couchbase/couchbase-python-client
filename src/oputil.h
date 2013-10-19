@@ -342,6 +342,15 @@ int pycbc_oputil_conn_lock(pycbc_Connection *self);
 void pycbc_oputil_conn_unlock(pycbc_Connection *self);
 
 /**
+ * Returns 1 if durability was found, 0 if durability was not found, and -1
+ * on error.
+ */
+int pycbc_handle_durability_args(pycbc_Connection *self,
+                                 pycbc_dur_params *params,
+                                 char persist_to,
+                                 char replicate_to);
+
+/**
  * Macro to declare prototypes for entry points.
  * If the entry point is foo, then it is expected that there exist a C
  * function called 'pycbc_Connection_foo'.

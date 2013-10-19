@@ -608,7 +608,7 @@ class Connection(_Base):
         """
         return _Base.unlock(self, key, cas=cas)
 
-    def delete(self, key, cas=0, quiet=None):
+    def delete(self, key, cas=0, quiet=None, persist_to=0, replicate_to=0):
         """Remove the key-value entry for a given key in Couchbase.
 
         :param key: A string which is the key to delete. The format and type
@@ -624,6 +624,16 @@ class Connection(_Base):
           an exception is thrown.
         :param boolean quiet:
           Follows the same semantics as `quiet` in :meth:`get`
+
+        :param int persist_to: If set, wait for the item to be deleted from
+          the storage of at least these many nodes
+
+          .. versionadded:: 1.2.0
+
+        :param int replicate_to: If set, wait for the item to be deleted from
+          the cache of at least these many nodes (excluding the master)
+
+          .. versionadded:: 1.2.0
 
         :raise: :exc:`couchbase.exceptions.NotFoundError` if the key
           does not exist on the bucket
@@ -661,10 +671,12 @@ class Connection(_Base):
             })
 
 
-        .. seealso:: :meth:`delete_multi`
+        .. seealso:: :meth:`delete_multi`, :meth:`endure` for more information
+          on the ``persist_to`` and ``replicate_to`` options.
 
         """
-        return _Base.delete(self, key, cas, quiet)
+        return _Base.delete(self, key, cas, quiet, persist_to=persist_to,
+                            replicate_to=replicate_to)
 
     def incr(self, key, amount=1, initial=None, ttl=0):
         """
