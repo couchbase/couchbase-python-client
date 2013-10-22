@@ -510,9 +510,9 @@ class Query(object):
         Returns the (uri_part, post_data_part) for a long query.
         """
         uristr = self._encode(omit_keys=True)
-        kstr = ""
+        kstr = "{}"
 
-        klist = self._real_options.get('keys', None)
+        klist = self._real_options.get('keys', UNSPEC)
         if klist != UNSPEC:
             kstr = '{{"keys":{0}}}'.format(klist)
 
