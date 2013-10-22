@@ -17,7 +17,7 @@
 
 from couchbase.tests.base import ViewTestCase, SkipTest
 from couchbase.views.iterator import (
-    View, ViewRow, RowProcessor, AlreadyQueriedError)
+    View, ViewRow, RowProcessor, AlreadyQueriedError, MAX_URI_LENGTH)
 
 from couchbase.views.params import Query, UNSPEC
 from couchbase.exceptions import CouchbaseError
@@ -319,7 +319,7 @@ class ViewIteratorTest(ViewTestCase):
 
     def test_long_uri(self):
         qobj = Query()
-        qobj.mapkey_multi = [ str(x) for x in range(500) ]
+        qobj.mapkey_multi = [ str(x) for x in xrange(MAX_URI_LENGTH) ]
         ret = self.cb.query("beer", "brewery_beers", query=qobj)
         # No assertions, just make sure it didn't break
         for row in ret:

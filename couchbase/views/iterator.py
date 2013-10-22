@@ -26,6 +26,7 @@ from couchbase._pyport import ulp, xrange
 from couchbase.user_constants import FMT_JSON
 import couchbase._libcouchbase as C
 
+MAX_URI_LENGTH = 2048 # Let's be safe
 
 class AlreadyQueriedError(CouchbaseError):
     """Thrown when iterating over a View which was already iterated over"""
@@ -350,7 +351,7 @@ class View(object):
         qstr = self._query.encoded
         uri = make_dvpath(self.design, self.view)
 
-        if len(uri) + len(qstr) > 200:
+        if len(uri) + len(qstr) > MAX_URI_LENGTH:
             (uriparams, post_data) = self._query._long_query_encoded
 
             d['method'] = C.LCB_HTTP_METHOD_POST
