@@ -23,6 +23,7 @@ from couchbase.views.params import Query, UNSPEC
 from couchbase.exceptions import CouchbaseError
 from couchbase.result import Result
 from couchbase.exceptions import ArgumentError, CouchbaseError, HTTPError
+from couchbase._pyport import xrange
 
 
 # We'll be using the beer-sample database as it has a sufficiently large
