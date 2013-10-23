@@ -39,7 +39,7 @@ from couchbase.mockserver import CouchbaseMock, BucketSpec, MockControlClient
 
 from couchbase._pyport import basestring
 
-CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'tests.ini')
+CONFIG_FILE = 'tests.ini' # in cwd
 
 class ClusterInformation(object):
     def __init__(self):
