@@ -62,12 +62,12 @@ def server_settings(config_file):
     config.read(config_file)
 
     return {
-        'host': config.get('node-1', 'host'),
-        'port': config.getint('node-1', 'port'),
-        'username': config.get('node-1', 'username'),
-        'password': config.get('node-1', 'password'),
-        'bucket_prefix': config.get('node-1', 'bucket_prefix'),
-        'bucket_password': config.get('node-1', 'bucket_password'),
+        'host': config.get('realserver', 'host'),
+        'port': config.getint('realserver', 'port'),
+        'username': config.get('realserver', 'admin_username'),
+        'password': config.get('realserver', 'admin_password'),
+        'bucket_prefix': config.get('realserver', 'bucket_prefix'),
+        'bucket_password': config.get('realserver', 'bucket_password'),
         'bucket_port': 11400
     }
 
