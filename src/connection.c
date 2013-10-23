@@ -171,6 +171,16 @@ Connection_connected(pycbc_Connection *self, void *unused)
 }
 
 static PyObject *
+Connection__instance_pointer(pycbc_Connection *self, void *unused)
+{
+    PyObject *ret;
+    Py_uintptr_t ptri = (Py_uintptr_t)self->instance;
+    ret = pycbc_IntFromULL(ptri);
+    (void)unused;
+    return ret;
+}
+
+static PyObject *
 Connection_lcb_version(pycbc_Connection *self)
 {
     const char *verstr;
@@ -281,6 +291,13 @@ static PyGetSetDef Connection_TABLE_getset[] = {
                         "\n"
                         "Note that this will still return true even if\n"
                         "it is subsequently closed via :meth:`_close`\n")
+        },
+
+        { "_instance_pointer",
+                (getter)Connection__instance_pointer,
+                NULL,
+                PyDoc_STR("Gets the C level pointer for the underlying C "
+                         "handle")
         },
 
         { NULL }
