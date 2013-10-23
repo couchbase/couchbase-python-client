@@ -382,6 +382,10 @@ class View(object):
             self._handle_meta(self.raw.value)
             self._do_iter = False
 
+        # No rows and nothing to iterate over?
+        elif not self._rp_iter:
+            self._rp_iter = iter([])
+
     def _get_page(self):
         if not self._streaming:
             self._handle_single_view()
