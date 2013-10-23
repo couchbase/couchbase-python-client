@@ -180,19 +180,18 @@ with Python. Additionally, the `testresources` package is required.
 
 To run them, use either `py.test`, `unittest` or `trial`.
 
-The tests need a running Couchbase instance. For this, a `tests/tests.ini`
+The tests need a running Couchbase instance. For this, a `tests.ini`
 file must be present, containing various connection parameters.
-An example of this file may be found in `tests/tests.ini.sample`.
-You may copy this file to `tests/tests.ini` and modify the values as needed.
+An example of this file may be found in `tests.ini.sample`.
+You may copy this file to `tests.ini` and modify the values as needed.
 
-The test suite need several buckets which need to be created before the tests
-are run. They will all have the common prefix as specified in the test
-configuration file. To create them, run:
-
+The simplest way to run the tests is to declare a `bucket_prefix` in
+the `tests.ini` file and run the `setup_tests.py` script to create
+them for you.
 
 .. code-block:: sh
 
-    python tests/setup_tests.py
+    python setup_tests.py
 
 To run the tests::
 
