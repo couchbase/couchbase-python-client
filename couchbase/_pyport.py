@@ -41,3 +41,8 @@ try:
     basestring = basestring
 except NameError:
     basestring = str
+
+try:
+    unicode = unicode
+except NameError:
+    unicode = str
