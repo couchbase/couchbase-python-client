@@ -94,8 +94,8 @@ class CouchbaseError(Exception):
         if self.rc:
             details.append("RC=0x{0:X}[{1}]".format(
                 self.rc, C._strerror(self.rc)))
-
-        details.append(self.message)
+        if self.message:
+            details.append(self.message)
         if self.all_results:
             details.append("Results={0}".format(len(self.all_results)))
 
