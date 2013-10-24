@@ -133,6 +133,7 @@ class ConnectionTranscoderTest(ConnectionTestCase):
         )
 
         for encret in encrets:
+            print(encret)
             mangled._op_next['encode_value'] = encret
             self.assertRaises(E.ValueFormatError, self.cb.set, key, "value")
 
@@ -168,6 +169,7 @@ class ConnectionTranscoderTest(ConnectionTestCase):
             mangled._op_next['decode_key'] = o
             mangled._op_next['decode_value'] = o
             self.assertRaises(E.ValueFormatError, self.cb.set, o, o)
+            self.assertRaises(E.ValueFormatError, self.cb.get, o, quiet=True)
 
     def test_transcoder_class(self):
         # Test whether we can pass a class for a transcoder
