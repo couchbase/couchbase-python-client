@@ -19,9 +19,11 @@ import warnings
 import json
 import pickle
 
-from couchbase import (FMT_JSON, FMT_BYTES, FMT_UTF8, FMT_PICKLE, FMT_MASK)
+from couchbase import (FMT_JSON, FMT_AUTO,
+                       FMT_BYTES, FMT_UTF8, FMT_PICKLE, FMT_MASK)
 from couchbase.exceptions import ValueFormatError
 from couchbase._libcouchbase import Transcoder
+from couchbase._pyport import unicode
 
 
 class TranscoderPP(object):
@@ -40,6 +42,16 @@ class TranscoderPP(object):
         return self.decode_value(key, FMT_UTF8)
 
     def encode_value(self, value, format):
+        if format == FMT_AUTO:
+            if isinstance(value, unicode):
+                format = FMT_UTF8
+            elif isinstance(value, (bytes, bytearray)):
+                format = FMT_BYTES
+            elif isinstance(value, (list, tuple, dict, bool)) or value is None:
+                format = FMT_JSON
+            else:
+                format = FMT_PICKLE
+
         fbase = format & FMT_MASK
 
         if fbase not in (FMT_PICKLE, FMT_JSON, FMT_BYTES, FMT_UTF8):
@@ -64,7 +76,8 @@ class TranscoderPP(object):
             return (pickle.dumps(value), FMT_PICKLE)
 
         elif fbase == FMT_JSON:
-            return (json.dumps(value).encode('utf-8'), FMT_JSON)
+            return (json.dumps(value, ensure_ascii=False
+                               ).encode('utf-8'), FMT_JSON)
 
         else:
             raise ValueError("Unrecognized format '%r'" % (format,))
