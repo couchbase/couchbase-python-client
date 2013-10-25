@@ -36,7 +36,8 @@ from testresources import ResourcedTestCase, TestResourceManager
 from couchbase.exceptions import CouchbaseError
 from couchbase.admin import Admin
 from couchbase.mockserver import CouchbaseMock, BucketSpec, MockControlClient
-
+from couchbase.result import (
+    MultiResult, ValueResult, OperationResult, ObserveInfo, Result)
 from couchbase._pyport import basestring
 
 CONFIG_FILE = 'tests.ini' # in cwd
@@ -193,6 +194,12 @@ class ApiImplementationMixin(object):
         destruction time
         """
         raise NotImplementedError()
+
+    cls_MultiResult = MultiResult
+    cls_ValueResult = ValueResult
+    cls_OperationResult = OperationResult
+    cls_ObserveInfo = ObserveInfo
+    cls_Result = Result
 
 GLOBAL_CONFIG = ConnectionConfiguration()
 

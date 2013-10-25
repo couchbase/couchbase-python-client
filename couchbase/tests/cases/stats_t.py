@@ -32,7 +32,7 @@ class ConnectionStatsTest(ConnectionTestCase):
         self.assertIsInstance(stats, dict)
         self.assertTrue('curr_connections' in stats)
         val = list(stats['curr_connections'].values())[0]
-        self.assertIsInstance(val, int)
+        self.assertIsInstance(val, (float,int))
         key, info = list(stats.items())[0]
         self.assertIsInstance(key, basestring)
         self.assertIsInstance(info, dict)

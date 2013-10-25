@@ -16,7 +16,6 @@
 #
 
 from couchbase.tests.base import ConnectionTestCase
-from couchbase.connection import Connection
 from couchbase.user_constants import FMT_JSON, FMT_AUTO, FMT_JSON, FMT_PICKLE
 from couchbase.exceptions import ClientTemporaryFailError
 from couchbase import Couchbase
@@ -35,7 +34,7 @@ class ConnectionMiscTest(ConnectionTestCase):
         self.assertRaises((AttributeError, TypeError), _set_nodes)
 
     def test_lcb_version(self):
-        verstr, vernum = Connection.lcb_version()
+        verstr, vernum = self.factory.lcb_version()
         self.assertIsInstance(verstr, str)
         self.assertIsInstance(vernum, int)
 
@@ -48,6 +47,8 @@ class ConnectionMiscTest(ConnectionTestCase):
 
 
     def test_connection_defaults(self):
+        # This will only work on the basic Connection class
+        from couchbase.connection import Connection
         ctor_params = self.make_connargs()
         # XXX: Change these if any of the defaults change
         defaults = {

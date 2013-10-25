@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 from couchbase.tests.base import ConnectionTestCase
-from couchbase.transcoder import Transcoder
+from couchbase.transcoder import TranscoderPP
 from couchbase import Couchbase
 from couchbase.connection import Connection
 import couchbase.exceptions as E
@@ -39,7 +39,7 @@ class MangledTranscoder(object):
     method is used
     """
     def __init__(self):
-        self._tc = Transcoder()
+        self._tc = TranscoderPP()
         self._op_next = {}
 
     def set_all(self, val):
@@ -54,7 +54,7 @@ class MangledTranscoder(object):
 class ConnectionTranscoderTest(ConnectionTestCase):
 
     def test_simple_transcoder(self):
-        tc = Transcoder()
+        tc = TranscoderPP()
         self.cb.transcoder = tc
 
         key = self.gen_key("simple_transcoder")
@@ -174,8 +174,8 @@ class ConnectionTranscoderTest(ConnectionTestCase):
     def test_transcoder_class(self):
         # Test whether we can pass a class for a transcoder
         key = self.gen_key("transcoder_class")
-        c = Connection(**self.make_connargs(transcoder=Transcoder))
+        c = Connection(**self.make_connargs(transcoder=TranscoderPP))
         c.set(key, "value")
 
-        c = Couchbase.connect(**self.make_connargs(transcoder=Transcoder))
+        c = Couchbase.connect(**self.make_connargs(transcoder=TranscoderPP))
         c.set(key, "value")

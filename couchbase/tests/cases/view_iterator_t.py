@@ -184,7 +184,7 @@ class ViewIteratorTest(ViewTestCase):
         rows = list(ret)
         self.assertEqual(len(rows), 10)
         for r in rows:
-            self.assertIsInstance(r.doc, Result)
+            self.assertIsInstance(r.doc, self.cls_Result)
             doc = r.doc
             mc_doc = self.cb.get(r.docid, quiet=True)
             self.assertEqual(doc.cas, mc_doc.cas)
@@ -348,7 +348,10 @@ class ViewIteratorTest(ViewTestCase):
 
     def test_http_data(self):
         q = Query(limit=30, debug=True)
-        self._verify_data(self.cb.query("beer", "brewery_beers", streaming=True,
-                                        query=q))
         self._verify_data(self.cb.query("beer", "brewery_beers", streaming=False,
+                                        query=q))
+
+    def test_http_data_streaming(self):
+        q = Query(limit=30, debug=True)
+        self._verify_data(self.cb.query("beer", "brewery_beers", streaming=True,
                                         query=q))

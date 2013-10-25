@@ -15,7 +15,6 @@
 # limitations under the License.
 #
 
-from couchbase.result import MultiResult, Result, ValueResult, OperationResult
 from couchbase.tests.base import ConnectionTestCase
 
 INT_TYPES = None
@@ -28,11 +27,11 @@ class ConnectionResultsTest(ConnectionTestCase):
 
     def __test_oprsesult(self, rv, check_exact=True, exprc=0):
         # Ensure they can be stringified
-        self.assertIsInstance(rv, OperationResult)
-        self.assertIsInstance(rv, Result)
+        self.assertIsInstance(rv, self.cls_OperationResult)
+        self.assertIsInstance(rv, self.cls_Result)
 
         if check_exact:
-            self.assertEqual(rv.__class__, OperationResult)
+            self.assertEqual(rv.__class__, self.cls_OperationResult)
 
         self.assertIsInstance(rv.cas, INT_TYPES)
         self.assertIsInstance(rv.rc, INT_TYPES)
@@ -47,7 +46,7 @@ class ConnectionResultsTest(ConnectionTestCase):
         self.assertIsInstance(str(rv), str)
 
     def __test_valresult(self, rv, value):
-        self.assertEqual(rv.__class__, ValueResult)
+        self.assertEqual(rv.__class__, self.cls_ValueResult)
         self.__test_oprsesult(rv, check_exact=False)
 
         self.assertEqual(rv.value, value)
@@ -87,13 +86,13 @@ class ConnectionResultsTest(ConnectionTestCase):
     def test_multi_results(self):
         kvs = self.gen_kv_dict(prefix="multi_results")
         rvs = self.cb.set_multi(kvs)
-        self.assertIsInstance(rvs, MultiResult)
+        self.assertIsInstance(rvs, self.cls_MultiResult)
         [ self.__test_oprsesult(x) for x in rvs.values() ]
         repr(rvs)
         str(rvs)
 
         rvs = self.cb.get_multi(kvs.keys())
-        self.assertIsInstance(rvs, MultiResult)
+        self.assertIsInstance(rvs, self.cls_MultiResult)
         self.assertTrue(rvs.all_ok)
 
         [ self.__test_valresult(v, kvs[k]) for k, v in rvs.items()]

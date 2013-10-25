@@ -23,7 +23,6 @@ import couchbase._libcouchbase as LCB
 class DupKeyTestCase(ConnectionTestCase):
     def setUp(self):
         super(DupKeyTestCase, self).setUp()
-        self.skipIfPyPy()
 
     def _assertWarned(self, wlog):
         mcount = 0

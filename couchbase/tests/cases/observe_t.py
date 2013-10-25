@@ -35,7 +35,7 @@ class ConnectionObserveTest(ConnectionTestCase):
 
 
         for oi in rv.value:
-            self.assertIsInstance(oi, ObserveInfo)
+            self.assertIsInstance(oi, self.cls_ObserveInfo)
             oi.cas
             oi.from_master
             self.assertEqual(oi.flags, oi.flags & OBS_MASK)
@@ -69,7 +69,7 @@ class ConnectionObserveTest(ConnectionTestCase):
             found_master = False
 
             for oi in v:
-                self.assertIsInstance(oi, ObserveInfo)
+                self.assertIsInstance(oi, self.cls_ObserveInfo)
                 oi.flags
                 oi.cas
                 if oi.from_master:

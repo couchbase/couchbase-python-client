@@ -17,8 +17,6 @@
 
 import couchbase.exceptions as E
 from couchbase.tests.base import ConnectionTestCase
-from couchbase.result import (
-    MultiResult, Result, ValueResult, OperationResult)
 
 # These tests try to see if the 'result' and 'all_results' appear properly
 # also verify that other documented exception fields are present
@@ -40,9 +38,9 @@ class ConnectionExcExtraTest(ConnectionTestCase):
         self.assertTrue(exc.message)
         self.assertIsInstance(exc, E.NotFoundError)
         self.assertEqual(exc.key, key)
-        self.assertIsInstance(exc.all_results, MultiResult)
+        self.assertIsInstance(exc.all_results, self.cls_MultiResult)
         self.assertTrue(key in exc.all_results)
-        self.assertIsInstance(exc.all_results[key], ValueResult)
+        self.assertIsInstance(exc.all_results[key], self.cls_ValueResult)
         self.assertEqual(exc.all_results[key].rc, exc.rc)
 
         str(exc)

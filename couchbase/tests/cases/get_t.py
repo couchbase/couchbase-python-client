@@ -34,7 +34,7 @@ class ConnectionGetTest(ConnectionTestCase):
         self.assertEqual(rv.value, 'value1')
 
         rvs = self.cb.get_multi([key])
-        self.assertIsInstance(rvs, MultiResult)
+        self.assertIsInstance(rvs, self.cls_MultiResult)
         self.assertEqual(len(rvs), 1)
         self.assertEqual(rvs[key].value, 'value1')
 
@@ -136,7 +136,7 @@ class ConnectionGetTest(ConnectionTestCase):
 
         # Single get as array
         result2 = self.cb.get_multi([key])
-        self.assertIsInstance(result2, MultiResult)
+        self.assertIsInstance(result2, self.cls_MultiResult)
         self.assertTrue(key in result2)
         self.assertEqual(result2[key].value, 'value1')
         self.assertEqual(result2[key].flags, 0x0)
