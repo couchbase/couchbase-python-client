@@ -21,10 +21,9 @@ from couchbase.tests.base import ConnectionTestCase
 class ConnectionDeleteTest(ConnectionTestCase):
 
     def test_trivial_delete(self):
-        """
-        Try to delete a key that exists. Ensure that the operation
-        succeeds
-        """
+        # Try to delete a key that exists. Ensure that the operation
+        # succeeds
+
         key = self.gen_key("trivial_delete")
         rv = self.cb.set(key, 'value')
         self.assertTrue(rv.success)
@@ -33,20 +32,18 @@ class ConnectionDeleteTest(ConnectionTestCase):
         self.assertTrue(rv.success)
 
     def test_delete_notfound(self):
-        """
-        Delete a key that does not exist.
-        With 'quiet' ensure that it returns false. Without 'quiet', ensure that
-        it raises a NotFoundError
-        """
+        # Delete a key that does not exist.
+        # With 'quiet' ensure that it returns false. Without 'quiet', ensure that
+        # it raises a NotFoundError
+
         self.cb.delete("foo", quiet = True)
         rv = self.cb.delete("foo", quiet = True)
         self.assertFalse(rv.success)
         self.assertRaises(NotFoundError, self.cb.delete, 'foo')
 
     def test_delete_cas(self):
-        """
-        Delete with a CAS value. Ensure that it returns OK
-        """
+        # Delete with a CAS value. Ensure that it returns OK
+
         key = self.gen_key("delete_cas")
         rv1 = self.cb.set(key, 'bar')
         self.assertTrue(rv1.cas > 0)
@@ -54,18 +51,16 @@ class ConnectionDeleteTest(ConnectionTestCase):
         self.assertTrue(rv2.success)
 
     def test_delete_badcas(self):
-        """
-        Simple delete with a bad CAS
-        """
+        # Simple delete with a bad CAS
+
         key = self.gen_key("delete_badcas")
         self.cb.set(key, 'bar')
         self.assertRaises(KeyExistsError,
                 self.cb.delete, key, cas = 0xdeadbeef)
 
     def test_delete_multi(self):
-        """
-        Delete passing a list of keys
-        """
+        # Delete passing a list of keys
+
         kvlist = self.gen_kv_dict(amount=5, prefix='delete_multi')
 
         rvs = self.cb.set_multi(kvlist)
@@ -79,9 +74,8 @@ class ConnectionDeleteTest(ConnectionTestCase):
             self.assertTrue(v.success)
 
     def test_delete_dict(self):
-        """
-        Delete passing a dict of key:cas pairs
-        """
+        # Delete passing a dict of key:cas pairs
+
         kvlist = self.gen_kv_dict(amount=5, prefix='delete_dict')
 
         rvs = self.cb.set_multi(kvlist)
@@ -94,11 +88,10 @@ class ConnectionDeleteTest(ConnectionTestCase):
             self.assertTrue(v.success)
 
     def test_delete_mixed(self):
-        """
-        Delete with mixed success-error keys.
-        Test with mixed found/not-found
-        Test with mixed cas-valid/cas-invalid
-        """
+        # Delete with mixed success-error keys.
+        # Test with mixed found/not-found
+        # Test with mixed cas-valid/cas-invalid
+
         self.cb.delete("foo", quiet = True)
 
         self.cb.set("bar", "a_value")

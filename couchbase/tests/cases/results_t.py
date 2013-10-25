@@ -53,9 +53,7 @@ class ConnectionResultsTest(ConnectionTestCase):
         self.assertIsInstance(rv.flags, INT_TYPES)
 
     def test_results(self):
-        """
-        Test OperationResult/ValueResult fields
-        """
+        # Test OperationResult/ValueResult fields
         key = self.gen_key("opresult")
         rv = self.cb.set(key, "value")
         self.__test_oprsesult(rv)
