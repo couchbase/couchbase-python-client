@@ -4,6 +4,7 @@ import subprocess
 import datetime
 import sys
 import os.path
+import warnings
 
 class CantInvokeGit(Exception): pass
 class VersionNotFound(Exception): pass
@@ -43,7 +44,7 @@ def gen_version():
     we are running from a tarball
     """
     try:
-        po = subprocess.Popen(("git", "describe", "--tags", "--long"),
+        po = subprocess.Popen(("git", "describe", "--tags", "--long", "--always"),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
     except OSError as e:
@@ -61,14 +62,18 @@ def gen_version():
 
     info = stdout.split('-')
     sha1 = info[-1]
-    ncommits = int(info[-2])
-    basevers = '-'.join(info[:-2])
+    try:
+        ncommits = int(info[-2])
+        basevers = '-'.join(info[:-2])
+        # Make the version string itself
+        if not ncommits:
+            vstr = basevers
+        else:
+            vstr = stdout
 
-    # Make the version string itself
-    if not ncommits:
-        vstr = basevers
-    else:
-        vstr = stdout
+    except IndexError:
+        warnings.warn("Malformed tag '{0}'".format(stdout))
+        vstr = "0.0.0-UNKNOWN-" + stdout
 
     fp = open(verfile, "w")
     fp.write('''
