@@ -122,6 +122,7 @@ setup(
         'couchbase.iops',
         'couchbase.async',
         'couchbase.tests',
+        'couchbase.tests.cases',
         'gcouchbase',
         'txcouchbase'
     ],
