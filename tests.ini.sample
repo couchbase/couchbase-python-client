@@ -27,4 +27,4 @@ enabled = True
 ; Local path for the mock
 path = /tmp/CouchbaseMock-0.6-SNAPSHOT.jar
 ; Where to download it, if not available
-url = http://packages.couchbase.com/clients/python/snapshots/CouchbaseMock-0.6-SNAPSHOT.jar
+url = http://files.couchbase.com/maven2/org/couchbase/mock/CouchbaseMock/0.6-SNAPSHOT/CouchbaseMock-0.6-20130903.160518-3.jar
