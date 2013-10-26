@@ -164,9 +164,10 @@ class CouchbaseMock(object):
         if not os.path.exists(runpath):
             if not url:
                 raise Exception(runpath + " Does not exist and no URL specified")
-            fp = open(runpath, "w")
+            fp = open(runpath, "wb")
             ulp = urlopen(url)
-            fp.write(ulp.read())
+            jarblob = ulp.read()
+            fp.write(jarblob)
             fp.close()
 
     def start(self):
