@@ -4,6 +4,9 @@ Couchbase Python Client
 
 Client for Couchbase_.
 
+.. image:: https://travis-ci.org/couchbase/couchbase-python-client.png
+    :target: https://travis-ci.org/couchbase/couchbase-python-client
+
 -----------------------
 Building and Installing
 -----------------------
