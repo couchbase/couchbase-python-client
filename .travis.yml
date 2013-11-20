@@ -27,4 +27,4 @@ script:
 
 notifications:
   email:
-    - sdk_dev@couchbase.com
+    - mark.nunberg@couchbase.com
