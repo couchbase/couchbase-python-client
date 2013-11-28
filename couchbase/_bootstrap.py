@@ -51,7 +51,7 @@ def _result__repr__(self):
     details.append(rcstr)
 
     if flags & C.PYCBC_RESFLD_KEY and hasattr(self, 'key'):
-        details.append("Key={0}".format(self.key))
+        details.append("Key={0}".format(repr(self.key)))
 
     if flags & C.PYCBC_RESFLD_VALUE and hasattr(self, 'value'):
         details.append("Value={0}".format(repr(self.value)))
