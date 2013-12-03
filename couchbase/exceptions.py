@@ -269,7 +269,7 @@ class UnknownHostError(CouchbaseNetworkError):
     """The server failed to resolve the requested hostname"""
 
 
-class ProtocolError(CouchbaseError):
+class ProtocolError(CouchbaseNetworkError):
     """Protocol error
 
     There is something wrong with the datastream received from
