@@ -326,6 +326,10 @@ create_event_python(lcb_io_opt_t io, pycbc_evtype_t evtype)
 
     if (meth) {
         ret = PyObject_CallObject(meth, NULL);
+        if (!ret) {
+            PyErr_PrintEx(0);
+            abort();
+        }
 
     } else {
         PyErr_Clear();
