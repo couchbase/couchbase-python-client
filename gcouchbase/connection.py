@@ -7,7 +7,10 @@ from couchbase import experimental
 from couchbase.async.connection import Async
 from couchbase.async.view import AsyncViewBase
 from couchbase.views.iterator import AlreadyQueriedError
-from gcouchbase.iops import IOPS
+try:
+    from gcouchbase.iops_gevent0x import IOPS
+except ImportError:
+    from gcouchbase.iops_gevent10 import IOPS
 
 class GView(AsyncViewBase):
     def __init__(self, *args, **kwargs):
