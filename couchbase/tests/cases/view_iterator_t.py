@@ -355,3 +355,20 @@ class ViewIteratorTest(ViewTestCase):
         q = Query(limit=30, debug=True)
         self._verify_data(self.cb.query("beer", "brewery_beers", streaming=True,
                                         query=q))
+
+    def test_pycbc_206(self):
+        # Set up the view..
+        design = self.cb.design_get('beer', use_devmode=False).value
+        if not 'with_value' in design['views']:
+
+            design['views']['with_value'] = {
+                'map': 'function(doc,meta) { emit(meta.id,doc.name); }'
+            }
+
+            ret = self.cb.design_create('beer', design, use_devmode=0)
+            self.assertTrue(ret.success)
+
+        # Streaming with values
+        view = self.cb.query("beer", "with_value", streaming=True)
+        rows = list(view)
+        self.assertTrue(len(rows))

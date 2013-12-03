@@ -110,7 +110,7 @@ combine_meta(lcbex_vrow_ctx_t *ctx)
 
     /* Append any trailing data */
     meta_trailer = get_buffer_region(ctx,
-                                     ctx->last_row_endpos + 1, -1, &ntrailer);
+                                     ctx->last_row_endpos, -1, &ntrailer);
 
     buffer_append(&ctx->meta_buf, meta_trailer, ntrailer);
     ctx->meta_complete = 1;
@@ -154,8 +154,8 @@ row_pop_callback(jsonsl_t jsn,
         return;
     }
 
-    ctx->keep_pos = state->pos_cur;
-    ctx->last_row_endpos = state->pos_cur;
+    ctx->keep_pos = jsn->pos;
+    ctx->last_row_endpos = jsn->pos;
 
     if (state->data == JOBJ_ROWSET) {
         /** The closing ] of "rows" : [ ... ] */
@@ -163,8 +163,8 @@ row_pop_callback(jsonsl_t jsn,
         jsn->action_callback_PUSH = NULL;
 
         if (ctx->rowcount == 0) {
-            buffer_append(&ctx->meta_buf, ctx->current_buf.s, state->pos_cur+1);
-            ctx->header_len = state->pos_cur+1;
+            buffer_append(&ctx->meta_buf, ctx->current_buf.s, jsn->pos + 1);
+            ctx->header_len = jsn->pos + 1;
         }
 
         return;
@@ -186,7 +186,7 @@ row_pop_callback(jsonsl_t jsn,
         lcbex_vrow_datum_t dt = { 0 };
         dt.type = LCBEX_VROW_ROW;
         dt.data = rowbuf;
-        dt.ndata = state->pos_cur - state->pos_begin + 1;
+        dt.ndata = jsn->pos - state->pos_begin + 1;
         ctx->callback(ctx, ctx->user_cookie, &dt);
     }
 
@@ -262,7 +262,7 @@ initial_pop_callback(jsonsl_t jsn,
     }
 
     key = ctx->current_buf.s + state->pos_begin;
-    len = state->pos_cur - state->pos_begin;
+    len = jsn->pos - state->pos_begin;
     NORMALIZE_OFFSETS(key, len);
 
     buffer_reset(&ctx->last_hk, 0);
