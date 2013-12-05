@@ -103,15 +103,15 @@ Twisted API
 ~~~~~~~~~~~
 
 The Python client now has support for the Twisted async network framework.
-To use with Twisted, simply import ``txcouchbase.TxCouchbase`` instead of
+To use with Twisted, simply import ``txcouchbase.connection`` instead of
 ``couchbase.Couchbase``
 
 .. code-block:: python
 
     from twisted.internet import reactor
-    from txcouchbase import TxCouchbase
+    from txcouchbase.connection import Connection as TxCouchbase
 
-    cb = TxCouchbase.connect(bucket='default')
+    cb = TxCouchbase(bucket='default')
     def on_set(ret):
         print "Set key. Result", ret
 

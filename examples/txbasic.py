@@ -3,9 +3,9 @@ from twisted.internet import reactor
 from couchbase import experimental
 experimental.enable()
 
-from txcouchbase import TxCouchbase
+from txcouchbase.connection import Connection as TxCouchbase
 
-cb = TxCouchbase.connect(bucket='default')
+cb = TxCouchbase(bucket='default')
 def on_set(ret):
     print("Set key. Result", ret)
 
