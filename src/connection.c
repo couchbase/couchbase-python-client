@@ -247,6 +247,66 @@ Connection__close(pycbc_Connection *self)
     Py_RETURN_NONE;
 }
 
+static void
+timings_callback(lcb_t instance,
+                 const void *cookie,
+                 lcb_timeunit_t timeunit,
+                 lcb_uint32_t min,
+                 lcb_uint32_t max,
+                 lcb_uint32_t total,
+                 lcb_uint32_t maxtotal)
+{
+    PyObject *arr = (PyObject *)cookie;
+    PyObject *dict;
+    double divisor = 1.0;
+    double d_min, d_max;
+
+    if (timeunit == LCB_TIMEUNIT_NSEC) {
+        divisor = 1000000;
+    } else if (timeunit == LCB_TIMEUNIT_USEC) {
+        divisor = 1000;
+    } else if (timeunit == LCB_TIMEUNIT_MSEC) {
+        divisor = 1;
+    } else if (timeunit == LCB_TIMEUNIT_SEC) {
+        divisor = 0.001;
+    }
+
+    d_min = (double)min / divisor;
+    d_max = (double)max / divisor;
+
+    dict = PyDict_New();
+    PyList_Append(arr, dict);
+    PyDict_SetItemString(dict, "min", PyFloat_FromDouble(d_min));
+    PyDict_SetItemString(dict, "max", PyFloat_FromDouble(d_max));
+    PyDict_SetItemString(dict, "count", pycbc_IntFromUL(total));
+
+    (void)maxtotal;
+    (void)instance;
+}
+
+static PyObject *
+Connection__start_timings(pycbc_Connection *self)
+{
+    lcb_disable_timings(self->instance);
+    lcb_enable_timings(self->instance);
+    Py_RETURN_NONE;
+}
+
+static PyObject *
+Connection__clear_timings(pycbc_Connection *self)
+{
+    lcb_disable_timings(self->instance);
+    Py_RETURN_NONE;
+}
+
+static PyObject *
+Connection__get_timings(pycbc_Connection *self)
+{
+    PyObject *ll = PyList_New(0);
+    lcb_get_timings(self->instance, ll, timings_callback);
+    return ll;
+}
+
 
 static PyGetSetDef Connection_TABLE_getset[] = {
         { "timeout",
@@ -493,6 +553,24 @@ static PyMethodDef Connection_TABLE_methods[] = {
                 METH_NOARGS,
                 PyDoc_STR(
                 "End pipeline mode and wait for operations to complete")
+        },
+
+        { "_start_timings",
+                (PyCFunction)Connection__start_timings,
+                METH_NOARGS,
+                PyDoc_STR("Start recording timings")
+        },
+
+        { "_get_timings",
+                (PyCFunction)Connection__get_timings,
+                METH_NOARGS,
+                PyDoc_STR("Get all timings since the last call to start_timings")
+        },
+
+        { "_stop_timings",
+                (PyCFunction)Connection__clear_timings,
+                METH_NOARGS,
+                PyDoc_STR("Clear and disable timings")
         },
 
         { NULL, NULL, 0, NULL }
