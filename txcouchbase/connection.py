@@ -218,6 +218,59 @@ class TxAsyncConnection(Async):
         opres.errback = _on_err
         return d
 
+    def queryEx(self, viewcls, *args, **kwargs):
+        """
+        Query a view, with the ``viewcls`` instance receiving events
+        of the query as they arrive.
+
+        :param type viewcls: A class (derived from :class:`AsyncViewBase`)
+          to instantiate
+
+        Other arguments are passed to the standard `query` method.
+
+        This functions exactly like the :meth:`~couchbase.async.Connection.query`
+        method, except it automatically schedules operations if the connection
+        has not yet been negotiated.
+        """
+
+        kwargs['itercls'] = viewcls
+        o = super(TxAsyncConnection, self).query(*args, **kwargs)
+        if not self.connected:
+            self.connect().addCallback(lambda x: o.start())
+        else:
+            o.start()
+
+        return o
+
+    def queryAll(self, *args, **kwargs):
+        """
+        Returns a :class:`Deferred` object which will have its callback invoked
+        with a :class:`BatchedView` when the results are complete.
+
+        Parameters follow conventions of
+        :meth:`~couchbase.connection.Connection.query`.
+
+        Example::
+
+          d = cb.queryAll("beer", "brewery_beers")
+          def on_all_rows(rows):
+              for row in rows:
+                 print("Got row {0}".format(row))
+
+          d.addCallback(on_all_rows)
+
+        """
+
+        if not self.connected:
+            cb = lambda x: self.queryAll(*args, **kwargs)
+            return self.connect().addCallback(cb)
+
+        kwargs['itercls'] = BatchedView
+        o = super(TxAsyncConnection, self).query(*args, **kwargs)
+        o.start()
+        return o._getDeferred()
+
+
 class Connection(TxAsyncConnection):
     def __init__(self, *args, **kwargs):
         """
@@ -299,55 +352,3 @@ class Connection(TxAsyncConnection):
     for x in TxAsyncConnection._MEMCACHED_OPERATIONS:
         if locals().get(x+'_multi', None):
             locals().update({x+"Multi": locals()[x+"_multi"]})
-
-    def queryEx(self, viewcls, *args, **kwargs):
-        """
-        Query a view, with the ``viewcls`` instance receiving events
-        of the query as they arrive.
-
-        :param type viewcls: A class (derived from :class:`AsyncViewBase`)
-          to instantiate
-
-        Other arguments are passed to the standard `query` method.
-
-        This functions exactly like the :meth:`~couchbase.async.Connection.query`
-        method, except it automatically schedules operations if the connection
-        has not yet been negotiated.
-        """
-
-        kwargs['itercls'] = viewcls
-        o = super(Connection, self).query(*args, **kwargs)
-        if not self.connected:
-            self.connect().addCallback(lambda x: o.start())
-        else:
-            o.start()
-
-        return o
-
-    def queryAll(self, *args, **kwargs):
-        """
-        Returns a :class:`Deferred` object which will have its callback invoked
-        with a :class:`BatchedView` when the results are complete.
-
-        Parameters follow conventions of
-        :meth:`~couchbase.connection.Connection.query`.
-
-        Example::
-
-          d = cb.queryAll("beer", "brewery_beers")
-          def on_all_rows(rows):
-              for row in rows:
-                 print("Got row {0}".format(row))
-
-          d.addCallback(on_all_rows)
-
-        """
-
-        if not self.connected:
-            cb = lambda x: self.queryAll(*args, **kwargs)
-            return self.connect().addCallback(cb)
-
-        kwargs['itercls'] = BatchedView
-        o = super(Connection, self).query(*args, **kwargs)
-        o.start()
-        return o._getDeferred()
