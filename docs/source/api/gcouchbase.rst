@@ -9,8 +9,12 @@ The ``gcouchbase`` module offers a complete API which is fully compatible
 with the :class:`couchbase.connection.Connection` API, but is fully aware
 and optimized for the gevent :class:`~gevent.hub.Hub`.
 
-Currently, this has been tested with `gevent` version 0.13, and it is
-unknown if it will work with the 1.0 series.
+Currently, this has been tested with `gevent` version 0.13 and 1.0.0.
+
+
+As the `gcouchbase` implementation relies on `gevent` internal APIs
+itself there may be incompatibilities between minor gevent releases,
+although this is not expected.
 
 Example usage::
 
