@@ -33,11 +33,61 @@ Connection__connect(pycbc_Connection *self);
 static void
 Connection_dtor(pycbc_Connection *self);
 
-static PyObject *
-Connection_get_timeout(pycbc_Connection *self, void *);
-
 static int
-Connection_set_timeout(pycbc_Connection *self, PyObject *value, void *);
+set_timeout_common(pycbc_Connection *self, PyObject *value, int op)
+{
+    double newval;
+    lcb_uint32_t usecs;
+    lcb_error_t err;
+
+    newval = PyFloat_AsDouble(value);
+    if (newval == -1.0) {
+        if (PyErr_Occurred()) {
+            return -1;
+        }
+    }
+
+    if (newval <= 0) {
+        PyErr_SetString(PyExc_ValueError, "Timeout must not be 0");
+        return -1;
+    }
+
+    usecs = (lcb_uint32_t)(newval * 1000000);
+    err = lcb_cntl(self->instance, LCB_CNTL_SET, op, &usecs);
+    if (err != LCB_SUCCESS) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, err, "Couldn't set timeout");
+        return -1;
+    }
+    return 0;
+}
+
+static PyObject *
+get_timeout_common(pycbc_Connection *self, int op)
+{
+    lcb_uint32_t usecs;
+    lcb_error_t err;
+    err = lcb_cntl(self->instance, LCB_CNTL_GET, op, &usecs);
+    if (err != LCB_SUCCESS) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, err, "Couldn't get timeout");
+        return NULL;
+    }
+    return PyFloat_FromDouble((double)usecs / 1000000);
+}
+
+#define DECL_TMO_ACC(name, op) \
+    static int \
+    Connection_set_##name(pycbc_Connection *self, PyObject *val, void *unused) { \
+        (void)unused; \
+        return set_timeout_common(self, val, op); \
+    } \
+    static PyObject * Connection_get_##name(pycbc_Connection *self, void *unused) { \
+        (void)unused; \
+        return get_timeout_common(self, op); \
+    }
+
+DECL_TMO_ACC(timeout, 0x00)
+DECL_TMO_ACC(views_timeout, 0x01)
+
 
 static PyTypeObject ConnectionType = {
         PYCBC_POBJ_HEAD_INIT(NULL)
@@ -315,6 +365,12 @@ static PyGetSetDef Connection_TABLE_getset[] = {
                 PyDoc_STR("The timeout value for operations, in seconds")
         },
 
+        { "views_timeout",
+                (getter)Connection_get_views_timeout,
+                (setter)Connection_set_views_timeout,
+                PyDoc_STR("Set the timeout for views requests, in seconds")
+        },
+
         { "default_format",
                 (getter)Connection_get_format,
                 (setter)Connection_set_format,
@@ -587,41 +643,6 @@ static PyMethodDef Connection_TABLE_methods[] = {
 
         { NULL, NULL, 0, NULL }
 };
-
-static int
-Connection_set_timeout(pycbc_Connection *self,
-                       PyObject *other, void *unused)
-{
-    double newval;
-    lcb_uint32_t usecs;
-    newval = PyFloat_AsDouble(other);
-    if (newval == -1.0) {
-        if (PyErr_Occurred()) {
-            return -1;
-        }
-    }
-
-    if (newval <= 0) {
-        PyErr_SetString(PyExc_ValueError, "Timeout must not be 0");
-        return -1;
-    }
-
-    usecs = (lcb_uint32_t)(newval * 1000000);
-    lcb_set_timeout(self->instance, usecs);
-
-    (void)unused;
-    return 0;
-}
-
-static PyObject *
-Connection_get_timeout(pycbc_Connection *self, void *unused)
-{
-    lcb_uint32_t usecs = lcb_get_timeout(self->instance);
-
-    (void)unused;
-    return PyFloat_FromDouble((double)usecs / 1000000);
-}
-
 
 static int
 Connection__init__(pycbc_Connection *self,

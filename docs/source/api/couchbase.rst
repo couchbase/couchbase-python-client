@@ -377,6 +377,8 @@ Attributes
 
     .. autoattribute:: timeout
 
+    .. autoattribute:: views_timeout
+
     .. autoattribute:: bucket
 
     .. autoattribute:: server_nodes
