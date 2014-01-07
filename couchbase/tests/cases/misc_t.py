@@ -19,6 +19,7 @@ from couchbase.tests.base import ConnectionTestCase
 from couchbase.user_constants import FMT_JSON, FMT_AUTO, FMT_JSON, FMT_PICKLE
 from couchbase.exceptions import ClientTemporaryFailError
 from couchbase import Couchbase
+from couchbase.exceptions import CouchbaseError
 
 class ConnectionMiscTest(ConnectionTestCase):
 
@@ -87,3 +88,25 @@ class ConnectionMiscTest(ConnectionTestCase):
         cb.set("foo", set([]))
         rv = cb.get("foo")
         self.assertEqual(rv.flags, FMT_PICKLE)
+
+
+    def test_cntl(self):
+        cb = self.make_connection()
+        # Get the timeout
+        rv = cb._cntl(0x01)
+        self.assertEqual(75000000, rv)
+
+        cb._cntl(0x01, rv)
+        # Doesn't crash? good enough
+
+        # Try with something invalid
+        self.assertRaises(CouchbaseError, cb._cntl, 0xf000)
+        self.assertRaises(CouchbaseError, cb._cntl, 0x01, "string")
+
+    def test_vbmap(self):
+        # We don't know what the vbucket map is supposed to be, so just
+        # check it doesn't fail
+        cb = self.make_connection()
+        vb, ix = cb._vbmap("hello")
+        int(vb)
+        int(ix)

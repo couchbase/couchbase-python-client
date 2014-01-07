@@ -1568,3 +1568,40 @@ class Connection(_Base):
                         continue
                     raise
         return d
+
+
+    def _cntl(self, *args):
+        """
+        Interface to 'lcb_cntl'.
+
+        This method accepts an opcode and an
+        optional value. Constants are intentionally not defined for
+        the various opcodes to allow saner error handling when an
+        unknown opcode is not used.
+
+        .. warning::
+
+          If you pass the wrong parameters to this API call, your
+          application may crash. For this reason, this is not a
+          public API call. Nevertheless it may be used sparingly as
+          a workaround for settings which may have not yet been exposed
+          directly via a supported API
+
+        :param int op: Type of cntl to access. These are defined in
+          libcouchbase's ``cntl.h`` header file
+
+        :param value: An optional value to supply for the operation.
+           If a value is not passed then the operation will return
+           the current value of the cntl without doing anything else.
+           otherwise, it will interpret the cntl in a manner that
+           makes sense. If the value is a float, it will be treated
+           as a timeout value and will be multiplied by 1000000 to yield
+           the microsecond equivalent for the library. If the value
+           is a boolean, it is treated as a C ``int``
+
+        :return: current value of the setting
+           (if no 'value' argument is provided), or the previous value of the
+           setting (if a value was provided).
+
+        """
+        return _Base._cntl(self, *args)

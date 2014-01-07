@@ -64,6 +64,7 @@ SOURCEMODS = [
         'result',
         'opresult',
         'callbacks',
+        'cntl',
         'convert',
         'connection',
         'store',

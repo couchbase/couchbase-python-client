@@ -573,6 +573,18 @@ static PyMethodDef Connection_TABLE_methods[] = {
                 PyDoc_STR("Clear and disable timings")
         },
 
+        { "_cntl",
+                (PyCFunction)pycbc_Connection__cntl,
+                METH_VARARGS,
+                NULL
+        },
+
+        { "_vbmap",
+                (PyCFunction)pycbc_Connection__vbmap,
+                METH_VARARGS,
+                PyDoc_STR("Returns a tuple of (vbucket, server index) for a key")
+        },
+
         { NULL, NULL, 0, NULL }
 };
 

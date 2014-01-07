@@ -407,3 +407,21 @@ Attributes
         still set an error inside the :class:`~couchbase.result.Result` object.
 
     .. autoattribute:: lockmode
+
+
+Private APIs
+============
+
+.. currentmodule:: couchbase.connection
+.. class:: Connection
+
+   The following APIs are not supported because using them is inherently
+   dangerous. They are provided as workarounds for specific problems which
+   may be encountered by users, and for potential testing of certain states
+   and/or modifications which are not attainable with the public API.
+
+   .. automethod:: _close
+
+   .. automethod:: _cntl
+
+   .. automethod:: _vbmap

@@ -992,4 +992,10 @@ void pycbc_invoke_error_callback(pycbc_Connection *self,
  */
 PyObject* pycbc_Connection__start_pipeline(pycbc_Connection *);
 PyObject* pycbc_Connection__end_pipeline(pycbc_Connection *);
+
+/**
+ * Control methods
+ */
+PyObject* pycbc_Connection__cntl(pycbc_Connection *, PyObject *);
+PyObject* pycbc_Connection__vbmap(pycbc_Connection *, PyObject *);
 #endif /* PYCBC_H_ */
