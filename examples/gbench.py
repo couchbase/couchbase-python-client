@@ -53,6 +53,7 @@ ap.add_argument('--iops', default=None, type=str,
 ap.add_argument('-g', '--global-instance',
                 help="Use global instance", default=False,
                 action='store_true')
+ap.add_argument('--batch', '-N', type=int, help="Batch size", default=1)
 
 options = ap.parse_args()
 
@@ -75,6 +76,10 @@ class Worker(object):
         self.delay = options.delay
         self.key = 'K' * options.ksize
         self.value = b'V' * options.vsize
+        self.kv = {}
+        for x in range(options.batch):
+            self.kv[self.key + str(x)] = self.value
+
         self.wait_time = 0
         self.opcount = 0
 
@@ -84,10 +89,10 @@ class Worker(object):
 
         while time() < self.end_time:
             begin_time = time()
-            rv = cb.set(self.key, self.value, format=FMT_BYTES)
-            assert rv.rc == 0, "Operation failed: " + str(rv.rc)
+            rv = cb.set_multi(self.kv, format=FMT_BYTES)
+            assert rv.all_ok, "Operation failed: "
             self.wait_time += time() - begin_time
-            self.opcount += 1
+            self.opcount += options.batch
 
 global_begin = None
 gthreads = []

@@ -61,6 +61,8 @@ ap.add_argument('--ksize', default=12, type=int,
 ap.add_argument('--vsize', default=128, type=int,
                 help="Value size to use")
 
+ap.add_argument('--batch', '-N', type=int, default=1, help="Batch size to use")
+
 options = ap.parse_args()
 
 class Runner(object):
@@ -69,6 +71,9 @@ class Runner(object):
         self.delay = options.delay
         self.key = 'K' * options.ksize
         self.value = b'V' * options.vsize
+        self.kv = {}
+        for x in range(options.batch):
+            self.kv[self.key + str(x)] = self.value
         self.wait_time = 0
         self.opcount = 0
         self.end_time = time() + options.duration
@@ -81,9 +86,9 @@ class Runner(object):
         self.opcount += 1
 
     def _schedule_deferred(self, *args):
-        rv = self.cb.set(self.key, self.value, format=FMT_BYTES)
+        rv = self.cb.setMulti(self.kv, format=FMT_BYTES)
         rv.addCallback(self._schedule_deferred)
-        self.opcount += 1
+        self.opcount += options.batch
 
     def start(self):
         if options.deferreds:
