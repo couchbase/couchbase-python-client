@@ -43,6 +43,9 @@ def gen_version():
     CantInvokeGit exception - which is normal (and squashed by setup.py) if
     we are running from a tarball
     """
+    if not os.path.exists(os.path.join(os.path.dirname(__file__), ".git")):
+        raise CantInvokeGit("Not a git build")
+
     try:
         po = subprocess.Popen(("git", "describe", "--tags", "--long", "--always"),
             stdout=subprocess.PIPE,
