@@ -652,6 +652,7 @@ Connection__init__(pycbc_Connection *self,
     int conntype = LCB_TYPE_BUCKET;
     lcb_error_t err;
     char *conncache = NULL;
+    char *config_cache = NULL;
     PyObject *unlock_gil_O = NULL;
     PyObject *iops_O = NULL;
     PyObject *timeout = NULL;
@@ -675,6 +676,7 @@ Connection__init__(pycbc_Connection *self,
     X("password", &create_opts.v.v1.passwd, "z") \
     X("host", &create_opts.v.v1.host, "z") \
     X("conncache", &conncache, "z") \
+    X("config_cache", &config_cache, "z") \
     X("quiet", &self->quiet, "I") \
     X("unlock_gil", &unlock_gil_O, "O") \
     X("transcoder", &tc, "O") \
@@ -770,6 +772,9 @@ Connection__init__(pycbc_Connection *self,
     self->unlock_gil = 0;
     self->lockmode = PYCBC_LOCKMODE_NONE;
 #endif
+    if (config_cache) {
+        conncache = config_cache;
+    }
 
     if (conncache) {
         if (conntype != LCB_TYPE_BUCKET) {

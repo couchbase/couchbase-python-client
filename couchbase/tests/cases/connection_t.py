@@ -102,7 +102,7 @@ class ConnectionTest(CouchbaseTestCase):
             cb = self.factory(conncache=cachefile.name, **self.make_connargs())
             self.assertTrue(cb.set("foo", "bar").success)
 
-            cb2 = self.factory(conncache=cachefile.name, **self.make_connargs())
+            cb2 = self.factory(config_cache=cachefile.name, **self.make_connargs())
 
             self.assertTrue(cb2.set("foo", "bar").success)
             self.assertEquals("bar", cb.get("foo").value)

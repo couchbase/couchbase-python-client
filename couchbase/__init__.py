@@ -89,7 +89,7 @@ class Couchbase:
                 port=8091,
                 password=None,
                 quiet=False,
-                conncache=None,
+                config_cache=None,
                 unlock_gil=True,
                 timeout=2.5,
                 transcoder=None,
@@ -126,11 +126,12 @@ class Couchbase:
           :exc:`couchbase.exceptions.NotFoundError` exceptions. When set
           to `True` the operations will return `None` silently.
 
-        :param string conncache: If set, this will refer to a file on the
+        :param string config_cache: If set, this will refer to a file on the
           filesystem where cached "bootstrap" information may be stored. This
           path may be shared among multiple instance of the Couchbase client.
           Using this option may reduce overhead when using many short-lived
           instances of the client.
+          In older releases this was called ``conncache`` and will be aliased.
 
           If the file does not exist, it will be created.
 
@@ -209,10 +210,10 @@ class Couchbase:
                           port=port,
                           password=password,
                           bucket=bucket,
-                          conncache=conncache,
                           unlock_gil=unlock_gil,
                           timeout=timeout,
                           transcoder=transcoder,
                           quiet=quiet,
                           lockmode=lockmode,
+                          config_cache=config_cache,
                           **kwargs)
