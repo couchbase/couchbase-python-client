@@ -28,15 +28,39 @@ from couchbase._libcouchbase import (
     PYCBC_EVACTION_UNWATCH
 )
 
+class SelectTimer(TimerEvent):
+    def __init__(self):
+        super(SelectTimer, self).__init__()
+        self.pydata = 0
+
+    @property
+    def exptime(self):
+        return self.pydata
+
+    @exptime.setter
+    def exptime(self, val):
+        self.pydata = val
+
+    def activate(self, usecs):
+        self.exptime = time.time() + usecs / 1000000
+
+    def deactivate(self):
+        pass
+
+    @property
+    def active(self):
+        return self.state == PYCBC_EVSTATE_ACTIVE
+
+    def __cmp__(self, other):
+        return cmp(self.exptime, other.exptime)
+
 
 
 class SelectIOPS(object):
     def __init__(self):
         self._do_watch = False
-        self._next_timeout = 0
-
         self._ioevents = set()
-        self._timers = set()
+        self._timers = []
 
         # Active readers and writers
         self._evwr = set()
@@ -44,9 +68,10 @@ class SelectIOPS(object):
 
 
 
-    def _unregister_timer(self, event):
-        if event in self._timers:
-            self._timers.remove(event)
+    def _unregister_timer(self, timer):
+        timer.deactivate()
+        if timer in self._timers:
+            self._timers.remove(timer)
 
     def _unregister_event(self, event):
         try:
@@ -67,8 +92,10 @@ class SelectIOPS(object):
             self._unregister_timer(timer)
             return
 
-        self._timers.add(timer)
-        timer.pydata = time.time() + usecs / 1000000
+        if timer.active:
+            self._unregister_timer(timer)
+        timer.activate(usecs)
+        self._timers.append(timer)
 
     def update_event(self, event, action, flags, fd=None):
         if action == PYCBC_EVACTION_UNWATCH:
@@ -97,9 +124,20 @@ class SelectIOPS(object):
         win = self._evwr
         ein = list(rin) + list(win)
 
-        rout, wout, eout = select.select(rin, win, ein)
-        now = time.time()
+        self._timers.sort()
+        mintime = self._timers[0].exptime - time.time()
+        if mintime < 0:
+            mintime = 0
 
+        if not (rin or win or ein):
+            time.sleep(mintime)
+            rout = tuple()
+            wout = tuple()
+            eout = tuple()
+        else:
+            rout, wout, eout = select.select(rin, win, ein, mintime)
+
+        now = time.time()
 
         ready_events = {}
         for ev in rout:
@@ -118,14 +156,14 @@ class SelectIOPS(object):
             if ev.state == PYCBC_EVSTATE_ACTIVE:
                 ev.ready(flags)
 
-        for ev in tuple(self._timers):
-            if not ev.state == PYCBC_EVSTATE_ACTIVE:
+        for timer in self._timers[:]:
+            if not timer.active:
                 continue
 
-            if ev.pydata > now:
+            if timer.exptime > now:
                 continue
 
-            ev.ready(0)
+            timer.ready(0)
 
     def start_watching(self):
         if self._do_watch:
@@ -137,3 +175,6 @@ class SelectIOPS(object):
 
     def stop_watching(self):
         self._do_watch = False
+
+    def timer_event_factory(self):
+        return SelectTimer()
