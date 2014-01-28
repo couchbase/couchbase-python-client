@@ -21,7 +21,8 @@ import os
 from couchbase.exceptions import (AuthError, ArgumentError,
                                   BucketNotFoundError, ConnectError,
                                   CouchbaseNetworkError,
-                                  NotFoundError, InvalidError)
+                                  NotFoundError, InvalidError,
+                                  TimeoutError)
 from couchbase.tests.base import CouchbaseTestCase, SkipTest
 
 
@@ -38,7 +39,8 @@ class ConnectionTest(CouchbaseTestCase):
         self.slowTest()
         connargs = self.make_connargs()
         connargs['host'] = 'example.com'
-        self.assertRaises(CouchbaseNetworkError, self.factory, **connargs)
+        self.assertRaises((CouchbaseNetworkError, TimeoutError),
+                          self.factory, **connargs)
 
         connargs['host'] = self.cluster_info.host
         connargs['port'] = 34567
