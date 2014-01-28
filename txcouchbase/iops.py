@@ -27,7 +27,8 @@ class TxIOEvent(IOEvent):
         self.ready_w()
 
     def connectionLost(self, reason):
-        pass
+        if self.state == PYCBC_EVSTATE_ACTIVE:
+            self.ready_w()
 
     def logPrefix(self):
         return "Couchbase IOEvent"
