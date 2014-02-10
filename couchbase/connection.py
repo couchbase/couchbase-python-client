@@ -773,7 +773,7 @@ class Connection(_Base):
             keys = (keys,)
         return self._stats(keys)
 
-    def observe(self, key):
+    def observe(self, key, master_only=False):
         """
         Return storage information for a key.
         The ``observe`` function maps to the low-level ``OBSERVE``
@@ -790,11 +790,13 @@ class Connection(_Base):
         given key.
 
         :param string key: The key to inspect
+        :param bool master_only: Whether to only retrieve information from
+          the master node. Note this requires libcouchbase 2.3.0 or greater
 
         .. seealso:: :ref:`observe_info`
 
         """
-        return _Base.observe(self, key)
+        return _Base.observe(self, key, master_only)
 
     def endure(self, key, persist_to=-1, replicate_to=-1,
                cas=0,
@@ -1109,11 +1111,11 @@ class Connection(_Base):
         """
         return _Base.unlock_multi(self, keys)
 
-    def observe_multi(self, keys):
+    def observe_multi(self, keys, master_only=False):
         """
         Multi-variant of :meth:`observe`
         """
-        return _Base.observe_multi(self, keys)
+        return _Base.observe_multi(self, keys, master_only)
 
     def endure_multi(self, keys, persist_to=-1, replicate_to=-1,
                      timeout=5.0,

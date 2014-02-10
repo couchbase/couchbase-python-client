@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-from couchbase.tests.base import ConnectionTestCase
+from couchbase.tests.base import ConnectionTestCase, MockTestCase
 from couchbase.result import ObserveInfo
 from couchbase.user_constants import OBS_MASK, OBS_FOUND, OBS_PERSISTED
 
@@ -74,3 +74,16 @@ class ConnectionObserveTest(ConnectionTestCase):
                 oi.cas
                 if oi.from_master:
                     found_master = True
+
+
+class ConnectionObserveMasterTest(MockTestCase):
+    def test_master_observe(self):
+        key = self.gen_key("test_master_observe")
+        rv = self.cb.set(key, "value")
+        obs_all = self.cb.observe(key)
+        self.assertTrue(len(obs_all.value) > 1)
+        obs_master = self.cb.observe(key, master_only=True)
+        self.assertEqual(len(obs_master.value), 1)
+        obs_val = obs_master.value[0]
+        self.assertTrue(obs_val.from_master)
+        self.assertEqual(obs_val.cas, rv.cas)

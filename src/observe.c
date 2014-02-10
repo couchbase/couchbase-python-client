@@ -91,6 +91,7 @@ static int
 handle_single_observe(pycbc_Connection *self,
                       PyObject *curkey,
                       int ii,
+                      int master_only,
                       struct pycbc_common_vars *cv)
 {
     int rv;
@@ -111,6 +112,17 @@ handle_single_observe(pycbc_Connection *self,
         return -1;
     }
 
+    if (master_only) {
+        /** New 'MASTER_ONLY' was added in 2.3.0 */
+#if LCB_VERSION < 0x020300
+        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
+                       "master_only requires libcouchbase >= 2.3.0");
+        return -1;
+#else
+        ocmd->version = 1;
+        ocmd->v.v1.options = LCB_OBSERVE_MASTER_ONLY;
+#endif
+    }
 
     ocmd->v.v0.key = key;
     ocmd->v.v0.nkey = nkey;
@@ -131,15 +143,18 @@ observe_common(pycbc_Connection *self,
     PyObject *kobj = NULL;
     pycbc_seqtype_t seqtype;
     lcb_error_t err;
+    int master_only = 0;
+    PyObject *master_only_O = NULL;
 
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
 
-    static char *kwlist[] = { "keys", NULL };
+    static char *kwlist[] = { "keys", "master_only", NULL };
     rv = PyArg_ParseTupleAndKeywords(args,
                                      kwargs,
-                                     "O",
+                                     "O|O",
                                      kwlist,
-                                     &kobj);
+                                     &kobj,
+                                     &master_only_O);
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;
@@ -153,6 +168,8 @@ observe_common(pycbc_Connection *self,
     } else {
         ncmds = 1;
     }
+
+    master_only = master_only_O && PyObject_IsTrue(master_only_O);
 
     rv = pycbc_common_vars_init(&cv,
                                 self,
@@ -185,7 +202,7 @@ observe_common(pycbc_Connection *self,
                 goto GT_ITER_DONE;
             }
 
-            rv = handle_single_observe(self, curkey, ii, &cv);
+            rv = handle_single_observe(self, curkey, ii, master_only, &cv);
 
             GT_ITER_DONE:
             Py_XDECREF(curkey);
@@ -197,7 +214,7 @@ observe_common(pycbc_Connection *self,
         }
 
     } else {
-        rv = handle_single_observe(self, kobj, 0, &cv);
+        rv = handle_single_observe(self, kobj, 0, master_only, &cv);
 
         if (rv < 0) {
             goto GT_DONE;
