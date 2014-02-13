@@ -905,15 +905,16 @@ class Connection(_Base):
             cb.set("bar", "bar_value")
             cb.set("baz", "baz_value")
 
-        is equivalent to:
+        is equivalent to::
 
-          cb.set("foo", "foo_value", persist_to=3)
-          cb.set("bar", "bar_value", persist_to=3)
-          cb.set("baz", "baz_value", persist_to=3)
+            cb.set("foo", "foo_value", persist_to=3)
+            cb.set("bar", "bar_value", persist_to=3)
+            cb.set("baz", "baz_value", persist_to=3)
+
 
         .. versionadded:: 1.2.0
 
-        .. seealso:: meth:`endure`
+        .. seealso:: :meth:`endure`
         """
         return DurabilityContext(self, persist_to, replicate_to, timeout)
 

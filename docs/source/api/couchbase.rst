@@ -360,6 +360,7 @@ Durability constraints ensure safer protection against data loss.
 
     .. automethod:: endure
     .. automethod:: endure_multi
+    .. automethod:: durability
 
 Attributes
 ==========
