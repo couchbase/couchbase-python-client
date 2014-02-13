@@ -235,6 +235,14 @@ class Connection(_Base):
           When in pipeline mode, you cannot execute view queries.
           Additionally, pipeline mode is not supported on async handles
 
+        .. warning::
+
+          Pipeline mode should not be used if you are using the same
+          object concurrently from multiple threads. This only refers
+          to the internal lock within the object itself. It is safe
+          to use if you employ your own locking mechanism (for example
+          a connection pool)
+
         .. versionadded:: 1.2.0
 
         """
