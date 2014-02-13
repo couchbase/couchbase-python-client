@@ -325,7 +325,7 @@ class Connection(_Base):
 
         """
         return _Base.set(self, key, value, cas, ttl, format,
-                         replicate_to, persist_to)
+                         persist_to, replicate_to)
 
     def add(self, key, value, ttl=0, format=None, persist_to=0, replicate_to=0):
         """
