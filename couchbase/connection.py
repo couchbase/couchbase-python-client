@@ -124,6 +124,7 @@ class Connection(_Base):
         port = kwargs.pop('port', 8091)
         _no_connect_exceptions = kwargs.pop('_no_connect_exceptions', False)
         _gevent_support = kwargs.pop('experimental_gevent_support', False)
+        _cntlopts = kwargs.pop('_cntl', {})
 
         if not bucket:
             raise exceptions.ArgumentError("A bucket name must be given")
@@ -145,6 +146,8 @@ class Connection(_Base):
             kwargs['_iops'] = SelectIOPS()
 
         super(Connection, self).__init__(**kwargs)
+        for ctl, val in _cntlopts.items():
+            self._cntl(ctl, val)
 
         try:
             self._do_ctor_connect()
