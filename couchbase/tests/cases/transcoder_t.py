@@ -16,7 +16,7 @@
 #
 from couchbase.tests.base import ConnectionTestCase
 from couchbase.transcoder import TranscoderPP
-from couchbase import Couchbase
+from couchbase import Couchbase, FMT_UTF8
 from couchbase.connection import Connection
 import couchbase.exceptions as E
 
@@ -27,6 +27,9 @@ import couchbase.exceptions as E
 def gen_func(fname):
     def fn(self, *args):
         if fname in self._op_next:
+            val = self._op_next[fname]
+            if hasattr(val, '__call__'):
+                return val()
             return self._op_next[fname]
 
         return getattr(self._tc, fname)(*args)
@@ -45,6 +48,9 @@ class MangledTranscoder(object):
     def set_all(self, val):
         for n in ('encode_key', 'encode_value', 'decode_key', 'decode_value'):
             self._op_next[n] = val
+
+    def set_next(self, ftype, val):
+        self._op_next[ftype] = val
 
     decode_key = gen_func('decode_key')
     encode_key = gen_func('encode_key')
@@ -136,6 +142,20 @@ class ConnectionTranscoderTest(ConnectionTestCase):
             print(encret)
             mangled._op_next['encode_value'] = encret
             self.assertRaises(E.ValueFormatError, self.cb.set, key, "value")
+
+    def test_transcoder_kdec_err(self):
+        key = self.gen_key("transcoder_kenc_err")
+        mangled = MangledTranscoder()
+        self.cb.transcoder = mangled
+        key = self.gen_key('kdec_err')
+        self.cb.set(key, 'blah', format=FMT_UTF8)
+        def exthrow():
+            raise UnicodeDecodeError()
+
+        mangled.set_next('decode_value', exthrow)
+        self.assertRaises(E.ValueFormatError, self.cb.get, key)
+
+
 
     def test_transcoder_anyobject(self):
         # This tests the versatility of the transcoder object

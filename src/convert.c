@@ -297,6 +297,10 @@ do_call_tc(pycbc_Connection *conn,
     *result = PyObject_Call(meth, args, NULL);
     if (*result) {
         ret = 0;
+    } else {
+        PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ENCODING, 0,
+                           "User-Defined transcoder failed",
+                           obj);
     }
 
     GT_DONE:
