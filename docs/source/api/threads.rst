@@ -72,14 +72,14 @@ Internally this uses the C equivalent of the ``threading.Lock`` object (i.e.
 to acquire the lock (without waiting). If the acquisition fails, the
 exception is raised.
 
+*This is the default lockmode*
+
 .. data:: LOCKMODE_WAIT
 
 In this mode, a lock is also used, only in this case an exception is not
 raised. Rather, the current thread patiently waits until the other thread
 has completed its operation and the lock is then acquired. It is released once
 the current thread has finished performing the operation.
-
-*This is the default lockmode*
 
 Without this option, odd behavior may be exhibited (including some crashes).
 If you are sure that the :class:`Connection` object will never be used from
