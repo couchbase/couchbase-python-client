@@ -57,9 +57,35 @@ HttpResult_headers(pycbc_HttpResult *self, void *unused)
 static PyObject *
 HttpResult_done(pycbc_HttpResult *self, void *unused)
 {
-    PyObject *res = self->htflags & PYCBC_HTRES_F_COMPLETE ? Py_True : Py_False;
-    Py_INCREF(res);
+    PyObject *res;
+    /**
+     * For non-async connection handles, the 'done'-ness of the result
+     * depends on it being complete _AND_ having no outstanding rows remaining.
+     *
+     * For async handles we don't ever use fetch and we deliver rows on-demand
+     * anyway, so there is no risk of accidentally finishing the iteration
+     * if all the rows have arrived via another means (i.e. rows arriving
+     * asynchronously through a get() call, which is not inside a _fetch()
+     * call).
+     *
+     * Since those final rows are actually returned from the next _fetch(), we
+     * don't return True until they've been returned.
+     */
+    if (self->htflags & PYCBC_HTRES_F_COMPLETE) {
+        if (self->parent->flags & PYCBC_CONN_F_ASYNC) {
+            res = Py_True;
+        } else {
+            if (self->rowsbuf == NULL || PyList_Size(self->rowsbuf) == 0) {
+                res = Py_True;
+            } else {
+                res = Py_False;
+            }
+        }
+    } else {
+        res = Py_False;
+    }
 
+    Py_INCREF(res);
     (void)unused;
     return res;
 }

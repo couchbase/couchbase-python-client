@@ -227,6 +227,9 @@ http_vrow_callback(lcbex_vrow_ctx_t *rctx,
     if (row->type == LCBEX_VROW_ROW) {
         if (row->ndata) {
             PyObject *s = PyUnicode_FromStringAndSize(row->data, row->ndata);
+            if (!htres->rowsbuf) {
+                htres->rowsbuf = PyList_New(0);
+            }
             PyList_Append(htres->rowsbuf, s);
             Py_DECREF(s);
         }
@@ -473,12 +476,6 @@ pycbc_HttpResult__fetch(pycbc_HttpResult *self)
         return NULL;
     }
 
-    if (!self->htreq) {
-        ret = Py_None;
-        Py_INCREF(ret);
-        goto GT_RET;
-    }
-
     if (self->parent->flags & PYCBC_CONN_F_ASYNC) {
         PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
                        "_fetch() should not be called with an async "
@@ -488,6 +485,20 @@ pycbc_HttpResult__fetch(pycbc_HttpResult *self)
         PYCBC_EXC_WRAP(PYCBC_EXC_PIPELINE, 0,
                        "HTTP requests cannot be executed in pipeline context");
     }
+
+
+    if (self->rowsbuf && PyList_Size(self->rowsbuf)) {
+        ret = self->rowsbuf;
+        self->rowsbuf = NULL;
+        goto GT_RET;
+    }
+
+    if (!self->htreq) {
+        ret = Py_None;
+        Py_INCREF(ret);
+        goto GT_RET;
+    }
+
 
     if (!self->rowsbuf) {
         self->rowsbuf = PyList_New(0);
