@@ -1,3 +1,5 @@
+PROJECT(CouchbasePythonClient)
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
 INSTALL(FILES
 	uuid.py
