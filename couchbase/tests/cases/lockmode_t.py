@@ -86,4 +86,4 @@ class LockmodeTest(CouchbaseTestCase):
         cb._thr_lockop(1)
 
         t.join()
-        self.assertTrue(d['ended'] > time_unlocked)
+        self.assertTrue(d['ended'] >= time_unlocked)
