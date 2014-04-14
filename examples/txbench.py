@@ -21,9 +21,6 @@ from time import time
 
 from twisted.internet import reactor
 
-from couchbase import experimental
-experimental.enable() # Enable experimental features on import
-
 from txcouchbase.connection import Connection, TxAsyncConnection
 from couchbase.connection import FMT_BYTES
 from couchbase.transcoder import Transcoder

@@ -18,9 +18,6 @@ although this is not expected.
 
 Example usage::
 
-    from couchbase import experimental
-    experimental.enable()
-
     from gcouchbase import GConnection
     cb = GConnection(bucket='default')
 

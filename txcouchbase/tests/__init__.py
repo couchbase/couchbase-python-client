@@ -14,7 +14,6 @@
 # limitations under the License.
 #
 
-from couchbase import experimental
 from couchbase.tests.base import SkipTest
 import sys
 import platform
@@ -32,5 +31,3 @@ except:
 
 if platform.python_implementation() == 'PyPy':
     raise SkipTest("Twisted/Async not supported on PyPy")
-
-experimental.enable()
