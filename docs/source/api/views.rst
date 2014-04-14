@@ -290,7 +290,7 @@ The following properties allow you to
 
         Example::
 
-            q.mapkey_single = ["abbaye_de_maredsous"]
+            q.mapkey_single = "abbaye_de_maredsous"
 
 
         Note that as the ``map`` function can return more than one result with
