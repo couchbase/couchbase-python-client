@@ -148,6 +148,21 @@ pycbc_init_pyconstants(PyObject *module)
     PyModule_AddIntMacro(module, LCB_READ_EVENT);
     PyModule_AddIntMacro(module, LCB_WRITE_EVENT);
     PyModule_AddIntMacro(module, LCB_RW_EVENT);
+
+#if LCB_VERSION < 0x020300
+#define LCB_ERRTYPE_DATAOP 0
+#define LCB_ERRTYPE_FATAL 0
+#define LCB_ERRTYPE_INTERNAL 0
+#define LCB_ERRTYPE_NETWORK 0
+#define LCB_ERRTYPE_TRANSIENT 0
+#define LCB_ERRTYPE_INPUT 0
+#endif
+    PyModule_AddIntMacro(module, LCB_ERRTYPE_DATAOP);
+    PyModule_AddIntMacro(module, LCB_ERRTYPE_FATAL);
+    PyModule_AddIntMacro(module, LCB_ERRTYPE_INTERNAL);
+    PyModule_AddIntMacro(module, LCB_ERRTYPE_NETWORK);
+    PyModule_AddIntMacro(module, LCB_ERRTYPE_TRANSIENT);
+    PyModule_AddIntMacro(module, LCB_ERRTYPE_INPUT);
 }
 
 

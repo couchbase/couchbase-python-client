@@ -180,7 +180,10 @@ static PyMethodDef _libcouchbase_methods[] = {
                 METH_VARARGS,
                 "Get a helper by name"
         },
-
+        { "_get_errtype", (PyCFunction) pycbc_exc_get_categories,
+                METH_VARARGS,
+                "Get error categories for a given code"
+        },
         { NULL }
 };
 

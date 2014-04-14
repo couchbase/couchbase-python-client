@@ -815,7 +815,11 @@ PyObject* pycbc_exc_map(int mode, lcb_error_t err);
  */
 PyObject* pycbc_exc_message(int mode, lcb_error_t err, const char *msg);
 
-
+/**
+ * Gets the error classifier categories (as a set of bit flags) for a given
+ * error code.
+ */
+PyObject* pycbc_exc_get_categories(PyObject *self, PyObject *arg);
 /**
  * Throws an exception. If an exception is pending, it is caught and wrapped,
  * delivered into the CouchbaseError's 'inner_cause' field

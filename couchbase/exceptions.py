@@ -17,7 +17,6 @@
 
 import couchbase._libcouchbase as C
 
-
 class CouchbaseError(Exception):
     """Base exception for Couchbase errors
 
@@ -28,8 +27,6 @@ class CouchbaseError(Exception):
       .. py:attribute:: rc
 
       The return code which caused the error
-
-      .. py:attribute:: all_results
 
         A :class:`~couchbase.result.MultiResult` object, if this
         exception was thrown as part of a multi-operation. This contains
@@ -49,6 +46,31 @@ class CouchbaseError(Exception):
         A tuple of (`file`, `line`) pointing to a location in the C
         source code where the exception was thrown (if applicable)
 
+      .. py:attribute:: categories
+
+        An integer representing a set of bits representing various error
+        categories for the specific error as returned by libcouchbase.
+
+      .. py:attribute:: is_data
+
+        True if this error is a negative reply from the server
+        (see :exc:`CouchbaseDataError`)
+
+      .. py:attribute:: is_transient
+
+        True if this error was likely caused by a transient condition
+        (see :exc:`CouchbaseTransientError`)
+
+      .. py:attribute:: is_fatal
+
+        True if this error indicates a likely fatal condition for the client.
+        See :exc:`CouchbaseFatalError`
+
+      .. py:attribute:: is_network
+
+        True if errors were received during TCP transport.
+        See :exc:`CouchbaseNetworkError`
+
 
     """
 
@@ -61,7 +83,13 @@ class CouchbaseError(Exception):
 
         :return: a subclass of :class:`CouchbaseError`
         """
-        return _LCB_ERRNO_MAP.get(rc, cls)
+        try:
+            return _LCB_ERRNO_MAP[rc]
+
+        except KeyError:
+            newcls = _mk_lcberr(rc)
+            _LCB_ERRNO_MAP[rc] = newcls
+            return newcls
 
     def __init__(self, params=None):
         if isinstance(params, str):
@@ -84,6 +112,29 @@ class CouchbaseError(Exception):
         return cls({'message': message,
                     'objextra': obj,
                     'inner_cause': inner})
+
+    @property
+    def categories(self):
+        """
+        Gets the exception categories (as a set of bits)
+        """
+        return C._get_errtype(self.rc)
+
+    @property
+    def is_transient(self):
+        return self.categories & C.LCB_ERRTYPE_TRANSIENT
+
+    @property
+    def is_fatal(self):
+        return self.categories & C.LCB_ERRTYPE_FATAL
+
+    @property
+    def is_network(self):
+        return self.categories & C.LCB_ERRTYPE_NETWORK
+
+    @property
+    def is_data(self):
+        return self.categories & C.LCB_ERRTYPE_DATAOP
 
     def __str__(self):
         details = []
@@ -119,11 +170,36 @@ class InternalSDKError(CouchbaseError):
     not be seeing this message)
     """
 
+class CouchbaseInternalError(InternalSDKError):
+    pass
 
 class CouchbaseNetworkError(CouchbaseError):
     """
     Base class for network-related errors. These indicate issues in the low
     level connectivity
+    """
+
+class CouchbaseInputError(CouchbaseError):
+    """
+    Base class for errors possibly caused by malformed input
+    """
+
+class CouchbaseTransientError(CouchbaseError):
+    """
+    Base class for errors which are likely to go away with time
+    """
+
+class CouchbaseFatalError(CouchbaseError):
+    """
+    Base class for errors which are likely fatal and require reinitialization
+    of the instance
+    """
+
+class CouchbaseDataError(CouchbaseError):
+    """
+    Base class for negative replies received from the server. These errors
+    indicate that the server could not satisfy the request because of certain
+    data constraints (such as an item not being present, or a CAS mismatch)
     """
 
 
@@ -326,6 +402,15 @@ class ObjectDestroyedError(CouchbaseError):
 class PipelineError(CouchbaseError):
     """Illegal operation within pipeline state"""
 
+_LCB_ERRCAT_MAP = {
+    C.LCB_ERRTYPE_NETWORK:      CouchbaseNetworkError,
+    C.LCB_ERRTYPE_INPUT:        CouchbaseInputError,
+    C.LCB_ERRTYPE_TRANSIENT:    CouchbaseTransientError,
+    C.LCB_ERRTYPE_FATAL:        CouchbaseFatalError,
+    C.LCB_ERRTYPE_DATAOP:       CouchbaseDataError,
+    C.LCB_ERRTYPE_INTERNAL:     CouchbaseInternalError
+}
+
 _LCB_ERRNO_MAP = {
     C.LCB_AUTH_ERROR:       AuthError,
     C.LCB_DELTA_BADVAL:     DeltaBadvalError,
@@ -347,13 +432,49 @@ _LCB_ERRNO_MAP = {
     C.LCB_CONNECT_ERROR:    ConnectError,
     C.LCB_BUCKET_ENOENT:    BucketNotFoundError,
     C.LCB_EBADHANDLE:       BadHandleError,
-    # LCB.SERVER_BUG,
     C.LCB_INVALID_HOST_FORMAT: InvalidError,
     C.LCB_INVALID_CHAR:     InvalidError,
     C.LCB_DURABILITY_ETOOMANY: ArgumentError,
     C.LCB_DUPLICATE_COMMANDS: ArgumentError,
     C.LCB_CLIENT_ETMPFAIL:  ClientTemporaryFailError
 }
+
+def _mk_lcberr(rc, name=None, default=CouchbaseError, docstr=""):
+    """
+    Create a new error class derived from the appropriate exceptions.
+    :param str name: The name of the new exception
+    :param class default: Default exception to return if no categories are found
+    :return: a new exception derived from the appropriate categories, or the
+             value supplied for `default`
+    """
+    categories = C._get_errtype(rc)
+    if not categories:
+        return default
+
+    bases = []
+    for cat, base in _LCB_ERRCAT_MAP.items():
+        if cat & categories:
+            bases.append(base)
+
+    if name is None:
+        name = "LCB_0x{0:0X}".format(rc)
+
+    d = { '__doc__' : docstr }
+
+    if not bases:
+        bases = [CouchbaseError]
+
+    return type(name, tuple(bases), d)
+
+# Reinitialize the exception classes again:
+for rc, oldcls in _LCB_ERRNO_MAP.items():
+    # Get error classifiers
+    newcls = _mk_lcberr(rc, name=oldcls.__name__,
+                        default=None, docstr=oldcls.__doc__)
+    if not newcls:
+        continue
+    globals()[newcls.__name__] = newcls
+    _LCB_ERRNO_MAP[rc] = newcls
 
 _EXCTYPE_MAP = {
     C.PYCBC_EXC_ARGUMENTS:  ArgumentError,

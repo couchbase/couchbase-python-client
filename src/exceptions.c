@@ -111,6 +111,10 @@ pycbc_exc_map(int mode, lcb_error_t err)
     if (mode == PYCBC_EXC_LCBERR) {
         ikey = pycbc_IntFromL(err);
         excls = PyDict_GetItem(pycbc_helpers.lcb_errno_map, ikey);
+        if (!excls) {
+            excls = PyObject_CallMethod(pycbc_helpers.default_exception,
+                                        "rc_to_exctype", "O", ikey);
+        }
     } else {
         ikey = pycbc_IntFromL(mode);
         excls = PyDict_GetItem(pycbc_helpers.misc_errno_map, ikey);
@@ -139,4 +143,23 @@ pycbc_exc_message(int mode, lcb_error_t err, const char *msg)
 
     pycbc_assert(instance);
     return instance;
+}
+
+PyObject *
+pycbc_exc_get_categories(PyObject *self, PyObject *arg)
+{
+    int rv = 0;
+    int rc = 0;
+
+    (void)self;
+    rv = PyArg_ParseTuple(arg, "i", &rc);
+    if (!rc) {
+        return NULL;
+    }
+#if LCB_VERSION < 0x020300
+    rv = 0;
+#else
+    rv = lcb_get_errtype(rc);
+#endif
+    return pycbc_IntFromL(rv);
 }
