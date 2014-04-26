@@ -18,6 +18,8 @@
 import tempfile
 import os
 
+from nose.plugins.attrib import attr
+
 from couchbase.exceptions import (AuthError, ArgumentError,
                                   BucketNotFoundError, ConnectError,
                                   CouchbaseNetworkError,
@@ -35,8 +37,8 @@ class ConnectionTest(CouchbaseTestCase):
         # Connection didn't throw an error
         self.assertIsInstance(cb, self.factory)
 
+    @attr('slow')
     def test_server_not_found(self):
-        self.slowTest()
         connargs = self.make_connargs()
         connargs['host'] = 'example.com'
         self.assertRaises((CouchbaseNetworkError, TimeoutError),

@@ -18,6 +18,8 @@
 import pickle
 from time import sleep
 
+from nose.plugins.attrib import attr
+
 from couchbase import FMT_JSON, FMT_PICKLE, FMT_UTF8, FMT_BYTES
 
 from couchbase.exceptions import (
@@ -159,8 +161,8 @@ class ConnectionGetTest(ConnectionTestCase):
         self.assertEqual(flags1, 0x0)
         self.assertEqual(cas4, 0)
 
+    @attr('slow')
     def test_get_ttl(self):
-        self.slowTest()
         key = self.gen_key('get_ttl')
         self.cb.delete(key, quiet=True)
         self.cb.set(key, "a_value")
@@ -171,8 +173,8 @@ class ConnectionGetTest(ConnectionTestCase):
         self.assertFalse(rv.success)
         self.assertEqual(NotFoundError, CouchbaseError.rc_to_exctype(rv.rc))
 
+    @attr('slow')
     def test_get_multi_ttl(self):
-        self.slowTest()
         kvs = self.gen_kv_dict(amount=2, prefix='get_multi_ttl')
 
         self.cb.set_multi(kvs)

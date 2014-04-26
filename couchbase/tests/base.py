@@ -101,7 +101,6 @@ class ConnectionConfiguration(object):
         else:
             self.realserver_info = None
 
-        self.nosleep = os.environ.get('PYCBC_TESTS_NOSLEEP', False)
         if (config.has_option("mock", "enabled") and
                               config.getboolean('mock', 'enabled')):
 
@@ -314,10 +313,6 @@ class CouchbaseTestCase(ResourcedTestCase):
 
     def make_connargs(self, **overrides):
         return self.cluster_info.make_connargs(**overrides)
-
-    def slowTest(self):
-        if self.config.nosleep:
-            raise SkipTest("Skipping slow/sleep-based test")
 
     def make_connection(self, **kwargs):
         return self.cluster_info.make_connection(self.factory, **kwargs)

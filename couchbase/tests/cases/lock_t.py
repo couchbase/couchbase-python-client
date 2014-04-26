@@ -17,6 +17,8 @@
 
 from time import sleep
 
+from nose.plugins.attrib import attr
+
 from couchbase.exceptions import (
     CouchbaseError, TemporaryFailError, KeyExistsError, ArgumentError)
 
@@ -54,9 +56,8 @@ class ConnectionLockTest(ConnectionTestCase):
         rv = self.cb.set(k, v)
         self.assertTrue(rv.success)
 
+    @attr('slow')
     def test_timed_lock(self):
-        self.slowTest()
-
         k = self.gen_key('lock')
         v = "locked_value"
         self.cb.set(k, v)

@@ -17,6 +17,8 @@
 
 from time import sleep
 
+from nose.plugins.attrib import attr
+
 from couchbase import FMT_JSON, FMT_PICKLE, FMT_BYTES, FMT_UTF8
 from couchbase.exceptions import (KeyExistsError, ValueFormatError,
                                   ArgumentError, NotFoundError,
@@ -50,8 +52,8 @@ class ConnectionSetTest(ConnectionTestCase):
         self.assertNotEqual(rv3.cas, rv2.cas)
         self.assertNotEqual(rv3.cas, rv1.cas)
 
+    @attr('slow')
     def test_set_with_ttl(self):
-        self.slowTest()
         key = self.gen_key('ttl')
         self.cb.set(key, 'value_ttl', ttl=2)
         rv = self.cb.get(key)

@@ -16,18 +16,19 @@
 #
 import time
 
+from nose.plugins.attrib import attr
+
 from couchbase.tests.base import ConnectionTestCase
 import couchbase.exceptions as E
 
 
+@attr('slow')
 class ConnectionTouchTest(ConnectionTestCase):
     def setUp(self):
         super(ConnectionTouchTest, self).setUp()
         self.cb = self.make_connection()
 
     def test_trivial_touch(self):
-        self.slowTest()
-
         key = self.gen_key("trivial_touch")
         self.cb.set(key, "value", ttl=1)
         rv = self.cb.touch(key, ttl=0)
@@ -44,7 +45,6 @@ class ConnectionTouchTest(ConnectionTestCase):
         self.assertEqual(E.NotFoundError, E.CouchbaseError.rc_to_exctype(rv.rc))
 
     def test_trivial_multi_touch(self):
-        self.slowTest()
         kv = self.gen_kv_dict(prefix="trivial_multi_touch")
         self.cb.set_multi(kv, ttl=1)
         time.sleep(2)

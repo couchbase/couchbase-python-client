@@ -16,6 +16,8 @@
 #
 import time
 
+from nose.plugins.attrib import attr
+
 from couchbase.tests.base import DDocTestCase
 from couchbase.exceptions import HTTPError, CouchbaseError
 
@@ -31,6 +33,7 @@ DESIGN_JSON = {
     }
 }
 
+@attr('slow')
 class DesignDocManagementTest(DDocTestCase):
     def setUp(self):
         super(DesignDocManagementTest, self).setUp()
