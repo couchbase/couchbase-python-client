@@ -644,6 +644,48 @@ static PyMethodDef Connection_TABLE_methods[] = {
         { NULL, NULL, 0, NULL }
 };
 
+static lcb_error_t
+set_config_cache(pycbc_Connection *self, const char *filename,
+                 const struct lcb_create_st *cropts)
+{
+#ifndef LCB_CNTL_CONFIGCACHE
+#define LCB_CNTL_CONFIGCACHE 0x21
+#endif
+    lcb_error_t err;
+
+    err = lcb_cntl(self->instance, LCB_CNTL_SET, LCB_CNTL_CONFIGCACHE,
+                   (void *)filename);
+
+    if (err == LCB_SUCCESS) {
+        return err;
+
+    } else if (err == LCB_NOT_SUPPORTED) {
+        /**
+         * Otherwise we need to use the older 'compat' structure which is
+         * deprecated and broken in newer versions of libcouchbase.
+         */
+        struct lcb_cached_config_st cached_config = { { 0 } };
+
+        cached_config.cachefile = filename;
+        memcpy(&cached_config.createopt, cropts, sizeof(*cropts));
+
+        /** Destroy the existing instance first */
+        lcb_destroy(self->instance);
+        self->instance = NULL;
+        err = lcb_create_compat(LCB_CACHED_CONFIG, &cached_config,
+                                &self->instance, NULL);
+        if (err != LCB_SUCCESS) {
+            self->instance = NULL;
+        }
+
+    } else {
+        /** Other error from lcb_cntl() */
+        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err,
+                       "Could not assign configuration cache");
+    }
+    return err;
+}
+
 static int
 Connection__init__(pycbc_Connection *self,
                        PyObject *args, PyObject *kwargs)
@@ -660,7 +702,6 @@ Connection__init__(pycbc_Connection *self,
     PyObject *tc = NULL;
 
     struct lcb_create_st create_opts = { 0 };
-    struct lcb_cached_config_st cached_config = { { 0 } };
 
 
     /**
@@ -776,23 +817,13 @@ Connection__init__(pycbc_Connection *self,
         conncache = config_cache;
     }
 
-    if (conncache) {
-        if (conntype != LCB_TYPE_BUCKET) {
-            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
-                           "Cannot use connection cache with "
-                           "management connection");
-            return -1;
-        }
-        cached_config.cachefile = conncache;
-        memcpy(&cached_config.createopt, &create_opts, sizeof(create_opts));
-        err = lcb_create_compat(LCB_CACHED_CONFIG,
-                                &cached_config,
-                                &self->instance,
-                                NULL);
-    } else {
-        err = lcb_create(&self->instance, &create_opts);
+    if (conncache && conntype != LCB_TYPE_BUCKET) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Cannot use connection cache with "
+                       "management connection");
+        return -1;
     }
 
+    err = lcb_create(&self->instance, &create_opts);
     if (err != LCB_SUCCESS) {
         self->instance = NULL;
         PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err,
@@ -802,6 +833,14 @@ Connection__init__(pycbc_Connection *self,
                        "object");
         return -1;
     }
+
+    if (conncache) {
+        err = set_config_cache(self, conncache, &create_opts);
+        if (err != LCB_SUCCESS) {
+            return -1;
+        }
+    }
+
 
     pycbc_callbacks_init(self->instance);
     lcb_set_cookie(self->instance, self);
