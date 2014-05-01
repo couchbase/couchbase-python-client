@@ -96,7 +96,7 @@ def _observeinfo__repr__(self):
     return ret
 
 def _json_encode_wrapper(*args):
-    return json.dumps(*args, ensure_ascii=False)
+    return json.dumps(*args, ensure_ascii=False, separators=(',', ':'))
 
 
 class FMT_AUTO_object_not_a_number(object):

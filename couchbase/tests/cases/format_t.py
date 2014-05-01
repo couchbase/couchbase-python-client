@@ -89,7 +89,7 @@ class ConnectionFormatTest(ConnectionTestCase):
         k = self.gen_key("get_noformat")
         self.cb.set(k, {"foo":"bar"}, format=FMT_JSON)
         rv = self.cb.get(k, no_format=True)
-        self.assertEqual(rv.value, b'{"foo": "bar"}')
+        self.assertEqual(rv.value, b'{"foo":"bar"}')
 
         kl = self.gen_key_list(prefix="get_noformat")
         kv = {}
@@ -99,7 +99,7 @@ class ConnectionFormatTest(ConnectionTestCase):
         self.cb.set_multi(kv)
         rvs = self.cb.get_multi(kv.keys(), no_format=True)
         for k, v in rvs.items():
-            self.assertEqual(v.value, b'{"foo": "bar"}')
+            self.assertEqual(v.value, b'{"foo":"bar"}')
 
 
     def test_get_format(self):
