@@ -198,24 +198,27 @@ The following properties allow you to
 
             function(doc, meta) {
                 if (doc.city && doc.event) {
-                    emit(doc.city, doc.event)
+                    emit([doc.country, doc.state, doc.city], doc.event)
                 }
             }
 
-        Then you may query for all events in a specific city by using::
+        Then you may query for all events in a specific state by using::
 
-            q.mapkey_range = [["Reno"], ["Reno", q.STRING_RANGE_END]]
+            q.mapkey_range = [
+                ["USA", "NV", ""]
+                ["USA", "NV", q.STRING_RANGE_END]
+            ]
 
-        The empty element ``r[0][1]`` means to match the lowest string value
-        for each result. The special last element ``r[1][1]`` is a constant
-        which expands to the highest acceptable unicode value. This means
-        to match any string in the second element as long as it is below this
-        value (which effectively means any string).
+        While the first two elements are an exact match (i.e. only keys which
+        have ``["USA","NV", ...]`` in them, the third element should accept
+        anything, and thus has its start value as the empty string (i.e. lowest
+        range) and the magic ``q.STRING_RANGE_END`` as its lowest value.
 
         As such, the results may look like::
 
-            ViewRow(key=["Reno", "Air Races"], ...),
-            ViewRow(key=["Reno", "Street Vibrations"], ...)
+            ViewRow(key=[u'USA', u'NV', u'Reno'], value=u'Air Races', docid=u'air_races_rno', doc=None)
+            ViewRow(key=[u'USA', u'NV', u'Reno'], value=u'Reno Rodeo', docid=u'rodeo_rno', doc=None)
+            ViewRow(key=[u'USA', u'NV', u'Reno'], value=u'Street Vibrations', docid=u'street_vibrations_rno', doc=None)
 
             # etc.
 
