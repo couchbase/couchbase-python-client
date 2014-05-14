@@ -51,9 +51,13 @@ class SelectTimer(TimerEvent):
     def active(self):
         return self.state == PYCBC_EVSTATE_ACTIVE
 
-    def __cmp__(self, other):
-        return cmp(self.exptime, other.exptime)
-
+    # Rich comparison operators implemented - __cmp__ not used in Py3
+    def __lt__(self, other): return self.exptime < other.exptime
+    def __le__(self, other): return self.exptime <= other.exptime
+    def __gt__(self, other): return self.exptime > other.exptime
+    def __ge__(self, other): return self.exptime >= other.exptime
+    def __ne__(self, other): return self.exptime != other.exptime
+    def __eq__(self, other): return self.exptime == other.exptime
 
 
 class SelectIOPS(object):
