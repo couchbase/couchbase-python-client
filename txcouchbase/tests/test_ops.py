@@ -106,7 +106,7 @@ class OperationTestCase(gen_base(ConnectionTestCase)):
 
             res_fail = err.value.result
             self.assertFalse(res_fail.success)
-            self.assertEqual(NotFoundError.rc_to_exctype(res.rc), NotFoundError)
+            self.assertEqual(NotFoundError.rc_to_exctype(res_fail.rc), NotFoundError)
 
         d.addErrback(t)
         return d
