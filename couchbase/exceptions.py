@@ -90,6 +90,15 @@ class CouchbaseError(Exception):
             _LCB_ERRNO_MAP[rc] = newcls
             return newcls
 
+    @classmethod
+    def _can_derive(cls, rc):
+        """
+        Determines if the given error code is logically derived from this class
+        :param int rc: the error code to check
+        :return: a boolean indicating if the code is derived from this exception
+        """
+        return issubclass(cls.rc_to_exctype(rc), cls)
+
     def __init__(self, params=None):
         if isinstance(params, str):
             params = {'message': params}

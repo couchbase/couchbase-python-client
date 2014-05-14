@@ -42,7 +42,7 @@ class ConnectionTouchTest(ConnectionTestCase):
         time.sleep(2)
         rv = self.cb.get(key, quiet=True)
         self.assertFalse(rv.success)
-        self.assertEqual(E.NotFoundError, E.CouchbaseError.rc_to_exctype(rv.rc))
+        self.assertTrue(E.NotFoundError._can_derive(rv.rc))
 
     def test_trivial_multi_touch(self):
         kv = self.gen_kv_dict(prefix="trivial_multi_touch")

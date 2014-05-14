@@ -86,8 +86,7 @@ class ConnectionGetTest(ConnectionTestCase):
             self.assertTrue(k in rvs)
             self.assertFalse(rvs[k].success)
             self.assertTrue(rvs[k].value is None)
-            self.assertTrue(CouchbaseError.rc_to_exctype(rvs[k].rc)
-                            is NotFoundError)
+            self.assertTrue(NotFoundError._can_derive(rvs[k].rc))
 
         for k, v in kv_existing.items():
             self.assertTrue(k in rvs)
@@ -171,7 +170,7 @@ class ConnectionGetTest(ConnectionTestCase):
         sleep(2)
         rv = self.cb.get(key, quiet=True)
         self.assertFalse(rv.success)
-        self.assertEqual(NotFoundError, CouchbaseError.rc_to_exctype(rv.rc))
+        self.assertTrue(NotFoundError._can_derive(rv.rc))
 
     @attr('slow')
     def test_get_multi_ttl(self):
@@ -187,8 +186,7 @@ class ConnectionGetTest(ConnectionTestCase):
         for k, v in rvs.items():
             self.assertFalse(v.success)
             self.assertTrue(k in kvs)
-            self.assertEqual(NotFoundError, CouchbaseError.rc_to_exctype(v.rc))
-
+            self.assertTrue(NotFoundError._can_derive(v.rc))
 
 if __name__ == '__main__':
     unittest.main()
