@@ -153,7 +153,7 @@ pycbc_exc_get_categories(PyObject *self, PyObject *arg)
 
     (void)self;
     rv = PyArg_ParseTuple(arg, "i", &rc);
-    if (!rc) {
+    if (!rv) {
         return NULL;
     }
 #if LCB_VERSION < 0x020300
