@@ -85,7 +85,6 @@ class CouchbaseError(Exception):
         """
         try:
             return _LCB_ERRNO_MAP[rc]
-
         except KeyError:
             newcls = _mk_lcberr(rc)
             _LCB_ERRNO_MAP[rc] = newcls
@@ -439,9 +438,10 @@ _LCB_ERRNO_MAP = {
     C.LCB_CLIENT_ETMPFAIL:  ClientTemporaryFailError
 }
 
-def _mk_lcberr(rc, name=None, default=CouchbaseError, docstr=""):
+def _mk_lcberr(rc, name=None, default=CouchbaseError, docstr="", extrabase=[]):
     """
     Create a new error class derived from the appropriate exceptions.
+    :param int rc: libcouchbase error code to map
     :param str name: The name of the new exception
     :param class default: Default exception to return if no categories are found
     :return: a new exception derived from the appropriate categories, or the
@@ -451,7 +451,8 @@ def _mk_lcberr(rc, name=None, default=CouchbaseError, docstr=""):
     if not categories:
         return default
 
-    bases = []
+    bases = extrabase[::]
+
     for cat, base in _LCB_ERRCAT_MAP.items():
         if cat & categories:
             bases.append(base)
@@ -466,14 +467,16 @@ def _mk_lcberr(rc, name=None, default=CouchbaseError, docstr=""):
 
     return type(name, tuple(bases), d)
 
-# Reinitialize the exception classes again:
+# Reinitialize the exception classes again.
 for rc, oldcls in _LCB_ERRNO_MAP.items():
-    # Get error classifiers
-    newcls = _mk_lcberr(rc, name=oldcls.__name__,
-                        default=None, docstr=oldcls.__doc__)
+    # Determine the new reparented error category for this
+    newname = "_{0}_0x{1:0X} (generated, catch {0})".format(oldcls.__name__, rc)
+    newcls = _mk_lcberr(rc, name=newname, default=None, docstr=oldcls.__doc__,
+                        extrabase=[oldcls])
     if not newcls:
+        # No categories for this type, fall back to existing one
         continue
-    globals()[newcls.__name__] = newcls
+
     _LCB_ERRNO_MAP[rc] = newcls
 
 _EXCTYPE_MAP = {
