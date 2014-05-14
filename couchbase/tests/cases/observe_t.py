@@ -78,6 +78,7 @@ class ConnectionObserveTest(ConnectionTestCase):
 
 class ConnectionObserveMasterTest(MockTestCase):
     def test_master_observe(self):
+        self.skipLcbMin("2.3.0")
         key = self.gen_key("test_master_observe")
         rv = self.cb.set(key, "value")
         obs_all = self.cb.observe(key)
