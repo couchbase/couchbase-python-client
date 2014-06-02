@@ -64,15 +64,13 @@ threads
 
 .. data:: LOCKMODE_EXC
 
-This is the default lockmode. If it is detected that the object is being used
+*This is the default lockmode*. If it is detected that the object is being used
 from multiple threads, an exception will be raised indicating such.
 
 Internally this uses the C equivalent of the ``threading.Lock`` object (i.e.
 ``PyThread_allocate_lock()``). Upon each entry to a function it will try
 to acquire the lock (without waiting). If the acquisition fails, the
 exception is raised.
-
-*This is the default lockmode*
 
 .. data:: LOCKMODE_WAIT
 
