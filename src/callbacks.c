@@ -562,7 +562,10 @@ stat_callback(lcb_t instance,
     CB_THR_END(mres->parent);
 
     if (!resp->v.v0.server_endpoint) {
+        pycbc_Connection *parent = mres->parent;
         operation_completed(mres->parent, mres);
+        CB_THR_BEGIN(parent);
+        return;
     }
 
     if (err != LCB_SUCCESS) {
