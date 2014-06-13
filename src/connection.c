@@ -631,7 +631,7 @@ static PyMethodDef Connection_TABLE_methods[] = {
 
         { "_cntl",
                 (PyCFunction)pycbc_Connection__cntl,
-                METH_VARARGS,
+                METH_VARARGS|METH_KEYWORDS,
                 NULL
         },
 

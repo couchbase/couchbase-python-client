@@ -131,23 +131,146 @@ handle_intval(lcb_t instance,
 
 }
 
-PyObject *
-pycbc_Connection__cntl(pycbc_Connection *self, PyObject *args)
-{
-    int cmd = 0, mode = 0;
-    PyObject *val = NULL;
-    PyObject *ret = NULL;
-    lcb_error_t err = LCB_SUCCESS;
+typedef union {
+    float f;
+    int i;
+    unsigned u;
+    lcb_uint32_t u32;
+    lcb_size_t sz;
+    const char *str;
+} uCNTL;
 
-    if (!PyArg_ParseTuple(args, "i|O", &cmd, &val)) {
-        PYCBC_EXCTHROW_ARGS();
-        return NULL;
+typedef enum {
+    CTL_TYPE_INVALID,
+    CTL_TYPE_STRING,
+    CTL_TYPE_INT,
+    CTL_TYPE_SIZET,
+    CTL_TYPE_U32,
+    CTL_TYPE_FLOAT,
+    CTL_TYPE_UNSIGNED,
+    CTL_TYPE_TIMEOUT,
+    CTL_TYPE_COMPAT
+} CTLTYPE;
+
+static CTLTYPE
+get_ctltype(const char *s)
+{
+    if (!strcmp(s, "str") || !strcmp(s, "string")) {
+        return CTL_TYPE_STRING;
+    }
+    if (!strcmp(s, "int")) {
+        return CTL_TYPE_INT;
+    }
+    if (!strcmp(s, "uint") || !strcmp(s, "unsigned")) {
+        return CTL_TYPE_UNSIGNED;
+    }
+    if (!strcmp(s, "size_t") || !strcmp(s, "lcb_size_t")) {
+        return CTL_TYPE_SIZET;
+    }
+    if (!strcmp(s, "float")) {
+        return CTL_TYPE_FLOAT;
+    }
+    if (!strcmp(s, "uint32_t") || !strcmp(s, "lcb_uint32_t")) {
+        return CTL_TYPE_U32;
+    }
+    if (!strcmp(s, "timeout") || !strcmp(s, "interval")) {
+        return CTL_TYPE_TIMEOUT;
+    }
+    return CTL_TYPE_INVALID;
+}
+/**
+ * Convert an input object to a proper pointer target based on the value
+ * @param type The type string
+ * @param input The input PyObject
+ * @param output Target for value
+ * @return 1 on success, 0 on failure
+ */
+static int
+convert_object_input(CTLTYPE t, PyObject* input, uCNTL *output)
+{
+    int rv = 1;
+    PyObject *tuple = PyTuple_New(1);
+    PyTuple_SET_ITEM(tuple, 0, input);
+    Py_INCREF(input);
+
+    if (t == CTL_TYPE_STRING) {
+        rv = PyArg_ParseTuple(tuple, "s", &output->str);
+
+    } else if (t == CTL_TYPE_INT) {
+        rv = PyArg_ParseTuple(tuple, "i", &output->i);
+
+    } else if (t == CTL_TYPE_UNSIGNED) {
+        rv = PyArg_ParseTuple(tuple, "I", &output->u);
+
+    } else if (t == CTL_TYPE_U32) {
+        unsigned long tmp = 0;
+        rv = PyArg_ParseTuple(tuple, "k", &tmp);
+        if (rv) {
+            output->u32 = tmp;
+        }
+
+    } else if (t == CTL_TYPE_TIMEOUT) {
+        double d;
+        rv = PyArg_ParseTuple(tuple, "d", &d);
+        if (rv) {
+            if (d <= 0) {
+                PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
+                    "Cannot set timeout of value <= 0. Use uint32 for that");
+                return 0;
+            }
+            output->u32 = d * 1000000;
+        }
+    } else if (t == CTL_TYPE_FLOAT) {
+        rv = PyArg_ParseTuple(tuple, "f", &output->f);
+
+    } else if (t == CTL_TYPE_SIZET) {
+        unsigned long tmp = 0;
+        rv = PyArg_ParseTuple(tuple, "k", &tmp);
+        if (rv) {
+            output->sz = tmp;
+        }
+    } else {
+        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Bad format for value");
+        rv = 0;
     }
 
-    mode = (val == NULL) ? CNTL_GET : CNTL_SET;
+    Py_DECREF(tuple);
+    return rv;
+}
+
+static PyObject *
+convert_object_output(CTLTYPE t, void *retval)
+{
+    if (t == CTL_TYPE_STRING) {
+        return PyUnicode_FromString(*(char**)retval);
+    } else if (t == CTL_TYPE_UNSIGNED) {
+        return pycbc_IntFromUL(*(unsigned*)retval);
+    } else if (t == CTL_TYPE_U32) {
+        return pycbc_IntFromUL(*(lcb_uint32_t*)retval);
+    } else if (t == CTL_TYPE_INT) {
+        return pycbc_IntFromL(*(int*)retval);
+    } else if (t == CTL_TYPE_TIMEOUT) {
+        double d = *(lcb_uint32_t*)retval;
+        d /= 1000000;
+        return PyFloat_FromDouble(d);
+    } else if (t == CTL_TYPE_SIZET) {
+        return pycbc_IntFromULL(*(lcb_size_t*)retval);
+    } else if (t == CTL_TYPE_FLOAT) {
+        return PyFloat_FromDouble(*(float*)retval);
+    } else {
+        PYCBC_EXC_WRAP(PYCBC_EXC_INTERNAL, 0, "oops");
+        return NULL;
+    }
+}
+
+static PyObject *
+handle_old_ctl(pycbc_Connection *self, int cmd, PyObject *val)
+{
+    PyObject *ret = NULL;
+    int mode = (val == NULL) ? CNTL_GET : CNTL_SET;
+    lcb_error_t err = LCB_SUCCESS;
 
     switch (cmd) {
-
     /** Timeout parameters */
     case CNTL_OP_TIMEOUT:
     case CNTL_VIEW_TIMEOUT:
@@ -176,29 +299,9 @@ pycbc_Connection__cntl(pycbc_Connection *self, PyObject *args)
         break;
     }
 
-    default: {
-        if (val == NULL) {
-            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Unknown cntl");
-            return NULL;
-
-        } else {
-            if (PyBool_Check(val)) {
-                ret = handle_boolean(self->instance, cmd, mode, val, &err);
-            } else if (PyFloat_Check(val)) {
-                ret = handle_float_tmo(self->instance, cmd, mode, val, &err);
-            } else if (PyNumber_Check(val)) {
-                ret = handle_float_tmo(self->instance, cmd, mode, val, &err);
-            } else {
-                PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
-                               "Couldn't determine type for cntl");
-                return NULL;
-            }
-        }
-
-        /** not reached */
-        abort();
+    default:
+        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Couldn't determine type for cntl");
         break;
-    }
     }
 
     if (ret) {
@@ -207,6 +310,58 @@ pycbc_Connection__cntl(pycbc_Connection *self, PyObject *args)
 
     PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, err, "lcb_cntl failed");
     return NULL;
+}
+
+PyObject *
+pycbc_Connection__cntl(pycbc_Connection *self, PyObject *args, PyObject *kwargs)
+{
+    int cmd = 0;
+    CTLTYPE type = CTL_TYPE_COMPAT;
+    const char *argt = NULL;
+    PyObject *val = NULL;
+    lcb_error_t err = LCB_SUCCESS;
+    uCNTL input;
+
+    char *kwnames[] = { "op", "value", "value_type", NULL };
+    if (!PyArg_ParseTupleAndKeywords(
+        args, kwargs, "i|Os", kwnames, &cmd, &val, &argt)) {
+
+        PYCBC_EXCTHROW_ARGS();
+        return NULL;
+    }
+
+    if (argt) {
+        type = get_ctltype(argt);
+        if (type == CTL_TYPE_INVALID) {
+            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Invalid type string");
+            return NULL;
+        }
+    }
+    if (type == CTL_TYPE_COMPAT) {
+        return handle_old_ctl(self, cmd, val);
+    }
+
+    if (val) {
+        int rv;
+        rv = convert_object_input(type, val, &input);
+        if (!rv) {
+            return NULL; /* error raised */
+        }
+        err = lcb_cntl(self->instance, LCB_CNTL_SET, cmd, &input);
+        if (err == LCB_SUCCESS) {
+            Py_RETURN_TRUE;
+        } else {
+            PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "lcb_cntl: Problem setting value");
+            return NULL;
+        }
+    } else {
+        err = lcb_cntl(self->instance, LCB_CNTL_GET, cmd, &input);
+        if (err != LCB_SUCCESS) {
+            PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "lcb_cntl: problem retrieving value");
+            return NULL;
+        }
+        return convert_object_output(type, &input);
+    }
 }
 
 PyObject *
@@ -235,5 +390,4 @@ pycbc_Connection__vbmap(pycbc_Connection *conn, PyObject *args)
     PyTuple_SET_ITEM(rtuple, 0, pycbc_IntFromL(info.v.v0.vbucket));
     PyTuple_SET_ITEM(rtuple, 1, pycbc_IntFromL(info.v.v0.server_index));
     return rtuple;
-
 }

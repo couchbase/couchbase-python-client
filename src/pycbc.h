@@ -1000,6 +1000,6 @@ PyObject* pycbc_Connection__end_pipeline(pycbc_Connection *);
 /**
  * Control methods
  */
-PyObject* pycbc_Connection__cntl(pycbc_Connection *, PyObject *);
+PyObject* pycbc_Connection__cntl(pycbc_Connection *, PyObject *, PyObject *);
 PyObject* pycbc_Connection__vbmap(pycbc_Connection *, PyObject *);
 #endif /* PYCBC_H_ */

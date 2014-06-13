@@ -103,6 +103,28 @@ class ConnectionMiscTest(ConnectionTestCase):
         self.assertRaises(CouchbaseError, cb._cntl, 0xf000)
         self.assertRaises(CouchbaseError, cb._cntl, 0x01, "string")
 
+        # Try with something else now. Operation timeout
+        rv = cb._cntl(0x00, value_type="timeout")
+        self.assertEqual(2.5, rv)
+
+        rv = cb._cntl(0x00, value_type="uint32_t")
+        self.assertEqual(2500000, rv)
+
+        # Modification:
+        cb._cntl(0x00, 100000, value_type="uint32_t")
+        rv = cb._cntl(0x00, value_type="timeout")
+        self.assertEqual(0.1, rv)
+
+    def test_newer_ctls(self):
+        cb = self.make_connection()
+        self.skipLcbMin("2.3.1")
+        rv = cb._cntl(0x1f, value_type="string") # LCB_CNTL_CHANGESET
+        "" + rv # String
+
+        # CONFIG_CACHE_LOADED
+        rv = cb._cntl(0x15, value_type="int") #
+        self.assertEqual(0, rv)
+
     def test_vbmap(self):
         # We don't know what the vbucket map is supposed to be, so just
         # check it doesn't fail

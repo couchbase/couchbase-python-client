@@ -1584,7 +1584,7 @@ class Connection(_Base):
         return d
 
 
-    def _cntl(self, *args):
+    def _cntl(self, *args, **kwargs):
         """
         Interface to 'lcb_cntl'.
 
@@ -1613,9 +1613,20 @@ class Connection(_Base):
            the microsecond equivalent for the library. If the value
            is a boolean, it is treated as a C ``int``
 
-        :return: current value of the setting
-           (if no 'value' argument is provided), or the previous value of the
-           setting (if a value was provided).
+        :param value_type: String indicating the type of C-level value to be
+           passed to ``lcb_cntl()``. The possible values are:
+
+            * ``"string"`` - NUL-terminated `const char`. Pass a Python string
+            * ``"int"`` - C ``int`` type. Pass a Python int
+            * ``"uint32_t"`` - C ``lcb_uint32_t`` type. Pass a Python int
+            * ``"unsigned"`` - C ``unsigned int`` type. Pass a Python int
+            * ``"float"`` - C ``float`` type. Pass a Python float
+            * ``"timeout"`` - The number of seconds as a float. This is converted
+              into microseconds within the extension library.
+
+        :return: If no `value` argument is provided, retrieves the current
+            setting (per the ``value_type`` specification). Otherwise this
+            function returns ``None``.
 
         """
-        return _Base._cntl(self, *args)
+        return _Base._cntl(self, *args, **kwargs)
