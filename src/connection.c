@@ -664,8 +664,8 @@ set_config_cache(pycbc_Connection *self, const char *filename,
          * Otherwise we need to use the older 'compat' structure which is
          * deprecated and broken in newer versions of libcouchbase.
          */
-        struct lcb_cached_config_st cached_config = { { 0 } };
-
+        struct lcb_cached_config_st cached_config;
+        memset(&cached_config, 0, sizeof cached_config);
         cached_config.cachefile = filename;
         memcpy(&cached_config.createopt, cropts, sizeof(*cropts));
 
