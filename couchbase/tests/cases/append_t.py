@@ -19,7 +19,7 @@ from couchbase import FMT_JSON, FMT_PICKLE, FMT_BYTES, FMT_UTF8
 
 from couchbase.exceptions import (KeyExistsError, ValueFormatError,
                                   ArgumentError, NotFoundError,
-                                  NotStoredError)
+                                  NotStoredError, CouchbaseError)
 
 from couchbase.tests.base import ConnectionTestCase
 
@@ -58,8 +58,12 @@ class ConnectionAppendTest(ConnectionTestCase):
     def test_append_enoent(self):
         key = self.gen_key("append_enoent")
         self.cb.delete(key, quiet=True)
-        self.assertRaises(NotStoredError,
-                          self.cb.append, key, "value")
+        try:
+            self.cb.append(key, "value")
+            self.assertTrue(false, "Exception not thrown")
+        except CouchbaseError as e:
+            self.assertTrue(isinstance(e, NotStoredError)
+                            or isinstance(e, NotFoundError))
 
     def test_append_multi(self):
         kv = self.gen_kv_dict(amount=4, prefix="append_multi")
