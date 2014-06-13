@@ -80,9 +80,9 @@ class AdminSimpleTest(CouchbaseTestCase):
                           'user', 'pass', host='127.0.0.1', port=1)
 
     def test_bad_handle(self):
-        self.assertRaises(BadHandleError, self.admin.set, "foo", "bar")
-        self.assertRaises(BadHandleError, self.admin.get, "foo")
-        self.assertRaises(BadHandleError, self.admin.append, "foo", "bar")
-        self.assertRaises(BadHandleError, self.admin.delete, "foo")
-        self.assertRaises(BadHandleError, self.admin.unlock, "foo", 1)
+        self.assertRaises(CouchbaseError, self.admin.set, "foo", "bar")
+        self.assertRaises(CouchbaseError, self.admin.get, "foo")
+        self.assertRaises(CouchbaseError, self.admin.append, "foo", "bar")
+        self.assertRaises(CouchbaseError, self.admin.delete, "foo")
+        self.assertRaises(CouchbaseError, self.admin.unlock, "foo", 1)
         str(None)
