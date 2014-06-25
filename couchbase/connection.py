@@ -1239,7 +1239,7 @@ class Connection(_Base):
         jobj = json.loads(jstr)
         return jobj['rev']
 
-    def _design_poll(self, name, mode, oldres, timeout=5):
+    def _design_poll(self, name, mode, oldres, timeout=5, use_devmode=False):
         """
         Poll for an 'async' action to be complete.
         :param string name: The name of the design document
@@ -1266,14 +1266,14 @@ class Connection(_Base):
 
         while time.time() < t_end:
             try:
-                cur_resp = self.design_get(name, use_devmode=False)
+                cur_resp = self.design_get(name, use_devmode=use_devmode)
                 if old_rev and self._doc_rev(cur_resp) == old_rev:
                     continue
 
                 # Try to execute a view..
                 vname = list(cur_resp.value['views'].keys())[0]
                 try:
-                    self._view(name, vname, use_devmode=False,
+                    self._view(name, vname, use_devmode=use_devmode,
                                params={'limit': 1, 'stale': 'ok'})
                     # We're able to query it? whoopie!
                     return True
@@ -1357,7 +1357,8 @@ class Connection(_Base):
                                  content_type="application/json",
                                  fetch_headers=True)
 
-        self._design_poll(name, 'add', existing, syncwait)
+        self._design_poll(name, 'add', existing, syncwait,
+                          use_devmode=use_devmode)
         return ret
 
     def design_get(self, name, use_devmode=True):
@@ -1411,9 +1412,11 @@ class Connection(_Base):
         """
         existing = self.design_get(name, use_devmode=True)
         rv = self.design_create(name, existing.value, use_devmode=False,
-                                syncwait=syncwait)
+                           syncwait=syncwait)
         self.design_delete(name, use_devmode=True,
                            syncwait=syncwait)
+        self._design_poll(name, 'add', None,
+                          timeout=syncwait, use_devmode=False)
         return rv
 
     def design_delete(self, name, use_devmode=True, syncwait=0):
