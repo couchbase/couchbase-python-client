@@ -22,7 +22,7 @@ from couchbase.admin import Admin
 from couchbase.result import HttpResult
 from couchbase.exceptions import (
     BadHandleError, ArgumentError, AuthError, ConnectError, CouchbaseError,
-    HTTPError)
+    CouchbaseNetworkError, HTTPError)
 from couchbase.tests.base import CouchbaseTestCase
 
 class AdminSimpleTest(CouchbaseTestCase):
@@ -48,9 +48,7 @@ class AdminSimpleTest(CouchbaseTestCase):
         self.assertTrue(htres.success)
 
     def test_bad_request(self):
-        self.assertRaises(HTTPError,
-                          self.admin.http_request,
-                          '/badpath')
+        self.assertRaises(HTTPError, self.admin.http_request, '/badpath')
 
         excraised = 0
         try:
@@ -76,7 +74,7 @@ class AdminSimpleTest(CouchbaseTestCase):
                           'baduser', 'badpass', host=self.cluster_info.host)
 
     def test_bad_host(self):
-        self.assertRaises(ConnectError, Admin,
+        self.assertRaises(CouchbaseNetworkError, Admin,
                           'user', 'pass', host='127.0.0.1', port=1)
 
     def test_bad_handle(self):
