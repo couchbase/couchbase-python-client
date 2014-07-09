@@ -576,6 +576,7 @@ class Connection(_Base):
             while time.time() - begin_time < 15:
                 try:
                     rv = cb.lock("key")
+                    break
                 except TemporaryFailError:
                     print("Key is currently locked.. waiting")
                     time.sleep(0)
