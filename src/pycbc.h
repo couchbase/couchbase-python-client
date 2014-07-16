@@ -866,15 +866,15 @@ int pycbc_handle_assert(const char *msg, const char* file, int line);
 #define PYCBC_EXCTHROW_WAIT(err) PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, \
        "There was a problem while trying to send/receive " \
        "your request over the network. This may be a result of a " \
-       "bad network or a misconfigured client or server.")
+       "bad network or a misconfigured client or server")
 
 #define PYCBC_EXCTHROW_SCHED(err) PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, \
         "There was a problem scheduling your request, or determining " \
         "the appropriate server or vBucket for the key(s) requested. "\
-        "This may also be a bug in the SDK if there are no network issues.")
+        "This may also be a bug in the SDK if there are no network issues")
 
 #define PYCBC_EXCTHROW_ARGS() PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, \
-                                           "Bad/insufficient arguments provided.")
+                                           "Bad/insufficient arguments provided")
 
 #define PYCBC_EXCTHROW_EMPTYKEY() PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, \
         "Empty key (i.e. '', empty string) passed")
