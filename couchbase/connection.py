@@ -528,11 +528,14 @@ class Connection(_Base):
         """Lock and retrieve a key-value entry in Couchbase.
 
         :param key: A string which is the key to lock.
-        :param int: a TTL for which the lock should be valid. If set to
-          `0` it will use the default lock timeout on the server.
+        :param int: a TTL for which the lock should be valid.
           While the lock is active, attempts to access the key (via
           other :meth:`lock`, :meth:`set` or other mutation calls) will
-          fail with an :exc:`couchbase.exceptions.TemporaryFailError`
+          fail with an :exc:`couchbase.exceptions.TemporaryFailError`.
+          Note that the value for this option is limited by the maximum allowable
+          lock time determined by the server (currently, this is 15 seconds). If
+          passed a higher value, the server will silently lower this to its
+          maximum limit.
 
 
         This function otherwise functions similarly to :meth:`get`;
@@ -553,8 +556,8 @@ class Connection(_Base):
 
         Lock a key ::
 
-            rv = cb.lock("locked_key", ttl=100)
-            # This key is now locked for the next 100 seconds.
+            rv = cb.lock("locked_key", ttl=5)
+            # This key is now locked for the next 5 seconds.
             # attempts to access this key will fail until the lock
             # is released.
 
@@ -564,7 +567,7 @@ class Connection(_Base):
 
         Lock a key, implicitly unlocking with :meth:`set` with CAS ::
 
-            rv = self.cb.lock("locked_key", ttl=100)
+            rv = self.cb.lock("locked_key", ttl=5)
             new_value = rv.value.upper()
             cb.set("locked_key", new_value, rv.cas)
 
@@ -575,10 +578,10 @@ class Connection(_Base):
             begin_time = time.time()
             while time.time() - begin_time < 15:
                 try:
-                    rv = cb.lock("key")
+                    rv = cb.lock("key", ttl=10)
                 except TemporaryFailError:
                     print("Key is currently locked.. waiting")
-                    time.sleep(0)
+                    time.sleep(1)
 
             if not rv:
                 raise Exception("Waited too long..")
