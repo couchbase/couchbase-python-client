@@ -46,8 +46,8 @@ class TxTimer(TimerEvent):
         if not self.lcb_active:
             return
 
-        self.ready(0)
         self.lcb_active = False
+        self.ready(0)
 
 
     def schedule(self, usecs, reactor):
