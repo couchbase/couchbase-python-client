@@ -115,7 +115,7 @@ static int handle_item_kv(pycbc_Item *itm,
 }
 
 static int
-handle_single_kv(pycbc_Connection *self,
+handle_single_kv(pycbc_Bucket *self,
                  struct pycbc_common_vars *cv,
                  int optype,
                  PyObject *curkey,
@@ -181,7 +181,7 @@ handle_single_kv(pycbc_Connection *self,
 
 
 static int
-handle_append_flags(pycbc_Connection *self, PyObject **flagsobj)
+handle_append_flags(pycbc_Bucket *self, PyObject **flagsobj)
 {
     unsigned long val = 0;
 
@@ -216,7 +216,7 @@ handle_append_flags(pycbc_Connection *self, PyObject **flagsobj)
 }
 
 static PyObject *
-set_common(pycbc_Connection *self,
+set_common(pycbc_Bucket *self,
            PyObject *args,
            PyObject *kwargs,
            const lcb_storage_t operation,
@@ -357,7 +357,7 @@ GT_DONE:
 }
 
 #define DECLFUNC(name, operation, mode) \
-    PyObject *pycbc_Connection_##name(pycbc_Connection *self, \
+    PyObject *pycbc_Bucket_##name(pycbc_Bucket *self, \
                                       PyObject *args, PyObject *kwargs) { \
     return set_common(self, args, kwargs, operation, mode); \
 }

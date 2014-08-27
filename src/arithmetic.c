@@ -24,7 +24,7 @@ struct arithmetic_common_vars {
 };
 
 static int
-handle_single_arith(pycbc_Connection *self,
+handle_single_arith(pycbc_Bucket *self,
                     struct pycbc_common_vars *cv,
                     int optype,
                     PyObject *curkey,
@@ -117,7 +117,7 @@ handle_single_arith(pycbc_Connection *self,
 }
 
 PyObject *
-arithmetic_common(pycbc_Connection *self,
+arithmetic_common(pycbc_Bucket *self,
                                    PyObject *args,
                                    PyObject *kwargs,
                                    int optype,
@@ -217,7 +217,7 @@ arithmetic_common(pycbc_Connection *self,
 }
 
 #define DECLFUNC(name, operation, mode) \
-    PyObject *pycbc_Connection_##name(pycbc_Connection *self, \
+    PyObject *pycbc_Bucket_##name(pycbc_Bucket *self, \
                                       PyObject *args, PyObject *kwargs) { \
     return arithmetic_common(self, args, kwargs, operation, mode); \
 }

@@ -32,7 +32,7 @@ struct getcmd_vars_st {
 };
 
 static int
-handle_single_key(pycbc_Connection *self,
+handle_single_key(pycbc_Bucket *self,
                   struct pycbc_common_vars *cv,
                   int optype,
                   PyObject *curkey,
@@ -196,7 +196,7 @@ static int handle_replica_options(int *optype,
 
 
 static PyObject*
-get_common(pycbc_Connection *self,
+get_common(pycbc_Bucket *self,
            PyObject *args,
            PyObject *kwargs,
            int optype,
@@ -346,7 +346,7 @@ GT_DONE:
 }
 
 #define DECLFUNC(name, operation, mode) \
-    PyObject *pycbc_Connection_##name(pycbc_Connection *self, \
+    PyObject *pycbc_Bucket_##name(pycbc_Bucket *self, \
                                       PyObject *args, PyObject *kwargs) { \
     return get_common(self, args, kwargs, operation, mode); \
 }

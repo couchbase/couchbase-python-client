@@ -80,7 +80,7 @@ pycbc_ObserveInfoType_init(PyObject **ptr)
 }
 
 pycbc_ObserveInfo *
-pycbc_observeinfo_new(pycbc_Connection *parent)
+pycbc_observeinfo_new(pycbc_Bucket *parent)
 {
     (void)parent;
     return (pycbc_ObserveInfo*)PyObject_CallFunction((PyObject*)&pycbc_ResultInfoType,
@@ -88,7 +88,7 @@ pycbc_observeinfo_new(pycbc_Connection *parent)
 }
 
 static int
-handle_single_observe(pycbc_Connection *self,
+handle_single_observe(pycbc_Bucket *self,
                       PyObject *curkey,
                       int ii,
                       int master_only,
@@ -126,7 +126,7 @@ handle_single_observe(pycbc_Connection *self,
 }
 
 static PyObject *
-observe_common(pycbc_Connection *self,
+observe_common(pycbc_Bucket *self,
                PyObject *args,
                PyObject *kwargs,
                int argopts)
@@ -233,13 +233,13 @@ observe_common(pycbc_Connection *self,
 }
 
 PyObject *
-pycbc_Connection_observe(pycbc_Connection *self, PyObject *args, PyObject *kw)
+pycbc_Bucket_observe(pycbc_Bucket *self, PyObject *args, PyObject *kw)
 {
     return observe_common(self, args, kw, PYCBC_ARGOPT_SINGLE);
 }
 
 PyObject *
-pycbc_Connection_observe_multi(pycbc_Connection *self, PyObject *args, PyObject *kw)
+pycbc_Bucket_observe_multi(pycbc_Bucket *self, PyObject *args, PyObject *kw)
 {
     return observe_common(self, args, kw, PYCBC_ARGOPT_MULTI);
 }

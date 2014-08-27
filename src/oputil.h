@@ -174,7 +174,7 @@ struct pycbc_common_vars {
  * Handler for iterations
  */
 typedef int (*pycbc_oputil_keyhandler)
-        (pycbc_Connection *self,
+        (pycbc_Bucket *self,
                 struct pycbc_common_vars *cv,
                 int optype,
                 PyObject *key,
@@ -282,7 +282,7 @@ int pycbc_oputil_sequence_next(pycbc_seqtype_t seqtype,
  * used to determine if the 'encvals' field should be allocated
  */
 int pycbc_common_vars_init(struct pycbc_common_vars *cv,
-                           pycbc_Connection *self,
+                           pycbc_Bucket *self,
                            int argopts,
                            Py_ssize_t ncmds,
                            size_t tsize,
@@ -300,7 +300,7 @@ int pycbc_common_vars_init(struct pycbc_common_vars *cv,
  * @param arg an opaque pointer passed to the handler
  */
 int
-pycbc_oputil_iter_multi(pycbc_Connection *self,
+pycbc_oputil_iter_multi(pycbc_Bucket *self,
                         pycbc_seqtype_t seqtype,
                         PyObject *collection,
                         struct pycbc_common_vars *cv,
@@ -313,13 +313,13 @@ pycbc_oputil_iter_multi(pycbc_Connection *self,
  * Clean up the 'common_vars' structure and free/decref any data. This
  * automatically DECREFs any PyObject enckeys and encvaks.
  */
-void pycbc_common_vars_finalize(struct pycbc_common_vars *cv, pycbc_Connection *self);
+void pycbc_common_vars_finalize(struct pycbc_common_vars *cv, pycbc_Bucket *self);
 
 /**
  * Wait for the operation to complete
  * @return 0 on success, -1 on failure.
  */
-int pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Connection *self);
+int pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Bucket *self);
 
 
 /**
@@ -327,25 +327,25 @@ int pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Connection *self)
  * initialized.
  */
 lcb_error_t
-pycbc_oputil_wait_common(pycbc_Connection *self);
+pycbc_oputil_wait_common(pycbc_Bucket *self);
 
 
 /**
  * Lock the connection (if a lockmode has been set)
  * @return 0 on success, nonzero on failure
  */
-int pycbc_oputil_conn_lock(pycbc_Connection *self);
+int pycbc_oputil_conn_lock(pycbc_Bucket *self);
 
 /**
  * Unlock the connection previously acquired by conn_lock()
  */
-void pycbc_oputil_conn_unlock(pycbc_Connection *self);
+void pycbc_oputil_conn_unlock(pycbc_Bucket *self);
 
 /**
  * Returns 1 if durability was found, 0 if durability was not found, and -1
  * on error.
  */
-int pycbc_handle_durability_args(pycbc_Connection *self,
+int pycbc_handle_durability_args(pycbc_Bucket *self,
                                  pycbc_dur_params *params,
                                  char persist_to,
                                  char replicate_to);
@@ -358,7 +358,7 @@ int pycbc_handle_durability_args(pycbc_Connection *self,
  * We might want to expand this in the future.
  */
 #define PYCBC_DECL_OP(name) \
-        PyObject* pycbc_Connection_##name(pycbc_Connection*, PyObject*, PyObject*)
+        PyObject* pycbc_Bucket_##name(pycbc_Bucket*, PyObject*, PyObject*)
 
 
 /* store.c */

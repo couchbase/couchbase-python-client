@@ -332,7 +332,7 @@ prepare_async_request(pycbc_HttpResult *htres)
 }
 
 PyObject *
-pycbc_Connection__http_request(pycbc_Connection *self,
+pycbc_Bucket__http_request(pycbc_Bucket *self,
                                PyObject *args,
                                PyObject *kwargs)
 {

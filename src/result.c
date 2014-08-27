@@ -142,7 +142,7 @@ pycbc_ResultType_init(PyObject **ptr)
 }
 
 PyObject *
-pycbc_result_new(pycbc_Connection *parent)
+pycbc_result_new(pycbc_Bucket *parent)
 {
     PyObject *obj = PyObject_CallFunction((PyObject*) &pycbc_ResultType,
                                           NULL,

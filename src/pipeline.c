@@ -17,7 +17,7 @@
 #include "oputil.h"
 
 PyObject *
-pycbc_Connection__start_pipeline(pycbc_Connection *self)
+pycbc_Bucket__start_pipeline(pycbc_Bucket *self)
 {
     if (self->pipeline_queue) {
         PYCBC_EXC_WRAP(PYCBC_EXC_PIPELINE, 0,
@@ -37,7 +37,7 @@ pycbc_Connection__start_pipeline(pycbc_Connection *self)
 }
 
 PyObject *
-pycbc_Connection__end_pipeline(pycbc_Connection *self)
+pycbc_Bucket__end_pipeline(pycbc_Bucket *self)
 {
     PyObject *rv;
     int ii;

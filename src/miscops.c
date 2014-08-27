@@ -29,7 +29,7 @@
  * This is called during each iteration of delete/unlock
  */
 static int
-handle_single_keyop(pycbc_Connection *self,
+handle_single_keyop(pycbc_Bucket *self,
                     struct pycbc_common_vars *cv,
                     int optype,
                     PyObject *curkey,
@@ -129,7 +129,7 @@ handle_single_keyop(pycbc_Connection *self,
 }
 
 static PyObject *
-keyop_common(pycbc_Connection *self,
+keyop_common(pycbc_Bucket *self,
              PyObject *args,
              PyObject *kwargs,
              int optype,
@@ -236,7 +236,7 @@ keyop_common(pycbc_Connection *self,
 
 
 PyObject *
-pycbc_Connection_endure_multi(pycbc_Connection *self,
+pycbc_Bucket_endure_multi(pycbc_Bucket *self,
                               PyObject *args,
                               PyObject *kwargs)
 {
@@ -322,7 +322,7 @@ pycbc_Connection_endure_multi(pycbc_Connection *self,
 }
 
 #define DECLFUNC(name, operation, mode) \
-    PyObject *pycbc_Connection_##name(pycbc_Connection *self, \
+    PyObject *pycbc_Bucket_##name(pycbc_Bucket *self, \
                                       PyObject *args, PyObject *kwargs) { \
     return keyop_common(self, args, kwargs, operation, mode); \
 }
@@ -334,7 +334,7 @@ DECLFUNC(unlock_multi, PYCBC_CMD_UNLOCK, PYCBC_ARGOPT_MULTI)
 
 
 PyObject *
-pycbc_Connection__stats(pycbc_Connection *self,
+pycbc_Bucket__stats(pycbc_Bucket *self,
                         PyObject *args,
                         PyObject *kwargs)
 {

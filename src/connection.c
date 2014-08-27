@@ -23,23 +23,23 @@ PyObject *pycbc_DummyTuple;
 PyObject *pycbc_DummyKeywords;
 
 static int
-Connection__init__(pycbc_Connection *self,
+Bucket__init__(pycbc_Bucket *self,
                    PyObject *args,
                    PyObject *kwargs);
 
 static PyObject*
-Connection__connect(pycbc_Connection *self);
+Bucket__connect(pycbc_Bucket *self);
 
 static void
-Connection_dtor(pycbc_Connection *self);
+Bucket_dtor(pycbc_Bucket *self);
 
-static PyTypeObject ConnectionType = {
+static PyTypeObject BucketType = {
         PYCBC_POBJ_HEAD_INIT(NULL)
         0
 };
 
 static PyObject *
-Connection_get_format(pycbc_Connection *self, void * unused)
+Bucket_get_format(pycbc_Bucket *self, void * unused)
 {
     if (self->dfl_fmt) {
         Py_INCREF(self->dfl_fmt);
@@ -51,7 +51,7 @@ Connection_get_format(pycbc_Connection *self, void * unused)
 }
 
 static int
-Connection_set_format(pycbc_Connection *self, PyObject *value, void *unused)
+Bucket_set_format(pycbc_Bucket *self, PyObject *value, void *unused)
 {
     if (value != pycbc_helpers.fmt_auto) {
         if (!PyNumber_Check(value)) {
@@ -76,9 +76,7 @@ Connection_set_format(pycbc_Connection *self, PyObject *value, void *unused)
 }
 
 static int
-Connection_set_transcoder(pycbc_Connection *self,
-                          PyObject *value,
-                          void *unused)
+Bucket_set_transcoder(pycbc_Bucket *self, PyObject *value, void *unused)
 {
     Py_XDECREF(self->tc);
     if (PyObject_IsTrue(value)) {
@@ -92,7 +90,7 @@ Connection_set_transcoder(pycbc_Connection *self,
 }
 
 static PyObject*
-Connection_get_transcoder(pycbc_Connection *self, void *unused)
+Bucket_get_transcoder(pycbc_Bucket *self, void *unused)
 {
     if (self->tc) {
         Py_INCREF(self->tc);
@@ -105,7 +103,7 @@ Connection_get_transcoder(pycbc_Connection *self, void *unused)
 }
 
 static PyObject *
-Connection_server_nodes(pycbc_Connection *self, void *unused)
+Bucket_server_nodes(pycbc_Bucket *self, void *unused)
 {
     const char * const *cnodes;
     const char **curnode;
@@ -134,7 +132,7 @@ Connection_server_nodes(pycbc_Connection *self, void *unused)
 }
 
 static PyObject *
-Connection_get_configured_replica_count(pycbc_Connection *self, void *unused)
+Bucket_get_configured_replica_count(pycbc_Bucket *self, void *unused)
 {
     PyObject *iret = pycbc_IntFromUL(lcb_get_num_replicas(self->instance));
 
@@ -143,7 +141,7 @@ Connection_get_configured_replica_count(pycbc_Connection *self, void *unused)
 }
 
 static PyObject *
-Connection_connected(pycbc_Connection *self, void *unused)
+Bucket_connected(pycbc_Bucket *self, void *unused)
 {
     PyObject* ret = self->flags & PYCBC_CONN_F_CONNECTED ? Py_True : Py_False;
 
@@ -165,7 +163,7 @@ Connection_connected(pycbc_Connection *self, void *unused)
 }
 
 static PyObject *
-Connection__instance_pointer(pycbc_Connection *self, void *unused)
+Bucket__instance_pointer(pycbc_Bucket *self, void *unused)
 {
     PyObject *ret;
     Py_uintptr_t ptri = (Py_uintptr_t)self->instance;
@@ -175,22 +173,7 @@ Connection__instance_pointer(pycbc_Connection *self, void *unused)
 }
 
 static PyObject *
-Connection_lcb_version(pycbc_Connection *self)
-{
-    const char *verstr;
-    lcb_uint32_t vernum;
-    PyObject *ret;
-
-    verstr = lcb_get_version(&vernum);
-    ret = Py_BuildValue("(s,k)", verstr, vernum);
-
-    (void)self;
-
-    return ret;
-}
-
-static PyObject *
-Connection__thr_lockop(pycbc_Connection *self, PyObject *arg)
+Bucket__thr_lockop(pycbc_Bucket *self, PyObject *arg)
 {
     int rv;
     int is_unlock = 0;
@@ -218,7 +201,7 @@ Connection__thr_lockop(pycbc_Connection *self, PyObject *arg)
 }
 
 static PyObject *
-Connection__close(pycbc_Connection *self)
+Bucket__close(pycbc_Bucket *self)
 {
     lcb_error_t err;
 
@@ -279,7 +262,7 @@ timings_callback(lcb_t instance,
 }
 
 static PyObject *
-Connection__start_timings(pycbc_Connection *self)
+Bucket__start_timings(pycbc_Bucket *self)
 {
     lcb_disable_timings(self->instance);
     lcb_enable_timings(self->instance);
@@ -287,14 +270,14 @@ Connection__start_timings(pycbc_Connection *self)
 }
 
 static PyObject *
-Connection__clear_timings(pycbc_Connection *self)
+Bucket__clear_timings(pycbc_Bucket *self)
 {
     lcb_disable_timings(self->instance);
     Py_RETURN_NONE;
 }
 
 static PyObject *
-Connection__get_timings(pycbc_Connection *self)
+Bucket__get_timings(pycbc_Bucket *self)
 {
     PyObject *ll = PyList_New(0);
     lcb_get_timings(self->instance, ll, timings_callback);
@@ -302,27 +285,27 @@ Connection__get_timings(pycbc_Connection *self)
 }
 
 
-static PyGetSetDef Connection_TABLE_getset[] = {
+static PyGetSetDef Bucket_TABLE_getset[] = {
         { "default_format",
-                (getter)Connection_get_format,
-                (setter)Connection_set_format,
+                (getter)Bucket_get_format,
+                (setter)Bucket_set_format,
                 PyDoc_STR("The default format to use for encoding values "
                 "(passed to transcoder)")
         },
         { "server_nodes",
-                (getter)Connection_server_nodes,
+                (getter)Bucket_server_nodes,
                 NULL,
                 PyDoc_STR("Get a list of the current nodes in the cluster")
         },
         { "configured_replica_count",
-                (getter)Connection_get_configured_replica_count,
+                (getter)Bucket_get_configured_replica_count,
                 NULL,
                 PyDoc_STR("Get the number of configured replicas for the bucket")
         },
 
         { "transcoder",
-                (getter)Connection_get_transcoder,
-                (setter)Connection_set_transcoder,
+                (getter)Bucket_get_transcoder,
+                (setter)Bucket_set_transcoder,
                 PyDoc_STR("The :class:`~couchbase.transcoder.Transcoder` "
                         "object being used.\n\n"
                         ""
@@ -332,7 +315,7 @@ static PyGetSetDef Connection_TABLE_getset[] = {
         },
 
         { "connected",
-                (getter)Connection_connected,
+                (getter)Bucket_connected,
                 NULL,
                 PyDoc_STR("Boolean read only property indicating whether\n"
                         "this instance has been connected.\n"
@@ -342,7 +325,7 @@ static PyGetSetDef Connection_TABLE_getset[] = {
         },
 
         { "_instance_pointer",
-                (getter)Connection__instance_pointer,
+                (getter)Bucket__instance_pointer,
                 NULL,
                 PyDoc_STR("Gets the C level pointer for the underlying C "
                          "handle")
@@ -351,8 +334,8 @@ static PyGetSetDef Connection_TABLE_getset[] = {
         { NULL }
 };
 
-static struct PyMemberDef Connection_TABLE_members[] = {
-        { "quiet", T_UINT, offsetof(pycbc_Connection, quiet),
+static struct PyMemberDef Bucket_TABLE_members[] = {
+        { "quiet", T_UINT, offsetof(pycbc_Bucket, quiet),
                 0,
                 PyDoc_STR("Whether to suppress errors when keys are not found "
                 "(in :meth:`get` and :meth:`delete` operations).\n"
@@ -361,13 +344,13 @@ static struct PyMemberDef Connection_TABLE_members[] = {
                 "object")
         },
 
-        { "data_passthrough", T_UINT, offsetof(pycbc_Connection, data_passthrough),
+        { "data_passthrough", T_UINT, offsetof(pycbc_Bucket, data_passthrough),
                 0,
                 PyDoc_STR("When this flag is set, values are always returned "
                         "as raw bytes\n")
         },
 
-        { "unlock_gil", T_UINT, offsetof(pycbc_Connection, unlock_gil),
+        { "unlock_gil", T_UINT, offsetof(pycbc_Bucket, unlock_gil),
                 READONLY,
                 PyDoc_STR("Whether GIL manipulation is enabeld for "
                 "this connection object.\n"
@@ -375,52 +358,52 @@ static struct PyMemberDef Connection_TABLE_members[] = {
                 "This attribute can only be set from the constructor.\n")
         },
 
-        { "bucket", T_OBJECT_EX, offsetof(pycbc_Connection, bucket),
+        { "bucket", T_OBJECT_EX, offsetof(pycbc_Bucket, bucket),
                 READONLY,
                 PyDoc_STR("Name of the bucket this object is connected to")
         },
 
-        { "lockmode", T_INT, offsetof(pycbc_Connection, lockmode),
+        { "lockmode", T_INT, offsetof(pycbc_Bucket, lockmode),
                 READONLY,
                 PyDoc_STR("How access from multiple threads is handled.\n"
                         "See :ref:`multiple_threads` for more information\n")
         },
 
-        { "_privflags", T_UINT, offsetof(pycbc_Connection, flags),
+        { "_privflags", T_UINT, offsetof(pycbc_Bucket, flags),
                 0,
                 PyDoc_STR("Internal flags.")
         },
 
-        { "_conncb", T_OBJECT_EX, offsetof(pycbc_Connection, conncb),
+        { "_conncb", T_OBJECT_EX, offsetof(pycbc_Bucket, conncb),
                 0,
                 PyDoc_STR("Internal connection callback.")
         },
 
-        { "_dtorcb", T_OBJECT_EX, offsetof(pycbc_Connection, dtorcb),
+        { "_dtorcb", T_OBJECT_EX, offsetof(pycbc_Bucket, dtorcb),
                 0,
                 PyDoc_STR("Internal destruction callback")
         },
 
         { "_dur_persist_to", T_BYTE,
-                offsetof(pycbc_Connection, dur_global.persist_to),
+                offsetof(pycbc_Bucket, dur_global.persist_to),
                 0,
                 PyDoc_STR("Internal default persistence settings")
         },
 
         { "_dur_replicate_to", T_BYTE,
-                offsetof(pycbc_Connection, dur_global.replicate_to),
+                offsetof(pycbc_Bucket, dur_global.replicate_to),
                 0,
                 PyDoc_STR("Internal default replication settings")
         },
 
         { "_dur_timeout", T_ULONG,
-                offsetof(pycbc_Connection, dur_timeout),
+                offsetof(pycbc_Bucket, dur_timeout),
                 0,
                 PyDoc_STR("Internal ")
         },
 
         { "_dur_testhook", T_OBJECT_EX,
-                offsetof(pycbc_Connection, dur_testhook),
+                offsetof(pycbc_Bucket, dur_testhook),
                 0,
                 PyDoc_STR("Internal hook for durability tests")
         },
@@ -428,10 +411,10 @@ static struct PyMemberDef Connection_TABLE_members[] = {
         { NULL }
 };
 
-static PyMethodDef Connection_TABLE_methods[] = {
+static PyMethodDef Bucket_TABLE_methods[] = {
 
 #define OPFUNC(name, doc) \
-{ #name, (PyCFunction)pycbc_Connection_##name, METH_VARARGS|METH_KEYWORDS, \
+{ #name, (PyCFunction)pycbc_Bucket_##name, METH_VARARGS|METH_KEYWORDS, \
     PyDoc_STR(doc) }
 
         /** Basic Operations */
@@ -478,36 +461,16 @@ static PyMethodDef Connection_TABLE_methods[] = {
 
 #undef OPFUNC
 
-        { "lcb_version",
-                (PyCFunction)Connection_lcb_version,
-                METH_NOARGS|METH_STATIC,
-                PyDoc_STR(
-                "Get `libcouchbase` version information\n"
-                "\n"
-                ":return: a tuple of ``(version_string, version_number)``\n"
-                "  corresponding to the underlying libcouchbase version\n"
-
-                "Show the versions ::\n" \
-                "   \n"
-                "   verstr, vernum = Connection.lcb_version()\n"
-                "   print('0x{0:x}'.format(vernum))\n"
-                "   # 0x020005\n"
-                "   \n"
-                "   print(verstr)\n"
-                "   # 2.0.5\n"
-                "\n"
-                "\n")
-        },
 
         { "_thr_lockop",
-                (PyCFunction)Connection__thr_lockop,
+                (PyCFunction)Bucket__thr_lockop,
                 METH_VARARGS,
                 PyDoc_STR("Unconditionally lock/unlock the connection object "
                         "if 'lockmode' has been set. For testing uses only")
         },
 
         { "_close",
-                (PyCFunction)Connection__close,
+                (PyCFunction)Bucket__close,
                 METH_NOARGS,
                 PyDoc_STR(
                 "Close the instance's underlying socket resources\n"
@@ -518,7 +481,7 @@ static PyMethodDef Connection_TABLE_methods[] = {
         },
 
         { "_connect",
-                (PyCFunction)Connection__connect,
+                (PyCFunction)Bucket__connect,
                 METH_NOARGS,
                 PyDoc_STR(
                 "Connect this instance. This is typically called by one of\n"
@@ -526,44 +489,44 @@ static PyMethodDef Connection_TABLE_methods[] = {
         },
 
         { "_pipeline_begin",
-                (PyCFunction)pycbc_Connection__start_pipeline,
+                (PyCFunction)pycbc_Bucket__start_pipeline,
                 METH_NOARGS,
                 PyDoc_STR("Enter pipeline mode. Internal use")
         },
 
         { "_pipeline_end",
-                (PyCFunction)pycbc_Connection__end_pipeline,
+                (PyCFunction)pycbc_Bucket__end_pipeline,
                 METH_NOARGS,
                 PyDoc_STR(
                 "End pipeline mode and wait for operations to complete")
         },
 
         { "_start_timings",
-                (PyCFunction)Connection__start_timings,
+                (PyCFunction)Bucket__start_timings,
                 METH_NOARGS,
                 PyDoc_STR("Start recording timings")
         },
 
         { "_get_timings",
-                (PyCFunction)Connection__get_timings,
+                (PyCFunction)Bucket__get_timings,
                 METH_NOARGS,
                 PyDoc_STR("Get all timings since the last call to start_timings")
         },
 
         { "_stop_timings",
-                (PyCFunction)Connection__clear_timings,
+                (PyCFunction)Bucket__clear_timings,
                 METH_NOARGS,
                 PyDoc_STR("Clear and disable timings")
         },
 
         { "_cntl",
-                (PyCFunction)pycbc_Connection__cntl,
+                (PyCFunction)pycbc_Bucket__cntl,
                 METH_VARARGS|METH_KEYWORDS,
                 NULL
         },
 
         { "_vbmap",
-                (PyCFunction)pycbc_Connection__vbmap,
+                (PyCFunction)pycbc_Bucket__vbmap,
                 METH_VARARGS,
                 PyDoc_STR("Returns a tuple of (vbucket, server index) for a key")
         },
@@ -572,7 +535,7 @@ static PyMethodDef Connection_TABLE_methods[] = {
 };
 
 static int
-Connection__init__(pycbc_Connection *self,
+Bucket__init__(pycbc_Bucket *self,
                        PyObject *args, PyObject *kwargs)
 {
     int rv;
@@ -658,14 +621,14 @@ Connection__init__(pycbc_Connection *self,
         Py_INCREF(dfl_fmt); /* later decref */
     }
 
-    rv = Connection_set_format(self, dfl_fmt, NULL);
+    rv = Bucket_set_format(self, dfl_fmt, NULL);
     Py_XDECREF(dfl_fmt);
     if (rv == -1) {
         return rv;
     }
 
     /** Set the transcoder */
-    if (tc && Connection_set_transcoder(self, tc, NULL) == -1) {
+    if (tc && Bucket_set_transcoder(self, tc, NULL) == -1) {
         return -1;
     }
 
@@ -706,7 +669,7 @@ Connection__init__(pycbc_Connection *self,
 }
 
 static PyObject*
-Connection__connect(pycbc_Connection *self)
+Bucket__connect(pycbc_Bucket *self)
 {
     lcb_error_t err;
 
@@ -734,7 +697,7 @@ Connection__connect(pycbc_Connection *self)
 }
 
 static void
-Connection_dtor(pycbc_Connection *self)
+Bucket_dtor(pycbc_Bucket *self)
 {
     if (self->instance) {
         lcb_set_cookie(self->instance, NULL);
@@ -767,28 +730,28 @@ Connection_dtor(pycbc_Connection *self)
 }
 
 int
-pycbc_ConnectionType_init(PyObject **ptr)
+pycbc_BucketType_init(PyObject **ptr)
 {
-    PyTypeObject *p = &ConnectionType;
+    PyTypeObject *p = &BucketType;
     *ptr = (PyObject*)p;
 
     if (p->tp_name) {
         return 0;
     }
 
-    p->tp_name = "Connection";
+    p->tp_name = "Bucket";
     p->tp_new = PyType_GenericNew;
-    p->tp_init = (initproc)Connection__init__;
-    p->tp_dealloc = (destructor)Connection_dtor;
+    p->tp_init = (initproc)Bucket__init__;
+    p->tp_dealloc = (destructor)Bucket_dtor;
 
     p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
     p->tp_doc = PyDoc_STR("The connection object");
 
-    p->tp_basicsize = sizeof(pycbc_Connection);
+    p->tp_basicsize = sizeof(pycbc_Bucket);
 
-    p->tp_methods = Connection_TABLE_methods;
-    p->tp_members = Connection_TABLE_members;
-    p->tp_getset = Connection_TABLE_getset;
+    p->tp_methods = Bucket_TABLE_methods;
+    p->tp_members = Bucket_TABLE_members;
+    p->tp_getset = Bucket_TABLE_getset;
 
     pycbc_DummyTuple = PyTuple_New(0);
     pycbc_DummyKeywords = PyDict_New();

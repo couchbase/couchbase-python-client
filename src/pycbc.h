@@ -330,7 +330,7 @@ typedef struct {
     pycbc_dur_params dur_global;
     unsigned long dur_timeout;
 
-} pycbc_Connection;
+} pycbc_Bucket;
 
 
 /*****************
@@ -404,7 +404,7 @@ typedef struct {
     lcb_http_request_t htreq;
 
 
-    pycbc_Connection *parent;
+    pycbc_Bucket *parent;
     long rows_per_call;
     unsigned short htcode;
     unsigned short format;
@@ -454,7 +454,7 @@ typedef struct pycbc_MultiResult_st {
     PYCBC_MULTIRESULT_BASE;
 
     /** parent Connection object */
-    pycbc_Connection *parent;
+    pycbc_Bucket *parent;
 
     /**
      * A list of fatal exceptions, i.e. ones not resulting from a bad
@@ -718,7 +718,7 @@ void pycbc_init_pyconstants(PyObject *module);
 PyObject *pycbc_lcb_errstr(lcb_t instance, lcb_error_t err);
 
 int pycbc_ResultType_init(PyObject **ptr);
-int pycbc_ConnectionType_init(PyObject **ptr);
+int pycbc_BucketType_init(PyObject **ptr);
 int pycbc_MultiResultType_init(PyObject **ptr);
 int pycbc_ValueResultType_init(PyObject **ptr);
 int pycbc_OperationResultType_init(PyObject **ptr);
@@ -740,15 +740,15 @@ int pycbc_AsyncResultType_init(PyObject **ptr);
 /**
  * Allocators for result functions. See callbacks.c:get_common
  */
-PyObject *pycbc_result_new(pycbc_Connection *parent);
-PyObject *pycbc_multiresult_new(pycbc_Connection *parent);
-pycbc_ValueResult *pycbc_valresult_new(pycbc_Connection *parent);
-pycbc_OperationResult *pycbc_opresult_new(pycbc_Connection *parent);
-pycbc_HttpResult *pycbc_httpresult_new(pycbc_Connection *parent);
-pycbc_Item *pycbc_item_new(pycbc_Connection *parent);
+PyObject *pycbc_result_new(pycbc_Bucket *parent);
+PyObject *pycbc_multiresult_new(pycbc_Bucket *parent);
+pycbc_ValueResult *pycbc_valresult_new(pycbc_Bucket *parent);
+pycbc_OperationResult *pycbc_opresult_new(pycbc_Bucket *parent);
+pycbc_HttpResult *pycbc_httpresult_new(pycbc_Bucket *parent);
+pycbc_Item *pycbc_item_new(pycbc_Bucket *parent);
 
 /* For observe info */
-pycbc_ObserveInfo * pycbc_observeinfo_new(pycbc_Connection *parent);
+pycbc_ObserveInfo * pycbc_observeinfo_new(pycbc_Bucket *parent);
 
 /**
  * If an HTTP result was successful or not
@@ -890,7 +890,7 @@ int pycbc_handle_assert(const char *msg, const char* file, int line);
  * @return
  * 0 on success, nonzero on error
  */
-int pycbc_tc_encode_key(pycbc_Connection *conn,
+int pycbc_tc_encode_key(pycbc_Bucket *conn,
                         PyObject **key,
                         void **buf,
                         size_t *nbuf);
@@ -906,7 +906,7 @@ int pycbc_tc_encode_key(pycbc_Connection *conn,
  * @return
  * 0 on success, nonzero on error
  */
-int pycbc_tc_decode_key(pycbc_Connection *conn,
+int pycbc_tc_decode_key(pycbc_Bucket *conn,
                         const void *key,
                         size_t nkey,
                         PyObject **pobj);
@@ -922,7 +922,7 @@ int pycbc_tc_decode_key(pycbc_Connection *conn,
  * @param flags pointer to a flags variable, will be set with the appropriate
  * flags
  */
-int pycbc_tc_encode_value(pycbc_Connection *conn,
+int pycbc_tc_encode_value(pycbc_Bucket *conn,
                           PyObject **value,
                           PyObject *flag_v,
                           void **buf,
@@ -937,7 +937,7 @@ int pycbc_tc_encode_value(pycbc_Connection *conn,
  * @param flags flags as received from the server
  * @param pobj the pythonized value
  */
-int pycbc_tc_decode_value(pycbc_Connection *conn,
+int pycbc_tc_decode_value(pycbc_Bucket *conn,
                           const void *value,
                           size_t nvalue,
                           lcb_uint32_t flags,
@@ -968,29 +968,29 @@ PyObject *
 pycbc_tc_determine_format(PyObject *value);
 
 /** IOPS Initializer */
-lcb_io_opt_t pycbc_iops_new(pycbc_Connection *conn, PyObject *pyio);
+lcb_io_opt_t pycbc_iops_new(pycbc_Bucket *conn, PyObject *pyio);
 void pycbc_iops_free(lcb_io_opt_t io);
 PyObject * pycbc_event_new(void);
 
 /**
  * Event callback handling
  */
-void pycbc_invoke_connected_event(pycbc_Connection *conn, lcb_error_t err);
+void pycbc_invoke_connected_event(pycbc_Bucket *conn, lcb_error_t err);
 
 /**
  * Schedule the dtor event
  */
-void pycbc_schedule_dtor_event(pycbc_Connection *self);
+void pycbc_schedule_dtor_event(pycbc_Bucket *self);
 
 /**
  * Pipeline handlers
  */
-PyObject* pycbc_Connection__start_pipeline(pycbc_Connection *);
-PyObject* pycbc_Connection__end_pipeline(pycbc_Connection *);
+PyObject* pycbc_Bucket__start_pipeline(pycbc_Bucket *);
+PyObject* pycbc_Bucket__end_pipeline(pycbc_Bucket *);
 
 /**
  * Control methods
  */
-PyObject* pycbc_Connection__cntl(pycbc_Connection *, PyObject *, PyObject *);
-PyObject* pycbc_Connection__vbmap(pycbc_Connection *, PyObject *);
+PyObject* pycbc_Bucket__cntl(pycbc_Bucket *, PyObject *, PyObject *);
+PyObject* pycbc_Bucket__vbmap(pycbc_Bucket *, PyObject *);
 #endif /* PYCBC_H_ */

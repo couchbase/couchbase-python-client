@@ -17,7 +17,7 @@
 #include "oputil.h"
 
 void
-pycbc_common_vars_finalize(struct pycbc_common_vars *cv, pycbc_Connection *conn)
+pycbc_common_vars_finalize(struct pycbc_common_vars *cv, pycbc_Bucket *conn)
 {
     int ii;
     if (cv->enckeys) {
@@ -51,7 +51,7 @@ pycbc_common_vars_finalize(struct pycbc_common_vars *cv, pycbc_Connection *conn)
 }
 
 int
-pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Connection *self)
+pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Bucket *self)
 {
     Py_ssize_t nsched = cv->is_seqcmd ? 1 : cv->ncmds;
     self->nremaining += nsched;
@@ -96,7 +96,7 @@ pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Connection *self)
 
 int
 pycbc_common_vars_init(struct pycbc_common_vars *cv,
-                       pycbc_Connection *self,
+                       pycbc_Bucket *self,
                        int argopts,
                        Py_ssize_t ncmds,
                        size_t tsize,
@@ -388,7 +388,7 @@ extract_item_params(struct pycbc_common_vars *cv,
 }
 
 int
-pycbc_oputil_iter_multi(pycbc_Connection *self,
+pycbc_oputil_iter_multi(pycbc_Bucket *self,
                         pycbc_seqtype_t seqtype,
                         PyObject *collection,
                         struct pycbc_common_vars *cv,
@@ -447,7 +447,7 @@ pycbc_oputil_iter_multi(pycbc_Connection *self,
 }
 
 int
-pycbc_oputil_conn_lock(pycbc_Connection *self)
+pycbc_oputil_conn_lock(pycbc_Bucket *self)
 {
     int status;
     int mode;
@@ -484,7 +484,7 @@ pycbc_oputil_conn_lock(pycbc_Connection *self)
 }
 
 void
-pycbc_oputil_conn_unlock(pycbc_Connection *self)
+pycbc_oputil_conn_unlock(pycbc_Bucket *self)
 {
     if (!self->lockmode) {
         return;
@@ -493,7 +493,7 @@ pycbc_oputil_conn_unlock(pycbc_Connection *self)
 }
 
 lcb_error_t
-pycbc_oputil_wait_common(pycbc_Connection *self)
+pycbc_oputil_wait_common(pycbc_Bucket *self)
 {
     lcb_error_t ret;
     /**
@@ -523,7 +523,7 @@ pycbc_oputil_wait_common(pycbc_Connection *self)
  * on error.
  */
 int
-pycbc_handle_durability_args(pycbc_Connection *self,
+pycbc_handle_durability_args(pycbc_Bucket *self,
                              pycbc_dur_params *params,
                              char persist_to,
                              char replicate_to)

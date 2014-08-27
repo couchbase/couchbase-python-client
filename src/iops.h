@@ -83,7 +83,7 @@ typedef struct pycbc_iops_st {
     /** Python object being used */
     PyObject *pyio;
 
-    pycbc_Connection *parent;
+    pycbc_Bucket *parent;
 
     /** Whether the loop is currently active */
     int in_loop;

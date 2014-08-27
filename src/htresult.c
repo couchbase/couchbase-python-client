@@ -93,7 +93,7 @@ HttpResult_done(pycbc_HttpResult *self, void *unused)
 static void
 HttpResult_dealloc(pycbc_HttpResult *self)
 {
-    pycbc_Connection *parent = self->parent;
+    pycbc_Bucket *parent = self->parent;
 
     self->parent = NULL;
 
@@ -212,7 +212,7 @@ pycbc_HttpResultType_init(PyObject **ptr)
 }
 
 pycbc_HttpResult *
-pycbc_httpresult_new(pycbc_Connection *parent)
+pycbc_httpresult_new(pycbc_Bucket *parent)
 {
     pycbc_HttpResult* ret = (pycbc_HttpResult*)
             PyObject_CallFunction((PyObject*)&pycbc_HttpResultType, NULL, NULL);

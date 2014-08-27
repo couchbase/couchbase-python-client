@@ -163,6 +163,21 @@ _libcouchbase_strerror(PyObject *self, PyObject *args, PyObject *kw)
     return pycbc_lcb_errstr(NULL, rc);
 }
 
+static PyObject *
+pycbc_lcb_version(pycbc_Bucket *self)
+{
+    const char *verstr;
+    lcb_uint32_t vernum;
+    PyObject *ret;
+
+    verstr = lcb_get_version(&vernum);
+    ret = Py_BuildValue("(s,k)", verstr, vernum);
+
+    (void)self;
+
+    return ret;
+}
+
 static PyMethodDef _libcouchbase_methods[] = {
         { "_init_helpers", (PyCFunction)_libcouchbase_init_helpers,
                 METH_VARARGS|METH_KEYWORDS,
@@ -183,6 +198,26 @@ static PyMethodDef _libcouchbase_methods[] = {
         { "_get_errtype", (PyCFunction) pycbc_exc_get_categories,
                 METH_VARARGS,
                 "Get error categories for a given code"
+        },
+        { "lcb_version",
+                (PyCFunction)pycbc_lcb_version,
+                METH_NOARGS,
+                PyDoc_STR(
+                "Get `libcouchbase` version information\n"
+                "\n"
+                ":return: a tuple of ``(version_string, version_number)``\n"
+                "  corresponding to the underlying libcouchbase version\n"
+
+                "Show the versions ::\n" \
+                "   \n"
+                "   verstr, vernum = Connection.lcb_version()\n"
+                "   print('0x{0:x}'.format(vernum))\n"
+                "   # 0x020005\n"
+                "   \n"
+                "   print(verstr)\n"
+                "   # 2.0.5\n"
+                "\n"
+                "\n")
         },
         { NULL }
 };
@@ -228,7 +263,7 @@ init_libcouchbase(void)
      * function used to initialize it
      */
 #define X_PYTYPES(X) \
-    X(Connection,       pycbc_ConnectionType_init) \
+    X(Connection,       pycbc_BucketType_init) \
     /** Remember to keep base classes in order */ \
     X(Result,           pycbc_ResultType_init) \
     X(OperationResult,  pycbc_OperationResultType_init) \

@@ -21,14 +21,14 @@
 #ifdef CB_THREADS
 
 static void
-cb_thr_end(pycbc_Connection *self)
+cb_thr_end(pycbc_Bucket *self)
 {
     PYCBC_CONN_THR_END(self);
     Py_INCREF((PyObject *)self);
 }
 
 static void
-cb_thr_begin(pycbc_Connection *self)
+cb_thr_begin(pycbc_Bucket *self)
 {
     if (Py_REFCNT(self) > 1) {
         Py_DECREF(self);
@@ -123,7 +123,7 @@ maybe_push_operr(pycbc_MultiResult *mres,
 
 
 static void
-operation_completed(pycbc_Connection *self, pycbc_MultiResult *mres)
+operation_completed(pycbc_Bucket *self, pycbc_MultiResult *mres)
 {
     pycbc_assert(self->nremaining);
     --self->nremaining;
@@ -150,7 +150,7 @@ get_common_objects(PyObject *cookie,
                    const void *key,
                    size_t nkey,
                    lcb_error_t err,
-                   pycbc_Connection **conn,
+                   pycbc_Bucket **conn,
                    pycbc_Result **res,
                    int restype,
                    pycbc_MultiResult **mres)
@@ -249,7 +249,7 @@ durability_callback(lcb_t instance,
                     lcb_error_t err,
                     const lcb_durability_resp_t *resp)
 {
-    pycbc_Connection *conn;
+    pycbc_Bucket *conn;
     pycbc_OperationResult *res;
     pycbc_MultiResult *mres;
     int rv;
@@ -286,7 +286,7 @@ durability_callback(lcb_t instance,
 }
 
 static void
-invoke_endure_test_notification(pycbc_Connection *self, pycbc_Result *resp)
+invoke_endure_test_notification(pycbc_Bucket *self, pycbc_Result *resp)
 {
     PyObject *ret;
     PyObject *argtuple = Py_BuildValue("(O)", resp);
@@ -304,7 +304,7 @@ static void
 dur_opres_common(const void *cookie, lcb_error_t err,
                  const void *key, lcb_size_t nkey, lcb_cas_t cas, int is_delete)
 {
-    pycbc_Connection *conn;
+    pycbc_Bucket *conn;
     pycbc_OperationResult *res = NULL;
     pycbc_MultiResult *mres;
     lcb_durability_opts_t dopts = { 0 };
@@ -387,7 +387,7 @@ get_callback(lcb_t instance,
 {
 
     int rv;
-    pycbc_Connection *conn = NULL;
+    pycbc_Bucket *conn = NULL;
     pycbc_ValueResult *res = NULL;
     pycbc_MultiResult *mres = NULL;
     lcb_uint32_t eflags;
@@ -458,7 +458,7 @@ arithmetic_callback(lcb_t instance,
                     const lcb_arithmetic_resp_t *resp)
 {
     int rv;
-    pycbc_Connection *conn = NULL;
+    pycbc_Bucket *conn = NULL;
     pycbc_ValueResult *res = NULL;
     pycbc_MultiResult *mres = NULL;
 
@@ -492,7 +492,7 @@ unlock_callback(lcb_t instance,
                 const lcb_unlock_resp_t *resp)
 {
     int rv;
-    pycbc_Connection *conn = NULL;
+    pycbc_Bucket *conn = NULL;
     pycbc_OperationResult *res = NULL;
     pycbc_MultiResult *mres = NULL;
 
@@ -521,7 +521,7 @@ touch_callback(lcb_t instance,
                const lcb_touch_resp_t *resp)
 {
     int rv;
-    pycbc_Connection *conn = NULL;
+    pycbc_Bucket *conn = NULL;
     pycbc_OperationResult *res = NULL;
     pycbc_MultiResult *mres = NULL;
 
@@ -562,7 +562,7 @@ stat_callback(lcb_t instance,
     CB_THR_END(mres->parent);
 
     if (!resp->v.v0.server_endpoint) {
-        pycbc_Connection *parent = mres->parent;
+        pycbc_Bucket *parent = mres->parent;
         operation_completed(mres->parent, mres);
         CB_THR_BEGIN(parent);
         return;
@@ -624,7 +624,7 @@ observe_callback(lcb_t instance,
 {
     int rv;
     pycbc_ObserveInfo *oi;
-    pycbc_Connection *conn;
+    pycbc_Bucket *conn;
     pycbc_ValueResult *vres;
     pycbc_MultiResult *mres;
 
@@ -673,9 +673,9 @@ observe_callback(lcb_t instance,
 }
 
 static int
-start_global_callback(lcb_t instance, pycbc_Connection **selfptr)
+start_global_callback(lcb_t instance, pycbc_Bucket **selfptr)
 {
-    *selfptr = (pycbc_Connection *)lcb_get_cookie(instance);
+    *selfptr = (pycbc_Bucket *)lcb_get_cookie(instance);
     if (!*selfptr) {
         return 0;
     }
@@ -685,11 +685,11 @@ start_global_callback(lcb_t instance, pycbc_Connection **selfptr)
 }
 
 static void
-end_global_callback(lcb_t instance, pycbc_Connection *self)
+end_global_callback(lcb_t instance, pycbc_Bucket *self)
 {
     Py_DECREF((PyObject *)(self));
 
-    self = (pycbc_Connection *)lcb_get_cookie(instance);
+    self = (pycbc_Bucket *)lcb_get_cookie(instance);
     if (self) {
         CB_THR_BEGIN(self);
     }
@@ -698,7 +698,7 @@ end_global_callback(lcb_t instance, pycbc_Connection *self)
 static void
 bootstrap_callback(lcb_t instance, lcb_error_t err)
 {
-    pycbc_Connection *self;
+    pycbc_Bucket *self;
 
     if (!start_global_callback(instance, &self)) {
         return;

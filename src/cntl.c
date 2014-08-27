@@ -264,7 +264,7 @@ convert_object_output(CTLTYPE t, void *retval)
 }
 
 static PyObject *
-handle_old_ctl(pycbc_Connection *self, int cmd, PyObject *val)
+handle_old_ctl(pycbc_Bucket *self, int cmd, PyObject *val)
 {
     PyObject *ret = NULL;
     int mode = (val == NULL) ? CNTL_GET : CNTL_SET;
@@ -313,7 +313,7 @@ handle_old_ctl(pycbc_Connection *self, int cmd, PyObject *val)
 }
 
 PyObject *
-pycbc_Connection__cntl(pycbc_Connection *self, PyObject *args, PyObject *kwargs)
+pycbc_Bucket__cntl(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
 {
     int cmd = 0;
     CTLTYPE type = CTL_TYPE_COMPAT;
@@ -365,7 +365,7 @@ pycbc_Connection__cntl(pycbc_Connection *self, PyObject *args, PyObject *kwargs)
 }
 
 PyObject *
-pycbc_Connection__vbmap(pycbc_Connection *conn, PyObject *args)
+pycbc_Bucket__vbmap(pycbc_Bucket *conn, PyObject *args)
 {
     pycbc_strlen_t slen = 0;
     const char *s = NULL;

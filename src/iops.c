@@ -522,7 +522,7 @@ cache_io_methods(pycbc_iops_t *pio, PyObject *obj)
 }
 
 lcb_io_opt_t
-pycbc_iops_new(pycbc_Connection *unused, PyObject *pyio)
+pycbc_iops_new(pycbc_Bucket *unused, PyObject *pyio)
 {
     lcb_io_opt_t ret = NULL;
     lcb_io_opt_t dfl = NULL;

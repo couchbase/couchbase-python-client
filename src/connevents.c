@@ -21,7 +21,7 @@
 #include "iops.h"
 
 void
-pycbc_invoke_connected_event(pycbc_Connection *conn, lcb_error_t err)
+pycbc_invoke_connected_event(pycbc_Bucket *conn, lcb_error_t err)
 {
     PyObject *argtuple;
     PyObject *arg;
@@ -100,7 +100,7 @@ dtor_callback(const void *arg)
 }
 
 void
-pycbc_schedule_dtor_event(pycbc_Connection *self)
+pycbc_schedule_dtor_event(pycbc_Bucket *self)
 {
     struct dtor_info_st *dti;
 

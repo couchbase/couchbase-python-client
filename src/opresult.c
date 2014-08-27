@@ -220,7 +220,7 @@ int pycbc_ItemType_init(PyObject **ptr)
 }
 
 pycbc_ValueResult *
-pycbc_valresult_new(pycbc_Connection *parent)
+pycbc_valresult_new(pycbc_Bucket *parent)
 {
     (void)parent;
     return (pycbc_ValueResult*)
@@ -228,7 +228,7 @@ pycbc_valresult_new(pycbc_Connection *parent)
 }
 
 pycbc_OperationResult *
-pycbc_opresult_new(pycbc_Connection *parent)
+pycbc_opresult_new(pycbc_Bucket *parent)
 {
     (void)parent;
     return (pycbc_OperationResult*)
@@ -236,7 +236,7 @@ pycbc_opresult_new(pycbc_Connection *parent)
 }
 
 pycbc_Item *
-pycbc_item_new(pycbc_Connection *parent)
+pycbc_item_new(pycbc_Bucket *parent)
 {
     (void)parent;
     return (pycbc_Item *)

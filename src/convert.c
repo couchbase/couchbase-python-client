@@ -251,7 +251,7 @@ enum {
     DECODE_VALUE
 };
 static int
-do_call_tc(pycbc_Connection *conn,
+do_call_tc(pycbc_Bucket *conn,
           PyObject *obj,
           PyObject *flags,
           PyObject **result,
@@ -311,7 +311,7 @@ do_call_tc(pycbc_Connection *conn,
 
 
 int
-pycbc_tc_encode_key(pycbc_Connection *conn,
+pycbc_tc_encode_key(pycbc_Bucket *conn,
                     PyObject **key,
                     void **buf,
                     size_t *nbuf)
@@ -364,7 +364,7 @@ pycbc_tc_encode_key(pycbc_Connection *conn,
 }
 
 int
-pycbc_tc_decode_key(pycbc_Connection *conn,
+pycbc_tc_decode_key(pycbc_Bucket *conn,
                      const void *key,
                      size_t nkey,
                      PyObject **pobj)
@@ -431,7 +431,7 @@ pycbc_tc_determine_format(PyObject *value)
 }
 
 int
-pycbc_tc_encode_value(pycbc_Connection *conn,
+pycbc_tc_encode_value(pycbc_Bucket *conn,
                        PyObject **value,
                        PyObject *flag_v,
                        void **buf,
@@ -532,7 +532,7 @@ pycbc_tc_encode_value(pycbc_Connection *conn,
 }
 
 int
-pycbc_tc_decode_value(pycbc_Connection *conn,
+pycbc_tc_decode_value(pycbc_Bucket *conn,
                        const void *value,
                        size_t nvalue,
                        lcb_uint32_t flags,

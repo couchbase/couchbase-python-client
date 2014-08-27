@@ -1605,3 +1605,7 @@ class Connection(_Base):
 
         """
         return _Base._cntl(self, *args, **kwargs)
+
+    @staticmethod
+    def lcb_version(self):
+        return _LCB.lcb_version()

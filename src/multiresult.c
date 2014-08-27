@@ -221,7 +221,7 @@ pycbc_AsyncResultType_init(PyObject **ptr)
 }
 
 PyObject *
-pycbc_multiresult_new(pycbc_Connection *parent)
+pycbc_multiresult_new(pycbc_Bucket *parent)
 {
     PyTypeObject *initmeth;
     pycbc_MultiResult *ret;
