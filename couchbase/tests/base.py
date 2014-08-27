@@ -39,6 +39,7 @@ from couchbase.mockserver import CouchbaseMock, BucketSpec, MockControlClient
 from couchbase.result import (
     MultiResult, ValueResult, OperationResult, ObserveInfo, Result)
 from couchbase._pyport import basestring
+from couchbase.connstr import ConnectionString
 
 CONFIG_FILE = 'tests.ini' # in cwd
 
@@ -53,11 +54,18 @@ class ClusterInformation(object):
         self.extra_buckets = False
 
     def make_connargs(self, **overrides):
+        bucket = self.bucket_prefix
+        if 'bucket' in overrides:
+            bucket = overrides.pop('bucket')
+        connstr = 'http://{0}:{1}/{2}?'.format(self.host, self.port, bucket)
+
+        if 'config_cache' in overrides:
+            connstr += 'config_cache='
+            connstr += str(overrides.pop('config_cache'))
+
         ret = {
-            'host': self.host,
-            'port': self.port,
             'password': self.bucket_password,
-            'bucket': self.bucket_prefix
+            'connection_string': connstr
         }
         ret.update(overrides)
         return ret
@@ -67,7 +75,10 @@ class ClusterInformation(object):
             return None
         ret = self.make_connargs()
         if self.extra_buckets:
-            ret['bucket'] += "_sasl"
+            cs = ret['connection_string']
+            cs = ConnectionString(cs)
+            cs.bucket += '_sasl'
+            ret['connection_string'] = str(cs)
         return ret
 
     def make_connection(self, conncls, **kwargs):

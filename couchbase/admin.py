@@ -68,7 +68,7 @@ class Admin(LCB.Connection):
         kwargs = {
             'username': username,
             'password': password,
-            'host': "{0}:{1}".format(host, port),
+            'connection_string': "http://{0}:{1}".format(host, port),
             '_conntype': LCB.LCB_TYPE_CLUSTER
         }
 

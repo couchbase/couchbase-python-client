@@ -19,6 +19,7 @@ from couchbase.exceptions import (
     ObjectDestroyedError)
 
 from couchbase.tests.base import ConnectionTestCase
+from couchbase.connstr import ConnectionString
 from txcouchbase.tests.base import gen_base
 
 class BasicConnectionTest(gen_base(ConnectionTestCase)):
@@ -47,9 +48,9 @@ class BasicConnectionTest(gen_base(ConnectionTestCase)):
 
     def testMultiHost(self):
         info = self.cluster_info
-        hostlist = [(info.host, 10), info.host]
-
-        cb = self.make_connection(host=hostlist)
+        cs = ConnectionString(self.make_connargs()['connection_string'])
+        cs.hosts = [ info.host + ':' + '10', info.host + ':' + str(info.port) ]
+        cb = self.make_connection(connection_string=cs.encode())
         d = cb.connect()
         d.addCallback(lambda x: self.assertTrue(cb.connected))
         return d

@@ -35,7 +35,7 @@ from couchbase.connection import Connection
 from couchbase.exceptions import ArgumentError
 
 class Async(Connection):
-    def __init__(self, iops=None, **kwargs):
+    def __init__(self, iops=None, *args, **kwargs):
         """
         Create a new Async connection. An async connection is an object
         which functions like a normal synchronous connection, except that it
@@ -75,7 +75,7 @@ class Async(Connection):
         # kwargs['unlock_gil'] = False
         # This is always set to false in connection.c
 
-        super(Async, self).__init__(**kwargs)
+        super(Async, self).__init__(*args, **kwargs)
 
     def query(self, *args, **kwargs):
         """

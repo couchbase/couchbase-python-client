@@ -32,6 +32,7 @@
     X(ERANGE) \
     X(ERROR) \
     X(ETMPFAIL) \
+    X(EINVAL) \
     X(CLIENT_ETMPFAIL) \
     X(KEY_EEXISTS) \
     X(KEY_ENOENT) \

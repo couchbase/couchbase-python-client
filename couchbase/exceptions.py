@@ -442,6 +442,7 @@ _LCB_ERRNO_MAP = {
     C.LCB_EBADHANDLE:       BadHandleError,
     C.LCB_INVALID_HOST_FORMAT: InvalidError,
     C.LCB_INVALID_CHAR:     InvalidError,
+    C.LCB_EINVAL:           InvalidError,
     C.LCB_DURABILITY_ETOOMANY: ArgumentError,
     C.LCB_DUPLICATE_COMMANDS: ArgumentError,
     C.LCB_CLIENT_ETMPFAIL:  ClientTemporaryFailError

@@ -87,52 +87,19 @@ class DurabilityContext(object):
         return False
 
 class Connection(_Base):
-
-    def _gen_host_string(self, host, port):
-        if not isinstance(host, (tuple, list)):
-            return "{0}:{1}".format(host, port)
-
-        hosts_tmp = []
-        for curhost in host:
-            cur_hname = None
-            cur_hport = None
-            if isinstance(curhost, (list, tuple)):
-                cur_hname, cur_hport = curhost
-            else:
-                cur_hname = curhost
-                cur_hport = port
-
-            hosts_tmp.append("{0}:{1}".format(cur_hname, cur_hport))
-
-        return ";".join(hosts_tmp)
-
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
         """Connection to a bucket.
 
         Normally it's initialized through :meth:`couchbase.Couchbase.connect`
 
         See :meth:`couchbase.Couchbase.connect` for constructor options
         """
-        bucket = kwargs.get('bucket', None)
-        host = kwargs.get('host', 'localhost')
         username = kwargs.get('username', None)
         password = kwargs.get('password', None)
 
-        # We don't pass this to the actual constructor
-        port = kwargs.pop('port', 8091)
         _no_connect_exceptions = kwargs.pop('_no_connect_exceptions', False)
         _gevent_support = kwargs.pop('experimental_gevent_support', False)
         _cntlopts = kwargs.pop('_cntl', {})
-        timeout = kwargs.pop('timeout', 0)
-
-        if not bucket:
-            raise exceptions.ArgumentError("A bucket name must be given")
-
-        kwargs['host'] = self._gen_host_string(host, port)
-        kwargs['bucket'] = bucket
-
-        if password and not username:
-            kwargs['username'] = bucket
 
         tc = kwargs.get('transcoder')
         if isinstance(tc, type):
@@ -141,12 +108,9 @@ class Connection(_Base):
         if _gevent_support:
             kwargs['_iops'] = SelectIOPS()
 
-        super(Connection, self).__init__(**kwargs)
+        super(Connection, self).__init__(*args, **kwargs)
         for ctl, val in _cntlopts.items():
             self._cntl(ctl, val)
-
-        if timeout:
-            self.timeout = timeout
 
         try:
             self._do_ctor_connect()

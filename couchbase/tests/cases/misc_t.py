@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+try:
+    from urlparse import urlparse
+except ImportError:
+    from urllib.parse import urlparse
 
 from couchbase.tests.base import ConnectionTestCase
 from couchbase.user_constants import FMT_JSON, FMT_AUTO, FMT_JSON, FMT_PICKLE
@@ -41,7 +45,10 @@ class ConnectionMiscTest(ConnectionTestCase):
 
     def test_bucket(self):
         bucket_str = self.cb.bucket
-        self.assertEqual(bucket_str, self.make_connargs()['bucket'])
+        connstr = self.make_connargs()['connection_string']
+        expected = urlparse(connstr).path
+
+        self.assertEqual('/' + bucket_str, expected)
 
     def test_conn_repr(self):
         repr(self.cb)
@@ -53,7 +60,6 @@ class ConnectionMiscTest(ConnectionTestCase):
         ctor_params = self.make_connargs()
         # XXX: Change these if any of the defaults change
         defaults = {
-            'timeout' : 2.5,
             'quiet' : False,
             'default_format' : FMT_JSON,
             'unlock_gil' : True,

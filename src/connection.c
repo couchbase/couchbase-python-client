@@ -577,9 +577,8 @@ Connection__init__(pycbc_Connection *self,
 {
     int rv;
     int conntype = LCB_TYPE_BUCKET;
+
     lcb_error_t err;
-    char *conncache = NULL;
-    char *config_cache = NULL;
     PyObject *unlock_gil_O = NULL;
     PyObject *iops_O = NULL;
     PyObject *dfl_fmt = NULL;
@@ -594,18 +593,16 @@ Connection__init__(pycbc_Connection *self,
      * removing various parameters.
      */
 #define XCTOR_ARGS(X) \
-    X("_flags", &self->flags, "I") \
-    X("bucket", &create_opts.v.v1.bucket, "z") \
-    X("username", &create_opts.v.v1.user, "z") \
-    X("password", &create_opts.v.v1.passwd, "z") \
-    X("host", &create_opts.v.v1.host, "z") \
-    X("conncache", &conncache, "z") \
-    X("config_cache", &config_cache, "z") \
+    X("connection_string", &create_opts.v.v3.connstr, "z") \
+    X("connstr", &create_opts.v.v3.connstr, "z") \
+    X("username", &create_opts.v.v3.username, "z") \
+    X("password", &create_opts.v.v3.passwd, "z") \
     X("quiet", &self->quiet, "I") \
     X("unlock_gil", &unlock_gil_O, "O") \
     X("transcoder", &tc, "O") \
     X("default_format", &dfl_fmt, "O") \
     X("lockmode", &self->lockmode, "i") \
+    X("_flags", &self->flags, "I") \
     X("_conntype", &conntype, "i") \
     X("_iops", &iops_O, "O")
 
@@ -613,7 +610,6 @@ Connection__init__(pycbc_Connection *self,
         #define X(s, target, type) s,
             XCTOR_ARGS(X)
         #undef X
-
             NULL
     };
 
@@ -632,11 +628,8 @@ Connection__init__(pycbc_Connection *self,
     self->lockmode = PYCBC_LOCKMODE_EXC;
 
     #define X(s, target, type) target,
-    rv = PyArg_ParseTupleAndKeywords(args,
-                                     kwargs,
-                                     argspec,
-                                     kwlist,
-                                     XCTOR_ARGS(X) NULL);
+    rv = PyArg_ParseTupleAndKeywords(args, kwargs, argspec, kwlist,
+        XCTOR_ARGS(X) NULL);
     #undef X
 
     if (!rv) {
@@ -648,16 +641,12 @@ Connection__init__(pycbc_Connection *self,
         self->unlock_gil = 0;
     }
 
-    if (create_opts.v.v1.bucket) {
-        self->bucket = pycbc_SimpleStringZ(create_opts.v.v1.bucket);
-    }
-
-    create_opts.version = 1;
-    create_opts.v.v1.type = conntype;
+    create_opts.version = 3;
+    create_opts.v.v3.type = conntype;
 
     if (iops_O && iops_O != Py_None) {
         self->iops = pycbc_iops_new(self, iops_O);
-        create_opts.v.v1.io = self->iops;
+        create_opts.v.v3.io = self->iops;
         self->unlock_gil = 0;
     }
 
@@ -692,15 +681,6 @@ Connection__init__(pycbc_Connection *self,
     self->unlock_gil = 0;
     self->lockmode = PYCBC_LOCKMODE_NONE;
 #endif
-    if (config_cache) {
-        conncache = config_cache;
-    }
-
-    if (conncache && conntype != LCB_TYPE_BUCKET) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Cannot use connection cache with "
-                       "management connection");
-        return -1;
-    }
 
     err = lcb_create(&self->instance, &create_opts);
     if (err != LCB_SUCCESS) {
@@ -713,17 +693,15 @@ Connection__init__(pycbc_Connection *self,
         return -1;
     }
 
-    if (conncache) {
-        err = lcb_cntl(self->instance,
-            LCB_CNTL_SET, LCB_CNTL_CONFIGCACHE, conncache);
-        if (err != LCB_SUCCESS) {
-            PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't set the configuration cache");
-            return -1;
-        }
-    }
-
     pycbc_callbacks_init(self->instance);
     lcb_set_cookie(self->instance, self);
+    {
+        const char *bucketstr;
+        err = lcb_cntl(self->instance, LCB_CNTL_GET, LCB_CNTL_BUCKETNAME, &bucketstr);
+        if (err == LCB_SUCCESS && bucketstr != NULL) {
+            self->bucket = pycbc_SimpleStringZ(bucketstr);
+        }
+    }
     return 0;
 }
 

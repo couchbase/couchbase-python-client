@@ -428,3 +428,65 @@ Private APIs
    .. automethod:: _cntl
 
    .. automethod:: _vbmap
+
+
+.. _connopts:
+
+Additional Connection Options
+=============================
+
+.. currentmodule:: couchbase.connection
+
+This section is intended to document some of the less common connection
+options and formats of the connection string (see :meth:`couchbase.Couchbase.connect`).
+
+
+Using Custom Ports
+-------------------
+
+If you require to connect to an alternate port for bootstrapping the client
+(either because your administrator has configured the cluster to listen on
+alternate ports, or because you are using the built-in ``cluster_run``
+script provided with the server source code), you may do so in the host list
+itself.
+
+Simply provide the host in the format of ``host:port``.
+
+Note that the port is dependent on the *scheme* used. In this case, the scheme
+dictates what specific service the port points to.
+
+
+=============== ========
+Scheme          Protocol
+=============== ========
+``couchbase``   memcached port (default is ``11210``)
+``couchbases``  SSL-encrypted memcached port (default is ``11207``)
+``http``        REST API/Administrative port (default is ``8091``)
+=============== ========
+
+
+Options in Connection String
+----------------------------
+
+Additional client options may be specified within the connection
+string itself. These options are derived from the underlying
+*libcouchbase* library and thus will accept any input accepted
+by the library itself. The following are some influential options:
+
+
+- ``config_total_timeout``. Number of seconds to wait for the client
+  bootstrap to complete.
+
+- ``config_node_timeout``. Maximum number of time to wait (in seconds)
+  to attempt to bootstrap from the current node. If the bootstrap times
+  out (and the ``config_total_timeout`` setting is not reached), the
+  bootstrap is then attempted from the next node (or an exception is
+  raised if no more nodes remain).
+
+- ``config_cache``. If set, this will refer to a file on the
+  filesystem where cached "bootstrap" information may be stored. This
+  path may be shared among multiple instance of the Couchbase client.
+  Using this option may reduce overhead when using many short-lived
+  instances of the client.
+
+  If the file does not exist, it will be created.

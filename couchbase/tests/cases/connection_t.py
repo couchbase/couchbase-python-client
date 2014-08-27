@@ -26,26 +26,20 @@ from couchbase.exceptions import (AuthError, ArgumentError,
                                   NotFoundError, InvalidError,
                                   TimeoutError)
 from couchbase.tests.base import CouchbaseTestCase, SkipTest
+from couchbase.connstr import ConnectionString
 
 
 class ConnectionTest(CouchbaseTestCase):
-    def test_connection_host_port(self):
-        cb = self.factory(host=self.cluster_info.host,
-                          port=self.cluster_info.port,
-                          password=self.cluster_info.bucket_password,
-                          bucket=self.cluster_info.bucket_prefix)
-        # Connection didn't throw an error
-        self.assertIsInstance(cb, self.factory)
-
     @attr('slow')
     def test_server_not_found(self):
         connargs = self.make_connargs()
-        connargs['host'] = 'example.com'
+        cs = ConnectionString(connargs['connection_string'])
+        cs.hosts = [ 'example.com' ]
+        connargs['connection_string'] = cs.encode()
         self.assertRaises((CouchbaseNetworkError, TimeoutError),
-                          self.factory, **connargs)
+            self.factory, **connargs)
 
-        connargs['host'] = self.cluster_info.host
-        connargs['port'] = 34567
+        cs.hosts = [ self.cluster_info.host + ':' + str(34567)]
         self.assertRaises(CouchbaseNetworkError, self.factory, **connargs)
 
     def test_bucket(self):
@@ -75,7 +69,7 @@ class ConnectionTest(CouchbaseTestCase):
     def test_sasl_bucket_wrong_credentials(self):
         self.skipUnlessSasl()
         sasl_info = self.get_sasl_cinfo()
-        sasl_bucket = sasl_info.get_sasl_params()['bucket']
+        sasl_bucket = ConnectionString(sasl_info.get_sasl_params()['connection_string']).bucket
         self.assertRaises(AuthError, self.factory,
                           **sasl_info.make_connargs(password='wrong_password',
                                                bucket=sasl_bucket))
@@ -94,17 +88,17 @@ class ConnectionTest(CouchbaseTestCase):
         self.assertRaises(NotFoundError, cb.get, 'missing_key')
 
 
-    def test_conncache(self):
+    def test_configcache(self):
         cachefile = None
         # On Windows, the NamedTemporaryFile is deleted right when it's
         # created. So we need to ensure it's not deleted, and delete it
         # ourselves when it's closed
         try:
             cachefile = tempfile.NamedTemporaryFile(delete=False)
-            cb = self.factory(conncache=cachefile.name, **self.make_connargs())
+            cb = self.factory(**self.make_connargs(config_cache=cachefile.name))
             self.assertTrue(cb.set("foo", "bar").success)
 
-            cb2 = self.factory(config_cache=cachefile.name, **self.make_connargs())
+            cb2 = self.factory(**self.make_connargs(config_cache=cachefile.name))
 
             self.assertTrue(cb2.set("foo", "bar").success)
             self.assertEquals("bar", cb.get("foo").value)
@@ -122,30 +116,27 @@ class ConnectionTest(CouchbaseTestCase):
         # apparently libcouchbase does not report this failure.
 
     def test_invalid_hostname(self):
-        self.assertRaises(InvalidError,
-                          self.factory,
-                          bucket='default', host='12345:qwer###')
+        self.assertRaises(InvalidError, self.factory,
+                          str('couchbase://12345:qwer###/default'))
 
     def test_multi_hosts(self):
-        kwargs = {
-            'password' : self.cluster_info.bucket_password,
-            'bucket' : self.cluster_info.bucket_prefix
-        }
+        bkt = self.cluster_info.bucket_prefix
+        passwd = self.cluster_info.bucket_password
+
+        cs = ConnectionString.from_hb(self.cluster_info.host,
+                                      self.cluster_info.bucket_prefix)
 
         if not self.mock:
-            cb = self.factory(host=[self.cluster_info.host], **kwargs)
+            cb = self.factory(str(cs), password=passwd)
             self.assertTrue(cb.set("foo", "bar").success)
 
-        hostspec = [(self.cluster_info.host, self.cluster_info.port)]
-        cb = self.factory(host=hostspec, **kwargs)
+        cs.hosts = [ self.cluster_info.host + ':' + str(self.cluster_info.port) ]
+        cs.scheme = 'http'
+        cb = self.factory(str(cs))
         self.assertTrue(cb.set("foo", "bar").success)
 
-        hostlist = [
-            ('localhost', 1),
-            (self.cluster_info.host,
-             self.cluster_info.port)
-        ]
-        cb = self.factory(host=hostlist, **kwargs)
+        cs.hosts.insert(0, 'localhost:1')
+        cb = self.factory(str(cs))
         self.assertTrue(cb.set("foo", "bar").success)
 
 if __name__ == '__main__':

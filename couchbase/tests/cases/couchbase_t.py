@@ -18,18 +18,18 @@
 from couchbase import Couchbase
 from couchbase.connection import Connection
 from couchbase.tests.base import CouchbaseTestCase
-
+from couchbase.connstr import ConnectionString
 
 BUCKET_NAME = 'test_bucket_for_pythonsdk'
 
 
 class CouchbaseTest(CouchbaseTestCase):
     def test_is_instance_of_connection(self):
+        cs = "http://{0}:{1}/{2}".format(self.cluster_info.host,
+                                         self.cluster_info.port,
+                                         self.cluster_info.bucket_prefix)
         self.assertIsInstance(
-            Couchbase.connect(host=self.cluster_info.host,
-                              port=self.cluster_info.port,
-                              password=self.cluster_info.bucket_password,
-                              bucket=self.cluster_info.bucket_prefix),
+            Couchbase.connect(cs, password=self.cluster_info.bucket_password),
             Connection)
 
 
