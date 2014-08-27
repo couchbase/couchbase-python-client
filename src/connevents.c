@@ -58,35 +58,23 @@ pycbc_invoke_connected_event(pycbc_Connection *conn, lcb_error_t err)
 
 
 struct dtor_info_st {
-    lcb_t instance;
     lcb_io_opt_t io;
     PyObject *dtorcb;
     PyObject *conncb;
-    void *event;
 };
 
 static void
-dtor_callback(lcb_socket_t sock, short which, void *arg)
+dtor_callback(const void *arg)
 {
-    struct dtor_info_st *dti = arg;
-    if (dti->instance) {
-        lcb_destroy(dti->instance);
-    }
-
-    if (dti->io) {
-        dti->io->v.v0.delete_timer(dti->io, dti->event);
-        dti->io->v.v0.destroy_timer(dti->io, dti->event);
-        pycbc_iops_free(dti->io);
-    }
+    struct dtor_info_st *dti = (void*)arg;
 
     if (dti->conncb) {
         PyObject *ret;
         PyObject *exc;
         PyObject *args = PyTuple_New(1);
 
-        exc = pycbc_exc_message(PYCBC_EXC_DESTROYED,
-                                0,
-                                "Connection object was garbage collected");
+        exc = pycbc_exc_message(PYCBC_EXC_DESTROYED, 0,
+            "Connection object was garbage collected");
         assert(exc);
 
         PyTuple_SET_ITEM(args, 0, exc);
@@ -105,9 +93,10 @@ dtor_callback(lcb_socket_t sock, short which, void *arg)
         dti->dtorcb = NULL;
     }
 
+    if (dti->io) {
+        pycbc_iops_free(dti->io);
+    }
     free(dti);
-    (void)sock;
-    (void)which;
 }
 
 void
@@ -119,8 +108,7 @@ pycbc_schedule_dtor_event(pycbc_Connection *self)
         return;
     }
 
-    pycbc_assert(self->iops);
-
+    pycbc_assert(self->instance);
     dti = malloc(sizeof(*dti));
     if (!dti) {
         fprintf(stderr,
@@ -128,15 +116,13 @@ pycbc_schedule_dtor_event(pycbc_Connection *self)
                 "destruction. Instance will leak\n");
 
     } else {
-        dti->instance = self->instance;
         dti->io = self->iops;
         dti->dtorcb = self->dtorcb;
         dti->conncb = self->conncb;
-        dti->event = self->iops->v.v0.create_timer(self->iops);
-
-        self->iops->v.v0.update_timer(self->iops, dti->event,
-                                      0, dti, dtor_callback);
     }
+
+    lcb_set_destroy_callback(self->instance, dtor_callback);
+    lcb_destroy_async(self->instance, dti);
 
     self->instance = NULL;
     self->iops = NULL;
