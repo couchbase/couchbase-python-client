@@ -19,7 +19,7 @@ import time
 
 import couchbase._bootstrap
 import couchbase._libcouchbase as _LCB
-from couchbase._libcouchbase import Connection as _Base
+from couchbase._libcouchbase import Bucket as _Base
 from couchbase.iops.select import SelectIOPS
 
 from couchbase.exceptions import *
@@ -37,7 +37,7 @@ class Pipeline(object):
 
         .. versionadded:: 1.2.0
 
-        Creates a new pipeline context. See :meth:`~Connection.pipeline`
+        Creates a new pipeline context. See :meth:`~Bucket.pipeline`
         for more details
         """
         self._parent = parent
@@ -86,13 +86,109 @@ class DurabilityContext(object):
 
         return False
 
-class Connection(_Base):
+class Bucket(_Base):
     def __init__(self, *args, **kwargs):
-        """Connection to a bucket.
+        """Connect to a bucket.
 
-        Normally it's initialized through :meth:`couchbase.Couchbase.connect`
+        :param string connection_string:
+          The connection string to use for connecting to the bucket. The
+          connection string is a URI-like string allowing specifying multiple
+          hosts and a bucket name.
 
-        See :meth:`couchbase.Couchbase.connect` for constructor options
+          The format of the connection string is the *scheme* (``couchbase``
+          for normal connections, ``couchbases`` for SSL enabled connections);
+          a list of one or more *hostnames* delimited by commas; a *bucket*
+          and a set of options.
+
+          like so::
+
+            couchbase://host1,host2,host3/bucketname?option1=value1&option2=value2
+
+
+          If using the SSL scheme (``couchbases``), ensure to specify the
+          ``certpath`` option to point to the location of the certificate on the
+          client's filesystem; otherwise connection may fail with an error code
+          indicating the server's certificate could not be trusted.
+
+          See :ref:`connopts` for additional connection options.
+
+
+        :param string password: the password of the bucket
+
+        :param boolean quiet: the flag controlling whether to raise an
+          exception when the client executes operations on non-existent
+          keys. If it is `False` it will raise
+          :exc:`couchbase.exceptions.NotFoundError` exceptions. When set
+          to `True` the operations will return `None` silently.
+
+        :param boolean unlock_gil: If set (which is the default), the
+          connection object will release the python GIL when possible, allowing
+          other (Python) threads to function in the background. This should be
+          set to true if you are using threads in your application (and is the
+          default), as otherwise all threads will be blocked while couchbase
+          functions execute.
+
+          You may turn this off for some performance boost and you are certain
+          your application is not using threads
+
+        :param transcoder:
+          Set the transcoder object to use. This should conform to the
+          interface in the documentation (it need not actually be a subclass).
+          This can be either a class type to instantiate, or an initialized
+          instance.
+        :type transcoder: :class:`couchbase.transcoder.Transcoder`
+
+        :param lockmode:
+          The *lockmode* for threaded access. See :ref:`multiple_threads`
+          for more information.
+
+        :param boolean experimental_gevent_support:
+          This boolean value specifies whether *experimental*
+          support for `gevent` should be used. Experimental support is supplied
+          by substituting the built-in libcouchbase I/O functions with their
+          monkey-patched `gevent` equivalents. Note that
+          `gevent.monkey_patch_all` (or similar) must have already been called
+          in order to ensure that the cooperative socket methods are called.
+
+          .. warning::
+
+            As the parameter name implies, this feature is experimental. This
+            means it may crash or hang your application. While no known issues
+            have been discovered at the time of writing, it has not been
+            sufficiently tested and as such is marked as experimental.
+
+            API and implementation of this feature are subject to change.
+
+        :raise: :exc:`couchbase.exceptions.BucketNotFoundError` if there
+                is no such bucket to connect to
+
+                :exc:`couchbase.exceptions.ConnectError` if the socket
+                wasn't accessible (doesn't accept connections or doesn't
+                respond in time)
+
+                :exc:`couchbase.exceptions.ArgumentError`
+                if the bucket wasn't specified
+
+        :return: instance of :class:`couchbase.connection.Connection`
+
+
+        Initialize connection using default options::
+
+            from couchbase.bucket import Bucket
+            cb = Bucket('couchbase:///mybucket')
+
+        Connect to protected bucket::
+
+            cb = Bucket('couchbase:///protected', password='secret')
+
+        Connect using a list of servers::
+
+            cb = Bucket('couchbase://host1,host2,host3/mybucket')
+
+        Connect using SSL::
+
+            cb = Bucket('couchbases://securehost/bucketname?certpath=/var/cb-cert.pem')
+
         """
         username = kwargs.get('username', None)
         password = kwargs.get('password', None)
@@ -108,7 +204,7 @@ class Connection(_Base):
         if _gevent_support:
             kwargs['_iops'] = SelectIOPS()
 
-        super(Connection, self).__init__(*args, **kwargs)
+        super(Bucket, self).__init__(*args, **kwargs)
         for ctl, val in _cntlopts.items():
             self._cntl(ctl, val)
 
@@ -220,7 +316,7 @@ class Connection(_Base):
           encoding the value. If none is specified, it will use the
           `default_format`
           For more info see
-          :attr:`~couchbase.connection.Connection.default_format`
+          :attr:`~couchbase.connection.Bucket.default_format`
 
         :param int persist_to: Perform durability checking on this many
 
@@ -276,7 +372,7 @@ class Connection(_Base):
         Store an object in Couchbase unless it already exists.
 
         Follows the same conventions as
-        :meth:`~couchbase.connection.Connection.set` but the value is
+        :meth:`~couchbase.connection.Bucket.set` but the value is
         stored only if it does not exist already. Conversely, the value
         is not stored if the key already exists.
 
@@ -299,7 +395,7 @@ class Connection(_Base):
         Store an object in Couchbase only if it already exists.
 
         Follows the same conventions as
-        :meth:`~couchbase.connection.Connection.set`, but the value is
+        :meth:`~couchbase.connection.Bucket.set`, but the value is
         stored only if a previous value already exists.
 
         :raise: :exc:`couchbase.exceptions.NotFoundError` if the key
@@ -317,7 +413,7 @@ class Connection(_Base):
         Append a string to an existing value in Couchbase.
 
         This follows the same conventions as
-        :meth:`~couchbase.connection.Connection.set`.
+        :meth:`~couchbase.connection.Bucket.set`.
 
         The `format` argument must be one of :const:`~couchbase.FMT_UTF8` or
         :const:`~couchbase.FMT_BYTES`. If not specified, it will be
@@ -371,7 +467,7 @@ class Connection(_Base):
         :param boolean quiet: causes `get` to return None instead of
           raising an exception when the key is not found. It defaults
           to the value set by
-          :attr:`~couchbase.connection.Connection.quiet` on the instance.
+          :attr:`~couchbase.connection.Bucket.quiet` on the instance.
           In `quiet` mode, the error may still be obtained by inspecting
           the :attr:`~couchbase.result.Result.rc` attribute of the
           :class:`couchbase.result.Result` object, or
@@ -379,7 +475,7 @@ class Connection(_Base):
 
           Note that the default value is `None`, which means to use
           the :attr:`quiet`. If it is a boolean (i.e. `True` or `False) it will
-          override the :class:`Connection`-level :attr:`quiet` attribute.
+          override the :class:`Bucket`-level :attr:`quiet` attribute.
 
         :param bool replica: Whether to fetch this key from a replica
           rather than querying the master server. This is primarily useful
@@ -877,7 +973,7 @@ class Connection(_Base):
         """Set multiple keys
 
         This follows the same semantics as
-        :meth:`~couchbase.connection.Connection.set`
+        :meth:`~couchbase.connection.Bucket.set`
 
         :param dict keys: A dictionary of keys to set. The keys are the keys
           as they should be on the server, and the values are the values for
@@ -923,7 +1019,7 @@ class Connection(_Base):
 
     def add_multi(self, keys, ttl=0, format=None, persist_to=0, replicate_to=0):
         """Add multiple keys.
-        Multi variant of :meth:`~couchbase.connection.Connection.add`
+        Multi variant of :meth:`~couchbase.connection.Bucket.add`
 
         .. seealso:: :meth:`add`, :meth:`set_multi`, :meth:`set`
 
@@ -1607,5 +1703,5 @@ class Connection(_Base):
         return _Base._cntl(self, *args, **kwargs)
 
     @staticmethod
-    def lcb_version(self):
+    def lcb_version():
         return _LCB.lcb_version()

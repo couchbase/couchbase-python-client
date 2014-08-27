@@ -18,7 +18,6 @@
 The contents of this module do not have a stable API and are subject to
 change
 """
-import couchbase.connection
 import couchbase._libcouchbase as LCB
 import couchbase.exceptions as E
 from couchbase.user_constants import FMT_JSON
@@ -32,7 +31,7 @@ METHMAP = {
 }
 
 
-class Admin(LCB.Connection):
+class Admin(LCB.Bucket):
     """An administrative connection to a Couchbase cluster.
 
     With this object, you can do things which affect the cluster, such as

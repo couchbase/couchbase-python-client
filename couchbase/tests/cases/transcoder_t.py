@@ -16,7 +16,7 @@
 #
 from couchbase.tests.base import ConnectionTestCase
 from couchbase.transcoder import TranscoderPP
-from couchbase import Couchbase, FMT_UTF8
+from couchbase import FMT_UTF8
 from couchbase.connection import Connection
 import couchbase.exceptions as E
 
@@ -197,5 +197,5 @@ class ConnectionTranscoderTest(ConnectionTestCase):
         c = Connection(**self.make_connargs(transcoder=TranscoderPP))
         c.set(key, "value")
 
-        c = Couchbase.connect(**self.make_connargs(transcoder=TranscoderPP))
+        c = Connection(**self.make_connargs(transcoder=TranscoderPP))
         c.set(key, "value")

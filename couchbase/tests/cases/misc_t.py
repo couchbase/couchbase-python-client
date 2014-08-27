@@ -22,7 +22,6 @@ except ImportError:
 from couchbase.tests.base import ConnectionTestCase
 from couchbase.user_constants import FMT_JSON, FMT_AUTO, FMT_JSON, FMT_PICKLE
 from couchbase.exceptions import ClientTemporaryFailError
-from couchbase import Couchbase
 from couchbase.exceptions import CouchbaseError
 
 class ConnectionMiscTest(ConnectionTestCase):
@@ -67,14 +66,11 @@ class ConnectionMiscTest(ConnectionTestCase):
         }
 
         cb_ctor = Connection(**ctor_params)
-        cb_connect = Couchbase.connect(**ctor_params)
 
         for option, value in defaults.items():
             actual = getattr(cb_ctor, option)
             self.assertEqual(actual, value)
 
-            actual = getattr(cb_connect, option)
-            self.assertEqual(actual, value)
 
     def test_closed(self):
         cb = self.cb

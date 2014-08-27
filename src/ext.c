@@ -263,7 +263,7 @@ init_libcouchbase(void)
      * function used to initialize it
      */
 #define X_PYTYPES(X) \
-    X(Connection,       pycbc_BucketType_init) \
+    X(Bucket,       pycbc_BucketType_init) \
     /** Remember to keep base classes in order */ \
     X(Result,           pycbc_ResultType_init) \
     X(OperationResult,  pycbc_OperationResultType_init) \
