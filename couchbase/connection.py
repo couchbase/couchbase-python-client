@@ -16,8 +16,6 @@
 #
 import json
 import time
-from collections import deque
-
 
 import couchbase._bootstrap
 import couchbase._libcouchbase as _LCB
@@ -125,6 +123,7 @@ class Connection(_Base):
         _no_connect_exceptions = kwargs.pop('_no_connect_exceptions', False)
         _gevent_support = kwargs.pop('experimental_gevent_support', False)
         _cntlopts = kwargs.pop('_cntl', {})
+        timeout = kwargs.pop('timeout', 0)
 
         if not bucket:
             raise exceptions.ArgumentError("A bucket name must be given")
@@ -134,9 +133,6 @@ class Connection(_Base):
 
         if password and not username:
             kwargs['username'] = bucket
-
-        # Internal parameters
-        kwargs['_errors'] = deque(maxlen=1000)
 
         tc = kwargs.get('transcoder')
         if isinstance(tc, type):
@@ -148,6 +144,9 @@ class Connection(_Base):
         super(Connection, self).__init__(**kwargs)
         for ctl, val in _cntlopts.items():
             self._cntl(ctl, val)
+
+        if timeout:
+            self.timeout = timeout
 
         try:
             self._do_ctor_connect()
@@ -170,28 +169,6 @@ class Connection(_Base):
 
     def __delitem__(self, key):
         return self.delete(key)
-
-    def errors(self, clear_existing=True):
-        """
-        Get miscellaneous error information.
-
-        This function returns error information relating to the client
-        instance. This will contain error information not related to
-        any specific operation and may also provide insight as to what
-        caused a specific operation to fail.
-
-        :param boolean clear_existing: If set to true, the errors will be
-          cleared once they are returned. The client will keep a history of
-          the last 1000 errors which were received.
-
-        :return: a tuple of ((errnum, errdesc), ...) (which may be empty)
-        """
-
-        ret = tuple(self._errors)
-
-        if clear_existing:
-            self._errors.clear()
-        return ret
 
     def pipeline(self):
         """
@@ -1552,6 +1529,34 @@ class Connection(_Base):
         Returns True if the object has been closed with :meth:`_close`
         """
         return self._privflags & _LCB.PYCBC_CONN_F_CLOSED
+
+    def _get_timeout_common(self, op):
+        return self._cntl(op, value_type="timeout")
+
+    def _set_timeout_common(self, op, value):
+        value = float(value)
+        if value <= 0:
+            raise ValueError("Timeout must be greater than 0")
+
+        self._cntl(op, value_type="timeout", value=value)
+
+
+
+    @property
+    def timeout(self):
+        return self._get_timeout_common(_LCB.LCB_CNTL_OP_TIMEOUT)
+
+    @timeout.setter
+    def timeout(self, value):
+        self._set_timeout_common(_LCB.LCB_CNTL_OP_TIMEOUT, value)
+
+    @property
+    def view_timeout(self):
+        return self._get_timeout_common(_LCB.LCB_CNTL_VIEW_TIMEOUT)
+
+    @view_timeout.setter
+    def view_timeout(self, value):
+        self._set_timeout_common(_LCB.LCB_CNTL_VIEW_TIMEOUT, value)
 
 
     """

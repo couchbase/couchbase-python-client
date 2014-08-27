@@ -696,33 +696,15 @@ end_global_callback(lcb_t instance, pycbc_Connection *self)
 }
 
 static void
-error_callback(lcb_t instance, lcb_error_t err, const char *msg)
+bootstrap_callback(lcb_t instance, lcb_error_t err)
 {
     pycbc_Connection *self;
 
     if (!start_global_callback(instance, &self)) {
         return;
     }
-
-    pycbc_invoke_error_callback(self, err, msg);
     pycbc_invoke_connected_event(self, err);
-
     end_global_callback(instance, self);
-}
-
-static void config_callback(lcb_t instance, lcb_configuration_t config)
-{
-    pycbc_Connection *self;
-
-    if (!start_global_callback(instance, &self)) {
-        return;
-    }
-
-    pycbc_invoke_connected_event(self, LCB_SUCCESS);
-
-    end_global_callback(instance, self);
-
-    (void)config;
 }
 
 
@@ -736,10 +718,9 @@ pycbc_callbacks_init(lcb_t instance)
     lcb_set_arithmetic_callback(instance, arithmetic_callback);
     lcb_set_remove_callback(instance, delete_callback);
     lcb_set_stat_callback(instance, stat_callback);
-    lcb_set_error_callback(instance, error_callback);
     lcb_set_observe_callback(instance, observe_callback);
     lcb_set_durability_callback(instance, durability_callback);
-    lcb_set_configuration_callback(instance, config_callback);
+    lcb_set_bootstrap_callback(instance, bootstrap_callback);
 
     pycbc_http_callbacks_init(instance);
 }

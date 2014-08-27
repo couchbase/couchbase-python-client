@@ -33,62 +33,6 @@ Connection__connect(pycbc_Connection *self);
 static void
 Connection_dtor(pycbc_Connection *self);
 
-static int
-set_timeout_common(pycbc_Connection *self, PyObject *value, int op)
-{
-    double newval;
-    lcb_uint32_t usecs;
-    lcb_error_t err;
-
-    newval = PyFloat_AsDouble(value);
-    if (newval == -1.0) {
-        if (PyErr_Occurred()) {
-            return -1;
-        }
-    }
-
-    if (newval <= 0) {
-        PyErr_SetString(PyExc_ValueError, "Timeout must not be 0");
-        return -1;
-    }
-
-    usecs = (lcb_uint32_t)(newval * 1000000);
-    err = lcb_cntl(self->instance, LCB_CNTL_SET, op, &usecs);
-    if (err != LCB_SUCCESS) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, err, "Couldn't set timeout");
-        return -1;
-    }
-    return 0;
-}
-
-static PyObject *
-get_timeout_common(pycbc_Connection *self, int op)
-{
-    lcb_uint32_t usecs;
-    lcb_error_t err;
-    err = lcb_cntl(self->instance, LCB_CNTL_GET, op, &usecs);
-    if (err != LCB_SUCCESS) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, err, "Couldn't get timeout");
-        return NULL;
-    }
-    return PyFloat_FromDouble((double)usecs / 1000000);
-}
-
-#define DECL_TMO_ACC(name, op) \
-    static int \
-    Connection_set_##name(pycbc_Connection *self, PyObject *val, void *unused) { \
-        (void)unused; \
-        return set_timeout_common(self, val, op); \
-    } \
-    static PyObject * Connection_get_##name(pycbc_Connection *self, void *unused) { \
-        (void)unused; \
-        return get_timeout_common(self, op); \
-    }
-
-DECL_TMO_ACC(timeout, 0x00)
-DECL_TMO_ACC(views_timeout, 0x01)
-
-
 static PyTypeObject ConnectionType = {
         PYCBC_POBJ_HEAD_INIT(NULL)
         0
@@ -359,18 +303,6 @@ Connection__get_timings(pycbc_Connection *self)
 
 
 static PyGetSetDef Connection_TABLE_getset[] = {
-        { "timeout",
-                (getter)Connection_get_timeout,
-                (setter)Connection_set_timeout,
-                PyDoc_STR("The timeout value for operations, in seconds")
-        },
-
-        { "views_timeout",
-                (getter)Connection_get_views_timeout,
-                (setter)Connection_set_views_timeout,
-                PyDoc_STR("Set the timeout for views requests, in seconds")
-        },
-
         { "default_format",
                 (getter)Connection_get_format,
                 (setter)Connection_set_format,
@@ -420,11 +352,6 @@ static PyGetSetDef Connection_TABLE_getset[] = {
 };
 
 static struct PyMemberDef Connection_TABLE_members[] = {
-        { "_errors", T_OBJECT_EX, offsetof(pycbc_Connection, errors),
-                READONLY,
-                PyDoc_STR("List of connection errors")
-        },
-
         { "quiet", T_UINT, offsetof(pycbc_Connection, quiet),
                 0,
                 PyDoc_STR("Whether to suppress errors when keys are not found "
@@ -644,48 +571,6 @@ static PyMethodDef Connection_TABLE_methods[] = {
         { NULL, NULL, 0, NULL }
 };
 
-static lcb_error_t
-set_config_cache(pycbc_Connection *self, const char *filename,
-                 const struct lcb_create_st *cropts)
-{
-#ifndef LCB_CNTL_CONFIGCACHE
-#define LCB_CNTL_CONFIGCACHE 0x21
-#endif
-    lcb_error_t err;
-
-    err = lcb_cntl(self->instance, LCB_CNTL_SET, LCB_CNTL_CONFIGCACHE,
-                   (void *)filename);
-
-    if (err == LCB_SUCCESS) {
-        return err;
-
-    } else if (err == LCB_NOT_SUPPORTED) {
-        /**
-         * Otherwise we need to use the older 'compat' structure which is
-         * deprecated and broken in newer versions of libcouchbase.
-         */
-        struct lcb_cached_config_st cached_config;
-        memset(&cached_config, 0, sizeof cached_config);
-        cached_config.cachefile = filename;
-        memcpy(&cached_config.createopt, cropts, sizeof(*cropts));
-
-        /** Destroy the existing instance first */
-        lcb_destroy(self->instance);
-        self->instance = NULL;
-        err = lcb_create_compat(LCB_CACHED_CONFIG, &cached_config,
-                                &self->instance, NULL);
-        if (err != LCB_SUCCESS) {
-            self->instance = NULL;
-        }
-
-    } else {
-        /** Other error from lcb_cntl() */
-        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err,
-                       "Could not assign configuration cache");
-    }
-    return err;
-}
-
 static int
 Connection__init__(pycbc_Connection *self,
                        PyObject *args, PyObject *kwargs)
@@ -697,7 +582,6 @@ Connection__init__(pycbc_Connection *self,
     char *config_cache = NULL;
     PyObject *unlock_gil_O = NULL;
     PyObject *iops_O = NULL;
-    PyObject *timeout = NULL;
     PyObject *dfl_fmt = NULL;
     PyObject *tc = NULL;
 
@@ -710,7 +594,6 @@ Connection__init__(pycbc_Connection *self,
      * removing various parameters.
      */
 #define XCTOR_ARGS(X) \
-    X("_errors", &self->errors, "O") \
     X("_flags", &self->flags, "I") \
     X("bucket", &create_opts.v.v1.bucket, "z") \
     X("username", &create_opts.v.v1.user, "z") \
@@ -721,7 +604,6 @@ Connection__init__(pycbc_Connection *self,
     X("quiet", &self->quiet, "I") \
     X("unlock_gil", &unlock_gil_O, "O") \
     X("transcoder", &tc, "O") \
-    X("timeout", &timeout, "O") \
     X("default_format", &dfl_fmt, "O") \
     X("lockmode", &self->lockmode, "i") \
     X("_conntype", &conntype, "i") \
@@ -779,9 +661,6 @@ Connection__init__(pycbc_Connection *self,
         self->unlock_gil = 0;
     }
 
-    Py_INCREF(self->errors);
-
-
     if (dfl_fmt == Py_None || dfl_fmt == NULL) {
         /** Set to 0 if None or NULL */
         dfl_fmt = pycbc_IntFromL(0);
@@ -835,22 +714,16 @@ Connection__init__(pycbc_Connection *self,
     }
 
     if (conncache) {
-        err = set_config_cache(self, conncache, &create_opts);
+        err = lcb_cntl(self->instance,
+            LCB_CNTL_SET, LCB_CNTL_CONFIGCACHE, conncache);
         if (err != LCB_SUCCESS) {
+            PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't set the configuration cache");
             return -1;
         }
     }
-
 
     pycbc_callbacks_init(self->instance);
     lcb_set_cookie(self->instance, self);
-
-    if (timeout && timeout != Py_None) {
-        if (Connection_set_timeout(self, timeout, NULL) == -1) {
-            return -1;
-        }
-    }
-
     return 0;
 }
 
@@ -893,7 +766,6 @@ Connection_dtor(pycbc_Connection *self)
 
     Py_XDECREF(self->dtorcb);
     Py_XDECREF(self->dfl_fmt);
-    Py_XDECREF(self->errors);
     Py_XDECREF(self->tc);
     Py_XDECREF(self->bucket);
     Py_XDECREF(self->conncb);

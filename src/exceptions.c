@@ -156,10 +156,6 @@ pycbc_exc_get_categories(PyObject *self, PyObject *arg)
     if (!rv) {
         return NULL;
     }
-#if LCB_VERSION < 0x020300
-    rv = 0;
-#else
     rv = lcb_get_errtype(rc);
-#endif
     return pycbc_IntFromL(rv);
 }

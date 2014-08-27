@@ -143,21 +143,3 @@ pycbc_schedule_dtor_event(pycbc_Connection *self)
     self->dtorcb = NULL;
     self->conncb = NULL;
 }
-
-void
-pycbc_invoke_error_callback(pycbc_Connection *self,
-                            lcb_error_t err, const char *msg)
-{
-    PyObject *errtuple;
-    PyObject *result;
-
-    pycbc_assert(self->errors);
-
-    errtuple = Py_BuildValue("(i,s)", err, msg);
-    pycbc_assert(errtuple);
-
-    result = PyObject_CallMethod(self->errors, "append", "(O)", errtuple);
-
-    Py_DECREF(errtuple);
-    Py_DECREF(result);
-}

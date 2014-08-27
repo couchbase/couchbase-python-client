@@ -114,14 +114,8 @@ handle_single_observe(pycbc_Connection *self,
 
     if (master_only) {
         /** New 'MASTER_ONLY' was added in 2.3.0 */
-#if LCB_VERSION < 0x020300
-        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
-                       "master_only requires libcouchbase >= 2.3.0");
-        return -1;
-#else
         ocmd->version = 1;
         ocmd->v.v1.options = LCB_OBSERVE_MASTER_ONLY;
-#endif
     }
 
     ocmd->v.v0.key = key;

@@ -24,8 +24,8 @@
 #include <Python.h>
 #include <libcouchbase/couchbase.h>
 
-#if LCB_VERSION < 0x020100
-#error "Couchbase Python SDK requires libcouchbase 2.1.0 or greater"
+#if LCB_VERSION < 0x020400
+#error "Couchbase Python SDK requires libcouchbase 2.4.0 or greater"
 #endif
 
 #include <pythread.h>
@@ -276,9 +276,6 @@ typedef struct {
 
     /** Default format, PyInt */
     PyObject *dfl_fmt;
-
-    /** Connection Errors */
-    PyObject *errors;
 
     /** Callback to be invoked when connected */
     PyObject *conncb;
@@ -984,12 +981,6 @@ void pycbc_invoke_connected_event(pycbc_Connection *conn, lcb_error_t err);
  * Schedule the dtor event
  */
 void pycbc_schedule_dtor_event(pycbc_Connection *self);
-
-/**
- * Invoke the error callback to log messages
- */
-void pycbc_invoke_error_callback(pycbc_Connection *self,
-                                 lcb_error_t err, const char *msg);
 
 /**
  * Pipeline handlers

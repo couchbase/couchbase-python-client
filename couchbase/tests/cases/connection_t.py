@@ -121,19 +121,6 @@ class ConnectionTest(CouchbaseTestCase):
         # TODO, see what happens when bad path is used
         # apparently libcouchbase does not report this failure.
 
-    def test_connection_errors(self):
-        cb = self.factory(password='bad',
-                          bucket='meh',
-                          host='localhost',
-                          port=1,
-                          _no_connect_exceptions=True)
-        errors = cb.errors()
-        self.assertTrue(len(errors))
-        self.assertEqual(len(errors[0]), 2)
-
-        cb = self.factory(**self.make_connargs())
-        self.assertFalse(len(cb.errors()))
-
     def test_invalid_hostname(self):
         self.assertRaises(InvalidError,
                           self.factory,

@@ -18,8 +18,6 @@
 The contents of this module do not have a stable API and are subject to
 change
 """
-from collections import deque
-
 import couchbase.connection
 import couchbase._libcouchbase as LCB
 import couchbase.exceptions as E
@@ -71,8 +69,7 @@ class Admin(LCB.Connection):
             'username': username,
             'password': password,
             'host': "{0}:{1}".format(host, port),
-            '_conntype': LCB.LCB_TYPE_CLUSTER,
-            '_errors': deque()
+            '_conntype': LCB.LCB_TYPE_CLUSTER
         }
 
         super(Admin, self).__init__(**kwargs)
