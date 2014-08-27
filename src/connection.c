@@ -760,9 +760,8 @@ Connection_dtor(pycbc_Connection *self)
 {
     if (self->instance) {
         lcb_set_cookie(self->instance, NULL);
+        pycbc_schedule_dtor_event(self);
     }
-
-    pycbc_schedule_dtor_event(self);
 
     Py_XDECREF(self->dtorcb);
     Py_XDECREF(self->dfl_fmt);
