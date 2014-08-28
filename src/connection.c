@@ -443,12 +443,8 @@ static PyMethodDef Bucket_TABLE_methods[] = {
         OPFUNC(delete_multi, "Multi-key variant of delete"),
         OPFUNC(unlock_multi, "Multi-key variant of unlock"),
 
-        OPFUNC(arithmetic, "Modify a counter in Couchbase"),
-        OPFUNC(incr, "Increment a counter in Couchbase"),
-        OPFUNC(decr, "Decrement a counter in Couchbase"),
-        OPFUNC(arithmetic_multi, NULL),
-        OPFUNC(incr_multi, NULL),
-        OPFUNC(decr_multi, NULL),
+        OPFUNC(counter, "Modify a counter in Couchbase"),
+        OPFUNC(counter_multi, "Multi-key variant of counter"),
         OPFUNC(_stats, "Get various server statistics"),
 
         OPFUNC(_http_request, "Internal routine for HTTP requests"),

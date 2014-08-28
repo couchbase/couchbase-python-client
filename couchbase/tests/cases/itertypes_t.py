@@ -30,13 +30,12 @@ class ConnectionItertypeTest(ConnectionTestCase):
         self.cb.get_multi(kvs.keys())
         self.cb.get_multi(kvs.values(), quiet=True)
 
-        self.cb.incr_multi(intlist, initial=10)
-        self.cb.decr_multi(intlist)
+        self.cb.counter_multi(intlist, initial=10)
         self.cb.get_multi(intlist)
 
     def test_bad_elements(self):
         badlist = ("key1", None, "key2")
-        for fn in (self.cb.incr_multi,
+        for fn in (self.cb.counter_multi,
                    self.cb.delete_multi,
                    self.cb.get_multi):
             self.assertRaises(
@@ -75,8 +74,7 @@ class ConnectionItertypeTest(ConnectionTestCase):
                 return self.max
 
         self.cb.delete_multi(IterTemp(gen_ints=False), quiet=True)
-        self.cb.incr_multi(IterTemp(gen_ints = False), initial=10)
-        self.cb.decr_multi(IterTemp(gen_ints = False), initial=10)
+        self.cb.counter_multi(IterTemp(gen_ints = False), initial=10)
         self.cb.get_multi(IterTemp(gen_ints=False))
         self.cb.delete_multi(IterTemp(gen_ints = False))
 

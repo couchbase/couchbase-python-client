@@ -73,7 +73,7 @@ class ConnectionResultsTest(ConnectionTestCase):
         rv = self.cb.delete(key)
         self.__test_oprsesult(rv)
 
-        rv = self.cb.incr(key, initial=10)
+        rv = self.cb.counter(key, initial=10)
         self.__test_valresult(rv, 10)
         rv = self.cb.get(key)
         self.__test_valresult(rv, 10)

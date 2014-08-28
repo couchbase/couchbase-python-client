@@ -374,13 +374,8 @@ PYCBC_DECL_OP(append);
 PYCBC_DECL_OP(prepend);
 
 /* arithmetic.c */
-PYCBC_DECL_OP(arithmetic);
-PYCBC_DECL_OP(incr);
-PYCBC_DECL_OP(decr);
-PYCBC_DECL_OP(arithmetic_multi);
-PYCBC_DECL_OP(incr_multi);
-PYCBC_DECL_OP(decr_multi);
-
+PYCBC_DECL_OP(counter);
+PYCBC_DECL_OP(counter_multi);
 
 /* miscops.c */
 PYCBC_DECL_OP(delete);

@@ -45,7 +45,7 @@ class ConnectionBadArgsTest(ConnectionTestCase):
             print("Testing with key (%r)" % (k,))
 
             self.assertRaises(ValueFormatError, self.cb.get, k)
-            self.assertRaises(ValueFormatError, self.cb.incr, k)
+            self.assertRaises(ValueFormatError, self.cb.counter, k)
             self.assertRaises(ValueFormatError, self.cb.delete, k)
             self.assertRaises(ValueFormatError, self.cb.set, k, "value")
             self.assertRaises(ValueFormatError, self.cb.set, "key", k,
@@ -69,7 +69,7 @@ class ConnectionBadArgsTest(ConnectionTestCase):
 
             self.assertRaises(ArgumentError, self.cb.get_multi, k)
             self.assertRaises(ArgumentError, self.cb.set_multi, k)
-            self.assertRaises(ArgumentError, self.cb.incr_multi, k)
+            self.assertRaises(ArgumentError, self.cb.counter_multi, k)
             self.assertRaises(ArgumentError, self.cb.delete_multi, k)
 
     def test_bad_timeout(self):
@@ -137,7 +137,7 @@ class ConnectionBadArgsTest(ConnectionTestCase):
             self.assertRaises(ArgumentError, self.cb.set, "key", "value",
                               ttl=bad_ttl)
             self.assertRaises(ArgumentError, self.cb.touch, "key", ttl=bad_ttl)
-            self.assertRaises(ArgumentError, self.cb.incr, "key", ttl=bad_ttl)
+            self.assertRaises(ArgumentError, self.cb.counter, "key", ttl=bad_ttl)
             self.assertRaises(ArgumentError, self.cb.lock, "key", ttl=bad_ttl)
 
             self.assertRaises(ArgumentError, self.cb.get_multi,
@@ -146,7 +146,7 @@ class ConnectionBadArgsTest(ConnectionTestCase):
                               { "key" : { 'ttl' : bad_ttl } })
             self.assertRaises(ArgumentError, self.cb.get_multi,
                               { "key" : bad_ttl } )
-            self.assertRaises(ArgumentError, self.cb.incr_multi,
+            self.assertRaises(ArgumentError, self.cb.counter_multi,
                               "key", ttl=bad_ttl)
             self.assertRaises(ArgumentError, self.cb.lock_multi,
                               "key", ttl=bad_ttl)

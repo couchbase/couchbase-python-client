@@ -721,14 +721,15 @@ class Bucket(_Base):
         return _Base.delete(self, key, cas, quiet, persist_to=persist_to,
                             replicate_to=replicate_to)
 
-    def incr(self, key, amount=1, initial=None, ttl=0):
+    def counter(self, key, delta=1, initial=None, ttl=0):
         """
-        Increment the numeric value of a key.
+        Increment or decrement the numeric value of a key.
 
-        :param string key: A key whose counter value is to be incremented
+        :param string key: A key whose counter value is to be modified
 
-        :param int amount: an amount by which the key should be
-          incremented
+        :param int delta: an amount by which the key should be modified.
+          If the number is negative then this number will be *subtracted*
+          from the current value.
 
         :param initial: The initial value for the key, if it does not
           exist. If the key does not exist, this value is used, and
@@ -752,38 +753,30 @@ class Bucket(_Base):
 
         Simple increment::
 
-            rv = cb.incr("key")
+            rv = cb.counter("key")
             rv.value
             # 42
 
         Increment by 10::
 
-            ok = cb.incr("key", amount=10)
+            rv = cb.counter("key", delta=10)
+
+        Decrement by 5::
+
+            rv = cb.counter("key", delta=-5)
 
         Increment by 20, set initial value to 5 if it does not exist::
 
-            ok = cb.incr("key", amount=20, initial=5)
+            rv = cb.counter("key", delta=20, initial=5)
 
         Increment three keys::
-
-            kv = cb.incr_multi(["foo", "bar", "baz"])
+            kv = cb.counter_multi(["foo", "bar", "baz"])
             for key, result in kv.items():
                 print "Key %s has value %d now" % (key, result.value)
 
-        .. seealso:: :meth:`decr`, :meth:`incr_multi`
-
+        .. seealso:: :meth:`counter_multi`
         """
-        return _Base.incr(self, key, amount, initial, ttl)
-
-    def decr(self, key, amount=1, initial=None, ttl=0):
-        """
-        Like :meth:`incr`, but decreases, rather than increaes the
-        counter value
-
-        .. seealso:: :meth:`incr`, :meth:`decr_multi`
-
-        """
-        return _Base.decr(self, key, amount, initial, ttl)
+        return _Base.counter(self, key, delta, initial, ttl)
 
     def stats(self, keys=None):
         """Request server statistics
@@ -1404,8 +1397,8 @@ class Bucket(_Base):
     for classes which want to wrap all the methods
     """
     _MEMCACHED_OPERATIONS = ('set', 'get', 'add', 'append', 'prepend',
-                             'replace', 'delete', 'incr', 'decr', 'touch',
-                             'lock', 'unlock', 'arithmetic', 'endure',
+                             'replace', 'delete', 'counter', 'touch',
+                             'lock', 'unlock', 'endure',
                              'observe', 'rget', 'stats')
 
     _MEMCACHED_NOMULTI = ('stats')

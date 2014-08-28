@@ -42,8 +42,7 @@ class DupKeyTestCase(ConnectionTestCase):
 
             meths = (self.cb.get_multi,
                      self.cb.delete_multi,
-                     self.cb.incr_multi,
-                     self.cb.decr_multi)
+                     self.cb.counter_multi)
 
             for m in meths:
                 print(m.__name__)

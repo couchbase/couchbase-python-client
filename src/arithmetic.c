@@ -17,8 +17,8 @@
 #include "oputil.h"
 
 struct arithmetic_common_vars {
-    lcb_int64_t delta;
-    lcb_uint64_t initial;
+    lcb_S64 delta;
+    lcb_U64 initial;
     unsigned long ttl;
     int create;
 };
@@ -91,10 +91,6 @@ handle_single_arith(pycbc_Bucket *self,
 
         } else if (PyNumber_Check(curvalue)) {
             my_params.delta = pycbc_IntAsLL(curvalue);
-            if (optype == PYCBC_CMD_DECR) {
-                my_params.delta = (-my_params.delta);
-            }
-
         } else {
             PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ARGUMENTS,
                                0,
@@ -133,7 +129,7 @@ arithmetic_common(pycbc_Bucket *self,
     lcb_error_t err;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
 
-    static char *kwlist[] = { "keys", "amount", "initial", "ttl", NULL };
+    static char *kwlist[] = { "keys", "delta", "initial", "ttl", NULL };
 
     global_params.delta = 1;
 
@@ -153,10 +149,7 @@ arithmetic_common(pycbc_Bucket *self,
     }
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
-        rv = pycbc_oputil_check_sequence(collection,
-                            optype != PYCBC_CMD_ARITH,
-                            &ncmds,
-                            &seqtype);
+        rv = pycbc_oputil_check_sequence(collection, 1, &ncmds, &seqtype);
         if (rv < 0) {
             return NULL;
         }
@@ -168,10 +161,6 @@ arithmetic_common(pycbc_Bucket *self,
     if (all_initial_O && PyNumber_Check(all_initial_O)) {
         global_params.create = 1;
         global_params.initial = pycbc_IntAsULL(all_initial_O);
-    }
-
-    if (optype == PYCBC_CMD_DECR) {
-        global_params.delta = -(global_params.delta);
     }
 
     rv = pycbc_common_vars_init(&cv,
@@ -222,10 +211,5 @@ arithmetic_common(pycbc_Bucket *self,
     return arithmetic_common(self, args, kwargs, operation, mode); \
 }
 
-DECLFUNC(arithmetic, PYCBC_CMD_ARITH, PYCBC_ARGOPT_SINGLE)
-DECLFUNC(incr, PYCBC_CMD_INCR, PYCBC_ARGOPT_SINGLE)
-DECLFUNC(decr, PYCBC_CMD_DECR, PYCBC_ARGOPT_SINGLE)
-
-DECLFUNC(arithmetic_multi, PYCBC_CMD_ARITH, PYCBC_ARGOPT_MULTI)
-DECLFUNC(incr_multi, PYCBC_CMD_INCR, PYCBC_ARGOPT_MULTI)
-DECLFUNC(decr_multi, PYCBC_CMD_DECR, PYCBC_ARGOPT_MULTI)
+DECLFUNC(counter, PYCBC_CMD_COUNTER, PYCBC_ARGOPT_SINGLE)
+DECLFUNC(counter_multi, PYCBC_CMD_COUNTER, PYCBC_ARGOPT_MULTI)

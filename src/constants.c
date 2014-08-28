@@ -84,8 +84,6 @@ pycbc_init_pyconstants(PyObject *module)
     PyModule_AddIntMacro(module, PYCBC_CMD_LOCK);
     PyModule_AddIntMacro(module, PYCBC_CMD_TOUCH);
     PyModule_AddIntMacro(module, PYCBC_CMD_GAT);
-    PyModule_AddIntMacro(module, PYCBC_CMD_INCR);
-    PyModule_AddIntMacro(module, PYCBC_CMD_DECR);
 
     PyModule_AddIntMacro(module, PYCBC_EXC_ARGUMENTS);
     PyModule_AddIntMacro(module, PYCBC_EXC_ENCODING);

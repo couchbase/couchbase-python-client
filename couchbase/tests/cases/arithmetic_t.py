@@ -24,34 +24,32 @@ class ConnectionArithmeticTest(ConnectionTestCase):
     def test_trivial_incrdecr(self):
         key = self.gen_key("trivial_incrdecr")
         self.cb.delete(key, quiet=True)
-        rv_arith = self.cb.incr(key, initial=1)
+        rv_arith = self.cb.counter(key, initial=1, delta=1)
         rv_get = self.cb.get(key)
 
         self.assertEqual(rv_arith.value, 1)
         self.assertEqual(int(rv_get.value), 1)
 
-        rv = self.cb.incr(key)
+        rv = self.cb.counter(key)
         self.assertEquals(rv.value, 2)
 
-        rv = self.cb.decr(key)
+        rv = self.cb.counter(key, delta=-1)
         self.assertEquals(rv.value, 1)
         self.assertEquals(int(self.cb.get(key).value), 1)
 
-        rv = self.cb.decr(key)
+        rv = self.cb.counter(key, delta=-1)
         self.assertEquals(rv.value, 0)
         self.assertEquals(int(self.cb.get(key).value), 0)
 
     def test_incr_notfound(self):
         key = self.gen_key("incr_notfound")
         self.cb.delete(key, quiet=True)
-        self.assertRaises(NotFoundError,
-                          self.cb.incr, key)
+        self.assertRaises(NotFoundError, self.cb.counter, key)
 
     def test_incr_badval(self):
         key = self.gen_key("incr_badval")
         self.cb.set(key, "THIS IS SPARTA")
-        self.assertRaises(DeltaBadvalError,
-                          self.cb.incr, key)
+        self.assertRaises(DeltaBadvalError, self.cb.counter, key)
 
     def test_incr_multi(self):
         keys = self.gen_key_list(amount=5, prefix="incr_multi")
@@ -62,30 +60,29 @@ class ConnectionArithmeticTest(ConnectionTestCase):
                 self.assertEqual(v.value, expected)
 
         self.cb.delete_multi(keys, quiet=True)
-        self.cb.incr_multi(keys, initial=5)
+        self.cb.counter_multi(keys, initial=5)
         _multi_lim_assert(5)
 
-        self.cb.incr_multi(keys)
+        self.cb.counter_multi(keys)
         _multi_lim_assert(6)
 
-        self.cb.decr_multi(keys)
+        self.cb.counter_multi(keys, delta=-1)
         _multi_lim_assert(5)
 
-        self.cb.incr_multi(keys, amount=10)
+        self.cb.counter_multi(keys, delta=10)
         _multi_lim_assert(15)
 
-        self.cb.decr_multi(keys, amount=6)
+        self.cb.counter_multi(keys, delta=-6)
         _multi_lim_assert(9)
 
         self.cb.delete(keys[0])
 
-        self.assertRaises(NotFoundError,
-                          self.cb.incr_multi, keys)
+        self.assertRaises(NotFoundError, self.cb.counter_multi, keys)
 
     def test_incr_extended(self):
         key = self.gen_key("incr_extended")
         self.cb.delete(key, quiet=True)
-        rv = self.cb.incr(key, initial=10)
+        rv = self.cb.counter(key, initial=10)
         self.assertEquals(rv.value, 10)
         srv = self.cb.set(key, "42", cas=rv.cas)
         self.assertTrue(srv.success)
@@ -93,7 +90,7 @@ class ConnectionArithmeticTest(ConnectionTestCase):
         # test with multiple values?
         klist = self.gen_key_list(amount=5, prefix="incr_extended_list")
         self.cb.delete_multi(klist, quiet=True)
-        rvs = self.cb.incr_multi(klist, initial=40)
+        rvs = self.cb.counter_multi(klist, initial=40)
         [ self.assertEquals(x.value, 40) for x in rvs.values() ]
         self.assertEquals(sorted(list(rvs.keys())), sorted(klist))
 
