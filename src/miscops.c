@@ -327,9 +327,9 @@ pycbc_Bucket_endure_multi(pycbc_Bucket *self,
     return keyop_common(self, args, kwargs, operation, mode); \
 }
 
-DECLFUNC(delete, PYCBC_CMD_DELETE, PYCBC_ARGOPT_SINGLE)
+DECLFUNC(remove, PYCBC_CMD_DELETE, PYCBC_ARGOPT_SINGLE)
 DECLFUNC(unlock, PYCBC_CMD_UNLOCK, PYCBC_ARGOPT_SINGLE)
-DECLFUNC(delete_multi, PYCBC_CMD_DELETE, PYCBC_ARGOPT_MULTI)
+DECLFUNC(remove_multi, PYCBC_CMD_DELETE, PYCBC_ARGOPT_MULTI)
 DECLFUNC(unlock_multi, PYCBC_CMD_UNLOCK, PYCBC_ARGOPT_MULTI)
 
 

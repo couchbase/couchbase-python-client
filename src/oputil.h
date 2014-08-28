@@ -362,13 +362,13 @@ int pycbc_handle_durability_args(pycbc_Bucket *self,
 
 
 /* store.c */
-PYCBC_DECL_OP(set_multi);
-PYCBC_DECL_OP(add_multi);
+PYCBC_DECL_OP(upsert_multi);
+PYCBC_DECL_OP(insert_multi);
 PYCBC_DECL_OP(replace_multi);
 PYCBC_DECL_OP(append_multi);
 PYCBC_DECL_OP(prepend_multi);
-PYCBC_DECL_OP(set);
-PYCBC_DECL_OP(add);
+PYCBC_DECL_OP(upsert);
+PYCBC_DECL_OP(insert);
 PYCBC_DECL_OP(replace);
 PYCBC_DECL_OP(append);
 PYCBC_DECL_OP(prepend);
@@ -378,9 +378,9 @@ PYCBC_DECL_OP(counter);
 PYCBC_DECL_OP(counter_multi);
 
 /* miscops.c */
-PYCBC_DECL_OP(delete);
+PYCBC_DECL_OP(remove);
 PYCBC_DECL_OP(unlock);
-PYCBC_DECL_OP(delete_multi);
+PYCBC_DECL_OP(remove_multi);
 PYCBC_DECL_OP(unlock_multi);
 
 PYCBC_DECL_OP(_stats);

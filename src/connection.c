@@ -418,13 +418,13 @@ static PyMethodDef Bucket_TABLE_methods[] = {
     PyDoc_STR(doc) }
 
         /** Basic Operations */
-        OPFUNC(set, "Unconditionally store a key in Couchbase"),
-        OPFUNC(add, "Add a key in Couchbase if it does not already exist"),
+        OPFUNC(upsert, "Unconditionally store a key in Couchbase"),
+        OPFUNC(insert, "Add a key in Couchbase if it does not already exist"),
         OPFUNC(replace, "Replace an existing key in Couchbase"),
         OPFUNC(append, "Append to an existing value in Couchbase"),
         OPFUNC(prepend, "Prepend to an existing value in Couchbase"),
-        OPFUNC(set_multi, NULL),
-        OPFUNC(add_multi, NULL),
+        OPFUNC(upsert_multi, NULL),
+        OPFUNC(insert_multi, NULL),
         OPFUNC(replace_multi, NULL),
         OPFUNC(append_multi, NULL),
         OPFUNC(prepend_multi, NULL),
@@ -438,9 +438,9 @@ static PyMethodDef Bucket_TABLE_methods[] = {
         OPFUNC(_rget, NULL),
         OPFUNC(_rgetix, NULL),
 
-        OPFUNC(delete, "Delete a key in Couchbase"),
+        OPFUNC(remove, "Delete a key in Couchbase"),
         OPFUNC(unlock, "Unlock a previously-locked key in Couchbase"),
-        OPFUNC(delete_multi, "Multi-key variant of delete"),
+        OPFUNC(remove_multi, "Multi-key variant of delete"),
         OPFUNC(unlock_multi, "Multi-key variant of unlock"),
 
         OPFUNC(counter, "Modify a counter in Couchbase"),
