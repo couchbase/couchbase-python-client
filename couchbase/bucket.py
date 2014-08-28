@@ -222,15 +222,6 @@ class Bucket(_Base):
         """
         self._connect()
 
-    def __getitem__(self, key):
-        return self.get(key)
-
-    def __setitem__(self, key, value):
-        return self.set(key, value)
-
-    def __delitem__(self, key):
-        return self.delete(key)
-
     def pipeline(self):
         """
 
