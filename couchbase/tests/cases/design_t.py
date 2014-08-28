@@ -38,29 +38,34 @@ class DesignDocManagementTest(DDocTestCase):
     def setUp(self):
         super(DesignDocManagementTest, self).setUp()
         self.skipIfMock()
+        self.mgr = self.cb.bucket_manager()
 
         try:
-            self.cb.design_delete(DNAME, use_devmode=False, syncwait=5)
+            self.mgr.design_delete(DNAME, use_devmode=False, syncwait=5)
         except HTTPError:
             pass
 
         try:
-            self.cb.design_delete(DNAME, use_devmode=True, syncwait=5)
+            self.mgr.design_delete(DNAME, use_devmode=True, syncwait=5)
         except HTTPError:
             pass
+
+    def tearDown(self):
+        del self.mgr
+        super(DesignDocManagementTest, self).tearDown()
+
 
     def test_design_management(self):
-        rv = self.cb.design_create(DNAME,
-                                   DESIGN_JSON,
-                                   use_devmode=True,
-                                   syncwait=5)
+        rv = self.mgr.design_create(
+            DNAME, DESIGN_JSON, use_devmode=True, syncwait=5)
         self.assertTrue(rv.success)
+
         rv = self.cb._view(DNAME, VNAME, use_devmode=True,
                            params = { 'limit':10 })
         print(rv)
         self.assertTrue(rv.success)
 
-        rv = self.cb.design_publish(DNAME, syncwait=5)
+        rv = self.mgr.design_publish(DNAME, syncwait=5)
         self.assertTrue(rv.success)
 
         rv = self.cb._view(DNAME, VNAME, use_devmode=False,
@@ -72,7 +77,7 @@ class DesignDocManagementTest(DDocTestCase):
                           DNAME, VNAME,
                           use_devmode=True)
 
-        rv = self.cb.design_delete(DNAME, use_devmode=False, syncwait=5)
+        rv = self.mgr.design_delete(DNAME, use_devmode=False, syncwait=5)
         self.assertTrue(rv.success)
 
         self.assertRaises(HTTPError,
@@ -81,10 +86,10 @@ class DesignDocManagementTest(DDocTestCase):
                           use_devmode=False)
 
     def test_design_headers(self):
-        rv = self.cb.design_create(DNAME, DESIGN_JSON, use_devmode=True,
+        rv = self.mgr.design_create(DNAME, DESIGN_JSON, use_devmode=True,
                                    syncwait=5)
 
-        rv = self.cb.design_get(DNAME, use_devmode=True)
+        rv = self.mgr.design_get(DNAME, use_devmode=True)
         self.assertTrue(rv.headers)
         print(rv.headers)
         self.assertTrue('X-Couchbase-Meta' in rv.headers)

@@ -358,14 +358,15 @@ class ViewIteratorTest(ViewTestCase):
 
     def test_pycbc_206(self):
         # Set up the view..
-        design = self.cb.design_get('beer', use_devmode=False).value
+        mgr = self.cb.bucket_manager()
+        design = mgr.design_get('beer', use_devmode=False).value
         if not 'with_value' in design['views']:
 
             design['views']['with_value'] = {
                 'map': 'function(doc,meta) { emit(meta.id,doc.name); }'
             }
 
-            ret = self.cb.design_create('beer', design, use_devmode=0)
+            ret = mgr.design_create('beer', design, use_devmode=0)
             self.assertTrue(ret.success)
 
         # Streaming with values
