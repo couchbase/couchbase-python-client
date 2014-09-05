@@ -705,13 +705,14 @@ Bucket__connect(pycbc_Bucket *self)
         return NULL;
     }
 
-    err = pycbc_oputil_wait_common(self);
-
-    if (err != LCB_SUCCESS) {
-        PYCBC_EXCTHROW_WAIT(err);
-        return NULL;
+    pycbc_oputil_wait_common(self);
+    if ((self->flags & PYCBC_CONN_F_ASYNC) == 0) {
+        err = lcb_get_bootstrap_status(self->instance);
+        if (err != LCB_SUCCESS) {
+            PYCBC_EXCTHROW_WAIT(err);
+            return NULL;
+        }
     }
-
     Py_RETURN_NONE;
 }
 

@@ -24,50 +24,6 @@
 #include "pycbc.h"
 
 /**
- * This enumerates the command structures (i.e. lcb_X_cmd_t) with a friendly
- * name for each one.
- */
-
-#define XLCBCMD(X) \
-    X(lcb_get_cmd_t, get) \
-    X(lcb_touch_cmd_t, touch) \
-    X(lcb_store_cmd_t, store) \
-    X(lcb_remove_cmd_t, remove) \
-    X(lcb_arithmetic_cmd_t, arith) \
-    X(lcb_unlock_cmd_t, unlock) \
-    X(lcb_server_stats_cmd_t, stats) \
-    X(lcb_observe_cmd_t, obs) \
-    X(lcb_get_replica_cmd_t, replica) \
-    X(lcb_durability_cmd_t, durability)
-
-/**
- * Union for 'common_vars'; actual commands
- */
-union pycbc_u_cmd {
-#define X(t, name) t name;
-    XLCBCMD(X)
-#undef X
-};
-
-/**
- * Union for 'common_vars'; command lists
- */
-union pycbc_u_pcmd {
-#define X(t, name) t *name;
-    XLCBCMD(X)
-#undef X
-};
-
-/**
- * Union for 'common_vars'; pointers to command pointers.
- */
-union pycbc_u_ppcmd {
-#define X(t, name) const t **name;
-    XLCBCMD(X)
-#undef X
-};
-
-/**
  * Populated by pycbc_oputil_check_sequence, indicates the type of
  * sequence being used.
  *
@@ -101,41 +57,6 @@ typedef enum {
  */
 struct pycbc_common_vars {
     /**
-     * A single command. This is used if the number of items passed is
-     * 1 (i.e. 'single' mode). This eliminates the need for allocating a
-     * pointer to a single command
-     */
-    union pycbc_u_cmd _single_cmd;
-
-    /**
-     * Actual command list. If ncmds is 1, this is a pointer to _single_cmd
-     */
-    union pycbc_u_pcmd cmds;
-
-    /**
-     * Actual command pointer list. If ncmds is 1, this is a pointer to cmds
-     */
-    union pycbc_u_ppcmd cmdlist;
-
-    /**
-     * Pair of stacked pointers, again, used if ncmds == 1.
-     */
-    PyObject *_po_single[2];
-
-    /**
-     * List of backing PyObject* for keys.
-     * As we possibly need conversion to/from bytes, we need to keep the
-     * PyObjects around until the command finishes (or lcb_cmd is scheduled).
-     * If ncmds == 1, then this is set to _po_single[0]
-     */
-    PyObject **enckeys;
-
-    /**
-     * List of backing PyObject* for values. Only used for storage operations.
-     */
-    PyObject **encvals;
-
-    /**
      * Return value information. The MultiResult object is always allocated,
      * however. If we need to return a single result, we extract it out of
      * the MultiResult object and decref the latter.
@@ -166,9 +87,11 @@ struct pycbc_common_vars {
      * only, with the callback decrementing it as needed
      */
     char is_seqcmd;
+
+    lcb_MULTICMD_CTX *mctx;
 };
 
-#define PYCBC_COMMON_VARS_STATIC_INIT { { { 0 } } }
+#define PYCBC_COMMON_VARS_STATIC_INIT { 0 }
 
 /**
  * Handler for iterations
@@ -181,7 +104,6 @@ typedef int (*pycbc_oputil_keyhandler)
                 PyObject *value,
                 PyObject *options,
                 pycbc_Item *item,
-                int ii,
                 void *arg);
 
 /**
@@ -268,7 +190,6 @@ int pycbc_oputil_sequence_next(pycbc_seqtype_t seqtype,
  * Initialize the 'common_vars' structure.
  * @param cv a pointer to a zero-populated common_vars struct
  * @param ncmds the number of keys in the operation
- * @param tsize the size of the lcb_cmd_t structure to use
  * @param want_vals whether this operation will need to use values. This is
  * used to determine if the 'encvals' field should be allocated
  */
@@ -276,7 +197,6 @@ int pycbc_common_vars_init(struct pycbc_common_vars *cv,
                            pycbc_Bucket *self,
                            int argopts,
                            Py_ssize_t ncmds,
-                           size_t tsize,
                            int want_vals);
 
 
@@ -317,7 +237,7 @@ int pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Bucket *self);
  * Wrapper around lcb_wait(). This ensures threading contexts are properly
  * initialized.
  */
-lcb_error_t
+void
 pycbc_oputil_wait_common(pycbc_Bucket *self);
 
 

@@ -24,38 +24,31 @@ struct arithmetic_common_vars {
 };
 
 static int
-handle_single_arith(pycbc_Bucket *self,
-                    struct pycbc_common_vars *cv,
-                    int optype,
-                    PyObject *curkey,
-                    PyObject *curvalue,
-                    PyObject *options,
-                    pycbc_Item *item,
-                    int ii,
-                    void *arg)
+handle_single_arith(pycbc_Bucket *self, struct pycbc_common_vars *cv,
+    int optype, PyObject *curkey, PyObject *curvalue, PyObject *options,
+    pycbc_Item *item, void *arg)
 {
     void *key;
     size_t nkey;
-    int rv;
-    lcb_arithmetic_cmd_t *acmd;
+    int rv = 0;
+    lcb_error_t err;
+    lcb_CMDCOUNTER cmd;
     struct arithmetic_common_vars my_params;
     static char *kwlist[] = { "delta", "initial", "ttl", NULL };
     my_params = *(struct arithmetic_common_vars *)arg;
 
     (void)item;
-
-    acmd = cv->cmds.arith + ii;
+    memset(&cmd, 0, sizeof cmd);
 
     rv = pycbc_tc_encode_key(self, &curkey, &key, &nkey);
     if (rv < 0) {
         return -1;
     }
 
-    cv->enckeys[ii] = curkey;
-
     if (!nkey) {
         PYCBC_EXCTHROW_EMPTYKEY();
-        return -1;
+        rv = -1;
+        goto GT_DONE;
     }
 
     if (options) {
@@ -65,25 +58,18 @@ handle_single_arith(pycbc_Bucket *self,
     if (curvalue) {
         if (PyDict_Check(curvalue)) {
             PyObject *initial_O = NULL;
-            rv = PyArg_ParseTupleAndKeywords(pycbc_DummyTuple,
-                                             curvalue,
-                                             "L|Ok",
-                                             kwlist,
-                                             &my_params.delta,
-                                             &initial_O,
-                                             &my_params.ttl);
+            rv = PyArg_ParseTupleAndKeywords(pycbc_DummyTuple, curvalue, "L|Ok",
+                kwlist, &my_params.delta, &initial_O, &my_params.ttl);
             if (!rv) {
-                PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ARGUMENTS, 0,
-                                   "Couldn't parse parameter for key",
-                                   curkey);
-                return -1;
+                PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ARGUMENTS, 0, "Couldn't parse parameter for key", curkey);
+                rv = -1;
+                goto GT_DONE;
             }
 
             if (initial_O) {
                 if (PyNumber_Check(initial_O)) {
                     my_params.create = 1;
                     my_params.initial = pycbc_IntAsULL(initial_O);
-
                 } else {
                     my_params.create = 0;
                 }
@@ -92,32 +78,32 @@ handle_single_arith(pycbc_Bucket *self,
         } else if (PyNumber_Check(curvalue)) {
             my_params.delta = pycbc_IntAsLL(curvalue);
         } else {
-            PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ARGUMENTS,
-                               0,
-                               "value for key must be an integer amount "
-                               "or a dict of parameters",
-                               curkey);
+            PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ARGUMENTS, 0, "value for key must be an integer amount or a dict of parameters", curkey);
             return -1;
         }
     }
 
-    acmd->v.v0.key = key;
-    acmd->v.v0.nkey = nkey;
-    acmd->v.v0.delta = my_params.delta;
-    acmd->v.v0.create = my_params.create;
-    acmd->v.v0.exptime = my_params.ttl;
-    acmd->v.v0.initial = my_params.initial;
-    cv->cmdlist.arith[ii] = acmd;
+    LCB_CMD_SET_KEY(&cmd, key, nkey);
+    cmd.delta = my_params.delta;
+    cmd.create = my_params.create;
+    cmd.initial = my_params.initial;
+    cmd.exptime = my_params.ttl;
+    err = lcb_counter3(self->instance, cv->mres, &cmd);
+    if (err != LCB_SUCCESS) {
+        PYCBC_EXCTHROW_SCHED(err);
+        rv = -1;
+    } else {
+        rv = 0;
+    }
 
-    return 0;
+    GT_DONE:
+    Py_XDECREF(curkey);
+    return rv;
 }
 
 PyObject *
-arithmetic_common(pycbc_Bucket *self,
-                                   PyObject *args,
-                                   PyObject *kwargs,
-                                   int optype,
-                                   int argopts)
+arithmetic_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
+    int optype, int argopts)
 {
     int rv;
     Py_ssize_t ncmds;
@@ -126,7 +112,6 @@ arithmetic_common(pycbc_Bucket *self,
     PyObject *all_initial_O = NULL;
     PyObject *all_ttl_O = NULL;
     PyObject *collection;
-    lcb_error_t err;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
 
     static char *kwlist[] = { "keys", "delta", "initial", "ttl", NULL };
@@ -134,10 +119,7 @@ arithmetic_common(pycbc_Bucket *self,
     global_params.delta = 1;
 
     rv = PyArg_ParseTupleAndKeywords(args, kwargs, "O|LOO", kwlist,
-                                     &collection,
-                                     &global_params.delta,
-                                     &all_initial_O,
-                                     &all_ttl_O);
+        &collection, &global_params.delta, &all_initial_O, &all_ttl_O);
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;
@@ -163,36 +145,18 @@ arithmetic_common(pycbc_Bucket *self,
         global_params.initial = pycbc_IntAsULL(all_initial_O);
     }
 
-    rv = pycbc_common_vars_init(&cv,
-                                self,
-                                argopts,
-                                ncmds,
-                                sizeof(lcb_arithmetic_cmd_t),
-                                0);
+    rv = pycbc_common_vars_init(&cv, self, argopts, ncmds, 0);
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
-        rv = pycbc_oputil_iter_multi(self,
-                                     seqtype,
-                                     collection,
-                                     &cv,
-                                     optype,
-                                     handle_single_arith,
-                                     &global_params);
+        rv = pycbc_oputil_iter_multi(self, seqtype, collection, &cv, optype,
+            handle_single_arith, &global_params);
 
     } else {
-        rv = handle_single_arith(self,
-                                 &cv, optype, collection, NULL, NULL, NULL, 0,
-                                 &global_params);
+        rv = handle_single_arith(self, &cv, optype, collection, NULL, NULL, NULL,
+            &global_params);
     }
 
     if (rv < 0) {
-        goto GT_DONE;
-    }
-
-
-    err = lcb_arithmetic(self->instance, cv.mres, ncmds, cv.cmdlist.arith);
-    if (err != LCB_SUCCESS) {
-        PYCBC_EXCTHROW_SCHED(err);
         goto GT_DONE;
     }
 

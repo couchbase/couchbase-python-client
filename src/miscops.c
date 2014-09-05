@@ -29,23 +29,26 @@
  * This is called during each iteration of delete/unlock
  */
 static int
-handle_single_keyop(pycbc_Bucket *self,
-                    struct pycbc_common_vars *cv,
-                    int optype,
-                    PyObject *curkey,
-                    PyObject *curval,
-                    PyObject *options,
-                    pycbc_Item *item,
-                    int ii,
-                    void *arg)
+handle_single_keyop(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
+    PyObject *curkey, PyObject *curval, PyObject *options, pycbc_Item *item,
+    void *arg)
 {
     int rv;
     char *key;
     size_t nkey;
-    lcb_uint64_t cas = 0;
+    lcb_U64 cas = 0;
+    lcb_error_t err;
 
-    (void)options;
-    (void)arg;
+    union {
+        lcb_CMDBASE base;
+        lcb_CMDREMOVE rm;
+        lcb_CMDUNLOCK unl;
+        lcb_CMDENDURE endure;
+    } ucmd;
+
+    (void)options; (void)arg;
+
+    memset(&ucmd, 0, sizeof ucmd);
 
     if ( (optype == PYCBC_CMD_UNLOCK || optype == PYCBC_CMD_ENDURE)
             && PYCBC_OPRES_CHECK(curkey)) {
@@ -58,11 +61,10 @@ handle_single_keyop(pycbc_Bucket *self,
         return -1;
     }
 
-    cv->enckeys[ii] = curkey;
-
     if (!nkey) {
         PYCBC_EXCTHROW_EMPTYKEY();
-        return -1;
+        rv = -1;
+        goto GT_DONE;
     }
 
     if (item) {
@@ -92,48 +94,37 @@ handle_single_keyop(pycbc_Bucket *self,
         }
     }
 
-    if (optype == PYCBC_CMD_UNLOCK) {
-        lcb_unlock_cmd_t *ucmd = cv->cmds.unlock + ii;
+    LCB_CMD_SET_KEY(&ucmd.base, key, nkey);
+    ucmd.base.cas = cas;
 
+    if (optype == PYCBC_CMD_UNLOCK) {
         if (!cas) {
-            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS,
-                           0,
-                           "CAS must be specified for unlock");
+            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "CAS must be specified for unlock");
             return -1;
         }
-
-        ucmd->v.v0.key = key;
-        ucmd->v.v0.nkey = nkey;
-        ucmd->v.v0.cas = cas;
-        cv->cmdlist.unlock[ii] = ucmd;
-
-        return 0;
+        err = lcb_unlock3(self->instance, cv->mres, &ucmd.unl);
 
     } else if (optype == PYCBC_CMD_ENDURE) {
-        lcb_durability_cmd_t *dcmd = cv->cmds.durability + ii;
-        dcmd->v.v0.cas = cas;
-        dcmd->v.v0.key = key;
-        dcmd->v.v0.nkey = nkey;
-        cv->cmdlist.durability[ii] = dcmd;
-        return 0;
+        err = cv->mctx->addcmd(cv->mctx, &ucmd.base);
 
     } else {
-        lcb_remove_cmd_t *rcmd = cv->cmds.remove + ii;
-        rcmd->v.v0.key = key;
-        rcmd->v.v0.nkey = nkey;
-        rcmd->v.v0.cas = cas;
-        cv->cmdlist.remove[ii] = rcmd;
-
-        return 0;
+        err = lcb_remove3(self->instance, cv->mres, &ucmd.rm);
     }
+    if (err == LCB_SUCCESS) {
+        rv = 0;
+    } else {
+        rv = -1;
+        PYCBC_EXCTHROW_SCHED(err);
+    }
+
+    GT_DONE:
+    Py_XDECREF(curkey);
+    return rv;
 }
 
 static PyObject *
-keyop_common(pycbc_Bucket *self,
-             PyObject *args,
-             PyObject *kwargs,
-             int optype,
-             int argopts)
+keyop_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
+    int argopts)
 {
     int rv;
     Py_ssize_t ncmds = 0;
@@ -142,7 +133,6 @@ keyop_common(pycbc_Bucket *self,
     PyObject *is_quiet = NULL;
     PyObject *kobj = NULL;
     char persist_to = 0, replicate_to = 0;
-    lcb_error_t err;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
 
     static char *kwlist[] = {
@@ -177,12 +167,7 @@ keyop_common(pycbc_Bucket *self,
         ncmds = 1;
     }
 
-    rv = pycbc_common_vars_init(&cv,
-                                self,
-                                argopts,
-                                ncmds,
-                                sizeof(lcb_remove_cmd_t),
-                                0);
+    rv = pycbc_common_vars_init(&cv, self, argopts, ncmds, 0);
     if (rv < 0) {
         return NULL;
     }
@@ -191,15 +176,12 @@ keyop_common(pycbc_Bucket *self,
         rv = pycbc_oputil_iter_multi(self, seqtype, kobj, &cv, optype,
                                      handle_single_keyop, NULL);
     } else {
-        rv = handle_single_keyop(self,
-                                 &cv, optype, kobj, casobj, NULL, NULL, 0, NULL);
+        rv = handle_single_keyop(self, &cv, optype, kobj, casobj, NULL, NULL, NULL);
     }
 
     if (rv < 0) {
         goto GT_DONE;
     }
-
-
 
     if (optype == PYCBC_CMD_DELETE) {
         rv = pycbc_handle_durability_args(self, &cv.mres->dur,
@@ -210,19 +192,9 @@ keyop_common(pycbc_Bucket *self,
         } else if (rv == -1) {
             goto GT_DONE;
         }
-
         if (pycbc_maybe_set_quiet(cv.mres, is_quiet) == -1) {
             goto GT_DONE;
         }
-        err = lcb_remove(self->instance, cv.mres, ncmds, cv.cmdlist.remove);
-
-    } else {
-        err = lcb_unlock(self->instance, cv.mres, ncmds, cv.cmdlist.unlock);
-    }
-
-    if (err != LCB_SUCCESS) {
-        PYCBC_EXCTHROW_SCHED(err);
-        goto GT_DONE;
     }
 
     if (-1 == pycbc_common_vars_wait(&cv, self)) {
@@ -236,9 +208,7 @@ keyop_common(pycbc_Bucket *self,
 
 
 PyObject *
-pycbc_Bucket_endure_multi(pycbc_Bucket *self,
-                              PyObject *args,
-                              PyObject *kwargs)
+pycbc_Bucket_endure_multi(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
 {
     int rv;
     Py_ssize_t ncmds;
@@ -263,16 +233,10 @@ pycbc_Bucket_endure_multi(pycbc_Bucket *self,
             NULL
     };
 
-    rv = PyArg_ParseTupleAndKeywords(args,
-                                     kwargs,
-                                     "OBB|Off",
-                                     kwlist,
+    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "OBB|Off", kwlist,
                                      &keys,
-                                     &persist_to,
-                                     &replicate_to,
-                                     &is_delete_O,
-                                     &timeout,
-                                     &interval);
+                                     &persist_to, &replicate_to,
+                                     &is_delete_O, &timeout, &interval);
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;
@@ -282,16 +246,9 @@ pycbc_Bucket_endure_multi(pycbc_Bucket *self,
     if (rv < 0) {
         return NULL;
     }
-    rv = pycbc_common_vars_init(&cv, self, PYCBC_ARGOPT_MULTI, ncmds,
-                                sizeof(lcb_durability_cmd_t), 0);
+    rv = pycbc_common_vars_init(&cv, self, PYCBC_ARGOPT_MULTI, ncmds, 0);
     if (rv < 0) {
         return NULL;
-    }
-
-    rv = pycbc_oputil_iter_multi(self, seqtype, keys, &cv, PYCBC_CMD_ENDURE,
-                                 handle_single_keyop, NULL);
-    if (rv < 0) {
-        goto GT_DONE;
     }
 
     dopts.v.v0.cap_max = persist_to < 0 || replicate_to < 0;
@@ -300,17 +257,18 @@ pycbc_Bucket_endure_multi(pycbc_Bucket *self,
     dopts.v.v0.interval = (lcb_uint32_t)(interval * 1000000.0);
     dopts.v.v0.persist_to = persist_to;
     dopts.v.v0.replicate_to = replicate_to;
-
-    err = lcb_durability_poll(self->instance,
-                              cv.mres,
-                              &dopts,
-                              ncmds,
-                              cv.cmdlist.durability);
-
-    if (err != LCB_SUCCESS) {
+    cv.mctx = lcb_endure3_ctxnew(self->instance, &dopts, &err);
+    if (cv.mctx == NULL) {
         PYCBC_EXCTHROW_SCHED(err);
         goto GT_DONE;
     }
+
+    rv = pycbc_oputil_iter_multi(self, seqtype, keys, &cv, PYCBC_CMD_ENDURE,
+                                 handle_single_keyop, NULL);
+    if (rv < 0) {
+        goto GT_DONE;
+    }
+
     if (-1 == pycbc_common_vars_wait(&cv, self)) {
         goto GT_DONE;
     }
@@ -341,10 +299,11 @@ pycbc_Bucket__stats(pycbc_Bucket *self,
     int rv;
     int ii;
     Py_ssize_t ncmds;
-    lcb_error_t err;
+    lcb_error_t err = LCB_ERROR;
     PyObject *keys = NULL;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
     static char *kwlist[] = {  "keys", NULL };
+    lcb_CMDSTATS cmd = { 0 };
 
     rv = PyArg_ParseTupleAndKeywords(args, kwargs, "|O", kwlist, &keys);
 
@@ -365,12 +324,7 @@ pycbc_Bucket__stats(pycbc_Bucket *self,
         ncmds = PySequence_Size(keys);
     }
 
-    rv = pycbc_common_vars_init(&cv,
-                                self,
-                                PYCBC_ARGOPT_MULTI,
-                                ncmds,
-                                sizeof(lcb_server_stats_cmd_t),
-                                0);
+    rv = pycbc_common_vars_init(&cv, self, PYCBC_ARGOPT_MULTI, ncmds, 0);
     if (rv < 0) {
         return NULL;
     }
@@ -382,27 +336,21 @@ pycbc_Bucket__stats(pycbc_Bucket *self,
             PyObject *newkey = NULL;
 
             PyObject *curkey = PySequence_GetItem(keys, ii);
-            lcb_server_stats_cmd_t *cmd = cv.cmds.stats + ii;
             rv = pycbc_BufFromString(curkey, &key, &nkey, &newkey);
             if (rv < 0) {
-                PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ARGUMENTS,
-                                   0,
-                                   "bad key type in stats",
-                                   curkey);
+                PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ARGUMENTS, 0, "bad key type in stats", curkey);
                 goto GT_DONE;
             }
 
-            cmd->v.v0.name = key;
-            cmd->v.v0.nname = nkey;
-            cv.cmdlist.stats[ii] = cmd;
-            cv.enckeys[ii] = newkey;
+            LCB_CMD_SET_KEY(&cmd, key, nkey);
+            err = lcb_stats3(self->instance, cv.mres, &cmd);
+            Py_XDECREF(newkey);
         }
 
     } else {
-        cv.cmdlist.stats[0] = cv.cmds.stats;
+        err = lcb_stats3(self->instance, cv.mres, &cmd);
     }
 
-    err = lcb_server_stats(self->instance, cv.mres, ncmds, cv.cmdlist.stats);
     if (err != LCB_SUCCESS) {
         PYCBC_EXCTHROW_SCHED(err);
         goto GT_DONE;

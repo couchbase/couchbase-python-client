@@ -19,30 +19,11 @@
 void
 pycbc_common_vars_finalize(struct pycbc_common_vars *cv, pycbc_Bucket *conn)
 {
-    int ii;
-    if (cv->enckeys) {
-        for (ii = 0; ii < cv->ncmds; ii++) {
-            Py_XDECREF(cv->enckeys[ii]);
-        }
+    if (cv->mctx) {
+        cv->mctx->fail(cv->mctx);
+        cv->mctx = NULL;
     }
-
-    if (cv->encvals) {
-        for (ii = 0; ii < cv->ncmds; ii++) {
-            Py_XDECREF(cv->encvals[ii]);
-        }
-    }
-
-    /**
-     * We only free the other malloc'd structures if we had more than
-     * one command.
-     */
-    if (cv->ncmds > 1) {
-        free(cv->cmds.get);
-        free((void*)cv->cmdlist.get);
-        free(cv->enckeys);
-        free(cv->encvals);
-    }
-
+    lcb_sched_fail(conn->instance);
     Py_XDECREF(cv->mres);
 
     if (conn->lockmode) {
@@ -54,6 +35,12 @@ int
 pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Bucket *self)
 {
     Py_ssize_t nsched = cv->is_seqcmd ? 1 : cv->ncmds;
+
+    if (cv->mctx) {
+        cv->mctx->done(cv->mctx, cv->mres);
+        cv->mctx = NULL;
+    }
+    lcb_sched_leave(self->instance);
     self->nremaining += nsched;
 
     if (self->flags & PYCBC_CONN_F_ASYNC) {
@@ -71,7 +58,6 @@ pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Bucket *self)
         Py_INCREF(Py_None);
         return 0;
     }
-
     pycbc_oputil_wait_common(self);
 
     if (!pycbc_assert(self->nremaining == 0)) {
@@ -99,12 +85,8 @@ pycbc_common_vars_init(struct pycbc_common_vars *cv,
                        pycbc_Bucket *self,
                        int argopts,
                        Py_ssize_t ncmds,
-                       size_t tsize,
                        int want_vals)
 {
-    int ok;
-
-
     if (-1 == pycbc_oputil_conn_lock(self)) {
         return -1;
     }
@@ -122,43 +104,7 @@ pycbc_common_vars_init(struct pycbc_common_vars *cv,
         return -1;
     }
 
-    /**
-     * If we have a single command, use the stack-allocated space.
-     */
-    if (ncmds == 1) {
-        cv->cmds.get = &cv->_single_cmd.get;
-        cv->cmdlist.get = (void*)&cv->cmds.get;
-        cv->enckeys = cv->_po_single;
-        cv->encvals = cv->_po_single + 1;
-        return 0;
-    }
-
-    /**
-     * TODO: Maybe Python has a memory pool we can use?
-     */
-    cv->cmds.get = calloc(ncmds, tsize);
-    cv->cmdlist.get = malloc(ncmds * sizeof(void*));
-    cv->enckeys = calloc(ncmds, sizeof(PyObject*));
-
-    if (want_vals) {
-        cv->encvals = calloc(ncmds, sizeof(PyObject*));
-
-    } else {
-        cv->encvals = NULL;
-    }
-
-    ok = (cv->cmds.get && cv->cmdlist.get && cv->enckeys);
-    if (ok) {
-        ok = (want_vals == 0 || cv->encvals);
-    }
-
-    if (!ok) {
-        pycbc_common_vars_finalize(cv, self);
-        PyErr_SetNone(PyExc_MemoryError);
-        return -1;
-    }
-
-
+    lcb_sched_enter(self->instance);
     return 0;
 }
 
@@ -402,10 +348,7 @@ pycbc_oputil_iter_multi(pycbc_Bucket *self,
     PyObject *seqobj;
     Py_ssize_t dictpos = 0;
 
-    seqobj = pycbc_oputil_iter_prepare(seqtype,
-                                       collection,
-                                       &iterobj,
-                                       &dictpos);
+    seqobj = pycbc_oputil_iter_prepare(seqtype, collection, &iterobj, &dictpos);
     if (seqobj == NULL) {
         return -1;
     }
@@ -431,7 +374,7 @@ pycbc_oputil_iter_multi(pycbc_Bucket *self,
             arg_k = k;
         }
 
-        rv = handler(self, cv, optype, arg_k, v, options, itm, ii, arg);
+        rv = handler(self, cv, optype, arg_k, v, options, itm, arg);
 
         GT_ITER_DONE:
         Py_XDECREF(k);
@@ -492,10 +435,9 @@ pycbc_oputil_conn_unlock(pycbc_Bucket *self)
     PyThread_release_lock(self->lock);
 }
 
-lcb_error_t
+void
 pycbc_oputil_wait_common(pycbc_Bucket *self)
 {
-    lcb_error_t ret;
     /**
      * If we have a 'lockmode' specified, check to see that nothing else is
      * using us. We lock in any event.
@@ -511,11 +453,8 @@ pycbc_oputil_wait_common(pycbc_Bucket *self)
      */
 
     PYCBC_CONN_THR_BEGIN(self);
-    ret = lcb_wait(self->instance);
+    lcb_wait3(self->instance, LCB_WAIT_NOCHECK);
     PYCBC_CONN_THR_END(self);
-
-
-    return ret;
 }
 
 /**

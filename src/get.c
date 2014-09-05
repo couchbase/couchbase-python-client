@@ -32,15 +32,9 @@ struct getcmd_vars_st {
 };
 
 static int
-handle_single_key(pycbc_Bucket *self,
-                  struct pycbc_common_vars *cv,
-                  int optype,
-                  PyObject *curkey,
-                  PyObject *curval,
-                  PyObject *options,
-                  pycbc_Item *itm,
-                  int ii,
-                  void *arg)
+handle_single_key(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
+    PyObject *curkey, PyObject *curval, PyObject *options, pycbc_Item *itm,
+    void *arg)
 {
     int rv;
     char *key;
@@ -48,7 +42,16 @@ handle_single_key(pycbc_Bucket *self,
     unsigned int lock = 0;
     struct getcmd_vars_st *gv = (struct getcmd_vars_st *)arg;
     unsigned long ttl = gv->u.ttl;
+    lcb_error_t err;
 
+    union {
+        lcb_CMDBASE base;
+        lcb_CMDGET get;
+        lcb_CMDTOUCH touch;
+        lcb_CMDGETREPLICA rget;
+    } u_cmd;
+
+    memset(&u_cmd, 0, sizeof u_cmd);
     (void)itm;
 
     rv = pycbc_tc_encode_key(self, &curkey, (void**)&key, &nkey);
@@ -56,12 +59,13 @@ handle_single_key(pycbc_Bucket *self,
         return -1;
     }
 
-    cv->enckeys[ii] = curkey;
-
     if (!nkey) {
         PYCBC_EXCTHROW_EMPTYKEY();
-        return -1;
+        rv = -1;
+        goto GT_DONE;
     }
+
+    LCB_CMD_SET_KEY(&u_cmd.base, key, nkey);
 
     if (curval && gv->allow_dval && options == NULL) {
         options = curval;
@@ -70,20 +74,18 @@ handle_single_key(pycbc_Bucket *self,
         static char *kwlist[] = { "ttl", NULL };
         PyObject *ttl_O = NULL;
         if (gv->u.ttl) {
-            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS,
-                           0,
-                           "Both global and single TTL specified");
-            return -1;
+            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Both global and single TTL specified");
+            rv = -1;
+            goto GT_DONE;
         }
 
         if (PyDict_Check(curval)) {
-            rv = PyArg_ParseTupleAndKeywords(pycbc_DummyTuple, curval,
-                                             "|O", kwlist, &ttl_O);
+            rv = PyArg_ParseTupleAndKeywords(pycbc_DummyTuple,
+                curval, "|O", kwlist, &ttl_O);
             if (!rv) {
-                PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ARGUMENTS, 0,
-                                   "Couldn't get sub-parmeters for key",
-                                   curkey);
-                return -1;
+                PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ARGUMENTS, 0, "Couldn't get sub-parmeters for key", curkey);
+                rv = -1;
+                goto GT_DONE;
             }
         } else {
             ttl_O = curval;
@@ -91,75 +93,75 @@ handle_single_key(pycbc_Bucket *self,
 
         rv = pycbc_get_ttl(ttl_O, &ttl, 1);
         if (rv < 0) {
-            return -1;
+            rv = -1;
+            goto GT_DONE;
         }
     }
+    u_cmd.base.exptime = ttl;
+
     switch (optype) {
     case PYCBC_CMD_GAT:
         if (!ttl) {
             PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "GAT must have positive TTL");
-            return -1;
+            rv = -1;
+            goto GT_DONE;
         }
         goto GT_GET;
 
     case PYCBC_CMD_LOCK:
         if (!ttl) {
             PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Lock must have an expiry");
-            return -1;
+            rv = -1;
+            goto GT_DONE;
         }
         lock = 1;
         goto GT_GET;
 
     case PYCBC_CMD_GET:
-        GT_GET: {
-            lcb_get_cmd_t *gcmd = cv->cmds.get + ii;
-            gcmd->v.v0.lock = lock;
-            gcmd->v.v0.key = key;
-            gcmd->v.v0.nkey = nkey;
-            gcmd->v.v0.exptime = ttl;
-            cv->cmdlist.get[ii] = gcmd;
-        }
+        GT_GET:
+        u_cmd.get.lock = lock;
+        err = lcb_get3(self->instance, cv->mres, &u_cmd.get);
         break;
 
-    case PYCBC_CMD_TOUCH: {
-        lcb_touch_cmd_t *tcmd = cv->cmds.touch + ii;
-        tcmd->v.v0.key = key;
-        tcmd->v.v0.nkey = nkey;
-        tcmd->v.v0.exptime = ttl;
-        cv->cmdlist.touch[ii] = tcmd;
+    case PYCBC_CMD_TOUCH:
+        u_cmd.touch.exptime = ttl;
+        err = lcb_touch3(self->instance, cv->mres, &u_cmd.touch);
         break;
-    }
 
     case PYCBC_CMD_GETREPLICA:
     case PYCBC_CMD_GETREPLICA_INDEX:
-    case PYCBC_CMD_GETREPLICA_ALL: {
-        lcb_get_replica_cmd_t *rcmd = cv->cmds.replica + ii;
-        rcmd->version = 1;
-        rcmd->v.v1.key = key;
-        rcmd->v.v1.nkey = nkey;
-        rcmd->v.v1.nkey = nkey;
-        rcmd->v.v1.strategy = gv->u.replica.strategy;
-        rcmd->v.v1.index = gv->u.replica.index;
-
-        cv->cmdlist.replica[ii] = rcmd;
+    case PYCBC_CMD_GETREPLICA_ALL:
+        u_cmd.rget.strategy = gv->u.replica.strategy;
+        u_cmd.rget.index = gv->u.replica.index;
+        err = lcb_rget3(self->instance, cv->mres, &u_cmd.rget);
+        break;
+    default:
+        err = LCB_ERROR;
+        abort();
         break;
     }
 
+    if (err != LCB_SUCCESS) {
+        PYCBC_EXCTHROW_SCHED(err);
+        rv = -1;
+        goto GT_DONE;
+    } else {
+        rv = 0;
     }
 
-    return 0;
+    GT_DONE:
+    Py_XDECREF(curkey);
+    return rv;
 }
 
-static int handle_replica_options(int *optype,
-                                  struct getcmd_vars_st *gv,
-                                  PyObject *replica_O)
+static int
+handle_replica_options(int *optype, struct getcmd_vars_st *gv, PyObject *replica_O)
 {
     switch (*optype) {
     case PYCBC_CMD_GET:
         *optype = PYCBC_CMD_GETREPLICA;
         if (gv->u.ttl) {
-            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS,
-                           0, "TTL specified along with replica");
+            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "TTL specified along with replica");
             return -1;
         }
         gv->u.replica.strategy = LCB_REPLICA_FIRST;
@@ -172,8 +174,7 @@ static int handle_replica_options(int *optype,
     case PYCBC_CMD_GETREPLICA_INDEX:
         gv->u.replica.strategy = LCB_REPLICA_SELECT;
         if (replica_O == NULL || replica_O == Py_None) {
-            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS,
-                           0, "rgetix must have a valid replica index");
+            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "rgetix must have a valid replica index");
             return -1;
         }
         gv->u.replica.index = (short)pycbc_IntAsL(replica_O);
@@ -187,8 +188,7 @@ static int handle_replica_options(int *optype,
         return 0;
 
     default:
-        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0,
-                       "Replica option not supported for this operation");
+        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Replica option not supported for this operation");
         return -1;
     }
     return -1;
@@ -196,20 +196,14 @@ static int handle_replica_options(int *optype,
 
 
 static PyObject*
-get_common(pycbc_Bucket *self,
-           PyObject *args,
-           PyObject *kwargs,
-           int optype,
-           int argopts)
+get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
+    int argopts)
 {
     int rv;
     Py_ssize_t ncmds = 0;
-    size_t cmdsize;
     pycbc_seqtype_t seqtype;
     PyObject *kobj = NULL;
     PyObject *is_quiet = NULL;
-    lcb_error_t err;
-
     PyObject *ttl_O = NULL;
     PyObject *replica_O = NULL;
     PyObject *nofmt_O = NULL;
@@ -220,15 +214,8 @@ get_common(pycbc_Bucket *self,
             "keys", "ttl", "quiet", "replica", "no_format", NULL
     };
 
-    rv = PyArg_ParseTupleAndKeywords(args,
-                                     kwargs,
-                                     "O|OOOO",
-                                     kwlist,
-                                     &kobj,
-                                     &ttl_O,
-                                     &is_quiet,
-                                     &replica_O,
-                                     &nofmt_O);
+    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "O|OOOO", kwlist,
+        &kobj, &ttl_O, &is_quiet, &replica_O, &nofmt_O);
 
     if (!rv) {
         PYCBC_EXCTHROW_ARGS()
@@ -249,10 +236,7 @@ get_common(pycbc_Bucket *self,
     }
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
-        rv = pycbc_oputil_check_sequence(kobj,
-                                         optype,
-                                         &ncmds,
-                                         &seqtype);
+        rv = pycbc_oputil_check_sequence(kobj, optype, &ncmds, &seqtype);
         if (rv < 0) {
             return NULL;
         }
@@ -261,24 +245,22 @@ get_common(pycbc_Bucket *self,
         ncmds = 1;
     }
 
+    gv.allow_dval = 1;
 
     switch (optype) {
     case PYCBC_CMD_GET:
     case PYCBC_CMD_LOCK:
     case PYCBC_CMD_GAT:
         gv.allow_dval = 1;
-        cmdsize = sizeof(lcb_get_cmd_t);
         break;
 
     case PYCBC_CMD_TOUCH:
         gv.allow_dval = 1;
-        cmdsize = sizeof(lcb_touch_cmd_t);
         break;
 
     case PYCBC_CMD_GETREPLICA:
     case PYCBC_CMD_GETREPLICA_INDEX:
     case PYCBC_CMD_GETREPLICA_ALL:
-        cmdsize = sizeof(lcb_get_replica_cmd_t);
         gv.allow_dval = 0;
         break;
 
@@ -288,7 +270,7 @@ get_common(pycbc_Bucket *self,
 
     }
 
-    rv = pycbc_common_vars_init(&cv, self, argopts, ncmds, cmdsize, 0);
+    rv = pycbc_common_vars_init(&cv, self, argopts, ncmds, 0);
 
     if (rv < 0) {
         return NULL;
@@ -300,39 +282,17 @@ get_common(pycbc_Bucket *self,
     }
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
-        rv = pycbc_oputil_iter_multi(self,
-                                     seqtype,
-                                     kobj,
-                                     &cv,
-                                     optype,
-                                     handle_single_key,
-                                     &gv);
+        rv = pycbc_oputil_iter_multi(self, seqtype, kobj, &cv, optype,
+            handle_single_key, &gv);
 
     } else {
-        rv = handle_single_key(self,
-                               &cv, optype, kobj, NULL, NULL, NULL, 0, &gv);
+        rv = handle_single_key(self, &cv, optype, kobj, NULL, NULL, NULL, &gv);
     }
     if (rv < 0) {
         goto GT_DONE;
     }
 
-
     if (pycbc_maybe_set_quiet(cv.mres, is_quiet) == -1) {
-        goto GT_DONE;
-    }
-
-    if (optype == PYCBC_CMD_GET || optype == PYCBC_CMD_LOCK) {
-        err = lcb_get(self->instance, cv.mres, ncmds, cv.cmdlist.get);
-
-    } else if (optype == PYCBC_CMD_TOUCH) {
-        err = lcb_touch(self->instance, cv.mres, ncmds, cv.cmdlist.touch);
-
-    } else {
-        err = lcb_get_replica(self->instance, cv.mres, ncmds, cv.cmdlist.replica);
-    }
-
-    if (err != LCB_SUCCESS) {
-        PYCBC_EXCTHROW_SCHED(err);
         goto GT_DONE;
     }
 

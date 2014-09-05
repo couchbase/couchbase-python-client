@@ -88,67 +88,60 @@ pycbc_observeinfo_new(pycbc_Bucket *parent)
 }
 
 static int
-handle_single_observe(pycbc_Bucket *self,
-                      PyObject *curkey,
-                      int ii,
-                      int master_only,
-                      struct pycbc_common_vars *cv)
+handle_single_observe(pycbc_Bucket *self, PyObject *curkey, int master_only,
+    struct pycbc_common_vars *cv)
 {
     int rv;
     char *key;
     size_t nkey;
-    lcb_observe_cmd_t *ocmd = cv->cmds.obs + ii;
+    lcb_CMDOBSERVE cmd = { 0 };
+    lcb_error_t err;
 
     rv = pycbc_tc_encode_key(self, &curkey, (void**)&key, &nkey);
     if (rv < 0) {
         return -1;
     }
-
-
-    cv->enckeys[ii] = curkey;
+    LCB_CMD_SET_KEY(&cmd, key, nkey);
 
     if (!nkey) {
         PYCBC_EXCTHROW_EMPTYKEY();
-        return -1;
+        rv = -1;
+        goto GT_DONE;
     }
 
     if (master_only) {
-        /** New 'MASTER_ONLY' was added in 2.3.0 */
-        ocmd->version = 1;
-        ocmd->v.v1.options = LCB_OBSERVE_MASTER_ONLY;
+        cmd.cmdflags |= LCB_CMDOBSERVE_F_MASTER_ONLY;
     }
 
-    ocmd->v.v0.key = key;
-    ocmd->v.v0.nkey = nkey;
+    err = cv->mctx->addcmd(cv->mctx, (lcb_CMDBASE*)&cmd);
+    if (err == LCB_SUCCESS) {
+        rv = 0;
+    } else {
+        PYCBC_EXCTHROW_SCHED(err);
+        rv = -1;
+    }
 
-    cv->cmdlist.obs[ii] = ocmd;
-    return 0;
+    GT_DONE:
+    Py_XDECREF(curkey);
+    return rv;
 }
 
 static PyObject *
-observe_common(pycbc_Bucket *self,
-               PyObject *args,
-               PyObject *kwargs,
-               int argopts)
+observe_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopts)
 {
     int rv;
     int ii;
     Py_ssize_t ncmds;
     PyObject *kobj = NULL;
     pycbc_seqtype_t seqtype;
-    lcb_error_t err;
     int master_only = 0;
     PyObject *master_only_O = NULL;
 
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
 
     static char *kwlist[] = { "keys", "master_only", NULL };
-    rv = PyArg_ParseTupleAndKeywords(args,
-                                     kwargs,
-                                     "O|O",
-                                     kwlist,
-                                     &kobj,
-                                     &master_only_O);
+    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "O|O", kwlist,
+        &kobj, &master_only_O);
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;
@@ -165,13 +158,15 @@ observe_common(pycbc_Bucket *self,
 
     master_only = master_only_O && PyObject_IsTrue(master_only_O);
 
-    rv = pycbc_common_vars_init(&cv,
-                                self,
-                                argopts,
-                                ncmds, sizeof(lcb_observe_cmd_t),
-                                0);
+    rv = pycbc_common_vars_init(&cv, self, argopts, ncmds, 0);
     if (rv < 0) {
         return NULL;
+    }
+
+    cv.mctx = lcb_observe3_ctxnew(self->instance);
+    if (cv.mctx == NULL) {
+        PYCBC_EXCTHROW_SCHED(LCB_CLIENT_ENOMEM);
+        goto GT_DONE;
     }
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
@@ -186,17 +181,13 @@ observe_common(pycbc_Bucket *self,
         for (ii = 0; ii < ncmds; ii++) {
             PyObject *curkey = NULL, *curvalue = NULL;
 
-            rv = pycbc_oputil_sequence_next(seqtype,
-                                            curseq,
-                                            &dictpos,
-                                            ii,
-                                            &curkey,
-                                            &curvalue);
+            rv = pycbc_oputil_sequence_next(seqtype, curseq, &dictpos, ii,
+                &curkey, &curvalue);
             if (rv < 0) {
                 goto GT_ITER_DONE;
             }
 
-            rv = handle_single_observe(self, curkey, ii, master_only, &cv);
+            rv = handle_single_observe(self, curkey, master_only, &cv);
 
             GT_ITER_DONE:
             Py_XDECREF(curkey);
@@ -208,17 +199,11 @@ observe_common(pycbc_Bucket *self,
         }
 
     } else {
-        rv = handle_single_observe(self, kobj, 0, master_only, &cv);
+        rv = handle_single_observe(self, kobj, master_only, &cv);
 
         if (rv < 0) {
             goto GT_DONE;
         }
-    }
-
-    err = lcb_observe(self->instance, cv.mres, ncmds, cv.cmdlist.obs);
-    if (err != LCB_SUCCESS) {
-        PYCBC_EXCTHROW_SCHED(err);
-        goto GT_DONE;
     }
 
     cv.is_seqcmd = 1;
