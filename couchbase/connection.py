@@ -1420,8 +1420,6 @@ class Connection(_Base):
         existing = self.design_get(name, use_devmode=True)
         rv = self.design_create(name, existing.value, use_devmode=False,
                            syncwait=syncwait)
-        self.design_delete(name, use_devmode=True,
-                           syncwait=syncwait)
         self._design_poll(name, 'add', None,
                           timeout=syncwait, use_devmode=False)
         return rv

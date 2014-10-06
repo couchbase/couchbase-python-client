@@ -67,10 +67,8 @@ class DesignDocManagementTest(DDocTestCase):
                            params = { 'limit':10 })
         self.assertTrue(rv.success)
 
-        self.assertRaises(HTTPError,
-                          self.cb._view,
-                          DNAME, VNAME,
-                          use_devmode=True)
+        rv = self.cb._view(DNAME, VNAME, use_devmode=True)
+        self.assertTrue(rv.success)
 
         rv = self.cb.design_delete(DNAME, use_devmode=False, syncwait=5)
         self.assertTrue(rv.success)
