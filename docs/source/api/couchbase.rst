@@ -55,6 +55,26 @@ operations avoiding the need for copying the result into your own data structure
 See the documentation for :class:`~couchbase.items.Item` for more information.
 
 
+.. _exp_info:
+
+Expiration Values
+=================
+
+Expiration times may be specified either as an absolute Unix timestamp, or as
+an offset in seconds from the current time.
+
+When the expiration time is reached, the item is considered to be deleted
+from the cluster, and thus will no longer be accessible. This is useful for
+transient storage (for example, session information).
+
+.. warning::
+
+    If the expiration time exceeds the number of seconds in a month
+    (i.e. `2592000`), the server will interpret the expiration time
+    as an absolute timestamp. It is thus recommended to always use
+    absolute Unix timestamps.
+
+
 .. _format_info:
 
 Key and Value Format

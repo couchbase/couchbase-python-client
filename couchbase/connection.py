@@ -272,8 +272,8 @@ class Connection(_Base):
         :param int cas: The _CAS_ value to use. If supplied, the value will
           only be stored if it already exists with the supplied CAS
 
-        :param int ttl: If specified, the key will expire after this many
-          seconds
+        :param int ttl: Expiration value.
+          See :ref:`exp_info` for accepted values.
 
         :param int format: If specified, indicates the `format` to use when
           encoding the value. If none is specified, it will use the
@@ -425,7 +425,7 @@ class Connection(_Base):
 
         :param int ttl:
           If specified, indicates that the key's expiration time should be
-          *modified* when retrieving the value.
+          *modified* when retrieving the value. See also :ref:`exp_info`
 
         :param boolean quiet: causes `get` to return None instead of
           raising an exception when the key is not found. It defaults
@@ -488,7 +488,7 @@ class Connection(_Base):
 
         Update the expiration time::
 
-            rv = cb.get("key", ttl=10)
+            rv = cb.get("key", int(time.time()) + 10)
             # Expires in ten seconds
 
 
@@ -505,13 +505,13 @@ class Connection(_Base):
         :param string key: The key whose expiration time should be modified
         :param int ttl: The new expiration time. If the expiration time is
           ``0`` then the key never expires (and any existing expiration is
-          removed)
+          removed). See :ref:`exp_info` for more details about expiration
 
         :return: :class:`couchbase.result.OperationResult`
 
         Update the expiration time of a key ::
 
-            cb.set("key", ttl=100)
+            cb.set("key", ttl=int(time.time()) + 100)
             # expires in 100 seconds
             cb.touch("key", ttl=0)
             # key should never expire now
@@ -536,6 +536,9 @@ class Connection(_Base):
           lock time determined by the server (currently, this is 15 seconds). If
           passed a higher value, the server will silently lower this to its
           maximum limit.
+
+          Note that the TTL value for lock is an offset in seconds, rather than a
+          Unix timestamp.
 
 
         This function otherwise functions similarly to :meth:`get`;
@@ -708,7 +711,7 @@ class Connection(_Base):
         :type initial: int or `None`
 
         :param int ttl: The lifetime for the key, after which it will
-          expire
+          expire. See :ref:`exp_info`.
 
         :raise: :exc:`couchbase.exceptions.NotFoundError` if the key
           does not exist on the bucket (and `initial` was `None`)
@@ -951,7 +954,7 @@ class Connection(_Base):
           specified in the `Item`'s `cas` field.
 
         :param int ttl: If specified, sets the expiration value for all
-          keys
+          keys. See :ref:`exp_info`
 
         :param int format:
           If specified, this is the conversion format which will be used for
@@ -1041,7 +1044,8 @@ class Connection(_Base):
         :param keys: keys the keys to fetch
         :type keys: :ref:`iterable<argtypes>`
 
-        :param int ttl: Set the expiration for all keys when retrieving
+        :param int ttl: Set the expiration for all keys when retrieving.
+          See :ref:`exp_info`
 
         :param boolean replica:
           Whether the results should be obtained from a replica instead of the
@@ -1067,18 +1071,18 @@ class Connection(_Base):
         whic case the value for each key will be used as the TTL instead
         of the global one (i.e. the one passed to this function)
 
-        :param int ttl: The new expiration time
+        :param int ttl: The new expiration time. See :ref:`exp_info`
 
         :return: A :class:`~couchbase.result.MultiResult` object
 
 
         Update three keys to expire in 10 seconds ::
 
-            cb.touch_multi(("key1", "key2", "key3"), ttl=10)
+            cb.touch_multi(("key1", "key2", "key3"), ttl=int(time.time())+10)
 
         Update three keys with different expiration times ::
-
-            cb.touch_multi({"foo" : 1, "bar" : 5, "baz" : 10})
+            now = int(time.time())
+            cb.touch_multi({"foo" : now+1, "bar" : now+5, "baz" : now+10})
 
         .. seealso:: :meth:`touch`
         """
@@ -1117,7 +1121,7 @@ class Connection(_Base):
         Thus, you can do something like ::
 
             keys = (....)
-            rvs = cb.lock_multi(keys, ttl=5)
+            rvs = cb.lock_multi(keys, ttl=int(time.time()) + 5)
             # do something with rvs
             cb.unlock_multi(rvs)
 
