@@ -108,10 +108,10 @@ class Couchbase:
           .. note::
 
             The value specified here is the same port used to access
-            The couchbase REST UI (typically `8091`). If you have selcted
+            The couchbase REST UI (typically `8091`). If you have selected
             an alternate port for your bucket, do *not* put it here. The
             configuration information obtained via the REST interface will
-            automatically instruct the client (one ``connect()`` is called)
+            automatically instruct the client (once ``connect()`` is called)
             about which bucket port to connect to. Note that bucket ports
             are typically ``112xx`` - don't use these for the `port`
             parameter.
