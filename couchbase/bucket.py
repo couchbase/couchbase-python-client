@@ -1384,11 +1384,11 @@ class Bucket(_Base):
         self._set_timeout_common(_LCB.LCB_CNTL_OP_TIMEOUT, value)
 
     @property
-    def view_timeout(self):
+    def views_timeout(self):
         return self._get_timeout_common(_LCB.LCB_CNTL_VIEW_TIMEOUT)
 
-    @view_timeout.setter
-    def view_timeout(self, value):
+    @views_timeout.setter
+    def views_timeout(self, value):
         self._set_timeout_common(_LCB.LCB_CNTL_VIEW_TIMEOUT, value)
 
 
