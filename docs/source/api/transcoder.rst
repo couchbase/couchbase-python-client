@@ -42,11 +42,11 @@ Typically one would subclass the :class:`Transcoder` class, and
 implement the needed methods, allowing for high efficient built-in
 methods to perform the un-needed operations.
 
-Note that the :class:`~couchbase.connection.Connection` does not
+Note that the :class:`~couchbase.bucket.Bucket` does not
 use a :class:`Transcoder` object by default (however it internally uses
 the same routines that the C-implemented :class:`Transcoder` does). Thus,
 if no custom transcoding is needed, it is more efficient to set the
-:attr:`~couchbase.connection.Connection.transcoder` to ``None``, which
+:attr:`~couchbase.bucket.Bucket.transcoder` to ``None``, which
 is the default.
 
 .. class:: Transcoder

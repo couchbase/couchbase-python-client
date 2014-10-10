@@ -1,21 +1,19 @@
 =================
-Connection object
+Bucket object
 =================
 
-.. module:: couchbase
-.. class:: Couchbase
+.. module:: couchbase.bucket
+.. class:: Bucket
 
-    .. automethod:: connect
+    .. automethod:: __init__
 
-
-.. module:: couchbase.connection
 
 .. _argtypes:
 
 Passing Arguments
 =================
 
-.. currentmodule:: couchbase.connection
+.. currentmodule:: couchbase.bucket
 
 All keyword arguments passed to methods should be specified as keyword
 arguments, and the user should not rely on their position within the keyword
@@ -40,7 +38,7 @@ Arguments passed to ``*_multi`` methods involves passing an iterable of keys.
 The iterable must have ``__len__`` and ``__iter__`` implemented.
 
 For operations which require values (i.e. the
-:meth:`~couchbase.connection.Connection.set_multi` family), a ``dict`` must
+:meth:`~couchbase.bucket.Bucket.upsert_multi` family), a ``dict`` must
 be passed with the values set as the values which should be stored for the keys.
 
 Some of the multi methods accept keyword arguments; these arguments apply to
@@ -74,7 +72,7 @@ The following constants may be used as values to the `format` option
 in methods where this is supported. This is also the value returned in the
 :attr:`~couchbase.result.ValueResult.flags` attribute of the
 :class:`~couchbase.result.ValueResult` object from a
-:meth:`~couchbase.connection.Connection.get` operation.
+:meth:`~couchbase.bucket.Bucket.get` operation.
 
 Each format specifier has specific rules about what data types it accepts.
 
@@ -136,7 +134,7 @@ Key Format
 ----------
 
 The above format options are only valid for *values* being passed to one
-of the storage methods (see :meth:`couchbase.connection.Connection.set`).
+of the storage methods (see :meth:`couchbase.bucket.Bucket.upset`).
 
 For *keys*, the acceptable inputs are those for :const:`FMT_UTF8`
 
@@ -146,21 +144,21 @@ Single-Key Data Methods
 These methods all return a :class:`~couchbase.result.Result` object containing
 information about the operation (such as status and value).
 
-.. currentmodule:: couchbase.connection
+.. currentmodule:: couchbase.bucket
 
 
 Storing Data
 ------------
 
-.. currentmodule:: couchbase.connection
-.. class:: Connection
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
 
     These methods set the contents of a key in Couchbase. If successful,
     they replace the existing contents (if any) of the key.
 
-    .. automethod:: set
+    .. automethod:: upsert
 
-    .. automethod:: add
+    .. automethod:: insert
 
     .. automethod:: replace
 
@@ -168,8 +166,8 @@ Storing Data
 Retrieving Data
 ---------------
 
-.. currentmodule:: couchbase.connection
-.. class:: Connection
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
 
     .. automethod:: get
 
@@ -178,8 +176,8 @@ Modifying Data
 
 These methods modify existing values in Couchbase
 
-.. currentmodule:: couchbase.connection
-.. class:: Connection
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
 
 
     .. automethod:: append
@@ -194,10 +192,10 @@ directly modify the value, but may affect the entry's accessibility
 or duration.
 
 
-.. currentmodule:: couchbase.connection
-.. class:: Connection
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
 
-    .. automethod:: delete
+    .. automethod:: remove
 
     .. automethod:: lock
 
@@ -212,15 +210,13 @@ Counter Operations
 These are atomic counter operations for Couchbase. They increment
 or decrement a counter. A counter is a key whose value can be parsed
 as an integer. Counter values may be retrieved (without modification)
-using the :meth:`Connection.get` method
+using the :meth:`Bucket.get` method
 
-.. currentmodule:: couchbase.connection
+.. currentmodule:: couchbase.bucket
 
-.. class:: Connection
+.. class:: Bucket
 
-    .. automethod:: incr
-
-    .. automethod:: decr
+    .. automethod:: counter
 
 
 Multi-Key Data Methods
@@ -231,14 +227,14 @@ equivalents. They return a :class:`couchbase.result.MultiResult` object (which i
 a dict subclass) which contains class:`couchbase.result.Result` objects as the
 values for its keys
 
-.. currentmodule:: couchbase.connection
-.. class:: Connection
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
 
-    .. automethod:: set_multi
+    .. automethod:: upsert_multi
 
     .. automethod:: get_multi
 
-    .. automethod:: add_multi
+    .. automethod:: insert_multi
 
     .. automethod:: replace_multi
 
@@ -246,11 +242,9 @@ values for its keys
 
     .. automethod:: prepend_multi
 
-    .. automethod:: delete_multi
+    .. automethod:: remove_multi
 
-    .. automethod:: incr_multi
-
-    .. automethod:: decr_multi
+    .. automethod:: counter_multi
 
     .. automethod:: lock_multi
 
@@ -264,8 +258,8 @@ Batch Operation Pipeline
 In addition to the multi methods, you may also use the `Pipeline` context
 manager to schedule multiple operations of different types
 
-.. currentmodule:: couchbase.connection
-.. class:: Connection
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
 
     .. automethod:: pipeline
 
@@ -277,13 +271,21 @@ manager to schedule multiple operations of different types
 MapReduce/View Methods
 ======================
 
-.. currentmodule:: couchbase.connection
-.. class:: Connection
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
 
     .. automethod:: query
 
 Design Document Management
 ==========================
+
+.. currentmodule:: couchbase.bucketmanager
+
+
+To perform design document management operations, you must first get
+an instance of the :class:`BucketManager`. You can do this by invoking
+the :meth:`~couchbase.bucket.Bucket.bucket_manager` method on the
+:class:`~couchbase.bucket.Bucket` object.
 
 .. note::
     Design document management functions are async. This means that any
@@ -309,8 +311,8 @@ Design Document Management
     The view and design functions accept a ``use_devmode`` parameter which
     prefixes the design name with ``dev_`` if not already prefixed.
 
-.. currentmodule:: couchbase.connection
-.. class:: Connection
+
+.. class:: BucketManager
 
 
     .. automethod:: design_create
@@ -318,18 +320,22 @@ Design Document Management
     .. automethod:: design_publish
     .. automethod:: design_delete
 
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
+
+    .. automethod:: bucket_manager
+
+
 Informational Methods
 =====================
 
 These methods do not operate on keys directly, but offer various
 information about things
 
-.. currentmodule:: couchbase.connection
-.. class:: Connection
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
 
     .. automethod:: stats
-
-    .. automethod:: errors
 
     .. automethod:: lcb_version
 
@@ -344,8 +350,8 @@ These methods are specifically for the :class:`~couchbase.items.Item`
 API. Most of the `multi` methods will accept `Item` objects as well,
 however there are some special methods for this interface
 
-.. currentmodule:: couchbase.connection
-.. class:: Connection
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
 
     .. automethod:: append_items
     .. automethod:: prepend_items
@@ -355,8 +361,8 @@ Durability Constraints
 
 Durability constraints ensure safer protection against data loss.
 
-.. currentmodule:: couchbase.connection
-.. class:: Connection
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
 
     .. automethod:: endure
     .. automethod:: endure_multi
@@ -365,8 +371,8 @@ Durability constraints ensure safer protection against data loss.
 Attributes
 ==========
 
-.. currentmodule:: couchbase.connection
-.. class:: Connection
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
 
     .. autoattribute:: quiet
 
@@ -392,7 +398,7 @@ Attributes
 
         See :ref:`format_info` for the possible values
 
-        On a :meth:`~couchbase.connection.Connection.get` the
+        On a :meth:`~couchbase.bucket.Bucket.get` the
         original value will be returned. This means the JSON will be
         decoded, respectively the object will be unpickled.
 
@@ -415,8 +421,8 @@ Attributes
 Private APIs
 ============
 
-.. currentmodule:: couchbase.connection
-.. class:: Connection
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
 
    The following APIs are not supported because using them is inherently
    dangerous. They are provided as workarounds for specific problems which
@@ -435,10 +441,11 @@ Private APIs
 Additional Connection Options
 =============================
 
-.. currentmodule:: couchbase.connection
+.. currentmodule:: couchbase.bucket
 
 This section is intended to document some of the less common connection
-options and formats of the connection string (see :meth:`couchbase.Couchbase.connect`).
+options and formats of the connection string
+(see :meth:`couchbase.bucket.Bucket.__init__`).
 
 
 Using Custom Ports

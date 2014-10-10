@@ -63,7 +63,7 @@ class Item(_Item):
                     def key(self, newkey):
                         self._key = key
 
-        To use this class with the :class:`couchbase.connection.Connection`
+        To use this class with the :class:`couchbase.bucket.Bucket`
         API methods, you must take care to:
 
         1. Use only the ``*_multi`` methods
@@ -82,11 +82,11 @@ class Item(_Item):
         Convenience method to return an instance of a :class:`ItemCollection`
         containing only this item. This would then be used like so::
 
-            cb.set_multi(itm.as_itcoll())
+            cb.upsert_multi(itm.as_itcoll())
 
         Or use it with options::
 
-            cb.set_multi(itm.as_itcoll(ignore_cas=True))
+            cb.upsert_multi(itm.as_itcoll(ignore_cas=True))
 
         :param kwargs: Extra operation-specific options.
 

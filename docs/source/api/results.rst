@@ -49,7 +49,7 @@ This is the base class for all result operations
 
     The :attr:`all_ok` field can be used to quickly examine the object for errors
     (in case something like ``quiet`` was passed to
-    :meth:`~couchbase.connection.Connection.get_multi`), e.g.
+    :meth:`~couchbase.bucket.Bucket.get_multi`), e.g.
 
     Using the `all_ok` field::
 
@@ -69,7 +69,7 @@ This is the base class for all result operations
     Using the ``MultiResult`` class from an exception handler::
 
         try:
-            cb.add({"foo":"fooval","bar":"barval"})
+            cb.insert({"foo":"fooval","bar":"barval"})
         except CouchbaseDataError as e:
             for key, result in e.all_results.items():
                 if not result.success:

@@ -12,14 +12,14 @@ Twisted.
 .. currentmodule:: txcouchbase.connection
 
 For the most part, the ``txcouchbase`` API functions like its synchronous
-counterpart, :class:`~couchbase.connection.Connection`, except for its
+counterpart, :class:`~couchbase.bucket.Bucket`, except for its
 asynchronous nature. Where the synchronous API returns a
 :class:`~couchbase.result.Result` object, the ``txcouchbase`` API returns
 a :class:`Deferred` which will have its callback invoked with a result.
 
 As such, we will omit the mentions of the normal key value operations, which
 function identially to their synchronous conterparts documented in the
-:class:`~couchbase.connection.Connection` class.
+:class:`~couchbase.bucket.Bucket` class.
 
 The :class:`Connection` interface for Twisted is subclassed from the lower-level
 :class:`TxAsyncConnection` which returns :class:`~couchbase.result.AsyncResult`

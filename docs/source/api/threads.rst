@@ -4,9 +4,9 @@ Using With and Without Threads
 
 .. module:: couchbase.connection
 
-You can use a single :class:`~couchbase.connection.Connection` object in
+You can use a single :class:`~couchbase.bucket.Bucket` object in
 a single thread, and attain reasonable performance by having one
-`Connection` object per thread. However, you **cannot** use the same object
+`Bucket` object per thread. However, you **cannot** use the same object
 from multiple threads concurrently (but see below)
 
 As `couchbase` is a C extension, it is helpful to know how Python
@@ -43,15 +43,15 @@ other threads in the case where an I/O operation takes a prolonged amount
 of time.
 
 This behavior itself can be controlled by the
-:attr:`~couchbase.connection.Connection.unlock_gil` attribute
+:attr:`~couchbase.bucket.Bucket.unlock_gil` attribute
 
 
 .. _multiple_threads:
 
-Using a :class:`Connection` from multiple threads
+Using a :class:`Bucket` from multiple threads
 ---------------------------------------------------
 
-Sometimes it may be necessary to use a :class:`Connection` object from
+Sometimes it may be necessary to use a :class:`Bucket` object from
 multiple threads. This is normally not a good option as there is no concurrency
 gained from multiple Python threads (as they do not run in parallel, as above)
 it might be necessary to have a single object which is being used from
@@ -59,7 +59,7 @@ an already-existing framework using threads, where there is typically little
 contention between them.
 
 You may utilize the ``lockmode`` constructor option to enforce a specific
-behavior when the :class:`Connection` object is accessed from multiple
+behavior when the :class:`Bucket` object is accessed from multiple
 threads
 
 .. data:: LOCKMODE_EXC
@@ -82,7 +82,7 @@ has completed its operation and the lock is then acquired. It is released once
 the current thread has finished performing the operation.
 
 Without this option, odd behavior may be exhibited (including some crashes).
-If you are sure that the :class:`Connection` object will never be used from
+If you are sure that the :class:`Bucket` object will never be used from
 multiple threads, or if you have some other locking mechanism in place, then
 you may use :const:`LOCKMODE_NONE`
 

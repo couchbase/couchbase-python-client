@@ -231,7 +231,7 @@ The following properties allow you to
             :ref:`viewtype_range` of :ref:`viewtype_string` elements.
 
         Specify the range based on the contents of the keys as they are stored
-        by :meth:`~couchbase.connection.Connection.set`. These are
+        by :meth:`~couchbase.bucket.Bucket.upsert`. These are
         returned as the "Document IDs" in each view result.
 
         You *must* use this attribute in conjunction with
@@ -241,10 +241,10 @@ The following properties allow you to
 
         Documents::
 
-            c.set("id_1", { "type" : "dummy" })
-            c.set("id_2", { "type" : "dummy" })
+            c.upsert("id_1", { "type" : "dummy" })
+            c.upsert("id_2", { "type" : "dummy" })
             # ...
-            c.set("id_9", { "type" : "dummy" })
+            c.upsert("id_9", { "type" : "dummy" })
 
 
         View::
@@ -351,7 +351,7 @@ and for which the ``reduce`` value is enabled
         :Value Type: :ref:`viewtype_boolean`
 
         Note that if the view specified in the query (to e.g.
-        :meth:`couchbase.connection.Connection.query`) does not have a
+        :meth:`couchbase.bucket.Bucket.query`) does not have a
         reduce function specified, an exception will be thrown once the query
         begins.
 

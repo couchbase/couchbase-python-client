@@ -6,7 +6,7 @@ GEvent Couchbase Support
 .. module:: gcouchbase
 
 The ``gcouchbase`` module offers a complete API which is fully compatible
-with the :class:`couchbase.connection.Connection` API, but is fully aware
+with the :class:`couchbase.bucket.Bucket` API, but is fully aware
 and optimized for the gevent :class:`~gevent.hub.Hub`.
 
 Currently, this has been tested with `gevent` version 0.13 and 1.0.0.

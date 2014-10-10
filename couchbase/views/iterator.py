@@ -53,7 +53,7 @@ class RowProcessor(object):
         be overridden using the :attr:`rowclass` attribute)
 
     * Fetching multiple documents for each row
-        You can use the :meth:`~couchbase.connection.Connection.get_multi`
+        You can use the :meth:`~couchbase.bucket.Bucket.get_multi`
         method to efficiently fetch multiple docs beforehand for the entire
         page.
 
@@ -68,7 +68,7 @@ class RowProcessor(object):
             view function's ``emit``, or the value of the ``reduce``
             function
         * ``docid`` is the ID of the document itself (as stored by one
-            of the :meth:`~couchbase.connection.Connection.set` family of
+            of the :meth:`~couchbase.bucket.Bucket.upsert` family of
             methods).
             If ``reduce`` was set to true for the view, this will always
             be None.
@@ -149,8 +149,8 @@ class View(object):
         Construct a iterable which can be used to iterate over view query
         results.
 
-        :param parent: The parent Connection object
-        :type parent: :class:`~couchbase.connection.Connection`
+        :param parent: The parent Bucket object
+        :type parent: :class:`~couchbase.bucket.Bucket`
         :param string design: The design document
         :param string view: The name of the view within the design document
         :param callable row_processor: See :attr:`row_processor` for more
@@ -158,7 +158,7 @@ class View(object):
 
         :param boolean include_docs: If set, the document itself will be
             retrieved for each row in the result. The default algorithm
-            uses :meth:`~couchbase.connection.Connection.get_multi` for each
+            uses :meth:`~couchbase.bucket.Bucket.get_multi` for each
             page (i.e. every :attr:`streaming` results).
 
             The :attr:`~couchbase.views.params.Query.reduce`
@@ -194,7 +194,7 @@ class View(object):
 
         Simple view query, with no extra options::
 
-            # c is the Connection object.
+            # c is the Bucket object.
 
             for result in View(c, "beer", "brewery_beers"):
                 print("emitted key: {0}, doc_id: {1}"

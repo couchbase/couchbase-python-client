@@ -180,7 +180,7 @@ class TxAsyncConnection(Async):
         This is shorthand for the following "non-idiom"::
 
           d = Deferred()
-          opres = cb.set("foo", "bar")
+          opres = cb.upsert("foo", "bar")
           opres.callback = d.callback
 
           def d_err(res, ex_type, ex_val, ex_tb):
@@ -196,7 +196,7 @@ class TxAsyncConnection(Async):
 
         Example::
 
-          opres = cb.set("foo", "bar")
+          opres = cb.upsert("foo", "bar")
           d = cb.defer(opres)
           def on_ok(res):
               print("Result OK. Cas: {0}".format(res.cas))
@@ -294,7 +294,7 @@ class Connection(TxAsyncConnection):
 
         Using single items::
 
-          d_set = cb.set("foo", "bar")
+          d_set = cb.upsert("foo", "bar")
           d_get = cb.get("foo")
 
           def on_err_common(*args):

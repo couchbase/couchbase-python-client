@@ -123,7 +123,7 @@ class Bucket(_Base):
           to `True` the operations will return `None` silently.
 
         :param boolean unlock_gil: If set (which is the default), the
-          connection object will release the python GIL when possible, allowing
+          bucket object will release the python GIL when possible, allowing
           other (Python) threads to function in the background. This should be
           set to true if you are using threads in your application (and is the
           default), as otherwise all threads will be blocked while couchbase
@@ -170,10 +170,10 @@ class Bucket(_Base):
                 :exc:`couchbase.exceptions.ArgumentError`
                 if the bucket wasn't specified
 
-        :return: instance of :class:`couchbase.connection.Connection`
+        :return: instance of :class:`couchbase.bucket.Bucket`
 
 
-        Initialize connection using default options::
+        Initialize bucket using default options::
 
             from couchbase.bucket import Bucket
             cb = Bucket('couchbase:///mybucket')
@@ -245,9 +245,9 @@ class Bucket(_Base):
         Scheduling multiple operations, without checking results::
 
           with cb.pipeline():
-            cb.set("key1", "value1")
-            cb.incr("counter")
-            cb.add_multi({
+            cb.upsert("key1", "value1")
+            cb.counter("counter")
+            cb.upsert_multi({
               "new_key1" : "new_value_1",
               "new_key2" : "new_value_2"
             })
@@ -256,7 +256,7 @@ class Bucket(_Base):
 
           pipeline = cb.pipeline()
           with pipeline:
-            cb.set("foo", "bar")
+            cb.upsert("foo", "bar")
             cb.replace("something", "value")
 
           for result in pipeline.results:
@@ -290,7 +290,7 @@ class Bucket(_Base):
         :param key: The key to set the value with. By default, the key must be
           either a :class:`bytes` or :class:`str` object encodable as UTF-8.
           If a custom `transcoder` class is used
-          (see :meth:`couchbase.Couchbase.connect`), then
+          (see :meth:`~couchbase.bucket.Bucket.__init__`), then
           the key object is passed directly to the transcoder, which may
           serialize it how it wishes.
         :type key: string or bytes
@@ -308,7 +308,7 @@ class Bucket(_Base):
           encoding the value. If none is specified, it will use the
           `default_format`
           For more info see
-          :attr:`~couchbase.connection.Bucket.default_format`
+          :attr:`~couchbase.bucket.Bucket.default_format`
 
         :param int persist_to: Perform durability checking on this many
 
@@ -339,21 +339,21 @@ class Bucket(_Base):
 
         Simple set::
 
-            cb.set('key', 'value')
+            cb.upsert('key', 'value')
 
         Force JSON document format for value::
 
-            cb.set('foo', {'bar': 'baz'}, format=couchbase.FMT_JSON)
+            cb.upsert('foo', {'bar': 'baz'}, format=couchbase.FMT_JSON)
 
         Perform optimistic locking by specifying last known CAS version::
 
-            cb.set('foo', 'bar', cas=8835713818674332672)
+            cb.upsert('foo', 'bar', cas=8835713818674332672)
 
         Several sets at the same time (mutli-set)::
 
-            cb.set_multi({'foo': 'bar', 'baz': 'value'})
+            cb.upsert_multi({'foo': 'bar', 'baz': 'value'})
 
-        .. seealso:: :meth:`set_multi`
+        .. seealso:: :meth:`upsert_multi`
 
         """
         return _Base.upsert(self, key, value, cas, ttl, format,
@@ -364,7 +364,7 @@ class Bucket(_Base):
         Store an object in Couchbase unless it already exists.
 
         Follows the same conventions as
-        :meth:`~couchbase.connection.Bucket.set` but the value is
+        :meth:`~couchbase.bucket.Bucket.upsert` but the value is
         stored only if it does not exist already. Conversely, the value
         is not stored if the key already exists.
 
@@ -375,7 +375,7 @@ class Bucket(_Base):
         :raise: :exc:`couchbase.exceptions.KeyExistsError` if the key
           already exists
 
-        .. seealso:: :meth:`set`, :meth:`add_multi`
+        .. seealso:: :meth:`upsert`, :meth:`add_multi`
 
         """
         return _Base.insert(self, key, value, ttl=ttl, format=format,
@@ -387,13 +387,13 @@ class Bucket(_Base):
         Store an object in Couchbase only if it already exists.
 
         Follows the same conventions as
-        :meth:`~couchbase.connection.Bucket.set`, but the value is
+        :meth:`~couchbase.bucket.Bucket.upsert`, but the value is
         stored only if a previous value already exists.
 
         :raise: :exc:`couchbase.exceptions.NotFoundError` if the key
           does not exist
 
-        .. seealso:: :meth:`set`, :meth:`replace_multi`
+        .. seealso:: :meth:`upsert`, :meth:`replace_multi`
 
         """
         return _Base.replace(self, key, value, ttl=ttl, cas=cas, format=format,
@@ -405,7 +405,7 @@ class Bucket(_Base):
         Append a string to an existing value in Couchbase.
 
         This follows the same conventions as
-        :meth:`~couchbase.connection.Bucket.set`.
+        :meth:`~couchbase.bucket.Bucket.upsert`.
 
         The `format` argument must be one of :const:`~couchbase.FMT_UTF8` or
         :const:`~couchbase.FMT_BYTES`. If not specified, it will be
@@ -414,7 +414,7 @@ class Bucket(_Base):
         This is because JSON or Pickle formats will be nonsensical when
         random data is appended to them. If you wish to modify a JSON or
         Pickle encoded object, you will need to retrieve it (via :meth:`get`),
-        modify it, and then store it again (using :meth:`set`).
+        modify it, and then store it again (using :meth:`upsert`).
 
         Additionally, you must ensure the value (and flags) for the current
         value is compatible with the data to be appended. For an example,
@@ -428,7 +428,7 @@ class Bucket(_Base):
           not exist
 
         .. seealso::
-            :meth:`set`, :meth:`append_multi`
+            :meth:`upsert`, :meth:`append_multi`
 
         """
         return _Base.append(self, key, value, ttl=ttl, cas=cas, format=format,
@@ -450,7 +450,7 @@ class Bucket(_Base):
         """Obtain an object stored in Couchbase by given key.
 
         :param string key: The key to fetch. The type of key is the same
-          as mentioned in :meth:`set`
+          as mentioned in :meth:`upsert`
 
         :param int ttl:
           If specified, indicates that the key's expiration time should be
@@ -459,7 +459,7 @@ class Bucket(_Base):
         :param boolean quiet: causes `get` to return None instead of
           raising an exception when the key is not found. It defaults
           to the value set by
-          :attr:`~couchbase.connection.Bucket.quiet` on the instance.
+          :attr:`~couchbase.bucket.Bucket.quiet` on the instance.
           In `quiet` mode, the error may still be obtained by inspecting
           the :attr:`~couchbase.result.Result.rc` attribute of the
           :class:`couchbase.result.Result` object, or
@@ -540,7 +540,7 @@ class Bucket(_Base):
 
         Update the expiration time of a key ::
 
-            cb.set("key", ttl=100)
+            cb.upsert("key", ttl=100)
             # expires in 100 seconds
             cb.touch("key", ttl=0)
             # key should never expire now
@@ -559,7 +559,7 @@ class Bucket(_Base):
         :param key: A string which is the key to lock.
         :param int: a TTL for which the lock should be valid.
           While the lock is active, attempts to access the key (via
-          other :meth:`lock`, :meth:`set` or other mutation calls) will
+          other :meth:`lock`, :meth:`upsert` or other mutation calls) will
           fail with an :exc:`couchbase.exceptions.TemporaryFailError`.
           Note that the value for this option is limited by the maximum allowable
           lock time determined by the server (currently, this is 15 seconds). If
@@ -574,7 +574,7 @@ class Bucket(_Base):
         object. This will be needed to :meth:`unlock` the key.
 
         Note the lock will also be implicitly released if modified by one
-        of the :meth:`set` family of functions when the valid CAS is
+        of the :meth:`upsert` family of functions when the valid CAS is
         supplied
 
         :raise: :exc:`couchbase.exceptions.TemporaryFailError` if the key
@@ -594,11 +594,11 @@ class Bucket(_Base):
 
             cb.unlock("locked_key", rv.cas)
 
-        Lock a key, implicitly unlocking with :meth:`set` with CAS ::
+        Lock a key, implicitly unlocking with :meth:`upsert` with CAS ::
 
             rv = self.cb.lock("locked_key", ttl=5)
             new_value = rv.value.upper()
-            cb.set("locked_key", new_value, rv.cas)
+            cb.upsert("locked_key", new_value, rv.cas)
 
 
         Poll and Lock ::
@@ -619,8 +619,8 @@ class Bucket(_Base):
 
             cb.unlock("key", rv.cas)
 
-        .. seealso::
-            :meth:`get`, :meth:`lock_multi`, :meth:`unlock`
+
+        .. seealso:: :meth:`get`, :meth:`lock_multi`, :meth:`unlock`
 
         """
         return _Base.lock(self, key, ttl=ttl)
@@ -643,10 +643,7 @@ class Bucket(_Base):
           supplied does not match the CAS on the server (possibly because
           it was unlocked by previous call).
 
-        .. seealso::
-
-        :meth:`lock`
-        :meth:`unlock_multi`
+        .. seealso:: :meth:`lock` :meth:`unlock_multi`
 
         """
         return _Base.unlock(self, key, cas=cas)
@@ -655,11 +652,11 @@ class Bucket(_Base):
         """Remove the key-value entry for a given key in Couchbase.
 
         :param key: A string which is the key to delete. The format and type
-          of the key follows the same conventions as in :meth:`set`
+          of the key follows the same conventions as in :meth:`upsert`
 
         :type key: string, dict, or tuple/list
         :param int cas: The CAS to use for the removal operation.
-          If specified, the key will only be deleted from the server if
+          If specified, the key will only be removed from the server if
           it has the same CAS as specified. This is useful to delete a
           key only if its value has not been changed from the version
           currently visible to the client.
@@ -688,33 +685,33 @@ class Bucket(_Base):
         :return: A :class:`~couchbase.result.Result` object.
 
 
-        Simple delete::
+        Simple remove::
 
-            ok = cb.delete("key").success
+            ok = cb.remove("key").success
 
         Don't complain if key does not exist::
 
-            ok = cb.delete("key", quiet=True)
+            ok = cb.remove("key", quiet=True)
 
-        Only delete if CAS matches our version::
+        Only remove if CAS matches our version::
 
             rv = cb.get("key")
-            cb.delete("key", cas=rv.cas)
+            cb.remove("key", cas=rv.cas)
 
         Remove multiple keys::
 
-            oks = cb.delete_multi(["key1", "key2", "key3"])
+            oks = cb.remove_multi(["key1", "key2", "key3"])
 
         Remove multiple keys with CAS::
 
-            oks = cb.delete({
+            oks = cb.remove({
                 "key1" : cas1,
                 "key2" : cas2,
                 "key3" : cas3
             })
 
 
-        .. seealso:: :meth:`delete_multi`, :meth:`endure` for more information
+        .. seealso:: :meth:`remove_multi`, :meth:`endure` for more information
           on the ``persist_to`` and ``replicate_to`` options.
 
         """
@@ -770,11 +767,13 @@ class Bucket(_Base):
             rv = cb.counter("key", delta=20, initial=5)
 
         Increment three keys::
+
             kv = cb.counter_multi(["foo", "bar", "baz"])
             for key, result in kv.items():
                 print "Key %s has value %d now" % (key, result.value)
 
         .. seealso:: :meth:`counter_multi`
+
         """
         return _Base.counter(self, key, delta, initial, ttl)
 
@@ -909,9 +908,9 @@ class Bucket(_Base):
         :return: A :class:`~couchbase.result.OperationResult`
 
         :raise: :exc:`~couchbase.exceptions.CouchbaseError`.
-            see :meth:`set` and :meth:`get` for possible errors
+            see :meth:`upsert` and :meth:`get` for possible errors
 
-        .. seealso:: :meth:`set`, :meth:`endure_multi`
+        .. seealso:: :meth:`upsert`, :meth:`endure_multi`
         """
         # We really just wrap 'endure_multi'
         kv = { key : cas }
@@ -937,15 +936,15 @@ class Bucket(_Base):
         Thus, something like::
 
           with cb.durability(persist_to=3):
-            cb.set("foo", "foo_value")
-            cb.set("bar", "bar_value")
-            cb.set("baz", "baz_value")
+            cb.upsert("foo", "foo_value")
+            cb.upsert("bar", "bar_value")
+            cb.upsert("baz", "baz_value")
 
         is equivalent to::
 
-            cb.set("foo", "foo_value", persist_to=3)
-            cb.set("bar", "bar_value", persist_to=3)
-            cb.set("baz", "baz_value", persist_to=3)
+            cb.upsert("foo", "foo_value", persist_to=3)
+            cb.upsert("bar", "bar_value", persist_to=3)
+            cb.upsert("baz", "baz_value", persist_to=3)
 
 
         .. versionadded:: 1.2.0
@@ -958,7 +957,7 @@ class Bucket(_Base):
         """Set multiple keys
 
         This follows the same semantics as
-        :meth:`~couchbase.connection.Bucket.set`
+        :meth:`~couchbase.bucket.Bucket.upsert`
 
         :param dict keys: A dictionary of keys to set. The keys are the keys
           as they should be on the server, and the values are the values for
@@ -996,7 +995,7 @@ class Bucket(_Base):
         network performance by batch-scheduling operations, reducing latencies.
         This is especially noticeable on smaller value sizes.
 
-        .. seealso:: :meth:`set`
+        .. seealso:: :meth:`upsert`
 
         """
         return _Base.upsert_multi(self, keys, ttl=ttl, format=format,
@@ -1004,9 +1003,9 @@ class Bucket(_Base):
 
     def insert_multi(self, keys, ttl=0, format=None, persist_to=0, replicate_to=0):
         """Add multiple keys.
-        Multi variant of :meth:`~couchbase.connection.Bucket.add`
+        Multi variant of :meth:`~couchbase.bucket.Bucket.insert`
 
-        .. seealso:: :meth:`add`, :meth:`set_multi`, :meth:`set`
+        .. seealso:: :meth:`add`, :meth:`upsert_multi`, :meth:`upsert`
 
         """
         return _Base.insert_multi(self, keys, ttl=ttl, format=format,
@@ -1017,7 +1016,7 @@ class Bucket(_Base):
         """Replace multiple keys.
         Multi variant of :meth:`replace`
 
-        .. seealso:: :meth:`replace`, :meth:`set_multi`, :meth:`set`
+        .. seealso:: :meth:`replace`, :meth:`upsert_multi`, :meth:`upsert`
 
         """
         return _Base.replace_multi(self, keys, ttl=ttl, format=format,
@@ -1037,7 +1036,7 @@ class Bucket(_Base):
             update the :attr:`couchbase.items.Item.value` property upon
             successful completion.
 
-        .. seealso:: :meth:`append`, :meth:`set_multi`, :meth:`set`
+        .. seealso:: :meth:`append`, :meth:`upsert_multi`, :meth:`upsert`
 
         """
         return _Base.append_multi(self, keys, ttl=ttl, format=format,
@@ -1049,7 +1048,7 @@ class Bucket(_Base):
         """Prepend to multiple keys.
         Multi variant of :meth:`prepend`
 
-        .. seealso:: :meth:`prepend`, :meth:`set_multi`, :meth:`set`
+        .. seealso:: :meth:`prepend`, :meth:`upsert_multi`, :meth:`upsert`
 
         """
         return _Base.prepend_multi(self, keys, ttl=ttl, format=format,
@@ -1205,8 +1204,7 @@ class Bucket(_Base):
 
             c.get(key, replica=True)
 
-        .. seealso::
-            :meth:`get` :meth:`rget_multi`
+        .. seealso:: :meth:`get` :meth:`rget_multi`
         """
         if replica_index is not None:
             return _Base._rgetix(self, key, replica=replica_index, quiet=quiet)
@@ -1283,7 +1281,7 @@ class Bucket(_Base):
             document
         :param boolean use_devmode: Whether the view name should be transformed
             into a development-mode view. See documentation on
-            :meth:`design_create` for more explanation.
+            :meth:`~couchbase.bucketmanager.BucketManager.design_create` for more explanation.
 
         :param kwargs: Extra arguments passedd to the
             :class:`~couchbase.views.iterator.View` object constructor.

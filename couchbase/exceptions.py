@@ -288,8 +288,8 @@ class TemporaryFailError(CouchbaseError):
 
     .. seealso::
 
-        :meth:`couchbase.connection.Connection.lock`
-        :meth:`couchbase.connection.Connection.unlock`
+        :meth:`couchbase.bucket.Bucket.lock`
+        :meth:`couchbase.bucket.Bucket.unlock`
     """
 
 

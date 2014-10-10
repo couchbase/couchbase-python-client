@@ -14,7 +14,7 @@ defined in the superclass (i.e. it has a ``__dict__`` field).
 These objects may be passed (via either the
 :class:`couchbase.items.ItemOptionDict` or
 :class:`couchbase.items.ItemSequence` containers) to any of the ``_multi``
-functions of the :class:`~couchbase.Connection` objects.
+functions of the :class:`~couchbase.bucket.Bucket` objects.
 
 Since the `Item` structure is backwards-compatible (and therefore,
 interchangeable) with any of the key-value subtypes of the
@@ -38,7 +38,7 @@ Creating Items
     from couchbase.items import Item
     it = Item()
 
-Before an `Item` object can be passed to any of the `Connection` methods,
+Before an `Item` object can be passed to any of the `Bucket` methods,
 it *must* have its key set. You can simply assign the key to the object's
 `key` property::
 
@@ -58,7 +58,7 @@ options::
     itmdict.add(it, format=couchbase.FMT_UTF8)
 
 To actually store the item, you pass the *collection* to the
-:meth:`~couchbase.Connection.set_multi` method, and it will function as
+:meth:`~couchbase.bucket.Bucket.upsert_multi` method, and it will function as
 normally::
 
     mres = cb.set_multi(itmdict)
