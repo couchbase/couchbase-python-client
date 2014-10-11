@@ -68,11 +68,11 @@ Here's an example code snippet which sets a key and then reads it
 
 .. code-block:: pycon
 
-    >>> from couchbase import Couchbase
-    >>> c = Couchbase.connect(bucket='default')
+    >>> from couchbase.bucket import Bucket as CouchbaseBucket
+    >>> c = CouchbaseBucket('couchbase://localhost/default')
     >>> c
-    <couchbase.connection.Connection bucket=default, nodes=['127.0.0.1:8091'] at 0xb21a50>
-    >>> c.set("key", "value")
+    <couchbase.bucket.Bucket bucket=default, nodes=['localhost:8091'] at 0x105991cd0>
+    >>> c.upsert("key", "value")
     OperationResult<RC=0x0, Key=key, CAS=0x31c0e3f3fc4b0000>
     >>> res = c.get("key")
     >>> res
@@ -85,8 +85,8 @@ You can also use views
 
 .. code-block:: pycon
 
-    >>> from couchbase import Couchbase
-    >>> c = Couchbase.connect(bucket='beer-sample')
+    >>> from couchbase.bucket import Bucket as CouchbaseBucket
+    >>> c = CouchbaseBucket('couchbase://localhost/beer-sample')
     >>> resultset = c.query("beer", "brewery_beers", limit=5)
     >>> resultset
     View<Design=beer, View=brewery_beers, Query=Query:'limit=5', Rows Fetched=0>
@@ -104,22 +104,22 @@ Twisted API
 
 The Python client now has support for the Twisted async network framework.
 To use with Twisted, simply import ``txcouchbase.connection`` instead of
-``couchbase.Couchbase``
+``couchbase.bucket``
 
 .. code-block:: python
 
     from twisted.internet import reactor
     from txcouchbase.connection import Connection as TxCouchbase
 
-    cb = TxCouchbase(bucket='default')
-    def on_set(ret):
+    cb = TxCouchbase('couchbase://localhost/default')
+    def on_upsert(ret):
         print "Set key. Result", ret
 
     def on_get(ret):
         print "Got key. Result", ret
         reactor.stop()
 
-    cb.set("key", "value").addCallback(on_set)
+    cb.upsert("key", "value").addCallback(on_upsert)
     cb.get("key").addCallback(on_get)
     reactor.run()
 
@@ -137,22 +137,16 @@ error.
 GEvent API
 ~~~~~~~~~~
 
-The `experimental_gevent_support` constructor flag has now been removed. Instead,
-you can import the `gcouchbase.connection` package and use the `GConnection`
-class like so:
-
 .. code-block:: python
 
     from gcouchbase.connection import GCouchbase
-    conn = GCouchbase(bucket='default')
-    print conn.set("foo", "bar")
+    conn = GCouchbase('couchbase://localhost/default')
+    print conn.upsert("foo", "bar")
     print conn.get("foo")
 
-The API functions exactly like the normal Connection API, except that the
+The API functions exactly like the normal Bucket API, except that the
 implementation is significantly different.
 
-Note that the new `GCouchbase` class does *not* use the same implementation
-as the experimental support featured in 1.1.0
 
 ~~~~~~~~~~~~~~
 Other Examples
