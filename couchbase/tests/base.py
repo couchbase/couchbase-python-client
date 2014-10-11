@@ -57,7 +57,7 @@ class ClusterInformation(object):
         bucket = self.bucket_prefix
         if 'bucket' in overrides:
             bucket = overrides.pop('bucket')
-        connstr = 'http://{0}:{1}/{2}?'.format(self.host, self.port, bucket)
+        connstr = 'http://{0}:{1}/{2}?http_urlmode=2&'.format(self.host, self.port, bucket)
 
         if 'config_cache' in overrides:
             connstr += 'config_cache='
