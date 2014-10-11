@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 from couchbase.items import Item, ItemSequence
-from couchbase import Couchbase
+from couchbase.bucket import Bucket
 from pprint import pprint
 from random import randint
 
@@ -40,7 +40,7 @@ class Player(Item):
         # In an actual application you'd probably want to use 'add',
         # but since this app might be run multiple times, you don't
         # want to get KeyExistsError
-        cb.set_multi(ItemSequence([it]))
+        cb.upsert_multi(ItemSequence([it]))
         return it
 
     @classmethod
@@ -75,7 +75,7 @@ class Player(Item):
     def email(self, value):
         self.value['email'] = value
 
-cb = Couchbase.connect(bucket='default')
+cb = Bucket('couchbase://localhost/default')
 single_player = Player.create("bob", "bob@bobnob.com", cb)
 single_player.score += 100
 single_player.save(cb)
@@ -85,7 +85,7 @@ players = ItemSequence([Player(x, create_structure=True)
            for x in ("joe", "jim", "bill", "larry")])
 
 # Save them all
-cb.set_multi(players)
+cb.upsert_multi(players)
 
 # Give them all some points
 for p, options in players:
@@ -109,6 +109,6 @@ for player in all_players.sequence:
     for line in lines:
         print INDENT, line
 
-cb.delete_multi(all_players)
+cb.remove_multi(all_players)
 cb.endure_multi(all_players, check_removed=True, replicate_to=0,
                 persist_to=1)

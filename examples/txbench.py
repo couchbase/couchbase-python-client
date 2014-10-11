@@ -22,7 +22,7 @@ from time import time
 from twisted.internet import reactor
 
 from txcouchbase.connection import Connection, TxAsyncConnection
-from couchbase.connection import FMT_BYTES
+from couchbase import FMT_BYTES
 from couchbase.transcoder import Transcoder
 
 ap = argparse.ArgumentParser()
@@ -40,10 +40,9 @@ ap.add_argument('-C', '--clients', default=1, type=int,
 
 ap.add_argument('--deferreds', action='store_true', default=False,
                 help="Whether to use Deferreds (or normal callbacks)")
-
-ap.add_argument('-b', '--bucket', default='default', type=str)
+ap.add_argument('-U', '--connstr', default='couchbase://localhost/default',
+                help="Connection string")
 ap.add_argument('-p', '--password', default=None, type=str)
-ap.add_argument('-H', '--hostname', default='localhost', type=str)
 ap.add_argument('-D', '--duration', default=10, type=int,
                 help="Duration of run (in seconds)")
 
@@ -78,12 +77,12 @@ class Runner(object):
         self.start()
 
     def _schedule_raw(self, *args):
-        opres = self.cb.set(self.key, self.value, format=FMT_BYTES)
+        opres = self.cb.upsert(self.key, self.value, format=FMT_BYTES)
         opres.callback = self._schedule_raw
         self.opcount += 1
 
     def _schedule_deferred(self, *args):
-        rv = self.cb.setMulti(self.kv, format=FMT_BYTES)
+        rv = self.cb.upsertMulti(self.kv, format=FMT_BYTES)
         rv.addCallback(self._schedule_deferred)
         self.opcount += options.batch
 
@@ -101,8 +100,7 @@ global_begin = time()
 runners = []
 clients = []
 kwargs = {
-    'bucket': options.bucket,
-    'host': options.hostname,
+    'connstr' : options.connstr,
     'password': options.password,
     'unlock_gil': False
 }

@@ -27,7 +27,7 @@ from argparse import ArgumentParser
 import random
 import pprint
 
-from couchbase.connection import Connection
+from couchbase.bucket import Bucket
 
 ap = ArgumentParser()
 
@@ -40,7 +40,7 @@ ap.add_argument('-n', '--number-of-terms', default=10,
 
 options = ap.parse_args()
 
-c = Connection(bucket='default')
+c = Bucket('couchbase://localhost/default')
 
 DESIGN = {
     '_id': '_design/search_keywords',
@@ -60,10 +60,8 @@ DESIGN = {
 }
 
 if options.create_design:
-    c.design_create('search_keywords',
-                    DESIGN,
-                    use_devmode=False,
-                    syncwait=5)
+    bm = c.bucket_manager()
+    bm.design_create('search_keywords', DESIGN, use_devmode=False, syncwait=5)
 
 NOUNS = ['cow', 'cat', 'dog', 'computer', 'WMD']
 ADJECTIVES = ['happy', 'sad', 'thoughtful', 'extroverted']
@@ -75,7 +73,7 @@ for x in range(options.number_of_terms):
     a = random.choice(ADJECTIVES)
     kv[" ".join([a, n])] = random.randint(1, 100000)
 
-c.set_multi(kv)
+c.upsert_multi(kv)
 
 vret = c.query('search_keywords',
                'top_keywords',

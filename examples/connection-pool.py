@@ -18,7 +18,7 @@
 """
 This file shows how to make a simple connection pool using Couchbase.
 """
-from couchbase.connection import Connection
+from couchbase.bucket import Bucket
 from Queue import Queue, Empty
 from threading import Lock, Thread
 from time import time
@@ -29,12 +29,12 @@ class ClientUnavailableError(Exception):
     pass
 
 
-class ConnectionWrapper(Connection):
+class BucketWrapper(Bucket):
     """
     This is a simple subclass which adds usage statistics to inspect later on
     """
     def __init__(self, **kwargs):
-        super(ConnectionWrapper, self).__init__(**kwargs)
+        super(BucketWrapper, self).__init__(**kwargs)
         self.use_count = 0
         self.use_time = 0
         self.last_use_time = 0
@@ -71,7 +71,7 @@ class Pool(object):
             self._cur_clients += 1
 
     def _make_client(self):
-        ret = ConnectionWrapper(**self._connargs)
+        ret = BucketWrapper(**self._connargs)
         self._l.append(ret)
         return ret
 
@@ -128,7 +128,7 @@ class CbThread(Thread):
             kv = dict(
                 ("Key_{0}".format(x), str(x)) for x in range(self.opcount)
             )
-            cb.set_multi(kv)
+            cb.upsert_multi(kv)
             self.pool.release_client(cb)
             self.remaining -= 1
 
@@ -136,10 +136,8 @@ class CbThread(Thread):
 def main():
 
     ap = ArgumentParser()
-    ap.add_argument('-H', '--host', help="Host to connect to",
-                    default="localhost")
-    ap.add_argument('-b', '--bucket', help="Bucket to connect to",
-                    default="default")
+    ap.add_argument('-U', '--connstr', help="Connection string",
+                    default='couchbase://localhost/default')
     ap.add_argument("-O", "--opcount", help="How many operations to perform "
                     "at once", type=int,
                     default=10)
@@ -154,8 +152,7 @@ def main():
 
     pool = Pool(initial=options.pool_min,
                 max_clients=options.pool_max,
-                bucket=options.bucket,
-                host=options.host)
+                connstr=options.connstr)
 
     thrs = [
         CbThread(pool, opcount=options.opcount) for _ in range(options.threads)

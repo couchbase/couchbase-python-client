@@ -21,7 +21,7 @@ from time import sleep, time
 
 import gevent
 
-from couchbase.connection import FMT_BYTES
+from couchbase import FMT_BYTES
 from gcouchbase.connection import GConnection as Connection
 
 ap = argparse.ArgumentParser()
@@ -33,10 +33,9 @@ ap.add_argument('-t', '--threads', default=4, type=int,
 ap.add_argument('-d', '--delay', default=0, type=float,
                 help="Number of seconds to wait between each op. "
                 "may be a fraction")
-
-ap.add_argument('-b', '--bucket', default='default', type=str)
+ap.add_argument('-U', '--connstr', default='couchbase://localhost/default',
+                help="Connection string")
 ap.add_argument('-p', '--password', default=None, type=str)
-ap.add_argument('-H', '--hostname', default='localhost', type=str)
 ap.add_argument('-D', '--duration', default=10, type=int,
                 help="Duration of run (in seconds)")
 
@@ -56,8 +55,8 @@ options = ap.parse_args()
 
 GLOBAL_INSTANCE = None
 CONN_OPTIONS = {
-    "bucket": options.bucket,
-    "host": options.hostname
+        'connstr' : options.connstr,
+        'password': options.password
 }
 
 GLOBAL_INSTANCE = Connection(**CONN_OPTIONS)
@@ -86,7 +85,7 @@ class Worker(object):
 
         while time() < self.end_time:
             begin_time = time()
-            rv = cb.set_multi(self.kv, format=FMT_BYTES)
+            rv = cb.upsert_multi(self.kv, format=FMT_BYTES)
             assert rv.all_ok, "Operation failed: "
             self.wait_time += time() - begin_time
             self.opcount += options.batch

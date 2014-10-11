@@ -19,7 +19,7 @@
 import argparse
 from threading import Thread
 from time import sleep, time
-from couchbase.connection import Connection, FMT_BYTES
+from couchbase.bucket import Bucket, FMT_BYTES
 from couchbase.transcoder import Transcoder
 
 ap = argparse.ArgumentParser()
@@ -32,9 +32,11 @@ ap.add_argument('-d', '--delay', default=0, type=float,
                 help="Number of seconds to wait between each op. "
                 "may be a fraction")
 
-ap.add_argument('-b', '--bucket', default='default', type=str)
+ap.add_argument('-U', '--connstr', default='couchbase://localhost/default',
+                help="Connection string")
+
 ap.add_argument('-p', '--password', default=None, type=str)
-ap.add_argument('-H', '--hostname', default='localhost', type=str)
+
 ap.add_argument('-D', '--duration', default=10, type=int,
                 help="Duration of run (in seconds)")
 ap.add_argument('-T', '--transcoder', default=False,
@@ -68,13 +70,12 @@ class Worker(Thread):
             self.kv[self.key + str(x)] = self.value
         self.wait_time = 0
         self.opcount = 0
-        connopts = { "bucket" : "default",
-                     "host" : options.hostname,
+        connopts = { "connstr" : options.connstr,
                      "unlock_gil": DO_UNLOCK_GIL }
         if options.iops:
             connopts["experimental_gevent_support"] = True
 
-        self.cb = Connection(**connopts)
+        self.cb = Bucket(**connopts)
 
         if options.transcoder:
             self.cb.transcoder = TC
@@ -86,7 +87,7 @@ class Worker(Thread):
 
         while time() < self.end_time:
             begin_time = time()
-            rv = cb.set_multi(self.kv, format=FMT_BYTES)
+            rv = cb.upsert_multi(self.kv, format=FMT_BYTES)
             assert rv.all_ok, "Operation failed: "
             self.wait_time += time() - begin_time
 
