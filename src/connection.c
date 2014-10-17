@@ -611,7 +611,7 @@ Bucket__init__(pycbc_Bucket *self,
 
     if (dfl_fmt == Py_None || dfl_fmt == NULL) {
         /** Set to 0 if None or NULL */
-        dfl_fmt = pycbc_IntFromL(0);
+        dfl_fmt = pycbc_IntFromL(PYCBC_FMT_JSON);
 
     } else {
         Py_INCREF(dfl_fmt); /* later decref */

@@ -79,7 +79,7 @@ encode_common(PyObject **o, void **buf, size_t *nbuf, lcb_uint32_t flags)
     Py_ssize_t plen;
     int rv;
 
-    if ((flags & PYCBC_FMT_UTF8) == PYCBC_FMT_UTF8) {
+    if (flags == PYCBC_FMT_UTF8) {
 #if PY_MAJOR_VERSION == 2
         if (PyString_Check(*o)) {
 #else
@@ -96,7 +96,7 @@ encode_common(PyObject **o, void **buf, size_t *nbuf, lcb_uint32_t flags)
             bytesobj = PyUnicode_AsUTF8String(*o);
         }
 
-    } else if ((flags & PYCBC_FMT_BYTES) == PYCBC_FMT_BYTES) {
+    } else if (flags == PYCBC_FMT_BYTES) {
         if (PyBytes_Check(*o) || PyByteArray_Check(*o)) {
             bytesobj = *o;
             Py_INCREF(*o);
@@ -111,10 +111,10 @@ encode_common(PyObject **o, void **buf, size_t *nbuf, lcb_uint32_t flags)
         PyObject *args = NULL;
         PyObject *helper;
 
-        if ((flags & PYCBC_FMT_PICKLE) == PYCBC_FMT_PICKLE) {
+        if (flags == PYCBC_FMT_PICKLE) {
             helper = pycbc_helpers.pickle_encode;
 
-        } else if ((flags & PYCBC_FMT_JSON) == PYCBC_FMT_JSON) {
+        } else if (flags == PYCBC_FMT_JSON) {
             helper = pycbc_helpers.json_encode;
 
         } else {
@@ -171,14 +171,21 @@ static int
 decode_common(PyObject **vp, const char *buf, size_t nbuf, lcb_uint32_t flags)
 {
     PyObject *decoded = NULL;
+    lcb_U32 c_flags, l_flags;
 
-    if ((flags & PYCBC_FMT_UTF8) == PYCBC_FMT_UTF8) {
+    c_flags = flags & PYCBC_FMT_COMMON_MASK;
+    l_flags = flags & PYCBC_FMT_LEGACY_MASK;
+
+    #define FMT_MATCHES(fmtbase) \
+        (c_flags == PYCBC_FMT_COMMON_##fmtbase || l_flags == PYCBC_FMT_LEGACY_##fmtbase)
+
+    if (FMT_MATCHES(UTF8)) {
         decoded = convert_to_string(buf, nbuf, CONVERT_MODE_UTF8_ONLY);
         if (!decoded) {
             return -1;
         }
 
-    } else if ((flags & PYCBC_FMT_BYTES) == PYCBC_FMT_BYTES) {
+    } else if (FMT_MATCHES(BYTES)) {
         GT_BYTES:
         decoded = convert_to_string(buf, nbuf, CONVERT_MODE_BYTES_ONLY);
         pycbc_assert(decoded);
@@ -188,12 +195,12 @@ decode_common(PyObject **vp, const char *buf, size_t nbuf, lcb_uint32_t flags)
         PyObject *args = NULL;
         PyObject *first_arg = NULL;
 
-        if ((flags & PYCBC_FMT_PICKLE) == PYCBC_FMT_PICKLE) {
+        if (FMT_MATCHES(PICKLE)) {
             converter = pycbc_helpers.pickle_decode;
             first_arg = convert_to_string(buf, nbuf, CONVERT_MODE_BYTES_ONLY);
             pycbc_assert(first_arg);
 
-        } else if ((flags & PYCBC_FMT_JSON) == PYCBC_FMT_JSON) {
+        } else if (FMT_MATCHES(JSON)) {
             converter = pycbc_helpers.json_decode;
             first_arg = convert_to_string(buf, nbuf, CONVERT_MODE_UTF8_ONLY);
 
@@ -224,6 +231,8 @@ decode_common(PyObject **vp, const char *buf, size_t nbuf, lcb_uint32_t flags)
 
     *vp = decoded;
     return 0;
+
+    #undef FMT_MATCHES
 }
 
 int
@@ -466,7 +475,7 @@ pycbc_tc_encode_value(pycbc_Bucket *conn,
             return -1;
         }
 
-        *flags = flags_stackval & PYCBC_FMT_MASK;
+        *flags = flags_stackval;
         return encode_common(value, buf, nbuf, flags_stackval);
     }
 

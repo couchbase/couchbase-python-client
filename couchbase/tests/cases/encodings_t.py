@@ -15,10 +15,13 @@
 # limitations under the License.
 #
 
-from couchbase import FMT_BYTES, FMT_JSON, FMT_PICKLE, FMT_UTF8
+from couchbase import (
+    FMT_BYTES, FMT_JSON, FMT_PICKLE, FMT_UTF8,
+    FMT_LEGACY_MASK, FMT_COMMON_MASK)
 from couchbase.connection import Connection
 from couchbase.exceptions import ValueFormatError, CouchbaseError
 from couchbase.tests.base import ConnectionTestCase, SkipTest
+from couchbase.transcoder import TranscoderPP, LegacyTranscoderPP
 
 BLOB_ORIG =  b'\xff\xfe\xe9\x05\xdc\x05\xd5\x05\xdd\x05'
 
@@ -99,3 +102,42 @@ class ConnectionEncodingTest(ConnectionTestCase):
             rv = self.cb.get(b"\0")
         else:
             self.assertRaises(ValueFormatError, self.cb.set, b"\0", "value")
+
+    def test_compat_interop(self):
+        # Check that we can interact with older versions, and vice versa:
+
+        # Some basic sanity checks:
+        self.assertEqual(0x00, FMT_JSON & FMT_LEGACY_MASK)
+        self.assertEqual(0x01, FMT_PICKLE & FMT_LEGACY_MASK)
+        self.assertEqual(0x02, FMT_BYTES & FMT_LEGACY_MASK)
+        self.assertEqual(0x04, FMT_UTF8 & FMT_LEGACY_MASK)
+
+        self.cb.transcoder = TranscoderPP()
+        self.cb.upsert('foo', { 'foo': 'bar' }) # JSON
+        self.cb.transcoder = LegacyTranscoderPP()
+        rv = self.cb.get('foo')
+        self.assertIsInstance(rv.value, dict)
+
+        # Set it back now
+        self.cb.upsert('foo', { 'foo': 'bar' })
+        self.cb.transcoder = TranscoderPP()
+        rv = self.cb.get('foo')
+        self.assertIsInstance(rv.value, dict)
+        self.assertEqual(rv.flags, FMT_JSON & FMT_LEGACY_MASK)
+
+
+        ## Try with Bytes
+        self.cb.transcoder = TranscoderPP()
+        self.cb.upsert('bytesval', 'Hello World'.encode('utf-8'), format=FMT_BYTES)
+        self.cb.transcoder = LegacyTranscoderPP()
+        rv = self.cb.get('bytesval')
+        self.assertEqual(FMT_BYTES, rv.flags)
+        self.assertEqual('Hello World'.encode('utf-8'), rv.value)
+
+        # Set it back
+        self.cb.transcoder = LegacyTranscoderPP()
+        self.cb.upsert('bytesval', 'Hello World'.encode('utf-8'), format=FMT_BYTES)
+        self.cb.transcoder = TranscoderPP()
+        rv = self.cb.get('bytesval')
+        self.assertEqual(FMT_BYTES & FMT_LEGACY_MASK, rv.flags)
+        self.assertEqual('Hello World'.encode('utf-8'), rv.value)

@@ -220,13 +220,22 @@ enum {
  * Format flags
  */
 enum {
-    PYCBC_FMT_JSON = 0x0,
-    PYCBC_FMT_PICKLE = 0x1,
-    PYCBC_FMT_BYTES = 0x2,
+    PYCBC_FMT_LEGACY_JSON = 0x00,
+    PYCBC_FMT_LEGACY_PICKLE = 0x01,
+    PYCBC_FMT_LEGACY_BYTES = 0x02,
+    PYCBC_FMT_LEGACY_UTF8 = 0x04,
+    PYCBC_FMT_LEGACY_MASK = 0x07,
 
-    PYCBC_FMT_UTF8 = 0x4,
+    PYCBC_FMT_COMMON_PICKLE = 0x01 << 24,
+    PYCBC_FMT_COMMON_JSON = 0x02 << 24,
+    PYCBC_FMT_COMMON_BYTES = 0x03 << 24,
+    PYCBC_FMT_COMMON_UTF8 = 0x04 << 24,
+    PYCBC_FMT_COMMON_MASK = 0xFF << 24,
 
-    PYCBC_FMT_MASK = 0x7
+    PYCBC_FMT_JSON = PYCBC_FMT_LEGACY_JSON|PYCBC_FMT_COMMON_JSON,
+    PYCBC_FMT_PICKLE = PYCBC_FMT_LEGACY_PICKLE|PYCBC_FMT_COMMON_PICKLE,
+    PYCBC_FMT_BYTES = PYCBC_FMT_LEGACY_BYTES|PYCBC_FMT_COMMON_BYTES,
+    PYCBC_FMT_UTF8 = PYCBC_FMT_LEGACY_UTF8|PYCBC_FMT_COMMON_UTF8
 };
 
 typedef enum {
@@ -403,9 +412,9 @@ typedef struct {
 
 
     pycbc_Bucket *parent;
+    unsigned int format;
     long rows_per_call;
     unsigned short htcode;
-    unsigned short format;
     unsigned short htflags;
 } pycbc_HttpResult;
 

@@ -126,13 +126,13 @@ class ConnectionGetTest(ConnectionTestCase):
         rv = self.cb.get(key)
         val1, flags1, cas1 = rv.value, rv.flags, rv.cas
         self.assertEqual(val1, 'value1')
-        self.assertEqual(flags1, 0x0)
+        self.assertEqual(flags1, FMT_JSON)
         self.assertEqual(cas1, orig_cas1)
 
         # Test named tuples
         result1 = self.cb.get(key)
         self.assertEqual(result1.value, 'value1')
-        self.assertEqual(result1.flags, 0x0)
+        self.assertEqual(result1.flags, FMT_JSON)
         self.assertEqual(result1.cas, orig_cas1)
 
         # Single get as array
@@ -140,7 +140,7 @@ class ConnectionGetTest(ConnectionTestCase):
         self.assertIsInstance(result2, self.cls_MultiResult)
         self.assertTrue(key in result2)
         self.assertEqual(result2[key].value, 'value1')
-        self.assertEqual(result2[key].flags, 0x0)
+        self.assertEqual(result2[key].flags, FMT_JSON)
         self.assertEqual(result2[key].cas, orig_cas1)
 
         key2 = self.gen_key('key_extended_2')
@@ -151,13 +151,13 @@ class ConnectionGetTest(ConnectionTestCase):
         results = self.cb.get_multi([key2, key3])
 
         self.assertEqual(results[key3].value, 'value3')
-        self.assertEqual(results[key3].flags, 0x0)
+        self.assertEqual(results[key3].flags, FMT_JSON)
         self.assertEqual(results[key3].cas, cas3)
 
         rv = self.cb.get('missing_key', quiet=True)
         val4, flags4, cas4 = rv.value, rv.flags, rv.cas
         self.assertEqual(val4, None)
-        self.assertEqual(flags1, 0x0)
+        self.assertEqual(flags4, 0x00)
         self.assertEqual(cas4, 0)
 
     @attr('slow')

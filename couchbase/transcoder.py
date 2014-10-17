@@ -20,10 +20,41 @@ import json
 import pickle
 
 from couchbase import (FMT_JSON, FMT_AUTO,
-                       FMT_BYTES, FMT_UTF8, FMT_PICKLE, FMT_MASK)
+                       FMT_BYTES, FMT_UTF8, FMT_PICKLE,
+                       FMT_LEGACY_MASK, FMT_COMMON_MASK)
 from couchbase.exceptions import ValueFormatError
 from couchbase._libcouchbase import Transcoder
 from couchbase._pyport import unicode
+
+# Initialize our dictionary
+
+UNIFIED_FORMATS = (FMT_JSON, FMT_BYTES, FMT_UTF8, FMT_PICKLE)
+LEGACY_FORMATS = tuple([x & FMT_LEGACY_MASK for x in UNIFIED_FORMATS])
+COMMON_FORMATS = tuple([x & FMT_COMMON_MASK for x in UNIFIED_FORMATS])
+
+COMMON2UNIFIED = {}
+LEGACY2UNIFIED = {}
+for fl in UNIFIED_FORMATS:
+    COMMON2UNIFIED[fl & FMT_COMMON_MASK] = fl
+    LEGACY2UNIFIED[fl & FMT_LEGACY_MASK] = fl
+
+def get_decode_format(flags):
+    """
+    Returns a tuple of format, recognized
+    """
+    c_flags = flags & FMT_COMMON_MASK
+    l_flags = flags & FMT_LEGACY_MASK
+
+    if (c_flags):
+        if c_flags not in COMMON_FORMATS:
+            return FMT_BYTES, False
+        else:
+            return COMMON2UNIFIED[c_flags], True
+    else:
+        if not l_flags in LEGACY_FORMATS:
+            return FMT_BYTES, False
+        else:
+            return LEGACY2UNIFIED[l_flags], True
 
 
 class TranscoderPP(object):
@@ -42,7 +73,9 @@ class TranscoderPP(object):
         return self.decode_value(key, FMT_UTF8)
 
     def encode_value(self, value, format):
-        if format == FMT_AUTO:
+        if format == 0:
+            format = FMT_JSON
+        elif format == FMT_AUTO:
             if isinstance(value, unicode):
                 format = FMT_UTF8
             elif isinstance(value, (bytes, bytearray)):
@@ -52,12 +85,10 @@ class TranscoderPP(object):
             else:
                 format = FMT_PICKLE
 
-        fbase = format & FMT_MASK
-
-        if fbase not in (FMT_PICKLE, FMT_JSON, FMT_BYTES, FMT_UTF8):
+        if format not in (FMT_PICKLE, FMT_JSON, FMT_BYTES, FMT_UTF8):
             raise ValueError("Unrecognized format")
 
-        if fbase == FMT_BYTES:
+        if format == FMT_BYTES:
             if isinstance(value, bytes):
                 pass
 
@@ -69,13 +100,13 @@ class TranscoderPP(object):
 
             return (value, format)
 
-        elif fbase == FMT_UTF8:
+        elif format == FMT_UTF8:
             return (value.encode('utf-8'), format)
 
-        elif fbase == FMT_PICKLE:
+        elif format == FMT_PICKLE:
             return (pickle.dumps(value), FMT_PICKLE)
 
-        elif fbase == FMT_JSON:
+        elif format == FMT_JSON:
             return (json.dumps(value, ensure_ascii=False
                                ).encode('utf-8'), FMT_JSON)
 
@@ -83,23 +114,23 @@ class TranscoderPP(object):
             raise ValueError("Unrecognized format '%r'" % (format,))
 
     def decode_value(self, value, flags):
-        is_recognized_format = True
-        fbase = flags & FMT_MASK
+        format, is_recognized = get_decode_format(flags)
 
-        if fbase not in (FMT_JSON, FMT_UTF8, FMT_BYTES, FMT_PICKLE):
-            fbase = FMT_BYTES
-            is_recognized_format = False
-
-        if fbase == FMT_BYTES:
-            if not is_recognized_format:
+        if format == FMT_BYTES:
+            if not is_recognized:
                 warnings.warn("Received unrecognized flags %d" % (flags,))
             return value
 
-        elif fbase == FMT_UTF8:
+        elif format == FMT_UTF8:
             return value.decode("utf-8")
 
-        elif fbase == FMT_JSON:
+        elif format == FMT_JSON:
             return json.loads(value.decode("utf-8"))
 
-        elif fbase == FMT_PICKLE:
+        elif format == FMT_PICKLE:
             return pickle.loads(value)
+
+class LegacyTranscoderPP(TranscoderPP):
+    def encode_value(self, value, format):
+        encoded, flags = super(LegacyTranscoderPP, self).encode_value(value, format)
+        return encoded, flags & FMT_LEGACY_MASK
