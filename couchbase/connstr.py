@@ -14,13 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from __future__ import print_function
 
 try:
     from urlparse import urlparse, parse_qs
     from urllib import urlencode
 except ImportError:
     from urllib.parse import urlparse, parse_qs, urlencode
-
 
 class ConnectionString(object):
     """
@@ -79,10 +79,10 @@ class ConnectionString(object):
 if __name__ == "__main__":
     sample = "couchbase://host1:111,host2:222,host3:333/default?op_timeout=4.2"
     cs = ConnectionString(sample)
-    print "Hosts", cs.hosts
-    print "Implicit Port", cs.implicit_port
-    print "Bucket", cs.bucket
-    print "Options", cs.options
+    print("Hosts", cs.hosts)
+    print("Implicit Port", cs.implicit_port)
+    print("Bucket", cs.bucket)
+    print("Options", cs.options)
 
     cs.bucket = "Hi"
-    print "Encoded again", cs
+    print("Encoded again", cs)
