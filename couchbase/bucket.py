@@ -562,7 +562,7 @@ class Bucket(_Base):
           other :meth:`lock`, :meth:`upsert` or other mutation calls) will
           fail with an :exc:`couchbase.exceptions.TemporaryFailError`.
           Note that the value for this option is limited by the maximum allowable
-          lock time determined by the server (currently, this is 15 seconds). If
+          lock time determined by the server (currently, this is 30 seconds). If
           passed a higher value, the server will silently lower this to its
           maximum limit.
 
