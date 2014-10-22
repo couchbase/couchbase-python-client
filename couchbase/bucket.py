@@ -399,7 +399,7 @@ class Bucket(_Base):
         return _Base.replace(self, key, value, ttl=ttl, cas=cas, format=format,
                              persist_to=persist_to, replicate_to=replicate_to)
 
-    def append(self, key, value, cas=0, ttl=0, format=None,
+    def append(self, key, value, cas=0, format=None,
                persist_to=0, replicate_to=0):
         """
         Append a string to an existing value in Couchbase.
@@ -431,10 +431,10 @@ class Bucket(_Base):
             :meth:`upsert`, :meth:`append_multi`
 
         """
-        return _Base.append(self, key, value, ttl=ttl, cas=cas, format=format,
+        return _Base.append(self, key, value, cas=cas, format=format,
                             persist_to=persist_to, replicate_to=replicate_to)
 
-    def prepend(self, key, value, cas=0, ttl=0, format=None,
+    def prepend(self, key, value, cas=0, format=None,
                 persist_to=0, replicate_to=0):
         """
         Prepend a string to an existing value in Couchbase.
@@ -443,7 +443,7 @@ class Bucket(_Base):
             :meth:`append`, :meth:`prepend_multi`
 
         """
-        return _Base.prepend(self, key, value, ttl=ttl, cas=cas, format=format,
+        return _Base.prepend(self, key, value, cas=cas, format=format,
                              persist_to=persist_to, replicate_to=replicate_to)
 
     def get(self, key, ttl=0, quiet=None, replica=False, no_format=False):
@@ -1023,8 +1023,7 @@ class Bucket(_Base):
                                    persist_to=persist_to,
                                    replicate_to=replicate_to)
 
-    def append_multi(self, keys, ttl=0, format=None,
-                     persist_to=0, replicate_to=0):
+    def append_multi(self, keys, format=None, persist_to=0, replicate_to=0):
         """Append to multiple keys.
         Multi variant of :meth:`append`.
 
@@ -1039,19 +1038,18 @@ class Bucket(_Base):
         .. seealso:: :meth:`append`, :meth:`upsert_multi`, :meth:`upsert`
 
         """
-        return _Base.append_multi(self, keys, ttl=ttl, format=format,
+        return _Base.append_multi(self, keys, format=format,
                                   persist_to=persist_to,
                                   replicate_to=replicate_to)
 
-    def prepend_multi(self, keys, ttl=0, format=None,
-                      persist_to=0, replicate_to=0):
+    def prepend_multi(self, keys, format=None, persist_to=0, replicate_to=0):
         """Prepend to multiple keys.
         Multi variant of :meth:`prepend`
 
         .. seealso:: :meth:`prepend`, :meth:`upsert_multi`, :meth:`upsert`
 
         """
-        return _Base.prepend_multi(self, keys, ttl=ttl, format=format,
+        return _Base.prepend_multi(self, keys, format=format,
                                    persist_to=persist_to,
                                    replicate_to=replicate_to)
 
