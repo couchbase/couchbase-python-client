@@ -560,7 +560,7 @@ class Bucket(_Base):
         :param int: a TTL for which the lock should be valid.
           While the lock is active, attempts to access the key (via
           other :meth:`lock`, :meth:`upsert` or other mutation calls) will
-          fail with an :exc:`couchbase.exceptions.TemporaryFailError`.
+          fail with an :exc:`couchbase.exceptions.KeyExistsError`.
           Note that the value for this option is limited by the maximum allowable
           lock time determined by the server (currently, this is 30 seconds). If
           passed a higher value, the server will silently lower this to its
@@ -639,7 +639,7 @@ class Bucket(_Base):
 
         See :meth:`lock` for an example.
 
-        :raise: :exc:`couchbase.exceptions.KeyExistsError` if the CAS
+        :raise: :exc:`couchbase.exceptions.TemporaryFailError` if the CAS
           supplied does not match the CAS on the server (possibly because
           it was unlocked by previous call).
 
