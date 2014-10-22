@@ -137,14 +137,12 @@ class BucketManager(object):
         name = self._cb._mk_devmode(name, use_devmode)
 
         fqname = "_design/{0}".format(name)
-        if isinstance(ddoc, dict):
-            ddoc = ddoc.copy()
-            ddoc['_id'] = fqname
-            ddoc = json.dumps(ddoc)
-        else:
-            if use_devmode:
-                raise ArgumentError.pyexc("devmode can only be used "
-                                          "with dict type design docs")
+        if not isinstance(ddoc, dict):
+            ddoc = json.loads(ddoc)
+
+        ddoc = ddoc.copy()
+        ddoc['_id'] = fqname
+        ddoc = json.dumps(ddoc)
 
         existing = None
         if syncwait:
