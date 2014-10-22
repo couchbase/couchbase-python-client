@@ -339,7 +339,7 @@ pycbc_Bucket__http_request(pycbc_Bucket *self,
     int rv;
     int method;
     int reqtype;
-    unsigned short value_format = 0;
+    unsigned value_format = PYCBC_FMT_JSON;
     lcb_error_t err;
 
     const char *body = NULL;
@@ -363,7 +363,7 @@ pycbc_Bucket__http_request(pycbc_Bucket *self,
     };
 
     rv = PyArg_ParseTupleAndKeywords(args, kwargs,
-                                     "iis|zz#HOOOl", kwlist,
+                                     "iis|zz#IOOOl", kwlist,
                                      &reqtype,
                                      &method,
                                      &path,
