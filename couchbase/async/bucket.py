@@ -31,15 +31,16 @@ from couchbase._libcouchbase import (
 
 from couchbase.result import AsyncResult
 from couchbase.async.view import AsyncViewBase
-from couchbase.connection import Connection
+from couchbase.bucket import Bucket
 from couchbase.exceptions import ArgumentError
 
-class Async(Connection):
+class AsyncBucket(Bucket):
     def __init__(self, iops=None, *args, **kwargs):
         """
-        Create a new Async connection. An async connection is an object
-        which functions like a normal synchronous connection, except that it
-        returns future objects (i.e. :class:`~couchbase.result.AsyncResult`
+        Create a new Async Bucket. An async Bucket is an object
+        which functions like a normal synchronous bucket connection,
+        except that it returns future objects
+        (i.e. :class:`~couchbase.result.AsyncResult`
         objects) instead of :class:`~couchbase.result.Result`.
         These objects are actually :class:`~couchbase.result.MultiResult`
         objects which are empty upon retun. As operations complete, this
@@ -58,7 +59,7 @@ class Async(Connection):
           instances, and is owned by the connection object.
 
         :param kwargs: Additional arguments to pass to
-          the :class:`~couchbase.connection.Connection` constructor
+          the :class:`~couchbase.bucket.Bucket` constructor
         """
         if not iops:
             raise ValueError("Must have IOPS")
@@ -75,7 +76,7 @@ class Async(Connection):
         # kwargs['unlock_gil'] = False
         # This is always set to false in connection.c
 
-        super(Async, self).__init__(*args, **kwargs)
+        super(AsyncBucket, self).__init__(*args, **kwargs)
 
     def query(self, *args, **kwargs):
         """
@@ -93,9 +94,9 @@ class Async(Connection):
             raise ArgumentError.pyexc("itercls must be defined "
                                       "and must be derived from AsyncViewBase")
 
-        return super(Async, self).query(*args, **kwargs)
+        return super(AsyncBucket, self).query(*args, **kwargs)
 
     def endure(self, key, *args, **kwargs):
-        res = super(Async, self).endure_multi([key], *args, **kwargs)
+        res = super(AsyncBucket, self).endure_multi([key], *args, **kwargs)
         res._set_single()
         return res

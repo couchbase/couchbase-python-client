@@ -22,7 +22,7 @@ from twisted.internet import reactor
 from twisted.internet.defer import Deferred
 from twisted.python.failure import Failure
 
-from couchbase.async.connection import Async
+from couchbase.async.bucket import AsyncBucket
 from couchbase.async.view import AsyncViewBase
 from couchbase.async.events import EventQueue
 from couchbase.exceptions import CouchbaseError
@@ -107,15 +107,15 @@ class ConnectionEventQueue(TxEventQueue):
             return
         raise err
 
-class TxAsyncConnection(Async):
+class RawBucket(AsyncBucket):
     def __init__(self, **kwargs):
         """
-        Connection subclass for Twisted. This inherits from the 'Async' class,
+        Bucket subclass for Twisted. This inherits from the 'AsyncBucket' class,
         but also adds some twisted-specific logic for hooking on a connection.
         """
 
         iops = v0Iops(reactor)
-        super(TxAsyncConnection, self).__init__(iops=iops, **kwargs)
+        super(RawBucket, self).__init__(iops=iops, **kwargs)
 
         self._evq = {
             'connect': ConnectionEventQueue(),
@@ -225,13 +225,13 @@ class TxAsyncConnection(Async):
 
         Other arguments are passed to the standard `query` method.
 
-        This functions exactly like the :meth:`~couchbase.async.Connection.query`
+        This functions exactly like the :meth:`~couchbase.async.AsyncBucket.query`
         method, except it automatically schedules operations if the connection
         has not yet been negotiated.
         """
 
         kwargs['itercls'] = viewcls
-        o = super(TxAsyncConnection, self).query(*args, **kwargs)
+        o = super(AsyncBucket, self).query(*args, **kwargs)
         if not self.connected:
             self.connect().addCallback(lambda x: o.start())
         else:
@@ -245,7 +245,7 @@ class TxAsyncConnection(Async):
         with a :class:`BatchedView` when the results are complete.
 
         Parameters follow conventions of
-        :meth:`~couchbase.connection.Connection.query`.
+        :meth:`~couchbase.bucket.Bucket.query`.
 
         Example::
 
@@ -263,15 +263,15 @@ class TxAsyncConnection(Async):
             return self.connect().addCallback(cb)
 
         kwargs['itercls'] = BatchedView
-        o = super(TxAsyncConnection, self).query(*args, **kwargs)
+        o = super(RawBucket, self).query(*args, **kwargs)
         o.start()
         return o._getDeferred()
 
 
-class Connection(TxAsyncConnection):
+class Bucket(RawBucket):
     def __init__(self, *args, **kwargs):
         """
-        This class inherits from :class:`TxAsyncConnection`.
+        This class inherits from :class:`RawBucket`.
         In addition to the connection methods, this class' data access methods
         return :class:`Deferreds` instead of :class:`AsyncResult` objects.
 
@@ -319,7 +319,7 @@ class Connection(TxAsyncConnection):
           d.addCallback(mres)
 
         """
-        super(Connection, self).__init__(*args, **kwargs)
+        super(Bucket, self).__init__(*args, **kwargs)
 
     def _connectSchedule(self, f, meth, *args, **kwargs):
         qop = Deferred()
@@ -345,7 +345,7 @@ class Connection(TxAsyncConnection):
             return self._wrap(meth, *args, **kwargs)
         return ret
 
-    locals().update(TxAsyncConnection._gen_memd_wrappers(_meth_factory))
-    for x in TxAsyncConnection._MEMCACHED_OPERATIONS:
+    locals().update(RawBucket._gen_memd_wrappers(_meth_factory))
+    for x in RawBucket._MEMCACHED_OPERATIONS:
         if locals().get(x+'_multi', None):
             locals().update({x+"Multi": locals()[x+"_multi"]})

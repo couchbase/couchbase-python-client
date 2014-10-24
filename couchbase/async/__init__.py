@@ -1,1 +1,1 @@
-from couchbase.async.connection import Async
+from couchbase.async.bucket import AsyncBucket

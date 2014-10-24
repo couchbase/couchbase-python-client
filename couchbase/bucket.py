@@ -16,6 +16,7 @@
 #
 import json
 import time
+from warnings import warn
 
 import couchbase._bootstrap
 import couchbase._libcouchbase as _LCB
@@ -1387,6 +1388,26 @@ class Bucket(_Base):
     def views_timeout(self, value):
         self._set_timeout_common(_LCB.LCB_CNTL_VIEW_TIMEOUT, value)
 
+    _OLDOPS = { 'set': 'upsert', 'add': 'insert', 'delete': 'remove'}
+    for o, n in _OLDOPS.items():
+        for variant in ('', '_multi'):
+            oldname = o + variant
+            newname = n + variant
+
+            try:
+                dst = locals()[n + variant]
+            except KeyError:
+                dst = getattr(_Base, n + variant)
+
+            msg = "Invoking `{0}` is deprecated. Use `{1}` instead".format(
+                oldname, newname)
+            def mkmeth(_msg, _dst):
+                def _tmpmeth(self, *args, **kwargs):
+                    warn(_msg, DeprecationWarning)
+                    return _dst(self, *args, **kwargs)
+                return _tmpmeth
+
+            locals().update({oldname: mkmeth(msg, dst)})
 
     """
     Lists the names of all the memcached operations. This is useful

@@ -22,7 +22,7 @@ from time import sleep, time
 import gevent
 
 from couchbase import FMT_BYTES
-from gcouchbase.connection import GConnection as Connection
+from gcouchbase.bucket import Bucket
 
 ap = argparse.ArgumentParser()
 
@@ -59,13 +59,13 @@ CONN_OPTIONS = {
         'password': options.password
 }
 
-GLOBAL_INSTANCE = Connection(**CONN_OPTIONS)
+GLOBAL_INSTANCE = Bucket(**CONN_OPTIONS)
 
 def make_instance():
     if options.global_instance:
         return GLOBAL_INSTANCE
     else:
-        return Connection(**CONN_OPTIONS)
+        return Bucket(**CONN_OPTIONS)
 
 class Worker(object):
     def __init__(self):

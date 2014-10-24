@@ -4,11 +4,11 @@ try:
 except ImportError as e:
     raise SkipTest(e)
 
-from gcouchbase.connection import GConnection, GView
+from gcouchbase.bucket import Bucket, GView
 from couchbase.tests.importer import get_configured_classes
 
 class GEventImplMixin(ApiImplementationMixin):
-    factory = GConnection
+    factory = Bucket
     viewfactor = GView
     should_check_refcount = False
 

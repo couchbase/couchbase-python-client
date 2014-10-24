@@ -3,7 +3,7 @@ from collections import deque
 from gevent.event import AsyncResult, Event
 from gevent.hub import get_hub, getcurrent, Waiter
 
-from couchbase.async.connection import Async
+from couchbase.async.bucket import AsyncBucket
 from couchbase.async.view import AsyncViewBase
 from couchbase.views.iterator import AlreadyQueriedError
 try:
@@ -67,14 +67,14 @@ class GView(AsyncViewBase):
 
         self._do_iter = False
 
-class GConnection(Async):
+class Bucket(AsyncBucket):
     def __init__(self, *args, **kwargs):
         """
         This class is a 'GEvent'-optimized subclass of libcouchbase
         which utilizes the underlying IOPS structures and the gevent
         event primitives to efficiently utilize couroutine switching.
         """
-        super(GConnection, self).__init__(IOPS(), *args, **kwargs)
+        super(Bucket, self).__init__(IOPS(), *args, **kwargs)
 
     def _do_ctor_connect(self):
         if self.connected:
@@ -105,7 +105,7 @@ class GConnection(Async):
         return ret
 
     def _http_request(self, **kwargs):
-        res = super(GConnection, self)._http_request(**kwargs)
+        res = super(Bucket, self)._http_request(**kwargs)
         if kwargs.get('chunked', False):
             return res #views
 
@@ -119,8 +119,8 @@ class GConnection(Async):
 
     def query(self, *args, **kwargs):
         kwargs['itercls'] = GView
-        ret = super(GConnection, self).query(*args, **kwargs)
+        ret = super(Bucket, self).query(*args, **kwargs)
         ret.start()
         return ret
 
-    locals().update(Async._gen_memd_wrappers(_meth_factory))
+    locals().update(AsyncBucket._gen_memd_wrappers(_meth_factory))

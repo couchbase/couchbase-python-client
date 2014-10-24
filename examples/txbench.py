@@ -21,7 +21,7 @@ from time import time
 
 from twisted.internet import reactor
 
-from txcouchbase.connection import Connection, TxAsyncConnection
+from txcouchbase.bucket import RawBucket, Bucket
 from couchbase import FMT_BYTES
 from couchbase.transcoder import Transcoder
 
@@ -108,11 +108,8 @@ if options.transcoder:
     kwargs['transcoder'] = Transcoder()
 
 for _ in range(options.clients):
-    if options.deferreds:
-        cb = Connection(**kwargs)
-    else:
-        cb = TxAsyncConnection(**kwargs)
-
+    cls = Bucket if options.deferreds else RawBucket
+    cb = cls(**kwargs)
     clients.append(cb)
     d = cb.connect()
 
