@@ -55,7 +55,7 @@ class GeventTimer(TimerEvent):
         self._tmev.cancel()
 
     def reset(self, usecs):
-        self._tmev.add(usecs / 1000000)
+        self._tmev.add(usecs / 1000000.0)
 
     def cancel(self):
         self._tmev.cancel()

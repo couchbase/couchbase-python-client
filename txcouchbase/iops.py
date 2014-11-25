@@ -51,7 +51,7 @@ class TxTimer(TimerEvent):
 
 
     def schedule(self, usecs, reactor):
-        nsecs = usecs / 1000000
+        nsecs = usecs / 1000000.0
         if not self._txev or not self._txev.active():
             self._txev = reactor.callLater(nsecs, self._timer_wrap)
         else:

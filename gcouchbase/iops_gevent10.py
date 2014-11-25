@@ -48,7 +48,7 @@ class GEventTimer(TimerEvent):
         self.ready(0)
 
     def schedule(self, usecs):
-        seconds = usecs / 1000000
+        seconds = usecs / 1000000.0
         # This isn't the "clean" way, but it's much quicker.. and
         # since we're already using undocumented APIs, why not..
         _PyxTimer.__init__(self.ev, get_hub().loop, seconds)
