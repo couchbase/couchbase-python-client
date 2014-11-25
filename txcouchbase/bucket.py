@@ -108,12 +108,13 @@ class ConnectionEventQueue(TxEventQueue):
         raise err
 
 class RawBucket(AsyncBucket):
-    def __init__(self, **kwargs):
+    def __init__(self, connstr=None, **kwargs):
         """
         Bucket subclass for Twisted. This inherits from the 'AsyncBucket' class,
         but also adds some twisted-specific logic for hooking on a connection.
         """
-
+        if connstr and 'connstr' not in kwargs:
+            kwargs['connstr'] = connstr
         iops = v0Iops(reactor)
         super(RawBucket, self).__init__(iops=iops, **kwargs)
 

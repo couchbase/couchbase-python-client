@@ -21,6 +21,7 @@ from couchbase.exceptions import (
 from couchbase.tests.base import ConnectionTestCase
 from couchbase.connstr import ConnectionString
 from txcouchbase.tests.base import gen_base
+from txcouchbase.bucket import Bucket
 
 class BasicConnectionTest(gen_base(ConnectionTestCase)):
     def testConnectionSuccess(self):
@@ -53,6 +54,13 @@ class BasicConnectionTest(gen_base(ConnectionTestCase)):
         cb = self.make_connection(connection_string=cs.encode())
         d = cb.connect()
         d.addCallback(lambda x: self.assertTrue(cb.connected))
+        return d
+
+    def testConnstrFirstArg(self):
+        info = self.cluster_info
+        s = self.make_connargs()['connection_string']
+        cb = Bucket(s)
+        d = cb.connect().addCallback(lambda x: self.assertTrue(cb.connected))
         return d
 
     def testConnectionDestroyed(self):
