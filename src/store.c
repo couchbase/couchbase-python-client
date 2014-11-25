@@ -168,6 +168,12 @@ handle_single_kv(pycbc_Bucket *self,
     if (rv < 0) {
         return -1;
     }
+    if (scv->operation == LCB_APPEND || scv->operation == LCB_PREPEND) {
+        /* The server ignores these flags and libcouchbase will throw an error
+         * if the flags are present. We check elsewhere here to ensure that
+         * only UTF8/BYTES are accepted for append/prepend anyway */
+        scmd->v.v0.flags = 0;
+    }
 
     scmd->v.v0.operation = scv->operation;
     scmd->v.v0.cas = skc.cas;
