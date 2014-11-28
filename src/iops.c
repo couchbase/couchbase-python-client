@@ -521,6 +521,32 @@ cache_io_methods(pycbc_iops_t *pio, PyObject *obj)
 #undef XIONAME_CACHENTRIES
 }
 
+static lcb_io_procs_fn old_getprocs = NULL;
+static void iops_getprocs(int version,
+    lcb_loop_procs *loop_procs, lcb_timer_procs *timer_procs,
+    lcb_bsd_procs *bsd_procs, lcb_ev_procs *ev_procs,
+    lcb_completion_procs *completion_procs, lcb_iomodel_t *iomodel) {
+
+    /* Call the parent function */
+    old_getprocs(version, loop_procs, timer_procs, bsd_procs, ev_procs,
+        completion_procs, iomodel);
+
+    /* Now apply our new I/O functionality */
+    ev_procs->create = create_event;
+    ev_procs->destroy = destroy_event_common;
+    ev_procs->watch = update_event;
+    ev_procs->cancel = delete_event;
+
+    timer_procs->create = create_timer;
+    timer_procs->destroy = destroy_event_common;
+    timer_procs->schedule = update_timer;
+    timer_procs->cancel = delete_timer;
+
+    loop_procs->start = run_event_loop;
+    loop_procs->stop = stop_event_loop;
+}
+
+
 lcb_io_opt_t
 pycbc_iops_new(pycbc_Bucket *unused, PyObject *pyio)
 {
@@ -558,6 +584,34 @@ pycbc_iops_new(pycbc_Bucket *unused, PyObject *pyio)
     /* hide the dlsym */
     dfl->dlhandle = NULL;
 
+    if (dfl->version >= 2 && old_getprocs == NULL) {
+        /* Using getprocs */
+        if (dfl->version == 2) {
+            old_getprocs = dfl->v.v2.get_procs;
+        } else if (dfl->version == 3) {
+            /* Introduced in version 2.4.5 */
+#if LCB_VERSION >= 0x020405
+            old_getprocs = dfl->v.v3.get_procs;
+#else
+            /* This is a hack that we need to use for master which defines v3 but
+             * doesn't expose LCB_VERSION as 0x020405 */
+            struct {
+                void *v1;
+                int i1;
+                int i2;
+                void (*pad[17])(void);
+                lcb_io_procs_fn get_procs;
+            } *v3tmp = (void *) &dfl->v.v2;
+            old_getprocs = v3tmp->get_procs;
+#endif
+        } else {
+            PYCBC_EXC_WRAP(PYCBC_EXC_INTERNAL, 0,
+                           "libcouchbase gave us an IOPS version which is too new! "
+                           "Downgrade your C library");
+            return NULL; /* TODO: refactor this so we don't leak! */
+        }
+    }
+
     lcb_destroy_io_ops(dfl);
     dfl = NULL;
 
@@ -565,17 +619,24 @@ pycbc_iops_new(pycbc_Bucket *unused, PyObject *pyio)
         return NULL;
     }
 
-    ret->v.v0.create_event = create_event;
-    ret->v.v0.create_timer = create_timer;
-    ret->v.v0.destroy_event = destroy_event_common;
-    ret->v.v0.destroy_timer = destroy_event_common;
-    ret->v.v0.update_event = update_event;
-    ret->v.v0.delete_event = delete_event;
-    ret->v.v0.delete_timer = delete_timer;
-    ret->v.v0.update_timer = update_timer;
-    ret->v.v0.run_event_loop = run_event_loop;
-    ret->v.v0.stop_event_loop = stop_event_loop;
     ret->destructor = iops_destructor;
+
+    if (old_getprocs != NULL) {
+        ret->version = 2;
+        ret->v.v2.get_procs = iops_getprocs;
+    } else {
+        ret->version = 0;
+        ret->v.v0.create_event = create_event;
+        ret->v.v0.create_timer = create_timer;
+        ret->v.v0.destroy_event = destroy_event_common;
+        ret->v.v0.destroy_timer = destroy_event_common;
+        ret->v.v0.update_event = update_event;
+        ret->v.v0.delete_event = delete_event;
+        ret->v.v0.delete_timer = delete_timer;
+        ret->v.v0.update_timer = update_timer;
+        ret->v.v0.run_event_loop = run_event_loop;
+        ret->v.v0.stop_event_loop = stop_event_loop;
+    }
 
     return ret;
 }
