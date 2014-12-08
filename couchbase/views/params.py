@@ -469,6 +469,11 @@ class Query(object):
         else:
             raise ArgumentError.pyexc("Params must be Query, dict, or string")
 
+    @classmethod
+    def from_string(cls, qstr):
+        """Wrapper for :meth:`from_any`"""
+        return cls.from_any(qstr)
+
     def _encode(self, omit_keys=False):
         res_d = []
 

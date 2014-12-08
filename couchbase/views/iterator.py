@@ -24,6 +24,7 @@ from couchbase.exceptions import ArgumentError, CouchbaseError, ViewEngineError
 from couchbase.views.params import Query, UNSPEC, make_dvpath
 from couchbase._pyport import ulp, xrange
 from couchbase.user_constants import FMT_JSON
+from couchbase._pyport import basestring
 import couchbase._libcouchbase as C
 
 MAX_URI_LENGTH = 2048 # Let's be safe
@@ -260,7 +261,10 @@ class View(object):
                 "'query' argument. Use query.update() to add extra arguments")
 
         if query:
-            self._query = deepcopy(query)
+            if isinstance(query, basestring):
+                self._query = Query.from_string(query)
+            else:
+                self._query = deepcopy(query)
         else:
             self._query = Query.from_any(params)
 
