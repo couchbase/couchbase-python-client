@@ -207,6 +207,9 @@ class Bucket(_Base):
             kwargs['_iops'] = SelectIOPS()
 
         super(Bucket, self).__init__(*args, **kwargs)
+        # Enable detailed error codes for network errors:
+        self._cntlstr("detailed_errcodes", "1")
+
         for ctl, val in _cntlopts.items():
             self._cntl(ctl, val)
 
