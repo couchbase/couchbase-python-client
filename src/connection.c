@@ -521,6 +521,11 @@ static PyMethodDef Bucket_TABLE_methods[] = {
                 NULL
         },
 
+        { "_cntlstr", (PyCFunction)pycbc_Bucket__cntlstr,
+                METH_VARARGS|METH_KEYWORDS,
+                NULL
+        },
+
         { "_vbmap",
                 (PyCFunction)pycbc_Bucket__vbmap,
                 METH_VARARGS,

@@ -127,6 +127,11 @@ class ConnectionMiscTest(ConnectionTestCase):
         rv = cb._cntl(0x15, value_type="int") #
         self.assertEqual(0, rv)
 
+    def test_cntl_string(self):
+        cb = self.make_connection()
+        cb._cntlstr("operation_timeout", "5.0")
+        self.assertEqual(5.0, cb.timeout)
+
     def test_vbmap(self):
         # We don't know what the vbucket map is supposed to be, so just
         # check it doesn't fail

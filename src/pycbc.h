@@ -1000,4 +1000,5 @@ PyObject* pycbc_Bucket__end_pipeline(pycbc_Bucket *);
  */
 PyObject* pycbc_Bucket__cntl(pycbc_Bucket *, PyObject *, PyObject *);
 PyObject* pycbc_Bucket__vbmap(pycbc_Bucket *, PyObject *);
+PyObject* pycbc_Bucket__cntlstr(pycbc_Bucket *conn, PyObject *args, PyObject *kw);
 #endif /* PYCBC_H_ */

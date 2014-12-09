@@ -365,6 +365,26 @@ pycbc_Bucket__cntl(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
 }
 
 PyObject *
+pycbc_Bucket__cntlstr(pycbc_Bucket *conn, PyObject *args, PyObject *kw)
+{
+    const char *key, *value;
+    lcb_error_t err;
+    char *kwlist[] = { "key", "value", NULL };
+
+    if (!PyArg_ParseTupleAndKeywords(args, kw, "ss", kwlist, &key, &value)) {
+        PYCBC_EXCTHROW_ARGS();
+        return NULL;
+    }
+
+    err = lcb_cntl_string(conn->instance, key, value);
+    if (err != LCB_SUCCESS) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't modify setting");
+        return NULL;
+    }
+    Py_RETURN_NONE;
+}
+
+PyObject *
 pycbc_Bucket__vbmap(pycbc_Bucket *conn, PyObject *args)
 {
     pycbc_strlen_t slen = 0;
