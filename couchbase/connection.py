@@ -1,13 +1,10 @@
-from warnings import warn
+from couchbase.bucket import Bucket, _depr
+from couchbase.user_constants import *
+from couchbase.connstr import convert_1x_args
 
-from couchbase.bucket import Bucket
-
-warn("Use/import couchbase.bucket.Bucket instead", DeprecationWarning)
+_depr('couchbase.connection', 'couchbase.bucket')
 
 class Connection(Bucket):
-    delete = Bucket.remove
-    set = Bucket.upsert
-    add = Bucket.insert
-    delete_multi = Bucket.remove_multi
-    set_multi = Bucket.upsert_multi
-    add_multi = Bucket.insert_multi
+    def __init__(self, bucket='default', **kwargs):
+        kwargs = convert_1x_args(bucket, **kwargs)
+        super(Connection, self).__init__(**kwargs)

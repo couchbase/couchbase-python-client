@@ -14,7 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from warnings import warn
+import warnings
+
+# Pythons > (2.7||3.2) silence deprecation warnings by default.
+# Many folks are not happy about this, as it avoids letting them
+# know about potential upcoming breaking changes in their code.
+# Here we add a warning filter for any deprecation warning thrown
+# by Couchbase
+warnings.filterwarnings(action='default',
+                        category=DeprecationWarning,
+                        module=r"^couchbase($|\..*)")
 
 from couchbase.user_constants import *
 import couchbase._libcouchbase as _LCB
@@ -79,3 +88,13 @@ def set_pickle_converters(encode, decode):
     """
     ret = _LCB._modify_helpers(pickle_encode=encode, pickle_decode=decode)
     return (ret['pickle_encode'], ret['pickle_decode'])
+
+
+class Couchbase(object):
+    @classmethod
+    def connect(self, bucket, **kwargs):
+        from couchbase.bucket import _depr
+        from couchbase.connection import Connection
+        _depr('Couchbase.connect()', 'Bucket()')
+        return Connection(bucket, **kwargs)
+

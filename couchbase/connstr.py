@@ -76,6 +76,40 @@ class ConnectionString(object):
     def __str__(self):
         return self.encode()
 
+
+def _fmthost(host, port):
+    if port is not None:
+        return '{0}:{1}'.format(host, port)
+    else:
+        return host
+
+def _build_connstr(host, port, bucket):
+    """
+    Converts a 1.x host:port specification to a connection string
+    """
+    hostlist = []
+    if isinstance(host, (tuple, list)):
+        for curhost in host:
+            if isinstance(curhost, (list, tuple)):
+                hostlist.append(_fmthost(*curhost))
+            else:
+                hostlist.append(curhost)
+    else:
+        hostlist.append(_fmthost(host, port))
+
+    return 'http://{0}/{1}'.format(','.join(hostlist), bucket)
+
+def convert_1x_args(bucket, **kwargs):
+    """
+    Converts arguments for 1.x constructors to their 2.x forms
+    """
+    host = kwargs.pop('host', 'localhost')
+    port = kwargs.pop('port', None)
+    if not 'connstr' in kwargs and 'connection_string' not in kwargs:
+        kwargs['connection_string'] = _build_connstr(host, port, bucket)
+    return kwargs
+
+
 if __name__ == "__main__":
     sample = "couchbase://host1:111,host2:222,host3:333/default?op_timeout=4.2"
     cs = ConnectionString(sample)
@@ -86,3 +120,6 @@ if __name__ == "__main__":
 
     cs.bucket = "Hi"
     print("Encoded again", cs)
+
+    kwargs = convert_1x_args('beer-sample', host=[('192.168.37.101',8091)])
+    print(kwargs)

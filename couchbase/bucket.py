@@ -33,6 +33,11 @@ from couchbase.views.params import make_dvpath, make_options_string
 from couchbase.views.iterator import View
 from couchbase._pyport import basestring
 
+def _depr(fn, usage, stacklevel=2):
+    "Internal convenience function for deprecation warnings"
+    warn('{0} is deprecated. Use {1} instead'.format(fn, usage),
+         stacklevel=stacklevel, category=DeprecationWarning)
+
 class Pipeline(object):
     def __init__(self, parent):
         """
@@ -781,6 +786,22 @@ class Bucket(_Base):
         """
         return _Base.counter(self, key, delta, initial, ttl)
 
+    def incr(self, key, amount=1, **kwargs):
+        _depr('incr', 'counter')
+        return self.counter(key, delta=amount, **kwargs)
+
+    def incr_multi(self, keys, amount=1, **kwargs):
+        _depr('incr_multi', 'counter_multi')
+        return self.counter_multi(keys, amount=amount, **kwargs)
+
+    def decr(self, key, amount=1, **kwargs):
+        _depr('decr', 'counter')
+        return self.counter(key, delta=-amount, **kwargs)
+
+    def decr_multi(self, keys, amount=1, **kwargs):
+        _depr('decr_multi', 'counter_multi')
+        return self.counter_multi(keys, delta=-amount, **kwargs)
+
     def stats(self, keys=None):
         """Request server statistics
         Fetches stats from each node in the cluster. Without a key
@@ -1402,15 +1423,13 @@ class Bucket(_Base):
             except KeyError:
                 dst = getattr(_Base, n + variant)
 
-            msg = "Invoking `{0}` is deprecated. Use `{1}` instead".format(
-                oldname, newname)
-            def mkmeth(_msg, _dst):
+            def mkmeth(oldname, newname, _dst):
                 def _tmpmeth(self, *args, **kwargs):
-                    warn(_msg, DeprecationWarning)
+                    _depr(oldname, newname)
                     return _dst(self, *args, **kwargs)
                 return _tmpmeth
 
-            locals().update({oldname: mkmeth(msg, dst)})
+            locals().update({oldname: mkmeth(oldname, newname, dst)})
 
     """
     Lists the names of all the memcached operations. This is useful
@@ -1499,4 +1518,20 @@ class Bucket(_Base):
     @staticmethod
     def lcb_version():
         return _LCB.lcb_version()
+
+    def design_get(self, *args, **kwargs):
+        _depr('design_get', 'bucket_manager().design_get')
+        return self.bucket_manager().design_get(*args, **kwargs)
+
+    def design_create(self, *args, **kwargs):
+        _depr('design_create', 'bucket_manager().design_create')
+        return self.bucket_manager().design_create(*args, **kwargs)
+
+    def design_publish(self, *args, **kwargs):
+        _depr('design_publish', 'bucket_manager().design_publish')
+        return self.bucket_manager().design_publish(*args, **kwargs)
+
+    def design_delete(self, *args, **kwargs):
+        _depr('design_delete', 'bucket_manager().design_delete')
+        return self.bucket_manager().design_delete(*args, **kwargs)
 
