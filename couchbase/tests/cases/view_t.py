@@ -62,7 +62,7 @@ class ConnectionViewTest(ViewTestCase):
         mgr = self.cb.bucket_manager()
         ret = mgr.design_create('blog', DESIGN_JSON, use_devmode=False)
         self.assertTrue(ret.success)
-        self.assertTrue(self.cb.set_multi(DOCS_JSON, format=FMT_JSON).all_ok)
+        self.assertTrue(self.cb.upsert_multi(DOCS_JSON, format=FMT_JSON).all_ok)
 
     def test_simple_view(self):
         ret = self.cb._view("blog", "recent_posts",

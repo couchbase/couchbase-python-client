@@ -25,10 +25,10 @@ class ConnectionDeleteTest(ConnectionTestCase):
         # succeeds
 
         key = self.gen_key("trivial_delete")
-        rv = self.cb.set(key, 'value')
+        rv = self.cb.upsert(key, 'value')
         self.assertTrue(rv.success)
         self.assertTrue(rv.cas > 0)
-        rv = self.cb.delete(key)
+        rv = self.cb.remove(key)
         self.assertTrue(rv.success)
 
     def test_delete_notfound(self):
@@ -36,36 +36,36 @@ class ConnectionDeleteTest(ConnectionTestCase):
         # With 'quiet' ensure that it returns false. Without 'quiet', ensure that
         # it raises a NotFoundError
 
-        self.cb.delete("foo", quiet = True)
-        rv = self.cb.delete("foo", quiet = True)
+        self.cb.remove("foo", quiet = True)
+        rv = self.cb.remove("foo", quiet = True)
         self.assertFalse(rv.success)
-        self.assertRaises(NotFoundError, self.cb.delete, 'foo')
+        self.assertRaises(NotFoundError, self.cb.remove, 'foo')
 
     def test_delete_cas(self):
         # Delete with a CAS value. Ensure that it returns OK
 
         key = self.gen_key("delete_cas")
-        rv1 = self.cb.set(key, 'bar')
+        rv1 = self.cb.upsert(key, 'bar')
         self.assertTrue(rv1.cas > 0)
-        rv2 = self.cb.delete(key, cas = rv1.cas)
+        rv2 = self.cb.remove(key, cas = rv1.cas)
         self.assertTrue(rv2.success)
 
     def test_delete_badcas(self):
         # Simple delete with a bad CAS
 
         key = self.gen_key("delete_badcas")
-        self.cb.set(key, 'bar')
+        self.cb.upsert(key, 'bar')
         self.assertRaises(KeyExistsError,
-                self.cb.delete, key, cas = 0xdeadbeef)
+                self.cb.remove, key, cas = 0xdeadbeef)
 
     def test_delete_multi(self):
         # Delete passing a list of keys
 
         kvlist = self.gen_kv_dict(amount=5, prefix='delete_multi')
 
-        rvs = self.cb.set_multi(kvlist)
+        rvs = self.cb.upsert_multi(kvlist)
         self.assertTrue(len(rvs) == len(kvlist))
-        rm_rvs = self.cb.delete_multi(list(rvs.keys()))
+        rm_rvs = self.cb.remove_multi(list(rvs.keys()))
         self.assertTrue(len(rm_rvs) == len(kvlist))
         self.assertTrue(rm_rvs.all_ok)
 
@@ -78,11 +78,11 @@ class ConnectionDeleteTest(ConnectionTestCase):
 
         kvlist = self.gen_kv_dict(amount=5, prefix='delete_dict')
 
-        rvs = self.cb.set_multi(kvlist)
+        rvs = self.cb.upsert_multi(kvlist)
         self.assertTrue(rvs.all_ok)
 
         # We should just be able to pass it to 'delete'
-        rm_rvs = self.cb.delete_multi(rvs)
+        rm_rvs = self.cb.remove_multi(rvs)
         self.assertTrue(rm_rvs.all_ok)
         for k, v in rm_rvs.items():
             self.assertTrue(v.success)
@@ -92,12 +92,12 @@ class ConnectionDeleteTest(ConnectionTestCase):
         # Test with mixed found/not-found
         # Test with mixed cas-valid/cas-invalid
 
-        self.cb.delete("foo", quiet = True)
+        self.cb.remove("foo", quiet = True)
 
-        self.cb.set("bar", "a_value")
+        self.cb.upsert("bar", "a_value")
         # foo does not exit,
 
-        rvs = self.cb.delete_multi(('foo', 'bar'), quiet = True)
+        rvs = self.cb.remove_multi(('foo', 'bar'), quiet = True)
         self.assertFalse(rvs.all_ok)
         self.assertTrue(rvs['bar'].success)
         self.assertFalse(rvs['foo'].success)
@@ -105,7 +105,7 @@ class ConnectionDeleteTest(ConnectionTestCase):
         # Now see what happens if we delete those with a bad CAS
         kvs = self.gen_kv_dict(amount=3, prefix="delete_mixed_badcas")
         keys = list(kvs.keys())
-        cas_rvs = self.cb.set_multi(kvs)
+        cas_rvs = self.cb.upsert_multi(kvs)
 
         # Ensure set had no errors
         set_errors = []
@@ -117,7 +117,7 @@ class ConnectionDeleteTest(ConnectionTestCase):
         # Set one to have a bad CAS
         cas_rvs[keys[0]] = 0xdeadbeef
         self.assertRaises(KeyExistsError,
-                          self.cb.delete_multi, cas_rvs)
+                          self.cb.remove_multi, cas_rvs)
 
 if __name__ == '__main__':
     unittest.main()

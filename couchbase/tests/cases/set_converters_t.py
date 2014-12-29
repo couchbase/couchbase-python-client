@@ -56,7 +56,7 @@ class ConverertSetTest(ConnectionTestCase):
 
         key = self.gen_key("test_json_conversion")
 
-        self.cb.set(key, ["value"], format=couchbase.FMT_JSON)
+        self.cb.upsert(key, ["value"], format=couchbase.FMT_JSON)
         rv = self.cb.get(key)
         self.assertEqual(rv.value, ["value"])
         self.assertEqual(1, d['encode'])
@@ -87,7 +87,7 @@ class ConverertSetTest(ConnectionTestCase):
                                     _encode,
                                     _decode)
         fn = set([1,2,3])
-        self.cb.set(key, fn, format=couchbase.FMT_PICKLE)
+        self.cb.upsert(key, fn, format=couchbase.FMT_PICKLE)
         rv = self.cb.get(key)
         self.assertEqual(rv.value, fn)
         self.assertEqual(1, d['encode'])

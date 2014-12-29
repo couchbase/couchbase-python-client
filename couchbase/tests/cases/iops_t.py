@@ -40,7 +40,7 @@ class ConnectionIopsTest(CouchbaseTestCase):
         cb = self._iops_connection()
         key = self.gen_key("iops-simple")
         value = "some_value"
-        cb.set(key, value)
+        cb.upsert(key, value)
         rv = cb.get(key)
         self.assertTrue(rv.success)
         self.assertEqual(rv.value, value)

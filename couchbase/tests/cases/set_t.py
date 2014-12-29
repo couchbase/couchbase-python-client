@@ -29,25 +29,25 @@ from couchbase.tests.base import ConnectionTestCase
 class ConnectionSetTest(ConnectionTestCase):
 
     def test_trivial_set(self):
-        rv = self.cb.set(self.gen_key(), 'value1')
+        rv = self.cb.upsert(self.gen_key(), 'value1')
         self.assertTrue(rv)
         self.assertTrue(rv.cas > 0)
-        rv = self.cb.set(self.gen_key(), 'value2')
+        rv = self.cb.upsert(self.gen_key(), 'value2')
         self.assertTrue(rv.cas > 0)
 
     def test_set_with_cas(self):
         key = self.gen_key('cas')
-        rv1 = self.cb.set(key, 'value1')
+        rv1 = self.cb.upsert(key, 'value1')
         self.assertTrue(rv1.cas > 0)
 
-        self.assertRaises(KeyExistsError, self.cb.set,
+        self.assertRaises(KeyExistsError, self.cb.upsert,
                           key, 'value2', cas=rv1.cas+1)
 
-        rv2 = self.cb.set(key, 'value3', cas=rv1.cas)
+        rv2 = self.cb.upsert(key, 'value3', cas=rv1.cas)
         self.assertTrue(rv2.cas > 0)
         self.assertNotEqual(rv1.cas, rv2.cas)
 
-        rv3 = self.cb.set(key, 'value4')
+        rv3 = self.cb.upsert(key, 'value4')
         self.assertTrue(rv3.cas > 0)
         self.assertNotEqual(rv3.cas, rv2.cas)
         self.assertNotEqual(rv3.cas, rv1.cas)
@@ -55,7 +55,7 @@ class ConnectionSetTest(ConnectionTestCase):
     @attr('slow')
     def test_set_with_ttl(self):
         key = self.gen_key('ttl')
-        self.cb.set(key, 'value_ttl', ttl=2)
+        self.cb.upsert(key, 'value_ttl', ttl=2)
         rv = self.cb.get(key)
         self.assertEqual(rv.value, 'value_ttl')
         # Make sure the key expires
@@ -66,7 +66,7 @@ class ConnectionSetTest(ConnectionTestCase):
         key = self.gen_key('set_objects')
         for v in (None, False, True):
             for fmt in (FMT_JSON, FMT_PICKLE):
-                rv = self.cb.set(key, v, format=fmt)
+                rv = self.cb.upsert(key, v, format=fmt)
                 self.assertTrue(rv.success)
                 rv = self.cb.get(key)
                 self.assertTrue(rv.success)
@@ -74,7 +74,7 @@ class ConnectionSetTest(ConnectionTestCase):
 
     def test_multi_set(self):
         kv = self.gen_kv_dict(prefix='set_multi')
-        rvs = self.cb.set_multi(kv)
+        rvs = self.cb.upsert_multi(kv)
         self.assertTrue(rvs.all_ok)
         for k, v in rvs.items():
             self.assertTrue(v.success)
@@ -84,21 +84,21 @@ class ConnectionSetTest(ConnectionTestCase):
             self.assertTrue(k in rvs)
             self.assertTrue(rvs[k].success)
 
-        self.assertRaises((ArgumentError,TypeError), self.cb.set_multi, kv,
+        self.assertRaises((ArgumentError,TypeError), self.cb.upsert_multi, kv,
                           cas = 123)
 
     def test_add(self):
         key = self.gen_key('add')
-        self.cb.delete(key, quiet=True)
-        rv = self.cb.add(key, "value")
+        self.cb.remove(key, quiet=True)
+        rv = self.cb.insert(key, "value")
         self.assertTrue(rv.cas)
 
         self.assertRaises(KeyExistsError,
-                          self.cb.add, key, "value")
+                          self.cb.insert, key, "value")
 
     def test_replace(self):
         key = self.gen_key('replace')
-        rv = self.cb.set(key, "value")
+        rv = self.cb.upsert(key, "value")
         self.assertTrue(rv.success)
 
         rv = self.cb.replace(key, "value")
@@ -110,7 +110,7 @@ class ConnectionSetTest(ConnectionTestCase):
         self.assertRaises(KeyExistsError,
                           self.cb.replace, key, "value", cas=0xdeadbeef)
 
-        self.cb.delete(key, quiet=True)
+        self.cb.remove(key, quiet=True)
         self.assertRaises(NotFoundError,
                           self.cb.replace, key, "value")
 

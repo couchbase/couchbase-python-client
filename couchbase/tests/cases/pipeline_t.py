@@ -24,8 +24,8 @@ class ConnectionPipelineTest(ConnectionTestCase):
     def test_simple_pipeline(self):
         k = self.gen_key("pipeline_test")
         with self.cb.pipeline():
-            self.cb.delete(k, quiet=True)
-            self.cb.add(k, "MIDDLE", format=FMT_UTF8)
+            self.cb.remove(k, quiet=True)
+            self.cb.insert(k, "MIDDLE", format=FMT_UTF8)
             self.cb.prepend(k, "BEGIN_")
             self.cb.append(k, "_END")
 
@@ -39,7 +39,7 @@ class ConnectionPipelineTest(ConnectionTestCase):
         with self.cb.pipeline():
             pass
 
-        self.cb.set(k, "a value")
+        self.cb.upsert(k, "a value")
         rv = self.cb.get(k)
         self.assertEqual(rv.value, "a value")
 
@@ -47,10 +47,10 @@ class ConnectionPipelineTest(ConnectionTestCase):
         k = self.gen_key("pipeline_results")
         pipeline = self.cb.pipeline()
         with pipeline:
-            self.cb.delete(k, quiet=True)
-            self.cb.set(k, "blah")
+            self.cb.remove(k, quiet=True)
+            self.cb.upsert(k, "blah")
             self.cb.get(k)
-            self.cb.delete(k)
+            self.cb.remove(k)
 
         results = pipeline.results
         self.assertEqual(len(results), 4)
@@ -67,15 +67,15 @@ class ConnectionPipelineTest(ConnectionTestCase):
     def test_pipeline_operrors(self):
         k = self.gen_key("pipeline_errors")
         v = "hahahaha"
-        self.cb.delete(k, quiet=True)
+        self.cb.remove(k, quiet=True)
 
         def run_pipeline():
             with self.cb.pipeline():
                 self.cb.get(k, quiet=False)
-                self.cb.set(k, v)
+                self.cb.upsert(k, v)
         self.assertRaises(NotFoundError, run_pipeline)
 
-        rv = self.cb.set("foo", "bar")
+        rv = self.cb.upsert("foo", "bar")
         self.assertTrue(rv.success)
 
     def test_pipeline_state_errors(self):
@@ -94,13 +94,13 @@ class ConnectionPipelineTest(ConnectionTestCase):
 
     def test_pipeline_argerrors(self):
         k = self.gen_key("pipeline_argerrors")
-        self.cb.delete(k, quiet=True)
+        self.cb.remove(k, quiet=True)
 
         pipeline = self.cb.pipeline()
 
         def fun():
             with pipeline:
-                self.cb.set(k, "foo")
+                self.cb.upsert(k, "foo")
                 self.cb.get("foo", "bar")
                 self.cb.get(k)
 
@@ -113,7 +113,7 @@ class ConnectionPipelineTest(ConnectionTestCase):
 
         pipeline = self.cb.pipeline()
         with pipeline:
-            self.cb.set_multi(kvs)
+            self.cb.upsert_multi(kvs)
             self.cb.get_multi(kvs.keys())
 
         self.assertEqual(len(pipeline.results), 2)

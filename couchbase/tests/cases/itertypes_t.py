@@ -25,8 +25,8 @@ class ConnectionItertypeTest(ConnectionTestCase):
         kvs = self.gen_kv_dict(amount=10, prefix='itertypes')
         intlist = set(self.gen_key_list(amount=3, prefix='setobject'))
 
-        self.cb.delete_multi(kvs.keys(), quiet=True)
-        self.cb.set_multi(kvs)
+        self.cb.remove_multi(kvs.keys(), quiet=True)
+        self.cb.upsert_multi(kvs)
         self.cb.get_multi(kvs.keys())
         self.cb.get_multi(kvs.values(), quiet=True)
 
@@ -73,10 +73,10 @@ class ConnectionItertypeTest(ConnectionTestCase):
                     return 100
                 return self.max
 
-        self.cb.delete_multi(IterTemp(gen_ints=False), quiet=True)
+        self.cb.remove_multi(IterTemp(gen_ints=False), quiet=True)
         self.cb.counter_multi(IterTemp(gen_ints = False), initial=10)
         self.cb.get_multi(IterTemp(gen_ints=False))
-        self.cb.delete_multi(IterTemp(gen_ints = False))
+        self.cb.remove_multi(IterTemp(gen_ints = False))
 
         # Try with a mismatched len-iter
         self.assertRaises(ArgumentError,

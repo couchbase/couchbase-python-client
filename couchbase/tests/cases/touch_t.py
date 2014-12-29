@@ -30,7 +30,7 @@ class ConnectionTouchTest(ConnectionTestCase):
 
     def test_trivial_touch(self):
         key = self.gen_key("trivial_touch")
-        self.cb.set(key, "value", ttl=1)
+        self.cb.upsert(key, "value", ttl=1)
         rv = self.cb.touch(key, ttl=0)
         self.assertTrue(rv.success)
         time.sleep(2)
@@ -46,12 +46,12 @@ class ConnectionTouchTest(ConnectionTestCase):
 
     def test_trivial_multi_touch(self):
         kv = self.gen_kv_dict(prefix="trivial_multi_touch")
-        self.cb.set_multi(kv, ttl=1)
+        self.cb.upsert_multi(kv, ttl=1)
         time.sleep(2)
         rvs = self.cb.get_multi(kv.keys(), quiet=True)
         self.assertFalse(rvs.all_ok)
 
-        self.cb.set_multi(kv, ttl=1)
+        self.cb.upsert_multi(kv, ttl=1)
         self.cb.touch_multi(kv.keys(), ttl=0)
         rvs = self.cb.get_multi(kv.keys())
         self.assertTrue(rvs.all_ok)
@@ -65,7 +65,7 @@ class ConnectionTouchTest(ConnectionTestCase):
         k_missing = self.gen_key("dict_touch_multi_missing")
         k_existing = self.gen_key("dict_touch_multi_existing")
 
-        self.cb.set_multi(
+        self.cb.upsert_multi(
             {k_missing : "missing_val", k_existing : "existing_val"})
 
         self.cb.touch_multi({k_missing : 1, k_existing : 3})

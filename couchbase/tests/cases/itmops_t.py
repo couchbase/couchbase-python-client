@@ -46,7 +46,7 @@ class ConnectionItemTest(ConnectionTestCase):
         k = self.gen_key("itm_simple_get")
         it = Item(k, "simple_value")
 
-        rvs = self.cb.set_multi(ItemSequence([it]))
+        rvs = self.cb.upsert_multi(ItemSequence([it]))
         self.assertTrue(rvs.all_ok)
 
         it_out = rvs[it.key]
@@ -66,7 +66,7 @@ class ConnectionItemTest(ConnectionTestCase):
         self.cb.replace_multi(itcoll)
 
         # Now, delete it
-        self.cb.delete_multi(itcoll)
+        self.cb.remove_multi(itcoll)
 
         self.assertRaises(NotFoundError,
                           self.cb.get_multi, itcoll)
@@ -77,7 +77,7 @@ class ConnectionItemTest(ConnectionTestCase):
         it = Item(k, {})
         itcoll = ItemOptionDict()
         itcoll.dict[it] = { "format" : FMT_BYTES }
-        self.assertRaises(ValueFormatError, self.cb.set_multi, itcoll)
+        self.assertRaises(ValueFormatError, self.cb.upsert_multi, itcoll)
 
     def test_items_append(self):
         k = self.gen_key("itm_append")
@@ -85,7 +85,7 @@ class ConnectionItemTest(ConnectionTestCase):
         itcoll = ItemOptionDict()
         itcoll.add(it)
 
-        self.cb.set_multi(itcoll, format=FMT_UTF8)
+        self.cb.upsert_multi(itcoll, format=FMT_UTF8)
 
         itcoll.add(it, fragment="_END")
         self.cb.append_items(itcoll, format=FMT_UTF8)
@@ -110,20 +110,20 @@ class ConnectionItemTest(ConnectionTestCase):
         it = Item(k, "a value")
         itcoll = ItemOptionDict()
         itcoll.add(it)
-        self.cb.set_multi(itcoll)
+        self.cb.upsert_multi(itcoll)
         self.assertTrue(it.cas)
 
         # Set it again
-        rv = self.cb.set(it.key, it.value)
+        rv = self.cb.upsert(it.key, it.value)
         self.assertTrue(rv.cas)
         self.assertFalse(rv.cas == it.cas)
 
         # Should raise an error without ignore_cas
-        self.assertRaises(KeyExistsError, self.cb.set_multi, itcoll)
+        self.assertRaises(KeyExistsError, self.cb.upsert_multi, itcoll)
         self.assertTrue(it.cas)
 
         itcoll.add(it, ignore_cas=True)
-        self.cb.set_multi(itcoll)
+        self.cb.upsert_multi(itcoll)
         rv = self.cb.get(it.key)
         self.assertEqual(rv.cas, it.cas)
 
@@ -143,16 +143,16 @@ class ConnectionItemTest(ConnectionTestCase):
         it.key = k
         it.value = "hi!"
         self.assertRaises(ArgumentError,
-                          self.cb.set_multi,
+                          self.cb.upsert_multi,
                           ItemSequence([it]))
 
     def test_apiwrap(self):
         it = Item(self.gen_key("item_apiwrap"))
-        self.cb.set_multi(it.as_itcoll())
+        self.cb.upsert_multi(it.as_itcoll())
         self.assertTrue(it.cas)
 
         # Set with 'ignorecas'
         it.cas = 1234
-        self.cb.set_multi(it.as_itcoll(ignore_cas=True))
+        self.cb.upsert_multi(it.as_itcoll(ignore_cas=True))
 
-        self.cb.set_multi(ItemSequence(it))
+        self.cb.upsert_multi(ItemSequence(it))

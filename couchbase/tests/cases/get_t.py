@@ -31,7 +31,7 @@ class ConnectionGetTest(ConnectionTestCase):
 
     def test_trivial_get(self):
         key = self.gen_key('trivial_get')
-        self.cb.set(key, 'value1')
+        self.cb.upsert(key, 'value1')
         rv = self.cb.get(key)
         self.assertEqual(rv.value, 'value1')
 
@@ -52,7 +52,7 @@ class ConnectionGetTest(ConnectionTestCase):
 
     def test_multi_get(self):
         kv = self.gen_kv_dict(amount=3, prefix='get_multi')
-        rvs = self.cb.set_multi(kv)
+        rvs = self.cb.upsert_multi(kv)
         self.assertTrue(rvs.all_ok)
 
         k_subset = list(kv.keys())[:2]
@@ -70,10 +70,10 @@ class ConnectionGetTest(ConnectionTestCase):
         kv_missing = self.gen_kv_dict(amount=3, prefix='multi_missing_mixed')
         kv_existing = self.gen_kv_dict(amount=3, prefix='multi_existing_mixed')
 
-        self.cb.delete_multi(list(kv_missing.keys()) + list(kv_existing.keys()),
+        self.cb.remove_multi(list(kv_missing.keys()) + list(kv_existing.keys()),
                              quiet=True)
 
-        self.cb.set_multi(kv_existing)
+        self.cb.upsert_multi(kv_existing)
 
         rvs = self.cb.get_multi(
             list(kv_existing.keys()) + list(kv_missing.keys()),
@@ -122,7 +122,7 @@ class ConnectionGetTest(ConnectionTestCase):
 
     def test_extended_get(self):
         key = self.gen_key(prefix='key_extended')
-        orig_cas1 = self.cb.set(key, 'value1').cas
+        orig_cas1 = self.cb.upsert(key, 'value1').cas
         rv = self.cb.get(key)
         val1, flags1, cas1 = rv.value, rv.flags, rv.cas
         self.assertEqual(val1, 'value1')
@@ -144,10 +144,10 @@ class ConnectionGetTest(ConnectionTestCase):
         self.assertEqual(result2[key].cas, orig_cas1)
 
         key2 = self.gen_key('key_extended_2')
-        cas2 = self.cb.set(key2, 'value2').cas
+        cas2 = self.cb.upsert(key2, 'value2').cas
 
         key3 = self.gen_key('key_extended_3')
-        cas3 = self.cb.set(key3, 'value3').cas
+        cas3 = self.cb.upsert(key3, 'value3').cas
         results = self.cb.get_multi([key2, key3])
 
         self.assertEqual(results[key3].value, 'value3')
@@ -163,8 +163,8 @@ class ConnectionGetTest(ConnectionTestCase):
     @attr('slow')
     def test_get_ttl(self):
         key = self.gen_key('get_ttl')
-        self.cb.delete(key, quiet=True)
-        self.cb.set(key, "a_value")
+        self.cb.remove(key, quiet=True)
+        self.cb.upsert(key, "a_value")
         rv = self.cb.get(key, ttl=1)
         self.assertEqual(rv.value, "a_value")
         sleep(2)
@@ -176,7 +176,7 @@ class ConnectionGetTest(ConnectionTestCase):
     def test_get_multi_ttl(self):
         kvs = self.gen_kv_dict(amount=2, prefix='get_multi_ttl')
 
-        self.cb.set_multi(kvs)
+        self.cb.upsert_multi(kvs)
         rvs = self.cb.get_multi(list(kvs.keys()), ttl=1)
         for k, v in rvs.items():
             self.assertEqual(v.value, kvs[k])

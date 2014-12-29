@@ -41,7 +41,7 @@ class DupKeyTestCase(ConnectionTestCase):
             warnings.resetwarnings()
 
             meths = (self.cb.get_multi,
-                     self.cb.delete_multi,
+                     self.cb.remove_multi,
                      self.cb.counter_multi)
 
             for m in meths:
@@ -60,7 +60,7 @@ class DupKeyTestCase(ConnectionTestCase):
             self._assertWarned(wlog)
 
             ktmp = self.gen_key("duplicate_keys")
-            rv = self.cb.set(ktmp, "value")
+            rv = self.cb.upsert(ktmp, "value")
 
             try:
                 self.cb.unlock_multi((rv, rv))

@@ -22,7 +22,7 @@ class ConnectionObserveTest(ConnectionTestCase):
 
     def test_single_observe(self):
         key = self.gen_key("test_single_observe")
-        self.cb.set(key, "value")
+        self.cb.upsert(key, "value")
         rv = self.cb.observe(key)
         grv = self.cb.get(key)
         print(rv)
@@ -52,8 +52,8 @@ class ConnectionObserveTest(ConnectionTestCase):
     def test_multi_observe(self):
         kexist = self.gen_key("test_multi_observe-exist")
         kmissing = self.gen_key("test_multi_observe-missing")
-        self.cb.set(kexist, "value")
-        self.cb.delete(kmissing, quiet=True)
+        self.cb.upsert(kexist, "value")
+        self.cb.remove(kmissing, quiet=True)
         grv = self.cb.get(kexist)
 
         mres = self.cb.observe_multi((kexist, kmissing))
@@ -80,7 +80,7 @@ class ConnectionObserveMasterTest(MockTestCase):
     def test_master_observe(self):
         self.skipLcbMin("2.3.0")
         key = self.gen_key("test_master_observe")
-        rv = self.cb.set(key, "value")
+        rv = self.cb.upsert(key, "value")
         obs_all = self.cb.observe(key)
         self.assertTrue(len(obs_all.value) > 1)
         obs_master = self.cb.observe(key, master_only=True)

@@ -37,7 +37,7 @@ class ConnectionEndureTest(MockTestCase):
                                        cas=res.cas)
 
             self.cb._dur_testhook = cb1
-            rv = self.cb.set(key, "blah blah")
+            rv = self.cb.upsert(key, "blah blah")
             self.assertTrue(rv.success)
 
 
@@ -65,7 +65,7 @@ class ConnectionEndureTest(MockTestCase):
             res = self.cb.get(key)
 
             self.cb._dur_testhook = cb1
-            rv_rm = self.cb.delete(key)
+            rv_rm = self.cb.remove(key)
             self.assertTrue(rv_rm.success)
 
 

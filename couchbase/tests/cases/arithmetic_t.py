@@ -23,7 +23,7 @@ class ConnectionArithmeticTest(ConnectionTestCase):
 
     def test_trivial_incrdecr(self):
         key = self.gen_key("trivial_incrdecr")
-        self.cb.delete(key, quiet=True)
+        self.cb.remove(key, quiet=True)
         rv_arith = self.cb.counter(key, initial=1, delta=1)
         rv_get = self.cb.get(key)
 
@@ -43,12 +43,12 @@ class ConnectionArithmeticTest(ConnectionTestCase):
 
     def test_incr_notfound(self):
         key = self.gen_key("incr_notfound")
-        self.cb.delete(key, quiet=True)
+        self.cb.remove(key, quiet=True)
         self.assertRaises(NotFoundError, self.cb.counter, key)
 
     def test_incr_badval(self):
         key = self.gen_key("incr_badval")
-        self.cb.set(key, "THIS IS SPARTA")
+        self.cb.upsert(key, "THIS IS SPARTA")
         self.assertRaises(DeltaBadvalError, self.cb.counter, key)
 
     def test_incr_multi(self):
@@ -59,7 +59,7 @@ class ConnectionArithmeticTest(ConnectionTestCase):
                 self.assertTrue(k in keys)
                 self.assertEqual(v.value, expected)
 
-        self.cb.delete_multi(keys, quiet=True)
+        self.cb.remove_multi(keys, quiet=True)
         self.cb.counter_multi(keys, initial=5)
         _multi_lim_assert(5)
 
@@ -75,21 +75,21 @@ class ConnectionArithmeticTest(ConnectionTestCase):
         self.cb.counter_multi(keys, delta=-6)
         _multi_lim_assert(9)
 
-        self.cb.delete(keys[0])
+        self.cb.remove(keys[0])
 
         self.assertRaises(NotFoundError, self.cb.counter_multi, keys)
 
     def test_incr_extended(self):
         key = self.gen_key("incr_extended")
-        self.cb.delete(key, quiet=True)
+        self.cb.remove(key, quiet=True)
         rv = self.cb.counter(key, initial=10)
         self.assertEquals(rv.value, 10)
-        srv = self.cb.set(key, "42", cas=rv.cas)
+        srv = self.cb.upsert(key, "42", cas=rv.cas)
         self.assertTrue(srv.success)
 
         # test with multiple values?
         klist = self.gen_key_list(amount=5, prefix="incr_extended_list")
-        self.cb.delete_multi(klist, quiet=True)
+        self.cb.remove_multi(klist, quiet=True)
         rvs = self.cb.counter_multi(klist, initial=40)
         [ self.assertEquals(x.value, 40) for x in rvs.values() ]
         self.assertEquals(sorted(list(rvs.keys())), sorted(klist))

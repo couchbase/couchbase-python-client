@@ -80,7 +80,7 @@ class ConnectionTest(CouchbaseTestCase):
         self.assertRaises(NotFoundError, cb.get, 'missing_key')
 
         cb = self.factory(quiet=True, **connparams)
-        cb.delete('missing_key', quiet=True)
+        cb.remove('missing_key', quiet=True)
         val1 = cb.get('missing_key')
         self.assertFalse(val1.success)
 
@@ -96,11 +96,11 @@ class ConnectionTest(CouchbaseTestCase):
         try:
             cachefile = tempfile.NamedTemporaryFile(delete=False)
             cb = self.factory(**self.make_connargs(config_cache=cachefile.name))
-            self.assertTrue(cb.set("foo", "bar").success)
+            self.assertTrue(cb.upsert("foo", "bar").success)
 
             cb2 = self.factory(**self.make_connargs(config_cache=cachefile.name))
 
-            self.assertTrue(cb2.set("foo", "bar").success)
+            self.assertTrue(cb2.upsert("foo", "bar").success)
             self.assertEquals("bar", cb.get("foo").value)
 
             sb = os.stat(cachefile.name)
@@ -128,16 +128,16 @@ class ConnectionTest(CouchbaseTestCase):
 
         if not self.mock:
             cb = self.factory(str(cs), password=passwd)
-            self.assertTrue(cb.set("foo", "bar").success)
+            self.assertTrue(cb.upsert("foo", "bar").success)
 
         cs.hosts = [ self.cluster_info.host + ':' + str(self.cluster_info.port) ]
         cs.scheme = 'http'
         cb = self.factory(str(cs))
-        self.assertTrue(cb.set("foo", "bar").success)
+        self.assertTrue(cb.upsert("foo", "bar").success)
 
         cs.hosts.insert(0, 'localhost:1')
         cb = self.factory(str(cs))
-        self.assertTrue(cb.set("foo", "bar").success)
+        self.assertTrue(cb.upsert("foo", "bar").success)
 
 if __name__ == '__main__':
     unittest.main()

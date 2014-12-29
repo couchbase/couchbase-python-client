@@ -18,7 +18,6 @@
 from couchbase import (
     FMT_BYTES, FMT_JSON, FMT_PICKLE, FMT_UTF8,
     FMT_LEGACY_MASK, FMT_COMMON_MASK)
-from couchbase.connection import Connection
 from couchbase.exceptions import ValueFormatError, CouchbaseError
 from couchbase.tests.base import ConnectionTestCase, SkipTest
 from couchbase.transcoder import TranscoderPP, LegacyTranscoderPP
@@ -33,14 +32,14 @@ class ConnectionEncodingTest(ConnectionTestCase):
     def test_unicode(self):
         txt = BLOB_ORIG.decode('utf-16')
         for f in (FMT_BYTES, FMT_PICKLE):
-            cas = self.cb.set(txt, txt.encode('utf-16'), format=f).cas
+            cas = self.cb.upsert(txt, txt.encode('utf-16'), format=f).cas
             server_val = self.cb.get(txt).value
             self.assertEquals(server_val, BLOB_ORIG)
 
     def test_json_unicode(self):
         self.assertEqual(self.cb.default_format, FMT_JSON)
         uc = BLOB_ORIG.decode('utf-16')
-        rv = self.cb.set(uc, uc)
+        rv = self.cb.upsert(uc, uc)
         self.assertTrue(rv.success)
         rv = self.cb.get(uc)
         self.assertEqual(rv.value, uc)
@@ -52,7 +51,7 @@ class ConnectionEncodingTest(ConnectionTestCase):
         self.assertEqual(self.cb.default_format, FMT_JSON)
         uc = BLOB_ORIG.decode('utf-16')
         key = self.gen_key('json_compact')
-        self.cb.set(key, uc, format=FMT_JSON)
+        self.cb.upsert(key, uc, format=FMT_JSON)
         self.cb.data_passthrough = 1
         rv = self.cb.get(key)
 
@@ -64,20 +63,20 @@ class ConnectionEncodingTest(ConnectionTestCase):
     def test_blob(self):
         blob = b'\x00\x01\x00\xfe\xff\x01\x42'
         for f in (FMT_BYTES, FMT_PICKLE):
-            cas = self.cb.set("key", blob, format=f).cas
+            cas = self.cb.upsert("key", blob, format=f).cas
             self.assertTrue(cas)
             rv = self.cb.get("key").value
             self.assertEquals(rv, blob)
 
     def test_bytearray(self):
         ba = bytearray(b"Hello World")
-        self.cb.set("key", ba, format=FMT_BYTES)
+        self.cb.upsert("key", ba, format=FMT_BYTES)
         rv = self.cb.get("key")
         self.assertEqual(ba, rv.value)
 
     def test_passthrough(self):
         self.cb.data_passthrough = True
-        self.cb.set("malformed", "some json")
+        self.cb.upsert("malformed", "some json")
         self.cb.append("malformed", "blobs")
         rv = self.cb.get("malformed")
 
@@ -89,19 +88,19 @@ class ConnectionEncodingTest(ConnectionTestCase):
         self.assertRaises(ValueFormatError, self.cb.get, "malformed")
 
     def test_zerolength(self):
-        rv = self.cb.set("key", b"", format=FMT_BYTES)
+        rv = self.cb.upsert("key", b"", format=FMT_BYTES)
         self.assertTrue(rv.success)
         rv = self.cb.get("key")
         self.assertEqual(rv.value, b"")
 
-        self.assertRaises(CouchbaseError, self.cb.set, "", "value")
+        self.assertRaises(CouchbaseError, self.cb.upsert, "", "value")
 
     def test_blob_keys_py2(self):
         if bytes == str:
-            rv = self.cb.set(b"\0", "value")
+            rv = self.cb.upsert(b"\0", "value")
             rv = self.cb.get(b"\0")
         else:
-            self.assertRaises(ValueFormatError, self.cb.set, b"\0", "value")
+            self.assertRaises(ValueFormatError, self.cb.upsert, b"\0", "value")
 
     def test_compat_interop(self):
         # Check that we can interact with older versions, and vice versa:

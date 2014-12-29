@@ -55,13 +55,13 @@ class ConnectionResultsTest(ConnectionTestCase):
     def test_results(self):
         # Test OperationResult/ValueResult fields
         key = self.gen_key("opresult")
-        rv = self.cb.set(key, "value")
+        rv = self.cb.upsert(key, "value")
         self.__test_oprsesult(rv)
 
-        rv = self.cb.delete(key)
+        rv = self.cb.remove(key)
         self.__test_oprsesult(rv)
 
-        rv = self.cb.set(key, "value")
+        rv = self.cb.upsert(key, "value")
         self.__test_oprsesult(rv)
 
         rv = self.cb.lock(key, ttl=10)
@@ -70,7 +70,7 @@ class ConnectionResultsTest(ConnectionTestCase):
         self.__test_oprsesult(rv)
         rv = self.cb.get(key)
         self.__test_valresult(rv, "value")
-        rv = self.cb.delete(key)
+        rv = self.cb.remove(key)
         self.__test_oprsesult(rv)
 
         rv = self.cb.counter(key, initial=10)
@@ -83,7 +83,7 @@ class ConnectionResultsTest(ConnectionTestCase):
 
     def test_multi_results(self):
         kvs = self.gen_kv_dict(prefix="multi_results")
-        rvs = self.cb.set_multi(kvs)
+        rvs = self.cb.upsert_multi(kvs)
         self.assertIsInstance(rvs, self.cls_MultiResult)
         [ self.__test_oprsesult(x) for x in rvs.values() ]
         repr(rvs)
@@ -95,5 +95,5 @@ class ConnectionResultsTest(ConnectionTestCase):
 
         [ self.__test_valresult(v, kvs[k]) for k, v in rvs.items()]
 
-        rvs = self.cb.delete_multi(kvs.keys())
+        rvs = self.cb.remove_multi(kvs.keys())
         [ self.__test_oprsesult(x) for x in rvs.values() ]

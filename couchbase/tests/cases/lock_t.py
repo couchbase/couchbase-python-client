@@ -30,7 +30,7 @@ class ConnectionLockTest(ConnectionTestCase):
     def test_simple_lock(self):
         k = self.gen_key('lock')
         v = "locked_value"
-        self.cb.set(k, v)
+        self.cb.upsert(k, v)
         rv = self.cb.lock(k, ttl=5)
 
         self.assertTrue(rv.success)
@@ -53,22 +53,22 @@ class ConnectionLockTest(ConnectionTestCase):
                           k,
                           1234)
 
-        rv = self.cb.set(k, v)
+        rv = self.cb.upsert(k, v)
         self.assertTrue(rv.success)
 
     @attr('slow')
     def test_timed_lock(self):
         k = self.gen_key('lock')
         v = "locked_value"
-        self.cb.set(k, v)
+        self.cb.upsert(k, v)
         rv = self.cb.lock(k, ttl=1)
         sleep(2)
-        self.cb.set(k, v)
+        self.cb.upsert(k, v)
 
     def test_multi_lock(self):
         kvs = self.gen_kv_dict(prefix='lock_multi')
 
-        self.cb.set_multi(kvs)
+        self.cb.upsert_multi(kvs)
         rvs = self.cb.lock_multi(kvs.keys(), ttl=5)
         self.assertTrue(rvs.all_ok)
         self.assertEqual(len(rvs), len(kvs))
@@ -80,7 +80,7 @@ class ConnectionLockTest(ConnectionTestCase):
     def test_unlock_multi(self):
         key = self.gen_key(prefix='unlock_multi')
         val = "lock_value"
-        self.cb.set(key, val)
+        self.cb.upsert(key, val)
 
         rv = self.cb.lock(key, ttl=5)
         rvs = self.cb.unlock_multi({key:rv.cas})
@@ -109,7 +109,7 @@ class ConnectionLockTest(ConnectionTestCase):
 
     def test_resobjs(self):
         keys = self.gen_kv_dict(prefix="Lock_test_resobjs")
-        self.cb.set_multi(keys)
+        self.cb.upsert_multi(keys)
         rvs = self.cb.lock_multi(keys.keys(), ttl=5)
         self.cb.unlock_multi(rvs)
 

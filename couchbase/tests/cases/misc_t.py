@@ -55,7 +55,7 @@ class ConnectionMiscTest(ConnectionTestCase):
 
     def test_connection_defaults(self):
         # This will only work on the basic Connection class
-        from couchbase.connection import Connection
+        from couchbase.bucket import Bucket
         ctor_params = self.make_connargs()
         # XXX: Change these if any of the defaults change
         defaults = {
@@ -65,7 +65,7 @@ class ConnectionMiscTest(ConnectionTestCase):
             'transcoder' : None
         }
 
-        cb_ctor = Connection(**ctor_params)
+        cb_ctor = Bucket(**ctor_params)
 
         for option, value in defaults.items():
             actual = getattr(cb_ctor, option)
@@ -87,7 +87,7 @@ class ConnectionMiscTest(ConnectionTestCase):
 
         key = self.gen_key("fmt_auto_ctor")
         cb = self.make_connection(default_format = FMT_AUTO)
-        cb.set("foo", set([]))
+        cb.upsert("foo", set([]))
         rv = cb.get("foo")
         self.assertEqual(rv.flags, FMT_PICKLE)
 

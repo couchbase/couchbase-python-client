@@ -16,8 +16,8 @@
 #
 from couchbase.tests.base import ConnectionTestCase
 from couchbase.transcoder import TranscoderPP
+from couchbase.bucket import Bucket
 from couchbase import FMT_UTF8
-from couchbase.connection import Connection
 import couchbase.exceptions as E
 
 # This won't test every single permutation of the transcoder, but will check
@@ -66,7 +66,7 @@ class ConnectionTranscoderTest(ConnectionTestCase):
         key = self.gen_key("simple_transcoder")
         obj_values = ({}, [], -1, None, False, True)
         for curval in obj_values:
-            self.cb.set(key, curval)
+            self.cb.upsert(key, curval)
             ret = self.cb.get(key)
             self.assertEqual(ret.value, curval)
 
@@ -76,35 +76,35 @@ class ConnectionTranscoderTest(ConnectionTestCase):
     def test_empty_transcoder(self):
         for v in (None, False, 0):
             self.cb.transcoder = v
-            self.cb.set("foo", "bar")
+            self.cb.upsert("foo", "bar")
 
     def test_bad_transcoder(self):
         self.cb.transcoder = None
 
         key = self.gen_key("bad_transcoder")
-        self.cb.set(key, "value")
+        self.cb.upsert(key, "value")
 
         self.cb.transcoder = object()
-        self.assertRaises(E.ValueFormatError, self.cb.set, key, "bar")
+        self.assertRaises(E.ValueFormatError, self.cb.upsert, key, "bar")
         self.assertRaises(E.ValueFormatError, self.cb.get, key)
 
 
         mangled = MangledTranscoder()
         # Ensure we actually work
         self.cb.transcoder = mangled
-        self.cb.set(key, "value")
+        self.cb.upsert(key, "value")
         self.cb.get(key)
 
 
         for badret in (None, (), [], ""):
             mangled.set_all(badret)
-            self.assertRaises(E.ValueFormatError, self.cb.set, key, "value")
+            self.assertRaises(E.ValueFormatError, self.cb.upsert, key, "value")
             self.assertRaises(E.ValueFormatError, self.cb.get, key)
 
         mangled._op_next.clear()
         # Try with only bad keys:
         mangled._op_next['encode_key'] = None
-        self.assertRaises(E.ValueFormatError, self.cb.set, key, "value")
+        self.assertRaises(E.ValueFormatError, self.cb.upsert, key, "value")
 
 
     def test_transcoder_bad_encvals(self):
@@ -141,14 +141,14 @@ class ConnectionTranscoderTest(ConnectionTestCase):
         for encret in encrets:
             print(encret)
             mangled._op_next['encode_value'] = encret
-            self.assertRaises(E.ValueFormatError, self.cb.set, key, "value")
+            self.assertRaises(E.ValueFormatError, self.cb.upsert, key, "value")
 
     def test_transcoder_kdec_err(self):
         key = self.gen_key("transcoder_kenc_err")
         mangled = MangledTranscoder()
         self.cb.transcoder = mangled
         key = self.gen_key('kdec_err')
-        self.cb.set(key, 'blah', format=FMT_UTF8)
+        self.cb.upsert(key, 'blah', format=FMT_UTF8)
         def exthrow():
             raise UnicodeDecodeError()
 
@@ -170,7 +170,7 @@ class ConnectionTranscoderTest(ConnectionTestCase):
         for o in objs:
             mangled._op_next['decode_key'] = o
             mangled._op_next['decode_value'] = o
-            self.cb.set(o, o, format=o)
+            self.cb.upsert(o, o, format=o)
             rv = self.cb.get(o)
             self.assertEqual(rv.value, o)
 
@@ -188,14 +188,14 @@ class ConnectionTranscoderTest(ConnectionTestCase):
         for o in unhashable:
             mangled._op_next['decode_key'] = o
             mangled._op_next['decode_value'] = o
-            self.assertRaises(E.ValueFormatError, self.cb.set, o, o)
+            self.assertRaises(E.ValueFormatError, self.cb.upsert, o, o)
             self.assertRaises(E.ValueFormatError, self.cb.get, o, quiet=True)
 
     def test_transcoder_class(self):
         # Test whether we can pass a class for a transcoder
         key = self.gen_key("transcoder_class")
-        c = Connection(**self.make_connargs(transcoder=TranscoderPP))
-        c.set(key, "value")
+        c = Bucket(**self.make_connargs(transcoder=TranscoderPP))
+        c.upsert(key, "value")
 
-        c = Connection(**self.make_connargs(transcoder=TranscoderPP))
-        c.set(key, "value")
+        c = Bucket(**self.make_connargs(transcoder=TranscoderPP))
+        c.upsert(key, "value")

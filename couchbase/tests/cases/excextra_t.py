@@ -26,7 +26,7 @@ class ConnectionExcExtraTest(ConnectionTestCase):
     def test_simple_excextra(self):
         exc = None
         key = self.gen_key("simple_excextra")
-        self.cb.delete(key, quiet=True)
+        self.cb.remove(key, quiet=True)
 
         try:
             self.cb.get(key, quiet=False)
@@ -50,7 +50,7 @@ class ConnectionExcExtraTest(ConnectionTestCase):
     def test_multi_exc(self):
         kv_missing = self.gen_kv_dict(prefix="multi_exc_missing")
         kv_existing = self.gen_kv_dict(prefix="multi_exc_existing")
-        self.cb.set_multi(kv_existing)
+        self.cb.upsert_multi(kv_existing)
         exc = None
         try:
             self.cb.get_multi(list(kv_missing.keys()) + list(kv_existing.keys()),

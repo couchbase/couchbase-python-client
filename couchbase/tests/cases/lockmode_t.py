@@ -30,7 +30,7 @@ class LockmodeTest(CouchbaseTestCase):
         self.assertEqual(cb.lockmode, LOCKMODE_EXC)
         cb._thr_lockop(0)
         cb._thr_lockop(1)
-        cb.set(key, "value")
+        cb.upsert(key, "value")
 
         cb = self.make_connection(lockmode=LOCKMODE_NONE)
         self.assertEqual(cb.lockmode, LOCKMODE_NONE)
@@ -39,17 +39,17 @@ class LockmodeTest(CouchbaseTestCase):
                           cb._thr_lockop, 1)
         self.assertRaises(ObjectThreadError,
                           cb._thr_lockop, 0)
-        cb.set(key, "value")
+        cb.upsert(key, "value")
 
         cb = self.make_connection(lockmode=LOCKMODE_WAIT)
         self.assertEqual(cb.lockmode, LOCKMODE_WAIT)
         cb._thr_lockop(0)
         cb._thr_lockop(1)
-        cb.set(key, "value")
+        cb.upsert(key, "value")
 
         cb = self.make_connection(lockmode=LOCKMODE_WAIT, unlock_gil=False)
         self.assertEqual(cb.lockmode, LOCKMODE_NONE)
-        cb.set(key, "value")
+        cb.upsert(key, "value")
 
     def test_lockmode_exc(self):
         key = self.gen_key("lockmode_exc")
@@ -57,12 +57,12 @@ class LockmodeTest(CouchbaseTestCase):
         cb = self.make_connection()
         cb._thr_lockop(0)
         self.assertRaises(ObjectThreadError,
-                          cb.set,
+                          cb.upsert,
                           key, "bar")
         cb._thr_lockop(1)
 
         # Ensure the old value is not buffered
-        cb.set(key, "baz")
+        cb.upsert(key, "baz")
         self.assertEqual(cb.get(key).value, "baz")
 
     def test_lockmode_wait(self):
@@ -74,7 +74,7 @@ class LockmodeTest(CouchbaseTestCase):
         }
 
         def runfunc():
-            cb.set(key, "value")
+            cb.upsert(key, "value")
             d['ended'] = time.time()
 
         cb._thr_lockop(0)
