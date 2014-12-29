@@ -468,7 +468,8 @@ def _mk_lcberr(rc, name=None, default=CouchbaseError, docstr="", extrabase=[]):
             bases.append(base)
 
     if name is None:
-        name = "LCB_0x{0:0X}".format(rc)
+        name = "LCB_0x{0:0X} (generated, catch: {1})".format(
+            rc, ", ".join(x.__name__ for x in bases))
 
     d = { '__doc__' : docstr }
 
