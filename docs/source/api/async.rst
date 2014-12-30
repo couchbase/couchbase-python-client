@@ -39,7 +39,7 @@ with an exception object upon error.
 The semantics of when an exception is passed follows the rules of the
 ``quiet`` parameter just like the synchronous API.
 
-.. currentmodule:: couchbase.async.connection
+.. currentmodule:: couchbase.async.bucket
 
 .. class:: couchbase.result.AsyncResult
 
@@ -47,7 +47,7 @@ The semantics of when an exception is passed follows the rules of the
 
     .. autoattribute:: errback
 
-.. class:: Async
+.. class:: AsyncBucket
 
     .. automethod:: __init__
     .. automethod:: query

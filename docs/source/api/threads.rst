@@ -2,7 +2,7 @@
 Using With and Without Threads
 ==============================
 
-.. module:: couchbase.connection
+.. module:: couchbase.bucket
 
 You can use a single :class:`~couchbase.bucket.Bucket` object in
 a single thread, and attain reasonable performance by having one

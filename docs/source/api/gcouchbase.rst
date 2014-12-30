@@ -18,11 +18,11 @@ although this is not expected.
 
 Example usage::
 
-    from gcouchbase import GConnection
-    cb = GConnection(bucket='default')
+    from gcouchbase import Bucket
+    cb = Bucket('couchbase://localhost/default')
 
-    # Like the normal Connection API
-    res = cb.set("foo", "bar")
+    # Like the normal Bucket API
+    res = cb.upsert("foo", "bar")
     res = cb.get("foo")
 
 

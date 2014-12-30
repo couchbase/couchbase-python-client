@@ -40,7 +40,7 @@ Attributes
 
     .. attribute:: raw
 
-        The actual :class:`couchbase.connection.HttpResult` object.
+        The actual :class:`couchbase.bucket.HttpResult` object.
         Note that this is only the *last* result returned. If using paginated
         views, the view comprises several such objects, and is cleared each
         time a new page is fetched.
@@ -109,7 +109,7 @@ Row Processing
     .. attribute:: doc
 
         If ``include_docs`` was specified, contains the actual
-        :class:`couchbase.connection.Result` object for the document.
+        :class:`couchbase.bucket.Result` object for the document.
 
 
 

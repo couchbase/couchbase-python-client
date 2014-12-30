@@ -9,7 +9,7 @@ library which may be found at http://www.twistedmatrix.com. This documentation
 contains the API reference for how to use the ``txcouchbase`` module with
 Twisted.
 
-.. currentmodule:: txcouchbase.connection
+.. currentmodule:: txcouchbase.bucket
 
 For the most part, the ``txcouchbase`` API functions like its synchronous
 counterpart, :class:`~couchbase.bucket.Bucket`, except for its
@@ -21,12 +21,12 @@ As such, we will omit the mentions of the normal key value operations, which
 function identially to their synchronous conterparts documented in the
 :class:`~couchbase.bucket.Bucket` class.
 
-The :class:`Connection` interface for Twisted is subclassed from the lower-level
-:class:`TxAsyncConnection` which returns :class:`~couchbase.result.AsyncResult`
+The :class:`Bucket` interface for Twisted is subclassed from the lower-level
+:class:`RawBucket` which returns :class:`~couchbase.result.AsyncResult`
 objects rather than `Deferred` objects. This is largely due to performance
 reasons (Deferreds result in a 3x performance slowdown).
 
-.. class:: TxAsyncConnection
+.. class:: RawBucket
 
     .. automethod:: __init__
     .. automethod:: registerDeferred
@@ -34,7 +34,7 @@ reasons (Deferreds result in a 3x performance slowdown).
     .. automethod:: defer
     .. autoattribute:: connected
 
-.. class:: Connection
+.. class:: Bucket
 
     .. automethod:: __init__
     .. automethod:: queryAll
