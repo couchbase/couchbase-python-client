@@ -20,6 +20,15 @@ Contents:
    api/convertfuncs
    api/items
 
+Asynchronous APIs
+=================
+
+.. toctree::
+   :maxdepth: 2
+
+   api/txcouchbase
+   api/gcouchbase
+
 Internal APIs
 =============
 
@@ -30,15 +39,6 @@ nevertheless be helpful for debugging or extending existing functionality.
    :maxdepth: 2
 
    api/async
-
-Integration APIs
-================
-
-.. toctree::
-   :maxdepth: 2
-
-   api/txcouchbase
-   api/gcouchbase
 
 Indices and tables
 ==================

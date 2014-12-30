@@ -1,6 +1,6 @@
-========================
-GEvent Couchbase Support
-========================
+==================
+`gevent` Interface
+==================
 
 
 .. module:: gcouchbase

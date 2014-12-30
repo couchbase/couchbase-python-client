@@ -45,7 +45,7 @@ Some of the multi methods accept keyword arguments; these arguments apply to
 *all* the keys within the iterable passed.
 
 
-Starting in version 1.1.0, you can pass an
+You can also pass an
 :class:`~couchbase.items.ItemCollection` as the ``keys`` or ``kv`` parameter.
 The `Item` interfaces allows in-place modifications to an object across multiple
 operations avoiding the need for copying the result into your own data structure.
@@ -117,8 +117,6 @@ Each format specifier has specific rules about what data types it accepts.
 
 .. data:: FMT_AUTO
 
-    .. versionadded:: 1.1.0
-
     Automatically determine the format of the input type. The value of this
     constant is an opaque object.
 
@@ -134,7 +132,7 @@ Key Format
 ----------
 
 The above format options are only valid for *values* being passed to one
-of the storage methods (see :meth:`couchbase.bucket.Bucket.upset`).
+of the storage methods (see :meth:`couchbase.bucket.Bucket.upsert`).
 
 For *keys*, the acceptable inputs are those for :const:`FMT_UTF8`
 

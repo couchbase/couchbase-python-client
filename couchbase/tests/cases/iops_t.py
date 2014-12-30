@@ -16,6 +16,7 @@
 #
 
 from couchbase.tests.base import CouchbaseTestCase
+from couchbase.iops.select import SelectIOPS
 
 # For now, this just checks that basic set/get doesn't explode
 # We'll definitely want to add more here before we consider it stable
@@ -26,11 +27,7 @@ class ConnectionIopsTest(CouchbaseTestCase):
         self.skipIfPyPy()
 
     def _iops_connection(self, **kwargs):
-        ret = self.make_connection(
-            experimental_gevent_support=True,
-            **kwargs
-        )
-        return ret
+        return self.make_connection(_iops=SelectIOPS(), **kwargs)
 
     def test_creation(self):
         self._iops_connection()

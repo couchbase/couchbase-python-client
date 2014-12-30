@@ -1,6 +1,6 @@
-=========================
-Twisted Couchbase Library
-=========================
+===================
+`Twisted` Interface
+===================
 
 .. module:: txcouchbase
 
