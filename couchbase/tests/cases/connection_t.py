@@ -46,33 +46,9 @@ class ConnectionTest(CouchbaseTestCase):
         cb = self.factory(**self.make_connargs())
         self.assertIsInstance(cb, self.factory)
 
-    def test_sasl_bucket(self):
-        self.skipUnlessSasl()
-        cb = self.factory(**self.get_sasl_cinfo().make_connargs())
-        self.assertIsInstance(cb, self.factory)
-
     def test_bucket_not_found(self):
         connargs = self.make_connargs(bucket='this_bucket_does_not_exist')
         self.assertRaises(BucketNotFoundError, self.factory, **connargs)
-
-    def test_bucket_wrong_credentials(self):
-        sasl_info = self.get_sasl_cinfo()
-        if sasl_info is self.mock_info:
-            raise SkipTest("Mock not supported")
-
-        self.assertRaises(AuthError, self.factory,
-                          **self.make_connargs(password='bad_pass'))
-
-        self.assertRaises(AuthError, self.factory,
-                          **self.make_connargs(password='wrong_password'))
-
-    def test_sasl_bucket_wrong_credentials(self):
-        self.skipUnlessSasl()
-        sasl_info = self.get_sasl_cinfo()
-        sasl_bucket = ConnectionString(sasl_info.get_sasl_params()['connection_string']).bucket
-        self.assertRaises(AuthError, self.factory,
-                          **sasl_info.make_connargs(password='wrong_password',
-                                               bucket=sasl_bucket))
 
     def test_quiet(self):
         connparams = self.make_connargs()
@@ -120,11 +96,11 @@ class ConnectionTest(CouchbaseTestCase):
                           str('couchbase://12345:qwer###/default'))
 
     def test_multi_hosts(self):
-        bkt = self.cluster_info.bucket_prefix
+        bkt = self.cluster_info.bucket_name
         passwd = self.cluster_info.bucket_password
 
         cs = ConnectionString.from_hb(self.cluster_info.host,
-                                      self.cluster_info.bucket_prefix)
+                                      self.cluster_info.bucket_name)
 
         if not self.mock:
             cb = self.factory(str(cs), password=passwd)
