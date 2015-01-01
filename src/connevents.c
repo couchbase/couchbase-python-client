@@ -58,7 +58,7 @@ pycbc_invoke_connected_event(pycbc_Bucket *conn, lcb_error_t err)
 
 
 struct dtor_info_st {
-    lcb_io_opt_t io;
+    PyObject *iowrap;
     PyObject *dtorcb;
     PyObject *conncb;
 };
@@ -92,9 +92,8 @@ dtor_callback(const void *arg)
         Py_DECREF(dti->dtorcb);
         dti->dtorcb = NULL;
     }
-
-    if (dti->io) {
-        pycbc_iops_free(dti->io);
+    if (dti->iowrap) {
+        Py_DECREF(dti->iowrap);
     }
     free(dti);
 }
@@ -116,7 +115,7 @@ pycbc_schedule_dtor_event(pycbc_Bucket *self)
                 "destruction. Instance will leak\n");
 
     } else {
-        dti->io = self->iops;
+        dti->iowrap = self->iopswrap;
         dti->dtorcb = self->dtorcb;
         dti->conncb = self->conncb;
     }
@@ -125,7 +124,7 @@ pycbc_schedule_dtor_event(pycbc_Bucket *self)
     lcb_destroy_async(self->instance, dti);
 
     self->instance = NULL;
-    self->iops = NULL;
+    self->iopswrap = NULL;
     self->dtorcb = NULL;
     self->conncb = NULL;
 }

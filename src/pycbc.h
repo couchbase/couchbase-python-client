@@ -309,7 +309,7 @@ typedef struct {
     PyObject *pipeline_queue;
 
     /** If using a custom IOPS, this contains it */
-    lcb_io_opt_t iops;
+    PyObject *iopswrap;
 
     /** Thread state. Used to lock/unlock the GIL */
     PyThreadState *thrstate;
@@ -737,6 +737,7 @@ int pycbc_EventType_init(PyObject **ptr);
 int pycbc_TimerEventType_init(PyObject **ptr);
 int pycbc_IOEventType_init(PyObject **ptr);
 int pycbc_AsyncResultType_init(PyObject **ptr);
+int pycbc_IOPSWrapperType_init(PyObject **ptr);
 
 /**
  * Calls the type's constructor with no arguments:
@@ -974,10 +975,11 @@ int pycbc_tc_simple_decode(PyObject **vp,
 PyObject *
 pycbc_tc_determine_format(PyObject *value);
 
-/** IOPS Initializer */
-lcb_io_opt_t pycbc_iops_new(pycbc_Bucket *conn, PyObject *pyio);
-void pycbc_iops_free(lcb_io_opt_t io);
-PyObject * pycbc_event_new(void);
+PyObject *
+pycbc_iowrap_new(pycbc_Bucket *conn, PyObject *pyio);
+
+lcb_io_opt_t
+pycbc_iowrap_getiops(PyObject *iowrap);
 
 /**
  * Event callback handling

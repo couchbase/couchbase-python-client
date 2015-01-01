@@ -18,6 +18,14 @@
 #include "iops.h"
 #include "structmember.h"
 
+#define XIONAME_CACHENTRIES(X) \
+    X(modevent, 0) \
+    X(modtimer, 0) \
+    X(startwatch, 0) \
+    X(stopwatch, 0) \
+    X(mkevent, 1) \
+    X(mktimer, 1)
+
 static PyTypeObject pycbc_EventType = {
         PYCBC_POBJ_HEAD_INIT(NULL)
         0
@@ -31,6 +39,10 @@ static PyTypeObject pycbc_IOEventType = {
 static PyTypeObject pycbc_TimerEventType = {
         PYCBC_POBJ_HEAD_INIT(NULL)
         0
+};
+
+static PyTypeObject pycbc_IOPSWrapperType = {
+        PYCBC_POBJ_HEAD_INIT(NULL)
 };
 
 static struct PyMemberDef pycbc_Event_TABLE_members[] = {
@@ -56,6 +68,8 @@ static struct PyMemberDef pycbc_TimerEvent_TABLE_members[] = {
 static void event_fire_common(pycbc_Event *ev, short which)
 {
     lcb_socket_t fd = 0;
+    PyObject *parent;
+
     if (ev->state == PYCBC_EVSTATE_FREED) {
         return;
     }
@@ -63,9 +77,12 @@ static void event_fire_common(pycbc_Event *ev, short which)
     if (ev->type == PYCBC_EVTYPE_IO) {
         fd = (lcb_socket_t)((pycbc_IOEvent*)ev)->fd;
     }
-
+    Py_INCREF(ev);
+    parent = ev->parent;
+    Py_XINCREF(parent);
     ev->cb.handler(fd, which, ev->cb.data);
-
+    Py_XDECREF(parent);
+    Py_DECREF(ev);
 }
 
 #define READY_RETURN() \
@@ -123,9 +140,7 @@ IOEvent__repr__(pycbc_IOEvent *self)
 {
     return PyUnicode_FromFormat("%s<fd=%lu,flags=0x%x @%p>",
                                 Py_TYPE(self)->tp_name,
-                                (unsigned long)self->fd,
-                                (int)self->flags,
-                                self);
+                                (unsigned long)self->fd, (int)self->flags, self);
 }
 
 
@@ -177,12 +192,34 @@ Event__init__(pycbc_Event *self, PyObject *args, PyObject *kwargs)
     return 0;
 }
 
+static int
+Event_gc_traverse(pycbc_Event *ev, visitproc visit, void *arg)
+{
+    Py_VISIT(ev->vdict);
+    Py_VISIT(ev->parent);
+    return 0;
+}
+
+static void
+Event_gc_clear(pycbc_Event *ev)
+{
+    Py_CLEAR(ev->vdict);
+    Py_CLEAR(ev->parent);
+}
+
 static void
 Event_dealloc(pycbc_Event *self)
 {
-    Py_XDECREF(self->vdict);
+    Event_gc_clear(self);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
+
+#define SET_EVENT_GCFUNCS(type) do {\
+    (type)->tp_flags |= Py_TPFLAGS_HAVE_GC; \
+    (type)->tp_traverse = (traverseproc)Event_gc_traverse; \
+    (type)->tp_clear = (inquiry)Event_gc_clear; \
+    (type)->tp_dealloc = (destructor)Event_dealloc; \
+} while (0);
 
 int
 pycbc_EventType_init(PyObject **ptr)
@@ -200,10 +237,11 @@ pycbc_EventType_init(PyObject **ptr)
     p->tp_basicsize = sizeof(pycbc_Event);
     p->tp_members = pycbc_Event_TABLE_members;
     p->tp_methods = pycbc_Event_TABLE_methods;
-    p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+    p->tp_flags = Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE;
     p->tp_init = (initproc)Event__init__;
-    p->tp_dealloc = (destructor)Event_dealloc;
     p->tp_dictoffset = offsetof(pycbc_Event, vdict);
+
+    SET_EVENT_GCFUNCS(p);
     return PyType_Ready(p);
 }
 
@@ -222,8 +260,9 @@ pycbc_IOEventType_init(PyObject **ptr)
     p->tp_methods = pycbc_IOEvent_TABLE_methods;
     p->tp_repr = (reprfunc)IOEvent__repr__;
     p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-    p->tp_dealloc = (destructor)Event_dealloc;
     p->tp_base = &pycbc_EventType;
+
+    SET_EVENT_GCFUNCS(p);
     return PyType_Ready(p);
 }
 
@@ -240,18 +279,65 @@ pycbc_TimerEventType_init(PyObject **ptr)
     p->tp_basicsize = sizeof(pycbc_TimerEvent);
     p->tp_members = pycbc_TimerEvent_TABLE_members;
     p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
-    p->tp_dealloc = (destructor)Event_dealloc;
     p->tp_base = &pycbc_EventType;
+
+    SET_EVENT_GCFUNCS(p);
     return PyType_Ready(p);
 }
 
+static int
+IOPSWrapper_traverse(pycbc_IOPSWrapper *self, visitproc visit, void *arg)
+{
+    #define X(n, ign) Py_VISIT(self->n);
+    XIONAME_CACHENTRIES(X);
+    #undef X
+    Py_VISIT(self->parent);
+    Py_VISIT(self->pyio);
+    return 0;
+}
+
+static void
+IOPSWrapper_clear(pycbc_IOPSWrapper *self)
+{
+    #define X(n, ign) Py_XDECREF(self->n);
+    XIONAME_CACHENTRIES(X);
+    #undef X
+    Py_CLEAR(self->parent);
+    Py_CLEAR(self->pyio);
+}
+
+static void
+IOPSWrapper_dealloc(pycbc_IOPSWrapper *self)
+{
+    IOPSWrapper_clear(self);
+    free(self->iops);
+
+    Py_TYPE(self)->tp_free((PyObject*)self);
+}
+
+int
+pycbc_IOPSWrapperType_init(PyObject **ptr)
+{
+    PyTypeObject *p = &pycbc_IOPSWrapperType;
+    *ptr = (PyObject *)p;
+    if (p->tp_name) {
+        return 0;
+    }
+
+    p->tp_name = "_IOPSWrapper";
+    p->tp_new = PyType_GenericNew;
+    p->tp_basicsize = sizeof(pycbc_IOPSWrapper);
+    p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC;
+    p->tp_dealloc = (destructor)IOPSWrapper_dealloc;
+    p->tp_traverse = (traverseproc)IOPSWrapper_traverse;
+    p->tp_clear = (inquiry)IOPSWrapper_clear;
+
+    return PyType_Ready(p);
+}
 
 static int
-modify_event_python(pycbc_iops_t *pio,
-                    pycbc_Event *ev,
-                    pycbc_evaction_t action,
-                    lcb_socket_t newsock,
-                    void *arg)
+modify_event_python(pycbc_IOPSWrapper *pio, pycbc_Event *ev,
+                    pycbc_evaction_t action, lcb_socket_t newsock, void *arg)
 {
     int ret;
     PyObject *result;
@@ -271,12 +357,12 @@ modify_event_python(pycbc_iops_t *pio,
         flags = *(short*)arg;
         o_arg = pycbc_IntFromL(flags);
         ((pycbc_IOEvent *)ev)->fd = newsock;
-        meth = pio->meths.modevent;
+        meth = pio->modevent;
 
     } else {
         usecs = *(lcb_uint32_t*)arg;
         o_arg = pycbc_IntFromL(usecs);
-        meth = pio->meths.modtimer;
+        meth = pio->modtimer;
     }
     PyTuple_SET_ITEM(argtuple, 2, o_arg);
 
@@ -313,15 +399,15 @@ create_event_python(lcb_io_opt_t io, pycbc_evtype_t evtype)
 {
     PyObject *meth, *ret;
     PyTypeObject *defltype;
-    pycbc_iops_t *pio = (pycbc_iops_t *)io;
+    pycbc_IOPSWrapper *pio = PYCBC_IOW_FROM_IOPS(io);
 
     if (evtype == PYCBC_EVTYPE_IO) {
         defltype = &pycbc_IOEventType;
-        meth = pio->meths.mkevent;
+        meth = pio->mkevent;
 
     } else {
         defltype = &pycbc_TimerEventType;
-        meth = pio->meths.mktimer;
+        meth = pio->mktimer;
     }
 
     if (meth) {
@@ -337,20 +423,20 @@ create_event_python(lcb_io_opt_t io, pycbc_evtype_t evtype)
     }
 
     ((pycbc_Event *)ret)->type = evtype;
+    ((pycbc_Event *)ret)->parent = (PyObject *)pio;
+    Py_INCREF(pio);
     return ret;
 }
 
 static void *
 create_event(lcb_io_opt_t io)
 {
-    (void)io;
     return create_event_python(io, PYCBC_EVTYPE_IO);
 }
 
 static void *
 create_timer(lcb_io_opt_t io)
 {
-    (void)io;
     return create_event_python(io, PYCBC_EVTYPE_TIMER);
 }
 
@@ -358,27 +444,19 @@ static void
 destroy_event_common(lcb_io_opt_t io, void *arg)
 {
     pycbc_Event *ev = arg;
-    lcb_uint32_t dummy = 0;
-    (void)io;
+    lcb_U32 dummy = 0;
     pycbc_assert(ev->state != PYCBC_EVSTATE_ACTIVE);
 
-    modify_event_python((pycbc_iops_t *)io,
-                        ev,
-                        PYCBC_EVACTION_CLEANUP,
-                        0,
-                        &dummy);
+    modify_event_python(PYCBC_IOW_FROM_IOPS(io), ev, PYCBC_EVACTION_CLEANUP,
+                        0, &dummy);
 
     ev->state = PYCBC_EVSTATE_FREED;
-    Py_DECREF(arg);
+    Py_DECREF(ev);
 }
 
 static int
-update_event(lcb_io_opt_t io,
-             lcb_socket_t sock,
-             void *event,
-             short flags,
-             void *data,
-             pycbc_lcb_cb_t handler)
+update_event(lcb_io_opt_t io, lcb_socket_t sock, void *event, short flags,
+             void *data, pycbc_lcb_cb_t handler)
 {
     pycbc_IOEvent *ev = (pycbc_IOEvent*)event;
     pycbc_evaction_t action;
@@ -400,85 +478,62 @@ update_event(lcb_io_opt_t io,
         return 0;
     }
 
-    return modify_event_python((pycbc_iops_t*)io,
-                               (pycbc_Event*)ev,
-                               action,
-                               sock,
-                               &flags);
+    return modify_event_python(PYCBC_IOW_FROM_IOPS(io), (pycbc_Event*)ev,
+                               action, sock, &flags);
 }
 
 static void
 delete_event(lcb_io_opt_t io, lcb_socket_t sock, void *event)
 {
     pycbc_IOEvent *ev = (pycbc_IOEvent*)event;
+    pycbc_IOPSWrapper *pio = PYCBC_IOW_FROM_IOPS(io);
 
-    modify_event_python((pycbc_iops_t*) io,
-                        (pycbc_Event*) ev,
-                        PYCBC_EVACTION_UNWATCH,
-                        sock,
+    modify_event_python(pio, (pycbc_Event*) ev, PYCBC_EVACTION_UNWATCH, sock,
                         &ev->flags);
 }
 
 static void
 delete_timer(lcb_io_opt_t io, void *timer)
 {
-    lcb_uint32_t dummy = 0;
-    modify_event_python((pycbc_iops_t*)io,
-                        (pycbc_Event*)timer,
-                        PYCBC_EVACTION_UNWATCH,
-                        -1,
+    lcb_U32 dummy = 0;
+    pycbc_IOPSWrapper *pio = PYCBC_IOW_FROM_IOPS(io);
+    modify_event_python(pio, (pycbc_Event*)timer, PYCBC_EVACTION_UNWATCH, -1,
                         &dummy);
 }
 
 static int
-update_timer(lcb_io_opt_t io,
-             void *timer,
-             lcb_uint32_t usec,
-             void *data,
+update_timer(lcb_io_opt_t io, void *timer, lcb_U32 usec, void *data,
              pycbc_lcb_cb_t handler)
 {
     pycbc_TimerEvent *ev = (pycbc_TimerEvent*)timer;
     ev->cb.data = data;
     ev->cb.handler = handler;
 
-    return modify_event_python((pycbc_iops_t*)io,
-                               (pycbc_Event*)ev,
-                               PYCBC_EVACTION_WATCH,
-                               -1,
-                               &usec);
+    return modify_event_python(PYCBC_IOW_FROM_IOPS(io), (pycbc_Event*)ev,
+                               PYCBC_EVACTION_WATCH, -1, &usec);
 }
 
 static void
 run_event_loop(lcb_io_opt_t io)
 {
-    pycbc_iops_t *pio = (pycbc_iops_t*)io;
+    pycbc_IOPSWrapper *pio = PYCBC_IOW_FROM_IOPS(io);
     pio->in_loop = 1;
-    PyObject_CallFunctionObjArgs(pio->meths.startwatch, NULL);
+    PyObject_CallFunctionObjArgs(pio->startwatch, NULL);
 }
 
 static void
 stop_event_loop(lcb_io_opt_t io)
 {
-    pycbc_iops_t *pio = (pycbc_iops_t*)io;
+    pycbc_IOPSWrapper *pio = PYCBC_IOW_FROM_IOPS(io);
     pio->in_loop = 0;
-    PyObject_CallFunctionObjArgs(pio->meths.stopwatch, NULL);
+    PyObject_CallFunctionObjArgs(pio->stopwatch, NULL);
 }
-
-#define XIONAME_CACHENTRIES(X) \
-    X(modevent, 0) \
-    X(modtimer, 0) \
-    X(startwatch, 0) \
-    X(stopwatch, 0) \
-    X(mkevent, 1) \
-    X(mktimer, 1)
 
 static void
 iops_destructor(lcb_io_opt_t io)
 {
-    pycbc_iops_t *pio = (pycbc_iops_t *)io;
-#define X(b, unused) Py_XDECREF(pio->meths.b);
-    XIONAME_CACHENTRIES(X)
-#undef X
+    /* Empty. The IOPS object is not scoped by the library */
+    (void)io;
 }
 
 static int
@@ -504,13 +559,11 @@ load_cached_method(PyObject *obj,
 }
 
 static int
-cache_io_methods(pycbc_iops_t *pio, PyObject *obj)
+cache_io_methods(pycbc_IOPSWrapper *pio, PyObject *obj)
 {
 
 #define X(b, is_optional) \
-    if (load_cached_method(obj, \
-                           pycbc_helpers.ioname_##b, \
-                           &pio->meths.b,\
+    if (load_cached_method(obj, pycbc_helpers.ioname_##b, &pio->b, \
                            is_optional) == -1) { \
         return -1; \
     }
@@ -547,22 +600,20 @@ static void iops_getprocs(int version,
 }
 
 
-lcb_io_opt_t
-pycbc_iops_new(pycbc_Bucket *unused, PyObject *pyio)
+PyObject *
+pycbc_iowrap_new(pycbc_Bucket *unused, PyObject *pyio)
 {
-    lcb_io_opt_t ret = NULL;
+    lcb_io_opt_t iops = NULL;
     lcb_io_opt_t dfl = NULL;
 
     lcb_error_t err;
     struct lcb_create_io_ops_st options = { 0 };
-    pycbc_iops_t *pio;
+    pycbc_IOPSWrapper *wrapper;
 
     (void)unused;
 
-    pio = calloc(1, sizeof(*pio));
-    ret = &pio->iops;
-    pio->pyio = pyio;
-
+    wrapper = (pycbc_IOPSWrapper *)PYCBC_TYPE_CTOR(&pycbc_IOPSWrapperType);
+    wrapper->pyio = pyio;
     Py_INCREF(pyio);
 
     /**
@@ -580,9 +631,14 @@ pycbc_iops_new(pycbc_Bucket *unused, PyObject *pyio)
         return NULL;
     }
 
-    memcpy(&pio->iops, dfl, sizeof(*dfl));
+    iops = calloc(1, sizeof(*iops));
+    wrapper->iops = iops;
+
+    memcpy(iops, dfl, sizeof(*dfl));
     /* hide the dlsym */
     dfl->dlhandle = NULL;
+    /* Inject the cookie */
+    iops->v.v0.cookie = wrapper;
 
     if (dfl->version >= 2 && old_getprocs == NULL) {
         /* Using getprocs */
@@ -615,46 +671,34 @@ pycbc_iops_new(pycbc_Bucket *unused, PyObject *pyio)
     lcb_destroy_io_ops(dfl);
     dfl = NULL;
 
-    if (-1 == cache_io_methods(pio, pyio)) {
+    if (-1 == cache_io_methods(wrapper, pyio)) {
         return NULL;
     }
 
-    ret->destructor = iops_destructor;
+    iops->destructor = iops_destructor;
 
     if (old_getprocs != NULL) {
-        ret->version = 2;
-        ret->v.v2.get_procs = iops_getprocs;
+        iops->version = 2;
+        iops->v.v2.get_procs = iops_getprocs;
     } else {
-        ret->version = 0;
-        ret->v.v0.create_event = create_event;
-        ret->v.v0.create_timer = create_timer;
-        ret->v.v0.destroy_event = destroy_event_common;
-        ret->v.v0.destroy_timer = destroy_event_common;
-        ret->v.v0.update_event = update_event;
-        ret->v.v0.delete_event = delete_event;
-        ret->v.v0.delete_timer = delete_timer;
-        ret->v.v0.update_timer = update_timer;
-        ret->v.v0.run_event_loop = run_event_loop;
-        ret->v.v0.stop_event_loop = stop_event_loop;
+        iops->version = 0;
+        iops->v.v0.create_event = create_event;
+        iops->v.v0.create_timer = create_timer;
+        iops->v.v0.destroy_event = destroy_event_common;
+        iops->v.v0.destroy_timer = destroy_event_common;
+        iops->v.v0.update_event = update_event;
+        iops->v.v0.delete_event = delete_event;
+        iops->v.v0.delete_timer = delete_timer;
+        iops->v.v0.update_timer = update_timer;
+        iops->v.v0.run_event_loop = run_event_loop;
+        iops->v.v0.stop_event_loop = stop_event_loop;
     }
-
-    return ret;
+    return (PyObject *)wrapper;
 }
 
-void
-pycbc_iops_free(lcb_io_opt_t io)
+lcb_io_opt_t
+pycbc_iowrap_getiops(PyObject *iowrap)
 {
-    pycbc_iops_t *pio = (pycbc_iops_t*)io;
-    Py_XDECREF(pio->pyio);
-    free(pio);
-}
-
-PyObject *
-pycbc_event_new(void)
-{
-    pycbc_TimerEvent *ev;
-
-    ev =(pycbc_TimerEvent *)PYCBC_TYPE_CTOR(&pycbc_TimerEventType);
-    ev->type = PYCBC_EVTYPE_TIMER;
-    return (PyObject *)ev;
+    pycbc_assert(Py_TYPE(iowrap) == &pycbc_IOPSWrapperType);
+    return ((pycbc_IOPSWrapper*)iowrap)->iops;
 }

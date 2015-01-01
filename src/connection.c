@@ -212,6 +212,12 @@ Bucket__close(pycbc_Bucket *self)
     self->flags |= PYCBC_CONN_F_CLOSED;
 
     lcb_destroy(self->instance);
+
+    if (self->iopswrap) {
+        Py_XDECREF(self->iopswrap);
+        self->iopswrap = NULL;
+    }
+
     err = lcb_create(&self->instance, NULL);
     pycbc_assert(err == LCB_SUCCESS);
     if (err != LCB_SUCCESS) {
@@ -609,8 +615,8 @@ Bucket__init__(pycbc_Bucket *self,
     create_opts.v.v3.type = conntype;
 
     if (iops_O && iops_O != Py_None) {
-        self->iops = pycbc_iops_new(self, iops_O);
-        create_opts.v.v3.io = self->iops;
+        self->iopswrap = pycbc_iowrap_new(self, iops_O);
+        create_opts.v.v3.io = pycbc_iowrap_getiops(self->iopswrap);
         self->unlock_gil = 0;
     }
 
@@ -700,6 +706,11 @@ Bucket__connect(pycbc_Bucket *self)
 static void
 Bucket_dtor(pycbc_Bucket *self)
 {
+    if (self->flags & PYCBC_CONN_F_CLOSED) {
+        lcb_destroy(self->instance);
+        self->instance = NULL;
+    }
+
     if (self->instance) {
         lcb_set_cookie(self->instance, NULL);
         pycbc_schedule_dtor_event(self);
@@ -711,13 +722,10 @@ Bucket_dtor(pycbc_Bucket *self)
     Py_XDECREF(self->bucket);
     Py_XDECREF(self->conncb);
     Py_XDECREF(self->dur_testhook);
+    Py_XDECREF(self->iopswrap);
 
     if (self->instance) {
         lcb_destroy(self->instance);
-    }
-
-    if (self->iops) {
-        pycbc_iops_free(self->iops);
     }
 
 #ifdef WITH_THREAD

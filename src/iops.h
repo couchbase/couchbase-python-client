@@ -56,6 +56,7 @@ typedef void (*pycbc_lcb_cb_t)(lcb_socket_t,short,void*);
         void *data; \
     } cb; \
     PyObject *vdict; \
+    PyObject *parent; \
     pycbc_evstate_t state; \
     pycbc_evtype_t type;
 
@@ -73,32 +74,28 @@ typedef struct {
     pycbc_Event_HEAD
 } pycbc_TimerEvent;
 
-/**
- * Wrapper around the IOPS structure.
- */
-typedef struct pycbc_iops_st {
-    /** Actual method table */
-    struct lcb_io_opt_st iops;
+/** Wrapper around the IOPS structure. */
+typedef struct pycbc_IOPSWrapper_st {
+    PyObject_HEAD
 
-    /** Python object being used */
+    /** LCB's iops */
+    struct lcb_io_opt_st *iops;
+
     PyObject *pyio;
-
     pycbc_Bucket *parent;
 
     /** Whether the loop is currently active */
     int in_loop;
 
-    /**
-     * Cached method table..
-     */
-    struct {
-        PyObject *mkevent;
-        PyObject *mktimer;
-        PyObject *modevent;
-        PyObject *modtimer;
-        PyObject *startwatch;
-        PyObject *stopwatch;
-    } meths;
-} pycbc_iops_t;
+    /** Cached method references */
+    PyObject *mkevent;
+    PyObject *mktimer;
+    PyObject *modevent;
+    PyObject *modtimer;
+    PyObject *startwatch;
+    PyObject *stopwatch;
+} pycbc_IOPSWrapper;
+
+#define PYCBC_IOW_FROM_IOPS(p) LCB_IOPS_BASEFLD(p, cookie)
 
 #endif
