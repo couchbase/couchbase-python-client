@@ -7,16 +7,11 @@ admin_username = Administrator
 ; log into the admin console
 admin_password = 123456
 
-bucket_prefix = default
+bucket_name = default
 ; If a SASL bucket is being used (i.e. buckets are set up
 ; per the script, then this is the *bucket* password
 ; bucket_password sasl_password
 bucket_password =
-
-; If using an existing cluster with the simple 'default' bucket,
-; set this to False. If your cluster was set up with the 'setup_tests.py'
-; script, you may set this to True
-extra_buckets = False
 
 ; Set this to true if there is a real cluster available
 enabled = True

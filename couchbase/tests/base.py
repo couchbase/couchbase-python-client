@@ -48,26 +48,17 @@ class ClusterInformation(object):
         self.port = 8091
         self.admin_username = "Administrator"
         self.admin_password = "password"
-        self.bucket_prefix = "default"
+        self.bucket_name = "default"
         self.bucket_password = ""
-        self.extra_buckets = False
 
     def make_connargs(self, **overrides):
         ret = {
             'host': self.host,
             'port': self.port,
             'password': self.bucket_password,
-            'bucket': self.bucket_prefix
+            'bucket': self.bucket_name
         }
         ret.update(overrides)
-        return ret
-
-    def get_sasl_params(self):
-        if not self.bucket_password:
-            return None
-        ret = self.make_connargs()
-        if self.extra_buckets:
-            ret['bucket'] += "_sasl"
         return ret
 
     def make_connection(self, conncls, **kwargs):
@@ -76,6 +67,10 @@ class ClusterInformation(object):
     def make_admin_connection(self):
         return Admin(self.admin_username, self.admin_password,
                      self.host, self.port)
+
+    @property
+    def bucket_prefix(self):
+        return self.bucket_name
 
 
 class ConnectionConfiguration(object):
@@ -92,9 +87,8 @@ class ConnectionConfiguration(object):
         info.port = config.getint('realserver', 'port')
         info.admin_username = config.get('realserver', 'admin_username')
         info.admin_password = config.get('realserver', 'admin_password')
-        info.bucket_prefix = config.get('realserver', 'bucket_prefix')
+        info.bucket_name = config.get('realserver', 'bucket_name')
         info.bucket_password = config.get('realserver', 'bucket_password')
-        info.extra_buckets = config.getboolean('realserver','extra_buckets')
 
         if config.getboolean('realserver', 'enabled'):
             self.realserver_info = info
@@ -131,8 +125,7 @@ class MockResourceManager(TestResourceManager):
             return self._info
 
         bspec_dfl = BucketSpec('default', 'couchbase')
-        bspec_sasl = BucketSpec('default_sasl', 'couchbase', 'secret')
-        mock = CouchbaseMock([bspec_dfl, bspec_sasl],
+        mock = CouchbaseMock([bspec_dfl],
                              self._config.mockpath,
                              self._config.mockurl,
                              replicas=2,
@@ -140,13 +133,11 @@ class MockResourceManager(TestResourceManager):
         mock.start()
 
         info = ClusterInformation()
-        info.bucket_prefix = "default"
-        info.bucket_password = "secret"
+        info.bucket_name = "default"
         info.port = mock.rest_port
         info.host = "127.0.0.1"
         info.admin_username = "Administrator"
         info.admin_password = "password"
-        info.extra_buckets = True
         info.mock = mock
         self._info = info
         return info
@@ -251,23 +242,6 @@ class CouchbaseTestCase(ResourcedTestCase):
             self.assertIsNone = types.MethodType(tmp, self)
 
         self._key_counter = 0
-
-    def get_sasl_cinfo(self):
-        for info in [self._realserver_info, self._mock_info]:
-            if info and info.bucket_password:
-                return info
-
-
-    def get_sasl_params(self):
-        einfo = self.get_sasl_cinfo()
-        if not einfo:
-            return None
-        return einfo.get_sasl_params()
-
-    def skipUnlessSasl(self):
-        sasl_params = self.get_sasl_params()
-        if not sasl_params:
-            raise SkipTest("No SASL buckets configured")
 
     def skipLcbMin(self, vstr):
         """
