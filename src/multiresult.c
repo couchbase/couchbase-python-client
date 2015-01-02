@@ -99,12 +99,25 @@ AsyncResult_set_single(pycbc_AsyncResult *self)
     Py_RETURN_NONE;
 }
 
+static PyObject *
+AsyncResult_clear_callbacks(pycbc_AsyncResult *self, PyObject *args)
+{
+    (void)args;
+    Py_CLEAR(self->errback);
+    Py_CLEAR(self->callback);
+    Py_RETURN_NONE;
+}
+
 static struct PyMethodDef AsyncResult_TABLE_methods[] = {
         { "set_callbacks", (PyCFunction)AsyncResult_set_callbacks,
                 METH_VARARGS,
                 PyDoc_STR("Set the ok and error callbacks")
         },
-
+        { "clear_callbacks", (PyCFunction)AsyncResult_clear_callbacks,
+                METH_NOARGS,
+                PyDoc_STR("Convenience function to clear all callbacks. This\n"
+                        "may be more performant than setting the fields manually")
+        },
         { "_set_single", (PyCFunction)AsyncResult_set_single,
                 METH_NOARGS,
                 PyDoc_STR("Indicate that this is a 'single' result to be "
