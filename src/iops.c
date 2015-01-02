@@ -485,11 +485,11 @@ update_event(lcb_io_opt_t io, lcb_socket_t sock, void *event, short flags,
 static void
 delete_event(lcb_io_opt_t io, lcb_socket_t sock, void *event)
 {
-    pycbc_IOEvent *ev = (pycbc_IOEvent*)event;
+    pycbc_Event *ev = (pycbc_Event*)event;
     pycbc_IOPSWrapper *pio = PYCBC_IOW_FROM_IOPS(io);
+    short tmp = 0;
 
-    modify_event_python(pio, (pycbc_Event*) ev, PYCBC_EVACTION_UNWATCH, sock,
-                        &ev->flags);
+    modify_event_python(pio, ev, PYCBC_EVACTION_UNWATCH, sock, &tmp);
 }
 
 static void
