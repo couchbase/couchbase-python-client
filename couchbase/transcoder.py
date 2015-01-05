@@ -34,9 +34,11 @@ COMMON_FORMATS = tuple([x & FMT_COMMON_MASK for x in UNIFIED_FORMATS])
 
 COMMON2UNIFIED = {}
 LEGACY2UNIFIED = {}
+
 for fl in UNIFIED_FORMATS:
     COMMON2UNIFIED[fl & FMT_COMMON_MASK] = fl
     LEGACY2UNIFIED[fl & FMT_LEGACY_MASK] = fl
+
 
 def get_decode_format(flags):
     """
@@ -45,7 +47,7 @@ def get_decode_format(flags):
     c_flags = flags & FMT_COMMON_MASK
     l_flags = flags & FMT_LEGACY_MASK
 
-    if (c_flags):
+    if c_flags:
         if c_flags not in COMMON_FORMATS:
             return FMT_BYTES, False
         else:
@@ -98,17 +100,16 @@ class TranscoderPP(object):
             else:
                 raise TypeError("Expected bytes")
 
-            return (value, format)
+            return value, format
 
         elif format == FMT_UTF8:
-            return (value.encode('utf-8'), format)
+            return value.encode('utf-8'), format
 
         elif format == FMT_PICKLE:
-            return (pickle.dumps(value), FMT_PICKLE)
+            return self._do_pickle_encode(value), FMT_PICKLE
 
         elif format == FMT_JSON:
-            return (json.dumps(value, ensure_ascii=False
-                               ).encode('utf-8'), FMT_JSON)
+            return self._do_json_encode(value).encode('utf-8'), FMT_JSON
 
         else:
             raise ValueError("Unrecognized format '%r'" % (format,))
@@ -125,10 +126,45 @@ class TranscoderPP(object):
             return value.decode("utf-8")
 
         elif format == FMT_JSON:
-            return json.loads(value.decode("utf-8"))
+            return self._do_json_decode(value.decode('utf-8'))
 
         elif format == FMT_PICKLE:
-            return pickle.loads(value)
+            return self._do_pickle_decode(value)
+
+    def _do_json_encode(self, value):
+        """
+        Can be overidden by subclasses. This should do the same as `json.dumps`
+        :param value: Python object
+        :return: JSON string
+        """
+        return json.dumps(value, ensure_ascii=False)
+
+    def _do_json_decode(self, value):
+        """
+        Can be overidden by subclasses. This should do the same as `json.loads`
+        :param value: The JSON string
+        :return: The decoded Python value
+        """
+        return json.loads(value)
+
+    def _do_pickle_encode(self, value):
+        """
+        Can be overidden by subclasses. This should do the same as
+        `pickle.dumps`
+        :param value: The value to pickle
+        :return: The pickled buffer
+        """
+        return pickle.dumps(value)
+
+    def _do_pickle_decode(self, value):
+        """
+        Can be overidden by subclasses. This should do the same as
+        `pickle.loads`
+        :param value: The pickled buffer
+        :return: The unpickled python object
+        """
+        return pickle.loads(value)
+
 
 class LegacyTranscoderPP(TranscoderPP):
     def encode_value(self, value, format):
