@@ -119,23 +119,26 @@ class PyPyMultiResultWrap(dict):
         setattr(self._mres, name, value)
 
 
-C._init_helpers(result_reprfunc=_result__repr__,
-                fmt_utf8_flags=C.FMT_UTF8,
-                fmt_bytes_flags=C.FMT_BYTES,
-                fmt_json_flags=C.FMT_JSON,
-                fmt_pickle_flags=C.FMT_PICKLE,
-                pickle_encode=pickle.dumps,
-                pickle_decode=pickle.loads,
-                json_encode=_json_encode_wrapper,
-                json_decode=json.loads,
-                lcb_errno_map=E._LCB_ERRNO_MAP,
-                misc_errno_map=E._EXCTYPE_MAP,
-                default_exception=E.CouchbaseError,
-                obsinfo_reprfunc=_observeinfo__repr__,
-                itmcoll_base_type=ItemCollection,
-                itmopts_dict_type=ItemOptionDict,
-                itmopts_seq_type=ItemSequence,
-                fmt_auto=_FMT_AUTO,
-                pypy_mres_factory=PyPyMultiResultWrap)
+def run_init(m):
+    m._init_helpers(result_reprfunc=_result__repr__,
+                    fmt_utf8_flags=C.FMT_UTF8,
+                    fmt_bytes_flags=C.FMT_BYTES,
+                    fmt_json_flags=C.FMT_JSON,
+                    fmt_pickle_flags=C.FMT_PICKLE,
+                    pickle_encode=pickle.dumps,
+                    pickle_decode=pickle.loads,
+                    json_encode=_json_encode_wrapper,
+                    json_decode=json.loads,
+                    lcb_errno_map=E._LCB_ERRNO_MAP,
+                    misc_errno_map=E._EXCTYPE_MAP,
+                    default_exception=E.CouchbaseError,
+                    obsinfo_reprfunc=_observeinfo__repr__,
+                    itmcoll_base_type=ItemCollection,
+                    itmopts_dict_type=ItemOptionDict,
+                    itmopts_seq_type=ItemSequence,
+                    fmt_auto=_FMT_AUTO,
+                    pypy_mres_factory=PyPyMultiResultWrap)
+
+run_init(C)
 
 C.FMT_AUTO = _FMT_AUTO
