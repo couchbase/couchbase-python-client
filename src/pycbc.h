@@ -723,6 +723,7 @@ extern struct pycbc_helpers_ST pycbc_helpers;
 /** Initializes the constants, constants. */
 void pycbc_init_pyconstants(PyObject *module);
 PyObject *pycbc_lcb_errstr(lcb_t instance, lcb_error_t err);
+PyObject *pycbc_print_constants(PyObject *mod, PyObject *args);
 
 int pycbc_ResultType_init(PyObject **ptr);
 int pycbc_BucketType_init(PyObject **ptr);

@@ -70,95 +70,105 @@
     X(APPEND) \
     X(PREPEND)
 
-void
-pycbc_init_pyconstants(PyObject *module)
+static void
+do_all_constants(PyObject *module, void (*handler)(PyObject*, const char*, long))
 {
-#define X(b) \
-    PyModule_AddIntMacro(module, LCB_##b);
+    #define ADD_MACRO(sym) handler(module, #sym, sym)
+    #define ADD_CONSTANT(name, val) handler(module, name, val)
+
+    #define X(b) ADD_MACRO(LCB_##b);
     XERR(X);
     XSTORAGE(X);
     XHTTP(X);
-#undef X
+    #undef X
 
-    PyModule_AddIntMacro(module, PYCBC_CMD_GET);
-    PyModule_AddIntMacro(module, PYCBC_CMD_LOCK);
-    PyModule_AddIntMacro(module, PYCBC_CMD_TOUCH);
-    PyModule_AddIntMacro(module, PYCBC_CMD_GAT);
+    ADD_MACRO(PYCBC_CMD_GET);
+    ADD_MACRO(PYCBC_CMD_LOCK);
+    ADD_MACRO(PYCBC_CMD_TOUCH);
+    ADD_MACRO(PYCBC_CMD_GAT);
 
-    PyModule_AddIntMacro(module, PYCBC_EXC_ARGUMENTS);
-    PyModule_AddIntMacro(module, PYCBC_EXC_ENCODING);
-    PyModule_AddIntMacro(module, PYCBC_EXC_LCBERR);
-    PyModule_AddIntMacro(module, PYCBC_EXC_INTERNAL);
-    PyModule_AddIntMacro(module, PYCBC_EXC_HTTP);
-    PyModule_AddIntMacro(module, PYCBC_EXC_THREADING);
-    PyModule_AddIntMacro(module, PYCBC_EXC_DESTROYED);
-    PyModule_AddIntMacro(module, PYCBC_EXC_PIPELINE);
+    ADD_MACRO(PYCBC_EXC_ARGUMENTS);
+    ADD_MACRO(PYCBC_EXC_ENCODING);
+    ADD_MACRO(PYCBC_EXC_LCBERR);
+    ADD_MACRO(PYCBC_EXC_INTERNAL);
+    ADD_MACRO(PYCBC_EXC_HTTP);
+    ADD_MACRO(PYCBC_EXC_THREADING);
+    ADD_MACRO(PYCBC_EXC_DESTROYED);
+    ADD_MACRO(PYCBC_EXC_PIPELINE);
 
-    PyModule_AddIntMacro(module, LCB_TYPE_BUCKET);
-    PyModule_AddIntMacro(module, LCB_TYPE_CLUSTER);
-    PyModule_AddIntMacro(module, LCB_HTTP_TYPE_VIEW);
-    PyModule_AddIntMacro(module, LCB_HTTP_TYPE_MANAGEMENT);
+    ADD_MACRO(LCB_TYPE_BUCKET);
+    ADD_MACRO(LCB_TYPE_CLUSTER);
+    ADD_MACRO(LCB_HTTP_TYPE_VIEW);
+    ADD_MACRO(LCB_HTTP_TYPE_MANAGEMENT);
 
-    PyModule_AddIntMacro(module, PYCBC_RESFLD_CAS);
-    PyModule_AddIntMacro(module, PYCBC_RESFLD_FLAGS);
-    PyModule_AddIntMacro(module, PYCBC_RESFLD_KEY);
-    PyModule_AddIntMacro(module, PYCBC_RESFLD_VALUE);
-    PyModule_AddIntMacro(module, PYCBC_RESFLD_RC);
-    PyModule_AddIntMacro(module, PYCBC_RESFLD_HTCODE);
-    PyModule_AddIntMacro(module, PYCBC_RESFLD_URL);
+    ADD_MACRO(PYCBC_RESFLD_CAS);
+    ADD_MACRO(PYCBC_RESFLD_FLAGS);
+    ADD_MACRO(PYCBC_RESFLD_KEY);
+    ADD_MACRO(PYCBC_RESFLD_VALUE);
+    ADD_MACRO(PYCBC_RESFLD_RC);
+    ADD_MACRO(PYCBC_RESFLD_HTCODE);
+    ADD_MACRO(PYCBC_RESFLD_URL);
 
-    PyModule_AddIntConstant(module, "FMT_JSON", PYCBC_FMT_JSON);
-    PyModule_AddIntConstant(module, "FMT_BYTES", PYCBC_FMT_BYTES);
-    PyModule_AddIntConstant(module, "FMT_UTF8", PYCBC_FMT_UTF8);
-    PyModule_AddIntConstant(module, "FMT_PICKLE", PYCBC_FMT_PICKLE);
-    PyModule_AddIntConstant(module, "FMT_LEGACY_MASK", PYCBC_FMT_LEGACY_MASK);
-    PyModule_AddIntConstant(module, "FMT_COMMON_MASK", PYCBC_FMT_COMMON_MASK);
+    ADD_CONSTANT("FMT_JSON", PYCBC_FMT_JSON);
+    ADD_CONSTANT("FMT_BYTES", PYCBC_FMT_BYTES);
+    ADD_CONSTANT("FMT_UTF8", PYCBC_FMT_UTF8);
+    ADD_CONSTANT("FMT_PICKLE", PYCBC_FMT_PICKLE);
+    ADD_CONSTANT("FMT_LEGACY_MASK", PYCBC_FMT_LEGACY_MASK);
+    ADD_CONSTANT("FMT_COMMON_MASK", PYCBC_FMT_COMMON_MASK);
 
-    PyModule_AddIntConstant(module, "OBS_PERSISTED", LCB_OBSERVE_PERSISTED);
-    PyModule_AddIntConstant(module, "OBS_FOUND", LCB_OBSERVE_FOUND);
-    PyModule_AddIntConstant(module, "OBS_NOTFOUND", LCB_OBSERVE_NOT_FOUND);
-    PyModule_AddIntConstant(module, "OBS_LOGICALLY_DELETED",
-                            LCB_OBSERVE_PERSISTED|
-                            LCB_OBSERVE_NOT_FOUND);
+    ADD_CONSTANT("OBS_PERSISTED", LCB_OBSERVE_PERSISTED);
+    ADD_CONSTANT("OBS_FOUND", LCB_OBSERVE_FOUND);
+    ADD_CONSTANT("OBS_NOTFOUND", LCB_OBSERVE_NOT_FOUND);
+    ADD_CONSTANT("OBS_LOGICALLY_DELETED",
+                 LCB_OBSERVE_PERSISTED| LCB_OBSERVE_NOT_FOUND);
 
-    PyModule_AddIntConstant(module, "OBS_MASK",
-                            LCB_OBSERVE_PERSISTED|
-                            LCB_OBSERVE_FOUND|
-                            LCB_OBSERVE_NOT_FOUND);
+    ADD_CONSTANT("OBS_MASK",
+                 LCB_OBSERVE_PERSISTED|LCB_OBSERVE_FOUND| LCB_OBSERVE_NOT_FOUND);
 
-    PyModule_AddIntConstant(module, "LOCKMODE_WAIT", PYCBC_LOCKMODE_WAIT);
-    PyModule_AddIntConstant(module, "LOCKMODE_EXC", PYCBC_LOCKMODE_EXC);
-    PyModule_AddIntConstant(module, "LOCKMODE_NONE", PYCBC_LOCKMODE_NONE);
+    ADD_CONSTANT("LOCKMODE_WAIT", PYCBC_LOCKMODE_WAIT);
+    ADD_CONSTANT("LOCKMODE_EXC", PYCBC_LOCKMODE_EXC);
+    ADD_CONSTANT("LOCKMODE_NONE", PYCBC_LOCKMODE_NONE);
 
-    PyModule_AddIntMacro(module, PYCBC_CONN_F_WARNEXPLICIT);
-    PyModule_AddIntMacro(module, PYCBC_CONN_F_CLOSED);
-    PyModule_AddIntMacro(module, PYCBC_CONN_F_ASYNC);
-    PyModule_AddIntMacro(module, PYCBC_CONN_F_ASYNC_DTOR);
+    ADD_MACRO(PYCBC_CONN_F_WARNEXPLICIT);
+    ADD_MACRO(PYCBC_CONN_F_CLOSED);
+    ADD_MACRO(PYCBC_CONN_F_ASYNC);
+    ADD_MACRO(PYCBC_CONN_F_ASYNC_DTOR);
 
-    PyModule_AddIntMacro(module, PYCBC_EVACTION_WATCH);
-    PyModule_AddIntMacro(module, PYCBC_EVACTION_UNWATCH);
-    PyModule_AddIntMacro(module, PYCBC_EVACTION_SUSPEND);
-    PyModule_AddIntMacro(module, PYCBC_EVACTION_RESUME);
-    PyModule_AddIntMacro(module, PYCBC_EVACTION_CLEANUP);
-    PyModule_AddIntMacro(module, PYCBC_EVSTATE_INITIALIZED);
-    PyModule_AddIntMacro(module, PYCBC_EVSTATE_ACTIVE);
-    PyModule_AddIntMacro(module, PYCBC_EVSTATE_SUSPENDED);
-    PyModule_AddIntMacro(module, PYCBC_EVTYPE_IO);
-    PyModule_AddIntMacro(module, PYCBC_EVTYPE_TIMER);
-    PyModule_AddIntMacro(module, LCB_READ_EVENT);
-    PyModule_AddIntMacro(module, LCB_WRITE_EVENT);
-    PyModule_AddIntMacro(module, LCB_RW_EVENT);
+    ADD_MACRO(PYCBC_EVACTION_WATCH);
+    ADD_MACRO(PYCBC_EVACTION_UNWATCH);
+    ADD_MACRO(PYCBC_EVACTION_SUSPEND);
+    ADD_MACRO(PYCBC_EVACTION_RESUME);
+    ADD_MACRO(PYCBC_EVACTION_CLEANUP);
+    ADD_MACRO(PYCBC_EVSTATE_INITIALIZED);
+    ADD_MACRO(PYCBC_EVSTATE_ACTIVE);
+    ADD_MACRO(PYCBC_EVSTATE_SUSPENDED);
+    ADD_MACRO(PYCBC_EVTYPE_IO);
+    ADD_MACRO(PYCBC_EVTYPE_TIMER);
+    ADD_MACRO(LCB_READ_EVENT);
+    ADD_MACRO(LCB_WRITE_EVENT);
+    ADD_MACRO(LCB_RW_EVENT);
 
-    PyModule_AddIntMacro(module, LCB_ERRTYPE_DATAOP);
-    PyModule_AddIntMacro(module, LCB_ERRTYPE_FATAL);
-    PyModule_AddIntMacro(module, LCB_ERRTYPE_INTERNAL);
-    PyModule_AddIntMacro(module, LCB_ERRTYPE_NETWORK);
-    PyModule_AddIntMacro(module, LCB_ERRTYPE_TRANSIENT);
-    PyModule_AddIntMacro(module, LCB_ERRTYPE_INPUT);
+    ADD_MACRO(LCB_ERRTYPE_DATAOP);
+    ADD_MACRO(LCB_ERRTYPE_FATAL);
+    ADD_MACRO(LCB_ERRTYPE_INTERNAL);
+    ADD_MACRO(LCB_ERRTYPE_NETWORK);
+    ADD_MACRO(LCB_ERRTYPE_TRANSIENT);
+    ADD_MACRO(LCB_ERRTYPE_INPUT);
 
     /* For CNTL constants */
-    PyModule_AddIntMacro(module, LCB_CNTL_OP_TIMEOUT);
-    PyModule_AddIntMacro(module, LCB_CNTL_VIEW_TIMEOUT);
+    ADD_MACRO(LCB_CNTL_OP_TIMEOUT);
+    ADD_MACRO(LCB_CNTL_VIEW_TIMEOUT);
+}
+
+static void
+do_constmod(PyObject *module, const char *name, long value) {
+    PyModule_AddIntConstant(module, name, value);
+}
+
+void
+pycbc_init_pyconstants(PyObject *module)
+{
+    do_all_constants(module, do_constmod);
 }
 
 
@@ -171,5 +181,19 @@ pycbc_lcb_errstr(lcb_t instance, lcb_error_t err)
 #else
     return PyString_InternFromString(lcb_strerror(instance, err));
 #endif
+}
 
+static void
+do_printmod(PyObject *module, const char *name, long value)
+{
+    printf("%s = %ld\n", name, value);
+}
+
+PyObject *
+pycbc_print_constants(PyObject *mod, PyObject *args)
+{
+    do_all_constants(NULL, do_printmod);
+    (void)mod;
+    (void)args;
+    Py_RETURN_NONE;
 }

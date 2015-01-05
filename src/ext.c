@@ -219,6 +219,10 @@ static PyMethodDef _libcouchbase_methods[] = {
                 "\n"
                 "\n")
         },
+        { "dump_constants",
+                (PyCFunction)pycbc_print_constants, METH_NOARGS,
+                PyDoc_STR("Print the constants to standard output")
+        },
         { NULL }
 };
 
