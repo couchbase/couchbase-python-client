@@ -60,47 +60,6 @@ enum {
     RESTYPE_VARCOUNT = 1 << 4
 };
 
-static PyObject *
-make_error_tuple(void)
-{
-    PyObject *type, *value, *traceback;
-    PyObject *ret;
-
-    pycbc_assert(PyErr_Occurred());
-
-    PyErr_Fetch(&type, &value, &traceback);
-    PyErr_Clear();
-
-    if (value == NULL) {
-        value = Py_None; Py_INCREF(value);
-    }
-    if (traceback == NULL) {
-        traceback = Py_None; Py_INCREF(traceback);
-    }
-
-    ret = PyTuple_New(3);
-    /** Steal references from PyErr_Fetch() */
-    PyTuple_SET_ITEM(ret, 0, type);
-    PyTuple_SET_ITEM(ret, 1, value);
-    PyTuple_SET_ITEM(ret, 2, traceback);
-
-    return ret;
-}
-
-static void
-push_fatal_error(pycbc_MultiResult* mres)
-{
-    PyObject *etuple;
-    mres->all_ok = 0;
-    if (!mres->exceptions) {
-        mres->exceptions = PyList_New(0);
-    }
-
-    etuple = make_error_tuple();
-    PyList_Append(mres->exceptions, etuple);
-    Py_DECREF(etuple);
-}
-
 static void
 maybe_push_operr(pycbc_MultiResult *mres,
                  pycbc_Result *res,
@@ -169,7 +128,7 @@ get_common_objects(PyObject *cookie,
     rv = pycbc_tc_decode_key(*conn, key, nkey, &hkey);
 
     if (rv < 0) {
-        push_fatal_error(*mres);
+        pycbc_multiresult_adderr(*mres);
         return -1;
     }
 
@@ -433,7 +392,7 @@ get_callback(lcb_t instance,
                                eflags,
                                &res->value);
     if (rv < 0) {
-        push_fatal_error(mres);
+        pycbc_multiresult_adderr(mres);
     }
 
     operation_completed(conn, mres);
@@ -657,7 +616,7 @@ observe_callback(lcb_t instance,
 
     oi = pycbc_observeinfo_new(conn);
     if (oi == NULL) {
-        push_fatal_error(mres);
+        pycbc_multiresult_adderr(mres);
         goto GT_DONE;
     }
 

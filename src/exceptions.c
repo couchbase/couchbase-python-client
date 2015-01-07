@@ -159,3 +159,30 @@ pycbc_exc_get_categories(PyObject *self, PyObject *arg)
     rv = lcb_get_errtype(rc);
     return pycbc_IntFromL(rv);
 }
+
+PyObject *
+pycbc_exc_mktuple(void)
+{
+    PyObject *type, *value, *traceback;
+    PyObject *ret;
+
+    pycbc_assert(PyErr_Occurred());
+
+    PyErr_Fetch(&type, &value, &traceback);
+    PyErr_Clear();
+
+    if (value == NULL) {
+        value = Py_None; Py_INCREF(value);
+    }
+    if (traceback == NULL) {
+        traceback = Py_None; Py_INCREF(traceback);
+    }
+
+    ret = PyTuple_New(3);
+    /** Steal references from PyErr_Fetch() */
+    PyTuple_SET_ITEM(ret, 0, type);
+    PyTuple_SET_ITEM(ret, 1, value);
+    PyTuple_SET_ITEM(ret, 2, traceback);
+
+    return ret;
+}

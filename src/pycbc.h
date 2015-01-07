@@ -771,6 +771,16 @@ int pycbc_httpresult_ok(pycbc_HttpResult *self);
 void pycbc_Result_dealloc(pycbc_Result *self);
 
 /**
+ * Traps the current exception and adds it to the current MultiResult
+ * context.
+ * @param mres The MultiResult object.
+ *
+ * This calls pycbc_exc_mktuple(), so the constrains there apply to this
+ * function as well.
+ */
+void pycbc_multiresult_adderr(pycbc_MultiResult* mres);
+
+/**
  * Raise an exception from a multi result. This will raise an exception if:
  * 1) There is a 'fatal' error in the 'exceptions' list
  * 2) There is an 'operr'. 'operr' can be a failed LCB code (if no_raise_enoent
@@ -859,6 +869,16 @@ PyObject* pycbc_exc_get_categories(PyObject *self, PyObject *arg);
 #define PYCBC_EXC_WRAP_VALUE PYCBC_EXC_WRAP_KEY
 
 int pycbc_handle_assert(const char *msg, const char* file, int line);
+
+/**
+ * Creates a tuple of (class, object, traceback), similar to what would be
+ * returned from sys.exc_info()
+ * @return The error tuple.
+ *
+ * Calling this function will also clear the error
+ * state. This must be called only if PyErr_Occurred() is true.
+ */
+PyObject *pycbc_exc_mktuple(void);
 
 /**
  * This macro can be used as an 'if' structure. It returns false if the

@@ -263,6 +263,20 @@ pycbc_multiresult_new(pycbc_Bucket *parent)
     return (PyObject*)ret;
 }
 
+void
+pycbc_multiresult_adderr(pycbc_MultiResult* mres)
+{
+    PyObject *etuple;
+    mres->all_ok = 0;
+    if (!mres->exceptions) {
+        mres->exceptions = PyList_New(0);
+    }
+
+    etuple = pycbc_exc_mktuple();
+    PyList_Append(mres->exceptions, etuple);
+    Py_DECREF(etuple);
+}
+
 /**
  * This function raises exceptions from the MultiResult object, as required
  */
