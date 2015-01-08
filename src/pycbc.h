@@ -389,43 +389,20 @@ typedef struct {
     pycbc_Result_HEAD
     PyObject *http_data;
     PyObject *headers;
-
-    /**
-     * Metadata about the result
-     */
-    PyObject *rowsbuf;
-
-    /**
-     * Callback to invoke upon receipt of data
-     */
-    PyObject *callback;
-
-    /**
-     * Row parser context.
-     */
-    lcbex_vrow_ctx_t *rctx;
-
-    /**
-     * HTTP Request handle
-     */
-    lcb_http_request_t htreq;
-
-
     pycbc_Bucket *parent;
+    lcb_http_request_t htreq;
     unsigned int format;
-    long rows_per_call;
     unsigned short htcode;
-    unsigned short htflags;
+    unsigned char done;
 } pycbc_HttpResult;
 
-enum {
-    PYCBC_HTRES_F_CHUNKED   = 1 << 0,
-    PYCBC_HTRES_F_QUIET     = 1 << 1,
-    PYCBC_HTRES_F_COMPLETE  = 1 << 2
-};
-
-PyObject* pycbc_HttpResult__fetch(pycbc_HttpResult *self);
-PyObject* pycbc_HttpResult__maybe_raise(pycbc_HttpResult *self);
+typedef struct {
+    pycbc_HttpResult base;
+    lcbex_vrow_ctx_t *rctx;
+    PyObject *rows;
+    long rows_per_call;
+    char has_parse_error;
+} pycbc_ViewResult;
 
 
 enum {
@@ -448,7 +425,10 @@ enum {
     PYCBC_MRES_F_ASYNC = 1 << 5,
 
     /** This result is from a call to one of the single-item APIs */
-    PYCBC_MRES_F_SINGLE = 1 << 6
+    PYCBC_MRES_F_SINGLE = 1 << 6,
+
+    /* Hint to dispatch to the view callback functions */
+    PYCBC_MRES_F_VIEWS = 1 << 7
 };
 /**
  * Object containing the result of a 'Multi' operation. It's the same as a
@@ -612,6 +592,9 @@ extern PyTypeObject pycbc_OperationResultType;
 extern PyTypeObject pycbc_ValueResultType;
 extern PyTypeObject pycbc_HttpResultType;
 
+/* views.c */
+extern PyTypeObject pycbc_ViewResultType;
+
 /**
  * Result type check macros
  */
@@ -652,7 +635,8 @@ extern PyObject *pycbc_ExceptionType;
     X(itmopts_dict_type) \
     X(itmopts_seq_type) \
     X(fmt_auto) \
-    X(pypy_mres_factory)
+    X(pypy_mres_factory) \
+    X(view_path_helper)
 
 #define PYCBC_XHELPERS_STRS(X) \
     X(tcname_encode_key, PYCBC_TCNAME_ENCODE_KEY) \
@@ -739,6 +723,7 @@ int pycbc_TimerEventType_init(PyObject **ptr);
 int pycbc_IOEventType_init(PyObject **ptr);
 int pycbc_AsyncResultType_init(PyObject **ptr);
 int pycbc_IOPSWrapperType_init(PyObject **ptr);
+int pycbc_ViewResultType_init(PyObject **ptr);
 
 /**
  * Calls the type's constructor with no arguments:
@@ -753,8 +738,10 @@ PyObject *pycbc_result_new(pycbc_Bucket *parent);
 PyObject *pycbc_multiresult_new(pycbc_Bucket *parent);
 pycbc_ValueResult *pycbc_valresult_new(pycbc_Bucket *parent);
 pycbc_OperationResult *pycbc_opresult_new(pycbc_Bucket *parent);
-pycbc_HttpResult *pycbc_httpresult_new(pycbc_Bucket *parent);
 pycbc_Item *pycbc_item_new(pycbc_Bucket *parent);
+
+/* Not an allocator per-se, but rather an initializer */
+void pycbc_httpresult_init(pycbc_HttpResult *self, pycbc_MultiResult *parent);
 
 /* For observe info */
 pycbc_ObserveInfo * pycbc_observeinfo_new(pycbc_Bucket *parent);
@@ -763,6 +750,18 @@ pycbc_ObserveInfo * pycbc_observeinfo_new(pycbc_Bucket *parent);
  * If an HTTP result was successful or not
  */
 int pycbc_httpresult_ok(pycbc_HttpResult *self);
+
+
+/**
+ * Append data to the HTTP result
+ * @param mres The multi result
+ * @param htres The HTTP result
+ * @param bytes Data to append
+ * @param nbytes Length of data
+ */
+void
+pycbc_httpresult_add_data(pycbc_MultiResult *mres, pycbc_HttpResult *htres,
+                          const void *bytes, size_t nbytes);
 
 /**
  * Simple function, here because it's defined in result.c but needed in
@@ -808,7 +807,7 @@ void pycbc_asyncresult_invoke(pycbc_AsyncResult *mres);
  */
 void pycbc_callbacks_init(lcb_t instance);
 void pycbc_http_callbacks_init(lcb_t instance);
-
+void pycbc_views_callbacks_init(lcb_t instance);
 
 /**
  * "Real" exception handler.

@@ -1,5 +1,3 @@
-from collections import deque
-
 from gevent.event import AsyncResult, Event
 from gevent.hub import get_hub, getcurrent, Waiter
 
@@ -11,61 +9,61 @@ try:
 except ImportError:
     from gcouchbase.iops_gevent10 import IOPS
 
+
 class GView(AsyncViewBase):
     def __init__(self, *args, **kwargs):
         """
-        Subclass of :class:`~couchbase.async.view.AsyncViewBase`
-        This doesn't expose an API different from the normal synchronous
-        view API. It's just implemented differently
+        Subclass of :class:`~.AsyncViewBase`
+        This doesn't expose an API different from the normal
+        synchronous view API. It's just implemented differently
         """
         super(GView, self).__init__(*args, **kwargs)
 
         # We use __double_underscore to mangle names. This is because
         # the views class has quite a bit of data attached to it.
         self.__waiter = Waiter()
-        self.__iterbufs = deque()
+        self.__raw_rows = []
         self.__done_called = False
+        self.start()
+        self.raw.rows_per_call = 100000
 
     def raise_include_docs(self):
         # We allow include_docs in the RowProcessor
         pass
 
     def _callback(self, *args):
-        # Here we need to make sure the callback is invoked
-        # from within the context of the calling greenlet. Since
-        # we're invoked from the hub, we will need to issue more
-        # blocking calls and thus ensure we're not doing the processing
-        # from here.
-        self.__waiter.switch(args)
+        # This method overridden from the parent. Rather than do the processing
+        # on demand, we must defer it for later. This is done by copying the
+        # rows to a list. In the typical case we shouldn't accumulate all
+        # the rows in the buffer (since .switch() will typically have something
+        # waiting for us). However if the view is destroyed prematurely,
+        # or if the user is not actively iterating over us, or if something
+        # else happens (such as more rows arriving during a get request with
+        # include_docs), we simply accumulate the rows here.
+        self.__raw_rows.append(self.raw.rows)
+        if self.raw.done:
+            self._clear()
+        self.__waiter.switch()
 
-    def on_rows(self, rows):
-        self.__iterbufs.appendleft(rows)
-
-    def on_error(self, ex):
-        raise ex
-
-    def on_done(self):
-        self.__done_called = True
-
-    def __wait_rows(self):
-        """
-        Called when we need more data..
-        """
-        args = self.__waiter.get()
-        super(GView, self)._callback(*args)
+    def _errback(self, mres, *args):
+        self._clear()
+        self.__waiter.throw(*args)
 
     def __iter__(self):
         if not self._do_iter:
             raise AlreadyQueriedError.pyexc("Already queried")
 
         while self._do_iter and not self.__done_called:
-            self.__wait_rows()
-            while len(self.__iterbufs):
-                ri = self.__iterbufs.pop()
-                for r in ri:
-                    yield r
+            self.__waiter.get()
+
+            rowset_list = self.__raw_rows
+            self.__raw_rows = []
+            for rowset in rowset_list:
+                for row in self._process_payload(rowset):
+                    yield row
 
         self._do_iter = False
+
 
 class Bucket(AsyncBucket):
     def __init__(self, *args, **kwargs):
@@ -106,21 +104,22 @@ class Bucket(AsyncBucket):
 
     def _http_request(self, **kwargs):
         res = super(Bucket, self)._http_request(**kwargs)
-        if kwargs.get('chunked', False):
-            return res #views
 
-        e = Event()
-        res._callback = lambda x, y: e.set()
-
-        e.wait()
-
-        res._maybe_raise()
-        return res
+        w = Waiter()
+        res.callback = lambda x: w.switch(x)
+        res.errback = lambda x, c, o, b: w.throw(c, o, b)
+        return w.get()
 
     def query(self, *args, **kwargs):
         kwargs['itercls'] = GView
-        ret = super(Bucket, self).query(*args, **kwargs)
-        ret.start()
-        return ret
+        return super(Bucket, self).query(*args, **kwargs)
+
+    def _get_close_future(self):
+        ev = Event()
+        def _dtor_cb(*args):
+            ev.set()
+        self._dtorcb = _dtor_cb
+        return ev
+
 
     locals().update(AsyncBucket._gen_memd_wrappers(_meth_factory))

@@ -18,8 +18,11 @@
 """
 This file contains the view implementation for Async
 """
+import sys
+
 from couchbase.views.iterator import View
 from couchbase.exceptions import CouchbaseError, ArgumentError
+from couchbase._pyport import PyErr_Restore
 
 class AsyncViewBase(View):
     def __init__(self, *args, **kwargs):
@@ -33,7 +36,6 @@ class AsyncViewBase(View):
         :meth:`~couchbase.connection.Connection.query` method of the
         connection object.
         """
-        kwargs['streaming'] = True
         super(AsyncViewBase, self).__init__(*args, **kwargs)
         if self.include_docs:
             self.raise_include_docs()
@@ -46,13 +48,19 @@ class AsyncViewBase(View):
             "Include docs not supported with async views. If you "
             "must gather docs, you should do so manually")
 
-
-
     def __iter__(self):
         """
         Unlike our base class, iterating does not make sense here
         """
         raise NotImplementedError("Iteration not supported on async view")
+
+    def _start(self):
+        super(AsyncViewBase, self)._start()
+        self._mres.callback = self._callback
+        self._mres.errback = self._errback
+
+    def start(self):
+        self._start()
 
     def on_error(self, ex):
         """
@@ -84,34 +92,27 @@ class AsyncViewBase(View):
         """
         raise NotImplementedError("Must be implemented in subclass")
 
-    def _callback(self, htres, rows):
+    def _callback(self, mres):
         """
         This is invoked as the row callback.
         If 'rows' is true, then we are a row callback, otherwise
         the request has ended and it's time to collect the other data
         """
         try:
-            self._process_payload(rows)
-            if self._rp_iter:
-                self.on_rows(self._rp_iter)
-
+            rows = self._process_payload(self.raw.rows)
+            if rows:
+                self.on_rows(rows)
             if self.raw.done:
-                self.raw._maybe_raise()
                 self.on_done()
-
-        except CouchbaseError as e:
-            self.on_error(e)
-
         finally:
-            self._rp_iter = None
+            if self.raw.done:
+                self._clear()
 
-    def start(self):
-        """
-        Initiate the callbacks for this query. These callbacks will be invoked
-        until the request has completed and the :meth:`on_done`
-        method is called.
-        """
-        self._setup_streaming_request()
-        self._do_iter = True
-        self.raw._callback = self._callback
-        return self
+    def _errback(self, mres, ex_cls, ex_obj, ex_bt):
+        try:
+            PyErr_Restore(ex_cls, ex_obj, ex_bt)
+        except Exception as e:
+            self.on_error(e)
+            self.on_done()
+        finally:
+            self._clear()

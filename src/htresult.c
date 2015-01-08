@@ -54,64 +54,18 @@ HttpResult_headers(pycbc_HttpResult *self, void *unused)
     return self->headers;
 }
 
-static PyObject *
-HttpResult_done(pycbc_HttpResult *self, void *unused)
-{
-    PyObject *res;
-    /**
-     * For non-async connection handles, the 'done'-ness of the result
-     * depends on it being complete _AND_ having no outstanding rows remaining.
-     *
-     * For async handles we don't ever use fetch and we deliver rows on-demand
-     * anyway, so there is no risk of accidentally finishing the iteration
-     * if all the rows have arrived via another means (i.e. rows arriving
-     * asynchronously through a get() call, which is not inside a _fetch()
-     * call).
-     *
-     * Since those final rows are actually returned from the next _fetch(), we
-     * don't return True until they've been returned.
-     */
-    if (self->htflags & PYCBC_HTRES_F_COMPLETE) {
-        if (self->parent->flags & PYCBC_CONN_F_ASYNC) {
-            res = Py_True;
-        } else {
-            if (self->rowsbuf == NULL || PyList_Size(self->rowsbuf) == 0) {
-                res = Py_True;
-            } else {
-                res = Py_False;
-            }
-        }
-    } else {
-        res = Py_False;
-    }
-
-    Py_INCREF(res);
-    (void)unused;
-    return res;
-}
-
 static void
 HttpResult_dealloc(pycbc_HttpResult *self)
 {
-    pycbc_Bucket *parent = self->parent;
-
-    self->parent = NULL;
-
     if (self->htreq) {
-        lcb_cancel_http_request(parent->instance, self->htreq);
+        if (self->parent) {
+            lcb_cancel_http_request(self->parent->instance, self->htreq);
+        }
         self->htreq = NULL;
     }
-
     Py_XDECREF(self->http_data);
-    Py_XDECREF(parent);
     Py_XDECREF(self->headers);
-    Py_XDECREF(self->rowsbuf);
-    Py_XDECREF(self->callback);
-
-    if (self->rctx) {
-        lcbex_vrow_free(self->rctx);
-        self->rctx = NULL;
-    }
+    Py_XDECREF(self->parent);
     pycbc_Result_dealloc((pycbc_Result*)self);
 }
 
@@ -131,56 +85,26 @@ static struct PyMemberDef HttpResult_TABLE_members[] = {
                 T_OBJECT_EX, offsetof(pycbc_HttpResult, key),
                 READONLY, PyDoc_STR("HTTP URI")
         },
-
-        { "_callback",
-                T_OBJECT_EX, offsetof(pycbc_HttpResult, callback),
-                0, PyDoc_STR("Callback to be invoked with row data")
+        { "done",
+                T_BOOL, offsetof(pycbc_HttpResult, done),
+                READONLY, PyDoc_STR("If the result is done")
         },
-
-        { "_rows",
-                T_OBJECT_EX, offsetof(pycbc_HttpResult, rowsbuf),
-                READONLY, PyDoc_STR("List containing raw strings of rows")
-        },
-
-        { "rows_per_call",
-                T_LONG, offsetof(pycbc_HttpResult, rows_per_call),
-                0, PyDoc_STR("Minimum number of rows to pass to callback")
-        },
-
         { NULL }
 };
 
 static PyGetSetDef HttpResult_TABLE_getset[] = {
-        { "success",
-                (getter)HttpResult_success,
-                NULL,
+        { "success", (getter)HttpResult_success, NULL,
                 PyDoc_STR("Whether the HTTP request was successful")
         },
 
-        { "headers",
-                (getter)HttpResult_headers,
-                NULL,
-                PyDoc_STR("Headers dict for the request. "
-                        "None unless 'fetch_headers' was passed to the request")
-        },
-
-        { "done",
-                (getter)HttpResult_done,
-                NULL,
-                PyDoc_STR("Return true if this request has no more data.\n"
-                        "This is most useful when issuing a streaming request\n"
-                        "where multiple chunks of data may arrive.\n")
+        { "headers", (getter)HttpResult_headers, NULL,
+                PyDoc_STR("Headers dict for the request. ")
         },
 
         { NULL }
 };
 
 static PyMethodDef HttpResult_TABLE_methods[] = {
-        { "_fetch", (PyCFunction)pycbc_HttpResult__fetch, METH_NOARGS, NULL },
-        { "_maybe_raise",
-                (PyCFunction)pycbc_HttpResult__maybe_raise,
-                METH_NOARGS, NULL },
-
         { NULL }
 };
 
@@ -211,13 +135,11 @@ pycbc_HttpResultType_init(PyObject **ptr)
     return pycbc_ResultType_ready(p, PYCBC_HTRESULT_BASEFLDS);
 }
 
-pycbc_HttpResult *
-pycbc_httpresult_new(pycbc_Bucket *parent)
+void
+pycbc_httpresult_init(pycbc_HttpResult *self, pycbc_MultiResult *mres)
 {
-    pycbc_HttpResult* ret = (pycbc_HttpResult*)
-            PyObject_CallFunction((PyObject*)&pycbc_HttpResultType, NULL, NULL);
-    ret->parent = parent;
-    ret->http_data = PyList_New(0);
-    Py_INCREF(parent);
-    return ret;
+    PyDict_SetItem((PyObject*)mres, Py_None, (PyObject*)self);
+    Py_DECREF(self);
+    self->parent = mres->parent;
+    Py_INCREF(self->parent);
 }

@@ -119,6 +119,24 @@ class PyPyMultiResultWrap(dict):
         setattr(self._mres, name, value)
 
 
+MAX_URI_LENGTH = 2048
+
+
+def _view_path_helper(design, view, options):
+    # Assume options are already encoded!
+    ss = '_design/{0}/_view/{1}'.format(design, view)
+    post_body = ''
+    if options:
+        encoded = options.encoded
+        if len(ss) + len(encoded) > MAX_URI_LENGTH:
+            uri_options, post_body = options._long_query_encoded
+            ss += '?' + uri_options
+        else:
+            ss += '?' + encoded
+
+    return ss, post_body
+
+
 def run_init(m):
     m._init_helpers(result_reprfunc=_result__repr__,
                     fmt_utf8_flags=C.FMT_UTF8,
@@ -137,7 +155,8 @@ def run_init(m):
                     itmopts_dict_type=ItemOptionDict,
                     itmopts_seq_type=ItemSequence,
                     fmt_auto=_FMT_AUTO,
-                    pypy_mres_factory=PyPyMultiResultWrap)
+                    pypy_mres_factory=PyPyMultiResultWrap,
+                    view_path_helper=_view_path_helper)
 
 run_init(C)
 

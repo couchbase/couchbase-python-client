@@ -405,6 +405,7 @@ pycbc_asyncresult_invoke(pycbc_AsyncResult *ares)
         }
     }
 
+    Py_CLEAR(ares->base.parent);
     Py_DECREF(argtuple);
     Py_DECREF(ares);
 }

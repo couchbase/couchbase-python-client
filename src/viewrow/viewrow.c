@@ -163,8 +163,8 @@ row_pop_callback(jsonsl_t jsn,
         jsn->action_callback_PUSH = NULL;
 
         if (ctx->rowcount == 0) {
-            buffer_append(&ctx->meta_buf, ctx->current_buf.s, jsn->pos + 1);
-            ctx->header_len = jsn->pos + 1;
+            buffer_append(&ctx->meta_buf, ctx->current_buf.s, jsn->pos);
+            ctx->header_len = jsn->pos;
         }
 
         return;

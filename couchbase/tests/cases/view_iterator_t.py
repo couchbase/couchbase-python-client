@@ -94,7 +94,6 @@ class BreweryBeerRowProcessor(object):
         # Iterates over names of beers. We get them via 'get_beer'.
         self._riter = None
 
-
     def handle_rows(self, rows, connection, include_docs):
         """
         This shows an example of an efficient 'include_docs' algorithm
@@ -107,6 +106,7 @@ class BreweryBeerRowProcessor(object):
 
         # The order of the keys returned in the result set.
         retkeys = []
+        pre_included = {}
 
         for r in rows:
             if len(r['key']) == 1:
@@ -119,26 +119,29 @@ class BreweryBeerRowProcessor(object):
             if not Brewery.by_id(brewery_id):
                 breweries_to_fetch.add(brewery_id)
 
-
             if not Beer.by_id(beer_id):
                 beers_to_fetch.add(beer_id)
 
+            if r.get('__DOCRESULT__'):
+                pre_included[r['id']] = r['__DOCRESULT__']
+
         self._riter = iter(retkeys)
 
-
         if beers_to_fetch or breweries_to_fetch:
-            if not include_docs:
+            if not include_docs and not pre_included:
                 raise ValueError(
                     "Don't have all documents, but include_docs was set to False")
 
             keys_to_fetch = list(breweries_to_fetch) + list(beers_to_fetch)
+            keys_to_fetch = [x for x in keys_to_fetch if x not in pre_included]
             docs = connection.get_multi(keys_to_fetch)
+            docs.update(pre_included)
 
             for brewery in breweries_to_fetch:
-                b = Brewery(brewery, docs[brewery].value)
+                Brewery(brewery, docs[brewery].value)
 
             for beer in beers_to_fetch:
-                b = Beer(beer, docs[beer].value)
+                Beer(beer, docs[beer].value)
 
         return iter(self)
 

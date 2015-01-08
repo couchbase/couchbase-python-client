@@ -17,17 +17,12 @@
 
 from collections import namedtuple
 from copy import deepcopy
-import json
 from warnings import warn
 
 from couchbase.exceptions import ArgumentError, CouchbaseError, ViewEngineError
-from couchbase.views.params import Query, UNSPEC, make_dvpath
-from couchbase._pyport import ulp, xrange
-from couchbase.user_constants import FMT_JSON
+from couchbase.views.params import Query
 from couchbase._pyport import basestring
 import couchbase._libcouchbase as C
-
-MAX_URI_LENGTH = 2048 # Let's be safe
 
 class AlreadyQueriedError(CouchbaseError):
     """Thrown when iterating over a View which was already iterated over"""
@@ -118,34 +113,20 @@ class RowProcessor(object):
         for ret in self._riter:
             doc = None
             if self._docs is not None:
-                # We still want to go through this if we have an empty dict
-                try:
-                    doc = self._docs[ret['id']]
-                except KeyError:
-                    warn("Error encountered when executing view. "
-                         "Inspect 'errors' for more information")
+                doc = self._docs[ret['id']]
+            elif C._IMPL_INCLUDE_DOCS and '__DOCRESULT__' in ret:
+                doc = ret['__DOCRESULT__']
 
-            yield self.rowclass(ret['key'],
-                                ret['value'],
-                                # Use get, because reduce values don't have
-                                # IDs
-                                ret.get('id'),
-                                doc)
+            yield self.rowclass(ret['key'], ret['value'], ret.get('id'), doc)
 
         self._docs = None
         self._riter = None
+        self.__raw = None
 
 
 class View(object):
-    def __init__(self,
-                 parent,
-                 design,
-                 view,
-                 row_processor=None,
-                 streaming=0,
-                 include_docs=False,
-                 query=None,
-                 **params):
+    def __init__(self, parent, design, view, row_processor=None,
+                 include_docs=False, query=None, streaming=True, **params):
         """
         Construct a iterable which can be used to iterate over view query
         results.
@@ -166,13 +147,6 @@ class View(object):
             family of attributes must not be active, as results fro
             ``reduce`` views do not have corresponding
             doc IDs (as these are aggregation functions).
-
-        :param bool streaming:
-            Whether a streaming chunked request should be used. This is
-            helpful for handling the view results in small chunks rather
-            than loading the entire resultset into memory at once. By default,
-            a single request is made and the response is decoded at once. With
-            streaming enabled, rows are decoded incrementally.
 
         :param query: If set, is a :class:`~couchbase.views.params.Query`
             object. It is illegal to use this in conjunction with
@@ -244,16 +218,13 @@ class View(object):
         self.design = design
         self.view = view
         self.errors = []
-        self.raw = None
         self.rows_returned = 0
-
         self.include_docs = include_docs
         self.indexed_rows = 0
 
         if not row_processor:
             row_processor = RowProcessor()
         self.row_processor = row_processor
-        self._rp_iter = None
 
         if query and params:
             raise ArgumentError.pyexc(
@@ -268,27 +239,33 @@ class View(object):
         else:
             self._query = Query.from_any(params)
 
-        if include_docs:
-            if (self._query.reduce or
-                    self._query.group or
-                    self._query.group_level):
-
-                raise ArgumentError.pyexc("include_docs is only applicable "
-                                          "for map-only views, but 'reduce', "
-                                          "'group', or 'group_level' "
-                                          "was specified",
-                                          self._query)
+        if include_docs and self._query.reduce:
+            raise ArgumentError.pyexc(
+                "include_docs is only applicable for map-only views, but "
+                "'reduce', 'group', or 'group_level' was specified",
+                self._query)
 
         # The original 'limit' parameter, passed to the query.
-        self._streaming = streaming
         self._do_iter = True
+        self._mres = None
 
-    @property
-    def streaming(self):
+    def _start(self):
+        if self._mres:
+            return
+
+        self._mres = self._parent._view_request(
+            design=self.design, view=self.view, options=self.query,
+            include_docs=self.include_docs)
+        self.__raw = self._mres[None]
+
+    def _clear(self):
         """
-        Read-Only. Returns whether streaming is enabled for this view.
+        Clears references to other internal objects.
+
+        This is useful to break out of a reference cycle
         """
-        return self._streaming
+        del self._parent
+        del self._mres
 
     @property
     def query(self):
@@ -302,11 +279,15 @@ class View(object):
         """
         return self._query
 
+    @property
+    def raw(self):
+        return self.__raw
+
     def _handle_errors(self, errors):
         if not errors:
             return
 
-        self.errors += [ errors ]
+        self.errors += [errors]
 
         if self._query.on_error != 'continue':
             raise ViewEngineError.pyexc("Error while executing view.",
@@ -318,91 +299,21 @@ class View(object):
     def _handle_meta(self, value):
         if not isinstance(value, dict):
             return
-
         self.indexed_rows = value.get('total_rows', 0)
         self._handle_errors(value.get('errors'))
 
-    def _process_page(self, rows):
-        if not rows:
-            return
-
-        self.rows_returned += len(rows)
-
-        self._rp_iter = self.row_processor.handle_rows(rows,
-                                                       self._parent,
-                                                       self.include_docs)
-
-        # Raise exceptions early on
-        self._rp_iter = iter(self._rp_iter)
-
-    def _handle_single_view(self):
-        self.raw = self._create_raw()
-        self._process_page(self.raw.value['rows'])
-        self._handle_meta(self.raw.value)
-
-    def _create_raw(self, **kwargs):
-        """
-        Return common parameters for _libcouchbase._http_request
-        """
-        d = {
-            'type': C.LCB_HTTP_TYPE_VIEW,
-            'fetch_headers': True,
-            'quiet': False,
-            'response_format': FMT_JSON
-        }
-
-        # Figure out the path
-        qstr = self._query.encoded
-        uri = make_dvpath(self.design, self.view)
-
-        if len(uri) + len(qstr) > MAX_URI_LENGTH:
-            (uriparams, post_data) = self._query._long_query_encoded
-
-            d['method'] = C.LCB_HTTP_METHOD_POST
-            d['post_data'] = post_data
-            d['path'] = uri + uriparams
-            d['content_type'] = "application/json"
-
-        else:
-            d['method'] = C.LCB_HTTP_METHOD_GET
-            d['path'] = "{0}{1}".format(uri, qstr)
-
-
-        d.update(**kwargs)
-        return self._parent._http_request(**d)
-
-    def _setup_streaming_request(self):
-        """
-        Sets up the streaming request. This contains a streaming
-        :class:`couchbase.results.HttpResult` object
-        """
-        self.raw = self._create_raw(chunked=True)
-
     def _process_payload(self, rows):
         if rows:
-            rows = tuple(json.loads(r) for r in rows)
-            self._process_page(rows)
+            self.rows_returned += len(rows)
+            return self.row_processor.handle_rows(
+                rows, self._parent,
+                self.include_docs if not C._IMPL_INCLUDE_DOCS else False)
 
-        if self.raw.done:
+        elif self.raw.done:
             self._handle_meta(self.raw.value)
             self._do_iter = False
 
-        # No rows and nothing to iterate over?
-        elif not self._rp_iter:
-            self._rp_iter = iter([])
-
-    def _get_page(self):
-        if not self._streaming:
-            self._handle_single_view()
-            self._do_iter = False
-            return
-
-        if not self.raw:
-            self._setup_streaming_request()
-
-        # Fetch the rows:
-        rows = self.raw._fetch()
-        self._process_payload(rows)
+        return []
 
     def __iter__(self):
         """
@@ -429,15 +340,11 @@ class View(object):
                 "This object has already been executed. Create a new one to "
                 "query again")
 
+        self._start()
         while self._do_iter:
-            self._get_page()
-            if not self._rp_iter:
-                break
-
-            for r in self._rp_iter:
-                yield r
-
-            self._rp_iter = None
+            raw_rows = self.raw.fetch(self._mres)
+            for row in self._process_payload(raw_rows):
+                yield row
 
     def __repr__(self):
         details = []

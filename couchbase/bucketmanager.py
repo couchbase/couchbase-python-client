@@ -154,7 +154,7 @@ class BucketManager(object):
         ret = self._cb._http_request(
             type=_LCB.LCB_HTTP_TYPE_VIEW, path=fqname,
             method=_LCB.LCB_HTTP_METHOD_PUT, post_data=ddoc,
-            content_type="application/json", fetch_headers=True)
+            content_type="application/json")
 
         self._design_poll(name, 'add', existing, syncwait,
                           use_devmode=use_devmode)
@@ -182,8 +182,7 @@ class BucketManager(object):
         existing = self._http_request(type=_LCB.LCB_HTTP_TYPE_VIEW,
                                       path="_design/" + name,
                                       method=_LCB.LCB_HTTP_METHOD_GET,
-                                      content_type="application/json",
-                                      fetch_headers=True)
+                                      content_type="application/json")
         return existing
 
     def design_publish(self, name, syncwait=0):
@@ -250,8 +249,7 @@ class BucketManager(object):
 
         ret = self._http_request(type=_LCB.LCB_HTTP_TYPE_VIEW,
                                  path="_design/" + name,
-                                 method=_LCB.LCB_HTTP_METHOD_DELETE,
-                                 fetch_headers=True)
+                                 method=_LCB.LCB_HTTP_METHOD_DELETE)
 
         self._design_poll(name, 'del', existing, syncwait)
         return ret

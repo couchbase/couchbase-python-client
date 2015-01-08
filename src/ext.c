@@ -274,6 +274,7 @@ init_libcouchbase(void)
     X(ValueResult,      pycbc_ValueResultType_init) \
     X(MultiResult,      pycbc_MultiResultType_init) \
     X(HttpResult,       pycbc_HttpResultType_init) \
+    X(ViewResult,       pycbc_ViewResultType_init) \
     X(Transcoder,       pycbc_TranscoderType_init) \
     X(ObserveInfo,      pycbc_ObserveInfoType_init) \
     X(Item,             pycbc_ItemType_init) \
@@ -326,6 +327,9 @@ init_libcouchbase(void)
     PyModule_AddObject(m, "FMT_AUTO", pycbc_helpers.fmt_auto);
 
     pycbc_init_pyconstants(m);
+
+    /* Add various implementation specific flags */
+    PyModule_AddIntConstant(m, "_IMPL_INCLUDE_DOCS", 0);
 
 #if PY_MAJOR_VERSION >= 3
     return m;

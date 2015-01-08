@@ -407,6 +407,9 @@ PYCBC_DECL_OP(_rgetall_multi);
 /* http.c */
 PYCBC_DECL_OP(_http_request);
 
+/* views.c */
+PYCBC_DECL_OP(_view_request);
+
 /* observe.c */
 PYCBC_DECL_OP(observe);
 PYCBC_DECL_OP(observe_multi);
