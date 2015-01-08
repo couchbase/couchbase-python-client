@@ -17,32 +17,26 @@
 
 # This module contains various mappings for modules which have had
 # their names changed across Python major versions
+import sys
 
-try:
+V = sys.version_info[0]
+
+if V == 3:
     import urllib.parse as ulp
     from urllib.request import urlopen
     from urllib.parse import parse_qs
-except ImportError:
+else:
     import urllib as ulp
     from urllib2 import urlopen
     from urlparse import parse_qs
 
-try:
-    long = long
-except NameError:
-    long = int
+long = long if V == 2 else int
+xrange = xrange if V == 2 else range
+basestring = basestring if V == 2 else str
+unicode = unicode if V == 2 else str
 
-try:
-    xrange = xrange
-except NameError:
-    xrange = range
-
-try:
-    basestring = basestring
-except NameError:
-    basestring = str
-
-try:
-    unicode = unicode
-except NameError:
-    unicode = str
+if V == 2:
+    exec("def PyErr_Restore(cls, obj, bt): raise cls, obj, bt\n")
+else:
+    def PyErr_Restore(cls, obj, bt):
+        raise obj.with_traceback(bt)
