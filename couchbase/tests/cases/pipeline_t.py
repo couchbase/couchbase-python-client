@@ -19,7 +19,7 @@ from couchbase.exceptions import PipelineError, NotFoundError, ArgumentError
 from couchbase.tests.base import ConnectionTestCase
 from couchbase import FMT_UTF8
 
-class ConnectionPipelineTest(ConnectionTestCase):
+class PipelineTest(ConnectionTestCase):
 
     def test_simple_pipeline(self):
         k = self.gen_key("pipeline_test")

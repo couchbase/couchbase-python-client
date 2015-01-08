@@ -19,7 +19,7 @@ from couchbase.tests.base import ConnectionTestCase
 from couchbase.exceptions import ArgumentError, ValueFormatError
 from couchbase.user_constants import FMT_UTF8
 
-class ConnectionItertypeTest(ConnectionTestCase):
+class ItertypeTest(ConnectionTestCase):
 
     def test_itertypes(self):
         kvs = self.gen_kv_dict(amount=10, prefix='itertypes')

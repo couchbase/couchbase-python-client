@@ -20,9 +20,9 @@ from couchbase.tests.base import ConnectionTestCase
 from couchbase.exceptions import NotFoundError, TemporaryFailError
 import couchbase._libcouchbase as LCB
 
-class DupKeyTestCase(ConnectionTestCase):
+class DupKeyTest(ConnectionTestCase):
     def setUp(self):
-        super(DupKeyTestCase, self).setUp()
+        super(DupKeyTest, self).setUp()
 
     def _assertWarned(self, wlog):
         mcount = 0

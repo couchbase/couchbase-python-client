@@ -55,9 +55,9 @@ DOCS_JSON = {
     }
 }
 
-class ConnectionViewTest(ViewTestCase):
+class ViewTest(ViewTestCase):
     def setUp(self):
-        super(ConnectionViewTest, self).setUp()
+        super(ViewTest, self).setUp()
         self.skipIfMock()
         mgr = self.cb.bucket_manager()
         ret = mgr.design_create('blog', DESIGN_JSON, use_devmode=False)

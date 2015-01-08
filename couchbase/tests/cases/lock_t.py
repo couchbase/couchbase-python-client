@@ -25,7 +25,7 @@ from couchbase.exceptions import (
 from couchbase.tests.base import ConnectionTestCase
 
 
-class ConnectionLockTest(ConnectionTestCase):
+class LockTest(ConnectionTestCase):
 
     def test_simple_lock(self):
         k = self.gen_key('lock')

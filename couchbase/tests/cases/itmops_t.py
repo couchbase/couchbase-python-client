@@ -21,13 +21,13 @@ from couchbase.exceptions import (
     NotFoundError, ValueFormatError, ArgumentError, KeyExistsError)
 from couchbase.user_constants import FMT_BYTES, FMT_UTF8
 
-class ConnectionItemTest(ConnectionTestCase):
+class ItemTest(ConnectionTestCase):
     """
     This class tests the new 'Item' API
     """
 
     def setUp(self):
-        super(ConnectionItemTest, self).setUp()
+        super(ItemTest, self).setUp()
         self.skipIfPyPy()
 
     def test_construction(self):

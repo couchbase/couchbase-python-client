@@ -25,7 +25,7 @@ except NameError:
     basestring = str
 
 
-class ConnectionStatsTest(ConnectionTestCase):
+class StatsTest(ConnectionTestCase):
 
     def test_trivial_stats_without_argument(self):
         stats = self.cb.stats()

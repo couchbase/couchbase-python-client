@@ -19,7 +19,7 @@ from couchbase.exceptions import (NotFoundError, DeltaBadvalError)
 from couchbase.tests.base import ConnectionTestCase
 
 
-class ConnectionArithmeticTest(ConnectionTestCase):
+class ArithmeticTest(ConnectionTestCase):
 
     def test_trivial_incrdecr(self):
         key = self.gen_key("trivial_incrdecr")

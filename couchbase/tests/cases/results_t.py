@@ -23,7 +23,7 @@ try:
 except:
     INT_TYPES = (int,)
 
-class ConnectionResultsTest(ConnectionTestCase):
+class ResultsTest(ConnectionTestCase):
 
     def __test_oprsesult(self, rv, check_exact=True, exprc=0):
         # Ensure they can be stringified

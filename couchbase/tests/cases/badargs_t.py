@@ -23,7 +23,7 @@ from couchbase.tests.base import ConnectionTestCase
 # limitations under the License.
 #
 
-class ConnectionBadArgsTest(ConnectionTestCase):
+class BadArgsTest(ConnectionTestCase):
 
     def test_bad_single(self):
 

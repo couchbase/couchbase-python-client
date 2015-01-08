@@ -22,7 +22,7 @@ from couchbase.tests.base import ConnectionTestCase, SkipTest
 from couchbase.exceptions import ValueFormatError, ArgumentError
 from couchbase import FMT_AUTO, FMT_JSON, FMT_BYTES, FMT_UTF8, FMT_PICKLE
 
-class ConnectionFormatTest(ConnectionTestCase):
+class FormatTest(ConnectionTestCase):
 
     def test_set_autoformat(self):
         key = self.gen_key("set_autoformat")

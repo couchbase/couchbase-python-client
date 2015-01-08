@@ -18,7 +18,7 @@
 from couchbase.exceptions import (KeyExistsError, NotFoundError)
 from couchbase.tests.base import ConnectionTestCase
 
-class ConnectionDeleteTest(ConnectionTestCase):
+class DeleteTest(ConnectionTestCase):
 
     def test_trivial_delete(self):
         # Try to delete a key that exists. Ensure that the operation

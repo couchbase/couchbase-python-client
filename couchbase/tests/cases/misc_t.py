@@ -24,7 +24,7 @@ from couchbase.user_constants import FMT_JSON, FMT_AUTO, FMT_JSON, FMT_PICKLE
 from couchbase.exceptions import ClientTemporaryFailError
 from couchbase.exceptions import CouchbaseError
 
-class ConnectionMiscTest(ConnectionTestCase):
+class MiscTest(ConnectionTestCase):
 
     def test_server_nodes(self):
         nodes = self.cb.server_nodes

@@ -18,7 +18,7 @@ from couchbase.tests.base import ConnectionTestCase, MockTestCase
 from couchbase.result import ObserveInfo
 from couchbase.user_constants import OBS_MASK, OBS_FOUND, OBS_PERSISTED
 
-class ConnectionObserveTest(ConnectionTestCase):
+class ObserveTest(ConnectionTestCase):
 
     def test_single_observe(self):
         key = self.gen_key("test_single_observe")

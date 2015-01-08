@@ -26,7 +26,7 @@ from couchbase.exceptions import (KeyExistsError, ValueFormatError,
 from couchbase.tests.base import ConnectionTestCase
 
 
-class ConnectionSetTest(ConnectionTestCase):
+class UpsertTest(ConnectionTestCase):
 
     def test_trivial_set(self):
         rv = self.cb.upsert(self.gen_key(), 'value1')

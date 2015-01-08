@@ -24,7 +24,7 @@ from couchbase.exceptions import (KeyExistsError, ValueFormatError,
 from couchbase.tests.base import ConnectionTestCase
 
 
-class ConnectionAppendTest(ConnectionTestCase):
+class AppendTest(ConnectionTestCase):
 
     def test_append_prepend(self):
         key = self.gen_key("appendprepend")

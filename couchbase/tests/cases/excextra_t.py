@@ -21,7 +21,7 @@ from couchbase.tests.base import ConnectionTestCase
 # These tests try to see if the 'result' and 'all_results' appear properly
 # also verify that other documented exception fields are present
 
-class ConnectionExcExtraTest(ConnectionTestCase):
+class ExceptionsTest(ConnectionTestCase):
 
     def test_simple_excextra(self):
         exc = None

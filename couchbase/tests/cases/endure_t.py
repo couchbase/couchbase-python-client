@@ -18,7 +18,7 @@
 from couchbase.exceptions import NotFoundError, ArgumentError, TimeoutError
 from couchbase.tests.base import MockTestCase
 
-class ConnectionEndureTest(MockTestCase):
+class EndureTest(MockTestCase):
     #XXX: Require LCB 2.1.0
 
     def test_excessive(self):

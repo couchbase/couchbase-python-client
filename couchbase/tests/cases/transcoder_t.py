@@ -57,7 +57,7 @@ class MangledTranscoder(object):
     decode_value = gen_func('decode_value')
     encode_value = gen_func('encode_value')
 
-class ConnectionTranscoderTest(ConnectionTestCase):
+class TranscoderTest(ConnectionTestCase):
 
     def test_simple_transcoder(self):
         tc = TranscoderPP()

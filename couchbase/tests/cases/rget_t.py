@@ -20,9 +20,9 @@ from couchbase.exceptions import NotFoundError, ArgumentError
 from couchbase.tests.base import MockTestCase
 from couchbase.mockserver import MockControlClient
 
-class ConnectionReplicaGetTest(MockTestCase):
+class ReplicaGetTest(MockTestCase):
     def setUp(self):
-        super(ConnectionReplicaGetTest, self).setUp()
+        super(ReplicaGetTest, self).setUp()
         self.skipUnlessMock()
         self.skipLcbMin("2.0.7")
         self.mockclient = MockControlClient(self.mock.rest_port)

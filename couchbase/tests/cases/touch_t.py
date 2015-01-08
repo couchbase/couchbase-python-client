@@ -23,9 +23,9 @@ import couchbase.exceptions as E
 
 
 @attr('slow')
-class ConnectionTouchTest(ConnectionTestCase):
+class TouchTest(ConnectionTestCase):
     def setUp(self):
-        super(ConnectionTouchTest, self).setUp()
+        super(TouchTest, self).setUp()
         self.cb = self.make_connection()
 
     def test_trivial_touch(self):
