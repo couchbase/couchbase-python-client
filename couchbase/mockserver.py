@@ -109,7 +109,7 @@ class CouchbaseMock(object):
         self._setup_listener()
         args = [
             "java", "-client", "-jar", self.runpath,
-            "--port", "0",
+            "--port", "0", "--with-beer-sample",
             "--harakiri-monitor", "127.0.0.1:" + str(self.port),
             "--nodes", str(self.nodes)
         ]

@@ -28,7 +28,6 @@ from couchbase.tests.base import CouchbaseTestCase
 class AdminSimpleTest(CouchbaseTestCase):
     def setUp(self):
         super(AdminSimpleTest, self).setUp()
-        self.skipIfMock()
         self.admin = self.make_admin_connection()
 
     def tearDown(self):
@@ -71,7 +70,9 @@ class AdminSimpleTest(CouchbaseTestCase):
 
     def test_bad_auth(self):
         self.assertRaises(AuthError, Admin,
-                          'baduser', 'badpass', host=self.cluster_info.host)
+                          'baduser', 'badpass',
+                          host=self.cluster_info.host,
+                          port=self.cluster_info.port)
 
     def test_bad_host(self):
         self.assertRaises(CouchbaseNetworkError, Admin,

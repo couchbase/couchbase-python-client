@@ -37,8 +37,6 @@ class StatsTest(ConnectionTestCase):
         self.assertIsInstance(key, basestring)
         self.assertIsInstance(info, dict)
 
-
-class ConnectionStatsDetailTest(RealServerTestCase):
     def test_stats_with_argument(self):
         stats = self.cb.stats('memory')
         self.assertIsInstance(stats, dict)

@@ -56,7 +56,7 @@ class ClusterInformation(object):
         bucket = self.bucket_name
         if 'bucket' in overrides:
             bucket = overrides.pop('bucket')
-        connstr = 'http://{0}:{1}/{2}?http_urlmode=2&'.format(self.host, self.port, bucket)
+        connstr = 'http://{0}:{1}/{2}?'.format(self.host, self.port, bucket)
 
         if 'config_cache' in overrides:
             connstr += 'config_cache='
@@ -296,7 +296,7 @@ class CouchbaseTestCase(ResourcedTestCase):
         return self.cluster_info.make_connection(self.factory, **kwargs)
 
     def make_admin_connection(self):
-        return self.realserver_info.make_admin_connection()
+        return self.cluster_info.make_admin_connection()
 
     def gen_key(self, prefix=None):
         if not prefix:
@@ -378,9 +378,10 @@ class MockTestCase(ConnectionTestCase):
     def cluster_info(self):
         return self.mock_info
 
-class DDocTestCase(RealServerTestCase):
+
+class DDocTestCase(ConnectionTestCase):
     pass
 
 
-class ViewTestCase(RealServerTestCase):
+class ViewTestCase(ConnectionTestCase):
     pass
