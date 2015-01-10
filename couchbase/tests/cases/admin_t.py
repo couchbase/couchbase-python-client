@@ -33,7 +33,7 @@ class AdminSimpleTest(CouchbaseTestCase):
 
     def tearDown(self):
         super(AdminSimpleTest, self).tearDown()
-        if platform.python_implementation() != 'PyPy':
+        if self.should_check_refcount:
             rc = sys.getrefcount(self.admin)
             self.assertEqual(rc, 2)
 
