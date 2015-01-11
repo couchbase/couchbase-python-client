@@ -343,10 +343,13 @@ class ConnectionTestCase(CouchbaseTestCase):
 
     def tearDown(self):
         super(ConnectionTestCase, self).tearDown()
-        try:
-            self.checkCbRefcount()
-        finally:
-            del self.cb
+        if hasattr(self, '_implDtorHook'):
+            self._implDtorHook()
+        else:
+            try:
+                self.checkCbRefcount()
+            finally:
+                del self.cb
 
 
 class RealServerTestCase(ConnectionTestCase):
