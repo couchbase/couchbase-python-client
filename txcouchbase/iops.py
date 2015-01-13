@@ -38,6 +38,7 @@ class TxTimer(TimerEvent):
     __slots__ = ['_txev', 'lcb_active']
 
     def __init__(self):
+        super(TxTimer, self).__init__()
         self.lcb_active = False
         self._txev = None
 
