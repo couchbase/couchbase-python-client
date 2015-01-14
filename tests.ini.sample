@@ -20,6 +20,6 @@ enabled = True
 ; Set this to enabled to use the mock
 enabled = True
 ; Local path for the mock
-path = /tmp/CouchbaseMock-0.6-SNAPSHOT.jar
+path = /tmp/CouchbaseMock-1.0.0-g50cf222.jar
 ; Where to download it, if not available
-url = http://files.couchbase.com/maven2/org/couchbase/mock/CouchbaseMock/0.6-SNAPSHOT/CouchbaseMock-0.6-20130903.160518-3.jar
+url = http://packages.coucbase.com/clients/c/mock/CouchbaseMock-LATEST.jar

@@ -5,18 +5,13 @@ admin_username = Administrator
 
 ; The administrative password. This is the password used to
 ; log into the admin console
-admin_password = 123456
+admin_password = password
 
-bucket_prefix = default
+bucket_name = default
 ; If a SASL bucket is being used (i.e. buckets are set up
 ; per the script, then this is the *bucket* password
 ; bucket_password sasl_password
 bucket_password =
-
-; If using an existing cluster with the simple 'default' bucket,
-; set this to False. If your cluster was set up with the 'setup_tests.py'
-; script, you may set this to True
-extra_buckets = False
 
 ; Set this to true if there is a real cluster available
 enabled = False
@@ -27,4 +22,4 @@ enabled = True
 ; Local path for the mock
 path = CouchbaseMock.jar
 ; Where to download it, if not available
-url = http://files.couchbase.com/maven2/org/couchbase/mock/CouchbaseMock/0.6-SNAPSHOT/CouchbaseMock-0.6-20130903.160518-3.jar
+url = http://packages.couchbase.com/clients/c/mock/CouchbaseMock-LATEST.jar
