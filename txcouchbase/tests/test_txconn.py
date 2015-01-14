@@ -61,6 +61,7 @@ class BasicConnectionTest(gen_base(ConnectionTestCase)):
         s = self.make_connargs()['connection_string']
         cb = Bucket(s)
         d = cb.connect().addCallback(lambda x: self.assertTrue(cb.connected))
+        self.register_cleanup(cb)
         return d
 
     def testConnectionDestroyed(self):

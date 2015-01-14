@@ -27,6 +27,11 @@ def gen_base(basecls):
             obj.registerDeferred('_dtor', d)
             self.addCleanup(lambda x: d, None)
 
+            # Add another callback (invoked _outside_ of C) to ensure
+            # the instance's destroy function is properly triggered
+            if hasattr(obj, '_async_shutdown'):
+                self.addCleanup(obj._async_shutdown)
+
         def make_connection(self, **kwargs):
             ret = super(_TxTestCase, self).make_connection(**kwargs)
             self.register_cleanup(ret)
@@ -41,7 +46,6 @@ def gen_base(basecls):
 
         def setUp(self):
             super(_TxTestCase, self).setUp()
-            self.register_cleanup(self.cb)
             self.cb = None
 
         def tearDown(self):
