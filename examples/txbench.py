@@ -77,7 +77,7 @@ class Runner(object):
         self.start()
 
     def _schedule_raw(self, *args):
-        opres = self.cb.upsert(self.key, self.value, format=FMT_BYTES)
+        opres = self.cb.upsert_multi(self.kv, format=FMT_BYTES)
         opres.callback = self._schedule_raw
         self.opcount += 1
 
