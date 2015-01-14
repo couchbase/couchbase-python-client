@@ -1378,3 +1378,29 @@ class Bucket(_Base):
         _depr('design_delete', 'bucket_manager().design_delete')
         return self.bucket_manager().design_delete(*args, **kwargs)
 
+    def flush(self):
+        """
+        Clears the bucket's contents.
+
+        .. note::
+
+            This functionality requires that the flush option be
+            enabled for the bucket by the cluster administrator. You
+            can enable flush on the bucket using the administrative
+            console (See http://docs.couchbase.com/admin/admin/UI/ui-data-buckets.html)
+
+        .. note::
+
+            This is a destructive operation, as it will clear all the
+            data from the bucket.
+
+        .. note::
+
+            A successful execution of this method means that the bucket
+            will have started the flush process. This does not
+            necessarily mean that the bucket is actually empty.
+        """
+        path = '/pools/default/buckets/{0}/controller/doFlush'
+        path = path.format(self.bucket)
+        return self._http_request(type=_LCB.LCB_HTTP_TYPE_MANAGEMENT,
+                                  path=path, method=_LCB.LCB_HTTP_METHOD_POST)
