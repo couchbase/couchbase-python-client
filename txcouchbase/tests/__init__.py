@@ -16,7 +16,6 @@
 
 from couchbase.tests.base import SkipTest
 import sys
-import platform
 
 vi = sys.version_info
 if vi[0] == 3:
@@ -28,6 +27,3 @@ try:
 except:
     raise SkipTest("Twisted not found")
 
-
-if platform.python_implementation() == 'PyPy':
-    raise SkipTest("Twisted/Async not supported on PyPy")
