@@ -322,7 +322,7 @@ pycbc_multiresult_maybe_raise(pycbc_MultiResult *self)
      */
 
     if (PyObject_IsInstance(value, pycbc_helpers.default_exception)) {
-        PyObject_SetAttrString(value, "all_results", pycbc_multiresult_wrap(self));
+        PyObject_SetAttrString(value, "all_results", (PyObject*)self);
         Py_XDECREF(self->exceptions);
     }
     Py_XDECREF(self->errop);
@@ -340,7 +340,7 @@ pycbc_multiresult_get_result(pycbc_MultiResult *self)
     PyObject *key, *value;
 
     if (!(self->mropts & PYCBC_MRES_F_SINGLE)) {
-        PyObject *res = pycbc_multiresult_wrap(self);
+        PyObject *res = (PyObject *)self;
         Py_INCREF(res);
         return res;
     }

@@ -92,11 +92,15 @@ SOURCEMODS = [
         os.path.join('contrib', 'jsonsl', 'jsonsl')
         ]
 
-if platform.python_implementation() == 'PyPy':
-    SOURCEMODS.append('pypy-compat')
-
-extoptions['sources'] = [ os.path.join("src", m + ".c") for m in SOURCEMODS ]
-module = Extension('couchbase._libcouchbase', **extoptions)
+if platform.python_implementation() != 'PyPy':
+    extoptions['sources'] = [ os.path.join("src", m + ".c") for m in SOURCEMODS ]
+    module = Extension('couchbase._libcouchbase', **extoptions)
+    setup_kw = {'ext_modules': [module]}
+else:
+    warnings.warn('The C extension libary does not work on PyPy. '
+            'You should install the couchbase_ffi module. Installation of this '
+            'module will continue but will be unusable without couchbase_ffi')
+    setup_kw = {}
 
 setup(
     name = 'couchbase',
@@ -122,7 +126,6 @@ setup(
         "Topic :: Software Development :: Libraries",
         "Topic :: Software Development :: Libraries :: Python Modules"],
 
-    ext_modules = [module],
     packages = [
         'couchbase',
         'couchbase.views',
@@ -135,5 +138,6 @@ setup(
     ],
     package_data = pkgdata,
     tests_require = [ 'nose', 'testresources>=0.2.7' ],
-    test_suite = 'couchbase.tests.test_sync'
+    test_suite = 'couchbase.tests.test_sync',
+    **setup_kw
 )

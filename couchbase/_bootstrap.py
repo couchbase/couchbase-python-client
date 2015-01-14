@@ -106,19 +106,6 @@ class FMT_AUTO_object_not_a_number(object):
 _FMT_AUTO = FMT_AUTO_object_not_a_number()
 
 
-class PyPyMultiResultWrap(dict):
-    def __init__(self, mres, d):
-        super(PyPyMultiResultWrap, self).__init__()
-        self.update(d)
-        object.__setattr__(self, '_mres', mres)
-
-    def __getattr__(self, name):
-        return getattr(self._mres, name)
-
-    def __setattr__(self, name, value):
-        setattr(self._mres, name, value)
-
-
 MAX_URI_LENGTH = 2048
 
 
@@ -155,7 +142,6 @@ def run_init(m):
                     itmopts_dict_type=ItemOptionDict,
                     itmopts_seq_type=ItemSequence,
                     fmt_auto=_FMT_AUTO,
-                    pypy_mres_factory=PyPyMultiResultWrap,
                     view_path_helper=_view_path_helper)
 
 run_init(C)

@@ -30,16 +30,9 @@
 
 #include <pythread.h>
 #include "viewrow/viewrow.h"
-
-#ifdef PYPY_VERSION
-#include "pypy-compat.h"
-#define PYCBC_REFCNT_ASSERT(x)
-#else
-#define PYCBC_REFCNT_ASSERT pycbc_assert
-#define pycbc_multiresult_wrap(mres) (PyObject *)(mres)
-#endif
-
 #include "mresdict.h"
+
+#define PYCBC_REFCNT_ASSERT pycbc_assert
 
 /**
  * See http://docs.python.org/2/c-api/arg.html for an explanation of this
@@ -635,7 +628,6 @@ extern PyObject *pycbc_ExceptionType;
     X(itmopts_dict_type) \
     X(itmopts_seq_type) \
     X(fmt_auto) \
-    X(pypy_mres_factory) \
     X(view_path_helper)
 
 #define PYCBC_XHELPERS_STRS(X) \

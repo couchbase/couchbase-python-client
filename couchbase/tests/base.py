@@ -283,12 +283,6 @@ class CouchbaseTestCase(ResourcedTestCase):
     def skipUnlessMock(self):
         pass
 
-    def skipIfPyPy(self):
-        import platform
-        if platform.python_implementation() == 'PyPy':
-            raise SkipTest("PyPy not supported here..")
-
-
     def make_connargs(self, **overrides):
         return self.cluster_info.make_connargs(**overrides)
 

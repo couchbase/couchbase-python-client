@@ -25,6 +25,3 @@ from couchbase._libcouchbase import (
     MultiResult,
     ObserveInfo,
     AsyncResult)
-
-if python_implementation() == 'PyPy':
-    from couchbase._bootstrap import PyPyMultiResultWrap as MultiResult

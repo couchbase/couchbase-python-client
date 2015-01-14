@@ -28,7 +28,6 @@ class ItemTest(ConnectionTestCase):
 
     def setUp(self):
         super(ItemTest, self).setUp()
-        self.skipIfPyPy()
 
     def test_construction(self):
         # Test whether we can construct a simple Item

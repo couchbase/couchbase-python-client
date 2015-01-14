@@ -640,7 +640,7 @@ Bucket__init__(pycbc_Bucket *self,
         return -1;
     }
 
-#if defined(WITH_THREAD) && !defined(PYPY_VERSION)
+#if defined(WITH_THREAD)
     if (!self->unlock_gil) {
         self->lockmode = PYCBC_LOCKMODE_NONE;
     }

@@ -24,7 +24,6 @@ from couchbase.iops.select import SelectIOPS
 class IopsTest(CouchbaseTestCase):
     def setUp(self):
         super(IopsTest, self).setUp()
-        self.skipIfPyPy()
 
     def _iops_connection(self, **kwargs):
         return self.make_connection(_iops=SelectIOPS(), **kwargs)
