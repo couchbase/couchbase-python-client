@@ -23,6 +23,7 @@ from couchbase.exceptions import ArgumentError, CouchbaseError, ViewEngineError
 from couchbase.views.params import Query
 from couchbase._pyport import basestring
 import couchbase._libcouchbase as C
+from couchbase._bootstrap import MAX_URI_LENGTH
 
 class AlreadyQueriedError(CouchbaseError):
     """Thrown when iterating over a View which was already iterated over"""
