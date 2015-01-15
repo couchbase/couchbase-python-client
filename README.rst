@@ -7,6 +7,13 @@ Client for Couchbase_.
 .. image:: https://travis-ci.org/couchbase/couchbase-python-client.png
     :target: https://travis-ci.org/couchbase/couchbase-python-client
 
+
+.. note::
+
+    This is the documentation for the 2.x version of the client. This is
+    mostly compatible with the older version. Please refer to the
+    *release12* branch for the older version.
+
 -----------------------
 Building and Installing
 -----------------------
@@ -19,12 +26,20 @@ Also note that these instructions apply to building from source.
 You can always get the latest supported release version from
 `PyPi <http://pypi.python.org/pypi/couchbase>`_
 
+
+If you have a recent version of *pip*, you may use the latest development
+version by issuing the following incantation
+
+.. code-block:: sh
+
+    pip install git+git://github.com/couchbase/couchbase-python-client
+
 ~~~~~~~~~~~~~
 Prerequisites
 ~~~~~~~~~~~~~
 
 - Couchbase Server (http://couchbase.com/download)
-- libcouchbase_. version 2.1.0 or greater (Bundled in Windows installer)
+- libcouchbase_. version 2.4.0 or greater (Bundled in Windows installer)
 - libcouchbase development files.
 - Python development files
 - A C compiler.
@@ -32,6 +47,9 @@ Prerequisites
 ~~~~~~~~
 Building
 ~~~~~~~~
+
+The following will compile the module locally; you can then test basic
+functionality including running the examples.
 
 .. code-block:: sh
 
@@ -49,16 +67,23 @@ If your libcouchbase install is in an alternate location (for example,
 
 Or you can modify the environment ``CFLAGS`` and ``LDFLAGS`` variables.
 
-.. _windowsbuilds:
 
-~~~~~~~~~~~~~~~~~
-Windows Snapshots
-~~~~~~~~~~~~~~~~~
+.. warning::
 
-A list of recent snapshot builds for Windows may be found
-`here <http://packages.couchbase.com/clients/python/snapshots>`.
+    If you do not intend to install this module, ensure you set the
+    ``PYTHONPATH`` environment variable to this directory before running
+    any scripts depending on it. Failing to do so may result in your script
+    running against an older version of this module (if installed), or
+    throwing an exception stating that the ``couchbase`` module could not
+    be found.
 
-You can always get release binaries from PyPi (as above).
+
+^^^^^^^^^^
+Installing
+^^^^^^^^^^
+.. code-block:: sh
+
+    python setup.py install
 
 -----
 Using
@@ -148,15 +173,29 @@ The API functions exactly like the normal Bucket API, except that the
 implementation is significantly different.
 
 
+~~~~
+PyPy
+~~~~
+
+`PyPy<http://pypy.org>`_ is an alternative high performance Python
+implementation. Since PyPy does not work well with C extension modules,
+this module will not work directly. You may refer to the alternate
+implementation based on the *cffi* module: https://github.com/couchbaselabs/couchbase-python-cffi
+
 ~~~~~~~~~~~~~~
 Other Examples
 ~~~~~~~~~~~~~~
 
-There are other examples in the `examples` directory.
+There are other examples in the `examples` directory. To run them from the
+source tree, do something like
 
----------------------
-Building documentaion
----------------------
+.. code-block:: sh
+
+    PYTHONPATH=$PWD ./examples/bench.py -U couchbase://localhost/default
+
+----------------------
+Building documentation
+----------------------
 
 
 The documentation is using Sphinx and also needs the numpydoc Sphinx extension.
