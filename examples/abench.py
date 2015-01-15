@@ -15,17 +15,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
 try:
     import asyncio
 except ImportError:
-    import trollius as asyncio
+    import trollius
+    asyncio = trollius
 
 import argparse
-from time import sleep, time
+from time import time
 
 
 from couchbase.user_constants import FMT_BYTES
+from couchbase.experimental import enable; enable()
 from acouchbase.bucket import Bucket
 
 ap = argparse.ArgumentParser()
@@ -48,8 +49,6 @@ ap.add_argument('--ksize', default=12, type=int,
 
 ap.add_argument('--vsize', default=128, type=int,
                 help="Value size to use")
-ap.add_argument('--iops', default=None, type=str,
-                help="Use Pure-Python IOPS plugin")
 ap.add_argument('-g', '--global-instance',
                 help="Use global instance", default=False,
                 action='store_true')
@@ -58,17 +57,18 @@ ap.add_argument('--batch', '-N', type=int, help="Batch size", default=1)
 options = ap.parse_args()
 
 GLOBAL_INSTANCE = None
-CONN_OPTIONS = {
-        "connstr": options.connstr
-}
+CONN_OPTIONS = {'connstr': options.connstr}
+
 
 def make_instance():
+    global GLOBAL_INSTANCE
     if options.global_instance:
         if not GLOBAL_INSTANCE:
             GLOBAL_INSTANCE = Bucket(**CONN_OPTIONS)
         return GLOBAL_INSTANCE
     else:
         return Bucket(**CONN_OPTIONS)
+
 
 class Worker(object):
     def __init__(self):
@@ -82,17 +82,32 @@ class Worker(object):
         self.wait_time = 0
         self.opcount = 0
 
-    @asyncio.coroutine
-    def run(self):
-        self.end_time = time() + options.duration
-        cb = make_instance()
-        yield from (cb.connect())
+    try:
+        exec('''
+@asyncio.coroutine
+def run(self):
+    self.end_time = time() + options.duration
+    cb = make_instance()
+    yield from cb.connect()
 
-        while time() < self.end_time:
-            begin_time = time()
-            yield from (cb.upsert_multi(self.kv, format=FMT_BYTES))
-            self.wait_time += time() - begin_time
-            self.opcount += options.batch
+    while time() < self.end_time:
+        begin_time = time()
+        yield from cb.upsert_multi(self.kv, format=FMT_BYTES)
+        self.wait_time += time() - begin_time
+        self.opcount += options.batch
+    ''')
+    except SyntaxError:
+        @asyncio.coroutine
+        def run(self):
+            self.end_time = time() + options.duration
+            cb = make_instance()
+            yield trollius.From(cb.connect())
+
+            while time() < self.end_time:
+                begin_time = time()
+                yield trollius.From(cb.upsert_multi(self.kv, format=FMT_BYTES))
+                self.wait_time += time() - begin_time
+                self.opcount += options.batch
 
 global_begin = None
 tasks = []

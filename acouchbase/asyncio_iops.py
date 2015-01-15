@@ -8,8 +8,10 @@ from couchbase.iops.base import (
     LCB_RW_EVENT, PYCBC_EVACTION_WATCH, PYCBC_EVACTION_UNWATCH
 )
 
+
 class AsyncioTimer(TimerEvent):
     def __init__(self):
+        super(AsyncioTimer, self).__init__()
         self._ashandle = None
 
     def cancel(self):
@@ -50,7 +52,8 @@ class IOPS(object):
         timer.cancel()
         if action == PYCBC_EVACTION_UNWATCH:
             return
-        timer.schedule(self.loop, usecs)
+        elif action == PYCBC_EVACTION_WATCH:
+            timer.schedule(self.loop, usecs)
 
     def start_watching(self):
         pass

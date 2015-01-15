@@ -5,6 +5,7 @@ except ImportError:
 
 from acouchbase.asyncio_iops import IOPS
 from couchbase.async.bucket import AsyncBucket
+from couchbase.experimental import enabled_or_raise; enabled_or_raise()
 
 
 class Bucket(AsyncBucket):
@@ -16,7 +17,7 @@ class Bucket(AsyncBucket):
         cft = asyncio.Future(loop=loop)
         def ftresult(err):
             if err:
-                cft.set_exception(cfg)
+                cft.set_exception(err)
             else:
                 cft.set_result(True)
 
