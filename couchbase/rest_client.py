@@ -661,10 +661,11 @@ class RestConnection(object):
         #get all the buckets
         buckets = []
         api = '%s%s' % (self.baseUrl, 'pools/default/buckets/')
-
         status, content = self._http_request(api)
-
-        json_parsed = json.loads(content)
+        try:
+            json_parsed = json.loads(content)
+        except:
+            log.error("load json exception")
 
         if status:
             for item in json_parsed:
@@ -1157,7 +1158,10 @@ class RestParser(object):
         if 'diskFetches' in stats:
             bucketStats.diskFetches = stats['diskFetches']
         bucketStats.itemCount = stats['itemCount']
-        bucketStats.diskUsed = stats['diskUsed']
+        if bucket.type == "membase":
+            bucketStats.diskUsed = stats['diskUsed']
+        else:
+            bucketStats.diskUsed = 0
         bucketStats.memUsed = stats['memUsed']
         quota = parsed['quota']
         bucketStats.ram = quota['ram']
