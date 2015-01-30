@@ -455,6 +455,7 @@ static PyMethodDef Bucket_TABLE_methods[] = {
 
         OPFUNC(_http_request, "Internal routine for HTTP requests"),
         OPFUNC(_view_request, "Internal routine for view requests"),
+        OPFUNC(_n1ql_query, "Internal routine for N1QL queries"),
 
         OPFUNC(observe, "Get replication/persistence status for keys"),
         OPFUNC(observe_multi, "multi-key variant of observe"),

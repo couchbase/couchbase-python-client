@@ -282,6 +282,7 @@ init_libcouchbase(void)
     X(IOEvent,          pycbc_IOEventType_init) \
     X(TimerEvent,       pycbc_TimerEventType_init) \
     X(AsyncResult,      pycbc_AsyncResultType_init) \
+    X(_N1QLParams,      pycbc_N1QLParamsType_init) \
     X(_IOPSWrapper,     pycbc_IOPSWrapperType_init)
 
 #define X(name, inf) PyObject *cls_##name;

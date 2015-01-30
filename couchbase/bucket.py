@@ -28,6 +28,7 @@ from couchbase.bucketmanager import BucketManager
 import couchbase.exceptions as exceptions
 from couchbase.views.params import make_dvpath, make_options_string
 from couchbase.views.iterator import View
+from couchbase.n1ql import N1QLQuery, N1QLRequest
 from couchbase._pyport import basestring
 
 
@@ -1177,6 +1178,21 @@ class Bucket(_Base):
         """
         design = self._mk_devmode(design, use_devmode)
         return itercls(self, design, view, **kwargs)
+
+    def n1ql_query(self, query, **kwargs):
+        """
+        Execute a N1QL query.
+
+        :param query: The query to execute. This may either be a
+            :class:`.N1QLQuery` object, or a string (which will be
+            implicitly converted to one).
+        :param kwargs: Arguments for :class:`.N1QLRequest`.
+        :return: An iterator which yields rows. The returned
+        """
+        if not isinstance(query, N1QLQuery):
+            query = N1QLQuery(query)
+
+        return N1QLRequest(query, self, **kwargs)
 
     def __repr__(self):
         return ('<{modname}.{cls} bucket={bucket}, nodes={nodes} at 0x{oid:x}>'

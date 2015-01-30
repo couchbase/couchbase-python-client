@@ -414,4 +414,7 @@ PYCBC_DECL_OP(_view_request);
 PYCBC_DECL_OP(observe);
 PYCBC_DECL_OP(observe_multi);
 
+/* n1ql.c */
+PYCBC_DECL_OP(_n1ql_query);
+
 #endif /* PYCBC_OPUTIL_H */
