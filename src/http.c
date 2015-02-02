@@ -18,16 +18,16 @@
 #include "oputil.h"
 
 static void
-get_headers(pycbc_HttpResult *htres, const lcb_http_resp_t * resp)
+get_headers(pycbc_HttpResult *htres, const char * const *headers)
 {
     const char * const *p;
     htres->headers = PyDict_New();
 
-    if (!resp->v.v0.headers) {
+    if (!headers) {
         return;
     }
 
-    for (p = resp->v.v0.headers; *p; p += 2) {
+    for (p = headers; *p; p += 2) {
         PyObject *hval = pycbc_SimpleStringZ(p[1]);
         PyDict_SetItemString(htres->headers, p[0], hval);
         Py_DECREF(hval);
@@ -65,6 +65,7 @@ decode_data(pycbc_MultiResult *mres, pycbc_HttpResult *htres)
     const void *data;
     Py_ssize_t ndata;
     PyObject *tmp;
+    int is_success = 1;
 
     if (!format) {
         /* Already bytes */
@@ -77,58 +78,59 @@ decode_data(pycbc_MultiResult *mres, pycbc_HttpResult *htres)
         return;
     }
 
+
     if (htres->htcode < 200 || htres->htcode > 299) {
         /* Not a successful response. */
-        return;
+        is_success = 0;
     }
+
+    /* Handle cases where we already have a failure. In this case failure should
+     * be for the actual content or HTTP code, rather than on encoding. */
+    #define MAYBE_ADD_ERR() \
+        if (is_success) { pycbc_multiresult_adderr(mres); } \
+        else { PyErr_Clear(); }
+
 
     rv = PyBytes_AsStringAndSize(htres->http_data, (char**)&data, &ndata);
     if (rv != 0) {
-        pycbc_multiresult_adderr(mres);
+        MAYBE_ADD_ERR();
         return;
     }
     rv = pycbc_tc_simple_decode(&tmp, data, ndata, format);
     if (rv != 0) {
-        pycbc_multiresult_adderr(mres);
+        MAYBE_ADD_ERR();
         return;
     }
+    #undef MAYBE_ADD_ERR
+
     Py_DECREF(htres->http_data);
     htres->http_data = tmp;
 }
 
-#define HTTP_IS_OK(resp) \
-            ((resp)->v.v0.status > 199 && resp->v.v0.status < 300)
+#define HTTP_IS_OK(st) (st > 199 && st < 300)
 
-static void
-complete_callback(lcb_http_request_t req, lcb_t instance, const void *cookie,
-                  lcb_error_t err, const lcb_http_resp_t *resp)
+void
+pycbc_httpresult_complete(pycbc_HttpResult *htres, pycbc_MultiResult *mres,
+                          lcb_error_t err, short status,
+                          const char * const *headers)
 {
-    pycbc_MultiResult *mres;
-    pycbc_Bucket *bucket;
-    pycbc_HttpResult *htres;
     int should_raise = 0;
+    pycbc_Bucket *bucket = htres->parent;
 
-    /* Expensive, but necessary */
-    mres = (pycbc_MultiResult *)cookie;
-    bucket = mres->parent;
+    if (htres->rc == LCB_SUCCESS) {
+        htres->rc = err;
+    }
 
-    PYCBC_CONN_THR_END(bucket);
-
-    htres = (pycbc_HttpResult*)PyDict_GetItem((PyObject*)mres, Py_None);
-    htres->rc = err;
-    htres->htcode = resp->v.v0.status;
+    htres->htcode = status;
     htres->done = 1;
     htres->htreq = NULL;
     Py_XDECREF(htres->parent);
     htres->parent = NULL;
 
-    get_headers(htres, resp);
-    pycbc_httpresult_add_data(mres, htres, resp->v.v0.bytes, resp->v.v0.nbytes);
-    decode_data(mres, htres);
-
     if (err != LCB_SUCCESS) {
         should_raise = 1;
-    } else if (!HTTP_IS_OK(resp) && (mres->mropts & PYCBC_MRES_F_QUIET) == 0) {
+    } else if (status && !HTTP_IS_OK(status) &&
+            (mres->mropts & PYCBC_MRES_F_QUIET) == 0) {
         should_raise = 1;
     }
 
@@ -138,6 +140,9 @@ complete_callback(lcb_http_request_t req, lcb_t instance, const void *cookie,
                           "full result", htres->key, (PyObject*)htres);
         pycbc_multiresult_adderr(mres);
     }
+
+    get_headers(htres, headers);
+    decode_data(mres, htres);
 
     if ((bucket->flags & PYCBC_CONN_F_ASYNC) == 0) {
         if (!bucket->nremaining) {
@@ -151,7 +156,26 @@ complete_callback(lcb_http_request_t req, lcb_t instance, const void *cookie,
         pycbc_asyncresult_invoke(ares);
         /* We don't handle the GIL in async mode */
     }
+}
 
+static void
+complete_callback(lcb_http_request_t req, lcb_t instance, const void *cookie,
+                  lcb_error_t err, const lcb_http_resp_t *resp)
+{
+    pycbc_MultiResult *mres;
+    pycbc_Bucket *bucket;
+    pycbc_HttpResult *htres;
+    mres = (pycbc_MultiResult *)cookie;
+    bucket = mres->parent;
+
+    PYCBC_CONN_THR_END(bucket);
+
+    htres = (pycbc_HttpResult*)PyDict_GetItem((PyObject*)mres, Py_None);
+    pycbc_httpresult_add_data(mres, htres, resp->v.v0.bytes, resp->v.v0.nbytes);
+    pycbc_httpresult_complete(htres, mres, err,
+                              resp->v.v0.status, resp->v.v0.headers);
+
+    /* CONN_THR_BEGIN called by httpresult_complete() */
     (void)instance; (void)req;
 }
 

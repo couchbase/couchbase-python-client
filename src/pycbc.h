@@ -756,6 +756,53 @@ pycbc_httpresult_add_data(pycbc_MultiResult *mres, pycbc_HttpResult *htres,
                           const void *bytes, size_t nbytes);
 
 /**
+ * Signal completion of an HTTP result.
+ *
+ * @param htres The HTTP result (Python)
+ * @param mres The MultiResult object
+ * @param err Error code (for the HTTP operation)
+ * @param status The status code
+ * @param headers The headers
+ */
+void
+pycbc_httpresult_complete(pycbc_HttpResult *htres, pycbc_MultiResult *mres,
+                          lcb_error_t err, short status,
+                          const char * const *headers);
+
+/**
+ * Add more data to the view's row list.
+ *
+ * This function will attempt to parse the data as JSON, and store an appropriate
+ * error code otherwise.
+ *
+ * @param vres The ViewResult object
+ * @param mres The MultiResult object
+ * @param data Buffer
+ * @param n Length of buffer
+ */
+void
+pycbc_viewresult_addrow(pycbc_ViewResult *vres, pycbc_MultiResult *mres,
+                        const void *data, size_t n);
+
+/**
+ * Attempt to notify the relevant callbacks for new data, if the constraints
+ * allow it.
+ *
+ * This will invoke the callback in asynchronous mode, and will break
+ * the event loop
+ *
+ * @param vres The ViewResult
+ * @param mres The MultiResult
+ * @param bucket The Bucket
+ * @param force_callback whether the async callback should be forcefully invoked,
+ * ignoring the rows_per_call setting (usually only required on error or when
+ * there are no more rows).
+ */
+void
+pycbc_viewresult_step(pycbc_ViewResult *vres, pycbc_MultiResult *mres,
+                      pycbc_Bucket *bucket, int force_callback);
+
+/**
  * Simple function, here because it's defined in result.c but needed in
  * opresult.c
  */

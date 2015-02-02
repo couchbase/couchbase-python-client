@@ -3,9 +3,9 @@
 #include "structmember.h"
 
 static int
-should_call_async(const pycbc_ViewResult *vres, const lcbex_vrow_datum_t *rd)
+should_call_async(const pycbc_ViewResult *vres, int flush_always)
 {
-    if (rd->type == LCBEX_VROW_ROW) {
+    if (!flush_always) {
         return vres->rows_per_call > -1 &&
                 PyList_GET_SIZE(vres->rows) > vres->rows_per_call;
     } else {
@@ -13,42 +13,29 @@ should_call_async(const pycbc_ViewResult *vres, const lcbex_vrow_datum_t *rd)
     }
 }
 
-static void
-row_callback(lcbex_vrow_ctx_t *rctx, const void *cookie,
-             const lcbex_vrow_datum_t *row)
+void
+pycbc_viewresult_addrow(pycbc_ViewResult *vres, pycbc_MultiResult *mres,
+                        const void *data, size_t n)
 {
-    pycbc_MultiResult *mres = (pycbc_MultiResult*)cookie;
-    pycbc_Bucket *bucket = mres->parent;
-    pycbc_ViewResult *vres = (pycbc_ViewResult *)
-            PyDict_GetItem((PyObject*)mres, Py_None);
+    PyObject *j;
+    int rv;
 
-    if (row->type == LCBEX_VROW_ROW) {
-        PyObject *j;
-        int rv;
-
-        rv = pycbc_tc_simple_decode(&j, row->data, row->ndata, PYCBC_FMT_JSON);
-        if (rv != 0) {
-            pycbc_multiresult_adderr(mres);
-            pycbc_tc_simple_decode(&j, row->data, row->ndata, PYCBC_FMT_BYTES);
-        }
-
-        PyList_Append(vres->rows, j);
-        Py_DECREF(j);
-
-    } else if (row->type == LCBEX_VROW_COMPLETE) {
-        pycbc_httpresult_add_data(mres, &vres->base, row->data, row->ndata);
-
-    } else if (row->type == LCBEX_VROW_ERROR) {
-        if (!vres->has_parse_error) {
-            PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR,
-                           LCB_PROTOCOL_ERROR, "Couldn't parse row");
-            vres->has_parse_error = 1;
-        }
+    rv = pycbc_tc_simple_decode(&j, data, n, PYCBC_FMT_JSON);
+    if (rv != 0) {
         pycbc_multiresult_adderr(mres);
-        pycbc_httpresult_add_data(mres, &vres->base, row->data, row->ndata);
+        pycbc_tc_simple_decode(&j, data, n, PYCBC_FMT_BYTES);
     }
 
-    if ((bucket->flags & PYCBC_CONN_F_ASYNC) && should_call_async(vres, row)) {
+    PyList_Append(vres->rows, j);
+    Py_DECREF(j);
+}
+
+void
+pycbc_viewresult_step(pycbc_ViewResult *vres, pycbc_MultiResult *mres,
+                      pycbc_Bucket *bucket, int force_callback)
+{
+    if ((bucket->flags & PYCBC_CONN_F_ASYNC) &&
+            should_call_async(vres, force_callback)) {
         pycbc_AsyncResult *ares = (pycbc_AsyncResult*)mres;
         PyObject *args = PyTuple_Pack(1, mres);
         PyObject *result;
@@ -70,6 +57,33 @@ row_callback(lcbex_vrow_ctx_t *rctx, const void *cookie,
     if (!bucket->nremaining) {
         lcb_breakout(bucket->instance);
     }
+}
+
+
+static void
+row_callback(lcbex_vrow_ctx_t *rctx, const void *cookie,
+             const lcbex_vrow_datum_t *row)
+{
+    pycbc_MultiResult *mres = (pycbc_MultiResult*)cookie;
+    pycbc_Bucket *bucket = mres->parent;
+    pycbc_ViewResult *vres = (pycbc_ViewResult *)
+            PyDict_GetItem((PyObject*)mres, Py_None);
+
+    if (row->type == LCBEX_VROW_ROW) {
+        pycbc_viewresult_addrow(vres, mres, row->data, row->ndata);
+    } else if (row->type == LCBEX_VROW_COMPLETE) {
+        pycbc_httpresult_add_data(mres, &vres->base, row->data, row->ndata);
+    } else if (row->type == LCBEX_VROW_ERROR) {
+        if (!vres->has_parse_error) {
+            PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR,
+                           LCB_PROTOCOL_ERROR, "Couldn't parse row");
+            vres->has_parse_error = 1;
+        }
+        pycbc_multiresult_adderr(mres);
+        pycbc_httpresult_add_data(mres, &vres->base, row->data, row->ndata);
+    }
+    pycbc_viewresult_step(vres, mres, bucket,
+                                 row->type != LCBEX_VROW_ROW);
 
     (void)rctx;
 }
