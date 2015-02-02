@@ -299,7 +299,7 @@ IOPSWrapper_traverse(pycbc_IOPSWrapper *self, visitproc visit, void *arg)
 static void
 IOPSWrapper_clear(pycbc_IOPSWrapper *self)
 {
-    #define X(n, ign) Py_XDECREF(self->n);
+    #define X(n, ign) Py_CLEAR(self->n);
     XIONAME_CACHENTRIES(X);
     #undef X
     Py_CLEAR(self->parent);
