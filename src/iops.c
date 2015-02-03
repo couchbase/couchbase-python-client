@@ -574,15 +574,13 @@ cache_io_methods(pycbc_IOPSWrapper *pio, PyObject *obj)
 #undef XIONAME_CACHENTRIES
 }
 
-static lcb_io_procs_fn old_getprocs = NULL;
 static void iops_getprocs(int version,
     lcb_loop_procs *loop_procs, lcb_timer_procs *timer_procs,
     lcb_bsd_procs *bsd_procs, lcb_ev_procs *ev_procs,
     lcb_completion_procs *completion_procs, lcb_iomodel_t *iomodel) {
 
     /* Call the parent function */
-    old_getprocs(version, loop_procs, timer_procs, bsd_procs, ev_procs,
-        completion_procs, iomodel);
+    lcb_iops_wire_bsd_impl2(bsd_procs, version);
 
     /* Now apply our new I/O functionality */
     ev_procs->create = create_event;
@@ -604,10 +602,6 @@ PyObject *
 pycbc_iowrap_new(pycbc_Bucket *unused, PyObject *pyio)
 {
     lcb_io_opt_t iops = NULL;
-    lcb_io_opt_t dfl = NULL;
-
-    lcb_error_t err;
-    struct lcb_create_io_ops_st options = { 0 };
     pycbc_IOPSWrapper *wrapper;
 
     (void)unused;
@@ -616,69 +610,17 @@ pycbc_iowrap_new(pycbc_Bucket *unused, PyObject *pyio)
     wrapper->pyio = pyio;
     Py_INCREF(pyio);
 
-    /**
-     * We create the select 'iops' handle and copy over its functionality
-     * from there. Now that libcouchbase has the 'select' iops build in, we use
-     * that instead.
-     *
-     * We discard the default iops loop data at the expense of leaking a
-     * dlhandle.
-     */
-    options.v.v0.type = LCB_IO_OPS_SELECT;
-    err = lcb_create_io_ops(&dfl, &options);
-    if (err != LCB_SUCCESS) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't create IOPS");
-        return NULL;
-    }
-
     iops = calloc(1, sizeof(*iops));
+    iops->dlhandle = NULL;
+    iops->destructor = iops_destructor;
+    iops->version = 2;
+    iops->v.v2.get_procs = iops_getprocs;
+
+    LCB_IOPS_BASEFLD(iops, cookie) = wrapper;
     wrapper->iops = iops;
-
-    memcpy(iops, dfl, sizeof(*dfl));
-    /* hide the dlsym */
-    dfl->dlhandle = NULL;
-    /* Inject the cookie */
-    iops->v.v0.cookie = wrapper;
-
-    if (dfl->version >= 2 && old_getprocs == NULL) {
-        /* Using getprocs */
-        if (dfl->version == 2) {
-            old_getprocs = dfl->v.v2.get_procs;
-        } else if (dfl->version == 3) {
-            /* Introduced in version 2.4.5 */
-            old_getprocs = dfl->v.v3.get_procs;
-        } else {
-            PYCBC_EXC_WRAP(PYCBC_EXC_INTERNAL, 0,
-                           "libcouchbase gave us an IOPS version which is too new! "
-                           "Downgrade your C library");
-            return NULL; /* TODO: refactor this so we don't leak! */
-        }
-    }
-
-    lcb_destroy_io_ops(dfl);
-    dfl = NULL;
 
     if (-1 == cache_io_methods(wrapper, pyio)) {
         return NULL;
-    }
-
-    iops->destructor = iops_destructor;
-
-    if (old_getprocs != NULL) {
-        iops->version = 2;
-        iops->v.v2.get_procs = iops_getprocs;
-    } else {
-        iops->version = 0;
-        iops->v.v0.create_event = create_event;
-        iops->v.v0.create_timer = create_timer;
-        iops->v.v0.destroy_event = destroy_event_common;
-        iops->v.v0.destroy_timer = destroy_event_common;
-        iops->v.v0.update_event = update_event;
-        iops->v.v0.delete_event = delete_event;
-        iops->v.v0.delete_timer = delete_timer;
-        iops->v.v0.update_timer = update_timer;
-        iops->v.v0.run_event_loop = run_event_loop;
-        iops->v.v0.stop_event_loop = stop_event_loop;
     }
     return (PyObject *)wrapper;
 }
