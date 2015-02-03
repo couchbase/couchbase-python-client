@@ -1175,6 +1175,12 @@ class Bucket(_Base):
             * :class:`~.Query` which contains documentation on
                 the available query options
 
+        .. note::
+
+            To query a spatial view, you must explicitly use the
+            :class:`.SpatialQuery`. Passing key-value view parameters
+            in ``kwargs`` is not supported for spatial views.
+
         """
         design = self._mk_devmode(design, use_devmode)
         return itercls(self, design, view, **kwargs)

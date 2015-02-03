@@ -20,7 +20,7 @@ from copy import deepcopy
 from warnings import warn
 
 from couchbase.exceptions import ArgumentError, CouchbaseError, ViewEngineError
-from couchbase.views.params import Query
+from couchbase.views.params import ViewQuery, SpatialQuery, QueryBase
 from couchbase._pyport import basestring
 import couchbase._libcouchbase as C
 from couchbase._bootstrap import MAX_URI_LENGTH
@@ -32,6 +32,12 @@ class AlreadyQueriedError(CouchbaseError):
 ViewRow = namedtuple('ViewRow', ['key', 'value', 'docid', 'doc'])
 """
 Default class for a single row.
+"""
+
+SpatialRow = namedtuple('SpatialRow',
+                        ['key', 'value', 'geometry', 'docid', 'doc'])
+"""
+Default class for a spatial row
 """
 
 
@@ -101,6 +107,16 @@ class RowProcessor(object):
                                 row.get('id'), row.get('__DOCRESULT__'))
 
 
+class SpatialRowProcessor(RowProcessor):
+    def __init__(self, rowclass=SpatialRow):
+        super(SpatialRowProcessor, self).__init__(rowclass)
+
+    def handle_rows(self, rows, *_):
+        for row in rows:
+            yield self.rowclass(row['key'], row['value'], row['geometry'],
+                                row.get('id'), row.get('__DOCRESULT__'))
+
+
 class View(object):
     def __init__(self, parent, design, view, row_processor=None,
                  include_docs=False, query=None, streaming=True, **params):
@@ -162,6 +178,17 @@ class View(object):
                         reduce=True,
                         group_level=2)
 
+        Execute a spatial view::
+
+            from couchbase.views.params import SpatialQuery
+            # ....
+            q = SpatialQuery()
+            q.start_range = [ -119.9556, 38.7056 ]
+            q.end_range = [ -118.8122, 39.7086 ]
+            view = View(c, 'geodesign', 'spatialview', query=q)
+            for row in view:
+                print('Location is {0}'.format(row.geometry))
+
         Pass a Query object::
 
             q = Query(
@@ -196,12 +223,7 @@ class View(object):
         self.view = view
         self.errors = []
         self.rows_returned = 0
-        self.include_docs = include_docs
         self.indexed_rows = 0
-
-        if not row_processor:
-            row_processor = RowProcessor()
-        self.row_processor = row_processor
 
         if query and params:
             raise ArgumentError.pyexc(
@@ -210,21 +232,39 @@ class View(object):
 
         if query:
             if isinstance(query, basestring):
-                self._query = Query.from_string(query)
+                self._query = ViewQuery.from_string(query)
             else:
                 self._query = deepcopy(query)
         else:
-            self._query = Query.from_any(params)
+            self._query = QueryBase.from_any(params)
+
+        self._flags = 0
+        if include_docs:
+            self._flags |= C.LCB_CMDVIEWQUERY_F_INCLUDE_DOCS
+        if isinstance(self._query, SpatialQuery):
+            self._flags |= C.LCB_CMDVIEWQUERY_F_SPATIAL
 
         if include_docs and self._query.reduce:
             raise ArgumentError.pyexc(
                 "include_docs is only applicable for map-only views, but "
-                "'reduce', 'group', or 'group_level' was specified",
+                "'reduce', 'group', or 'group_level' was specified; or "
+                "this is a spatial query",
                 self._query)
 
         # The original 'limit' parameter, passed to the query.
         self._do_iter = True
         self._mres = None
+
+        if not row_processor:
+            if self._spatial:
+                row_processor = SpatialRowProcessor()
+            else:
+                row_processor = RowProcessor()
+        self.row_processor = row_processor
+
+    @property
+    def _spatial(self):
+        return self._flags & C.LCB_CMDVIEWQUERY_F_SPATIAL
 
     def _start(self):
         if self._mres:
@@ -232,7 +272,7 @@ class View(object):
 
         self._mres = self._parent._view_request(
             design=self.design, view=self.view, options=self.query,
-            include_docs=self.include_docs)
+            _flags=self._flags)
         self.__raw = self._mres[None]
 
     def _clear(self):
@@ -282,9 +322,7 @@ class View(object):
     def _process_payload(self, rows):
         if rows:
             self.rows_returned += len(rows)
-            return self.row_processor.handle_rows(
-                rows, self._parent,
-                self.include_docs if not C._IMPL_INCLUDE_DOCS else False)
+            return self.row_processor.handle_rows(rows, self._parent, False)
 
         elif self.raw.done:
             self._handle_meta(self.raw.value)

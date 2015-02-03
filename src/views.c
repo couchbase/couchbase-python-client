@@ -230,12 +230,12 @@ pycbc_Bucket__view_request(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     lcb_error_t rc;
     const char *view = NULL, *design = NULL;
     PyObject *options = NULL;
-    int include_docs = 0;
+    int flags;
 
-    static char *kwlist[] = { "design", "view", "options", "include_docs", NULL };
+    static char *kwlist[] = { "design", "view", "options", "_flags", NULL };
 
     rv = PyArg_ParseTupleAndKeywords(args, kwargs, "ss|Oi", kwlist,
-                                     &design, &view, &options, &include_docs);
+                                     &design, &view, &options, &flags);
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;
@@ -271,10 +271,7 @@ pycbc_Bucket__view_request(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     vcmd.npostdata = vp.nbody;
     vcmd.handle = &vres->base.u.vh;
     vcmd.callback = row_callback;
-
-    if (include_docs) {
-        vcmd.cmdflags |= LCB_CMDVIEWQUERY_F_INCLUDE_DOCS;
-    }
+    vcmd.cmdflags = flags;
 
     vres->rows = PyList_New(0);
     vres->base.format = PYCBC_FMT_JSON;

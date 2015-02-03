@@ -20,7 +20,8 @@ import time
 
 import couchbase._libcouchbase as _LCB
 import couchbase.exceptions as exceptions
-from couchbase.exceptions import CouchbaseError, HTTPError, ArgumentError
+from couchbase.exceptions import CouchbaseError, ArgumentError
+from couchbase.views.params import Query, SpatialQuery, STALE_OK
 
 class BucketManager(object):
     """
@@ -47,6 +48,34 @@ class BucketManager(object):
         jstr = res.headers['X-Couchbase-Meta']
         jobj = json.loads(jstr)
         return jobj['rev']
+
+    def _poll_vq_single(self, dname, use_devmode, ddresp):
+        """
+        Initiate a view query for a view located in a design document
+        :param ddresp: The design document to poll (as JSON)
+        :return: True if successful, False if no views.
+        """
+        vname = None
+        query = None
+        v_mr = ddresp.get('views', {})
+        v_spatial = ddresp.get('spatial', {})
+        if v_mr:
+            vname = v_mr.keys()[0]
+            query = Query()
+        elif v_spatial:
+            vname = v_spatial.keys()[0]
+            query = SpatialQuery()
+
+        if not vname:
+            return False
+
+        query.stale = STALE_OK
+        query.limit = 1
+
+        for r in self._cb.query(dname, vname, use_devmode=use_devmode,
+                                query=query):
+            pass
+        return True
 
     def _design_poll(self, name, mode, oldres, timeout=5, use_devmode=False):
         """
@@ -78,22 +107,19 @@ class BucketManager(object):
                 if old_rev and self._doc_rev(cur_resp) == old_rev:
                     continue
 
-                # Try to execute a view..
-                vname = list(cur_resp.value['views'].keys())[0]
                 try:
-                    self._view(name, vname, use_devmode=use_devmode,
-                               params={'limit': 1, 'stale': 'ok'})
-                    # We're able to query it? whoopie!
+                    if not self._poll_vq_single(
+                            name, use_devmode, cur_resp.value):
+                        continue
                     return True
 
                 except CouchbaseError:
                     continue
 
-            except CouchbaseError as e:
+            except CouchbaseError:
                 if mode == 'del':
                     # Deleted, whopee!
                     return True
-                cur_resp = e.objextra
 
         raise exceptions.TimeoutError.pyexc(
             "Wait time for design action completion exceeded")

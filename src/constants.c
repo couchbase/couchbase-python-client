@@ -159,6 +159,10 @@ do_all_constants(PyObject *module, void (*handler)(PyObject*, const char*, long)
     /* For CNTL constants */
     ADD_MACRO(LCB_CNTL_OP_TIMEOUT);
     ADD_MACRO(LCB_CNTL_VIEW_TIMEOUT);
+
+    /* View options */
+    ADD_MACRO(LCB_CMDVIEWQUERY_F_INCLUDE_DOCS);
+    ADD_MACRO(LCB_CMDVIEWQUERY_F_SPATIAL);
 }
 
 static void
