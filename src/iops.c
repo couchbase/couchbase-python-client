@@ -646,20 +646,7 @@ pycbc_iowrap_new(pycbc_Bucket *unused, PyObject *pyio)
             old_getprocs = dfl->v.v2.get_procs;
         } else if (dfl->version == 3) {
             /* Introduced in version 2.4.5 */
-#if LCB_VERSION >= 0x020405
             old_getprocs = dfl->v.v3.get_procs;
-#else
-            /* This is a hack that we need to use for master which defines v3 but
-             * doesn't expose LCB_VERSION as 0x020405 */
-            struct {
-                void *v1;
-                int i1;
-                int i2;
-                void (*pad[17])(void);
-                lcb_io_procs_fn get_procs;
-            } *v3tmp = (void *) &dfl->v.v2;
-            old_getprocs = v3tmp->get_procs;
-#endif
         } else {
             PYCBC_EXC_WRAP(PYCBC_EXC_INTERNAL, 0,
                            "libcouchbase gave us an IOPS version which is too new! "
