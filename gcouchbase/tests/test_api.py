@@ -10,7 +10,7 @@ from couchbase.tests.importer import get_configured_classes
 
 class GEventImplMixin(ApiImplementationMixin):
     factory = Bucket
-    viewfactor = GView
+    viewfactory = GView
     should_check_refcount = True
 
     def _implDtorHook(self):
