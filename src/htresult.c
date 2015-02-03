@@ -57,11 +57,15 @@ HttpResult_headers(pycbc_HttpResult *self, void *unused)
 static void
 HttpResult_dealloc(pycbc_HttpResult *self)
 {
-    if (self->htreq) {
+    if (self->u.htreq) {
         if (self->parent) {
-            lcb_cancel_http_request(self->parent->instance, self->htreq);
+            if (self->htype == PYCBC_HTTP_HVIEW) {
+                lcb_view_cancel(self->parent->instance, self->u.vh);
+            } else {
+                lcb_cancel_http_request(self->parent->instance, self->u.htreq);
+            }
         }
-        self->htreq = NULL;
+        self->u.htreq = NULL;
     }
     Py_XDECREF(self->http_data);
     Py_XDECREF(self->headers);

@@ -69,15 +69,6 @@ class TxViewsTests(gen_base(ViewTestCase)):
         self.assertFailure(d, HTTPError)
         return d
 
-
-    # What happens with 'includeDocs'? this should be interesting
-    def testIncludeDocs(self):
-        cb = self.make_connection()
-        d = cb.queryAll('beer', 'brewery_beers', limit=20, include_docs=True)
-        self.assertFailure(d, ArgumentError)
-
-
-
     def testIncrementalRows(self):
         d = defer.Deferred()
         cb = self.make_connection()

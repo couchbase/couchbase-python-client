@@ -109,19 +109,18 @@ _FMT_AUTO = FMT_AUTO_object_not_a_number()
 MAX_URI_LENGTH = 2048
 
 
-def _view_path_helper(design, view, options):
+def _view_path_helper(options):
     # Assume options are already encoded!
-    ss = '_design/{0}/_view/{1}'.format(design, view)
-    post_body = ''
-    if options:
-        encoded = options.encoded
-        if len(ss) + len(encoded) > MAX_URI_LENGTH:
-            uri_options, post_body = options._long_query_encoded
-            ss += '?' + uri_options
-        else:
-            ss += '?' + encoded
+    if not options:
+        return '', ''
 
-    return ss, post_body
+    post_body = ''
+    encoded = options.encoded
+
+    if len(encoded) > MAX_URI_LENGTH:
+        encoded, post_body = options._long_query_encoded
+
+    return encoded, post_body
 
 
 def run_init(m):

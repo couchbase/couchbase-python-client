@@ -23,13 +23,14 @@
 
 #include <Python.h>
 #include <libcouchbase/couchbase.h>
+#include <libcouchbase/api3.h>
+#include <libcouchbase/views.h>
 
 #if LCB_VERSION < 0x020400
 #error "Couchbase Python SDK requires libcouchbase 2.4.0 or greater"
 #endif
 
 #include <pythread.h>
-#include "viewrow/viewrow.h"
 #include "mresdict.h"
 
 #define PYCBC_REFCNT_ASSERT pycbc_assert
@@ -378,20 +379,27 @@ typedef struct {
     PyObject* vdict;
 } pycbc_Item;
 
+
+#define PYCBC_HTTP_HVIEW 1
+#define PYCBC_HTTP_HRAW 2
+
 typedef struct {
     pycbc_Result_HEAD
     PyObject *http_data;
     PyObject *headers;
     pycbc_Bucket *parent;
-    lcb_http_request_t htreq;
+    union {
+        lcb_http_request_t htreq;
+        lcb_VIEWHANDLE vh;
+    } u;
     unsigned int format;
     unsigned short htcode;
     unsigned char done;
+    unsigned char htype;
 } pycbc_HttpResult;
 
 typedef struct {
     pycbc_HttpResult base;
-    lcbex_vrow_ctx_t *rctx;
     PyObject *rows;
     long rows_per_call;
     char has_parse_error;
@@ -640,7 +648,12 @@ extern PyObject *pycbc_ExceptionType;
     X(ioname_startwatch, "start_watching") \
     X(ioname_stopwatch, "stop_watching") \
     X(ioname_mkevent, "io_event_factory") \
-    X(ioname_mktimer, "timer_event_factory")
+    X(ioname_mktimer, "timer_event_factory") \
+    X(vkey_id,        "id") \
+    X(vkey_key,       "key") \
+    X(vkey_value,     "value") \
+    X(vkey_geo,       "geometry") \
+    X(vkey_docresp,   "__DOCRESULT__")
 
 /**
  * Definition of global helpers. This is only instantiated once as

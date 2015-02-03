@@ -37,16 +37,6 @@ class AsyncViewBase(View):
         connection object.
         """
         super(AsyncViewBase, self).__init__(*args, **kwargs)
-        if self.include_docs:
-            self.raise_include_docs()
-
-    def raise_include_docs(self):
-        """
-        Raise an error on include docs
-        """
-        raise ArgumentError.pyexc(
-            "Include docs not supported with async views. If you "
-            "must gather docs, you should do so manually")
 
     def __iter__(self):
         """

@@ -134,8 +134,11 @@ class BreweryBeerRowProcessor(object):
 
             keys_to_fetch = list(breweries_to_fetch) + list(beers_to_fetch)
             keys_to_fetch = [x for x in keys_to_fetch if x not in pre_included]
-            docs = connection.get_multi(keys_to_fetch)
+            docs = {}
             docs.update(pre_included)
+
+            if keys_to_fetch:
+                docs.update(connection.get_multi(keys_to_fetch))
 
             for brewery in breweries_to_fetch:
                 Brewery(brewery, docs[brewery].value)

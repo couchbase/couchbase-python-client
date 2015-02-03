@@ -79,11 +79,9 @@ class RowProcessor(object):
         By default, the :class:`ViewRow` is used.
     """
     def __init__(self, rowclass=ViewRow):
-        self._riter = None
-        self._docs = None
         self.rowclass = rowclass
 
-    def handle_rows(self, rows, connection, include_docs):
+    def handle_rows(self, rows, *_):
         """
         Preprocesses a page of rows.
 
@@ -98,31 +96,9 @@ class RowProcessor(object):
         :return: an iterable. When the iterable is exhausted, this method will
             be called again with a new 'page'.
         """
-        self._riter = iter(rows)
-
-        if not include_docs:
-            return iter(self)
-
-        keys = tuple(x['id'] for x in rows)
-        self._docs = connection.get_multi(keys, quiet=True)
-        return iter(self)
-
-    def __iter__(self):
-        if not self._riter:
-            return
-
-        for ret in self._riter:
-            doc = None
-            if self._docs is not None:
-                doc = self._docs[ret['id']]
-            elif C._IMPL_INCLUDE_DOCS and '__DOCRESULT__' in ret:
-                doc = ret['__DOCRESULT__']
-
-            yield self.rowclass(ret['key'], ret['value'], ret.get('id'), doc)
-
-        self._docs = None
-        self._riter = None
-        self.__raw = None
+        for row in rows:
+            yield self.rowclass(row['key'], row['value'],
+                                row.get('id'), row.get('__DOCRESULT__'))
 
 
 class View(object):

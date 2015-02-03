@@ -88,8 +88,6 @@ SOURCEMODS = [
         'connevents',
         'pipeline',
         'views',
-        os.path.join('viewrow', 'viewrow'),
-        os.path.join('contrib', 'jsonsl', 'jsonsl')
         ]
 
 if platform.python_implementation() != 'PyPy':

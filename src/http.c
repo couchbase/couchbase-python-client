@@ -123,7 +123,7 @@ pycbc_httpresult_complete(pycbc_HttpResult *htres, pycbc_MultiResult *mres,
 
     htres->htcode = status;
     htres->done = 1;
-    htres->htreq = NULL;
+    htres->u.htreq = NULL;
     Py_XDECREF(htres->parent);
     htres->parent = NULL;
 
@@ -251,7 +251,7 @@ pycbc_Bucket__http_request(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     htcmd.v.v1.method = method;
 
     err = lcb_make_http_request(self->instance,
-                                mres, reqtype, &htcmd, &htres->htreq);
+                                mres, reqtype, &htcmd, &htres->u.htreq);
 
     if (err != LCB_SUCCESS) {
         PYCBC_EXCTHROW_SCHED(err);

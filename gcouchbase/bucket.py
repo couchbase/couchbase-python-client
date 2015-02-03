@@ -27,10 +27,6 @@ class GView(AsyncViewBase):
         self.start()
         self.raw.rows_per_call = 100000
 
-    def raise_include_docs(self):
-        # We allow include_docs in the RowProcessor
-        pass
-
     def _callback(self, *args):
         # This method overridden from the parent. Rather than do the processing
         # on demand, we must defer it for later. This is done by copying the

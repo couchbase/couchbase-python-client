@@ -53,7 +53,8 @@
     X(INVALID_HOST_FORMAT) \
     X(INVALID_CHAR) \
     X(DURABILITY_ETOOMANY) \
-    X(DUPLICATE_COMMANDS)
+    X(DUPLICATE_COMMANDS) \
+    X(HTTP_ERROR)
 
 #define XHTTP(X) \
     X(HTTP_METHOD_GET) \
@@ -169,6 +170,8 @@ void
 pycbc_init_pyconstants(PyObject *module)
 {
     do_all_constants(module, do_constmod);
+    /* We support built-in include_docs now! */
+    PyModule_AddIntConstant(module, "_IMPL_INCLUDE_DOCS", 1);
 }
 
 

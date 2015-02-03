@@ -59,73 +59,140 @@ pycbc_viewresult_step(pycbc_ViewResult *vres, pycbc_MultiResult *mres,
     }
 }
 
-
-static void
-row_callback(lcbex_vrow_ctx_t *rctx, const void *cookie,
-             const lcbex_vrow_datum_t *row)
+static int
+add_view_field(PyObject *dd, PyObject *k, const void *v, size_t n)
 {
-    pycbc_MultiResult *mres = (pycbc_MultiResult*)cookie;
-    pycbc_Bucket *bucket = mres->parent;
-    pycbc_ViewResult *vres = (pycbc_ViewResult *)
-            PyDict_GetItem((PyObject*)mres, Py_None);
+    PyObject *tmp;
+    int rv;
 
-    if (row->type == LCBEX_VROW_ROW) {
-        pycbc_viewresult_addrow(vres, mres, row->data, row->ndata);
-    } else if (row->type == LCBEX_VROW_COMPLETE) {
-        pycbc_httpresult_add_data(mres, &vres->base, row->data, row->ndata);
-    } else if (row->type == LCBEX_VROW_ERROR) {
-        if (!vres->has_parse_error) {
-            PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR,
-                           LCB_PROTOCOL_ERROR, "Couldn't parse row");
-            vres->has_parse_error = 1;
-        }
-        pycbc_multiresult_adderr(mres);
-        pycbc_httpresult_add_data(mres, &vres->base, row->data, row->ndata);
+    if (!n) {
+        return 0;
     }
-    pycbc_viewresult_step(vres, mres, bucket,
-                                 row->type != LCBEX_VROW_ROW);
 
-    (void)rctx;
+    rv = pycbc_tc_simple_decode(&tmp, v, n, PYCBC_FMT_JSON);
+    if (rv != 0) {
+        return rv;
+    }
+
+    PyDict_SetItem(dd, k, tmp);
+    Py_XDECREF(tmp);
+    return 0;
+}
+
+static int
+parse_row_json(pycbc_Bucket *bucket, pycbc_ViewResult *vres,
+               pycbc_MultiResult *mres, const lcb_RESPVIEWQUERY *resp)
+{
+    PyObject *dd = PyDict_New();
+    PyObject *docid;
+    int is_ok, rv = 0;
+
+    if (resp->ndocid) {
+        rv = pycbc_tc_decode_key(bucket, resp->docid, resp->ndocid, &docid);
+        if (rv == -1) {
+            goto GT_DONE;
+        } else {
+            PyDict_SetItem(dd, pycbc_helpers.vkey_id, docid);
+            Py_XDECREF(docid);
+        }
+    }
+
+    #define ADD_FIELD(helpname, fbase) \
+    add_view_field(dd, pycbc_helpers.helpname, resp->fbase, resp->n##fbase)
+
+    is_ok = ADD_FIELD(vkey_key, key) == 0 &&
+            ADD_FIELD(vkey_value, value) == 0 &&
+            ADD_FIELD(vkey_geo, geometry) == 0;
+
+    #undef ADD_FIELD
+
+    if (!is_ok) {
+        rv = -1;
+        goto GT_DONE;
+    } else {
+        PyList_Append(vres->rows, dd);
+    }
+
+    if (resp->docresp) {
+        /* include_docs */
+        const lcb_RESPGET *rg = resp->docresp;
+        pycbc_ValueResult *docres = pycbc_valresult_new(bucket);
+
+        docres->key = docid;
+        Py_INCREF(docid);
+        docres->rc = rg->rc;
+
+        if (rg->rc == LCB_SUCCESS) {
+            docres->cas = rg->cas;
+            docres->flags = rg->itmflags;
+            rv = pycbc_tc_decode_value(
+                    bucket, rg->value, rg->nvalue, rg->itmflags, &docres->value);
+            if (rv != 0) {
+                pycbc_multiresult_adderr(mres);
+            }
+        }
+
+        PyDict_SetItem(dd, pycbc_helpers.vkey_docresp, (PyObject*)docres);
+        Py_DECREF(docres);
+    }
+
+    GT_DONE:
+    Py_DECREF(dd);
+    return rv;
 }
 
 static void
-views_data_callback(lcb_http_request_t req, lcb_t instance, const void *cookie,
-                    lcb_error_t err, const lcb_http_resp_t *resp)
+row_callback(lcb_t instance, int cbtype, const lcb_RESPVIEWQUERY *resp)
 {
-    pycbc_MultiResult *mres = (pycbc_MultiResult *)cookie;
+    pycbc_MultiResult *mres = (pycbc_MultiResult*)resp->cookie;
     pycbc_Bucket *bucket = mres->parent;
-    pycbc_ViewResult *vres;
+    const char * const * hdrs = NULL;
+    short htcode = 0;
+
+    if (resp->htresp != NULL) {
+        hdrs = resp->htresp->headers;
+        htcode = resp->htresp->htstatus;
+    }
 
     PYCBC_CONN_THR_END(bucket);
 
-    vres = (pycbc_ViewResult *)PyDict_GetItem((PyObject*)mres, Py_None);
+    pycbc_ViewResult *vres = (pycbc_ViewResult *)
+            PyDict_GetItem((PyObject*)mres, Py_None);
 
-    if (!vres->has_parse_error) {
-        lcbex_vrow_feed(vres->rctx, resp->v.v0.bytes, resp->v.v0.nbytes);
-    } else {
-        pycbc_httpresult_add_data(mres, &vres->base,
-                                  resp->v.v0.bytes, resp->v.v0.nbytes);
+    if (resp->rflags & LCB_RESP_F_FINAL) {
+        pycbc_httpresult_add_data(mres, &vres->base, resp->value, resp->nvalue);
+    } else if (resp->rc == LCB_SUCCESS) {
+        if (parse_row_json(bucket, vres, mres, resp) != 0) {
+            pycbc_multiresult_adderr(mres);
+        }
     }
-    PYCBC_CONN_THR_BEGIN(bucket);
+
+    pycbc_viewresult_step(vres, mres, bucket, resp->rflags & LCB_RESP_F_FINAL);
+
+    if (resp->rflags & LCB_RESP_F_FINAL) {
+        pycbc_httpresult_complete(&vres->base, mres, resp->rc, htcode, hdrs);
+    } else {
+        PYCBC_CONN_THR_BEGIN(bucket);
+    }
+    (void)instance; (void)cbtype;
 }
 
 void
 pycbc_views_callbacks_init(lcb_t instance)
 {
-    lcb_set_http_data_callback(instance, views_data_callback);
+    (void)instance;
 }
 
 typedef struct {
-    const char *path;
-    pycbc_strlen_t npath;
+    const char *optstr;
+    pycbc_strlen_t noptstr;
     const void *body;
     pycbc_strlen_t nbody;
     PyObject *bk;
 } viewpath_st;
 
 static int
-get_viewpath_str(pycbc_Bucket *self, viewpath_st *vp,
-                 PyObject *design, PyObject *view, PyObject *options)
+get_viewpath_str(pycbc_Bucket *self, viewpath_st *vp, PyObject *options)
 {
     PyObject *args;
 
@@ -133,15 +200,17 @@ get_viewpath_str(pycbc_Bucket *self, viewpath_st *vp,
         options = Py_None;
     }
 
-    args = PyTuple_Pack(3, design, view, options);
+    args = PyTuple_Pack(1, options);
     vp->bk = PyObject_CallObject(pycbc_helpers.view_path_helper, args);
     Py_DECREF(args);
 
     if (!vp->bk) {
         return -1;
     } else {
-        int rv = PyArg_ParseTuple(vp->bk, "s#s#", &vp->path, &vp->npath,
-                                  &vp->body, &vp->nbody);
+        int rv = PyArg_ParseTuple(
+                vp->bk, "s#s#", &vp->optstr, &vp->noptstr,
+                &vp->body, &vp->nbody);
+
         if (!rv) {
             return -1;
         }
@@ -156,16 +225,16 @@ pycbc_Bucket__view_request(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     PyObject *ret = NULL;
     pycbc_MultiResult *mres = NULL;
     pycbc_ViewResult *vres = NULL;
-    lcb_http_cmd_t htcmd = { 0 };
+    lcb_CMDVIEWQUERY vcmd = { 0 };
     viewpath_st vp = { NULL };
     lcb_error_t rc;
-    PyObject *design = NULL, *view = NULL, *options = NULL;
+    const char *view = NULL, *design = NULL;
+    PyObject *options = NULL;
     int include_docs = 0;
 
-    static char *kwlist[] = { "design", "view", "options",
-            "include_docs", NULL };
+    static char *kwlist[] = { "design", "view", "options", "include_docs", NULL };
 
-    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "OO|Oi", kwlist,
+    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "ss|Oi", kwlist,
                                      &design, &view, &options, &include_docs);
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
@@ -183,34 +252,35 @@ pycbc_Bucket__view_request(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
 
     mres = (pycbc_MultiResult *)pycbc_multiresult_new(self);
     vres = (pycbc_ViewResult *)PYCBC_TYPE_CTOR(&pycbc_ViewResultType);
+    vres->base.htype = PYCBC_HTTP_HVIEW;
+
     pycbc_httpresult_init(&vres->base, mres);
 
-    rv = get_viewpath_str(self, &vp, design, view, options);
+    rv = get_viewpath_str(self, &vp, options);
     if (rv != 0) {
         goto GT_DONE;
     }
 
-    vres->rctx = lcbex_vrow_create();
-    vres->rctx->callback = row_callback;
-    vres->rctx->user_cookie = mres;
+    vcmd.ddoc = design;
+    vcmd.nddoc = strlen(design);
+    vcmd.view = view;
+    vcmd.nview = strlen(view);
+    vcmd.optstr = vp.optstr;
+    vcmd.noptstr = vp.noptstr;
+    vcmd.postdata = vp.body;
+    vcmd.npostdata = vp.nbody;
+    vcmd.handle = &vres->base.u.vh;
+    vcmd.callback = row_callback;
+
+    if (include_docs) {
+        vcmd.cmdflags |= LCB_CMDVIEWQUERY_F_INCLUDE_DOCS;
+    }
+
     vres->rows = PyList_New(0);
     vres->base.format = PYCBC_FMT_JSON;
 
-    htcmd.version = 1;
-    htcmd.v.v1.chunked = 1;
-    htcmd.v.v1.method = LCB_HTTP_METHOD_GET;
-    htcmd.v.v1.path = vp.path;
-    htcmd.v.v1.npath = vp.npath;
+    rc = lcb_view_query(self->instance, mres, &vcmd);
 
-    if (vp.nbody) {
-        htcmd.v.v1.method = LCB_HTTP_METHOD_POST;
-        htcmd.v.v1.body = vp.body;
-        htcmd.v.v1.nbody = vp.nbody;
-        htcmd.v.v1.content_type = "application/json";
-    }
-
-    rc = lcb_make_http_request(self->instance, mres, LCB_HTTP_TYPE_VIEW,
-                               &htcmd, &vres->base.htreq);
     if (rc != LCB_SUCCESS) {
         PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, rc, "Couldn't schedule view");
         goto GT_DONE;
@@ -271,9 +341,6 @@ static void
 ViewResult_dealloc(pycbc_ViewResult *vres)
 {
     Py_CLEAR(vres->rows);
-    if (vres->rctx) {
-        lcbex_vrow_free(vres->rctx);
-    }
     Py_TYPE(vres)->tp_base->tp_dealloc((PyObject*)vres);
 }
 
