@@ -205,7 +205,6 @@ class N1QLInsertQuery(N1QLQuery):
         ss = 'INSERT INTO {0} {1}'.format(
             keyspace, ','.join(kvp)
         )
-        print ss
         super(N1QLInsertQuery, self).__init__(ss)
 
 
