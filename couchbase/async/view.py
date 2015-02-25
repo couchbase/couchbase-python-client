@@ -18,13 +18,12 @@
 """
 This file contains the view implementation for Async
 """
-import sys
 
 from couchbase.views.iterator import View
-from couchbase.exceptions import CouchbaseError, ArgumentError
-from couchbase._pyport import PyErr_Restore
+from couchbase.async.rowsbase import AsyncRowsBase
 
-class AsyncViewBase(View):
+
+class AsyncViewBase(AsyncRowsBase, View):
     def __init__(self, *args, **kwargs):
         """
         Initialize a new AsyncViewBase object. This is intended to be
@@ -36,73 +35,4 @@ class AsyncViewBase(View):
         :meth:`~couchbase.connection.Connection.query` method of the
         connection object.
         """
-        super(AsyncViewBase, self).__init__(*args, **kwargs)
-
-    def __iter__(self):
-        """
-        Unlike our base class, iterating does not make sense here
-        """
-        raise NotImplementedError("Iteration not supported on async view")
-
-    def _start(self):
-        super(AsyncViewBase, self)._start()
-        self._mres.callback = self._callback
-        self._mres.errback = self._errback
-
-    def start(self):
-        self._start()
-
-    def on_error(self, ex):
-        """
-        Called when there is a failure with the response data
-
-        :param Exception ex: The exception caught.
-
-        This must be implemented in a subclass
-        """
-        raise NotImplementedError("Must be implemented in subclass")
-
-    def on_rows(self, rowiter):
-        """
-        Called when there are more processed views.
-
-        :param iterable rowiter: An iterable which will yield results
-          as defined by the :class:`RowProcessor` implementation
-
-        This method must be implemented in a subclass
-        """
-        raise NotImplementedError("Must be implemented in subclass")
-
-    def on_done(self):
-        """
-        Called when this request has completed. Once this method is called,
-        no other methods will be invoked on this object.
-
-        This method must be implemented in a subclass
-        """
-        raise NotImplementedError("Must be implemented in subclass")
-
-    def _callback(self, mres):
-        """
-        This is invoked as the row callback.
-        If 'rows' is true, then we are a row callback, otherwise
-        the request has ended and it's time to collect the other data
-        """
-        try:
-            rows = self._process_payload(self.raw.rows)
-            if rows:
-                self.on_rows(rows)
-            if self.raw.done:
-                self.on_done()
-        finally:
-            if self.raw.done:
-                self._clear()
-
-    def _errback(self, mres, ex_cls, ex_obj, ex_bt):
-        try:
-            PyErr_Restore(ex_cls, ex_obj, ex_bt)
-        except Exception as e:
-            self.on_error(e)
-            self.on_done()
-        finally:
-            self._clear()
+        View.__init__(self, *args, **kwargs)

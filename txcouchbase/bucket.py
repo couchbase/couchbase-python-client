@@ -28,10 +28,11 @@ from couchbase.async.events import EventQueue
 from couchbase.exceptions import CouchbaseError
 from txcouchbase.iops import v0Iops
 
-class BatchedView(AsyncViewBase):
+
+class BatchedRowMixin(object):
     def __init__(self, *args, **kwargs):
         """
-        Iterator/Container object for a single-call view result.
+        Iterator/Container object for a single-call row-based results.
 
         This functions as an iterator over all results of the query, once the
         query has been completed.
@@ -41,7 +42,6 @@ class BatchedView(AsyncViewBase):
 
         You will normally not need to construct this object manually.
         """
-        super(BatchedView, self).__init__(*args, **kwargs)
         self._d = Deferred()
         self.__rows = None # likely a superlcass might have this?
 
@@ -49,7 +49,7 @@ class BatchedView(AsyncViewBase):
         return self._d
 
     def start(self):
-        super(BatchedView, self).start()
+        super(BatchedRowMixin, self).start()
         self.raw.rows_per_call = -1
         return self
 
@@ -82,6 +82,12 @@ class BatchedView(AsyncViewBase):
         Iterate over the rows in this resultset
         """
         return self.__rows
+
+
+class BatchedView(BatchedRowMixin, AsyncViewBase):
+    def __init__(self, *args, **kwargs):
+        AsyncViewBase.__init__(self, *args, **kwargs)
+        BatchedRowMixin.__init__(self, *args, **kwargs)
 
 
 class TxEventQueue(EventQueue):

@@ -10,14 +10,13 @@ except ImportError:
     from gcouchbase.iops_gevent10 import IOPS
 
 
-class GView(AsyncViewBase):
-    def __init__(self, *args, **kwargs):
+class GRowsHandler(object):
+    def __init__(self):
         """
         Subclass of :class:`~.AsyncViewBase`
         This doesn't expose an API different from the normal
         synchronous view API. It's just implemented differently
         """
-        super(GView, self).__init__(*args, **kwargs)
 
         # We use __double_underscore to mangle names. This is because
         # the views class has quite a bit of data attached to it.
@@ -59,6 +58,12 @@ class GView(AsyncViewBase):
                     yield row
 
         self._do_iter = False
+
+
+class GView(GRowsHandler, AsyncViewBase):
+    def __init__(self, *args, **kwargs):
+        AsyncViewBase.__init__(self, *args, **kwargs)
+        GRowsHandler.__init__(self)
 
 
 class Bucket(AsyncBucket):
