@@ -1380,6 +1380,27 @@ class Bucket(_Base):
         """
         return _Base._cntl(self, *args, **kwargs)
 
+    def _cntlstr(self, key, value):
+        """
+        Low-level interface to the underlying C library's settings.
+        via ``lcb_cntl_string()``.
+
+        This method accepts a key and a value. It can modify the same
+        sort of settings as the :meth:`~._cntl` method, but may be a
+        bit more convenient to follow in code.
+
+        .. warning::
+
+            See :meth:`~._cntl` for warnings.
+
+        :param string key: The setting key
+        :param string value: The setting value
+
+        See the API documentation for libcouchbase for a list of
+        acceptable setting keys.
+        """
+        return _Base._cntlstr(self, key, value)
+
     @staticmethod
     def lcb_version():
         return _LCB.lcb_version()

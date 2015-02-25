@@ -430,6 +430,8 @@ Private APIs
    .. automethod:: _close
 
    .. automethod:: _cntl
+   
+   .. automethod:: _cntlstr
 
    .. automethod:: _vbmap
 
