@@ -3,6 +3,7 @@ from gevent.hub import get_hub, getcurrent, Waiter
 
 from couchbase.async.bucket import AsyncBucket
 from couchbase.async.view import AsyncViewBase
+from couchbase.async.n1ql import AsyncN1QLRequest
 from couchbase.views.iterator import AlreadyQueriedError
 try:
     from gcouchbase.iops_gevent0x import IOPS
@@ -66,6 +67,11 @@ class GView(GRowsHandler, AsyncViewBase):
         GRowsHandler.__init__(self)
 
 
+class GN1QLRequest(GRowsHandler, AsyncN1QLRequest):
+    def __init__(self, *args, **kwargs):
+        AsyncN1QLRequest.__init__(self, *args, **kwargs)
+        GRowsHandler.__init__(self)
+
 class Bucket(AsyncBucket):
     def __init__(self, *args, **kwargs):
         """
@@ -114,6 +120,10 @@ class Bucket(AsyncBucket):
     def query(self, *args, **kwargs):
         kwargs['itercls'] = GView
         return super(Bucket, self).query(*args, **kwargs)
+
+    def n1ql_query(self, query, *args, **kwargs):
+        kwargs['itercls'] = GN1QLRequest
+        return super(Bucket, self).n1ql_query(query, *args, **kwargs)
 
     def _get_close_future(self):
         ev = Event()

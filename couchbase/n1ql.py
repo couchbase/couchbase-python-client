@@ -250,6 +250,10 @@ class N1QLRequest(object):
     def raw(self):
         return self.__raw
 
+    def _clear(self):
+        del self._parent
+        del self._mres
+
     def _handle_meta(self, value):
         if not isinstance(value, dict):
             return

@@ -24,6 +24,7 @@ from twisted.python.failure import Failure
 
 from couchbase.async.bucket import AsyncBucket
 from couchbase.async.view import AsyncViewBase
+from couchbase.async.n1ql import AsyncN1QLRequest
 from couchbase.async.events import EventQueue
 from couchbase.exceptions import CouchbaseError
 from txcouchbase.iops import v0Iops
@@ -87,6 +88,12 @@ class BatchedRowMixin(object):
 class BatchedView(BatchedRowMixin, AsyncViewBase):
     def __init__(self, *args, **kwargs):
         AsyncViewBase.__init__(self, *args, **kwargs)
+        BatchedRowMixin.__init__(self, *args, **kwargs)
+
+
+class BatchedN1QLRequest(BatchedRowMixin, AsyncN1QLRequest):
+    def __init__(self, *args, **kwargs):
+        AsyncN1QLRequest.__init__(self, *args, **kwargs)
         BatchedRowMixin.__init__(self, *args, **kwargs)
 
 
@@ -271,6 +278,32 @@ class RawBucket(AsyncBucket):
 
         kwargs['itercls'] = BatchedView
         o = super(RawBucket, self).query(*args, **kwargs)
+        o.start()
+        return o._getDeferred()
+
+    def n1qlQueryEx(self, cls, *args, **kwargs):
+        """
+        Execute a N1QL statement providing a custom handler for rows.
+
+        This method allows you to define your own subclass (of
+        :class:`~AsyncN1QLRequest`) which can handle rows as they are
+        received from the network.
+
+        :param cls: The subclass (not instance) to use
+        :param args: Positional arguments for the class constructor
+        :param kwargs: Keyword arguments for the class constructor
+
+        .. seealso:: :meth:`queryEx`, around which this method wraps
+        """
+        return self.queryEx(cls, *args, **kwargs)
+
+    def n1qlQueryAll(self, *args, **kwargs):
+        if not self.connected:
+            cb = lambda x: self.n1qlQueryAll(*args, **kwargs)
+            return self.connect().addCallback(cb)
+
+        kwargs['itercls'] = BatchedN1QLRequest
+        o = super(RawBucket, self).n1ql_query(*args, **kwargs)
         o.start()
         return o._getDeferred()
 

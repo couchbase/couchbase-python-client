@@ -1185,7 +1185,7 @@ class Bucket(_Base):
         design = self._mk_devmode(design, use_devmode)
         return itercls(self, design, view, **kwargs)
 
-    def n1ql_query(self, query, **kwargs):
+    def n1ql_query(self, query, itercls=N1QLRequest, **kwargs):
         """
         Execute a N1QL query.
 
@@ -1198,7 +1198,7 @@ class Bucket(_Base):
         if not isinstance(query, N1QLQuery):
             query = N1QLQuery(query)
 
-        return N1QLRequest(query, self, **kwargs)
+        return itercls(query, self, **kwargs)
 
     def __repr__(self):
         return ('<{modname}.{cls} bucket={bucket}, nodes={nodes} at 0x{oid:x}>'
