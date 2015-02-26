@@ -22,6 +22,7 @@ import couchbase._libcouchbase as _LCB
 import couchbase.exceptions as exceptions
 from couchbase.exceptions import CouchbaseError, ArgumentError
 from couchbase.views.params import Query, SpatialQuery, STALE_OK
+from couchbase._pyport import single_dict_key
 
 class BucketManager(object):
     """
@@ -60,10 +61,10 @@ class BucketManager(object):
         v_mr = ddresp.get('views', {})
         v_spatial = ddresp.get('spatial', {})
         if v_mr:
-            vname = v_mr.keys()[0]
+            vname = single_dict_key(v_mr)
             query = Query()
         elif v_spatial:
-            vname = v_spatial.keys()[0]
+            vname = single_dict_key(v_spatial)
             query = SpatialQuery()
 
         if not vname:

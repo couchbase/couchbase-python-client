@@ -40,3 +40,11 @@ if V == 2:
 else:
     def PyErr_Restore(cls, obj, bt):
         raise obj.with_traceback(bt)
+
+if V == 2:
+    def single_dict_key(d):
+        return d.keys()[0]
+else:
+    def single_dict_key(d):
+        for k in d.keys():
+            return k
