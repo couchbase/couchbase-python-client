@@ -104,7 +104,7 @@ class RowProcessor(object):
         """
         for row in rows:
             yield self.rowclass(row['key'], row['value'],
-                                row.get('id'), row.get('__DOCRESULT__'))
+                                row.get('id'), get_row_doc(row))
 
 
 class SpatialRowProcessor(RowProcessor):
@@ -114,7 +114,22 @@ class SpatialRowProcessor(RowProcessor):
     def handle_rows(self, rows, *_):
         for row in rows:
             yield self.rowclass(row['key'], row['value'], row['geometry'],
-                                row.get('id'), row.get('__DOCRESULT__'))
+                                row.get('id'), get_row_doc(row))
+
+
+def get_row_doc(row_json):
+    """
+    Gets the document for the given parsed JSON row.
+
+    Use this function in custom :class:`~.RowProcessor`
+    implementations to extract the actual document. The document
+    itself is stored within a private field of the row itself, and
+    should only be accessed by this function.
+
+    :param dict row_json: The parsed row (passed to the processor)
+    :return: The document, or None
+    """
+    return row_json.get('__DOCRESULT__')
 
 
 class View(object):
