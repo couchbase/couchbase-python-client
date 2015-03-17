@@ -23,8 +23,7 @@ installer then everything (other than the server) is already included.
 See below for windows snapshot releases.
 
 Also note that these instructions apply to building from source.
-You can always get the latest supported release version from
-`PyPi <http://pypi.python.org/pypi/couchbase>`_
+You can always get the latest supported release version from pypi_.
 
 
 If you have a recent version of *pip*, you may use the latest development
@@ -39,7 +38,7 @@ Prerequisites
 ~~~~~~~~~~~~~
 
 - Couchbase Server (http://couchbase.com/download)
-- libcouchbase_. version 2.4.0 or greater (Bundled in Windows installer)
+- libcouchbase_. version 2.4.7 or greater (Bundled in Windows installer)
 - libcouchbase development files.
 - Python development files
 - A C compiler.
@@ -93,8 +92,8 @@ Here's an example code snippet which sets a key and then reads it
 
 .. code-block:: pycon
 
-    >>> from couchbase.bucket import Bucket as CouchbaseBucket
-    >>> c = CouchbaseBucket('couchbase://localhost/default')
+    >>> from couchbase.bucket import Bucket
+    >>> c = Bucket('couchbase://localhost/default')
     >>> c
     <couchbase.bucket.Bucket bucket=default, nodes=['localhost:8091'] at 0x105991cd0>
     >>> c.upsert("key", "value")
@@ -110,8 +109,8 @@ You can also use views
 
 .. code-block:: pycon
 
-    >>> from couchbase.bucket import Bucket as CouchbaseBucket
-    >>> c = CouchbaseBucket('couchbase://localhost/beer-sample')
+    >>> from couchbase.bucket import Bucket
+    >>> c = Bucket('couchbase://localhost/beer-sample')
     >>> resultset = c.query("beer", "brewery_beers", limit=5)
     >>> resultset
     View<Design=beer, View=brewery_beers, Query=Query:'limit=5', Rows Fetched=0>
@@ -134,9 +133,9 @@ To use with Twisted, simply import ``txcouchbase.connection`` instead of
 .. code-block:: python
 
     from twisted.internet import reactor
-    from txcouchbase.connection import Connection as TxCouchbase
+    from txcouchbase.bucket import Bucket
 
-    cb = TxCouchbase('couchbase://localhost/default')
+    cb = Bucket('couchbase://localhost/default')
     def on_upsert(ret):
         print "Set key. Result", ret
 
@@ -164,8 +163,9 @@ GEvent API
 
 .. code-block:: python
 
-    from gcouchbase.connection import GCouchbase
-    conn = GCouchbase('couchbase://localhost/default')
+    from gcouchbase.bucket import Bucket
+
+    conn = Bucket('couchbase://localhost/default')
     print conn.upsert("foo", "bar")
     print conn.get("foo")
 
@@ -177,7 +177,7 @@ implementation is significantly different.
 PyPy
 ~~~~
 
-`PyPy<http://pypy.org>`_ is an alternative high performance Python
+`PyPy <http://pypy.org>`_ is an alternative high performance Python
 implementation. Since PyPy does not work well with C extension modules,
 this module will not work directly. You may refer to the alternate
 implementation based on the *cffi* module: https://github.com/couchbaselabs/couchbase-python-cffi
@@ -251,3 +251,4 @@ The Couchbase Python SDK is licensed under the Apache License 2.0.
 .. _libcouchbase: http://couchbase.com/develop/c/current
 .. _JIRA: http://couchbase.com/issues/browse/pycbc
 .. _freenode: http://freenode.net/irc_servers.shtml
+.. _pypi: http://pypy.python.org/pypi/couchbase
