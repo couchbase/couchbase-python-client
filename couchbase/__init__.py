@@ -90,6 +90,29 @@ def set_pickle_converters(encode, decode):
     return (ret['pickle_encode'], ret['pickle_decode'])
 
 
+def enable_logging():
+    """
+    Enables integration with Python's `logging` module.
+
+    This function enables the C library's logging to be propagated to
+    the Python standard `logging` module.
+
+    Calling this function affects any `~.Bucket` objects created
+    afterwards (but not before). Note that currently this will also
+    override any ``LCB_LOGLEVEL`` directive inside the environment as
+    well.
+
+    The "root" couchbase logger is ``couchbase``.
+    """
+    import couchbase._logutil
+    couchbase._logutil.configure(True)
+
+
+def disable_logging():
+    import couchbase._logutil
+    couchbase._logutil.configure(False)
+
+
 class Couchbase(object):
     @classmethod
     def connect(self, bucket, **kwargs):

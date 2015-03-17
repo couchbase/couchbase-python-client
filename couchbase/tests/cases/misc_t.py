@@ -139,3 +139,19 @@ class MiscTest(ConnectionTestCase):
         vb, ix = cb._vbmap("hello")
         int(vb)
         int(ix)
+
+    def test_logging(self):
+        # Assume we don't have logging here..
+        import couchbase
+        import couchbase._libcouchbase as lcb
+
+        self.assertFalse(lcb.lcb_logging())
+
+        logfn = lambda x: x
+        lcb.lcb_logging(logfn)
+        self.assertEqual(logfn, lcb.lcb_logging())
+
+        couchbase.enable_logging()
+        self.assertTrue(lcb.lcb_logging())
+        couchbase.disable_logging()
+        self.assertFalse(lcb.lcb_logging())

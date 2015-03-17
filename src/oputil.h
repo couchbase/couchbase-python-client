@@ -184,15 +184,6 @@ typedef int (*pycbc_oputil_keyhandler)
                 int ii,
                 void *arg);
 
-
-/**
- * Dummy tuple/keywords, used for PyArg_ParseTupleAndKeywordArgs, which dies
- * if one of the arguments is NULL, so these contain empty tuples and dicts,
- * respectively.
- */
-extern PyObject *pycbc_DummyTuple;
-extern PyObject *pycbc_DummyKeywords;
-
 /**
  * Examine the 'quiet' parameter and see if we should set the MultiResult's
  * 'no_raise_enoent' flag.

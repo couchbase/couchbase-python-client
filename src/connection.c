@@ -665,6 +665,16 @@ Bucket__init__(pycbc_Bucket *self,
         return -1;
     }
 
+    if (pycbc_log_handler) {
+        err = lcb_cntl(self->instance, LCB_CNTL_SET, LCB_CNTL_LOGGER,
+                       &pycbc_lcb_logprocs);
+        if (err != LCB_SUCCESS) {
+            self->instance = NULL;
+            PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't create log handler");
+            return -1;
+        }
+    }
+
     pycbc_callbacks_init(self->instance);
     lcb_set_cookie(self->instance, self);
     {

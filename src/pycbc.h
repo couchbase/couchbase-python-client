@@ -1076,4 +1076,19 @@ PyObject* pycbc_Bucket__end_pipeline(pycbc_Bucket *);
 PyObject* pycbc_Bucket__cntl(pycbc_Bucket *, PyObject *, PyObject *);
 PyObject* pycbc_Bucket__vbmap(pycbc_Bucket *, PyObject *);
 PyObject* pycbc_Bucket__cntlstr(pycbc_Bucket *conn, PyObject *args, PyObject *kw);
+
+/**
+ * Flag to check if logging is enabled for the library via Python's logging
+ */
+extern PyObject* pycbc_log_handler;
+extern struct lcb_logprocs_st pycbc_lcb_logprocs;
+
+/**
+ * Dummy tuple/keywords, used for PyArg_ParseTupleAndKeywordArgs, which dies
+ * if one of the arguments is NULL, so these contain empty tuples and dicts,
+ * respectively.
+ */
+extern PyObject *pycbc_DummyTuple;
+extern PyObject *pycbc_DummyKeywords;
+
 #endif /* PYCBC_H_ */

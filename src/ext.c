@@ -22,6 +22,13 @@
 
 struct pycbc_helpers_ST pycbc_helpers;
 
+PyObject *pycbc_log_handler = NULL;
+
+static void log_handler(struct lcb_logprocs_st *procs, unsigned int iid,
+    const char *subsys, int severity, const char *srcfile, int srcline,
+    const char *fmt, va_list ap);
+
+struct lcb_logprocs_st pycbc_lcb_logprocs = { 0 };
 
 static PyObject *
 _libcouchbase_init_helpers(PyObject *self, PyObject *args, PyObject *kwargs) {
@@ -178,6 +185,44 @@ pycbc_lcb_version(pycbc_Bucket *self)
     return ret;
 }
 
+static PyObject *
+set_log_handler(PyObject *self, PyObject *args)
+{
+    PyObject *val_O = NULL;
+    PyObject *oldval = pycbc_log_handler;
+
+    int rv;
+
+    rv = PyArg_ParseTuple(args, "|O", &val_O);
+    if (!rv) {
+        return NULL;
+    }
+
+    if (val_O) {
+        pycbc_log_handler = val_O;
+        if (val_O != Py_None) {
+            Py_INCREF(val_O);
+            pycbc_log_handler = val_O;
+        } else {
+            pycbc_log_handler = NULL;
+        }
+
+        if (oldval) {
+            return oldval;
+        } else {
+            Py_RETURN_NONE;
+        }
+    } else {
+        /* Simple GET */
+        if (oldval) {
+            Py_INCREF(oldval);
+            return oldval;
+        } else {
+            Py_RETURN_NONE;
+        }
+    }
+}
+
 static PyMethodDef _libcouchbase_methods[] = {
         { "_init_helpers", (PyCFunction)_libcouchbase_init_helpers,
                 METH_VARARGS|METH_KEYWORDS,
@@ -219,6 +264,9 @@ static PyMethodDef _libcouchbase_methods[] = {
                 "\n"
                 "\n")
         },
+        { "lcb_logging", (PyCFunction)set_log_handler, METH_VARARGS,
+                PyDoc_STR("Get/Set logging callback")
+        },
         { "dump_constants",
                 (PyCFunction)pycbc_print_constants, METH_NOARGS,
                 PyDoc_STR("Print the constants to standard output")
@@ -255,6 +303,9 @@ init_libcouchbase(void)
 #endif
 {
     PyObject *m = NULL;
+
+    /* Initialize the logging routines */
+    pycbc_lcb_logprocs.v.v0.callback = log_handler;
 
 #ifndef PYCBC_CPYCHECKER
 
@@ -335,4 +386,53 @@ init_libcouchbase(void)
 #if PY_MAJOR_VERSION >= 3
     return m;
 #endif
+}
+
+#ifndef va_copy
+#define va_copy(a, b) (a) = (b)
+#endif
+
+/* Logging functionality */
+static void log_handler(struct lcb_logprocs_st *procs,
+                        unsigned int iid,
+                        const char *subsys,
+                        int severity,
+                        const char *srcfile,
+                        int srcline,
+                        const char *fmt,
+                        va_list ap)
+{
+    PyGILState_STATE gil_prev;
+    PyObject *tmp;
+    PyObject *kwargs;
+    va_list vacp;
+
+    if (!pycbc_log_handler) {
+        return;
+    }
+
+    gil_prev = PyGILState_Ensure();
+
+    kwargs = PyDict_New();
+    va_copy(vacp, ap);
+    tmp = PyString_FromFormatV(fmt, vacp);
+    va_end(ap);
+
+    PyDict_SetItemString(kwargs, "message", tmp); Py_DECREF(tmp);
+
+    tmp = pycbc_IntFromL(iid);
+    PyDict_SetItemString(kwargs, "id", tmp); Py_DECREF(tmp);
+
+    tmp = pycbc_IntFromL(severity);
+    PyDict_SetItemString(kwargs, "level", tmp); Py_DECREF(tmp);
+
+    tmp = Py_BuildValue("(s,i)", srcfile, srcline);
+    PyDict_SetItemString(kwargs, "c_src", tmp); Py_DECREF(tmp);
+
+    tmp = pycbc_SimpleStringZ(subsys);
+    PyDict_SetItemString(kwargs, "subsys", tmp); Py_DECREF(tmp);
+
+    PyObject_Call(pycbc_log_handler, pycbc_DummyTuple, kwargs);
+    Py_DECREF(kwargs);
+    PyGILState_Release(gil_prev);
 }
