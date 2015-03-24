@@ -63,13 +63,19 @@ class ExceptionsTest(ConnectionTestCase):
         self.assertEqual(len(exc.all_results),
                          len(kv_missing) + len(kv_existing))
 
+
+        res_ok, res_fail = exc.split_results()
         all_results = exc.all_results
         for k, v in kv_missing.items():
             self.assertTrue(k in all_results)
+            self.assertTrue(k in res_fail)
+            self.assertFalse(k in res_ok)
             self.assertFalse(all_results[k].success)
 
         for k, v in kv_existing.items():
             self.assertTrue(k in all_results)
+            self.assertTrue(k in res_ok)
+            self.assertFalse(k in res_fail)
             self.assertTrue(all_results[k].success)
             self.assertTrue(all_results[k].value)
             self.assertEqual(v, all_results[k].value)

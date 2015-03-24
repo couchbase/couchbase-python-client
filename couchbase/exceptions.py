@@ -144,6 +144,49 @@ class CouchbaseError(Exception):
     def is_data(self):
         return self.categories & C.LCB_ERRTYPE_DATAOP
 
+    def split_results(self):
+        """
+        Convenience method to separate failed and successful results.
+
+        .. versionadded:: 2.0.0
+
+        This function will split the results of the failed operation
+        (see :attr:`.all_results`) into "good" and "bad" dictionaries.
+
+        The intent is for the application to handle any successful
+        results in a success code path, and handle any failed results
+        in a "retry" code path. For example
+
+        .. code-block:: python
+
+            try:
+                cb.add_multi(docs)
+            except CouchbaseTransientError as e:
+                # Temporary failure or server OOM
+                _, fail = e.split_results()
+
+                # Sleep for a bit to reduce the load on the server
+                time.sleep(0.5)
+
+                # Try to add only the failed results again
+                cb.add_multi(fail)
+
+        Of course, in the example above, the second retry may fail as
+        well, and a more robust implementation is left as an exercise
+        to the reader.
+
+        :return: A tuple of ( `ok`, `bad` ) dictionaries.
+        """
+
+        ret_ok, ret_fail = {}, {}
+        for v in self.all_results.values():
+            if v.success:
+                ret_ok[v.key] = v
+            else:
+                ret_fail[v.key] = v
+
+        return ret_ok, ret_fail
+
     def __str__(self):
         details = []
 

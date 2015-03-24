@@ -67,6 +67,7 @@ are specific to the library. Other standard Python exceptions may still be
 thrown depending on the condition.
 
 .. autoexception:: CouchbaseError
+   :members:
 
 --------------------
 Exception Categories
