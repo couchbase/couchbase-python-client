@@ -29,9 +29,8 @@ pkgversion = couchbase_version.get_version()
 LCB_NAME = None
 if sys.platform != 'win32':
     extoptions['libraries'] = ['couchbase']
-    if sys.platform == 'darwin' and sys.executable == '/usr/bin/python':
-        warnings.warn("Compiling on Mac Python. Using homebrew's Python is strongly recommended. Manually adding /usr/local prefix")
-        # Forcefully add library_dirs and include_dirs:
+    if sys.platform == 'darwin':
+        warnings.warn('Adding /usr/local to search path for OS X')
         extoptions['library_dirs'] = ['/usr/local/lib']
         extoptions['include_dirs'] = ['/usr/local/include']
 else:
