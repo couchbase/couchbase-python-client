@@ -304,9 +304,6 @@ init_libcouchbase(void)
 {
     PyObject *m = NULL;
 
-    /* Initialize the logging routines */
-    pycbc_lcb_logprocs.v.v0.callback = log_handler;
-
 #ifndef PYCBC_CPYCHECKER
 
     /**
@@ -382,6 +379,9 @@ init_libcouchbase(void)
 
     /* Add various implementation specific flags */
     PyModule_AddIntConstant(m, "_IMPL_INCLUDE_DOCS", 0);
+
+    /* Initialize the logging routines */
+    pycbc_lcb_logprocs.v.v0.callback = log_handler;
 
 #if PY_MAJOR_VERSION >= 3
     return m;
