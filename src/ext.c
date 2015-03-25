@@ -415,7 +415,7 @@ static void log_handler(struct lcb_logprocs_st *procs,
 
     kwargs = PyDict_New();
     va_copy(vacp, ap);
-    tmp = PyString_FromFormatV(fmt, vacp);
+    tmp = PyUnicode_FromFormatV(fmt, vacp);
     va_end(ap);
 
     PyDict_SetItemString(kwargs, "message", tmp); Py_DECREF(tmp);
