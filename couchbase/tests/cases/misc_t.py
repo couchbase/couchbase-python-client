@@ -155,3 +155,7 @@ class MiscTest(ConnectionTestCase):
         self.assertTrue(lcb.lcb_logging())
         couchbase.disable_logging()
         self.assertFalse(lcb.lcb_logging())
+
+    def test_compat_timeout(self):
+        cb = self.make_connection(timeout=7.5)
+        self.assertEqual(7.5, cb.timeout)

@@ -179,6 +179,19 @@ class Bucket(_Base):
         _no_connect_exceptions = kwargs.pop('_no_connect_exceptions', False)
         _cntlopts = kwargs.pop('_cntl', {})
 
+        # The following two blocks adapt some options from 1.x to proper
+        # connection string (or lcb_cntl_string()) settings.
+        strcntls = {}
+        if 'timeout' in kwargs:
+            _depr('timeout keyword argument',
+                  'operation_timeout (with float value) in connection string')
+            strcntls['operation_timeout'] = str(float(kwargs.pop('timeout')))
+
+        if 'config_cache' in kwargs:
+            _depr('config_cache keyword argument',
+                  'config_cache in connection string')
+            strcntls['config_cache'] = kwargs.pop('config_cache')
+
         tc = kwargs.get('transcoder')
         if isinstance(tc, type):
             kwargs['transcoder'] = tc()
@@ -186,6 +199,9 @@ class Bucket(_Base):
         super(Bucket, self).__init__(*args, **kwargs)
         # Enable detailed error codes for network errors:
         self._cntlstr("detailed_errcodes", "1")
+
+        for ctl, val in strcntls.items():
+            self._cntlstr(ctl, val)
 
         for ctl, val in _cntlopts.items():
             self._cntl(ctl, val)
