@@ -148,6 +148,7 @@ row_callback(lcb_t instance, int cbtype, const lcb_RESPVIEWQUERY *resp)
     pycbc_Bucket *bucket = mres->parent;
     const char * const * hdrs = NULL;
     short htcode = 0;
+    pycbc_ViewResult *vres;
 
     if (resp->htresp != NULL) {
         hdrs = resp->htresp->headers;
@@ -156,8 +157,7 @@ row_callback(lcb_t instance, int cbtype, const lcb_RESPVIEWQUERY *resp)
 
     PYCBC_CONN_THR_END(bucket);
 
-    pycbc_ViewResult *vres = (pycbc_ViewResult *)
-            PyDict_GetItem((PyObject*)mres, Py_None);
+    vres = (pycbc_ViewResult*)PyDict_GetItem((PyObject*)mres, Py_None);
 
     if (resp->rflags & LCB_RESP_F_FINAL) {
         pycbc_httpresult_add_data(mres, &vres->base, resp->value, resp->nvalue);

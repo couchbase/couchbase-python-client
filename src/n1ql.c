@@ -4,7 +4,7 @@
 #include <libcouchbase/n1ql.h>
 
 typedef struct {
-    PyObject_HEAD;
+    PyObject_HEAD
     lcb_N1QLPARAMS *params;
 } N1QLParams;
 
