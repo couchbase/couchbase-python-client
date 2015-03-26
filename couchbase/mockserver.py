@@ -18,6 +18,7 @@ from couchbase._pyport import urlopen, ulp, basestring
 import socket
 import json
 import os.path
+import select
 
 class BucketSpec(object):
     def __init__(self, name='default', bucket_type='couchbase', password=''):
@@ -124,6 +125,16 @@ class CouchbaseMock(object):
         args += ["--buckets", bspec]
 
         self.po = Popen(args)
+
+        # Sometimes we get an invalid JAR file. Unfortunately there is no
+        # way to determine or "wait for completion". The next best thing
+        # is to set a maximum of 15 seconds for the process to start (and
+        # connect to the listening socket);
+
+        rlist, w_, x_ = select.select([self.listen], [], [], 15)
+        if not rlist:
+            raise Exception('Mock server was not ready in time')
+
         self.harakiri_sock, addr = self.listen.accept()
         self.ctlfp = self.harakiri_sock.makefile()
 
