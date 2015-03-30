@@ -47,7 +47,7 @@ You may also employ a different use model, for example:
     try:
         cb.get("foo")
     except CouchbaseError as e:
-        if e.is_data and isintance(e, NotFoundError):
+        if e.is_data and isinstance(e, NotFoundError):
             # handle not found
             pass
         elif e.is_network:
