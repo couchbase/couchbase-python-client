@@ -43,7 +43,7 @@ def _get_packages():
     """
     ret = {}
     for modname in imps:
-        print(repr(modname))
+        # print(repr(modname))
 
         module = __import__('couchbase.tests.cases.'+modname,
                             fromlist=('couchbase', 'tests', 'cases'))
