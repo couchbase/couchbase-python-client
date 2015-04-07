@@ -117,6 +117,7 @@ class MockResourceManager(TestResourceManager):
         super(MockResourceManager, self).__init__()
         self._config = config
         self._info = None
+        self._failed = False
 
     def _reset(self, *args, **kw):
         pass
@@ -128,13 +129,21 @@ class MockResourceManager(TestResourceManager):
         if self._info:
             return self._info
 
+        if self._failed:
+            raise Exception('Not invoking failed mock!')
+
         bspec_dfl = BucketSpec('default', 'couchbase')
         mock = CouchbaseMock([bspec_dfl],
                              self._config.mockpath,
                              self._config.mockurl,
                              replicas=2,
                              nodes=4)
-        mock.start()
+
+        try:
+            mock.start()
+        except:
+            self._failed = True
+            raise
 
         info = ClusterInformation()
         info.bucket_name = "default"
