@@ -16,8 +16,7 @@
 #
 import json
 
-from couchbase._pyport import long, basestring
-from couchbase._libcouchbase import _N1QLParams
+from couchbase._pyport import basestring
 from couchbase.views.iterator import AlreadyQueriedError
 from couchbase.exceptions import CouchbaseError
 
@@ -28,199 +27,137 @@ class N1QLError(CouchbaseError):
         return self.objextra['code']
 
 
-class N1QLRow(object):
-    def __init__(self, jsobj):
-        """
-        Default class wrapping a row returned by an N1QL query.
+CONSISTENCY_REQUEST = 'request_plus'
+"""
+For use with :attr:`~.N1QLQuery.consistency`, will ensure that query
+results always reflect the latest data in the server
+"""
 
-        The fields in the row may be obtained by using the index
-        syntax (``['name']`` or ``[4]``) to retrieve a named or
-        indexed result field.
-        :param jsobj: The raw JSON from the row
-        """
-        self._jsobj = jsobj
-
-    def __getitem__(self, item):
-        if isinstance(item, (int, long)):
-            try:
-                return self._jsobj['${0}'.format(item)]
-            except IndexError:
-                raise IndexError('Row has no positional index {0}'.format(item))
-        else:
-            return self._jsobj[item]
-
-    @property
-    def raw(self):
-        """
-        Retrieve the underlying JSON object
-        """
-        return self._jsobj
-
-    def named_field(self, name):
-        """
-        Retrieve a field by its name
-        :param name: The field name
-        :return: The field value
-        :raise: :exc:`KeyError` if there is no such field
-        """
-        return self._jsobj[name]
-
-    def pos_field(self, pos):
-        """
-        Retrieve a field by its index.
-        The field must have been retrieved as an indexed parameter
-        :param pos: The numeric index
-        :return: The field value
-        :raise: :exc:`IndexError` if there is no such field
-        """
-        return self._jsobj['${0}'.format(pos)]
-
-    def pos_values(self):
-        """
-        Get all positional field values as a list
-        :return: All positional field values.
-        :raise: :exc:`ValueError` if there are no positional results.
-        """
-        ll = []
-        i = 1
-        while True:
-            try:
-                ll.append(self[i])
-                i += 1
-            except (IndexError, KeyError):
-                break
-        if ll:
-            return ll
-        else:
-            raise ValueError('No positional arguments')
-
-    def unwrap(self):
-        """
-        Unwraps the result from any surrounding placeholders.
-
-        This method is useful if the query yields a single top level
-        field (either positional or named).
-
-        This will fail if there is more than one top level object in the row
-        :return: A new :class:`N1QLRow` which encapsulates the top level
-        field.
-        """
-        if len(self._jsobj) > 1:
-            raise ValueError('Cannot unwrap!')
-        return self.__class__(self._jsobj[self._jsobj.keys()[0]])
+CONSISTENCY_NONE = 'none'
+"""
+For use with :attr:`~.N1QLQuery.consistency`, will allow cached
+values to be returned. This will improve performance but may not
+reflect the latest data in the server.
+"""
 
 
 class N1QLQuery(object):
-    def __init__(self, query, prepared=False):
+    def __init__(self, query, *args, **kwargs):
         """
         Create an N1QL Query object. This may be passed as the
         `params` argument to :class:`N1QLRequest`.
 
-        :param query: The query body. This may either be a query string,
-            or a dictionary representing a prepared query.
-        :param prepared: Set to true if the query object should be treated
-            as a prepared statement
+        :param query: The query string to execute
+        :param args: Positional placeholder arguments.
+        :param kwargs: Named placeholder arguments.
+            (The client will automatically prepend a leading ``$``
+            to each named parameter).
+
+        Use positional parameters::
+
+            q = N1QLQuery('SELECT * FROM `travel-sample` '
+                          'WHERE type=$1 AND id=$2',
+                          'airline', 0)
+
+        Use named parameters::
+
+            q = N1QLQuery('SELECT * FROM `travel-sample` '
+                          'WHERE type=$type AND id=$id',
+                           type='airline', id=0)
+
         """
-        self._cparams = _N1QLParams()
-        if prepared:
-            if not isinstance(query, dict):
-                raise ValueError('Prepared query must be a dictionary')
-            self._cparams.setquery(json.dumps(query), 2)
-        else:
-            self._cparams.setquery(query)
-        self._stmt = query
+        self._body = {'statement': query}
+        if args:
+            self._add_pos_args(*args)
+        if kwargs:
+            self._set_named_args(**kwargs)
 
-        self.posargs = []
-        self.namedargs = {}
-
-    def set_args(self, **kv):
+    def _set_named_args(self, **kv):
         """
         Set a named parameter in the query. The named field must
         exist in the query itself.
+
         :param kv: Key-Value pairs representing values within the
             query. These values should be stripped of their leading
             `$` identifier.
+
         """
         for k in kv:
-            self.set_rawargs({'$'+k: kv[k]}, encoded=False)
+            self._body['${0}'.format(k)] = kv
         return self
 
-    def set_rawargs(self, kv, encoded=False):
+    def _add_pos_args(self, *args):
         """
-        :param kv: A dictionary containing the raw key-values for
-            the query arguments.
-        :param encoded: Whether the values are already JSON encoded.
-        """
-        if encoded:
-            self.namedargs.update(**kv)
-            return self
-        for k in kv:
-            self.namedargs[k] = json.dumps(kv[k])
+        Set values for *positional* placeholders (``$1,$2,...``)
 
-        return self
+        :param args: Values to be used
+        """
+        arg_array = self._body.setdefault('args', [])
+        arg_array.extend(args)
 
     def set_option(self, name, value):
-        self._cparams.setopt(name, value)
+        """
+        Set a raw option in the query. This option is encoded
+        as part of the query parameters without any client-side
+        verification. Use this for settings not directly exposed
+        by the Python client.
 
-    def add_args(self, *args):
-        for arg in args:
-            self.posargs.append(json.dumps(arg))
+        :param name: The name of the option
+        :param value: The value of the option
+        """
+        self._body[name] = value
 
     @property
     def statement(self):
-        return self._stmt
+        return self._body['statement']
 
-    def clear(self):
-        self._cparams.clear()
+    @property
+    def consistency(self):
+        """
+        Sets the consistency level.
 
-    def _presubmit(self):
-        for arg in self.posargs:
-            self._cparams.add_pos_param(arg)
-        for k in self.namedargs:
-            self._cparams.set_named_param(k, self.namedargs[k])
+        :see: :data:`CONSISTENCY_NONE`, :data:`CONSISTENCY_REQUEST`
+        """
+        return self._body.get('scan_consistency', CONSISTENCY_NONE)
+
+    @consistency.setter
+    def consistency(self, value):
+        self._body['scan_consistency'] = value
+
+    @property
+    def encoded(self):
+        """
+        Get an encoded representation of the query.
+
+        This is used internally by the client, and can be useful
+        to debug queries.
+        """
+        return json.dumps(self._body)
 
     def __repr__(self):
         return ('<{cls} stmt={stmt} at {oid}>'.format(
             cls=self.__class__.__name__,
-            stmt=repr(self._stmt),
+            stmt=repr(self._body),
             oid=id(self)))
 
 
-class N1QLInsertQuery(N1QLQuery):
-    def __init__(self, keyspace, kv, encode=True):
-        """
-        Create an INSERT query
-        :param string keyspace: The keyspace
-        :param kv: key=value entries to insert
-        :param boolean encode: Whether to encode the values
-        """
-
-        kvp = []
-        for k in kv:
-            v = kv[k]
-            cur = 'VALUES("{0}",{1})'
-            cur = cur.format(k, json.dumps(v) if encode else v)
-            kvp.append(cur)
-
-        ss = 'INSERT INTO {0} {1}'.format(
-            keyspace, ','.join(kvp)
-        )
-        super(N1QLInsertQuery, self).__init__(ss)
-
-
 class N1QLRequest(object):
-    def __init__(self, params, parent, row_factory=N1QLRow, _host=''):
+    def __init__(self, params, parent, row_factory=lambda x: x):
         """
         Object representing the execution of the request on the
         server.
+
+        .. warning::
+
+            You should typically not call this constructor by
+            yourself, rather use the :meth:`~.Bucket.n1ql_query`
+            method (or one of its async derivatives).
+
         :param params: An :class:`N1QLQuery` object.
         :param parent: The parent :class:`.Bucket` object
-        :param row_factory: Callable which accepts the JSON encoded
-            rows and converts them to Python objects. The default is
-            :class:`N1QLRow`. You may use ``lambda x: x`` to just
-            return the raw JSON
-        :param _host: `host:port` specifier, useful for standalone
-            instances of Developer Preview N1QL versions.
+        :param row_factory: Callable which accepts the raw dictionary
+            of each row, and can wrap them in a customized class.
+            The default is simply to return the dictionary itself.
 
         To actually receive results of the query, iterate over this
         object.
@@ -234,16 +171,13 @@ class N1QLRequest(object):
         self.errors = []
         self._mres = None
         self._do_iter = True
-        self._host = _host
         self.__raw = False
 
     def _start(self):
         if self._mres:
             return
 
-        self._params._presubmit()
-        self._mres = self._parent._n1ql_query(
-            self._params._cparams, _host=self._host)
+        self._mres = self._parent._n1ql_query(self._params.encoded)
         self.__raw = self._mres[None]
 
     @property
@@ -278,7 +212,7 @@ class N1QLRequest(object):
         indexes, where the application does not need to extract any
         data, but merely determine success or failure.
         """
-        for r in self:
+        for _ in self:
             pass
 
     def get_single_result(self):
@@ -287,6 +221,7 @@ class N1QLRequest(object):
 
         This should only be used on statements which are intended to
         return only a single result.
+
         :return: The single result, as encapsulated by the
             `row_factory`
         """

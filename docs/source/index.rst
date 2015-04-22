@@ -13,6 +13,7 @@ Contents:
 
    api/couchbase
    api/views
+   api/n1ql
    api/results
    api/exceptions
    api/transcoder

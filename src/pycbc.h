@@ -729,7 +729,6 @@ int pycbc_IOEventType_init(PyObject **ptr);
 int pycbc_AsyncResultType_init(PyObject **ptr);
 int pycbc_IOPSWrapperType_init(PyObject **ptr);
 int pycbc_ViewResultType_init(PyObject **ptr);
-int pycbc_N1QLParamsType_init(PyObject **ptr);
 
 /**
  * Calls the type's constructor with no arguments:
