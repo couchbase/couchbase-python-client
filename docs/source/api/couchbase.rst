@@ -324,6 +324,18 @@ the :meth:`~couchbase.bucket.Bucket.bucket_manager` method on the
     .. automethod:: bucket_manager
 
 
+Flushing (clearing) the Bucket
+==============================
+
+For some stages of development and/or deployment, it might be useful
+to be able to clear the bucket of its contents.
+
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
+
+    .. automethod:: flush
+
+
 Informational Methods
 =====================
 
