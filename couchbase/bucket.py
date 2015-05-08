@@ -1184,12 +1184,21 @@ class Bucket(_Base):
             object constructor.
         :param itercls: Subclass of 'view' to use. This parameter is
             mainly used by async modules
+        :param kwargs: Additional parameters passed to the
+            :class:`~.View` constructor. See that class'
+            documentation for accepted parameters.
 
         .. seealso::
-            * :class:`~.View` which contains more extensive
-                documentation and examples
-            * :class:`~.Query` which contains documentation on
-                the available query options
+
+            :class:`~.View`
+                contains more extensive documentation and examples
+
+            :class:`~.Query`
+                contains documentation on the available query options
+
+            :class:`~.SpatialQuery`
+                contains documentation on the available query options
+                for Geospatial views.
 
         .. note::
 

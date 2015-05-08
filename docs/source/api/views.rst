@@ -747,6 +747,16 @@ To query a geospatial view, you must pass an instance of :class:`.SpatialQuery`
 as the ``query`` keyword argument to either the :class:`.View` constructor, or
 the :meth:`.Bucket.query` method.
 
+.. code-block:: python
+
+    from couchbase.views.params import SpatialQuery
+    q = SpatialQuery(start_range=[0, -90, None], end_range=[180, 90, None])
+    for row in bkt.query(query=q):
+        print "Key:", row.key
+        print "Value:", row.value
+        print "Geometry", row.geometry
+
+
 .. currentmodule:: couchbase.views.params
 
 .. class:: SpatialQuery
@@ -756,13 +766,21 @@ the :meth:`.Bucket.query` method.
     .. attribute:: start_range
 
         The starting range to query. If querying geometries, this should be
-        the lower bounds of the longtitudes and latitudes to filter. Use
+        the lower bounds of the longitudes and latitudes to filter. Use
         `None` to indicate that a given dimension should not be bounded.
+
+        .. code-block:: python
+
+            q.start_range=[0, -90]
 
     .. attribute:: end_range
 
         The upper limit for the range. This contains the upper bounds for
         the ranges specified in ``start_range``.
+
+        .. code-block:: python
+
+            q.end_range[180, 90]
 
     .. attribute:: skip
 
