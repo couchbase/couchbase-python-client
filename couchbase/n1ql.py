@@ -83,7 +83,7 @@ class N1QLQuery(object):
 
         """
         for k in kv:
-            self._body['${0}'.format(k)] = kv
+            self._body['${0}'.format(k)] = kv[k]
         return self
 
     def _add_pos_args(self, *args):

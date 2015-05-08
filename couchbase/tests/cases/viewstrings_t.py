@@ -27,9 +27,9 @@ from couchbase.views.params import (make_options_string,
 from couchbase.exceptions import ArgumentError
 from couchbase.tests.base import CouchbaseTestCase
 
-class QueryStringTest(CouchbaseTestCase):
+class ViewStringTest(CouchbaseTestCase):
     def setUp(self):
-        super(QueryStringTest, self).setUp()
+        super(ViewStringTest, self).setUp()
 
     def _assert_vopteq(self, expected, key, value):
         s = make_options_string({key:value})
