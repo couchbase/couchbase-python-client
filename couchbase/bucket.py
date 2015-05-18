@@ -724,9 +724,8 @@ class Bucket(_Base):
         return self.counter(key, delta=amount, **kwargs)
 
     def incr_multi(self, keys, amount=1, **kwargs):
-
         _depr('incr_multi', 'counter_multi')
-        return self.counter_multi(keys, amount=amount, **kwargs)
+        return self.counter_multi(keys, delta=amount, **kwargs)
 
     def decr(self, key, amount=1, **kwargs):
         _depr('decr', 'counter')
