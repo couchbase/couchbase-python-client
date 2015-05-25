@@ -15,6 +15,7 @@
 # limitations under the License.
 #
 from __future__ import print_function
+import copy
 
 try:
     from urlparse import urlparse, parse_qs
@@ -22,35 +23,83 @@ try:
 except ImportError:
     from urllib.parse import urlparse, parse_qs, urlencode
 
+
 class ConnectionString(object):
     """
-    This module is somewhat internal to help us parse the connection
-    string for the tests
+    This class parses the connection string and may be passed
+    to the :class:`~.Bucket` constructor instead of a raw
+    string.
+
+    .. note::
+
+        Raw strings passed to the :class:`~.Bucket` constructor
+        are *not* first converted into a `ConnectionString`
+        object. This is an internal implementation detail, but
+        may be helpful to know in case of bugs encountered in
+        this class.
+
+    The :meth:`encode` method can be used to check the encoded
+    form of the connection string.
     """
 
+    def __init__(self, bucket='default',
+                 hosts=None, options=None, scheme='couchbase://'):
+        """
+        Create a new ConnectionString object.
+
+        This is an alternative form to manually inputting
+        a connection string.
+
+        :param string bucket: The bucket to connect to
+        :param list hosts: A list of hosts to which the initial
+            connection should be attempted
+        :param dict options: A dictionary of options. These options
+            are passed verbatim to the C library.
+        :param string scheme: The scheme to be used when connecting.
+            This scheme is used to interpret the initial default
+            port to use for each node.
+        """
+
+        #: The bucket to connect to. See :meth:`~.__init__`
+        self.bucket = bucket
+
+        #: Options for the connection. See :meth:`~.__init__`
+        self.options = copy.copy(options) if options else {}
+
+        #: List of hosts. See :meth:`~.__init__`
+        self.hosts = copy.copy(hosts) if hosts else []
+
+        #: The scheme to be used. See :meth:`~.__init__`
+        self.scheme = scheme
+
     @classmethod
-    def from_hb(self, host, bucket):
-        ss = 'couchbase://{0}/{1}'.format(host, bucket)
-        return self(ss)
+    def parse(cls, ss):
+        """
+        Parses an existing connection string
 
+        This method will return a :class:`~.ConnectionString` object
+        which will allow further inspection on the input parameters.
 
-    def __init__(self, ss):
-        self._base = ss
+        :param string ss: The existing connection string
+        :return: A new :class:`~.ConnectionString` object
+        """
+
         up = urlparse(ss)
-        pthstr = up.path
+        path = up.path
 
-        if '?' in pthstr:
-            pthstr, qstr = up.path.split('?')
+        if '?' in path:
+            path, query = up.path.split('?')
         else:
-            qstr = ""
+            query = ""
 
-        if pthstr.startswith('/'):
-            pthstr = pthstr[1:]
+        if path.startswith('/'):
+            path = path[1:]
 
-        self.bucket = pthstr
-        self.options = parse_qs(qstr)
-        self.scheme = up.scheme
-        self.hosts = up.netloc.split(',')
+        bucket = path
+        options = parse_qs(query)
+        scheme = up.scheme
+        hosts = up.netloc.split(',')
+        return cls(bucket=bucket, options=options, hosts=hosts, scheme=scheme)
 
     @property
     def implicit_port(self):
@@ -64,6 +113,11 @@ class ConnectionString(object):
             return -1
 
     def encode(self):
+        """
+        Encodes the current state of the object into a string.
+
+        :return: The encoded string
+        """
         opt_dict = {}
         for k, v in self.options.items():
             opt_dict[k] = v[0]
@@ -83,6 +137,7 @@ def _fmthost(host, port):
     else:
         return host
 
+
 def _build_connstr(host, port, bucket):
     """
     Converts a 1.x host:port specification to a connection string
@@ -99,6 +154,7 @@ def _build_connstr(host, port, bucket):
 
     return 'http://{0}/{1}'.format(','.join(hostlist), bucket)
 
+
 def convert_1x_args(bucket, **kwargs):
     """
     Converts arguments for 1.x constructors to their 2.x forms
@@ -112,7 +168,7 @@ def convert_1x_args(bucket, **kwargs):
 
 if __name__ == "__main__":
     sample = "couchbase://host1:111,host2:222,host3:333/default?op_timeout=4.2"
-    cs = ConnectionString(sample)
+    cs = ConnectionString.parse(sample)
     print("Hosts", cs.hosts)
     print("Implicit Port", cs.implicit_port)
     print("Bucket", cs.bucket)

@@ -49,7 +49,7 @@ class BasicConnectionTest(gen_base(ConnectionTestCase)):
 
     def testMultiHost(self):
         info = self.cluster_info
-        cs = ConnectionString(self.make_connargs()['connection_string'])
+        cs = ConnectionString.parse(self.make_connargs()['connection_string'])
         cs.hosts = [ info.host + ':' + '10', info.host + ':' + str(info.port) ]
         cb = self.make_connection(connection_string=cs.encode())
         d = cb.connect()

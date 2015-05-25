@@ -33,7 +33,7 @@ class ConnectionTest(CouchbaseTestCase):
     @attr('slow')
     def test_server_not_found(self):
         connargs = self.make_connargs()
-        cs = ConnectionString(connargs['connection_string'])
+        cs = ConnectionString.parse(connargs['connection_string'])
         cs.hosts = [ 'example.com' ]
         connargs['connection_string'] = cs.encode()
         self.assertRaises((CouchbaseNetworkError, TimeoutError),
@@ -96,11 +96,9 @@ class ConnectionTest(CouchbaseTestCase):
                           str('couchbase://12345:qwer###/default'))
 
     def test_multi_hosts(self):
-        bkt = self.cluster_info.bucket_name
         passwd = self.cluster_info.bucket_password
-
-        cs = ConnectionString.from_hb(self.cluster_info.host,
-                                      self.cluster_info.bucket_name)
+        cs = ConnectionString(bucket=self.cluster_info.bucket_name,
+                              hosts=[self.cluster_info.host])
 
         if not self.mock:
             cb = self.factory(str(cs), password=passwd)
