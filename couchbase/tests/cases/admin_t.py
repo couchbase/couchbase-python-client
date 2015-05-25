@@ -16,14 +16,15 @@
 #
 
 import sys
-import platform
+import os
 
 from couchbase.admin import Admin
 from couchbase.result import HttpResult
+from couchbase.connstr import ConnectionString
 from couchbase.exceptions import (
-    BadHandleError, ArgumentError, AuthError, ConnectError, CouchbaseError,
+    ArgumentError, AuthError, CouchbaseError,
     CouchbaseNetworkError, HTTPError)
-from couchbase.tests.base import CouchbaseTestCase
+from couchbase.tests.base import CouchbaseTestCase, SkipTest
 
 class AdminSimpleTest(CouchbaseTestCase):
     def setUp(self):
@@ -85,3 +86,42 @@ class AdminSimpleTest(CouchbaseTestCase):
         self.assertRaises(CouchbaseError, self.admin.remove, "foo")
         self.assertRaises(CouchbaseError, self.admin.unlock, "foo", 1)
         str(None)
+
+    def test_actions(self):
+        if not self.is_realserver:
+            raise SkipTest('Real server must be used for admin tests')
+
+        if not os.environ.get('PYCBC_TEST_ADMIN'):
+            raise SkipTest('PYCBC_TEST_ADMIN must be set in the environment')
+
+        try:
+            # Remove the bucket, if it exists
+            self.admin.bucket_remove('dummy')
+        except CouchbaseError:
+            pass
+
+        # Need to explicitly enable admin tests..
+        # Create the bucket
+        self.admin.bucket_create(name='dummy',
+                                 ram_quota=100, bucket_password='letmein')
+        self.admin.wait_ready('dummy', timeout=15.0)
+
+        # All should be OK, ensure we can connect:
+        connstr = ConnectionString.parse(
+            self.make_connargs()['connection_string'])
+
+        connstr.bucket = 'dummy'
+        connstr = connstr.encode()
+        self.factory(connstr, password='letmein')
+        # OK, it exists
+        self.assertRaises(CouchbaseError, self.factory, connstr)
+
+        # Change the password
+        self.admin.bucket_update('dummy',
+                                 self.admin.bucket_info('dummy'),
+                                 bucket_password='')
+        self.factory(connstr)  # No password
+
+        # Remove the bucket
+        self.admin.bucket_remove('dummy')
+        self.assertRaises(CouchbaseError, self.factory, connstr)

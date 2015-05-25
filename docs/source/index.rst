@@ -41,6 +41,20 @@ nevertheless be helpful for debugging or extending existing functionality.
 
    api/async
 
+
+Administrative APIs
+===================
+
+These APIs allow simple manipulation of buckets themselves. They require
+administrative privileges. Currently these APIs are only available for
+the synchronous `couchbase` interface.
+
+.. toctree::
+   :maxdepth: 2
+
+   api/admin
+
+
 Indices and tables
 ==================
 

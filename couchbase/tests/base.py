@@ -223,6 +223,14 @@ class CouchbaseTestCase(ResourcedTestCase):
         raise Exception("Neither mock nor realserver available")
 
     @property
+    def is_realserver(self):
+        return self.cluster_info is self._realserver_info
+
+    @property
+    def is_mock(self):
+        return self.cluster_info is self._mock_info
+
+    @property
     def realserver_info(self):
         if not self._realserver_info:
             raise SkipTest("Real server required")
