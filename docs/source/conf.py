@@ -249,3 +249,4 @@ texinfo_documents = [
 #texinfo_show_urls = 'footnote'
 
 autoclass_content = 'both'
+numpydoc_show_class_members = False
