@@ -159,30 +159,30 @@ pycbc_httpresult_complete(pycbc_HttpResult *htres, pycbc_MultiResult *mres,
 }
 
 static void
-complete_callback(lcb_http_request_t req, lcb_t instance, const void *cookie,
-                  lcb_error_t err, const lcb_http_resp_t *resp)
+complete_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *rb)
 {
     pycbc_MultiResult *mres;
     pycbc_Bucket *bucket;
     pycbc_HttpResult *htres;
-    mres = (pycbc_MultiResult *)cookie;
+    const lcb_RESPHTTP *resp = (const lcb_RESPHTTP *)rb;
+
+    mres = (pycbc_MultiResult *)resp->cookie;
     bucket = mres->parent;
 
     PYCBC_CONN_THR_END(bucket);
 
     htres = (pycbc_HttpResult*)PyDict_GetItem((PyObject*)mres, Py_None);
-    pycbc_httpresult_add_data(mres, htres, resp->v.v0.bytes, resp->v.v0.nbytes);
-    pycbc_httpresult_complete(htres, mres, err,
-                              resp->v.v0.status, resp->v.v0.headers);
+    pycbc_httpresult_add_data(mres, htres, resp->body, resp->nbody);
+    pycbc_httpresult_complete(htres, mres, resp->rc, resp->htstatus, resp->headers);
 
     /* CONN_THR_BEGIN called by httpresult_complete() */
-    (void)instance; (void)req;
+    (void)instance; (void)cbtype;
 }
 
 void
 pycbc_http_callbacks_init(lcb_t instance)
 {
-    lcb_set_http_complete_callback(instance, complete_callback);
+    lcb_install_callback3(instance, LCB_CALLBACK_HTTP, complete_callback);
     pycbc_views_callbacks_init(instance);
 }
 
@@ -203,8 +203,7 @@ pycbc_Bucket__http_request(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     const char *content_type = NULL;
     pycbc_HttpResult *htres = NULL;
     pycbc_MultiResult *mres = NULL;
-
-    lcb_http_cmd_t htcmd = { 0 };
+    lcb_CMDHTTP htcmd = { 0 };
 
     static char *kwlist[] = {
             "type", "method", "path", "content_type", "post_data",
@@ -243,15 +242,15 @@ pycbc_Bucket__http_request(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     }
     mres->mropts |= PYCBC_MRES_F_SINGLE;
 
-    htcmd.v.v1.body = body;
-    htcmd.v.v1.nbody = nbody;
-    htcmd.v.v1.content_type = content_type;
-    htcmd.v.v1.path = path;
-    htcmd.v.v1.npath = strlen(path);
-    htcmd.v.v1.method = method;
+    LCB_CMD_SET_KEY(&htcmd, path, strlen(path));
+    htcmd.body = body;
+    htcmd.nbody = nbody;
+    htcmd.content_type = content_type;
+    htcmd.method = method;
+    htcmd.reqhandle = &htres->u.htreq;
+    htcmd.type = reqtype;
 
-    err = lcb_make_http_request(self->instance,
-                                mres, reqtype, &htcmd, &htres->u.htreq);
+    err = lcb_http3(self->instance, mres, &htcmd);
 
     if (err != LCB_SUCCESS) {
         PYCBC_EXCTHROW_SCHED(err);
