@@ -20,6 +20,7 @@ Contents:
    api/threads
    api/convertfuncs
    api/items
+   api/logging
 
 Asynchronous APIs
 =================

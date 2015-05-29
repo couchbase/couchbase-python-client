@@ -97,7 +97,7 @@ def enable_logging():
     This function enables the C library's logging to be propagated to
     the Python standard `logging` module.
 
-    Calling this function affects any `~.Bucket` objects created
+    Calling this function affects any :class:`~.Bucket` objects created
     afterwards (but not before). Note that currently this will also
     override any ``LCB_LOGLEVEL`` directive inside the environment as
     well.
