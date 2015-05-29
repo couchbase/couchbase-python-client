@@ -29,3 +29,10 @@ Example usage::
     viewiter = cb.query("beer", "brewery_beers", limit=4)
     for row in viewiter:
         print("Have row {0}".format(row))
+
+
+
+.. module:: gcouchbase.bucket
+
+.. autoclass:: Bucket
+    :show-inheritance:

@@ -47,11 +47,10 @@ The semantics of when an exception is passed follows the rules of the
 
     .. autoattribute:: errback
 
-.. class:: AsyncBucket
 
-    .. automethod:: __init__
-    .. automethod:: query
-
+.. autoclass:: AsyncBucket
+    :members:
+    :show-inheritance:
 
 Views Interface
 ===============
