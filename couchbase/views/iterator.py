@@ -113,7 +113,7 @@ class SpatialRowProcessor(RowProcessor):
 
     def handle_rows(self, rows, *_):
         for row in rows:
-            yield self.rowclass(row['key'], row['value'], row['geometry'],
+            yield self.rowclass(row['key'], row['value'], row.get('geometry'),
                                 row.get('id'), get_row_doc(row))
 
 
