@@ -203,6 +203,10 @@ class N1QLRequest(object):
             self._handle_meta(self.raw.value)
             self._do_iter = False
             return []
+        else:
+            # We can only get here if another concurrent query broke out the
+            # event loop before we did.
+            return []
 
     def execute(self):
         """
