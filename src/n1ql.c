@@ -71,11 +71,13 @@ pycbc_Bucket__n1ql_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     pycbc_httpresult_init(&vres->base, mres);
     vres->rows = PyList_New(0);
     vres->base.format = PYCBC_FMT_JSON;
+    vres->base.htype = PYCBC_HTTP_HN1QL;
 
     cmd.content_type = "application/json";
     cmd.callback = n1ql_row_callback;
     cmd.query = params;
     cmd.nquery = nparams;
+    cmd.handle = &vres->base.u.nq;
     rc = lcb_n1ql_query(self->instance, mres, &cmd);
 
     if (rc != LCB_SUCCESS) {

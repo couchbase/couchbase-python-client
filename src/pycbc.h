@@ -25,6 +25,7 @@
 #include <libcouchbase/couchbase.h>
 #include <libcouchbase/api3.h>
 #include <libcouchbase/views.h>
+#include <libcouchbase/n1ql.h>
 
 #if LCB_VERSION < 0x020406
 #error "Couchbase Python SDK requires libcouchbase 2.4.6 or greater"
@@ -382,6 +383,7 @@ typedef struct {
 
 #define PYCBC_HTTP_HVIEW 1
 #define PYCBC_HTTP_HRAW 2
+#define PYCBC_HTTP_HN1QL 3
 
 typedef struct {
     pycbc_Result_HEAD
@@ -391,6 +393,7 @@ typedef struct {
     union {
         lcb_http_request_t htreq;
         lcb_VIEWHANDLE vh;
+        lcb_N1QLHANDLE nq;
     } u;
     unsigned int format;
     unsigned short htcode;

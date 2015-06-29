@@ -61,6 +61,8 @@ HttpResult_dealloc(pycbc_HttpResult *self)
         if (self->parent) {
             if (self->htype == PYCBC_HTTP_HVIEW) {
                 lcb_view_cancel(self->parent->instance, self->u.vh);
+            } else if (self->htype == PYCBC_HTTP_HN1QL) {
+                lcb_n1ql_cancel(self->parent->instance, self->u.nq);
             } else {
                 lcb_cancel_http_request(self->parent->instance, self->u.htreq);
             }
