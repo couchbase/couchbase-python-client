@@ -63,3 +63,29 @@ class N1QLStringTest(CouchbaseTestCase):
         q.consistency = CONSISTENCY_NONE
         dval = json.loads(q.encoded)
         self.assertEqual('none', dval['scan_consistency'])
+
+    def test_encode_scanvec(self):
+        # The value is a vbucket's sequence number,
+        # and guard is a vbucket's UUID.
+
+        q = N1QLQuery('SELECT * FROM default')
+
+        q._add_scanvec((42, 3004, 3))
+        dval = json.loads(q.encoded)
+        sv_exp = {
+            '42': {'value': 3, 'guard': '3004'}
+        }
+
+        self.assertEqual('at_plus', dval['scan_consistency'])
+        self.assertDictEqual(sv_exp, dval['scan_vector'])
+
+        # Ensure the vb field gets updated. No duplicates!
+        q._add_scanvec((42, 3004, 4))
+        sv_exp['42']['value'] = 4
+        dval = json.loads(q.encoded)
+        self.assertEqual(sv_exp, dval['scan_vector'])
+
+        q._add_scanvec((91, 7779, 23))
+        dval = json.loads(q.encoded)
+        sv_exp['91'] = {'guard': '7779', 'value': 23}
+        self.assertEqual(sv_exp, dval['scan_vector'])

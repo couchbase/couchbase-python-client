@@ -18,7 +18,7 @@ import json
 
 from couchbase._pyport import basestring
 from couchbase.views.iterator import AlreadyQueriedError
-from couchbase.exceptions import CouchbaseError
+from couchbase.exceptions import CouchbaseError, NotSupportedError
 
 
 class N1QLError(CouchbaseError):
@@ -123,6 +123,85 @@ class N1QLQuery(object):
     @consistency.setter
     def consistency(self, value):
         self._body['scan_consistency'] = value
+
+    def _add_scanvec(self, mutinfo):
+        """
+        Internal method used to specify a scan vector.
+        :param mutinfo: A tuple in the form of
+            `(vbucket id, vbucket uuid, mutation sequence)`
+        """
+        vb, uuid, seq = mutinfo
+        self._body.setdefault('scan_vector', {})[vb] = {
+            'value': seq,
+            'guard': str(uuid)
+        }
+        self.consistency = 'at_plus'
+
+    def consistent_with_ops(self, *ops, **kwargs):
+        """
+        Ensure results reflect consistency of one or more mutations.
+        This is similar to setting :attr:`consistency` to
+        :data:`CONSISTENCY_REQUEST`, but is more optimal as the query
+        will use cached data, *except* when the given mutation(s) are
+        concerned. This option is useful for use patterns when an
+        application has just performed a mutation, and wishes to
+        perform a query in which the newly-performed mutation
+        should reflect on the query results.
+
+        :param ops: One or more :class:`~.OperationResult` objects
+        :param bool quiet: Whether to suppress throwing an exception
+            if one or more operations are missing mutation information.
+        :raise: :exc:`~.NotSupportedError` if one of the mutations
+
+        .. note::
+
+            This feature requires Couchbase Server 4.0 or greater,
+            and also requires that `fetch_mutation_tokens=true`
+            be specified in the connection string when creating
+            a :class:`~couchbase.bucket.Bucket`
+
+
+        .. code-block:: python
+
+            cb = Bucket('couchbase://localhost/default?fetch_mutation_tokens=true')
+
+            rvs = cb.upsert_multi({
+                'foo': {'type': 'user', 'value': 'a foo value'},
+                'bar': {'type': 'user', 'value': 'a bar value'}
+            })
+
+            nq = N1QLQuery('SELECT type, value FROM default WHERE type="user"')
+            nq.consistent_with_ops(*rvs.values())
+            for row in cb.n1ql_query(nq):
+                # ...
+
+
+        .. seealso:: :meth:`~consistent_with_all`
+        """
+        for op in ops:
+            if not op._mutinfo:
+                if kwargs.get('quiet'):
+                    continue
+                raise NotSupportedError.pyexc(
+                    "OperationResult object missing mutation information. "
+                    "Ensure that `fetch_mutation_tokens=true` was specified "
+                    "in the connection string")
+            self._add_scanvec(op._mutinfo)
+
+    def consistent_with_all(self, bucket):
+        """
+        Ensures the query result is consistent with all prior
+        mutations performed by a given bucket.
+
+        Using this function is equivalent to keeping track of all
+        mutations performed by the given bucket, and passing them to
+        :meth:`~consistent_with_ops`
+
+        :param bucket: A :class:`~couchbase.bucket.Bucket` object
+            used for the mutations
+        """
+        for mt in bucket._mutinfo():
+            self._add_scanvec(mt)
 
     @property
     def encoded(self):
