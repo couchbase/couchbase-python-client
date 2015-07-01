@@ -18,6 +18,7 @@
 #include "structmember.h"
 #include "oputil.h"
 #include "iops.h"
+#include <libcouchbase/vbucket.h>
 
 PyObject *pycbc_DummyTuple;
 PyObject *pycbc_DummyKeywords;
@@ -290,6 +291,43 @@ Bucket__get_timings(pycbc_Bucket *self)
     return ll;
 }
 
+static PyObject *
+Bucket__mutinfo(pycbc_Bucket *self)
+{
+    PyObject *ll = PyList_New(0);
+    size_t ii, vbmax;
+    lcbvb_CONFIG *cfg = NULL;
+    lcb_error_t rc;
+
+    rc = lcb_cntl(self->instance, LCB_CNTL_GET, LCB_CNTL_VBCONFIG, &cfg);
+    if (rc != LCB_SUCCESS) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, rc, "Couldn't get vBucket config");
+        return NULL;
+    }
+
+    vbmax = vbucket_config_get_num_vbuckets(cfg);
+    for (ii = 0; ii < vbmax; ++ii) {
+        lcb_KEYBUF kb = { 0 };
+        const lcb_MUTATION_TOKEN *mt;
+        lcb_error_t rc = LCB_SUCCESS;
+        PyObject *cur;
+
+        kb.type = LCB_KV_VBID;
+        kb.contig.nbytes = (size_t)ii;
+
+        mt = lcb_get_mutation_token(self->instance, &kb, &rc);
+        if (mt == NULL) {
+            continue;
+        }
+        cur = Py_BuildValue("HKK", LCB_MUTATION_TOKEN_VB(mt),
+            LCB_MUTATION_TOKEN_ID(mt), LCB_MUTATION_TOKEN_SEQ(mt));
+        PyList_Append(ll, cur);
+        Py_DECREF(cur);
+    }
+
+    return ll;
+}
+
 
 static PyGetSetDef Bucket_TABLE_getset[] = {
         { "default_format",
@@ -538,6 +576,12 @@ static PyMethodDef Bucket_TABLE_methods[] = {
                 (PyCFunction)pycbc_Bucket__vbmap,
                 METH_VARARGS,
                 PyDoc_STR("Returns a tuple of (vbucket, server index) for a key")
+        },
+
+        { "_mutinfo",
+                (PyCFunction)Bucket__mutinfo,
+                METH_NOARGS,
+                PyDoc_STR("Gets known mutation information")
         },
 
         { NULL, NULL, 0, NULL }

@@ -352,7 +352,8 @@ typedef struct {
 
 #define pycbc_OpResult_HEAD \
     pycbc_Result_HEAD \
-    lcb_uint64_t cas;
+    lcb_uint64_t cas; \
+    PyObject *mutinfo;
 
 typedef struct {
     pycbc_Result_HEAD

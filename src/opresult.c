@@ -35,6 +35,7 @@ static void
 OperationResult_dealloc(pycbc_OperationResult *self)
 {
     pycbc_Result_dealloc((pycbc_Result*)self);
+    Py_CLEAR(self->mutinfo);
 }
 
 static void
@@ -68,6 +69,10 @@ static struct PyMemberDef OperationResult_TABLE_members[] = {
         { "cas",
                 T_ULONGLONG, offsetof(pycbc_OperationResult, cas),
                 READONLY, PyDoc_STR("CAS For the key")
+        },
+        { "_mutinfo",
+                T_OBJECT_EX, offsetof(pycbc_OperationResult, mutinfo),
+                READONLY, PyDoc_STR("Mutation info")
         },
         { NULL }
 };

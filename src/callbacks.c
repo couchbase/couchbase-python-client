@@ -233,6 +233,21 @@ durability_chain_common(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
 
     res->rc = resp->rc;
     if (resp->rc == LCB_SUCCESS) {
+        const lcb_MUTATION_TOKEN *mutinfo = NULL;
+
+        Py_XDECREF(res->mutinfo);
+
+        mutinfo = lcb_resp_get_mutation_token(cbtype, resp);
+        if (mutinfo && LCB_MUTATION_TOKEN_ISVALID(mutinfo)) {
+            /* Create the mutation token tuple: (vb,uuid,seqno) */
+            res->mutinfo = Py_BuildValue("HKK",
+                LCB_MUTATION_TOKEN_VB(mutinfo),
+                LCB_MUTATION_TOKEN_ID(mutinfo),
+                LCB_MUTATION_TOKEN_SEQ(mutinfo));
+        } else {
+            Py_INCREF(Py_None);
+            res->mutinfo = Py_None;
+        }
         res->cas = resp->cas;
     }
 
