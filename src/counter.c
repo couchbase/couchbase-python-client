@@ -28,27 +28,20 @@ handle_single_arith(pycbc_Bucket *self, struct pycbc_common_vars *cv,
     int optype, PyObject *curkey, PyObject *curvalue, PyObject *options,
     pycbc_Item *item, void *arg)
 {
-    void *key;
-    size_t nkey;
     int rv = 0;
     lcb_error_t err;
     lcb_CMDCOUNTER cmd;
     struct arithmetic_common_vars my_params;
     static char *kwlist[] = { "delta", "initial", "ttl", NULL };
+    pycbc_pybuffer keybuf = { 0 };
     my_params = *(struct arithmetic_common_vars *)arg;
 
     (void)item;
     memset(&cmd, 0, sizeof cmd);
 
-    rv = pycbc_tc_encode_key(self, &curkey, &key, &nkey);
+    rv = pycbc_tc_encode_key(self, curkey, &keybuf);
     if (rv < 0) {
         return -1;
-    }
-
-    if (!nkey) {
-        PYCBC_EXCTHROW_EMPTYKEY();
-        rv = -1;
-        goto GT_DONE;
     }
 
     if (options) {
@@ -83,7 +76,7 @@ handle_single_arith(pycbc_Bucket *self, struct pycbc_common_vars *cv,
         }
     }
 
-    LCB_CMD_SET_KEY(&cmd, key, nkey);
+    LCB_CMD_SET_KEY(&cmd, keybuf.buffer, keybuf.length);
     cmd.delta = my_params.delta;
     cmd.create = my_params.create;
     cmd.initial = my_params.initial;
@@ -97,7 +90,7 @@ handle_single_arith(pycbc_Bucket *self, struct pycbc_common_vars *cv,
     }
 
     GT_DONE:
-    Py_XDECREF(curkey);
+    PYCBC_PYBUF_RELEASE(&keybuf);
     return rv;
 }
 

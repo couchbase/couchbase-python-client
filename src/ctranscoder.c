@@ -25,8 +25,7 @@ static PyObject *
 encode_key(PyObject *self, PyObject *args)
 {
     int rv;
-    char *buf;
-    size_t nbuf;
+    pycbc_pybuffer keybuf;
     PyObject *kobj;
 
     rv = PyArg_ParseTuple(args, "O", &kobj);
@@ -34,13 +33,13 @@ encode_key(PyObject *self, PyObject *args)
         return NULL;
     }
 
-    rv = pycbc_tc_simple_encode(&kobj, &buf, &nbuf, PYCBC_FMT_UTF8);
+    rv = pycbc_tc_simple_encode(kobj, &keybuf,PYCBC_FMT_UTF8);
     if (rv < 0) {
         return NULL;
     }
 
     (void)self;
-    return kobj;
+    return keybuf.pyobj;
 }
 
 static PyObject *
@@ -77,9 +76,8 @@ encode_value(PyObject *self, PyObject *args)
     int rv;
     PyObject *vobj;
     PyObject *flagsobj;
-    char *buf;
+    pycbc_pybuffer valbuf = { NULL };
     PyObject *ret;
-    size_t nbuf;
 
     rv = PyArg_ParseTuple(args, "OO", &vobj, &flagsobj);
     if (!rv) {
@@ -91,13 +89,13 @@ encode_value(PyObject *self, PyObject *args)
         return NULL;
     }
 
-    rv = pycbc_tc_simple_encode(&vobj, &buf, &nbuf, flags);
+    rv = pycbc_tc_simple_encode(vobj, &valbuf, flags);
     if (rv < 0) {
         return NULL;
     }
 
     ret = PyTuple_New(2);
-    PyTuple_SET_ITEM(ret, 0, vobj);
+    PyTuple_SET_ITEM(ret, 0, valbuf.pyobj);
     PyTuple_SET_ITEM(ret, 1, flagsobj);
 
     /** INCREF flags because we got it as an argument */

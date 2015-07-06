@@ -34,8 +34,7 @@ handle_single_keyop(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype
     void *arg)
 {
     int rv;
-    char *key;
-    size_t nkey;
+    pycbc_pybuffer keybuf = { NULL };
     lcb_U64 cas = 0;
     lcb_error_t err;
 
@@ -55,16 +54,9 @@ handle_single_keyop(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype
         curval = curkey;
         curkey = ((pycbc_OperationResult*)curkey)->key;
     }
-
-    rv = pycbc_tc_encode_key(self, &curkey, (void**)&key, &nkey);
+    rv = pycbc_tc_encode_key(self, curkey, &keybuf);
     if (rv == -1) {
         return -1;
-    }
-
-    if (!nkey) {
-        PYCBC_EXCTHROW_EMPTYKEY();
-        rv = -1;
-        goto GT_DONE;
     }
 
     if (item) {
@@ -90,17 +82,19 @@ handle_single_keyop(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype
         if (cas == (lcb_uint64_t)-1 && PyErr_Occurred()) {
             PyErr_Clear();
             PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Invalid CAS specified");
-            return -1;
+            rv = -1;
+            goto GT_DONE;
         }
     }
 
-    LCB_CMD_SET_KEY(&ucmd.base, key, nkey);
+    LCB_CMD_SET_KEY(&ucmd.base, keybuf.buffer, keybuf.length);
     ucmd.base.cas = cas;
 
     if (optype == PYCBC_CMD_UNLOCK) {
         if (!cas) {
             PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "CAS must be specified for unlock");
-            return -1;
+            rv = -1;
+            goto GT_DONE;
         }
         err = lcb_unlock3(self->instance, cv->mres, &ucmd.unl);
 
@@ -118,7 +112,7 @@ handle_single_keyop(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype
     }
 
     GT_DONE:
-    Py_XDECREF(curkey);
+    PYCBC_PYBUF_RELEASE(&keybuf);
     return rv;
 }
 

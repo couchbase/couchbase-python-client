@@ -37,12 +37,11 @@ handle_single_key(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
     void *arg)
 {
     int rv;
-    char *key;
-    size_t nkey;
     unsigned int lock = 0;
     struct getcmd_vars_st *gv = (struct getcmd_vars_st *)arg;
     unsigned long ttl = gv->u.ttl;
     lcb_error_t err;
+    pycbc_pybuffer keybuf = { NULL };
 
     union {
         lcb_CMDBASE base;
@@ -54,18 +53,12 @@ handle_single_key(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
     memset(&u_cmd, 0, sizeof u_cmd);
     (void)itm;
 
-    rv = pycbc_tc_encode_key(self, &curkey, (void**)&key, &nkey);
+    rv = pycbc_tc_encode_key(self, curkey, &keybuf);
     if (rv == -1) {
         return -1;
     }
 
-    if (!nkey) {
-        PYCBC_EXCTHROW_EMPTYKEY();
-        rv = -1;
-        goto GT_DONE;
-    }
-
-    LCB_CMD_SET_KEY(&u_cmd.base, key, nkey);
+    LCB_CMD_SET_KEY(&u_cmd.base, keybuf.buffer, keybuf.length);
 
     if (curval && gv->allow_dval && options == NULL) {
         options = curval;
@@ -150,7 +143,7 @@ handle_single_key(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
     }
 
     GT_DONE:
-    Py_XDECREF(curkey);
+    PYCBC_PYBUF_RELEASE(&keybuf);
     return rv;
 }
 

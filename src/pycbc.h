@@ -961,6 +961,17 @@ PyObject *pycbc_exc_mktuple(void);
 #define PYCBC_EXCTHROW_EMPTYKEY() PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, \
         "Empty key (i.e. '', empty string) passed")
 
+typedef struct {
+    PyObject *pyobj;
+    const void *buffer;
+    size_t length;
+} pycbc_pybuffer;
+
+#define PYCBC_PYBUF_RELEASE(buf) do { \
+    Py_XDECREF((buf)->pyobj); \
+    (buf)->pyobj = NULL; \
+} while (0)
+
 /**
  * Encodes a key into a buffer.
  * @param conn the connection object
@@ -975,10 +986,7 @@ PyObject *pycbc_exc_mktuple(void);
  * @return
  * 0 on success, nonzero on error
  */
-int pycbc_tc_encode_key(pycbc_Bucket *conn,
-                        PyObject **key,
-                        void **buf,
-                        size_t *nbuf);
+int pycbc_tc_encode_key(pycbc_Bucket *conn, PyObject *src, pycbc_pybuffer *dst);
 
 /**
  * Decodes a key buffer into a python object.
@@ -991,9 +999,7 @@ int pycbc_tc_encode_key(pycbc_Bucket *conn,
  * @return
  * 0 on success, nonzero on error
  */
-int pycbc_tc_decode_key(pycbc_Bucket *conn,
-                        const void *key,
-                        size_t nkey,
+int pycbc_tc_decode_key(pycbc_Bucket *conn, const void *key, size_t nkey,
                         PyObject **pobj);
 
 /**
@@ -1007,12 +1013,8 @@ int pycbc_tc_decode_key(pycbc_Bucket *conn,
  * @param flags pointer to a flags variable, will be set with the appropriate
  * flags
  */
-int pycbc_tc_encode_value(pycbc_Bucket *conn,
-                          PyObject **value,
-                          PyObject *flag_v,
-                          void **buf,
-                          size_t *nbuf,
-                          lcb_uint32_t *flags);
+int pycbc_tc_encode_value(pycbc_Bucket *conn, PyObject *srcbuf, PyObject *flag_v,
+                          pycbc_pybuffer *dstbuf, lcb_U32 *dstflags);
 
 /**
  * Decode a value with flags
@@ -1022,29 +1024,19 @@ int pycbc_tc_encode_value(pycbc_Bucket *conn,
  * @param flags flags as received from the server
  * @param pobj the pythonized value
  */
-int pycbc_tc_decode_value(pycbc_Bucket *conn,
-                          const void *value,
-                          size_t nvalue,
-                          lcb_uint32_t flags,
-                          PyObject **pobj);
-
-
+int pycbc_tc_decode_value(pycbc_Bucket *conn, const void *value, size_t nvalue,
+                          lcb_U32 flags, PyObject **pobj);
 
 /**
  * Like encode_value, but only uses built-in encoders
  */
-int pycbc_tc_simple_encode(PyObject **p,
-                           void *buf,
-                           size_t *nbuf,
-                           lcb_uint32_t flags);
+int pycbc_tc_simple_encode(PyObject *src, pycbc_pybuffer *dst, lcb_U32 flags);
 
 /**
  * Like decode_value, but only uses built-in decoders
  */
-int pycbc_tc_simple_decode(PyObject **vp,
-                           const char *buf,
-                           size_t nbuf,
-                           lcb_uint32_t flags);
+int pycbc_tc_simple_decode(PyObject **vp, const char *buf, size_t nbuf,
+                           lcb_U32 flags);
 
 /**
  * Automatically determine the format for the object.

@@ -92,22 +92,15 @@ handle_single_observe(pycbc_Bucket *self, PyObject *curkey, int master_only,
     struct pycbc_common_vars *cv)
 {
     int rv;
-    char *key;
-    size_t nkey;
+    pycbc_pybuffer keybuf = { NULL };
     lcb_CMDOBSERVE cmd = { 0 };
     lcb_error_t err;
 
-    rv = pycbc_tc_encode_key(self, &curkey, (void**)&key, &nkey);
+    rv = pycbc_tc_encode_key(self, curkey, &keybuf);
     if (rv < 0) {
         return -1;
     }
-    LCB_CMD_SET_KEY(&cmd, key, nkey);
-
-    if (!nkey) {
-        PYCBC_EXCTHROW_EMPTYKEY();
-        rv = -1;
-        goto GT_DONE;
-    }
+    LCB_CMD_SET_KEY(&cmd, keybuf.buffer, keybuf.length);
 
     if (master_only) {
         cmd.cmdflags |= LCB_CMDOBSERVE_F_MASTER_ONLY;
@@ -121,8 +114,7 @@ handle_single_observe(pycbc_Bucket *self, PyObject *curkey, int master_only,
         rv = -1;
     }
 
-    GT_DONE:
-    Py_XDECREF(curkey);
+    PYCBC_PYBUF_RELEASE(&keybuf);
     return rv;
 }
 

@@ -73,7 +73,7 @@ convert_to_string(const char *buf, size_t nbuf, int mode)
 }
 
 static int
-encode_common(PyObject **o, void **buf, size_t *nbuf, lcb_uint32_t flags)
+encode_common(PyObject *src, pycbc_pybuffer *dst, lcb_U32 flags)
 {
     PyObject *bytesobj;
     Py_ssize_t plen;
@@ -81,29 +81,27 @@ encode_common(PyObject **o, void **buf, size_t *nbuf, lcb_uint32_t flags)
 
     if (flags == PYCBC_FMT_UTF8) {
 #if PY_MAJOR_VERSION == 2
-        if (PyString_Check(*o)) {
+        if (PyString_Check(src)) {
 #else
         if (0) {
 #endif
-            bytesobj = *o;
-            Py_INCREF(*o);
+            bytesobj = src;
+            Py_INCREF(bytesobj);
         } else {
-            if (!PyUnicode_Check(*o)) {
+            if (!PyUnicode_Check(src)) {
                 PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ENCODING,
-                                   0, "Must be unicode or string", *o);
+                                   0, "Must be unicode or string", src);
                 return -1;
             }
-            bytesobj = PyUnicode_AsUTF8String(*o);
+            bytesobj = PyUnicode_AsUTF8String(src);
         }
-
     } else if (flags == PYCBC_FMT_BYTES) {
-        if (PyBytes_Check(*o) || PyByteArray_Check(*o)) {
-            bytesobj = *o;
-            Py_INCREF(*o);
-
+        if (PyBytes_Check(src) || PyByteArray_Check(src)) {
+            bytesobj = src;
+            Py_INCREF(bytesobj);
         } else {
             PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ENCODING, 0,
-                               "Must be bytes or bytearray", *o);
+                               "Must be bytes or bytearray", src);
             return -1;
         }
 
@@ -122,13 +120,13 @@ encode_common(PyObject **o, void **buf, size_t *nbuf, lcb_uint32_t flags)
             return -1;
         }
 
-        args = PyTuple_Pack(1, *o);
+        args = PyTuple_Pack(1, src);
         bytesobj = PyObject_CallObject(helper, args);
         Py_DECREF(args);
 
         if (!bytesobj) {
             PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ENCODING,
-                               0, "Couldn't encode value", *o);
+                               0, "Couldn't encode value", src);
             return -1;
         }
 
@@ -143,11 +141,11 @@ encode_common(PyObject **o, void **buf, size_t *nbuf, lcb_uint32_t flags)
     }
 
     if (PyByteArray_Check(bytesobj)) {
-        *buf = PyByteArray_AS_STRING(bytesobj);
+        dst->buffer = PyByteArray_AS_STRING(bytesobj);
         plen = PyByteArray_GET_SIZE(bytesobj);
         rv = 0;
     } else {
-        rv = PyBytes_AsStringAndSize(bytesobj, (char**)buf, &plen);
+        rv = PyBytes_AsStringAndSize(bytesobj, (char**)&dst->buffer, &plen);
     }
 
     if (rv < 0) {
@@ -156,8 +154,8 @@ encode_common(PyObject **o, void **buf, size_t *nbuf, lcb_uint32_t flags)
         return -1;
     }
 
-    *nbuf = plen;
-    *o = bytesobj;
+    dst->pyobj = bytesobj;
+    dst->length = plen;
     return 0;
 }
 
@@ -233,19 +231,13 @@ decode_common(PyObject **vp, const char *buf, size_t nbuf, lcb_uint32_t flags)
 }
 
 int
-pycbc_tc_simple_encode(PyObject **p,
-                       void *buf,
-                       size_t *nbuf,
-                       lcb_uint32_t flags)
+pycbc_tc_simple_encode(PyObject *src, pycbc_pybuffer *dst, lcb_U32 flags)
 {
-    return encode_common(p, buf, nbuf, flags);
+    return encode_common(src, dst, flags);
 }
 
 int
-pycbc_tc_simple_decode(PyObject **vp,
-                       const char *buf,
-                       size_t nbuf,
-                       lcb_uint32_t flags)
+pycbc_tc_simple_decode(PyObject **vp, const char *buf, size_t nbuf, lcb_U32 flags)
 {
     return decode_common(vp, buf, nbuf, flags);
 }
@@ -257,11 +249,8 @@ enum {
     DECODE_VALUE
 };
 static int
-do_call_tc(pycbc_Bucket *conn,
-          PyObject *obj,
-          PyObject *flags,
-          PyObject **result,
-          int mode)
+do_call_tc(pycbc_Bucket *conn, PyObject *obj, PyObject *flags,
+           PyObject **result, int mode)
 {
     PyObject *meth = NULL;
     PyObject *args = NULL;
@@ -307,6 +296,7 @@ do_call_tc(pycbc_Bucket *conn,
         PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ENCODING, 0,
                            "User-Defined transcoder failed",
                            obj);
+        ret = -1;
     }
 
     GT_DONE:
@@ -317,41 +307,39 @@ do_call_tc(pycbc_Bucket *conn,
 
 
 int
-pycbc_tc_encode_key(pycbc_Bucket *conn,
-                    PyObject **key,
-                    void **buf,
-                    size_t *nbuf)
+pycbc_tc_encode_key(pycbc_Bucket *conn, PyObject *src, pycbc_pybuffer *dst)
 {
     int rv;
     Py_ssize_t plen;
 
-    PyObject *orig_key;
-    PyObject *new_key = NULL;
-
     if (!conn->tc) {
-        return encode_common(key, buf, nbuf, PYCBC_FMT_UTF8);
+        rv = encode_common(src, dst, PYCBC_FMT_UTF8);
+        if (rv == 0 && dst->length == 0) {
+            PYCBC_EXCTHROW_EMPTYKEY();
+            rv = -1;
+        }
+        return rv;
     }
 
-    orig_key = *key;
-    pycbc_assert(orig_key);
+    /* Swap out key and new key. Assign back later on */
 
-    rv = do_call_tc(conn, orig_key, NULL, &new_key, ENCODE_KEY);
+    rv = do_call_tc(conn, src, NULL, &dst->pyobj, ENCODE_KEY);
 
-    if (new_key == NULL || rv < 0) {
+    if (dst->pyobj == NULL || rv < 0) {
+        dst->pyobj = NULL;
         return -1;
     }
 
-    rv = PyBytes_AsStringAndSize(new_key, (char**)buf, &plen);
+    rv = PyBytes_AsStringAndSize(dst->pyobj, (char**)&dst->buffer, &plen);
 
     if (rv == -1) {
         PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ENCODING,
                            0,
                            "Couldn't convert encoded key to bytes. It is "
                            "possible that the Transcoder.encode_key method "
-                           "returned an unexpected value",
-                           new_key);
+                           "returned an unexpected value", dst->pyobj);
 
-        Py_XDECREF(new_key);
+        PYCBC_PYBUF_RELEASE(dst);
         return -1;
     }
 
@@ -359,21 +347,17 @@ pycbc_tc_encode_key(pycbc_Bucket *conn,
         PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ENCODING,
                            0,
                            "Transcoder.encode_key returned an empty string",
-                           new_key);
-        Py_XDECREF(new_key);
+                           dst->pyobj);
+        PYCBC_PYBUF_RELEASE(dst);
         return -1;
     }
-
-    *nbuf = plen;
-    *key = new_key;
+    dst->length = plen;
     return 0;
 }
 
 int
-pycbc_tc_decode_key(pycbc_Bucket *conn,
-                     const void *key,
-                     size_t nkey,
-                     PyObject **pobj)
+pycbc_tc_decode_key(pycbc_Bucket *conn, const void *key, size_t nkey,
+                    PyObject **pobj)
 {
     PyObject *bobj;
     int rv = 0;
@@ -437,50 +421,40 @@ pycbc_tc_determine_format(PyObject *value)
 }
 
 int
-pycbc_tc_encode_value(pycbc_Bucket *conn,
-                       PyObject **value,
-                       PyObject *flag_v,
-                       void **buf,
-                       size_t *nbuf,
-                       lcb_uint32_t *flags)
+pycbc_tc_encode_value(pycbc_Bucket *conn, PyObject *srcbuf, PyObject *srcflags,
+                      pycbc_pybuffer *dstbuf, lcb_U32 *dstflags)
 {
     PyObject *flags_obj;
-    PyObject *orig_value;
     PyObject *new_value = NULL;
     PyObject *result_tuple = NULL;
-    lcb_uint32_t flags_stackval;
+    lcb_U32 flags_stackval;
     int rv;
     Py_ssize_t plen;
 
-    orig_value = *value;
-
-    if (!flag_v) {
-        flag_v = conn->dfl_fmt;
+    if (!srcflags) {
+        srcflags = conn->dfl_fmt;
     }
 
     if (!conn->tc) {
-
-        if (flag_v == pycbc_helpers.fmt_auto) {
-            flag_v = pycbc_tc_determine_format(*value);
+        if (srcflags == pycbc_helpers.fmt_auto) {
+            srcflags = pycbc_tc_determine_format(srcbuf);
         }
 
-        rv = pycbc_get_u32(flag_v, &flags_stackval);
+        rv = pycbc_get_u32(srcflags, &flags_stackval);
         if (rv < 0) {
             PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0,
-                               "Bad value for flags",
-                               flag_v);
+                               "Bad value for flags", srcflags);
             return -1;
         }
 
-        *flags = flags_stackval;
-        return encode_common(value, buf, nbuf, flags_stackval);
+        *dstflags = flags_stackval;
+        return encode_common(srcbuf, dstbuf, flags_stackval);
     }
 
     /**
      * Calling into Transcoder
      */
-
-    rv = do_call_tc(conn, orig_value, flag_v, &result_tuple, ENCODE_VALUE);
+    rv = do_call_tc(conn, srcbuf, srcflags, &result_tuple, ENCODE_VALUE);
     if (rv < 0) {
         return -1;
     }
@@ -488,8 +462,7 @@ pycbc_tc_encode_value(pycbc_Bucket *conn,
     if (!PyTuple_Check(result_tuple) || PyTuple_GET_SIZE(result_tuple) != 2) {
         PYCBC_EXC_WRAP_EX(PYCBC_EXC_ENCODING, 0,
                           "Expected return of (bytes, flags)",
-                          orig_value,
-                          result_tuple);
+                          srcbuf, result_tuple);
 
         Py_XDECREF(result_tuple);
         return -1;
@@ -512,24 +485,22 @@ pycbc_tc_encode_value(pycbc_Bucket *conn,
         Py_XDECREF(result_tuple);
         PYCBC_EXC_WRAP_VALUE(PYCBC_EXC_ENCODING, 0,
                              "Transcoder.encode_value() returned a bad "
-                             "value for flags", orig_value);
+                             "value for flags", srcbuf);
         return -1;
     }
 
-    *flags = flags_stackval;
-    rv = PyBytes_AsStringAndSize(new_value, (char**)buf, &plen);
+    *dstflags = flags_stackval;
+    rv = PyBytes_AsStringAndSize(new_value, (char**)&dstbuf->buffer, &plen);
     if (rv == -1) {
         Py_XDECREF(result_tuple);
-
         PYCBC_EXC_WRAP_VALUE(PYCBC_EXC_ENCODING, 0,
                              "Value returned by Transcoder.encode_value() "
-                             "could not be converted to bytes",
-                orig_value);
+                             "could not be converted to bytes", srcbuf);
         return -1;
     }
 
-    *value = new_value;
-    *nbuf = plen;
+    dstbuf->pyobj = new_value;
+    dstbuf->length = plen;
 
     Py_INCREF(new_value);
     Py_XDECREF(result_tuple);

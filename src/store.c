@@ -110,10 +110,7 @@ handle_single_kv(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
     int rv;
     const struct storecmd_vars *scv = (struct storecmd_vars *)arg;
     struct single_key_context skc = { NULL };
-    const void *key, *value;
-    /* backing key/values for to-bytes conversion. Freed at the end */
-    PyObject *encvalue = NULL, *enckey = NULL;
-    size_t nkey, nvalue;
+    pycbc_pybuffer keybuf = { NULL }, valbuf = { NULL };
     lcb_error_t err;
     lcb_CMDSTORE cmd = { 0 };
 
@@ -122,16 +119,9 @@ handle_single_kv(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
     skc.value = curvalue;
     skc.cas = scv->single_cas;
 
-    rv = pycbc_tc_encode_key(self, &curkey, (void**)&key, &nkey);
+    rv = pycbc_tc_encode_key(self, curkey, &keybuf);
     if (rv < 0) {
         return -1;
-    }
-    enckey = curkey;
-
-    if (!nkey) {
-        PYCBC_EXCTHROW_EMPTYKEY();
-        rv = -1;
-        goto GT_DONE;
     }
 
     if (itm) {
@@ -142,14 +132,12 @@ handle_single_kv(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
         }
     }
 
-    rv = pycbc_tc_encode_value(self, &skc.value, skc.flagsobj,
-        (void**)&value, &nvalue, &cmd.flags);
+    rv = pycbc_tc_encode_value(self, skc.value, skc.flagsobj,
+        &valbuf, &cmd.flags);
     if (rv < 0) {
         rv = -1;
         goto GT_DONE;
     }
-    /* Set the encoded value */
-    encvalue = skc.value;
 
     if (scv->operation == LCB_APPEND || scv->operation == LCB_PREPEND) {
         /* The server ignores these flags and libcouchbase will throw an error
@@ -158,8 +146,8 @@ handle_single_kv(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
         cmd.flags = 0;
     }
 
-    LCB_CMD_SET_KEY(&cmd, key, nkey);
-    LCB_CMD_SET_VALUE(&cmd, value, nvalue);
+    LCB_CMD_SET_KEY(&cmd, keybuf.buffer, keybuf.length);
+    LCB_CMD_SET_VALUE(&cmd, valbuf.buffer, valbuf.length);
     cmd.cas = skc.cas;
     cmd.operation = scv->operation;
     cmd.exptime = skc.ttl;
@@ -174,8 +162,8 @@ handle_single_kv(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
 
     GT_DONE:
     /* Clean up our encoded keys and values */
-    Py_XDECREF(enckey);
-    Py_XDECREF(encvalue);
+    PYCBC_PYBUF_RELEASE(&keybuf);
+    PYCBC_PYBUF_RELEASE(&valbuf);
     return rv;
 }
 
