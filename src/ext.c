@@ -330,7 +330,8 @@ init_libcouchbase(void)
     X(IOEvent,          pycbc_IOEventType_init) \
     X(TimerEvent,       pycbc_TimerEventType_init) \
     X(AsyncResult,      pycbc_AsyncResultType_init) \
-    X(_IOPSWrapper,     pycbc_IOPSWrapperType_init)
+    X(_IOPSWrapper,     pycbc_IOPSWrapperType_init) \
+    X(_SDResult,        pycbc_SDResultType_init)
 
 #define X(name, inf) PyObject *cls_##name;
     X_PYTYPES(X)

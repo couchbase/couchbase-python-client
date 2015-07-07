@@ -71,8 +71,18 @@ class CouchbaseError(Exception):
         True if errors were received during TCP transport.
         See :exc:`CouchbaseNetworkError`
 
+      .. py:attribute:: CODE
+
+        This is a _class_ level attribute which contains the equivalent
+        libcouchbase error code which is mapped to this exception class.
+
+        This is usually the :attr:`rc` value for an exception instance. Unlike
+        :attr:`rc` however, it may be used without an instantiated object,
+        possibly helping performance.
 
     """
+
+    CODE = 0
 
     @classmethod
     def rc_to_exctype(cls, rc):
@@ -106,7 +116,7 @@ class CouchbaseError(Exception):
             self.__dict__.update(params.__dict__)
             return
 
-        self.rc = params.get('rc', 0)
+        self.rc = params.get('rc', self.CODE)
         self.all_results = params.get('all_results', {})
         self.result = params.get('result', None)
         self.inner_cause = params.get('inner_cause', None)
@@ -453,6 +463,51 @@ class ObjectDestroyedError(CouchbaseError):
 class PipelineError(CouchbaseError):
     """Illegal operation within pipeline state"""
 
+
+class SubdocPathNotFoundError(CouchbaseError):
+    """Subdocument path does not exist"""
+
+
+class SubdocPathExistsError(CouchbaseError):
+    """Subdocument path already exists (and shouldn't)"""
+
+
+class SubdocPathInvalidError(CouchbaseError):
+    """Subdocument path is invalid"""
+
+
+class DocumentNotJsonError(CouchbaseError):
+    """Document is not JSON and cannot be used for subdoc operations"""
+
+class SubdocPathMismatchError(CouchbaseError):
+    """Subdocument path conflicts with actual document structure"""
+
+
+class DocumentTooDeepError(CouchbaseError):
+    """Document is too deep to be used for subdocument operations"""
+
+
+class SubdocNumberTooBigError(CouchbaseError):
+    """Existing number is too big to be used for subdocument operations"""
+
+
+class SubdocValueTooDeepError(CouchbaseError):
+    """Value is too deep to insert into document, or would cause the document
+    to be too deep"""
+
+
+class SubdocCantInsertValueError(CouchbaseError):
+    """Cannot insert value for given operation"""
+
+
+class SubdocBadDeltaError(CouchbaseError):
+    """Bad delta supplied for counter command"""
+
+
+class SubdocMultipleErrors(CouchbaseError):
+    """One or more subcommands failed. Inspect the individual operation"""
+    CODE = C.LCB_SUBDOC_MULTI_FAILURE
+
 _LCB_ERRCAT_MAP = {
     C.LCB_ERRTYPE_NETWORK:      CouchbaseNetworkError,
     C.LCB_ERRTYPE_INPUT:        CouchbaseInputError,
@@ -489,8 +544,24 @@ _LCB_ERRNO_MAP = {
     C.LCB_DURABILITY_ETOOMANY: ArgumentError,
     C.LCB_DUPLICATE_COMMANDS: ArgumentError,
     C.LCB_CLIENT_ETMPFAIL:  ClientTemporaryFailError,
-    C.LCB_HTTP_ERROR:       HTTPError
+    C.LCB_HTTP_ERROR:       HTTPError,
+    C.LCB_SUBDOC_PATH_ENOENT: SubdocPathNotFoundError,
+    C.LCB_SUBDOC_PATH_EEXISTS: SubdocPathExistsError,
+    C.LCB_SUBDOC_PATH_EINVAL: SubdocPathInvalidError,
+    C.LCB_SUBDOC_DOC_E2DEEP: DocumentTooDeepError,
+    C.LCB_SUBDOC_DOC_NOTJSON: DocumentNotJsonError,
+    C.LCB_SUBDOC_VALUE_E2DEEP: SubdocValueTooDeepError,
+    C.LCB_SUBDOC_PATH_MISMATCH: SubdocPathMismatchError,
+    C.LCB_SUBDOC_VALUE_CANTINSERT: SubdocCantInsertValueError,
+    C.LCB_SUBDOC_BAD_DELTA: SubdocBadDeltaError,
+    C.LCB_SUBDOC_NUM_ERANGE: SubdocNumberTooBigError,
+    C.LCB_EMPTY_PATH: InvalidError
 }
+
+for k, v in _LCB_ERRNO_MAP.iteritems():
+    v.CODE = k
+    del k
+    del v
 
 def _mk_lcberr(rc, name=None, default=CouchbaseError, docstr="", extrabase=[]):
     """
@@ -534,6 +605,9 @@ for rc, oldcls in _LCB_ERRNO_MAP.items():
 
     _LCB_ERRNO_MAP[rc] = newcls
 
+    del newcls
+    del oldcls
+
 _EXCTYPE_MAP = {
     C.PYCBC_EXC_ARGUMENTS:  ArgumentError,
     C.PYCBC_EXC_ENCODING:   ValueFormatError,
@@ -543,3 +617,19 @@ _EXCTYPE_MAP = {
     C.PYCBC_EXC_DESTROYED:  ObjectDestroyedError,
     C.PYCBC_EXC_PIPELINE:   PipelineError
 }
+
+
+def exc_from_rc(rc, msg=None, obj=None):
+    """
+    .. warning:: INTERNAL
+
+    For those rare cases when an exception needs to be thrown from
+    Python using a libcouchbase error code.
+
+    :param rc: The error code
+    :param msg: Message (description)
+    :param obj: Context
+    :return: a raisable exception
+    """
+    newcls = CouchbaseError.rc_to_exctype(rc)
+    return newcls(params={'rc': rc, 'objextra': obj, 'message': msg})

@@ -27,8 +27,8 @@
 #include <libcouchbase/views.h>
 #include <libcouchbase/n1ql.h>
 
-#if LCB_VERSION < 0x020503
-#error "Couchbase Python SDK requires libcouchbase 2.5.3 or greater"
+#if LCB_VERSION < 0x020506
+#error "Couchbase Python SDK requires libcouchbase 2.5.6 or greater"
 #endif
 
 #include <pythread.h>
@@ -208,7 +208,11 @@ enum {
     PYCBC_ARGOPT_SINGLE = 0x1,
 
     /** Entry point is a multi key variant */
-    PYCBC_ARGOPT_MULTI = 0x2
+    PYCBC_ARGOPT_MULTI = 0x2,
+
+    PYCBC_ARGOPT_SUBDOC = 0x04,
+
+    PYCBC_ARGOPT_SDMULTI = 0x08
 };
 
 /**
@@ -380,6 +384,16 @@ typedef struct {
     pycbc_ValResult_HEAD
     PyObject* vdict;
 } pycbc_Item;
+
+typedef struct {
+    pycbc_OpResult_HEAD
+    /* List of results. (value,errcode) */
+    PyObject *results;
+
+    /* Original list of specs passed. We can cache this later on if access
+     * by element is required. */
+    PyObject *specs;
+} pycbc__SDResult;
 
 
 #define PYCBC_HTTP_HVIEW 1
@@ -597,6 +611,7 @@ extern PyTypeObject pycbc_OperationResultType;
 extern PyTypeObject pycbc_ValueResultType;
 extern PyTypeObject pycbc_HttpResultType;
 extern PyTypeObject pycbc_ItemType;
+extern PyTypeObject pycbc__SDResultType;
 
 /* views.c */
 extern PyTypeObject pycbc_ViewResultType;
@@ -641,7 +656,9 @@ extern PyObject *pycbc_ExceptionType;
     X(itmopts_dict_type) \
     X(itmopts_seq_type) \
     X(fmt_auto) \
-    X(view_path_helper)
+    X(view_path_helper) \
+    X(sd_result_type) \
+    X(sd_multival_type)
 
 #define PYCBC_XHELPERS_STRS(X) \
     X(tcname_encode_key, PYCBC_TCNAME_ENCODE_KEY) \
@@ -724,6 +741,7 @@ int pycbc_BucketType_init(PyObject **ptr);
 int pycbc_MultiResultType_init(PyObject **ptr);
 int pycbc_ValueResultType_init(PyObject **ptr);
 int pycbc_OperationResultType_init(PyObject **ptr);
+int pycbc_SDResultType_init(PyObject **ptr);
 int pycbc_HttpResultType_init(PyObject **ptr);
 int pycbc_TranscoderType_init(PyObject **ptr);
 int pycbc_ObserveInfoType_init(PyObject **ptr);
@@ -749,6 +767,10 @@ PyObject *pycbc_multiresult_new(pycbc_Bucket *parent);
 pycbc_ValueResult *pycbc_valresult_new(pycbc_Bucket *parent);
 pycbc_OperationResult *pycbc_opresult_new(pycbc_Bucket *parent);
 pycbc_Item *pycbc_item_new(pycbc_Bucket *parent);
+pycbc__SDResult *pycbc_sdresult_new(pycbc_Bucket *parent, PyObject *specs);
+
+/* Add a result to a list of multi results. Specify the index */
+void pycbc_sdresult_addresult(pycbc__SDResult *obj, size_t ii, PyObject *item);
 
 /* Not an allocator per-se, but rather an initializer */
 void pycbc_httpresult_init(pycbc_HttpResult *self, pycbc_MultiResult *parent);

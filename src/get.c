@@ -298,6 +298,80 @@ GT_DONE:
     return cv.ret;
 }
 
+static int
+handle_single_lookup(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
+    PyObject *curkey, PyObject *curval, PyObject *options, pycbc_Item *itm,
+    void *arg)
+{
+    pycbc_pybuffer keybuf = { NULL };
+    lcb_CMDSUBDOC cmd = { 0 };
+    int rv = 0;
+
+    if (itm) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Items not supported for subdoc!");
+        return -1;
+    }
+    if (pycbc_tc_encode_key(self, curkey, &keybuf) != 0) {
+        return -1;
+    }
+    LCB_CMD_SET_KEY(&cmd, keybuf.buffer, keybuf.length);
+    rv = pycbc_sd_handle_speclist(self, cv->mres, curkey, curval, &cmd);
+    PYCBC_PYBUF_RELEASE(&keybuf);
+    return rv;
+}
+
+static PyObject *
+sdlookup_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopts)
+{
+    Py_ssize_t ncmds;
+    PyObject *kobj = NULL;
+    PyObject *quiet_key = NULL;
+    pycbc_seqtype_t seqtype;
+    struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
+    static char *kwlist[] = { "ks", "quiet", NULL };
+
+    if (!PyArg_ParseTupleAndKeywords(
+        args, kwargs, "O|O", kwlist, &kobj, &quiet_key)) {
+        PYCBC_EXCTHROW_ARGS();
+        return NULL;
+    }
+
+    if (pycbc_oputil_check_sequence(kobj, 0, &ncmds, &seqtype) != 0) {
+        return NULL;
+    }
+
+    if (pycbc_common_vars_init(&cv, self, argopts, ncmds, 1) != 0) {
+        return NULL;
+    }
+
+    if (pycbc_oputil_iter_multi(
+        self, seqtype, kobj, &cv, 0, handle_single_lookup, NULL) != 0) {
+        goto GT_DONE;
+    }
+
+    if (pycbc_maybe_set_quiet(cv.mres, quiet_key) != 0) {
+        goto GT_DONE;
+    }
+
+    pycbc_common_vars_wait(&cv, self);
+
+    GT_DONE:
+    pycbc_common_vars_finalize(&cv, self);
+    return cv.ret;
+}
+
+PyObject *
+pycbc_Bucket_lookup_in(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
+{
+    return sdlookup_common(self, args, kwargs, PYCBC_ARGOPT_SINGLE);
+}
+
+PyObject *
+pycbc_Bucket_lookup_in_multi(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
+{
+    return sdlookup_common(self, args, kwargs, PYCBC_ARGOPT_MULTI);
+}
+
 #define DECLFUNC(name, operation, mode) \
     PyObject *pycbc_Bucket_##name(pycbc_Bucket *self, \
                                       PyObject *args, PyObject *kwargs) { \

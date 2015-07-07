@@ -202,6 +202,27 @@ or duration.
     .. automethod:: touch
 
 
+Sub-Document Operations
+-----------------------
+
+These methods provide entry points to modify *parts* of a document in
+Couchbase.
+
+.. note::
+
+    Sub-Document API methods are available in Couchbase Server 4.5
+    (currently in Developer Preview).
+
+    The server and SDK implementations and APIs are subject to change
+
+
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
+
+    .. automethod:: lookup_in
+    .. automethod:: mutate_in
+    .. automethod:: retrieve_in
+
 Counter Operations
 ------------------
 

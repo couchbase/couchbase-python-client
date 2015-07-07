@@ -482,6 +482,9 @@ static PyMethodDef Bucket_TABLE_methods[] = {
         OPFUNC(_rget, NULL),
         OPFUNC(_rgetix, NULL),
 
+        OPFUNC(mutate_in, "Perform mutations in document paths"),
+        OPFUNC(lookup_in, "Perform lookups in document paths"),
+
         OPFUNC(remove, "Delete a key in Couchbase"),
         OPFUNC(unlock, "Unlock a previously-locked key in Couchbase"),
         OPFUNC(remove_multi, "Multi-key variant of delete"),

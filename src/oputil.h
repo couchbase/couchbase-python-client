@@ -262,6 +262,22 @@ int pycbc_handle_durability_args(pycbc_Bucket *self,
                                  char replicate_to);
 
 /**
+ * Handle the 'key' argument for sub-document paths
+ * @param conn The bucket
+ * @param src The input Python object (should be a tuple; this function checks)
+ * @param keybuf The output key
+ * @param pathbuf The output path
+ * @return 0 on success, nonzero on error
+ */
+int
+pycbc_encode_sd_keypath(pycbc_Bucket *conn, PyObject *src,
+                      pycbc_pybuffer *keybuf, pycbc_pybuffer *pathbuf);
+
+int
+pycbc_sd_handle_speclist(pycbc_Bucket *self, pycbc_MultiResult *mres,
+    PyObject *key, PyObject *spectuple, lcb_CMDSUBDOC *cmd);
+
+/**
  * Macro to declare prototypes for entry points.
  * If the entry point is foo, then it is expected that there exist a C
  * function called 'pycbc_Connection_foo'.
@@ -283,6 +299,13 @@ PYCBC_DECL_OP(insert);
 PYCBC_DECL_OP(replace);
 PYCBC_DECL_OP(append);
 PYCBC_DECL_OP(prepend);
+
+/* subdoc (store.c) */
+PYCBC_DECL_OP(mutate_in);
+
+/* subdoc (get.c) */
+PYCBC_DECL_OP(lookup_in);
+PYCBC_DECL_OP(lookup_in_multi);
 
 /* arithmetic.c */
 PYCBC_DECL_OP(counter);

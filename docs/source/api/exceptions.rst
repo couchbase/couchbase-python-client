@@ -152,3 +152,7 @@ be inherited from multiple exception categories.
    :show-inheritance:
 .. autoexception:: HTTPError
    :show-inheritance:
+.. autoexception:: SubdocPathNotFoundError
+   :show-inheritance:
+.. autoexception:: SubdocPathExistsError
+   :show-inheritance:

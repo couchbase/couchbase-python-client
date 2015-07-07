@@ -14,9 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from platform import python_implementation
+from itertools import izip
 
-import couchbase._bootstrap
 from couchbase._libcouchbase import (
     Result,
     ValueResult,
@@ -25,3 +24,138 @@ from couchbase._libcouchbase import (
     MultiResult,
     ObserveInfo,
     AsyncResult)
+import couchbase._libcouchbase as C
+import couchbase.exceptions as E
+
+
+class SubdocResult(C._SDResult):
+    """
+    Class for objects returned via a subdoc operation. This may contain
+    one or more values depending on the number of input commands.
+
+    The actual values from the result can be retrieved by iteration:
+
+    Iteration::
+
+        for value in rv:
+            print(value)
+
+    Index::
+
+        value = rv['some.path']
+        value = rv[2]
+
+    Or by using the :meth:`get()` method::
+
+        error, value = rv.get('some.path')
+        error, value = rv.get(2)
+
+
+    Iterator and index access will raise exceptions when encountering
+    a non-successful item. The :meth:`get()` usage will not throw an
+    exception, however
+    """
+
+    def _pycbc_repr_extra(self):
+        ret = ["specs={0}".format(repr(self._specs))]
+        if hasattr(self, '_results'):
+            ret.append('results={0}'.format(repr(self._results)))
+        return ret
+
+    def __path2index(self, path):
+        if not hasattr(self, '__path_cache'):
+            self.__path_cache = {}
+            for x in xrange(len(self._specs)):
+                spec = self._specs[x]
+                self.__path_cache[spec[1]] = x
+
+        return self.__path_cache[path]
+
+    def _resolve(self, item):
+        if isinstance(item, (int, long)):
+            # Get by value
+            return self._results[item]
+        else:
+            return self._results[self.__path2index(item)]
+
+    def __getitem__(self, item):
+        rv = self._resolve(item)
+        if rv[0]:
+            raise E.exc_from_rc(rv[0], obj=item)
+        else:
+            return rv[1]
+
+    def __iter__(self):
+        for resinfo, specinfo in izip(self._results, self._specs):
+            err, value, path = resinfo[0], resinfo[1], specinfo[1]
+            if err:
+                raise E.exc_from_rc(err, obj=path)
+            yield value
+
+    @property
+    def command_count(self):
+        """
+        Total number of input commands received.
+
+        For mutations (i.e. :cb_bmeth:`mutate_in`) this might be more
+        than :py:attr:`~.result_count`.
+        """
+        return len(self._specs)
+
+    @property
+    def result_count(self):
+        """
+        Total number of results available. For mutations, this might be less
+        than the :py:attr:`~.command_count`
+        """
+        try:
+            return len(self._results)
+        except AttributeError:
+            return 0
+
+    def get(self, path_or_index, default=None):
+        """
+        Get details about a given result
+
+        :param path_or_index: The path (or index) of the result to fetch.
+        :param default: If the given result does not exist, return this value
+            instead
+        :return: A tuple of `(error, value)`. If the entry does not exist
+            then `(0, default)` is returned.
+        """
+        try:
+            return self._resolve(path_or_index)
+        except (KeyError, IndexError):
+            return 0, default
+
+    def exists(self, path_or_index):
+        """
+        Checks if a path exists in the document. This is meant to be used
+        for a corresponding :meth:`~couchbase.subdocument.exists` request.
+
+        :param path_or_index: The path (or index) to check
+        :return: `True` if the path exists, `False` if the path does not exist
+        :raise: An exception if the server-side check failed for a reason other
+            than the path not existing.
+        """
+        result = self._resolve(path_or_index)
+        if not result[0]:
+            return True
+        elif E.SubdocPathNotFoundError._can_derive(result[0]):
+            return False
+        else:
+            raise E.exc_from_rc(result[0])
+
+    @property
+    def access_ok(self):
+        """
+        Dynamic property indicating if the document could be accessed (and thus
+        results can be retrieved)
+
+        :return: True if the document is accessible, False otherwise
+        """
+        return self.rc == 0 or self.rc == C.LCB_SUBDOC_MULTI_FAILRUE
+
+    @property
+    def value(self):
+        raise AttributeError(".value not applicable in multiple result operation")

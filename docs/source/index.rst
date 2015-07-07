@@ -12,6 +12,7 @@ Contents:
    :maxdepth: 2
 
    api/couchbase
+   api/subdoc
    api/views
    api/n1ql
    api/results

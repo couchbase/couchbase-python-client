@@ -46,6 +46,14 @@ ValueResult_dealloc(pycbc_ValueResult *self)
 }
 
 static void
+SDResult_dealloc(pycbc__SDResult *self)
+{
+    Py_CLEAR(self->results);
+    Py_CLEAR(self->specs);
+    OperationResult_dealloc((pycbc_OperationResult*)self);
+}
+
+static void
 Item_dealloc(pycbc_Item *self)
 {
     Py_XDECREF(self->vdict);
@@ -91,6 +99,12 @@ static PyGetSetDef ValueResult_TABLE_getset[] = {
                 NULL,
                 PyDoc_STR("Value for the operation")
         },
+        { NULL }
+};
+
+static struct PyMemberDef SDResult_TABLE_members[] = {
+        { "_results", T_OBJECT_EX, offsetof(pycbc__SDResult, results), READONLY },
+        { "_specs", T_OBJECT_EX, offsetof(pycbc__SDResult, specs), READONLY },
         { NULL }
 };
 
@@ -154,6 +168,11 @@ PyTypeObject pycbc_ItemType = {
         0
 };
 
+PyTypeObject pycbc__SDResultType = {
+        PYCBC_POBJ_HEAD_INIT(NULL)
+        0
+};
+
 int
 pycbc_ValueResultType_init(PyObject **ptr)
 {
@@ -196,6 +215,23 @@ pycbc_OperationResultType_init(PyObject **ptr)
     p->tp_members = OperationResult_TABLE_members;
     p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
     p->tp_dealloc = (destructor)OperationResult_dealloc;
+    return pycbc_ResultType_ready(p, PYCBC_OPRESULT_BASEFLDS);
+}
+
+int pycbc_SDResultType_init(PyObject **ptr)
+{
+    PyTypeObject *p = &pycbc__SDResultType;
+    *ptr = (PyObject*)p;
+    if (p->tp_name) {
+        return 0;
+    }
+
+    p->tp_name = "_SDResult";
+    p->tp_basicsize = sizeof(pycbc__SDResult);
+    p->tp_base = &pycbc_OperationResultType;
+    p->tp_members = SDResult_TABLE_members;
+    p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
+    p->tp_dealloc = (destructor)SDResult_dealloc;
     return pycbc_ResultType_ready(p, PYCBC_OPRESULT_BASEFLDS);
 }
 
@@ -246,4 +282,28 @@ pycbc_item_new(pycbc_Bucket *parent)
     (void)parent;
     return (pycbc_Item *)
             PyObject_CallFunction((PyObject*)&pycbc_ItemType, NULL, NULL);
+}
+
+pycbc__SDResult *
+pycbc_sdresult_new(pycbc_Bucket *parent, PyObject *specs)
+{
+    pycbc__SDResult *res =
+            (pycbc__SDResult*)PyObject_CallFunction(
+                pycbc_helpers.sd_result_type, NULL, NULL);
+    if (res != NULL) {
+        res->specs = specs;
+        Py_INCREF(specs);
+    }
+    return res;
+}
+
+void
+pycbc_sdresult_addresult(pycbc__SDResult *obj, size_t ii, PyObject *item)
+{
+    if (obj->results == NULL) {
+        obj->results = PyList_New(PyTuple_GET_SIZE(obj->specs));
+    }
+    pycbc_assert(ii < PyTuple_GET_SIZE(obj->specs));
+    PyList_SetItem(obj->results, ii, item);
+    Py_INCREF(item); /* To normalize refcount semantics */
 }

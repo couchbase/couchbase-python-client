@@ -18,6 +18,7 @@
 
 struct storecmd_vars {
     int operation;
+    int argopts;
     unsigned long ttl;
     PyObject *flagsobj;
     lcb_U64 single_cas;
@@ -103,6 +104,11 @@ handle_item_kv(pycbc_Item *itm, PyObject *options, const struct storecmd_vars *s
 }
 
 static int
+handle_multi_mutate(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
+    PyObject *curkey, PyObject *curvalue, PyObject *options, pycbc_Item *itm,
+    void *arg);
+
+static int
 handle_single_kv(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
     PyObject *curkey, PyObject *curvalue, PyObject *options, pycbc_Item *itm,
     void *arg)
@@ -113,6 +119,10 @@ handle_single_kv(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
     pycbc_pybuffer keybuf = { NULL }, valbuf = { NULL };
     lcb_error_t err;
     lcb_CMDSTORE cmd = { 0 };
+
+    if (scv->argopts & PYCBC_ARGOPT_SDMULTI) {
+        return handle_multi_mutate(self, cv, optype, curkey, curvalue, options, itm, arg);
+    }
 
     skc.ttl = scv->ttl;
     skc.flagsobj = scv->flagsobj;
@@ -167,6 +177,32 @@ handle_single_kv(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
     return rv;
 }
 
+static int
+handle_multi_mutate(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
+    PyObject *curkey, PyObject *curvalue, PyObject *options, pycbc_Item *itm,
+    void *arg)
+{
+    int rv;
+    const struct storecmd_vars *scv = arg;
+    pycbc_pybuffer keybuf = { NULL };
+    lcb_CMDSUBDOC cmd = { 0 };
+
+    if (itm) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Item not supported in subdoc mode");
+        return -1;
+    }
+
+    if (pycbc_tc_encode_key(self, curkey, &keybuf) != 0) {
+        return -1;
+    }
+
+    cmd.cas = scv->single_cas;
+    cmd.exptime = scv->ttl;
+    LCB_CMD_SET_KEY(&cmd, keybuf.buffer, keybuf.length);
+    rv = pycbc_sd_handle_speclist(self, cv->mres, curkey, curvalue, &cmd);
+    PYCBC_PYBUF_RELEASE(&keybuf);
+    return rv;
+}
 
 static int
 handle_append_flags(pycbc_Bucket *self, PyObject **flagsobj)
@@ -201,7 +237,7 @@ handle_append_flags(pycbc_Bucket *self, PyObject **flagsobj)
 
 static PyObject *
 set_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
-    const lcb_storage_t operation, int argopts)
+    int operation, int argopts)
 {
     int rv;
     Py_ssize_t ncmds = 0;
@@ -228,6 +264,7 @@ set_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
     };
 
     scv.operation = operation;
+    scv.argopts = argopts;
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
         rv = PyArg_ParseTupleAndKeywords(args, kwargs, "O|OOBB", kwlist_multi,
@@ -326,3 +363,5 @@ DECLFUNC(replace, LCB_REPLACE, PYCBC_ARGOPT_SINGLE)
 
 DECLFUNC(append, LCB_APPEND, PYCBC_ARGOPT_SINGLE)
 DECLFUNC(prepend, LCB_PREPEND, PYCBC_ARGOPT_SINGLE)
+
+DECLFUNC(mutate_in, 0, PYCBC_ARGOPT_SINGLE | PYCBC_ARGOPT_SDMULTI)

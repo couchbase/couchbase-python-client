@@ -34,6 +34,8 @@ import pickle
 import couchbase.exceptions as E
 import couchbase._libcouchbase as C
 from couchbase.items import ItemCollection, ItemOptionDict, ItemSequence
+from couchbase.result import SubdocResult
+from couchbase.subdocument import MultiValue
 
 
 def _result__repr__(self):
@@ -67,6 +69,9 @@ def _result__repr__(self):
 
     if flags & C.PYCBC_RESFLD_URL and hasattr(self, "url"):
         details.append("url={0}".format(self.url))
+
+    if hasattr(self, '_pycbc_repr_extra'):
+        details += self._pycbc_repr_extra()
 
     ret = "{0}<{1}>".format(self.__class__.__name__, ', '.join(details))
     return ret
@@ -141,7 +146,9 @@ def run_init(m):
                     itmopts_dict_type=ItemOptionDict,
                     itmopts_seq_type=ItemSequence,
                     fmt_auto=_FMT_AUTO,
-                    view_path_helper=_view_path_helper)
+                    view_path_helper=_view_path_helper,
+                    sd_result_type=SubdocResult,
+                    sd_multival_type=MultiValue)
 
 run_init(C)
 

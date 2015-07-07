@@ -719,6 +719,79 @@ class Bucket(_Base):
         """
         return _Base.counter(self, key, delta=delta, initial=initial, ttl=ttl)
 
+    def mutate_in(self, key, *specs, **kwargs):
+        """Perform multiple atomic modifications within a document.
+
+        :param key: The key of the document to modify
+        :param specs: A list of specs (See :mod:`couchbase.subdocument`)
+        :param kwargs: CAS, etc.
+        :return: A :class:`~.couchbase.result.SubdocResult` object.
+
+        Here's an example of adding a new tag to a "user" document
+        and incrementing a modification counter::
+
+            import couchbase.subdocument as SD
+            # ....
+            cb.mutate_in('user',
+                         SD.add_unique('tags', 'dog'),
+                         SD.counter('updates', 1))
+
+        .. seealso:: :mod:`couchbase.subdocument`
+        """
+        return super(Bucket, self).mutate_in(key, specs, **kwargs)
+
+    def lookup_in(self, key, *specs, **kwargs):
+        """Atomically retrieve one or more paths from a document.
+
+        :param key: The key of the document to lookup
+        :param spec: A list of specs (see :mod:`couchbase.subdocument`)
+        :return: A :class:`.couchbase.result.SubdocResult` object.
+            This object contains the results and any errors of the
+            operation.
+
+        Example::
+
+            import couchbase.subdocument as SD
+            rv = cb.lookup_in('user',
+                              SD.get('email'),
+                              SD.get('name'),
+                              SD.exists('friends.therock'))
+
+            email = rv[0]
+            name = rv[1]
+            friend_exists = rv.exists(2)
+
+        .. seealso:: meth:`retrieve_in` which acts as a convenience wrapper
+        """
+        return super(Bucket, self).lookup_in({key: specs}, **kwargs)
+
+    def retrieve_in(self, key, *paths, **kwargs):
+        """Atomically fetch one or more paths from a document.
+
+        Convenience method for retrieval operations. This functions
+        identically to :meth:`lookup_in`. As such, the following two
+        forms are equivalent:
+
+        .. code-block:: python
+
+            import couchbase.subdocument as SD
+            rv = cb.lookup_in(key,
+                              SD.get('email'),
+                              SD.get('name'),
+                              SD.get('friends.therock')
+
+            email, name, friend = rv
+
+        .. code-block:: python
+
+            rv = cb.retrieve_in(key, 'email', 'name', 'friends.therock')
+            email, name, friend = rv
+
+        .. seealso:: :meth:`lookup_in`
+        """
+        import couchbase.subdocument as SD
+        return self.lookup_in(key, *tuple(SD.get(x) for x in paths), **kwargs)
+
     def incr(self, key, amount=1, **kwargs):
         _depr('incr', 'counter')
         return self.counter(key, delta=amount, **kwargs)
@@ -1398,9 +1471,9 @@ class Bucket(_Base):
                              'replace', 'remove', 'counter', 'touch',
                              'lock', 'unlock', 'endure',
                              'observe', 'rget', 'stats',
-                             'set', 'add', 'delete')
+                             'set', 'add', 'delete', 'lookup_in', 'mutate_in')
 
-    _MEMCACHED_NOMULTI = ('stats')
+    _MEMCACHED_NOMULTI = ('stats', 'lookup_in', 'mutate_in')
 
     @classmethod
     def _gen_memd_wrappers(cls, factory):
