@@ -83,7 +83,6 @@ class TranscoderTest(ConnectionTestCase):
 
         key = self.gen_key("bad_transcoder")
         self.cb.upsert(key, "value")
-
         self.cb.transcoder = object()
         self.assertRaises(E.ValueFormatError, self.cb.upsert, key, "bar")
         self.assertRaises(E.ValueFormatError, self.cb.get, key)
@@ -199,3 +198,8 @@ class TranscoderTest(ConnectionTestCase):
 
         c = Bucket(**self.make_connargs(transcoder=TranscoderPP))
         c.upsert(key, "value")
+
+    def test_mask_sanity(self):
+        from couchbase import FMT_COMMON_MASK, FMT_LEGACY_MASK
+        self.assertEqual(FMT_COMMON_MASK, 0xFF000000)
+        self.assertEqual(FMT_LEGACY_MASK, 0x00000007)
