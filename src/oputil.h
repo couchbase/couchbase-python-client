@@ -295,6 +295,7 @@ PYCBC_DECL_OP(remove_multi);
 PYCBC_DECL_OP(unlock_multi);
 
 PYCBC_DECL_OP(_stats);
+PYCBC_DECL_OP(_keystats);
 
 PYCBC_DECL_OP(endure_multi);
 

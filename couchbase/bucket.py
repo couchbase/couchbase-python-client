@@ -735,7 +735,7 @@ class Bucket(_Base):
         _depr('decr_multi', 'counter_multi')
         return self.counter_multi(keys, delta=-amount, **kwargs)
 
-    def stats(self, keys=None):
+    def stats(self, keys=None, keystats=False):
         """Request server statistics.
 
         Fetches stats from each node in the cluster. Without a key
@@ -762,7 +762,7 @@ class Bucket(_Base):
         """
         if keys and not isinstance(keys, (tuple, list)):
             keys = (keys,)
-        return self._stats(keys)
+        return self._stats(keys, keystats=keystats)
 
     def observe(self, key, master_only=False):
         """Return storage information for a key.

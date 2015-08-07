@@ -292,20 +292,19 @@ DECLFUNC(unlock_multi, PYCBC_CMD_UNLOCK, PYCBC_ARGOPT_MULTI)
 
 
 PyObject *
-pycbc_Bucket__stats(pycbc_Bucket *self,
-                        PyObject *args,
-                        PyObject *kwargs)
+pycbc_Bucket__stats(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
 {
     int rv;
     int ii;
     Py_ssize_t ncmds;
     lcb_error_t err = LCB_ERROR;
-    PyObject *keys = NULL;
+    PyObject *keys = NULL, *is_keystats = NULL;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
-    static char *kwlist[] = {  "keys", NULL };
+    static char *kwlist[] = {  "keys", "keystats", NULL };
     lcb_CMDSTATS cmd = { 0 };
 
-    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "|O", kwlist, &keys);
+    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "|OO", kwlist,
+        &keys, &is_keystats);
 
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
@@ -343,6 +342,9 @@ pycbc_Bucket__stats(pycbc_Bucket *self,
             }
 
             LCB_CMD_SET_KEY(&cmd, key, nkey);
+            if (is_keystats && PyObject_IsTrue(is_keystats)) {
+                cmd.cmdflags |= LCB_CMDSTATS_F_KV;
+            }
             err = lcb_stats3(self->instance, cv.mres, &cmd);
             Py_XDECREF(newkey);
         }
