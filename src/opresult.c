@@ -34,8 +34,8 @@ ValueResult_value(pycbc_ValueResult *self, void *closure)
 static void
 OperationResult_dealloc(pycbc_OperationResult *self)
 {
-    pycbc_Result_dealloc((pycbc_Result*)self);
     Py_CLEAR(self->mutinfo);
+    pycbc_Result_dealloc((pycbc_Result*)self);
 }
 
 static void
