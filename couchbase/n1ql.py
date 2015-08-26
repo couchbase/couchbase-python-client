@@ -66,6 +66,8 @@ class N1QLQuery(object):
                            type='airline', id=0)
 
         """
+
+        self._adhoc = True
         self._body = {'statement': query}
         if args:
             self._add_pos_args(*args)
@@ -203,6 +205,26 @@ class N1QLQuery(object):
         for mt in bucket._mutinfo():
             self._add_scanvec(mt)
 
+    # TODO: I really wish Sphinx were able to automatically
+    # document instance vars
+    @property
+    def adhoc(self):
+        """
+        A non-`adhoc` query can be internally optimized so that repeated
+        executions of the same query can be quicker. If this query is issued
+        repeatedly in your application, then you should set this property to
+        `False`.
+
+        Note that this optimization involves an up-front "preparation"
+        cost, and should only be used for queries that are issued multiple
+        times.
+        """
+        return self._adhoc
+
+    @adhoc.setter
+    def adhoc(self, arg):
+        self._adhoc = arg
+
     @property
     def encoded(self):
         """
@@ -256,7 +278,8 @@ class N1QLRequest(object):
         if self._mres:
             return
 
-        self._mres = self._parent._n1ql_query(self._params.encoded)
+        self._mres = self._parent._n1ql_query(self._params.encoded,
+                                              not self._params.adhoc)
         self.__raw = self._mres[None]
 
     @property

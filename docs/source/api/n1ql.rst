@@ -15,6 +15,7 @@ N1QL Queries
     .. automethod:: set_option
     .. autoattribute:: consistency
     .. autoattribute:: encoded
+    .. autoattribute:: adhoc
     .. automethod:: consistent_with_ops
     .. automethod:: consistent_with_all
 

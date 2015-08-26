@@ -27,8 +27,8 @@
 #include <libcouchbase/views.h>
 #include <libcouchbase/n1ql.h>
 
-#if LCB_VERSION < 0x020406
-#error "Couchbase Python SDK requires libcouchbase 2.4.6 or greater"
+#if LCB_VERSION < 0x020503
+#error "Couchbase Python SDK requires libcouchbase 2.5.3 or greater"
 #endif
 
 #include <pythread.h>

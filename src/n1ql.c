@@ -48,10 +48,11 @@ pycbc_Bucket__n1ql_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     lcb_CMDN1QL cmd = { 0 };
     const char *params;
     pycbc_strlen_t nparams;
+    int prepared = 0;
 
-    static char *kwlist[] = { "params", NULL };
+    static char *kwlist[] = { "params", "prepare", NULL };
     rv = PyArg_ParseTupleAndKeywords(
-        args, kwargs, "s#", kwlist, &params, &nparams);
+        args, kwargs, "s#|i", kwlist, &params, &nparams, &prepared);
 
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
@@ -78,6 +79,9 @@ pycbc_Bucket__n1ql_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     cmd.query = params;
     cmd.nquery = nparams;
     cmd.handle = &vres->base.u.nq;
+    if (prepared) {
+        cmd.cmdflags |= LCB_CMDN1QL_F_PREPCACHE;
+    }
     rc = lcb_n1ql_query(self->instance, mres, &cmd);
 
     if (rc != LCB_SUCCESS) {
