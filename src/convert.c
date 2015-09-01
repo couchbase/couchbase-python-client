@@ -161,17 +161,20 @@ encode_common(PyObject **o, void **buf, size_t *nbuf, lcb_uint32_t flags)
     return 0;
 }
 
+
 static int
 decode_common(PyObject **vp, const char *buf, size_t nbuf, lcb_uint32_t flags)
 {
     PyObject *decoded = NULL;
-    lcb_U32 c_flags, l_flags;
 
-    c_flags = flags & PYCBC_FMT_COMMON_MASK;
-    l_flags = flags & PYCBC_FMT_LEGACY_MASK;
+    /* Strip away non-common-flag info if we are indeed common flags */
+    if (flags & PYCBC_FMT_COMMON_MASK) {
+        flags &= PYCBC_FMT_COMMON_MASK;
+    }
 
     #define FMT_MATCHES(fmtbase) \
-        (c_flags == PYCBC_FMT_COMMON_##fmtbase || l_flags == PYCBC_FMT_LEGACY_##fmtbase)
+        (flags == PYCBC_FMT_COMMON_##fmtbase) || \
+        (flags == PYCBC_FMT_LEGACY_##fmtbase)
 
     if (FMT_MATCHES(UTF8)) {
         decoded = convert_to_string(buf, nbuf, CONVERT_MODE_UTF8_ONLY);

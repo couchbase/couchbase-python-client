@@ -14,8 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import json
+
 from couchbase.tests.base import ConnectionTestCase
-from couchbase.transcoder import TranscoderPP
+from couchbase.transcoder import TranscoderPP, Transcoder
 from couchbase.bucket import Bucket
 from couchbase import FMT_UTF8
 import couchbase.exceptions as E
@@ -203,3 +205,21 @@ class TranscoderTest(ConnectionTestCase):
         from couchbase import FMT_COMMON_MASK, FMT_LEGACY_MASK
         self.assertEqual(FMT_COMMON_MASK, 0xFF000000)
         self.assertEqual(FMT_LEGACY_MASK, 0x00000007)
+
+    def test_pycbc295(self):
+        # Test that we ignore the legacy flags and use the common flags
+        # instead
+        custom_tc = MangledTranscoder()
+        orig_tc = Transcoder()
+
+        c = self.make_connection()
+        c.transcoder = custom_tc
+        custom_tc._op_next['encode_value'] = (
+            json.dumps({'Hello': 'World'}),
+            0x02000001
+        )
+        key = self.gen_key('pycbc295')
+        c.upsert(key, 'whatevs')
+        c.transcoder = orig_tc
+        rv = c.get(key)
+        self.assertIsInstance(rv.value, (dict,))
