@@ -43,7 +43,7 @@ class ConnectionString(object):
     """
 
     def __init__(self, bucket='default',
-                 hosts=None, options=None, scheme='couchbase://'):
+                 hosts=None, options=None, scheme='couchbase'):
         """
         Create a new ConnectionString object.
 
