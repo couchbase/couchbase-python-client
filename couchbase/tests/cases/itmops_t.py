@@ -155,3 +155,41 @@ class ItemTest(ConnectionTestCase):
         self.cb.upsert_multi(it.as_itcoll(ignore_cas=True))
 
         self.cb.upsert_multi(ItemSequence(it))
+
+    def test_invalid_item(self):
+        itcoll = ItemOptionDict()
+        itcoll.add(None)
+        self.assertRaises(ArgumentError, self.cb.upsert_multi, itcoll)
+
+        self.assertRaises(ArgumentError,
+                          self.cb.upsert_multi, ItemSequence([None]))
+
+    def test_create_and_add(self):
+        itcoll = ItemOptionDict()
+        itcoll.create_and_add('foo', value='fooValue', cas=123, persist_to=-1)
+        itcoll.create_and_add('bar', value='barValue', cas=321, replicate_to=-1)
+
+        dd = itcoll.dict
+        self.assertEqual(2, len(dd))
+
+        def _find_item(key):
+            for k, v in dd.items():
+                if k.key == key:
+                    return k, v
+
+        foo_item, foo_options = _find_item('foo')
+        self.assertIsInstance(foo_item, Item)
+        self.assertEqual('foo', foo_item.key)
+        self.assertEqual('fooValue', foo_item.value)
+        self.assertEqual(123, foo_item.cas)
+        self.assertEqual(1, len(foo_options))
+        self.assertEqual(-1, foo_options['persist_to'])
+
+        bar_item, bar_options = _find_item('bar')
+        self.assertIsInstance(bar_item, Item)
+        self.assertEqual('bar', bar_item.key)
+        self.assertEqual('barValue', bar_item.value)
+        self.assertEqual(321, bar_item.cas)
+        self.assertEqual(1, len(bar_options))
+        self.assertEqual(-1, bar_options['replicate_to'])
+

@@ -306,6 +306,11 @@ extract_item_params(struct pycbc_common_vars *cv,
     }
 
     *itm = (pycbc_Item *) PyTuple_GET_ITEM(k, 0);
+    if (!PyObject_IsInstance((PyObject*)*itm, (PyObject *)&pycbc_ItemType)) {
+        PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0,
+                           "Expected 'Item' instance", (PyObject*)*itm);
+        return -1;
+    }
 
     if (tsz == 2) {
         *options = PyTuple_GET_ITEM(k, 1);

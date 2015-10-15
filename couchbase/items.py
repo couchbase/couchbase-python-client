@@ -157,6 +157,17 @@ class ItemOptionDict(ItemCollection):
             options = None
         self._d[itm] = options
 
+    def create_and_add(self, key, value=None, cas=0, **options):
+        """
+        Creates and adds an item.
+        :param key: The key to use for the item
+        :param value: The value to use for the item
+        :param options: Additional operation-specific options
+        """
+        itm = Item(key, value)
+        itm.cas = cas
+        return self.add(itm, **options)
+
     def __iter__(self):
         for p in self._d.items():
             yield p
@@ -173,6 +184,8 @@ class ItemSequence(ItemCollection):
         :type seq: An iterable or a single item
         """
         self._seq = [ obj ] if isinstance(obj, Item) else obj
+        # Verify this is indeed a sequence
+        len(self._seq)
 
     @property
     def sequence(self):

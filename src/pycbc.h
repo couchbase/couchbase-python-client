@@ -596,6 +596,7 @@ extern PyTypeObject pycbc_ResultType;
 extern PyTypeObject pycbc_OperationResultType;
 extern PyTypeObject pycbc_ValueResultType;
 extern PyTypeObject pycbc_HttpResultType;
+extern PyTypeObject pycbc_ItemType;
 
 /* views.c */
 extern PyTypeObject pycbc_ViewResultType;
