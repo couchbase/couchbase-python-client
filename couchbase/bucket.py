@@ -1300,6 +1300,11 @@ class Bucket(_Base):
     def views_timeout(self, value):
         self._set_timeout_common(_LCB.LCB_CNTL_VIEW_TIMEOUT, value)
 
+    @property
+    def is_ssl(self):
+        mode = self._cntl(op=_LCB.LCB_CNTL_SSL_MODE, value_type='int')
+        return mode & _LCB.LCB_SSL_ENABLED != 0
+
     _OLDOPS = { 'set': 'upsert', 'add': 'insert', 'delete': 'remove'}
     for o, n in _OLDOPS.items():
         for variant in ('', '_multi'):
