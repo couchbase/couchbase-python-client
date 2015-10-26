@@ -44,29 +44,29 @@ def _result__repr__(self):
     details = []
     flags = self.__class__._fldprops
 
-    rcstr = "RC=0x{0:X}".format(self.rc)
+    rcstr = "rc=0x{0:X}".format(self.rc)
     if self.rc != 0:
         rcstr += "[{0}]".format(self.errstr)
 
     details.append(rcstr)
 
     if flags & C.PYCBC_RESFLD_KEY and hasattr(self, 'key'):
-        details.append("Key={0}".format(repr(self.key)))
+        details.append("key={0}".format(repr(self.key)))
 
     if flags & C.PYCBC_RESFLD_VALUE and hasattr(self, 'value'):
-        details.append("Value={0}".format(repr(self.value)))
+        details.append("value={0}".format(repr(self.value)))
 
     if flags & C.PYCBC_RESFLD_CAS and hasattr(self, 'cas'):
-        details.append("CAS=0x{cas:x}".format(cas=self.cas))
+        details.append("cas=0x{cas:x}".format(cas=self.cas))
 
     if flags & C.PYCBC_RESFLD_CAS and hasattr(self, 'flags'):
-        details.append("Flags=0x{flags:x}".format(flags=self.flags))
+        details.append("flags=0x{flags:x}".format(flags=self.flags))
 
     if flags & C.PYCBC_RESFLD_HTCODE and hasattr(self, "http_status"):
-        details.append("HTTP={0}".format(self.http_status))
+        details.append("http_status={0}".format(self.http_status))
 
     if flags & C.PYCBC_RESFLD_URL and hasattr(self, "url"):
-        details.append("URL={0}".format(self.url))
+        details.append("url={0}".format(self.url))
 
     ret = "{0}<{1}>".format(self.__class__.__name__, ', '.join(details))
     return ret
