@@ -274,6 +274,15 @@ MapReduce/View Methods
 
     .. automethod:: query
 
+N1QL Query Methods
+==================
+
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
+
+    .. automethod:: n1ql_query
+
+
 Design Document Management
 ==========================
 

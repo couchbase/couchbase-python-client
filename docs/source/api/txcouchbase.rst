@@ -39,6 +39,8 @@ reasons (Deferreds result in a 3x performance slowdown).
     .. automethod:: __init__
     .. automethod:: queryAll
     .. automethod:: queryEx
+    .. automethod:: n1qlQueryAll
+    .. automethod:: n1qlQueryEx
 
 .. class:: BatchedView
 

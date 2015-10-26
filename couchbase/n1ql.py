@@ -59,11 +59,16 @@ class N1QLQuery(object):
                           'WHERE type=$1 AND id=$2',
                           'airline', 0)
 
+            for row in cb.n1ql_query(q):
+                print 'Got', row
+
         Use named parameters::
 
             q = N1QLQuery('SELECT * FROM `travel-sample` '
                           'WHERE type=$type AND id=$id',
                            type='airline', id=0)
+            for row in cb.n1ql_query(q):
+                print 'Got', row
 
         """
 
@@ -255,7 +260,7 @@ class N1QLRequest(object):
             method (or one of its async derivatives).
 
         :param params: An :class:`N1QLQuery` object.
-        :param parent: The parent :class:`.Bucket` object
+        :param parent: The parent :class:`~.couchbase.bucket.Bucket` object
         :param row_factory: Callable which accepts the raw dictionary
             of each row, and can wrap them in a customized class.
             The default is simply to return the dictionary itself.

@@ -1164,7 +1164,7 @@ class Bucket(_Base):
         """
         return BucketManager(self)
 
-    def query(self, design, view, use_devmode=False, itercls=View, **kwargs):
+    def query(self, design, view, use_devmode=False, **kwargs):
         """
         Query a pre-defined MapReduce view, passing parameters.
 
@@ -1181,8 +1181,6 @@ class Bucket(_Base):
             explanation.
         :param kwargs: Extra arguments passed to the :class:`~.View`
             object constructor.
-        :param itercls: Subclass of 'view' to use. This parameter is
-            mainly used by async modules
         :param kwargs: Additional parameters passed to the
             :class:`~.View` constructor. See that class'
             documentation for accepted parameters.
@@ -1207,22 +1205,44 @@ class Bucket(_Base):
 
         """
         design = self._mk_devmode(design, use_devmode)
+        itercls = kwargs.pop('itercls', View)
         return itercls(self, design, view, **kwargs)
 
-    def n1ql_query(self, query, itercls=N1QLRequest, **kwargs):
+    def n1ql_query(self, query, *args, **kwargs):
         """
         Execute a N1QL query.
+
+        This method is mainly a wrapper around the :class:`~.N1QLQuery`
+        and :class:`~.N1QLRequest` objects, which contain the inputs
+        and outputs of the query.
+
+        Using an explicit :class:`~.N1QLQuery`::
+
+            query = N1QLQuery(
+                'SELECT airportname FROM `travel-sample` WHERE city=$1', "Reno")
+            # Use this option for often-repeated queries
+            query.adhoc = False
+            for row in cb.n1ql_query(query):
+                print 'Name: {0}'.format(row['airportname'])
+
+        Using an implicit :class:`~.N1QLQuery`::
+
+            for row in cb.n1ql_query(
+                'SELECT airportname, FROM `travel-sample` WHERE city=$1', "Reno"):
+                print 'Name: {0}'.format(row['airportname'])
 
         :param query: The query to execute. This may either be a
             :class:`.N1QLQuery` object, or a string (which will be
             implicitly converted to one).
         :param kwargs: Arguments for :class:`.N1QLRequest`.
-        :return: An iterator which yields rows. The returned
+        :return: An iterator which yields rows. Each row is a dictionary
+            representing a single result
         """
         if not isinstance(query, N1QLQuery):
             query = N1QLQuery(query)
 
-        return itercls(query, self, **kwargs)
+        itercls = kwargs.pop('itercls', N1QLRequest)
+        return itercls(query, self, *args, **kwargs)
 
     def __repr__(self):
         return ('<{modname}.{cls} bucket={bucket}, nodes={nodes} at 0x{oid:x}>'

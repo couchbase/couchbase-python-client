@@ -304,6 +304,30 @@ class RawBucket(AsyncBucket):
         return o
 
     def n1qlQueryAll(self, *args, **kwargs):
+        """
+        Execute a N1QL query, retrieving all rows.
+
+        This method returns a :class:`Deferred` object which is executed
+        with a :class:`~.N1QLRequest` object. The object may be iterated
+        over to yield the rows in the result set.
+
+        This method is similar to :meth:`~couchbase.bucket.Bucket.n1ql_query`
+        in its arguments.
+
+        Example::
+
+            def handler(req):
+                for row in req:
+                    # ... handle row
+
+            d = cb.n1qlQueryAll('SELECT * from `travel-sample` WHERE city=$1`,
+                            'Reno')
+            d.addCallback(handler)
+
+        :return: A :class:`Deferred`
+
+        .. seealso:: :meth:`~couchbase.bucket.Bucket.n1ql_query`
+        """
         if not self.connected:
             cb = lambda x: self.n1qlQueryAll(*args, **kwargs)
             return self.connect().addCallback(cb)
