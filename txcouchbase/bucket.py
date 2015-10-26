@@ -82,7 +82,7 @@ class BatchedRowMixin(object):
         """
         Iterate over the rows in this resultset
         """
-        return self.__rows
+        return iter(self.__rows)
 
 
 class BatchedView(BatchedRowMixin, AsyncViewBase):
@@ -295,7 +295,13 @@ class RawBucket(AsyncBucket):
 
         .. seealso:: :meth:`queryEx`, around which this method wraps
         """
-        return self.queryEx(cls, *args, **kwargs)
+        kwargs['itercls'] = cls
+        o = super(AsyncBucket, self).n1ql_query(*args, **kwargs)
+        if not self.connected:
+            self.connect().addCallback(lambda x: o.start())
+        else:
+            o.start()
+        return o
 
     def n1qlQueryAll(self, *args, **kwargs):
         if not self.connected:
