@@ -77,7 +77,7 @@ class N1QLStringTest(CouchbaseTestCase):
         }
 
         self.assertEqual('at_plus', dval['scan_consistency'])
-        self.assertDictEqual(sv_exp, dval['scan_vector'])
+        self.assertEqual(sv_exp, dval['scan_vector'])
 
         # Ensure the vb field gets updated. No duplicates!
         q._add_scanvec((42, 3004, 4))
