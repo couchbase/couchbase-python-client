@@ -248,6 +248,7 @@ pycbc_Bucket__view_request(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
         PYCBC_EXC_WRAP(PYCBC_EXC_PIPELINE, 0,
                        "HTTP/View Requests cannot be executed in "
                        "pipeline context");
+        goto GT_DONE;
     }
 
     mres = (pycbc_MultiResult *)pycbc_multiresult_new(self);
