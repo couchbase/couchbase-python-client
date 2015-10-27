@@ -215,7 +215,7 @@ class TranscoderTest(ConnectionTestCase):
         c = self.make_connection()
         c.transcoder = custom_tc
         custom_tc._op_next['encode_value'] = (
-            json.dumps({'Hello': 'World'}),
+            json.dumps({'Hello': 'World'}).encode('utf8'),
             0x02000001
         )
         key = self.gen_key('pycbc295')
