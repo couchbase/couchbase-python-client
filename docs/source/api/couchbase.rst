@@ -405,9 +405,13 @@ Attributes
 
     .. autoattribute:: views_timeout
 
+    .. autoattribute:: n1ql_timeout
+
     .. autoattribute:: bucket
 
     .. autoattribute:: server_nodes
+
+    .. autoattribute:: is_ssl
 
     .. attribute:: default_format
 

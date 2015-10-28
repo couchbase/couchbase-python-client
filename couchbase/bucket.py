@@ -1306,6 +1306,18 @@ class Bucket(_Base):
 
     @property
     def timeout(self):
+        """
+        The timeout for key-value operations, in fractions of a second.
+        This timeout affects the :meth:`get` and :meth:`upsert` family
+        of methods.
+
+        ::
+
+            # Set timeout to 3.75 seconds
+            cb.timeout = 3.75
+
+        .. seealso:: :attr:`views_timeout`, :attr:`n1ql_timeout`
+        """
         return self._get_timeout_common(_LCB.LCB_CNTL_OP_TIMEOUT)
 
     @timeout.setter
@@ -1314,6 +1326,13 @@ class Bucket(_Base):
 
     @property
     def views_timeout(self):
+        """
+        The timeout for view query operations. This affects the
+        :meth:`query` method.
+
+        Timeout may be specified in fractions of a second.
+        .. seealso:: :attr:`timeout`
+        """
         return self._get_timeout_common(_LCB.LCB_CNTL_VIEW_TIMEOUT)
 
     @views_timeout.setter
@@ -1322,6 +1341,16 @@ class Bucket(_Base):
 
     @property
     def n1ql_timeout(self):
+        """
+        The timeout for N1QL query operations. This affects the
+        :meth:`n1ql_query` method.
+
+        Timeouts may also be adjusted on a per-query basis by setting the
+        :attr:`couchbase.n1ql.N1QLQuery.timeout` property. The effective
+        timeout is either the per-query timeout or the global timeout,
+        whichever is lower.
+        """
+
         return self._get_timeout_common(_LCB.LCB_CNTL_N1QL_TIMEOUT)
 
     @n1ql_timeout.setter
@@ -1330,6 +1359,15 @@ class Bucket(_Base):
 
     @property
     def is_ssl(self):
+        """
+        Read-only boolean property indicating whether SSL is used for
+        this connection.
+
+        If this property is true, then all communication between this
+        object and the Couchbase cluster is encrypted using SSL.
+
+        See :meth:`__init__` for more information on connection options.
+        """
         mode = self._cntl(op=_LCB.LCB_CNTL_SSL_MODE, value_type='int')
         return mode & _LCB.LCB_SSL_ENABLED != 0
 
