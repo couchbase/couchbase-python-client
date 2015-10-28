@@ -1321,6 +1321,14 @@ class Bucket(_Base):
         self._set_timeout_common(_LCB.LCB_CNTL_VIEW_TIMEOUT, value)
 
     @property
+    def n1ql_timeout(self):
+        return self._get_timeout_common(_LCB.LCB_CNTL_N1QL_TIMEOUT)
+
+    @n1ql_timeout.setter
+    def n1ql_timeout(self, value):
+        self._set_timeout_common(_LCB.LCB_CNTL_N1QL_TIMEOUT, value)
+
+    @property
     def is_ssl(self):
         mode = self._cntl(op=_LCB.LCB_CNTL_SSL_MODE, value_type='int')
         return mode & _LCB.LCB_SSL_ENABLED != 0

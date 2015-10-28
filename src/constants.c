@@ -161,6 +161,7 @@ do_all_constants(PyObject *module, void (*handler)(PyObject*, const char*, long)
     ADD_MACRO(LCB_CNTL_VIEW_TIMEOUT);
     ADD_MACRO(LCB_CNTL_SSL_MODE);
     ADD_MACRO(LCB_SSL_ENABLED);
+    ADD_MACRO(LCB_CNTL_N1QL_TIMEOUT);
 
     /* View options */
     ADD_MACRO(LCB_CMDVIEWQUERY_F_INCLUDE_DOCS);

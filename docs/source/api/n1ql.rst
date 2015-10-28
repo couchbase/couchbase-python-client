@@ -16,6 +16,7 @@ N1QL Queries
     .. autoattribute:: consistency
     .. autoattribute:: encoded
     .. autoattribute:: adhoc
+    .. autoattribute:: timeout
 
 .. autodata:: CONSISTENCY_NONE
 .. autodata:: CONSISTENCY_REQUEST

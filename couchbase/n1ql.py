@@ -231,6 +231,32 @@ class N1QLQuery(object):
         self._adhoc = arg
 
     @property
+    def timeout(self):
+        """
+        Optional per-query timeout. If set, this will limit the amount
+        of time in which the query can be executed and waited for.
+
+        .. note::
+
+            The effective timeout for the query will be either this property
+            or the value of :attr:`couchbase.bucket.Bucket.n1ql_timeout`
+            property, whichever is *lower*.
+
+        .. seealso:: couchbase.bucket.Bucket.n1ql_timeout
+        """
+        value = self._body.get('timeout', '0s')
+        value = value[:-1]
+        return float(value)
+
+    @timeout.setter
+    def timeout(self, value):
+        if not value:
+            self._body.pop('timeout', 0)
+        else:
+            value = float(value)
+            self._body['timeout'] = '{0}s'.format(value)
+
+    @property
     def encoded(self):
         """
         Get an encoded representation of the query.

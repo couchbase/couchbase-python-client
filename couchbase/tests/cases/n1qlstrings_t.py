@@ -89,3 +89,18 @@ class N1QLStringTest(CouchbaseTestCase):
         dval = json.loads(q.encoded)
         sv_exp['91'] = {'guard': '7779', 'value': 23}
         self.assertEqual(sv_exp, dval['scan_vector'])
+
+    def test_timeout(self):
+        q = N1QLQuery('SELECT foo')
+        q.timeout = 3.75
+        self.assertEqual('3.75s', q._body['timeout'])
+        self.assertEqual(3.75, q.timeout)
+
+        def setfn():
+            q.timeout = "blah"
+
+        self.assertRaises(ValueError, setfn)
+
+        # Unset the timeout
+        q.timeout = 0
+        self.assertFalse('timeout' in q._body)
