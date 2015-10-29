@@ -72,7 +72,8 @@
     X(PREPEND)
 
 static void
-do_all_constants(PyObject *module, void (*handler)(PyObject*, const char*, long))
+do_all_constants(PyObject *module,
+                 void (*handler)(PyObject*, const char*, PY_LONG_LONG))
 {
     #define ADD_MACRO(sym) handler(module, #sym, sym)
     #define ADD_CONSTANT(name, val) handler(module, name, val)
@@ -110,12 +111,12 @@ do_all_constants(PyObject *module, void (*handler)(PyObject*, const char*, long)
     ADD_MACRO(PYCBC_RESFLD_HTCODE);
     ADD_MACRO(PYCBC_RESFLD_URL);
 
-    ADD_CONSTANT("FMT_JSON", PYCBC_FMT_JSON);
-    ADD_CONSTANT("FMT_BYTES", PYCBC_FMT_BYTES);
-    ADD_CONSTANT("FMT_UTF8", PYCBC_FMT_UTF8);
-    ADD_CONSTANT("FMT_PICKLE", PYCBC_FMT_PICKLE);
-    ADD_CONSTANT("FMT_LEGACY_MASK", PYCBC_FMT_LEGACY_MASK);
-    ADD_CONSTANT("FMT_COMMON_MASK", PYCBC_FMT_COMMON_MASK);
+    ADD_CONSTANT("FMT_JSON", (lcb_U32)PYCBC_FMT_JSON);
+    ADD_CONSTANT("FMT_BYTES", (lcb_U32)PYCBC_FMT_BYTES);
+    ADD_CONSTANT("FMT_UTF8", (lcb_U32)PYCBC_FMT_UTF8);
+    ADD_CONSTANT("FMT_PICKLE", (lcb_U32)PYCBC_FMT_PICKLE);
+    ADD_CONSTANT("FMT_LEGACY_MASK", (lcb_U32)PYCBC_FMT_LEGACY_MASK);
+    ADD_CONSTANT("FMT_COMMON_MASK", (lcb_U32)PYCBC_FMT_COMMON_MASK);
 
     ADD_CONSTANT("OBS_PERSISTED", LCB_OBSERVE_PERSISTED);
     ADD_CONSTANT("OBS_FOUND", LCB_OBSERVE_FOUND);
@@ -169,8 +170,9 @@ do_all_constants(PyObject *module, void (*handler)(PyObject*, const char*, long)
 }
 
 static void
-do_constmod(PyObject *module, const char *name, long value) {
-    PyModule_AddIntConstant(module, name, value);
+do_constmod(PyObject *module, const char *name, PY_LONG_LONG value) {
+    PyObject *o = PyLong_FromLongLong(value);
+    PyModule_AddObject(module, name, o);
 }
 
 void
@@ -194,9 +196,9 @@ pycbc_lcb_errstr(lcb_t instance, lcb_error_t err)
 }
 
 static void
-do_printmod(PyObject *module, const char *name, long value)
+do_printmod(PyObject *module, const char *name, PY_LONG_LONG value)
 {
-    printf("%s = %ld\n", name, value);
+    printf("%s = %lld\n", name, value);
 }
 
 PyObject *
