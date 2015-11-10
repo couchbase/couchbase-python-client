@@ -15,7 +15,6 @@
 
 from __future__ import absolute_import
 
-import os
 import sys
 import types
 import platform
@@ -33,13 +32,11 @@ except ImportError:
 
 from testresources import ResourcedTestCase, TestResourceManager
 
-from couchbase.exceptions import CouchbaseError
 from couchbase.admin import Admin
 from couchbase.mockserver import CouchbaseMock, BucketSpec, MockControlClient
 from couchbase.result import (
     MultiResult, ValueResult, OperationResult, ObserveInfo, Result)
 from couchbase._pyport import basestring
-from couchbase.connstr import ConnectionString
 
 CONFIG_FILE = 'tests.ini' # in cwd
 
