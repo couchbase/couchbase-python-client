@@ -44,7 +44,7 @@ class BatchedRowMixin(object):
         You will normally not need to construct this object manually.
         """
         self._d = Deferred()
-        self.__rows = None # likely a superlcass might have this?
+        self.__rows = [] # likely a superlcass might have this?
 
     def _getDeferred(self):
         return self._d

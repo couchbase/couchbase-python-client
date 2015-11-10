@@ -69,3 +69,13 @@ class TxN1QLTests(gen_base(MockTestCase)):
             self.assertEqual(1, len(rows))
 
         return d.addCallback(verify)
+
+    def testEmpty(self):
+        cb = self.make_connection()
+        d = cb.n1qlQueryAll('SELECT emptyrow')
+
+        def verify(o):
+            self.assertIsInstance(o, BatchedN1QLRequest)
+            rows = [r for r in o]
+            self.assertEqual(0, len(rows))
+        return d.addCallback(verify)
