@@ -18,6 +18,7 @@ from __future__ import absolute_import
 import sys
 import types
 import platform
+import warnings
 
 try:
     from unittest.case import SkipTest
@@ -246,7 +247,6 @@ class CouchbaseTestCase(ResourcedTestCase):
             raise SkipTest("Mock server required")
         return self._mock_info
 
-
     def setUp(self):
         super(CouchbaseTestCase, self).setUp()
 
@@ -261,12 +261,27 @@ class CouchbaseTestCase(ResourcedTestCase):
 
         self._key_counter = 0
 
+        if not hasattr(self, 'factory'):
+            from couchbase.bucket import Bucket
+            from couchbase.views.iterator import View
+            from couchbase.result import (
+                MultiResult, Result, OperationResult, ValueResult,
+                ObserveInfo)
+
+            self.factory = Bucket
+            self.viewfactory = View
+            self.cls_Result = Result
+            self.cls_MultiResult = MultiResult
+            self.cls_OperationResult = OperationResult
+            self.cls_ObserveInfo = ObserveInfo
+            self.should_check_refcount = True
+            warnings.warn('Using fallback (couchbase module) defaults')
+
     def skipLcbMin(self, vstr):
         """
         Test requires a libcouchbase version of at least vstr.
         This may be a hex number (e.g. 0x020007) or a string (e.g. "2.0.7")
         """
-
         if isinstance(vstr, basestring):
             components = vstr.split('.')
             hexstr = "0x"
