@@ -688,13 +688,6 @@ functions.
 Geospatial Views
 ================
 
-.. warning::
-
-    Geospatial views are considered an experimental feature in current
-    versions of Couchbase Server (the latest version at the time of
-    writing being 3.0.2). As such, the feature exposed in the SDK itself
-    is too inherently experimental
-
 Geospatial views are views which can index and filter items based on one or
 more independent axes or coordinates. This allows greater application at
 query-time to filter based on more than a single attribute.

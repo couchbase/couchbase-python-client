@@ -2,11 +2,6 @@
 N1QL Queries
 ############
 
-.. warning::
-    At the time of writing, N1QL is still an experimental feature. As such,
-    both the server-side API as well as the client API are subject to change.
-
-
 .. currentmodule:: couchbase.n1ql
 
 .. class:: N1QLQuery
