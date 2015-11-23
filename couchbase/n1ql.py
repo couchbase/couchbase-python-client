@@ -48,10 +48,13 @@ class N1QLQuery(object):
         `params` argument to :class:`N1QLRequest`.
 
         :param query: The query string to execute
-        :param args: Positional placeholder arguments.
-        :param kwargs: Named placeholder arguments.
-            (The client will automatically prepend a leading ``$``
-            to each named parameter).
+        :param args: Positional placeholder arguments. These satisfy
+            the placeholder values for positional placeholders in the
+            query string, such as ``$1``, ``$2`` and so on.
+        :param kwargs: Named placeholder arguments. These satisfy
+            named placeholders in the query string, such as
+            ``$name``, ``$email`` and so on. For the placeholder
+            values, omit the leading sigil (``$``).
 
         Use positional parameters::
 
@@ -70,6 +73,24 @@ class N1QLQuery(object):
             for row in cb.n1ql_query(q):
                 print 'Got', row
 
+
+        When using placeholders, ensure that the placeholder value is
+        the *unserialized* (i.e. native) Python value, not the JSON
+        serialized value. For example the query
+        ``SELECT * FROM products WHERE tags IN ["sale", "clearance"]``
+        can be rewritten using placeholders:
+
+        Correct::
+
+            N1QLQuery('SELECT * FROM products WHERE tags IN $1',
+                      ['sale', 'clearance'])
+
+        Incorrect::
+
+            N1QLQuery('SELECT * FROM products WHERE tags IN $1',
+                      "[\\"sale\\",\\"clearance\\"]")
+
+        Since the placeholders are serialized to JSON internally anyway.
         """
 
         self._adhoc = True
