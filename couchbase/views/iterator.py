@@ -236,9 +236,13 @@ class View(object):
         self._parent = parent
         self.design = design
         self.view = view
-        self.errors = []
+        self._errors = []
         self.rows_returned = 0
-        self.indexed_rows = 0
+        self._indexed_rows = 0
+
+        # Sentinel used to ensure confusing metadata properties don't get
+        # returned unless metadata is actually parsed (or query is complete)
+        self.__meta_received = False
 
         if query and params:
             raise ArgumentError.pyexc(
@@ -315,23 +319,43 @@ class View(object):
     def raw(self):
         return self.__raw
 
+    def __meta_or_raise(self):
+        """
+        Check if meta has been handled and raise an exception otherwise.
+        Thrown from 'meta-only' properties
+        """
+        if not self.__meta_received:
+            raise RuntimeError(
+                'This property only valid once all rows are received')
+
+    @property
+    def indexed_rows(self):
+        self.__meta_or_raise()
+        return self._indexed_rows
+
+    @property
+    def errors(self):
+        self.__meta_or_raise()
+        return self._errors
+
     def _handle_errors(self, errors):
         if not errors:
             return
 
-        self.errors += [errors]
+        self._errors += [errors]
 
         if self._query.on_error != 'continue':
             raise ViewEngineError.pyexc("Error while executing view.",
-                                        self.errors)
+                                        self._errors)
         else:
             warn("Error encountered when executing view. Inspect 'errors' "
                  "for more information")
 
     def _handle_meta(self, value):
+        self.__meta_received = True
         if not isinstance(value, dict):
             return
-        self.indexed_rows = value.get('total_rows', 0)
+        self._indexed_rows = value.get('total_rows', 0)
         self._handle_errors(value.get('errors'))
 
     def _process_payload(self, rows):

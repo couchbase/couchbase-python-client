@@ -379,3 +379,15 @@ class ViewIteratorTest(ViewTestCase):
         view = self.cb.query("beer", "with_value", streaming=True)
         rows = list(view)
         self.assertTrue(len(rows))
+
+    def test_props_before_rows(self):
+        it = self.cb.query('beer', 'brewery_beers', limit=1)
+
+        def get_rowcount():
+            return it.indexed_rows
+
+        def get_errors():
+            return it.errors
+
+        self.assertRaises(RuntimeError, get_rowcount)
+        self.assertRaises(RuntimeError, get_errors)
