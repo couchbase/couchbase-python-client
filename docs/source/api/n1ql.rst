@@ -22,4 +22,5 @@ N1QL Queries
     .. automethod:: __init__
     .. automethod:: __iter__
     .. automethod:: execute
+    .. automethod:: meta
     .. automethod:: get_single_result

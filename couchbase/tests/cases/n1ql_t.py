@@ -29,3 +29,9 @@ class N1QLTest(MockTestCase):
     def test_emptyrow(self):
         rv = self.cb.n1ql_query('SELECT emptyrow').get_single_result()
         self.assertEqual(None, rv)
+
+    def test_meta(self):
+        q = self.cb.n1ql_query('SELECT mockrow')
+        self.assertRaises(RuntimeError, getattr, q, 'meta')
+        q.execute()
+        self.assertIsInstance(q.meta, dict)

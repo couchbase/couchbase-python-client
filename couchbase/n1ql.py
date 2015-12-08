@@ -325,6 +325,7 @@ class N1QLRequest(object):
         self._mres = None
         self._do_iter = True
         self.__raw = False
+        self.__meta_received = False
 
     def _start(self):
         if self._mres:
@@ -338,11 +339,36 @@ class N1QLRequest(object):
     def raw(self):
         return self.__raw
 
+    @property
+    def meta(self):
+        """
+        Get metadata from the query itself. This is guaranteed to only
+        return a Python dictionary.
+
+        Note that if the query failed, the metadata might not be in JSON
+        format, in which case there may be additional, non-JSON data
+        which can be retrieved using the following
+
+        .. code-block::
+
+            raw_meta = req.raw.value
+
+        :return: A dictionary containing the query metadata
+        """
+        if not self.__meta_received:
+            raise RuntimeError(
+                'This property only valid once all rows are received!')
+
+        if isinstance(self.raw.value, dict):
+            return self.raw.value
+        return {}
+
     def _clear(self):
         del self._parent
         del self._mres
 
     def _handle_meta(self, value):
+        self.__meta_received = True
         if not isinstance(value, dict):
             return
         if 'errors' in value:
