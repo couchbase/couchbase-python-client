@@ -399,6 +399,8 @@ class N1QLRequest(object):
         for _ in self:
             pass
 
+        return self
+
     def get_single_result(self):
         """
         Execute the statement and return its single result.
