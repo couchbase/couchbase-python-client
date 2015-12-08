@@ -16,6 +16,10 @@ class VersionNotFound(Exception):
     pass
 
 
+class MalformedGitTag(Exception):
+    pass
+
+
 RE_XYZ = re.compile(r'(\d+)\.(\d+)\.(\d)(?:-(.*))?')
 
 VERSION_FILE = os.path.join(
@@ -26,7 +30,11 @@ VERSION_FILE = os.path.join(
 class VersionInfo(object):
     def __init__(self, rawtext):
         self.rawtext = rawtext
-        vinfo, self.ncommits, self.sha = rawtext.rsplit('-', 2)
+        t = self.rawtext.rsplit('-', 2)
+        if len(t) != 3:
+            raise MalformedGitTag(self.rawtext)
+
+        vinfo, self.ncommits, self.sha = t
         self.ncommits = int(self.ncommits)
 
         # Split up the X.Y.Z
@@ -129,7 +137,7 @@ def gen_version(do_write=True, txt=None):
     try:
         info = VersionInfo(txt)
         vstr = info.package_version
-    except IndexError:
+    except MalformedGitTag:
         warnings.warn("Malformed input '{0}'".format(txt))
         vstr = '0.0.0'+txt
 
