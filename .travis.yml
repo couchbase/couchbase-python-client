@@ -16,6 +16,7 @@ addons:
       - libcouchbase2-libevent 
 
 install:
+  - pip -q install testresources==0.2.7
   - pip -q install -r dev_requirements.txt
   - pip -q install -r requirements.txt
   - pip -q install gevent || echo "Couldn't install gevent"
