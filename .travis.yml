@@ -1,4 +1,5 @@
 language: python
+sudo: false
 
 python:
   - "2.7"
@@ -6,25 +7,29 @@ python:
   - "3.2"
   - "3.3"
 
-before_install:
-  - sudo rm -rf /etc/apt/sources.list.d/*
-  - wget -O- http://packages.couchbase.com/ubuntu/couchbase.key | sudo apt-key add -
-  - echo deb http://packages.couchbase.com/ubuntu precise precise/main | sudo tee /etc/apt/sources.list.d/couchbase.list
-  - sudo apt-get update
-  - sudo apt-cache search libcouchbase
+addons:
+  apt:
+    sources:
+      - couchbase-precise
+    packages:
+      - libcouchbase-dev
+      - libcouchbase2-libevent 
 
 install:
-  - sudo apt-get -y install libcouchbase-dev libcouchbase2-core libcouchbase2-libevent libevent-dev
-  - pip -q install gevent || echo "Couldn't find gevent"
-  - pip -q install twisted
-  - pip -q install testresources
-  - export CFLAGS='-Wextra -Wno-long-long -Wno-missing-field-initializers'
-  - CFLAGS="$CFLAGS -fno-strict-aliasing -Wno-strict-aliasing"
+  - pip -q install -r dev_requirements.txt
+  - pip -q install -r requirements.txt
+  - pip -q install gevent || echo "Couldn't install gevent"
+  - pip -q install twisted || echo "Couldn't install Twisted"
+  - git describe --tags --long --always
   - python setup.py build_ext --inplace
-  - sudo $(which python) setup.py install
+  - python setup.py install
 
 script:
-  - ./.ci_script.sh
+  - python -m couchbase.bucket
+  - cp .tests.ini.travis tests.ini
+  - nosetests -v couchbase.tests.test_sync
+  - nosetests -v gcouchbase.tests.test_api || echo "Gevent tests failed"
+  - nosetests -v txcouchbase || echo "Twisted tests failed"
 
 notifications:
   email:
