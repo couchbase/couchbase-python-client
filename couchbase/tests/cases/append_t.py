@@ -32,7 +32,7 @@ class AppendTest(ConnectionTestCase):
         self.cb.upsert(key, vbase, format=FMT_UTF8)
         self.cb.prepend(key, "begin ")
         self.cb.append(key, " end")
-        self.assertEquals(self.cb.get(key).value,
+        self.assertEqual(self.cb.get(key).value,
                           "begin middle end")
 
 

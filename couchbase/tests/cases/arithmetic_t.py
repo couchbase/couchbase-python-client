@@ -31,15 +31,15 @@ class ArithmeticTest(ConnectionTestCase):
         self.assertEqual(int(rv_get.value), 1)
 
         rv = self.cb.counter(key)
-        self.assertEquals(rv.value, 2)
+        self.assertEqual(rv.value, 2)
 
         rv = self.cb.counter(key, delta=-1)
-        self.assertEquals(rv.value, 1)
-        self.assertEquals(int(self.cb.get(key).value), 1)
+        self.assertEqual(rv.value, 1)
+        self.assertEqual(int(self.cb.get(key).value), 1)
 
         rv = self.cb.counter(key, delta=-1)
-        self.assertEquals(rv.value, 0)
-        self.assertEquals(int(self.cb.get(key).value), 0)
+        self.assertEqual(rv.value, 0)
+        self.assertEqual(int(self.cb.get(key).value), 0)
 
     def test_incr_notfound(self):
         key = self.gen_key("incr_notfound")
@@ -83,7 +83,7 @@ class ArithmeticTest(ConnectionTestCase):
         key = self.gen_key("incr_extended")
         self.cb.remove(key, quiet=True)
         rv = self.cb.counter(key, initial=10)
-        self.assertEquals(rv.value, 10)
+        self.assertEqual(rv.value, 10)
         srv = self.cb.upsert(key, "42", cas=rv.cas)
         self.assertTrue(srv.success)
 
@@ -91,8 +91,8 @@ class ArithmeticTest(ConnectionTestCase):
         klist = self.gen_key_list(amount=5, prefix="incr_extended_list")
         self.cb.remove_multi(klist, quiet=True)
         rvs = self.cb.counter_multi(klist, initial=40)
-        [ self.assertEquals(x.value, 40) for x in rvs.values() ]
-        self.assertEquals(sorted(list(rvs.keys())), sorted(klist))
+        [ self.assertEqual(x.value, 40) for x in rvs.values() ]
+        self.assertEqual(sorted(list(rvs.keys())), sorted(klist))
 
 
 if __name__ == '__main__':

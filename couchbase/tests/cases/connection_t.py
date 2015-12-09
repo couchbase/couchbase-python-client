@@ -77,7 +77,7 @@ class ConnectionTest(CouchbaseTestCase):
             cb2 = self.factory(**self.make_connargs(config_cache=cachefile.name))
 
             self.assertTrue(cb2.upsert("foo", "bar").success)
-            self.assertEquals("bar", cb.get("foo").value)
+            self.assertEqual("bar", cb.get("foo").value)
 
             sb = os.stat(cachefile.name)
 

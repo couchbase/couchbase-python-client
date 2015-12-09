@@ -34,7 +34,7 @@ class EncodingTest(ConnectionTestCase):
         for f in (FMT_BYTES, FMT_PICKLE):
             cas = self.cb.upsert(txt, txt.encode('utf-16'), format=f).cas
             server_val = self.cb.get(txt).value
-            self.assertEquals(server_val, BLOB_ORIG)
+            self.assertEqual(server_val, BLOB_ORIG)
 
     def test_json_unicode(self):
         self.assertEqual(self.cb.default_format, FMT_JSON)
@@ -66,7 +66,7 @@ class EncodingTest(ConnectionTestCase):
             cas = self.cb.upsert("key", blob, format=f).cas
             self.assertTrue(cas)
             rv = self.cb.get("key").value
-            self.assertEquals(rv, blob)
+            self.assertEqual(rv, blob)
 
     def test_bytearray(self):
         ba = bytearray(b"Hello World")
