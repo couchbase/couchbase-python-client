@@ -125,6 +125,7 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules"],
 
     packages = [
+        'acouchbase',
         'couchbase',
         'couchbase.views',
         'couchbase.iops',
