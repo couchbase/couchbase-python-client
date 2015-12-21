@@ -61,15 +61,6 @@ Attributes
         Whether documents are fetched along with each row
 
 
-    .. attribute:: rows_returned
-
-        How many actual rows were returned from the server.
-
-        This is incremented each time a new request is made. Note this may
-        be different from the amount of rows yielded by iterator from
-        :meth:`RowProcessor.handle_rows` if a custom :attr:`row_processor`
-        is being used
-
 
 ^^^^^^^^^^^^^^
 Row Processing
