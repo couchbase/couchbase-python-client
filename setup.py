@@ -132,7 +132,8 @@ setup(
         'couchbase.tests',
         'couchbase.tests.cases',
         'gcouchbase',
-        'txcouchbase'
+        'txcouchbase',
+        'acouchbase'
     ],
     package_data = pkgdata,
     tests_require = [ 'nose', 'testresources>=0.2.7' ],
