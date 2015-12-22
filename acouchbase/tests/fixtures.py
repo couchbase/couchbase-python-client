@@ -9,8 +9,12 @@ from functools import wraps
 config = ConnectionConfiguration()
 cluster_info = config.realserver_info
 
-beer_bucket = cluster_info.make_connection(Bucket, bucket="beer-sample")
-default_bucket = cluster_info.make_connection(Bucket)
+if cluster_info:
+    beer_bucket = cluster_info.make_connection(Bucket, bucket="beer-sample")
+    default_bucket = cluster_info.make_connection(Bucket)
+else:
+    beer_bucket = None
+    default_bucket = None
 
 def asynct(f):
     @wraps(f)
@@ -22,5 +26,7 @@ def asynct(f):
     return wrapper
 
 class AioTestCase(unittest.TestCase):
-    pass
-    
+
+    def setUp(self):
+        if not cluster_info:
+            self.skipTest("Real Server required.")
