@@ -1,21 +1,10 @@
 import asyncio
 import unittest
 
-from couchbase.tests.base import ConnectionConfiguration, MockResourceManager
+from couchbase.tests.base import ConnectionConfiguration, MockResourceManager, MockTestCase
 from acouchbase.bucket import Bucket
 
 from functools import wraps
-
-config = ConnectionConfiguration()
-
-manager = MockResourceManager(config)
-mock_info = manager.make()
-if mock_info:
-    beer_bucket = mock_info.make_connection(Bucket, bucket="beer-sample")
-    default_bucket = mock_info.make_connection(Bucket)
-else:
-    beer_bucket = None
-    default_bucket = None
 
 
 def asynct(f):
@@ -27,8 +16,6 @@ def asynct(f):
 
     return wrapper
 
-class AioTestCase(unittest.TestCase):
-
-    def setUp(self):
-        if not beer_bucket:
-            self.skipTest("Mock Server required.")
+class AioTestCase(MockTestCase):
+    factory = Bucket
+    should_check_refcount = False

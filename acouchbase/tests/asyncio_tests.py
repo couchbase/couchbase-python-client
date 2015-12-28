@@ -2,7 +2,7 @@
 # ImportError will fail for python 3.3 because asyncio does not exist
 
 try:
-    from py34only import CouchbaseTest
+    from py34only import CouchbaseBeerTest, CouchbaseDefaultTest
 except ImportError:
     pass
 except SyntaxError:
