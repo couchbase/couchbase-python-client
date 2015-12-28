@@ -4,7 +4,7 @@ except ImportError:
     import trollius as asyncio
 
 from acouchbase.asyncio_iops import IOPS
-from acouchbase.iterator import ViewRowProcessor, N1QLRowProcessor
+from acouchbase.iterator import AView, AN1QLRequest
 from couchbase.async.bucket import AsyncBucket
 from couchbase.experimental import enabled_or_raise; enabled_or_raise()
 
@@ -45,12 +45,12 @@ class Bucket(AsyncBucket):
 
     def query(self, *args, **kwargs):
         if "itercls" not in kwargs:
-            kwargs["itercls"] = ViewRowProcessor
+            kwargs["itercls"] = AView
         return super().query(*args, **kwargs)
 
     def n1ql_query(self, *args, **kwargs):
         if "itercls" not in kwargs:
-            kwargs["itercls"] = N1QLRowProcessor
+            kwargs["itercls"] = AN1QLRequest
         return super().n1ql_query(*args, **kwargs)
 
     locals().update(AsyncBucket._gen_memd_wrappers(_meth_factory))

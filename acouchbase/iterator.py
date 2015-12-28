@@ -59,14 +59,14 @@ class AioBase:
         self.__accumulator.put_nowait(None)
 
 
-class ViewRowProcessor(AioBase, AsyncViewBase):
+class AView(AioBase, AsyncViewBase):
 
     def __init__(self, *args, **kwargs):
         AsyncViewBase.__init__(self, *args, **kwargs)
         AioBase.__init__(self)
 
 
-class N1QLRowProcessor(AioBase, AsyncN1QLRequest):
+class AN1QLRequest(AioBase, AsyncN1QLRequest):
 
     def __init__(self, *args, **kwargs):
         AsyncN1QLRequest.__init__(self, *args, **kwargs)

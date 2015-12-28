@@ -1,6 +1,6 @@
 from fixtures import asynct, AioTestCase, beer_bucket, default_bucket
 
-class CouchBasePy35Test(AioTestCase):
+class CouchbasePy35Test(AioTestCase):
 
     @asynct
     async def test_query_with_async_iterator(self):

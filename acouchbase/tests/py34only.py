@@ -6,7 +6,7 @@ from fixtures import asynct, AioTestCase, beer_bucket, default_bucket
 from couchbase.n1ql import N1QLQuery
 
 
-class CouchBaseTest(AioTestCase):
+class CouchbaseTest(AioTestCase):
 
     @asynct
     def test_get_data(self):
