@@ -33,9 +33,16 @@ class CouchbaseTest(AioTestCase):
     @asynct
     @asyncio.coroutine
     def test_upsert(self):
+        import uuid
+
+        expected = str(uuid.uuid4())
+
         yield from (default_bucket.connect() or asyncio.sleep(0.01))
 
-        yield from default_bucket.upsert('hello', {"key": "test"})
+        yield from default_bucket.upsert('hello', {"key": expected})
+
+        obtained = yield from default_bucket.get('hello')
+        self.assertEqual({"key": expected}, obtained.value)
 
 
     @asynct
