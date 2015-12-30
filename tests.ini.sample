@@ -22,4 +22,4 @@ enabled = True
 ; Local path for the mock
 path = /tmp/CouchbaseMock-1.0.0-g50cf222.jar
 ; Where to download it, if not available
-url = http://packages.coucbase.com/clients/c/mock/CouchbaseMock-LATEST.jar
+url = http://packages.couchbase.com/clients/c/mock/CouchbaseMock-LATEST.jar

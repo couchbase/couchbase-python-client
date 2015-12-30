@@ -6,6 +6,8 @@ python:
   - "2.6"
   - "3.2"
   - "3.3"
+  - "3.4"
+  - "3.5"
 
 addons:
   apt:
@@ -29,6 +31,7 @@ script:
   - python -m couchbase.bucket
   - cp .tests.ini.travis tests.ini
   - nosetests -v couchbase.tests.test_sync
+  - nosetests -v acouchbase
   - nosetests -v gcouchbase.tests.test_api || echo "Gevent tests failed"
   - nosetests -v txcouchbase || echo "Twisted tests failed"
 
