@@ -335,6 +335,51 @@ pycbc_IOPSWrapperType_init(PyObject **ptr)
     return PyType_Ready(p);
 }
 
+static PyObject *
+do_safecall(PyObject *callable, PyObject *args)
+{
+    int has_error = 0;
+    PyObject *exctype = NULL, *excval = NULL, *exctb = NULL;
+    PyObject *result;
+
+    if (PyErr_Occurred()) {
+        /* Calling from within handler */
+        has_error = 1;
+        PyErr_Fetch(&exctype, &excval, &exctb);
+        PyErr_Clear();
+    }
+
+    result = PyObject_CallObject(callable, args);
+    if (!has_error) {
+        /* No special handling here... */
+        return result;
+    }
+
+    if (!result) {
+
+        #if PY_MAJOR_VERSION == 3
+        PyObject *exctype2, *excval2, *exctb2;
+        PyErr_NormalizeException(&exctype, &excval, &exctb);
+        PyErr_Fetch(&exctype2, &excval2, &exctb2);
+        PyErr_NormalizeException(&exctype2, &excval, &exctb2);
+        /* Py3K has exception contexts we can use! */
+        PyException_SetContext(excval2, excval);
+        excval = NULL; /* Since SetContext steals a reference */
+        PyErr_Restore(exctype2, excval2, exctb2);
+        #else
+        PyErr_PrintEx(0);
+        #endif
+
+        /* Clean up remaining variables */
+        Py_XDECREF(exctype);
+        Py_XDECREF(excval);
+        Py_XDECREF(exctb);
+    } else {
+        PyErr_Restore(exctype, excval, exctb);
+    }
+    return result;
+}
+
 static int
 modify_event_python(pycbc_IOPSWrapper *pio, pycbc_Event *ev,
                     pycbc_evaction_t action, lcb_socket_t newsock, void *arg)
@@ -366,7 +411,7 @@ modify_event_python(pycbc_IOPSWrapper *pio, pycbc_Event *ev,
     }
     PyTuple_SET_ITEM(argtuple, 2, o_arg);
 
-    result = PyObject_CallObject(meth, argtuple);
+    result = do_safecall(meth, argtuple);
     Py_DECREF(argtuple);
     Py_XDECREF(result);
 
@@ -411,7 +456,7 @@ create_event_python(lcb_io_opt_t io, pycbc_evtype_t evtype)
     }
 
     if (meth) {
-        ret = PyObject_CallObject(meth, NULL);
+        ret = do_safecall(meth, NULL);
         if (!ret) {
             PyErr_PrintEx(0);
             abort();
