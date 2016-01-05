@@ -172,6 +172,35 @@ GEvent API
 The API functions exactly like the normal Bucket API, except that the
 implementation is significantly different.
 
+------------------------
+Asynchronous (Tulip) API
+------------------------
+
+This module also supports Python 3.4/3.5 asynchronous I/O. To use this
+functionality, import the `couchbase.experimental` module (since this
+functionality is considered experimental) and then import the `acouchbase`
+module. The `acouchbase` module offers an API similar to the synchronous
+client:
+
+.. code-block:: python
+
+    import asyncio
+
+    import couchbase.experimental
+    couchbase.experimental.enable()
+    from acouchbase.bucket import Bucket
+
+
+    async def write_and_read(key, value):
+        cb = Bucket('couchbase://10.0.0.31/default')
+        await cb.connect()
+        await cb.upsert(key, value)
+        return await cb.get(key)
+
+    loop = asyncio.get_event_loop()
+    rv = loop.run_until_complete(write_and_read('foo', 'bar'))
+    print(rv.value)
+
 
 ~~~~
 PyPy
