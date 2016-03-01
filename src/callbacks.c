@@ -240,10 +240,11 @@ durability_chain_common(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
         mutinfo = lcb_resp_get_mutation_token(cbtype, resp);
         if (mutinfo && LCB_MUTATION_TOKEN_ISVALID(mutinfo)) {
             /* Create the mutation token tuple: (vb,uuid,seqno) */
-            res->mutinfo = Py_BuildValue("HKK",
+            res->mutinfo = Py_BuildValue("HKKO",
                 LCB_MUTATION_TOKEN_VB(mutinfo),
                 LCB_MUTATION_TOKEN_ID(mutinfo),
-                LCB_MUTATION_TOKEN_SEQ(mutinfo));
+                LCB_MUTATION_TOKEN_SEQ(mutinfo),
+                conn->bucket);
         } else {
             Py_INCREF(Py_None);
             res->mutinfo = Py_None;

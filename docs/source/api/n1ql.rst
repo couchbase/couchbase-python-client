@@ -8,6 +8,7 @@ N1QL Queries
 
     .. automethod:: __init__
     .. automethod:: set_option
+    .. automethod:: consistent_with
     .. autoattribute:: consistency
     .. autoattribute:: encoded
     .. autoattribute:: adhoc
@@ -16,11 +17,12 @@ N1QL Queries
 .. autodata:: CONSISTENCY_NONE
 .. autodata:: CONSISTENCY_REQUEST
 
+.. autoclass:: MutationState
 
 .. class:: N1QLRequest
 
     .. automethod:: __init__
     .. automethod:: __iter__
     .. automethod:: execute
-    .. automethod:: meta
+    .. autoattribute:: meta
     .. automethod:: get_single_result

@@ -90,6 +90,28 @@ def set_pickle_converters(encode, decode):
     return (ret['pickle_encode'], ret['pickle_decode'])
 
 
+def _to_json(*args):
+    """
+    Utility function to encode an object to json using the user-defined
+    JSON encoder (see :meth:`set_json_converters`).
+
+    :param args: Arguments passed to the encoder
+    :return: Serialized JSON string
+    """
+    return _LCB._get_helper('json_encode').dumps(*args)
+
+
+def _from_json(*args):
+    """
+    Utility function to decode a JSON string to a Python object using
+    the user-defined JSON decoder (see :meth:`set_json_converters`).
+
+    :param args: Arguments passed to the decoder
+    :return: Python object converted from JSON
+    """
+    return _LCB._get_helper('json_decode').loads(*args)
+
+
 def enable_logging():
     """
     Enables integration with Python's `logging` module.

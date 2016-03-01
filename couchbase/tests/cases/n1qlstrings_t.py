@@ -20,6 +20,7 @@ import json
 
 from couchbase.tests.base import CouchbaseTestCase
 from couchbase.n1ql import N1QLQuery, CONSISTENCY_REQUEST, CONSISTENCY_NONE
+from couchbase.n1ql import MutationState
 
 
 class N1QLStringTest(CouchbaseTestCase):
@@ -69,26 +70,34 @@ class N1QLStringTest(CouchbaseTestCase):
         # and guard is a vbucket's UUID.
 
         q = N1QLQuery('SELECT * FROM default')
+        ms = MutationState()
+        ms._add_scanvec((42, 3004, 3, 'default'))
+        q.consistent_with(ms)
 
-        q._add_scanvec((42, 3004, 3))
         dval = json.loads(q.encoded)
         sv_exp = {
-            '42': {'value': 3, 'guard': '3004'}
+            'default': {'42': [3, '3004']}
         }
 
         self.assertEqual('at_plus', dval['scan_consistency'])
-        self.assertEqual(sv_exp, dval['scan_vector'])
+        self.assertEqual(sv_exp, dval['scan_vectors'])
 
         # Ensure the vb field gets updated. No duplicates!
-        q._add_scanvec((42, 3004, 4))
-        sv_exp['42']['value'] = 4
+        ms._add_scanvec((42, 3004, 4, 'default'))
+        sv_exp['default']['42'] = [4, '3004']
         dval = json.loads(q.encoded)
-        self.assertEqual(sv_exp, dval['scan_vector'])
+        self.assertEqual(sv_exp, dval['scan_vectors'])
 
-        q._add_scanvec((91, 7779, 23))
+        ms._add_scanvec((91, 7779, 23, 'default'))
         dval = json.loads(q.encoded)
-        sv_exp['91'] = {'guard': '7779', 'value': 23}
-        self.assertEqual(sv_exp, dval['scan_vector'])
+        sv_exp['default']['91'] = [23, '7779']
+        self.assertEqual(sv_exp, dval['scan_vectors'])
+
+        # Try with a second bucket
+        sv_exp['other'] = {'666': [99, '5551212']}
+        ms._add_scanvec((666, 5551212, 99, 'other'))
+        dval = json.loads(q.encoded)
+        self.assertEqual(sv_exp, dval['scan_vectors'])
 
     def test_timeout(self):
         q = N1QLQuery('SELECT foo')
