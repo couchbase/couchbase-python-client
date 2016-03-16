@@ -80,7 +80,7 @@ static struct PyMemberDef OperationResult_TABLE_members[] = {
 static struct PyMemberDef ValueResult_TABLE_members[] = {
         { "flags",
                 T_ULONG, offsetof(pycbc_ValueResult, flags),
-                READONLY, PyDoc_STR("Flags for the value")
+                READONLY
         },
         { NULL }
 };
