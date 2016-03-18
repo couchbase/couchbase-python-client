@@ -1156,6 +1156,64 @@ class Bucket(_Base):
                                   timeout=timeout, interval=interval,
                                   check_removed=check_removed)
 
+    def remove_multi(self, kvs, quiet=None):
+        """Remove multiple items from the cluster
+
+        :param kvs: Iterable of keys to delete from the cluster. If you wish
+            to specify a CAS for each item, then you may pass a dictionary
+            of keys mapping to cas, like ``remove_multi({k1:cas1, k2:cas2})
+        :param quiet: Whether an exception should be raised if one or more
+            items were not found
+        :return: A :class:`~.MultiResult` containing :class:`~.OperationResult`
+            values.
+        """
+        return _Base.remove_multi(self, kvs, quiet=quiet)
+
+    def counter_multi(self, kvs, initial=None, delta=1, ttl=0):
+        """Perform counter operations on multiple items
+
+        :param kvs: Keys to operate on. See below for more options
+        :param initial: Initial value to use for all keys.
+        :param delta: Delta value for all keys.
+        :param ttl: Expiration value to use for all keys
+
+        :return: A :class:`~.MultiResult` containing :class:`~.ValueResult`
+            values
+
+
+        The `kvs` can be a:
+
+        - Iterable of keys
+            .. code-block:: python
+
+                cb.counter_multi((k1, k2))
+
+        - A dictionary mapping a key to its delta
+            .. code-block:: python
+
+                cb.counter_multi({
+                    k1: 42,
+                    k2: 99
+                })
+
+        - A dictionary mapping a key to its additional options
+            .. code-block:: python
+
+                cb.counter_multi({
+                    k1: {'delta': 42, 'initial': 9, 'ttl': 300},
+                    k2: {'delta': 99, 'initial': 4, 'ttl': 700}
+                })
+
+
+        When using a dictionary, you can override settings for each key on
+        a per-key basis (for example, the initial value). Global settings
+        (global here means something passed as a parameter to the method)
+        will take effect for those values which do not have a given option
+        specified.
+        """
+        return _Base.counter_multi(self, kvs, initial=initial, delta=delta,
+                                   ttl=ttl)
+
     def rget(self, key, replica_index=None, quiet=None):
         """Get an item from a replica node
 
