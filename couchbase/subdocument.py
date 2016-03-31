@@ -6,7 +6,7 @@ from couchbase._libcouchbase import (
 )
 
 _SPECMAP = {}
-for k, v in globals().items():
+for k, v in tuple(globals().items()):
     if not k.startswith('LCB_SDCMD_'):
         continue
     k = k.replace('LCB_SDCMD_', '')

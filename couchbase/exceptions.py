@@ -558,10 +558,13 @@ _LCB_ERRNO_MAP = {
     C.LCB_EMPTY_PATH: InvalidError
 }
 
-for k, v in _LCB_ERRNO_MAP.iteritems():
-    v.CODE = k
-    del k
-    del v
+
+def _set_default_codes():
+    for k, v in _LCB_ERRNO_MAP.items():
+        v.CODE = k
+
+_set_default_codes()
+
 
 def _mk_lcberr(rc, name=None, default=CouchbaseError, docstr="", extrabase=[]):
     """

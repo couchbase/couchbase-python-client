@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from itertools import izip
 
 from couchbase._libcouchbase import (
     Result,
@@ -24,6 +23,7 @@ from couchbase._libcouchbase import (
     MultiResult,
     ObserveInfo,
     AsyncResult)
+from couchbase._pyport import long, xrange
 import couchbase._libcouchbase as C
 import couchbase.exceptions as E
 
