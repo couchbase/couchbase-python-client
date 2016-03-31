@@ -609,6 +609,8 @@ pycbc_sd_handle_speclist(pycbc_Bucket *self, pycbc_MultiResult *mres,
     Py_ssize_t nspecs = 0;
     pycbc__SDResult *newitm = NULL;
     lcb_SDSPEC *specs = NULL, spec_s = { 0 };
+    pycbc_pybuffer pathbuf_s = { NULL }, valbuf_s = { NULL };
+    pycbc_pybuffer *pathbufs = NULL, *valbufs = NULL;
 
     if (!PyTuple_Check(spectuple)) {
         PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Value must be a tuple!");
@@ -626,23 +628,25 @@ pycbc_sd_handle_speclist(pycbc_Bucket *self, pycbc_MultiResult *mres,
     Py_INCREF(newitm->key);
 
     if (nspecs == 1) {
-        pycbc_pybuffer pathbuf = { 0 }, valbuf = { 0 };
         PyObject *single_spec = PyTuple_GET_ITEM(spectuple, 0);
+        pathbufs = &pathbuf_s;
+        valbufs = &valbuf_s;
+
         cmd->specs = &spec_s;
         cmd->nspecs = 1;
-        rv = sd_convert_spec(single_spec, &spec_s, &pathbuf, &valbuf);
+        rv = sd_convert_spec(single_spec, &spec_s, pathbufs, valbufs);
     } else {
         Py_ssize_t ii;
         specs = calloc(nspecs, sizeof *specs);
+        pathbufs = calloc(nspecs, sizeof *pathbufs);
+        valbufs = calloc(nspecs, sizeof *valbufs);
+
         cmd->specs = specs;
         cmd->nspecs = nspecs;
 
         for (ii = 0; ii < nspecs; ++ii) {
             PyObject *cur = PyTuple_GET_ITEM(spectuple, ii);
-            pycbc_pybuffer pathbuf = { NULL }, valbuf = { NULL };
-            rv = sd_convert_spec(cur, specs + ii, &pathbuf, &valbuf);
-            PYCBC_PYBUF_RELEASE(&pathbuf);
-            PYCBC_PYBUF_RELEASE(&valbuf);
+            rv = sd_convert_spec(cur, specs + ii, pathbufs + ii, valbufs + ii);
             if (rv != 0) {
                 break;
             }
@@ -658,6 +662,19 @@ pycbc_sd_handle_speclist(pycbc_Bucket *self, pycbc_MultiResult *mres,
     }
 
     free(specs);
+    {
+        size_t ii;
+        for (ii = 0; ii < nspecs; ++ii) {
+            PYCBC_PYBUF_RELEASE(pathbufs + ii);
+            PYCBC_PYBUF_RELEASE(valbufs + ii);
+        }
+    }
+
+    if (nspecs > 1) {
+        free(pathbufs);
+        free(valbufs);
+    }
+
     Py_DECREF(newitm);
 
     if (err != LCB_SUCCESS) {
