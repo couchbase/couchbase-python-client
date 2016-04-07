@@ -1,3 +1,5 @@
+.. module:: couchbase.subdocument
+
 ================
 Sub-Document API
 ================
@@ -5,11 +7,42 @@ Sub-Document API
 .. currentmodule:: couchbase.subdocument
 
 The functions in this module can be used to specify operations to the
-:cb_bmeth:`lookup_in` and :cb_bmeth:`upsert_in` methods. Both the
+:cb_bmeth:`lookup_in` and :cb_bmeth:`mutate_in` methods. Both the
 `mutate_in` and `lookup_in` methods can take multiple operations.
 
 Any given operation is either valid in :cb_bmeth:`lookup_in` or
 :cb_bmeth:`mutate_in`; never both.
+
+
+Internally every function in this module returns an object
+specifying the path, options, and value of the command, so for example:
+
+.. code-block:: python
+
+    cb.mutate_in(key,
+                 SD.upsert('path1', 'value1'),
+                 SD.insert('path2', 'value2', create_parents=True))
+
+really becomes
+
+.. code-block:: python
+
+    cb.mutate_in(key,
+                 (CMD_SUBDOC_UPSERT, 'path1', 'value1', 0),
+                 (CMD_SUBDOC_INSERT, 'path2', 'value2', 1))
+
+
+Thus, the actual operations are performed when the `mutate_in` or `lookup_in`
+methods are executed, the functions in this module just acting as an interface
+to specify what sorts of operations are to be executed.
+
+Throughout the SDK documentation, this module is referred to as ``SD`` which
+is significantly easier to type than ``couchbase.subdocument``. This is done
+via
+
+.. code-block:: python
+
+    import couchbase.subdocument as SD
 
 -----------------
 Lookup Operations

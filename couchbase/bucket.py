@@ -723,7 +723,7 @@ class Bucket(_Base):
         """Perform multiple atomic modifications within a document.
 
         :param key: The key of the document to modify
-        :param specs: A list of specs (See :mod:`couchbase.subdocument`)
+        :param specs: A list of specs (See :mod:`.couchbase.subdocument`)
         :param kwargs: CAS, etc.
         :return: A :class:`~.couchbase.result.SubdocResult` object.
 
@@ -733,10 +733,10 @@ class Bucket(_Base):
             import couchbase.subdocument as SD
             # ....
             cb.mutate_in('user',
-                         SD.add_unique('tags', 'dog'),
+                         SD.array_addunique('tags', 'dog'),
                          SD.counter('updates', 1))
 
-        .. seealso:: :mod:`couchbase.subdocument`
+        .. seealso:: :mod:`.couchbase.subdocument`
         """
         return super(Bucket, self).mutate_in(key, specs, **kwargs)
 
@@ -744,7 +744,7 @@ class Bucket(_Base):
         """Atomically retrieve one or more paths from a document.
 
         :param key: The key of the document to lookup
-        :param spec: A list of specs (see :mod:`couchbase.subdocument`)
+        :param spec: A list of specs (see :mod:`.couchbase.subdocument`)
         :return: A :class:`.couchbase.result.SubdocResult` object.
             This object contains the results and any errors of the
             operation.
@@ -761,7 +761,7 @@ class Bucket(_Base):
             name = rv[1]
             friend_exists = rv.exists(2)
 
-        .. seealso:: meth:`retrieve_in` which acts as a convenience wrapper
+        .. seealso:: :meth:`retrieve_in` which acts as a convenience wrapper
         """
         return super(Bucket, self).lookup_in({key: specs}, **kwargs)
 
