@@ -515,28 +515,30 @@ stats_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp_base)
     PyObject *value;
     PyObject *skey, *knodes;
     PyObject *mrdict;
+    pycbc_Bucket *parent;
     const lcb_RESPSTATS *resp = (const lcb_RESPSTATS *)resp_base;
-
+    int do_return = 0;
 
     mres = (pycbc_MultiResult*)resp->cookie;
-    CB_THR_END(mres->parent);
-
-    if (!resp->server) {
-        pycbc_Bucket *parent = mres->parent;
-        operation_completed(mres->parent, mres);
-        CB_THR_BEGIN(parent);
-        return;
-    }
+    parent = mres->parent;
+    CB_THR_END(parent);
 
     if (resp->rc != LCB_SUCCESS) {
+        do_return = 1;
         if (mres->errop == NULL) {
-            pycbc_Result *res =
-                    (pycbc_Result*)pycbc_result_new(mres->parent);
+            pycbc_Result *res = (pycbc_Result*)pycbc_result_new(parent);
             res->rc = resp->rc;
             res->key = Py_None; Py_INCREF(res->key);
             maybe_push_operr(mres, res, resp->rc, 0);
         }
-        CB_THR_BEGIN(mres->parent);
+    }
+    if (resp->rflags & LCB_RESP_F_FINAL) {
+        /* Note this can happen in both success and error cases! */
+        do_return = 1;
+        operation_completed(parent, mres);
+    }
+    if (do_return) {
+        CB_THR_BEGIN(parent);
         return;
     }
 
@@ -565,7 +567,7 @@ stats_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp_base)
     Py_DECREF(skey);
     Py_DECREF(value);
 
-    CB_THR_BEGIN(mres->parent);
+    CB_THR_BEGIN(parent);
     (void)instance;
 }
 
