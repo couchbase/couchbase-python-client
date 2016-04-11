@@ -98,7 +98,7 @@ def _to_json(*args):
     :param args: Arguments passed to the encoder
     :return: Serialized JSON string
     """
-    return _LCB._get_helper('json_encode').dumps(*args)
+    return _LCB._get_helper('json_encode')(*args)
 
 
 def _from_json(*args):
@@ -109,7 +109,7 @@ def _from_json(*args):
     :param args: Arguments passed to the decoder
     :return: Python object converted from JSON
     """
-    return _LCB._get_helper('json_decode').loads(*args)
+    return _LCB._get_helper('json_decode')(*args)
 
 
 def enable_logging():
