@@ -280,4 +280,4 @@ The Couchbase Python SDK is licensed under the Apache License 2.0.
 .. _libcouchbase: http://couchbase.com/develop/c/current
 .. _JIRA: http://couchbase.com/issues/browse/pycbc
 .. _freenode: http://freenode.net/irc_servers.shtml
-.. _pypi: http://pypy.python.org/pypi/couchbase
+.. _pypi: http://pypi.python.org/pypi/couchbase
