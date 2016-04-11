@@ -26,9 +26,10 @@
 #include <libcouchbase/api3.h>
 #include <libcouchbase/views.h>
 #include <libcouchbase/n1ql.h>
+#include <libcouchbase/cbft.h>
 
-#if LCB_VERSION < 0x020506
-#error "Couchbase Python SDK requires libcouchbase 2.5.6 or greater"
+#if LCB_VERSION < 0x020508
+#error "Couchbase Python SDK requires libcouchbase 2.5.8 or greater"
 #endif
 
 #include <pythread.h>
@@ -395,10 +396,12 @@ typedef struct {
     PyObject *specs;
 } pycbc__SDResult;
 
-
-#define PYCBC_HTTP_HVIEW 1
-#define PYCBC_HTTP_HRAW 2
-#define PYCBC_HTTP_HN1QL 3
+enum {
+    PYCBC_HTTP_HVIEW = 1,
+    PYCBC_HTTP_HRAW,
+    PYCBC_HTTP_HN1QL,
+    PYCBC_HTTP_HFTS
+};
 
 typedef struct {
     pycbc_Result_HEAD
@@ -409,6 +412,7 @@ typedef struct {
         lcb_http_request_t htreq;
         lcb_VIEWHANDLE vh;
         lcb_N1QLHANDLE nq;
+        lcb_FTSHANDLE fts;
     } u;
     unsigned int format;
     unsigned short htcode;

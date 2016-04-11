@@ -352,4 +352,7 @@ PYCBC_DECL_OP(observe_multi);
 /* n1ql.c */
 PYCBC_DECL_OP(_n1ql_query);
 
+/* fts.c */
+PYCBC_DECL_OP(_fts_query);
+
 #endif /* PYCBC_OPUTIL_H */

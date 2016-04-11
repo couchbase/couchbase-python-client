@@ -304,6 +304,14 @@ N1QL Query Methods
     .. automethod:: n1ql_query
 
 
+Full-Text Search Methods
+========================
+
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
+
+    .. automethod:: search
+
 Design Document Management
 ==========================
 

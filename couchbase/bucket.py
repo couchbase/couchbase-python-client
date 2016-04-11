@@ -29,6 +29,7 @@ import couchbase.exceptions as exceptions
 from couchbase.views.params import make_dvpath, make_options_string
 from couchbase.views.iterator import View
 from couchbase.n1ql import N1QLQuery, N1QLRequest
+import couchbase.fulltext as _FTS
 from couchbase._pyport import basestring
 
 
@@ -1374,6 +1375,37 @@ class Bucket(_Base):
 
         itercls = kwargs.pop('itercls', N1QLRequest)
         return itercls(query, self, *args, **kwargs)
+
+    def search(self, index, query, **kwargs):
+        """
+        Perform full-text searches
+
+        .. versionadded:: 2.0.9
+
+        .. warning::
+
+            The full-text search API is experimental and subject to change
+
+        :param str index: Name of the index to query
+        :param couchbase.fulltext.SearchQuery query: Query to issue
+        :param couchbase.fulltext.Params params: Additional query options
+        :return: An iterator over query hits
+
+        .. note:: You can avoid instantiating an explicit `Params` object
+            and instead pass the parameters directly to the `search` method.
+
+        .. code-block:: python
+
+            it = cb.search('name', ft.MatchQuery('nosql'), limit=10)
+            for hit in it:
+                print(hit)
+
+        """
+        itercls = kwargs.pop('itercls', _FTS.SearchRequest)
+        iterargs = itercls.mk_kwargs(kwargs)
+        params = kwargs.pop('params', _FTS.Params(**kwargs))
+        body = _FTS.make_search_body(index, query, params)
+        return itercls(body, self, **iterargs)
 
     def __repr__(self):
         return ('<{modname}.{cls} bucket={bucket}, nodes={nodes} at 0x{oid:x}>'

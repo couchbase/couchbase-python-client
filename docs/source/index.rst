@@ -15,6 +15,7 @@ Contents:
    api/subdoc
    api/views
    api/n1ql
+   api/fulltext
    api/results
    api/exceptions
    api/transcoder
