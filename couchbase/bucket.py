@@ -201,6 +201,13 @@ class Bucket(_Base):
         # Enable detailed error codes for network errors:
         self._cntlstr("detailed_errcodes", "1")
 
+        # Enable self-identification in logs
+        try:
+            from couchbase._version import __version__ as cb_version
+            self._cntlstr('client_string', 'PYCBC/' + cb_version)
+        except E.NotSupportedError:
+            pass
+
         for ctl, val in strcntls.items():
             self._cntlstr(ctl, val)
 
