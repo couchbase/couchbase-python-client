@@ -574,6 +574,7 @@ class Bucket(_Base):
             while time.time() - begin_time < 15:
                 try:
                     rv = cb.lock("key", ttl=10)
+                    break
                 except TemporaryFailError:
                     print("Key is currently locked.. waiting")
                     time.sleep(1)
