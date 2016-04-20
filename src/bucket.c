@@ -174,6 +174,22 @@ Bucket__instance_pointer(pycbc_Bucket *self, void *unused)
 }
 
 static PyObject *
+Bucket__add_creds(pycbc_Bucket *self, PyObject *args)
+{
+    char *arr[2] = { NULL };
+    lcb_error_t rc;
+    if (!PyArg_ParseTuple(args, "ss", &arr[0], &arr[1])) {
+        return NULL;
+    }
+    rc = lcb_cntl(self->instance, LCB_CNTL_SET, LCB_CNTL_BUCKET_CRED, arr);
+    if (rc != LCB_SUCCESS) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, rc, "Couldn't add credentials");
+        return NULL;
+    }
+    Py_RETURN_NONE;
+}
+
+static PyObject *
 Bucket__thr_lockop(pycbc_Bucket *self, PyObject *arg)
 {
     int rv;
@@ -586,6 +602,11 @@ static PyMethodDef Bucket_TABLE_methods[] = {
                 (PyCFunction)Bucket__mutinfo,
                 METH_NOARGS,
                 PyDoc_STR("Gets known mutation information")
+        },
+        { "_add_creds",
+                (PyCFunction)Bucket__add_creds,
+                METH_VARARGS,
+                PyDoc_STR("Add additional user/pasword information")
         },
 
         { NULL, NULL, 0, NULL }

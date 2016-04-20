@@ -159,3 +159,10 @@ class MiscTest(ConnectionTestCase):
     def test_compat_timeout(self):
         cb = self.make_connection(timeout=7.5)
         self.assertEqual(7.5, cb.timeout)
+
+    def test_multi_auth(self):
+        cb = self.make_connection()
+        new_bucket = cb.bucket + '2'
+        cb.add_bucket_creds(new_bucket, 'newpass')
+        self.assertRaises(ValueError, cb.add_bucket_creds, '', 'pass')
+        self.assertRaises(ValueError, cb.add_bucket_creds, 'bkt', '')

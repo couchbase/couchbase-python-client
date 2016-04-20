@@ -1712,3 +1712,8 @@ class Bucket(_Base):
         path = path.format(self.bucket)
         return self._http_request(type=_LCB.LCB_HTTP_TYPE_MANAGEMENT,
                                   path=path, method=_LCB.LCB_HTTP_METHOD_POST)
+
+    def add_bucket_creds(self, bucket, password):
+        if not bucket or not password:
+            raise ValueError('Bucket and password must be nonempty')
+        return _Base._add_creds(self, bucket, password)
