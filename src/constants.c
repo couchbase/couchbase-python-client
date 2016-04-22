@@ -191,6 +191,7 @@ do_all_constants(PyObject *module,
     ADD_MACRO(LCB_SDCMD_COUNTER);
     ADD_MACRO(LCB_SDCMD_REMOVE);
     ADD_MACRO(LCB_SDCMD_ARRAY_INSERT);
+    ADD_MACRO(LCB_IXSPEC_F_DEFER);
 }
 
 static void

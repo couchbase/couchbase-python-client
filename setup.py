@@ -88,7 +88,8 @@ SOURCEMODS = [
         'pipeline',
         'views',
         'n1ql',
-        'fts'
+        'fts',
+        'ixmgmt'
         ]
 
 if platform.python_implementation() != 'PyPy':

@@ -355,4 +355,8 @@ PYCBC_DECL_OP(_n1ql_query);
 /* fts.c */
 PYCBC_DECL_OP(_fts_query);
 
+/* ixmgmt.c */
+PYCBC_DECL_OP(_ixmanage);
+PYCBC_DECL_OP(_ixwatch);
+
 #endif /* PYCBC_OPUTIL_H */

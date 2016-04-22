@@ -23,6 +23,8 @@ import couchbase.exceptions as exceptions
 from couchbase.exceptions import CouchbaseError, ArgumentError
 from couchbase.views.params import Query, SpatialQuery, STALE_OK
 from couchbase._pyport import single_dict_key
+from couchbase._ixmgmt import IxmgmtRequest, N1qlIndex, N1QL_PRIMARY_INDEX
+
 
 class BucketManager(object):
     """
@@ -280,3 +282,193 @@ class BucketManager(object):
 
         self._design_poll(name, 'del', existing, syncwait)
         return ret
+
+    def _mk_index_def(self, ix, primary=False):
+        if isinstance(ix, N1qlIndex):
+            return N1qlIndex(ix)
+
+        info = N1qlIndex()
+        info.keyspace = self._cb.bucket
+        info.primary = primary
+
+        if ix:
+            info.name = ix
+        elif not primary:
+            raise ValueError('Missing name for non-primary index')
+
+        return info
+
+    def n1ql_index_create(self, ix, **kwargs):
+        """
+        Create an index for use with N1QL.
+
+        :param str ix: The name of the index to create
+        :param bool defer: Whether the building of indexes should be
+            deferred. If creating multiple indexes on an existing
+            dataset, using the `defer` option in conjunction with
+            :meth:`build_deferred_indexes` and :meth:`watch_indexes` may
+            result in substantially reduced build times.
+        :param bool ignore_exists: Do not throw an exception if the index
+            already exists.
+        :param list fields: A list of fields that should be supplied
+            as keys for the index. For non-primary indexes, this must
+            be specified and must contain at least one field name.
+        :param bool primary: Whether this is a primary index. If creating
+            a primary index, the name may be an empty string and `fields`
+            must be empty.
+        :raise: :exc:`~.KeyExistsError` if the index already exists
+
+        .. seealso:: :meth:`n1ql_index_create_primary`
+        """
+        defer = kwargs.pop('defer', False)
+        ignore_exists = kwargs.pop('ignore_exists', False)
+        primary = kwargs.pop('primary', False)
+        fields = kwargs.pop('fields', [])
+
+        if kwargs:
+            raise TypeError('Unknown keyword arguments', kwargs)
+
+        info = self._mk_index_def(ix, primary)
+
+        if primary and fields:
+            raise TypeError('Cannot create primary index with explicit fields')
+        elif not primary and not fields:
+            raise ValueError('Fields required for non-primary index')
+
+        if fields:
+            info._index_key = ','.join(fields)
+
+        if primary and info.name is N1QL_PRIMARY_INDEX:
+            del info.name
+
+        options = {
+            'ignore_exists': ignore_exists,
+            'defer': defer
+        }
+
+        # Now actually create the indexes
+        return IxmgmtRequest(self._cb, 'create', info, **options).execute()
+
+    def n1ql_index_create_primary(self, defer=False, ignore_exists=False):
+        """
+        Create the primary index on the bucket.
+
+        Equivalent to::
+
+            n1ql_index_create('', primary=True, **kwargs)
+
+        :param bool defer:
+        :param bool ignore_exists:
+
+        .. seealso:: :meth:`create_index`
+        """
+        return self.n1ql_index_create(
+            '', defer=defer, primary=True, ignore_exists=ignore_exists)
+
+    def n1ql_index_drop(self, ix, primary=False, **kwargs):
+        """
+        Delete an index from the cluster.
+
+        :param str ix: the name of the index
+        :param bool primary: if this index is a primary index
+        :param bool ignore_missing: Do not raise an exception if the index
+            does not exist
+        :raise: :exc:`~.NotFoundError` if the index does not exist and
+            `ignore_missing` was not specified
+        """
+        info = self._mk_index_def(ix, primary)
+        return IxmgmtRequest(self._cb, 'drop', info, **kwargs).execute()
+
+    def n1ql_index_drop_primary(self, **kwargs):
+        """
+        Remove the primary index
+
+        Equivalent to ``n1ql_index_drop('', primary=True, **kwargs)``
+        """
+        return self.n1ql_index_drop('', primary=True, **kwargs)
+
+    def n1ql_index_list(self, other_buckets=False):
+        """
+        List indexes in the cluster.
+
+        :param bool other_buckets: Whether to also include indexes belonging
+            to other buckets (i.e. buckets other than the current `Bucket`
+            object)
+        :return: list[couchbase._ixmgmt.Index] objects
+        """
+        info = N1qlIndex()
+        if not other_buckets:
+            info.keyspace = self._cb.bucket
+        return IxmgmtRequest(self._cb, 'list', info).execute()
+
+    def n1ql_index_build_deferred(self, other_buckets=False):
+        """
+        Instruct the server to begin building any previously deferred index
+        definitions.
+
+        This method will gather a list of all pending indexes in the cluster
+        (including those created using the `defer` option with
+        :meth:`create_index`) and start building them in an efficient manner.
+
+        :param bool other_buckets: Whether to also build indexes found in
+            other buckets, if possible
+        :return: list[couchbase._ixmgmt.Index] objects. This
+            list contains the indexes which are being built and
+            may be passed to :meth:`n1ql_index_watch` to poll
+            their build statuses.
+
+        You can use the :meth:`n1ql_index_watch`
+        method to wait until all indexes have been built::
+
+            mgr.n1ql_index_create('ix_fld1', fields=['field1'], defer=True)
+            mgr.n1ql_index_create('ix_fld2', fields['field2'], defer=True)
+            mgr.n1ql_index_create('ix_fld3', fields=['field3'], defer=True)
+
+            indexes = mgr.n1ql_index_build_deferred()
+            # [IndexInfo('field1'), IndexInfo('field2'), IndexInfo('field3')]
+            mgr.n1ql_index_watch(indexes, timeout=30, interval=1)
+
+        """
+        info = N1qlIndex()
+        if not other_buckets:
+            info.keyspace = self._cb.bucket
+            return IxmgmtRequest(self._cb, 'build', info).execute()
+
+    def n1ql_index_watch(self, indexes,
+                         timeout=30, interval=1, watch_primary=False):
+        """
+        Await completion of index building
+
+        This method will wait up to `timeout` seconds for every index in
+        `indexes` to have been built. It will poll the cluster every
+        `interval` seconds.
+
+        :param list indexes: A list of indexes to check. This is returned by
+            :meth:`build_deferred_indexes`
+        :param float timeout: How long to wait for the indexes to become ready.
+        :param float interval: How often to poll the cluster.
+        :param bool watch_primary: Whether to also watch the primary index.
+            This parameter should only be used when manually constructing a
+            list of string indexes
+        :raise: :exc:`~.TimeoutError` if the timeout was reached before all
+            indexes were built
+        :raise: :exc:`~.NotFoundError` if one of the indexes passed no longer
+            exists.
+        """
+        kwargs = {
+            'timeout_us': int(timeout * 1000000),
+            'interval_us': int(interval * 1000000)
+        }
+        ixlist = [N1qlIndex.from_any(x, self._cb.bucket) for x in indexes]
+        if watch_primary:
+            ixlist.append(
+                N1qlIndex.from_any(N1QL_PRIMARY_INDEX, self._cb.bucket))
+        return IxmgmtRequest(self._cb, 'watch', ixlist, **kwargs).execute()
+
+    create_n1ql_index = n1ql_index_create
+    create_n1ql_primary_index = n1ql_index_create_primary
+    list_n1ql_indexes = n1ql_index_list
+    drop_n1ql_index = n1ql_index_drop
+    drop_n1ql_primary_index = n1ql_index_drop_primary
+    build_n1ql_deferred_indexes = n1ql_index_build_deferred
+    watch_n1ql_indexes = n1ql_index_watch

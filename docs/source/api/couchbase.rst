@@ -356,6 +356,33 @@ the :meth:`~couchbase.bucket.Bucket.bucket_manager` method on the
     .. automethod:: design_publish
     .. automethod:: design_delete
 
+N1QL Index Management
+=====================
+
+.. currentmodule:: couchbase.bucketmanager
+
+Before issuing any N1QL query using :cb_bmeth:`n1ql_query`, the bucket being
+queried must have an index defined for the query. The simplest index is the
+primary index.
+
+To create a primary index, use::
+
+    mgr.n1ql_index_create_primary(ignore_exists=True)
+
+You can create additional indexes using::
+
+    mgr.n1ql_create_index('idx_foo', fields=['foo'])
+
+.. class:: BucketManager
+
+    .. automethod:: n1ql_index_create
+    .. automethod:: n1ql_index_create_primary
+    .. automethod:: n1ql_index_drop
+    .. automethod:: n1ql_index_drop_primary
+    .. automethod:: n1ql_index_build_deferred
+    .. automethod:: n1ql_index_watch
+    .. automethod:: n1ql_index_list
+
 .. currentmodule:: couchbase.bucket
 .. class:: Bucket
 

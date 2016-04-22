@@ -27,7 +27,7 @@
 #include <libcouchbase/views.h>
 #include <libcouchbase/n1ql.h>
 #include <libcouchbase/cbft.h>
-
+#include <libcouchbase/ixmgmt.h>
 #if LCB_VERSION < 0x020508
 #error "Couchbase Python SDK requires libcouchbase 2.5.8 or greater"
 #endif
@@ -400,7 +400,8 @@ enum {
     PYCBC_HTTP_HVIEW = 1,
     PYCBC_HTTP_HRAW,
     PYCBC_HTTP_HN1QL,
-    PYCBC_HTTP_HFTS
+    PYCBC_HTTP_HFTS,
+    PYCBC_HTTP_HNONE
 };
 
 typedef struct {
