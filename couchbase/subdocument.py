@@ -87,7 +87,7 @@ def upsert(path, value, create_parents=False):
 
         .. code-block:: python
 
-            cb.mutate_in("docid", SD.upsert("foo.bar.baz", "newValue")
+            cb.mutate_in("docid", SD.upsert("foo.bar.baz", "newValue"))
 
         would fail with :cb_exc:`SubdocPathNotFoundError` because `foo.bar`
         does not exist. However when using the `create_parents` option, the
