@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
 from couchbase._libcouchbase import (
     Result,
     ValueResult,
@@ -23,7 +22,7 @@ from couchbase._libcouchbase import (
     MultiResult,
     ObserveInfo,
     AsyncResult)
-from couchbase._pyport import long, xrange
+from couchbase._pyport import long, xrange, izip
 import couchbase._libcouchbase as C
 import couchbase.exceptions as E
 

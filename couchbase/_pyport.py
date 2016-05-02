@@ -25,10 +25,12 @@ if V == 3:
     import urllib.parse as ulp
     from urllib.request import urlopen
     from urllib.parse import parse_qs
+    izip = zip
 else:
     import urllib as ulp
     from urllib2 import urlopen
     from urlparse import parse_qs
+    from itertools import izip
 
 long = long if V == 2 else int
 xrange = xrange if V == 2 else range

@@ -232,3 +232,19 @@ class SubdocTest(ConnectionTestCase):
 
         cb.mutate_in(key, SD.array_prepend('array', [42]))
         self.assertEqual([[42], True, 1, 2, 3], cb.retrieve_in(key, 'array')[0])
+
+    def test_result_iter(self):
+        cb = self.cb
+        key = self.gen_key('sditer')
+        cb.upsert(key, [1, 2, 3])
+        vals = cb.retrieve_in(key, '[0]', '[1]', '[2]')
+        v1, v2, v3 = vals
+        self.assertEqual(1, v1)
+        self.assertEqual(2, v2)
+        self.assertEqual(3, v3)
+
+        vals = cb.retrieve_in(key, '[0]', '[34]', '[3]')
+        self.assertFalse(vals.success)
+        it = iter(vals)
+        self.assertEqual(1, next(it))
+        self.assertRaises(E.SubdocPathNotFoundError, next, it)
