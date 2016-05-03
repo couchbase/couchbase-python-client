@@ -29,3 +29,4 @@ ci/
 buildall.py
 *egg-info*
 _trial*
+*.dSYM
