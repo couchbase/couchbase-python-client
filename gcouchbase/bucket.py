@@ -1,3 +1,4 @@
+from gevent import GreenletExit
 from gevent.event import AsyncResult, Event
 from gevent.hub import get_hub, getcurrent, Waiter
 
@@ -72,6 +73,11 @@ class GN1QLRequest(GRowsHandler, AsyncN1QLRequest):
         AsyncN1QLRequest.__init__(self, *args, **kwargs)
         GRowsHandler.__init__(self)
 
+
+def dummy_callback(*args):
+    pass
+
+
 class Bucket(AsyncBucket):
     def __init__(self, *args, **kwargs):
         """
@@ -99,10 +105,15 @@ class Bucket(AsyncBucket):
 
     def _waitwrap(self, cbasync):
         cur_thread = getcurrent()
-        cbasync.callback = cur_thread.switch
-        cbasync.errback = lambda r, x, y, z: cur_thread.throw(x, y, z)
-
-        return get_hub().switch()
+        errback = lambda r, x, y, z: cur_thread.throw(x, y, z)
+        cbasync.set_callbacks(cur_thread.switch, errback)
+        try:
+            return get_hub().switch()
+        except GreenletExit:
+            # Deregister callbacks to prevent another request on the same
+            # greenlet to get the result from this context.
+            cbasync.set_callbacks(dummy_callback, dummy_callback)
+            raise
 
     def _meth_factory(meth, name):
         def ret(self, *args, **kwargs):
