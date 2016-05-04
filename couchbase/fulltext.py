@@ -54,7 +54,7 @@ def _genprop(converter, *apipaths, **kwargs):
             pass
 
     doc = kwargs.pop(
-        'doc', 'Corresponds to the ``{}`` field'.format('.'.join(apipaths)))
+        'doc', 'Corresponds to the ``{0}`` field'.format('.'.join(apipaths)))
     return property(fget, fset, fdel, doc)
 
 
@@ -262,9 +262,10 @@ class Params(object):
     @property
     def encodable(self):
         if self.facets:
-            self._json_['facets'] = {
-                n: x.encodable for n, x in self.facets.items()
-            }
+            encoded_facets = {}
+            for name, facet in self.facets.items():
+                encoded_facets[name] = facet.encodable
+            self._json_['facets'] = encoded_facets
 
         return self._json_
 
@@ -397,7 +398,9 @@ def _with_fields(*fields):
     :param fields: List of fields to include. These should be keys of the
         `_COMMON_FIELDS` dict
     """
-    dd = {x: _COMMON_FIELDS[x] for x in fields}
+    dd = {}
+    for x in fields:
+        dd[x] = _COMMON_FIELDS[x]
 
     def wrap(cls):
         dd.update(cls.__dict__)
