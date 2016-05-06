@@ -48,7 +48,8 @@ class ConnectionTest(CouchbaseTestCase):
 
     def test_bucket_not_found(self):
         connargs = self.make_connargs(bucket='this_bucket_does_not_exist')
-        self.assertRaises(BucketNotFoundError, self.factory, **connargs)
+        self.assertRaises(
+            (BucketNotFoundError, AuthError), self.factory, **connargs)
 
     def test_quiet(self):
         connparams = self.make_connargs()
