@@ -70,7 +70,7 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     pycbc_httpresult_init(&vres->base, mres);
     vres->rows = PyList_New(0);
     vres->base.format = PYCBC_FMT_JSON;
-    vres->base.htype = PYCBC_HTTP_HN1QL;
+    vres->base.htype = PYCBC_HTTP_HFTS;
 
     cmd.callback = fts_row_callback;
     cmd.query = params;
