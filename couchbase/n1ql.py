@@ -88,8 +88,10 @@ class MutationState(object):
         for row in cb.n1ql_query(nq):
             # ...
     """
-    def __init__(self):
+    def __init__(self, *docs):
         self._sv = {}
+        if docs:
+            self.add_results(*docs)
 
     def _add_scanvec(self, mutinfo):
         """
