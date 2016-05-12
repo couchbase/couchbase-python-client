@@ -3,9 +3,10 @@
 #include "structmember.h"
 #include <libcouchbase/ixmgmt.h>
 
+#ifdef LCB_N1XSPEC_F_PRIMARY
 /* lcb callback for index management operations */
 static void
-mgmt_callback(lcb_t instance, int ign, const lcb_RESPIXMGMT *resp)
+mgmt_callback(lcb_t instance, int ign, const lcb_RESPN1XMGMT *resp)
 {
     pycbc_MultiResult *mres = (pycbc_MultiResult *)resp->cookie;
     pycbc_Bucket *bucket = mres->parent;
@@ -17,7 +18,7 @@ mgmt_callback(lcb_t instance, int ign, const lcb_RESPIXMGMT *resp)
     PYCBC_CONN_THR_END(bucket);
     vres = (pycbc_ViewResult *)PyDict_GetItem((PyObject*)mres, Py_None);
     for (ii = 0; ii < resp->nspecs; ++ii) {
-        const lcb_INDEXSPEC *spec = resp->specs[ii];
+        const lcb_N1XSPEC *spec = resp->specs[ii];
         pycbc_viewresult_addrow(vres, mres, spec->rawjson, spec->nrawjson);
     }
 
@@ -45,11 +46,11 @@ pycbc_Bucket__ixmanage(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     pycbc_ViewResult *vres;
     lcb_error_t rc;
     unsigned cmdflags = 0;
-    lcb_CMDIXMGMT cmd = { { 0 } };
+    lcb_CMDN1XMGMT cmd = { { 0 } };
     const char *params;
     const char *action;
     pycbc_strlen_t nparams;
-    lcb_error_t (*action_fn)(lcb_t, const void *, const lcb_CMDIXMGMT*);
+    lcb_error_t (*action_fn)(lcb_t, const void *, const lcb_CMDN1XMGMT*);
 
     static char *kwlist[] = { "action", "index", "flags",  NULL };
     rv = PyArg_ParseTupleAndKeywords(args, kwargs,
@@ -79,13 +80,13 @@ pycbc_Bucket__ixmanage(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     cmd.spec.rawjson = params;
     cmd.spec.nrawjson = nparams;
     if (!strcmp(action, "create")) {
-        action_fn = lcb_ixmgmt_mkindex;
+        action_fn = lcb_n1x_create;
     } else if (!strcmp(action, "drop")) {
-        action_fn = lcb_ixmgmt_rmindex;
+        action_fn = lcb_n1x_drop;
     } else if (!strcmp(action, "list")) {
-        action_fn = lcb_ixmgmt_list;
+        action_fn = lcb_n1x_list;
     } else if (!strcmp(action, "build")) {
-        action_fn = lcb_ixmgmt_build_begin;
+        action_fn = lcb_n1x_startbuild;
     } else {
         PYCBC_EXC_WRAP(PYCBC_EXC_INTERNAL, 0, "Bad action name!");
         goto GT_DONE;
@@ -120,8 +121,8 @@ pycbc_Bucket__ixwatch(pycbc_Bucket *self, PyObject *args, PyObject *kw)
     pycbc_pybuffer *bufs = NULL;
     pycbc_MultiResult *mres = NULL;
     pycbc_ViewResult *vres = NULL;
-    lcb_CMDIXWATCH cmd = { 0 };
-    lcb_INDEXSPEC **specs = NULL;
+    lcb_CMDN1XWATCH cmd = { 0 };
+    lcb_N1XSPEC **specs = NULL;
     int rv;
     size_t ii;
     Py_ssize_t nspecs;
@@ -159,7 +160,7 @@ pycbc_Bucket__ixwatch(pycbc_Bucket *self, PyObject *args, PyObject *kw)
 
     cmd.nspec = nspecs;
     specs = calloc(nspecs, sizeof *cmd.specs);
-    cmd.specs = (const lcb_INDEXSPEC * const *)specs;
+    cmd.specs = (const lcb_N1XSPEC * const *)specs;
     bufs = calloc(nspecs, sizeof *bufs);
 
     for (ii = 0; ii < nspecs; ++ii) {
@@ -184,7 +185,7 @@ pycbc_Bucket__ixwatch(pycbc_Bucket *self, PyObject *args, PyObject *kw)
         specs[ii]->nrawjson = bufs[ii].length;
     }
 
-    rc = lcb_ixmgmt_build_watch(self->instance, mres, &cmd);
+    rc = lcb_n1x_watchbuild(self->instance, mres, &cmd);
     if (rc != LCB_SUCCESS) {
         PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, rc, "Couldn't schedule index watch");
         goto GT_DONE;
@@ -203,3 +204,19 @@ pycbc_Bucket__ixwatch(pycbc_Bucket *self, PyObject *args, PyObject *kw)
     free(specs);
     return ret;
 }
+#else
+#warning "Index management operations not supported in this version of libcouchbase"
+PyObject *
+pycbc_Bucket__ixmanage(pycbc_Bucket *s, PyObject *a, PyObject *k)
+{
+    PYCBC_EXC_WRAP(PYCBC_EXC_INTERNAL, 0,
+        "Index management requires at least version 2.6.0 of libcouchbase. "
+        "Please compile with a newer libcouchbase version");
+    return NULL;
+}
+PyObject *
+pycbc_Bucket__ixwatch(pycbc_Bucket *s, PyObject *a, PyObject *k)
+{
+    return pycbc_Bucket__ixmanage(s, a, k);
+}
+#endif

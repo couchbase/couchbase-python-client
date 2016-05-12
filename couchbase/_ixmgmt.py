@@ -122,7 +122,7 @@ class IxmgmtRequest(object):
 
         if cmd == 'create' and self._options.pop('defer', False):
             self._options['flags'] = (
-                self._options.setdefault('flags', 0) | C.LCB_IXSPEC_F_DEFER)
+                self._options.setdefault('flags', 0) | C.LCB_N1XSPEC_F_DEFER)
 
     def _start(self):
         if self._mres:

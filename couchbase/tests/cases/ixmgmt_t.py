@@ -31,6 +31,11 @@ class IndexManagementTestCase(RealServerTestCase):
         super(IndexManagementTestCase, self).setUp()
         if self.cb.__class__ is not Bucket:
             raise SkipTest('Only supported for synchronous bucket')
+
+        import couchbase._libcouchbase as C
+        if not hasattr(C, 'LCB_N1XSPEC_F_DEFER'):
+            raise SkipTest('LCB headers are too old!')
+
         self._clear_indexes()
 
     def tearDown(self):
