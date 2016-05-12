@@ -112,6 +112,14 @@ class IndexManagementTestCase(RealServerTestCase):
         mgr.n1ql_index_drop(ixname, ignore_missing=True)
         self.assertRaises(E.NotFoundError, mgr.n1ql_index_drop, ixname)
 
+        # Create an index with a condition
+        ixname = 'ix_with_condition'
+        cond = '((`foo` = "foo") and (`bar` = "bar"))'
+        mgr.n1ql_index_create(ixname, fields=['foo'], condition=cond)
+        ll = filter(lambda x: x.name == ixname, mgr.n1ql_index_list())
+        self.assertTrue(ll)
+        self.assertEqual(cond, ll[0].condition)
+
     def test_list_indexes(self):
         cb = self.cb  # type: Bucket
         mgr = cb.bucket_manager()

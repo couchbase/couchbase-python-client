@@ -52,6 +52,7 @@ class N1qlIndex(object):
     primary = _genprop('is_primary')  # type: bool
     keyspace = _genprop('keyspace_id')  # type: str
     state = _genprop('state')  # type: str
+    condition = _genprop('condition')  # type: str
     _index_key = _genprop('index_key')  # type: str
 
     @property

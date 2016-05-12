@@ -316,6 +316,8 @@ class BucketManager(object):
         :param bool primary: Whether this is a primary index. If creating
             a primary index, the name may be an empty string and `fields`
             must be empty.
+        :param str condition: Specify a condition for indexing. Using
+            a condition reduces an index size
         :raise: :exc:`~.KeyExistsError` if the index already exists
 
         .. seealso:: :meth:`n1ql_index_create_primary`
@@ -324,6 +326,7 @@ class BucketManager(object):
         ignore_exists = kwargs.pop('ignore_exists', False)
         primary = kwargs.pop('primary', False)
         fields = kwargs.pop('fields', [])
+        cond = kwargs.pop('condition', None)
 
         if kwargs:
             raise TypeError('Unknown keyword arguments', kwargs)
@@ -340,6 +343,11 @@ class BucketManager(object):
 
         if primary and info.name is N1QL_PRIMARY_INDEX:
             del info.name
+
+        if cond:
+            if primary:
+                raise ValueError('cannot specify condition for primary index')
+            info.condition = cond
 
         options = {
             'ignore_exists': ignore_exists,
