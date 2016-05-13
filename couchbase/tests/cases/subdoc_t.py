@@ -64,7 +64,7 @@ class SubdocTest(ConnectionTestCase):
                           cb.lookup_in, bkey, SD.exists('path'))
 
         # Empty paths fail for get_in
-        self.assertRaises(E.InvalidError,
+        self.assertRaises(E.SubdocEmptyPathError,
                           cb.retrieve_in, key, '')
 
         # Try on non-existing document. Should fail
@@ -125,8 +125,9 @@ class SubdocTest(ConnectionTestCase):
         self.assertEqual(None, cb.retrieve_in(key, 'null')[0])
 
         # Test with empty path. Should throw some kind of error?
-        self.assertRaises((E.SubdocCantInsertValueError, E.InvalidError),
-                          cb.mutate_in, key, SD.upsert('', {}))
+        self.assertRaises(
+            (E.SubdocCantInsertValueError, E.SubdocEmptyPathError),
+            cb.mutate_in, key, SD.upsert('', {}))
 
         cb.mutate_in(key, SD.upsert('array', [1, 2, 3]))
         self.assertRaises(E.SubdocPathMismatchError, cb.mutate_in, key,

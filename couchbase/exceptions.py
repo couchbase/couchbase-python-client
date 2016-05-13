@@ -508,6 +508,10 @@ class SubdocMultipleErrors(CouchbaseError):
     """One or more subcommands failed. Inspect the individual operation"""
     CODE = C.LCB_SUBDOC_MULTI_FAILURE
 
+
+class SubdocEmptyPathError(CouchbaseError):
+    """Empty path passed as subdoc spec"""
+
 _LCB_ERRCAT_MAP = {
     C.LCB_ERRTYPE_NETWORK:      CouchbaseNetworkError,
     C.LCB_ERRTYPE_INPUT:        CouchbaseInputError,
@@ -555,13 +559,15 @@ _LCB_ERRNO_MAP = {
     C.LCB_SUBDOC_VALUE_CANTINSERT: SubdocCantInsertValueError,
     C.LCB_SUBDOC_BAD_DELTA: SubdocBadDeltaError,
     C.LCB_SUBDOC_NUM_ERANGE: SubdocNumberTooBigError,
-    C.LCB_EMPTY_PATH: InvalidError
+    C.LCB_EMPTY_PATH: SubdocEmptyPathError
 }
 
 
 def _set_default_codes():
     for k, v in _LCB_ERRNO_MAP.items():
         v.CODE = k
+
+    ArgumentError.CODE = 0
 
 _set_default_codes()
 
