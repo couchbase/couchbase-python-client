@@ -109,11 +109,10 @@ class Bucket(AsyncBucket):
         cbasync.set_callbacks(cur_thread.switch, errback)
         try:
             return get_hub().switch()
-        except GreenletExit:
+        finally:
             # Deregister callbacks to prevent another request on the same
             # greenlet to get the result from this context.
             cbasync.set_callbacks(dummy_callback, dummy_callback)
-            raise
 
     def _meth_factory(meth, name):
         def ret(self, *args, **kwargs):
