@@ -187,7 +187,7 @@ class Admin(LCB.Bucket):
             'type': bucket_type,
             'authType': 'sasl',
             'saslPassword': bucket_password if bucket_password else '',
-            'flush_enabled': int(flush_enabled),
+            'flushEnabled': int(flush_enabled),
             'ramQuotaMB': ram_quota
         }
         if bucket_type in ('couchbase', 'membase'):
