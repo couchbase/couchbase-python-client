@@ -926,6 +926,23 @@ class SearchRequest(object):
     def raw(self):
         return self.__raw
 
+    def execute(self):
+        """
+        Use this convenience method if you are not actually reading the
+        search hits, for example if you are only using :attr:`facets`.
+
+        Equivalent to::
+
+            def execute(self):
+                [x for x in self]
+                return self
+
+        :return: :class:`SearchRequest` (self)
+        """
+        for _ in self:
+            pass
+        return self
+
     @property
     def meta(self):
         """
