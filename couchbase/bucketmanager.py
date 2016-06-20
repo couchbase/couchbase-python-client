@@ -339,7 +339,7 @@ class BucketManager(object):
             raise ValueError('Fields required for non-primary index')
 
         if fields:
-            info._index_key = ','.join(fields)
+            info.fields = fields
 
         if primary and info.name is N1QL_PRIMARY_INDEX:
             del info.name
