@@ -153,7 +153,7 @@ class SubdocResult(C._SDResult):
 
         :return: True if the document is accessible, False otherwise
         """
-        return self.rc == 0 or self.rc == C.LCB_SUBDOC_MULTI_FAILRUE
+        return self.rc == 0 or self.rc == C.LCB_SUBDOC_MULTI_FAILURE
 
     @property
     def value(self):

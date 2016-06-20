@@ -249,3 +249,16 @@ class SubdocTest(ConnectionTestCase):
         it = iter(vals)
         self.assertEqual(1, next(it))
         self.assertRaises(E.SubdocPathNotFoundError, next, it)
+
+    def test_access_ok(self):
+        cb = self.cb
+        key = self.gen_key('non-exist')
+        try:
+            cb.lookup_in(key, SD.get('pth1'), quiet=True)
+        except E.NotFoundError as e:
+            rv = e.all_results[key]
+            self.assertFalse(rv.access_ok)
+
+        cb.upsert(key, {'hello': 'world'})
+        rv = cb.lookup_in(key, SD.get('nonexist'))
+        self.assertTrue(rv.access_ok)
