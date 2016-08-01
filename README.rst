@@ -262,13 +262,17 @@ To run the tests::
 
     nosetests
 
--------
-Support
--------
+------------------------------
+Support & Additional Resources
+------------------------------
 
-If you found an issue, please file it in our JIRA_. You may also ask in the
-`#libcouchbase` IRC channel at freenode_. (which is where the author(s)
-of this module may be found).
+If you found an issue, please file it in our JIRA_.
+You can ask questions in our forums_ or in the `#libcouchbase` channel on
+freenode_.
+
+The `official documentation`_ can be consulted as well for
+general Couchbase concepts and offers a more didactic approach to using the
+SDK.
 
 -------
 License
@@ -277,7 +281,9 @@ License
 The Couchbase Python SDK is licensed under the Apache License 2.0.
 
 .. _Couchbase: http://couchbase.com
-.. _libcouchbase: http://couchbase.com/develop/c/current
+.. _libcouchbase: http://developer.couchbase.com/documentation/server/4.5/sdk/c/start-using-sdk.html
+.. _official documentation: http://developer.couchbase.com/documentation/server/4.5/sdk/python/start-using-sdk.html
 .. _JIRA: http://couchbase.com/issues/browse/pycbc
 .. _freenode: http://freenode.net/irc_servers.shtml
 .. _pypi: http://pypi.python.org/pypi/couchbase
+.. _forums: https://forums.couchbase.com
