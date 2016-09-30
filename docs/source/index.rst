@@ -13,6 +13,7 @@ Contents:
 
    api/couchbase
    api/subdoc
+   api/datastructures
    api/views
    api/n1ql
    api/fulltext

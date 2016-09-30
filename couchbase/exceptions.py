@@ -642,3 +642,9 @@ def exc_from_rc(rc, msg=None, obj=None):
     """
     newcls = CouchbaseError.rc_to_exctype(rc)
     return newcls(params={'rc': rc, 'objextra': obj, 'message': msg})
+
+
+class QueueEmpty(Exception):
+    """
+    Thrown if a datastructure queue is empty
+    """
