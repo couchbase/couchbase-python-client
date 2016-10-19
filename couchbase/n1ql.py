@@ -241,6 +241,7 @@ class N1QLQuery(object):
         """
 
         self._adhoc = True
+        self._cross_bucket = False
         self._body = {'statement': query}
         if args:
             self._add_pos_args(*args)
@@ -337,6 +338,20 @@ class N1QLQuery(object):
         self._adhoc = arg
 
     @property
+    def cross_bucket(self):
+        """
+        Set this to true to indicate that the query string involves multiple
+        buckets. This makes the query a "cluster-level" query. Cluster level
+        queries have access to documents in multiple buckets, using credentials
+        supplied via :meth:`.Bucket.add_bucket_creds`
+        """
+        return self._cross_bucket
+
+    @cross_bucket.setter
+    def cross_bucket(self, value):
+        self._cross_bucket = value
+
+    @property
     def timeout(self):
         """
         Optional per-query timeout. If set, this will limit the amount
@@ -416,8 +431,10 @@ class N1QLRequest(object):
         if self._mres:
             return
 
-        self._mres = self._parent._n1ql_query(self._params.encoded,
-                                              not self._params.adhoc)
+        self._mres = self._parent._n1ql_query(
+            self._params.encoded, not self._params.adhoc,
+            cross_bucket=self._params.cross_bucket)
+
         self.__raw = self._mres[None]
 
     @property

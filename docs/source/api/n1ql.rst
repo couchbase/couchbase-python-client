@@ -13,6 +13,7 @@ N1QL Queries
     .. autoattribute:: encoded
     .. autoattribute:: adhoc
     .. autoattribute:: timeout
+    .. autoattribute:: cross_bucket
 
 .. autodata:: CONSISTENCY_NONE
 .. autodata:: CONSISTENCY_REQUEST
