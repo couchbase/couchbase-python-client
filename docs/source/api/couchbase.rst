@@ -355,6 +355,7 @@ the :meth:`~couchbase.bucket.Bucket.bucket_manager` method on the
     .. automethod:: design_get
     .. automethod:: design_publish
     .. automethod:: design_delete
+    .. automethod:: design_list
 
 N1QL Index Management
 =====================

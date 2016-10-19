@@ -203,7 +203,7 @@ class BucketManager(object):
         :raise: :exc:`couchbase.exceptions.HTTPError` if the design does not
             exist.
 
-        .. seealso:: :meth:`design_create`
+        .. seealso:: :meth:`design_create`, :meth:`design_list`
 
         """
         name = self._mk_devmode(name, use_devmode)
@@ -281,6 +281,59 @@ class BucketManager(object):
                                  method=_LCB.LCB_HTTP_METHOD_DELETE)
 
         self._design_poll(name, 'del', existing, syncwait)
+        return ret
+
+    def design_list(self):
+        """
+        List all design documents for the current bucket.
+
+        :return: A :class:`~couchbase.result.HttpResult` containing
+            a dict, with keys being the ID of the design document.
+
+        .. note::
+
+            This information is derived using the
+            ``pools/default/buckets/<bucket>ddocs`` endpoint, but the return
+            value has been modified to match that of :meth:`design_get`.
+
+        .. note::
+
+            This function returns both 'production' and 'development' mode
+            views. These two can be distinguished by the name of the
+            design document being prefixed with the ``dev_`` identifier.
+
+            The keys of the dict in ``value`` will be of the form
+            ``_design/<VIEWNAME>`` where ``VIEWNAME`` may either be e.g.
+            ``foo`` or ``dev_foo`` depending on whether ``foo`` is a
+            production or development mode view.
+
+            ::
+
+                for name, ddoc in mgr.design_list().value.items():
+                    if name.startswith('_design/dev_'):
+                        print "Development view!"
+                    else:
+                        print "Production view!"
+
+        Example::
+
+            for name, ddoc in mgr.design_list().value.items():
+                print 'Design name {0}. Contents {1}'.format(name, ddoc)
+
+        .. seealso:: :meth:`design_get`
+
+        """
+        ret = self._http_request(
+            type=_LCB.LCB_HTTP_TYPE_MANAGEMENT,
+            path="/pools/default/buckets/{0}/ddocs".format(self._cb.bucket),
+            method=_LCB.LCB_HTTP_METHOD_GET)
+
+        real_rows = {r['doc']['meta']['id']: r['doc']['json']
+                     for r in ret.value['rows']}
+
+        # Can't use normal assignment because 'value' is read-only
+        ret.value.clear()
+        ret.value.update(real_rows)
         return ret
 
     def _mk_index_def(self, ix, primary=False):
