@@ -15,8 +15,8 @@ N1QL Queries
     .. autoattribute:: timeout
     .. autoattribute:: cross_bucket
 
-.. autodata:: CONSISTENCY_NONE
-.. autodata:: CONSISTENCY_REQUEST
+.. autodata:: UNBOUNDED
+.. autodata:: REQUEST_PLUS
 
 .. autoclass:: MutationState
 

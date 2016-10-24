@@ -28,18 +28,22 @@ class N1QLError(CouchbaseError):
         return self.objextra['code']
 
 
-CONSISTENCY_REQUEST = 'request_plus'
+STATEMENT_PLUS = 'statement_plus'
+
+REQUEST_PLUS = 'request_plus'
 """
 For use with :attr:`~.N1QLQuery.consistency`, will ensure that query
 results always reflect the latest data in the server
 """
-
-CONSISTENCY_NONE = 'none'
+UNBOUNDED = 'none'
 """
 For use with :attr:`~.N1QLQuery.consistency`, will allow cached
 values to be returned. This will improve performance but may not
 reflect the latest data in the server.
 """
+
+CONSISTENCY_REQUEST = REQUEST_PLUS
+CONSISTENCY_NONE = UNBOUNDED
 
 
 class MissingTokenError(CouchbaseError):
@@ -58,7 +62,7 @@ class MutationState(object):
     mutations.
 
     Using `consistent_with` is similar to setting
-    :attr:`~.N1QLQuery.consistency` to :data:`CONSISTENCY_REQUEST`,
+    :attr:`~.N1QLQuery.consistency` to :data:`REQUEST_PLUS`,
     but is more optimal as the query will use cached data, *except*
     when the given mutation(s) are concerned. This option is useful
     for use patterns when an application has just performed a mutation,
@@ -292,9 +296,9 @@ class N1QLQuery(object):
         """
         Sets the consistency level.
 
-        :see: :data:`CONSISTENCY_NONE`, :data:`CONSISTENCY_REQUEST`
+        :see: :data:`UNBOUNDED`, :data:`REQUEST_PLUS`
         """
-        return self._body.get('scan_consistency', CONSISTENCY_NONE)
+        return self._body.get('scan_consistency', UNBOUNDED)
 
     @consistency.setter
     def consistency(self, value):
@@ -308,7 +312,7 @@ class N1QLQuery(object):
         :param state: The state of the mutations it should be consistent
             with.
         """
-        if self.consistency not in (CONSISTENCY_NONE, 'at_plus'):
+        if self.consistency not in (UNBOUNDED, 'at_plus'):
             raise TypeError(
                 'consistent_with not valid with other consistency options')
 
