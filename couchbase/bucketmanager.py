@@ -328,8 +328,9 @@ class BucketManager(object):
             path="/pools/default/buckets/{0}/ddocs".format(self._cb.bucket),
             method=_LCB.LCB_HTTP_METHOD_GET)
 
-        real_rows = {r['doc']['meta']['id']: r['doc']['json']
-                     for r in ret.value['rows']}
+        real_rows = {}
+        for r in ret.value['rows']:
+            real_rows[r['doc']['meta']['id']] = r['doc']['json']
 
         # Can't use normal assignment because 'value' is read-only
         ret.value.clear()
