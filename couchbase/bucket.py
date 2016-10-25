@@ -325,8 +325,14 @@ class Bucket(_Base):
             to the transcoder, which may serialize it how it wishes.
         :type key: string or bytes
 
-        :param value: The value to set for the key. The type for `value`
-            follows the same rules as for `key`
+        :param value: The value to set for the key.
+            This should be a native Python value which will be transparently
+            serialized to JSON by the library. Do not pass already-serialized
+            JSON as the value or it will be serialized again.
+
+            If you are using a different `format` setting (see `format`
+            parameter), and/or a custom transcoder then value for this
+            argument may need to conform to different criteria.
 
         :param int cas: The _CAS_ value to use. If supplied, the value
             will only be stored if it already exists with the supplied
