@@ -54,7 +54,6 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
         "s#", kwlist, &params, &nparams);
 
     if (!rv) {
-        PYCBC_EXCTHROW_ARGS();
         return NULL;
     }
     if (-1 == pycbc_oputil_conn_lock(self)) {
