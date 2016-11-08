@@ -46,16 +46,20 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     pycbc_ViewResult *vres;
     lcb_error_t rc;
     lcb_CMDFTS cmd = { 0 };
-    const char *params;
-    pycbc_strlen_t nparams;
+    pycbc_pybuffer buf = { 0 };
+    PyObject *params_o = NULL;
 
     static char *kwlist[] = { "params", NULL };
-    rv = PyArg_ParseTupleAndKeywords(args, kwargs,
-        "s#", kwlist, &params, &nparams);
+    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &params_o);
 
     if (!rv) {
         return NULL;
     }
+
+    if (pycbc_tc_simple_encode(params_o, &buf, PYCBC_FMT_UTF8) != 0) {
+        return NULL;
+    }
+
     if (-1 == pycbc_oputil_conn_lock(self)) {
         return NULL;
     }
@@ -72,10 +76,11 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     vres->base.htype = PYCBC_HTTP_HFTS;
 
     cmd.callback = fts_row_callback;
-    cmd.query = params;
-    cmd.nquery = nparams;
+    cmd.query = buf.buffer;
+    cmd.nquery = buf.length;
     cmd.handle = &vres->base.u.fts;
     rc = lcb_fts_query(self->instance, mres, &cmd);
+    PYCBC_PYBUF_RELEASE(&buf);
 
     if (rc != LCB_SUCCESS) {
         PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, rc, "Couldn't schedule fts query");
