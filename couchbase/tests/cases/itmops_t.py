@@ -193,3 +193,7 @@ class ItemTest(ConnectionTestCase):
         self.assertEqual(1, len(bar_options))
         self.assertEqual(-1, bar_options['replicate_to'])
 
+    def test_pycbc366(self):
+        itcoll = ItemOptionDict()
+        itcoll.create_and_add('foo', replica=True)
+        self.assertRaises(ArgumentError, self.cb.get_multi, itcoll)

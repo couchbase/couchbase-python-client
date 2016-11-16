@@ -72,6 +72,14 @@ handle_single_key(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
             goto GT_DONE;
         }
 
+        /* Note, options only comes when ItemOptionsCollection and friends
+         * are used. When this is in effect, options is the options for the
+         * current item, and value is NULL.
+         */
+        if (!curval) {
+            curval = options;
+        }
+
         if (PyDict_Check(curval)) {
             rv = PyArg_ParseTupleAndKeywords(pycbc_DummyTuple,
                 curval, "|O", kwlist, &ttl_O);
