@@ -1837,7 +1837,7 @@ class Bucket(_Base):
         return self._wrap_dsop(sdres)
 
     @_dsop()
-    def map_length(self, key):
+    def map_size(self, key):
         """
         Get the number of items in the map.
 
@@ -1903,12 +1903,12 @@ class Bucket(_Base):
         return self._wrap_dsop(sdres)
 
     @_dsop()
-    def list_insert(self, key, index, value, **kwargs):
+    def list_set(self, key, index, value, **kwargs):
         """
-        Insert an item within a list at a given position.
+        Sets an item within a list at a given position.
 
         :param key: The key of the document
-        :param index: The position at which the item should be inserted
+        :param index: The position to replace
         :param value: The value to be inserted
         :param kwargs: Additional arguments to :meth:`mutate_in`
         :return: :class:`OperationResult`
@@ -1918,12 +1918,12 @@ class Bucket(_Base):
         example::
 
             cb.upsert('a_list', ['hello', 'world'])
-            cb.list_insert('a_list', 1, 'good')
-            cb.get('a_list').value # => ['hello', 'good', 'world']
+            cb.list_set('a_list', 1, 'good')
+            cb.get('a_list').value # => ['hello', 'good']
 
         .. seealso:: :meth:`map_add`, :meth:`list_append`
         """
-        op = SD.array_insert('[{0}]'.format(index), value)
+        op = SD.replace('[{0}]'.format(index), value)
         sdres = self.mutate_in(key, op, **kwargs)
         return self._wrap_dsop(sdres)
 
@@ -1974,7 +1974,7 @@ class Bucket(_Base):
             except ValueError:
                 return
 
-    def set_length(self, key):
+    def set_size(self, key):
         """
         Get the length of a set.
 
@@ -1985,7 +1985,7 @@ class Bucket(_Base):
         """
         return self.list_length(key)
 
-    def set_exists(self, key, value):
+    def set_contains(self, key, value):
         """
         Determine if an item exists in a set
         :param key: The document ID of the set
@@ -2020,19 +2020,17 @@ class Bucket(_Base):
         :return: :class:`OperationResult`
         :raise: :exc:`IndexError` if the index does not exist
         :raise: :cb_exc:`NotFoundError` if the list does not exist
-
         """
         return self.map_remove(key, '[{0}]'.format(index), **kwargs)
 
     @_dsop()
-    def list_length(self, key):
+    def list_size(self, key):
         """
         Retrieve the number of elements in the list.
 
         :param key: The document ID of the list
         :return: The number of elements within the list
         :raise: :cb_exc:`NotFoundError` if the list does not exist
-
         """
         return self.map_length(key)
 
@@ -2056,7 +2054,6 @@ class Bucket(_Base):
             cb.remove('a_queue')
             cb.queue_push('a_queue', 'job9999', create=True)
             cb.queue_pop('a_queue').value  # => job9999
-
         """
         return self.list_prepend(key, value, **kwargs)
 
@@ -2087,7 +2084,7 @@ class Bucket(_Base):
                 raise E.QueueEmpty
 
     @_dsop()
-    def queue_length(self, key):
+    def queue_size(self, key):
         """
         Get the length of the queue.
 

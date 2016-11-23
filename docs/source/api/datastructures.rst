@@ -69,21 +69,22 @@ The datastructures are:
 
     .. automethod:: map_add
     .. automethod:: map_get
-    .. automethod:: map_length
+    .. automethod:: map_size
     .. automethod:: map_remove
 
     .. automethod:: list_append
     .. automethod:: list_prepend
-    .. automethod:: list_insert
+    .. automethod:: list_set
     .. automethod:: list_get
     .. automethod:: list_remove
-    .. automethod:: list_length
+    .. automethod:: list_size
 
 
-    .. automethod:: set_length
+    .. automethod:: set_size
     .. automethod:: set_add
     .. automethod:: set_remove
-    .. automethod:: set_exists
+    .. automethod:: set_contains
 
     .. automethod:: queue_push
     .. automethod:: queue_pop
+    .. automethod:: queue_size
