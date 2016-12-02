@@ -1983,7 +1983,7 @@ class Bucket(_Base):
         :raise: :cb_exc:`NotFoundError` if the set does not exist.
 
         """
-        return self.list_length(key)
+        return self.list_size(key)
 
     def set_contains(self, key, value):
         """
@@ -2032,7 +2032,7 @@ class Bucket(_Base):
         :return: The number of elements within the list
         :raise: :cb_exc:`NotFoundError` if the list does not exist
         """
-        return self.map_length(key)
+        return self.map_size(key)
 
     @_dsop(create_type=list)
     def queue_push(self, key, value, create=False, **kwargs):
@@ -2093,3 +2093,10 @@ class Bucket(_Base):
         :raise: :cb_exc:`NotFoundError` if the queue does not exist.
         """
         return self.list_length(key)
+
+
+    def get_attribute(self, key, attrname):
+        pass
+
+    def set_attribute(self, key, attrname):
+        pass

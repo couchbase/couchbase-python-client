@@ -34,12 +34,12 @@ class DatastructureTest(ConnectionTestCase):
         rv = cb.map_get(key, 'key1')
         self.assertEqual('val1', rv.value)
 
-        self.assertEqual(1, cb.map_length(key))
+        self.assertEqual(1, cb.map_size(key))
 
         self.assertRaises(IndexError, cb.map_remove, key, 'key2')
         rv = cb.map_remove(key, 'key1')
         self.assertTrue(rv.success)
-        self.assertEqual(0, cb.map_length(key))
+        self.assertEqual(0, cb.map_size(key))
 
     def test_list(self):
         key = self.gen_key('dslist')
@@ -59,16 +59,19 @@ class DatastructureTest(ConnectionTestCase):
         self.assertTrue(rv.success)
         self.assertEqual('before', cb.list_get(key, 0).value)
         self.assertEqual('hello', cb.list_get(key, 1).value)
-        self.assertEqual(2, cb.list_length(key))
-
-        # Insert value
-        rv = cb.list_insert(key, 1, 'between')
-        self.assertTrue(rv.success)
-        self.assertEqual(['before', 'between', 'hello'], cb.get(key).value)
+        self.assertEqual(2, cb.list_size(key))
 
         rv = cb.list_remove(key, 1)
         self.assertTrue(rv.success)
-        self.assertEqual(['before', 'hello'], cb.get(key).value)
+        self.assertEqual(['before'], cb.get(key).value)
+
+        rv = cb.list_append(key, 'world')
+        self.assertTrue(rv.success)
+        self.assertEqual(['before', 'world'], cb.get(key).value)
+
+        rv = cb.list_set(key, 1, 'after')
+        self.assertTrue(rv.success)
+        self.assertEqual(['before', 'after'], cb.get(key).value)
 
     def test_sets(self):
         key = self.gen_key('dsset')
@@ -80,15 +83,15 @@ class DatastructureTest(ConnectionTestCase):
         self.assertTrue(rv.success)
         rv = cb.set_add(key, 123)
         self.assertFalse(rv)
-        self.assertEqual(1, cb.set_length(key))
-        self.assertTrue(cb.set_exists(key, 123))
+        self.assertEqual(1, cb.set_size(key))
+        self.assertTrue(cb.set_contains(key, 123))
 
         rv = cb.set_remove(key, 123)
         self.assertTrue(rv.success)
-        self.assertEqual(0, cb.set_length(key))
+        self.assertEqual(0, cb.set_size(key))
         rv = cb.set_remove(key, 123)
         self.assertFalse(rv)
-        self.assertFalse(cb.set_exists(key, 123))
+        self.assertFalse(cb.set_contains(key, 123))
 
     def test_queue(self):
         key = self.gen_key('a_queue')
