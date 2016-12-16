@@ -45,6 +45,7 @@ pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p)
     PyObject *excparams;
     PyObject *excinstance;
     PyObject *ctor_args;
+    Py_ssize_t excinstance_refcnt;
 
     PyErr_Fetch(&type, &value, &traceback);
     PyErr_Clear();
@@ -96,9 +97,10 @@ pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p)
         Py_XDECREF(traceback);
 
     } else {
+        excinstance_refcnt = Py_REFCNT(excinstance);
         Py_INCREF(Py_TYPE(excinstance));
         PyErr_Restore((PyObject*)Py_TYPE(excinstance), excinstance, traceback);
-        PYCBC_REFCNT_ASSERT(Py_REFCNT(excinstance) == 1);
+        PYCBC_REFCNT_ASSERT(Py_REFCNT(excinstance) == excinstance_refcnt);
     }
 }
 
