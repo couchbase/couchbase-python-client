@@ -2,6 +2,7 @@ from __future__ import print_function
 
 from couchbase.tests.base import CouchbaseTestCase
 import couchbase.fulltext as cbft
+from couchbase.n1ql import MutationState
 
 
 class FTStringsTest(CouchbaseTestCase):
@@ -70,29 +71,35 @@ class FTStringsTest(CouchbaseTestCase):
             'size': 10,
             'indexName': 'ix'
         }
-        q = cbft.StringQuery('q*ry', boost=2.0)
+        q = cbft.QueryStringQuery('q*ry', boost=2.0)
         p = cbft.Params(limit=10, explain=True)
         self.assertEqual(exp_json, cbft.make_search_body('ix', q, p))
 
     def test_params(self):
-        self.assertEqual({}, cbft.Params().encodable)
-        self.assertEqual({'size': 10}, cbft.Params(limit=10).encodable)
-        self.assertEqual({'from': 100}, cbft.Params(skip=100).encodable)
+        self.assertEqual({}, cbft.Params().as_encodable('ix'))
+        self.assertEqual({'size': 10}, cbft.Params(limit=10).as_encodable('ix'))
+        self.assertEqual({'from': 100},
+                         cbft.Params(skip=100).as_encodable('ix'))
 
         self.assertEqual({'explain': True},
-                         cbft.Params(explain=True).encodable)
+                         cbft.Params(explain=True).as_encodable('ix'))
 
         self.assertEqual({'highlight': {'style': 'html'}},
-                         cbft.Params(highlight_style='html').encodable)
+                         cbft.Params(highlight_style='html').as_encodable('ix'))
 
         self.assertEqual({'highlight': {'style': 'ansi',
                                         'fields': ['foo', 'bar', 'baz']}},
                          cbft.Params(highlight_style='ansi',
                                      highlight_fields=['foo', 'bar', 'baz'])
-                         .encodable)
+                         .as_encodable('ix'))
 
         self.assertEqual({'fields': ['foo', 'bar', 'baz']},
-                         cbft.Params(fields=['foo', 'bar', 'baz']).encodable)
+                         cbft.Params(fields=['foo', 'bar', 'baz']
+                                     ).as_encodable('ix'))
+
+        self.assertEqual({'sort': ['f1', 'f2', '-_score']},
+                         cbft.Params(sort=['f1', 'f2', '-_score']
+                                     ).as_encodable('ix'))
 
         p = cbft.Params(facets={
             'term': cbft.TermFacet('somefield', limit=10),
@@ -123,7 +130,7 @@ class FTStringsTest(CouchbaseTestCase):
                 },
             }
         }
-        self.assertEqual(exp, p.encodable)
+        self.assertEqual(exp, p.as_encodable('ix'))
 
     def test_facets(self):
         p = cbft.Params()
@@ -231,9 +238,9 @@ class FTStringsTest(CouchbaseTestCase):
         self.assertEqual({'conjuncts': [{'prefix': 'somePrefix'}]},
                          cq.encodable)
 
-    def match_all_none_queries(self):
+    def test_match_all_none_queries(self):
         self.assertEqual({'match_all': None}, cbft.MatchAllQuery().encodable)
-        self.assertEqual({'match_none': None}, cbft.MatchNoneQuery.encodable)
+        self.assertEqual({'match_none': None}, cbft.MatchNoneQuery().encodable)
 
     def test_phrase_query(self):
         pq = cbft.PhraseQuery('salty', 'beers')
@@ -255,3 +262,34 @@ class FTStringsTest(CouchbaseTestCase):
     def test_booleanfield_query(self):
         bq = cbft.BooleanFieldQuery(True)
         self.assertEqual({'bool': True}, bq.encodable)
+
+    def test_consistency(self):
+        uuid = str('10000')
+        vb = 42
+        seq = 101
+        ixname = 'ix'
+
+        mutinfo = (vb, uuid, seq, 'dummy-bucket-name')
+        ms = MutationState()
+        ms._add_scanvec(mutinfo)
+
+        params = cbft.Params()
+        params.consistent_with(ms)
+        got = cbft.make_search_body('ix', cbft.MatchNoneQuery(), params)
+        exp = {
+            'indexName': ixname,
+            'query': {
+                'match_none': None
+            },
+            'ctl': {
+                'consistency': {
+                    'level': 'at_plus',
+                    'vectors': {
+                        ixname: {
+                            '{0}/{1}'.format(vb, uuid): seq
+                        }
+                    }
+                }
+            }
+        }
+        self.assertEqual(exp, got)

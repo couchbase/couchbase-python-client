@@ -115,6 +115,15 @@ class MutationState(object):
         """
         return couchbase._to_json(self._sv)
 
+    def _to_fts_encodable(self):
+        if len(self._sv) > 1:
+            raise TypeError('Cannot use more than a single bucket with FTS')
+        from couchbase._pyport import single_dict_key
+        out = {}
+        for vb, params in self._sv[single_dict_key(self._sv)].items():
+            out['{0}/{1}'.format(vb, params[1])] = params[0]
+        return out
+
     @classmethod
     def decode(cls, s):
         """

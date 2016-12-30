@@ -14,7 +14,7 @@ Couchbase offers full-text queries in version 4.5. To issue a query from the
 Python SDK, use the :cb_bmeth:`search` bucket method.
 
 To perform an actual search, define a search index (via Couchbase web UI, or
-using the REST interface), create a :class:`SearchQuery` object and then pass the
+using the REST interface), create a :class:`Query` object and then pass the
 index name and the query object to the `search` method:
 
 .. code-block:: python
@@ -43,7 +43,7 @@ term; :class:`TermQuery` to match a field exactly, :class:`PrefixQuery` for
 type-ahead queries, or a compound query type such as :class:`ConjunctionQuery`
 for more complex queries.
 
-.. autoclass:: SearchQuery
+.. autoclass:: Query
     :members:
 
 =============
@@ -68,7 +68,7 @@ Match Queries
 .. autoclass:: BooleanFieldQuery
     :members:
 
-.. autoclass:: StringQuery
+.. autoclass:: QueryStringQuery
     :members:
 
 .. autoclass:: DocIdQuery

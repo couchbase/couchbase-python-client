@@ -75,6 +75,13 @@ def _highlight(value):
             'Highlight must be "html" or "ansi", got {0}'.format(value))
     return value
 
+def _consistency(value):
+    """
+    Validator for 'consistency' parameter
+    """
+    if value and value.lower() not in ('', 'not_bounded'):
+        raise ValueError('Invalid value!')
+    return value
 
 def _assign_kwargs(self, kwargs):
     """
@@ -256,17 +263,30 @@ class Params(object):
     """
     def __init__(self, **kwargs):
         self._json_ = {}
+        self._ms = None
         self.facets = _FacetDict(**kwargs.pop('facets', {}))
         _assign_kwargs(self, kwargs)
 
-    @property
-    def encodable(self):
+    def as_encodable(self, index_name):
+        """
+        :param index_name: The name of the index for the query
+        :return: A dict suitable for passing to `json.dumps()`
+        """
         if self.facets:
             encoded_facets = {}
             for name, facet in self.facets.items():
                 encoded_facets[name] = facet.encodable
             self._json_['facets'] = encoded_facets
 
+        if self._ms:
+            # Encode according to scan vectors..
+            sv_val = {
+                'level': 'at_plus',
+                'vectors': {
+                    index_name: self._ms._to_fts_encodable()
+                }
+            }
+            self._json_.setdefault('ctl', {})['consistency'] = sv_val
         return self._json_
 
     limit = _genprop(int, 'size', doc='Maximum number of results to return')
@@ -292,8 +312,38 @@ class Params(object):
         Highlight the results from these fields (list)
         """)
 
+    sort = _genprop(
+        list, 'sort', doc="""
+        Specify a list of fields by which to sort the results
+        """
+    )
 
-class SearchQuery(object):
+    consistency = _genprop(
+        _consistency, 'ctl', 'consistency', doc="""
+        Consistency for the query. Use this for 'fixed' consistency, or to
+        clear consistency.
+
+        You might want to use :meth:`consistent_with` for consistency that is
+        bounded to specific mutations
+        """
+    )
+
+    def consistent_with(self, ms):
+        """
+        Ensure that this query is consistent with the given mutations. When
+        set, this ensures that only document versions as or more recent than
+        the provided mutations are used for the search. This is often helpful
+        when attempting searches on newly inserted documents.
+        :param ms: Mutation State
+        :type ms: :class:`couchbase.n1ql.MutationState`
+        """
+        if self.consistency:
+            raise ValueError(
+                'Clear "consistency" before specifying "consistent_with"')
+        self._ms = ms
+
+
+class Query(object):
     """
     Base query object. You probably want to use one of the subclasses.
 
@@ -331,7 +381,7 @@ class SearchQuery(object):
         pass
 
 
-class RawQuery(SearchQuery):
+class RawQuery(Query):
     """
     This class is used to wrap a raw query payload. It should be used
     for custom query parameters, or in cases where any of the other
@@ -342,7 +392,7 @@ class RawQuery(SearchQuery):
         self._json_ = obj
 
 
-class _SingleQuery(SearchQuery):
+class _SingleQuery(Query):
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractproperty
@@ -409,7 +459,7 @@ def _with_fields(*fields):
     return wrap
 
 
-class StringQuery(_SingleQuery):
+class QueryStringQuery(_SingleQuery):
     """
     Query which allows users to describe a query in a query language.
     The server will then execute the appropriate query based on the contents
@@ -421,7 +471,7 @@ class StringQuery(_SingleQuery):
 
     Example::
 
-        StringQuery('description:water and stuff')
+        QueryStringQuery('description:water and stuff')
     """
 
     _TERMPROP = 'query'
@@ -541,7 +591,7 @@ class RegexQuery(_SingleQuery):
 RegexpQuery = RegexQuery
 
 
-class _RangeQuery(SearchQuery):
+class _RangeQuery(Query):
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractproperty
@@ -642,7 +692,7 @@ class DateRangeQuery(_RangeQuery):
     _MINMAX = 'start', 'end'
 
 
-class _CompoundQuery(SearchQuery):
+class _CompoundQuery(Query):
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractproperty
@@ -739,7 +789,7 @@ def _bprop_wrap(name, reqtype, doc):
                 del self._subqueries[name]
         elif isinstance(value, reqtype):
             self._subqueries[name] = value
-        elif isinstance(value, SearchQuery):
+        elif isinstance(value, Query):
             self._subqueries[name] = reqtype(value)
         else:
             try:
@@ -749,7 +799,7 @@ def _bprop_wrap(name, reqtype, doc):
 
             l = []
             for q in it:
-                if not isinstance(q, SearchQuery):
+                if not isinstance(q, Query):
                     raise TypeError('Item is not a query!', q)
                 l.append(q)
             self._subqueries[name] = reqtype(*l)
@@ -760,7 +810,7 @@ def _bprop_wrap(name, reqtype, doc):
     return property(fget, fset, fdel, doc)
 
 
-class BooleanQuery(SearchQuery):
+class BooleanQuery(Query):
     def __init__(self, must=None, should=None, must_not=None):
         super(BooleanQuery, self).__init__()
         self._subqueries = {}
@@ -816,24 +866,24 @@ class BooleanQuery(SearchQuery):
             raise ValueError('No sub-queries specified', self)
 
 
-class MatchAllQuery(_SingleQuery):
+class MatchAllQuery(Query):
     """
     Special query which matches all documents
     """
     def __init__(self, **kwargs):
-        super(MatchAllQuery, self).__init__(None, **kwargs)
+        super(MatchAllQuery, self).__init__()
+        self._json_['match_all'] = None
+        _assign_kwargs(self, kwargs)
 
-    _TERMFIELD = 'match_all'
 
-
-class MatchNoneQuery(_SingleQuery):
+class MatchNoneQuery(Query):
     """
     Special query which matches no documents
     """
     def __init__(self, **kwargs):
-        super(MatchNoneQuery, self).__init__(None, **kwargs)
-
-    _TERMFIELD = 'match_none'
+        super(MatchNoneQuery, self).__init__()
+        self._json_['match_none'] = None
+        _assign_kwargs(self, kwargs)
 
 
 @_with_fields('field')
@@ -862,16 +912,17 @@ def make_search_body(index, query, params=None):
     :param index: The index name to query
     :param query: The query itself
     :param params: Modifiers for the query
+    :type params: :class:`couchbase.fulltext.Params`
     :return: A dictionary suitable for serialization
     """
     dd = {}
 
-    if not isinstance(query, SearchQuery):
-        query = StringQuery(query)
+    if not isinstance(query, Query):
+        query = QueryStringQuery(query)
 
     dd['query'] = query.encodable
     if params:
-        dd.update(params.encodable)
+        dd.update(params.as_encodable(index))
     dd['indexName'] = index
     return dd
 
