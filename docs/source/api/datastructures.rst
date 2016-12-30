@@ -9,26 +9,12 @@ Datastructures API
 
 .. versionadded:: 2.1.1
 
-The datastructure API is a new experimental API added which allows your
-application to view Couchbase documents as common data structures such as
-lists, maps, and queues.
+The datastructure API allows your application to view Couchbase documents as
+common data structures such as lists, maps, and queues.
 
 Datastructure operations are implemented largely using
 :mod:`couchbase.subdocument` operations, and also carry with some more
 efficiency.
-
-.. warning::
-
-    The data structure API is currently experimental. The API may change
-    or be removed entirely.
-
-
-In order to use this API you must first enable experimental functionality:
-
-.. code-block:: python
-
-    import couchbase.experimental
-    couchbase.experimental.enable()
 
 
 Couchbase datatypes are still JSON underneath, and use the

@@ -17,7 +17,6 @@
 
 from couchbase.tests.base import ConnectionTestCase, SkipTest
 import couchbase.exceptions as E
-import couchbase.experimental; couchbase.experimental.enable()
 
 
 class DatastructureTest(ConnectionTestCase):

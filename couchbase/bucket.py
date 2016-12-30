@@ -94,13 +94,11 @@ class DurabilityContext(object):
 
 
 def _dsop(create_type=None, wrap_missing_path=True):
-    from couchbase.experimental import enabled_or_raise
     import functools
 
     def real_decorator(fn):
         @functools.wraps(fn)
         def newfn(self, key, *args, **kwargs):
-            enabled_or_raise()
             try:
                 return fn(self, key, *args, **kwargs)
             except E.NotFoundError:
