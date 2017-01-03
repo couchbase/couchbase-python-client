@@ -28,8 +28,8 @@
 #include <libcouchbase/n1ql.h>
 #include <libcouchbase/cbft.h>
 #include <libcouchbase/ixmgmt.h>
-#if LCB_VERSION < 0x020600
-#error "Couchbase Python SDK requires libcouchbase 2.6.0 or greater"
+#if LCB_VERSION < 0x020601
+#error "Couchbase Python SDK requires libcouchbase 2.6.1 or greater"
 #endif
 
 #include <pythread.h>
