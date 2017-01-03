@@ -335,7 +335,7 @@ class Params(object):
         the provided mutations are used for the search. This is often helpful
         when attempting searches on newly inserted documents.
         :param ms: Mutation State
-        :type ms: :class:`couchbase.n1ql.MutationState`
+        :type ms: :class:`couchbase.mutation_state.MutationState`
         """
         if self.consistency:
             raise ValueError(
