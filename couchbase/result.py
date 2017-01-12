@@ -120,12 +120,17 @@ class SubdocResult(C._SDResult):
         :param default: If the given result does not exist, return this value
             instead
         :return: A tuple of `(error, value)`. If the entry does not exist
-            then `(0, default)` is returned.
+            then `(err, default)` is returned, where `err` is the actual error
+            which occurred.
+            You can use :meth:`couchbase.exceptions.CouchbaseError.rc_to_exctype`
+            to convert the error code to a proper exception class
+        :raise: :exc:`IndexError` or :exc:`KeyError` if `path_or_index`
+            is not an initially requested path. This is a programming error
+            as opposed to a constraint error where the path is not found.
         """
-        try:
-            return self._resolve(path_or_index)
-        except (KeyError, IndexError):
-            return 0, default
+        err, value = self._resolve(path_or_index)
+        value = default if err else value
+        return err, value
 
     def exists(self, path_or_index):
         """

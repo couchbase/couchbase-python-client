@@ -52,6 +52,10 @@ class SubdocTest(ConnectionTestCase):
         self.assertEqual(E.SubdocMultipleErrors.CODE, result.rc)
         self.assertEqual(E.SubdocPathNotFoundError.CODE, result.get(0)[0])
 
+        # Ensure that we complain about a missing path
+        self.assertRaises((IndexError, KeyError), result.get, 33)
+        self.assertRaises((IndexError, KeyError), result.get, 'non-requested')
+
         # Test with quiet
         result = cb.lookup_in(key, SD.exists('p'), quiet=True)
         self.assertFalse(result.exists('p'))
