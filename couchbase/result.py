@@ -150,6 +150,9 @@ class SubdocResult(C._SDResult):
         else:
             raise E.exc_from_rc(result[0])
 
+    def __contains__(self, item):
+        return self.exists(item)
+
     @property
     def access_ok(self):
         """

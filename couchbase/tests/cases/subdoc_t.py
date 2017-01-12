@@ -202,6 +202,8 @@ class SubdocTest(ConnectionTestCase):
 
         self.assertTrue(rvs.exists('field2'))
         self.assertTrue(rvs.exists(1))
+        self.assertTrue(1 in rvs)
+        self.assertTrue('field2' in rvs)
 
         self.assertEqual((E.SubdocPathNotFoundError.CODE, None),
                          rvs.get('field3'))
