@@ -528,14 +528,15 @@ sd_convert_spec(PyObject *pyspec, lcb_SDSPEC *sdspec,
 {
     PyObject *path = NULL;
     PyObject *val = NULL;
-    int op = 0, create = 0;
+    int op = 0;
+    unsigned flags = 0;
 
     if (!PyTuple_Check(pyspec)) {
         PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0, "Expected tuple for spec", pyspec);
         return -1;
     }
 
-    if (!PyArg_ParseTuple(pyspec, "iO|Oi", &op, &path, &val, &create)) {
+    if (!PyArg_ParseTuple(pyspec, "iOI|O", &op, &path, &flags, &val)) {
         PYCBC_EXCTHROW_ARGS();
         return -1;
     }
@@ -544,7 +545,7 @@ sd_convert_spec(PyObject *pyspec, lcb_SDSPEC *sdspec,
     }
 
     sdspec->sdcmd = op;
-    sdspec->options = create ? LCB_SDSPEC_F_MKINTERMEDIATES : 0;
+    sdspec->options = flags;
     LCB_SDSPEC_SET_PATH(sdspec, pathbuf->buffer, pathbuf->length);
     if (val != NULL) {
         int is_multival = 0;

@@ -5,6 +5,15 @@ from couchbase._libcouchbase import (
     LCB_SDCMD_COUNTER, LCB_SDCMD_REMOVE, LCB_SDCMD_ARRAY_INSERT
 )
 
+# Defined in libcouchbase's headers. We don't want to force a hard dependency
+# on a later version of libcouchbase just for these flags, especially
+# considering that most users will only be using _F_MKDIR_P
+_F_MKDIR_P = 1 << 16
+_F_MKDOC = 1 << 17
+_F_XATTR = 1 << 18
+_F_EXPAND_MACROS = 1 << 19
+_F_ACCESS_DELETED = 1 << 20
+
 _SPECMAP = {}
 for k, v in tuple(globals().items()):
     if not k.startswith('LCB_SDCMD_'):
@@ -25,12 +34,43 @@ class Spec(tuple):
                                  ', '.join(details))
 
 
-def _gen_2spec(op, path):
-    return Spec(op, path)
+def _gen_3spec(op, path, xattr=False, _access_deleted=False):
+    """
+    Returns a Spec tuple suitable for passing to the underlying C extension.
+    This variant is called for operations that lack an input value.
+
+    :param str path: The path to fetch
+    :param bool xattr: Whether this is an extended attribute
+    :return: a spec suitable for passing to the underlying C extension
+    """
+    flags = 0
+    if xattr:
+        flags |= _F_XATTR
+    if _access_deleted:
+        flags |= _F_ACCESS_DELETED
+    return Spec(op, path, flags)
 
 
-def _gen_4spec(op, path, value, create=False):
-    return Spec(op, path, value, int(create))
+def _gen_4spec(op, path, value,
+               create_path=False, create_doc=False, xattr=False,
+               _expand_macros=False, _access_deleted=False):
+    """
+    Like `_gen_3spec`, but also accepts a mandatory value as its third argument
+    :param bool _expand_macros: Whether macros in the value should be expanded.
+        The macros themselves are defined at the server side
+    """
+    flags = 0
+    if create_path:
+        flags |= _F_MKDIR_P
+    if create_doc:
+        flags |= _F_MKDOC
+    if xattr:
+        flags |= _F_XATTR
+    if _expand_macros:
+        flags |= _F_EXPAND_MACROS
+    if _access_deleted:
+        flags |= _F_ACCESS_DELETED
+    return Spec(op, path, flags, value)
 
 
 class MultiValue(tuple):
@@ -44,19 +84,18 @@ class MultiValue(tuple):
 # The following functions return either 2-tuples or 4-tuples for operations
 # which are converted into mutation or lookup specifications
 
-def get(path):
+def get(path, **kwargs):
     """
     Retrieve the value from the given path. The value is returned in the result.
     Valid only in :cb_bmeth:`lookup_in`
 
     :param path: The path to retrieve
-
     .. seealso:: :meth:`exists`
     """
-    return _gen_2spec(LCB_SDCMD_GET, path)
+    return _gen_3spec(LCB_SDCMD_GET, path, **kwargs)
 
 
-def exists(path):
+def exists(path, **kwargs):
     """
     Check if a given path exists. This is the same as :meth:`get()`,
     but the result will not contain the value.
@@ -64,10 +103,10 @@ def exists(path):
 
     :param path: The path to check
     """
-    return _gen_2spec(LCB_SDCMD_EXISTS, path)
+    return _gen_3spec(LCB_SDCMD_EXISTS, path, **kwargs)
 
 
-def upsert(path, value, create_parents=False):
+def upsert(path, value, create_parents=False, **kwargs):
     """
     Create or replace a dictionary path.
 
@@ -95,10 +134,11 @@ def upsert(path, value, create_parents=False):
         `baz` value.
 
     """
-    return _gen_4spec(LCB_SDCMD_DICT_UPSERT, path, value, create_parents)
+    return _gen_4spec(LCB_SDCMD_DICT_UPSERT, path, value,
+                      create_path=create_parents, **kwargs)
 
 
-def replace(path, value):
+def replace(path, value, **kwargs):
     """
     Replace an existing path. This works on any valid path if the path already
     exists. Valid only in :cb_bmeth:`mutate_in`
@@ -106,10 +146,11 @@ def replace(path, value):
     :param path: The path to replace
     :param value: The new value
     """
-    return _gen_4spec(LCB_SDCMD_REPLACE, path, value, False)
+    return _gen_4spec(LCB_SDCMD_REPLACE, path, value,
+                      create_path=False, **kwargs)
 
 
-def insert(path, value, create_parents=False):
+def insert(path, value, create_parents=False, **kwargs):
     """
     Create a new path in the document. The final path element points to a
     dictionary key that should be created. Valid only in :cb_bmeth:`mutate_in`
@@ -118,7 +159,8 @@ def insert(path, value, create_parents=False):
     :param value: Value for the path
     :param create_parents: Whether intermediate parents should be created
     """
-    return _gen_4spec(LCB_SDCMD_DICT_ADD, path, value, create_parents)
+    return _gen_4spec(LCB_SDCMD_DICT_ADD, path, value,
+                      create_path=create_parents, **kwargs)
 
 
 def array_append(path, *values, **kwargs):
@@ -143,7 +185,9 @@ def array_append(path, *values, **kwargs):
     .. seealso:: :func:`array_prepend`, :func:`upsert`
     """
     return _gen_4spec(LCB_SDCMD_ARRAY_ADD_LAST, path,
-                      MultiValue(*values), kwargs.get('create_parents', False))
+                      MultiValue(*values),
+                      create_path=kwargs.pop('create_parents', False),
+                      **kwargs)
 
 
 def array_prepend(path, *values, **kwargs):
@@ -160,10 +204,12 @@ def array_prepend(path, *values, **kwargs):
     .. seealso:: :func:`array_append`, :func:`upsert`
     """
     return _gen_4spec(LCB_SDCMD_ARRAY_ADD_FIRST, path,
-                      MultiValue(*values), kwargs.get('create_parents', False))
+                      MultiValue(*values),
+                      create_path=kwargs.pop('create_parents', False),
+                      **kwargs)
 
 
-def array_insert(path, *values):
+def array_insert(path, *values, **kwargs):
     """
     Insert items at a given position within an array.
 
@@ -176,10 +222,10 @@ def array_insert(path, *values):
     .. seealso:: :func:`array_prepend`, :func:`upsert`
     """
     return _gen_4spec(LCB_SDCMD_ARRAY_INSERT, path,
-                      MultiValue(*values), False)
+                      MultiValue(*values), **kwargs)
 
 
-def array_addunique(path, value, create_parents=False):
+def array_addunique(path, value, create_parents=False, **kwargs):
     """
     Add a new value to an array if the value does not exist.
 
@@ -199,10 +245,11 @@ def array_addunique(path, value, create_parents=False):
 
     .. seealso:: :func:`array_append`, :func:`upsert`
     """
-    return _gen_4spec(LCB_SDCMD_ARRAY_ADD_UNIQUE, path, value, create_parents)
+    return _gen_4spec(LCB_SDCMD_ARRAY_ADD_UNIQUE, path, value,
+                      create_path=create_parents, **kwargs)
 
 
-def counter(path, delta, create_parents=False):
+def counter(path, delta, create_parents=False, **kwargs):
     """
     Increment or decrement a counter in a document.
 
@@ -226,10 +273,11 @@ def counter(path, delta, create_parents=False):
     """
     if not delta:
         raise ValueError("Delta must be positive or negative!")
-    return _gen_4spec(LCB_SDCMD_COUNTER, path, delta, create_parents)
+    return _gen_4spec(LCB_SDCMD_COUNTER, path, delta,
+                      create_path=create_parents, **kwargs)
 
 
-def remove(path):
+def remove(path, **kwargs):
     """
     Remove an existing path in the document.
 
@@ -237,4 +285,4 @@ def remove(path):
 
     :param path: The path to remove
     """
-    return _gen_2spec(LCB_SDCMD_REMOVE, path)
+    return _gen_3spec(LCB_SDCMD_REMOVE, path, **kwargs)
