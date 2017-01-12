@@ -228,6 +228,9 @@ Building documentation
 
 
 The documentation is using Sphinx and also needs the numpydoc Sphinx extension.
+In order for the documentation to build properly, the C extension must have
+been built, since there are embedded docstrings in there as well.
+
 To build the documentation, go into the `docs` directory and run
 
 .. code-block:: sh
@@ -235,6 +238,16 @@ To build the documentation, go into the `docs` directory and run
     make html
 
 The HTML output can be found in `docs/build/html/`.
+
+
+Alternatively, you can also build the documentation (after building the module
+itself) from the top-level directory:
+
+.. code-block:: sh
+
+    python setup.py build_sphinx
+
+Once built, the docs will be in in `build/sphinx/html`
 
 -------
 Testing
