@@ -2090,7 +2090,7 @@ class Bucket(_Base):
         :return: The length of the queue
         :raise: :cb_exc:`NotFoundError` if the queue does not exist.
         """
-        return self.list_length(key)
+        return self.list_size(key)
 
 
     def get_attribute(self, key, attrname):
