@@ -37,27 +37,15 @@ n1ql_row_callback(lcb_t instance, int ign, const lcb_RESPN1QL *resp)
     }
 }
 
-PyObject *
-pycbc_Bucket__n1ql_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
-{
-    int rv;
+static PyObject *
+query_common(pycbc_Bucket *self, const char *params, unsigned nparams,
+             const char *host, int is_prepared, int is_xbucket) {
     PyObject *ret = NULL;
     pycbc_MultiResult *mres;
     pycbc_ViewResult *vres;
     lcb_error_t rc;
     lcb_CMDN1QL cmd = { 0 };
-    const char *params;
-    pycbc_strlen_t nparams;
-    int prepared = 0, cross_bucket = 0;
 
-    static char *kwlist[] = { "params", "prepare", "cross_bucket", NULL };
-    rv = PyArg_ParseTupleAndKeywords(
-        args, kwargs, "s#|ii", kwlist, &params, &nparams, &prepared, &cross_bucket);
-
-    if (!rv) {
-        PYCBC_EXCTHROW_ARGS();
-        return NULL;
-    }
     if (-1 == pycbc_oputil_conn_lock(self)) {
         return NULL;
     }
@@ -79,12 +67,20 @@ pycbc_Bucket__n1ql_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     cmd.query = params;
     cmd.nquery = nparams;
     cmd.handle = &vres->base.u.nq;
-    if (prepared) {
+
+    if (is_prepared) {
         cmd.cmdflags |= LCB_CMDN1QL_F_PREPCACHE;
     }
-    if (cross_bucket) {
+    if (is_xbucket) {
         cmd.cmdflags |= LCB_CMD_F_MULTIAUTH;
     }
+
+    if (host) {
+        /* #define LCB_CMDN1QL_F_CBASQUERY 1<<18 */
+        cmd.cmdflags |= (1<<18);
+        cmd.host = host;
+    }
+
     rc = lcb_n1ql_query(self->instance, mres, &cmd);
 
     if (rc != LCB_SUCCESS) {
@@ -99,4 +95,37 @@ pycbc_Bucket__n1ql_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     Py_XDECREF(mres);
     pycbc_oputil_conn_unlock(self);
     return ret;
+
+}
+
+PyObject *
+pycbc_Bucket__n1ql_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
+{
+    const char *params = NULL;
+    pycbc_strlen_t nparams = 0;
+    int prepared = 0, cross_bucket = 0;
+    static char *kwlist[] = { "params", "prepare", "cross_bucket", NULL };
+    if (!PyArg_ParseTupleAndKeywords(
+        args, kwargs, "s#|ii", kwlist, &params,
+        &nparams, &prepared, &cross_bucket)) {
+
+        PYCBC_EXCTHROW_ARGS();
+        return NULL;
+    }
+    return query_common(self, params, nparams, NULL, prepared, cross_bucket);
+}
+
+PyObject *
+pycbc_Bucket__cbas_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
+{
+    const char *host = NULL;
+    const char *params = NULL;
+    pycbc_strlen_t nparams = 0;
+    static char *kwlist[] = { "params", "host", NULL };
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s", kwlist,
+        &params, &nparams, &host)) {
+        PYCBC_EXCTHROW_ARGS();
+        return NULL;
+    }
+    return query_common(self, params, nparams, host, 0, 0);
 }

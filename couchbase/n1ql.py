@@ -288,14 +288,17 @@ class N1QLRequest(object):
         self.__raw = False
         self.__meta_received = False
 
+    def _submit_query(self):
+        return self._parent._n1ql_query(self._params.encoded,
+                                        not self._params.adhoc,
+                                        cross_bucket=self._params.cross_bucket)
+
     def _start(self):
         if self._mres:
             return
 
-        self._mres = self._parent._n1ql_query(
-            self._params.encoded, not self._params.adhoc,
-            cross_bucket=self._params.cross_bucket)
-
+        self._mres = self._submit_query()
+        self._mres = self._submit_query()
         self.__raw = self._mres[None]
 
     @property

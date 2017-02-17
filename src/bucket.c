@@ -513,6 +513,7 @@ static PyMethodDef Bucket_TABLE_methods[] = {
         OPFUNC(_http_request, "Internal routine for HTTP requests"),
         OPFUNC(_view_request, "Internal routine for view requests"),
         OPFUNC(_n1ql_query, "Internal routine for N1QL queries"),
+        OPFUNC(_cbas_query, "Internal routine for analytics queries"),
         OPFUNC(_fts_query, "Internal routine for Fulltext queries"),
 
         OPFUNC(_ixmanage, "Internal routine for managing indexes"),

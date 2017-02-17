@@ -1417,6 +1417,12 @@ class Bucket(_Base):
         itercls = kwargs.pop('itercls', N1QLRequest)
         return itercls(query, self, *args, **kwargs)
 
+    def _analytics_query(self, query, host):
+        from cbas import AnalyticsRequest, AnalyticsQuery
+        if not isinstance(query, AnalyticsQuery):
+            query = AnalyticsQuery(query)
+        return AnalyticsRequest(query, host, self)
+
     def search(self, index, query, **kwargs):
         """
         Perform full-text searches

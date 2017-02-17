@@ -351,6 +351,7 @@ PYCBC_DECL_OP(observe_multi);
 
 /* n1ql.c */
 PYCBC_DECL_OP(_n1ql_query);
+PYCBC_DECL_OP(_cbas_query);
 
 /* fts.c */
 PYCBC_DECL_OP(_fts_query);
