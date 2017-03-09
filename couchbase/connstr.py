@@ -122,9 +122,12 @@ class ConnectionString(object):
         for k, v in self.options.items():
             opt_dict[k] = v[0]
 
-        ss = '{scheme}://{hosts}/{bucket}?{options}'.format(
-            scheme=self.scheme, hosts=','.join(self.hosts), bucket=self.bucket,
-            options=urlencode(opt_dict))
+        ss = '{0}://{1}'.format(self.scheme, ','.join(self.hosts))
+        if self.bucket:
+            ss += '/' + self.bucket
+
+        ss += '?' + urlencode(opt_dict)
+
         return ss
 
     def __str__(self):
