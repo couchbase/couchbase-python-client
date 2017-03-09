@@ -19,6 +19,20 @@ import weakref
 from couchbase.admin import Admin
 from couchbase.bucket import Bucket
 from couchbase.connstr import ConnectionString
+from couchbase.exceptions import CouchbaseError
+
+
+class MixedAuthError(CouchbaseError):
+    """
+    Cannot use old and new style auth together in the same cluster
+    """
+    pass
+
+
+class NoBucketError(CouchbaseError):
+    """
+    Operation requires at least a single bucket to be open
+    """
 
 
 class Cluster(object):
@@ -65,12 +79,12 @@ class Cluster(object):
         connstr = ConnectionString.parse(str(self.connstr))
         connstr.bucket = bucket_name
         if username:
-            connstr.options['username'] = username
+            connstr.set_option('username', username)
 
         if 'password' in kwargs:
             if isinstance(self.authenticator, PasswordAuthenticator):
-                raise ValueError("Cannot override "
-                                 "PasswordAuthenticators password")
+                raise MixedAuthError("Cannot override "
+                                     "PasswordAuthenticators password")
         else:
             kwargs['password'] = password
         rv = self.bucket_class(str(connstr), **kwargs)
@@ -100,14 +114,18 @@ class Cluster(object):
 
         query.cross_bucket = True
 
+        to_purge = []
         for k, v in self._buckets.items():
             bucket = v()
             if bucket:
                 return bucket.n1ql_query(query, *args, **kwargs)
             else:
-                del self._buckets[k]
+                to_purge.append(k)
 
-        raise Exception('Must have at least one active bucket for query')
+        for k in to_purge:
+            del self._buckets[k]
+
+        raise NoBucketError('Must have at least one active bucket for query')
 
 
 class Authenticator(object):
@@ -119,7 +137,7 @@ class Authenticator(object):
         :param bucket: The bucket to act as context
         :return: A tuple of `username, password`
         """
-        raise NotImplemented()
+        raise NotImplementedError()
 
 
 class PasswordAuthenticator(Authenticator):

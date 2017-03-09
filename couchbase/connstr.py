@@ -112,6 +112,18 @@ class ConnectionString(object):
         else:
             return -1
 
+    def get_option(self, optname, default=None):
+        try:
+            return self.options[optname][0]
+        except KeyError:
+            return default
+
+    def set_option(self, optname, value):
+        self.options[optname] = [value]
+
+    def clear_option(self, optname):
+        self.options.pop(optname, None)
+
     def encode(self):
         """
         Encodes the current state of the object into a string.
