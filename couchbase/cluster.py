@@ -89,6 +89,10 @@ class Cluster(object):
             kwargs['password'] = password
         rv = self.bucket_class(str(connstr), **kwargs)
         self._buckets[bucket_name] = weakref.ref(rv)
+        if isinstance(self.authenticator, ClassicAuthenticator):
+            for bucket, passwd in self.authenticator.buckets.items():
+                if passwd:
+                    rv.add_bucket_creds(bucket, passwd)
         return rv
 
     def cluster_manager(self):
