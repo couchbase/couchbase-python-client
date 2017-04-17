@@ -1087,6 +1087,31 @@ class Bucket(_Base):
                                   persist_to=persist_to,
                                   replicate_to=replicate_to)
 
+    def uppend_multi(self, keys, ttl = 0, format=None, persist_to=0, replicate_to=0):
+        """Variant of :meth:`append_multi`; when appending to multiple keys,
+            if the keys do not exist, insert them instead. 
+        """
+        
+        reinsert_keys = []
+        try:
+            return _Base.append_multi(self, keys, format=format,
+                                  persist_to=persist_to,
+                                  replicate_to=replicate_to)
+            
+        except CouchbaseError as exc:
+            for k, res in exc.all_results.items():
+                if res.success:
+                    pass
+                else:
+                    reinsert_keys.append(k)
+    
+        if len(reinsert_keys) > 0:
+            return _Base.insert_multi(self, {k: keys[k] for k in reinsert_keys}, ttl=ttl, format=format,
+                                  persist_to=persist_to,
+                                  replicate_to=replicate_to)
+
+
+
     def prepend_multi(self, keys, format=None, persist_to=0, replicate_to=0):
         """Prepend to multiple keys. Multi variant of :meth:`prepend`
 
