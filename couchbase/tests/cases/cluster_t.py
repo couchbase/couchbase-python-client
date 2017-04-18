@@ -19,6 +19,7 @@ from couchbase.tests.base import CouchbaseTestCase
 from couchbase.connstr import ConnectionString
 from couchbase.cluster import Cluster, ClassicAuthenticator,\
     PasswordAuthenticator, NoBucketError, MixedAuthError
+import gc
 
 
 class ClusterTest(CouchbaseTestCase):
@@ -55,6 +56,8 @@ class ClusterTest(CouchbaseTestCase):
 
         # Should fail again once the bucket has been GC'd
         del cb
+        gc.collect()
+
         self.assertRaises(NoBucketError, cluster.n1ql_query, 'select mockrow')
 
     def test_no_mixed_auth(self):
