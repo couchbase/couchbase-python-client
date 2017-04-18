@@ -497,7 +497,7 @@ class BucketManager(object):
             return IxmgmtRequest(self._cb, 'build', info).execute()
 
     def n1ql_index_watch(self, indexes,
-                         timeout=30, interval=1, watch_primary=False):
+                         timeout=30, interval=0.2, watch_primary=False):
         """
         Await completion of index building
 
