@@ -370,6 +370,11 @@ value_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
             eflags = gresp->itmflags;
         }
 
+        if (res->value) {
+            Py_DECREF(res->value);
+            res->value = NULL;
+        }
+
         rv = pycbc_tc_decode_value(mres->parent, gresp->value, gresp->nvalue,
             eflags, &res->value);
         if (rv < 0) {
