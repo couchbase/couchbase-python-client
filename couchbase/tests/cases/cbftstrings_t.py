@@ -101,6 +101,10 @@ class FTStringsTest(CouchbaseTestCase):
                          cbft.Params(sort=['f1', 'f2', '-_score']
                                      ).as_encodable('ix'))
 
+        self.assertEqual({'sort': ['f1', 'f2', '-_score']},
+                         cbft.Params(sort=cbft.SortString(
+                             'f1', 'f2', '-_score')).as_encodable('ix'))
+
         p = cbft.Params(facets={
             'term': cbft.TermFacet('somefield', limit=10),
             'dr': cbft.DateFacet('datefield').add_range('name', 'start', 'end'),
@@ -293,3 +297,15 @@ class FTStringsTest(CouchbaseTestCase):
             }
         }
         self.assertEqual(exp, got)
+
+    def test_advanced_sort(self):
+        self.assertEqual({'by': 'score'}, cbft.SortScore().as_encodable())
+        self.assertEqual({'by': 'score', 'descending': False},
+                         cbft.SortScore(descending=False).as_encodable())
+
+        self.assertEqual({'by': 'id'}, cbft.SortID().as_encodable())
+
+        self.assertEqual({'by': 'field', 'field': 'foo'},
+                         cbft.SortField('foo').as_encodable())
+        self.assertEqual({'by': 'field', 'field': 'foo', 'type': 'int'},
+                         cbft.SortField('foo', type='int').as_encodable())

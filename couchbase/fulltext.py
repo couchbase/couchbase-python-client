@@ -244,6 +244,90 @@ class _FacetDict(dict):
         return self[key]
 
 
+class Sort(object):
+    def __init__(self, by, **kwargs):
+        self._json_ = {
+            'by': by
+        }
+        _assign_kwargs(self, kwargs)
+
+    descending = _genprop(bool, 'descending', doc='Sort using descending order')
+
+    def as_encodable(self):
+        return self._json_
+
+
+class SortString(Sort):
+    """
+    Sorts by a list of fields. This is similar to specifying a list of
+    fields in :attr:`Params.sort`
+    """
+    def __init__(self, *fields):
+        self._json_ = list(fields)
+
+
+class SortScore(Sort):
+    """
+    Sorts by the score of each match.
+    """
+    def __init__(self, **kwargs):
+        super(SortScore, self).__init__('score', **kwargs)
+
+
+class SortID(Sort):
+    """
+    Sorts lexically by the document ID of each match
+    """
+    def __init__(self, **kwargs):
+        super(SortID, self).__init__('id', **kwargs)
+
+
+class SortField(Sort):
+    """
+    Sorts according to the properties of a given field
+    """
+    def __init__(self, field, **kwargs):
+        kwargs['field'] = field
+        super(SortField, self).__init__('field', **kwargs)
+
+    field = _genprop_str('field', doc='Field to sort by')
+    type = _genprop_str('type', doc='Coerce field to this type')
+    mode = _genprop_str('mode')
+    missing = _genprop_str('missing')
+
+
+def _location_conv(l):
+    if len(l) != 2:
+        raise ValueError('Require list of two numbers')
+    return [float(l[0]), float(l[1])]
+
+
+class SortGeoDistance(Sort):
+    """
+    Sorts matches based on their distance from a specific location
+    """
+    def __init__(self, location, field, **kwargs):
+        kwargs.update(location=location, field=field)
+        super(SortGeoDistance, self).__init__('geo_distance', **kwargs)
+
+    location = _genprop(_location_conv, 'location',
+                        doc='`(lat, lon)` of point of origin')
+    field = _genprop_str('field', doc='Field that contains the distance')
+    unit = _genprop_str('unit', doc='Distance unit used for measuring')
+
+
+class SortRaw(Sort):
+    def __init__(self, raw):
+        self._json_ = raw
+
+
+def _convert_sort(s):
+    if isinstance(s, Sort):
+        return s
+    else:
+        return list(s)
+
+
 class Params(object):
     """
     Generic parameters and query modifiers. Keyword arguments may be used
@@ -287,6 +371,13 @@ class Params(object):
                 }
             }
             self._json_.setdefault('ctl', {})['consistency'] = sv_val
+
+        if self.sort:
+            if isinstance(self.sort, Sort):
+                self._json_['sort'] = self.sort.as_encodable()
+            else:
+                self._json_['sort'] = self.sort
+
         return self._json_
 
     limit = _genprop(int, 'size', doc='Maximum number of results to return')
@@ -313,8 +404,9 @@ class Params(object):
         """)
 
     sort = _genprop(
-        list, 'sort', doc="""
-        Specify a list of fields by which to sort the results
+        _convert_sort, 'sort', doc="""
+        Specify a list of fields by which to sort the results. Can also be
+        a :class:`Sort` class
         """
     )
 
@@ -591,12 +683,6 @@ class RegexQuery(_SingleQuery):
 RegexpQuery = RegexQuery
 
 
-def _location_conv(l):
-    if len(l) != 2:
-        raise ValueError('Require list of two numbers')
-    return [float(l[0]), float(l[1])]
-
-
 @_with_fields('field')
 class GeoDistanceQuery(Query):
     def __init__(self, distance, location, **kwargs):
@@ -608,7 +694,7 @@ class GeoDistanceQuery(Query):
         super(GeoDistanceQuery, self).__init__()
         kwargs['distance'] = distance
         kwargs['location'] = location
-        self._assign_kwargs(**kwargs)
+        _assign_kwargs(self, **kwargs)
 
     location = _genprop(_location_conv, 'location', doc='Location')
     distance = _genprop_str('distance')
@@ -620,7 +706,7 @@ class GeoBoundingBoxQuery(Query):
         super(GeoBoundingBoxQuery, self).__init__()
         kwargs['top_left'] = top_left
         kwargs['bottom_right'] = bottom_right
-        self._assign_kwargs(**kwargs)
+        _assign_kwargs(self, **kwargs)
 
     top_left = _genprop(
         _location_conv, 'top_left',
@@ -742,12 +828,12 @@ class TermRangeQuery(_RangeQuery):
 
     start = _genprop_str('start', doc='Lower range of term')
 
-    end = _genprop('end', doc='Upper range of term')
+    end = _genprop_str('end', doc='Upper range of term')
 
-    start_inclusive = _genprop_str(
+    start_inclusive = _genprop(
         bool, 'inclusive_start', doc='If :attr:`start` is inclusive')
 
-    end_inclusive = _genprop_str(
+    end_inclusive = _genprop(
         bool, 'inclusive_end', doc='If :attr:`end` is inclusive')
 
     _MINMAX = 'start', 'end'
