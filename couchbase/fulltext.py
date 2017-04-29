@@ -591,6 +591,45 @@ class RegexQuery(_SingleQuery):
 RegexpQuery = RegexQuery
 
 
+def _location_conv(l):
+    if len(l) != 2:
+        raise ValueError('Require list of two numbers')
+    return [float(l[0]), float(l[1])]
+
+
+@_with_fields('field')
+class GeoDistanceQuery(Query):
+    def __init__(self, distance, location, **kwargs):
+        """
+        Search for items within a given radius
+        :param distance: The distance string specifying the radius
+        :param location: A tuple of `(lon, lat)` indicating point of origin
+        """
+        super(GeoDistanceQuery, self).__init__()
+        kwargs['distance'] = distance
+        kwargs['location'] = location
+        self._assign_kwargs(**kwargs)
+
+    location = _genprop(_location_conv, 'location', doc='Location')
+    distance = _genprop_str('distance')
+
+
+@_with_fields('field')
+class GeoBoundingBoxQuery(Query):
+    def __init__(self, top_left, bottom_right, **kwargs):
+        super(GeoBoundingBoxQuery, self).__init__()
+        kwargs['top_left'] = top_left
+        kwargs['bottom_right'] = bottom_right
+        self._assign_kwargs(**kwargs)
+
+    top_left = _genprop(
+        _location_conv, 'top_left',
+        doc='Tuple of `(lat, lon)` for the top left corner of bounding box')
+    bottom_right = _genprop(
+        _location_conv, 'bottom_right',
+        doc='Tuple of `(lat, lon`) for the bottom right corner of bounding box')
+
+
 class _RangeQuery(Query):
     __metaclass__ = abc.ABCMeta
 
@@ -629,7 +668,7 @@ class NumericRangeQuery(_RangeQuery):
         float, 'min', doc='Lower bound of range. See :attr:`min_inclusive`')
 
     min_inclusive = _genprop(
-        bool, 'min_inclusive',
+        bool, 'inclusive_min',
         doc='Whether matches are inclusive of lower bound')
 
     max = _genprop(
@@ -637,7 +676,7 @@ class NumericRangeQuery(_RangeQuery):
         doc='Upper bound of range. See :attr:`max_inclusive`')
 
     max_inclusive = _genprop(
-        bool, 'max_inclusive',
+        bool, 'inclusive_max',
         doc='Whether matches are inclusive of upper bound')
 
     _MINMAX = 'min', 'max'
@@ -673,10 +712,10 @@ class DateRangeQuery(_RangeQuery):
     end = _genprop_str('end', doc='Upper bound datetime')
 
     start_inclusive = _genprop(
-        bool, 'start_inclusive', doc='If :attr:`start` is inclusive')
+        bool, 'inclusive_start', doc='If :attr:`start` is inclusive')
 
     end_inclusive = _genprop(
-        bool, 'end_inclusive', doc='If :attr:`end` is inclusive')
+        bool, 'inclusive_end', doc='If :attr:`end` is inclusive')
 
     datetime_parser = _genprop_str(
         'datetime_parser',
@@ -688,6 +727,28 @@ class DateRangeQuery(_RangeQuery):
         Ensure to specify :attr:`start` and :attr:`end` in a format suitable
         for the given parser.
         """)
+
+    _MINMAX = 'start', 'end'
+
+
+@_with_fields('field')
+class TermRangeQuery(_RangeQuery):
+    """
+    Search documents for fields containing a value within a given
+    lexical range.
+    """
+    def __init__(self, start=None, end=None, **kwargs):
+        super(TermRangeQuery, self).__init__(start=start, end=end, **kwargs)
+
+    start = _genprop_str('start', doc='Lower range of term')
+
+    end = _genprop('end', doc='Upper range of term')
+
+    start_inclusive = _genprop_str(
+        bool, 'inclusive_start', doc='If :attr:`start` is inclusive')
+
+    end_inclusive = _genprop_str(
+        bool, 'inclusive_end', doc='If :attr:`end` is inclusive')
 
     _MINMAX = 'start', 'end'
 
