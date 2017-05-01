@@ -23,7 +23,7 @@ from time import time, sleep
 import couchbase._libcouchbase as LCB
 import couchbase.exceptions as E
 from couchbase.user_constants import FMT_JSON
-from couchbase._pyport import ulp
+from couchbase._pyport import ulp, basestring
 
 METHMAP = {
     'GET': LCB.LCB_HTTP_METHOD_GET,
@@ -319,3 +319,66 @@ class Admin(LCB.Bucket):
                                  method='POST',
                                  content_type='application/x-www-form-urlencoded',
                                  content=self._mk_formstr(params))
+
+    def users_get(self):
+        """
+        Retrieve a list of users from the server.
+        :return: :class:`~.HttpResult`. The list of users can be obtained from
+            the returned object's `value` property.
+        """
+        return self.http_request(path='/settings/rbac/users', method='GET')
+
+    def user_upsert(self, userid, password, roles, name=None):
+        """
+        Upsert a user in the cluster
+        :param userid: The user ID
+        :param password: The user password
+        :param roles: A list of roles. A role can either be a simple string,
+            or a list of `(role, bucket)` pairs.
+        :param name: Human-readable name
+        :return: :class:`~.HttpResult`
+
+        .. Creating a new read-only admin user::
+
+            adm.upsert_user('mark', 's3cr3t', ['ro_admin'])
+
+        .. An example of using more complex roles:
+
+            adm.upsert_user('mark', 's3cr3t', [('data_reader', '*'),
+                                               ('data_writer', 'inbox')])
+
+
+        .. warning::
+
+        Due to the asynchronous nature of Couchbase management APIs, it may
+        take a few moments for the new user settings to take effect.
+        """
+        tmplist = []
+        for role in roles:
+            if isinstance(role, basestring):
+                tmplist.append(role)
+            else:
+                tmplist.append('{0}[{1}]'.format(*role))
+
+        role_string = ','.join(tmplist)
+        params = {
+            'roles': role_string,
+            'password': password
+        }
+        if name:
+            params['name'] = name
+
+        form = self._mk_formstr(params)
+        return self.http_request(path='/settings/rbac/users/local/' + userid,
+                                 method='PUT',
+                                 content_type='application/x-www-form-urlencoded',
+                                 content=form)
+
+    def user_remove(self, userid):
+        """
+        Remove a user
+        :param userid: The user ID to remove
+        :return: :class:`~.HttpResult`
+        """
+        return self.http_request(path='/settings/rbac/users/local/' + userid,
+                                 method='DELETE')
