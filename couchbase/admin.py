@@ -163,6 +163,9 @@ class Admin(LCB.Bucket):
             bucket (which persists data and supports replication) or
             `memcached` (which is memory-only and does not support
             replication).
+            Since Couchbase version 5.0, you can also specify
+            `ephemeral`, which is a replicated bucket which does
+            not have strict disk persistence requirements
         :param string bucket_password: The bucket password. This can be
             empty to disable authentication. This can be changed later on
             using :meth:`bucket_update`
@@ -190,7 +193,7 @@ class Admin(LCB.Bucket):
             'flushEnabled': int(flush_enabled),
             'ramQuotaMB': ram_quota
         }
-        if bucket_type in ('couchbase', 'membase'):
+        if bucket_type in ('couchbase', 'membase', 'ephemeral'):
             params['replicaNumber'] = replicas
 
         return self.http_request(
