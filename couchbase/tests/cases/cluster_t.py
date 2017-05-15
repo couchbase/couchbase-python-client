@@ -73,3 +73,9 @@ class ClusterTest(CouchbaseTestCase):
         cluster2, bucket_name = self._create_cluster()
         cb2 = cluster2.open_bucket(bucket_name,
                                    password=self.cluster_info.bucket_password)
+
+    def test_pathless_connstr(self):
+        # Not strictly a cluster test, but relevant
+        connstr = ConnectionString.parse('couchbase://localhost?opt1=val1&opt2=val2')
+        self.assertTrue('opt1' in connstr.options)
+        self.assertTrue('opt2' in connstr.options)

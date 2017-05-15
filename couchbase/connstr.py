@@ -86,11 +86,10 @@ class ConnectionString(object):
 
         up = urlparse(ss)
         path = up.path
+        query = up.query
 
         if '?' in path:
-            path, query = up.path.split('?')
-        else:
-            query = ""
+            path, _ = up.path.split('?')
 
         if path.startswith('/'):
             path = path[1:]

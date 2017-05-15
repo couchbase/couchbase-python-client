@@ -87,6 +87,7 @@ class Cluster(object):
                                      "PasswordAuthenticators password")
         else:
             kwargs['password'] = password
+
         rv = self.bucket_class(str(connstr), **kwargs)
         self._buckets[bucket_name] = weakref.ref(rv)
         if isinstance(self.authenticator, ClassicAuthenticator):
