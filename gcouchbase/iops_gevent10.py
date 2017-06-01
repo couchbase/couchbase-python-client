@@ -28,6 +28,7 @@ REVERSERMAP = {
 
 class GEventIOEvent(IOEvent):
     def __init__(self):
+        super(GEventIOEvent, self).__init__()
         self.ev = get_hub().loop.io(0,0)
 
     def ready_proxy(self, event):
@@ -42,6 +43,7 @@ class GEventIOEvent(IOEvent):
 
 class GEventTimer(TimerEvent):
     def __init__(self):
+        super(GEventTimer, self).__init__()
         self.ev = get_hub().loop.timer(0)
 
     def ready_proxy(self, *args):
