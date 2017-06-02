@@ -5,14 +5,11 @@ from couchbase._libcouchbase import (
     LCB_SDCMD_COUNTER, LCB_SDCMD_REMOVE, LCB_SDCMD_ARRAY_INSERT
 )
 
+import couchbase.priv_constants as _P
+
 # Defined in libcouchbase's headers. We don't want to force a hard dependency
 # on a later version of libcouchbase just for these flags, especially
 # considering that most users will only be using _F_MKDIR_P
-_F_MKDIR_P = 1 << 16
-_F_MKDOC = 1 << 17
-_F_XATTR = 1 << 18
-_F_EXPAND_MACROS = 1 << 19
-_F_ACCESS_DELETED = 1 << 20
 
 _SPECMAP = {}
 for k, v in tuple(globals().items()):
@@ -34,7 +31,7 @@ class Spec(tuple):
                                  ', '.join(details))
 
 
-def _gen_3spec(op, path, xattr=False, _access_deleted=False):
+def _gen_3spec(op, path, xattr=False):
     """
     Returns a Spec tuple suitable for passing to the underlying C extension.
     This variant is called for operations that lack an input value.
@@ -45,15 +42,12 @@ def _gen_3spec(op, path, xattr=False, _access_deleted=False):
     """
     flags = 0
     if xattr:
-        flags |= _F_XATTR
-    if _access_deleted:
-        flags |= _F_ACCESS_DELETED
+        flags |= _P.SDSPEC_F_XATTR
     return Spec(op, path, flags)
 
 
 def _gen_4spec(op, path, value,
-               create_path=False, create_doc=False, xattr=False,
-               _expand_macros=False, _access_deleted=False):
+               create_path=False, xattr=False, _expand_macros=False):
     """
     Like `_gen_3spec`, but also accepts a mandatory value as its third argument
     :param bool _expand_macros: Whether macros in the value should be expanded.
@@ -61,15 +55,11 @@ def _gen_4spec(op, path, value,
     """
     flags = 0
     if create_path:
-        flags |= _F_MKDIR_P
-    if create_doc:
-        flags |= _F_MKDOC
+        flags |= _P.SDSPEC_F_MKDIR_P
     if xattr:
-        flags |= _F_XATTR
+        flags |= _P.SDSPEC_F_XATTR
     if _expand_macros:
-        flags |= _F_EXPAND_MACROS
-    if _access_deleted:
-        flags |= _F_ACCESS_DELETED
+        flags |= _P.SDSPEC_F_EXPANDMACROS
     return Spec(op, path, flags, value)
 
 
@@ -286,3 +276,58 @@ def remove(path, **kwargs):
     :param path: The path to remove
     """
     return _gen_3spec(LCB_SDCMD_REMOVE, path, **kwargs)
+
+
+def get_count(path, **kwargs):
+    """
+    Return the number of items in an dictionary or array
+    :param path: Path to the dictionary or array to count
+
+    This operation is only valid in :cb_bmeth:`lookup_in`
+
+    .. versionadded:: 2.2.5
+    """
+    return _gen_3spec(_P.SDCMD_GET_COUNT, path, **kwargs)
+
+
+def get_fulldoc(**kwargs):
+    """
+    Use this command to retrieve the entire document via subdoc.
+    This command should be used in conjunction with another :meth:`get`
+    command which may retrieve one of the document's XATTRs.
+
+    Example::
+
+        result = cb.lookup_in('docid', SD.get_fulldoc(),
+                              SD.get('mystuff', xattr=True)
+
+        whole_doc = result[0]
+        mystuff = result[1]
+
+
+    .. versionadded:: 2.2.5
+    """
+    return _gen_3spec(_P.SDCMD_GET_FULLDOC, '', **kwargs)
+
+
+def upsert_fulldoc(doc, **kwargs):
+    """
+    Use this command to write the whole document.
+    :param doc: The document to upsert
+
+    This command should be used in conjunction with another :meth:`upsert`
+    (or another mutation command) to write a document's XATTRs.
+
+    Example::
+
+        cb.mutate_in('docid',
+                     SD.upsert_fulldoc({'name': 'Mark'}),
+                     SD.upsert('mymeta._doctype', 'user',
+                               xattr=True, create_parents=True))
+
+    .. versionadded:: 2.2.5
+
+    You can use the `insert_doc` and `upsert_doc` options to further refine
+    conditions for the operation. See :cb_bmeth:`mutate_in`
+    """
+    return _gen_4spec(_P.SDCMD_UPSERT_FULLDOC, '', doc, **kwargs)

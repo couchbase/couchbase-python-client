@@ -268,3 +268,47 @@ class SubdocTest(ConnectionTestCase):
         cb.upsert(key, {'hello': 'world'})
         rv = cb.lookup_in(key, SD.get('nonexist'))
         self.assertTrue(rv.access_ok)
+
+    def test_get_count(self):
+        cb = self.cb
+        key = self.gen_key('get_count')
+
+        cb.upsert(key, [1, 2, 3])
+        self.assertEqual(3, cb.lookup_in(key, SD.get_count(''))[0])
+
+        cb.upsert(key, {'k1': 1, 'k2': 2, 'k3': 3})
+        self.assertEqual(3, cb.lookup_in(key, SD.get_count(''))[0])
+
+    def test_create_doc(self):
+        cb = self.cb
+        key = self.gen_key('create_doc')
+        cb.mutate_in(key, SD.upsert('new.path', 'newval'), upsert_doc=True)
+        self.assertEqual('newval', cb.retrieve_in(key, 'new.path')[0])
+
+        # Check 'insert_doc'
+        self.assertRaises(E.KeyExistsError, cb.mutate_in,
+                          key, SD.upsert('new.path', 'newval'), insert_doc=True)
+
+        cb.remove(key)
+        cb.mutate_in(key, SD.upsert('new.path', 'newval'), insert_doc=True)
+        self.assertEqual('newval', cb.retrieve_in(key, 'new.path')[0])
+
+    def test_fulldoc(self):
+        cb = self.cb
+        key = self.gen_key('fulldoc')
+        cb.mutate_in(key,
+                     SD.upsert_fulldoc({'val': True}),
+                     SD.upsert('my.xattr', 'attrval',
+                               create_parents=True, xattr=True),
+                     insert_doc=True)
+        self.assertEqual(True, cb.retrieve_in(key, 'val')[0])
+
+        self.assertEqual('attrval',
+                         cb.lookup_in(key, SD.get('my.xattr', xattr=True))[0])
+
+        rv = cb.lookup_in(key, SD.get('my.xattr'))
+        self.assertFalse(rv.exists(0))
+
+        # Get the document back
+        rv = cb.lookup_in(key, SD.get_fulldoc())
+        self.assertEqual(True, rv[0]['val'])

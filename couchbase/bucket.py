@@ -32,6 +32,11 @@ from couchbase.n1ql import N1QLQuery, N1QLRequest
 import couchbase.fulltext as _FTS
 from couchbase._pyport import basestring
 import couchbase.subdocument as SD
+import couchbase.priv_constants as _P
+
+
+### Private constants. This is to avoid imposing a dependency requirement
+### For simple flags:
 
 
 def _depr(fn, usage, stacklevel=3):
@@ -766,6 +771,12 @@ class Bucket(_Base):
 
         :param key: The key of the document to modify
         :param specs: A list of specs (See :mod:`.couchbase.subdocument`)
+        :param bool create_doc:
+            Whether the document should be create if it doesn't exist
+        :param bool insert_doc: If the document should be created anew, and the
+            operations performed *only* if it does not exist.
+        :param bool upsert_doc: If the document should be created anew if it
+            does not exist. If it does exist the commands are still executed.
         :param kwargs: CAS, etc.
         :return: A :class:`~.couchbase.result.SubdocResult` object.
 
@@ -778,8 +789,25 @@ class Bucket(_Base):
                          SD.array_addunique('tags', 'dog'),
                          SD.counter('updates', 1))
 
+        .. note::
+
+            The `insert_doc` and `upsert_doc` options are mutually exclusive.
+            Use `insert_doc` when you wish to create a new document with
+            extended attributes (xattrs).
+
         .. seealso:: :mod:`.couchbase.subdocument`
         """
+
+        # Note we don't verify the validity of the options. lcb does that for
+        # us.
+        sdflags = kwargs.pop('_sd_doc_flags', 0)
+
+        if kwargs.pop('insert_doc', False):
+            sdflags |= _P.CMDSUBDOC_F_INSERT_DOC
+        if kwargs.pop('upsert_doc', False):
+            sdflags |= _P.CMDSUBDOC_F_UPSERT_DOC
+
+        kwargs['_sd_doc_flags'] = sdflags
         return super(Bucket, self).mutate_in(key, specs, **kwargs)
 
     def lookup_in(self, key, *specs, **kwargs):

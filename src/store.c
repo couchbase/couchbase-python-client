@@ -19,6 +19,7 @@
 struct storecmd_vars {
     int operation;
     int argopts;
+    unsigned int sd_doc_flags;
     unsigned long ttl;
     PyObject *flagsobj;
     lcb_U64 single_cas;
@@ -198,6 +199,7 @@ handle_multi_mutate(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype
 
     cmd.cas = scv->single_cas;
     cmd.exptime = scv->ttl;
+    cmd.cmdflags |= scv->sd_doc_flags;
     LCB_CMD_SET_KEY(&cmd, keybuf.buffer, keybuf.length);
     rv = pycbc_sd_handle_speclist(self, cv->mres, curkey, curvalue, &cmd);
     PYCBC_PYBUF_RELEASE(&keybuf);
@@ -259,7 +261,7 @@ set_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
 
     static char *kwlist_single[] = {
             "key", "value", "cas", "ttl", "format",
-            "persist_to", "replicate_to",
+            "persist_to", "replicate_to", "_sd_doc_flags",
             NULL
     };
 
@@ -273,10 +275,11 @@ set_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
                                          &persist_to, &replicate_to);
 
     } else {
-        rv = PyArg_ParseTupleAndKeywords(args, kwargs, "OO|KOOBB", kwlist_single,
+        rv = PyArg_ParseTupleAndKeywords(args, kwargs, "OO|KOOBBI", kwlist_single,
                                          &key, &value,
                                          &scv.single_cas, &ttl_O, &scv.flagsobj,
-                                         &persist_to, &replicate_to);
+                                         &persist_to, &replicate_to,
+                                         &scv.sd_doc_flags);
     }
 
     if (!rv) {
