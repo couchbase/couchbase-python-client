@@ -298,7 +298,6 @@ class N1QLRequest(object):
             return
 
         self._mres = self._submit_query()
-        self._mres = self._submit_query()
         self.__raw = self._mres[None]
 
     @property
