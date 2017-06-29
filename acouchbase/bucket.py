@@ -10,8 +10,9 @@ from couchbase.experimental import enabled_or_raise; enabled_or_raise()
 
 
 class Bucket(AsyncBucket):
-    def __init__(self, *args, **kwargs):
-        loop = asyncio.get_event_loop()
+    def __init__(self, *args, loop=None, **kwargs):
+        loop = loop or asyncio.get_event_loop()
+
         super(Bucket, self).__init__(IOPS(loop), *args, **kwargs)
         self._loop = loop
 
