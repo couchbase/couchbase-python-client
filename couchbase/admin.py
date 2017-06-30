@@ -326,7 +326,18 @@ class Admin(LCB.Bucket):
         :return: :class:`~.HttpResult`. The list of users can be obtained from
             the returned object's `value` property.
         """
-        return self.http_request(path='/settings/rbac/users', method='GET')
+        return self.http_request(path='/settings/rbac/users/local',
+                                 method='GET')
+
+    def user_get(self, userid):
+        """
+        Retrieve a user from the server
+        :param userid: The user ID
+        :return: :class:`~.HttpResult`. The user can be obtained from the
+            returned object's `value` property.
+        """
+        return self.http_request(path='/settings/rbac/users/local/' + userid,
+                                 method='GET')
 
     def user_upsert(self, userid, password, roles, name=None):
         """
