@@ -15,7 +15,7 @@ addons:
       - couchbase-precise
     packages:
       - libcouchbase-dev
-      - libcouchbase2-libevent 
+      - libcouchbase2-libevent
 
 install:
   - pip -q install testresources==0.2.7
@@ -37,4 +37,4 @@ script:
 
 notifications:
   email:
-    - mark.nunberg@couchbase.com
+    - mike.goldsmith@couchbase.com

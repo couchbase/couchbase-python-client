@@ -102,7 +102,8 @@ class Cluster(object):
         used to create and manage buckets in the cluster.
         """
         username, password = self.authenticator.get_credentials()
-        return Admin(username, password)
+        connection_string = str(self.connstr)
+        return Admin(username, password, connection_string=connection_string)
 
     def n1ql_query(self, query, *args, **kwargs):
         """

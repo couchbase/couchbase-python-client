@@ -26,6 +26,7 @@ from couchbase.exceptions import (
     CouchbaseNetworkError, HTTPError)
 from couchbase.tests.base import CouchbaseTestCase, SkipTest
 
+
 class AdminSimpleTest(CouchbaseTestCase):
     def setUp(self):
         super(AdminSimpleTest, self).setUp()
@@ -46,6 +47,23 @@ class AdminSimpleTest(CouchbaseTestCase):
         self.assertEqual(htres.http_status, 200)
         self.assertEqual(htres.url, 'pools/')
         self.assertTrue(htres.success)
+
+    def test_connection_string_param(self):
+
+        conn_str = 'http://{0}:{1}'.format(self.cluster_info.host, self.cluster_info.port)
+        admin = Admin('Administrator',
+                      'password',
+                      connection_string=conn_str)
+        self.assertIsNotNone(admin)
+
+    def test_bucket_param(self):
+
+        admin = Admin('Administrator',
+                      'password',
+                      host=self.cluster_info.host,
+                      port=self.cluster_info.port,
+                      bucket='default')
+        self.assertIsNotNone(admin)
 
     def test_bad_request(self):
         self.assertRaises(HTTPError, self.admin.http_request, '/badpath')

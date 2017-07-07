@@ -31,3 +31,4 @@ buildall.py
 _trial*
 *.dSYM
 .idea/
+CouchbaseMock.jar

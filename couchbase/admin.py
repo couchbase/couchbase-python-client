@@ -74,10 +74,17 @@ class Admin(LCB.Bucket):
 
         :return: an instance of :class:`Admin`
         """
+        connection_string = kwargs.pop('connection_string', None)
+        if not connection_string:
+            connection_string = "http://{0}:{1}".format(host, port)
+
+        bucket = kwargs.pop('bucket', 'default')
+        connection_string += "/{0}".format(bucket)
+
         kwargs.update({
             'username': username,
             'password': password,
-            'connection_string': "http://{0}:{1}".format(host, port),
+            'connection_string': connection_string,
             '_conntype': LCB.LCB_TYPE_CLUSTER
         })
         super(Admin, self).__init__(**kwargs)
