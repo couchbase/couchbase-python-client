@@ -194,7 +194,7 @@ class Admin(LCB.Bucket):
         """
         params = {
             'name': name,
-            'type': bucket_type,
+            'bucketType': bucket_type,
             'authType': 'sasl',
             'saslPassword': bucket_password if bucket_password else '',
             'flushEnabled': int(flush_enabled),
