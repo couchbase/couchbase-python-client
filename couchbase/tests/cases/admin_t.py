@@ -19,6 +19,7 @@ import sys
 import os
 
 from couchbase.admin import Admin
+from couchbase.bucket import Bucket
 from couchbase.result import HttpResult
 from couchbase.connstr import ConnectionString
 from couchbase.exceptions import (
@@ -143,3 +144,28 @@ class AdminSimpleTest(CouchbaseTestCase):
         # Remove the bucket
         self.admin.bucket_remove('dummy')
         self.assertRaises(CouchbaseError, self.factory, connstr)
+
+    def test_create_ephemeral_bucket_and_use(self):
+        bucket_name = 'ephemeral'
+        password = 'letmein'
+
+        # create ephemeral test bucket
+        self.admin.bucket_create(name=bucket_name,
+                                 bucket_type='ephemeral',
+                                 ram_quota=100,
+                                 bucket_password=password)
+        self.admin.wait_ready(bucket_name, timeout=10)
+
+        # connect to bucket to ensure we can use it
+        conn_str = "http://{0}:{1}/{2}".format(self.cluster_info.host, self.cluster_info.port, bucket_name)
+        bucket = Bucket(connection_string=conn_str, password=password)
+        self.assertIsNotNone(bucket)
+
+        # create a doc then read it back
+        key = 'mike'
+        doc = {'name': 'mike'}
+        bucket.upsert(key, doc)
+        result = bucket.get(key)
+
+        # original and result should be the same
+        self.assertEqual(doc, result.value)
