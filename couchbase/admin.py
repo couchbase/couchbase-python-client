@@ -24,6 +24,7 @@ import couchbase._libcouchbase as LCB
 import couchbase.exceptions as E
 from couchbase.user_constants import FMT_JSON
 from couchbase._pyport import ulp, basestring
+from couchbase.auth_domain import AuthDomain
 
 METHMAP = {
     'GET': LCB.LCB_HTTP_METHOD_GET,
@@ -327,42 +328,67 @@ class Admin(LCB.Bucket):
                                  content_type='application/x-www-form-urlencoded',
                                  content=self._mk_formstr(params))
 
-    def users_get(self):
+    @staticmethod
+    def _get_management_path(auth_domain, userid=None):
+
+        if auth_domain == AuthDomain.Local:
+            domain = 'local'
+        elif auth_domain == AuthDomain.External:
+            domain = 'external'
+        else:
+            raise E.ArgumentError.pyexc("Unknown Authentication Domain", auth_domain)
+
+        path = '/settings/rbac/users/{0}'.format(domain)
+        if userid is not None:
+            path = '{0}/{1}'.format(path, userid)
+
+        return path
+
+    def users_get(self, domain):
         """
         Retrieve a list of users from the server.
+        :param AuthDomain domain: The authentication domain to retrieve users from.
         :return: :class:`~.HttpResult`. The list of users can be obtained from
             the returned object's `value` property.
         """
-        return self.http_request(path='/settings/rbac/users/local',
+        path = self._get_management_path(domain)
+        return self.http_request(path=path,
                                  method='GET')
 
-    def user_get(self, userid):
+    def user_get(self, domain, userid):
         """
         Retrieve a user from the server
-        :param userid: The user ID
+        :param AuthDomain domain: The authentication domain for the user.
+        :param userid: The user ID.
+        :raise: :exc:`couchbase.exceptions.HTTPError` if the user does not
+            exist.
         :return: :class:`~.HttpResult`. The user can be obtained from the
             returned object's `value` property.
         """
-        return self.http_request(path='/settings/rbac/users/local/' + userid,
+        path = self._get_management_path(domain, userid)
+        return self.http_request(path=path,
                                  method='GET')
 
-    def user_upsert(self, userid, password, roles, name=None):
+    def user_upsert(self, domain, userid, password, roles, name=None):
         """
         Upsert a user in the cluster
+        :param AuthDomain domain: The authentication domain for the user.
         :param userid: The user ID
         :param password: The user password
         :param roles: A list of roles. A role can either be a simple string,
             or a list of `(role, bucket)` pairs.
         :param name: Human-readable name
+        :raise: :exc:`couchbase.exceptions.HTTPError` if the request fails.
         :return: :class:`~.HttpResult`
 
         .. Creating a new read-only admin user::
 
-            adm.upsert_user('mark', 's3cr3t', ['ro_admin'])
+            adm.upsert_user(AuthDomain.Local, 'mark', 's3cr3t', ['ro_admin'])
 
         .. An example of using more complex roles:
 
-            adm.upsert_user('mark', 's3cr3t', [('data_reader', '*'),
+            adm.upsert_user(AuthDomain.Local, 'mark', 's3cr3t',
+                                              [('data_reader', '*'),
                                                ('data_writer', 'inbox')])
 
 
@@ -387,16 +413,21 @@ class Admin(LCB.Bucket):
             params['name'] = name
 
         form = self._mk_formstr(params)
-        return self.http_request(path='/settings/rbac/users/local/' + userid,
+        path = self._get_management_path(domain, userid)
+        return self.http_request(path=path,
                                  method='PUT',
                                  content_type='application/x-www-form-urlencoded',
                                  content=form)
 
-    def user_remove(self, userid):
+    def user_remove(self, domain, userid):
         """
         Remove a user
+        :param AuthDomain domain: The authentication domain for the user.
         :param userid: The user ID to remove
+        :raise: :exc:`couchbase.exceptions.HTTPError` if the user does not
+            exist.
         :return: :class:`~.HttpResult`
         """
-        return self.http_request(path='/settings/rbac/users/local/' + userid,
+        path = self._get_management_path(domain, userid)
+        return self.http_request(path=path,
                                  method='DELETE')

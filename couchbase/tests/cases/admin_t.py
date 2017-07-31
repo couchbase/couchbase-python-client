@@ -26,6 +26,7 @@ from couchbase.exceptions import (
     ArgumentError, AuthError, CouchbaseError,
     CouchbaseNetworkError, HTTPError)
 from couchbase.tests.base import CouchbaseTestCase, SkipTest
+from couchbase.auth_domain import AuthDomain
 
 
 class AdminSimpleTest(CouchbaseTestCase):
@@ -169,3 +170,49 @@ class AdminSimpleTest(CouchbaseTestCase):
 
         # original and result should be the same
         self.assertEqual(doc, result.value)
+
+    def test_build_user_management_path(self):
+
+        path = self.admin._get_management_path(AuthDomain.Local)
+        self.assertEqual('/settings/rbac/users/local', path)
+
+        path = self.admin._get_management_path(AuthDomain.Local, 'user')
+        self.assertEqual('/settings/rbac/users/local/user', path)
+
+        path = self.admin._get_management_path(AuthDomain.Local)
+        self.assertEqual('/settings/rbac/users/local', path)
+
+        path = self.admin._get_management_path(AuthDomain.Local, 'user')
+        self.assertEqual('/settings/rbac/users/local/user', path)
+
+    def test_create_list_get_remove_internal_user(self):
+
+        userid = 'custom-user'
+        password = 's3cr3t'
+        roles = [('data_reader', 'default'), ('data_writer', 'default')]
+
+        # add user
+        self.admin.user_upsert(AuthDomain.Local, userid, password, roles)
+
+        # get all users
+        users = self.admin.users_get(AuthDomain.Local)
+        self.assertIsNotNone(users)
+
+        # get single user
+        user = self.admin.user_get(AuthDomain.Local, userid)
+        self.assertIsNotNone(user)
+
+        # remove user
+        self.admin.user_remove(AuthDomain.Local, userid)
+
+    def test_invalid_domain_raises_argument_error(self):
+
+        userid = 'custom-user'
+        password = 's3cr3t'
+        roles = [('data_reader', 'default'), ('data_writer', 'default')]
+
+        # invalid domain generates argument error
+        self.assertRaises(ArgumentError, self.admin.users_get, None)
+        self.assertRaises(ArgumentError, self.admin.user_get, None, userid)
+        self.assertRaises(ArgumentError, self.admin.user_upsert, None, userid, password, roles)
+        self.assertRaises(ArgumentError, self.admin.user_remove, None, userid)
