@@ -216,3 +216,23 @@ class AdminSimpleTest(CouchbaseTestCase):
         self.assertRaises(ArgumentError, self.admin.user_get, None, userid)
         self.assertRaises(ArgumentError, self.admin.user_upsert, None, userid, password, roles)
         self.assertRaises(ArgumentError, self.admin.user_remove, None, userid)
+
+    def test_user_api_aliases(self):
+
+        userid = 'custom-user'
+        password = 's3cr3t'
+        roles = [('data_reader', 'default'), ('data_writer', 'default')]
+
+        # add user
+        self.admin.upsert_user(AuthDomain.Local, userid, password, roles)
+
+        # get all users
+        users = self.admin.get_users(AuthDomain.Local)
+        self.assertIsNotNone(users)
+
+        # get single user
+        user = self.admin.get_user(AuthDomain.Local, userid)
+        self.assertIsNotNone(user)
+
+        # remove user
+        self.admin.remove_user(AuthDomain.Local, userid)

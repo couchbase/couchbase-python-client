@@ -431,3 +431,10 @@ class Admin(LCB.Bucket):
         path = self._get_management_path(domain, userid)
         return self.http_request(path=path,
                                  method='DELETE')
+
+    # Add aliases to match RFC
+    # Python SDK so far has used object-verb where RFC uses verb-object
+    get_user = user_get
+    get_users = users_get
+    upsert_user = user_upsert
+    remove_user = user_remove
