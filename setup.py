@@ -107,7 +107,7 @@ setup(
     version = pkgversion,
     url="https://github.com/couchbase/couchbase-python-client",
     author="Couchbase, Inc.",
-    author_email="mark.nunberg@couchbase.com",
+    author_email="mike.goldsmith@couchbase.com",
     license="Apache License 2.0",
     description="Python Client for Couchbase",
     long_description=open("README.rst", "r").read(),
