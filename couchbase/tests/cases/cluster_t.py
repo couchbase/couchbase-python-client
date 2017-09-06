@@ -79,3 +79,21 @@ class ClusterTest(CouchbaseTestCase):
         connstr = ConnectionString.parse('couchbase://localhost?opt1=val1&opt2=val2')
         self.assertTrue('opt1' in connstr.options)
         self.assertTrue('opt2' in connstr.options)
+
+    def test_validate_authenticate(self):
+
+        cluster, bucket_name = self._create_cluster()
+        self.assertRaises(ValueError, cluster.authenticate, username=None, password=None)
+        self.assertRaises(ValueError, cluster.authenticate, username='', password='')
+        self.assertRaises(ValueError, cluster.authenticate, username='username', password=None)
+        self.assertRaises(ValueError, cluster.authenticate, username='username', password='')
+        self.assertRaises(ValueError, cluster.authenticate, username=None, password='password')
+        self.assertRaises(ValueError, cluster.authenticate, username='', password='password')
+
+    def test_can_authenticate_with_username_password(self):
+
+        cluster, bucket_name = self._create_cluster()
+        cluster.authenticate(username='Administrator', password='password')
+
+        bucket = cluster.open_bucket(bucket_name)
+        self.assertIsNotNone(bucket)

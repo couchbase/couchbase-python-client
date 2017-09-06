@@ -55,12 +55,21 @@ class Cluster(object):
             raise ValueError('username must be specified in the authenticator, '
                              'not the connection string')
 
-    def authenticate(self, authenticator):
+    def authenticate(self, authenticator=None, username=None, password=None):
         """
         Set the type of authenticator to use when opening buckets or performing
         cluster management operations
         :param authenticator: The new authenticator to use
+        :param username: The username to authenticate with
+        :param password: The password to authenticate with
         """
+        if authenticator is None:
+            if not username:
+                raise ValueError('username must not be empty.')
+            if not password:
+                raise ValueError('password must not be empty.')
+            authenticator = PasswordAuthenticator(username, password)
+
         self.authenticator = authenticator
 
     def open_bucket(self, bucket_name, **kwargs):
