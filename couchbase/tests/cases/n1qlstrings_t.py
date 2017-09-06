@@ -113,3 +113,31 @@ class N1QLStringTest(CouchbaseTestCase):
         # Unset the timeout
         q.timeout = 0
         self.assertFalse('timeout' in q._body)
+
+    def test_scan_cap(self):
+        q = N1QLQuery('SELECT foo')
+        q.scan_cap = 10
+
+        self.assertEqual('10', q._body['scan_cap'])
+        self.assertEqual(10, q.scan_cap)
+
+    def test_pipeline_batch(self):
+        q = N1QLQuery('SELECT foo')
+        q.pipeline_batch = 10
+
+        self.assertEqual('10', q._body['pipeline_batch'])
+        self.assertEqual(10, q.pipeline_batch)
+
+    def test_pipeline_cap(self):
+        q = N1QLQuery('SELECT foo')
+        q.pipeline_cap = 10
+
+        self.assertEqual('10', q._body['pipeline_cap'])
+        self.assertEqual(10, q.pipeline_cap)
+
+    def test_readonly(self):
+        q = N1QLQuery('SELECT foo')
+        q.readonly = True
+
+        self.assertEqual(True, q._body['readonly'])
+        self.assertEqual(True, q.readonly)

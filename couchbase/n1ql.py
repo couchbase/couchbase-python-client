@@ -248,6 +248,74 @@ class N1QLQuery(object):
         """
         return json.dumps(self._body)
 
+    @property
+    def scan_cap(self):
+        """
+        Maximum buffered channel size between the indexer client and the query
+        service for index scans. This parameter controls when to use scan
+        backfill. Use 0 or a negative number to disable.
+
+        Available from Couchbase Server 5.0
+        """
+        value = self._body.get('scan_cap', '0')
+        return int(value)
+
+    @scan_cap.setter
+    def scan_cap(self, value):
+        self._body['scan_cap'] = str(value)
+
+    @property
+    def pipeline_batch(self):
+        """
+        Controls the number of items execution operators can batch for Fetch
+        from the KV.
+
+        Available from Couchbase Server 5.0
+        """
+        value = self._body.get('pipeline_batch', '0')
+        return int(value)
+
+    @pipeline_batch.setter
+    def pipeline_batch(self, value):
+        self._body['pipeline_batch'] = str(value)
+
+    @property
+    def pipeline_cap(self):
+        """
+        Maximum number of items each execution operator can buffer between
+        various operators.
+
+        Available from Couchbase Server 5.0
+        """
+        value = self._body.get('pipeline_cap', '0')
+        return int(value)
+
+    @pipeline_cap.setter
+    def pipeline_cap(self, value):
+        self._body['pipeline_cap'] = str(value)
+
+    @property
+    def readonly(self):
+        """
+        Controls whether a query can change a resulting recordset.
+        If readonly is true, then the following statements are not allowed:
+        CREATE INDEX
+        DROP INDEX
+        INSERT
+        MERGE
+        UPDATE
+        UPSERT
+        DELETE
+
+        Available from Couchbase Server 5.0
+        """
+        value = self._body.get('readonly', False)
+        return value
+
+    @readonly.setter
+    def readonly(self, value):
+        self._body['readonly'] = value
+
     def __repr__(self):
         return ('<{cls} stmt={stmt} at {oid}>'.format(
             cls=self.__class__.__name__,
