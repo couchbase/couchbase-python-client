@@ -84,17 +84,36 @@ Installing
 Using
 -----
 
+Authentication is handled differently depending on what version of Couchbase Server
+you are using:
+
+Couchbase Server < 5.0
+Each bucket can optionally have a password. You may omit the authenticator if you
+are only working with password-less buckets.
+
+.. code-block:: pycon
+    >>> from couchbase.cluster import Cluster, ClassicAuthenticator
+    >>> cluster = Cluster('couchbase://localhost')
+    >>> cluster.authenticate(ClassicAuthenticator(buckets={'bucket-name': 'password'}))
+    >>> bucket = cluster.open_bucket('bucket-name')
+
+Couchbase Server >= 5.0
+Role-Based Access Control (RBAC) provides discrete username and passwords for an
+application that allow fine-grained control. The authenticator is always required.
+
+.. code-block:: pycon
+    >>> from couchbase.cluster import Cluster, PasswordAuthenticator
+    >>> cluster = Cluster('couchbase://localhost')
+    >>> cluster.authenticate(PasswordAuthenticator('username', 'password'))
+    >>> bucket = cluster.open_bucket('bucket-name')
+
 Here's an example code snippet which sets a key and then reads it
 
 .. code-block:: pycon
 
-    >>> from couchbase.bucket import Bucket
-    >>> c = Bucket('couchbase://localhost/default')
-    >>> c
-    <couchbase.bucket.Bucket bucket=default, nodes=['localhost:8091'] at 0x105991cd0>
-    >>> c.upsert("key", "value")
+    >>> bucket.upsert("key", "value")
     OperationResult<RC=0x0, Key=key, CAS=0x31c0e3f3fc4b0000>
-    >>> res = c.get("key")
+    >>> res = bucket.get("key")
     >>> res
     ValueResult<RC=0x0, Key=key, Value=u'value', CAS=0x31c0e3f3fc4b0000, Flags=0x0>
     >>> res.value
@@ -105,9 +124,7 @@ You can also use views
 
 .. code-block:: pycon
 
-    >>> from couchbase.bucket import Bucket
-    >>> c = Bucket('couchbase://localhost/beer-sample')
-    >>> resultset = c.query("beer", "brewery_beers", limit=5)
+    >>> resultset = bucket.query("beer", "brewery_beers", limit=5)
     >>> resultset
     View<Design=beer, View=brewery_beers, Query=Query:'limit=5', Rows Fetched=0>
     >>> for row in resultset: print row.key
