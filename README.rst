@@ -87,21 +87,27 @@ Using
 Authentication is handled differently depending on what version of Couchbase Server
 you are using:
 
+~~~~~~~~~~~~~~~~~~~~~~
 Couchbase Server < 5.0
+~~~~~~~~~~~~~~~~~~~~~~
 Each bucket can optionally have a password. You may omit the authenticator if you
 are only working with password-less buckets.
 
 .. code-block:: pycon
+
     >>> from couchbase.cluster import Cluster, ClassicAuthenticator
     >>> cluster = Cluster('couchbase://localhost')
     >>> cluster.authenticate(ClassicAuthenticator(buckets={'bucket-name': 'password'}))
     >>> bucket = cluster.open_bucket('bucket-name')
 
+~~~~~~~~~~~~~~~~~~~~~~~
 Couchbase Server >= 5.0
+~~~~~~~~~~~~~~~~~~~~~~~
 Role-Based Access Control (RBAC) provides discrete username and passwords for an
 application that allow fine-grained control. The authenticator is always required.
 
 .. code-block:: pycon
+
     >>> from couchbase.cluster import Cluster, PasswordAuthenticator
     >>> cluster = Cluster('couchbase://localhost')
     >>> cluster.authenticate(PasswordAuthenticator('username', 'password'))
