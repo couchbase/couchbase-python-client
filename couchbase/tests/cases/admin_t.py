@@ -96,8 +96,9 @@ class AdminSimpleTest(CouchbaseTestCase):
                           port=self.cluster_info.port)
 
     def test_bad_host(self):
-        self.assertRaises(CouchbaseNetworkError, Admin,
-                          'user', 'pass', host='127.0.0.1', port=1)
+        # admin connections don't really connect until an action is performed
+        admin = Admin('username', 'password', host='127.0.0.1', port=1)
+        self.assertRaises(CouchbaseNetworkError, admin.bucket_info, 'default')
 
     def test_bad_handle(self):
         self.assertRaises(CouchbaseError, self.admin.upsert, "foo", "bar")
