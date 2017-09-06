@@ -282,15 +282,15 @@ class SubdocTest(ConnectionTestCase):
     def test_create_doc(self):
         cb = self.cb
         key = self.gen_key('create_doc')
-        cb.mutate_in(key, SD.upsert('new.path', 'newval'), upsert_doc=True)
+        cb.mutate_in(key, SD.upsert('new.path', 'newval'), upsert_document=True)
         self.assertEqual('newval', cb.retrieve_in(key, 'new.path')[0])
 
-        # Check 'insert_doc'
+        # Check 'insert_document'
         self.assertRaises(E.KeyExistsError, cb.mutate_in,
-                          key, SD.upsert('new.path', 'newval'), insert_doc=True)
+                          key, SD.upsert('new.path', 'newval'), insert_document=True)
 
         cb.remove(key)
-        cb.mutate_in(key, SD.upsert('new.path', 'newval'), insert_doc=True)
+        cb.mutate_in(key, SD.upsert('new.path', 'newval'), insert_document=True)
         self.assertEqual('newval', cb.retrieve_in(key, 'new.path')[0])
 
     def test_fulldoc(self):
@@ -300,7 +300,7 @@ class SubdocTest(ConnectionTestCase):
                      SD.upsert_fulldoc({'val': True}),
                      SD.upsert('my.xattr', 'attrval',
                                create_parents=True, xattr=True),
-                     insert_doc=True)
+                     insert_document=True)
         self.assertEqual(True, cb.retrieve_in(key, 'val')[0])
 
         self.assertEqual('attrval',
