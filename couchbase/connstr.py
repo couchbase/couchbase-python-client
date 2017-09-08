@@ -137,7 +137,8 @@ class ConnectionString(object):
         if self.bucket:
             ss += '/' + self.bucket
 
-        ss += '?' + urlencode(opt_dict)
+        # URL encode options then decoded forward slash /
+        ss += '?' + urlencode(opt_dict).replace('%2F', '/')
 
         return ss
 
