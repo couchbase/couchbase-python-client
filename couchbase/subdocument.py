@@ -327,7 +327,7 @@ def upsert_fulldoc(doc, **kwargs):
 
     .. versionadded:: 2.2.5
 
-    You can use the `insert_document` and `upsert_document` options to further refine
+    You can use the `insert_doc` and `upsert_doc` options to further refine
     conditions for the operation. See :cb_bmeth:`mutate_in`
     """
     return _gen_4spec(_P.SDCMD_UPSERT_FULLDOC, '', doc, **kwargs)

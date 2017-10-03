@@ -771,9 +771,11 @@ class Bucket(_Base):
 
         :param key: The key of the document to modify
         :param specs: A list of specs (See :mod:`.couchbase.subdocument`)
-        :param bool insert_document: If the document should be created anew, and the
+        :param bool create_doc:
+            Whether the document should be create if it doesn't exist
+        :param bool insert_doc: If the document should be created anew, and the
             operations performed *only* if it does not exist.
-        :param bool upsert_document: If the document should be created anew if it
+        :param bool upsert_doc: If the document should be created anew if it
             does not exist. If it does exist the commands are still executed.
         :param kwargs: CAS, etc.
         :return: A :class:`~.couchbase.result.SubdocResult` object.
@@ -789,8 +791,8 @@ class Bucket(_Base):
 
         .. note::
 
-            The `insert_document` and `upsert_document` options are mutually exclusive.
-            Use `insert_document` when you wish to create a new document with
+            The `insert_doc` and `upsert_doc` options are mutually exclusive.
+            Use `insert_doc` when you wish to create a new document with
             extended attributes (xattrs).
 
         .. seealso:: :mod:`.couchbase.subdocument`
@@ -800,9 +802,9 @@ class Bucket(_Base):
         # us.
         sdflags = kwargs.pop('_sd_doc_flags', 0)
 
-        if kwargs.pop('insert_document', False):
+        if kwargs.pop('insert_doc', False):
             sdflags |= _P.CMDSUBDOC_F_INSERT_DOC
-        if kwargs.pop('upsert_document', False):
+        if kwargs.pop('upsert_doc', False):
             sdflags |= _P.CMDSUBDOC_F_UPSERT_DOC
 
         kwargs['_sd_doc_flags'] = sdflags
