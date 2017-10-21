@@ -26,5 +26,6 @@ SDSPEC_F_XATTR = 1 << 18
 SDSPEC_F_EXPANDMACROS = 1 << 19
 
 SDCMD_GET_COUNT = 12
+# Not exposed in public API but reserved for future use.
 SDCMD_GET_FULLDOC = 13
 SDCMD_UPSERT_FULLDOC = 14

@@ -292,23 +292,3 @@ class SubdocTest(ConnectionTestCase):
         cb.remove(key)
         cb.mutate_in(key, SD.upsert('new.path', 'newval'), insert_doc=True)
         self.assertEqual('newval', cb.retrieve_in(key, 'new.path')[0])
-
-    def test_fulldoc(self):
-        cb = self.cb
-        key = self.gen_key('fulldoc')
-        cb.mutate_in(key,
-                     SD.upsert_fulldoc({'val': True}),
-                     SD.upsert('my.xattr', 'attrval',
-                               create_parents=True, xattr=True),
-                     insert_doc=True)
-        self.assertEqual(True, cb.retrieve_in(key, 'val')[0])
-
-        self.assertEqual('attrval',
-                         cb.lookup_in(key, SD.get('my.xattr', xattr=True))[0])
-
-        rv = cb.lookup_in(key, SD.get('my.xattr'))
-        self.assertFalse(rv.exists(0))
-
-        # Get the document back
-        rv = cb.lookup_in(key, SD.get_fulldoc())
-        self.assertEqual(True, rv[0]['val'])
