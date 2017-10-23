@@ -140,6 +140,7 @@ MultiResultType__init__(pycbc_MultiResult *self, PyObject *args, PyObject *kwarg
     self->exceptions = NULL;
     self->errop = NULL;
     self->mropts = 0;
+    self->err_info = NULL;
 
     return 0;
 }
@@ -150,6 +151,7 @@ MultiResult_dealloc(pycbc_MultiResult *self)
     Py_XDECREF(self->parent);
     Py_XDECREF(self->exceptions);
     Py_XDECREF(self->errop);
+    Py_XDECREF(self->err_info);
     pycbc_multiresult_destroy_dict(self);
 }
 
@@ -201,6 +203,7 @@ AsyncResult__init__(pycbc_AsyncResult *self, PyObject *args, PyObject *kwargs)
     self->callback = NULL;
     self->errback = NULL;
     self->base.mropts |= PYCBC_MRES_F_ASYNC;
+    self->base.err_info = NULL;
     return 0;
 }
 
@@ -280,8 +283,8 @@ pycbc_multiresult_adderr(pycbc_MultiResult* mres)
 /**
  * This function raises exceptions from the MultiResult object, as required
  */
-int
-pycbc_multiresult_maybe_raise(pycbc_MultiResult *self)
+int pycbc_multiresult_maybe_raise2(pycbc_MultiResult *self,
+                                   pycbc_enhanced_err_info *err_info)
 {
     PyObject *type = NULL, *value = NULL, *traceback = NULL;
 
@@ -306,7 +309,11 @@ pycbc_multiresult_maybe_raise(pycbc_MultiResult *self)
         pycbc_Result *res = (pycbc_Result*)self->errop;
 
         /** Craft an exception based on the operation */
-        PYCBC_EXC_WRAP_KEY(PYCBC_EXC_LCBERR, res->rc, "Operational Error", res->key);
+        PYCBC_EXC_WRAP_KEY_ERR_INFO(PYCBC_EXC_LCBERR,
+                                    res->rc,
+                                    "Operational Error",
+                                    res->key,
+                                    err_info ? err_info : self->err_info);
 
         /** Now we have an exception. Let's fetch it back */
         PyErr_Fetch(&type, &value, &traceback);
@@ -332,6 +339,11 @@ pycbc_multiresult_maybe_raise(pycbc_MultiResult *self)
     return 1;
 }
 
+int pycbc_multiresult_maybe_raise(pycbc_MultiResult *self)
+{
+    return pycbc_multiresult_maybe_raise2(self, NULL);
+}
+
 PyObject *
 pycbc_multiresult_get_result(pycbc_MultiResult *self)
 {
@@ -355,13 +367,12 @@ pycbc_multiresult_get_result(pycbc_MultiResult *self)
     return value;
 }
 
-void
-pycbc_asyncresult_invoke(pycbc_AsyncResult *ares)
+void pycbc_asyncresult_invoke(pycbc_AsyncResult *ares,
+                              pycbc_enhanced_err_info *err_info)
 {
     PyObject *argtuple;
     PyObject *cbmeth;
-
-    if (!pycbc_multiresult_maybe_raise(&ares->base)) {
+    if (!pycbc_multiresult_maybe_raise2(&ares->base, err_info)) {
         /** All OK */
         PyObject *eres = pycbc_multiresult_get_result(&ares->base);
         cbmeth = ares->callback;

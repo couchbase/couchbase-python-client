@@ -124,6 +124,8 @@ class CouchbaseError(Exception):
         self.key = params.get('key', None)
         self.objextra = params.get('objextra', None)
         self.message = params.get('message', None)
+        self.context = params.get('context',None)
+        self.ref = params.get('ref',None)
 
     @classmethod
     def pyexc(cls, message=None, obj=None, inner=None):
@@ -219,6 +221,12 @@ class CouchbaseError(Exception):
 
         if self.objextra:
             details.append("OBJ={0}".format(repr(self.objextra)))
+
+        if self.context:
+            details.append("Context={0}".format(self.context))
+
+        if self.ref:
+            details.append("Ref={0}".format(self.ref))
 
         s = "<{0}>".format(", ".join(details))
         return s

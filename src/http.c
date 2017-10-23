@@ -135,9 +135,13 @@ pycbc_httpresult_complete(pycbc_HttpResult *htres, pycbc_MultiResult *mres,
     }
 
     if (should_raise) {
-        PYCBC_EXC_WRAP_EX(err ? PYCBC_EXC_LCBERR : PYCBC_EXC_HTTP, err,
+        PYCBC_EXC_WRAP_EX(err ? PYCBC_EXC_LCBERR : PYCBC_EXC_HTTP,
+                          err,
                           "HTTP Request failed. Examine 'objextra' for "
-                          "full result", htres->key, (PyObject*)htres);
+                          "full result",
+                          htres->key,
+                          (PyObject *)htres,
+                          NULL);
         pycbc_multiresult_adderr(mres);
     }
 
@@ -153,7 +157,7 @@ pycbc_httpresult_complete(pycbc_HttpResult *htres, pycbc_MultiResult *mres,
         pycbc_AsyncResult *ares = (pycbc_AsyncResult *)mres;
         ares->nops--;
         Py_INCREF(ares);
-        pycbc_asyncresult_invoke(ares);
+        pycbc_asyncresult_invoke(ares, NULL);
         /* We don't handle the GIL in async mode */
     }
 }
