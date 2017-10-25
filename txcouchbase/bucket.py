@@ -25,6 +25,7 @@ from twisted.python.failure import Failure
 from couchbase.async.bucket import AsyncBucket
 from couchbase.async.view import AsyncViewBase
 from couchbase.async.n1ql import AsyncN1QLRequest
+from couchbase.async.fulltext import AsyncSearchRequest
 from couchbase.async.events import EventQueue
 from couchbase.exceptions import CouchbaseError
 from txcouchbase.iops import v0Iops
@@ -94,6 +95,12 @@ class BatchedView(BatchedRowMixin, AsyncViewBase):
 class BatchedN1QLRequest(BatchedRowMixin, AsyncN1QLRequest):
     def __init__(self, *args, **kwargs):
         AsyncN1QLRequest.__init__(self, *args, **kwargs)
+        BatchedRowMixin.__init__(self, *args, **kwargs)
+
+
+class BatchedSearchRequest(BatchedRowMixin, AsyncSearchRequest):
+    def __init__(self, *args, **kwargs):
+        AsyncSearchRequest.__init__(self, *args, **kwargs)
         BatchedRowMixin.__init__(self, *args, **kwargs)
 
 
@@ -334,6 +341,66 @@ class RawBucket(AsyncBucket):
 
         kwargs['itercls'] = BatchedN1QLRequest
         o = super(RawBucket, self).n1ql_query(*args, **kwargs)
+        o.start()
+        return o._getDeferred()
+
+    def searchQueryEx(self, cls, *args, **kwargs):
+        """
+        Experimental Method
+
+        Execute a Search query providing a custom handler for rows.
+
+        This method allows you to define your own subclass (of
+        :class:`~AsyncSearchRequest`) which can handle rows as they are
+        received from the network.
+
+        :param cls: The subclass (not instance) to use
+        :param args: Positional arguments for the class constructor
+        :param kwargs: Keyword arguments for the class constructor
+
+        .. seealso:: :meth:`search`, around which this method wraps
+        """
+        kwargs['itercls'] = cls
+        o = super(AsyncBucket, self).search(*args, **kwargs)
+        if not self.connected:
+            self.connect().addCallback(lambda x: o.start())
+        else:
+            o.start()
+        return o
+
+    def searchQueryAll(self, *args, **kwargs):
+        """
+        Experimental Method
+
+        Execute a Search query, retrieving all rows.
+
+        This method returns a :class:`Deferred` object which is executed
+        with a :class:`~.SearchRequest` object. The object may be iterated
+        over to yield the rows in the result set.
+
+        This method is similar to :meth:`~couchbase.bucket.Bucket.search`
+        in its arguments.
+
+        Example::
+
+            def handler(req):
+                for row in req:
+                    # ... handle row
+
+            d = cb.search('name', ft.MatchQuery('nosql'), limit=10)
+            d.addCallback(handler)
+
+        :return: A :class:`Deferred`
+
+        .. seealso:: :meth:`~couchbase.bucket.Bucket.search`
+        """
+
+        if not self.connected:
+            cb = lambda x: self.searchQueryAll(*args, **kwargs)
+            return self.connect().addCallback(cb)
+
+        kwargs['itercls'] = BatchedSearchRequest
+        o = super(AsyncBucket, self).search(*args, **kwargs)
         o.start()
         return o._getDeferred()
 
