@@ -305,6 +305,9 @@ typedef struct {
     /** String bucket */
     PyObject *bucket;
 
+    /** Bucket type */
+    PyObject *btype;
+
     /** Pipeline MultiResult container */
     PyObject *pipeline_queue;
 

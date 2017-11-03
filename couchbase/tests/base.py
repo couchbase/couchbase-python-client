@@ -48,7 +48,7 @@ class ClusterInformation(object):
         self.admin_username = "Administrator"
         self.admin_password = "password"
         self.bucket_name = "default"
-        self.bucket_password = ""
+        self.bucket_password = "s3cr3t"
 
     def make_connargs(self, **overrides):
         bucket = self.bucket_name
@@ -61,6 +61,7 @@ class ClusterInformation(object):
             connstr += str(overrides.pop('config_cache'))
 
         ret = {
+            'username': 'default',
             'password': self.bucket_password,
             'connection_string': connstr
         }
@@ -68,7 +69,8 @@ class ClusterInformation(object):
         return ret
 
     def make_connection(self, conncls, **kwargs):
-        return conncls(**self.make_connargs(**kwargs))
+        connargs = self.make_connargs(**kwargs)
+        return conncls(**connargs)
 
     def make_admin_connection(self):
         return Admin(self.admin_username, self.admin_password,

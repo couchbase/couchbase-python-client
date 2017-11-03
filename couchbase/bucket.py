@@ -34,7 +34,6 @@ from couchbase._pyport import basestring
 import couchbase.subdocument as SD
 import couchbase.priv_constants as _P
 
-
 ### Private constants. This is to avoid imposing a dependency requirement
 ### For simple flags:
 
@@ -149,6 +148,8 @@ class Bucket(_Base):
             certificate could not be trusted.
 
             See :ref:`connopts` for additional connection options.
+
+        :param string username: username to connect to bucket with
 
         :param string password: the password of the bucket
 

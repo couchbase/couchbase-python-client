@@ -423,6 +423,11 @@ static struct PyMemberDef Bucket_TABLE_members[] = {
                 PyDoc_STR("Name of the bucket this object is connected to")
         },
 
+        { "btype", T_OBJECT_EX, offsetof(pycbc_Bucket, btype),
+                READONLY,
+                PyDoc_STR("Type of the bucket this object is connected to")
+        },
+
         { "lockmode", T_INT, offsetof(pycbc_Bucket, lockmode),
                 READONLY,
                 PyDoc_STR("How access from multiple threads is handled.\n"
@@ -757,6 +762,8 @@ Bucket__init__(pycbc_Bucket *self,
             self->bucket = pycbc_SimpleStringZ(bucketstr);
         }
     }
+
+    self->btype = pycbc_IntFromL(LCB_BTYPE_UNSPEC);
     return 0;
 }
 
@@ -786,6 +793,12 @@ Bucket__connect(pycbc_Bucket *self)
             return NULL;
         }
     }
+    lcb_BTYPE btype;
+    err = lcb_cntl(self->instance, LCB_CNTL_GET, LCB_CNTL_BUCKETTYPE, &btype);
+    if (err != LCB_SUCCESS) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Problems getting bucket type");
+    }
+    self->btype = pycbc_IntFromL(btype);
     Py_RETURN_NONE;
 }
 

@@ -18,8 +18,10 @@ import json
 
 from couchbase.tests.base import ViewTestCase
 from couchbase.user_constants import FMT_JSON
-from couchbase.exceptions import HTTPError
+from couchbase.exceptions import HTTPError, NotSupportedError
+from couchbase.bucket import Bucket
 
+from couchbase.auth_domain import AuthDomain
 DESIGN_JSON = {
     'language' : 'javascript',
     'views' : {
@@ -123,3 +125,30 @@ class ViewTest(ViewTestCase):
         self.assertRaises(HTTPError,
                           self.cb._view,
                           "nonexist", "designdoc")
+
+    def test_reject_ephemeral_attempt(self):
+        admin=self.make_admin_connection()
+        bucket_name = 'ephemeral'
+        users=[('writer',('s3cr3t',[('data_reader', 'ephemeral'), ('data_writer', 'ephemeral')])),
+               ('reader',('s3cr3t',[('data_reader', 'ephemeral')])),
+               ('viewer',('s3cr3t',[('views_reader', 'ephemeral'), ('views_admin', 'ephemeral')]))]
+        user=users[2]
+        (userid, password, roles) = user[0],user[1][0],user[1][1]
+        # add user
+        try:
+            admin.bucket_delete(bucket_name)
+        except:
+            pass
+        admin.bucket_create(name=bucket_name,
+                                 bucket_type='ephemeral',
+                                 ram_quota=100)
+        try:
+            admin.user_upsert(AuthDomain.Local, userid, password, roles)
+            admin.wait_ready(bucket_name, timeout=10)
+            conn_str = "couchbase://{0}/{1}".format(self.cluster_info.host, bucket_name)
+            bucket = Bucket(connection_string=conn_str,username=userid,password=password)
+            self.assertIsNotNone(bucket)
+            self.assertRaisesRegex(NotSupportedError, "Ephemeral", lambda: bucket.query("beer", "brewery_beers", streaming=True, limit=100))
+        finally:
+            admin.bucket_delete(bucket_name)
+            admin.user_remove(AuthDomain.Local, userid)
