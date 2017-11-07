@@ -1125,6 +1125,12 @@ PyObject* pycbc_Bucket__vbmap(pycbc_Bucket *, PyObject *);
 PyObject* pycbc_Bucket__cntlstr(pycbc_Bucket *conn, PyObject *args, PyObject *kw);
 
 /**
+ * Health-check methods
+ */
+PyObject *pycbc_Bucket__get_health(pycbc_Bucket *self,
+                                   PyObject *args,
+                                   PyObject *kwargs);
+/**
  * Flag to check if logging is enabled for the library via Python's logging
  */
 extern PyObject* pycbc_log_handler;

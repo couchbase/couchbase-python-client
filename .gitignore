@@ -32,3 +32,9 @@ _trial*
 *.dSYM
 .idea/
 CouchbaseMock.jar
+/.cproject
+/.eclipse-pmd
+/.project
+/.pydevproject
+/cmake-build-debug/
+/make.sh

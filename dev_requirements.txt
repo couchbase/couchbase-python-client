@@ -3,3 +3,4 @@ pbr==1.8.1
 numpydoc==0.4
 sphinx==1.2b1
 testresources>=0.2.7
+jsonschema==2.6.0

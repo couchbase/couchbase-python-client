@@ -344,7 +344,6 @@ Bucket__mutinfo(pycbc_Bucket *self)
     return ll;
 }
 
-
 static PyGetSetDef Bucket_TABLE_getset[] = {
         { "default_format",
                 (getter)Bucket_get_format,
@@ -514,6 +513,7 @@ static PyMethodDef Bucket_TABLE_methods[] = {
         OPFUNC(counter, "Modify a counter in Couchbase"),
         OPFUNC(counter_multi, "Multi-key variant of counter"),
         OPFUNC(_stats, "Get various server statistics"),
+        OPFUNC(_get_health, "Get health info"),
 
         OPFUNC(_http_request, "Internal routine for HTTP requests"),
         OPFUNC(_view_request, "Internal routine for view requests"),

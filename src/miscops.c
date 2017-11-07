@@ -360,3 +360,40 @@ pycbc_Bucket__stats(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     pycbc_common_vars_finalize(&cv, self);
     return cv.ret;
 }
+
+PyObject *pycbc_Bucket__get_health(pycbc_Bucket *self,
+                                   PyObject *args,
+                                   PyObject *kwargs)
+{
+    int rv;
+    Py_ssize_t ncmds = 0;
+    lcb_error_t err = LCB_ERROR;
+    struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
+    lcb_CMDPING cmd = {0};
+    cmd.services = LCB_PINGSVC_F_KV | LCB_PINGSVC_F_N1QL | LCB_PINGSVC_F_VIEWS |
+                   LCB_PINGSVC_F_FTS;
+    cmd.options = LCB_PINGOPT_F_JSON | LCB_PINGOPT_F_JSONPRETTY;
+    if (1) {
+        cmd.options |= LCB_PINGOPT_F_JSONDETAILS;
+    }
+
+    rv = pycbc_common_vars_init(&cv, self, PYCBC_ARGOPT_MULTI, ncmds, 0);
+    if (rv < 0) {
+        return NULL;
+    }
+    lcb_sched_enter(self->instance);
+    err = lcb_ping3(self->instance, cv.mres, &cmd);
+
+    if (err != LCB_SUCCESS) {
+        PYCBC_EXCTHROW_SCHED(err);
+        goto GT_DONE;
+    }
+
+    if (-1 == pycbc_common_vars_wait(&cv, self)) {
+        goto GT_DONE;
+    }
+    lcb_sched_leave(self->instance);
+GT_DONE:
+    pycbc_common_vars_finalize(&cv, self);
+    return cv.ret;
+}

@@ -908,6 +908,26 @@ class Bucket(_Base):
             keys = (keys,)
         return self._stats(keys, keystats=keystats)
 
+    def get_health(self):
+        """Request cluster health information.
+
+        Fetches health information from each node in the cluster. 
+        It returns a `dict` with 'type' keys
+        and server summary lists as a value.
+
+
+        :raise: :exc:`.CouchbaseNetworkError`
+        :return: `dict` where keys are stat keys and values are
+            host-value pairs
+
+        Get health info (works on couchbase buckets)::
+
+            cb.get_health()
+            # {'services': {...}, ...}
+        """
+        resultdict = self._get_health()
+        return resultdict['services_struct']
+
     def observe(self, key, master_only=False):
         """Return storage information for a key.
 
