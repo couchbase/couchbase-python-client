@@ -15,8 +15,9 @@ N1QL Queries
     .. autoattribute:: timeout
     .. autoattribute:: cross_bucket
 
-.. autodata:: UNBOUNDED
+.. autodata:: NOT_BOUNDED
 .. autodata:: REQUEST_PLUS
+.. autodata:: UNBOUNDED
 
 .. autoclass:: MutationState
 

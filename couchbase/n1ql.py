@@ -17,8 +17,10 @@
 import json
 
 from couchbase._pyport import basestring
+from couchbase.deprecation import deprecate_module_attribute
 from couchbase.views.iterator import AlreadyQueriedError
-from couchbase.exceptions import CouchbaseError, NotSupportedError
+from couchbase.exceptions import CouchbaseError
+import sys
 
 # Not used internally, but by other modules
 from couchbase.mutation_state import MutationState, MissingTokenError
@@ -30,8 +32,17 @@ class N1QLError(CouchbaseError):
         return self.objextra['code']
 
 
+sys.modules[__name__] = deprecate_module_attribute(sys.modules[__name__],
+                                                   deprecated=['CONSISTENCY_NONE', 'UNBOUNDED'])
+
 STATEMENT_PLUS = 'statement_plus'
 
+NOT_BOUNDED = 'not_bounded'
+"""
+For use with :attr:`~.N1QLQuery.consistency`, will allow cached
+values to be returned. This will improve performance but may not
+reflect the latest data in the server.
+"""
 REQUEST_PLUS = 'request_plus'
 """
 For use with :attr:`~.N1QLQuery.consistency`, will ensure that query
@@ -39,14 +50,21 @@ results always reflect the latest data in the server
 """
 UNBOUNDED = 'none'
 """
-For use with :attr:`~.N1QLQuery.consistency`, will allow cached
-values to be returned. This will improve performance but may not
-reflect the latest data in the server.
+.. deprecated:: 2.3.3
+   Use :attr:`couchbase.n1ql.NOT_BOUNDED` instead. This had no effect in its advertised
+   usage as a value for :attr:`~.N1QLQuery.consistency` before.
 """
 
+CONSISTENCY_UNBOUNDED = NOT_BOUNDED
 CONSISTENCY_REQUEST = REQUEST_PLUS
 CONSISTENCY_NONE = UNBOUNDED
-
+"""
+.. deprecated:: 2.3.3
+   Use :attr:`couchbase.n1ql.CONSISTENCY_UNBOUNDED` instead. This had no effect in its advertised
+   usage as a value for :attr:`~.N1QLQuery.consistency` before. By default
+   'Not Bounded' mode is used so the effect was functionally equivalent, but
+   this is not guaranteed in future.
+"""
 
 class N1QLQuery(object):
     def __init__(self, query, *args, **kwargs):
@@ -152,9 +170,9 @@ class N1QLQuery(object):
         """
         Sets the consistency level.
 
-        :see: :data:`UNBOUNDED`, :data:`REQUEST_PLUS`
+        :see: :data:`NOT_BOUNDED`, :data:`REQUEST_PLUS`
         """
-        return self._body.get('scan_consistency', UNBOUNDED)
+        return self._body.get('scan_consistency', NOT_BOUNDED)
 
     @consistency.setter
     def consistency(self, value):
@@ -169,7 +187,7 @@ class N1QLQuery(object):
             with.
         :type state: :class:`~.couchbase.mutation_state.MutationState`
         """
-        if self.consistency not in (UNBOUNDED, 'at_plus'):
+        if self.consistency not in (UNBOUNDED, NOT_BOUNDED, 'at_plus'):
             raise TypeError(
                 'consistent_with not valid with other consistency options')
 

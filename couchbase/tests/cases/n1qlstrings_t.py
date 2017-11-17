@@ -19,7 +19,7 @@ from __future__ import print_function
 import json
 
 from couchbase.tests.base import CouchbaseTestCase
-from couchbase.n1ql import N1QLQuery, CONSISTENCY_REQUEST, CONSISTENCY_NONE
+from couchbase.n1ql import N1QLQuery, CONSISTENCY_REQUEST, CONSISTENCY_UNBOUNDED
 from couchbase.n1ql import MutationState
 
 
@@ -61,9 +61,9 @@ class N1QLStringTest(CouchbaseTestCase):
         dval = json.loads(q.encoded)
         self.assertEqual('request_plus', dval['scan_consistency'])
 
-        q.consistency = CONSISTENCY_NONE
+        q.consistency = CONSISTENCY_UNBOUNDED
         dval = json.loads(q.encoded)
-        self.assertEqual('none', dval['scan_consistency'])
+        self.assertEqual('not_bounded', dval['scan_consistency'])
 
     def test_encode_scanvec(self):
         # The value is a vbucket's sequence number,
