@@ -29,7 +29,7 @@ try:
     from configparser import ConfigParser
 except ImportError:
     # Python <3.0 fallback
-    from ConfigParser import SafeConfigParser as ConfigParser
+    from fallback import configparser
 
 from testresources import ResourcedTestCase, TestResourceManager
 
@@ -39,7 +39,9 @@ from couchbase.result import (
     MultiResult, ValueResult, OperationResult, ObserveInfo, Result)
 from couchbase._pyport import basestring
 
+
 CONFIG_FILE = 'tests.ini' # in cwd
+
 
 class ClusterInformation(object):
     def __init__(self):
@@ -49,15 +51,17 @@ class ClusterInformation(object):
         self.admin_password = "password"
         self.bucket_name = "default"
         self.bucket_password = ""
+        self.ipv6 = "disabled"
 
     def make_connargs(self, **overrides):
         bucket = self.bucket_name
         if 'bucket' in overrides:
             bucket = overrides.pop('bucket')
         connstr = 'http://{0}:{1}/{2}?'.format(self.host, self.port, bucket)
+        connstr += 'ipv6=' + overrides.pop('ipv6', self.ipv6)
 
         if 'config_cache' in overrides:
-            connstr += 'config_cache='
+            connstr += '&config_cache='
             connstr += str(overrides.pop('config_cache'))
 
         ret = {
@@ -73,7 +77,7 @@ class ClusterInformation(object):
 
     def make_admin_connection(self):
         return Admin(self.admin_username, self.admin_password,
-                     self.host, self.port)
+                     self.host, self.port, ipv6=self.ipv6)
 
 
 class ConnectionConfiguration(object):
@@ -92,7 +96,7 @@ class ConnectionConfiguration(object):
         info.admin_password = config.get('realserver', 'admin_password')
         info.bucket_name = config.get('realserver', 'bucket_name')
         info.bucket_password = config.get('realserver', 'bucket_password')
-
+        info.ipv6 = config.get('realserver', 'ipv6', fallback="disabled")
         if config.getboolean('realserver', 'enabled'):
             self.realserver_info = info
         else:

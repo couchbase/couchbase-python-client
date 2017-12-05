@@ -23,6 +23,8 @@ from couchbase.bucket import Bucket
 
 from couchbase.auth_domain import AuthDomain
 from nose import SkipTest
+from nose.plugins.attrib import attr
+
 
 DESIGN_JSON = {
     'language' : 'javascript',
@@ -59,7 +61,10 @@ DOCS_JSON = {
     }
 }
 
+
+@attr("view")
 class ViewTest(ViewTestCase):
+
     def setUp(self):
         super(ViewTest, self).setUp()
         self.skipIfMock()
