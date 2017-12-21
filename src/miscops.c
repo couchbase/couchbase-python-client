@@ -14,7 +14,9 @@
  *   limitations under the License.
  **/
 
+#include <libcouchbase/api3.h>
 #include "oputil.h"
+#include "pycbc.h"
 
 /**
  * This file contains 'miscellaneous' operations. Functions contained here
@@ -361,9 +363,9 @@ pycbc_Bucket__stats(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     return cv.ret;
 }
 
-PyObject *pycbc_Bucket__get_health(pycbc_Bucket *self,
-                                   PyObject *args,
-                                   PyObject *kwargs)
+PyObject *pycbc_Bucket__ping(pycbc_Bucket *self,
+                             PyObject *args,
+                             PyObject *kwargs)
 {
     int rv;
     Py_ssize_t ncmds = 0;
@@ -394,6 +396,43 @@ PyObject *pycbc_Bucket__get_health(pycbc_Bucket *self,
     }
     lcb_sched_leave(self->instance);
 GT_DONE:
+    pycbc_common_vars_finalize(&cv, self);
+    return cv.ret;
+}
+
+PyObject *pycbc_Bucket__diagnostics(pycbc_Bucket *self,
+                                    PyObject *args,
+                                    PyObject *kwargs)
+{
+    int rv;
+    Py_ssize_t ncmds = 0;
+    lcb_error_t err = LCB_ERROR;
+    struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
+    lcb_CMDDIAG cmd = {0};
+    cmd.options = LCB_PINGOPT_F_JSONPRETTY;
+
+    cmd.id = "PYCBC";
+    rv = pycbc_common_vars_init(&cv, self, PYCBC_ARGOPT_MULTI, ncmds, 0);
+
+    if (rv < 0) {
+        return NULL;
+    }
+    lcb_sched_enter(self->instance);
+    PYCBC_CONN_THR_BEGIN(self);
+    err = lcb_diag(self->instance, cv.mres, &cmd);
+    PYCBC_CONN_THR_END(self);
+
+    if (err != LCB_SUCCESS) {
+        PYCBC_EXCTHROW_SCHED(err);
+        goto GT_DONE;
+    }
+
+    if (-1 == pycbc_common_vars_wait(&cv, self)) {
+        goto GT_DONE;
+    }
+    lcb_sched_leave(self->instance);
+
+    GT_DONE:
     pycbc_common_vars_finalize(&cv, self);
     return cv.ret;
 }

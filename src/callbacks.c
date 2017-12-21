@@ -799,6 +799,42 @@ static void ping_callback(lcb_t instance,
     CB_THR_BEGIN(parent);
 }
 
+
+static void diag_callback(lcb_t instance,
+                          int cbtype,
+                          const lcb_RESPBASE *resp_base)
+{
+    pycbc_Bucket *parent;
+    const lcb_RESPDIAG *resp = (const lcb_RESPDIAG *)resp_base;
+
+    pycbc_MultiResult *mres = (pycbc_MultiResult *)resp->cookie;
+    PyObject *resultdict = pycbc_multiresult_dict(mres);
+    parent = mres->parent;
+    CB_THR_END(parent);
+
+    if (resp->rc != LCB_SUCCESS) {
+        if (mres->errop == NULL) {
+            pycbc_Result *res = (pycbc_Result *)pycbc_result_new(parent);
+            res->rc = resp->rc;
+            res->key = Py_None;
+            Py_INCREF(res->key);
+            maybe_push_operr(mres, res, resp->rc, 0);
+        }
+    }
+
+    if (resp->njson) {
+        pycbc_dict_add_text_kv(resultdict, "health_json", resp->json);
+    }
+    if (resp->rflags & LCB_RESP_F_FINAL) {
+        /* Note this can happen in both success and error cases!*/
+        operation_completed_with_err_info(parent, mres, cbtype, resp_base);
+    }
+
+    CB_THR_BEGIN(parent);
+}
+
+
+
 void
 pycbc_callbacks_init(lcb_t instance)
 {
@@ -813,6 +849,7 @@ pycbc_callbacks_init(lcb_t instance)
     lcb_install_callback3(instance, LCB_CALLBACK_OBSERVE, observe_callback);
     lcb_install_callback3(instance, LCB_CALLBACK_STATS, stats_callback);
     lcb_install_callback3(instance, LCB_CALLBACK_PING, ping_callback);
+    lcb_install_callback3(instance, LCB_CALLBACK_DIAG, diag_callback);
 
     /* Subdoc */
     lcb_install_callback3(instance, LCB_CALLBACK_SDLOOKUP, subdoc_callback);

@@ -1127,9 +1127,13 @@ PyObject* pycbc_Bucket__cntlstr(pycbc_Bucket *conn, PyObject *args, PyObject *kw
 /**
  * Health-check methods
  */
-PyObject *pycbc_Bucket__get_health(pycbc_Bucket *self,
-                                   PyObject *args,
-                                   PyObject *kwargs);
+PyObject *pycbc_Bucket__ping(pycbc_Bucket *self,
+                             PyObject *args,
+                             PyObject *kwargs);
+
+PyObject *pycbc_Bucket__diagnostics(pycbc_Bucket *self,
+                                    PyObject *args,
+                                    PyObject *kwargs);
 /**
  * Flag to check if logging is enabled for the library via Python's logging
  */

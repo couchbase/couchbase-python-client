@@ -33,6 +33,7 @@ import couchbase.fulltext as _FTS
 from couchbase._pyport import basestring
 import couchbase.subdocument as SD
 import couchbase.priv_constants as _P
+import json
 
 ### Private constants. This is to avoid imposing a dependency requirement
 ### For simple flags:
@@ -908,12 +909,31 @@ class Bucket(_Base):
             keys = (keys,)
         return self._stats(keys, keystats=keystats)
 
-    def get_health(self):
-        """Request cluster health information.
+    def ping(self):
+        """Ping cluster for latency/status information per-service
 
-        Fetches health information from each node in the cluster. 
-        It returns a `dict` with 'type' keys
-        and server summary lists as a value.
+        Pings each node in the cluster, and
+        returns a `dict` with 'type' keys (e.g 'n1ql', 'kv')
+        and node service summary lists as a value.
+
+
+        :raise: :exc:`.CouchbaseNetworkError`
+        :return: `dict` where keys are stat keys and values are
+            host-value pairs
+
+        Ping cluster (works on couchbase buckets)::
+
+            cb.ping()
+            # {'services': {...}, ...}
+        """
+        resultdict = self._ping()
+        return resultdict['services_struct']
+
+    def diagnostics(self):
+        """Request diagnostics report about network connections
+
+        Generates diagnostics for each node in the cluster.
+        It returns a `dict` with details
 
 
         :raise: :exc:`.CouchbaseNetworkError`
@@ -922,11 +942,22 @@ class Bucket(_Base):
 
         Get health info (works on couchbase buckets)::
 
-            cb.get_health()
-            # {'services': {...}, ...}
+            cb.diagnostics()
+            # {
+                  'config':
+                  {
+                     'id': node ID,
+                     'last_activity_us': time since last activity in nanoseconds
+                     'local': local server and port,
+                     'remote': remote server and port,
+                     'status': connection status
+                  }
+                  'id': client ID,
+                  'sdk': sdk version,
+                  'version': diagnostics API version
+              }
         """
-        resultdict = self._get_health()
-        return resultdict['services_struct']
+        return json.loads(self._diagnostics()['health_json'])
 
     def observe(self, key, master_only=False):
         """Return storage information for a key.

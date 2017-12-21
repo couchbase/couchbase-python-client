@@ -38,3 +38,6 @@ CouchbaseMock.jar
 /.pydevproject
 /cmake-build-debug/
 /make.sh
+html
+latex
+
