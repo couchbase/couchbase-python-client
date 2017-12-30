@@ -37,4 +37,4 @@ script:
 
 notifications:
   email:
-    - mike.goldsmith@couchbase.com
+    - PythonPackage@couchbase.com
