@@ -32,13 +32,12 @@ except ImportError:
     from fallback import configparser
 
 from testresources import ResourcedTestCase, TestResourceManager
-
+from couchbase.exceptions import CouchbaseError
 from couchbase.admin import Admin
 from couchbase.mockserver import CouchbaseMock, BucketSpec, MockControlClient
 from couchbase.result import (
     MultiResult, ValueResult, OperationResult, ObserveInfo, Result)
 from couchbase._pyport import basestring
-
 
 CONFIG_FILE = 'tests.ini' # in cwd
 
@@ -52,17 +51,33 @@ class ClusterInformation(object):
         self.bucket_name = "default"
         self.bucket_password = ""
         self.ipv6 = "disabled"
+        self.protocol = "http"
+
+    @staticmethod
+    def filter_opts(options):
+        return {key: value for key, value in
+                options.items() if key in ["certpath", "keypath", "ipv6", "config_cache"] and value}
 
     def make_connargs(self, **overrides):
         bucket = self.bucket_name
         if 'bucket' in overrides:
             bucket = overrides.pop('bucket')
-        connstr = 'http://{0}:{1}/{2}?'.format(self.host, self.port, bucket)
-        connstr += 'ipv6=' + overrides.pop('ipv6', self.ipv6)
 
-        if 'config_cache' in overrides:
-            connstr += '&config_cache='
-            connstr += str(overrides.pop('config_cache'))
+        if self.protocol.startswith('couchbase'):
+            protocol_format = '{0}/{1}'.format(self.host, bucket)
+        elif self.protocol.startswith('http'):
+            protocol_format = '{0}:{1}/{2}'.format(self.host, self.port, bucket)
+        else:
+            raise CouchbaseError('Unrecognised protocol')
+        connstr = self.protocol + '://' + protocol_format
+        final_options = ClusterInformation.filter_opts(self.__dict__)
+        override_options = ClusterInformation.filter_opts(overrides)
+        for k, v in override_options.items():
+            overrides.pop(k)
+            final_options[k] = override_options[k]
+
+        conn_options = '&'.join((key + "=" + value) for key, value in final_options.items())
+        connstr += ("?" + conn_options) if conn_options else ""
 
         ret = {
             'password': self.bucket_password,
@@ -96,7 +111,10 @@ class ConnectionConfiguration(object):
         info.admin_password = config.get('realserver', 'admin_password')
         info.bucket_name = config.get('realserver', 'bucket_name')
         info.bucket_password = config.get('realserver', 'bucket_password')
-        info.ipv6 = config.get('realserver', 'ipv6', fallback="disabled")
+        info.ipv6 = config.get('realserver', 'ipv6', fallback='disabled')
+        info.certpath = config.get('realserver', 'certpath', fallback=None)
+        info.keypath = config.get('realserver', 'keypath', fallback=None)
+        info.protocol = config.get('realserver', 'protocol', fallback="http")
         if config.getboolean('realserver', 'enabled'):
             self.realserver_info = info
         else:
