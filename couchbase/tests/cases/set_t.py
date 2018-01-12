@@ -1,3 +1,4 @@
+#-*- coding:utf-8 -*-
 #
 # Copyright 2013, Couchbase, Inc.
 # All Rights Reserved
@@ -34,6 +35,23 @@ class UpsertTest(ConnectionTestCase):
         self.assertTrue(rv.cas > 0)
         rv = self.cb.upsert(self.gen_key(), 'value2')
         self.assertTrue(rv.cas > 0)
+
+    def test_utf8_set(self):
+        rv = self.cb.upsert("documentID", "<xml></xml>", format=FMT_UTF8)
+        self.assertTrue(rv)
+        self.assertTrue(rv.cas > 0)
+        rv = self.cb.get("documentID")
+        self.assertTrue(rv.cas > 0)
+        self.assertEqual(rv.value, "<xml></xml>")
+
+    def test_utf8_set_nonascii(self):
+
+        rv = self.cb.upsert("documentID",  u'Öüç', format=FMT_UTF8)
+        self.assertTrue(rv)
+        self.assertTrue(rv.cas > 0)
+        rv = self.cb.get("documentID")
+        self.assertTrue(rv.cas > 0)
+        self.assertEqual(rv.value,  u'Öüç')
 
     def test_set_with_cas(self):
         key = self.gen_key('cas')

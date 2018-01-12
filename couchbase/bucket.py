@@ -378,6 +378,10 @@ class Bucket(_Base):
 
             cb.upsert('foo', {'bar': 'baz'}, format=couchbase.FMT_JSON)
 
+        Force UTF8 document format for value::
+
+            cb.upsert('foo', "<xml></xml>", format=couchbase.FMT_UTF8)
+
         Perform optimistic locking by specifying last known CAS version::
 
             cb.upsert('foo', 'bar', cas=8835713818674332672)
