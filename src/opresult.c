@@ -303,7 +303,7 @@ pycbc_sdresult_addresult(pycbc__SDResult *obj, size_t ii, PyObject *item)
     if (obj->results == NULL) {
         obj->results = PyList_New(PyTuple_GET_SIZE(obj->specs));
     }
-    pycbc_assert(ii < PyTuple_GET_SIZE(obj->specs));
+    pycbc_assert(ii < (size_t)PyTuple_GET_SIZE(obj->specs));
     PyList_SetItem(obj->results, ii, item);
     Py_INCREF(item); /* To normalize refcount semantics */
 }

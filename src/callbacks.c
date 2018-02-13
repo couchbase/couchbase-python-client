@@ -733,7 +733,6 @@ static void ping_callback(lcb_t instance,
 {
     pycbc_Bucket *parent;
     const lcb_RESPPING *resp = (const lcb_RESPPING *)resp_base;
-    int do_return = 0;
 
     pycbc_MultiResult *mres = (pycbc_MultiResult *)resp->cookie;
     PyObject *resultdict = pycbc_multiresult_dict(mres);
@@ -741,7 +740,6 @@ static void ping_callback(lcb_t instance,
     CB_THR_END(parent);
 
     if (resp->rc != LCB_SUCCESS) {
-        do_return = 1;
         if (mres->errop == NULL) {
             pycbc_Result *res = (pycbc_Result *)pycbc_result_new(parent);
             res->rc = resp->rc;
@@ -754,7 +752,7 @@ static void ping_callback(lcb_t instance,
     {
         PyObject *struct_services_dict = PyDict_New();
 
-        int ii;
+        lcb_SIZE ii;
         for (ii = 0; ii < resp->nservices; ii++) {
             lcb_PINGSVC *svc = &resp->services[ii];
             const char *type_s = get_type_s(svc->type);
@@ -769,9 +767,16 @@ static void ping_callback(lcb_t instance,
             {
                 PyObject *mrdict = PyDict_New();
                 PyList_Append(struct_server_list, mrdict);
-                pycbc_dict_add_text_kv(mrdict,
-                                       "details",
-                                       lcb_strerror(NULL, svc->status));
+                switch (svc->status) {
+                    case LCB_PINGSTATUS_OK:
+                        break;
+                    case LCB_PINGSTATUS_TIMEOUT:
+                        break;
+                    default:
+                        pycbc_dict_add_text_kv(mrdict,
+                                               "details",
+                                               lcb_strerror_long(svc->rc));
+                }
                 pycbc_dict_add_text_kv(
                         mrdict, "server", svc->server);
                 PyDict_SetItemString(mrdict,
@@ -793,7 +798,6 @@ static void ping_callback(lcb_t instance,
     }
     if (resp->rflags & LCB_RESP_F_FINAL) {
         /* Note this can happen in both success and error cases!*/
-        do_return = 1;
         operation_completed_with_err_info(parent, mres, cbtype, resp_base);
     }
     CB_THR_BEGIN(parent);

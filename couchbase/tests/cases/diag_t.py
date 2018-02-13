@@ -32,7 +32,7 @@ service_schema = {"type": "object",
                             "server": {"type": "string"},
                             "status": {"type": "number"}
                             },
-             "required": ["details", "latency", "server", "status"]}
+             "required": ["latency", "server", "status"]}
 
 any_of_required_services_schema = {"type": "array",
                   "items": service_schema}

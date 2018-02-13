@@ -163,7 +163,7 @@ pycbc_Bucket__ixwatch(pycbc_Bucket *self, PyObject *args, PyObject *kw)
     cmd.specs = (const lcb_N1XSPEC * const *)specs;
     bufs = calloc(nspecs, sizeof *bufs);
 
-    for (ii = 0; ii < nspecs; ++ii) {
+    for (ii = 0; nspecs > 0 && ii < (size_t) nspecs; ++ii) {
         PyObject *index = PySequence_GetItem(indexes, ii);
         PyObject *strobj = NULL;
         if (index == NULL) {

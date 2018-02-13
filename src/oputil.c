@@ -605,7 +605,7 @@ int
 pycbc_sd_handle_speclist(pycbc_Bucket *self, pycbc_MultiResult *mres,
     PyObject *key, PyObject *spectuple, lcb_CMDSUBDOC *cmd)
 {
-    int rv;
+    int rv = 0;
     lcb_error_t err = LCB_SUCCESS;
     Py_ssize_t nspecs = 0;
     pycbc__SDResult *newitm = NULL;
@@ -665,7 +665,7 @@ pycbc_sd_handle_speclist(pycbc_Bucket *self, pycbc_MultiResult *mres,
     free(specs);
     {
         size_t ii;
-        for (ii = 0; ii < nspecs; ++ii) {
+        for (ii = 0; nspecs > 0 && ii < (size_t) nspecs; ++ii) {
             PYCBC_PYBUF_RELEASE(pathbufs + ii);
             PYCBC_PYBUF_RELEASE(valbufs + ii);
         }

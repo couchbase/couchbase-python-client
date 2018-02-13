@@ -72,6 +72,18 @@ convert_to_string(const char *buf, size_t nbuf, int mode)
     return PyBytes_FromStringAndSize(buf, nbuf);
 }
 
+#if defined(__clang__)
+#define DISABLE_SCOPE_START \
+_Pragma("clang diagnostic push") \
+_Pragma("clang diagnostic ignored \"-Wunreachable-code\"")
+
+#define DISABLE_SCOPE_END\
+    _Pragma("clang diagnostic pop")
+#else
+#define DISABLE_SCOPE_START
+#define DISABLE_SCOPE_END
+#endif
+
 static int
 encode_common(PyObject *src, pycbc_pybuffer *dst, lcb_U32 flags)
 {
@@ -80,9 +92,11 @@ encode_common(PyObject *src, pycbc_pybuffer *dst, lcb_U32 flags)
     int rv;
 
     if (flags == PYCBC_FMT_UTF8) {
+
 #if PY_MAJOR_VERSION == 2
         if (PyString_Check(src)) {
 #else
+        DISABLE_SCOPE_START
         if (0) {
 #endif
             bytesobj = src;
@@ -95,6 +109,9 @@ encode_common(PyObject *src, pycbc_pybuffer *dst, lcb_U32 flags)
             }
             bytesobj = PyUnicode_AsUTF8String(src);
         }
+#if PY_MAJOR_VERSION != 2
+        DISABLE_SCOPE_END
+#endif
     } else if (flags == PYCBC_FMT_BYTES) {
         if (PyBytes_Check(src) || PyByteArray_Check(src)) {
             bytesobj = src;
