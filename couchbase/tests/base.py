@@ -19,9 +19,41 @@ import sys
 import types
 import platform
 import warnings
+from testfixtures import LogCapture
+
+from testresources import ResourcedTestCase as ResourcedTestCaseReal, TestResourceManager
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
+import logging
+
+
+class ResourcedTestCase(ResourcedTestCaseReal):
+
+    class CaptureContext(LogCapture):
+        def __init__(self, *args, **kwargs):
+            self.records = []
+            kwargs['attributes'] = (lambda r: self.records.append(r))
+            super(ResourcedTestCase.CaptureContext, self).__init__(*args, **kwargs)
+
+        @property
+        def output(self):
+            return map(str, self.records)
+
+    def __init__(self,*args,**kwargs):
+        super(ResourcedTestCase,self).__init__(*args,**kwargs)
+
+    def assertLogs(self, *args, **kwargs):
+        try:
+            return super(ResourcedTestCase,self).assertLogs(*args, **kwargs)
+        except Exception as e:
+            logging.warn(e)
+
+            return ResourcedTestCase.CaptureContext(*args, **kwargs)
 
 try:
-    from unittest.case import SkipTest
+    from unittest2.case import SkipTest
 except ImportError:
     from nose.exc import SkipTest
 
@@ -31,7 +63,6 @@ except ImportError:
     # Python <3.0 fallback
     from fallback import configparser
 
-from testresources import ResourcedTestCase, TestResourceManager
 from couchbase.exceptions import CouchbaseError
 from couchbase.admin import Admin
 from couchbase.mockserver import CouchbaseMock, BucketSpec, MockControlClient
@@ -56,7 +87,7 @@ class ClusterInformation(object):
     @staticmethod
     def filter_opts(options):
         return {key: value for key, value in
-                options.items() if key in ["certpath", "keypath", "ipv6", "config_cache", "compression"] and value}
+                options.items() if key in ["certpath", "keypath", "ipv6", "config_cache", "compression", "log_redaction"] and value}
 
     def make_connargs(self, **overrides):
         bucket = self.bucket_name
@@ -131,7 +162,6 @@ class ConnectionConfiguration(object):
                 self.mockurl = None
         else:
             self.mock_enabled = False
-
 
 class MockResourceManager(TestResourceManager):
     def __init__(self, config):
@@ -362,6 +392,12 @@ class CouchbaseTestCase(ResourcedTestCase):
         for k in keys:
             ret[k] = "Value_For_" + k
         return ret
+
+    def assertRegex(self, *args, **kwargs):
+        try:
+            return super(CouchbaseTestCase,self).assertRegex(*args,**kwargs)
+        except:
+            return super(CouchbaseTestCase,self).assertRegexpMatches(*args,**kwargs)
 
 
 class ConnectionTestCase(CouchbaseTestCase):

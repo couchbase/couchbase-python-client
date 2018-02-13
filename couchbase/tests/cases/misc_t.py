@@ -18,11 +18,25 @@ try:
     from urlparse import urlparse
 except ImportError:
     from urllib.parse import urlparse
+import heapq
+import inspect
+import unittest
+try:
+    import unittest2
+except ImportError:
+    unittest2 = None
+
 
 from couchbase.tests.base import ConnectionTestCase
 from couchbase.user_constants import FMT_JSON, FMT_AUTO, FMT_JSON, FMT_PICKLE
 from couchbase.exceptions import ClientTemporaryFailError
 from couchbase.exceptions import CouchbaseError
+import couchbase
+import re
+import couchbase._libcouchbase as _LCB
+from couchbase import enable_logging
+import logging
+
 
 class MiscTest(ConnectionTestCase):
 
@@ -142,7 +156,6 @@ class MiscTest(ConnectionTestCase):
 
     def test_logging(self):
         # Assume we don't have logging here..
-        import couchbase
         import couchbase._libcouchbase as lcb
 
         self.assertFalse(lcb.lcb_logging())
@@ -155,6 +168,47 @@ class MiscTest(ConnectionTestCase):
         self.assertTrue(lcb.lcb_logging())
         couchbase.disable_logging()
         self.assertFalse(lcb.lcb_logging())
+
+    def test_redaction(self):
+
+        all_tags = r'|'.join(re.escape(v) for k, v in _LCB.__dict__.items() if
+                             re.match(r'.*LCB_LOG_(SD|MD|UD)_[OC]TAG.*', k))
+
+        enable_logging()
+        contains_no_tags = r'^(.(?!<' + all_tags + r'))*$'
+        contains_tags = r'^.*(' + all_tags + r').*$'
+        expected = {0: {logging.DEBUG: {'text': 'off', 'pattern': contains_no_tags}},
+                    1: {logging.DEBUG: {'text': 'on', 'pattern': contains_tags}}}
+
+        for num, entry in reversed(list(expected.items())):
+            for level, val in entry.items():
+
+                optype='connstr'
+                with self.assertLogs(level=level, recursive_check=True) as cm:
+                    curbc = self.make_connection(log_redaction=val['text'])
+                    self.assertEqual(num != 0, curbc.redaction != 0)
+                result_str=''.join(cm.output)
+                logging.info(
+                    'checking {pattern} matches {optype} addition {text} result:{result_str}'.format(optype=optype,
+                                                                                                     result_str=result_str,
+                                                                                                     **val))
+                self.assertRegex(result_str, val['pattern'])
+
+                opposite = 1 - num
+                opposite_val = expected[opposite][level]
+
+                optype='cntl'
+                with self.assertLogs(level=level) as cm:
+                    curbc.redaction = opposite
+                    curbc.upsert(key='test', value='value')
+                    self.assertEqual(opposite != 0, curbc.redaction != 0)
+
+                result_str=''.join(cm.output)
+                logging.info(
+                    'checking {pattern} matches {optype} addition {text} result:{result_str}'.format(optype=optype,
+                                                                                                     result_str=result_str,
+                                                                                                     **val))
+                self.assertRegex(''.join(cm.output), opposite_val['pattern'])
 
     def test_compat_timeout(self):
         cb = self.make_connection(timeout=7.5)

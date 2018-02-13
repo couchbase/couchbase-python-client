@@ -93,6 +93,7 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
 {
     #define ADD_MACRO(sym) handler(module, #sym, sym)
     #define ADD_CONSTANT(name, val) handler(module, name, val)
+    #define ADD_STRING(name) PyModule_AddObject(module, #name, pycbc_SimpleStringZ(name) )
     #define LCB_CONSTANT(postfix, ...) ADD_CONSTANT(#postfix, LCB_##postfix)
     #define X(b) ADD_MACRO(LCB_##b);
     XERR(X);
@@ -179,7 +180,14 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
     ADD_MACRO(LCB_CNTL_SSL_MODE);
     ADD_MACRO(LCB_SSL_ENABLED);
     ADD_MACRO(LCB_CNTL_N1QL_TIMEOUT);
-    ADD_MACRO(LCB_CNTL_COMPRESSION_OPTS);
+	ADD_MACRO(LCB_CNTL_COMPRESSION_OPTS);
+    ADD_MACRO(LCB_CNTL_LOG_REDACTION);
+    ADD_STRING(LCB_LOG_MD_OTAG);
+    ADD_STRING(LCB_LOG_MD_CTAG);
+    ADD_STRING(LCB_LOG_SD_OTAG);
+    ADD_STRING(LCB_LOG_SD_CTAG);
+    ADD_STRING(LCB_LOG_UD_OTAG);
+    ADD_STRING(LCB_LOG_UD_CTAG);
 
     /* View options */
     ADD_MACRO(LCB_CMDVIEWQUERY_F_INCLUDE_DOCS);

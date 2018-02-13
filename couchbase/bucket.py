@@ -1762,6 +1762,14 @@ class Bucket(_Base):
                     raise
         return d
 
+    @property
+    def redaction(self):
+        return self._cntl(_LCB.LCB_CNTL_LOG_REDACTION,  value_type='int')
+
+    @redaction.setter
+    def redaction(self, val):
+        return self._cntl(_LCB.LCB_CNTL_LOG_REDACTION, value=val, value_type='int')
+
     def _cntl(self, *args, **kwargs):
         """Low-level interface to the underlying C library's settings. via
         ``lcb_cntl()``.
