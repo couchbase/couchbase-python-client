@@ -378,6 +378,12 @@ class Bucket(_Base):
 
             cb.upsert('foo', {'bar': 'baz'}, format=couchbase.FMT_JSON)
 
+        Insert JSON from a string::
+
+            JSONstr = '{"key1": "value1", "key2": 123}'
+            JSONobj = json.loads(JSONstr)
+            cb.upsert("documentID", JSONobj, format=couchbase.FMT_JSON)
+
         Force UTF8 document format for value::
 
             cb.upsert('foo', "<xml></xml>", format=couchbase.FMT_UTF8)

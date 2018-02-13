@@ -25,7 +25,7 @@ from couchbase.exceptions import (KeyExistsError, ValueFormatError,
                                   ArgumentError, NotFoundError,
                                   NotStoredError)
 from couchbase.tests.base import ConnectionTestCase
-
+import json
 
 class UpsertTest(ConnectionTestCase):
 
@@ -131,6 +131,11 @@ class UpsertTest(ConnectionTestCase):
         self.cb.remove(key, quiet=True)
         self.assertRaises(NotFoundError,
                           self.cb.replace, key, "value")
+
+    def test_from_json_string(self):
+        JSONstr = '{"key1": "value1", "key2": 123}'
+        JSONobj = json.loads(JSONstr)
+        self.cb.upsert("documentID", JSONobj, format=FMT_JSON)
 
 
 if __name__ == '__main__':
