@@ -138,7 +138,7 @@ setup(
         'txcouchbase',
         'acouchbase',
     ] + ([
-        'acouchbase.tests'
+        'acouchbase.tests',
         'acouchbase.py34only'
     ] if sys.version_info >= (3, 4) else []),
     package_data = pkgdata,
