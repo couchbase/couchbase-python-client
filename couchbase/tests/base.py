@@ -56,7 +56,7 @@ class ClusterInformation(object):
     @staticmethod
     def filter_opts(options):
         return {key: value for key, value in
-                options.items() if key in ["certpath", "keypath", "ipv6", "config_cache"] and value}
+                options.items() if key in ["certpath", "keypath", "ipv6", "config_cache", "compression"] and value}
 
     def make_connargs(self, **overrides):
         bucket = self.bucket_name

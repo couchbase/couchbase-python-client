@@ -83,13 +83,17 @@
     X(APPEND) \
     X(PREPEND)
 
+typedef void (*pycbc_constant_handler)(PyObject *, const char *, long long int);
+
+static PyObject *setup_compression_map(PyObject *module,
+                                       pycbc_constant_handler handler);
+
 static void
-do_all_constants(PyObject *module,
-                 void (*handler)(PyObject*, const char*, PY_LONG_LONG))
+do_all_constants(PyObject *module, pycbc_constant_handler handler)
 {
     #define ADD_MACRO(sym) handler(module, #sym, sym)
     #define ADD_CONSTANT(name, val) handler(module, name, val)
-
+    #define LCB_CONSTANT(postfix, ...) ADD_CONSTANT(#postfix, LCB_##postfix)
     #define X(b) ADD_MACRO(LCB_##b);
     XERR(X);
     XSTORAGE(X);
@@ -175,6 +179,7 @@ do_all_constants(PyObject *module,
     ADD_MACRO(LCB_CNTL_SSL_MODE);
     ADD_MACRO(LCB_SSL_ENABLED);
     ADD_MACRO(LCB_CNTL_N1QL_TIMEOUT);
+    ADD_MACRO(LCB_CNTL_COMPRESSION_OPTS);
 
     /* View options */
     ADD_MACRO(LCB_CMDVIEWQUERY_F_INCLUDE_DOCS);
@@ -197,14 +202,46 @@ do_all_constants(PyObject *module,
     ADD_MACRO(LCB_BTYPE_COUCHBASE);
     ADD_MACRO(LCB_BTYPE_EPHEMERAL);
     ADD_MACRO(LCB_BTYPE_MEMCACHED);
+
+    PyModule_AddObject(module, "COMPRESSION", setup_compression_map(module, handler));
+
 #ifdef LCB_N1XSPEC_F_DEFER
     ADD_MACRO(LCB_N1XSPEC_F_DEFER);
 #endif
 }
 
+static PyObject *setup_compression_map(PyObject *module,
+                                       pycbc_constant_handler handler)
+{
+/* Compression options */
+#define LCB_FOR_EACH_COMPRESS_TYPE(X, DIV)\
+    X(COMPRESS_NONE, "Do not perform compression in any direction.") DIV \
+    X(COMPRESS_IN, "Decompress incoming data, if the data has been compressed at the server.") DIV \
+    X(COMPRESS_OUT," Compress outgoing data.") DIV \
+    X(COMPRESS_INOUT) DIV \
+    X(COMPRESS_FORCE,"Setting this flag will force the client to assume that all servers support compression despite a HELLO not having been initially negotiated.")
+
+    PyObject *result = PyDict_New();
+    LCB_FOR_EACH_COMPRESS_TYPE(LCB_CONSTANT, ;);
+#define PP_FOR_EACH(FUNC, DIV)\
+    FUNC(on,           LCB_COMPRESS_INOUT) DIV\
+    FUNC(off,          LCB_COMPRESS_NONE) DIV\
+    FUNC(inflate_only, LCB_COMPRESS_IN) DIV\
+    FUNC(force,        LCB_COMPRESS_INOUT | LCB_COMPRESS_FORCE)
+#undef LCB_FOR_EACH_COMPRESS_TYPE
+
+#define X(NAME, VALUE) PyDict_SetItemString(result,#NAME,PyLong_FromLong(VALUE))
+    PP_FOR_EACH(X, ;);
+#undef X
+    return result;
+}
+
+
+#undef LCB_CONSTANT
+
 static void
-do_constmod(PyObject *module, const char *name, PY_LONG_LONG value) {
-    PyObject *o = PyLong_FromLongLong(value);
+do_constmod(PyObject *module, const char *name, long long value) {
+    PyObject *o = PyLong_FromLongLong((PY_LONG_LONG)value);
     PyModule_AddObject(module, name, o);
 }
 

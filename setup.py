@@ -33,6 +33,9 @@ if sys.platform != 'win32':
         warnings.warn('Adding /usr/local to search path for OS X')
         extoptions['library_dirs'] = ['/usr/local/lib']
         extoptions['include_dirs'] = ['/usr/local/include']
+        if os.environ.get('PYCBC_DEBUG'):
+            extoptions['extra_compile_args'] = ['-O0', '-g']
+            extoptions['extra_link_args'] = ['-O0', '-g']
 else:
     warnings.warn("I'm detecting you're running windows."
                   "You might want to modify "

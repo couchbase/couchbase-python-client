@@ -470,6 +470,8 @@ Attributes
 
     .. autoattribute:: is_ssl
 
+    .. autoattribute:: compression
+
     .. attribute:: default_format
 
         Specify the default format (default: :const:`~couchbase.FMT_JSON`)

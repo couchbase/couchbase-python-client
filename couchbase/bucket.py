@@ -1658,6 +1658,42 @@ class Bucket(_Base):
         self._set_timeout_common(_LCB.LCB_CNTL_N1QL_TIMEOUT, value)
 
     @property
+    def compression(self):
+        """
+        The compression mode to be used when talking to the server.
+
+        This can be any of the values in :module:`couchbase._libcouchbase`
+        prefixed with `COMPRESS_`:
+
+        .. data:: COMPRESS_NONE
+
+        Do not perform compression in any direction.
+
+        .. data:: COMPRESS_IN
+
+        Decompress incoming data, if the data has been compressed at the server.
+
+        .. data:: COMPRESS_OUT
+
+        Compress outgoing data.
+
+        .. data:: COMPRESS_INOUT
+
+        Both `COMPRESS_IN` and `COMPRESS_OUT`.
+
+        .. data:: COMPRESS_FORCE
+
+        Setting this flag will force the client to assume that all servers
+        support compression despite a HELLO not having been initially negotiated.
+        """
+
+        return self._cntl(_LCB.LCB_CNTL_COMPRESSION_OPTS, value_type='int')
+
+    @compression.setter
+    def compression(self, value):
+        self._cntl(_LCB.LCB_CNTL_COMPRESSION_OPTS, value_type='int', value=value)
+
+    @property
     def is_ssl(self):
         """
         Read-only boolean property indicating whether SSL is used for

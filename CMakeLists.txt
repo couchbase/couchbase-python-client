@@ -115,7 +115,7 @@ add_executable(couchbase_python_client_2_3_1
         acouchbase/__init__.py
         acouchbase/asyncio_iops.py
         acouchbase/bucket.py
-        acouchbase/iterator.py
+        acouchbase/py34only/iterator.py
         couchbase/async/__init__.py
         couchbase/async/bucket.py
         couchbase/async/events.py
@@ -147,7 +147,7 @@ add_executable(couchbase_python_client_2_3_1
         couchbase/tests/cases/flush_t.py
         couchbase/tests/cases/format_t.py
         couchbase/tests/cases/get_t.py
-        couchbase/tests/cases/health_t.py
+        couchbase/tests/cases/diag_t.py
         couchbase/tests/cases/iops_t.py
         couchbase/tests/cases/itertypes_t.py
         couchbase/tests/cases/itmops_t.py
