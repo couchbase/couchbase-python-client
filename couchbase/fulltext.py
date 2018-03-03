@@ -694,7 +694,7 @@ class GeoDistanceQuery(Query):
         super(GeoDistanceQuery, self).__init__()
         kwargs['distance'] = distance
         kwargs['location'] = location
-        _assign_kwargs(self, **kwargs)
+        _assign_kwargs(self, kwargs)
 
     location = _genprop(_location_conv, 'location', doc='Location')
     distance = _genprop_str('distance')
@@ -706,7 +706,7 @@ class GeoBoundingBoxQuery(Query):
         super(GeoBoundingBoxQuery, self).__init__()
         kwargs['top_left'] = top_left
         kwargs['bottom_right'] = bottom_right
-        _assign_kwargs(self, **kwargs)
+        _assign_kwargs(self, kwargs)
 
     top_left = _genprop(
         _location_conv, 'top_left',
