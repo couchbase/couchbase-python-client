@@ -22,6 +22,10 @@ sys.path.insert(0, os.path.abspath('../..'))
 sys.path.insert(0, os.path.dirname(__file__))
 #sys.path.insert(0, os.path.abspath('../../couchbase'))
 #sys.path.insert(0, os.path.abspath(os.path.join(os.pardir, os.pardir, 'couchbase')))
+
+from distutils.util import get_platform
+sys.path.insert(0, os.path.abspath('../../build/lib.%s-%s' % (get_platform(), sys.version[0:3])))
+
 import couchbase_version
 
 # -- General configuration -----------------------------------------------------
@@ -129,7 +133,7 @@ html_theme = 'classic'
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+# html_static_path = ['_static']
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
