@@ -80,6 +80,7 @@ def get(path, **kwargs):
     Valid only in :cb_bmeth:`lookup_in`
 
     :param path: The path to retrieve
+
     .. seealso:: :meth:`exists`
     """
     return _gen_3spec(LCB_SDCMD_GET, path, **kwargs)

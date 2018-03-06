@@ -50,7 +50,7 @@ class Admin(LCB.Bucket):
     the cluster.
 
     This object should **not** be used to perform Key/Value operations. The
-    :class:`~.Bucket` is used for that.
+    :class:`~couchbase.bucket.Bucket` is used for that.
     """
     def __init__(self, username, password, host='localhost', port=8091,
                  **kwargs):
@@ -347,6 +347,7 @@ class Admin(LCB.Bucket):
     def users_get(self, domain):
         """
         Retrieve a list of users from the server.
+
         :param AuthDomain domain: The authentication domain to retrieve users from.
         :return: :class:`~.HttpResult`. The list of users can be obtained from
             the returned object's `value` property.
@@ -358,10 +359,10 @@ class Admin(LCB.Bucket):
     def user_get(self, domain, userid):
         """
         Retrieve a user from the server
+
         :param AuthDomain domain: The authentication domain for the user.
         :param userid: The user ID.
-        :raise: :exc:`couchbase.exceptions.HTTPError` if the user does not
-            exist.
+        :raise: :exc:`couchbase.exceptions.HTTPError` if the user does not exist.
         :return: :class:`~.HttpResult`. The user can be obtained from the
             returned object's `value` property.
         """
@@ -372,6 +373,7 @@ class Admin(LCB.Bucket):
     def user_upsert(self, domain, userid, password, roles, name=None):
         """
         Upsert a user in the cluster
+
         :param AuthDomain domain: The authentication domain for the user.
         :param userid: The user ID
         :param password: The user password
@@ -381,11 +383,11 @@ class Admin(LCB.Bucket):
         :raise: :exc:`couchbase.exceptions.HTTPError` if the request fails.
         :return: :class:`~.HttpResult`
 
-        .. Creating a new read-only admin user::
+        Creating a new read-only admin user ::
 
             adm.upsert_user(AuthDomain.Local, 'mark', 's3cr3t', ['ro_admin'])
 
-        .. An example of using more complex roles:
+        An example of using more complex roles ::
 
             adm.upsert_user(AuthDomain.Local, 'mark', 's3cr3t',
                                               [('data_reader', '*'),
@@ -394,8 +396,8 @@ class Admin(LCB.Bucket):
 
         .. warning::
 
-        Due to the asynchronous nature of Couchbase management APIs, it may
-        take a few moments for the new user settings to take effect.
+           Due to the asynchronous nature of Couchbase management APIs, it may
+           take a few moments for the new user settings to take effect.
         """
         tmplist = []
         for role in roles:
@@ -424,8 +426,7 @@ class Admin(LCB.Bucket):
         Remove a user
         :param AuthDomain domain: The authentication domain for the user.
         :param userid: The user ID to remove
-        :raise: :exc:`couchbase.exceptions.HTTPError` if the user does not
-            exist.
+        :raise: :exc:`couchbase.exceptions.HTTPError` if the user does not exist.
         :return: :class:`~.HttpResult`
         """
         path = self._get_management_path(domain, userid)

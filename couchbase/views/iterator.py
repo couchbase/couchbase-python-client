@@ -156,7 +156,7 @@ class View(object):
             ``reduce`` views do not have corresponding
             doc IDs (as these are aggregation functions).
 
-        :param query: If set, should be a :class:`~.Query` or
+        :param query: If set, should be a :class:`~couchbase.views.params.Query` or
             :class:`~.SpatialQuery` object. It is illegal to use
             this in conjunction with additional ``params``
 

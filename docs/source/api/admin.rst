@@ -12,10 +12,10 @@ to perform common API requests.
 
 
 To create an administrative handle, simply instantiate a new
-:class:`Admin` object. Note that unlike the :class:`~.Bucket`,
+:class:`Admin` object. Note that unlike the :class:`~couchbase.bucket.Bucket`,
 the :class:`Admin` constructor does not accept a connection string. This is
 deliberate, as the administrative API communicates with a single node, on
-a well defined port (whereas the :class:`Bucket` object communicates with
+a well defined port (whereas the :class:`~couchbase.bucket.Bucket` object communicates with
 one or more nodes using a variety of different protocols).
 
 

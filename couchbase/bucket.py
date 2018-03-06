@@ -190,7 +190,7 @@ class Bucket(_Base):
         :raise: :exc:`.InvalidError` if the connection string
             was malformed.
 
-        :return: instance of :class:`~.Bucket`
+        :return: instance of :class:`~couchbase.bucket.Bucket`
 
 
         Initialize bucket using default options::
@@ -492,7 +492,7 @@ class Bucket(_Base):
 
             Note that the default value is `None`, which means to use
             the :attr:`quiet`. If it is a boolean (i.e. `True` or
-            `False`) it will override the `Bucket`-level
+            `False`) it will override the `couchbase.bucket.Bucket`-level
             :attr:`quiet` attribute.
 
         :param bool replica: Whether to fetch this key from a replica
@@ -565,10 +565,8 @@ class Bucket(_Base):
 
         :raise: The same things that :meth:`get` does
 
-        .. seealso::
-            :meth:`get` - which can be used to get *and* update the
-                expiration,
-            :meth:`touch_multi`
+        .. seealso:: :meth:`get` - which can be used to get *and* update the
+            expiration, :meth:`touch_multi`
         """
         return _Base.touch(self, key, ttl=ttl)
 
@@ -1293,7 +1291,7 @@ class Bucket(_Base):
 
         :param kvs: Iterable of keys to delete from the cluster. If you wish
             to specify a CAS for each item, then you may pass a dictionary
-            of keys mapping to cas, like ``remove_multi({k1:cas1, k2:cas2})
+            of keys mapping to cas, like `remove_multi({k1:cas1, k2:cas2}`)
         :param quiet: Whether an exception should be raised if one or more
             items were not found
         :return: A :class:`~.MultiResult` containing :class:`~.OperationResult`
@@ -1453,7 +1451,7 @@ class Bucket(_Base):
             :class:`~.View`
                 contains more extensive documentation and examples
 
-            :class:`~.Query`
+            :class:`couchbase.views.params.Query`
                 contains documentation on the available query options
 
             :class:`~.SpatialQuery`

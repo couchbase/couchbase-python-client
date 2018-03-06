@@ -690,8 +690,7 @@ function. Unlike Map-Reduce views and compound keys for *startkey* and
 not sorted or evaluated in any particular order.
 
 
-See `GeoCouch`_<https://github.com/couchbase/geocouch/wiki/Spatial-Views-API>
-for more information.
+See `GeoCouch_<https://github.com/couchbase/geocouch/wiki/Spatial-Views-API>` for more information.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 Creating Geospatial Views
