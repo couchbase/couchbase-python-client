@@ -1,4 +1,3 @@
-#
 # Copyright 2013, Couchbase, Inc.
 # All Rights Reserved
 #

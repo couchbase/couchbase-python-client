@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import gevent
 import gevent.monkey; gevent.monkey.patch_all()
 import sys

@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-#
 # Copyright 2015, Couchbase, Inc.
 # All Rights Reserved
 #

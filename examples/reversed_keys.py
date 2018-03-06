@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 from couchbase.transcoder import Transcoder
 from couchbase.bucket import Bucket
 
