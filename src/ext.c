@@ -325,6 +325,7 @@ init_libcouchbase(void)
     X(HttpResult,       pycbc_HttpResultType_init) \
     X(ViewResult,       pycbc_ViewResultType_init) \
     X(Transcoder,       pycbc_TranscoderType_init) \
+    X(CryptoProvider,   pycbc_CryptoProviderType_init) \
     X(ObserveInfo,      pycbc_ObserveInfoType_init) \
     X(Item,             pycbc_ItemType_init) \
     X(Event,            pycbc_EventType_init) \

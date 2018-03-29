@@ -103,6 +103,141 @@ Bucket_get_transcoder(pycbc_Bucket *self, void *unused)
     return Py_None;
 }
 
+static PyObject*
+Bucket_register_crypto_provider(pycbc_Bucket *self, PyObject *args) {
+    char *name = NULL;
+    pycbc_CryptoProvider *provider = NULL;
+
+    if (!PyArg_ParseTuple(args, "sO", &name, &provider)) {
+        PYCBC_EXCTHROW_ARGS();
+        return NULL;
+    }
+
+    if (!provider || !provider->provider)
+    {
+        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, LCB_EINVAL, "Invalid provider");
+        return NULL;
+    }
+
+    lcbcrypto_register(self->instance, name, provider->provider);
+
+    return Py_None;
+}
+
+static PyObject*
+Bucket_unregister_crypto_provider(pycbc_Bucket *self, PyObject *args)
+{
+    char *name = NULL;
+
+    if (!PyArg_ParseTuple(args, "s", &name)) {
+        PYCBC_EXCTHROW_ARGS();
+        return NULL;
+    }
+    lcbcrypto_unregister(self->instance, name);
+
+    return Py_None;
+}
+#if PY_MAJOR_VERSION<3
+const char* pycbc_cstrn(PyObject* object, Py_ssize_t *length)
+{
+    const char* buffer = NULL;
+    PyString_AsStringAndSize(object, &buffer, length);
+    return buffer;
+}
+#endif
+
+const char *pycbc_dict_cstr(PyObject *dp, char *key) {
+    PyObject *item = PyDict_GetItemString(dp, key);
+    const char* result = "";
+    if (item && PyObject_IsTrue(item)) {
+        result=PYCBC_CSTR(item);
+    }
+    return result;
+}
+
+size_t pycbc_populate_fieldspec(lcbcrypto_FIELDSPEC **fields, PyObject *fieldspec) {
+    size_t i = 0;
+    size_t size = (size_t) PyList_Size(fieldspec);
+    *fields = calloc(size, sizeof(lcbcrypto_FIELDSPEC));
+    for (i = 0; i < size ; ++i) {
+        PyObject *dict = PyList_GetItem(fieldspec, i);
+        (*fields)[i].alg = pycbc_dict_cstr(dict, "alg");
+        (*fields)[i].kid = (PYCBC_CRYPTO_VERSION < 1) ? pycbc_dict_cstr(dict, "kid") : NULL;
+        (*fields)[i].name = pycbc_dict_cstr(dict, "name");;
+    }
+    return size;
+}
+
+static PyObject *
+Bucket_encrypt_fields(pycbc_Bucket *self, PyObject *args)
+{
+    lcbcrypto_CMDENCRYPT cmd = {0};
+    PyObject* fieldspec=NULL;
+    int res =0;
+    if (!PyArg_ParseTuple(args, "s#Os", &cmd.doc, &cmd.ndoc, &fieldspec, &(cmd.prefix))) {
+        PYCBC_EXCTHROW_ARGS();
+        return NULL;
+    }
+
+    ;
+    if (!PyErr_Occurred()) {
+        cmd.nfields = pycbc_populate_fieldspec(&cmd.fields, fieldspec);
+#if PYCBC_CRYPTO_VERSION > 0
+        res = lcbcrypto_encrypt_fields(self->instance, &cmd);
+#else
+        res = lcbcrypto_encrypt_document(self->instance, &cmd);
+#endif
+
+    }
+    if (PyErr_Occurred()) {
+        return NULL;
+    }
+    if (!res) {
+        return pycbc_SimpleStringN(cmd.out, cmd.nout);
+    }
+    PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, LCB_GENERIC_TMPERR, "Internal error while encrypting");
+    return NULL;
+}
+
+
+static PyObject *
+Bucket_decrypt_fields(pycbc_Bucket *self, PyObject *args)
+{
+    lcbcrypto_CMDDECRYPT cmd = { 0 };
+    int res =0;
+    PyObject* fieldspec = NULL;
+    if (!PyArg_ParseTuple(args, "s#"
+#if PYCBC_CRYPTO_VERSION >0
+                                "O"
+#endif
+                                "s", &cmd.doc, &cmd.ndoc,
+#if PYCBC_CRYPTO_VERSION > 0
+                          &fieldspec,
+#endif
+                          &cmd.prefix)) {
+        PYCBC_EXCTHROW_ARGS();
+        return NULL;
+    }
+
+    if (!PyErr_Occurred()) {
+#if PYCBC_CRYPTO_VERSION > 0
+        cmd.nfields = pycbc_populate_fieldspec(&cmd.fields, fieldspec);
+        res = lcbcrypto_decrypt_fields(self->instance, &cmd);
+#else
+        res = lcbcrypto_decrypt_document(self->instance, &cmd);
+#endif
+    }
+
+    if (PyErr_Occurred()) {
+        return NULL;
+    }
+    if (!res) {
+        return pycbc_SimpleStringN(cmd.out, cmd.nout);
+    }
+    PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, LCB_GENERIC_TMPERR, "Internal error while decrypting");
+    return NULL;
+}
+
 static PyObject *
 Bucket_server_nodes(pycbc_Bucket *self, void *unused)
 {
@@ -617,6 +752,26 @@ static PyMethodDef Bucket_TABLE_methods[] = {
                 (PyCFunction)Bucket__add_creds,
                 METH_VARARGS,
                 PyDoc_STR("Add additional user/pasword information")
+        },
+        { "register_crypto_provider",
+                (PyCFunction)Bucket_register_crypto_provider,
+                METH_VARARGS,
+                PyDoc_STR("Registers crypto provider used to encrypt/decrypt document fields")
+        },
+        { "unregister_crypto_provider",
+                (PyCFunction)Bucket_unregister_crypto_provider,
+                METH_VARARGS,
+                PyDoc_STR("Unregisters crypto provider used to encrypt/decrypt document fields")
+        },
+        { "encrypt_fields",
+                (PyCFunction)Bucket_encrypt_fields,
+                METH_VARARGS,
+                PyDoc_STR("Encrypts a set of fields using the registered providers")
+        },
+        { "decrypt_fields",
+                (PyCFunction)Bucket_decrypt_fields,
+                METH_VARARGS,
+                PyDoc_STR("Decrypts a set of fields using the registered providers")
         },
 
         { NULL, NULL, 0, NULL }

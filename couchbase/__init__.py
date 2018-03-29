@@ -27,7 +27,7 @@ warnings.filterwarnings(action='default',
 
 from couchbase.user_constants import *
 import couchbase._libcouchbase as _LCB
-
+from couchbase.crypto import *
 try:
     from couchbase._version import __version__
 

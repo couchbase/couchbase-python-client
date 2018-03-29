@@ -211,6 +211,11 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
     ADD_MACRO(LCB_BTYPE_EPHEMERAL);
     ADD_MACRO(LCB_BTYPE_MEMCACHED);
 
+    /* Encryption options */
+    ADD_MACRO(LCBCRYPTO_KEY_ENCRYPT);
+    ADD_MACRO(LCBCRYPTO_KEY_DECRYPT);
+    LCB_CONSTANT(VERSION);
+    ADD_MACRO(PYCBC_CRYPTO_VERSION);
     PyModule_AddObject(module, "COMPRESSION", setup_compression_map(module, handler));
 
 #ifdef LCB_N1XSPEC_F_DEFER

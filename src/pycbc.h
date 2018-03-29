@@ -49,6 +49,29 @@
 #include <libcouchbase/n1ql.h>
 #include <libcouchbase/cbft.h>
 #include <libcouchbase/ixmgmt.h>
+
+#undef PYCBC_DEBUG
+#ifdef PYCBC_DEBUG
+#define PYCBC_DEBUG_LOG_RAW(...) printf(__VA_ARGS__);
+#else
+#define PYCBC_DEBUG_LOG_RAW(...)
+#endif
+
+// TODO: fix in libcouchbase
+#ifdef _WIN32
+//#if _MSC_VER >= 1600
+//        #include <cstdint>
+//#else
+    typedef __int8              int8_t;
+    typedef __int16             int16_t;
+//#endif
+#include "libcouchbase/sysdefs.h"
+#define uint8_t lcb_uint8_t
+#define uint16_t lcb_uint16_t
+#define uint64_t lcb_uint64_t
+#endif
+
+#include <libcouchbase/crypto.h>
 #if LCB_VERSION < 0x020601
 #error "Couchbase Python SDK requires libcouchbase 2.6.1 or greater"
 #endif
@@ -108,6 +131,8 @@ typedef int pycbc_strlen_t;
 #define pycbc_SimpleStringZ(c) PyUnicode_FromString(c)
 #define pycbc_SimpleStringN(c, n) PyUnicode_FromStringAndSize(c, n)
 
+#define PYCBC_CSTR(X) PyUnicode_AsUTF8(X)
+#define PYCBC_CSTRN(X, n) PyUnicode_AsUTF8AndSize(X, (Py_ssize_t*)n)
 
 #else
 
@@ -124,6 +149,11 @@ typedef int pycbc_strlen_t;
 #define pycbc_IntFromULL PyLong_FromUnsignedLongLong
 #define pycbc_SimpleStringZ(c) PyString_FromString(c)
 #define pycbc_SimpleStringN(c, n) PyString_FromStringAndSize(c, n)
+
+const char* pycbc_cstrn(PyObject* object, Py_ssize_t *length);
+
+#define PYCBC_CSTR(X) PyString_AsString(X)
+#define PYCBC_CSTRN(X, n) pycbc_cstrn((X), (n))
 
 unsigned PY_LONG_LONG pycbc_IntAsULL(PyObject *o);
 PY_LONG_LONG pycbc_IntAsLL(PyObject *o);
@@ -969,6 +999,7 @@ int pycbc_OperationResultType_init(PyObject **ptr);
 int pycbc_SDResultType_init(PyObject **ptr);
 int pycbc_HttpResultType_init(PyObject **ptr);
 int pycbc_TranscoderType_init(PyObject **ptr);
+int pycbc_CryptoProviderType_init(PyObject **ptr);
 int pycbc_ObserveInfoType_init(PyObject **ptr);
 int pycbc_ItemType_init(PyObject **ptr);
 int pycbc_EventType_init(PyObject **ptr);
@@ -1354,6 +1385,32 @@ PyObject *pycbc_Bucket__ping(pycbc_Bucket *self,
 PyObject *pycbc_Bucket__diagnostics(pycbc_Bucket *self,
                                     PyObject *args,
                                     PyObject *kwargs);
+
+/**
+ * Encryption Provider
+ */
+typedef struct {
+    PyObject_HEAD
+    lcbcrypto_PROVIDER* provider;
+} pycbc_CryptoProvider;
+
+#ifndef PYCBC_CRYPTO_VERSION
+#if LCB_VERSION > 0x020807
+#define PYCBC_CRYPTO_VERSION 1
+#else
+#define PYCBC_CRYPTO_VERSION 0
+#endif
+#endif
+
+
+#if PYCBC_CRYPTO_VERSION==1
+#define PYCBC_CRYPTO_VVERSION v1
+#define PYCBC_CRYPTO_METHODS(X) PYCBC_X_V1_CRYPTO_METHODS(X)
+#else
+#define PYCBC_CRYPTO_VVERSION v0
+#define PYCBC_CRYPTO_METHODS(X) PYCBC_X_V0_CRYPTO_METHODS(X)
+#endif
+
 /**
  * Flag to check if logging is enabled for the library via Python's logging
  */

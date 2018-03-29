@@ -67,7 +67,7 @@ else:
     extoptions['libraries'] = ['libcouchbase']
     ## Enable these lines for debug builds
     if os.environ.get('PYCBC_DEBUG'):
-        extoptions['extra_compile_args'] += ['/Zi']
+        extoptions['extra_compile_args'] += ['/Zi','/DEBUG']
         extoptions['extra_link_args'] += ['/DEBUG']
     extoptions['library_dirs'] = [os.path.join(lcb_root, 'lib')]
     extoptions['include_dirs'] = [os.path.join(lcb_root, 'include')]
@@ -95,6 +95,7 @@ SOURCEMODS = [
         'http',
         'htresult',
         'ctranscoder',
+        'crypto',
         'observe',
         'iops',
         'connevents',

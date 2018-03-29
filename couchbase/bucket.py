@@ -2239,3 +2239,70 @@ class Bucket(_Base):
 
     def set_attribute(self, key, attrname):
         pass
+
+    def register_crypto_provider(self, name, provider):
+        """
+        Registers the crypto provider used to encrypt and decrypt document fields.
+        :param name: The name of the provider.
+        :param provider: The provider implementation. // reference LCB type?
+        """
+        _Base.register_crypto_provider(self, name, provider)
+
+    def unregister_crypto_provider(self, name):
+        """
+        Unregisters the crypto provider used to encrypt and decrypt document fields.
+        :param name: The name of the provider.
+        """
+        _Base.unregister_crypto_provider(self, name)
+
+    def encrypt_fields(self, document, fieldspec, prefix):
+        """
+        Encrypt a document using the registered encryption providers.
+        :param document: The document body.
+        :param fieldspec: A list of field specifications, each of which is
+        a dictionary as follows:
+            {
+                'alg' : registered algorithm name,
+                'kid' : key id to use to encrypt with,
+                'name' : field name
+            }
+        :param prefix: Prefix for encrypted field names. Default is None.
+        :return: Encrypted document.
+        """
+        json_encoded = json.dumps(document)
+        encrypted_string = _Base.encrypt_fields(self, json_encoded, fieldspec, prefix)
+        if not encrypted_string:
+            raise couchbase.exceptions.CouchbaseError("Encryption failed")
+        return json.loads(encrypted_string)
+
+    def decrypt_fields_real(self, document, *args):
+        json_decoded = json.dumps(document)
+        decrypted_string = _Base.decrypt_fields(self, json_decoded, *args)
+        if not decrypted_string:
+            raise couchbase.exceptions.CouchbaseError("Decryption failed")
+        return json.loads(decrypted_string)
+
+    if _LCB.PYCBC_CRYPTO_VERSION<1:
+        def decrypt_fields(self, document, prefix):
+            """
+            Decrypts a document using the registered encryption providers.
+            :param document: The document body.
+            :param prefix: Prefix for encrypted field names. Default is None.
+            :return:
+            """
+            return self.decrypt_fields_real(document, prefix)
+    else:
+        def decrypt_fields(self, document, fieldspec, prefix):
+            """
+            Decrypts a document using the registered encryption providers.
+            :param document: The document body.
+            :param fieldspec: A list of field specifications, each of which is
+            a dictionary as follows:
+                {
+                    'alg' : registered algorithm name,
+                    'name' : field name
+                }
+            :param prefix: Prefix for encrypted field names. Default is None.
+            :return:
+            """
+            return self.decrypt_fields_real(document, fieldspec, prefix)
