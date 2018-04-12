@@ -123,7 +123,6 @@ def _dsop(create_type=None, wrap_missing_path=True):
 
     return real_decorator
 
-
 class Bucket(_Base):
     def __init__(self, *args, **kwargs):
         """Connect to a bucket.
@@ -180,6 +179,10 @@ class Bucket(_Base):
 
         :param lockmode: The *lockmode* for threaded access.
             See :ref:`multiple_threads` for more information.
+
+        :param tracer: An OpenTracing tracer into which
+            to propagate any tracing information. Requires
+            tracing to be enabled.
 
         :raise: :exc:`.BucketNotFoundError` or :exc:`.AuthError` if
             there is no such bucket to connect to, or if invalid
@@ -254,7 +257,7 @@ class Bucket(_Base):
             if not _no_connect_exceptions:
                 raise
 
-    def _do_ctor_connect(self):
+    def _do_ctor_connect(self, *args, **kwargs):
         """This should be overidden by subclasses which want to use a
         different sort of connection behavior
         """

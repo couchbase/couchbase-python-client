@@ -14,7 +14,10 @@
  *   limitations under the License.
  **/
 
+//#include <libcouchbase/subdoc.h>
 #include "oputil.h"
+#include "pycbc.h"
+#include "structmember.h"
 
 void
 pycbc_common_vars_finalize(struct pycbc_common_vars *cv, pycbc_Bucket *conn)
@@ -31,8 +34,9 @@ pycbc_common_vars_finalize(struct pycbc_common_vars *cv, pycbc_Bucket *conn)
     }
 }
 
-int
-pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Bucket *self)
+TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,,
+int,
+pycbc_common_vars_wait, struct pycbc_common_vars *cv, pycbc_Bucket *self)
 {
     Py_ssize_t nsched = cv->is_seqcmd ? 1 : cv->ncmds;
 
@@ -58,7 +62,7 @@ pycbc_common_vars_wait(struct pycbc_common_vars *cv, pycbc_Bucket *self)
         Py_INCREF(Py_None);
         return 0;
     }
-    pycbc_oputil_wait_common(self);
+    PYCBC_TRACE_WRAP(pycbc_oputil_wait_common, NULL, self);
 
     if (!pycbc_assert(self->nremaining == 0)) {
         fprintf(stderr, "Remaining count != 0. Adjusting");
@@ -250,7 +254,8 @@ pycbc_oputil_sequence_next(pycbc_seqtype_t seqtype,
                            Py_ssize_t *dictpos,
                            int ii,
                            PyObject **key,
-                           PyObject **value)
+                           PyObject **value,
+                           pycbc_stack_context_handle context )
 {
     if (seqtype & PYCBC_SEQTYPE_DICT) {
         int rv = PyDict_Next(seqobj, dictpos, key, value);
@@ -338,6 +343,16 @@ extract_item_params(struct pycbc_common_vars *cv,
     return 0;
 }
 
+#ifdef PYCBC_TRACING
+pycbc_oputil_keyhandler pycbc_oputil_keyhandler_build(pycbc_oputil_keyhandler_raw cb, const char* category, const char* name) {
+	pycbc_oputil_keyhandler handler;
+	handler.cb = cb;
+	handler.category = category;
+	handler.name = name;
+	return handler;
+}
+#endif
+
 int
 pycbc_oputil_iter_multi(pycbc_Bucket *self,
                         pycbc_seqtype_t seqtype,
@@ -345,7 +360,8 @@ pycbc_oputil_iter_multi(pycbc_Bucket *self,
                         struct pycbc_common_vars *cv,
                         int optype,
                         pycbc_oputil_keyhandler handler,
-                        void *arg)
+                        void *arg,
+                        pycbc_stack_context_handle context)
 {
     int rv = 0;
     int ii;
@@ -359,12 +375,13 @@ pycbc_oputil_iter_multi(pycbc_Bucket *self,
     }
 
     for (ii = 0; ii < cv->ncmds; ii++) {
+
         PyObject *k, *v = NULL, *options = NULL;
         PyObject *arg_k = NULL;
         pycbc_Item *itm = NULL;
 
         rv = pycbc_oputil_sequence_next(seqtype,
-                                        seqobj, &dictpos, ii, &k, &v);
+                                        seqobj, &dictpos, ii, &k, &v, context);
         if (rv < 0) {
             goto GT_ITER_DONE;
         }
@@ -379,9 +396,13 @@ pycbc_oputil_iter_multi(pycbc_Bucket *self,
             arg_k = k;
         }
 
-        rv = handler(self, cv, optype, arg_k, v, options, itm, arg);
+#ifdef PYCBC_TRACING
+        rv = PYCBC_TRACE_WRAP_EXPLICIT_NAMED((handler).cb, (handler).name, (handler).category, NULL, self, cv, optype, arg_k, v, options, itm, arg);
+#else
+        rv = PYCBC_TRACE_WRAP_EXPLICIT_NAMED(handler, "", "", NULL, self, cv, optype, arg_k, v, options, itm, arg);
+#endif
 
-        GT_ITER_DONE:
+    GT_ITER_DONE:
         Py_XDECREF(k);
         Py_XDECREF(v);
 
@@ -440,8 +461,8 @@ pycbc_oputil_conn_unlock(pycbc_Bucket *self)
     PyThread_release_lock(self->lock);
 }
 
-void
-pycbc_oputil_wait_common(pycbc_Bucket *self)
+TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,,void,
+pycbc_oputil_wait_common,pycbc_Bucket *self)
 {
     /**
      * If we have a 'lockmode' specified, check to see that nothing else is
@@ -601,8 +622,8 @@ sd_convert_spec(PyObject *pyspec, lcb_SDSPEC *sdspec,
     return -1;
 }
 
-int
-pycbc_sd_handle_speclist(pycbc_Bucket *self, pycbc_MultiResult *mres,
+TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,, int,
+pycbc_sd_handle_speclist, pycbc_Bucket *self, pycbc_MultiResult *mres,
     PyObject *key, PyObject *spectuple, lcb_CMDSUBDOC *cmd)
 {
     int rv = 0;
@@ -655,6 +676,11 @@ pycbc_sd_handle_speclist(pycbc_Bucket *self, pycbc_MultiResult *mres,
     }
 
     if (rv == 0) {
+        PYCBC_TRACECMD_PURE((*cmd), context);
+#ifdef PYCBC_TRACING
+        newitm->tracing_context = context;
+        newitm->is_tracing_stub = 0;
+#endif
         err = lcb_subdoc3(self->instance, mres, cmd);
         if (err == LCB_SUCCESS) {
             PyDict_SetItem((PyObject*)mres, key, (PyObject*)newitm);

@@ -89,7 +89,7 @@ pycbc_observeinfo_new(pycbc_Bucket *parent)
 
 static int
 handle_single_observe(pycbc_Bucket *self, PyObject *curkey, int master_only,
-    struct pycbc_common_vars *cv)
+    struct pycbc_common_vars *cv, pycbc_stack_context_handle context)
 {
     int rv;
     pycbc_pybuffer keybuf = { NULL };
@@ -105,7 +105,7 @@ handle_single_observe(pycbc_Bucket *self, PyObject *curkey, int master_only,
     if (master_only) {
         cmd.cmdflags |= LCB_CMDOBSERVE_F_MASTER_ONLY;
     }
-
+    PYCBC_TRACECMD(cmd,context, cv->mres, curkey, self);
     err = cv->mctx->addcmd(cv->mctx, (lcb_CMDBASE*)&cmd);
     if (err == LCB_SUCCESS) {
         rv = 0;
@@ -119,7 +119,7 @@ handle_single_observe(pycbc_Bucket *self, PyObject *curkey, int master_only,
 }
 
 static PyObject *
-observe_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopts)
+observe_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopts, pycbc_stack_context_handle context)
 {
     int rv;
     int ii;
@@ -174,12 +174,12 @@ observe_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopts
             PyObject *curkey = NULL, *curvalue = NULL;
 
             rv = pycbc_oputil_sequence_next(seqtype, curseq, &dictpos, ii,
-                &curkey, &curvalue);
+                &curkey, &curvalue, context);
             if (rv < 0) {
                 goto GT_ITER_DONE;
             }
 
-            rv = handle_single_observe(self, curkey, master_only, &cv);
+            rv = handle_single_observe(self, curkey, master_only, &cv, context);
 
             GT_ITER_DONE:
             Py_XDECREF(curkey);
@@ -191,7 +191,7 @@ observe_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopts
         }
 
     } else {
-        rv = handle_single_observe(self, kobj, master_only, &cv);
+        rv = handle_single_observe(self, kobj, master_only, &cv, context);
 
         if (rv < 0) {
             goto GT_DONE;
@@ -199,7 +199,7 @@ observe_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopts
     }
 
     cv.is_seqcmd = 1;
-    if (-1 == pycbc_common_vars_wait(&cv, self)) {
+    if (-1 == PYCBC_TRACE_WRAP(pycbc_common_vars_wait, kwargs, &cv, self)) {
         goto GT_DONE;
     }
 
@@ -210,13 +210,17 @@ observe_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopts
 }
 
 PyObject *
-pycbc_Bucket_observe(pycbc_Bucket *self, PyObject *args, PyObject *kw)
+pycbc_Bucket_observe(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
 {
-    return observe_common(self, args, kw, PYCBC_ARGOPT_SINGLE);
+    PyObject* result;
+    PYCBC_TRACE_WRAP_TOPLEVEL(result,LCBTRACE_OP_REQUEST_ENCODING, observe_common, self->tracer, self, args, kwargs, PYCBC_ARGOPT_SINGLE);
+    return result;
 }
 
 PyObject *
-pycbc_Bucket_observe_multi(pycbc_Bucket *self, PyObject *args, PyObject *kw)
+pycbc_Bucket_observe_multi(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
 {
-    return observe_common(self, args, kw, PYCBC_ARGOPT_MULTI);
+    PyObject* result;
+    PYCBC_TRACE_WRAP_TOPLEVEL(result,LCBTRACE_OP_REQUEST_ENCODING, observe_common, self->tracer, self, args, kwargs, PYCBC_ARGOPT_MULTI);
+    return result;
 }

@@ -13,13 +13,34 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  **/
-
 #ifndef PYCBC_H_
 #define PYCBC_H_
 /**
  * This file contains the base header for the Python Couchbase Client
  * @author Mark Nunberg
  */
+#ifdef PYCBC_DEBUG
+#define PYCBC_DEBUG_LOG_RAW(...) printf(__VA_ARGS__);
+#else
+#define PYCBC_DEBUG_LOG_RAW(...)
+#endif
+
+#define PYCBC_DEBUG_LOG_WITH_FILE_AND_LINE_POSTFIX(FILE,LINE,POSTFIX,...)\
+    PYCBC_DEBUG_LOG_RAW("at %s line %d:", FILE, LINE)\
+    PYCBC_DEBUG_LOG_RAW(__VA_ARGS__)\
+    PYCBC_DEBUG_LOG_RAW(POSTFIX)
+#define PYCBC_DEBUG_LOG_WITH_FILE_AND_LINE_NEWLINE(FILE,LINE,...) PYCBC_DEBUG_LOG_WITH_FILE_AND_LINE_POSTFIX(FILE,LINE,"\n", __VA_ARGS__)
+#define PYCBC_DEBUG_LOG_WITHOUT_NEWLINE(...) PYCBC_DEBUG_LOG_WITH_FILE_AND_LINE_POSTFIX(__FILE__,__LINE__, "", __VA_ARGS__)
+#define PYCBC_DEBUG_LOG(...) PYCBC_DEBUG_LOG_WITH_FILE_AND_LINE_NEWLINE(__FILE__,__LINE__,__VA_ARGS__)
+
+#ifdef PYCBC_DEBUG
+#define PYCBC_DECREF(X) pycbc_assert(Py_REFCNT(X)>0);PYCBC_DEBUG_LOG("%p has count of %li", X, Py_REFCNT(X)); Py_DECREF(X);
+#define PYCBC_XDECREF(X) pycbc_assert(!X || Py_REFCNT(X)>0);PYCBC_DEBUG_LOG("%p has count of %li", X, X?Py_REFCNT(X):0); Py_XDECREF(X)
+#else
+#define PYCBC_DECREF(X) Py_DECREF(X);
+#define PYCBC_XDECREF(X) Py_XDECREF(X);
+#endif
+
 
 #include <Python.h>
 #include <libcouchbase/couchbase.h>
@@ -272,12 +293,35 @@ typedef struct {
     char replicate_to;
 } pycbc_dur_params;
 
+void pycbc_dict_add_text_kv(PyObject *dict, const char *key, const char *value);
+void pycbc_print_string( PyObject *curkey);
+void pycbc_print_repr( PyObject *pobj);
+void pycbc_exception_log(const char* file, int line, int clear);
+#ifdef PYCBC_DEBUG
+#define PYCBC_EXCEPTION_LOG_NOCLEAR pycbc_exception_log(__FILE__,__LINE__,0);
+#define PYCBC_EXCEPTION_LOG pycbc_exception_log(__FILE__,__LINE__,1);
+#else
+#define PYCBC_EXCEPTION_LOG_NOCLEAR
+#define PYCBC_EXCEPTION_LOG PyErr_Clear();
+#endif
+
+struct pycbc_Tracer;
+
+#ifdef LCB_TRACING
+#ifdef PYCBC_TRACING_ENABLE
+#define PYCBC_TRACING
+#endif
+#endif
+
 typedef struct {
     PyObject_HEAD
 
     /** LCB instance */
     lcb_t instance;
-
+#ifdef PYCBC_TRACING
+    /** Tracer **/
+    struct pycbc_Tracer *tracer;
+#endif
     /** Transcoder object */
     PyObject *tc;
 
@@ -342,6 +386,140 @@ typedef struct {
 
 } pycbc_Bucket;
 
+#ifdef PYCBC_TRACING
+
+typedef struct pycbc_Tracer {
+    PyObject_HEAD
+    lcbtrace_TRACER *tracer;
+    PyObject* parent;
+    lcb_t *instance;
+
+    int init_called:1;
+} pycbc_Tracer_t;
+
+static PyTypeObject SpanType = {
+        PYCBC_POBJ_HEAD_INIT(NULL)
+        0
+};
+
+typedef struct {
+    PyObject_HEAD
+#ifdef PYCBC_TRACING
+    lcbtrace_SPAN *span;
+#endif
+} pycbc_Span_t;
+
+
+typedef struct
+{
+#ifdef PYCBC_TRACING
+    pycbc_Tracer_t* tracer;
+    lcbtrace_SPAN* span;
+#endif
+} pycbc_stack_context;
+
+typedef pycbc_stack_context* pycbc_stack_context_handle;
+#else
+
+typedef void* pycbc_stack_context_handle;
+
+#endif
+
+#ifdef PYCBC_TRACING
+
+int pycbc_is_async_or_pipeline(const pycbc_Bucket *self);
+
+pycbc_stack_context_handle pycbc_Tracer_span_start(pycbc_Tracer_t *tracer, PyObject *kwargs, const char *operation,
+                                                   lcb_uint64_t now, pycbc_stack_context_handle context,
+                                                   lcbtrace_REF_TYPE ref_type, const char* component);
+PyObject* pycbc_Context_finish(pycbc_stack_context_handle context );
+void pycbc_Tracer_propagate(pycbc_Tracer_t *tracer);
+
+
+void pycbc_init_traced_result(pycbc_Bucket *self, PyObject* mres_dict, PyObject *curkey,
+                              pycbc_stack_context_handle context);
+
+#define PYCBC_GET_STACK_CONTEXT(KWARGS,CATEGORY,TRACER, PARENT_CONTEXT) pycbc_Tracer_span_start(TRACER, KWARGS, CATEGORY, 0, PARENT_CONTEXT, LCBTRACE_REF_CHILD_OF )
+#define PYCBC_TRACE_GET_STACK_CONTEXT_TOPLEVEL(KWARGS,CATEGORY,TRACER, NAME) pycbc_Tracer_span_start(TRACER, KWARGS, CATEGORY, 0, NULL, LCBTRACE_REF_NONE, NAME )
+
+extern PyObject* pycbc_default_key;
+#define PYCBC_DEFAULT_TRACING_KEY pycbc_default_key
+
+pycbc_stack_context_handle pycbc_check_context(pycbc_stack_context_handle CONTEXT, const char* file, int line);
+
+
+#define PYCBC_CHECK_CONTEXT(CONTEXT) pycbc_check_context(CONTEXT,__FILE__,__LINE__)
+#define PYCBC_TRACECMD_PURE(CMD,CONTEXT) {\
+    if (PYCBC_CHECK_CONTEXT(CONTEXT))\
+    {  \
+        PYCBC_DEBUG_LOG("setting trace span on %.*s\n",\
+        (int)(CMD).key.contig.nbytes,(const char*)(CMD).key.contig.bytes);\
+        LCB_CMD_SET_TRACESPAN(&(CMD),(CONTEXT)->span);\
+    } else {PYCBC_EXCEPTION_LOG_NOCLEAR;}\
+};
+
+#define PYCBC_TRACECMD(CMD,CONTEXT,MRES,CURKEY,BUCKET) PYCBC_TRACECMD_PURE(CMD,CONTEXT); \
+    pycbc_init_traced_result(BUCKET, pycbc_multiresult_dict(MRES), CURKEY, context);
+
+#define PYCBC_TRACE_POP_CONTEXT(CONTEXT) pycbc_Context_finish(CONTEXT);
+
+
+#define PYCBC_TRACE_WRAP_TOPLEVEL_WITHNAME(RV, CATEGORY, NAME, TRACER, STRINGNAME, ...) \
+{\
+    int should_trace = 1 || !pycbc_is_async_or_pipeline(self);\
+    pycbc_stack_context_handle sub_context = NULL;\
+    if (should_trace) { sub_context = PYCBC_TRACE_GET_STACK_CONTEXT_TOPLEVEL(kwargs, CATEGORY, TRACER, STRINGNAME); };\
+    RV = NAME(__VA_ARGS__, sub_context);\
+    if ( 0 && should_trace && sub_context && !pycbc_is_async_or_pipeline(self)) {\
+        pycbc_Context_finish(sub_context);\
+    }\
+    PYCBC_EXCEPTION_LOG_NOCLEAR;\
+};
+
+
+
+#define PYCBC_TRACE_WRAP_EXPLICIT_NAMED(NAME,COMPONENTNAME,CATEGORY,KWARGS,...) NAME(__VA_ARGS__, pycbc_Tracer_span_start(self->tracer,KWARGS,CATEGORY,0, context, LCBTRACE_REF_CHILD_OF, COMPONENTNAME))
+#define PYCBC_TRACE_WRAP(NAME,KWARGS,...) PYCBC_TRACE_WRAP_EXPLICIT_NAMED(NAME, #NAME, NAME##_category(), KWARGS, __VA_ARGS__)
+
+#define PYCBC_TRACE_WRAP_TOPLEVEL(RV, CATEGORY, NAME, TRACER, ...)\
+    PYCBC_TRACE_WRAP_TOPLEVEL_WITHNAME(RV, CATEGORY, NAME, TRACER, #NAME, __VA_ARGS__);
+
+#else
+
+#define PYCBC_GET_STACK_CONTEXT(CATEGORY,TRACER, PARENT_CONTEXT) NULL
+#define PYCBC_TRACECMD(...)
+#define PYCBC_TRACECMD_PURE(...)
+#define PYCBC_TRACE_POP_CONTEXT(X)
+#define PYCBC_TRACE_WRAP_TOPLEVEL_WITHNAME(RV, CATEGORY, NAME, TRACER, STRINGNAME, ...) { RV = NAME(__VA_ARGS__, NULL); }
+#define PYCBC_TRACE_WRAP_EXPLICIT_NAMED(NAME,COMPONENTNAME,CATEGORY,KWARGS,...) NAME(__VA_ARGS__, NULL)
+#define PYCBC_TRACE_WRAP_TOPLEVEL(RV,CATEGORY,NAME,TRACER,...) { RV=NAME(__VA_ARGS__,NULL); }
+#define PYCBC_TRACE_WRAP(NAME,KWARGS,...) NAME(__VA_ARGS__, NULL)
+#define PYCBC_TRACE_GET_STACK_CONTEXT_TOPLEVEL(...) NULL
+
+#endif
+
+
+#define TRACED_FUNCTION(CATEGORY,QUALIFIERS,RTYPE,NAME,...)\
+    const char* NAME##_category(void){ return CATEGORY; }\
+    QUALIFIERS RTYPE NAME(__VA_ARGS__, pycbc_stack_context_handle context)
+
+#define TRACED_FUNCTION_DECL(QUALIFIERS,RTYPE,NAME,...)\
+    const char* NAME##_category(void);\
+    QUALIFIERS RTYPE NAME(__VA_ARGS__, pycbc_stack_context_handle context);
+
+#define TRACED_FUNCTION_WRAPPER(name, CATEGORY, CLASS) \
+PyObject *pycbc_##CLASS##_##name##_real(pycbc_##CLASS *self, PyObject *args, PyObject *kwargs,\
+                                        pycbc_stack_context_handle context);\
+PyObject *pycbc_##CLASS##_##name(pycbc_##CLASS *self, \
+                                      PyObject *args, PyObject *kwargs) {\
+        PyObject* result;\
+        PYCBC_TRACE_WRAP_TOPLEVEL_WITHNAME(result, CATEGORY, pycbc_##CLASS##_##name##_real, self->tracer, #CLASS "." #name, self, args, kwargs);\
+        return result;\
+}\
+PyObject *pycbc_##CLASS##_##name##_real(pycbc_##CLASS *self, PyObject *args, PyObject *kwargs,\
+                                        pycbc_stack_context_handle context)
+
+
 
 /*****************
  * Result Objects.
@@ -353,10 +531,20 @@ typedef struct {
  * See result.c and opresult.c
  */
 
+#ifdef PYCBC_TRACING
+#define TRACING_DATA \
+    pycbc_stack_context_handle tracing_context;\
+    int is_tracing_stub;\
+    PyObject* tracing_output;
+#else
+#define TRACING_DATA
+#endif
+
 #define pycbc_Result_HEAD \
     PyObject_HEAD \
     lcb_error_t rc; \
-    PyObject *key;
+    PyObject *key; \
+    TRACING_DATA
 
 #define pycbc_OpResult_HEAD \
     pycbc_Result_HEAD \
@@ -429,6 +617,10 @@ typedef struct {
     PyObject *rows;
     long rows_per_call;
     char has_parse_error;
+#ifdef PYCBC_TRACING
+    pycbc_Tracer_t* py_tracer;
+    int own_tracer;
+#endif
 } pycbc_ViewResult;
 
 
@@ -616,6 +808,11 @@ enum {
  */
 int pycbc_ResultType_ready(PyTypeObject *p, int flags);
 
+/**
+ * Types used for tracing
+ */
+#define PYCBC_TRACING_TYPES(X)\
+    X(Tracer, "The Tracer Object") \
 
 /**
  * Extern PyTypeObject declaraions.
@@ -638,6 +835,12 @@ extern PyTypeObject pycbc__SDResultType;
 /* views.c */
 extern PyTypeObject pycbc_ViewResultType;
 
+/* ext.c */
+#define PYCBC_EXTERN(X,DOC)\
+extern PyTypeObject pycbc_##X##Type;
+
+PYCBC_TRACING_TYPES(PYCBC_EXTERN);
+#undef PYCBC_EXTERN
 /**
  * Result type check macros
  */
@@ -775,11 +978,28 @@ int pycbc_AsyncResultType_init(PyObject **ptr);
 int pycbc_IOPSWrapperType_init(PyObject **ptr);
 int pycbc_ViewResultType_init(PyObject **ptr);
 
+#define PYCBC_TYPE_INIT_DECL(TYPENAME,TYPE_DOC)\
+int \
+pycbc_##TYPENAME##Type_init(PyObject **ptr);\
+extern PyTypeObject pycbc_##TYPENAME##Type;
+
+PYCBC_TRACING_TYPES(PYCBC_TYPE_INIT_DECL);
+
+#undef PYCBC_TYPE_INIT_DECL
 /**
  * Calls the type's constructor with no arguments:
  */
-#define PYCBC_TYPE_CTOR(t) PyObject_CallFunction((PyObject*)t, NULL, NULL)
+//#define PYCBC_TYPE_CTOR(t,...) PyObject_CallFunction((PyObject*)t, NULL, NULL)
+#define PYCBC_TYPE_CTOR_1_args(t)               PyObject_CallFunction((PyObject*)t, 0)
+#define PYCBC_TYPE_CTOR_2_args(t, args)         PyObject_CallFunction((PyObject*)t, "O", args)
+#define PYCBC_TYPE_CTOR_3_args(t, args, kwargs) PyObject_CallFunction((PyObject*)t, "OO", args, kwargs)
 
+#define GET_4TH_ARG(arg1, arg2, arg3, arg4, ...) arg4
+#define PYCBC_TYPE_CTOR_CHOOSER(...) \
+    GET_4TH_ARG(__VA_ARGS__, PYCBC_TYPE_CTOR_3_args, \
+                PYCBC_TYPE_CTOR_2_args, PYCBC_TYPE_CTOR_1_args, )
+
+#define PYCBC_TYPE_CTOR(...) PYCBC_TYPE_CTOR_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
 
 /**
  * Allocators for result functions. See callbacks.c:get_common
@@ -952,7 +1172,7 @@ PyObject* pycbc_exc_get_categories(PyObject *self, PyObject *arg);
         struct pycbc_exception_params __pycbc_ep = {0};                        \
         __pycbc_ep.file = __FILE__;                                            \
         __pycbc_ep.line = __LINE__;                                            \
-        __pycbc_ep.err = e_err;                                                \
+        __pycbc_ep.err = (lcb_error_t)e_err;                                                \
         __pycbc_ep.msg = e_msg;                                                \
         __pycbc_ep.key = e_key;                                                \
         __pycbc_ep.objextra = e_objextra;                                      \

@@ -350,14 +350,20 @@ pycbc_multiresult_get_result(pycbc_MultiResult *self)
     int rv;
     Py_ssize_t dictpos = 0;
     PyObject *key, *value;
+    PyObject *mres = pycbc_multiresult_dict(self);
 
     if (!(self->mropts & PYCBC_MRES_F_SINGLE)) {
         PyObject *res = (PyObject *)self;
         Py_INCREF(res);
         return res;
     }
-
-    rv = PyDict_Next(pycbc_multiresult_dict(self), &dictpos, &key, &value);
+    PYCBC_DEBUG_LOG("\n hit multiresult_get_result:[");
+    pycbc_print_repr((PyObject*)self);
+    PYCBC_DEBUG_LOG("]\n");
+    PYCBC_DEBUG_LOG("\ngot results:[");
+    pycbc_print_repr(mres);
+    PYCBC_DEBUG_LOG("]\n");
+    rv = PyDict_Next(mres, &dictpos, &key, &value);
     if (!rv) {
         PYCBC_EXC_WRAP(PYCBC_EXC_INTERNAL, 0, "No objects in MultiResult");
         return NULL;

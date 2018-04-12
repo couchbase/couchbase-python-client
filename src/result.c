@@ -111,6 +111,18 @@ pycbc_Result_dealloc(pycbc_Result *self)
 {
     Result_dealloc(self);
 }
+static int
+pycbc_Result_init(PyObject *self_raw,
+               PyObject *args, PyObject *kwargs)
+{
+    pycbc_Result* self = (pycbc_Result*) self_raw;
+#ifdef PYCBC_TRACING
+    self->is_tracing_stub = 0;
+    self->tracing_context = NULL;
+#endif
+    PYCBC_EXCEPTION_LOG_NOCLEAR;
+    return 0;
+}
 
 int
 pycbc_ResultType_init(PyObject **ptr)
@@ -130,6 +142,7 @@ pycbc_ResultType_init(PyObject **ptr)
             "operations which may required additional fields.");
 
     p->tp_new = PyType_GenericNew;
+    p->tp_init = pycbc_Result_init;
     p->tp_dealloc = (destructor)Result_dealloc;
     p->tp_basicsize = sizeof(pycbc_Result);
     p->tp_members = Result_TABLE_members;

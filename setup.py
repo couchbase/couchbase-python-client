@@ -27,15 +27,24 @@ pkgversion = couchbase_version.get_version()
 
 
 LCB_NAME = None
+extoptions['extra_compile_args'] = []
+extoptions['extra_link_args'] = []
+
+if os.environ.get('PYCBC_TRACING_ENABLE'):
+    extoptions['extra_compile_args'] += ['-DPYCBC_TRACING_ENABLE']
+if os.environ.get('PYCBC_DEBUG'):
+    extoptions['extra_compile_args'] += ['-DPYCBC_DEBUG']
+
 if sys.platform != 'win32':
     extoptions['libraries'] = ['couchbase']
+    if os.environ.get('PYCBC_DEBUG'):
+        extoptions['extra_compile_args'] += ['-O0', '-g3']
+        extoptions['extra_link_args'] += ['-O0', '-g3']
     if sys.platform == 'darwin':
         warnings.warn('Adding /usr/local to search path for OS X')
         extoptions['library_dirs'] = ['/usr/local/lib']
         extoptions['include_dirs'] = ['/usr/local/include']
-        if os.environ.get('PYCBC_DEBUG'):
-            extoptions['extra_compile_args'] = ['-O0', '-g']
-            extoptions['extra_link_args'] = ['-O0', '-g']
+
 else:
     warnings.warn("I'm detecting you're running windows."
                   "You might want to modify "
@@ -57,8 +66,9 @@ else:
 
     extoptions['libraries'] = ['libcouchbase']
     ## Enable these lines for debug builds
-    #extoptions['extra_compile_args'] = ['/Zi']
-    #extoptions['extra_link_args'] = ['/DEBUG']
+    if os.environ.get('PYCBC_DEBUG'):
+        extoptions['extra_compile_args'] += ['/Zi']
+        extoptions['extra_link_args'] += ['/DEBUG']
     extoptions['library_dirs'] = [os.path.join(lcb_root, 'lib')]
     extoptions['include_dirs'] = [os.path.join(lcb_root, 'include')]
     extoptions['define_macros'] = [('_CRT_SECURE_NO_WARNINGS', 1)]
@@ -145,7 +155,8 @@ setup(
         'acouchbase.py34only'
     ] if sys.version_info >= (3, 4) else []),
     package_data = pkgdata,
-    tests_require = [ 'nose', 'testresources>=0.2.7' ],
+    install_requires = [],
+    tests_require = [ 'nose', 'testresources>=0.2.7', 'basictracer==2.2.0'  ],
     test_suite = 'couchbase.tests.test_sync',
     **setup_kw
 )

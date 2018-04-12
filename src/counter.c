@@ -15,16 +15,17 @@
  **/
 
 #include "oputil.h"
+#include "pycbc.h"
 
 struct arithmetic_common_vars {
     lcb_S64 delta;
-    lcb_U64 initial;
+    lcb_uint64_t initial;
     unsigned long ttl;
     int create;
 };
 
-static int
-handle_single_arith(pycbc_Bucket *self, struct pycbc_common_vars *cv,
+TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
+handle_single_arith, pycbc_Bucket *self, struct pycbc_common_vars *cv,
     int optype, PyObject *curkey, PyObject *curvalue, PyObject *options,
     pycbc_Item *item, void *arg)
 {
@@ -81,6 +82,8 @@ handle_single_arith(pycbc_Bucket *self, struct pycbc_common_vars *cv,
     cmd.create = my_params.create;
     cmd.initial = my_params.initial;
     cmd.exptime = my_params.ttl;
+
+    PYCBC_TRACECMD(cmd,context,cv->mres,curkey, self);
     err = lcb_counter3(self->instance, cv->mres, &cmd);
     if (err != LCB_SUCCESS) {
         PYCBC_EXCTHROW_SCHED(err);
@@ -96,7 +99,7 @@ handle_single_arith(pycbc_Bucket *self, struct pycbc_common_vars *cv,
 
 PyObject *
 arithmetic_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
-    int optype, int argopts)
+    int optype, int argopts, pycbc_stack_context_handle context)
 {
     int rv;
     Py_ssize_t ncmds;
@@ -141,19 +144,19 @@ arithmetic_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
     rv = pycbc_common_vars_init(&cv, self, argopts, ncmds, 0);
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
-        rv = pycbc_oputil_iter_multi(self, seqtype, collection, &cv, optype,
-            handle_single_arith, &global_params);
+        rv = PYCBC_OPUTIL_ITER_MULTI(self, seqtype, collection, &cv, optype,
+            handle_single_arith, &global_params, context);
 
     } else {
         rv = handle_single_arith(self, &cv, optype, collection, NULL, NULL, NULL,
-            &global_params);
+            &global_params, context);
     }
 
     if (rv < 0) {
         goto GT_DONE;
     }
 
-    if (-1 == pycbc_common_vars_wait(&cv, self)) {
+    if (-1 == PYCBC_TRACE_WRAP(pycbc_common_vars_wait, kwargs, &cv, self)) {
         goto GT_DONE;
     }
 
@@ -165,7 +168,7 @@ arithmetic_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
 #define DECLFUNC(name, operation, mode) \
     PyObject *pycbc_Bucket_##name(pycbc_Bucket *self, \
                                       PyObject *args, PyObject *kwargs) { \
-    return arithmetic_common(self, args, kwargs, operation, mode); \
+    return arithmetic_common(self, args, kwargs, operation, mode, PYCBC_TRACE_GET_STACK_CONTEXT_TOPLEVEL(kwargs, LCBTRACE_OP_REQUEST_ENCODING, self->tracer, "bucket." #name)); \
 }
 
 DECLFUNC(counter, PYCBC_CMD_COUNTER, PYCBC_ARGOPT_SINGLE)

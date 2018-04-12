@@ -69,7 +69,18 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     }
 
     mres = (pycbc_MultiResult *)pycbc_multiresult_new(self);
-    vres = (pycbc_ViewResult *)PYCBC_TYPE_CTOR(&pycbc_ViewResultType);
+    {
+#ifdef PYCBC_TRACING
+        PyObject* view_kwargs = PyDict_New();
+        PyDict_SetItemString(view_kwargs, "tracer", (PyObject*)self->tracer);
+#else
+        PyObject* view_kwargs = pycbc_DummyKeywords;
+#endif
+        vres = (pycbc_ViewResult *) PYCBC_TYPE_CTOR(&pycbc_ViewResultType, pycbc_DummyTuple, view_kwargs);
+#ifdef PYCBC_TRACING
+        PYCBC_DECREF(view_kwargs);
+#endif
+    }
     pycbc_httpresult_init(&vres->base, mres);
     vres->rows = PyList_New(0);
     vres->base.format = PYCBC_FMT_JSON;

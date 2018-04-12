@@ -193,6 +193,8 @@ pycbc_http_callbacks_init(lcb_t instance)
 PyObject *
 pycbc_Bucket__http_request(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
 {
+    pycbc_stack_context_handle context = PYCBC_TRACE_GET_STACK_CONTEXT_TOPLEVEL(kwargs, LCBTRACE_OP_REQUEST_ENCODING,
+                                                                          self->tracer, "bucket.http_request");
     int rv;
     int method;
     int reqtype;
@@ -262,7 +264,7 @@ pycbc_Bucket__http_request(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     }
 
     if (!(self->flags & PYCBC_CONN_F_ASYNC)) {
-        pycbc_oputil_wait_common(self);
+        PYCBC_TRACE_WRAP(pycbc_oputil_wait_common, kwargs, self);
         /* RC=1 (decref on done) */
         if (pycbc_multiresult_maybe_raise(mres)) {
             goto GT_DONE;

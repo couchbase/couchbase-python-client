@@ -27,8 +27,9 @@ from couchbase.exceptions import (
 from couchbase.result import MultiResult, Result
 from couchbase.tests.base import ConnectionTestCase, SkipTest
 
-class GetTest(ConnectionTestCase):
+from  couchbase.tests.base import TracedCase
 
+class GetTest(TracedCase):
     def test_trivial_get(self):
         key = self.gen_key('trivial_get')
         self.cb.upsert(key, 'value1')

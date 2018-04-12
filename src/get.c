@@ -15,6 +15,8 @@
  **/
 
 #include "oputil.h"
+#include "pycbc.h"
+
 /**
  * Covers 'lock', 'touch', and 'get_and_touch'
  */
@@ -31,10 +33,10 @@ struct getcmd_vars_st {
     } u;
 };
 
-static int
-handle_single_key(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
-    PyObject *curkey, PyObject *curval, PyObject *options, pycbc_Item *itm,
-    void *arg)
+TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
+                handle_single_key, pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
+                PyObject *curkey, PyObject *curval, PyObject *options, pycbc_Item *itm,
+                void *arg)
 {
     int rv;
     unsigned int lock = 0;
@@ -99,6 +101,7 @@ handle_single_key(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
         }
     }
     u_cmd.base.exptime = ttl;
+    PYCBC_TRACE_POP_CONTEXT(context);
 
     switch (optype) {
     case PYCBC_CMD_GAT:
@@ -121,11 +124,13 @@ handle_single_key(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
     case PYCBC_CMD_GET:
         GT_GET:
         u_cmd.get.lock = lock;
+        PYCBC_TRACECMD(u_cmd.get, context, cv->mres, curkey, self);
         err = lcb_get3(self->instance, cv->mres, &u_cmd.get);
         break;
 
     case PYCBC_CMD_TOUCH:
         u_cmd.touch.exptime = ttl;
+        PYCBC_TRACECMD(u_cmd.touch, context, cv->mres, curkey, self);
         err = lcb_touch3(self->instance, cv->mres, &u_cmd.touch);
         break;
 
@@ -134,6 +139,7 @@ handle_single_key(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
     case PYCBC_CMD_GETREPLICA_ALL:
         u_cmd.rget.strategy = gv->u.replica.strategy;
         u_cmd.rget.index = gv->u.replica.index;
+        PYCBC_TRACECMD(u_cmd.rget,context, cv->mres, curkey, self);
         err = lcb_rget3(self->instance, cv->mres, &u_cmd.rget);
         break;
     default:
@@ -198,7 +204,7 @@ handle_replica_options(int *optype, struct getcmd_vars_st *gv, PyObject *replica
 
 static PyObject*
 get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
-    int argopts)
+    int argopts, pycbc_stack_context_handle context)
 {
     int rv;
     Py_ssize_t ncmds = 0;
@@ -283,11 +289,11 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
     }
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
-        rv = pycbc_oputil_iter_multi(self, seqtype, kobj, &cv, optype,
-            handle_single_key, &gv);
+        rv = PYCBC_OPUTIL_ITER_MULTI(self, seqtype, kobj, &cv, optype,
+            handle_single_key, &gv, context);
 
     } else {
-        rv = handle_single_key(self, &cv, optype, kobj, NULL, NULL, NULL, &gv);
+        rv= PYCBC_TRACE_WRAP(handle_single_key, kwargs, self, &cv, optype, kobj, NULL, NULL, NULL, &gv);
     }
     if (rv < 0) {
         goto GT_DONE;
@@ -297,7 +303,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
         goto GT_DONE;
     }
 
-    if (-1 == pycbc_common_vars_wait(&cv, self)) {
+    if (-1 == PYCBC_TRACE_WRAP(pycbc_common_vars_wait, kwargs, &cv, self)) {
         goto GT_DONE;
     }
 
@@ -306,8 +312,8 @@ GT_DONE:
     return cv.ret;
 }
 
-static int
-handle_single_lookup(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
+TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
+handle_single_lookup, pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
     PyObject *curkey, PyObject *curval, PyObject *options, pycbc_Item *itm,
     void *arg)
 {
@@ -323,13 +329,13 @@ handle_single_lookup(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optyp
         return -1;
     }
     LCB_CMD_SET_KEY(&cmd, keybuf.buffer, keybuf.length);
-    rv = pycbc_sd_handle_speclist(self, cv->mres, curkey, curval, &cmd);
+    rv = PYCBC_TRACE_WRAP(pycbc_sd_handle_speclist, NULL, self, cv->mres, curkey, curval, &cmd);
     PYCBC_PYBUF_RELEASE(&keybuf);
     return rv;
 }
 
 static PyObject *
-sdlookup_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopts)
+sdlookup_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopts, pycbc_stack_context_handle context)
 {
     Py_ssize_t ncmds;
     PyObject *kobj = NULL;
@@ -352,8 +358,8 @@ sdlookup_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopt
         return NULL;
     }
 
-    if (pycbc_oputil_iter_multi(
-        self, seqtype, kobj, &cv, 0, handle_single_lookup, NULL) != 0) {
+    if (PYCBC_OPUTIL_ITER_MULTI(
+        self, seqtype, kobj, &cv, 0, handle_single_lookup, NULL, context) != 0) {
         goto GT_DONE;
     }
 
@@ -361,7 +367,7 @@ sdlookup_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopt
         goto GT_DONE;
     }
 
-    pycbc_common_vars_wait(&cv, self);
+    PYCBC_TRACE_WRAP(pycbc_common_vars_wait, kwargs, &cv, self);
 
     GT_DONE:
     pycbc_common_vars_finalize(&cv, self);
@@ -371,21 +377,24 @@ sdlookup_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopt
 PyObject *
 pycbc_Bucket_lookup_in(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
 {
-    return sdlookup_common(self, args, kwargs, PYCBC_ARGOPT_SINGLE);
+    return sdlookup_common(self, args, kwargs, PYCBC_ARGOPT_SINGLE,
+                           PYCBC_TRACE_GET_STACK_CONTEXT_TOPLEVEL(kwargs, LCBTRACE_OP_REQUEST_ENCODING, self->tracer, "bucket.lookup_in"));
 }
 
 PyObject *
 pycbc_Bucket_lookup_in_multi(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
 {
-    return sdlookup_common(self, args, kwargs, PYCBC_ARGOPT_MULTI);
+    return sdlookup_common(self, args, kwargs, PYCBC_ARGOPT_MULTI,
+                           PYCBC_TRACE_GET_STACK_CONTEXT_TOPLEVEL(kwargs, LCBTRACE_OP_REQUEST_ENCODING, self->tracer, "bucket.lookup_in_multi"));
 }
 
 #define DECLFUNC(name, operation, mode) \
     PyObject *pycbc_Bucket_##name(pycbc_Bucket *self, \
                                       PyObject *args, PyObject *kwargs) { \
-    return get_common(self, args, kwargs, operation, mode); \
+                                      PyObject* result;\
+    PYCBC_TRACE_WRAP_TOPLEVEL(result,LCBTRACE_OP_REQUEST_ENCODING,get_common, self->tracer, self, args, kwargs, operation, mode); \
+    return result;\
 }
-
 
 DECLFUNC(get, PYCBC_CMD_GET, PYCBC_ARGOPT_SINGLE)
 DECLFUNC(touch, PYCBC_CMD_TOUCH, PYCBC_ARGOPT_SINGLE)

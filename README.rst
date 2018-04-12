@@ -60,6 +60,9 @@ If your libcouchbase install is in an alternate location (for example,
         --library-dir /opt/local/libcouchbase/lib \
         --include-dir /opt/local/libcouchbase/include
 
+If you wish to enable the experimental tracing feature, set the
+``PYCBC_TRACING_ENABLE`` environment variable.
+
 Or you can modify the environment ``CFLAGS`` and ``LDFLAGS`` variables.
 
 

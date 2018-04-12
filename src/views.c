@@ -320,7 +320,7 @@ ViewResult_fetch(pycbc_ViewResult *self, PyObject *args)
     }
 
     if (!self->base.done) {
-        pycbc_oputil_wait_common(bucket);
+        pycbc_oputil_wait_common(bucket, PYCBC_TRACE_GET_STACK_CONTEXT_TOPLEVEL(NULL, LCBTRACE_OP_RESPONSE_DECODING, self->py_tracer, "viewresult.fetch"));
     }
 
     if (pycbc_multiresult_maybe_raise(mres)) {
@@ -334,11 +334,33 @@ ViewResult_fetch(pycbc_ViewResult *self, PyObject *args)
     pycbc_oputil_conn_unlock(bucket);
     return ret;
 }
+static int
+ViewResult__init__(PyObject *self_raw,
+                   PyObject *args, PyObject *kwargs)
+{
+    pycbc_ViewResult* self = (pycbc_ViewResult*)(self_raw);
+#ifdef PYCBC_TRACING
+    PYCBC_DEBUG_LOG("in ur view making ur tracer\n");
+    self->py_tracer = kwargs?(pycbc_Tracer_t*)PyDict_GetItemString(kwargs, "tracer"):NULL;
+    self->own_tracer = 0;
+    if (self->py_tracer) {
+        PYCBC_DEBUG_LOG("Got parent tracer %p\n", self->py_tracer);
+    }
+#endif
+    PYCBC_EXCEPTION_LOG_NOCLEAR;
+    return 0;
+}
 
 static void
 ViewResult_dealloc(pycbc_ViewResult *vres)
 {
     Py_CLEAR(vres->rows);
+#ifdef PYCBC_TRACING
+    if (vres->own_tracer && vres->py_tracer) {
+        lcbtrace_destroy(vres->py_tracer->tracer);
+        PYCBC_DECREF((PyObject*)vres->py_tracer);
+    }
+#endif
     Py_TYPE(vres)->tp_base->tp_dealloc((PyObject*)vres);
 }
 
@@ -366,6 +388,7 @@ static struct PyMethodDef ViewResult_TABLE_methods[] = {
         { NULL }
 };
 
+
 int
 pycbc_ViewResultType_init(PyObject **ptr)
 {
@@ -378,6 +401,7 @@ pycbc_ViewResultType_init(PyObject **ptr)
     p->tp_name = "ViewResult";
     p->tp_doc = PyDoc_STR("Low level view result object");
     p->tp_new = PyType_GenericNew;
+    p->tp_init = ViewResult__init__;
     p->tp_dealloc = (destructor)ViewResult_dealloc;
     p->tp_basicsize = sizeof(pycbc_ViewResult);
     p->tp_members = ViewResult_TABLE_members;

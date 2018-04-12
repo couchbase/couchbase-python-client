@@ -14,7 +14,9 @@
  *   limitations under the License.
  **/
 
+
 #include "oputil.h"
+#include "pycbc.h"
 
 struct storecmd_vars {
     int operation;
@@ -104,25 +106,47 @@ handle_item_kv(pycbc_Item *itm, PyObject *options, const struct storecmd_vars *s
     return 0;
 }
 
-static int
-handle_multi_mutate(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
-    PyObject *curkey, PyObject *curvalue, PyObject *options, pycbc_Item *itm,
-    void *arg);
-
-static int
-handle_single_kv(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
-    PyObject *curkey, PyObject *curvalue, PyObject *options, pycbc_Item *itm,
-    void *arg)
-{
+TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,static, int,
+                handle_multi_mutate, pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
+                PyObject *curkey, PyObject *curvalue, PyObject *options, pycbc_Item *itm,
+                void *arg) {
     int rv;
-    const struct storecmd_vars *scv = (struct storecmd_vars *)arg;
-    struct single_key_context skc = { NULL };
-    pycbc_pybuffer keybuf = { NULL }, valbuf = { NULL };
+    const struct storecmd_vars *scv = (const struct storecmd_vars *) arg;
+    pycbc_pybuffer keybuf = {NULL};
+    lcb_CMDSUBDOC cmd = {0};
+
+    if (itm) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Item not supported in subdoc mode");
+        return -1;
+    }
+
+    if (pycbc_tc_encode_key(self, curkey, &keybuf) != 0) {
+        return -1;
+    }
+
+    cmd.cas = scv->single_cas;
+    cmd.exptime = scv->ttl;
+    cmd.cmdflags |= scv->sd_doc_flags;
+    LCB_CMD_SET_KEY(&cmd, keybuf.buffer, keybuf.length);
+    rv = PYCBC_TRACE_WRAP(pycbc_sd_handle_speclist, NULL, self, cv->mres, curkey, curvalue, &cmd);
+    PYCBC_PYBUF_RELEASE(&keybuf);
+    return rv;
+}
+
+
+TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
+handle_single_kv, pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
+                 PyObject *curkey, PyObject *curvalue, PyObject *options, pycbc_Item *itm,
+                 void *arg) {
+    int rv;
+    const struct storecmd_vars *scv = (struct storecmd_vars *) arg;
+    struct single_key_context skc = {NULL};
+    pycbc_pybuffer keybuf = {NULL}, valbuf = {NULL};
     lcb_error_t err;
-    lcb_CMDSTORE cmd = { 0 };
+    lcb_CMDSTORE cmd = {0};
 
     if (scv->argopts & PYCBC_ARGOPT_SDMULTI) {
-        return handle_multi_mutate(self, cv, optype, curkey, curvalue, options, itm, arg);
+        return PYCBC_TRACE_WRAP(handle_multi_mutate, NULL, self, cv, optype, curkey, curvalue, options, itm, arg);
     }
 
     skc.ttl = scv->ttl;
@@ -144,7 +168,7 @@ handle_single_kv(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
     }
 
     rv = pycbc_tc_encode_value(self, skc.value, skc.flagsobj,
-        &valbuf, &cmd.flags);
+                               &valbuf, &cmd.flags);
     if (rv < 0) {
         rv = -1;
         goto GT_DONE;
@@ -160,8 +184,10 @@ handle_single_kv(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
     LCB_CMD_SET_KEY(&cmd, keybuf.buffer, keybuf.length);
     LCB_CMD_SET_VALUE(&cmd, valbuf.buffer, valbuf.length);
     cmd.cas = skc.cas;
-    cmd.operation = scv->operation;
+    cmd.operation = (lcb_storage_t) scv->operation;
     cmd.exptime = skc.ttl;
+    PYCBC_TRACECMD(cmd, context, cv->mres, curkey, self);
+
     err = lcb_store3(self->instance, cv->mres, &cmd);
     if (err == LCB_SUCCESS) {
         rv = 0;
@@ -179,36 +205,7 @@ handle_single_kv(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
 }
 
 static int
-handle_multi_mutate(pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
-    PyObject *curkey, PyObject *curvalue, PyObject *options, pycbc_Item *itm,
-    void *arg)
-{
-    int rv;
-    const struct storecmd_vars *scv = arg;
-    pycbc_pybuffer keybuf = { NULL };
-    lcb_CMDSUBDOC cmd = { 0 };
-
-    if (itm) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Item not supported in subdoc mode");
-        return -1;
-    }
-
-    if (pycbc_tc_encode_key(self, curkey, &keybuf) != 0) {
-        return -1;
-    }
-
-    cmd.cas = scv->single_cas;
-    cmd.exptime = scv->ttl;
-    cmd.cmdflags |= scv->sd_doc_flags;
-    LCB_CMD_SET_KEY(&cmd, keybuf.buffer, keybuf.length);
-    rv = pycbc_sd_handle_speclist(self, cv->mres, curkey, curvalue, &cmd);
-    PYCBC_PYBUF_RELEASE(&keybuf);
-    return rv;
-}
-
-static int
-handle_append_flags(pycbc_Bucket *self, PyObject **flagsobj)
-{
+handle_append_flags(pycbc_Bucket *self, PyObject **flagsobj) {
     unsigned long val = 0;
 
     if (*flagsobj == NULL || *flagsobj == Py_None) {
@@ -221,7 +218,7 @@ handle_append_flags(pycbc_Bucket *self, PyObject **flagsobj)
     }
 
     val = pycbc_IntAsUL(*flagsobj);
-    if (val == (unsigned long)-1) {
+    if (val == (unsigned long) -1) {
         PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0, "invalid flags", *flagsobj);
         return -1;
     }
@@ -232,16 +229,18 @@ handle_append_flags(pycbc_Bucket *self, PyObject **flagsobj)
         return 0;
     }
 
-    PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0, "Only FMT_BYTES and FMT_UTF8 are supported for append/prepend", *flagsobj);
+    PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0, "Only FMT_BYTES and FMT_UTF8 are supported for append/prepend",
+                       *flagsobj);
     return -1;
 
 }
 
-static PyObject *
-set_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
-    int operation, int argopts)
-{
+TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
+        static, PyObject *,
+set_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
+           int operation, int argopts) {
     int rv;
+
     Py_ssize_t ncmds = 0;
     PyObject *ttl_O = NULL;
     PyObject *dict = NULL;
@@ -328,29 +327,31 @@ set_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
     }
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
-        rv = pycbc_oputil_iter_multi(self, seqtype, dict, &cv, 0, handle_single_kv, &scv);
+        rv = PYCBC_OPUTIL_ITER_MULTI(self, seqtype, dict, &cv, 0, handle_single_kv, &scv, context);
 
     } else {
-        rv = handle_single_kv(self, &cv, 0, key, value, NULL, NULL, &scv);
+        rv = handle_single_kv(self, &cv, 0, key, value, NULL, NULL, &scv, context);
     }
 
     if (rv < 0) {
         goto GT_DONE;
     }
 
-    if (-1 == pycbc_common_vars_wait(&cv, self)) {
+    if (-1 == PYCBC_TRACE_WRAP(pycbc_common_vars_wait, kwargs, &cv, self)) {
         goto GT_DONE;
     }
 
-GT_DONE:
+    GT_DONE:
     pycbc_common_vars_finalize(&cv, self);
     return cv.ret;
 }
 
 #define DECLFUNC(name, operation, mode) \
     PyObject *pycbc_Bucket_##name(pycbc_Bucket *self, \
-                                      PyObject *args, PyObject *kwargs) { \
-    return set_common(self, args, kwargs, operation, mode); \
+                                      PyObject *args, PyObject *kwargs) {\
+        PyObject* result;\
+        PYCBC_TRACE_WRAP_TOPLEVEL(result, LCBTRACE_OP_REQUEST_ENCODING, set_common, self->tracer, self, args, kwargs, operation, mode);\
+        return result;\
 }
 
 DECLFUNC(upsert_multi, LCB_SET, PYCBC_ARGOPT_MULTI)
