@@ -668,7 +668,7 @@ class PrefixQuery(_SingleQuery):
     most useful for type-ahead or lookup queries.
     """
     _TERMPROP = 'prefix'
-    prefix = _genprop(str, 'prefix', doc='The prefix to match')
+    prefix = _genprop_str('prefix', doc='The prefix to match')
 
 
 @_with_fields('field')
