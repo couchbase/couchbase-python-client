@@ -35,3 +35,20 @@ class N1QLTest(MockTestCase):
         self.assertRaises(RuntimeError, getattr, q, 'meta')
         q.execute()
         self.assertIsInstance(q.meta, dict)
+
+    def test_profile(self):
+        query = N1QLQuery('SELECT 1')
+
+        # default should be 'off'
+        self.assertEqual('off', query.profile)
+
+        # test setting each possible value
+        query.profile = 'phases'
+        self.assertEqual('phases', query.profile)
+        query.profile = 'timings'
+        self.assertEqual('timings', query.profile)
+        query.profile = 'off'
+        self.assertEqual('off', query.profile)
+
+        # should raise error for unknown profile
+        self.assertRaises(TypeError, query.profile, 'unknown')

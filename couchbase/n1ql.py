@@ -66,6 +66,11 @@ CONSISTENCY_NONE = UNBOUNDED
    this is not guaranteed in future.
 """
 
+PROFILE_OFF = 'off'
+PROFILE_PHASES = 'phases'
+PROFILE_TIMINGS = 'timings'
+VALID_PROFILES = [PROFILE_OFF, PROFILE_TIMINGS, PROFILE_PHASES]
+
 class N1QLQuery(object):
     def __init__(self, query, *args, **kwargs):
         """
@@ -333,6 +338,27 @@ class N1QLQuery(object):
     @readonly.setter
     def readonly(self, value):
         self._body['readonly'] = value
+
+    @property
+    def profile(self):
+        """
+        Get the N1QL profile type.
+        :return: The profile type.
+        """
+        value = self._body.get('profile', PROFILE_OFF)
+        return value
+
+    @profile.setter
+    def profile(self, value):
+        """
+        Sets the N1QL profile type. Must be one of: 'off', 'phases', 'timings'
+        :param value: The profile type to use.
+        :return:
+        """
+        if value not in VALID_PROFILES:
+            raise TypeError('Profile option must be one of: ' + ', '.join(VALID_PROFILES))
+
+        self._body['profile'] = value
 
     def __repr__(self):
         return ('<{cls} stmt={stmt} at {oid}>'.format(
