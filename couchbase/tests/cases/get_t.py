@@ -15,21 +15,19 @@
 # limitations under the License.
 #
 
-import pickle
 from time import sleep
 
 from nose.plugins.attrib import attr
 
-from couchbase import FMT_JSON, FMT_PICKLE, FMT_UTF8, FMT_BYTES
+from couchbase import FMT_JSON, FMT_UTF8
 
 from couchbase.exceptions import (
     CouchbaseError, ValueFormatError, NotFoundError)
-from couchbase.result import MultiResult, Result
-from couchbase.tests.base import ConnectionTestCase, SkipTest
 
-from  couchbase.tests.base import TracedCase
+from couchbase.tests.base import ConnectionTestCase
 
-class GetTest(TracedCase):
+
+class GetTest(ConnectionTestCase):
     def test_trivial_get(self):
         key = self.gen_key('trivial_get')
         self.cb.upsert(key, 'value1')
@@ -40,7 +38,6 @@ class GetTest(TracedCase):
         self.assertIsInstance(rvs, self.cls_MultiResult)
         self.assertEqual(len(rvs), 1)
         self.assertEqual(rvs[key].value, 'value1')
-
 
     def test_get_missing_key(self):
         rv = self.cb.get('key_missing_1', quiet=True)

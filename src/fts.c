@@ -14,7 +14,6 @@ fts_row_callback(lcb_t instance, int ign, const lcb_RESPFTS *resp)
 
     PYCBC_CONN_THR_END(bucket);
     vres = (pycbc_ViewResult *)PyDict_GetItem((PyObject*)mres, Py_None);
-
     if (resp->htresp) {
         hdrs = resp->htresp->headers;
         htcode = resp->htresp->htstatus;
@@ -48,7 +47,8 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     lcb_CMDFTS cmd = { 0 };
     pycbc_pybuffer buf = { 0 };
     PyObject *params_o = NULL;
-
+    pycbc_stack_context_handle context = PYCBC_TRACE_GET_STACK_CONTEXT_TOPLEVEL(
+            kwargs, LCBTRACE_OP_REQUEST_ENCODING, self->tracer, "fts_query");
     static char *kwlist[] = { "params", NULL };
     rv = PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &params_o);
 
@@ -69,18 +69,7 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     }
 
     mres = (pycbc_MultiResult *)pycbc_multiresult_new(self);
-    {
-#ifdef PYCBC_TRACING
-        PyObject* view_kwargs = PyDict_New();
-        PyDict_SetItemString(view_kwargs, "tracer", (PyObject*)self->tracer);
-#else
-        PyObject* view_kwargs = pycbc_DummyKeywords;
-#endif
-        vres = (pycbc_ViewResult *) PYCBC_TYPE_CTOR(&pycbc_ViewResultType, pycbc_DummyTuple, view_kwargs);
-#ifdef PYCBC_TRACING
-        PYCBC_DECREF(view_kwargs);
-#endif
-    }
+    vres = pycbc_propagate_view_result(context);
     pycbc_httpresult_init(&vres->base, mres);
     vres->rows = PyList_New(0);
     vres->base.format = PYCBC_FMT_JSON;
@@ -90,7 +79,9 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     cmd.query = buf.buffer;
     cmd.nquery = buf.length;
     cmd.handle = &vres->base.u.fts;
-    rc = lcb_fts_query(self->instance, mres, &cmd);
+
+    PYCBC_TRACECMD_SCOPED(
+            rc, fts, query, self->instance, *cmd.handle, context, mres, &cmd);
     PYCBC_PYBUF_RELEASE(&buf);
 
     if (rc != LCB_SUCCESS) {

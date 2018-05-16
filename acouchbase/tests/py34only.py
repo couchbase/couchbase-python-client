@@ -9,9 +9,9 @@ from couchbase.n1ql import N1QLQuery
 
 class CouchbaseBeerTest(AioTestCase):
 
-    def make_connection(self):
+    def setUp(self):
         try:
-            return super().make_connection(bucket='beer-sample')
+            return super(CouchbaseBeerTest,self).setUp(bucket='beer-sample')
         except CouchbaseError:
             raise SkipTest("Need 'beer-sample' bucket for this")
 

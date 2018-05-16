@@ -37,15 +37,22 @@ n1ql_row_callback(lcb_t instance, int ign, const lcb_RESPN1QL *resp)
     }
 }
 
-static PyObject *
-query_common(pycbc_Bucket *self, const char *params, unsigned nparams,
-             const char *host, int is_prepared, int is_xbucket) {
+TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
+                static,
+                PyObject *,
+                query_common,
+                pycbc_Bucket *self,
+                const char *params,
+                unsigned nparams,
+                const char *host,
+                int is_prepared,
+                int is_xbucket)
+{
     PyObject *ret = NULL;
     pycbc_MultiResult *mres;
     pycbc_ViewResult *vres;
     lcb_error_t rc;
     lcb_CMDN1QL cmd = { 0 };
-
     if (-1 == pycbc_oputil_conn_lock(self)) {
         return NULL;
     }
@@ -56,23 +63,7 @@ query_common(pycbc_Bucket *self, const char *params, unsigned nparams,
     }
 
     mres = (pycbc_MultiResult *)pycbc_multiresult_new(self);
-    {
-        PyObject* kwargs = pycbc_DummyKeywords;
-#ifdef PYCBC_TRACING
-        if (self->tracer) {
-            kwargs= PyDict_New();
-            PyDict_SetItemString(kwargs, "tracer", (PyObject*)self->tracer);
-        }
-#endif
-        vres = (pycbc_ViewResult *) PyObject_CallFunction((PyObject*)&pycbc_ViewResultType, "OO", Py_None, kwargs);
-        if (!vres)
-        {
-            PYCBC_DEBUG_LOG("null vres");
-        }
-
-        PYCBC_EXCEPTION_LOG_NOCLEAR;
-        PYCBC_DEBUG_LOG("got vres: %p", vres);
-    }
+    vres = pycbc_propagate_view_result(context);
     pycbc_httpresult_init(&vres->base, mres);
     vres->rows = PyList_New(0);
     vres->base.format = PYCBC_FMT_JSON;
@@ -97,7 +88,8 @@ query_common(pycbc_Bucket *self, const char *params, unsigned nparams,
         cmd.host = host;
     }
 
-    rc = lcb_n1ql_query(self->instance, mres, &cmd);
+    PYCBC_TRACECMD_SCOPED(
+            rc, n1ql, query, self->instance, *cmd.handle, context, mres, &cmd);
 
     if (rc != LCB_SUCCESS) {
         PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, rc, "Couldn't schedule n1ql query");
@@ -113,13 +105,13 @@ query_common(pycbc_Bucket *self, const char *params, unsigned nparams,
     return ret;
 
 }
-
 PyObject *
 pycbc_Bucket__n1ql_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
 {
     const char *params = NULL;
     pycbc_strlen_t nparams = 0;
     int prepared = 0, cross_bucket = 0;
+    PyObject *result = NULL;
     static char *kwlist[] = { "params", "prepare", "cross_bucket", NULL };
     if (!PyArg_ParseTupleAndKeywords(
         args, kwargs, "s#|ii", kwlist, &params,
@@ -128,7 +120,17 @@ pycbc_Bucket__n1ql_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
         PYCBC_EXCTHROW_ARGS();
         return NULL;
     }
-    return query_common(self, params, nparams, NULL, prepared, cross_bucket);
+    PYCBC_TRACE_WRAP_TOPLEVEL(result,
+                              LCBTRACE_OP_REQUEST_ENCODING,
+                              query_common,
+                              self->tracer,
+                              self,
+                              params,
+                              nparams,
+                              NULL,
+                              prepared,
+                              cross_bucket);
+    return result;
 }
 
 PyObject *
@@ -138,10 +140,21 @@ pycbc_Bucket__cbas_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     const char *params = NULL;
     pycbc_strlen_t nparams = 0;
     static char *kwlist[] = { "params", "host", NULL };
+    PyObject *result = NULL;
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s", kwlist,
         &params, &nparams, &host)) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;
     }
-    return query_common(self, params, nparams, host, 0, 0);
+    PYCBC_TRACE_WRAP_TOPLEVEL(result,
+                              LCBTRACE_OP_REQUEST_ENCODING,
+                              query_common,
+                              self->tracer,
+                              self,
+                              params,
+                              nparams,
+                              host,
+                              0,
+                              0);
+    return result;
 }

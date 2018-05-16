@@ -62,7 +62,7 @@ pycbc_common_vars_wait, struct pycbc_common_vars *cv, pycbc_Bucket *self)
         Py_INCREF(Py_None);
         return 0;
     }
-    PYCBC_TRACE_WRAP(pycbc_oputil_wait_common, NULL, self);
+    PYCBC_TRACE_WRAP_VOID(pycbc_oputil_wait_common, NULL, self);
 
     if (!pycbc_assert(self->nremaining == 0)) {
         fprintf(stderr, "Remaining count != 0. Adjusting");
@@ -80,7 +80,6 @@ pycbc_common_vars_wait, struct pycbc_common_vars *cv, pycbc_Bucket *self)
     if (cv->ret == NULL) {
         return -1;
     }
-
     return 0;
 }
 
@@ -397,7 +396,18 @@ pycbc_oputil_iter_multi(pycbc_Bucket *self,
         }
 
 #ifdef PYCBC_TRACING
-        rv = PYCBC_TRACE_WRAP_EXPLICIT_NAMED((handler).cb, (handler).name, (handler).category, NULL, self, cv, optype, arg_k, v, options, itm, arg);
+        rv = PYCBC_TRACE_WRAP_EXPLICIT_NAMED((handler).cb,
+                                             (handler).name,
+                                             (handler).category,
+                                             NULL,
+                                             self,
+                                             cv,
+                                             optype,
+                                             arg_k,
+                                             v,
+                                             options,
+                                             itm,
+                                             arg);
 #else
         rv = PYCBC_TRACE_WRAP_EXPLICIT_NAMED(handler, "", "", NULL, self, cv, optype, arg_k, v, options, itm, arg);
 #endif

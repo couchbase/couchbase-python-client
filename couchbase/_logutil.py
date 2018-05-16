@@ -26,7 +26,7 @@ LEVEL_MAP = (
 )
 
 
-def _pylog_log_handler(**kwargs):
+def pylog_log_handler(**kwargs):
     pylevel = LEVEL_MAP[kwargs.pop('level')]
     logger_name = 'couchbase' + '.' + kwargs['subsys']
     msg = '[{id}] {message} (L:{c_src[1]})'.format(**kwargs)
@@ -37,7 +37,7 @@ def configure(val):
     from couchbase.bucket import Bucket
     import couchbase._libcouchbase
     if val:
-        couchbase._libcouchbase.lcb_logging(_pylog_log_handler)
+        couchbase._libcouchbase.lcb_logging(pylog_log_handler)
         initmsg = 'Initializing Couchbase logging. lcb_version={0}'.format(
             Bucket.lcb_version())
         logging.getLogger('couchbase').info(initmsg)

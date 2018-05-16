@@ -65,9 +65,21 @@ static struct PyMemberDef Result_TABLE_members[] = {
                 READONLY,
                 PyDoc_STR("Key for the operation")
         },
-
+#ifdef PYCBC_TRACING
+        { "is_tracing_stub", T_BOOL, offsetof(pycbc_Result, is_tracing_stub),
+                READONLY,
+                PyDoc_STR("Whether this is a tracing stub")
+        },
+#endif
         { NULL }
 };
+
+#ifdef PYCBC_TRACING
+PyObject *Result_tracing_context(pycbc_Result *self, void *closure)
+{
+    return PyLong_FromVoidPtr((void *)self->tracing_context);
+}
+#endif
 
 static struct PyGetSetDef Result_TABLE_getset[] = {
         { "success",
@@ -87,6 +99,11 @@ static struct PyGetSetDef Result_TABLE_getset[] = {
         { "cas", (getter)Result_int0,
                 NULL, NULL
         },
+#ifdef PYCBC_TRACING
+        { "tracing_context", (getter)Result_tracing_context,
+                NULL, NULL
+        },
+#endif
         { NULL }
 };
 
@@ -115,8 +132,8 @@ static int
 pycbc_Result_init(PyObject *self_raw,
                PyObject *args, PyObject *kwargs)
 {
-    pycbc_Result* self = (pycbc_Result*) self_raw;
 #ifdef PYCBC_TRACING
+    pycbc_Result* self = (pycbc_Result*)self_raw;
     self->is_tracing_stub = 0;
     self->tracing_context = NULL;
 #endif

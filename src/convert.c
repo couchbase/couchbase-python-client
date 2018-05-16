@@ -265,6 +265,7 @@ enum {
     DECODE_KEY,
     DECODE_VALUE
 };
+
 static int
 do_call_tc(pycbc_Bucket *conn, PyObject *obj, PyObject *flags,
            PyObject **result, int mode)
@@ -306,7 +307,8 @@ do_call_tc(pycbc_Bucket *conn, PyObject *obj, PyObject *flags,
                            conn->tc);
         goto GT_DONE;
     }
-    *result = PyObject_Call(meth, args, NULL);
+    PYCBC_EXCEPTION_LOG_NOCLEAR;
+    PYCBC_STASH_EXCEPTION(*result = PyObject_Call(meth, args, NULL));
     if (*result) {
         ret = 0;
     } else {
@@ -388,7 +390,8 @@ pycbc_tc_decode_key(pycbc_Bucket *conn, const void *key, size_t nkey,
     } else {
         bobj = PyBytes_FromStringAndSize(key, nkey);
         if (bobj) {
-            rv = do_call_tc(conn, bobj, NULL, pobj, DECODE_KEY);
+            PYCBC_STASH_EXCEPTION(
+                    rv = do_call_tc(conn, bobj, NULL, pobj, DECODE_KEY));
             Py_XDECREF(bobj);
 
         } else {

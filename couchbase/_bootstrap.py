@@ -70,6 +70,9 @@ def _result__repr__(self):
     if flags & C.PYCBC_RESFLD_URL and hasattr(self, "url"):
         details.append("url={0}".format(self.url))
 
+    if hasattr(self, "tracing_context"):
+        details.append("tracing_context={0}".format(self.tracing_context))
+
     if hasattr(self, '_pycbc_repr_extra'):
         details += self._pycbc_repr_extra()
 

@@ -163,15 +163,11 @@ class BreweryBeerRowProcessor(object):
 
 class ViewIteratorTest(ViewTestCase):
     def setUp(self):
-        super(ViewIteratorTest, self).setUp()
-        self.skipIfMock()
-
-    def make_connection(self):
         try:
-            return super(ViewIteratorTest,
-                         self).make_connection(bucket='beer-sample')
+            super(ViewIteratorTest, self).setUp(bucket='beer-sample')
         except CouchbaseError:
             raise SkipTest("Need 'beer-sample' bucket for this")
+        self.skipIfMock()
 
     def test_simple_query(self):
         ret = self.cb.query("beer", "brewery_beers", limit=3)

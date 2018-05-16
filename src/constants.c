@@ -85,9 +85,9 @@
 
 typedef void (*pycbc_constant_handler)(PyObject *, const char *, long long int);
 
-static PyObject *setup_compression_map(PyObject *module,
-                                       pycbc_constant_handler handler);
-
+static void setup_compression_map(PyObject *module,
+                                  pycbc_constant_handler handler);
+static void setup_tracing_map(PyObject *module, pycbc_constant_handler handler);
 static void
 do_all_constants(PyObject *module, pycbc_constant_handler handler)
 {
@@ -210,21 +210,58 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
     ADD_MACRO(LCB_BTYPE_COUCHBASE);
     ADD_MACRO(LCB_BTYPE_EPHEMERAL);
     ADD_MACRO(LCB_BTYPE_MEMCACHED);
-
     /* Encryption options */
     ADD_MACRO(LCBCRYPTO_KEY_ENCRYPT);
     ADD_MACRO(LCBCRYPTO_KEY_DECRYPT);
     LCB_CONSTANT(VERSION);
     ADD_MACRO(PYCBC_CRYPTO_VERSION);
-    PyModule_AddObject(module, "COMPRESSION", setup_compression_map(module, handler));
-
+    setup_tracing_map(module, handler);
+    setup_compression_map(module, handler);
 #ifdef LCB_N1XSPEC_F_DEFER
     ADD_MACRO(LCB_N1XSPEC_F_DEFER);
 #endif
 }
 
-static PyObject *setup_compression_map(PyObject *module,
-                                       pycbc_constant_handler handler)
+static void setup_tracing_map(PyObject *module,
+                                       pycbc_constant_handler handler) {
+#define LCB_CNTL_CONSTANT(postfix, ...) ADD_CONSTANT(#postfix, LCB_CNTL_##postfix)
+#define LCB_FOR_EACH_THRESHOLD_PARAM(X, DIV)\
+    X(TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL, convert_timevalue) DIV\
+    X(TRACING_ORPHANED_QUEUE_SIZE, convert_u32) DIV\
+    X(TRACING_THRESHOLD_QUEUE_FLUSH_INTERVAL, convert_timevalue) DIV\
+    X(TRACING_THRESHOLD_QUEUE_SIZE, convert_u32) DIV\
+    X(TRACING_THRESHOLD_KV, convert_timevalue) DIV\
+    X(TRACING_THRESHOLD_N1QL, convert_timevalue) DIV\
+    X(TRACING_THRESHOLD_VIEW, convert_timevalue) DIV\
+    X(TRACING_THRESHOLD_FTS, convert_timevalue) DIV\
+    X(TRACING_THRESHOLD_ANALYTICS, convert_timevalue) DIV \
+    X(ENABLE_TRACING, convert_intbool)
+    PyObject* convert_timevalue = pycbc_SimpleStringZ("timeout");
+    PyObject* convert_u32 = pycbc_SimpleStringZ("uint32_t");
+    PyObject* convert_intbool = pycbc_SimpleStringZ("int");
+    PyObject *result = PyDict_New();
+    LCB_FOR_EACH_THRESHOLD_PARAM(LCB_CNTL_CONSTANT, ;);
+    LCB_CNTL_TRACING_THRESHOLD_KV;
+#define X(NAME, VALUE)                                       \
+    {                                                        \
+        PyObject *attrdict = PyDict_New();                   \
+        PyObject *val = PyLong_FromLong(LCB_CNTL_##NAME);    \
+        PyDict_SetItemString(attrdict, "op", val);           \
+        PyDict_SetItemString(attrdict, "value_type", VALUE); \
+        PyDict_SetItemString(result, #NAME, attrdict);       \
+        Py_DecRef(val);                                      \
+        Py_DecRef(attrdict);                                 \
+    }
+    LCB_FOR_EACH_THRESHOLD_PARAM(X, ;);
+#undef X
+    Py_DecRef(convert_timevalue);
+    Py_DecRef(convert_u32);
+    PyModule_AddObject(module, "TRACING", result);
+#undef LCB_FOR_EACH_THRESHOLD_PARAM
+}
+
+static void setup_compression_map(PyObject *module,
+                                  pycbc_constant_handler handler)
 {
 /* Compression options */
 #define LCB_FOR_EACH_COMPRESS_TYPE(X, DIV)\
@@ -246,7 +283,8 @@ static PyObject *setup_compression_map(PyObject *module,
 #define X(NAME, VALUE) PyDict_SetItemString(result,#NAME,PyLong_FromLong(VALUE))
     PP_FOR_EACH(X, ;);
 #undef X
-    return result;
+#undef PP_FOR_EACH
+    PyModule_AddObject(module, "COMPRESSION", result);
 }
 
 

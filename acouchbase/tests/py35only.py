@@ -2,9 +2,9 @@ from fixtures import asynct, AioTestCase
 
 class CouchbasePy35Test(AioTestCase):
 
-    def make_connection(self):
+    def setUp(self):
         try:
-            return super().make_connection(bucket='beer-sample')
+            super(CouchbasePy35Test,self).setUp(bucket='beer-sample')
         except CouchbaseError:
             raise SkipTest("Need 'beer-sample' bucket for this")
 

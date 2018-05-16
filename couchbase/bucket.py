@@ -123,6 +123,7 @@ def _dsop(create_type=None, wrap_missing_path=True):
 
     return real_decorator
 
+
 class Bucket(_Base):
     def __init__(self, *args, **kwargs):
         """Connect to a bucket.
@@ -1770,6 +1771,18 @@ class Bucket(_Base):
     @redaction.setter
     def redaction(self, val):
         return self._cntl(_LCB.LCB_CNTL_LOG_REDACTION, value=val, value_type='int')
+
+    def __getattribute__(self, name):
+        if name in _LCB.TRACING.keys():
+            return self._cntl(**_LCB.TRACING[name])
+        else:
+            return super(Bucket, self).__getattribute__(name)
+
+    def __setattr__(self, name, value):
+        if name in _LCB.TRACING.keys():
+            return self._cntl(value=value, **_LCB.TRACING[name])
+        else:
+            super(Bucket, self).__setattr__(name, value)
 
     def _cntl(self, *args, **kwargs):
         """Low-level interface to the underlying C library's settings. via
