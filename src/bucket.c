@@ -224,6 +224,7 @@ Bucket_decrypt_fields(pycbc_Bucket *self, PyObject *args)
         cmd.nfields = pycbc_populate_fieldspec(&cmd.fields, fieldspec);
         res = lcbcrypto_decrypt_fields(self->instance, &cmd);
 #else
+        (void)fieldspec;
         res = lcbcrypto_decrypt_document(self->instance, &cmd);
 #endif
     }

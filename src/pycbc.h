@@ -20,12 +20,15 @@
  * @author Mark Nunberg
  */
 
+
 #ifdef PYCBC_DEBUG
-#define PYCBC_DEBUG_LOG_RAW(...) printf(__VA_ARGS__);
-void pycbc_log_pyformat(const char *file, int line, const char *format, ...);
+#define PYCBC_DEBUG_LOG_RAW(...) fprintf(stderr,__VA_ARGS__);
+void pycbc_print_pyformat(const char *format, ...);
 void pycbc_exception_log(const char *file, int line, int clear);
 #define PYCBC_DEBUG_PYFORMAT(FORMAT, ...) \
-    pycbc_log_pyformat(__FILE__, __LINE__, FORMAT, __VA_ARGS__, NULL)
+    PYCBC_DEBUG_LOG_PREFIX(__FILE__, __LINE__)\
+    pycbc_print_pyformat(FORMAT, __VA_ARGS__, NULL);\
+    fprintf(stderr, "\n");
 #define PYCBC_EXCEPTION_LOG_NOCLEAR pycbc_exception_log(__FILE__, __LINE__, 0);
 #define PYCBC_EXCEPTION_LOG pycbc_exception_log(__FILE__, __LINE__, 1);
 #else
@@ -35,8 +38,9 @@ void pycbc_exception_log(const char *file, int line, int clear);
 #define PYCBC_EXCEPTION_LOG PyErr_Clear();
 #endif
 
+#define PYCBC_DEBUG_LOG_PREFIX(FILE,LINE) PYCBC_DEBUG_LOG_RAW("at %s line %d:", FILE, LINE)
 #define PYCBC_DEBUG_LOG_WITH_FILE_AND_LINE_POSTFIX(FILE,LINE,POSTFIX,...)\
-    PYCBC_DEBUG_LOG_RAW("at %s line %d:", FILE, LINE)\
+    PYCBC_DEBUG_LOG_PREFIX(FILE,LINE)\
     PYCBC_DEBUG_LOG_RAW(__VA_ARGS__)\
     PYCBC_DEBUG_LOG_RAW(POSTFIX)
 #define PYCBC_DEBUG_LOG_WITH_FILE_AND_LINE_NEWLINE(FILE,LINE,...) PYCBC_DEBUG_LOG_WITH_FILE_AND_LINE_POSTFIX(FILE,LINE,"\n", __VA_ARGS__)
@@ -200,6 +204,8 @@ unsigned long pycbc_IntAsUL(PyObject *o);
 
 
 #endif
+
+PyObject* pycbc_replace_str(PyObject** string, const char* pat, const char* replace);
 
 /**
  * Fetches a valid TTL from the object

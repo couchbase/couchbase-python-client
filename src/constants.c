@@ -234,28 +234,75 @@ static void setup_tracing_map(PyObject *module,
     X(TRACING_THRESHOLD_N1QL, convert_timevalue) DIV\
     X(TRACING_THRESHOLD_VIEW, convert_timevalue) DIV\
     X(TRACING_THRESHOLD_FTS, convert_timevalue) DIV\
-    X(TRACING_THRESHOLD_ANALYTICS, convert_timevalue) DIV \
-    X(ENABLE_TRACING, convert_intbool)
+    X(TRACING_THRESHOLD_ANALYTICS, convert_timevalue)
+
     PyObject* convert_timevalue = pycbc_SimpleStringZ("timeout");
+#define convert_timevalue_desc "The %S, in fractions of a second."
+#define convert_timevalue_desc_val "0.5"
+#define convert_timevalue_desc_val_units " seconds"
     PyObject* convert_u32 = pycbc_SimpleStringZ("uint32_t");
+#define convert_u32_desc "The %S."
+#define convert_u32_desc_val "100"
+#define convert_u32_desc_val_units " entries"
     PyObject* convert_intbool = pycbc_SimpleStringZ("int");
+#define convert_intbool_desc "Whether %S is set. "
+#define convert_intbool_desc_val "True"
+#define convert_intbool_desc_val_units ""
     PyObject *result = PyDict_New();
     LCB_FOR_EACH_THRESHOLD_PARAM(LCB_CNTL_CONSTANT, ;);
     LCB_CNTL_TRACING_THRESHOLD_KV;
-#define X(NAME, VALUE)                                       \
-    {                                                        \
-        PyObject *attrdict = PyDict_New();                   \
-        PyObject *val = PyLong_FromLong(LCB_CNTL_##NAME);    \
-        PyDict_SetItemString(attrdict, "op", val);           \
-        PyDict_SetItemString(attrdict, "value_type", VALUE); \
-        PyDict_SetItemString(result, #NAME, attrdict);       \
-        Py_DecRef(val);                                      \
-        Py_DecRef(attrdict);                                 \
+#define X(NAME, TYPE)                                       \
+    {                                                       \
+        PyObject *attrdict = PyDict_New();                  \
+        PyObject *val = PyLong_FromLong(LCB_CNTL_##NAME);   \
+        PyDict_SetItemString(attrdict, "op", val);          \
+        PyDict_SetItemString(attrdict, "value_type", TYPE); \
+        PyDict_SetItemString(result, #NAME, attrdict);      \
+        Py_DecRef(val);                                     \
+        Py_DecRef(attrdict);                                \
     }
     LCB_FOR_EACH_THRESHOLD_PARAM(X, ;);
 #undef X
+
+#define X(NAME,TYPE)\
+    {\
+        PyObject* as_string = pycbc_SimpleStringZ(#NAME);\
+        PyObject* as_lower_case = PyObject_CallMethod(as_string, "lower","");\
+        PyObject* as_words = PyObject_CallMethod(as_lower_case, "replace", "ss", "_", " ");\
+        pycbc_replace_str(&as_words, "analytics", "for analytics");\
+        pycbc_replace_str(&as_words, "n1ql", "for N1QL");\
+        pycbc_replace_str(&as_words, "kv", "for KV");\
+        pycbc_replace_str(&as_words, "fts", "for FTS");\
+        pycbc_replace_str(&as_words, "view", "for View");\
+        pycbc_print_pyformat(\
+        "@property\n"\
+        "def %S(self):\n"\
+        "    \"\"\"\n"\
+        "    " TYPE##_desc "\n"\
+        "\n"\
+        "    ::\n"\
+        "        # Set %S to " TYPE##_desc_val TYPE##_desc_val_units "\n"\
+        "        cb.%S=" TYPE##_desc_val "\n" \
+        "\n"\
+        "    \"\"\"\n"\
+        "    \n"\
+        "    return self._cntl(op=_LCB." #NAME ", value_type=\"%S\")\n\n", as_lower_case, as_words, as_words, as_lower_case, TYPE  );\
+        pycbc_print_pyformat(\
+        "@%S.setter\n"\
+        "def %S(self, val):\n"\
+        "    return self._cntl(op=_LCB." #NAME ", value=val, value_type=\"%S\")\n\n", as_lower_case, as_lower_case, TYPE);\
+        Py_DecRef(as_words);\
+        Py_DecRef(as_lower_case);\
+        Py_DecRef(as_string);\
+    }
+
+#ifdef PYCBC_GEN_PYTHON
+LCB_FOR_EACH_THRESHOLD_PARAM(X, ; );
+#endif
+#undef X
     Py_DecRef(convert_timevalue);
     Py_DecRef(convert_u32);
+    Py_DecRef(convert_intbool);
     PyModule_AddObject(module, "TRACING", result);
 #undef LCB_FOR_EACH_THRESHOLD_PARAM
 }

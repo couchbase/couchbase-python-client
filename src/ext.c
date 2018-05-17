@@ -495,8 +495,9 @@ void pycbc_exception_log(const char* file, int line, int clear)
         }
     }
 }
+#endif
 
-void pycbc_log_pyformat(const char *file, int line, const char *format, ...)
+void pycbc_print_pyformat(const char *format, ...)
 {
     va_list v1;
     PyObject *type = NULL, *value = NULL, *traceback = NULL;
@@ -508,8 +509,7 @@ void pycbc_log_pyformat(const char *file, int line, const char *format, ...)
     if (!formatted || PyErr_Occurred()) {
         PYCBC_EXCEPTION_LOG
     } else {
-        PYCBC_DEBUG_LOG_WITH_FILE_AND_LINE_NEWLINE(
-                file, line, "%s", PYCBC_CSTR(formatted));
+        fprintf(stderr, "%s", PYCBC_CSTR(formatted));
     }
     Py_XDECREF(formatted);
     PyErr_Print();
@@ -518,7 +518,13 @@ void pycbc_log_pyformat(const char *file, int line, const char *format, ...)
     }
 }
 
-#endif
+PyObject* pycbc_replace_str(PyObject** string, const char* pat, const char* replace)
+{
+    PyObject* result = PyObject_CallMethod(*string, "replace", "ss", pat, replace);
+    Py_DecRef(*string);
+    *string = result;
+    return result;
+}
 
 #ifdef PYCBC_TRACING
 pycbc_stack_context_handle pycbc_Context_deref_debug(

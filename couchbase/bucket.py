@@ -125,6 +125,7 @@ def _dsop(create_type=None, wrap_missing_path=True):
 
 
 class Bucket(_Base):
+
     def __init__(self, *args, **kwargs):
         """Connect to a bucket.
 
@@ -1772,17 +1773,169 @@ class Bucket(_Base):
     def redaction(self, val):
         return self._cntl(_LCB.LCB_CNTL_LOG_REDACTION, value=val, value_type='int')
 
-    def __getattribute__(self, name):
-        if name in _LCB.TRACING.keys():
-            return self._cntl(**_LCB.TRACING[name])
-        else:
-            return super(Bucket, self).__getattribute__(name)
+    @property
+    def tracing_orphaned_queue_flush_interval(self):
+        """
+        The tracing orphaned queue flush interval, in fractions of a second.
 
-    def __setattr__(self, name, value):
-        if name in _LCB.TRACING.keys():
-            return self._cntl(value=value, **_LCB.TRACING[name])
-        else:
-            super(Bucket, self).__setattr__(name, value)
+        ::
+            # Set tracing orphaned queue flush interval to 0.5 seconds
+            cb.tracing_orphaned_queue_flush_interval = 0.5
+
+        """
+
+        return self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL, value_type="timeout")
+
+    @tracing_orphaned_queue_flush_interval.setter
+    def tracing_orphaned_queue_flush_interval(self, val):
+        return self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL, value=val, value_type="timeout")
+
+    @property
+    def tracing_orphaned_queue_size(self):
+        """
+        The tracing orphaned queue size.
+
+        ::
+            # Set tracing orphaned queue size to 100 entries
+            cb.tracing_orphaned_queue_size = 100
+
+        """
+
+        return self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_SIZE, value_type="uint32_t")
+
+    @tracing_orphaned_queue_size.setter
+    def tracing_orphaned_queue_size(self, val):
+        return self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_SIZE, value=val, value_type="uint32_t")
+
+    @property
+    def tracing_threshold_queue_flush_interval(self):
+        """
+        The tracing threshold queue flush interval, in fractions of a second.
+
+        ::
+            # Set tracing threshold queue flush interval to 0.5 seconds
+            cb.tracing_threshold_queue_flush_interval = 0.5
+
+        """
+
+        return self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_FLUSH_INTERVAL, value_type="timeout")
+
+    @tracing_threshold_queue_flush_interval.setter
+    def tracing_threshold_queue_flush_interval(self, val):
+        return self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_FLUSH_INTERVAL, value=val, value_type="timeout")
+
+    @property
+    def tracing_threshold_queue_size(self):
+        """
+        The tracing threshold queue size.
+
+        ::
+            # Set tracing threshold queue size to 100 entries
+            cb.tracing_threshold_queue_size = 100
+
+        """
+
+        return self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_SIZE, value_type="uint32_t")
+
+    @tracing_threshold_queue_size.setter
+    def tracing_threshold_queue_size(self, val):
+        return self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_SIZE, value=val, value_type="uint32_t")
+
+    @property
+    def tracing_threshold_kv(self):
+        """
+        The tracing threshold for KV, in fractions of a second.
+
+        ::
+            # Set tracing threshold for KV to 0.5 seconds
+            cb.tracing_threshold_kv = 0.5
+
+        """
+
+        return self._cntl(op=_LCB.TRACING_THRESHOLD_KV, value_type="timeout")
+
+    @tracing_threshold_kv.setter
+    def tracing_threshold_kv(self, val):
+        return self._cntl(op=_LCB.TRACING_THRESHOLD_KV, value=val, value_type="timeout")
+
+    @property
+    def tracing_threshold_n1ql(self):
+        """
+        The tracing threshold for N1QL, in fractions of a second.
+
+        ::
+            # Set tracing threshold for N1QL to 0.5 seconds
+            cb.tracing_threshold_n1ql = 0.5
+
+        """
+
+        return self._cntl(op=_LCB.TRACING_THRESHOLD_N1QL, value_type="timeout")
+
+    @tracing_threshold_n1ql.setter
+    def tracing_threshold_n1ql(self, val):
+        return self._cntl(op=_LCB.TRACING_THRESHOLD_N1QL, value=val, value_type="timeout")
+
+    @property
+    def tracing_threshold_view(self):
+        """
+        The tracing threshold for View, in fractions of a second.
+
+        ::
+            # Set tracing threshold for View to 0.5 seconds
+            cb.tracing_threshold_view = 0.5
+
+        """
+
+        return self._cntl(op=_LCB.TRACING_THRESHOLD_VIEW, value_type="timeout")
+
+    @tracing_threshold_view.setter
+    def tracing_threshold_view(self, val):
+        return self._cntl(op=_LCB.TRACING_THRESHOLD_VIEW, value=val, value_type="timeout")
+
+    @property
+    def tracing_threshold_fts(self):
+        """
+        The tracing threshold for FTS, in fractions of a second.
+
+        ::
+            # Set tracing threshold for FTS to 0.5 seconds
+            cb.tracing_threshold_fts = 0.5
+
+        """
+
+        return self._cntl(op=_LCB.TRACING_THRESHOLD_FTS, value_type="timeout")
+
+    @tracing_threshold_fts.setter
+    def tracing_threshold_fts(self, val):
+        return self._cntl(op=_LCB.TRACING_THRESHOLD_FTS, value=val, value_type="timeout")
+
+    @property
+    def tracing_threshold_analytics(self):
+        """
+        The tracing threshold for analytics, in fractions of a second.
+
+        ::
+            # Set tracing threshold for analytics to 0.5 seconds
+            cb.tracing_threshold_analytics = 0.5
+
+        """
+
+        return self._cntl(op=_LCB.TRACING_THRESHOLD_ANALYTICS, value_type="timeout")
+
+    @tracing_threshold_analytics.setter
+    def tracing_threshold_analytics(self, val):
+        return self._cntl(op=_LCB.TRACING_THRESHOLD_ANALYTICS, value=val, value_type="timeout")
+
+    # Backward compatibility aliases, to be removed by next major revision
+    TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL = tracing_orphaned_queue_flush_interval
+    TRACING_ORPHANED_QUEUE_SIZE = tracing_orphaned_queue_size
+    TRACING_THRESHOLD_QUEUE_FLUSH_INTERVAL = tracing_threshold_queue_flush_interval
+    TRACING_THRESHOLD_QUEUE_SIZE = tracing_threshold_queue_size
+    TRACING_THRESHOLD_KV = tracing_threshold_kv
+    TRACING_THRESHOLD_N1QL = tracing_threshold_n1ql
+    TRACING_THRESHOLD_VIEW = tracing_threshold_view
+    TRACING_THRESHOLD_FTS = tracing_threshold_fts
+    TRACING_THRESHOLD_ANALYTICS = tracing_threshold_analytics
 
     def _cntl(self, *args, **kwargs):
         """Low-level interface to the underlying C library's settings. via

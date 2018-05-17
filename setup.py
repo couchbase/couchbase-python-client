@@ -30,11 +30,9 @@ LCB_NAME = None
 extoptions['extra_compile_args'] = []
 extoptions['extra_link_args'] = []
 
-if os.environ.get('PYCBC_TRACING_ENABLE'):
-    extoptions['extra_compile_args'] += ['-DPYCBC_TRACING_ENABLE']
-if os.environ.get('PYCBC_DEBUG'):
-    extoptions['extra_compile_args'] += ['-DPYCBC_DEBUG']
-
+comp_flags = ["PYCBC_TRACING_ENABLE","PYCBC_DEBUG","PYCBC_CRYPTO_VERSION"]
+extoptions['extra_compile_args'] += ["-D{}={}".format(flag,os.environ.get(flag))
+                                     for flag in comp_flags if flag in os.environ.keys()]
 if sys.platform != 'win32':
     extoptions['libraries'] = ['couchbase']
     if os.environ.get('PYCBC_DEBUG'):
