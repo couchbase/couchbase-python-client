@@ -414,8 +414,12 @@ static void log_handler(struct lcb_logprocs_st *procs,
     PyGILState_STATE gil_prev;
     PyObject *tmp;
     PyObject *kwargs;
+#define PYCBC_LOG_BUFSZ 1000
+    char stackbuf[PYCBC_LOG_BUFSZ] = {0};
+    char* heapbuf = NULL;
+    char* tempbuf = stackbuf;
     va_list vacp;
-
+    int length = 0;
     if (!pycbc_log_handler) {
         return;
     }
@@ -424,10 +428,35 @@ static void log_handler(struct lcb_logprocs_st *procs,
 
     kwargs = PyDict_New();
     va_copy(vacp, ap);
-    tmp = PyUnicode_FromFormatV(fmt, vacp);
+    length = vsnprintf(stackbuf, PYCBC_LOG_BUFSZ, fmt, vacp);
+    if (length > PYCBC_LOG_BUFSZ)
+    {
+        heapbuf = calloc(length, sizeof(char));
+        va_copy(vacp, ap);
+        length = vsnprintf(heapbuf, length, fmt, vacp);
+        tempbuf = heapbuf;
+    }
+    if (length >= 0)
+    {
+        tmp = pycbc_SimpleStringN(
+            tempbuf, length);
+    }
+    else
+    {
+        va_copy(vacp, ap);
+        PYCBC_DEBUG_LOG("Got negative result %d from FMT %s", length, fmt);
+        PYCBC_DEBUG_LOG("should be:");
+        PYCBC_DEBUG_LOG(fmt, vacp);
+    }
     va_end(ap);
-
-    PyDict_SetItemString(kwargs, "message", tmp); Py_DECREF(tmp);
+#undef PYCBC_LOG_BUFSZ
+    if (heapbuf) // in case we ever-hit a noncompliant C implementation
+    {
+        free(heapbuf);
+    }
+    if (length<0 || !tmp || PyErr_Occurred()) goto FAIL;
+    PyDict_SetItemString(kwargs, "message", tmp);
+    Py_DECREF(tmp);
     tmp = pycbc_IntFromL(iid);
     PyDict_SetItemString(kwargs, "id", tmp); Py_DECREF(tmp);
 
@@ -442,7 +471,7 @@ static void log_handler(struct lcb_logprocs_st *procs,
 
     PYCBC_STASH_EXCEPTION(
             PyObject_Call(pycbc_log_handler, pycbc_DummyTuple, kwargs));
-
+    FAIL:
     Py_DECREF(kwargs);
     PyGILState_Release(gil_prev);
 }
