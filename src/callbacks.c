@@ -39,7 +39,10 @@ static void
 cb_thr_begin(pycbc_Bucket *self)
 {
 #ifdef PYCBC_TRACING
-    pycbc_Tracer_propagate(self->tracer);
+    if (self && self->tracer) {
+        PYCBC_DEBUG_LOG("propagating tracer from %p, %p", self, self->tracer);
+        pycbc_Tracer_propagate(self->tracer);
+    }
 #endif
     if (Py_REFCNT(self) > 1) {
         Py_DECREF(self);

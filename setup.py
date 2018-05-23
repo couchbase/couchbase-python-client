@@ -31,11 +31,12 @@ extoptions['extra_compile_args'] = []
 extoptions['extra_link_args'] = []
 
 comp_flags = ["PYCBC_TRACING_ENABLE","PYCBC_DEBUG","PYCBC_CRYPTO_VERSION"]
+debug_symbols = len(set(os.environ.keys()) & set(["PYCBC_DEBUG","PYCBC_DEBUG_SYMBOLS"])) >0
 extoptions['extra_compile_args'] += ["-D{}={}".format(flag,os.environ.get(flag))
                                      for flag in comp_flags if flag in os.environ.keys()]
 if sys.platform != 'win32':
     extoptions['libraries'] = ['couchbase']
-    if os.environ.get('PYCBC_DEBUG'):
+    if debug_symbols:
         extoptions['extra_compile_args'] += ['-O0', '-g3']
         extoptions['extra_link_args'] += ['-O0', '-g3']
     if sys.platform == 'darwin':
@@ -64,9 +65,9 @@ else:
 
     extoptions['libraries'] = ['libcouchbase']
     ## Enable these lines for debug builds
-    if os.environ.get('PYCBC_DEBUG'):
-        extoptions['extra_compile_args'] += ['/Zi','/DEBUG']
-        extoptions['extra_link_args'] += ['/DEBUG']
+    if debug_symbols:
+        extoptions['extra_compile_args'] += ['/Zi','/DEBUG','/O0']
+        extoptions['extra_link_args'] += ['/DEBUG','-debug']
     extoptions['library_dirs'] = [os.path.join(lcb_root, 'lib')]
     extoptions['include_dirs'] = [os.path.join(lcb_root, 'include')]
     extoptions['define_macros'] = [('_CRT_SECURE_NO_WARNINGS', 1)]

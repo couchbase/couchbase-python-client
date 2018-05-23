@@ -46,7 +46,15 @@ void pycbc_exception_log(const char *file, int line, int clear);
 #define PYCBC_DEBUG_LOG_WITH_FILE_AND_LINE_NEWLINE(FILE,LINE,...) PYCBC_DEBUG_LOG_WITH_FILE_AND_LINE_POSTFIX(FILE,LINE,"\n", __VA_ARGS__)
 #define PYCBC_DEBUG_LOG(...) PYCBC_DEBUG_LOG_WITH_FILE_AND_LINE_NEWLINE(__FILE__,__LINE__,__VA_ARGS__)
 
+#define PYCBC_FREE(X)                 \
+    PYCBC_DEBUG_LOG("freeing %p", X); \
+    free(X);
+
 #ifdef PYCBC_DEBUG
+#define PYCBC_MALLOC(X) malloc_and_log(__FILE__, __LINE__, X)
+#define PYCBC_CALLOC(X, Y) calloc_and_log(__FILE__, __LINE__, X, Y, "unknown")
+#define PYCBC_CALLOC_TYPED(X, Y) \
+    calloc_and_log(__FILE__, __LINE__, X, sizeof(Y), #Y)
 #define LOG_REFOP(Y, OP)                                                    \
     {                                                                       \
         pycbc_assert((Y) && Py_REFCNT(Y) > 0);                              \
@@ -68,6 +76,9 @@ void pycbc_exception_log(const char *file, int line, int clear);
         Py_##X##OP((PyObject *)(Y));                                        \
     }
 #else
+#define PYCBC_MALLOC(X) malloc(X)
+#define PYCBC_CALLOC(X, Y) calloc(X, Y)
+#define PYCBC_CALLOC_TYPED(X, Y) calloc(X, sizeof(Y))
 #define LOG_REFOP(Y, OP) Py_##OP(Y)
 #define LOG_REFOPX(Y, OP) Py_X##OP(Y)
 #endif
@@ -110,6 +121,12 @@ void pycbc_exception_log(const char *file, int line, int clear);
 
 void pycbc_fetch_error(PyObject *err[3]);
 void pycbc_store_error(PyObject *err[3]);
+void *malloc_and_log(const char *file, int line, size_t size);
+void *calloc_and_log(const char *file,
+                     int line,
+                     size_t quant,
+                     size_t size,
+                     const char *type_name);
 
 #define PYCBC_STASH_EXCEPTION(OP)                           \
     {                                                       \
@@ -195,13 +212,12 @@ typedef int pycbc_strlen_t;
 const char* pycbc_cstrn(PyObject* object, Py_ssize_t *length);
 
 #define PYCBC_CSTR(X) PyString_AsString(X)
-#define PYCBC_CSTRN(X, n) pycbc_cstrn((X), (n))
+#define PYCBC_CSTRN(X, n) pycbc_cstrn((X), (Py_ssize_t *)(n))
 
 unsigned PY_LONG_LONG pycbc_IntAsULL(PyObject *o);
 PY_LONG_LONG pycbc_IntAsLL(PyObject *o);
 long pycbc_IntAsL(PyObject *o);
 unsigned long pycbc_IntAsUL(PyObject *o);
-
 
 #endif
 
@@ -389,6 +405,7 @@ typedef struct {
 #ifdef PYCBC_TRACING
     /** Tracer **/
     struct pycbc_Tracer *tracer;
+    PyObject *parent_tracer;
 #endif
     /** Transcoder object */
     PyObject *tc;
@@ -461,11 +478,6 @@ typedef struct pycbc_Tracer {
     lcbtrace_TRACER *tracer;
 } pycbc_Tracer_t;
 
-static PyTypeObject SpanType = {
-        PYCBC_POBJ_HEAD_INIT(NULL)
-        0
-};
-
 typedef struct {
     PyObject_HEAD
 #ifdef PYCBC_TRACING
@@ -497,7 +509,7 @@ typedef void* pycbc_stack_context_handle;
 
 #ifdef PYCBC_TRACING
 int pycbc_is_async_or_pipeline(const pycbc_Bucket *self);
-typedef struct pycbc_Result pycbc_Result;
+typedef struct pycbc_Result pycbc_Result_t;
 typedef struct pycbc_MultiResult_st pycbc_MultiResult;
 
 pycbc_stack_context_handle pycbc_Result_start_context(
@@ -505,18 +517,18 @@ pycbc_stack_context_handle pycbc_Result_start_context(
         PyObject *hkey,
         char *component,
         char *operation);
-void pycbc_Result_propagate_context(pycbc_Result *res,
+void pycbc_Result_propagate_context(pycbc_Result_t *res,
                                     pycbc_stack_context_handle parent_context);
 void pycbc_MultiResult_init_context(pycbc_MultiResult *self,
                                     PyObject *curkey,
                                     pycbc_stack_context_handle context,
                                     pycbc_Bucket *bucket);
 pycbc_stack_context_handle pycbc_MultiResult_extract_context(
-        pycbc_MultiResult *self, PyObject *hkey, pycbc_Result **res);
+        pycbc_MultiResult *self, PyObject *hkey, pycbc_Result_t **res);
 #define PYCBC_MULTIRESULT_EXTRACT_CONTEXT(MRES, KEY, RES) \
     pycbc_MultiResult_extract_context(MRES, KEY, RES)
-pycbc_stack_context_handle pycbc_Result_extract_context(
-        const pycbc_Result *res);
+pycbc_stack_context_handle pycbc_Result_t_extract_context(
+        const pycbc_Result_t *res);
 #define PYCBC_RESULT_EXTRACT_CONTEXT(RESULT) \
     pycbc_Result_extract_context(RESULT)
 
@@ -827,7 +839,7 @@ typedef PyObject pycbc_enhanced_err_info;
  *
  * See multiresult.c
  */
-typedef struct pycbc_MultiResult_st {
+struct pycbc_MultiResult_st {
     PYCBC_MULTIRESULT_BASE;
 
     /** parent Connection object */
@@ -851,8 +863,7 @@ typedef struct pycbc_MultiResult_st {
     int mropts;
 
     pycbc_enhanced_err_info *err_info;
-
-} pycbc_MultiResult;
+};
 
 typedef struct {
     pycbc_MultiResult base;

@@ -237,6 +237,11 @@ X(v1,decrypt, pycbc_cstrndup, PYCBC_V1_DECRYPT_TYPES)\
 PYCBC_X_V1_ONLY_CRYPTO_METHODS(X)\
 PYCBC_X_COMMON_CRYPTO_METHODS(X)
 
+#define PYCBC_X_ALL_CRYPTO_FUNCTIONS(X) \
+    PYCBC_X_V0_ONLY_CRYPTO_METHODS(X)   \
+    PYCBC_X_V1_ONLY_CRYPTO_METHODS(X)   \
+    PYCBC_X_COMMON_CRYPTO_METHODS(X)
+
 #define PYCBC_SIG_METHOD(VERSION, METHOD, PROCESSOR, X_ARGS)\
 static lcb_error_t \
 pycbc_crypto_##VERSION##_##METHOD(lcbcrypto_PROVIDER *provider \
@@ -271,7 +276,7 @@ pycbc_crypto_##VERSION##_##METHOD(lcbcrypto_PROVIDER *provider \
 #endif
 
 #ifdef PYCBC_GEN_METHODS
-PYCBC_X_ALL_CRYPTO_VERSIONS(PYCBC_SIG_METHOD);
+PYCBC_X_ALL_CRYPTO_FUNCTIONS(PYCBC_SIG_METHOD);
 #else
 
 static lcb_error_t pycbc_crypto_generic_generate_iv(lcbcrypto_PROVIDER *provider, uint8_t **subject,
@@ -561,6 +566,9 @@ pycbc_CryptoProviderType_init(PyObject **ptr)
     p->tp_basicsize = sizeof(pycbc_CryptoProvider);
     p->tp_setattro = CryptoProvider___setattr__;
     p->tp_methods = CryptoProvider_TABLE_methods;
-
+#define PYCBC_DUMMY_METHOD_USE(VERSION, METHOD, PROCESSOR, X_ARGS) \
+    (void)pycbc_crypto_##VERSION##_##METHOD;
+    PYCBC_X_ALL_CRYPTO_FUNCTIONS(PYCBC_DUMMY_METHOD_USE)
+#undef PYCBC_DUMMY_METHOD_USE
     return PyType_Ready(p);
 }

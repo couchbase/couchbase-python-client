@@ -1,3 +1,4 @@
+
 /**
  *     Copyright 2013 Couchbase, Inc.
  *
@@ -140,7 +141,7 @@ Bucket_unregister_crypto_provider(pycbc_Bucket *self, PyObject *args)
 #if PY_MAJOR_VERSION<3
 const char* pycbc_cstrn(PyObject* object, Py_ssize_t *length)
 {
-    const char* buffer = NULL;
+    char *buffer = NULL;
     PyString_AsStringAndSize(object, &buffer, length);
     return buffer;
 }
@@ -800,6 +801,8 @@ PyObject *pycbc_value_or_none(PyObject *tracer)
     return tracer ? tracer : Py_None;
 }
 
+void pycbc_Bucket_init_tracer(pycbc_Bucket *self);
+
 static int
 Bucket__init__(pycbc_Bucket *self,
                        PyObject *args, PyObject *kwargs)
@@ -812,31 +815,27 @@ Bucket__init__(pycbc_Bucket *self,
     PyObject *iops_O = NULL;
     PyObject *dfl_fmt = NULL;
     PyObject *tc = NULL;
-    PyObject *tracer = NULL;
     struct lcb_create_st create_opts = { 0 };
-#ifdef PYCBC_TRACING
-    lcbtrace_TRACER *threshold_tracer = NULL;
-#endif
 
     /**
      * This xmacro enumerates the constructor keywords, targets, and types.
      * This was converted into an xmacro to ease the process of adding or
      * removing various parameters.
      */
-#define XCTOR_ARGS(X) \
+#define XCTOR_ARGS(X)                                      \
     X("connection_string", &create_opts.v.v3.connstr, "z") \
-    X("connstr", &create_opts.v.v3.connstr, "z") \
-    X("username", &create_opts.v.v3.username, "z") \
-    X("password", &create_opts.v.v3.passwd, "z") \
-    X("quiet", &self->quiet, "I") \
-    X("unlock_gil", &unlock_gil_O, "O") \
-    X("transcoder", &tc, "O") \
-    X("default_format", &dfl_fmt, "O") \
-    X("lockmode", &self->lockmode, "i") \
-    X("_flags", &self->flags, "I") \
-    X("_conntype", &conntype, "i") \
-    X("_iops", &iops_O, "O") \
-    X("tracer", &tracer, "O")
+    X("connstr", &create_opts.v.v3.connstr, "z")           \
+    X("username", &create_opts.v.v3.username, "z")         \
+    X("password", &create_opts.v.v3.passwd, "z")           \
+    X("quiet", &self->quiet, "I")                          \
+    X("unlock_gil", &unlock_gil_O, "O")                    \
+    X("transcoder", &tc, "O")                              \
+    X("default_format", &dfl_fmt, "O")                     \
+    X("lockmode", &self->lockmode, "i")                    \
+    X("_flags", &self->flags, "I")                         \
+    X("_conntype", &conntype, "i")                         \
+    X("_iops", &iops_O, "O")                               \
+    X("tracer", &self->parent_tracer, "O")
 
     static char *kwlist[] = {
         #define X(s, target, type) s,
@@ -872,10 +871,6 @@ Bucket__init__(pycbc_Bucket *self,
     if (unlock_gil_O && PyObject_IsTrue(unlock_gil_O) == 0) {
         self->unlock_gil = 0;
     }
-#ifdef PYCBC_TRACING
-    PYCBC_DEBUG_LOG("threshold tracer %p", threshold_tracer);
-
-#endif
     create_opts.version = 3;
     create_opts.v.v3.type = conntype;
 
@@ -918,33 +913,7 @@ Bucket__init__(pycbc_Bucket *self,
 #endif
 
     err = lcb_create(&self->instance, &create_opts);
-#ifdef PYCBC_TRACING
-    threshold_tracer = lcb_get_tracer(self->instance);
 
-    if (tracer || threshold_tracer) {
-        PyObject *tracer_args = PyTuple_New(2);
-        PyObject *threshold_tracer_capsule =
-                threshold_tracer
-                        ? PyCapsule_New(
-                                  threshold_tracer, "threshold_tracer", NULL)
-                        : NULL;
-        PyTuple_SetItem(tracer_args, 0, pycbc_value_or_none(tracer));
-        PyTuple_SetItem(
-                tracer_args, 1, pycbc_value_or_none(threshold_tracer_capsule));
-        self->tracer =
-                (pycbc_Tracer_t *)PyObject_Call((PyObject *)&pycbc_TracerType,
-                                                tracer_args,
-                                                pycbc_DummyKeywords);
-        if (PyErr_Occurred()) {
-            PYCBC_EXCEPTION_LOG_NOCLEAR;
-            self->tracer = NULL;
-        } else {
-            PYCBC_XINCREF(self->tracer);
-            lcb_set_tracer(self->instance, self->tracer->tracer);
-        }
-        PYCBC_DECREF(tracer_args);
-    }
-#endif
     if (err != LCB_SUCCESS) {
         self->instance = NULL;
         PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err,
@@ -976,9 +945,51 @@ Bucket__init__(pycbc_Bucket *self,
     }
 
     self->btype = pycbc_IntFromL(LCB_BTYPE_UNSPEC);
+#ifdef PYCBC_TRACING
+
+    pycbc_Bucket_init_tracer(self);
+#endif
 
     return 0;
 }
+PyObject *pycbc_value_or_none_incref(PyObject *maybe_value)
+{
+    PyObject *result = pycbc_value_or_none(maybe_value);
+    PYCBC_INCREF(result);
+    return result;
+}
+
+void pycbc_Bucket_init_tracer(pycbc_Bucket *self)
+{
+    lcbtrace_TRACER *threshold_tracer = lcb_get_tracer(self->instance);
+
+    if (self->parent_tracer || threshold_tracer) {
+        PyObject *tracer_args = PyTuple_New(2);
+        PyObject *threshold_tracer_capsule =
+                threshold_tracer
+                        ? PyCapsule_New(
+                                  threshold_tracer, "threshold_tracer", NULL)
+                        : NULL;
+        PyTuple_SetItem(tracer_args,
+                        0,
+                        pycbc_value_or_none_incref(self->parent_tracer));
+        PyTuple_SetItem(tracer_args,
+                        1,
+                        pycbc_value_or_none_incref(threshold_tracer_capsule));
+        self->tracer =
+                (pycbc_Tracer_t *)PyObject_Call((PyObject *)&pycbc_TracerType,
+                                                tracer_args,
+                                                pycbc_DummyKeywords);
+        if (PyErr_Occurred()) {
+            PYCBC_EXCEPTION_LOG_NOCLEAR;
+            self->tracer = NULL;
+        } else {
+            PYCBC_XINCREF(self->tracer);
+        }
+        PYCBC_DECREF(tracer_args);
+    }
+}
+
 static PyObject*
 Bucket__connect(pycbc_Bucket *self, PyObject* args, PyObject* kwargs)
 {
@@ -1019,6 +1030,9 @@ Bucket__connect(pycbc_Bucket *self, PyObject* args, PyObject* kwargs)
             PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Problems getting bucket type");
         }
         self->btype = pycbc_IntFromL(btype);
+    }
+    if (self->tracer) {
+        lcb_set_tracer(self->instance, self->tracer->tracer);
     }
     Py_RETURN_NONE;
 }
