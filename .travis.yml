@@ -3,11 +3,10 @@ sudo: false
 
 python:
   - "2.7"
-  - "2.6"
-  - "3.2"
   - "3.3"
   - "3.4"
   - "3.5"
+  - "3.6"
 
 addons:
   apt:
@@ -20,7 +19,6 @@ addons:
 install:
   - pip -q install testresources==0.2.7
   - pip -q install -r dev_requirements.txt
-  - pip -q install -r requirements.txt
   - pip -q install gevent || echo "Couldn't install gevent"
   - pip -q install twisted || echo "Couldn't install Twisted"
   - git describe --tags --long --always
