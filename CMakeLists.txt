@@ -12,6 +12,8 @@ set(OT_ROOT thirdparty/opentracing-cpp)
 set(LCB_CJSON ${LCB_ROOT}/contrib/cJSON)
 set(TP_CJSON thirdparty/cJSON)
 set(LCB_TRACING_DIR ${LCB_ROOT}/src/tracing)
+set(LCB_MCSERVER_DIR ${LCB_ROOT}/src/mcserver)
+set(LCB_BUCKETCONFIG_DIR ${LCB_ROOT}/src/bucketconfig)
 aux_source_directory(${LCB_ROOT}/src LCB_CORE)
 aux_source_directory(${LCB_ROOT}/src/http HTTP)
 aux_source_directory(${LCB_ROOT}/include/memcached/ MCD_INC)
@@ -19,11 +21,11 @@ aux_source_directory(${LCB_ROOT}/include/libcouchbase/ LCB_INC)
 aux_source_directory(${LCB_ROOT}/contrib/lcb-jsoncpp LCB_JSON)
 aux_source_directory(${LCB_CJSON} LCB_CJSON_SRC )
 aux_source_directory(${LCB_ROOT}/src/ssl LCB_SSL)
-aux_source_directory(${LCB_ROOT}/src/mcserver LCB_MCSERVER)
+aux_source_directory(${LCB_MCSERVER_DIR} LCB_MCSERVER)
 aux_source_directory(${LCB_IO} LCB_IO_A)
 aux_source_directory(${LCB_ROOT_SRC}/sasl LCB_SASL)
 aux_source_directory(${LCB_ROOT_SRC}/tracing LCB_TRACING_DIR)
-
+aux_source_directory(${LCB_BUCKETCONFIG_DIR} BUCKETCONFIG)
 aux_source_directory(LCB_VBUCKET ${LCB_ROOT}/src/vbucket)
 aux_source_directory(LCB_SASL ${LCB_ROOT}/contrib/cbsasl)
 aux_source_directory(LCB_CLI ${LCB_ROOT}/contrib/cliopts)
@@ -32,7 +34,7 @@ aux_source_directory(LCB_ROOT_A ${LCB_ROOT_SRC})
 include(ExternalProject)
 add_definitions(-DLCB_TRACING=TRUE
         -DPYCBC_TRACING_ENABLE=TRUE
-        -DPYCBC_DEBUG=TRUE)
+        )
 
 ExternalProject_Add (cJSON
 PREFIX ${OT_ROOT}
@@ -63,6 +65,7 @@ include_directories( ${LCB_ROOT_SRC}
         ${LCB_JSON}
         ${LCB_SSL}
         ${LCB_MCSERVER}
+        ${LCB_MCSERVER_DIR}
         ${LCB_IO}
         ${LCB_VBUCKET}
         ${LCB_SASL}
@@ -87,8 +90,9 @@ set(EXTRA_SOURCE_DIRS
         ${LCB_ROOT}/include/libcouchbase
         ${LCB_ROOT}/src/http
         ${LCB_ROOT}/src/ssl
+        ${LCB_MCSERVER_DIR}
 
-        ${LCB_MCSERVER}
+        ${LCB_ROOT}/src/mcserver
         ${LCB_IO}
 
         ${LCB_VBUCKET}
@@ -96,6 +100,9 @@ set(EXTRA_SOURCE_DIRS
         ${LCB_CLI}
         ${LCB_ROOT_SRC}
         ${LCB_ROOT_A}
+
+        ${LCB_BUCKETCONFIG}
+        ${LCB_BUCKETCONFIG_DIR}
         )
 
 set(SOURCE
@@ -106,19 +113,26 @@ set(SOURCE
         ${HTTP}
         ${LCB_SSL}
         ${LCB_ROOT}/src/ssl
-
+        ${LCB_TRACING_DIR}
+        ${LCB_JSON}
         ${LCB_MCSERVER}
         ${LCB_IO}
+        ${LCB_MCSERVER_DIR}
 
         ${LCB_VBUCKET}
         ${LCB_SASL}
         ${LCB_CLI}
         ${LCB_ROOT_SRC}
+        ${LCB_BUCKETCONFIG}
+        ${LCB_BUCKETCONFIG_DIR}
         )
 link_directories(${LCB_ROOT}/lib)
 link_libraries(${LCB_ROOT}/../lib/
         )
 add_executable(couchbase_python_client_2_3_1
+        ${LCB_BUCKETCONFIG}
+        ${LCB_BUCKETCONFIG_DIR}
+        ${LCB_TRACING_DIR}
         ${OT_ROOT}/src
         ${LCB_CORE}
         ${LCB_INC}
@@ -129,6 +143,9 @@ add_executable(couchbase_python_client_2_3_1
         ${LCB_VBUCKET}
         ${LCB_SASL}
         ${LCB_CLI}
+        ${LCB_MCSERVER}
+        ${LCB_MCSERVER_DIR}
+        ${LCB_JSON}
         acouchbase/tests/asyncio_tests.py
         acouchbase/tests/fixtures.py
         acouchbase/tests/py34only.py

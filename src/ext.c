@@ -483,11 +483,49 @@ FAIL:
 #endif
 
 #include "oputil.h"
-#if PYTHON_ABI_VERSION >= 3
-#define PYCBC_CSTR(X) PyUnicode_AsUTF8(X)
+#if PY_MAJOR_VERSION < 3
+const char *pycbc_cstrn(PyObject *object, Py_ssize_t *length)
+{
+    const char *buffer = NULL;
+    *length = 0;
+    if (!object) {
+        goto FAIL;
+    }
+
+    if (PyUnicode_Check(object)) {
+        buffer = PyUnicode_AS_DATA(object);
+        *length = PyUnicode_GetSize(object);
+    } else if (PyString_Check(object)) {
+        PyString_AsStringAndSize(object, (char **)&buffer, length);
+    }
+FAIL:
+    return buffer;
+}
+
 #else
-#define PYCBC_CSTR(X) PyString_AsString(X)
+
+const char *pycbc_cstrn(PyObject *object, Py_ssize_t *length)
+{
+    char *buffer = NULL;
+    *length = 0;
+    if (!object) {
+        goto FAIL;
+    }
+    if (PyBytes_Check(object)) {
+        PyBytes_AsStringAndSize(object, &buffer, length);
+    } else if (PyUnicode_Check(object)) {
+        buffer = PyUnicode_AsUTF8AndSize(object, length);
+    }
+FAIL:
+    return buffer;
+}
 #endif
+
+const char *pycbc_cstr(PyObject *object)
+{
+    Py_ssize_t dummy = 0;
+    return pycbc_cstrn(object, &dummy);
+}
 
 void pycbc_fetch_error(PyObject *err[3])
 {
@@ -503,8 +541,11 @@ void pycbc_store_error(PyObject *err[3])
 void *malloc_and_log(const char *file, int line, size_t size)
 {
     void *result = malloc(size);
-    PYCBC_DEBUG_LOG_WITH_FILE_AND_LINE_NEWLINE(
-            file, line, "malloced %llu at %p", size, result);
+    PYCBC_DEBUG_LOG_WITH_FILE_AND_LINE_NEWLINE(file,
+                                               line,
+                                               "malloced %llu at %p",
+                                               (unsigned long long)size,
+                                               result);
     return result;
 }
 void *calloc_and_log(const char *file,
@@ -518,10 +559,10 @@ void *calloc_and_log(const char *file,
             file,
             line,
             "calloced (%llu * [ %s == %llu ])= %llu at %p",
-            quant,
+            (unsigned long long)(quant),
             type_name,
-            size,
-            quant * size,
+            (unsigned long long)size,
+            (unsigned long long)(quant * size),
             result);
     return result;
 }

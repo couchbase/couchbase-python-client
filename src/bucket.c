@@ -138,14 +138,6 @@ Bucket_unregister_crypto_provider(pycbc_Bucket *self, PyObject *args)
 
     return Py_None;
 }
-#if PY_MAJOR_VERSION<3
-const char* pycbc_cstrn(PyObject* object, Py_ssize_t *length)
-{
-    char *buffer = NULL;
-    PyString_AsStringAndSize(object, &buffer, length);
-    return buffer;
-}
-#endif
 
 const char *pycbc_dict_cstr(PyObject *dp, char *key) {
     PyObject *item = PyDict_GetItemString(dp, key);
@@ -156,15 +148,31 @@ const char *pycbc_dict_cstr(PyObject *dp, char *key) {
     return result;
 }
 
-size_t pycbc_populate_fieldspec(lcbcrypto_FIELDSPEC **fields, PyObject *fieldspec) {
+size_t pycbc_populate_fieldspec(lcbcrypto_FIELDSPEC **fields,
+                                PyObject *fieldspec)
+{
     size_t i = 0;
-    size_t size = (size_t) PyList_Size(fieldspec);
+    size_t size = (size_t)PyList_Size(fieldspec);
     *fields = calloc(size, sizeof(lcbcrypto_FIELDSPEC));
-    for (i = 0; i < size ; ++i) {
+    for (i = 0; i < size; ++i) {
         PyObject *dict = PyList_GetItem(fieldspec, i);
+        const char *kid_value = pycbc_dict_cstr(dict, "kid");
         (*fields)[i].alg = pycbc_dict_cstr(dict, "alg");
-        (*fields)[i].kid = (PYCBC_CRYPTO_VERSION < 1) ? pycbc_dict_cstr(dict, "kid") : NULL;
-        (*fields)[i].name = pycbc_dict_cstr(dict, "name");;
+#if PYCBC_CRYPTO_VERSION < 1
+        (*fields)[i].kid = kid_value;
+#else
+        if (kid_value && strlen(kid_value) > 0) {
+            PYCBC_FREE(*fields);
+            *fields = NULL;
+            size = 0;
+            PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR,
+                           LCB_EINVAL,
+                           "Fieldspec should not include Key ID - this should "
+                           "be provided by get_key_id instead")
+            break;
+        }
+#endif
+        (*fields)[i].name = pycbc_dict_cstr(dict, "name");
     }
     return size;
 }
@@ -175,14 +183,16 @@ Bucket_encrypt_fields(pycbc_Bucket *self, PyObject *args)
     lcbcrypto_CMDENCRYPT cmd = {0};
     PyObject* fieldspec=NULL;
     int res =0;
+    PyObject *result = NULL;
     if (!PyArg_ParseTuple(args, "s#Os", &cmd.doc, &cmd.ndoc, &fieldspec, &(cmd.prefix))) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;
     }
 
-    ;
     if (!PyErr_Occurred()) {
         cmd.nfields = pycbc_populate_fieldspec(&cmd.fields, fieldspec);
+    }
+    if (!PyErr_Occurred()) {
 #if PYCBC_CRYPTO_VERSION > 0
         res = lcbcrypto_encrypt_fields(self->instance, &cmd);
 #else
@@ -191,13 +201,19 @@ Bucket_encrypt_fields(pycbc_Bucket *self, PyObject *args)
 
     }
     if (PyErr_Occurred()) {
-        return NULL;
+        goto FINISH;
     }
     if (!res) {
-        return pycbc_SimpleStringN(cmd.out, cmd.nout);
+        result = pycbc_SimpleStringN(cmd.out, cmd.nout);
     }
-    PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, LCB_GENERIC_TMPERR, "Internal error while encrypting");
-    return NULL;
+    if (!result && !PyErr_Occurred()) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR,
+                       LCB_GENERIC_TMPERR,
+                       "Internal error while encrypting");
+    }
+FINISH:
+    PYCBC_FREE(cmd.out);
+    return result;
 }
 
 
@@ -207,6 +223,7 @@ Bucket_decrypt_fields(pycbc_Bucket *self, PyObject *args)
     lcbcrypto_CMDDECRYPT cmd = { 0 };
     int res =0;
     PyObject* fieldspec = NULL;
+    PyObject *result = NULL;
     if (!PyArg_ParseTuple(args, "s#"
 #if PYCBC_CRYPTO_VERSION >0
                                 "O"
@@ -231,13 +248,19 @@ Bucket_decrypt_fields(pycbc_Bucket *self, PyObject *args)
     }
 
     if (PyErr_Occurred()) {
-        return NULL;
+        goto FINISH;
     }
     if (!res) {
-        return pycbc_SimpleStringN(cmd.out, cmd.nout);
+        result = pycbc_SimpleStringN(cmd.out, cmd.nout);
     }
-    PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, LCB_GENERIC_TMPERR, "Internal error while decrypting");
-    return NULL;
+    if (!result && !PyErr_Occurred()) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR,
+                       LCB_GENERIC_TMPERR,
+                       "Internal error while decrypting");
+    }
+FINISH:
+    PYCBC_FREE(cmd.out);
+    return result;
 }
 
 static PyObject *

@@ -190,8 +190,6 @@ typedef int pycbc_strlen_t;
 #define pycbc_SimpleStringZ(c) PyUnicode_FromString(c)
 #define pycbc_SimpleStringN(c, n) PyUnicode_FromStringAndSize(c, n)
 
-#define PYCBC_CSTR(X) PyUnicode_AsUTF8(X)
-#define PYCBC_CSTRN(X, n) PyUnicode_AsUTF8AndSize(X, (Py_ssize_t*)n)
 
 #else
 
@@ -209,17 +207,18 @@ typedef int pycbc_strlen_t;
 #define pycbc_SimpleStringZ(c) PyString_FromString(c)
 #define pycbc_SimpleStringN(c, n) PyString_FromStringAndSize(c, n)
 
-const char* pycbc_cstrn(PyObject* object, Py_ssize_t *length);
-
-#define PYCBC_CSTR(X) PyString_AsString(X)
-#define PYCBC_CSTRN(X, n) pycbc_cstrn((X), (Py_ssize_t *)(n))
-
 unsigned PY_LONG_LONG pycbc_IntAsULL(PyObject *o);
 PY_LONG_LONG pycbc_IntAsLL(PyObject *o);
 long pycbc_IntAsL(PyObject *o);
 unsigned long pycbc_IntAsUL(PyObject *o);
 
 #endif
+
+const char *pycbc_cstr(PyObject *object);
+const char *pycbc_cstrn(PyObject *object, Py_ssize_t *length);
+
+#define PYCBC_CSTR(X) pycbc_cstr(X)
+#define PYCBC_CSTRN(X, n) pycbc_cstrn((X), (Py_ssize_t *)(n))
 
 PyObject* pycbc_replace_str(PyObject** string, const char* pat, const char* replace);
 
@@ -527,7 +526,7 @@ pycbc_stack_context_handle pycbc_MultiResult_extract_context(
         pycbc_MultiResult *self, PyObject *hkey, pycbc_Result_t **res);
 #define PYCBC_MULTIRESULT_EXTRACT_CONTEXT(MRES, KEY, RES) \
     pycbc_MultiResult_extract_context(MRES, KEY, RES)
-pycbc_stack_context_handle pycbc_Result_t_extract_context(
+pycbc_stack_context_handle pycbc_Result_extract_context(
         const pycbc_Result_t *res);
 #define PYCBC_RESULT_EXTRACT_CONTEXT(RESULT) \
     pycbc_Result_extract_context(RESULT)
@@ -648,6 +647,7 @@ int pycbc_wrap_and_pop(pycbc_stack_context_handle *context, int result);
 
 #define PYCBC_CONTEXT_DEREF(X, Y)
 #define PYCBC_GET_STACK_CONTEXT(CATEGORY,TRACER, PARENT_CONTEXT) NULL
+#define PYCBC_MULTIRESULT_EXTRACT_CONTEXT(MRES, KEY, RES) NULL
 #define PYCBC_RESULT_EXTRACT_CONTEXT(RESULT) NULL
 #define PYCBC_MULTIRESULT_EXTRACT_CONTEXT(MRES, KEY, RES) NULL
 #define PYCBC_TRACECMD(...)
@@ -1548,15 +1548,6 @@ typedef struct {
 #else
 #define PYCBC_CRYPTO_VERSION 0
 #endif
-#endif
-
-
-#if PYCBC_CRYPTO_VERSION==1
-#define PYCBC_CRYPTO_VVERSION v1
-#define PYCBC_CRYPTO_METHODS(X) PYCBC_X_V1_CRYPTO_METHODS(X)
-#else
-#define PYCBC_CRYPTO_VVERSION v0
-#define PYCBC_CRYPTO_METHODS(X) PYCBC_X_V0_CRYPTO_METHODS(X)
 #endif
 
 /**

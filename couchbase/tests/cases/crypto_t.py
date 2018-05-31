@@ -81,6 +81,9 @@ class ROT13PythonCryptoProvider(PythonCryptoProvider):
         def decrypt(self, input, iv):
             return self.decrypt_real(input, iv)
 
+    def get_key_id(self):
+        return 'key'
+
 
 
 
@@ -146,8 +149,8 @@ class FieldEncryptionTests(ConnectionTestCase):
         self.cb.register_crypto_provider('aes256', provider)
         # encrypt document
         document = self.cb.encrypt_fields(document, [fieldspec], "crypto_")
-        expected = {'ciphertext': 'ImZycGVyZyI=', 'iv': 'd2liYmxl', 'sig': 'Z3Jvbms='}
-        orig_fields = {'alg': 'aes256', 'kid': 'key'}
+        expected = {'ciphertext': 'ImZycGVyZyI=', 'iv': 'd2liYmxl', 'sig': 'Z3Jvbms=', 'kid': 'key'}
+        orig_fields = {'alg': 'aes256'}
         expected_orig = {k:orig_fields[k] for k in orig_fields if k in fieldspec}
         expected.update(expected_orig)
 
