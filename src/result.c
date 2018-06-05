@@ -70,15 +70,22 @@ static struct PyMemberDef Result_TABLE_members[] = {
                 READONLY,
                 PyDoc_STR("Whether this is a tracing stub")
         },
+
+        { "tracing_output",
+                T_OBJECT, offsetof(pycbc_Result, tracing_output),
+          READONLY, PyDoc_STR("Tracing output")
+        },
 #endif
         { NULL }
 };
 
 #ifdef PYCBC_TRACING
+
 PyObject *Result_tracing_context(pycbc_Result *self, void *closure)
 {
     return PyLong_FromVoidPtr((void *)self->tracing_context);
 }
+
 #endif
 
 static struct PyGetSetDef Result_TABLE_getset[] = {
@@ -120,6 +127,12 @@ static void
 Result_dealloc(pycbc_Result *self)
 {
     Py_XDECREF(self->key);
+#ifdef PYCBC_STRICT
+    pycbc_assert(!self->tracing_context);
+#else
+    pycbc_Context_deref(self->tracing_context, 0);
+#endif
+    Py_XDECREF(self->tracing_output);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 

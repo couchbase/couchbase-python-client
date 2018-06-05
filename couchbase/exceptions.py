@@ -18,7 +18,7 @@
 import couchbase._libcouchbase as C
 from collections import defaultdict
 from string import Template
-
+import json
 
 class CouchbaseError(Exception):
     """Base exception for Couchbase errors
@@ -230,6 +230,11 @@ class CouchbaseError(Exception):
 
         if self.ref:
             details.append("Ref={0}".format(self.ref))
+
+        success, fail = self.split_results()
+        if len(fail)>0:
+            summary = {key: value.tracing_output for key, value in fail.items()}
+            details.append("Tracing Output={}".format(json.dumps(summary)))
 
         s = "<{0}>".format(", ".join(details))
         return s

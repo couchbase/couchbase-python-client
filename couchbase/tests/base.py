@@ -533,30 +533,39 @@ class TracedCase(ConnectionTestCaseBase):
     def tracer(self):
         return TracedCase._tracer
 
-    def setUp(self, trace_all = True, flushcount = 0, *args, **kwargs):
+    def setUp(self, trace_all = True, flushcount = 0, enable_logging = False, use_parent_tracer = False, *args, **kwargs):
+        self.enable_logging = enable_logging or os.environ.get("PYCBC_ENABLE_LOGGING")
+        self.use_parent_tracer = use_parent_tracer
         self.using_jaeger =(os.environ.get("PYCBC_USE_JAEGER") == "TRUE")
         self.flushdict = {k: v for k, v in zip(map(str, range(1, 100)), map(str, range(1, 100)))}
         self.trace_all = os.environ.get("PYCBC_TRACE_ALL") or trace_all
         self.flushcount = flushcount
         if self.using_jaeger and self.flushcount>5:
             raise SkipTest("too slow when using jaeger")
-        if self.trace_all:
+        enable_logging |= self.trace_all
+        if enable_logging:
             couchbase.enable_logging()
-        super(TracedCase, self).setUp(enable_tracing = "true", init_tracer = self.init_tracer, **kwargs)
+        if self.use_parent_tracer:
+            kwargs['init_tracer'] =self.init_tracer
+        kwargs['enable_tracing']="true"
+        super(TracedCase, self).setUp(**kwargs)
         if self.trace_all:
-            self.cb.TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL = 0.0001
-            self.cb.TRACING_ORPHANED_QUEUE_SIZE =10
-            self.cb.TRACING_THRESHOLD_QUEUE_FLUSH_INTERVAL = 0.00001
-            self.cb.TRACING_THRESHOLD_QUEUE_SIZE = 10
-            self.cb.TRACING_THRESHOLD_KV = 0.00001
-            self.cb.TRACING_THRESHOLD_N1QL= 0.00001
-            self.cb.TRACING_THRESHOLD_VIEW =0.00001
-            self.cb.TRACING_THRESHOLD_FTS =0.00001
-            self.cb.TRACING_THRESHOLD_ANALYTICS =0.00001
+            self.cb.tracing_orphaned_queue_flush_interval = 0.0001
+            self.cb.tracing_orphaned_queue_size =10
+            self.cb.tracing_threshold_queue_flush_interval = 0.00001
+            self.cb.tracing_threshold_queue_size = 10
+            self.cb.tracing_threshold_kv = 0.00001
+            self.cb.tracing_threshold_n1ql= 0.00001
+            self.cb.tracing_threshold_view =0.00001
+            self.cb.tracing_threshold_fts =0.00001
+            self.cb.tracing_threshold_analytics =0.00001
 
     def flush_tracer(self):
-        for entry in range(1, self.flushcount):
-            self.cb.upsert_multi(self.flushdict)
+        try:
+            for entry in range(1, self.flushcount):
+                self.cb.upsert_multi(self.flushdict)
+        except Exception as e:
+            logging.warning(str(e))
 
     def tearDown(self):
         if self.trace_all and not self.using_jaeger:

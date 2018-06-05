@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
 project(couchbase_python_client_2_3_1)
-add_definitions("-DPYCBC_TRACING_ENABLE -DPYCBC_DEBUG")
 set(LCB_ROOT ../libcouchbase)
 set(LCB_ROOT_SRC ${LCB_ROOT}/src)
 set(LCB_ROOT_CONTRIB ${LCB_ROOT}/contrib)

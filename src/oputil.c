@@ -689,6 +689,7 @@ pycbc_sd_handle_speclist, pycbc_Bucket *self, pycbc_MultiResult *mres,
         PYCBC_TRACECMD_PURE((*cmd), context);
 #ifdef PYCBC_TRACING
         newitm->tracing_context = context;
+        ++context->ref_count;
         newitm->is_tracing_stub = 0;
 #endif
         err = lcb_subdoc3(self->instance, mres, cmd);

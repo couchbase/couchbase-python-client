@@ -1788,7 +1788,7 @@ class Bucket(_Base):
 
     @tracing_orphaned_queue_flush_interval.setter
     def tracing_orphaned_queue_flush_interval(self, val):
-        return self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL, value=val, value_type="timeout")
+        self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL, value=val, value_type="timeout")
 
     @property
     def tracing_orphaned_queue_size(self):
@@ -1805,7 +1805,7 @@ class Bucket(_Base):
 
     @tracing_orphaned_queue_size.setter
     def tracing_orphaned_queue_size(self, val):
-        return self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_SIZE, value=val, value_type="uint32_t")
+        self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_SIZE, value=val, value_type="uint32_t")
 
     @property
     def tracing_threshold_queue_flush_interval(self):
@@ -1822,7 +1822,7 @@ class Bucket(_Base):
 
     @tracing_threshold_queue_flush_interval.setter
     def tracing_threshold_queue_flush_interval(self, val):
-        return self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_FLUSH_INTERVAL, value=val, value_type="timeout")
+        self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_FLUSH_INTERVAL, value=val, value_type="timeout")
 
     @property
     def tracing_threshold_queue_size(self):
@@ -1839,7 +1839,7 @@ class Bucket(_Base):
 
     @tracing_threshold_queue_size.setter
     def tracing_threshold_queue_size(self, val):
-        return self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_SIZE, value=val, value_type="uint32_t")
+        self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_SIZE, value=val, value_type="uint32_t")
 
     @property
     def tracing_threshold_kv(self):
@@ -1856,7 +1856,7 @@ class Bucket(_Base):
 
     @tracing_threshold_kv.setter
     def tracing_threshold_kv(self, val):
-        return self._cntl(op=_LCB.TRACING_THRESHOLD_KV, value=val, value_type="timeout")
+        self._cntl(op=_LCB.TRACING_THRESHOLD_KV, value=val, value_type="timeout")
 
     @property
     def tracing_threshold_n1ql(self):
@@ -1873,7 +1873,7 @@ class Bucket(_Base):
 
     @tracing_threshold_n1ql.setter
     def tracing_threshold_n1ql(self, val):
-        return self._cntl(op=_LCB.TRACING_THRESHOLD_N1QL, value=val, value_type="timeout")
+        self._cntl(op=_LCB.TRACING_THRESHOLD_N1QL, value=val, value_type="timeout")
 
     @property
     def tracing_threshold_view(self):
@@ -1890,7 +1890,7 @@ class Bucket(_Base):
 
     @tracing_threshold_view.setter
     def tracing_threshold_view(self, val):
-        return self._cntl(op=_LCB.TRACING_THRESHOLD_VIEW, value=val, value_type="timeout")
+        self._cntl(op=_LCB.TRACING_THRESHOLD_VIEW, value=val, value_type="timeout")
 
     @property
     def tracing_threshold_fts(self):
@@ -1907,7 +1907,7 @@ class Bucket(_Base):
 
     @tracing_threshold_fts.setter
     def tracing_threshold_fts(self, val):
-        return self._cntl(op=_LCB.TRACING_THRESHOLD_FTS, value=val, value_type="timeout")
+        self._cntl(op=_LCB.TRACING_THRESHOLD_FTS, value=val, value_type="timeout")
 
     @property
     def tracing_threshold_analytics(self):
@@ -1924,7 +1924,7 @@ class Bucket(_Base):
 
     @tracing_threshold_analytics.setter
     def tracing_threshold_analytics(self, val):
-        return self._cntl(op=_LCB.TRACING_THRESHOLD_ANALYTICS, value=val, value_type="timeout")
+        self._cntl(op=_LCB.TRACING_THRESHOLD_ANALYTICS, value=val, value_type="timeout")
 
     # Backward compatibility aliases, to be removed by next major revision
     TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL = tracing_orphaned_queue_flush_interval

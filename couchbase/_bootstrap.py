@@ -73,6 +73,9 @@ def _result__repr__(self):
     if hasattr(self, "tracing_context"):
         details.append("tracing_context={0}".format(self.tracing_context))
 
+    if hasattr(self, "tracing_output"):
+        details.append("tracing_output={0}".format(self.tracing_output))
+
     if hasattr(self, '_pycbc_repr_extra'):
         details += self._pycbc_repr_extra()
 

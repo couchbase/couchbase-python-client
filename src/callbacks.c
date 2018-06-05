@@ -79,8 +79,15 @@ static int
 maybe_push_operr(pycbc_MultiResult *mres, pycbc_Result *res, lcb_error_t err,
     int check_enoent)
 {
+    pycbc_stack_context_handle parent_context =
+            res->tracing_context ? res->tracing_context->parent : NULL;
     if (err == LCB_SUCCESS || mres->errop) {
         return 0;
+    }
+    if (parent_context) {
+        PYCBC_DEBUG_LOG("maybe_push_operr %p", res->tracing_context);
+        pycbc_Result_propagate_context(
+                res, res->tracing_context, mres ? mres->parent : NULL);
     }
 
     if (check_enoent &&
@@ -276,7 +283,7 @@ get_common_objects(const lcb_RESPBASE *resp, pycbc_Bucket **conn,
         (*res)->key = hkey;
         PYCBC_DECREF(*res);
     }
-
+    pycbc_Result_propagate_context(*res, parent_context, *conn);
     PYCBC_CONTEXT_DEREF(decoding_context, 1);
 
     if (resp->rc) {

@@ -20,7 +20,6 @@
  * @author Mark Nunberg
  */
 
-
 #ifdef PYCBC_DEBUG
 #define PYCBC_DEBUG_LOG_RAW(...) fprintf(stderr,__VA_ARGS__);
 void pycbc_print_pyformat(const char *format, ...);
@@ -40,7 +39,8 @@ void pycbc_exception_log(const char *file, int line, int clear);
 #define PYCBC_EXCEPTION_LOG PyErr_Clear();
 #endif
 
-#define PYCBC_DEBUG_LOG_PREFIX(FILE,LINE) PYCBC_DEBUG_LOG_RAW("at %s line %d:", FILE, LINE)
+#define PYCBC_DEBUG_LOG_PREFIX(FILE, LINE) \
+    PYCBC_DEBUG_LOG_RAW("[%15s:%5d]:", FILE, LINE)
 #define PYCBC_DEBUG_LOG_WITH_FILE_AND_LINE_POSTFIX(FILE,LINE,POSTFIX,...)\
     PYCBC_DEBUG_LOG_PREFIX(FILE,LINE)\
     PYCBC_DEBUG_LOG_RAW(__VA_ARGS__)\
@@ -48,15 +48,18 @@ void pycbc_exception_log(const char *file, int line, int clear);
 #define PYCBC_DEBUG_LOG_WITH_FILE_AND_LINE_NEWLINE(FILE,LINE,...) PYCBC_DEBUG_LOG_WITH_FILE_AND_LINE_POSTFIX(FILE,LINE,"\n", __VA_ARGS__)
 #define PYCBC_DEBUG_LOG(...) PYCBC_DEBUG_LOG_WITH_FILE_AND_LINE_NEWLINE(__FILE__,__LINE__,__VA_ARGS__)
 
+
+#ifdef PYCBC_DEBUG
+#define PYCBC_MALLOC(X) malloc_and_log(__FILE__, __LINE__, 1, X, #X)
+#define PYCBC_MALLOC_TYPED(X, Y) \
+    malloc_and_log(__FILE__, __LINE__, X, sizeof(Y), #Y)
+#define PYCBC_CALLOC(X, Y) calloc_and_log(__FILE__, __LINE__, X, Y, "unknown")
+#define PYCBC_CALLOC_TYPED(X, Y) \
+    calloc_and_log(__FILE__, __LINE__, X, sizeof(Y), #Y)
 #define PYCBC_FREE(X)                 \
     PYCBC_DEBUG_LOG("freeing %p", X); \
     free(X);
 
-#ifdef PYCBC_DEBUG
-#define PYCBC_MALLOC(X) malloc_and_log(__FILE__, __LINE__, X)
-#define PYCBC_CALLOC(X, Y) calloc_and_log(__FILE__, __LINE__, X, Y, "unknown")
-#define PYCBC_CALLOC_TYPED(X, Y) \
-    calloc_and_log(__FILE__, __LINE__, X, sizeof(Y), #Y)
 #define LOG_REFOP(Y, OP)                                                    \
     {                                                                       \
         pycbc_assert((Y) && Py_REFCNT(Y) > 0);                              \
@@ -78,7 +81,9 @@ void pycbc_exception_log(const char *file, int line, int clear);
         Py_##X##OP((PyObject *)(Y));                                        \
     }
 #else
+#define PYCBC_FREE(X) free(X)
 #define PYCBC_MALLOC(X) malloc(X)
+#define PYCBC_MALLOC_TYPED(X, Y) malloc((X) * sizeof(Y))
 #define PYCBC_CALLOC(X, Y) calloc(X, Y)
 #define PYCBC_CALLOC_TYPED(X, Y) calloc(X, sizeof(Y))
 #define LOG_REFOP(Y, OP) Py_##OP(Y)
@@ -123,7 +128,11 @@ void pycbc_exception_log(const char *file, int line, int clear);
 
 void pycbc_fetch_error(PyObject *err[3]);
 void pycbc_store_error(PyObject *err[3]);
-void *malloc_and_log(const char *file, int line, size_t size);
+void *malloc_and_log(const char *file,
+                     int line,
+                     size_t quant,
+                     size_t size,
+                     const char *type_name);
 void *calloc_and_log(const char *file,
                      int line,
                      size_t quant,
@@ -223,6 +232,12 @@ const char *pycbc_cstrn(PyObject *object, Py_ssize_t *length);
 #define PYCBC_CSTRN(X, n) pycbc_cstrn((X), (Py_ssize_t *)(n))
 
 PyObject* pycbc_replace_str(PyObject** string, const char* pat, const char* replace);
+PyObject *pycbc_none_or_value(PyObject *maybe_value);
+void *pycbc_null_or_capsule_value(PyObject *maybe_capsule,
+                                  const char *capsule_name);
+void *pycbc_capsule_value_or_null(PyObject *capsule, const char *capsule_name);
+
+#define PYCBC_NULL_OR_CAPSULE(NAME) pycbc_null_or_capsule_value(NAME, #NAME)
 
 /**
  * Fetches a valid TTL from the object
@@ -502,6 +517,11 @@ typedef struct pycbc_stack_context {
 } pycbc_stack_context;
 
 typedef struct pycbc_stack_context *pycbc_stack_context_handle;
+
+PyObject *pycbc_Context_capsule(pycbc_stack_context_handle context);
+void pycbc_Context_capsule_destructor(PyObject *context_capsule);
+void *pycbc_Context_capsule_value(PyObject *context_capsule);
+
 #else
 
 typedef void* pycbc_stack_context_handle;
@@ -519,7 +539,8 @@ pycbc_stack_context_handle pycbc_Result_start_context(
         char *component,
         char *operation);
 void pycbc_Result_propagate_context(pycbc_Result_t *res,
-                                    pycbc_stack_context_handle parent_context);
+                                    pycbc_stack_context_handle parent_context,
+                                    pycbc_Bucket *bucket);
 void pycbc_MultiResult_init_context(pycbc_MultiResult *self,
                                     PyObject *curkey,
                                     pycbc_stack_context_handle context,
@@ -715,7 +736,8 @@ int pycbc_wrap_and_pop(pycbc_stack_context_handle *context, int result);
 #ifdef PYCBC_TRACING
 #define TRACING_DATA                            \
     pycbc_stack_context_handle tracing_context; \
-    char is_tracing_stub;
+    char is_tracing_stub;                       \
+    PyObject *tracing_output;
 #else
 #define TRACING_DATA
 #endif

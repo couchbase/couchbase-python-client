@@ -842,11 +842,6 @@ static PyMethodDef Bucket_TABLE_methods[] = {
         { NULL, NULL, 0, NULL }
 };
 
-PyObject *pycbc_value_or_none(PyObject *tracer)
-{
-    return tracer ? tracer : Py_None;
-}
-
 void pycbc_Bucket_init_tracer(pycbc_Bucket *self);
 
 static int
@@ -1000,7 +995,7 @@ Bucket__init__(pycbc_Bucket *self,
 }
 PyObject *pycbc_value_or_none_incref(PyObject *maybe_value)
 {
-    PyObject *result = pycbc_value_or_none(maybe_value);
+    PyObject *result = pycbc_none_or_value(maybe_value);
     PYCBC_INCREF(result);
     return result;
 }
@@ -1039,13 +1034,6 @@ void pycbc_Bucket_init_tracer(pycbc_Bucket *self)
 static PyObject*
 Bucket__connect(pycbc_Bucket *self, PyObject* args, PyObject* kwargs)
 {
-#ifdef PYCBC_TRACING
-    pycbc_stack_context_handle context =
-            PYCBC_TRACE_GET_STACK_CONTEXT_TOPLEVEL(kwargs,
-                                                   LCBTRACE_OP_REQUEST_ENCODING,
-                                                   self->tracer,
-                                                   "bucket.connect");
-#endif
     lcb_error_t err;
 
     if (self->flags & PYCBC_CONN_F_CONNECTED) {
@@ -1061,7 +1049,7 @@ Bucket__connect(pycbc_Bucket *self, PyObject* args, PyObject* kwargs)
         return NULL;
     }
 
-    PYCBC_TRACE_WRAP_VOID(pycbc_oputil_wait_common, NULL, self);
+    pycbc_oputil_wait_common(self, NULL);
     if ((self->flags & PYCBC_CONN_F_ASYNC) == 0) {
         err = lcb_get_bootstrap_status(self->instance);
         if (err != LCB_SUCCESS) {
