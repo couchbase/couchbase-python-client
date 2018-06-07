@@ -114,14 +114,31 @@ Bucket_register_crypto_provider(pycbc_Bucket *self, PyObject *args) {
         return NULL;
     }
 
-    if (!provider || !provider->provider)
-    {
+    if (!provider || !provider->lcb_provider) {
         PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, LCB_EINVAL, "Invalid provider");
         return NULL;
     }
-
-    lcbcrypto_register(self->instance, name, provider->provider);
-
+    {
+        PyObject *ctor_args = PyDict_New();
+        PyObject *name_obj = pycbc_SimpleStringZ(name);
+        pycbc_NamedCryptoProvider *named_provider_proxy;
+        PyDict_SetItemString(ctor_args, "provider", (PyObject *)provider);
+        PyDict_SetItemString(ctor_args, "name", name_obj);
+        named_provider_proxy = (pycbc_NamedCryptoProvider *)PyObject_Call(
+                (PyObject *)&pycbc_NamedCryptoProviderType,
+                pycbc_DummyTuple,
+                ctor_args);
+        PYCBC_XDECREF(name_obj);
+        PYCBC_XDECREF(ctor_args);
+        if (named_provider_proxy && !PyErr_Occurred()) {
+            PYCBC_INCREF(named_provider_proxy);
+            lcbcrypto_register(
+                    self->instance, name, named_provider_proxy->lcb_provider);
+        } else {
+            PYCBC_EXCEPTION_LOG_NOCLEAR;
+            PYCBC_XDECREF(named_provider_proxy);
+        }
+    }
     return Py_None;
 }
 
@@ -135,7 +152,6 @@ Bucket_unregister_crypto_provider(pycbc_Bucket *self, PyObject *args)
         return NULL;
     }
     lcbcrypto_unregister(self->instance, name);
-
     return Py_None;
 }
 
@@ -157,24 +173,31 @@ size_t pycbc_populate_fieldspec(lcbcrypto_FIELDSPEC **fields,
     for (i = 0; i < size; ++i) {
         PyObject *dict = PyList_GetItem(fieldspec, i);
         const char *kid_value = pycbc_dict_cstr(dict, "kid");
+        PyObject *alg = PyDict_GetItemString(dict, "alg");
+        if (!alg) {
+            PYCBC_EXC_WRAP(
+                    PYCBC_EXC_ARGUMENTS, PYCBC_CRYPTO_PROVIDER_ALIAS_NULL, "")
+            goto FAIL;
+        }
         (*fields)[i].alg = pycbc_dict_cstr(dict, "alg");
 #if PYCBC_CRYPTO_VERSION < 1
         (*fields)[i].kid = kid_value;
 #else
         if (kid_value && strlen(kid_value) > 0) {
-            PYCBC_FREE(*fields);
-            *fields = NULL;
-            size = 0;
             PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR,
                            LCB_EINVAL,
                            "Fieldspec should not include Key ID - this should "
-                           "be provided by get_key_id instead")
-            break;
+                           "be provided by get_key_id instead");
+            goto FAIL;
         }
 #endif
         (*fields)[i].name = pycbc_dict_cstr(dict, "name");
     }
     return size;
+FAIL:
+    PYCBC_FREE(*fields);
+    *fields = NULL;
+    return 0;
 }
 
 static PyObject *

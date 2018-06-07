@@ -12,7 +12,12 @@ with open(supp_file,"w+") as x:
                 continue
 
             print("Parsing {}".format(file))
-            file=libxml2.parseFile(fullpath)
+            try:
+                file=libxml2.recoverFile(fullpath)
+            except Exception as e:
+                with open(fullpath,"a") as oldxml:
+                    oldxml.writelines(["</valgrindoutput>"])
+                file=libxml2.recoverFile(fullpath)
             suppressions=file.xpathEval2("//suppression")
             print("got suppressions: {}".format(suppressions))
             pycbc=[]

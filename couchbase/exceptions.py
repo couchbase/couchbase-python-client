@@ -16,6 +16,9 @@
 #
 
 import couchbase._libcouchbase as C
+from collections import defaultdict
+from string import Template
+
 
 class CouchbaseError(Exception):
     """Base exception for Couchbase errors
@@ -520,6 +523,107 @@ class SubdocMultipleErrors(CouchbaseError):
 class SubdocEmptyPathError(CouchbaseError):
     """Empty path passed as subdoc spec"""
 
+
+class CryptoError(CouchbaseError):
+    def __init__(self, params=None, message="Generic Cryptography Error for alias:$alias", **kwargs):
+        params = params or {}
+        param_dict = params.get('objextra') or defaultdict(lambda: "unknown")
+        params['message'] = Template(message).safe_substitute(**param_dict)
+        super(CryptoError, self).__init__(params=params)
+
+
+class CryptoConfigError(CryptoError):
+    """Generic Crypto Config Error"""
+
+    def __init__(self, params=None, message="Generic Cryptography Configuration Error for alias:$alias", **kwargs):
+        super(CryptoConfigError, self).__init__(params=params, message=message, **kwargs)
+
+
+class CryptoExecutionError(CryptoError):
+    """Generic Crypto Execution Error"""
+
+    def __init__(self, params=None, message="Generic Cryptography Execution Error for alias:$alias", **kwargs):
+        super(CryptoExecutionError, self).__init__(params=params, message=message, **kwargs)
+
+
+class CryptoProviderNotFoundException(CryptoConfigError):
+    """No crypto provider can be found for a given alias."""
+
+    def __init__(self, params=None):
+        super(CryptoProviderNotFoundException, self).__init__(params=params,
+                                                              message="The cryptographic provider could not be found for the alias:$alias")
+
+
+class CryptoProviderAliasNullException(CryptoConfigError):
+    """The annotation has no associated alias or is null or and empty string."""
+
+    def __init__(self, params=None):
+        super(CryptoProviderAliasNullException, self).__init__(params=params,
+                                                               message="Cryptographic providers require a non-null, empty alias be configured.")
+
+
+class CryptoProviderMissingPublicKeyException(CryptoConfigError):
+    """The PublicKeyName field has not been set in the crypto provider configuration or is null or and empty string"""
+    def __init__(self, params = None):
+        super(CryptoProviderMissingPublicKeyException,self).__init__(params=params, message="Cryptographic providers require a non-null, empty public and key identifier (kid) be configured for the alias:$alias")
+
+
+
+class CryptoProviderMissingSigningKeyException(CryptoConfigError):
+    """The SigningKeyName field has not been set in the crypto provider configuration or is null or and empty string. Required for symmetric algos."""
+    def __init__(self, params = None):
+        super(CryptoProviderMissingSigningKeyException,self).__init__(params=params, message="Symmetric key cryptographic providers require a non-null, empty signing key be configured for the alias:$alias")
+
+
+
+class CryptoProviderMissingPrivateKeyException(CryptoConfigError):
+    """The PrivateKeyName field has not been set in the crypto provider configuration or is null or and empty string. Required for asymmetric algos."""
+    def __init__(self, params = None):
+        super(CryptoProviderMissingPrivateKeyException,self).__init__(params=params, message="Asymmetric key cryptographic providers require a non-null, empty private key be configured for the alias:$alias")
+
+
+
+class CryptoProviderSigningFailedException(CryptoExecutionError):
+    """Thrown if the authentication check fails on the decryption side."""
+    def __init__(self, params = None):
+        super(CryptoProviderSigningFailedException,self).__init__(params=params, message="The authentication failed while checking the signature of the message payload for the alias:$alias")
+
+
+
+class CryptoProviderEncryptFailedException(CryptoExecutionError):
+    """Thrown if an error occurs during encryption."""
+    def __init__(self, params = None):
+        super(CryptoProviderEncryptFailedException,self).__init__(params=params, message="The encryption of the field failed for the alias:$alias")
+
+
+
+class CryptoProviderDecryptFailedException(CryptoExecutionError):
+    """Thrown if an error occurs during decryption."""
+    def __init__(self, params = None):
+        super(CryptoProviderDecryptFailedException,self).__init__(params=params, message="The decryption of the field failed for the alias:$alias")
+
+
+class CryptoProviderKeySizeException(CryptoError):
+    def __init__(self, params = None):
+        super(CryptoProviderKeySizeException,self).__init__(params=params, message=
+        "The key found does not match the size of the key that the algorithm expects for the alias: $alias. Expected key size was $expected_keysize and configured key size is $configured_keysize")
+
+_PYCBC_CRYPTO_ERR_MAP ={
+    C.PYCBC_CRYPTO_PROVIDER_NOT_FOUND: CryptoProviderNotFoundException,
+    C.PYCBC_CRYPTO_PROVIDER_ALIAS_NULL: CryptoProviderAliasNullException,
+    C.PYCBC_CRYPTO_PROVIDER_MISSING_PUBLIC_KEY: CryptoProviderMissingPublicKeyException,
+    C.PYCBC_CRYPTO_PROVIDER_MISSING_SIGNING_KEY: CryptoProviderMissingSigningKeyException,
+    C.PYCBC_CRYPTO_PROVIDER_MISSING_PRIVATE_KEY: CryptoProviderMissingPrivateKeyException,
+    C.PYCBC_CRYPTO_PROVIDER_SIGNING_FAILED: CryptoProviderSigningFailedException,
+    C.PYCBC_CRYPTO_PROVIDER_ENCRYPT_FAILED: CryptoProviderEncryptFailedException,
+    C.PYCBC_CRYPTO_PROVIDER_DECRYPT_FAILED: CryptoProviderDecryptFailedException,
+    C.PYCBC_CRYPTO_CONFIG_ERROR: CryptoConfigError,
+    C.PYCBC_CRYPTO_EXECUTION_ERROR: CryptoExecutionError,
+    C.PYCBC_CRYPTO_ERROR: CryptoError,
+    C.PYCBC_CRYPTO_PROVIDER_KEY_SIZE_EXCEPTION: CryptoProviderKeySizeException
+}
+
+
 _LCB_ERRCAT_MAP = {
     C.LCB_ERRTYPE_NETWORK:      CouchbaseNetworkError,
     C.LCB_ERRTYPE_INPUT:        CouchbaseInputError,
@@ -529,7 +633,7 @@ _LCB_ERRCAT_MAP = {
     C.LCB_ERRTYPE_INTERNAL:     CouchbaseInternalError
 }
 
-_LCB_ERRNO_MAP = {
+_LCB_ERRNO_MAP = dict(list({
     C.LCB_AUTH_ERROR:       AuthError,
     C.LCB_DELTA_BADVAL:     DeltaBadvalError,
     C.LCB_E2BIG:            TooBigError,
@@ -567,8 +671,8 @@ _LCB_ERRNO_MAP = {
     C.LCB_SUBDOC_VALUE_CANTINSERT: SubdocCantInsertValueError,
     C.LCB_SUBDOC_BAD_DELTA: SubdocBadDeltaError,
     C.LCB_SUBDOC_NUM_ERANGE: SubdocNumberTooBigError,
-    C.LCB_EMPTY_PATH: SubdocEmptyPathError
-}
+    C.LCB_EMPTY_PATH: SubdocEmptyPathError,
+}.items()) + list(_PYCBC_CRYPTO_ERR_MAP.items()))
 
 
 def _set_default_codes():

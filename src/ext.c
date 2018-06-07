@@ -306,40 +306,41 @@ init_libcouchbase(void)
 
 #ifndef PYCBC_CPYCHECKER
 
-    /**
-     * Each of our types has an initializer function that accepts a single
-     * PyObject** pointer which is set to the newly created class object.
-     *
-     * More types should be added to this list. The first field is the type
-     * name (not a string but a literal) and the second is the name of the
-     * function used to initialize it
-     */
-#define X_PYTYPES_NOTRACING(X) \
-    X(Bucket,       pycbc_BucketType_init) \
-    /** Remember to keep base classes in order */ \
-    X(Result,           pycbc_ResultType_init) \
-    X(OperationResult,  pycbc_OperationResultType_init) \
-    X(ValueResult,      pycbc_ValueResultType_init) \
-    X(MultiResult,      pycbc_MultiResultType_init) \
-    X(HttpResult,       pycbc_HttpResultType_init) \
-    X(ViewResult,       pycbc_ViewResultType_init) \
-    X(Transcoder,       pycbc_TranscoderType_init) \
-    X(CryptoProvider,   pycbc_CryptoProviderType_init) \
-    X(ObserveInfo,      pycbc_ObserveInfoType_init) \
-    X(Item,             pycbc_ItemType_init) \
-    X(Event,            pycbc_EventType_init) \
-    X(IOEvent,          pycbc_IOEventType_init) \
-    X(TimerEvent,       pycbc_TimerEventType_init) \
-    X(AsyncResult,      pycbc_AsyncResultType_init) \
-    X(_IOPSWrapper,     pycbc_IOPSWrapperType_init) \
-    X(_SDResult,        pycbc_SDResultType_init)
+/**
+ * Each of our types has an initializer function that accepts a single
+ * PyObject** pointer which is set to the newly created class object.
+ *
+ * More types should be added to this list. The first field is the type
+ * name (not a string but a literal) and the second is the name of the
+ * function used to initialize it
+ */
+#define PYCBC_CRYPTO_TYPES_ADAPTER(NAME, DOC, ...) \
+    X(NAME, pycbc_##NAME##Type_init)
+#define X_PYTYPES_NOTRACING(X)                         \
+    X(Bucket, pycbc_BucketType_init)                   \
+    /** Remember to keep base classes in order */      \
+    X(Result, pycbc_ResultType_init)                   \
+    X(OperationResult, pycbc_OperationResultType_init) \
+    X(ValueResult, pycbc_ValueResultType_init)         \
+    X(MultiResult, pycbc_MultiResultType_init)         \
+    X(HttpResult, pycbc_HttpResultType_init)           \
+    X(ViewResult, pycbc_ViewResultType_init)           \
+    X(Transcoder, pycbc_TranscoderType_init)           \
+    X(ObserveInfo, pycbc_ObserveInfoType_init)         \
+    X(Item, pycbc_ItemType_init)                       \
+    X(Event, pycbc_EventType_init)                     \
+    X(IOEvent, pycbc_IOEventType_init)                 \
+    X(TimerEvent, pycbc_TimerEventType_init)           \
+    X(AsyncResult, pycbc_AsyncResultType_init)         \
+    X(_IOPSWrapper, pycbc_IOPSWrapperType_init)        \
+    X(_SDResult, pycbc_SDResultType_init)              \
+    PYCBC_CRYPTO_TYPES(PYCBC_CRYPTO_TYPES_ADAPTER)
 #ifdef PYCBC_TRACING
-#define X_PYTYPES(X) \
+#define X_PYTYPES(X)       \
     X_PYTYPES_NOTRACING(X) \
-    X(Tracer,           pycbc_TracerType_init)
+    X(Tracer, pycbc_TracerType_init)
 #else
-#define X_PYTYPES(X) \
-    X_PYTYPES_NOTRACING(X)
+#define X_PYTYPES(X) X_PYTYPES_NOTRACING(X)
 #endif
 
 #define X(name, inf) PyObject *cls_##name;
@@ -572,7 +573,8 @@ void pycbc_exception_log(const char* file, int line, int clear)
     if (PyErr_Occurred()) {
         PyObject* type, *value, *traceback;
         PyErr_Fetch(&type,&value,&traceback);
-        PYCBC_DEBUG_PYFORMAT("***** EXCEPTION:[%R], [%R] *****", type, value);
+        PYCBC_DEBUG_PYFORMAT_FILE_AND_LINE(
+                file, line, "***** EXCEPTION:[%R], [%R] *****", type, value);
         if (clear)
         {
             Py_XDECREF(type);
@@ -1495,10 +1497,10 @@ static PyMethodDef pycbc_Tracer_TABLE_methods[] = {
         { NULL, NULL, 0, NULL }
 };
 
-PyTypeObject pycbc_TracerType = {
-        PYCBC_POBJ_HEAD_INIT(NULL)
-        0
-};
+#define PYCBC_TYPE_DEF(NAME, DOC, ...) \
+    PyTypeObject pycbc_##NAME##Type = {PYCBC_POBJ_HEAD_INIT(NULL) 0};
+
+PYCBC_AUTODEF_TYPES(PYCBC_TYPE_DEF)
 
 int pycbc_TracerType_init(PyObject **ptr) {
     PyTypeObject *p = &pycbc_TracerType;

@@ -144,6 +144,12 @@ class PythonCryptoProvider_V1(CryptoProvider):
         """
         pass
 
+    @abc.abstractmethod
+    def get_key_id(self):
+        """
+        Return the key ID
+        :return: the key id
+        """
 
 if _LCB.PYCBC_CRYPTO_VERSION == 0:
     PythonCryptoProvider=PythonCryptoProvider_V0

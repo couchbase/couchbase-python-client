@@ -25,10 +25,12 @@
 #define PYCBC_DEBUG_LOG_RAW(...) fprintf(stderr,__VA_ARGS__);
 void pycbc_print_pyformat(const char *format, ...);
 void pycbc_exception_log(const char *file, int line, int clear);
-#define PYCBC_DEBUG_PYFORMAT(FORMAT, ...) \
-    PYCBC_DEBUG_LOG_PREFIX(__FILE__, __LINE__)\
-    pycbc_print_pyformat(FORMAT, __VA_ARGS__, NULL);\
+#define PYCBC_DEBUG_PYFORMAT_FILE_AND_LINE(FILE, LINE, FORMAT, ...) \
+    PYCBC_DEBUG_LOG_PREFIX(FILE, LINE)                              \
+    pycbc_print_pyformat(FORMAT, __VA_ARGS__);                      \
     fprintf(stderr, "\n");
+#define PYCBC_DEBUG_PYFORMAT(FORMAT, ...) \
+    PYCBC_DEBUG_PYFORMAT_FILE_AND_LINE(__FILE__, __LINE__, FORMAT, __VA_ARGS__)
 #define PYCBC_EXCEPTION_LOG_NOCLEAR pycbc_exception_log(__FILE__, __LINE__, 0);
 #define PYCBC_EXCEPTION_LOG pycbc_exception_log(__FILE__, __LINE__, 1);
 #else
@@ -987,8 +989,23 @@ int pycbc_ResultType_ready(PyTypeObject *p, int flags);
 /**
  * Types used for tracing
  */
+#ifdef PYCBC_TRACING
 #define PYCBC_TRACING_TYPES(X)\
-    X(Tracer, "The Tracer Object") \
+    X(Tracer, "The Tracer Object")
+
+#else
+#define PYCBC_TRACING_TYPES(X)
+#endif
+
+#define PYCBC_CRYPTO_TYPES(X)                         \
+    X(CryptoProvider,                                 \
+      "A Cryptography Provider for Field Encryption", \
+      pycbc_CryptoProvideType_extra_init(ptr))        \
+    X(NamedCryptoProvider, "A Named Cryptography Provider for Field Encryption")
+
+#define PYCBC_AUTODEF_TYPES(X) \
+    PYCBC_CRYPTO_TYPES(X);     \
+    PYCBC_TRACING_TYPES(X);
 
 /**
  * Extern PyTypeObject declaraions.
@@ -1012,10 +1029,9 @@ extern PyTypeObject pycbc__SDResultType;
 extern PyTypeObject pycbc_ViewResultType;
 
 /* ext.c */
-#define PYCBC_EXTERN(X,DOC)\
-extern PyTypeObject pycbc_##X##Type;
+#define PYCBC_EXTERN(X, DOC, ...) extern PyTypeObject pycbc_##X##Type;
 
-PYCBC_TRACING_TYPES(PYCBC_EXTERN);
+PYCBC_AUTODEF_TYPES(PYCBC_EXTERN);
 #undef PYCBC_EXTERN
 /**
  * Result type check macros
@@ -1145,7 +1161,6 @@ int pycbc_OperationResultType_init(PyObject **ptr);
 int pycbc_SDResultType_init(PyObject **ptr);
 int pycbc_HttpResultType_init(PyObject **ptr);
 int pycbc_TranscoderType_init(PyObject **ptr);
-int pycbc_CryptoProviderType_init(PyObject **ptr);
 int pycbc_ObserveInfoType_init(PyObject **ptr);
 int pycbc_ItemType_init(PyObject **ptr);
 int pycbc_EventType_init(PyObject **ptr);
@@ -1155,12 +1170,10 @@ int pycbc_AsyncResultType_init(PyObject **ptr);
 int pycbc_IOPSWrapperType_init(PyObject **ptr);
 int pycbc_ViewResultType_init(PyObject **ptr);
 
-#define PYCBC_TYPE_INIT_DECL(TYPENAME,TYPE_DOC)\
-int \
-pycbc_##TYPENAME##Type_init(PyObject **ptr);\
-extern PyTypeObject pycbc_##TYPENAME##Type;
+#define PYCBC_TYPE_INIT_DECL(TYPENAME, TYPE_DOC, ...) \
+    int pycbc_##TYPENAME##Type_init(PyObject **ptr);
 
-PYCBC_TRACING_TYPES(PYCBC_TYPE_INIT_DECL);
+PYCBC_AUTODEF_TYPES(PYCBC_TYPE_INIT_DECL)
 
 #undef PYCBC_TYPE_INIT_DECL
 /**
@@ -1538,9 +1551,38 @@ PyObject *pycbc_Bucket__diagnostics(pycbc_Bucket *self,
  * Encryption Provider
  */
 typedef struct {
-    PyObject_HEAD
-    lcbcrypto_PROVIDER* provider;
+    PyObject_HEAD lcbcrypto_PROVIDER *lcb_provider;
 } pycbc_CryptoProvider;
+
+typedef struct {
+    PyObject_HEAD pycbc_CryptoProvider *orig_py_provider;
+    lcbcrypto_PROVIDER *lcb_provider;
+    PyObject *name;
+} pycbc_NamedCryptoProvider;
+
+#define PP_FOR_EACH_CRYPTO_EXCEPTION(X, ...)                               \
+    X(PYCBC_CRYPTO_PROVIDER_NOT_FOUND, = LCB_MAX_ERROR),                   \
+            X(PYCBC_CRYPTO_PROVIDER_ALIAS_NULL),                           \
+            X(PYCBC_CRYPTO_PROVIDER_MISSING_PUBLIC_KEY),                   \
+            X(PYCBC_CRYPTO_PROVIDER_MISSING_SIGNING_KEY),                  \
+            X(PYCBC_CRYPTO_PROVIDER_MISSING_PRIVATE_KEY),                  \
+            X(PYCBC_CRYPTO_PROVIDER_SIGNING_FAILED),                       \
+            X(PYCBC_CRYPTO_PROVIDER_ENCRYPT_FAILED),                       \
+            X(PYCBC_CRYPTO_PROVIDER_DECRYPT_FAILED),                       \
+            X(PYCBC_CRYPTO_PROVIDER_KEY_SIZE_EXCEPTION),                   \
+            X(PYCBC_CRYPTO_CONFIG_ERROR), X(PYCBC_CRYPTO_EXECUTION_ERROR), \
+            X(PYCBC_CRYPTO_ERROR)
+
+typedef enum {
+#define PYCBC_CRYPTO_X(NAME, ...) NAME __VA_ARGS__
+#define COMMA ,
+    PP_FOR_EACH_CRYPTO_EXCEPTION(PYCBC_CRYPTO_X),
+    PYCBC_CRYPTO_PROVIDER_ERROR_MAX
+#undef COMMA
+#undef PYCBC_CRYPTO_X
+} pycbc_crypto_err;
+
+PyObject *pycbc_gen_crypto_exception_map(void);
 
 #ifndef PYCBC_CRYPTO_VERSION
 #if LCB_VERSION > 0x020807

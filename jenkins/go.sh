@@ -51,6 +51,7 @@ run_all_nosetests(){
         echo "]"
         echo "run `which nosetests` -v --with-xunit" > "${TMPCMDS}"
         echo "bt" >>"${TMPCMDS}"
+        echo "py-bt" >>"${TMPCMDS}"
         echo "quit" >>"${TMPCMDS}"
         gdb -batch -x "${TMPCMDS}" `which python`
     fi
