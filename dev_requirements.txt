@@ -13,3 +13,4 @@ docker==3.3.0
 py-zipkin==0.11.0
 zipkin==0.1.0
 opentracing-pyzipkin==0.0.1
+libxml2-python3

@@ -78,10 +78,10 @@ class Admin(LCB.Bucket):
         connection_string = kwargs.pop('connection_string', None)
         if not connection_string:
             connection_string = "http://{0}:{1}".format(host, port)
+            bucket = kwargs.pop('bucket', 'default')
+            connection_string += "/{0}".format(bucket)
+            connection_string += "?ipv6=" + kwargs.pop('ipv6', 'disabled')
 
-        bucket = kwargs.pop('bucket', 'default')
-        connection_string += "/{0}".format(bucket)
-        connection_string+= "?ipv6="+kwargs.pop('ipv6', 'disabled')
         kwargs.update({
             'username': username,
             'password': password,
