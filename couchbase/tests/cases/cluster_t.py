@@ -15,14 +15,16 @@
 # limitations under the License.
 #
 
+from unittest import SkipTest
+
 from couchbase.tests.base import CouchbaseTestCase
 from couchbase.connstr import ConnectionString
-from couchbase.cluster import Cluster, ClassicAuthenticator,\
-    PasswordAuthenticator, NoBucketError, MixedAuthError
+from couchbase.cluster import Cluster, ClassicAuthenticator,PasswordAuthenticator, NoBucketError, MixedAuthError, CertAuthenticator
 import gc
 
 
 class ClusterTest(CouchbaseTestCase):
+
     def _create_cluster(self):
         connargs = self.make_connargs()
         connstr = ConnectionString.parse(str(connargs.pop('connection_string')))
@@ -83,6 +85,41 @@ class ClusterTest(CouchbaseTestCase):
         cluster2, bucket_name = self._create_cluster()
         cb2 = cluster2.open_bucket(bucket_name,
                                    password=self.cluster_info.bucket_password)
+
+    def test_no_mixed_cert_auth(self):
+        cluster3, bucket_name = self._create_cluster()
+        auther_cert = CertAuthenticator(cert_path="dummy",key_path="dummy2")
+        cluster3.authenticate(auther_cert)
+        with self.assertRaises(MixedAuthError) as maerr:
+            cluster3.open_bucket(bucket_name,
+                          password=self.cluster_info.bucket_password)
+        exception = maerr.exception
+        self.assertIsInstance(exception, MixedAuthError)
+
+        self.assertRegex(exception.message, r'.*CertAuthenticator.*password.*')
+
+    def _create_cluster_clean(self, authenticator):
+        connargs = self.make_connargs()
+        connstr = ConnectionString.parse(str(connargs.pop('connection_string')))
+        connstr.clear_option('username')
+        bucket = connstr.bucket
+        connstr.bucket = None
+        password = connargs.get('password', None)
+        keys_to_skip = authenticator.get_credentials(bucket)['options'].keys()
+        for entry in keys_to_skip:
+            connstr.clear_option(entry)
+        cluster = Cluster(connstr, bucket_class=self.factory)
+        cluster.authenticate(ClassicAuthenticator(buckets={bucket: password}))
+        return cluster, bucket
+
+    def test_cert_auth(self):
+        if self.is_mock:
+            raise SkipTest()
+        auther_cert = CertAuthenticator(cert_path=self.cluster_info.certpath,key_path=self.cluster_info.certpath)
+
+        cluster3, bucket_name = self._create_cluster_clean(auther_cert)
+        cluster3.authenticate(auther_cert)
+        cluster3.open_bucket(bucket_name)
 
     def test_pathless_connstr(self):
         # Not strictly a cluster test, but relevant
