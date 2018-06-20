@@ -86,6 +86,25 @@ class ClusterTest(CouchbaseTestCase):
         cb2 = cluster2.open_bucket(bucket_name,
                                    password=self.cluster_info.bucket_password)
 
+    def test_PYCBC_488(self):
+        cluster = Cluster('couchbases://10.142.175.101?certpath=/Users/daschl/tmp/ks/chain.pem&keypath=/Users/daschl/tmp/ks/pkey.key')
+        with self.assertRaises(MixedAuthError) as maerr:
+            cluster.open_bucket("pixels",
+                                 password=self.cluster_info.bucket_password)
+        exception = maerr.exception
+        self.assertIsInstance(exception, MixedAuthError)
+        self.assertRegex(exception.message, r'.*CertAuthenticator.*password.*')
+
+    def test_PYCBC_489(self):
+        from couchbase.cluster import Cluster
+        with self.assertRaises(MixedAuthError) as maerr:
+            cluster = Cluster('couchbases://10.142.175.101?certpath=/Users/daschl/tmp/ks/chain.pem&keypath=/Users/daschl/tmp/ks/pkey.key')
+            cb = cluster.open_bucket('pixels', password = 'foo')
+            cb.upsert('u:king_arthur', {'name': 'Arthur', 'email': 'kingarthur@couchbase.com', 'interests': ['Holy Grail', 'African Swallows']})
+        exception = maerr.exception
+        self.assertIsInstance(exception, MixedAuthError)
+        self.assertRegex(exception.message, r'.*CertAuthenticator-style.*password.*')
+
     def test_no_mixed_cert_auth(self):
         cluster3, bucket_name = self._create_cluster()
         auther_cert = CertAuthenticator(cert_path="dummy",key_path="dummy2")
@@ -114,12 +133,24 @@ class ClusterTest(CouchbaseTestCase):
 
     def test_cert_auth(self):
         if self.is_mock:
-            raise SkipTest()
-        auther_cert = CertAuthenticator(cert_path=self.cluster_info.certpath,key_path=self.cluster_info.certpath)
+            self.cluster_info.certpath="dummy"
+            self.cluster_info.keypath="dummy"
+
+        auther_cert = CertAuthenticator(cert_path=self.cluster_info.certpath,key_path=self.cluster_info.keypath)
 
         cluster3, bucket_name = self._create_cluster_clean(auther_cert)
         cluster3.authenticate(auther_cert)
-        cluster3.open_bucket(bucket_name)
+        try:
+            cluster3.open_bucket(bucket_name)
+        except Exception as e:
+            if self.is_realserver:
+                raise e
+            else:
+                pass
+        finally:
+            if self.is_mock:
+                del self.cluster_info.certpath
+                del self.cluster_info.keypath
 
     def test_pathless_connstr(self):
         # Not strictly a cluster test, but relevant
