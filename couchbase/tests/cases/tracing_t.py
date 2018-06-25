@@ -42,7 +42,6 @@ logging.getLogger().addHandler(ch)
 
 
 class BogusHandler:
-
     def __init__(self, pattern=None):
         self.records = []
         self.pattern = re.compile(pattern) if pattern else None
@@ -57,21 +56,23 @@ class BogusHandler:
 
 class TimeoutTest(TracedCase):
     def setUp(self, *args, **kwargs):
+        if not couchbase._libcouchbase.PYCBC_TRACING:
+            raise SkipTest("Tracing feature not compiled into Python Client")
         kwargs = {}
         couchbase.enable_logging()
         kwargs['enable_tracing'] = "true"
         #super(TimeoutTest, self).setUp(**kwargs)
         super(TimeoutTest, self).setUp(trace_all=True, enable_logging=True, use_parent_tracer=True, flushcount=0)
-        self.repetitions = 1
+        self.repetitions = 100
         logging.info("starting TimeoutTest")
 
     def test_timeout(self):
-        raise SkipTest("to be fixed")
+        couchbase.enable_logging()
         bucket = self.cb
         bucket.upsert("key", "value")
 
-        bucket.timeout = 9e-4
-        bucket.tracing_orphaned_queue_flush_interval = 5
+        bucket.timeout = 9e-6#0.00000000001#9e-4
+        bucket.tracing_orphaned_queue_flush_interval = 1
         bucket.tracing_orphaned_queue_size = 10
         bucket.tracing_threshold_queue_flush_interval = 5
         bucket.tracing_threshold_queue_size = 10
@@ -81,16 +82,14 @@ class TimeoutTest(TracedCase):
         bucket.tracing_threshold_fts = 0.00001
         bucket.tracing_threshold_analytics = 0.00001
 
-        self.verify_tracer(bucket, r'.*Operations over threshold:.*')
+        self.verify_tracer(bucket, r'.*Operations over threshold:.*', rep_factor=100)
 
     def test_orphaned(self):
-        raise SkipTest("to be fixed")
-
         bucket = self.cb
         bucket.upsert("key", "value")
 
-        bucket.timeout = 9e-4
-        bucket.tracing_orphaned_queue_flush_interval = 5
+        bucket.timeout = 9e-6
+        bucket.tracing_orphaned_queue_flush_interval = 1
         bucket.tracing_orphaned_queue_size = 10
         bucket.tracing_threshold_queue_flush_interval = 5
         bucket.tracing_threshold_queue_size = 10
@@ -104,7 +103,7 @@ class TimeoutTest(TracedCase):
 
     def verify_tracer(self, bucket, pattern, rep_factor=1):
         self.trigger_tracer(bucket, self.repetitions * rep_factor, pattern)
-        self.assertRegex(str(self.handler.records), pattern)
+        self.assertTrue(self.handler.count > 0, "no {} found in output {}".format(pattern,self.handler.records))
         logging.info("Finished TimeoutTest")
 
     def trigger_tracer(self, bucket, i, pattern, mincount=1):
@@ -222,17 +221,20 @@ exception_grammar = ExceptionGrammar()
 class TracingTest(TracedCase):
 
     def setUp(self, *args, **kwargs):
+        if not couchbase._libcouchbase.PYCBC_TRACING:
+            raise SkipTest("Tracing feature not compiled into Python Client")
         pass
 
     def test_threshold_multi_get(self):
         super(TracingTest, self).setUp(trace_all=True, enable_logging=True, use_parent_tracer=False, flushcount=0)
         raise SkipTest("to be fixed")
         super(TracingTest, self).setUp(trace_all=True, enable_logging=True, use_parent_tracer=False, flushcount=10)
-        handler = BogusHandler()
+        error_message_expected = r'.*Operations over threshold:.*'
+        handler = BogusHandler(error_message_expected)
         couchbase._libcouchbase.lcb_logging(handler.handler)
 
         kv = self.gen_kv_dict(amount=3, prefix='get_multi')
-        for i in range(0, 50):
+        for i in range(0, 500000):
             rvs = self.cb.upsert_multi(kv)
             self.assertTrue(rvs.all_ok)
 
@@ -247,7 +249,7 @@ class TracingTest(TracedCase):
             self.assertEqual(rv2.keys(), kv.keys())
         self.flush_tracer()
 
-        self.assertRegex(str(handler.records), r'.*Operations over threshold:.*')
+        self.assertTrue(handler.count>0, "no {} found in logs".format(error_message_expected))
 
     def test_tracing_result_context(self):
         super(TracingTest, self).setUp(trace_all=True, enable_logging=True, use_parent_tracer=False, flushcount=0)

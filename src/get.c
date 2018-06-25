@@ -101,7 +101,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
         }
     }
     u_cmd.base.exptime = ttl;
-
+#ifdef PYCBC_TRACING
     context =
             context ? pycbc_Context_init(context->tracer,
                                          LCBTRACE_OP_RESPONSE_DECODING,
@@ -110,6 +110,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
                                          LCBTRACE_REF_FOLLOWS_FROM,
                                          "")
                     : NULL;
+#endif
     switch (optype) {
         case PYCBC_CMD_GAT:
             if (!ttl) {
@@ -164,8 +165,9 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
     }
     
     GT_DONE:
-    PYCBC_PYBUF_RELEASE(&keybuf);
-    return rv;
+        PYCBC_CONTEXT_DEREF(context, 0);
+        PYCBC_PYBUF_RELEASE(&keybuf);
+        return rv;
 }
 
 static int

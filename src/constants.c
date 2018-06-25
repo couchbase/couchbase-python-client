@@ -222,8 +222,12 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
     ADD_MACRO(LCBCRYPTO_KEY_DECRYPT);
     LCB_CONSTANT(VERSION);
     ADD_MACRO(PYCBC_CRYPTO_VERSION);
-
+#ifdef PYCBC_TRACING
+    ADD_CONSTANT("PYCBC_TRACING",1);
     setup_tracing_map(module, handler);
+#else
+    ADD_CONSTANT("PYCBC_TRACING",0);
+#endif
     setup_compression_map(module, handler);
     setup_crypto_exceptions(module, handler);
     PyModule_AddObject(

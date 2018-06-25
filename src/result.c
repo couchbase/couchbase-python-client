@@ -130,9 +130,11 @@ Result_dealloc(pycbc_Result *self)
 #ifdef PYCBC_STRICT
     pycbc_assert(!self->tracing_context);
 #else
-    pycbc_Context_deref(self->tracing_context, 0);
+    PYCBC_CONTEXT_DEREF_FROM_CONTEXT(self->tracing_context, 0, 0, NULL);
 #endif
+#ifdef PYCBC_TRACING
     Py_XDECREF(self->tracing_output);
+#endif
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 

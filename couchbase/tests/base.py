@@ -33,6 +33,7 @@ import os
 import time
 from basictracer import BasicTracer, SpanRecorder
 import couchbase
+import couchbase._libcouchbase
 if os.environ.get("PYCBC_TRACE_GC") in ['FULL', 'STATS_LEAK_ONLY']:
     gc.set_debug(gc.DEBUG_STATS | gc.DEBUG_LEAK)
 
@@ -481,7 +482,8 @@ class ConnectionTestCaseBase(CouchbaseTestCase):
 
 class LogRecorder(SpanRecorder):
     def record_span(self, span):
-        logging.info("recording span: "+str(span.__dict__))
+        if os.environ.get("PYCBC_LOG_RECORDED_SPANS"):
+            logging.info("recording span: "+str(span.__dict__))
 
 
 def basic_tracer():
@@ -542,7 +544,7 @@ class TracedCase(ConnectionTestCaseBase):
         self.flushcount = flushcount
         if self.using_jaeger and self.flushcount>5:
             raise SkipTest("too slow when using jaeger")
-        enable_logging |= self.trace_all
+        enable_logging |= bool(self.trace_all)
         if enable_logging:
             couchbase.enable_logging()
         if self.use_parent_tracer:
@@ -580,7 +582,7 @@ class TracedCase(ConnectionTestCaseBase):
                 pass
 
 
-if os.environ.get("PYCBC_TRACE_ALL"):
+if os.environ.get("PYCBC_TRACE_ALL") and couchbase._libcouchbase.PYCBC_TRACING:
     ConnectionTestCase = TracedCase
 else:
     ConnectionTestCase = ConnectionTestCaseBase

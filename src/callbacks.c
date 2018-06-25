@@ -79,17 +79,20 @@ static int
 maybe_push_operr(pycbc_MultiResult *mres, pycbc_Result *res, lcb_error_t err,
     int check_enoent)
 {
+#ifdef PYCBC_TRACING
     pycbc_stack_context_handle parent_context =
             res->tracing_context ? res->tracing_context->parent : NULL;
+#endif
     if (err == LCB_SUCCESS || mres->errop) {
         return 0;
     }
+#ifdef PYCBC_TRACING
     if (parent_context) {
         PYCBC_DEBUG_LOG("maybe_push_operr %p", res->tracing_context);
         pycbc_Result_propagate_context(
                 res, res->tracing_context, mres ? mres->parent : NULL);
     }
-
+#endif
     if (check_enoent &&
             (mres->mropts & PYCBC_MRES_F_QUIET) &&
             (err == LCB_KEY_ENOENT || err == LCB_SUBDOC_PATH_ENOENT)) {
@@ -283,8 +286,10 @@ get_common_objects(const lcb_RESPBASE *resp, pycbc_Bucket **conn,
         (*res)->key = hkey;
         PYCBC_DECREF(*res);
     }
+#ifdef PYCBC_TRACING
     pycbc_Result_propagate_context(*res, parent_context, *conn);
-    PYCBC_CONTEXT_DEREF(decoding_context, 1);
+#endif
+    PYCBC_CONTEXT_DEREF(decoding_context, 1)
 
     if (resp->rc) {
         (*res)->rc = resp->rc;

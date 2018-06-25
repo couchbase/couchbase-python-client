@@ -332,7 +332,11 @@ ViewResult_fetch(pycbc_ViewResult *self, PyObject *args)
     }
 
     if (!self->base.done) {
+#ifdef PYCBC_TRACING
         pycbc_oputil_wait_common(bucket, pycbc_ViewResult_get_context(self));
+#else
+        pycbc_oputil_wait_common(bucket, NULL);
+#endif
     }
 
     if (pycbc_multiresult_maybe_raise(mres)) {

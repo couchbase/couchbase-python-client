@@ -14,6 +14,7 @@ try:
 except ImportError:
     from distutils.core import setup, Extension
 
+import re
 extoptions = {}
 pkgdata = {}
 pkgversion = None
@@ -30,10 +31,52 @@ LCB_NAME = None
 extoptions['extra_compile_args'] = []
 extoptions['extra_link_args'] = []
 
-comp_flags = ["PYCBC_TRACING_ENABLE","PYCBC_DEBUG","PYCBC_CRYPTO_VERSION"]
-debug_symbols = len(set(os.environ.keys()) & set(["PYCBC_DEBUG","PYCBC_DEBUG_SYMBOLS"])) >0
-extoptions['extra_compile_args'] += ["-D{}={}".format(flag,os.environ.get(flag))
-                                     for flag in comp_flags if flag in os.environ.keys()]
+
+def boolean_option(flag):
+    return "-D{}={}".format(flag,os.environ.get(flag))
+
+
+COMP_OPTION_PREFIX = "PYCBC_COMP_OPT_"
+
+
+def comp_option(flag):
+    return "-{}={}".format(flag.replace(COMP_OPTION_PREFIX, ""), os.environ.get(flag))
+
+
+COMP_OPTION_BOOL_PREFIX = "PYCBC_COMP_OPT_BOOL_"
+
+
+def comp_option_bool(flag):
+    return "-{}".format(flag.replace(COMP_OPTION_BOOL_PREFIX, ""))
+
+
+CLANG_SAN_OPTIONS={"address":"lsan","undefined":"ubsan"}
+
+CLANG_SAN_PREFIX = "PYCBC_SAN_OPT_"
+
+def comp_clang_san_option(flag):
+    san_option = flag.replace(CLANG_SAN_PREFIX, "")
+    fsanitize_statement = "-fsanitize={}".format(san_option)
+    extoptions['extra_link_args']+=["{}".format(fsanitize_statement)]
+    return fsanitize_statement
+
+
+def comp_option_pattern(prefix):
+    return re.escape(prefix) + ".*"
+
+
+comp_flags = {"PYCBC_STRICT":boolean_option,
+              "PYCBC_TABBED_CONTEXTS_ENABLE": boolean_option,
+              "PYCBC_REF_ACCOUNTING": boolean_option,
+              "PYCBC_TRACING_DISABLE": boolean_option, "PYCBC_DEBUG": boolean_option,
+              "PYCBC_CRYPTO_VERSION": boolean_option, comp_option_pattern(COMP_OPTION_PREFIX): comp_option,
+              comp_option_pattern(COMP_OPTION_BOOL_PREFIX): comp_option_bool,
+              comp_option_pattern(CLANG_SAN_PREFIX):comp_clang_san_option}
+
+debug_symbols = len(set(os.environ.keys()) & {"PYCBC_DEBUG", "PYCBC_DEBUG_SYMBOLS"}) > 0
+comp_arg_additions = (action(actual_flag) for flag, action in comp_flags.items() for actual_flag in os.environ.keys() if
+                      re.match(flag, actual_flag))
+extoptions['extra_compile_args'] += comp_arg_additions
 if sys.platform != 'win32':
     extoptions['libraries'] = ['couchbase']
     if debug_symbols:

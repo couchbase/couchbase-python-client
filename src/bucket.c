@@ -842,7 +842,9 @@ static PyMethodDef Bucket_TABLE_methods[] = {
         { NULL, NULL, 0, NULL }
 };
 
+#ifdef PYCBC_TRACING
 void pycbc_Bucket_init_tracer(pycbc_Bucket *self);
+#endif
 
 static int
 Bucket__init__(pycbc_Bucket *self,
@@ -863,7 +865,7 @@ Bucket__init__(pycbc_Bucket *self,
      * This was converted into an xmacro to ease the process of adding or
      * removing various parameters.
      */
-#define XCTOR_ARGS(X)                                      \
+#define XCTOR_ARGS_NOTRACING(X)                                      \
     X("connection_string", &create_opts.v.v3.connstr, "z") \
     X("connstr", &create_opts.v.v3.connstr, "z")           \
     X("username", &create_opts.v.v3.username, "z")         \
@@ -876,7 +878,15 @@ Bucket__init__(pycbc_Bucket *self,
     X("_flags", &self->flags, "I")                         \
     X("_conntype", &conntype, "i")                         \
     X("_iops", &iops_O, "O")                               \
+
+#ifdef PYCBC_TRACING
+#define XCTOR_ARGS(X)\
+    XCTOR_ARGS_NOTRACING(X)\
     X("tracer", &self->parent_tracer, "O")
+#else
+#define XCTOR_ARGS(X)\
+    XCTOR_ARGS_NOTRACING(X)
+#endif
 
     static char *kwlist[] = {
         #define X(s, target, type) s,
@@ -999,7 +1009,7 @@ PyObject *pycbc_value_or_none_incref(PyObject *maybe_value)
     PYCBC_INCREF(result);
     return result;
 }
-
+#ifdef PYCBC_TRACING
 void pycbc_Bucket_init_tracer(pycbc_Bucket *self)
 {
     lcbtrace_TRACER *threshold_tracer = lcb_get_tracer(self->instance);
@@ -1030,7 +1040,7 @@ void pycbc_Bucket_init_tracer(pycbc_Bucket *self)
         PYCBC_DECREF(tracer_args);
     }
 }
-
+#endif
 static PyObject*
 Bucket__connect(pycbc_Bucket *self, PyObject* args, PyObject* kwargs)
 {
@@ -1065,9 +1075,11 @@ Bucket__connect(pycbc_Bucket *self, PyObject* args, PyObject* kwargs)
         }
         self->btype = pycbc_IntFromL(btype);
     }
+#ifdef PYCBC_TRACING
     if (self->tracer) {
         lcb_set_tracer(self->instance, self->tracer->tracer);
     }
+#endif
     Py_RETURN_NONE;
 }
 

@@ -15,3 +15,4 @@ zipkin==0.1.0
 opentracing-pyzipkin==0.0.1
 libxml2-python3
 pyparsing==2.2.0
+configparser2

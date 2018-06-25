@@ -233,7 +233,7 @@ class CouchbaseError(Exception):
 
         success, fail = self.split_results()
         if len(fail)>0:
-            summary = {key: value.tracing_output for key, value in fail.items()}
+            summary = {key: value.tracing_output for key, value in fail.items() if hasattr(value,"tracing_output")}
             details.append("Tracing Output={}".format(json.dumps(summary)))
 
         s = "<{0}>".format(", ".join(details))
