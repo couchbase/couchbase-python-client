@@ -34,6 +34,7 @@ from couchbase._pyport import basestring
 import couchbase.subdocument as SD
 import couchbase.priv_constants as _P
 import json
+from couchbase.cbas import AnalyticsRequest, AnalyticsQuery
 
 ### Private constants. This is to avoid imposing a dependency requirement
 ### For simple flags:
@@ -1511,7 +1512,6 @@ class Bucket(_Base):
         return itercls(query, self, *args, **kwargs)
 
     def _analytics_query(self, query, host):
-        from cbas import AnalyticsRequest, AnalyticsQuery
         if not isinstance(query, AnalyticsQuery):
             query = AnalyticsQuery(query)
         return AnalyticsRequest(query, host, self)
