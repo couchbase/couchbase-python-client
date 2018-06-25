@@ -11,7 +11,7 @@ python:
 addons:
   apt:
     sources:
-      - couchbase-precise
+      - couchbase-trusty
     packages:
       - libcouchbase-dev
       - libcouchbase2-libevent
