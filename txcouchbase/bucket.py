@@ -22,11 +22,11 @@ from twisted.internet import reactor
 from twisted.internet.defer import Deferred
 from twisted.python.failure import Failure
 
-from couchbase.async.bucket import AsyncBucket
-from couchbase.async.view import AsyncViewBase
-from couchbase.async.n1ql import AsyncN1QLRequest
-from couchbase.async.fulltext import AsyncSearchRequest
-from couchbase.async.events import EventQueue
+from couchbase.asynchronous.bucket import AsyncBucket
+from couchbase.asynchronous.view import AsyncViewBase
+from couchbase.asynchronous.n1ql import AsyncN1QLRequest
+from couchbase.asynchronous.fulltext import AsyncSearchRequest
+from couchbase.asynchronous.events import EventQueue
 from couchbase.exceptions import CouchbaseError
 from txcouchbase.iops import v0Iops
 
@@ -246,7 +246,7 @@ class RawBucket(AsyncBucket):
 
         Other arguments are passed to the standard `query` method.
 
-        This functions exactly like the :meth:`~couchbase.async.AsyncBucket.query`
+        This functions exactly like the :meth:`~couchbase.asynchronous.AsyncBucket.query`
         method, except it automatically schedules operations if the connection
         has not yet been negotiated.
         """

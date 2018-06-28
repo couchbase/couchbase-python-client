@@ -20,7 +20,7 @@ This file contains the base N1QL implementation for async frameworks.
 """
 
 from couchbase.n1ql import N1QLRequest
-from couchbase.async.rowsbase import AsyncRowsBase
+from couchbase.asynchronous.rowsbase import AsyncRowsBase
 
 
 class AsyncN1QLRequest(AsyncRowsBase, N1QLRequest):

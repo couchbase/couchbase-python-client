@@ -22,7 +22,7 @@ from couchbase._libcouchbase import (
     PYCBC_CONN_F_ASYNC_DTOR)
 
 from couchbase.result import AsyncResult
-from couchbase.async.view import AsyncViewBase
+from couchbase.asynchronous.view import AsyncViewBase
 from couchbase.bucket import Bucket
 from couchbase.exceptions import ArgumentError
 
@@ -162,7 +162,7 @@ class AsyncBucket(Bucket):
 
         :param class itercls: A class used for instantiating the view
           object. This should be a subclass of
-          :class:`~couchbase.async.view.AsyncViewBase`.
+          :class:`~couchbase.asynchronous.view.AsyncViewBase`.
         """
         if not issubclass(kwargs.get('itercls', None), AsyncViewBase):
             raise ArgumentError.pyexc("itercls must be defined "

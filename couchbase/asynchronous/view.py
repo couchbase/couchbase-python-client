@@ -20,7 +20,7 @@ This file contains the view implementation for Async
 """
 
 from couchbase.views.iterator import View
-from couchbase.async.rowsbase import AsyncRowsBase
+from couchbase.asynchronous.rowsbase import AsyncRowsBase
 
 
 class AsyncViewBase(AsyncRowsBase, View):

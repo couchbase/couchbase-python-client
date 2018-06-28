@@ -1,6 +1,6 @@
 import asyncio
-from couchbase.async.view import AsyncViewBase
-from couchbase.async.n1ql import AsyncN1QLRequest
+from couchbase.asynchronous.view import AsyncViewBase
+from couchbase.asynchronous.n1ql import AsyncN1QLRequest
 
 
 class AioBase:

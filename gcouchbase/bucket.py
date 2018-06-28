@@ -2,9 +2,9 @@ from gevent import GreenletExit
 from gevent.event import AsyncResult, Event
 from gevent.hub import get_hub, getcurrent, Waiter
 
-from couchbase.async.bucket import AsyncBucket
-from couchbase.async.view import AsyncViewBase
-from couchbase.async.n1ql import AsyncN1QLRequest
+from couchbase.asynchronous.bucket import AsyncBucket
+from couchbase.asynchronous.view import AsyncViewBase
+from couchbase.asynchronous.n1ql import AsyncN1QLRequest
 from couchbase.views.iterator import AlreadyQueriedError
 try:
     from gcouchbase.iops_gevent0x import IOPS

@@ -20,7 +20,7 @@ This file contains the FTS implementation for Async
 """
 
 from couchbase.fulltext import SearchRequest
-from couchbase.async.rowsbase import AsyncRowsBase
+from couchbase.asynchronous.rowsbase import AsyncRowsBase
 
 
 class AsyncSearchRequest(AsyncRowsBase, SearchRequest):

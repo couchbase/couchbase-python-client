@@ -17,7 +17,7 @@ from twisted.internet import defer
 
 from txcouchbase.bucket import BatchedView
 from couchbase.exceptions import HTTPError, ArgumentError
-from couchbase.async.view import AsyncViewBase
+from couchbase.asynchronous.view import AsyncViewBase
 
 from couchbase.tests.base import ViewTestCase
 from txcouchbase.tests.base import gen_base

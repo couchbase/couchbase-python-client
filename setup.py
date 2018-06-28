@@ -187,7 +187,7 @@ setup(
         'couchbase',
         'couchbase.views',
         'couchbase.iops',
-        'couchbase.async',
+        'couchbase.asynchronous',
         'couchbase.tests',
         'couchbase.tests.cases',
         'gcouchbase',

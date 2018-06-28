@@ -2,7 +2,7 @@
 Asynchronous Interface
 ======================
 
-.. module:: couchbase.async
+.. module:: couchbase.asynchronous
 
 
 .. _async_intro:
@@ -39,7 +39,7 @@ with an exception object upon error.
 The semantics of when an exception is passed follows the rules of the
 ``quiet`` parameter just like the synchronous API.
 
-.. currentmodule:: couchbase.async.bucket
+.. currentmodule:: couchbase.asynchronous.bucket
 
 .. class:: couchbase.result.AsyncResult
 
@@ -61,7 +61,7 @@ is itself an iterator which yields results. Because this is a synchronous
 API, the iterator interface must be replaced with a class interface
 which must be subclassed by a user.
 
-.. currentmodule:: couchbase.async.view
+.. currentmodule:: couchbase.asynchronous.view
 
 .. class:: AsyncViewBase
 
