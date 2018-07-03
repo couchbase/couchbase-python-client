@@ -19,7 +19,6 @@
  * This file contains the base header for the Python Couchbase Client
  * @author Mark Nunberg
  */
-
 #define PYCBC_REF_ACCOUNTING
 
 #define PYCBC_REF_CLEANUP_ENABLE
@@ -38,74 +37,23 @@
 #endif
 #endif
 
-#define PYCBC_PREFIX_FMTSTRING \
-    "[%20s:%40s:%5d:ctx=%20p:span=%20p:%10llx:%20s:%20s:%4zu:%4zu]:"
-#define PYCBC_PREFIX_FMTSTRING_NOCONTEXT \
-    "[%20s:%40s:%5d:ctx=%20s:span=%20s:%10s:%20s:%20s:%4s:%4s]:"
+
 #define PYCBC_TABBED_CONTEXTS_ENABLE
 
-#ifdef PYCBC_DEBUG
-#ifdef PYCBC_TABBED_CONTEXTS_ENABLE
+typedef struct pycbc_stack_context_decl *pycbc_stack_context_handle;
+
 #define PYCBC_TABBED_CONTEXTS
-#define PYCBC_DEBUG_LOG_PREFIX(FILE, FUNC, LINE, CONTEXT)                    \
-    {                                                                        \
-        char fmtstring[100] = PYCBC_PREFIX_FMTSTRING "%";                    \
-        size_t depth = (CONTEXT) ? ((CONTEXT)->depth) : 0;                   \
-        char *component =                                                    \
-                pycbc_get_string_tag_basic(CONTEXT, LCBTRACE_TAG_COMPONENT); \
-        sprintf(fmtstring + strlen(fmtstring), "%zus", depth * 4);           \
-        PYCBC_DEBUG_LOG_RAW(                                                 \
-                fmtstring,                                                   \
-                FILE,                                                        \
-                FUNC,                                                        \
-                LINE,                                                        \
-                CONTEXT,                                                     \
-                (CONTEXT) ? ((CONTEXT)->span) : NULL,                        \
-                (CONTEXT && CONTEXT->span)                                   \
-                        ? lcbtrace_span_get_span_id(CONTEXT->span)           \
-                        : 1000,                                              \
-                ((CONTEXT) && (CONTEXT->span))                               \
-                        ? lcbtrace_span_get_operation((CONTEXT)->span)       \
-                        : "unknown",                                         \
-                component ? component : "Unknown",                           \
-                (CONTEXT) ? ((CONTEXT)->depth) : 1000,                       \
-                (CONTEXT) ? pycbc_Context_get_ref_count(CONTEXT) : 1000,     \
-                "");                                                         \
-        free(component);                                                     \
-    }
-#else
-#define PYCBC_DEBUG_LOG_PREFIX(FILE, FUNC, LINE, CONTEXT)          \
-    PYCBC_DEBUG_LOG_RAW(                                           \
-            PYCBC_PREFIX_FMTSTRING,                                \
-            FILE,                                                  \
-            FUNC,                                                  \
-            LINE,                                                  \
-            CONTEXT,                                               \
-            (CONTEXT) ? ((CONTEXT)->span) : NULL,                  \
-            ((CONTEXT) && (CONTEXT->span))                         \
-                    ? lcbtrace_span_get_operation((CONTEXT)->span) \
-                    : "unknown",                                   \
-            "",                                                    \
-            "",                                                    \
-            (CONTEXT) ? ((CONTEXT)->depth) : 1000,                 \
-            (CONTEXT) ? pycbc_Context_get_ref_count(CONTEXT) : 1000)
-#endif
+
+#ifdef PYCBC_DEBUG
+void pycbc_debug_log_prefix(const char* FILE, const char* FUNC, int LINE, pycbc_stack_context_handle CONTEXT);
+#define PYCBC_DEBUG_LOG_PREFIX(FILE, FUNC, LINE, CONTEXT)  pycbc_debug_log_prefix(FILE,FUNC,LINE,CONTEXT);
+void pycbc_debug_log_prefix_nocontext(const char* FILE, const char* FUNC, int LINE);
+#define PYCBC_DEBUG_LOG_PREFIX_NOCONTEXT(FILE, FUNC, LINE) pycbc_debug_log_prefix_nocontext(FILE,FUNC,LINE);
 #else
 #define PYCBC_DEBUG_LOG_PREFIX(FILE, FUNC, LINE, CONTEXT)
+#define PYCBC_DEBUG_LOG_PREFIX_NOCONTEXT(FILE, FUNC, LINE)
 #endif
 
-#define PYCBC_DEBUG_LOG_PREFIX_NOCONTEXT(FILE, FUNC, LINE) \
-    PYCBC_DEBUG_LOG_RAW(PYCBC_PREFIX_FMTSTRING_NOCONTEXT,  \
-                        FILE,                              \
-                        FUNC,                              \
-                        LINE,                              \
-                        "",                                \
-                        "",                                \
-                        "",                                \
-                        "",                                \
-                        "",                                \
-                        "",                                \
-                        "")
 
 #ifdef PYCBC_DEBUG
 #define PYCBC_DEBUG_LOG_RAW(...) fprintf(stderr,__VA_ARGS__);
@@ -142,25 +90,29 @@ void pycbc_exception_log(const char *file,
     pycbc_exception_log(__FILE__, __FUNCTION_NAME__, __LINE__, 0);
 #define PYCBC_EXCEPTION_LOG \
     pycbc_exception_log(__FILE__, __FUNCTION_NAME__, __LINE__, 1);
+#define PYCBC_DEBUG_FLUSH fflush(stderr);
 #else
 #define PYCBC_DEBUG_LOG_RAW(...)
 #define PYCBC_DEBUG_PYFORMAT_CONTEXT(CONTEXT, FORMAT, ...)
 #define PYCBC_DEBUG_PYFORMAT(...)
 #define PYCBC_EXCEPTION_LOG_NOCLEAR
 #define PYCBC_EXCEPTION_LOG PyErr_Clear();
+#define PYCBC_DEBUG_FLUSH
 #endif
 
 #define PYCBC_DEBUG_LOG_WITH_FILE_FUNC_AND_LINE_POSTFIX( \
         FILE, FUNC, LINE, POSTFIX, CONTEXT, ...)         \
     PYCBC_DEBUG_LOG_PREFIX(FILE, FUNC, LINE, CONTEXT)    \
     PYCBC_DEBUG_LOG_RAW(__VA_ARGS__)                     \
-    PYCBC_DEBUG_LOG_RAW(POSTFIX)
+    PYCBC_DEBUG_LOG_RAW(POSTFIX)\
+    PYCBC_DEBUG_FLUSH
 
 #define PYCBC_DEBUG_LOG_WITH_FILE_FUNC_AND_LINE_POSTFIX_NOCONTEXT( \
         FILE, FUNC, LINE, POSTFIX, ...)                            \
     PYCBC_DEBUG_LOG_PREFIX_NOCONTEXT(FILE, FUNC, LINE)             \
     PYCBC_DEBUG_LOG_RAW(__VA_ARGS__)                               \
-    PYCBC_DEBUG_LOG_RAW(POSTFIX)
+    PYCBC_DEBUG_LOG_RAW(POSTFIX)\
+    PYCBC_DEBUG_FLUSH
 
 #define PYCBC_DEBUG_LOG_WITH_FILE_FUNC_LINE_CONTEXT_NEWLINE( \
         FILE, FUNC, LINE, CONTEXT, ...)                      \
@@ -634,8 +586,6 @@ typedef struct {
 #endif
 } pycbc_Span_t;
 
-typedef struct pycbc_stack_context_decl *pycbc_stack_context_handle;
-
 typedef struct pycbc_context_children_t {
     pycbc_stack_context_handle value;
     struct pycbc_context_children_t *next;
@@ -662,9 +612,18 @@ typedef struct pycbc_stack_context_decl {
 #endif
 } pycbc_stack_context;
 
-char *pycbc_get_string_tag_basic(pycbc_stack_context_handle context,
-                                 const char *tagname);
+typedef struct {
+    char *buffer;
+    size_t length;
+} pycbc_strn;
 
+typedef struct {
+    pycbc_strn content;
+} pycbc_strn_unmanaged;
+
+extern pycbc_strn pycbc_invalid_strn;
+
+pycbc_strn pycbc_get_string_tag_basic(lcbtrace_SPAN *span, const char *tagname);
 PyObject *pycbc_Context_capsule(pycbc_stack_context_handle context);
 void pycbc_Context_capsule_destructor(PyObject *context_capsule);
 void *pycbc_Context_capsule_value(PyObject *context_capsule);

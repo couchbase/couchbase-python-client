@@ -153,12 +153,12 @@ add_executable(couchbase_python_client_2_3_1
         acouchbase/asyncio_iops.py
         acouchbase/bucket.py
         acouchbase/py34only/iterator.py
-        couchbase/async/__init__.py
-        couchbase/async/bucket.py
-        couchbase/async/events.py
-        couchbase/async/n1ql.py
-        couchbase/async/rowsbase.py
-        couchbase/async/view.py
+        couchbase/asynchronous/__init__.py
+        couchbase/asynchronous/bucket.py
+        couchbase/asynchronous/events.py
+        couchbase/asynchronous/n1ql.py
+        couchbase/asynchronous/rowsbase.py
+        couchbase/asynchronous/view.py
         couchbase/iops/__init__.py
         couchbase/iops/base.py
         couchbase/iops/select.py

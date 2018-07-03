@@ -254,7 +254,7 @@ class TracingTest(TracedCase):
     def test_threshold_multi_get(self):
         super(TracingTest, self).setUp(trace_all=True, enable_logging=True, use_parent_tracer=False, flushcount=0)
         raise SkipTest("to be fixed")
-        super(TracingTest, self).setUp(trace_all=True, enable_logging=True, use_parent_tracer=False, flushcount=10)
+        super(TracingTest, self).setUp(trace_all=True, enable_logging=True, use_parent_tracer=False, flushcount=0)
         error_message_expected = r'.*Operations over threshold:.*'
         handler = BogusHandler(error_message_expected)
         couchbase._libcouchbase.lcb_logging(handler.handler)
