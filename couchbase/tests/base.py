@@ -100,7 +100,7 @@ class ClusterInformation(object):
     @staticmethod
     def filter_opts(options):
         return {key: value for key, value in
-                options.items() if key in ["certpath", "keypath", "ipv6", "config_cache", "compression", "log_redaction", "enable_tracing"] and value}
+                options.items() if key in ["certpath", "keypath", "ipv6", "config_cache", "compression", "log_redaction", "enable_tracing"]}
 
     def make_connargs(self, **overrides):
         bucket = self.bucket_name
@@ -118,9 +118,10 @@ class ClusterInformation(object):
         override_options = ClusterInformation.filter_opts(overrides)
         for k, v in override_options.items():
             overrides.pop(k)
-            final_options[k] = override_options[k]
+            if v:
+                final_options[k] = v
 
-        conn_options = '&'.join((key + "=" + value) for key, value in final_options.items())
+        conn_options = '&'.join((key + "=" + value) for key, value in filter(lambda tpl: tpl[1],final_options.items()))
         connstr += ("?" + conn_options) if conn_options else ""
         if 'init_tracer' in overrides.keys():
             overrides['tracer']=overrides.pop("init_tracer")(PYCBC_CB_VERSION
@@ -161,9 +162,10 @@ class ConnectionConfiguration(object):
         info.certpath = config.get('realserver', 'certpath', fallback=None)
         info.keypath = config.get('realserver', 'keypath', fallback=None)
         info.protocol = config.get('realserver', 'protocol', fallback="http")
-        info.enable_tracing = config.get('realserver', 'tracing', fallback="off")
+        info.enable_tracing = config.get('realserver', 'tracing', fallback=None)
         info.tracingparms['port'] = config.get('realserver', 'tracing_port', fallback=None)
         logging.info("info is "+str(info.__dict__))
+        self.enable_tracing = info.enable_tracing
         if config.getboolean('realserver', 'enabled'):
             self.realserver_info = info
         else:
@@ -222,7 +224,7 @@ class MockResourceManager(TestResourceManager):
         info.admin_username = "Administrator"
         info.admin_password = "password"
         info.mock = mock
-        info.enable_tracing = "true"
+        info.enable_tracing = self._config.enable_tracing
         self._info = info
         return info
 
@@ -378,7 +380,7 @@ class CouchbaseTestCase(ResourcedTestCase):
         rtstr, rtnum = self.factory.lcb_version()
         if rtnum < vernum:
             raise SkipTest(("Test requires {0} to run (have {1})")
-                            .format(vstr, rtstr))
+                           .format(vstr, rtstr))
 
     def skipIfMock(self):
         pass
@@ -448,8 +450,8 @@ class ConnectionTestCaseBase(CouchbaseTestCase):
                                        **options)
                     objgraph.show_backrefs(attrib,
                                            filename=os.path.join(graphdir,
-                                                                         '{}_{}_backrefs.dot'.format(self._testMethodName,
-                                                                                                     attrib_name)),
+                                                                 '{}_{}_backrefs.dot'.format(self._testMethodName,
+                                                                                             attrib_name)),
                                            **options)
                     logging.info("got referrents {}".format(repr(gc.get_referents(attrib))))
                     logging.info("got referrers {}".format(repr(gc.get_referrers(attrib))))
@@ -516,7 +518,7 @@ except Exception as e:
     def jaeger_tracer(service, port = None):
         logging.error("No Jaeger import available")
         return basic_tracer()
-    
+
 
 class TracedCase(ConnectionTestCaseBase):
     _tracer = None

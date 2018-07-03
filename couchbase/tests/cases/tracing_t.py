@@ -54,6 +54,29 @@ class BogusHandler:
         self.records.append(kwargs)
 
 
+class DisabledByDefaultTest(ConnectionTestCase):
+    def setUp(self, **kwargs):
+        super(DisabledByDefaultTest,self).setUp(enable_tracing=None)
+
+    def test_tracer_disabledbydefault(self):
+        self.assertFalse(self.cb.tracer)
+
+
+class CanEnableTest(ConnectionTestCase):
+    def setUp(self, **kwargs):
+        super(CanEnableTest,self).setUp(enable_tracing="true")
+
+    def test_tracer_canenable(self):
+        self.assertTrue(self.cb.tracer)
+
+
+class CanDisableTest(ConnectionTestCase):
+    def setUp(self, **kwargs):
+        super(CanDisableTest,self).setUp(enable_tracing="false")
+
+    def test_tracer_candisable(self):
+        self.assertFalse(self.cb.tracer)
+
 class TimeoutTest(TracedCase):
     def setUp(self, *args, **kwargs):
         if not couchbase._libcouchbase.PYCBC_TRACING:
