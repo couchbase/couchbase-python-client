@@ -31,7 +31,7 @@
 #endif
 
 #ifndef __FUNCTION_NAME__
-#ifdef WIN32 // WINDOWS
+#if defined(_WIN32) || defined(WIN32) // WINDOWS
 #define __FUNCTION_NAME__ __FUNCTION__
 #else //*NIX
 #define __FUNCTION_NAME__ __func__
@@ -714,8 +714,15 @@ pycbc_stack_context_handle pycbc_Context_check(
         const char *file,
         const char *func,
         int line);
+
+#ifdef PYCBC_DEBUG
 #define PYCBC_CHECK_CONTEXT(CONTEXT) \
     pycbc_Context_check(CONTEXT, __FILE__, __FUNCTION_NAME__, __LINE__)
+#else
+#define PYCBC_CHECK_CONTEXT(CONTEXT) \
+    pycbc_Context_check(CONTEXT, __FILE__, "N/A", __LINE__)
+#endif
+
 pycbc_stack_context_handle pycbc_Context_deref(
         pycbc_stack_context_handle context,
         int should_be_final,
@@ -730,6 +737,7 @@ pycbc_stack_context_handle pycbc_Context_deref_debug(
         int dealloc_children,
         pycbc_stack_context_handle from_context);
 
+#ifdef PYCBC_DEBUG
 #define PYCBC_CONTEXT_DEREF_FROM_CONTEXT(                         \
         CONTEXT, SHOULD_BE_FINAL, DEALLOC_CHILDREN, FROM_CONTEXT) \
     pycbc_Context_deref_debug(__FILE__,                           \
@@ -739,7 +747,17 @@ pycbc_stack_context_handle pycbc_Context_deref_debug(
                               SHOULD_BE_FINAL,                    \
                               DEALLOC_CHILDREN,                   \
                               FROM_CONTEXT);
+#else
+#define PYCBC_CONTEXT_DEREF_FROM_CONTEXT(                         \
+        CONTEXT, SHOULD_BE_FINAL, DEALLOC_CHILDREN, FROM_CONTEXT) \
+    pycbc_Context_deref(      CONTEXT,                            \
+                              SHOULD_BE_FINAL,                    \
+                              DEALLOC_CHILDREN,                   \
+                              FROM_CONTEXT);
 
+#endif
+
+#ifdef PYCBC_DEBUG
 #define PYCBC_CONTEXT_DEREF(CONTEXT, SHOULD_BE_FINAL) \
     pycbc_Context_deref_debug(__FILE__,               \
                               __FUNCTION_NAME__,      \
@@ -748,15 +766,27 @@ pycbc_stack_context_handle pycbc_Context_deref_debug(
                               SHOULD_BE_FINAL,        \
                               1,                      \
                               NULL);
+#else
+#define PYCBC_CONTEXT_DEREF(CONTEXT, SHOULD_BE_FINAL) \
+    pycbc_Context_deref(      CONTEXT,                \
+                              SHOULD_BE_FINAL,        \
+                              1,                      \
+                              NULL);
+#endif
 
 size_t pycbc_Context_get_ref_count(pycbc_stack_context_handle context);
 size_t pycbc_Context_get_ref_count_debug(const char *FILE,
                                          const char *FUNC,
                                          int line,
                                          pycbc_stack_context_handle context);
+#ifdef PYCBC_DEBUG
 #define PYCBC_CONTEXT_GET_REF_COUNT(CONTEXT) \
     pycbc_Context_get_ref_count_debug(       \
             __FILE__, __FUNCTION_NAME__, __LINE__, CONTEXT)
+#else
+#define PYCBC_CONTEXT_GET_REF_COUNT(CONTEXT) \
+    pycbc_Context_get_ref_count(CONTEXT)
+#endif
 
 void pycbc_ref_context(pycbc_stack_context_handle parent_context);
 #define PYCBC_REF_CONTEXT(CONTEXT)                                     \

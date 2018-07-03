@@ -994,7 +994,7 @@ static void pycbc_Context_ref(pycbc_stack_context_handle context,
             (unsigned long long)pycbc_Context_get_ref_count(context),
             child);
 }
-
+#ifdef PYCBC_DEBUG
 static void pycbc_Context_ref_debug(const char *FILE,
                                     const char *FUNC,
                                     int line,
@@ -1025,6 +1025,10 @@ static void pycbc_Context_ref_debug(const char *FILE,
 #define PYCBC_CONTEXT_REF(ref_context, child) \
     pycbc_Context_ref_debug(                  \
             __FILE__, __FUNCTION_NAME__, __LINE__, ref_context, child)
+#else
+#define PYCBC_CONTEXT_REF(ref_context, child)\
+    pycbc_Context_ref(ref_context, child)
+#endif
 
 pycbc_stack_context_handle pycbc_Context_init(
         pycbc_Tracer_t *py_tracer,
@@ -1516,6 +1520,9 @@ char *pycbc_dupe_string_tag(const lcbtrace_SPAN *span,
 
     return target ? *target : NULL;
 }
+
+#ifdef PYCBC_DEBUG
+
 char *pycbc_dupe_string_tag_debug(const char *FILE,
                                   const char *FUNC,
                                   int LINE,
@@ -1549,6 +1556,10 @@ char *pycbc_dupe_string_tag_debug(const char *FILE,
 #define PYCBC_DUPE_STRING_TAG(SPAN, TAGNAME, TARGET_ORIG) \
     pycbc_dupe_string_tag_debug(                          \
             __FILE__, __FUNCTION_NAME__, __LINE__, SPAN, TAGNAME, TARGET_ORIG)
+#else
+#define PYCBC_DUPE_STRING_TAG(SPAN, TAGNAME, TARGET_ORIG) \
+    pycbc_dupe_string_tag(SPAN,TAGNAME,TARGET_ORIG)
+#endif
 
 void pycbc_forward_string_tag(const lcbtrace_SPAN *span,
                               PyObject *dict,
@@ -1574,6 +1585,7 @@ char *pycbc_get_string_tag(const lcbtrace_SPAN *span, const char *tagname)
     return dest;
 }
 
+#ifdef PYCBC_DEBUG
 char *pycbc_get_string_tag_debug(const char *FILE,
                                  const char *FUNC,
                                  int LINE,
@@ -1598,6 +1610,10 @@ char *pycbc_get_string_tag_debug(const char *FILE,
 #define PYCBC_GET_STRING_TAG(SPAN, TAGNAME) \
     pycbc_get_string_tag_debug(             \
             __FILE__, __FUNCTION_NAME__, __LINE__, SPAN, TAGNAME)
+#else
+#define PYCBC_GET_STRING_TAG(SPAN, TAGNAME) \
+    pycbc_get_string_tag(SPAN, TAGNAME)
+#endif
 
 lcb_uint64_t pycbc_get_uint64_tag(const lcbtrace_SPAN *span,
                                   const char *tagname,
@@ -1732,14 +1748,16 @@ void pycbc_propagate_tag_str(const lcbtrace_SPAN *span,
         PYCBC_DEBUG_LOG("Span %p: Get better value than %s",
                         span,
                         value ? value : "Nothing");
-        char *better_value = PYCBC_GET_STRING_TAG(span, tagname);
-        if (better_value) {
-            PYCBC_DEBUG_LOG("Span %p: Got better value %s", span, better_value);
-            PYCBC_FREE(value);
-            value = better_value;
+        {
+            char *better_value = PYCBC_GET_STRING_TAG(span, tagname);
+            if (better_value) {
+                PYCBC_DEBUG_LOG("Span %p: Got better value %s", span, better_value);
+                PYCBC_FREE(value);
+                value = better_value;
+            }
+            PYCBC_DEBUG_LOG("Span %p: looking for parent", span)
+            span = lcbtrace_span_get_parent((lcbtrace_SPAN *) span);
         }
-        PYCBC_DEBUG_LOG("Span %p: looking for parent", span)
-        span = lcbtrace_span_get_parent((lcbtrace_SPAN*)span);
     }
     PYCBC_DEBUG_LOG("Span %p: finished searching, got %s, propagating to %p",
                     span,
@@ -1752,6 +1770,7 @@ void pycbc_propagate_tag_str(const lcbtrace_SPAN *span,
     PYCBC_FREE(orig);
 }
 
+#ifdef PYCBC_DEBUG
 void pycbc_propagate_tag_str_debug(const char *FILE,
                                    const char *FUNC,
                                    int LINE,
@@ -1773,6 +1792,11 @@ void pycbc_propagate_tag_str_debug(const char *FILE,
 #define PYCBC_PROPAGATE_TAG_STR(SPAN, DEST, TAGNAME) \
     pycbc_propagate_tag_str_debug(                   \
             __FILE__, __FUNCTION_NAME__, __LINE__, SPAN, DEST, TAGNAME)
+#else
+#define PYCBC_PROPAGATE_TAG_STR(SPAN, DEST, TAGNAME) \
+    pycbc_propagate_tag_str(                   \
+            SPAN, DEST, TAGNAME)
+#endif
 
 void pycbc_propagate_tag_ull(const lcbtrace_SPAN *span,
                              lcbtrace_SPAN *dest,
