@@ -300,9 +300,12 @@ class FTStringsTest(CouchbaseTestCase):
 
     def test_advanced_sort(self):
         self.assertEqual({'by': 'score'}, cbft.SortScore().as_encodable())
-        self.assertEqual({'by': 'score', 'descending': False},
+        #test legacy 'descending' support
+        self.assertEqual({'by': 'score', 'desc': False},
                          cbft.SortScore(descending=False).as_encodable())
-
+        #official RFC format
+        self.assertEqual({'by': 'score', 'desc': False},
+                         cbft.SortScore(desc=False).as_encodable())
         self.assertEqual({'by': 'id'}, cbft.SortID().as_encodable())
 
         self.assertEqual({'by': 'field', 'field': 'foo'},

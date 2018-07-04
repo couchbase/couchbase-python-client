@@ -246,12 +246,23 @@ class _FacetDict(dict):
 
 class Sort(object):
     def __init__(self, by, **kwargs):
+        by = by.replace('descending','desc')
         self._json_ = {
             'by': by
         }
+        if 'descending' in kwargs:
+            kwargs['desc']=kwargs.pop('descending')
         _assign_kwargs(self, kwargs)
 
-    descending = _genprop(bool, 'descending', doc='Sort using descending order')
+    desc = _genprop(bool, 'desc', doc='Sort using descending order')
+
+    @property
+    def descending(self):
+        return self.desc
+
+    @descending.setter
+    def descending(self, value):
+        self.desc = value
 
     def as_encodable(self):
         return self._json_
