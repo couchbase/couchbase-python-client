@@ -3,7 +3,7 @@ project(couchbase_python_client_2_3_1)
 set(LCB_ROOT ../libcouchbase)
 set(LCB_ROOT_SRC ${LCB_ROOT}/src)
 set(LCB_ROOT_CONTRIB ${LCB_ROOT}/contrib)
-
+#SET_TARGET_PROPERTIES(couchbase_python_client_2_3_1 PROPERTIES LINKER_LANGUAGE C)
 set(PYTHON_INCLUDE_DIR /Users/ellis_breen/root/virtualenvs/3.6/default/include/python3.6m/)
 set(PYTHON_INCLUDE ${PYTHON_INCLUDE_DIR})
 set(LCB_IO ${LCB_ROOT}/src/lcbio)

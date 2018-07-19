@@ -44,6 +44,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
     unsigned long ttl = gv->u.ttl;
     lcb_error_t err;
     pycbc_pybuffer keybuf = { NULL };
+    pycbc_stack_context_handle decoding_context = NULL;
 
     union {
         lcb_CMDBASE base;
@@ -102,8 +103,9 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
     }
     u_cmd.base.exptime = ttl;
 #ifdef PYCBC_TRACING
-    context =
-            context ? pycbc_Context_init(context->tracer,
+
+    decoding_context =
+            context ? PYCBC_CONTEXT_INIT(context->tracer,
                                          LCBTRACE_OP_RESPONSE_DECODING,
                                          0,
                                          context,
@@ -132,13 +134,14 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
         case PYCBC_CMD_GET:
         GT_GET:
             u_cmd.get.lock = lock;
-            PYCBC_TRACECMD(u_cmd.get, context, cv->mres, curkey, self);
+            PYCBC_TRACECMD(u_cmd.get, decoding_context, cv->mres, curkey, self);
             err = lcb_get3(self->instance, cv->mres, &u_cmd.get);
             break;
 
         case PYCBC_CMD_TOUCH:
             u_cmd.touch.exptime = ttl;
-            PYCBC_TRACECMD(u_cmd.touch, context, cv->mres, curkey, self);
+            PYCBC_TRACECMD(
+                    u_cmd.touch, decoding_context, cv->mres, curkey, self);
             err = lcb_touch3(self->instance, cv->mres, &u_cmd.touch);
             break;
 
@@ -147,7 +150,8 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
         case PYCBC_CMD_GETREPLICA_ALL:
             u_cmd.rget.strategy = gv->u.replica.strategy;
             u_cmd.rget.index = gv->u.replica.index;
-            PYCBC_TRACECMD(u_cmd.rget, context, cv->mres, curkey, self);
+            PYCBC_TRACECMD(
+                    u_cmd.rget, decoding_context, cv->mres, curkey, self);
             err = lcb_rget3(self->instance, cv->mres, &u_cmd.rget);
             break;
         default:
@@ -165,7 +169,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
     }
     
     GT_DONE:
-        PYCBC_CONTEXT_DEREF(context, 0);
+        PYCBC_CONTEXT_DEREF(decoding_context, 0);
         PYCBC_PYBUF_RELEASE(&keybuf);
         return rv;
 }

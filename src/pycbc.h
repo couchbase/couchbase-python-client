@@ -163,6 +163,7 @@ void pycbc_exception_log(const char *file,
                              #OP);                                          \
         Py_##X##OP((PyObject *)(Y));                                        \
     }
+
 #else
 #define PYCBC_FREE(X) free(X)
 #define PYCBC_MALLOC(X) malloc(X)
@@ -593,6 +594,7 @@ typedef struct pycbc_context_children_t {
 
 typedef struct pycbc_stack_context_decl {
 #ifdef PYCBC_TRACING
+    int is_stub;
     pycbc_Tracer_t* tracer;
     lcbtrace_SPAN* span;
     pycbc_stack_context_handle parent;
@@ -668,6 +670,29 @@ pycbc_stack_context_handle pycbc_Context_init(
         pycbc_stack_context_handle ref_context,
         lcbtrace_REF_TYPE ref_type,
         const char *component);
+
+pycbc_stack_context_handle pycbc_Context_init_debug(
+        const char *FILE,
+        int LINE,
+        const char *FUNC,
+        pycbc_Tracer_t *py_tracer,
+        const char *operation,
+        lcb_uint64_t now,
+        pycbc_stack_context_handle ref_context,
+        lcbtrace_REF_TYPE ref_type,
+        const char *component);
+#define PYCBC_CONTEXT_INIT(                                          \
+        py_tracer, operation, now, ref_context, ref_type, component) \
+    pycbc_Context_init_debug(__FILE__,                               \
+                             __LINE__,                               \
+                             __FUNCTION_NAME__,                      \
+                             py_tracer,                              \
+                             operation,                              \
+                             now,                                    \
+                             ref_context,                            \
+                             ref_type,                               \
+                             component)
+
 pycbc_stack_context_handle pycbc_Context_check(
         pycbc_stack_context_handle context,
         const char *file,
@@ -794,7 +819,7 @@ void pycbc_Tracer_set_child(pycbc_Tracer_t *pTracer, lcbtrace_TRACER *pTRACER);
     PYCBC_TRACECMD_PURE(CMD, CONTEXT);                     \
     pycbc_MultiResult_init_context(MRES, CURKEY, CONTEXT, BUCKET);
 
-#define PYCBC_TRACE_POP_CONTEXT(context) PYCBC_CONTEXT_DEREF(context, 1);
+#define PYCBC_TRACE_POP_CONTEXT(CONTEXT) PYCBC_CONTEXT_DEREF((CONTEXT), 1);
 #define PYCBC_TRACE_WRAP_TOPLEVEL_WITHNAME(                                  \
         RV, CATEGORY, NAME, TRACER, STRINGNAME, ...)                         \
     {                                                                        \
@@ -809,19 +834,19 @@ void pycbc_Tracer_set_child(pycbc_Tracer_t *pTracer, lcbtrace_TRACER *pTRACER);
 int pycbc_wrap_and_pop(pycbc_stack_context_handle *context, int result);
 
 #define PYCBC_TRACE_WRAP_EXPLICIT_NAMED(                                   \
-        NAME, COMPONENTNAME, CATEGORY, KWARGS, ...)                        \
-    pycbc_wrap_and_pop(&context,                                           \
+        CONTEXT, NAME, COMPONENTNAME, CATEGORY, KWARGS, ...)               \
+    pycbc_wrap_and_pop(&(CONTEXT),                                         \
                        NAME(__VA_ARGS__,                                   \
                             pycbc_Tracer_start_span(self->tracer,          \
                                                     KWARGS,                \
                                                     CATEGORY,              \
                                                     0,                     \
-                                                    &context,              \
+                                                    &(CONTEXT),            \
                                                     LCBTRACE_REF_CHILD_OF, \
                                                     COMPONENTNAME)))
 #define PYCBC_TRACE_WRAP(NAME, KWARGS, ...) \
     PYCBC_TRACE_WRAP_EXPLICIT_NAMED(        \
-            NAME, #NAME, NAME##_category(), KWARGS, __VA_ARGS__)
+            context, NAME, #NAME, NAME##_category(), KWARGS, __VA_ARGS__)
 
 #define PYCBC_TRACE_WRAP_EXPLICIT_NAMED_VOID(               \
         NAME, COMPONENTNAME, CATEGORY, KWARGS, ...)         \

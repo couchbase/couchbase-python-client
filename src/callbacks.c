@@ -290,7 +290,9 @@ get_common_objects(const lcb_RESPBASE *resp, pycbc_Bucket **conn,
     pycbc_Result_propagate_context(*res, parent_context, *conn);
 #endif
     PYCBC_CONTEXT_DEREF(decoding_context, 1)
-
+    if (parent_context && parent_context->is_stub) {
+        PYCBC_CONTEXT_DEREF(parent_context, 1);
+    }
     if (resp->rc) {
         (*res)->rc = resp->rc;
     }

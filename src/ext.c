@@ -529,6 +529,7 @@ const char PYCBC_UNKNOWN[] = "Unknown";
 #define sizeof_array(X) sizeof(X) / sizeof(X[0])
 
 pycbc_strn pycbc_invalid_strn;
+
 char *pycbc_strn_buf(pycbc_strn buf)
 {
     return buf.buffer;
@@ -604,10 +605,10 @@ void pycbc_strn_free(pycbc_strn_unmanaged buf)
 
 #ifdef PYCBC_DEBUG
 #define PYCBC_PREFIX_FMTSTRING \
-    "[%20s:%-5d:%40s:ctx=%20p:span=%20p:%20llx:%30s:%30.*s:%4zu:%4zu]:"
+    "[%20s:%-5d:%40s:ctx=%20p:span=%20p:%20llx:%30s:%30.*s:%4zu:%4zu:%1d]:"
 
 #define PYCBC_PREFIX_FMTSTRING_NOCONTEXT \
-    "[%20s:%-5d:%40s:ctx=%20s:span=%20s:%20s:%30s:%30s:%4s:%4s]:"
+    "[%20s:%-5d:%40s:ctx=%20s:span=%20s:%20s:%30s:%30s:%4s:%4s:%1s]:"
 
 void print_current_time_with_ms (uint64_t start_time)
 {
@@ -654,6 +655,7 @@ void pycbc_debug_log_prefix(const char *FILE,
                         repr_buf,
                         depth2,
                         refcount,
+                        (CONTEXT) ? (CONTEXT->is_stub) : 9,
                         "");
 }
 void pycbc_debug_log_prefix_nocontext(const char *FILE,
@@ -666,6 +668,7 @@ void pycbc_debug_log_prefix_nocontext(const char *FILE,
                         FILE,
                         LINE,
                         FUNC,
+                        "",
                         "",
                         "",
                         "",
@@ -930,9 +933,12 @@ pycbc_stack_context_handle pycbc_Context_deref_debug(
 
 void pycbc_Context__dtor(pycbc_stack_context_handle context)
 {
+    PYCBC_DEBUG_LOG_CONTEXT(context, "destroying context")
     if (context) {
         if (context->span) {
+            PYCBC_DEBUG_LOG_CONTEXT(context, "closing span %p", context->span);
             lcbtrace_span_finish(context->span, 0);
+            PYCBC_DEBUG_LOG_CONTEXT(context, "finished span")
             context->span = NULL;
         } else {
             PYCBC_DEBUG_LOG("Has null span already")
@@ -943,6 +949,11 @@ void pycbc_Context__dtor(pycbc_stack_context_handle context)
     }
     PYCBC_FREE(context);
 }
+
+#define PYCBC_CONTEXT_DTOR(CONTEXT)                              \
+    PYCBC_DEBUG_LOG_CONTEXT(CONTEXT, "About to destroy context") \
+    pycbc_Context__dtor(CONTEXT);                                \
+    PYCBC_DEBUG_LOG("Finished destroying context %p", CONTEXT)
 
 #ifdef PYCBC_REF_ACCOUNTING
 static int pycbc_Context_account_for_children(
@@ -1019,7 +1030,7 @@ static int pycbc_Context_account_for_children(
         ++result;
         result += pycbc_Context_account_for_children(current_node->value);
 #ifdef PYCBC_REF_CLEANUP
-        pycbc_Context__dtor(current_node->value);
+        PYCBC_CONTEXT_DTOR(current_node->value);
 #endif
         PYCBC_FREE(current_node);
         current_node = next_node;
@@ -1088,8 +1099,7 @@ pycbc_stack_context_handle pycbc_Context_deref(
             }
 
 #endif
-            PYCBC_DEBUG_LOG_CONTEXT(context, "closing span %p", context->span);
-            pycbc_Context__dtor(context);
+            PYCBC_CONTEXT_DTOR(context);
         } else {
 #ifdef PYCBC_REF_ACCOUNTING
             if (should_be_final && context->children) {
@@ -1204,6 +1214,7 @@ pycbc_stack_context_handle pycbc_Context_init(
             py_tracer->tracer, operation, now, ref_context ? &ref : NULL);
     _pycbc_Context_set_ref_count(context, 1);
     context->parent = NULL;
+    context->is_stub = 0;
     if (ref_context) {
         switch (ref_type) {
         case LCBTRACE_REF_CHILD_OF:
@@ -1240,6 +1251,38 @@ pycbc_stack_context_handle pycbc_Context_init(
             context->parent,
             (unsigned long long)PYCBC_CONTEXT_GET_REF_COUNT(context));
     return context;
+}
+
+pycbc_stack_context_handle pycbc_Context_init_debug(
+        const char *FILE,
+        int LINE,
+        const char *FUNC,
+        pycbc_Tracer_t *py_tracer,
+        const char *operation,
+        lcb_uint64_t now,
+        pycbc_stack_context_handle ref_context,
+        lcbtrace_REF_TYPE ref_type,
+        const char *component)
+{
+    pycbc_stack_context_handle result;
+    PYCBC_DEBUG_LOG_WITH_FILE_FUNC_LINE_CONTEXT_NEWLINE(
+            FILE,
+            FUNC,
+            LINE,
+            ref_context,
+            "Creating context from parent %p",
+            ref_context);
+    result = pycbc_Context_init(
+            py_tracer, operation, now, ref_context, ref_type, component);
+    PYCBC_DEBUG_LOG_WITH_FILE_FUNC_LINE_CONTEXT_NEWLINE(
+            FILE,
+            FUNC,
+            LINE,
+            ref_context,
+            "Created context %p from parent %p",
+            result,
+            ref_context);
+    return result;
 }
 
 pycbc_stack_context_handle pycbc_Context_check(
@@ -1294,7 +1337,7 @@ pycbc_stack_context_handle pycbc_Tracer_start_span(
         return NULL;
     }
 
-    result = pycbc_Context_init(py_tracer,
+    result = PYCBC_CONTEXT_INIT(py_tracer,
                                 operation,
                                 now,
                                 context ? *context : NULL,
@@ -1316,7 +1359,7 @@ pycbc_stack_context_handle pycbc_Result_start_context(
     if (PYCBC_CHECK_CONTEXT(parent_context)) {
         pycbc_Tracer_t *py_tracer = (parent_context)->tracer;
         if (py_tracer) {
-            stack_context_handle = pycbc_Context_init(py_tracer,
+            stack_context_handle = PYCBC_CONTEXT_INIT(py_tracer,
                                                       operation,
                                                       0,
                                                       parent_context,
@@ -1405,6 +1448,7 @@ void pycbc_MultiResult_init_context(pycbc_MultiResult *self, PyObject *curkey,
         item = (pycbc_Result *)pycbc_valresult_new(bucket);
         PyDict_SetItem(mres_dict, curkey, (PyObject*)item);
         item->is_tracing_stub = 1;
+        context->is_stub = 1;
     }
     PYCBC_EXCEPTION_LOG_NOCLEAR;
     PYCBC_REF_CONTEXT(context);
@@ -1737,7 +1781,7 @@ void pycbc_forward_string_tag(lcbtrace_SPAN *span,
                               PyObject *key,
                               const char *tagname)
 {
-    pycbc_strn dest = pycbc_get_string_tag_basic(span, tagname);
+    pycbc_strn dest = PYCBC_GET_STRING_TAG_BASIC(span, tagname);
     PYCBC_DEBUG_LOG("Got tagname %s from %p, result %s",
                     tagname,
                     span,

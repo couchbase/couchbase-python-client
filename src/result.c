@@ -127,7 +127,7 @@ static void
 Result_dealloc(pycbc_Result *self)
 {
     Py_XDECREF(self->key);
-#ifdef PYCBC_STRICT
+#ifdef PYCBC_EXTRA_STRICT
     pycbc_assert(!self->tracing_context);
 #else
     PYCBC_CONTEXT_DEREF_FROM_CONTEXT(self->tracing_context, 0, 0, NULL);
