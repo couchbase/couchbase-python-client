@@ -87,7 +87,7 @@ typedef void *(*pycbc_constant_handler)(PyObject *,
                                         const char *,
                                         long long int);
 
-static void setup_compression_map(PyObject *module,
+static void setup_compression_map(PyObject *module, PyObject* public_constants,
                                   pycbc_constant_handler handler);
 static void setup_tracing_map(PyObject *module, pycbc_constant_handler handler);
 
@@ -97,10 +97,20 @@ static void setup_crypto_exceptions(PyObject *module,
 static void
 do_all_constants(PyObject *module, pycbc_constant_handler handler)
 {
+    PyObject* public_constants = PyDict_New();
+    PyModule_AddObject(module, "PUBLIC_CONSTANTS", public_constants);
+
     #define ADD_MACRO(sym) handler(module, #sym, sym)
     #define ADD_CONSTANT(name, val) handler(module, name, val)
     #define ADD_STRING(name) PyModule_AddObject(module, #name, pycbc_SimpleStringZ(name) )
     #define LCB_CONSTANT(postfix, ...) ADD_CONSTANT(#postfix, LCB_##postfix)
+#define LCB_PUBLIC_CONSTANT(postfix, ...)                              \
+    {                                                                  \
+        PyObject *py_longlong =                                        \
+                PyLong_FromLongLong((PY_LONG_LONG)LCB_##postfix);      \
+        PyDict_SetItemString(public_constants, #postfix, py_longlong); \
+        Py_DecRef(py_longlong);                                        \
+    }
     #define X(b) ADD_MACRO(LCB_##b);
     XERR(X);
     XSTORAGE(X);
@@ -220,6 +230,7 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
     /* Encryption options */
     ADD_MACRO(LCBCRYPTO_KEY_ENCRYPT);
     ADD_MACRO(LCBCRYPTO_KEY_DECRYPT);
+
     LCB_CONSTANT(VERSION);
     ADD_MACRO(PYCBC_CRYPTO_VERSION);
 #ifdef PYCBC_TRACING
@@ -228,7 +239,7 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
 #else
     ADD_CONSTANT("PYCBC_TRACING",0);
 #endif
-    setup_compression_map(module, handler);
+    setup_compression_map(module, public_constants, handler);
     setup_crypto_exceptions(module, handler);
     PyModule_AddObject(
             module, "CRYPTO_EXCEPTIONS", pycbc_gen_crypto_exception_map());
@@ -333,7 +344,7 @@ LCB_FOR_EACH_THRESHOLD_PARAM(X, ; );
 #undef LCB_FOR_EACH_THRESHOLD_PARAM
 }
 
-static void setup_compression_map(PyObject *module,
+static void setup_compression_map(PyObject *module, PyObject* public_constants,
                                   pycbc_constant_handler handler)
 {
 /* Compression options */
@@ -351,6 +362,7 @@ static void setup_compression_map(PyObject *module,
 
     PyObject *result = PyDict_New();
     LCB_FOR_EACH_COMPRESS_TYPE(LCB_CONSTANT);
+    LCB_FOR_EACH_COMPRESS_TYPE(LCB_PUBLIC_CONSTANT);
 #undef LCB_FOR_EACH_COMPRESS_TYPE
 #define PP_FOR_EACH(FUNC)                \
     FUNC(on, LCB_COMPRESS_INOUT);        \

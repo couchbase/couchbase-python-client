@@ -35,6 +35,7 @@ import couchbase
 import re
 import couchbase._libcouchbase as _LCB
 from couchbase import enable_logging
+from couchbase import COMPRESS_INOUT
 import logging
 
 
@@ -238,4 +239,7 @@ class MiscTest(ConnectionTestCaseBase):
             self.assertEqual(value, cb.get("hello").value)
             cb.remove("hello")
 
-
+    def test_compression_named(self):
+        import couchbase._libcouchbase as _LCB
+        cb = self.make_connection()
+        cb.compression =couchbase.COMPRESS_INOUT

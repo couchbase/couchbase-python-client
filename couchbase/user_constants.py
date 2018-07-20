@@ -37,5 +37,12 @@ from couchbase._libcouchbase import (
 
     LOCKMODE_WAIT,
     LOCKMODE_EXC,
-    LOCKMODE_NONE
+    LOCKMODE_NONE,
+
 )
+
+import couchbase._libcouchbase as _LCB
+import sys
+
+for name, value in _LCB.PUBLIC_CONSTANTS.items():
+    setattr(sys.modules[__name__],name, value)
