@@ -256,6 +256,23 @@ class AdminSimpleTest(CouchbaseTestCase):
         self.assertRaises(ArgumentError, self.admin.user_upsert, None, userid, password, roles)
         self.assertRaises(ArgumentError, self.admin.user_remove, None, userid)
 
+    def test_external_nopassword(self):
+
+        userid = 'custom-user'
+        password = 's3cr3t'
+        roles = [('data_reader', 'default'), ('data_writer', 'default')]
+
+        # password with external generates argument error
+        self.assertRaises(ArgumentError, self.admin.user_upsert, AuthDomain.External, userid, password, roles)
+        self.assertRaises(ArgumentError, self.admin.user_upsert, AuthDomain.External, userid, password, None)
+        self.assertRaises(ArgumentError, self.admin.user_upsert, AuthDomain.External, userid, password, [])
+        try:
+            self.admin.user_upsert(AuthDomain.External, userid, None, roles)
+        except ArgumentError:
+            raise
+        except:
+            pass
+
     def test_user_api_aliases(self):
 
         userid = 'custom-user'

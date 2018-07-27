@@ -370,7 +370,7 @@ class Admin(LCB.Bucket):
         return self.http_request(path=path,
                                  method='GET')
 
-    def user_upsert(self, domain, userid, password, roles, name=None):
+    def user_upsert(self, domain, userid, password=None, roles=None, name=None):
         """
         Upsert a user in the cluster
 
@@ -399,6 +399,11 @@ class Admin(LCB.Bucket):
            Due to the asynchronous nature of Couchbase management APIs, it may
            take a few moments for the new user settings to take effect.
         """
+        if not roles or not isinstance(roles, list):
+            raise E.ArgumentError("Roles must be a non-empty list")
+
+        if password and domain == AuthDomain.External:
+            raise E.ArgumentError("External domains must not have passwords")
         tmplist = []
         for role in roles:
             if isinstance(role, basestring):
@@ -409,8 +414,10 @@ class Admin(LCB.Bucket):
         role_string = ','.join(tmplist)
         params = {
             'roles': role_string,
-            'password': password
         }
+
+        if password:
+            params['password'] = password
         if name:
             params['name'] = name
 
