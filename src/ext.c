@@ -530,27 +530,27 @@ const char PYCBC_UNKNOWN[] = "Unknown";
 
 pycbc_strn pycbc_invalid_strn;
 
-char *pycbc_strn_buf(pycbc_strn buf)
+char *pycbc_strn_buf(const pycbc_strn buf)
 {
     return buf.buffer;
 }
 
-int pycbc_strn_valid(pycbc_strn buf)
+int pycbc_strn_valid(const pycbc_strn buf)
 {
     return buf.buffer ? 1 : 0;
 }
 
-size_t pycbc_strn_len(pycbc_strn buf)
+size_t pycbc_strn_len(const pycbc_strn buf)
 {
     return buf.length;
 }
 
-int pycbc_strn_repr_len(pycbc_strn buf)
+int pycbc_strn_repr_len(const pycbc_strn buf)
 {
     return pycbc_strn_valid(buf) ? buf.length : sizeof_array(PYCBC_UNKNOWN);
 }
 
-const char *pycbc_strn_repr_buf(pycbc_strn buf)
+const char *pycbc_strn_repr_buf(const pycbc_strn buf)
 {
     return pycbc_strn_valid(buf) ? buf.buffer : PYCBC_UNKNOWN;
 }
@@ -559,18 +559,23 @@ const char *pycbc_strn_repr_buf(pycbc_strn buf)
 #define PYCBC_FORCE_TAG_PSZ
 #endif
 
-#ifdef PYCBC_FORCE_TAG_PSZ
-pycbc_strn_unmanaged pycbc_strn_ensure_psz(pycbc_strn *input)
+pycbc_strn_unmanaged pycbc_strn_ensure_psz_unmanaged(pycbc_strn *input)
 {
     pycbc_strn_unmanaged output;
     output.content = pycbc_invalid_strn;
-    if ((*input).length && (*input).buffer) {
+    if (pycbc_strn_valid(*input)) {
         output.content.buffer = PYCBC_CALLOC_TYPED((*input).length + 1, char);
         memcpy(output.content.buffer, input->buffer, input->length);
         output.content.buffer[input->length] = '\0';
         output.content.length = input->length;
     }
     return output;
+}
+
+#ifdef PYCBC_FORCE_TAG_PSZ
+pycbc_strn_unmanaged pycbc_strn_ensure_psz(pycbc_strn *input)
+{
+    return pycbc_strn_ensure_psz_unmanaged(input);
 }
 
 char *pycbc_strn_buf_psz(pycbc_strn_unmanaged buf)
@@ -1701,33 +1706,35 @@ pycbc_strn pycbc_get_string_tag_basic_debug(const char* FILE, int LINE, lcbtrace
 #define PYCBC_GET_STRING_TAG_BASIC(SPAN,TAGNAME)\
     pycbc_get_string_tag_basic_debug(__FILE__,__LINE__,SPAN,TAGNAME)
 
+#ifdef PYCBC_FORCE_TAG_PSZ
+pycbc_strn_unmanaged
+#else
+pycbc_strn
+#endif
+pycbc_dupe_strn_tag(const lcbtrace_SPAN *span, const char *tagname)
+{
+    pycbc_strn tag_contents =
+            pycbc_get_string_tag_basic((lcbtrace_SPAN *)span, tagname);
+    pycbc_strn_unmanaged tag_psz =
+            pycbc_strn_ensure_psz_unmanaged(&tag_contents);
+    PYCBC_DEBUG_LOG("Looking for tagname %s from %p, got something: [%.*s]",
+                    tagname,
+                    span,
+                    (int)pycbc_strn_len(tag_contents),
+                    pycbc_strn_buf(tag_contents));
+    return tag_psz;
+}
+
 char *pycbc_dupe_string_tag(const lcbtrace_SPAN *span,
                             const char *tagname,
                             char **target_orig)
 {
-    size_t nbuf = 0;
-    char* target_temp = target_orig?*target_orig:NULL;
-    char **target = target_orig?target_orig:&target_temp;
-    lcb_error_t result = lcbtrace_span_get_tag_str(
-            (lcbtrace_SPAN *)span, tagname, target, &nbuf);
-    if (result == LCB_SUCCESS && target && *target && nbuf && **target) {
-        char *old_target = *target;
-        PYCBC_DEBUG_LOG("Looking for tagname %s from %p, got something: [%.*s]",
-                        tagname,
-                        span,
-                        (int)nbuf,
-                        *target);
-        *target = PYCBC_CALLOC_TYPED(nbuf + 1, char);
-        memcpy(*target, old_target, nbuf);
-        (*target)[nbuf] = '\0';
+    char **target = target_orig;
+    pycbc_strn_unmanaged tag_psz = pycbc_dupe_strn_tag(span, tagname);
 
-        PYCBC_DEBUG_LOG("Looking for tagname %s from %p, got something: [%s]",
-                        tagname,
-                        span,
-                        *target);
-    } else {
+    {
         if (target) {
-            *target = NULL;
+            *target = pycbc_strn_buf_psz(tag_psz);
         }
         PYCBC_DEBUG_LOG(
                 "Looking for tagname %s from %p, got nothing", tagname, span);
@@ -1827,21 +1834,59 @@ void pycbc_forward_uint64_tag(const lcbtrace_SPAN *span,
     }
 }
 
+size_t pycbc_print_aggregate_raw_real(const pycbc_strn *FIRST,
+                                      const pycbc_strn *SECOND,
+                                      char *buf,
+                                      size_t length)
+{
+    return snprintf(buf,
+                    length,
+                    "%.*s:%.*s",
+                    pycbc_strn_repr_len((*FIRST)),
+                    pycbc_strn_repr_buf((*FIRST)),
+                    pycbc_strn_repr_len((*SECOND)),
+                    pycbc_strn_repr_buf((*SECOND)));
+}
+
+pycbc_strn_unmanaged pycbc_print_aggregate_raw(pycbc_strn FIRST,
+                                               pycbc_strn SECOND,
+                                               pycbc_strn_unmanaged *receiver)
+{
+    pycbc_strn_unmanaged result = *receiver;
+    result.content.length =
+            pycbc_print_aggregate_raw_real(&FIRST,
+                                           &SECOND,
+                                           receiver->content.buffer,
+                                           receiver->content.length);
+    if (result.content.length > receiver->content.length) {
+        result.content.buffer =
+                PYCBC_MALLOC_TYPED(result.content.length + 2, char);
+        pycbc_print_aggregate_raw_real(&FIRST,
+                                       &SECOND,
+                                       result.content.buffer,
+                                       result.content.length + 1);
+        result.content.buffer[result.content.length] = '\0';
+    }
+    return result;
+}
+
 void pycbc_print_aggregate(PyObject *dict,
                            pycbc_strn FIRST,
                            pycbc_strn SECOND,
                            PyObject *key)
 {
 #define PYCBC_TRACING_BUFSZ 1000
-        char buf[PYCBC_TRACING_BUFSZ] = {0};
-        snprintf(buf,
-                 PYCBC_TRACING_BUFSZ,
-                 "%.*s:%.*s",
-                 pycbc_strn_repr_len(FIRST),
-                 pycbc_strn_repr_buf(FIRST),
-                 pycbc_strn_repr_len(SECOND),
-                 pycbc_strn_repr_buf(SECOND));
-        pycbc_set_dict_kv_object(dict, key, buf);
+    char buf[PYCBC_TRACING_BUFSZ] = {0};
+    pycbc_strn_unmanaged buf_strn;
+    pycbc_strn_unmanaged result_strn;
+    buf_strn.content.buffer = buf;
+    buf_strn.content.length = PYCBC_TRACING_BUFSZ;
+    result_strn = pycbc_print_aggregate_raw(FIRST, SECOND, &buf_strn);
+    pycbc_set_dict_kv_strn(dict, key, result_strn.content);
+    if (result_strn.content.buffer != buf) {
+        PYCBC_FREE(result_strn.content.buffer);
+    }
+
 #undef PYCBC_TRACING_BUFSZ
 }
 
@@ -1852,31 +1897,66 @@ lcb_uint64_t pycbc_get_timeout(pycbc_Bucket *bucket, int timeout_type)
     return timeout;
 }
 
-PyObject *pycbc_set_args_from_payload_abbreviated(lcbtrace_SPAN *span,
-                                                  pycbc_Bucket *bucket)
+#define PYCBC_CONTEXT_INFO "couchbase.context_info"
+#define PYCBC_CONTEXT_INFO_FINISHED "couchbase.context_info.finished"
+
+typedef struct {
+#define FORWARD_TAG(NAME, VALUE) pycbc_strn_unmanaged NAME;
+#define FORWARD_TAG_ULL(NAME, VALUE) lcb_U64 *NAME;
+#define FORWARD_AGGREGATE(NAME, TAG_VALUE, SECOND) pycbc_strn_unmanaged NAME;
+
+#define FORWARD_TIMEOUT(NAME) lcb_U64 *NAME;
+
+#define TAG_VALUE(NAME) pycbc_strn_unmanaged NAME;
+#define FORWARD_TAG_ULL_NOPREFIX(NAME, VALUE) lcb_U64 *NAME;
+    PYCBC_X_TAG_TO_OP_CONTEXT(FORWARD_TAG,
+                              FORWARD_TAG_ULL,
+                              FORWARD_TIMEOUT,
+                              FORWARD_OP_NAME,
+                              FORWARD_AGGREGATE,
+                              TAG_VALUE,
+                              FORWARD_TAG_ULL_NOPREFIX)
+#undef FORWARD_TAG_ULL_NOPREFIX
+#undef FORWARD_TAG
+#undef FORWARD_TAG_ULL
+#undef FORWARD_TIMEOUT
+#undef FORWARD_OP_NAME
+#undef FORWARD_AGGREGATE
+#undef TAG_VALUE
+} pycbc_context_info;
+
+pycbc_context_info *pycbc_persist_context_info(lcbtrace_SPAN *span,
+                                               pycbc_Bucket *bucket)
 {
-    PyObject *dict = PyDict_New();
+    pycbc_context_info *dict;
+    if (lcbtrace_span_get_tag_uint64(
+                span, PYCBC_CONTEXT_INFO, (lcb_U64 *)&dict) == LCB_SUCCESS) {
+        return dict;
+    }
+    dict = PYCBC_CALLOC_TYPED(1, pycbc_context_info);
 
 #define FORWARD_TAG(NAME, VALUE) \
-    pycbc_forward_string_tag(    \
-            span, dict, PYCBC_ABBREV_NAME(NAME), LCBTRACE_TAG_##VALUE);
+    dict->NAME = pycbc_dupe_strn_tag(span, LCBTRACE_TAG_##VALUE);
+
 #define FORWARD_TAG_ULL(NAME, VALUE) \
-    pycbc_forward_uint64_tag(        \
-            span, dict, PYCBC_ABBREV_NAME(NAME), LCBTRACE_TAG_##VALUE);
+    dict->NAME = pycbc_dupe_uint64_tag(span, LCBTRACE_TAG_##VALUE, &dict->NAME);
 #define FORWARD_OP_NAME PYCBC_GET_STRING_TAG_BASIC(span, "opcode")
 #define FORWARD_AGGREGATE(NAME, TAG_VALUE, SECOND) \
-    pycbc_print_aggregate(dict, (TAG_VALUE), (SECOND), PYCBC_ABBREV_NAME(NAME));
+    dict->NAME.content = pycbc_invalid_strn;       \
+    dict->NAME = pycbc_print_aggregate_raw((TAG_VALUE), (SECOND), &dict->NAME);
 
-#define FORWARD_TIMEOUT(NAME)                 \
-    pycbc_set_kv_ull(dict,                    \
-                     PYCBC_ABBREV_NAME(NAME), \
-                     pycbc_get_timeout(bucket, LCB_CNTL_OP_TIMEOUT));
+#define FORWARD_TIMEOUT(NAME)                                         \
+    if (bucket) {                                                     \
+        dict->NAME = PYCBC_CALLOC_TYPED(1, lcb_U64);                  \
+        *dict->NAME = pycbc_get_timeout(bucket, LCB_CNTL_OP_TIMEOUT); \
+    }
 
 #define TAG_VALUE(NAME) PYCBC_GET_STRING_TAG_BASIC(span, LCBTRACE_TAG_##NAME)
-#define FORWARD_TAG_ULL_NOPREFIX(NAME, VALUE) \
-    pycbc_forward_uint64_tag(span, dict, PYCBC_ABBREV_NAME(NAME), VALUE);
-
-#ifdef PYCBC_GEN_OP_CONTEXT
+#define FORWARD_TAG_ULL_NOPREFIX(NAME, VALUE)    \
+    dict->NAME = PYCBC_CALLOC_TYPED(1, lcb_U64); \
+    *dict->NAME = lcbtrace_span_get_span_id(span);
+#define PYCBC_GEN_CONTEXT_INFO
+#ifdef PYCBC_GEN_CONTEXT_INFO
     PYCBC_X_TAG_TO_OP_CONTEXT(FORWARD_TAG,
                               FORWARD_TAG_ULL,
                               FORWARD_TIMEOUT,
@@ -1886,19 +1966,23 @@ PyObject *pycbc_set_args_from_payload_abbreviated(lcbtrace_SPAN *span,
                               FORWARD_TAG_ULL_NOPREFIX)
 
 #else
-    pycbc_print_aggregate(
-            dict,
-            (PYCBC_GET_STRING_TAG_BASIC(span, "couchbase.service")),
-            (PYCBC_GET_STRING_TAG_BASIC(span, "opcode")),
-            pycbc_s_abbrev);
-    pycbc_forward_string_tag(span, dict, pycbc_c_abbrev, "couchbase.local_id");
-    pycbc_forward_uint64_tag(span, dict, pycbc_i_abbrev, "couchbase.orig_id");
-    pycbc_forward_string_tag(span, dict, pycbc_b_abbrev, "db.instance");
-    pycbc_forward_string_tag(span, dict, pycbc_l_abbrev, "local.address");
-    pycbc_forward_string_tag(span, dict, pycbc_r_abbrev, "peer.address");
-    pycbc_set_kv_ull(dict, pycbc_t_abbrev, pycbc_get_timeout(bucket, 0x00));
+    dict->s.content = pycbc_invalid_strn;
+    dict->s = pycbc_print_aggregate_raw(
+            (pycbc_get_string_tag_basic_debug(
+                    "_file_name_", 1966, span, "couchbase.service")),
+            (pycbc_get_string_tag_basic_debug(
+                    "_file_name_", 1967, span, "opcode")),
+            &dict->s);
+    dict->c = pycbc_dupe_strn_tag(span, "couchbase.local_id");
+    pycbc_forward_opid_to_tag(span, dest, "couchbase.orig_id");
+    dict->b = pycbc_dupe_strn_tag(span, "db.instance");
+    dict->l = pycbc_dupe_strn_tag(span, "local.address");
+    dict->r = pycbc_dupe_strn_tag(span, "peer.address");
+    if (bucket) {
+        dict->t = calloc(1, sizeof(lcb_U64));
+        *dict->t = pycbc_get_timeout(bucket, 0x00);
+    }
 #endif
-
 
 #undef FORWARD_TAG_ULL_NOPREFIX
 #undef FORWARD_TAG
@@ -1907,6 +1991,143 @@ PyObject *pycbc_set_args_from_payload_abbreviated(lcbtrace_SPAN *span,
 #undef FORWARD_OP_NAME
 #undef FORWARD_AGGREGATE
 #undef TAG_VALUE
+    return dict;
+}
+
+void pycbc_context_info_delete(lcbtrace_SPAN *span,
+                               pycbc_context_info *context_info)
+{
+#define FORWARD_TAG(NAME, VALUE)                   \
+    PYCBC_FREE(context_info->NAME.content.buffer); \
+    context_info->NAME.content.buffer = NULL;
+#define FORWARD_TAG_ULL(NAME, VALUE) PYCBC_FREE(context_info->NAME);
+#define FORWARD_OP_NAME PYCBC_GET_STRING_TAG_BASIC(span, "opcode")
+#define FORWARD_AGGREGATE(NAME, TAG_VALUE, SECOND) FORWARD_TAG(NAME, SECOND)
+
+#define FORWARD_TIMEOUT(NAME) PYCBC_FREE(context_info->NAME);
+
+#define TAG_VALUE(NAME) NAME
+    lcbtrace_span_add_tag_uint64(
+            span, PYCBC_CONTEXT_INFO_FINISHED, (uint64_t)NULL);
+#ifdef PYCBC_GEN_OP_CONTEXT
+    PYCBC_X_TAG_TO_OP_CONTEXT(FORWARD_TAG,
+                              FORWARD_TAG_ULL,
+                              FORWARD_TIMEOUT,
+                              FORWARD_TAG,
+                              FORWARD_AGGREGATE,
+                              TAG_VALUE,
+                              FORWARD_TAG_ULL);
+#else
+    free(context_info->s.content.buffer);
+    context_info->s.content.buffer = ((void *)0);
+    free(context_info->c.content.buffer);
+    context_info->c.content.buffer = ((void *)0);
+    free(context_info->i);
+    free(context_info->b.content.buffer);
+    context_info->b.content.buffer = ((void *)0);
+    free(context_info->l.content.buffer);
+    context_info->l.content.buffer = ((void *)0);
+    free(context_info->r.content.buffer);
+    context_info->r.content.buffer = ((void *)0);
+    free(context_info->t);
+    ;
+#endif
+#undef FORWARD_TAG_ULL_NOPREFIX
+#undef FORWARD_TAG
+#undef FORWARD_TAG_ULL
+#undef FORWARD_TIMEOUT
+#undef FORWARD_OP_NAME
+#undef FORWARD_AGGREGATE
+#undef TAG_VALUE
+
+    PYCBC_FREE(context_info);
+}
+
+PyObject *pycbc_set_args_from_payload_abbreviated(lcbtrace_SPAN *span,
+                                                  pycbc_Bucket *bucket)
+{
+    PyObject *dict = PyDict_New();
+
+#define FORWARD_TAG(NAME, VALUE)                                            \
+    if (pycbc_strn_valid(context_info->NAME.content)) {                     \
+        pycbc_set_dict_kv_strn(                                             \
+                dict, PYCBC_ABBREV_NAME(NAME), context_info->NAME.content); \
+    }
+#define FORWARD_TAG_ULL(NAME, VALUE)                                           \
+    if (context_info->NAME) {                                                  \
+        pycbc_set_kv_ull(dict, PYCBC_ABBREV_NAME(NAME), LCBTRACE_TAG_##VALUE); \
+    }
+#define FORWARD_OP_NAME PYCBC_GET_STRING_TAG_BASIC(span, "opcode")
+#define FORWARD_AGGREGATE(NAME, TAG_VALUE, SECOND)                          \
+    if (pycbc_strn_valid(context_info->NAME.content)) {                     \
+        pycbc_set_dict_kv_strn(                                             \
+                dict, PYCBC_ABBREV_NAME(NAME), context_info->NAME.content); \
+    }
+
+#define FORWARD_TIMEOUT(NAME)                 \
+    pycbc_set_kv_ull(dict,                    \
+                     PYCBC_ABBREV_NAME(NAME), \
+                     pycbc_get_timeout(bucket, LCB_CNTL_OP_TIMEOUT));
+
+#define TAG_VALUE(NAME) NAME
+#define FORWARD_TAG_ULL_NOPREFIX(NAME, VALUE)                                 \
+    if (context_info->NAME) {                                                 \
+        pycbc_set_kv_ull(dict, PYCBC_ABBREV_NAME(NAME), *context_info->NAME); \
+    }
+
+    lcb_U64 context_info_u64;
+    if (!lcbtrace_span_get_tag_uint64(
+                span, PYCBC_CONTEXT_INFO, &context_info_u64) &&
+        lcbtrace_span_get_tag_uint64(
+                span, PYCBC_CONTEXT_INFO_FINISHED, &context_info_u64)) {
+        pycbc_context_info *context_info =
+                (pycbc_context_info *)context_info_u64;
+#ifdef PYCBC_GEN_OP_CONTEXT
+        PYCBC_X_TAG_TO_OP_CONTEXT(FORWARD_TAG,
+                                  FORWARD_TAG_ULL,
+                                  FORWARD_TIMEOUT,
+                                  FORWARD_OP_NAME,
+                                  FORWARD_AGGREGATE,
+                                  TAG_VALUE,
+                                  FORWARD_TAG_ULL_NOPREFIX)
+
+#else
+        if (pycbc_strn_valid(context_info->s.content)) {
+            pycbc_set_dict_kv_strn(
+                    dict, pycbc_s_abbrev, context_info->s.content);
+        }
+        if (pycbc_strn_valid(context_info->c.content)) {
+            pycbc_set_dict_kv_strn(
+                    dict, pycbc_c_abbrev, context_info->c.content);
+        }
+        if (context_info->i) {
+            pycbc_set_kv_ull(dict, pycbc_i_abbrev, *context_info->i);
+        }
+        if (pycbc_strn_valid(context_info->b.content)) {
+            pycbc_set_dict_kv_strn(
+                    dict, pycbc_b_abbrev, context_info->b.content);
+        }
+        if (pycbc_strn_valid(context_info->l.content)) {
+            pycbc_set_dict_kv_strn(
+                    dict, pycbc_l_abbrev, context_info->l.content);
+        }
+        if (pycbc_strn_valid(context_info->r.content)) {
+            pycbc_set_dict_kv_strn(
+                    dict, pycbc_r_abbrev, context_info->r.content);
+        }
+        pycbc_set_kv_ull(dict, pycbc_t_abbrev, pycbc_get_timeout(bucket, 0x00));
+#endif
+#undef FORWARD_TAG_ULL_NOPREFIX
+#undef FORWARD_TAG
+#undef FORWARD_TAG_ULL
+#undef FORWARD_TIMEOUT
+#undef FORWARD_OP_NAME
+#undef FORWARD_AGGREGATE
+#undef TAG_VALUE
+
+        pycbc_context_info_delete(span, context_info);
+    }
+
     return dict;
 }
 
@@ -2031,47 +2252,25 @@ void pycbc_forward_opid_to_tag(lcbtrace_SPAN *span, lcbtrace_SPAN *dest, const c
     lcbtrace_span_add_tag_uint64(dest, tagname, value );
 }
 
-void pycbc_propagate_context_info(lcbtrace_SPAN *span,
-                                  lcbtrace_SPAN *dest)
+void pycbc_propagate_context_info(lcbtrace_SPAN *span, lcbtrace_SPAN *dest)
 {
-#define FORWARD_TAG(NAME, VALUE) \
-    PYCBC_PROPAGATE_TAG_STR(span, dest, LCBTRACE_TAG_##VALUE);
-#define FORWARD_TAG_ULL(NAME, VALUE) \
-    pycbc_propagate_tag_ull(span, dest, LCBTRACE_TAG_##VALUE);
-#define FORWARD_OP_NAME(NAME)  pycbc_forward_opname_to_tag(span, dest);
-#define FORWARD_AGGREGATE(NAME, FIRST, SECOND) \
-    pycbc_propagate_tag_str(span, dest, FIRST);  SECOND(NAME)
+    pycbc_context_info *context_info;
+    lcb_U64 context_info_U64 = 0;
+    if (!span || !dest) {
+        return;
+    }
+    if (lcbtrace_span_get_tag_uint64(
+                span, PYCBC_CONTEXT_INFO, (lcb_U64 *)&context_info_U64) !=
+        LCB_SUCCESS) {
+        context_info = pycbc_persist_context_info(span, NULL);
+    } else {
+        context_info = (pycbc_context_info *)context_info_U64;
+    }
 
-#define FORWARD_TIMEOUT(NAME)
-#define TAG_VALUE(NAME) LCBTRACE_TAG_##NAME
-#define FORWARD_OP_ID(NAME, VALUE)            pycbc_forward_opid_to_tag(span, dest, VALUE);
-
-#ifdef PYCBC_GEN_OP_CONTEXT
-    PYCBC_X_TAG_TO_OP_CONTEXT(FORWARD_TAG,
-                              FORWARD_TAG_ULL,
-                              FORWARD_TIMEOUT,
-                              FORWARD_OP_NAME,
-                              FORWARD_AGGREGATE,
-                              TAG_VALUE,
-                              FORWARD_OP_ID)
-
-#else
-
-    PYCBC_PROPAGATE_TAG_STR(span, dest, "couchbase.service");
-    pycbc_forward_opname_to_tag(span, dest);
-    PYCBC_PROPAGATE_TAG_STR(span, dest, "couchbase.local_id");
-    pycbc_forward_opid_to_tag(span, dest, "couchbase.orig_id");
-    PYCBC_PROPAGATE_TAG_STR(span, dest, "db.instance");
-    PYCBC_PROPAGATE_TAG_STR(span, dest, "local.address");
-    PYCBC_PROPAGATE_TAG_STR(span, dest, "peer.address");
-
-#endif
-#undef FORWARD_TAG
-#undef FORWARD_TAG_ULL
-#undef FORWARD_TIMEOUT
-#undef FORWARD_OP_NAME
-#undef FORWARD_AGGREGATE
-#undef TAG_VALUE
+    lcbtrace_span_add_tag_uint64(
+            dest, PYCBC_CONTEXT_INFO, (lcb_U64)context_info);
+    lcbtrace_span_add_tag_uint64(
+            span, PYCBC_CONTEXT_INFO_FINISHED, (lcb_U64)context_info);
 }
 
 #undef TAGS

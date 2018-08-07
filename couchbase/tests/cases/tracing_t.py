@@ -36,7 +36,10 @@ import couchbase
 from functools import reduce
 from pyparsing import *
 import sys
-
+try:
+    import __builtin__ as builtins
+except:
+    import builtins
 ch = logging.StreamHandler()
 ch.setLevel(logging.WARNING)
 logging.getLogger().addHandler(ch)
@@ -351,22 +354,23 @@ class TracingTest(TracedCase):
             self.assertEqual(rvs[k].value, v if is_existing else None)
             if is_existing:
                 self.assertEqual(rvs[k].rc, 0)
-
     def verify_output(self, tracing_output):
         bucket_name = "default"
         expected_tracing = {'s': r'.+:.+', 'b': bucket_name, 'c': r'[0-9a-f]+/[0-9a-f]+', 'l': r'.+:.+', 'r': r'.+:.+',
                             't': lambda v: self.assertEqual(v, self.cb.timeout * 1000000),
-                            'i': lambda v: self.assertTrue(isinstance(v, int) or isinstance(v, long))}
+                            'i': lambda v: self.assertIn(type(v), [int,getattr(builtins,'long',None),float])}
         exceptions = []
         for label, pattern in expected_tracing.items():
-            value = tracing_output[label]
-            if isinstance(value, str):
-                try:
+            value = tracing_output.get(label)
+            try:
+                self.assertIsNotNone(value,"{label} of {output} yields None".format(label=label, output=tracing_output))
+                if isinstance(pattern, str):
                     self.assertRegex(value, pattern)
-                except Exception as e:
-                    exceptions.append(e)
-            else:
-                pattern(value)
+                else:
+                    pattern(value)
+            except Exception as e:
+                exceptions.append(e)
+                raise e
 
         if len(exceptions) > 0:
             raise self.failureException("Got exceptions: {}".format(str(exceptions)))
