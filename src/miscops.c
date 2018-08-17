@@ -107,6 +107,11 @@ handle_single_keyop, pycbc_Bucket *self, struct pycbc_common_vars *cv, int optyp
     } else {
         PYCBC_TRACECMD(ucmd.rm,context, cv->mres, curkey, self);
         err = lcb_remove3(self->instance, cv->mres, &ucmd.rm);
+        if (err) {
+#if PYCBC_GC>1
+            PYCBC_CONTEXT_DEREF(context,0);
+#endif
+        }
     }
     if (err == LCB_SUCCESS) {
         rv = 0;
@@ -116,8 +121,14 @@ handle_single_keyop, pycbc_Bucket *self, struct pycbc_common_vars *cv, int optyp
     }
 
     GT_DONE:
-    PYCBC_PYBUF_RELEASE(&keybuf);
-    return rv;
+        if (rv){
+#if PYCBC_GC>2
+            PYCBC_CONTEXT_DEREF(context,0);
+            PYCBC_CONTEXT_DEREF(context,1);
+#endif
+        }
+        PYCBC_PYBUF_RELEASE(&keybuf);
+        return rv;
 }
 
 TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
@@ -173,7 +184,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, p
         rv = PYCBC_OPUTIL_ITER_MULTI(self, seqtype, kobj, &cv, optype,
                                      handle_single_keyop, NULL, context);
     } else {
-        rv= PYCBC_TRACE_WRAP(handle_single_keyop, kwargs, self, &cv, optype, kobj, casobj, NULL, NULL, NULL);
+        rv= PYCBC_TRACE_WRAP_NOTERV(handle_single_keyop, kwargs, 1, self, &cv, optype, kobj, casobj, NULL, NULL, NULL);
     }
 
     if (rv < 0) {

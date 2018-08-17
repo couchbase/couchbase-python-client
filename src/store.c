@@ -189,6 +189,8 @@ handle_single_kv, pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
     PYCBC_TRACECMD(cmd, context, cv->mres, curkey, self);
 
     err = lcb_store3(self->instance, cv->mres, &cmd);
+
+    PYCBC_DEBUG_LOG_CONTEXT(context, "got result %d", err)
     if (err == LCB_SUCCESS) {
         rv = 0;
     } else {
@@ -198,10 +200,12 @@ handle_single_kv, pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
 
 
     GT_DONE:
-    /* Clean up our encoded keys and values */
-    PYCBC_PYBUF_RELEASE(&keybuf);
-    PYCBC_PYBUF_RELEASE(&valbuf);
-    return rv;
+
+        PYCBC_DEBUG_LOG_CONTEXT(context, "got rv %d", rv)
+        /* Clean up our encoded keys and values */
+        PYCBC_PYBUF_RELEASE(&keybuf);
+        PYCBC_PYBUF_RELEASE(&valbuf);
+        return rv;
 }
 
 static int

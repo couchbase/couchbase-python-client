@@ -173,10 +173,11 @@ complete_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *rb)
 
     mres = (pycbc_MultiResult *)resp->cookie;
     bucket = mres->parent;
-
     PYCBC_CONN_THR_END(bucket);
 
     htres = (pycbc_HttpResult*)PyDict_GetItem((PyObject*)mres, Py_None);
+    PYCBC_DEBUG_LOG_CONTEXT(htres ? htres->tracing_context : NULL,
+                            "HTTP callback")
     pycbc_httpresult_add_data(mres, htres, resp->body, resp->nbody);
     pycbc_httpresult_complete(htres, mres, resp->rc, resp->htstatus, resp->headers);
 

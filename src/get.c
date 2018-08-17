@@ -42,7 +42,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
     unsigned int lock = 0;
     struct getcmd_vars_st *gv = (struct getcmd_vars_st *)arg;
     unsigned long ttl = gv->u.ttl;
-    lcb_error_t err;
+    lcb_error_t err = LCB_SUCCESS;
     pycbc_pybuffer keybuf = { NULL };
     pycbc_stack_context_handle decoding_context = NULL;
 
@@ -53,6 +53,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
         lcb_CMDGETREPLICA rget;
     } u_cmd;
 
+    PYCBC_DEBUG_LOG_CONTEXT(context,"Started processing")
     memset(&u_cmd, 0, sizeof u_cmd);
     (void)itm;
 
@@ -161,6 +162,11 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
     }
 
     if (err != LCB_SUCCESS) {
+        PYCBC_DEBUG_LOG_CONTEXT(decoding_context, "Got result %d", err)
+#if PYCBC_GC>1
+        PYCBC_CONTEXT_DEREF(decoding_context, 0);
+        PYCBC_CONTEXT_DEREF(decoding_context, 0);
+#endif
         PYCBC_EXCTHROW_SCHED(err);
         rv = -1;
         goto GT_DONE;
@@ -169,9 +175,13 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
     }
     
     GT_DONE:
-        PYCBC_CONTEXT_DEREF(decoding_context, 0);
+        PYCBC_DEBUG_LOG_CONTEXT(decoding_context, "Got rv %d", rv)
+
+    PYCBC_CONTEXT_DEREF(decoding_context, 0);
         PYCBC_PYBUF_RELEASE(&keybuf);
-        return rv;
+    PYCBC_DEBUG_LOG_CONTEXT(context,"Finished processing")
+
+    return rv;
 }
 
 static int
@@ -306,9 +316,10 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
             handle_single_key, &gv, context);
 
     } else {
-        rv= PYCBC_TRACE_WRAP(handle_single_key, kwargs, self, &cv, optype, kobj, NULL, NULL, NULL, &gv);
+        rv= PYCBC_TRACE_WRAP_NOTERV(handle_single_key, kwargs, 1, self, &cv, optype, kobj, NULL, NULL, NULL, &gv);
     }
     if (rv < 0) {
+        PYCBC_CONTEXT_DEREF(context,0);
         goto GT_DONE;
     }
 

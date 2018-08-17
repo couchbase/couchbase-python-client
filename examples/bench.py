@@ -35,6 +35,8 @@ ap.add_argument('-U', '--connstr', default='couchbase://localhost/default',
                 help="Connection string")
 
 ap.add_argument('-p', '--password', default=None, type=str)
+ap.add_argument('-b', '--bucket', default=None, type=str)
+ap.add_argument('-u', '--user', default=None, type=str)
 
 ap.add_argument('-D', '--duration', default=10, type=int,
                 help="Duration of run (in seconds)")
@@ -70,7 +72,8 @@ class Worker(Thread):
         self.wait_time = 0
         self.opcount = 0
         connopts = { "connstr" : options.connstr,
-                     "unlock_gil": DO_UNLOCK_GIL }
+                     "unlock_gil": DO_UNLOCK_GIL,
+                     "password": options.password}
         if options.iops:
             connopts["experimental_gevent_support"] = True
 

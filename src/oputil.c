@@ -401,6 +401,7 @@ pycbc_oputil_iter_multi(pycbc_Bucket *self,
                                              (handler).name,
                                              (handler).category,
                                              NULL,
+                                             1,
                                              self,
                                              cv,
                                              optype,
@@ -490,7 +491,9 @@ pycbc_oputil_wait_common,pycbc_Bucket *self)
      */
 
     PYCBC_CONN_THR_BEGIN(self);
+    PYCBC_DEBUG_LOG_CONTEXT(context, "Beginning wait")
     lcb_wait3(self->instance, LCB_WAIT_NOCHECK);
+    PYCBC_DEBUG_LOG_CONTEXT(context, "Finished wait")
     PYCBC_CONN_THR_END(self);
 }
 

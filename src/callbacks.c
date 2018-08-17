@@ -54,8 +54,12 @@ cb_thr_begin(pycbc_Bucket *self)
     Py_DECREF(self);
 }
 
-#define CB_THR_END cb_thr_end
-#define CB_THR_BEGIN cb_thr_begin
+#define CB_THR_END                 \
+    PYCBC_DEBUG_LOG("cb_thr_end"); \
+    cb_thr_end
+#define CB_THR_BEGIN                 \
+    PYCBC_DEBUG_LOG("cb_thr_begin"); \
+    cb_thr_begin
 #else
 #define CB_THR_END(x)
 #define CB_THR_BEGIN(x)
@@ -81,14 +85,16 @@ maybe_push_operr(pycbc_MultiResult *mres, pycbc_Result *res, lcb_error_t err,
 {
 #ifdef PYCBC_TRACING
     pycbc_stack_context_handle parent_context =
-            res->tracing_context ? res->tracing_context->parent : NULL;
+            res ? (res->tracing_context ? res->tracing_context->parent : NULL)
+                : NULL;
+    PYCBC_DEBUG_LOG_CONTEXT(parent_context, "maybe_push_operr")
 #endif
     if (err == LCB_SUCCESS || mres->errop) {
         return 0;
     }
 #ifdef PYCBC_TRACING
     if (parent_context) {
-        PYCBC_DEBUG_LOG("maybe_push_operr %p", res->tracing_context);
+        PYCBC_DEBUG_LOG_CONTEXT(parent_context, "maybe_push_operr")
         pycbc_Result_propagate_context(
                 res, res->tracing_context, mres ? mres->parent : NULL);
     }
@@ -289,7 +295,7 @@ get_common_objects(const lcb_RESPBASE *resp, pycbc_Bucket **conn,
 #ifdef PYCBC_TRACING
     pycbc_Result_propagate_context(*res, parent_context, *conn);
 #endif
-    PYCBC_CONTEXT_DEREF(decoding_context, 1)
+    PYCBC_CONTEXT_DEREF(decoding_context, 1);
     if (parent_context && parent_context->is_stub) {
         PYCBC_CONTEXT_DEREF(parent_context, 1);
     }
@@ -326,7 +332,8 @@ dur_chain2(pycbc_Bucket *conn,
     lcb_CMDENDURE cmd = { 0 };
     lcb_MULTICMD_CTX *mctx = NULL;
     int is_delete = cbtype == LCB_CALLBACK_REMOVE;
-
+    PYCBC_DEBUG_LOG_CONTEXT(res ? res->tracing_context : NULL,
+                            "durability chain callback")
     res->rc = resp->rc;
     if (resp->rc == LCB_SUCCESS) {
         const lcb_MUTATION_TOKEN *mutinfo = lcb_resp_get_mutation_token(cbtype, resp);
@@ -425,7 +432,8 @@ durability_chain_common(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
         CB_THR_BEGIN(conn);
         return;
     }
-
+    PYCBC_DEBUG_LOG_CONTEXT(res ? res->tracing_context : NULL,
+                            "durability_chain_common")
     dur_chain2(conn, mres, res, cbtype, resp);
 }
 
@@ -436,13 +444,15 @@ value_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
     pycbc_Bucket *conn = NULL;
     pycbc_ValueResult *res = NULL;
     pycbc_MultiResult *mres = NULL;
-
+    PYCBC_DEBUG_LOG("Value callback")
     rv = get_common_objects(resp, &conn, (pycbc_Result**)&res, RESTYPE_VALUE,
         &mres);
 
     if (rv < 0) {
         goto GT_DONE;
     }
+    PYCBC_DEBUG_LOG_CONTEXT(res ? res->tracing_context : NULL,
+                            "Value callback continues")
 
     if (resp->rc == LCB_SUCCESS) {
         res->cas = resp->cas;
@@ -526,13 +536,15 @@ subdoc_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *rb)
     lcb_SDENTRY cur;
     size_t vii = 0, oix = 0;
     const lcb_RESPSUBDOC *resp = (const lcb_RESPSUBDOC *)rb;
-
+    PYCBC_DEBUG_LOG("Subdoc callback")
     rv = get_common_objects(rb, &conn,
         (pycbc_Result**)&res, RESTYPE_EXISTS_OK, &mres);
     if (rv < 0) {
         goto GT_ERROR;
     }
 
+    PYCBC_DEBUG_LOG_CONTEXT(res ? res->tracing_context : NULL,
+                            "Subdoc callback continues")
     if (rb->rc == LCB_SUCCESS || rb->rc == LCB_SUBDOC_MULTI_FAILURE) {
         res->cas = rb->cas;
     } else {
@@ -590,8 +602,10 @@ keyop_simple_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
     if (cbtype == LCB_CALLBACK_ENDURE) {
         optflags |= RESTYPE_EXISTS_OK;
     }
-
+    PYCBC_DEBUG_LOG("Keyop callback")
     rv = get_common_objects(resp, &conn, (pycbc_Result**)&res, optflags, &mres);
+    PYCBC_DEBUG_LOG_CONTEXT(res ? res->tracing_context : NULL,
+                            "Keyop callback continues")
 
     if (rv == 0) {
         res->rc = resp->rc;
@@ -684,6 +698,7 @@ observe_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp_base)
     pycbc_ValueResult *vres = NULL;
     pycbc_MultiResult *mres;
     const lcb_RESPOBSERVE *oresp = (const lcb_RESPOBSERVE *)resp_base;
+    PYCBC_DEBUG_LOG("observe callback")
     if (resp_base->rflags & LCB_RESP_F_FINAL) {
         mres = (pycbc_MultiResult*)resp_base->cookie;
         operation_completed_with_err_info(
@@ -693,9 +708,13 @@ observe_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp_base)
 
     rv = get_common_objects(resp_base, &conn, (pycbc_Result**)&vres,
         RESTYPE_VALUE|RESTYPE_EXISTS_OK|RESTYPE_VARCOUNT, &mres);
+
     if (rv < 0) {
         goto GT_DONE;
     }
+
+    PYCBC_DEBUG_LOG_CONTEXT(vres ? vres->tracing_context : NULL,
+                            "observe callback continues")
 
     if (resp_base->rc != LCB_SUCCESS) {
         maybe_push_operr(mres, (pycbc_Result*)vres, resp_base->rc, 0);
@@ -730,6 +749,7 @@ start_global_callback(lcb_t instance, pycbc_Bucket **selfptr)
     if (!*selfptr) {
         return 0;
     }
+    PYCBC_DEBUG_LOG("start of bootstrap callback on bucket %p", selfptr);
     CB_THR_END(*selfptr);
     Py_INCREF((PyObject *)*selfptr);
     return 1;
@@ -744,6 +764,7 @@ end_global_callback(lcb_t instance, pycbc_Bucket *self)
     if (self) {
         CB_THR_BEGIN(self);
     }
+    PYCBC_DEBUG_LOG("end of bootstrap callback on bucket %p", self);
 }
 
 static void
@@ -754,6 +775,7 @@ bootstrap_callback(lcb_t instance, lcb_error_t err)
     if (!start_global_callback(instance, &self)) {
         return;
     }
+    PYCBC_DEBUG_LOG("bootstrap callback on bucket %p", self);
     pycbc_invoke_connected_event(self, err);
     end_global_callback(instance, self);
 }
