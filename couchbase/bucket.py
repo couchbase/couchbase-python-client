@@ -229,20 +229,6 @@ class Bucket(_Base):
                   'operation_timeout (with float value) in connection string')
             strcntls['operation_timeout'] = str(float(kwargs.pop('timeout')))
 
-        # disable tracing unless it is specified as an option
-        # TODO: set to enable pending further tracing enhancements
-
-        args_list = list(args)
-        connection_string = args_list.pop(0) if args_list else kwargs.pop("connection_string", None)
-
-        if connection_string:
-            connstr = ConnectionString.parse(connection_string)
-            if 'enable_tracing' not in connstr.options.keys():
-                connstr.set_option('enable_tracing', 'false')
-            args_list.insert(0, connstr.encode())
-
-        args = tuple(args_list)
-
         if 'config_cache' in kwargs:
             _depr('config_cache keyword argument',
                   'config_cache in connection string')

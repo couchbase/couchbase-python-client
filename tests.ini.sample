@@ -15,7 +15,6 @@ bucket_password =
 
 ; Set this to true if there is a real cluster available
 enabled = True
-tracing = off
 [mock]
 ; Set this to enabled to use the mock
 enabled = True

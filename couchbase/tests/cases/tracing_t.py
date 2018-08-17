@@ -58,12 +58,12 @@ class BogusHandler:
         self.records.append(kwargs)
 
 
-class DisabledByDefaultTest(ConnectionTestCase):
+class EnabledByDefaultTest(ConnectionTestCase):
     def setUp(self, **kwargs):
-        super(DisabledByDefaultTest,self).setUp(enable_tracing=None)
+        super(EnabledByDefaultTest,self).setUp(enable_tracing=None)
 
-    def test_tracer_disabledbydefault(self):
-        self.assertFalse(self.cb.tracer)
+    def test_tracer_enabledbydefault(self):
+        self.assertTrue(self.cb.tracer)
 
 
 class CanEnableTest(ConnectionTestCase):
