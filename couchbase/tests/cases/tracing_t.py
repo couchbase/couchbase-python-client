@@ -96,6 +96,8 @@ class TimeoutTest(TracedCase):
     def test_timeout(self):
         if sys.platform == 'win32':
             raise SkipTest("To be fixed on Windows")
+        if sys.version_info >= (3,6) and sys.platform.startswith('linux') and os.environ.get("VALGRIND_REPORT_DIR"):
+            raise SkipTest("To be fixed on Linux 3.6/Valgrind")
         couchbase.enable_logging()
         bucket = self.cb
         bucket.upsert("key", "value")
@@ -114,6 +116,8 @@ class TimeoutTest(TracedCase):
         self.verify_tracer(bucket, r'.*Operations over threshold:.*', rep_factor=100)
 
     def test_orphaned(self):
+        if sys.version_info >= (3,6) and sys.platform.startswith('linux') and os.environ.get("VALGRIND_REPORT_DIR"):
+            raise SkipTest("To be fixed on Linux 3.6/Valgrind")
         bucket = self.cb
         bucket.upsert("key", "value")
 

@@ -111,7 +111,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
                                          0,
                                          context,
                                          LCBTRACE_REF_FOLLOWS_FROM,
-                                         "")
+                                         "handle_single_key::dec")
                     : NULL;
 #endif
     switch (optype) {
@@ -164,7 +164,6 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
     if (err != LCB_SUCCESS) {
         PYCBC_DEBUG_LOG_CONTEXT(decoding_context, "Got result %d", err)
 #if PYCBC_GC>1
-        PYCBC_CONTEXT_DEREF(decoding_context, 0);
         PYCBC_CONTEXT_DEREF(decoding_context, 0);
 #endif
         PYCBC_EXCTHROW_SCHED(err);
@@ -319,7 +318,11 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
         rv= PYCBC_TRACE_WRAP_NOTERV(handle_single_key, kwargs, 1, self, &cv, optype, kobj, NULL, NULL, NULL, &gv);
     }
     if (rv < 0) {
-        PYCBC_CONTEXT_DEREF(context,0);
+        if (cv.is_seqcmd && cv.sched_cmds) {
+            cv.ncmds = cv.sched_cmds;
+            PYCBC_STASH_EXCEPTION(PYCBC_TRACE_WRAP(
+                    pycbc_common_vars_wait, kwargs, &cv, self));
+        }
         goto GT_DONE;
     }
 

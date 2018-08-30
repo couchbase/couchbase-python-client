@@ -547,7 +547,8 @@ size_t pycbc_strn_len(const pycbc_strn buf)
 
 int pycbc_strn_repr_len(const pycbc_strn buf)
 {
-    return pycbc_strn_valid(buf) ? buf.length : sizeof_array(PYCBC_UNKNOWN);
+    return (int)(pycbc_strn_valid(buf) ? buf.length
+                                       : sizeof_array(PYCBC_UNKNOWN));
 }
 
 const char *pycbc_strn_repr_buf(const pycbc_strn buf)
@@ -934,6 +935,16 @@ void pycbc_Context_dec_ref_count(pycbc_stack_context_handle context)
     context->ref_count--;
 }
 
+#ifdef PYCBC_DEBUG
+#define PYCBC_CONTEXT_DEC_REF_COUNT(CONTEXT)      \
+    PYCBC_DEBUG_LOG_CONTEXT(CONTEXT, "Dereffing") \
+    pycbc_Context_dec_ref_count(CONTEXT);         \
+    PYCBC_DEBUG_LOG_CONTEXT(CONTEXT, "Dereffed")
+#else
+#define PYCBC_CONTEXT_DEC_REF_COUNT(CONTEXT) \
+    pycbc_Context_dec_ref_count(CONTEXT);
+#endif
+
 void pycbc_ref_context(pycbc_stack_context_handle parent_context)
 {
     if (parent_context) {
@@ -950,16 +961,27 @@ pycbc_stack_context_handle pycbc_Context_deref_debug(
         int dealloc_children,
         pycbc_stack_context_handle from_context)
 {
+    pycbc_stack_context_handle bottom_most_relative;
     PYCBC_DEBUG_LOG_WITH_FILE_FUNC_LINE_CONTEXT_NEWLINE(
             file,
             func,
             line,
             context,
-            "dereffing %p, %s",
+            "****** dereffing %p, %s",
             context,
             should_be_final ? "should be final" : "not necessarily final");
-    return pycbc_Context_deref(
+    bottom_most_relative = pycbc_Context_deref(
             context, should_be_final, dealloc_children, from_context);
+    PYCBC_DEBUG_LOG_WITH_FILE_FUNC_LINE_CONTEXT_NEWLINE(
+            file,
+            func,
+            line,
+            context,
+            "****** dereffed %p, %s, got %p",
+            context,
+            should_be_final ? "should be final" : "not necessarily final",
+            bottom_most_relative);
+    return bottom_most_relative;
 }
 
 void pycbc_Context__dtor(pycbc_stack_context_handle context)
@@ -978,7 +1000,9 @@ void pycbc_Context__dtor(pycbc_stack_context_handle context)
 #endif
         }
     }
+#ifdef PYCBC_FREE_CONTEXTS
     PYCBC_FREE(context);
+#endif
 }
 
 #define PYCBC_CONTEXT_DTOR(CONTEXT)                              \
@@ -1032,7 +1056,9 @@ int pycbc_unregister_child_context(pycbc_stack_context_handle from_context)
                 return -1;
             }
         }
+#ifdef PYCBC_FREE_ACCOUNTING
         PYCBC_FREE(current_node);
+#endif
         if (current_node == context->children) {
             context->children = NULL;
         }
@@ -1112,10 +1138,10 @@ pycbc_stack_context_handle pycbc_Context_deref(
 #ifdef PYCBC_STRICT
             abort();
 #endif
-            return context;
+            return NULL;
         }
 
-        pycbc_Context_dec_ref_count(context);
+        PYCBC_CONTEXT_DEC_REF_COUNT(context);
         if (PYCBC_CONTEXT_GET_REF_COUNT(context) == 0) {
 #ifdef PYCBC_REF_ACCOUNTING
             if (account_for_children &&
@@ -1127,6 +1153,7 @@ pycbc_stack_context_handle pycbc_Context_deref(
                 abort();
 #endif
             }
+#endif
             parent = context->parent;
             if (parent) {
 #ifdef PYCBC_REF_ACCOUNTING
@@ -1134,8 +1161,6 @@ pycbc_stack_context_handle pycbc_Context_deref(
 #endif
                 pycbc_Context_deref(parent, 0, 0, context);
             }
-
-#endif
             PYCBC_CONTEXT_DTOR(context);
         } else {
 #ifdef PYCBC_REF_ACCOUNTING
@@ -1434,7 +1459,7 @@ pycbc_stack_context_handle pycbc_Tracer_start_span(
 pycbc_stack_context_handle pycbc_Result_start_context(
         pycbc_stack_context_handle parent_context,
         PyObject *hkey,
-        char *component,
+        const char *component,
         char *operation)
 {
     pycbc_stack_context_handle stack_context_handle = NULL;

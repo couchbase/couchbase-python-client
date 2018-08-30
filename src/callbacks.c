@@ -185,7 +185,12 @@ static void operation_completed_with_err_info(pycbc_Bucket *self,
 {
     pycbc_enhanced_err_info *err_info =
             pycbc_enhanced_err_info_store(resp, cbtype);
-    PYCBC_CONTEXT_DEREF(PYCBC_RESULT_EXTRACT_CONTEXT(res), 0);
+    pycbc_stack_context_handle context = PYCBC_RESULT_EXTRACT_CONTEXT(res);
+    PYCBC_DEBUG_LOG("Completed context %p with %p, nremaining is %d",
+                    context,
+                    res ? (PyObject *)res : NULL,
+                    self ? self->nremaining : 0)
+    PYCBC_CONTEXT_DEREF(context, 0);
     operation_completed3(self, mres, err_info);
     Py_XDECREF(err_info);
 }
@@ -211,9 +216,11 @@ get_common_objects(const lcb_RESPBASE *resp, pycbc_Bucket **conn,
     PyObject *hkey;
     PyObject *mrdict;
     int rv;
+    PyObject *pycbc_err[3] = {0};
 #ifdef PYCBC_TRACING
     pycbc_stack_context_handle parent_context = NULL;
     pycbc_stack_context_handle decoding_context = NULL;
+    int was_tracing_stub = 0;
 #endif
     pycbc_assert(pycbc_multiresult_check(resp->cookie));
     *mres = (pycbc_MultiResult*)resp->cookie;
@@ -227,86 +234,106 @@ get_common_objects(const lcb_RESPBASE *resp, pycbc_Bucket **conn,
         pycbc_multiresult_adderr(*mres);
         return -1;
     }
-
-    mrdict = pycbc_multiresult_dict(*mres);
-    *res = (pycbc_Result*)PyDict_GetItem(mrdict, hkey);
+    pycbc_store_error(pycbc_err);
+    {
+        mrdict = pycbc_multiresult_dict(*mres);
+        *res = (pycbc_Result *)PyDict_GetItem(mrdict, hkey);
 
 #ifdef PYCBC_TRACING
-    parent_context = PYCBC_MULTIRESULT_EXTRACT_CONTEXT(*mres, hkey, res);
-    decoding_context =
-            pycbc_Result_start_context(parent_context,
-                                       hkey,
-                                       "get_common_objects",
-                                       LCBTRACE_OP_RESPONSE_DECODING);
+        parent_context = PYCBC_MULTIRESULT_EXTRACT_CONTEXT(*mres, hkey, res);
+        decoding_context =
+                pycbc_Result_start_context(parent_context,
+                                           hkey,
+                                           "get_common_objects",
+                                           LCBTRACE_OP_RESPONSE_DECODING);
 #endif
-    if (*res) {
-        int exists_ok = (restype & RESTYPE_EXISTS_OK) ||
-                ( (*mres)->mropts & PYCBC_MRES_F_UALLOCED);
+        if (*res) {
+            int exists_ok = (restype & RESTYPE_EXISTS_OK) ||
+                            ((*mres)->mropts & PYCBC_MRES_F_UALLOCED);
+            was_tracing_stub = (*res)->is_tracing_stub;
 
-        if (!exists_ok) {
-            if ((*conn)->flags & PYCBC_CONN_F_WARNEXPLICIT) {
-                PyErr_WarnExplicit(PyExc_RuntimeWarning,
-                                   "Found duplicate key",
-                                   __FILE__, __LINE__,
-                                   "couchbase._libcouchbase",
-                                   NULL);
+            if (!exists_ok) {
+                if ((*conn)->flags & PYCBC_CONN_F_WARNEXPLICIT) {
+                    PyErr_WarnExplicit(PyExc_RuntimeWarning,
+                                       "Found duplicate key",
+                                       __FILE__,
+                                       __LINE__,
+                                       "couchbase._libcouchbase",
+                                       NULL);
+
+                } else {
+                    PyErr_WarnEx(
+                            PyExc_RuntimeWarning, "Found duplicate key", 1);
+                }
+                /**
+                 * We need to destroy the existing object and re-create it.
+                 */
+                PyDict_DelItem(mrdict, hkey);
+                *res = NULL;
 
             } else {
-                PyErr_WarnEx(PyExc_RuntimeWarning,
-                             "Found duplicate key",
-                             1);
+                Py_XDECREF(hkey);
             }
-            /**
-             * We need to destroy the existing object and re-create it.
-             */
-            PyDict_DelItem(mrdict, hkey);
-            *res = NULL;
+            }
 
-        } else {
-            Py_XDECREF(hkey);
-        }
-    }
+            if (*res == NULL) {
+                /* Now, get/set the result object */
+                if ((*mres)->mropts & PYCBC_MRES_F_ITEMS) {
+                    PYCBC_DEBUG_LOG("Item creation");
+                    *res = (pycbc_Result *)pycbc_item_new(*conn);
+                } else if (restype & RESTYPE_BASE) {
+                    PYCBC_DEBUG_LOG("Result creation");
+                    *res = (pycbc_Result *)pycbc_result_new(*conn);
 
-    if (*res == NULL) {
-        /* Now, get/set the result object */
-        if ((*mres)->mropts & PYCBC_MRES_F_ITEMS) {
-            PYCBC_DEBUG_LOG("Item creation");
-            *res = (pycbc_Result *) pycbc_item_new(*conn);
-        } else if (restype & RESTYPE_BASE) {
-            PYCBC_DEBUG_LOG("Result creation");
-            *res = (pycbc_Result *) pycbc_result_new(*conn);
+                } else if (restype & RESTYPE_OPERATION) {
+                    PYCBC_DEBUG_LOG("Opresult creation");
+                    *res = (pycbc_Result *)pycbc_opresult_new(*conn);
 
-        } else if (restype & RESTYPE_OPERATION) {
-            PYCBC_DEBUG_LOG("Opresult creation");
-            *res = (pycbc_Result *) pycbc_opresult_new(*conn);
-
-        } else if (restype & RESTYPE_VALUE) {
-            PYCBC_DEBUG_LOG("Valresult creation");
-            *res = (pycbc_Result *) pycbc_valresult_new(*conn);
-        }
-        PYCBC_EXCEPTION_LOG_NOCLEAR;
-        if (*res == NULL){
-            abort();
-        }
-        PyDict_SetItem(mrdict, hkey, (PyObject*)*res);
-        (*res)->key = hkey;
-        PYCBC_DECREF(*res);
-    }
+                } else if (restype & RESTYPE_VALUE) {
+                    PYCBC_DEBUG_LOG("Valresult creation");
+                    *res = (pycbc_Result *)pycbc_valresult_new(*conn);
+                } else {
+                    *res = (pycbc_Result *)pycbc_result_new(*conn);
+                    if ((*conn)->nremaining) {
+                        --(*conn)->nremaining;
+                    }
+                }
+                if (*res) {
+                    PyDict_SetItem(mrdict, hkey, (PyObject *)*res);
+                    (*res)->key = hkey;
+                    PYCBC_DECREF(*res);
+                } else {
+                    abort();
+                }
+            }
 #ifdef PYCBC_TRACING
-    pycbc_Result_propagate_context(*res, parent_context, *conn);
+            if (res && *res) {
+                pycbc_Result_propagate_context(*res, parent_context, *conn);
+            }
 #endif
-    PYCBC_CONTEXT_DEREF(decoding_context, 1);
-    if (parent_context && parent_context->is_stub) {
-        PYCBC_CONTEXT_DEREF(parent_context, 1);
-    }
-    if (resp->rc) {
-        (*res)->rc = resp->rc;
-    }
+            PYCBC_CONTEXT_DEREF(decoding_context, 1);
+            if (parent_context && parent_context->is_stub) {
+                PYCBC_CONTEXT_DEREF(parent_context, 1);
+            }
+            if (resp->rc && res && *res) {
+                (*res)->rc = resp->rc;
+            }
 
-    if (resp->rc != LCB_SUCCESS) {
-        (*mres)->all_ok = 0;
+            if (resp->rc != LCB_SUCCESS) {
+                (*mres)->all_ok = 0;
+            }
     }
+#define PYCBC_RESTORE_PRE_CONTEXT_ERROR
+    if (pycbc_err[0] || pycbc_err[1] || pycbc_err[2]) {
+#ifdef PYCBC_RESTORE_PRE_CONTEXT_ERROR
+        pycbc_fetch_error(pycbc_err);
+#else
 
+        PYCBC_XDECREF(pycbc_err[0]);
+        PYCBC_XDECREF(pycbc_err[1]);
+        PYCBC_XDECREF(pycbc_err[2]);
+#endif
+    }
     return 0;
 }
 
@@ -419,7 +446,7 @@ durability_chain_common(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
     pycbc_OperationResult *res = NULL;
     pycbc_MultiResult *mres;
     int restype = RESTYPE_VARCOUNT;
-
+    PYCBC_DEBUG_LOG("Durability chain callback")
     if (cbtype == LCB_CALLBACK_COUNTER) {
         restype |= RESTYPE_VALUE;
     } else {
@@ -429,6 +456,8 @@ durability_chain_common(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
     if (get_common_objects(resp, &conn, (pycbc_Result**)&res, restype, &mres) != 0) {
         operation_completed_with_err_info(
                 conn, mres, cbtype, resp, (pycbc_Result *)res);
+        PYCBC_DEBUG_LOG("Durability chain returning")
+
         CB_THR_BEGIN(conn);
         return;
     }
@@ -914,7 +943,59 @@ static void diag_callback(lcb_t instance,
     CB_THR_BEGIN(parent);
 }
 
+void pycbc_generic_cb(lcb_t instance,
+                      int cbtype,
+                      const lcb_RESPBASE *rb,
+                      const char *NAME)
+{
+    const lcb_RESPCOUNTER *resp = (const lcb_RESPCOUNTER *)rb;
+    int rv;
+    int optflags = RESTYPE_OPERATION;
+    pycbc_Bucket *conn = NULL;
+    pycbc_OperationResult *res = NULL;
+    pycbc_MultiResult *mres = NULL;
 
+    PYCBC_DEBUG_LOG("%s callback", NAME)
+    rv = get_common_objects((const lcb_RESPBASE *)resp,
+                            &conn,
+                            (pycbc_Result **)&res,
+                            optflags,
+                            &mres);
+    PYCBC_DEBUG_LOG_CONTEXT(
+            res ? res->tracing_context : NULL, "%s callback continues", NAME)
+
+    if (rv == 0) {
+        res->rc = resp->rc;
+        maybe_push_operr(mres, (pycbc_Result *)res, resp->rc, 0);
+    }
+
+    operation_completed_with_err_info(conn,
+                                      mres,
+                                      cbtype,
+                                      (const lcb_RESPBASE *)resp,
+                                      (pycbc_Result *)res);
+    CB_THR_BEGIN(conn);
+    (void)instance;
+}
+
+#define PYCBC_CALLBACK_GENERIC(NAME)                                   \
+    void NAME##_cb(lcb_t instance, int cbtype, const lcb_RESPBASE *rb) \
+    {                                                                  \
+        pycbc_generic_cb(instance, cbtype, rb, #NAME);                 \
+    }
+
+#ifdef PYCBC_EXTRA_CALLBACK_WRAPPERS
+#define PYCBC_FOR_EACH_GEN_CALLBACK(X) \
+    X(LCB_CALLBACK_VERSIONS)           \
+    X(LCB_CALLBACK_VERBOSITY)          \
+    X(LCB_CALLBACK_FLUSH)              \
+    X(LCB_CALLBACK_CBFLUSH)            \
+    X(LCB_CALLBACK_OBSEQNO)            \
+    X(LCB_CALLBACK_STOREDUR)           \
+    X(LCB_CALLBACK_COUNTER)
+
+PYCBC_FOR_EACH_GEN_CALLBACK(PYCBC_CALLBACK_GENERIC)
+#endif
 
 void
 pycbc_callbacks_init(lcb_t instance)
@@ -931,7 +1012,11 @@ pycbc_callbacks_init(lcb_t instance)
     lcb_install_callback3(instance, LCB_CALLBACK_STATS, stats_callback);
     lcb_install_callback3(instance, LCB_CALLBACK_PING, ping_callback);
     lcb_install_callback3(instance, LCB_CALLBACK_DIAG, diag_callback);
-
+#ifdef PYCBC_EXTRA_CALLBACK_WRAPPERS
+#define X(NAME) lcb_install_callback3(instance, NAME, NAME##_cb);
+    PYCBC_FOR_EACH_GEN_CALLBACK(X)
+#undef X
+#endif
     /* Subdoc */
     lcb_install_callback3(instance, LCB_CALLBACK_SDLOOKUP, subdoc_callback);
     lcb_install_callback3(instance, LCB_CALLBACK_SDMUTATE, subdoc_callback);

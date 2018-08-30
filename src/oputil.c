@@ -65,7 +65,9 @@ pycbc_common_vars_wait, struct pycbc_common_vars *cv, pycbc_Bucket *self)
     PYCBC_TRACE_WRAP_VOID(pycbc_oputil_wait_common, NULL, self);
 
     if (!pycbc_assert(self->nremaining == 0)) {
-        fprintf(stderr, "Remaining count != 0. Adjusting");
+        fprintf(stderr,
+                "Remaining count %d!= 0. Adjusting",
+                (int)self->nremaining);
         self->nremaining = 0;
     }
 
@@ -95,6 +97,7 @@ pycbc_common_vars_init(struct pycbc_common_vars *cv,
     }
 
     cv->ncmds = ncmds;
+    cv->sched_cmds = 0;
     cv->mres = (pycbc_MultiResult*)pycbc_multiresult_new(self);
     cv->argopts = argopts;
 
@@ -364,17 +367,15 @@ pycbc_oputil_iter_multi(pycbc_Bucket *self,
 {
     int rv = 0;
     int ii;
+    Py_ssize_t orig_ncmds = cv->ncmds;
     PyObject *iterobj;
     PyObject *seqobj;
     Py_ssize_t dictpos = 0;
-
     seqobj = pycbc_oputil_iter_prepare(seqtype, collection, &iterobj, &dictpos);
     if (seqobj == NULL) {
         return -1;
     }
-
-    for (ii = 0; ii < cv->ncmds; ii++) {
-
+    for (ii = 0; ii < orig_ncmds; ii++) {
         PyObject *k, *v = NULL, *options = NULL;
         PyObject *arg_k = NULL;
         pycbc_Item *itm = NULL;
@@ -421,6 +422,7 @@ pycbc_oputil_iter_multi(pycbc_Bucket *self,
         if (rv == -1) {
             break;
         }
+        ++cv->sched_cmds;
     }
 
     Py_XDECREF(iterobj);

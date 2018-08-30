@@ -81,6 +81,7 @@ struct pycbc_common_vars {
 
     Py_ssize_t ncmds;
 
+    Py_ssize_t sched_cmds;
     /**
      * Whether this command is expected to be received in sequence with a
      * 'NUL' delimiter. If so, the remaining count will be modified by one

@@ -107,11 +107,6 @@ handle_single_keyop, pycbc_Bucket *self, struct pycbc_common_vars *cv, int optyp
     } else {
         PYCBC_TRACECMD(ucmd.rm,context, cv->mres, curkey, self);
         err = lcb_remove3(self->instance, cv->mres, &ucmd.rm);
-        if (err) {
-#if PYCBC_GC>1
-            PYCBC_CONTEXT_DEREF(context,0);
-#endif
-        }
     }
     if (err == LCB_SUCCESS) {
         rv = 0;
@@ -121,12 +116,6 @@ handle_single_keyop, pycbc_Bucket *self, struct pycbc_common_vars *cv, int optyp
     }
 
     GT_DONE:
-        if (rv){
-#if PYCBC_GC>2
-            PYCBC_CONTEXT_DEREF(context,0);
-            PYCBC_CONTEXT_DEREF(context,1);
-#endif
-        }
         PYCBC_PYBUF_RELEASE(&keybuf);
         return rv;
 }
@@ -188,19 +177,24 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, p
     }
 
     if (rv < 0) {
+        PYCBC_DEBUG_LOG_CONTEXT(context, "Got error from keyops")
         goto GT_DONE;
     }
 
     if (optype == PYCBC_CMD_DELETE) {
         rv = pycbc_handle_durability_args(self, &cv.mres->dur,
                                           persist_to, replicate_to);
+        PYCBC_DEBUG_LOG_CONTEXT(
+                context, "Handling delete durability, got rv %d", rv)
         if (rv == 1) {
             cv.mres->mropts |= PYCBC_MRES_F_DURABILITY;
 
         } else if (rv == -1) {
+            PYCBC_DEBUG_LOG_CONTEXT(context, "Problems with durability")
             goto GT_DONE;
         }
         if (pycbc_maybe_set_quiet(cv.mres, is_quiet) == -1) {
+            PYCBC_DEBUG_LOG_CONTEXT(context, "Problems with maybe_set_quiet")
             goto GT_DONE;
         }
     }

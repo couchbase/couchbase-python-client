@@ -165,11 +165,22 @@ arithmetic_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
     return cv.ret;
 }
 
-#define DECLFUNC(name, operation, mode) \
-    PyObject *pycbc_Bucket_##name(pycbc_Bucket *self, \
-                                      PyObject *args, PyObject *kwargs) { \
-    return arithmetic_common(self, args, kwargs, operation, mode, PYCBC_TRACE_GET_STACK_CONTEXT_TOPLEVEL(kwargs, LCBTRACE_OP_REQUEST_ENCODING, self->tracer, "bucket." #name)); \
-}
+#define DECLFUNC(name, operation, mode)                           \
+    PyObject *pycbc_Bucket_##name(                                \
+            pycbc_Bucket *self, PyObject *args, PyObject *kwargs) \
+    {                                                             \
+        PyObject *result;                                         \
+        PYCBC_TRACE_WRAP_TOPLEVEL(result,                         \
+                                  LCBTRACE_OP_REQUEST_ENCODING,   \
+                                  arithmetic_common,              \
+                                  self->tracer,                   \
+                                  self,                           \
+                                  args,                           \
+                                  kwargs,                         \
+                                  operation,                      \
+                                  mode);                          \
+        return result;                                            \
+    }
 
 DECLFUNC(counter, PYCBC_CMD_COUNTER, PYCBC_ARGOPT_SINGLE)
 DECLFUNC(counter_multi, PYCBC_CMD_COUNTER, PYCBC_ARGOPT_MULTI)

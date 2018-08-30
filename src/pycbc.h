@@ -19,6 +19,7 @@
  * This file contains the base header for the Python Couchbase Client
  * @author Mark Nunberg
  */
+#define PYCBC_FREE_CONTEXTS
 #define PYCBC_REF_ACCOUNTING_ENABLE
 #ifdef PYCBC_REF_ACCOUNTING_ENABLE
 #define PYCBC_REF_ACCOUNTING
@@ -39,9 +40,6 @@
 #define __FUNCTION_NAME__ __func__
 #endif
 #endif
-
-
-#define PYCBC_TABBED_CONTEXTS_ENABLE
 
 typedef struct pycbc_stack_context_decl *pycbc_stack_context_handle;
 
@@ -654,7 +652,7 @@ int pycbc_is_async_or_pipeline(const pycbc_Bucket *self);
 pycbc_stack_context_handle pycbc_Result_start_context(
         pycbc_stack_context_handle parent_context,
         PyObject *hkey,
-        char *component,
+        const char *component,
         char *operation);
 void pycbc_Result_propagate_context(pycbc_Result_t *res,
                                     pycbc_stack_context_handle parent_context,
@@ -814,7 +812,7 @@ void pycbc_Tracer_set_child(pycbc_Tracer_t *pTracer, lcbtrace_TRACER *pTRACER);
             PYCBC_DEBUG_LOG("setting trace span on %.*s\n",        \
                             (int)(CMD).key.contig.nbytes,          \
                             (const char *)(CMD).key.contig.bytes); \
-            if (1) {                                               \
+            if (0) {                                               \
                 PYCBC_REF_CONTEXT(CONTEXT);                        \
             }                                                      \
             LCB_CMD_SET_TRACESPAN(&(CMD), (CONTEXT)->span);        \
@@ -822,6 +820,12 @@ void pycbc_Tracer_set_child(pycbc_Tracer_t *pTracer, lcbtrace_TRACER *pTRACER);
             PYCBC_EXCEPTION_LOG_NOCLEAR;                           \
         }                                                          \
     }
+#define PYCBC_TRACECMD_SCOPED(                                          \
+        RV, SCOPE, COMMAND, INSTANCE, HANDLE, CONTEXT, ...)             \
+    if (PYCBC_CHECK_CONTEXT(CONTEXT)) {                                 \
+        lcb_##SCOPE##_set_parent_span(INSTANCE, HANDLE, CONTEXT->span); \
+    }                                                                   \
+    RV = lcb_##SCOPE##_##COMMAND(INSTANCE, __VA_ARGS__)
 
 #define PYCBC_TRACECMD(CMD, CONTEXT, MRES, CURKEY, BUCKET) \
     PYCBC_TRACECMD_PURE(CMD, CONTEXT);                     \
@@ -863,13 +867,8 @@ int pycbc_wrap_and_pop_debug(const char *FILE,
                              int result);
 
 #define PYCBC_WRAP_AND_POP(CONTEXT, RESULT, NAME, NOTERV) \
-    pycbc_wrap_and_pop_debug(__FILE__,                    \
-                             __LINE__,                    \
-                             __FUNCTION__,                \
-                             #NAME,                       \
-                             CONTEXT,                     \
-                             NOTERV,                      \
-                             (RESULT))
+    pycbc_wrap_and_pop_debug(                             \
+            __FILE__, __LINE__, __FUNCTION__, NAME, CONTEXT, NOTERV, (RESULT))
 
 #define PYCBC_TRACE_WRAP_EXPLICIT_NAMED(                                       \
         CONTEXT, NAME, COMPONENTNAME, CATEGORY, KWARGS, NOTERV, ...)           \
@@ -878,8 +877,8 @@ int pycbc_wrap_and_pop_debug(const char *FILE,
                             pycbc_logging_monad(__FILE__,                      \
                                                 __LINE__,                      \
                                                 __FUNCTION__,                  \
-                                                #NAME,                         \
-                                                 pycbc_Tracer_start_span(      \
+                                                COMPONENTNAME,                 \
+                                                pycbc_Tracer_start_span(       \
                                                         self->tracer,          \
                                                         KWARGS,                \
                                                         CATEGORY,              \
@@ -887,7 +886,7 @@ int pycbc_wrap_and_pop_debug(const char *FILE,
                                                         &(CONTEXT),            \
                                                         LCBTRACE_REF_CHILD_OF, \
                                                         COMPONENTNAME))),      \
-                       NAME,                                                   \
+                       COMPONENTNAME,                                          \
                        NOTERV)
 
 #define PYCBC_TRACE_WRAP_NOTERV(NAME, KWARGS, NOTERV, ...) \
@@ -910,7 +909,7 @@ int pycbc_wrap_and_pop_debug(const char *FILE,
                      __FILE__,                                      \
                      __LINE__,                                      \
                      __FUNCTION__,                                  \
-                     #NAME,                                         \
+                     COMPONENTNAME,                                 \
                      pycbc_Tracer_start_span(self->tracer,          \
                                              KWARGS,                \
                                              CATEGORY,              \
@@ -918,7 +917,7 @@ int pycbc_wrap_and_pop_debug(const char *FILE,
                                              &context,              \
                                              LCBTRACE_REF_CHILD_OF, \
                                              COMPONENTNAME)));      \
-        PYCBC_WRAP_AND_POP(&context, 0, NAME, 0);                   \
+        PYCBC_WRAP_AND_POP(&context, 0, COMPONENTNAME, 0);          \
     }
 #define PYCBC_TRACE_WRAP_VOID(NAME, KWARGS, ...) \
     PYCBC_TRACE_WRAP_EXPLICIT_NAMED_VOID(        \
@@ -928,12 +927,6 @@ int pycbc_wrap_and_pop_debug(const char *FILE,
     PYCBC_TRACE_WRAP_TOPLEVEL_WITHNAME(                            \
             RV, CATEGORY, NAME, TRACER, #NAME, __VA_ARGS__)
 
-#define PYCBC_TRACECMD_SCOPED(                                          \
-        RV, SCOPE, COMMAND, INSTANCE, HANDLE, CONTEXT, ...)             \
-    if (PYCBC_CHECK_CONTEXT(CONTEXT)) {                                 \
-        lcb_##SCOPE##_set_parent_span(INSTANCE, HANDLE, CONTEXT->span); \
-    }                                                                   \
-    RV = lcb_##SCOPE##_##COMMAND(INSTANCE, __VA_ARGS__)
 
 #else
 
