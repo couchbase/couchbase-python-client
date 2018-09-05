@@ -334,12 +334,38 @@ set_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
         rv = PYCBC_OPUTIL_ITER_MULTI(self, seqtype, dict, &cv, 0, handle_single_kv, &scv, context);
 
     } else {
-        rv = handle_single_kv(self, &cv, 0, key, value, NULL, NULL, &scv, context);
+        rv = PYCBC_TRACE_WRAP_NOTERV(handle_single_kv,
+                                     kwargs,
+                                     0,
+                                     &cv,
+                                     self,
+                                     &cv,
+                                     0,
+                                     key,
+                                     value,
+                                     NULL,
+                                     NULL,
+                                     &scv);
+#ifndef PYCBC_GLOBAL_SCHED
+        if (!rv) {
+            cv.sched_cmds++;
+        }
+#endif
     }
 
     if (rv < 0) {
+        if (cv.sched_cmds) {
+            cv.ncmds = cv.sched_cmds;
+            PYCBC_STASH_EXCEPTION(PYCBC_TRACE_WRAP(
+                    pycbc_common_vars_wait, kwargs, &cv, self));
+        }
         goto GT_DONE;
     }
+    PYCBC_DEBUG_LOG_CONTEXT(context,
+                            "Got rv %d, cv.is_seqcmd %d and cv.sched_cmds %d",
+                            rv,
+                            cv.is_seqcmd,
+                            cv.sched_cmds)
 
     if (-1 == PYCBC_TRACE_WRAP(pycbc_common_vars_wait, kwargs, &cv, self)) {
         goto GT_DONE;

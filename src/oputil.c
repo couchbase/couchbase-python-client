@@ -371,6 +371,7 @@ pycbc_oputil_iter_multi(pycbc_Bucket *self,
     PyObject *iterobj;
     PyObject *seqobj;
     Py_ssize_t dictpos = 0;
+    cv->sched_cmds = 0;
     seqobj = pycbc_oputil_iter_prepare(seqtype, collection, &iterobj, &dictpos);
     if (seqobj == NULL) {
         return -1;
@@ -403,6 +404,8 @@ pycbc_oputil_iter_multi(pycbc_Bucket *self,
                                              (handler).category,
                                              NULL,
                                              1,
+                                             cv,
+                                             self,
                                              self,
                                              cv,
                                              optype,
@@ -422,9 +425,8 @@ pycbc_oputil_iter_multi(pycbc_Bucket *self,
         if (rv == -1) {
             break;
         }
-        ++cv->sched_cmds;
     }
-
+    PYCBC_DEBUG_LOG_CONTEXT(context, "Scheduled %d cmds", cv->sched_cmds)
     Py_XDECREF(iterobj);
     return rv;
 }
@@ -638,6 +640,12 @@ sd_convert_spec(PyObject *pyspec, lcb_SDSPEC *sdspec,
     return -1;
 }
 
+#ifdef PYCBC_GLOBAL_SCHED
+#ifndef PYCBC_GLOBAL_SCHED_SD_DISABLE
+#define PYCBC_GLOBAL_SCHED_SD
+#endif
+#endif
+
 TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,, int,
 pycbc_sd_handle_speclist, pycbc_Bucket *self, pycbc_MultiResult *mres,
     PyObject *key, PyObject *spectuple, lcb_CMDSUBDOC *cmd)
@@ -695,11 +703,13 @@ pycbc_sd_handle_speclist, pycbc_Bucket *self, pycbc_MultiResult *mres,
         PYCBC_TRACECMD_PURE((*cmd), context);
 #ifdef PYCBC_TRACING
         newitm->tracing_context = context;
-        PYCBC_REF_CONTEXT(context);
         newitm->is_tracing_stub = 0;
 #endif
         err = lcb_subdoc3(self->instance, mres, cmd);
         if (err == LCB_SUCCESS) {
+#ifdef PYCBC_GLOBAL_SCHED_SD
+            PYCBC_REF_CONTEXT(context);
+#endif
             PyDict_SetItem((PyObject*)mres, key, (PyObject*)newitm);
             pycbc_assert(Py_REFCNT(newitm) == 2);
         }
@@ -709,6 +719,13 @@ pycbc_sd_handle_speclist, pycbc_Bucket *self, pycbc_MultiResult *mres,
     {
         size_t ii;
         for (ii = 0; nspecs > 0 && ii < (size_t) nspecs; ++ii) {
+#ifdef PYCBC_TRACING
+#ifdef PYCBC_GLOBAL_SCHED_SD
+            if (!err) {
+                PYCBC_REF_CONTEXT(context);
+            }
+#endif
+#endif
             PYCBC_PYBUF_RELEASE(pathbufs + ii);
             PYCBC_PYBUF_RELEASE(valbufs + ii);
         }

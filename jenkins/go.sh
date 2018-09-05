@@ -71,6 +71,7 @@ if [ -n "${PYCBC_VALGRIND}" ]; then
     export VALGRIND_REPORT_DIR="build/valgrind/${PYCBC_VALGRIND}"
     mkdir -p $VALGRIND_REPORT_DIR
     valgrind --suppressions=jenkins/suppressions.txt --gen-suppressions=all --track-origins=yes --leak-check=full --xml=yes --xml-file=${VALGRIND_REPORT_DIR}/valgrind.xml --show-reachable=yes ${CMDARGS} `which python` `which nosetests` -v "${PYCBC_VALGRIND}" > build/valgrind.txt
+    unset VALGRIND_REPORT_DIR
 fi
 if [ -z ${command} ]; then
     #echo "skipping nosetests"

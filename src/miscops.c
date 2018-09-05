@@ -173,7 +173,18 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, p
         rv = PYCBC_OPUTIL_ITER_MULTI(self, seqtype, kobj, &cv, optype,
                                      handle_single_keyop, NULL, context);
     } else {
-        rv= PYCBC_TRACE_WRAP_NOTERV(handle_single_keyop, kwargs, 1, self, &cv, optype, kobj, casobj, NULL, NULL, NULL);
+        rv = PYCBC_TRACE_WRAP_NOTERV(handle_single_keyop,
+                                     kwargs,
+                                     1,
+                                     &cv,
+                                     self,
+                                     &cv,
+                                     optype,
+                                     kobj,
+                                     casobj,
+                                     NULL,
+                                     NULL,
+                                     NULL);
     }
 
     if (rv < 0) {

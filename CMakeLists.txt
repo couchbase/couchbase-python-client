@@ -13,6 +13,8 @@ set(TP_CJSON thirdparty/cJSON)
 set(LCB_TRACING_DIR ${LCB_ROOT}/src/tracing)
 set(LCB_MCSERVER_DIR ${LCB_ROOT}/src/mcserver)
 set(LCB_BUCKETCONFIG_DIR ${LCB_ROOT}/src/bucketconfig)
+set(LCB_OPERATIONS ${LCB_ROOT}/src/operations)
+aux_source_directory(${LCB_ROOT}/src/operations LCB_OPS)
 aux_source_directory(${LCB_ROOT}/src LCB_CORE)
 aux_source_directory(${LCB_ROOT}/src/http HTTP)
 aux_source_directory(${LCB_ROOT}/include/memcached/ MCD_INC)
@@ -76,6 +78,8 @@ include_directories( ${LCB_ROOT_SRC}
         ${LCB_TRACING_DIR}
         ${LCB_CJSON}
         ${PYTHON_INCLUDE_DIRS}
+        ${LCB_OPS}
+        ${LCB_OPERATIONS}
         )
 
 ExternalProject_Add(libcouchbase
@@ -102,10 +106,15 @@ set(EXTRA_SOURCE_DIRS
 
         ${LCB_BUCKETCONFIG}
         ${LCB_BUCKETCONFIG_DIR}
+        ${LCB_OPERATIONS}
+        ${LCB_OPS}
         )
 
 set(SOURCE
         ${SOURCE}
+        ${LCB_OPERATIONS}
+
+        ${LCB_OPS}
         ${LCB_CORE}
         ${LCB_INC}
         ${MCD_INC}
@@ -145,6 +154,8 @@ add_executable(couchbase_python_client_2_3_1
         ${LCB_MCSERVER}
         ${LCB_MCSERVER_DIR}
         ${LCB_JSON}
+        ${LCB_OPERATIONS}
+        ${LCB_OPS}
         acouchbase/tests/asyncio_tests.py
         acouchbase/tests/fixtures.py
         acouchbase/tests/py34only.py

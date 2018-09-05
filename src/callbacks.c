@@ -241,11 +241,14 @@ get_common_objects(const lcb_RESPBASE *resp, pycbc_Bucket **conn,
 
 #ifdef PYCBC_TRACING
         parent_context = PYCBC_MULTIRESULT_EXTRACT_CONTEXT(*mres, hkey, res);
-        decoding_context =
-                pycbc_Result_start_context(parent_context,
-                                           hkey,
-                                           "get_common_objects",
-                                           LCBTRACE_OP_RESPONSE_DECODING);
+        if (parent_context) {
+            decoding_context =
+                    pycbc_Result_start_context(parent_context,
+                                               hkey,
+                                               "get_common_objects",
+                                               LCBTRACE_OP_RESPONSE_DECODING,
+                                               LCBTRACE_REF_CHILD_OF);
+        };
 #endif
         if (*res) {
             int exists_ok = (restype & RESTYPE_EXISTS_OK) ||
@@ -274,47 +277,49 @@ get_common_objects(const lcb_RESPBASE *resp, pycbc_Bucket **conn,
             } else {
                 Py_XDECREF(hkey);
             }
-            }
+        }
 
-            if (*res == NULL) {
-                /* Now, get/set the result object */
-                if ((*mres)->mropts & PYCBC_MRES_F_ITEMS) {
-                    PYCBC_DEBUG_LOG("Item creation");
-                    *res = (pycbc_Result *)pycbc_item_new(*conn);
-                } else if (restype & RESTYPE_BASE) {
-                    PYCBC_DEBUG_LOG("Result creation");
-                    *res = (pycbc_Result *)pycbc_result_new(*conn);
+        if (*res == NULL) {
+            /* Now, get/set the result object */
+            if ((*mres)->mropts & PYCBC_MRES_F_ITEMS) {
+                PYCBC_DEBUG_LOG("Item creation");
+                *res = (pycbc_Result *)pycbc_item_new(*conn);
+            } else if (restype & RESTYPE_BASE) {
+                PYCBC_DEBUG_LOG("Result creation");
+                *res = (pycbc_Result *)pycbc_result_new(*conn);
 
-                } else if (restype & RESTYPE_OPERATION) {
-                    PYCBC_DEBUG_LOG("Opresult creation");
-                    *res = (pycbc_Result *)pycbc_opresult_new(*conn);
+            } else if (restype & RESTYPE_OPERATION) {
+                PYCBC_DEBUG_LOG("Opresult creation");
+                *res = (pycbc_Result *)pycbc_opresult_new(*conn);
 
-                } else if (restype & RESTYPE_VALUE) {
-                    PYCBC_DEBUG_LOG("Valresult creation");
-                    *res = (pycbc_Result *)pycbc_valresult_new(*conn);
-                } else {
-                    *res = (pycbc_Result *)pycbc_result_new(*conn);
-                    if ((*conn)->nremaining) {
-                        --(*conn)->nremaining;
-                    }
-                }
-                if (*res) {
-                    PyDict_SetItem(mrdict, hkey, (PyObject *)*res);
-                    (*res)->key = hkey;
-                    PYCBC_DECREF(*res);
-                } else {
-                    abort();
+            } else if (restype & RESTYPE_VALUE) {
+                PYCBC_DEBUG_LOG("Valresult creation");
+                *res = (pycbc_Result *)pycbc_valresult_new(*conn);
+            } else {
+                *res = (pycbc_Result *)pycbc_result_new(*conn);
+                if ((*conn)->nremaining) {
+                    --(*conn)->nremaining;
                 }
             }
+            if (*res) {
+                PyDict_SetItem(mrdict, hkey, (PyObject *)*res);
+                (*res)->key = hkey;
+                PYCBC_DECREF(*res);
+            } else {
+                abort();
+            }
+        }
 #ifdef PYCBC_TRACING
             if (res && *res) {
                 pycbc_Result_propagate_context(*res, parent_context, *conn);
             }
-#endif
             PYCBC_CONTEXT_DEREF(decoding_context, 1);
+#ifdef PYCBC_CLEAN_PARENT
             if (parent_context && parent_context->is_stub) {
-                PYCBC_CONTEXT_DEREF(parent_context, 1);
+                PYCBC_CONTEXT_DEREF(parent_context, 0);
             }
+#endif
+#endif
             if (resp->rc && res && *res) {
                 (*res)->rc = resp->rc;
             }
