@@ -247,7 +247,7 @@ get_common_objects(const lcb_RESPBASE *resp, pycbc_Bucket **conn,
                                                hkey,
                                                "get_common_objects",
                                                LCBTRACE_OP_RESPONSE_DECODING,
-                                               LCBTRACE_REF_CHILD_OF);
+                                               LCBTRACE_REF_FOLLOWS_FROM);
         };
 #endif
         if (*res) {

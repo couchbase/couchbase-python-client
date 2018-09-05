@@ -153,6 +153,7 @@ arithmetic_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
     }
 
     if (rv < 0) {
+        pycbc_wait_for_scheduled(self, kwargs, &context, &cv);
         goto GT_DONE;
     }
 

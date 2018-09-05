@@ -44,7 +44,6 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
     unsigned long ttl = gv->u.ttl;
     lcb_error_t err = LCB_SUCCESS;
     pycbc_pybuffer keybuf = { NULL };
-    pycbc_stack_context_handle decoding_context = NULL;
 
     union {
         lcb_CMDBASE base;
@@ -103,10 +102,6 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
         }
     }
     u_cmd.base.exptime = ttl;
-#ifdef PYCBC_TRACING
-
-    decoding_context = context;
-#endif
     switch (optype) {
         case PYCBC_CMD_GAT:
             if (!ttl) {
@@ -128,14 +123,13 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
         case PYCBC_CMD_GET:
         GT_GET:
             u_cmd.get.lock = lock;
-            PYCBC_TRACECMD(u_cmd.get, decoding_context, cv->mres, curkey, self);
+            PYCBC_TRACECMD(u_cmd.get, context, cv->mres, curkey, self);
             err = lcb_get3(self->instance, cv->mres, &u_cmd.get);
             break;
 
         case PYCBC_CMD_TOUCH:
             u_cmd.touch.exptime = ttl;
-            PYCBC_TRACECMD(
-                    u_cmd.touch, decoding_context, cv->mres, curkey, self);
+            PYCBC_TRACECMD(u_cmd.touch, context, cv->mres, curkey, self);
             err = lcb_touch3(self->instance, cv->mres, &u_cmd.touch);
             break;
 
@@ -144,8 +138,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
         case PYCBC_CMD_GETREPLICA_ALL:
             u_cmd.rget.strategy = gv->u.replica.strategy;
             u_cmd.rget.index = gv->u.replica.index;
-            PYCBC_TRACECMD(
-                    u_cmd.rget, decoding_context, cv->mres, curkey, self);
+            PYCBC_TRACECMD(u_cmd.rget, context, cv->mres, curkey, self);
             err = lcb_rget3(self->instance, cv->mres, &u_cmd.rget);
             break;
         default:
@@ -155,7 +148,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
     }
 
     if (err != LCB_SUCCESS) {
-        PYCBC_DEBUG_LOG_CONTEXT(decoding_context, "Got result %d", err)
+        PYCBC_DEBUG_LOG_CONTEXT(context, "Got result %d", err)
         PYCBC_EXCTHROW_SCHED(err);
         rv = -1;
         goto GT_DONE;
@@ -164,9 +157,9 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
     }
     
     GT_DONE:
-        PYCBC_DEBUG_LOG_CONTEXT(decoding_context, "Got rv %d", rv)
+        PYCBC_DEBUG_LOG_CONTEXT(context, "Got rv %d", rv)
         PYCBC_PYBUF_RELEASE(&keybuf);
-    PYCBC_DEBUG_LOG_CONTEXT(context,"Finished processing")
+        PYCBC_DEBUG_LOG_CONTEXT(context, "Finished processing")
 
     return rv;
 }
@@ -329,11 +322,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
                             cv.is_seqcmd,
                             cv.sched_cmds)
     if (rv < 0) {
-        if (cv.sched_cmds) {
-            cv.ncmds = cv.sched_cmds;
-            PYCBC_STASH_EXCEPTION(PYCBC_TRACE_WRAP(
-                    pycbc_common_vars_wait, kwargs, &cv, self));
-        }
+        pycbc_wait_for_scheduled(self, kwargs, &context, &cv);
         goto GT_DONE;
     }
 
@@ -398,6 +387,7 @@ sdlookup_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopt
 
     if (PYCBC_OPUTIL_ITER_MULTI(
         self, seqtype, kobj, &cv, 0, handle_single_lookup, NULL, context) != 0) {
+        pycbc_wait_for_scheduled(self, kwargs, &context, &cv);
         goto GT_DONE;
     }
 

@@ -103,7 +103,6 @@ handle_single_keyop, pycbc_Bucket *self, struct pycbc_common_vars *cv, int optyp
 
     } else if (optype == PYCBC_CMD_ENDURE) {
         err = cv->mctx->addcmd(cv->mctx, &ucmd.base);
-
     } else {
         PYCBC_TRACECMD(ucmd.rm,context, cv->mres, curkey, self);
         err = lcb_remove3(self->instance, cv->mres, &ucmd.rm);
@@ -279,6 +278,7 @@ TRACED_FUNCTION_WRAPPER(endure_multi, LCBTRACE_OP_REQUEST_ENCODING, Bucket)
 
     rv = PYCBC_OPUTIL_ITER_MULTI(self, seqtype, keys, &cv, PYCBC_CMD_ENDURE, handle_single_keyop, NULL, context);
     if (rv < 0) {
+        pycbc_wait_for_scheduled(self, kwargs, &context, &cv);
         goto GT_DONE;
     }
 

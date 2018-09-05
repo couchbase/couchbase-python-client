@@ -436,8 +436,8 @@ void pycbc_wait_for_scheduled(pycbc_Bucket *self,
                               pycbc_stack_context_handle *context,
                               struct pycbc_common_vars *cv)
 {
-    if ((*cv).sched_cmds) {
-        (*cv).ncmds = (*cv).sched_cmds;
+    if (cv->sched_cmds) {
+        cv->ncmds = cv->sched_cmds;
         PYCBC_STASH_EXCEPTION(PYCBC_TRACE_WRAP_NOTERV(pycbc_common_vars_wait,
                                                       kwargs,
                                                       0,
