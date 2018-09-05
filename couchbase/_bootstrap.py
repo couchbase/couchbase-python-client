@@ -36,7 +36,12 @@ import couchbase._libcouchbase as C
 from couchbase.items import ItemCollection, ItemOptionDict, ItemSequence
 from couchbase.result import SubdocResult
 from couchbase.subdocument import MultiValue
-
+import os
+if os.getenv("PYCBC_CPPYY"):
+    try:
+        import cppyy
+    except:
+        pass
 
 def _result__repr__(self):
     """

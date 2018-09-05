@@ -40,9 +40,9 @@ try:
     import __builtin__ as builtins
 except:
     import builtins
-ch = logging.StreamHandler()
-ch.setLevel(logging.WARNING)
-logging.getLogger().addHandler(ch)
+#ch = logging.StreamHandler()
+#ch.setLevel(logging.WARNING)
+#logging.getLogger().addHandler(ch)
 
 
 class BogusHandler:
@@ -89,7 +89,7 @@ class TimeoutTest(TracedCase):
         couchbase.enable_logging()
         kwargs['enable_tracing'] = "true"
         #super(TimeoutTest, self).setUp(**kwargs)
-        super(TimeoutTest, self).setUp(trace_all=True, enable_logging=True, use_parent_tracer=True, flushcount=0)
+        super(TimeoutTest, self).setUp(trace_all=True, enable_logging=True, use_parent_tracer=False, flushcount=0)
         self.repetitions = 100
         logging.info("starting TimeoutTest")
 

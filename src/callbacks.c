@@ -237,7 +237,7 @@ get_common_objects(const lcb_RESPBASE *resp, pycbc_Bucket **conn,
     pycbc_store_error(pycbc_err);
     {
         mrdict = pycbc_multiresult_dict(*mres);
-        *res = (pycbc_Result *)PyDict_GetItem(mrdict, hkey);
+        *res = (pycbc_Result *) PyDict_GetItem(mrdict, hkey);
 
 #ifdef PYCBC_TRACING
         parent_context = PYCBC_MULTIRESULT_EXTRACT_CONTEXT(*mres, hkey, res);
@@ -305,6 +305,7 @@ get_common_objects(const lcb_RESPBASE *resp, pycbc_Bucket **conn,
                 PyDict_SetItem(mrdict, hkey, (PyObject *)*res);
                 (*res)->key = hkey;
                 PYCBC_DECREF(*res);
+
             } else {
                 abort();
             }
@@ -314,19 +315,20 @@ get_common_objects(const lcb_RESPBASE *resp, pycbc_Bucket **conn,
                 pycbc_Result_propagate_context(*res, parent_context, *conn);
             }
             PYCBC_CONTEXT_DEREF(decoding_context, 1);
+#define PYCBC_CLEAN_PARENT
 #ifdef PYCBC_CLEAN_PARENT
             if (parent_context && parent_context->is_stub) {
                 PYCBC_CONTEXT_DEREF(parent_context, 0);
             }
 #endif
 #endif
-            if (resp->rc && res && *res) {
-                (*res)->rc = resp->rc;
-            }
+        if (resp->rc && res && *res) {
+            (*res)->rc = resp->rc;
+        }
 
-            if (resp->rc != LCB_SUCCESS) {
-                (*mres)->all_ok = 0;
-            }
+        if (resp->rc != LCB_SUCCESS) {
+            (*mres)->all_ok = 0;
+        }
     }
 #define PYCBC_RESTORE_PRE_CONTEXT_ERROR
     if (pycbc_err[0] || pycbc_err[1] || pycbc_err[2]) {

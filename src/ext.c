@@ -632,20 +632,24 @@ void pycbc_debug_log_prefix(const char *FILE,
     size_t depth = (CONTEXT) ? ((CONTEXT)->depth) : 0;
     lcbtrace_SPAN *span_ptr = (CONTEXT) ? ((CONTEXT)->span) : NULL;
 
-    pycbc_strn component = span_ptr ? pycbc_get_string_tag_basic(
-                                              span_ptr, LCBTRACE_TAG_COMPONENT)
-                                    : pycbc_invalid_strn;
-    const char *op_id =
-            span_ptr ? lcbtrace_span_get_operation(span_ptr) : "unknown";
+    pycbc_strn component =
+            span_ptr ? pycbc_get_string_tag_basic(span_ptr,
+                                                   LCBTRACE_TAG_COMPONENT)
+                      : pycbc_invalid_strn;
+    const char *op_id = span_ptr
+                                ? lcbtrace_span_get_operation(span_ptr)
+                                : "unknown";
     size_t depth2 = (CONTEXT) ? ((CONTEXT)->depth) : 1000;
     size_t refcount = (CONTEXT) ? pycbc_Context_get_ref_count(CONTEXT) : 1000;
     int repr_len = pycbc_strn_repr_len(component);
     const char *repr_buf = pycbc_strn_repr_buf(component);
-    lcb_U64 id = span_ptr ? lcbtrace_span_get_span_id(span_ptr) : 1000;
+    lcb_U64 id = span_ptr
+                         ? lcbtrace_span_get_span_id(span_ptr)
+                         : 1000;
     sprintf(fmtstring + strlen(fmtstring), "%zus", depth * 4);
     print_current_time_with_ms(0);
-    print_current_time_with_ms(span_ptr ? lcbtrace_span_get_start_ts(span_ptr)
-                                        : 0);
+    print_current_time_with_ms(
+            span_ptr ? lcbtrace_span_get_start_ts(span_ptr) : 0);
     PYCBC_DEBUG_LOG_RAW(fmtstring,
                         FILE,
                         LINE,
@@ -1655,8 +1659,8 @@ void pycbc_MultiResult_init_context(pycbc_MultiResult *self, PyObject *curkey,
     }
     pycbc_tc_encode_key(bucket, curkey, &keybuf);
     PYCBC_EXCEPTION_LOG_NOCLEAR;
-    pycbc_tc_decode_key(bucket, keybuf.buffer, keybuf.length, &curkey);
-    PYCBC_PYBUF_RELEASE(&keybuf);
+    if (pycbc_tc_decode_key(bucket, keybuf.buffer, keybuf.length, &curkey))
+        goto DONE;
     item=(pycbc_Result*)PyDict_GetItem(mres_dict, curkey);
     if (!item) {
         PYCBC_DEBUG_PYFORMAT_CONTEXT(
@@ -1677,6 +1681,9 @@ void pycbc_MultiResult_init_context(pycbc_MultiResult *self, PyObject *curkey,
                                  curkey);
     PYCBC_EXCEPTION_LOG_NOCLEAR;
     PYCBC_DEBUG_PYFORMAT_CONTEXT(context, "After insertion:[%R]", mres_dict);
+DONE:
+    PYCBC_PYBUF_RELEASE(&keybuf);
+    PYCBC_XDECREF(curkey);
 }
 
 int pycbc_is_async_or_pipeline(const pycbc_Bucket *self) { return self->flags & PYCBC_CONN_F_ASYNC || self->pipeline_queue; }
@@ -2336,7 +2343,6 @@ PyObject *pycbc_set_args_from_payload_abbreviated(lcbtrace_SPAN *span,
 #undef FORWARD_OP_NAME
 #undef FORWARD_AGGREGATE
 #undef TAG_VALUE
-
         pycbc_context_info_delete(span, context_info);
     }
 
@@ -2466,25 +2472,35 @@ void pycbc_forward_opid_to_tag(lcbtrace_SPAN *span, lcbtrace_SPAN *dest, const c
 
 void pycbc_propagate_context_info(lcbtrace_SPAN *span, lcbtrace_SPAN *dest)
 {
-    pycbc_context_info *context_info;
-    lcb_U64 context_info_U64 = 0;
-    if (!span || !dest) {
+    lcb_U64 context_info = 0;
+    lcb_U64 dest_context_info = 0;
+    if (!span) {
         return;
     }
     PYCBC_DEBUG_LOG(
             "Propagating context_info from span %p to span %p", span, dest)
-    if (lcbtrace_span_get_tag_uint64(
-                span, PYCBC_CONTEXT_INFO, (lcb_U64 *)&context_info_U64) !=
-        LCB_SUCCESS) {
-        context_info = pycbc_persist_context_info(span, NULL);
-    } else {
-        context_info = (pycbc_context_info *)context_info_U64;
+    if (!lcbtrace_span_get_tag_uint64(
+                span, PYCBC_CONTEXT_INFO_FINISHED, &context_info)) {
+        return;
+    }
+    context_info = 0;
+    if (dest) {
+        lcbtrace_span_get_tag_uint64(
+                dest, PYCBC_CONTEXT_INFO, &dest_context_info);
+    }
+    lcbtrace_span_get_tag_uint64(span, PYCBC_CONTEXT_INFO, &context_info);
+    if (!dest || dest_context_info) {
+        if (context_info)
+            pycbc_context_info_delete(span, (pycbc_context_info *)context_info);
+        return;
+    }
+    if (!context_info) {
+        context_info = (lcb_U64)(pycbc_persist_context_info(span, NULL));
     }
 
     lcbtrace_span_add_tag_uint64(
-            dest, PYCBC_CONTEXT_INFO, (lcb_U64)context_info);
-    lcbtrace_span_add_tag_uint64(
-            span, PYCBC_CONTEXT_INFO_FINISHED, (lcb_U64)context_info);
+            span, PYCBC_CONTEXT_INFO_FINISHED, context_info);
+    lcbtrace_span_add_tag_uint64(dest, PYCBC_CONTEXT_INFO, context_info);
 }
 
 #undef TAGS
@@ -2888,7 +2904,6 @@ lcbtrace_TRACER *pycbc_tracer_new(PyObject *parent,
     tracer->cookie = pycbc_tracer;
     pycbc_tracer->id_map = PyDict_New();
     pycbc_tracer->child = child_tracer;
-
     if (parent) {
         PYCBC_DEBUG_PYFORMAT("initialising tracer start_span method from:[%R]",
                              parent);
