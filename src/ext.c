@@ -1030,6 +1030,16 @@ int pycbc_unregister_child_context(pycbc_stack_context_handle from_context)
         _pycbc_Context_set_ref_count(from_context, 0);
     }
 
+    if (!PYCBC_CONTEXT_GET_REF_COUNT(context)) {
+        PYCBC_DEBUG_LOG(
+                "*** tracing anomaly: count shouldn't be zero for parent "
+                "context %p",
+                context);
+#ifdef PYCBC_STRICT
+        abort();
+#endif
+    }
+
     PYCBC_DEBUG_LOG_CONTEXT(
             context, "freeing one child of %p, %p", context, from_context);
     {

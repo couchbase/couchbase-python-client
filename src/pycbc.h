@@ -24,7 +24,7 @@
 #define PYCBC_POSTINCREMENT
 #define PYCBC_FREE_ACCOUNTING
 #define PYCBC_FREE_CONTEXTS
-#define PYCBC_REF_ACCOUNTING_ENABLE
+//#define PYCBC_REF_ACCOUNTING_ENABLE
 #ifdef PYCBC_REF_ACCOUNTING_ENABLE
 #define PYCBC_REF_ACCOUNTING
 #endif
@@ -835,7 +835,7 @@ void pycbc_Tracer_set_child(pycbc_Tracer_t *pTracer, lcbtrace_TRACER *pTRACER);
             PYCBC_DEBUG_LOG("setting trace span on %.*s\n",        \
                             (int)(CMD).key.contig.nbytes,          \
                             (const char *)(CMD).key.contig.bytes); \
-            if (1) {                                               \
+            if (0) {                                               \
                 PYCBC_REF_CONTEXT(CONTEXT);                        \
             }                                                      \
             LCB_CMD_SET_TRACESPAN(&(CMD), (CONTEXT)->span);        \
@@ -894,7 +894,7 @@ void pycbc_wrap_teardown(pycbc_stack_context_handle sub_context,
     }
 
 typedef struct pycbc_common_vars pycbc_common_vars_t;
-int pycbc_wrap_and_pop(pycbc_stack_context_handle *context,
+int pycbc_wrap_and_pop(pycbc_stack_context_handle *contextptr,
                        int noterv,
                        int result,
                        pycbc_common_vars_t *cv);
@@ -908,84 +908,91 @@ int pycbc_wrap_and_pop_debug(const char *FILE,
                              int LINE,
                              const char *FUNC,
                              const char *NAME,
-                             pycbc_stack_context_handle *context,
+                             pycbc_stack_context_handle *contextptr,
                              int noterv,
                              int result,
                              pycbc_common_vars_t *cv);
 
-#define PYCBC_WRAP_AND_POP(CONTEXT, RESULT, NAME, NOTERV, CV) \
-    pycbc_wrap_and_pop_debug(__FILE__,                        \
-                             __LINE__,                        \
-                             __FUNCTION__,                    \
-                             NAME,                            \
-                             CONTEXT,                         \
-                             NOTERV,                          \
-                             (RESULT),                        \
+#define PYCBC_WRAP_AND_POP(CONTEXTPTR, RESULT, NAME, NOTERV, CV) \
+    pycbc_wrap_and_pop_debug(__FILE__,                           \
+                             __LINE__,                           \
+                             __FUNCTION__,                       \
+                             NAME,                               \
+                             CONTEXTPTR,                         \
+                             NOTERV,                             \
+                             (RESULT),                           \
                              CV)
 
 pycbc_stack_context_handle pycbc_explicit_named_setup(
         const char *FILE,
         int LINE,
         const char *FUNCTION,
-        pycbc_stack_context_handle *CONTEXT,
+        pycbc_stack_context_handle *CONTEXTPTR,
         const char *COMPONENTNAME,
         const char *CATEGORY,
         PyObject *KWARGS,
         pycbc_Bucket *self);
 
-#define PYCBC_EXPLICIT_NAMED_SETUP(                     \
-        CONTEXT, COMPONENTNAME, CATEGORY, KWARGS, SELF) \
-    pycbc_explicit_named_setup(__FILE__,                \
-                               __LINE__,                \
-                               __FUNCTION__,            \
-                               &(CONTEXT),              \
-                               COMPONENTNAME,           \
-                               CATEGORY,                \
-                               KWARGS,                  \
+#define PYCBC_EXPLICIT_NAMED_SETUP(                        \
+        CONTEXTPTR, COMPONENTNAME, CATEGORY, KWARGS, SELF) \
+    pycbc_explicit_named_setup(__FILE__,                   \
+                               __LINE__,                   \
+                               __FUNCTION__,               \
+                               CONTEXTPTR,                 \
+                               COMPONENTNAME,              \
+                               CATEGORY,                   \
+                               KWARGS,                     \
                                SELF)
 
-#define PYCBC_TRACE_WRAP_EXPLICIT_NAMED(                                       \
-        CONTEXT, NAME, COMPONENTNAME, CATEGORY, KWARGS, NOTERV, CV, SELF, ...) \
-    PYCBC_WRAP_AND_POP(                                                        \
-            &(CONTEXT),                                                        \
-            NAME(__VA_ARGS__,                                                  \
-                 PYCBC_EXPLICIT_NAMED_SETUP(                                   \
-                         CONTEXT, COMPONENTNAME, CATEGORY, KWARGS, SELF)),     \
-            COMPONENTNAME,                                                     \
-            NOTERV,                                                            \
+#define PYCBC_TRACE_WRAP_EXPLICIT_NAMED(CONTEXTPTR,                           \
+                                        NAME,                                 \
+                                        COMPONENTNAME,                        \
+                                        CATEGORY,                             \
+                                        KWARGS,                               \
+                                        NOTERV,                               \
+                                        CV,                                   \
+                                        SELF,                                 \
+                                        ...)                                  \
+    PYCBC_WRAP_AND_POP(                                                       \
+            CONTEXTPTR,                                                       \
+            NAME(__VA_ARGS__,                                                 \
+                 PYCBC_EXPLICIT_NAMED_SETUP(                                  \
+                         CONTEXTPTR, COMPONENTNAME, CATEGORY, KWARGS, SELF)), \
+            COMPONENTNAME,                                                    \
+            NOTERV,                                                           \
             CV)
 
-#define PYCBC_TRACE_WRAP_EXPLICIT_NAMED_VOID(                          \
-        CONTEXT, NAME, COMPONENTNAME, CATEGORY, KWARGS, CV, SELF, ...) \
-    {                                                                  \
-        NAME(__VA_ARGS__,                                              \
-             PYCBC_EXPLICIT_NAMED_SETUP(                               \
-                     CONTEXT, COMPONENTNAME, CATEGORY, KWARGS, SELF)); \
-        PYCBC_WRAP_AND_POP(&(CONTEXT), 0, COMPONENTNAME, 0, CV);       \
+#define PYCBC_TRACE_WRAP_EXPLICIT_NAMED_VOID(                             \
+        CONTEXTPTR, NAME, COMPONENTNAME, CATEGORY, KWARGS, CV, SELF, ...) \
+    {                                                                     \
+        NAME(__VA_ARGS__,                                                 \
+             PYCBC_EXPLICIT_NAMED_SETUP(                                  \
+                     CONTEXTPTR, COMPONENTNAME, CATEGORY, KWARGS, SELF)); \
+        PYCBC_WRAP_AND_POP(CONTEXTPTR, 0, COMPONENTNAME, 0, CV);          \
     }
 
-#define PYCBC_TRACE_WRAP_NOTERV(NAME, KWARGS, NOTERV, CV, ...) \
-    PYCBC_TRACE_WRAP_EXPLICIT_NAMED(context,                   \
-                                    NAME,                      \
-                                    #NAME,                     \
-                                    NAME##_category(),         \
-                                    KWARGS,                    \
-                                    NOTERV,                    \
-                                    CV,                        \
-                                    self,                      \
+#define PYCBC_TRACE_WRAP_NOTERV(NAME, KWARGS, NOTERV, CV, CONTEXT, SELF, ...) \
+    PYCBC_TRACE_WRAP_EXPLICIT_NAMED(CONTEXT,                                  \
+                                    NAME,                                     \
+                                    #NAME,                                    \
+                                    NAME##_category(),                        \
+                                    KWARGS,                                   \
+                                    NOTERV,                                   \
+                                    CV,                                       \
+                                    SELF,                                     \
                                     __VA_ARGS__)
 
 #define PYCBC_TRACE_WRAP(NAME, KWARGS, ...) \
-    PYCBC_TRACE_WRAP_NOTERV(NAME, KWARGS, 0, NULL, __VA_ARGS__)
+    PYCBC_TRACE_WRAP_NOTERV(NAME, KWARGS, 0, NULL, &context, self, __VA_ARGS__)
 
-#define PYCBC_TRACE_WRAP_VOID(NAME, KWARGS, ...)            \
-    PYCBC_TRACE_WRAP_EXPLICIT_NAMED_VOID(context,           \
-                                         NAME,              \
-                                         #NAME,             \
-                                         NAME##_category(), \
-                                         KWARGS,            \
-                                         NULL,              \
-                                         self,              \
+#define PYCBC_TRACE_WRAP_VOID(NAME, KWARGS, CONTEXT, SELF, ...) \
+    PYCBC_TRACE_WRAP_EXPLICIT_NAMED_VOID(CONTEXT,               \
+                                         NAME,                  \
+                                         #NAME,                 \
+                                         NAME##_category(),     \
+                                         KWARGS,                \
+                                         NULL,                  \
+                                         SELF,                  \
                                          __VA_ARGS__)
 
 #define PYCBC_TRACE_WRAP_TOPLEVEL(RV, CATEGORY, NAME, TRACER, ...) \

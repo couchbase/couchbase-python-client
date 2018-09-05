@@ -177,6 +177,8 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, p
                                      kwargs,
                                      1,
                                      &cv,
+                                     &context,
+                                     self,
                                      self,
                                      &cv,
                                      optype,
@@ -188,7 +190,8 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, p
     }
 
     if (rv < 0) {
-        PYCBC_DEBUG_LOG_CONTEXT(context, "Got error from keyops")
+        pycbc_wait_for_scheduled(self, kwargs, &context, &cv);
+        PYCBC_DEBUG_LOG_CONTEXT(context,"Got error from keyops")
         goto GT_DONE;
     }
 

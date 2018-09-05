@@ -338,6 +338,8 @@ set_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
                                      kwargs,
                                      0,
                                      &cv,
+                                     &context,
+                                     self,
                                      self,
                                      &cv,
                                      0,
@@ -354,11 +356,7 @@ set_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
     }
 
     if (rv < 0) {
-        if (cv.sched_cmds) {
-            cv.ncmds = cv.sched_cmds;
-            PYCBC_STASH_EXCEPTION(PYCBC_TRACE_WRAP(
-                    pycbc_common_vars_wait, kwargs, &cv, self));
-        }
+        pycbc_wait_for_scheduled(self, kwargs, &context, &cv);
         goto GT_DONE;
     }
     PYCBC_DEBUG_LOG_CONTEXT(context,

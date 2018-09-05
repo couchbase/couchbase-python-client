@@ -61,7 +61,7 @@ pycbc_Bucket__end_pipeline(pycbc_Bucket *self)
         goto GT_DONE;
     }
 
-    PYCBC_TRACE_WRAP_VOID(pycbc_oputil_wait_common, NULL, self);
+    PYCBC_TRACE_WRAP_VOID(pycbc_oputil_wait_common, NULL, &context, self, self);
 
     pycbc_assert(self->nremaining == 0);
 

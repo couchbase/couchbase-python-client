@@ -271,7 +271,8 @@ pycbc_Bucket__http_request(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     }
 
     if (!(self->flags & PYCBC_CONN_F_ASYNC)) {
-        PYCBC_TRACE_WRAP_VOID(pycbc_oputil_wait_common, kwargs, self);
+        PYCBC_TRACE_WRAP_VOID(
+                pycbc_oputil_wait_common, kwargs, &context, self, self);
         /* RC=1 (decref on done) */
         if (pycbc_multiresult_maybe_raise(mres)) {
             goto GT_DONE;

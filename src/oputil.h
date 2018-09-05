@@ -242,6 +242,10 @@ pycbc_oputil_iter_multi(pycbc_Bucket *self,
                         void *arg,
                         pycbc_stack_context_handle context);
 
+void pycbc_wait_for_scheduled(pycbc_Bucket *self,
+                              PyObject *kwargs,
+                              pycbc_stack_context_handle *context,
+                              struct pycbc_common_vars *cv);
 
 /**
  * Clean up the 'common_vars' structure and free/decref any data. This

@@ -62,7 +62,7 @@ pycbc_common_vars_wait, struct pycbc_common_vars *cv, pycbc_Bucket *self)
         Py_INCREF(Py_None);
         return 0;
     }
-    PYCBC_TRACE_WRAP_VOID(pycbc_oputil_wait_common, NULL, self);
+    PYCBC_TRACE_WRAP_VOID(pycbc_oputil_wait_common, NULL, &context, self, self);
 
     if (!pycbc_assert(self->nremaining == 0)) {
         fprintf(stderr,
@@ -398,7 +398,7 @@ pycbc_oputil_iter_multi(pycbc_Bucket *self,
         }
 
 #ifdef PYCBC_TRACING
-        rv = PYCBC_TRACE_WRAP_EXPLICIT_NAMED(context,
+        rv = PYCBC_TRACE_WRAP_EXPLICIT_NAMED(&context,
                                              (handler).cb,
                                              (handler).name,
                                              (handler).category,
@@ -429,6 +429,24 @@ pycbc_oputil_iter_multi(pycbc_Bucket *self,
     PYCBC_DEBUG_LOG_CONTEXT(context, "Scheduled %d cmds", cv->sched_cmds)
     Py_XDECREF(iterobj);
     return rv;
+}
+
+void pycbc_wait_for_scheduled(pycbc_Bucket *self,
+                              PyObject *kwargs,
+                              pycbc_stack_context_handle *context,
+                              struct pycbc_common_vars *cv)
+{
+    if ((*cv).sched_cmds) {
+        (*cv).ncmds = (*cv).sched_cmds;
+        PYCBC_STASH_EXCEPTION(PYCBC_TRACE_WRAP_NOTERV(pycbc_common_vars_wait,
+                                                      kwargs,
+                                                      0,
+                                                      NULL,
+                                                      context,
+                                                      self,
+                                                      cv,
+                                                      self));
+    }
 }
 
 int
