@@ -1172,7 +1172,7 @@ pycbc_stack_context_handle pycbc_Context_deref(
 #ifdef PYCBC_REF_ACCOUNTING
                 pycbc_unregister_child_context(context);
 #endif
-                pycbc_Context_deref(parent, 0, 0, context);
+                parent=pycbc_Context_deref(parent, 0, 0, context);
             }
             PYCBC_CONTEXT_DTOR(context);
         } else {
@@ -1657,10 +1657,16 @@ void pycbc_MultiResult_init_context(pycbc_MultiResult *self, PyObject *curkey,
     if (!context) {
         return;
     }
-    pycbc_tc_encode_key(bucket, curkey, &keybuf);
-    PYCBC_EXCEPTION_LOG_NOCLEAR;
-    if (pycbc_tc_decode_key(bucket, keybuf.buffer, keybuf.length, &curkey))
+    PYCBC_REF_CONTEXT(context);
+    if (pycbc_tc_encode_key(bucket, curkey, &keybuf))
+    {
+        PYCBC_EXCEPTION_LOG
         goto DONE;
+    }
+    if (pycbc_tc_decode_key(bucket, keybuf.buffer, keybuf.length, &curkey)){
+        PYCBC_EXCEPTION_LOG
+        goto DONE;
+    }
     item=(pycbc_Result*)PyDict_GetItem(mres_dict, curkey);
     if (!item) {
         PYCBC_DEBUG_PYFORMAT_CONTEXT(
@@ -1672,7 +1678,6 @@ void pycbc_MultiResult_init_context(pycbc_MultiResult *self, PyObject *curkey,
         context->is_stub = 1;
     }
     PYCBC_EXCEPTION_LOG_NOCLEAR;
-    PYCBC_REF_CONTEXT(context);
     item->tracing_context = context;
     PYCBC_DEBUG_PYFORMAT_CONTEXT(context,
                                  "res %p: binding context %p to [%R]",

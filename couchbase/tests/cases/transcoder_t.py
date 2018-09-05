@@ -15,6 +15,7 @@
 # limitations under the License.
 #
 import json
+from unittest import SkipTest
 
 from couchbase.tests.base import ConnectionTestCase
 from couchbase.transcoder import TranscoderPP, Transcoder
@@ -145,6 +146,8 @@ class TranscoderTest(ConnectionTestCase):
             self.assertRaises(E.ValueFormatError, self.cb.upsert, key, "value")
 
     def test_transcoder_kdec_err(self):
+        #raise SkipTest("to be fixed")
+
         key = self.gen_key("transcoder_kenc_err")
         mangled = MangledTranscoder()
         self.cb.transcoder = mangled
@@ -177,6 +180,7 @@ class TranscoderTest(ConnectionTestCase):
 
 
     def test_transcoder_unhashable_keys(self):
+        #raise SkipTest("to be fixed")
         key = self.gen_key("transcoder_unhashable_keys")
         mangled = MangledTranscoder()
         mangled._op_next['encode_key'] = key.encode("utf-8")
