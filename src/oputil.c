@@ -62,7 +62,7 @@ pycbc_common_vars_wait, struct pycbc_common_vars *cv, pycbc_Bucket *self)
         Py_INCREF(Py_None);
         return 0;
     }
-    PYCBC_TRACE_WRAP_VOID(pycbc_oputil_wait_common, NULL, &context, self, self);
+    pycbc_oputil_wait_common(self, context);
 
     if (!pycbc_assert(self->nremaining == 0)) {
         fprintf(stderr,

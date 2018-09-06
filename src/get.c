@@ -330,7 +330,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
         goto GT_DONE;
     }
 
-    if (-1 == PYCBC_TRACE_WRAP(pycbc_common_vars_wait, kwargs, &cv, self)) {
+    if (-1 == pycbc_common_vars_wait(&cv, self, context)) {
         goto GT_DONE;
     }
 
@@ -395,7 +395,7 @@ sdlookup_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopt
         goto GT_DONE;
     }
 
-    PYCBC_TRACE_WRAP(pycbc_common_vars_wait, kwargs, &cv, self);
+    pycbc_common_vars_wait(&cv, self, context);
 
     GT_DONE:
     pycbc_common_vars_finalize(&cv, self);

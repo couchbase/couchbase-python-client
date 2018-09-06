@@ -157,7 +157,7 @@ arithmetic_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
         goto GT_DONE;
     }
 
-    if (-1 == PYCBC_TRACE_WRAP(pycbc_common_vars_wait, kwargs, &cv, self)) {
+    if (-1 == pycbc_common_vars_wait(&cv, self, context)) {
         goto GT_DONE;
     }
 
