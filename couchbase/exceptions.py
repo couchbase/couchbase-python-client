@@ -195,10 +195,12 @@ class CouchbaseError(Exception):
 
         ret_ok, ret_fail = {}, {}
         for v in self.all_results.values():
+            key = getattr(v, 'key', None)
+
             if v.success:
-                ret_ok[v.key] = v
+                ret_ok[key] = v
             else:
-                ret_fail[v.key] = v
+                ret_fail[key] = v
 
         return ret_ok, ret_fail
 
