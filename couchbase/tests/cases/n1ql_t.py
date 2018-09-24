@@ -17,6 +17,7 @@
 
 from __future__ import print_function
 
+from couchbase.exceptions import HTTPError
 from couchbase.tests.base import MockTestCase
 from couchbase.n1ql import N1QLQuery
 
@@ -35,6 +36,16 @@ class N1QLTest(MockTestCase):
         self.assertRaises(RuntimeError, getattr, q, 'meta')
         q.execute()
         self.assertIsInstance(q.meta, dict)
+
+    def test_httperror_str(self):
+        q = self.cb.n1ql_query('CREATE INDEX abc#123 ON abc (col_1)')
+
+        with self.assertRaises(HTTPError) as c:
+            q.execute()
+
+        self.assertIn('0x3B', str(c.exception))
+        ok, failed = c.exception.split_results()
+        self.assertTrue(':nokey:' in k for k in failed.keys())
 
     def test_profile(self):
         query = N1QLQuery('SELECT 1')

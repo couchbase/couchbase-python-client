@@ -194,11 +194,16 @@ class CouchbaseError(Exception):
         """
 
         ret_ok, ret_fail = {}, {}
-        for v in self.all_results.values():
+        count = 0
+        nokey_prefix = ([""] + sorted(filter(bool, self.all_results.keys())))[-1]
+        for key, v in self.all_results.items():
+            if not key:
+                key = nokey_prefix + ":nokey:" + str(count)
+                count += 1
             if v.success:
-                ret_ok[v.key] = v
+                ret_ok[key] = v
             else:
-                ret_fail[v.key] = v
+                ret_fail[key] = v
 
         return ret_ok, ret_fail
 
