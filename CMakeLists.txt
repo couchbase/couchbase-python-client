@@ -239,7 +239,7 @@ add_executable(couchbase_python_client_2_3_1
         couchbase/auth_domain.py
         couchbase/bucket.py
         couchbase/bucketmanager.py
-        couchbase/cbas.py
+        couchbase/analytics.py
         couchbase/cluster.py
         couchbase/connection.py
         couchbase/connstr.py

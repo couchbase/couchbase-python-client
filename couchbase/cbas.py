@@ -1,5 +1,5 @@
 #
-# Copyright 2017, Couchbase, Inc.
+# Copyright 2018, Couchbase, Inc.
 # All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -14,23 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
-import couchbase.n1ql as N
-
-
-class AnalyticsQuery(N.N1QLQuery):
-    def __init__(self, querystr):
-        querystr = querystr.rstrip()
-        if not querystr.endswith(';'):
-            querystr += ';'
-        super(AnalyticsQuery, self).__init__(querystr)
-
-
-class AnalyticsRequest(N.N1QLRequest):
-    def __init__(self, params, host, parent):
-        self._host = host
-        super(AnalyticsRequest, self).__init__(params, parent)
-
-    def _submit_query(self):
-        return self._parent._cbas_query(self._params.encoded,
-                                        self._host)
+import sys
+import couchbase.analytics
+sys.modules[__name__]=sys.modules['couchbase.analytics']

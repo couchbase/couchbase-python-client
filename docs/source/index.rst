@@ -15,6 +15,7 @@ Contents:
    api/subdoc
    api/datastructures
    api/views
+   api/analytics
    api/n1ql
    api/fulltext
    api/results

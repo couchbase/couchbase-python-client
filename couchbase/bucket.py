@@ -34,7 +34,7 @@ from couchbase._pyport import basestring
 import couchbase.subdocument as SD
 import couchbase.priv_constants as _P
 import json
-from couchbase.cbas import AnalyticsRequest, AnalyticsQuery
+from couchbase.analytics import AnalyticsRequest, AnalyticsQuery
 from couchbase.connstr import ConnectionString
 
 ### Private constants. This is to avoid imposing a dependency requirement
@@ -1512,10 +1512,44 @@ class Bucket(_Base):
         itercls = kwargs.pop('itercls', N1QLRequest)
         return itercls(query, self, *args, **kwargs)
 
-    def _analytics_query(self, query, host):
+    def analytics_query(self, query, host, *args, **kwargs):
+        """
+        Execute an Analytics query.
+
+        This method is mainly a wrapper around the :class:`~.AnalyticsQuery`
+        and :class:`~.AnalyticsRequest` objects, which contain the inputs
+        and outputs of the query.
+
+        Using an explicit :class:`~.AnalyticsQuery`::
+
+            query = AnalyticsQuery(
+                "SELECT VALUE bw FROM breweries bw WHERE bw.name = ?", "Kona Brewing")
+            for row in cb.analytics_query(query, "127.0.0.1"):
+                print('Entry: {0}'.format(row))
+
+        Using an implicit :class:`~.AnalyticsQuery`::
+
+            for row in cb.analytics_query(
+                "SELECT VALUE bw FROM breweries bw WHERE bw.name = ?", "127.0.0.1", "Kona Brewing"):
+                print('Entry: {0}'.format(row))
+
+        :param query: The query to execute. This may either be a
+            :class:`.AnalyticsQuery` object, or a string (which will be
+            implicitly converted to one).
+        :param host: The host to send the request to.
+        :param args: Positional arguments for :class:`.AnalyticsQuery`.
+        :param kwargs: Named arguments for :class:`.AnalyticsQuery`.
+        :return: An iterator which yields rows. Each row is a dictionary
+            representing a single result
+        """
         if not isinstance(query, AnalyticsQuery):
-            query = AnalyticsQuery(query)
+            query = AnalyticsQuery(query, *args, **kwargs)
+        else:
+            query.update(*args, **kwargs)
+
         return AnalyticsRequest(query, host, self)
+
+    _analytics_query = analytics_query
 
     def search(self, index, query, **kwargs):
         """

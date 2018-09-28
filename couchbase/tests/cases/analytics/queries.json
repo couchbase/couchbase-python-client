@@ -1,0 +1,1197 @@
+{
+    "00-show-dataverse": {
+        "query": {
+            "options": {},
+            "statement": "SELECT * FROM Metadata.`Dataverse`"
+        },
+        "response": [
+            {
+                "Dataverse": {
+                    "DataFormat": "org.apache.asterix.runtime.formats.NonTaggedDataFormat",
+                    "DataverseName": "Default",
+                    "PendingOp": 0,
+                    "Timestamp": "Tue Sep 25 13:47:16 UTC 2018"
+                }
+            },
+            {
+                "Dataverse": {
+                    "DataFormat": "org.apache.asterix.runtime.formats.NonTaggedDataFormat",
+                    "DataverseName": "Metadata",
+                    "PendingOp": 0,
+                    "Timestamp": "Tue Sep 25 13:47:16 UTC 2018"
+                }
+            }
+        ]
+    },
+    "01-setup-dataset-breweries": {
+        "query": {
+            "options": {},
+            "statement": "CREATE DATASET breweries ON `beer-sample` WHERE `type` = \"brewery\""
+        },
+        "response": []
+    },
+    "02-setup-dataset-beers": {
+        "query": {
+            "options": {},
+            "statement": "CREATE DATASET beers ON `beer-sample` WHERE `type` = \"beer\""
+        },
+        "response": []
+    },
+    "03-initiate-shadow": {
+        "query": {
+            "options": {},
+            "statement": "CONNECT LINK Local"
+        },
+        "response": []
+    },
+    "04-list-datasets": {
+        "query": {
+            "options": {},
+            "statement": "SELECT ds.BucketName, ds.DatasetName, ds.`Filter` FROM Metadata.`Dataset` ds WHERE ds.DataverseName = \"Default\""
+        },
+        "response": [
+            {
+                "BucketName": "beer-sample",
+                "DatasetName": "beers",
+                "Filter": "`type` = \"beer\""
+            },
+            {
+                "BucketName": "beer-sample",
+                "DatasetName": "breweries",
+                "Filter": "`type` = 'brewery'"
+            }
+        ]
+    },
+    "05-count-breweries": {
+        "query": {
+            "options": {},
+            "statement": "SELECT VALUE COUNT(*) FROM breweries"
+        },
+        "response": 1412
+    },
+    "06-first-brewery": {
+        "query": {
+            "options": {
+                "pretty": true
+            },
+            "statement": "SELECT * FROM breweries ORDER BY name LIMIT 1"
+        },
+        "response": {
+            "breweries": {
+                "address": [
+                    "407 Radam, F200"
+                ],
+                "city": "Austin",
+                "code": "78745",
+                "country": "United States",
+                "description": "(512) Brewing Company is a microbrewery located in the heart of Austin that brews for the community using as many local, domestic and organic ingredients as possible.",
+                "geo": {
+                    "accuracy": "ROOFTOP",
+                    "lat": 30.2234,
+                    "lon": -97.7697
+                },
+                "name": "(512) Brewing Company",
+                "phone": "512.707.2337",
+                "state": "Texas",
+                "type": "brewery",
+                "updated": "2010-07-22 20:00:20",
+                "website": "http://512brewing.com/"
+            }
+        }
+    },
+    "07-key-based-lookup": {
+        "query": {
+            "options": {
+                "pretty": true
+            },
+            "statement": "SELECT meta(bw) AS meta, bw AS data FROM breweries bw WHERE meta(bw).id = 'kona_brewing'"
+        },
+        "response": {
+            "data": {
+                "address": [
+                    "75-5629 Kuakini Highway"
+                ],
+                "city": "Kailua-Kona",
+                "code": "96740",
+                "country": "United States",
+                "description": "",
+                "geo": {
+                    "accuracy": "RANGE_INTERPOLATED",
+                    "lat": 19.642,
+                    "lon": -155.996
+                },
+                "name": "Kona Brewing",
+                "phone": "1-808-334-1133",
+                "state": "Hawaii",
+                "type": "brewery",
+                "updated": "2010-07-22 20:00:20",
+                "website": "http://www.konabrewingco.com"
+            },
+            "meta": {
+                "cas": 1537883725610221568,
+                "flags": 33554432,
+                "id": "kona_brewing",
+                "seq": 5,
+                "vbid": 862
+            }
+        }
+    },
+    "08-exact-match-lookup": {
+        "query": {
+            "options": {
+                "pretty": true
+            },
+            "statement": "SELECT VALUE bw FROM breweries bw WHERE bw.name = 'Kona Brewing'"
+        },
+        "response": {
+            "address": [
+                "75-5629 Kuakini Highway"
+            ],
+            "city": "Kailua-Kona",
+            "code": "96740",
+            "country": "United States",
+            "description": "",
+            "geo": {
+                "accuracy": "RANGE_INTERPOLATED",
+                "lat": 19.642,
+                "lon": -155.996
+            },
+            "name": "Kona Brewing",
+            "phone": "1-808-334-1133",
+            "state": "Hawaii",
+            "type": "brewery",
+            "updated": "2010-07-22 20:00:20",
+            "website": "http://www.konabrewingco.com"
+        }
+    },
+    "09-exact-match-lookup-different-shape": {
+        "query": {
+            "options": {
+                "pretty": true
+            },
+            "statement": "SELECT bw FROM breweries bw WHERE bw.name = 'Kona Brewing'"
+        },
+        "response": {
+            "bw": {
+                "address": [
+                    "75-5629 Kuakini Highway"
+                ],
+                "city": "Kailua-Kona",
+                "code": "96740",
+                "country": "United States",
+                "description": "",
+                "geo": {
+                    "accuracy": "RANGE_INTERPOLATED",
+                    "lat": 19.642,
+                    "lon": -155.996
+                },
+                "name": "Kona Brewing",
+                "phone": "1-808-334-1133",
+                "state": "Hawaii",
+                "type": "brewery",
+                "updated": "2010-07-22 20:00:20",
+                "website": "http://www.konabrewingco.com"
+            }
+        }
+    },
+    "10-other-query-filters": {
+        "query": {
+            "options": {
+                "pretty": true
+            },
+            "statement": "SELECT VALUE bw FROM breweries bw WHERE bw.geo.lat > 60.0 AND bw.name LIKE '%Brewing%' ORDER BY bw.name"
+        },
+        "response": [
+            {
+                "address": [
+                    "238 North Boundary Street"
+                ],
+                "city": "Wasilla",
+                "code": "99654",
+                "country": "United States",
+                "description": "",
+                "geo": {
+                    "accuracy": "RANGE_INTERPOLATED",
+                    "lat": 61.5816,
+                    "lon": -149.439
+                },
+                "name": "Great Bear Brewing",
+                "phone": "1-907-373-4782",
+                "state": "Alaska",
+                "type": "brewery",
+                "updated": "2010-07-22 20:00:20",
+                "website": ""
+            },
+            {
+                "address": [
+                    "8111 Dimond Hook Drive"
+                ],
+                "city": "Anchorage",
+                "code": "99507",
+                "country": "United States",
+                "description": "Since firing up its brew kettle in 1995, Midnight Sun Brewing Company has become a serious yet creative force on the American brewing front. From concept to glass, Midnight Sun relies on an art marries science approach, mixing tradition with innovation, to design and craft bold, distinctive beers for Alaska...and beyond. We at Midnight Sun find inspiration in the untamed spirit and rugged beauty of the Last Frontier and develop unique beers with equally appealing names and labels. But the company's true focus remains in its dedication to producing consistently high-quality beers that provide satisfying refreshment in all seasons... for Alaskans and visitors alike.  From our Pacific Northwest locale, we offer our wonderful beers on draft throughout Alaska and in 22-ounce bottles throughout Alaska and Oregon. We invite you to visit our hardworking, little brewery in South Anchorage every chance you get!",
+                "geo": {
+                    "accuracy": "ROOFTOP",
+                    "lat": 61.1473,
+                    "lon": -149.844
+                },
+                "name": "Midnight Sun Brewing Co.",
+                "phone": "1-907-344-1179",
+                "state": "Alaska",
+                "type": "brewery",
+                "updated": "2010-07-22 20:00:20",
+                "website": "http://www.midnightsunbrewing.com/"
+            },
+            {
+                "address": [],
+                "city": "Anchorage",
+                "code": "",
+                "country": "United States",
+                "description": "",
+                "geo": {
+                    "accuracy": "APPROXIMATE",
+                    "lat": 61.2181,
+                    "lon": -149.9
+                },
+                "name": "Railway Brewing",
+                "phone": "",
+                "state": "Alaska",
+                "type": "brewery",
+                "updated": "2010-07-22 20:00:20",
+                "website": ""
+            },
+            {
+                "address": [
+                    "2195 Old Steese Highway"
+                ],
+                "city": "Fox",
+                "code": "99708",
+                "country": "United States",
+                "description": "Silver Gulch Brewing and Bottling Co. has been in operation since February 1998 in the small mining community of Fox, Alaska, located about 10 miles north of Fairbanks on the Steese Highway. Silver Gulch Brewing grew from brewmaster Glenn Brady's home-brewing efforts in 5-gallon batches to its current capacity of 24-barrel (750 gallon) batches.",
+                "geo": {
+                    "accuracy": "ROOFTOP",
+                    "lat": 64.9583,
+                    "lon": -147.622
+                },
+                "name": "Silver Gulch Brewing Company",
+                "phone": "(907) 452-2739",
+                "state": "Alaska",
+                "type": "brewery",
+                "updated": "2010-07-22 20:00:20",
+                "website": "http://www.ptialaska.net/~gbrady/"
+            },
+            {
+                "address": [
+                    "717 W. 3rd Ave"
+                ],
+                "city": "Anchorage",
+                "code": "99501",
+                "country": "United States",
+                "description": "",
+                "geo": {
+                    "accuracy": "RANGE_INTERPOLATED",
+                    "lat": 61.2196,
+                    "lon": -149.896
+                },
+                "name": "Sleeping Lady Brewing Company",
+                "phone": "(907) 277-7727",
+                "state": "Alaska",
+                "type": "brewery",
+                "updated": "2010-07-22 20:00:20",
+                "website": "http://www.alaskabeers.com/"
+            }
+        ]
+    },
+    "11-equijoin": {
+        "query": {
+            "options": {},
+            "statement": "SELECT bw.name AS brewer, br.name AS beer FROM breweries bw, beers br WHERE br.brewery_id = meta(bw).id ORDER BY bw.name, br.name LIMIT 3"
+        },
+        "response": [
+            {
+                "beer": "(512) ALT",
+                "brewer": "(512) Brewing Company"
+            },
+            {
+                "beer": "(512) Bruin",
+                "brewer": "(512) Brewing Company"
+            },
+            {
+                "beer": "(512) IPA",
+                "brewer": "(512) Brewing Company"
+            }
+        ]
+    },
+    "12-equijoin-select-star": {
+        "query": {
+            "options": {
+                "pretty": true
+            },
+            "statement": "SELECT * FROM breweries bw, beers br WHERE br.brewery_id = meta(bw).id ORDER BY bw.name, br.name LIMIT 3"
+        },
+        "response": [
+            {
+                "br": {
+                    "abv": 6.0,
+                    "brewery_id": "512_brewing_company",
+                    "category": "German Ale",
+                    "description": "(512) ALT is a German-style amber ale that is fermented cooler than typical ales and cold conditioned like a lager. ALT means \u201cold\u201d in German and refers to a beer style made using ale yeast after many German brewers had switched to newly discovered lager yeast. This ale has a very smooth, yet pronounced, hop bitterness with a malty backbone and a characteristic German yeast character. Made with 98% Organic 2-row and Munch malts and US noble hops.",
+                    "ibu": 0.0,
+                    "name": "(512) ALT",
+                    "srm": 0.0,
+                    "style": "German-Style Brown Ale/Altbier",
+                    "type": "beer",
+                    "upc": 0,
+                    "updated": "2010-07-22 20:00:20"
+                },
+                "bw": {
+                    "address": [
+                        "407 Radam, F200"
+                    ],
+                    "city": "Austin",
+                    "code": "78745",
+                    "country": "United States",
+                    "description": "(512) Brewing Company is a microbrewery located in the heart of Austin that brews for the community using as many local, domestic and organic ingredients as possible.",
+                    "geo": {
+                        "accuracy": "ROOFTOP",
+                        "lat": 30.2234,
+                        "lon": -97.7697
+                    },
+                    "name": "(512) Brewing Company",
+                    "phone": "512.707.2337",
+                    "state": "Texas",
+                    "type": "brewery",
+                    "updated": "2010-07-22 20:00:20",
+                    "website": "http://512brewing.com/"
+                }
+            },
+            {
+                "br": {
+                    "abv": 7.6,
+                    "brewery_id": "512_brewing_company",
+                    "category": "North American Ale",
+                    "description": "At once cuddly and ferocious, (512) BRUIN combines a smooth, rich maltiness and mahogany color with a solid hop backbone and stealthy 7.6% alcohol. Made with Organic 2 Row and Munich malts, plus Chocolate and Crystal malts, domestic hops, and a touch of molasses, this brew has notes of raisins, dark sugars, and cocoa, and pairs perfectly with food and the crisp fall air.",
+                    "ibu": 0.0,
+                    "name": "(512) Bruin",
+                    "srm": 0.0,
+                    "style": "American-Style Brown Ale",
+                    "type": "beer",
+                    "upc": 0,
+                    "updated": "2010-07-22 20:00:20"
+                },
+                "bw": {
+                    "address": [
+                        "407 Radam, F200"
+                    ],
+                    "city": "Austin",
+                    "code": "78745",
+                    "country": "United States",
+                    "description": "(512) Brewing Company is a microbrewery located in the heart of Austin that brews for the community using as many local, domestic and organic ingredients as possible.",
+                    "geo": {
+                        "accuracy": "ROOFTOP",
+                        "lat": 30.2234,
+                        "lon": -97.7697
+                    },
+                    "name": "(512) Brewing Company",
+                    "phone": "512.707.2337",
+                    "state": "Texas",
+                    "type": "brewery",
+                    "updated": "2010-07-22 20:00:20",
+                    "website": "http://512brewing.com/"
+                }
+            },
+            {
+                "br": {
+                    "abv": 7.0,
+                    "brewery_id": "512_brewing_company",
+                    "category": "North American Ale",
+                    "description": "(512) India Pale Ale is a big, aggressively dry-hopped American IPA with smooth bitterness (~65 IBU) balanced by medium maltiness. Organic 2-row malted barley, loads of hops, and great Austin water create an ale with apricot and vanilla aromatics that lure you in for more.",
+                    "ibu": 0.0,
+                    "name": "(512) IPA",
+                    "srm": 0.0,
+                    "style": "American-Style India Pale Ale",
+                    "type": "beer",
+                    "upc": 0,
+                    "updated": "2010-07-22 20:00:20"
+                },
+                "bw": {
+                    "address": [
+                        "407 Radam, F200"
+                    ],
+                    "city": "Austin",
+                    "code": "78745",
+                    "country": "United States",
+                    "description": "(512) Brewing Company is a microbrewery located in the heart of Austin that brews for the community using as many local, domestic and organic ingredients as possible.",
+                    "geo": {
+                        "accuracy": "ROOFTOP",
+                        "lat": 30.2234,
+                        "lon": -97.7697
+                    },
+                    "name": "(512) Brewing Company",
+                    "phone": "512.707.2337",
+                    "state": "Texas",
+                    "type": "brewery",
+                    "updated": "2010-07-22 20:00:20",
+                    "website": "http://512brewing.com/"
+                }
+            }
+        ]
+    },
+    "13-ansi-join": {
+        "query": {
+            "options": {
+                "pretty": true
+            },
+            "statement": "SELECT * FROM breweries bw JOIN beers br ON br.brewery_id = meta(bw).id ORDER BY bw.name, br.name LIMIT 3"
+        },
+        "response": [
+            {
+                "br": {
+                    "abv": 6.0,
+                    "brewery_id": "512_brewing_company",
+                    "category": "German Ale",
+                    "description": "(512) ALT is a German-style amber ale that is fermented cooler than typical ales and cold conditioned like a lager. ALT means \u201cold\u201d in German and refers to a beer style made using ale yeast after many German brewers had switched to newly discovered lager yeast. This ale has a very smooth, yet pronounced, hop bitterness with a malty backbone and a characteristic German yeast character. Made with 98% Organic 2-row and Munch malts and US noble hops.",
+                    "ibu": 0.0,
+                    "name": "(512) ALT",
+                    "srm": 0.0,
+                    "style": "German-Style Brown Ale/Altbier",
+                    "type": "beer",
+                    "upc": 0,
+                    "updated": "2010-07-22 20:00:20"
+                },
+                "bw": {
+                    "address": [
+                        "407 Radam, F200"
+                    ],
+                    "city": "Austin",
+                    "code": "78745",
+                    "country": "United States",
+                    "description": "(512) Brewing Company is a microbrewery located in the heart of Austin that brews for the community using as many local, domestic and organic ingredients as possible.",
+                    "geo": {
+                        "accuracy": "ROOFTOP",
+                        "lat": 30.2234,
+                        "lon": -97.7697
+                    },
+                    "name": "(512) Brewing Company",
+                    "phone": "512.707.2337",
+                    "state": "Texas",
+                    "type": "brewery",
+                    "updated": "2010-07-22 20:00:20",
+                    "website": "http://512brewing.com/"
+                }
+            },
+            {
+                "br": {
+                    "abv": 7.6,
+                    "brewery_id": "512_brewing_company",
+                    "category": "North American Ale",
+                    "description": "At once cuddly and ferocious, (512) BRUIN combines a smooth, rich maltiness and mahogany color with a solid hop backbone and stealthy 7.6% alcohol. Made with Organic 2 Row and Munich malts, plus Chocolate and Crystal malts, domestic hops, and a touch of molasses, this brew has notes of raisins, dark sugars, and cocoa, and pairs perfectly with food and the crisp fall air.",
+                    "ibu": 0.0,
+                    "name": "(512) Bruin",
+                    "srm": 0.0,
+                    "style": "American-Style Brown Ale",
+                    "type": "beer",
+                    "upc": 0,
+                    "updated": "2010-07-22 20:00:20"
+                },
+                "bw": {
+                    "address": [
+                        "407 Radam, F200"
+                    ],
+                    "city": "Austin",
+                    "code": "78745",
+                    "country": "United States",
+                    "description": "(512) Brewing Company is a microbrewery located in the heart of Austin that brews for the community using as many local, domestic and organic ingredients as possible.",
+                    "geo": {
+                        "accuracy": "ROOFTOP",
+                        "lat": 30.2234,
+                        "lon": -97.7697
+                    },
+                    "name": "(512) Brewing Company",
+                    "phone": "512.707.2337",
+                    "state": "Texas",
+                    "type": "brewery",
+                    "updated": "2010-07-22 20:00:20",
+                    "website": "http://512brewing.com/"
+                }
+            },
+            {
+                "br": {
+                    "abv": 7.0,
+                    "brewery_id": "512_brewing_company",
+                    "category": "North American Ale",
+                    "description": "(512) India Pale Ale is a big, aggressively dry-hopped American IPA with smooth bitterness (~65 IBU) balanced by medium maltiness. Organic 2-row malted barley, loads of hops, and great Austin water create an ale with apricot and vanilla aromatics that lure you in for more.",
+                    "ibu": 0.0,
+                    "name": "(512) IPA",
+                    "srm": 0.0,
+                    "style": "American-Style India Pale Ale",
+                    "type": "beer",
+                    "upc": 0,
+                    "updated": "2010-07-22 20:00:20"
+                },
+                "bw": {
+                    "address": [
+                        "407 Radam, F200"
+                    ],
+                    "city": "Austin",
+                    "code": "78745",
+                    "country": "United States",
+                    "description": "(512) Brewing Company is a microbrewery located in the heart of Austin that brews for the community using as many local, domestic and organic ingredients as possible.",
+                    "geo": {
+                        "accuracy": "ROOFTOP",
+                        "lat": 30.2234,
+                        "lon": -97.7697
+                    },
+                    "name": "(512) Brewing Company",
+                    "phone": "512.707.2337",
+                    "state": "Texas",
+                    "type": "brewery",
+                    "updated": "2010-07-22 20:00:20",
+                    "website": "http://512brewing.com/"
+                }
+            }
+        ]
+    },
+    "14-join-select-values": {
+        "query": {
+            "options": {
+                "pretty": true
+            },
+            "statement": "SELECT VALUE {\"bw\": bw, \"br\": br} FROM breweries bw, beers br WHERE br.brewery_id = meta(bw).id ORDER BY bw.name, br.name LIMIT 3"
+        },
+        "response": [
+            {
+                "br": {
+                    "abv": 6.0,
+                    "brewery_id": "512_brewing_company",
+                    "category": "German Ale",
+                    "description": "(512) ALT is a German-style amber ale that is fermented cooler than typical ales and cold conditioned like a lager. ALT means \u201cold\u201d in German and refers to a beer style made using ale yeast after many German brewers had switched to newly discovered lager yeast. This ale has a very smooth, yet pronounced, hop bitterness with a malty backbone and a characteristic German yeast character. Made with 98% Organic 2-row and Munch malts and US noble hops.",
+                    "ibu": 0.0,
+                    "name": "(512) ALT",
+                    "srm": 0.0,
+                    "style": "German-Style Brown Ale/Altbier",
+                    "type": "beer",
+                    "upc": 0,
+                    "updated": "2010-07-22 20:00:20"
+                },
+                "bw": {
+                    "address": [
+                        "407 Radam, F200"
+                    ],
+                    "city": "Austin",
+                    "code": "78745",
+                    "country": "United States",
+                    "description": "(512) Brewing Company is a microbrewery located in the heart of Austin that brews for the community using as many local, domestic and organic ingredients as possible.",
+                    "geo": {
+                        "accuracy": "ROOFTOP",
+                        "lat": 30.2234,
+                        "lon": -97.7697
+                    },
+                    "name": "(512) Brewing Company",
+                    "phone": "512.707.2337",
+                    "state": "Texas",
+                    "type": "brewery",
+                    "updated": "2010-07-22 20:00:20",
+                    "website": "http://512brewing.com/"
+                }
+            },
+            {
+                "br": {
+                    "abv": 7.6,
+                    "brewery_id": "512_brewing_company",
+                    "category": "North American Ale",
+                    "description": "At once cuddly and ferocious, (512) BRUIN combines a smooth, rich maltiness and mahogany color with a solid hop backbone and stealthy 7.6% alcohol. Made with Organic 2 Row and Munich malts, plus Chocolate and Crystal malts, domestic hops, and a touch of molasses, this brew has notes of raisins, dark sugars, and cocoa, and pairs perfectly with food and the crisp fall air.",
+                    "ibu": 0.0,
+                    "name": "(512) Bruin",
+                    "srm": 0.0,
+                    "style": "American-Style Brown Ale",
+                    "type": "beer",
+                    "upc": 0,
+                    "updated": "2010-07-22 20:00:20"
+                },
+                "bw": {
+                    "address": [
+                        "407 Radam, F200"
+                    ],
+                    "city": "Austin",
+                    "code": "78745",
+                    "country": "United States",
+                    "description": "(512) Brewing Company is a microbrewery located in the heart of Austin that brews for the community using as many local, domestic and organic ingredients as possible.",
+                    "geo": {
+                        "accuracy": "ROOFTOP",
+                        "lat": 30.2234,
+                        "lon": -97.7697
+                    },
+                    "name": "(512) Brewing Company",
+                    "phone": "512.707.2337",
+                    "state": "Texas",
+                    "type": "brewery",
+                    "updated": "2010-07-22 20:00:20",
+                    "website": "http://512brewing.com/"
+                }
+            },
+            {
+                "br": {
+                    "abv": 7.0,
+                    "brewery_id": "512_brewing_company",
+                    "category": "North American Ale",
+                    "description": "(512) India Pale Ale is a big, aggressively dry-hopped American IPA with smooth bitterness (~65 IBU) balanced by medium maltiness. Organic 2-row malted barley, loads of hops, and great Austin water create an ale with apricot and vanilla aromatics that lure you in for more.",
+                    "ibu": 0.0,
+                    "name": "(512) IPA",
+                    "srm": 0.0,
+                    "style": "American-Style India Pale Ale",
+                    "type": "beer",
+                    "upc": 0,
+                    "updated": "2010-07-22 20:00:20"
+                },
+                "bw": {
+                    "address": [
+                        "407 Radam, F200"
+                    ],
+                    "city": "Austin",
+                    "code": "78745",
+                    "country": "United States",
+                    "description": "(512) Brewing Company is a microbrewery located in the heart of Austin that brews for the community using as many local, domestic and organic ingredients as possible.",
+                    "geo": {
+                        "accuracy": "ROOFTOP",
+                        "lat": 30.2234,
+                        "lon": -97.7697
+                    },
+                    "name": "(512) Brewing Company",
+                    "phone": "512.707.2337",
+                    "state": "Texas",
+                    "type": "brewery",
+                    "updated": "2010-07-22 20:00:20",
+                    "website": "http://512brewing.com/"
+                }
+            }
+        ]
+    },
+    "15-nested-outer-join": {
+        "query": {
+            "options": {
+                "pretty": true
+            },
+            "statement": "SELECT bw.name AS brewer, (SELECT br.name, br.abv FROM beers br WHERE br.brewery_id = meta(bw).id ORDER BY br.name) AS beers FROM breweries bw ORDER BY bw.name LIMIT 2"
+        },
+        "response": [
+            {
+                "beers": [
+                    {
+                        "abv": 6.0,
+                        "name": "(512) ALT"
+                    },
+                    {
+                        "abv": 7.6,
+                        "name": "(512) Bruin"
+                    },
+                    {
+                        "abv": 7.0,
+                        "name": "(512) IPA"
+                    },
+                    {
+                        "abv": 5.8,
+                        "name": "(512) Pale"
+                    },
+                    {
+                        "abv": 6.8,
+                        "name": "(512) Pecan Porter"
+                    },
+                    {
+                        "abv": 8.2,
+                        "name": "(512) Whiskey Barrel Aged Double Pecan Porter"
+                    },
+                    {
+                        "abv": 5.2,
+                        "name": "(512) Wit"
+                    },
+                    {
+                        "abv": 8.0,
+                        "name": "One"
+                    }
+                ],
+                "brewer": "(512) Brewing Company"
+            },
+            {
+                "beers": [
+                    {
+                        "abv": 7.2,
+                        "name": "21A IPA"
+                    },
+                    {
+                        "abv": 5.0,
+                        "name": "563 Stout"
+                    },
+                    {
+                        "abv": 5.2,
+                        "name": "Amendment Pale Ale"
+                    },
+                    {
+                        "abv": 3.6,
+                        "name": "Bitter American"
+                    },
+                    {
+                        "abv": 9.8,
+                        "name": "Double Trouble IPA"
+                    },
+                    {
+                        "abv": 5.5,
+                        "name": "General Pippo's Porter"
+                    },
+                    {
+                        "abv": 5.8,
+                        "name": "North Star Red"
+                    },
+                    {
+                        "abv": 5.9,
+                        "name": "Oyster Point Oyster Stout"
+                    },
+                    {
+                        "abv": 5.2,
+                        "name": "Potrero ESB"
+                    },
+                    {
+                        "abv": 5.0,
+                        "name": "South Park Blonde"
+                    },
+                    {
+                        "abv": 5.5,
+                        "name": "Watermelon Wheat"
+                    }
+                ],
+                "brewer": "21st Amendment Brewery Cafe"
+            }
+        ]
+    },
+    "16-theta-join": {
+        "query": {
+            "options": {
+                "pretty": true
+            },
+            "statement": "SELECT bw1.name AS brewer, bw1.geo AS location, (SELECT VALUE bw2.name FROM breweries bw2 WHERE bw2.name != bw1.name AND abs(bw1.geo.lat - bw2.geo.lat) <= 0.1 AND abs(bw2.geo.lon - bw1.geo.lon) <= 0.1) AS competitors FROM breweries bw1 WHERE bw1.state = 'Arizona' ORDER BY bw1.name LIMIT 3"
+        },
+        "response": [
+            {
+                "brewer": "Barley Brothers Brewery and Grill",
+                "competitors": [
+                    "Mudshark Brewing"
+                ],
+                "location": {
+                    "accuracy": "RANGE_INTERPOLATED",
+                    "lat": 34.4702,
+                    "lon": -114.35
+                }
+            },
+            {
+                "brewer": "Flagstaff Brewing",
+                "competitors": [
+                    "Mogollon Brewing Company"
+                ],
+                "location": {
+                    "accuracy": "ROOFTOP",
+                    "lat": 35.1973,
+                    "lon": -111.648
+                }
+            },
+            {
+                "brewer": "Four Peaks Brewing",
+                "competitors": [
+                    "Rio Salado Brewing"
+                ],
+                "location": {
+                    "accuracy": "ROOFTOP",
+                    "lat": 33.4194,
+                    "lon": -111.916
+                }
+            }
+        ]
+    },
+    "17-existential-quantification": {
+        "query": {
+            "options": {
+                "pretty": true
+            },
+            "statement": "WITH nested_breweries AS ( SELECT bw.name AS brewer, bw.phone, ( SELECT br.name, br.abv FROM beers br WHERE br.brewery_id = meta(bw).id ORDER BY br.name) AS beers FROM breweries bw) SELECT VALUE nb FROM nested_breweries nb WHERE (SOME b IN nb.beers SATISFIES b.name LIKE '%IPA%') ORDER BY nb.brewer LIMIT 2"
+        },
+        "response": [
+            {
+                "beers": [
+                    {
+                        "abv": 6.0,
+                        "name": "(512) ALT"
+                    },
+                    {
+                        "abv": 7.6,
+                        "name": "(512) Bruin"
+                    },
+                    {
+                        "abv": 7.0,
+                        "name": "(512) IPA"
+                    },
+                    {
+                        "abv": 5.8,
+                        "name": "(512) Pale"
+                    },
+                    {
+                        "abv": 6.8,
+                        "name": "(512) Pecan Porter"
+                    },
+                    {
+                        "abv": 8.2,
+                        "name": "(512) Whiskey Barrel Aged Double Pecan Porter"
+                    },
+                    {
+                        "abv": 5.2,
+                        "name": "(512) Wit"
+                    },
+                    {
+                        "abv": 8.0,
+                        "name": "One"
+                    }
+                ],
+                "brewer": "(512) Brewing Company",
+                "phone": "512.707.2337"
+            },
+            {
+                "beers": [
+                    {
+                        "abv": 7.2,
+                        "name": "21A IPA"
+                    },
+                    {
+                        "abv": 5.0,
+                        "name": "563 Stout"
+                    },
+                    {
+                        "abv": 5.2,
+                        "name": "Amendment Pale Ale"
+                    },
+                    {
+                        "abv": 3.6,
+                        "name": "Bitter American"
+                    },
+                    {
+                        "abv": 9.8,
+                        "name": "Double Trouble IPA"
+                    },
+                    {
+                        "abv": 5.5,
+                        "name": "General Pippo's Porter"
+                    },
+                    {
+                        "abv": 5.8,
+                        "name": "North Star Red"
+                    },
+                    {
+                        "abv": 5.9,
+                        "name": "Oyster Point Oyster Stout"
+                    },
+                    {
+                        "abv": 5.2,
+                        "name": "Potrero ESB"
+                    },
+                    {
+                        "abv": 5.0,
+                        "name": "South Park Blonde"
+                    },
+                    {
+                        "abv": 5.5,
+                        "name": "Watermelon Wheat"
+                    }
+                ],
+                "brewer": "21st Amendment Brewery Cafe",
+                "phone": "1-415-369-0900"
+            }
+        ]
+    },
+    "18-universal-quantification": {
+        "query": {
+            "options": {
+                "pretty": true
+            },
+            "statement": "WITH nested_breweries AS ( SELECT bw.name AS brewer, bw.phone, ( SELECT br.name, br.abv FROM beers br WHERE br.brewery_id = meta(bw).id ORDER BY br.name) AS beers FROM breweries bw) SELECT VALUE nb FROM nested_breweries nb WHERE (EVERY b IN nb.beers SATISFIES b.abv >= 10) AND ARRAY_COUNT(nb.beers) > 0 ORDER BY nb.brewer LIMIT 5"
+        },
+        "response": [
+            {
+                "beers": [
+                    {
+                        "abv": 10.5,
+                        "name": "Podge Belgian Imperial Stout"
+                    }
+                ],
+                "brewer": "Alvinne Picobrouwerij",
+                "phone": "32-051-/-30-55-17"
+            },
+            {
+                "beers": [
+                    {
+                        "abv": 13.0,
+                        "name": "Belzebuth"
+                    }
+                ],
+                "brewer": "Brasserie Grain D'Orge",
+                "phone": ""
+            },
+            {
+                "beers": [
+                    {
+                        "abv": 10.0,
+                        "name": "Malheur 10"
+                    },
+                    {
+                        "abv": 12.0,
+                        "name": "Malheur 12"
+                    },
+                    {
+                        "abv": 12.0,
+                        "name": "Malheur Black Chocolate 2003"
+                    },
+                    {
+                        "abv": 11.0,
+                        "name": "Malheur Brut Reserve"
+                    },
+                    {
+                        "abv": 10.0,
+                        "name": "Malheur MM"
+                    }
+                ],
+                "brewer": "Brouwerij De Landtsheer",
+                "phone": "32-052-33-39-11"
+            },
+            {
+                "beers": [
+                    {
+                        "abv": 10.0,
+                        "name": "Maredsous 10 Tripple"
+                    }
+                ],
+                "brewer": "Brouwerij Duvel Moortgat",
+                "phone": ""
+            },
+            {
+                "beers": [
+                    {
+                        "abv": 10.0,
+                        "name": "Sexual Chocolate"
+                    }
+                ],
+                "brewer": "Foothills Brewing Company",
+                "phone": "(336) 777-3348"
+            }
+        ]
+    },
+    "19-simple-aggregation": {
+        "query": {
+            "options": {},
+            "statement": "SELECT COUNT(*) AS num_beers FROM beers"
+        },
+        "response": {
+            "num_beers": 5891
+        }
+    },
+    "20-simple-aggregation-unwrapped-value": {
+        "query": {
+            "options": {},
+            "statement": "SELECT VALUE COUNT(b) FROM beers b"
+        },
+        "response": 5891
+    },
+    "21-simple-aggregation-explicit": {
+        "query": {
+            "options": {},
+            "statement": "SELECT VALUE ARRAY_COUNT((SELECT b FROM beers b))"
+        },
+        "response": 5891
+    },
+    "22-grouping-and-aggregation": {
+        "query": {
+            "options": {},
+            "statement": "SELECT br.brewery_id, COUNT(*) AS num_beers FROM beers br GROUP BY br.brewery_id HAVING COUNT(*) > 30 ORDER BY COUNT(*) DESC"
+        },
+        "response": [
+            {
+                "brewery_id": "midnight_sun_brewing_co",
+                "num_beers": 57
+            },
+            {
+                "brewery_id": "rogue_ales",
+                "num_beers": 49
+            },
+            {
+                "brewery_id": "anheuser_busch",
+                "num_beers": 38
+            },
+            {
+                "brewery_id": "egan_brewing",
+                "num_beers": 37
+            },
+            {
+                "brewery_id": "troegs_brewing",
+                "num_beers": 37
+            },
+            {
+                "brewery_id": "boston_beer_company",
+                "num_beers": 36
+            },
+            {
+                "brewery_id": "f_x_matt_brewing",
+                "num_beers": 34
+            },
+            {
+                "brewery_id": "titletown_brewing",
+                "num_beers": 34
+            },
+            {
+                "brewery_id": "sierra_nevada_brewing_co",
+                "num_beers": 33
+            },
+            {
+                "brewery_id": "stone_brewing_co",
+                "num_beers": 32
+            },
+            {
+                "brewery_id": "southern_tier_brewing_co",
+                "num_beers": 31
+            }
+        ]
+    },
+    "23-grouping-and-aggregation-with-hint": {
+        "query": {
+            "options": {},
+            "statement": "SELECT br.brewery_id, COUNT(*) AS num_beers FROM beers br /*+ hash */ GROUP BY br.brewery_id HAVING COUNT(*) > 30 ORDER BY COUNT(*) DESC"
+        },
+        "response": [
+            {
+                "brewery_id": "midnight_sun_brewing_co",
+                "num_beers": 57
+            },
+            {
+                "brewery_id": "rogue_ales",
+                "num_beers": 49
+            },
+            {
+                "brewery_id": "anheuser_busch",
+                "num_beers": 38
+            },
+            {
+                "brewery_id": "troegs_brewing",
+                "num_beers": 37
+            },
+            {
+                "brewery_id": "egan_brewing",
+                "num_beers": 37
+            },
+            {
+                "brewery_id": "boston_beer_company",
+                "num_beers": 36
+            },
+            {
+                "brewery_id": "f_x_matt_brewing",
+                "num_beers": 34
+            },
+            {
+                "brewery_id": "titletown_brewing",
+                "num_beers": 34
+            },
+            {
+                "brewery_id": "sierra_nevada_brewing_co",
+                "num_beers": 33
+            },
+            {
+                "brewery_id": "stone_brewing_co",
+                "num_beers": 32
+            },
+            {
+                "brewery_id": "southern_tier_brewing_co",
+                "num_beers": 31
+            }
+        ]
+    },
+    "24-grouping-and-limits": {
+        "query": {
+            "options": {},
+            "statement": "SELECT bw.name, COUNT(*) AS num_beers, AVG(br.abv) AS abv_avg, MIN(br.abv) AS abv_min, MAX(br.abv) AS abv_max FROM breweries bw, beers br WHERE br.brewery_id = meta(bw).id GROUP BY bw.name ORDER BY num_beers DESC LIMIT 3"
+        },
+        "response": [
+            {
+                "abv_avg": 7.7675438596491215,
+                "abv_max": 16.0,
+                "abv_min": 0.0,
+                "name": "Midnight Sun Brewing Co.",
+                "num_beers": 57
+            },
+            {
+                "abv_avg": 4.688775510204082,
+                "abv_max": 11.5,
+                "abv_min": 0.0,
+                "name": "Rogue Ales",
+                "num_beers": 49
+            },
+            {
+                "abv_avg": 3.8052631578947373,
+                "abv_max": 8.0,
+                "abv_min": 0.0,
+                "name": "Anheuser-Busch",
+                "num_beers": 38
+            }
+        ]
+    },
+    "25-named-parameters": {
+        "query": {
+            "options": {
+                "name": "Kona Brewing",
+                "pretty": true
+            },
+            "statement": "SELECT VALUE bw FROM breweries bw WHERE bw.name = $name"
+        },
+        "response": {
+            "address": [
+                "75-5629 Kuakini Highway"
+            ],
+            "city": "Kailua-Kona",
+            "code": "96740",
+            "country": "United States",
+            "description": "",
+            "geo": {
+                "accuracy": "RANGE_INTERPOLATED",
+                "lat": 19.642,
+                "lon": -155.996
+            },
+            "name": "Kona Brewing",
+            "phone": "1-808-334-1133",
+            "state": "Hawaii",
+            "type": "brewery",
+            "updated": "2010-07-22 20:00:20",
+            "website": "http://www.konabrewingco.com"
+        }
+    },
+    "26-positional-parameters": {
+        "query": {
+            "options": {
+                "pretty": true
+            },
+            "args" :["Kona Brewing"],
+            "statement": "SELECT VALUE bw FROM breweries bw WHERE bw.name = ?"
+        },
+        "response": {
+            "address": [
+                "75-5629 Kuakini Highway"
+            ],
+            "city": "Kailua-Kona",
+            "code": "96740",
+            "country": "United States",
+            "description": "",
+            "geo": {
+                "accuracy": "RANGE_INTERPOLATED",
+                "lat": 19.642,
+                "lon": -155.996
+            },
+            "name": "Kona Brewing",
+            "phone": "1-808-334-1133",
+            "state": "Hawaii",
+            "type": "brewery",
+            "updated": "2010-07-22 20:00:20",
+            "website": "http://www.konabrewingco.com"
+        }
+    }
+}
