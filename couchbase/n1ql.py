@@ -167,6 +167,14 @@ class N1QLQuery(object):
         self._body[name] = value
 
     @property
+    def metrics(self):
+        return self._body.get('metrics', True)
+
+    @metrics.setter
+    def metrics(self, value):
+        self.set_option('metrics', value)
+
+    @property
     def statement(self):
         return self._body['statement']
 
@@ -368,7 +376,7 @@ class N1QLQuery(object):
 
 
 class N1QLRequest(object):
-    def __init__(self, params, parent, row_factory=lambda x: x):
+    def __init__(self, params, parent, row_factory=lambda x: x, meta_lookahead = True, **kwargs):
         """
         Object representing the execution of the request on the
         server.
@@ -399,6 +407,8 @@ class N1QLRequest(object):
         self._do_iter = True
         self.__raw = False
         self.__meta_received = False
+        self.buffered_remainder = []
+        self.meta_lookahead = meta_lookahead
 
     def _submit_query(self):
         return self._parent._n1ql_query(self._params.encoded,
@@ -418,6 +428,13 @@ class N1QLRequest(object):
 
     @property
     def meta(self):
+        return self.meta_retrieve()
+
+    @property
+    def metrics(self):
+        return self.meta_retrieve().get('metrics', None)
+
+    def meta_retrieve(self, meta_lookahead = None):
         """
         Get metadata from the query itself. This is guaranteed to only
         return a Python dictionary.
@@ -433,8 +450,11 @@ class N1QLRequest(object):
         :return: A dictionary containing the query metadata
         """
         if not self.__meta_received:
-            raise RuntimeError(
-                'This property only valid once all rows are received!')
+            if meta_lookahead or self.meta_lookahead:
+                self.buffered_remainder = list(self)
+            else:
+                raise RuntimeError(
+                    'This property only valid once all rows are received!')
 
         if isinstance(self.raw.value, dict):
             return self.raw.value
@@ -492,7 +512,10 @@ class N1QLRequest(object):
             return r
 
     def __iter__(self):
-        if not self._do_iter:
+        if self.buffered_remainder:
+            while len(self.buffered_remainder)>0:
+                yield self.buffered_remainder.pop(0)
+        elif not self._do_iter:
             raise AlreadyQueriedError()
 
         self._start()

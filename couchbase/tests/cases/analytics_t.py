@@ -112,7 +112,7 @@ class CBASTestBase(RealServerTestCase):
                 result = list(query)
                 if len(result) == 1:
                     result = result[0]
-            metrics = query.meta.get("metrics", {})
+            metrics = query.metrics
         except Exception as e:
             result = e
         if not quiet:
@@ -193,6 +193,14 @@ class CBASTestSpecific(CBASTestBase):
         self.init_if_not_setup()
         query = self.cb.analytics_query('SELECT * FROM Metadata.`Dataverse`', self.cluster_info.host)
         logging.error("Got query {}".format(repr(query._params)))
+        result = list(query)
+        logging.error("got result [{}]".format(result))
+
+    def test_hasmetrics(self):
+        self.init_if_not_setup()
+        query = self.cb._analytics_query('SELECT * FROM Metadata.`Dataverse`', self.cluster_info.host)
+        logging.error("Got query {}".format(repr(query._params)))
+        self.assertNotEqual(query.metrics,{})
         result = list(query)
         logging.error("got result [{}]".format(result))
 

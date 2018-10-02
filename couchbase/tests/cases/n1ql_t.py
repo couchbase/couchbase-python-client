@@ -20,6 +20,7 @@ from __future__ import print_function
 from couchbase.exceptions import HTTPError
 from couchbase.tests.base import MockTestCase
 from couchbase.n1ql import N1QLQuery
+import json
 
 
 class N1QLTest(MockTestCase):
@@ -32,9 +33,20 @@ class N1QLTest(MockTestCase):
         self.assertEqual(None, rv)
 
     def test_meta(self):
-        q = self.cb.n1ql_query('SELECT mockrow')
+        q = self.cb.n1ql_query('SELECT mockrow',meta_lookahead=False)
         self.assertRaises(RuntimeError, getattr, q, 'meta')
         q.execute()
+        self.assertIsInstance(q.meta, dict)
+
+    def test_metrics_switch(self):
+        q = N1QLQuery('SELECT mockrow')
+        q.metrics = False
+        self.assertFalse(json.loads(q.encoded)['metrics'])
+        q.metrics = True
+        self.assertTrue(json.loads(q.encoded)['metrics'])
+
+    def test_meta_lookahead(self):
+        q = self.cb.n1ql_query('SELECT mockrow',meta_lookahead=True)
         self.assertIsInstance(q.meta, dict)
 
     def test_httperror_str(self):
