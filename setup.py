@@ -5,6 +5,7 @@ import os
 import platform
 import warnings
 import couchbase_version
+import pip
 
 try:
     if os.environ.get('PYCBC_NO_DISTRIBUTE'):
@@ -88,6 +89,10 @@ if sys.platform != 'win32':
         extoptions['include_dirs'] = ['/usr/local/include']
 
 else:
+    if sys.version_info<(3,0,0):
+        if pip.__version__<"9.0.0":
+            raise pip.exceptions.InstallationError("Windows on Python earlier than v3 unsupported.")
+
     warnings.warn("I'm detecting you're running windows."
                   "You might want to modify "
                   "the 'setup.py' script to use appropriate paths")
@@ -198,8 +203,11 @@ setup(
         'acouchbase.py34only'
     ] if sys.version_info >= (3, 4) else []),
     package_data = pkgdata,
-    install_requires = [],
-    tests_require = [ 'nose', 'testresources>=0.2.7', 'basictracer==2.2.0'  ],
-    test_suite = 'couchbase.tests.test_sync',
+
+    install_requires=["pip>=9.0; (sys_platform != 'win32' and python_version >= '2.7') or (python_version >= '3.0')"]
+        if pip.__version__ >= "9.0.0"
+        else [],
+    tests_require=['nose', 'testresources>=0.2.7', 'basictracer==2.2.0'],
+    test_suite='couchbase.tests.test_sync',
     **setup_kw
 )
