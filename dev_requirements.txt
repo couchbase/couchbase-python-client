@@ -8,11 +8,7 @@ jsonschema==2.6.0
 configparser==3.5.0
 testfixtures==5.4.0
 basictracer==2.2.0
-jaeger-client==3.9.0
-docker==3.3.0
-py-zipkin==0.11.0
 zipkin==0.1.0
-opentracing-pyzipkin==0.0.1
 pyparsing==2.2.0
 configparser2
 parameterized

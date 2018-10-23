@@ -34,6 +34,9 @@ import time
 from basictracer import BasicTracer, SpanRecorder
 import couchbase
 import couchbase._libcouchbase
+
+from typing import *
+from couchbase.bucket import Bucket
 if os.environ.get("PYCBC_TRACE_GC") in ['FULL', 'STATS_LEAK_ONLY']:
     gc.set_debug(gc.DEBUG_STATS | gc.DEBUG_LEAK)
 
@@ -96,11 +99,12 @@ class ClusterInformation(object):
         self.protocol = "http"
         self.enable_tracing = "off"
         self.tracingparms = {}
+        self.bucket_username = None
 
     @staticmethod
     def filter_opts(options):
         return {key: value for key, value in
-                options.items() if key in ["certpath", "keypath", "ipv6", "config_cache", "compression", "log_redaction", "enable_tracing"]}
+                options.items() if key in ["certpath", "keypath", "ipv6", "config_cache", "compression", "log_redaction", "enable_tracing", "network"]}
 
     def make_connargs(self, **overrides):
         bucket = self.bucket_name
@@ -130,6 +134,9 @@ class ClusterInformation(object):
             'password': self.bucket_password,
             'connection_string': connstr
         }
+
+        if self.bucket_username:
+            ret['password']=self.bucket_username
         ret.update(overrides)
         return ret
 
@@ -164,6 +171,7 @@ class ConnectionConfiguration(object):
         info.protocol = config.get('realserver', 'protocol', fallback="http")
         info.enable_tracing = config.get('realserver', 'tracing', fallback=None)
         info.tracingparms['port'] = config.get('realserver', 'tracing_port', fallback=None)
+        info.network = config.get('realserver','network',fallback=None)
         logging.info("info is "+str(info.__dict__))
         self.enable_tracing = info.enable_tracing
         if config.getboolean('realserver', 'enabled'):
@@ -223,6 +231,7 @@ class MockResourceManager(TestResourceManager):
         info.host = "127.0.0.1"
         info.admin_username = "Administrator"
         info.admin_password = "password"
+        info.network = None
         info.mock = mock
         info.enable_tracing = self._config.enable_tracing
         self._info = info
@@ -291,6 +300,7 @@ class CouchbaseTestCase(ResourcedTestCase):
 
     @property
     def cluster_info(self):
+        # type: (Any)->ClusterInformation
         for v in [self._realserver_info, self._mock_info]:
             if v:
                 return v
@@ -392,6 +402,7 @@ class CouchbaseTestCase(ResourcedTestCase):
         return self.cluster_info.make_connargs(**overrides)
 
     def make_connection(self, **kwargs):
+        # type: (**Dict[str,Any])->Bucket
         return self.cluster_info.make_connection(self.factory, **kwargs)
 
     def make_admin_connection(self):

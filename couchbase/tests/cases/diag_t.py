@@ -105,7 +105,8 @@ class DiagnosticsTests(ConnectionTestCase):
         jsonschema.validate(result, any_of_required_services_schema)
 
     def test_diagnostics(self):
-
+        if getattr(self.cluster_info,"network","") == "external":
+            raise SkipTest("Issue with diagnostics on external network")
         if self.is_mock:
             raise SkipTest()
         result = self.cb.diagnostics()

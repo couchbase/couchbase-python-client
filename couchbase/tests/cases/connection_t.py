@@ -25,7 +25,7 @@ from couchbase.exceptions import (AuthError, ArgumentError,
                                   CouchbaseNetworkError,
                                   NotFoundError, InvalidError,
                                   TimeoutError)
-from couchbase.tests.base import CouchbaseTestCase, SkipTest
+from couchbase.tests.base import CouchbaseTestCase, SkipTest, ConnectionTestCase
 from couchbase.connstr import ConnectionString
 
 
@@ -119,6 +119,34 @@ class ConnectionTest(CouchbaseTestCase):
         conn_str = 'http://{0}:{1}?enable_errmap=true'.format(self.cluster_info.host, self.cluster_info.port)
         cb = self.factory(conn_str)
         self.assertTrue(cb.upsert("foo", "bar").success)
+
+
+class AlternateNamesTest(ConnectionTestCase):
+    def setUp(self):
+        super(AlternateNamesTest, self).setUp()
+        self.args = dict()
+        self.cb = None
+
+    def test_external(self):
+        if self.is_mock:
+            raise SkipTest("Not supported with mock")
+        super(AlternateNamesTest, self).setUp(network="external", **self.args)
+        self.check_all_services()
+
+    def test_default(self):
+        super(AlternateNamesTest, self).setUp(network="default", **self.args)
+        self.check_all_services()
+
+    def test_blank(self):
+        super(AlternateNamesTest, self).setUp(network=None, **self.args)
+        self.check_all_services()
+
+    def check_all_services(self):
+        import uuid
+        unique_str = str(uuid.uuid4())
+        self.cb.upsert("network", unique_str)
+        self.assertEqual(self.cb.get("network").value, unique_str)
+
 
 if __name__ == '__main__':
     unittest.main()
