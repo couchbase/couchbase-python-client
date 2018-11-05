@@ -4,6 +4,7 @@ import unittest
 from couchbase.experimental import enable; enable()
 from fixtures import asynct, AioTestCase
 from couchbase.n1ql import N1QLQuery
+from couchbase.exceptions import CouchbaseError
 
 
 

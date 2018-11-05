@@ -1,5 +1,5 @@
 from fixtures import asynct, AioTestCase
-
+from couchbase.exceptions import CouchbaseError
 class CouchbasePy35Test(AioTestCase):
 
     def setUp(self):

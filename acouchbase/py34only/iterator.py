@@ -23,7 +23,6 @@ class AioBase:
 
         yield from iter(self.__accum.get_nowait, None)
 
-    @asyncio.coroutine
     def __aiter__(self):
         if self._future is None:
             raise ValueError("do not yield from result.future before calling async for.")
