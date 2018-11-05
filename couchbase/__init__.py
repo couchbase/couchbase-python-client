@@ -27,6 +27,11 @@ warnings.filterwarnings(action='default',
 
 from couchbase.user_constants import *
 import couchbase._libcouchbase as _LCB
+
+from typing import Callable, Any, Union, NewType, Mapping, List
+JSON = Union[str, int, float, bool, None, Mapping[str, 'JSON'], List['JSON']]
+
+
 from couchbase.crypto import *
 try:
     from couchbase._version import __version__

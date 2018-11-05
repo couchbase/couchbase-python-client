@@ -40,6 +40,35 @@ from couchbase.bucket import Bucket
 if os.environ.get("PYCBC_TRACE_GC") in ['FULL', 'STATS_LEAK_ONLY']:
     gc.set_debug(gc.DEBUG_STATS | gc.DEBUG_LEAK)
 
+from utilspie.collectionsutils import frozendict
+
+loglevel=os.environ.get("PYCBC_DEBUG_LOG")
+if loglevel:
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.getLevelName(loglevel))
+    logging.getLogger().addHandler(ch)
+
+
+def sanitize_json(input, ignored_parts):
+    # types (Any,Dict) -> Any
+    if isinstance(input, list):
+        return tuple(set(sanitize_json(x, ignored_parts) for x in input))
+    elif isinstance(input,str):
+        return input.replace("'",'"')
+    elif isinstance(input,float):
+        return round(input,5)
+    elif isinstance(input,dict):
+        result ={}
+        for key, value in input.items():
+            sub_ignored_parts = None
+            if isinstance(ignored_parts, dict):
+                sub_ignored_parts=ignored_parts.get(key)
+            elif isinstance(ignored_parts,str) and ignored_parts == key:
+                continue
+            result[key]=sanitize_json(value, sub_ignored_parts or {})
+        input = frozendict(result)
+    return input
+
 
 class ResourcedTestCase(ResourcedTestCaseReal):
 
@@ -55,6 +84,16 @@ class ResourcedTestCase(ResourcedTestCaseReal):
 
     def __init__(self,*args,**kwargs):
         super(ResourcedTestCase,self).__init__(*args,**kwargs)
+
+    def assertSanitizedEqual(self, actual, expected, ignored):
+        actual_json_sanitized = sanitize_json(actual, ignored)
+        expected_json_sanitized = sanitize_json(expected, ignored)
+        logging.warning(("\n"
+                       "comparing {} and\n"
+                       "{}\n"
+                       "sanitized actual:{} and\n"
+                       "sanitized expected:{}").format(actual, expected, actual_json_sanitized, expected_json_sanitized))
+        self.assertEqual(actual_json_sanitized, expected_json_sanitized)
 
     def assertLogs(self, *args, **kwargs):
         try:
@@ -171,6 +210,8 @@ class ConnectionConfiguration(object):
         info.protocol = config.get('realserver', 'protocol', fallback="http")
         info.enable_tracing = config.get('realserver', 'tracing', fallback=None)
         info.tracingparms['port'] = config.get('realserver', 'tracing_port', fallback=None)
+        info.analytics_host = config.get('analytics','host',fallback=info.host)
+        info.analytics_port = config.get('analytics','host',fallback=info.port)
         info.network = config.get('realserver','network',fallback=None)
         logging.info("info is "+str(info.__dict__))
         self.enable_tracing = info.enable_tracing
@@ -523,9 +564,6 @@ try:
         return tracer
 
 except Exception as e:
-
-    logging.error(e)
-
     def jaeger_tracer(service, port = None):
         logging.error("No Jaeger import available")
         return basic_tracer()
