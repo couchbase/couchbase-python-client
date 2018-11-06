@@ -163,6 +163,18 @@ else:
             'module will continue but will be unusable without couchbase_ffi')
     setup_kw = {}
 
+cmake_build=os.environ.get("PYCBC_CMAKE_BUILD")
+
+# Dummy dependency to prevent installation of Python < 3 package on Windows.
+
+pip_not_on_win_python_lt_3 = (
+    ["pip>=9.0; (sys_platform != 'win32' and python_version >= '2.7') or (python_version >= '3.0')"]
+    if pip.__version__ >= "9.0.0"
+    else [])
+
+conan_and_cmake_deps = (['conan', 'cmake>=3.0.2'] if
+                        cmake_build and sys.platform.startswith('darwin') else [])
+
 setup(
     name = 'couchbase',
     version = pkgversion,
@@ -202,11 +214,9 @@ setup(
         'acouchbase.tests',
         'acouchbase.py34only'
     ] if sys.version_info >= (3, 4) else []),
-    package_data = pkgdata,
-
-    install_requires=["pip>=9.0; (sys_platform != 'win32' and python_version >= '2.7') or (python_version >= '3.0')"]
-        if pip.__version__ >= "9.0.0"
-        else [],
+    package_data=pkgdata,
+    setup_requires=['typing'] + conan_and_cmake_deps,
+    install_requires=['typing'] + pip_not_on_win_python_lt_3,
     tests_require=['nose', 'testresources>=0.2.7', 'basictracer==2.2.0'],
     test_suite='couchbase.tests.test_sync',
     **setup_kw
