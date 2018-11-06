@@ -163,6 +163,8 @@ else:
             'module will continue but will be unusable without couchbase_ffi')
     setup_kw = {}
 
+cmake_build=os.environ.get("PYCBC_CMAKE_BUILD")
+
 setup(
     name = 'couchbase',
     version = pkgversion,
@@ -202,11 +204,13 @@ setup(
         'acouchbase.tests',
         'acouchbase.py34only'
     ] if sys.version_info >= (3, 4) else []),
-    package_data = pkgdata,
-
-    install_requires=["pip>=9.0; (sys_platform != 'win32' and python_version >= '2.7') or (python_version >= '3.0')"]
-        if pip.__version__ >= "9.0.0"
-        else [],
+    package_data=pkgdata,
+    setup_requires=['typing']+
+                   (['conan','cmake>=3.0.2'] if cmake_build and sys.platform.startswith('darwin') else [])+
+                   (["pip>=9.0; (sys_platform != 'win32' and python_version >= '2.7') or (python_version >= '3.0')"]
+                    if pip.__version__ >= "9.0.0"
+                    else []),
+    install_requires=['typing'],
     tests_require=['nose', 'testresources>=0.2.7', 'basictracer==2.2.0'],
     test_suite='couchbase.tests.test_sync',
     **setup_kw
