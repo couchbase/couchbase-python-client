@@ -51,11 +51,13 @@ class AnalyticsIngester:
         # type: (IdGenerator, DataConverter, BucketOperator) -> None
         """
         Initialise ingester.
-        :param DataConverter data_converter: Single parameter Callable which takes a JSON input and returns a transformed
-        JSON output.
-        :param IdGenerator id_generator: Callable that takes a JSON input and returns an ID string
-        :param BucketOperator operation: Callable that takes a bucket object, a key and a value and applies the
-        key and value to the bucket (e.g. upsert/insert/replace)
+
+        :param DataConverter data_converter: Single parameter Callable which takes a JSON
+            input and returns a transformed JSON output.
+        :param IdGenerator id_generator: Callable that takes a JSON input and
+            returns an ID string
+        :param BucketOperator operation: Callable that takes a bucket object, a key and a
+            value and applies the key and value to the bucket (e.g. upsert/insert/replace)
         """
         if not isinstance(operation, BucketOperator):
             raise ArgumentError("Operation is not a BucketOperator")
