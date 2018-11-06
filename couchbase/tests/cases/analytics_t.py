@@ -18,6 +18,7 @@
 from __future__ import print_function
 
 import logging
+from unittest import SkipTest
 
 import couchbase
 import couchbase.analytics
@@ -28,7 +29,6 @@ import json
 import os
 import time
 import copy
-import typing
 from couchbase import JSON
 from couchbase.analytics_ingester import AnalyticsIngester
 import couchbase.bucket
@@ -77,9 +77,9 @@ class CBASTestBase(RealServerTestCase):
                 for dataset, source in CBASTestBase.datasets.items():
                     self.perform_query(
                         "CREATE DATASET {} ON `beer-sample` WHERE `type` = '{}';".format(dataset, source[0]),
-                        quiet=False)
+                        quiet=True)
 
-                self.perform_query("CONNECT LINK Local;", quiet=False)
+                self.perform_query("CONNECT LINK Local;", quiet=True)
                 for dataset, source in CBASTestBase.datasets.items():
                     self.poll_for_response(dataset, source[1])
                 time.sleep(10)
@@ -89,22 +89,22 @@ class CBASTestBase(RealServerTestCase):
     def cleanUp(self):
         if not self.is_mock:
             logging.error("cleaning up")
-            self.perform_query("DISCONNECT LINK Local;", quiet=False)
+            self.perform_query("DISCONNECT LINK Local;", quiet=True)
             for dataset, source in CBASTestBase.datasets.items():
-                self.perform_query("DROP DATASET {} IF EXISTS;".format(dataset), quiet=False)
+                self.perform_query("DROP DATASET {} IF EXISTS;".format(dataset), quiet=True)
             time.sleep(10)
         CBASTestBase.initialised = False
 
     def poll_for_response(self, dataset, marker):
         if not self.is_mock:
             while not self.perform_query("SELECT VALUE bw FROM {} bw WHERE bw.name = '{}'".format(dataset, marker),
-                                         quiet=False,
+                                         quiet=True,
                                          wait=0.1):
                 pass
 
     def initiate_query(self, statement, *args, **kwargs):
         logging.info("initiating query {} : {}, {}".format(statement,args,kwargs))
-        return self.cb.analytics_query(statement, self.cluster_info.host, *args, **kwargs)
+        return self.cb.analytics_query(statement, self.cluster_info.analytics_host, *args, **kwargs)
 
     def perform_query(self, statement, *args, **kwargs):
         quiet = kwargs.pop("quiet", False)
@@ -119,9 +119,7 @@ class CBASTestBase(RealServerTestCase):
                 result = None
             else:
                 time.sleep(waittime)
-                result = list(query)
-                if len(result) == 1:
-                    result = result[0]
+                result = self.extract_results(query)
             metrics = query.metrics
         except Exception as e:
             result = e
@@ -134,13 +132,46 @@ class CBASTestBase(RealServerTestCase):
 
         return result, encoded
 
+    def extract_results(self, query):
+        result = list(query)
+        if len(result) == 1:
+            result = result[0]
+        return result
+
 
 gen_reference = os.getenv("PYCBC_GEN_CBAS_REF")
 with open(os.path.join(response_dir, "queries.json")) as resp_file:
     cbas_response = json.load(resp_file)
 
 
-class CBASTestQueries(CBASTestBase):
+class CBASTestQueriesBase(CBASTestBase):
+    def gen_query_params(self, query_file, responsedict):
+        logging.info("test={}".format(query_file))
+        query = copy.deepcopy(responsedict[query_file]['query'])
+        statement = query.pop("statement")
+        args = query.pop("args", [])
+        for key, value in query.items():
+            if key.startswith("$"):
+                query.pop(key)
+                query[key[1:]] = value
+        return args, query, statement
+
+    def _check_response(self, encoded, query_file, result, responsedict):
+        logging.error("encoded is {}".format(encoded))
+        decoded_encoded = json.loads(encoded)
+
+        expected_query = responsedict[query_file]['query']
+        if not expected_query['statement'].endswith(';'):
+            expected_query['statement'] += ';'
+        options = expected_query.pop('options')
+        if len(options):
+            expected_query.update({"${}".format(k): v for k, v in options.items()})
+        actual = (result)
+        expected = (responsedict[query_file]['response'])
+        self.assertSanitizedEqual(actual, expected, {u'meta': 'cas', 'Dataverse': 'Timestamp'})
+
+
+class CBASTestQueries(CBASTestQueriesBase):
     @classmethod
     def tearDownClass(cls):
         if gen_reference:
@@ -151,41 +182,56 @@ class CBASTestQueries(CBASTestBase):
         x for x in sorted(cbas_response.keys())
     )
     def test_query(self, query_file):
-        args, query, statement = self.gen_query_params(query_file)
+        self.init_if_not_setup("setup-dataset" in query_file)
+        args, query, statement = self.gen_query_params(query_file, cbas_response)
         result, encoded = self.perform_query(statement, *args, **(query.get("options", {})))
         if gen_reference:
             decoded_encoded = json.loads(encoded)
             cbas_response[query_file] = {'query': {'statement': statement, 'options': query}, 'response': result,
                                          'encoded': decoded_encoded}
         else:
-            self._check_response(encoded, query_file, result)
+            self._check_response(encoded, query_file, result, cbas_response)
 
-    def gen_query_params(self, query_file):
-        logging.info("test={}".format(query_file))
-        self.init_if_not_setup("setup-dataset" in query_file)
-        query = copy.deepcopy(cbas_response[query_file]['query'])
-        statement = query.pop("statement")
-        args = query.pop("args", [])
-        for key, value in query.items():
-            if key.startswith("$"):
-                query.pop(key)
-                query[key[1:]] = value
-        return args, query, statement
+class DeferredAnalyticsTest(CBASTestQueriesBase):
+    _responses = None
 
-    def _check_response(self, encoded, query_file, result):
-        logging.error("encoded is {}".format(encoded))
-        decoded_encoded = json.loads(encoded)
+    @property
+    def _handles(self):
+        if not DeferredAnalyticsTest._responses:
+            self.init_if_not_setup()
+            logging.error("setting up deferred queries")
+            DeferredAnalyticsTest._responses = {}
+            for query_file in cbas_response.keys():
+                if 'setup-dataset' in query_file or 'initiate-shadow' in query_file:
+                    continue
+                args, query, statement = self.gen_query_params(query_file, cbas_response)
+                real_statement = couchbase.analytics.DeferredAnalyticsQuery(statement,*args, **(query.get("options", {})))
+                logging.error("scheduling query {}".format(real_statement))
+                deferred_query = self.cb.analytics_query(real_statement, self.cluster_info.analytics_host)
+                logging.error("scheduled query {}, got response {}".format(real_statement,deferred_query))
+                DeferredAnalyticsTest._responses[query_file]=deferred_query, real_statement.encoded
+        logging.error("finished scheduling")
+        return DeferredAnalyticsTest._responses
 
-        expected_query = cbas_response[query_file]['query']
-        if not expected_query['statement'].endswith(';'):
-            expected_query['statement'] += ';'
-        options = expected_query.pop('options')
-        if len(options):
-            expected_query.update({"${}".format(k): v for k, v in options.items()})
-        actual = (result)
-        expected = (cbas_response[query_file]['response'])
-        self.assertSanitizedEqual(actual, expected, {u'meta': 'cas', 'Dataverse': 'Timestamp'})
+    def test_deferred(self):
+        for query_file, response in self._handles.items():
+            pre_result, encoded = self._handles[query_file]
+            result=self.extract_results(pre_result)
+            logging.error("checking response for {}: {}".format(query_file,result))
+            self._check_response(encoded, query_file, result,cbas_response)
 
+    def test_single(self):
+        self.init_if_not_setup()
+        x=couchbase.analytics.DeferredAnalyticsQuery("SELECT VALUE bw FROM breweries bw WHERE bw.name = 'Kona Brewing'")
+        response=self.cb.analytics_query(x,self.cluster_info.analytics_host)
+        list_resp = list(response)
+        expected = [{"address": ["75-5629 Kuakini Highway"], "city": "Kailua-Kona", "code": "96740",
+                    "country": "United States",
+                    "description": "", "geo": {"accuracy": "RANGE_INTERPOLATED", "lat": 19.642, "lon": -155.996},
+                    "name": "Kona Brewing", "phone": "1-808-334-1133", "state": "Hawaii", "type": "brewery",
+                    "updated": "2010-07-22 20:00:20", "website": "http://www.konabrewingco.com"}]
+
+        self.assertSanitizedEqual(expected,list_resp)
 
 class CBASTestSpecific(CBASTestBase):
     def test_importworks(self):

@@ -52,8 +52,8 @@ if loglevel:
 def sanitize_json(input, ignored_parts):
     # types (Any,Dict) -> Any
     if isinstance(input, list):
-        return tuple(set(sanitize_json(x, ignored_parts) for x in input))
-    elif isinstance(input,str):
+        return tuple(sorted(sanitize_json(x, ignored_parts) for x in input))
+    elif isinstance(input,basestring):
         return input.replace("'",'"')
     elif isinstance(input,float):
         return round(input,5)
@@ -85,7 +85,7 @@ class ResourcedTestCase(ResourcedTestCaseReal):
     def __init__(self,*args,**kwargs):
         super(ResourcedTestCase,self).__init__(*args,**kwargs)
 
-    def assertSanitizedEqual(self, actual, expected, ignored):
+    def assertSanitizedEqual(self, actual, expected, ignored={}):
         actual_json_sanitized = sanitize_json(actual, ignored)
         expected_json_sanitized = sanitize_json(expected, ignored)
         logging.warning(("\n"

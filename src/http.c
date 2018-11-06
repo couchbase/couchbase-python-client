@@ -220,13 +220,13 @@ pycbc_Bucket__http_request(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
 
     static char *kwlist[] = {
             "type", "method", "path", "content_type", "post_data",
-            "response_format", "quiet", NULL
+            "response_format", "quiet", "host", NULL
     };
 
-    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "iis|zz#IO", kwlist,
+    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "iis|zz#IOs", kwlist,
                                      &reqtype, &method, &path,
                                      &content_type, &body, &nbody,
-                                     &value_format, &quiet_O);
+                                     &value_format, &quiet_O, &htcmd.host);
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;

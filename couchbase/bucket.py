@@ -1547,9 +1547,10 @@ class Bucket(_Base):
         else:
             query.update(*args, **kwargs)
 
-        return AnalyticsRequest(query, host, self)
+        return couchbase.analytics.gen_request(query, host, self)
 
     _analytics_query = analytics_query
+
 
     def search(self, index, query, **kwargs):
         """
