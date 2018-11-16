@@ -471,9 +471,22 @@ class CouchbaseTestCase(ResourcedTestCase):
     def assertRegex(self, *args, **kwargs):
         try:
             return super(CouchbaseTestCase,self).assertRegex(*args,**kwargs)
-        except:
-            return super(CouchbaseTestCase,self).assertRegexpMatches(*args,**kwargs)
+        except NameError:
+            pass
+        except AttributeError:
+            pass
 
+        return super(CouchbaseTestCase,self).assertRegexpMatches(*args,**kwargs)
+
+    def assertRaisesRegex(self, *args, **kwargs):
+        try:
+            return super(CouchbaseTestCase,self).assertRaisesRegex(*args,**kwargs)
+        except NameError:
+            pass
+        except AttributeError:
+            pass
+
+        super(CouchbaseTestCase,self).assertRaisesRegexp(*args,**kwargs)
 
 class ConnectionTestCaseBase(CouchbaseTestCase):
     def checkCbRefcount(self):
