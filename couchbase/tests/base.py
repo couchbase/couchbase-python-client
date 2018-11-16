@@ -52,7 +52,8 @@ if loglevel:
 def sanitize_json(input, ignored_parts):
     # types (Any,Dict) -> Any
     if isinstance(input, list):
-        return tuple(sorted(sanitize_json(x, ignored_parts) for x in input))
+        to_be_sorted=list(sanitize_json(x, ignored_parts) for x in input)
+        return tuple(sorted(to_be_sorted, key=lambda x: x.__hash__() ))
     elif isinstance(input,basestring):
         return input.replace("'",'"')
     elif isinstance(input,float):
