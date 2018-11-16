@@ -200,7 +200,8 @@ class CouchbaseError(Exception):
             if not key:
                 key = nokey_prefix + ":nokey:" + str(count)
                 count += 1
-            if v.success:
+            success = getattr(v,'success', True)
+            if success:
                 ret_ok[key] = v
             else:
                 ret_fail[key] = v
