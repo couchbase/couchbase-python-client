@@ -117,6 +117,15 @@ class DeferredAnalyticsQuery(AnalyticsQuery):
        """
         super(DeferredAnalyticsQuery, self).__init__(querystr, *args, **kwargs)
         self.set_option("mode", "async")
+        self._timeout = None
+
+    @property
+    def timeout(self):
+        return self._timeout
+
+    @timeout.setter
+    def timeout(self, value):
+        self._timeout = value
 
 
 class AnalyticsRequest(N.N1QLRequest):
@@ -179,7 +188,7 @@ class DeferredAnalyticsRequest(AnalyticsRequest):
 
         self.parent = parent
         self._final_response= None
-        self.finish_time=(time.time()+timeout) if timeout else None
+        self.finish_time=(time.time()+timeout) if timeout else params._timeout
         self.handle_host=urlparse.urlparse(handle)
         self.interval = interval or 10
         super(DeferredAnalyticsRequest,self).__init__(params,host,parent)

@@ -206,6 +206,7 @@ class DeferredAnalyticsTest(CBASTestQueriesBase):
                     continue
                 args, query, statement = self.gen_query_params(query_file, cbas_response)
                 real_statement = couchbase.analytics.DeferredAnalyticsQuery(statement,*args, **(query.get("options", {})))
+                real_statement.timeout = 100
                 logging.error("scheduling query {}".format(real_statement))
                 deferred_query = self.cb.analytics_query(real_statement, self.cluster_info.analytics_host)
                 logging.error("scheduled query {}, got response {}".format(real_statement,deferred_query))
@@ -223,6 +224,7 @@ class DeferredAnalyticsTest(CBASTestQueriesBase):
     def test_single(self):
         self.init_if_not_setup()
         x=couchbase.analytics.DeferredAnalyticsQuery("SELECT VALUE bw FROM breweries bw WHERE bw.name = 'Kona Brewing'")
+        x.timeout = 100
         response=self.cb.analytics_query(x,self.cluster_info.analytics_host)
         list_resp = list(response)
         expected = [{"address": ["75-5629 Kuakini Highway"], "city": "Kailua-Kona", "code": "96740",
