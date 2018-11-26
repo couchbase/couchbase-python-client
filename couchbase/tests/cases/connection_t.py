@@ -107,17 +107,17 @@ class ConnectionTest(CouchbaseTestCase):
 
         cs.hosts = [ self.cluster_info.host + ':' + str(self.cluster_info.port) ]
         cs.scheme = 'http'
-        cb = self.factory(str(cs))
+        cb = self.factory(str(cs), username=self.cluster_info.bucket_username, password=self.cluster_info.bucket_password)
         self.assertTrue(cb.upsert("foo", "bar").success)
 
         cs.hosts.insert(0, 'localhost:1')
-        cb = self.factory(str(cs))
+        cb = self.factory(str(cs), username=self.cluster_info.bucket_username, password=self.cluster_info.bucket_password)
         self.assertTrue(cb.upsert("foo", "bar").success)
 
     def test_enable_error_map(self):
         # enabled via connection string param, invalid params cause error
         conn_str = 'http://{0}:{1}?enable_errmap=true'.format(self.cluster_info.host, self.cluster_info.port)
-        cb = self.factory(conn_str)
+        cb = self.factory(conn_str,username=self.cluster_info.bucket_username,password=self.cluster_info.bucket_password)
         self.assertTrue(cb.upsert("foo", "bar").success)
 
 

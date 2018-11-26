@@ -435,11 +435,12 @@ class CouchbaseTestCase(ResourcedTestCase):
                            .format(vstr, rtstr))
 
     def skipIfMock(self):
-        pass
+        if self.is_mock:
+            raise SkipTest("Not be run against mock")
 
     def skipUnlessMock(self):
-        pass
-
+        if not self.is_mock:
+            raise SkipTest("Not to be run against non-mock")
     def make_connargs(self, **overrides):
         return self.cluster_info.make_connargs(**overrides)
 

@@ -35,7 +35,7 @@ class ClusterTest(CouchbaseTestCase):
 
         # Can I open a new bucket via open_bucket?
         cluster = Cluster(connstr, bucket_class=self.factory)
-        cluster.authenticate(ClassicAuthenticator(buckets={bucket: password}))
+        cluster.authenticate(ClassicAuthenticator(buckets={bucket: password},cluster_password=self.cluster_info.bucket_password))
         return cluster, bucket
 
     def test_cluster(self):
