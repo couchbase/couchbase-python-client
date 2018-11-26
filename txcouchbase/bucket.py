@@ -449,11 +449,11 @@ class Bucket(RawBucket):
 
         Using multiple items::
 
-          d_get = cb.get_multi(("Foo", "bar", "baz))
+          d_get = cb.get_multi(("Foo", "bar", "baz"))
           def on_mres(mres):
               for k, v in mres.items():
                   print("Got result for key {0}: {1}".format(k, v.value))
-          d.addCallback(mres)
+          d_get.addCallback(on_mres)
 
         """
         super(Bucket, self).__init__(*args, **kwargs)
