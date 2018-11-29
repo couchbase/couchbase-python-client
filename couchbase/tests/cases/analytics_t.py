@@ -235,6 +235,37 @@ class DeferredAnalyticsTest(CBASTestQueriesBase):
 
         self.assertSanitizedEqual(expected,list_resp)
 
+    def test_correct_timeout_via_query_property(self):
+        self.init_if_not_setup()
+        x = couchbase.analytics.DeferredAnalyticsQuery(
+            "SELECT VALUE bw FROM breweries bw WHERE bw.name = 'Kona Brewing'")
+
+        def creator(query, host, timeout):
+            query.timeout = timeout
+            return self.cb.analytics_query(query, host)
+
+        self._check_finish_time_in_bounds(x, creator, 100)
+
+    def test_correct_timeout_in_constructor(self):
+        self.init_if_not_setup()
+        x = couchbase.analytics.DeferredAnalyticsQuery(
+            "SELECT VALUE bw FROM breweries bw WHERE bw.name = 'Kona Brewing'")
+        creator = lambda query, host, timeout: couchbase.analytics.DeferredAnalyticsRequest(query, host, self.cb,
+                                                                                            timeout=timeout)
+        self._check_finish_time_in_bounds(x, creator, 500)
+
+    def _check_finish_time_in_bounds(self, x, response_creator, expected_timeout):
+        orig_time = time.time()
+        response = response_creator(x, self.cluster_info.analytics_host, expected_timeout)
+        self.assertGreater(response.finish_time, orig_time + expected_timeout)
+        self.assertLess(response.finish_time, time.time() + expected_timeout)
+        # consume the response, just to be safe
+        try:
+            list(response)
+        except:
+            pass
+
+
 class CBASTestSpecific(CBASTestBase):
     def test_importworks(self):
         self.init_if_not_setup()

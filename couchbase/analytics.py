@@ -187,8 +187,8 @@ class DeferredAnalyticsRequest(AnalyticsRequest):
             raise CouchbaseInternalError("{} does not support deferred queries".format(host))
 
         self.parent = parent
-        self._final_response= None
-        self.finish_time=(time.time()+timeout) if timeout else params._timeout
+        self._final_response = None
+        self.finish_time = time.time() + (timeout if timeout else params._timeout)
         self.handle_host=urlparse.urlparse(handle)
         self.interval = interval or 10
         super(DeferredAnalyticsRequest,self).__init__(params,host,parent)
