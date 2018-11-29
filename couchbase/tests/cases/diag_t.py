@@ -14,11 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import logging
 from unittest import SkipTest
 
-from couchbase.tests.base import ConnectionTestCase
+from couchbase.tests.base import ConnectionTestCase, PYCBC_CB_VERSION
 import jsonschema
 import re
+import couchbase._libcouchbase as LCB
 
 # For Python 2/3 compatibility
 try:
@@ -76,13 +78,12 @@ python_id="PYCBC"
 client_id_schema = {"type": "string",
                     "pattern": "^0x[a-f0-9]+/"+python_id}
 
-three_part_ver_num = "([0-9]+\.)+[0-9]+"
+two_part_ver_num = "([0-9]+\.)+[0-9]+"
 
 sdk_schema = {"type": "string",
               "pattern": "libcouchbase" +
-                         re.escape("/") + three_part_ver_num + "_[0-9]+_(.*?)" +
-                         re.escape(python_id + "/") +
-                         three_part_ver_num + "\.[^\s]*"}
+                         re.escape("/") + re.escape(LCB.lcb_version()[0]) + "\s*"+
+                         re.escape(PYCBC_CB_VERSION)}
 
 
 diagnostics_schema = {"type": "object",
@@ -110,7 +111,6 @@ class DiagnosticsTests(ConnectionTestCase):
         if self.is_mock:
             raise SkipTest()
         result = self.cb.diagnostics()
-
         jsonschema.validate(result, diagnostics_schema)
 
 

@@ -35,7 +35,7 @@ class ClusterTest(CouchbaseTestCase):
 
         # Can I open a new bucket via open_bucket?
         cluster = Cluster(connstr, bucket_class=self.factory)
-        cluster.authenticate(ClassicAuthenticator(buckets={bucket: password}))
+        cluster.authenticate(ClassicAuthenticator(buckets={bucket: password},cluster_password=self.cluster_info.admin_password, cluster_username=self.cluster_info.admin_username))
         return cluster, bucket
 
     def test_cluster(self):
@@ -132,25 +132,20 @@ class ClusterTest(CouchbaseTestCase):
         return cluster, bucket
 
     def test_cert_auth(self):
-        if self.is_mock:
-            self.cluster_info.certpath="dummy"
-            self.cluster_info.keypath="dummy"
+        certpath=getattr(self.cluster_info,'certpath',None)
+        keypath=getattr(self.cluster_info,'keypath',None)
 
-        auther_cert = CertAuthenticator(cert_path=self.cluster_info.certpath,key_path=self.cluster_info.keypath)
+        auther_cert = CertAuthenticator(cert_path=certpath or "dummy",key_path=keypath or "dummy")
 
         cluster3, bucket_name = self._create_cluster_clean(auther_cert)
         cluster3.authenticate(auther_cert)
         try:
             cluster3.open_bucket(bucket_name)
         except Exception as e:
-            if self.is_realserver:
+            if self.is_realserver and certpath and keypath:
                 raise e
             else:
                 pass
-        finally:
-            if self.is_mock:
-                del self.cluster_info.certpath
-                del self.cluster_info.keypath
 
     def test_pathless_connstr(self):
         # Not strictly a cluster test, but relevant

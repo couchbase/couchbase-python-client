@@ -34,6 +34,7 @@ import time
 from basictracer import BasicTracer, SpanRecorder
 import couchbase
 import couchbase._libcouchbase
+import traceback
 
 from typing import *
 from couchbase.bucket import Bucket
@@ -47,6 +48,13 @@ if loglevel:
     ch = logging.StreamHandler()
     ch.setLevel(logging.getLevelName(loglevel))
     logging.getLogger().addHandler(ch)
+
+
+def version_to_tuple(version_str, default=None):
+    return tuple(map(int, str.split(version_str, "."))) if version_str else default
+
+
+PYCBC_SERVER_VERSION = version_to_tuple(os.environ.get("PYCBC_SERVER_VERSION"))
 
 
 def sanitize_json(input, ignored_parts):
@@ -85,6 +93,7 @@ class ResourcedTestCase(ResourcedTestCaseReal):
 
     def __init__(self,*args,**kwargs):
         super(ResourcedTestCase,self).__init__(*args,**kwargs)
+        self.maxDiff = None
 
     def assertSanitizedEqual(self, actual, expected, ignored={}):
         actual_json_sanitized = sanitize_json(actual, ignored)
@@ -103,6 +112,18 @@ class ResourcedTestCase(ResourcedTestCaseReal):
             logging.warn(e)
 
             return ResourcedTestCase.CaptureContext(*args, **kwargs)
+
+    def run_and_collect_exceptions(self, command):
+        try:
+            command()
+        except:
+            if not hasattr(self, "exceptions"):
+                self.exceptions=[]
+            self.exceptions.append(traceback.format_exc())
+
+    def check_exceptions(self):
+        exceptions = getattr(self, "exceptions", [])
+        self.assertListEqual([], exceptions)
 
 try:
     from unittest2.case import SkipTest
@@ -435,11 +456,12 @@ class CouchbaseTestCase(ResourcedTestCase):
                            .format(vstr, rtstr))
 
     def skipIfMock(self):
-        pass
+        if self.is_mock:
+            raise SkipTest("Not be run against mock")
 
     def skipUnlessMock(self):
-        pass
-
+        if not self.is_mock:
+            raise SkipTest("Not to be run against non-mock")
     def make_connargs(self, **overrides):
         return self.cluster_info.make_connargs(**overrides)
 

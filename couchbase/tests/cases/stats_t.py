@@ -47,10 +47,11 @@ class StatsTest(ConnectionTestCase):
         self.assertIsInstance(info, dict)
 
     def test_stats_with_argument_list(self):
-        stats = self.cb.stats(['memory', 'tap'])
+        second_entry = {True: {'tap': "ep_tap_count"}, False: {'config': "ep_dcp_conn_buffer_size"}}[self.is_mock]
+        stats = self.cb.stats(['memory'] + list(second_entry.keys()))
         self.assertIsInstance(stats, dict)
         self.assertTrue('mem_used' in stats)
-        self.assertTrue('ep_tap_count' in stats)
+        self.assertSetEqual(set(), set(second_entry.values()).difference(stats.keys()))
         key, info = list(stats.items())[0]
         self.assertIsInstance(key, basestring)
         self.assertIsInstance(info, dict)

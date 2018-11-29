@@ -148,9 +148,12 @@ class ViewTest(ViewTestCase):
             admin.bucket_delete(bucket_name)
         except:
             pass
-        admin.bucket_create(name=bucket_name,
-                                 bucket_type='ephemeral',
-                                 ram_quota=100)
+        try:
+            admin.bucket_create(name=bucket_name,
+                                     bucket_type='ephemeral',
+                                     ram_quota=100)
+        except HTTPError:
+            raise SkipTest("Unable to provision ephemeral bucket")
         try:
             admin.user_upsert(AuthDomain.Local, userid, password, roles)
             admin.wait_ready(bucket_name, timeout=10)

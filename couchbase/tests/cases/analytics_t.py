@@ -23,7 +23,7 @@ from unittest import SkipTest
 import couchbase
 import couchbase.analytics
 import couchbase.exceptions
-from couchbase.tests.base import RealServerTestCase, ConnectionTestCase
+from couchbase.tests.base import RealServerTestCase, ConnectionTestCase, version_to_tuple
 from parameterized import parameterized
 import json
 import os
@@ -34,6 +34,10 @@ from couchbase.analytics_ingester import AnalyticsIngester
 import couchbase.bucket
 from typing import *
 from couchbase.analytics_ingester import BucketOperators
+import traceback
+from couchbase.tests.base import PYCBC_SERVER_VERSION
+import os
+
 
 analytics_dir = os.path.join("couchbase", "tests", "cases", "analytics")
 response_dir = analytics_dir
@@ -59,6 +63,20 @@ class CBASTestBase(RealServerTestCase):
         CBASTestBase.datasets = {'beers': ['beer', '21A IPA'], 'breweries': ['brewery', 'Kona Brewing']}
 
     def setUp(self):
+        pycbc_min_analytics = version_to_tuple(os.environ.get("PYCBC_MIN_ANALYTICS"))
+
+        # analytics tests seem to fail on 5.5.2, seemingly because dataset creation semantics have changed
+        # we get "cannot find dataset 'Breweries'"
+        # offer the option to skip these tests pending further investigation
+
+        old_analytics = PYCBC_SERVER_VERSION and pycbc_min_analytics and PYCBC_SERVER_VERSION < pycbc_min_analytics
+        if old_analytics and not os.environ.get("PYCBC_TEST_OLD_ANALYTICS"):
+            raise SkipTest("Skipping analytics tests on version {} as older than {}".format(PYCBC_SERVER_VERSION,
+                                                                                            pycbc_min_analytics))
+
+        logging.error("Testing against server version {}".format(PYCBC_SERVER_VERSION))
+        self.override_quiet = old_analytics
+
         super(CBASTestBase, self).setUp()
         if not CBASTestBase.lastcb:
             CBASTestBase.lastcb = copy.copy(self)
@@ -102,18 +120,24 @@ class CBASTestBase(RealServerTestCase):
                                          wait=0.1):
                 pass
 
-    def initiate_query(self, statement, *args, **kwargs):
+    def initiate_query(self, statement, options, *args, **kwargs):
         logging.info("initiating query {} : {}, {}".format(statement,args,kwargs))
-        return self.cb.analytics_query(statement, self.cluster_info.analytics_host, *args, **kwargs)
+        query=couchbase.analytics.AnalyticsQuery(statement, *args, **kwargs)
+        for k,v in options.items():
+            query.set_option(k, v)
+        return self.cb.analytics_query(query, self.cluster_info.analytics_host)
 
     def perform_query(self, statement, *args, **kwargs):
+        return self.perform_query_with_options(statement, {}, *args,**kwargs)
+
+    def perform_query_with_options(self, statement, options, *args, **kwargs):
         quiet = kwargs.pop("quiet", False)
         query = None
         metrics = None
         encoded = "{}"
         try:
             waittime = kwargs.pop("wait", 0)
-            query = self.initiate_query(statement,*args,**kwargs)
+            query = self.initiate_query(statement,options,*args,**kwargs)
             encoded = query._params.encoded
             if self.is_mock:
                 result = None
@@ -123,10 +147,11 @@ class CBASTestBase(RealServerTestCase):
             metrics = query.metrics
         except Exception as e:
             result = e
-        if not quiet:
+        if not quiet or self.override_quiet:
             logging.error(
                 "statement {}(   args={}  kwargs={}   )\nyields\n{}\n with metrics {}".format(statement, args, kwargs,
                                                                                               result, metrics))
+        if not quiet:
             if isinstance(result, Exception):
                 raise result
 
@@ -143,18 +168,30 @@ gen_reference = os.getenv("PYCBC_GEN_CBAS_REF")
 with open(os.path.join(response_dir, "queries.json")) as resp_file:
     cbas_response = json.load(resp_file)
 
+def build_expected_query_opts(expected_query, kwarg_type, prefix=""):
+    kwargs = expected_query.pop(kwarg_type,{})
+    if len(kwargs):
+        expected_query.update({prefix+"{}".format(k): v for k, v in kwargs.items()})
+
+
+def get_expected_query(expected_query):
+    expected_query_copy=copy.deepcopy(expected_query)
+    build_expected_query_opts(expected_query_copy, "options")
+    build_expected_query_opts(expected_query_copy, "kwargs", "$")
+    return expected_query_copy
 
 class CBASTestQueriesBase(CBASTestBase):
     def gen_query_params(self, query_file, responsedict):
         logging.info("test={}".format(query_file))
-        query = copy.deepcopy(responsedict[query_file]['query'])
-        statement = query.pop("statement")
+        entry = copy.deepcopy(responsedict[query_file])
+        query = copy.deepcopy(entry['query'])
+        statement = query.get("statement")
         args = query.pop("args", [])
-        for key, value in query.items():
-            if key.startswith("$"):
-                query.pop(key)
-                query[key[1:]] = value
-        return args, query, statement
+        kwargs = query.get('kwargs',{})
+        options = query.get('options',{})
+        return args, kwargs, statement, options
+
+
 
     def _check_response(self, encoded, query_file, result, responsedict):
         logging.error("encoded is {}".format(encoded))
@@ -163,12 +200,11 @@ class CBASTestQueriesBase(CBASTestBase):
         expected_query = responsedict[query_file]['query']
         if not expected_query['statement'].endswith(';'):
             expected_query['statement'] += ';'
-        options = expected_query.pop('options')
-        if len(options):
-            expected_query.update({"${}".format(k): v for k, v in options.items()})
+        expected_query = get_expected_query(expected_query)
         actual = (result)
         expected = (responsedict[query_file]['response'])
         self.assertSanitizedEqual(actual, expected, {u'meta': 'cas', 'Dataverse': 'Timestamp'})
+
 
 
 class CBASTestQueries(CBASTestQueriesBase):
@@ -183,11 +219,11 @@ class CBASTestQueries(CBASTestQueriesBase):
     )
     def test_query(self, query_file):
         self.init_if_not_setup("setup-dataset" in query_file)
-        args, query, statement = self.gen_query_params(query_file, cbas_response)
-        result, encoded = self.perform_query(statement, *args, **(query.get("options", {})))
+        args, kwargs, statement, options= self.gen_query_params(query_file, cbas_response)
+        result, encoded = self.perform_query_with_options(statement, options, *args, **kwargs)
         if gen_reference:
             decoded_encoded = json.loads(encoded)
-            cbas_response[query_file] = {'query': {'statement': statement, 'options': query}, 'response': result,
+            cbas_response[query_file] = {'query': {'statement': statement, 'options': options, 'kwargs': kwargs}, 'response': result,
                                          'encoded': decoded_encoded}
         else:
             self._check_response(encoded, query_file, result, cbas_response)
@@ -204,10 +240,11 @@ class DeferredAnalyticsTest(CBASTestQueriesBase):
             for query_file in cbas_response.keys():
                 if 'setup-dataset' in query_file or 'initiate-shadow' in query_file:
                     continue
-                args, query, statement = self.gen_query_params(query_file, cbas_response)
-                real_statement = couchbase.analytics.DeferredAnalyticsQuery(statement,*args, **(query.get("options", {})))
+                args, kwargs, statement, options = self.gen_query_params(query_file, cbas_response)
+                real_statement = couchbase.analytics.DeferredAnalyticsQuery(statement,*args, **kwargs)
                 real_statement.timeout = 100
-                logging.error("scheduling query {}".format(real_statement))
+                logging.error("scheduling query {} with args{} kwargs {} and options {}".format(real_statement, args, kwargs, options))
+                logging.error("query content; {}, body: {}".format(real_statement,real_statement._body))
                 deferred_query = self.cb.analytics_query(real_statement, self.cluster_info.analytics_host)
                 logging.error("scheduled query {}, got response {}".format(real_statement,deferred_query))
                 DeferredAnalyticsTest._responses[query_file]=deferred_query, real_statement.encoded
@@ -215,11 +252,17 @@ class DeferredAnalyticsTest(CBASTestQueriesBase):
         return DeferredAnalyticsTest._responses
 
     def test_deferred(self):
+        exceptions = []
         for query_file, response in self._handles.items():
             pre_result, encoded = self._handles[query_file]
             result=self.extract_results(pre_result)
             logging.error("checking response for {}: {}".format(query_file,result))
-            self._check_response(encoded, query_file, result,cbas_response)
+            try:
+                self._check_response(encoded, query_file, result,cbas_response)
+            except Exception as e:
+                exceptions.append(traceback.format_exc())
+
+        self.assertListEqual([],exceptions)
 
     def test_single(self):
         self.init_if_not_setup()

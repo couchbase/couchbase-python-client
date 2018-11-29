@@ -1139,9 +1139,9 @@
     "25-named-parameters": {
         "query": {
             "options": {
-                "name": "Kona Brewing",
                 "pretty": true
             },
+            "kwargs": {"name": "Kona Brewing"},
             "statement": "SELECT VALUE bw FROM breweries bw WHERE bw.name = $name"
         },
         "response": {

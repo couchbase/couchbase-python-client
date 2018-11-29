@@ -14,9 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from unittest import SkipTest
+
 from couchbase.tests.base import RealServerTestCase
 from couchbase.user_constants import FMT_JSON
 from couchbase.views.params import SpatialQuery
+import time
+import os
 
 DESIGN_JSON = {
     'language': 'javascript',
@@ -54,6 +58,11 @@ DOCS_JSON = {
 
 class SpatialTest(RealServerTestCase):
     def setUp(self):
+        # TODO - fix
+        # tracked in https://issues.couchbase.com/browse/PYCBC-557
+
+        if os.getenv("PYCBC_JENKINS_INVOCATION"):
+            raise SkipTest("To be fixed on Jenkins")
         super(SpatialTest, self).setUp()
         mgr = self.cb.bucket_manager()
         ret = mgr.design_create('geo', DESIGN_JSON, use_devmode=False)
