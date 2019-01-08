@@ -212,8 +212,10 @@ void pycbc_exception_log(const char *file,
 #endif
 
 #include <libcouchbase/crypto.h>
-#if LCB_VERSION < 0x020601
-#error "Couchbase Python SDK requires libcouchbase 2.6.1 or greater"
+#include "../build/lcb_min_version.h"
+#if LCB_VERSION < LCB_MIN_VERSION
+#pragma message "Couchbase Python SDK requires libcouchbase " LCB_MIN_VERSION_TEXT " or greater"
+#error "Please upgrade libcouchbase accordingly"
 #endif
 
 #include <pythread.h>

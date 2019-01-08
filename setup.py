@@ -20,6 +20,39 @@ extoptions = {}
 pkgdata = {}
 pkgversion = None
 
+lcb_min_version = (2, 9, 0)
+
+try:
+    # check the version listed in README.rst isn't greater than lcb_min_version
+    # bump it up to the specified version if it is
+    import docutils.parsers.rst
+    import docutils.utils
+    import docutils.frontend
+
+    parser = docutils.parsers.rst.Parser()
+
+    with open("README.rst") as README:
+        settings = docutils.frontend.OptionParser().get_default_values()
+        settings.update(
+            dict(tab_width=4, report_level=1, pep_references=False, rfc_references=False, syntax_highlight=False),
+            docutils.frontend.OptionParser())
+        document = docutils.utils.new_document(README.name, settings=settings)
+
+        parser.parse(README.read(), document)
+        readme_min_version = tuple(map(int, document.substitution_defs.get("libcouchbase_version").astext().split('.')))
+        lcb_min_version = max(lcb_min_version, readme_min_version)
+        print("min version is {}".format(lcb_min_version))
+except Exception as e:
+    print("problem: {}".format(e))
+
+if not os.path.exists("build"):
+    os.mkdir("build")
+
+with open("build/lcb_min_version.h", "w+") as LCB_MIN_VERSION:
+    LCB_MIN_VERSION.writelines(
+        ["#define LCB_MIN_VERSION 0x{}\n".format(''.join(map(lambda x: "{0:02d}".format(x), lcb_min_version))),
+         '#define LCB_MIN_VERSION_TEXT "{}"'.format('.'.join(map(str, lcb_min_version)))])
+
 try:
     couchbase_version.gen_version()
 except couchbase_version.CantInvokeGit:

@@ -32,12 +32,12 @@ version by issuing the following incantation
 ~~~~~~~~~~~~~
 Prerequisites
 ~~~~~~~~~~~~~
-
+.. |libcouchbase_version| replace:: 2.9.0
 - Couchbase Server (http://couchbase.com/download)
-- libcouchbase_. version 2.8.0 or greater (Bundled in Windows installer)
+- libcouchbase_. version |libcouchbase_version| or greater (Bundled in Windows installer)
 - libcouchbase development files.
 - Python development files
-- A C compiler.
+- A C compiler (except on Windows)
 
 ~~~~~~~~
 Building
@@ -59,9 +59,6 @@ If your libcouchbase install is in an alternate location (for example,
     python setup.py build_ext --inplace \
         --library-dir /opt/local/libcouchbase/lib \
         --include-dir /opt/local/libcouchbase/include
-
-If you wish to enable the experimental tracing feature, set the
-``PYCBC_TRACING_ENABLE`` environment variable.
 
 Or you can modify the environment ``CFLAGS`` and ``LDFLAGS`` variables.
 
