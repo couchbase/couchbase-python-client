@@ -6,6 +6,14 @@
 Couchbase Python Client Library Documentation
 =============================================
 
+Prerequisites
+=============
+- Couchbase Server (http://couchbase.com/download)
+- libcouchbase version |libcouchbase_version| or greater (Bundled in Windows installer)
+- libcouchbase development files.
+- Python development files
+- A C compiler (except on Windows)
+
 Contents:
 
 .. toctree::

@@ -18,6 +18,7 @@ import sys
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #sys.path.insert(0, os.path.abspath('.'))
+
 sys.path.insert(0, os.path.abspath('../..'))
 sys.path.insert(0, os.path.dirname(__file__))
 #sys.path.insert(0, os.path.abspath('../../couchbase'))
@@ -27,8 +28,15 @@ from distutils.util import get_platform
 sys.path.insert(0, os.path.abspath('../../build/lib.%s-%s' % (get_platform(), sys.version[0:3])))
 
 import couchbase_version
+try:
+    import lcb_version
 
+    libcouchbase_version=lcb_version.get_lcb_min_version()
+except:
+    libcouchbase_version=(2,9,0)
 # -- General configuration -----------------------------------------------------
+rst_epilog = """
+.. |libcouchbase_version| replace:: {}""".format('.'.join(map(str,libcouchbase_version)))
 
 # If your documentation needs a minimal Sphinx version, state it here.
 #needs_sphinx = '1.0'
@@ -53,7 +61,12 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Couchbase Python Client Library'
-copyright = '2013-2015, Couchbase, Inc.'
+try:
+    from datetime import date
+    year=str(date.year)
+except:
+    year="2019"
+copyright = "2013-{}, Couchbase, Inc.".format(year)
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
