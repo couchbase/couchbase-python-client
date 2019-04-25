@@ -260,7 +260,6 @@ typedef Py_ssize_t pycbc_strlen_t;
 typedef int pycbc_strlen_t;
 #endif
 
-#define PYCBC_PACKAGE_NAME "couchbase"
 #define PYCBC_MODULE_NAME "_libcouchbase"
 #define PYCBC_FQNAME PYCBC_PACKAGE_NAME "." PYCBC_MODULE_NAME
 

@@ -21,8 +21,6 @@ import sys
 
 sys.path.insert(0, os.path.abspath('../..'))
 sys.path.insert(0, os.path.dirname(__file__))
-#sys.path.insert(0, os.path.abspath('../../couchbase'))
-#sys.path.insert(0, os.path.abspath(os.path.join(os.pardir, os.pardir, 'couchbase')))
 
 from distutils.util import get_platform
 sys.path.insert(0, os.path.abspath('../../build/lib.%s-%s' % (get_platform(), sys.version[0:3])))

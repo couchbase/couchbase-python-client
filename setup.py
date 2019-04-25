@@ -1,11 +1,12 @@
 #!/usr/bin/env python
-import sys
+import logging
 import os.path
 import os
-import platform
-import warnings
 import couchbase_version
 import pip
+
+from cbuild_config import get_ext_options, couchbase_core
+from cmodule import gen_cmodule
 
 try:
     if os.environ.get('PYCBC_NO_DISTRIBUTE'):
@@ -15,10 +16,13 @@ try:
 except ImportError:
     from distutils.core import setup, Extension
 
-import re
-extoptions = {}
-pkgdata = {}
-pkgversion = None
+from distutils.command.install_headers import install_headers as install_headers_orig
+
+import os
+import sys
+import platform
+
+from setuptools.command.build_ext import build_ext
 
 lcb_min_version = (2, 9, 0)
 
@@ -31,9 +35,10 @@ if not os.path.exists("build"):
     os.mkdir("build")
 
 with open("build/lcb_min_version.h", "w+") as LCB_MIN_VERSION:
-    LCB_MIN_VERSION.writelines(
-        ["#define LCB_MIN_VERSION 0x{}\n".format(''.join(map(lambda x: "{0:02d}".format(x), lcb_min_version))),
-         '#define LCB_MIN_VERSION_TEXT "{}"'.format('.'.join(map(str, lcb_min_version)))])
+    LCB_MIN_VERSION.write('\n'.join(
+        ["#define LCB_MIN_VERSION 0x{}".format(''.join(map(lambda x: "{0:02d}".format(x), lcb_min_version))),
+         '#define LCB_MIN_VERSION_TEXT "{}"'.format('.'.join(map(str, lcb_min_version))),
+         '#define PYCBC_PACKAGE_NAME "{}"'.format(couchbase_core)]))
 
 try:
     couchbase_version.gen_version()
@@ -42,144 +47,6 @@ except couchbase_version.CantInvokeGit:
 
 pkgversion = couchbase_version.get_version()
 
-
-LCB_NAME = None
-extoptions['extra_compile_args'] = []
-extoptions['extra_link_args'] = []
-
-
-def boolean_option(flag):
-    return "-D{}={}".format(flag,os.environ.get(flag))
-
-
-COMP_OPTION_PREFIX = "PYCBC_COMP_OPT_"
-
-
-def comp_option(flag):
-    return "-{}={}".format(flag.replace(COMP_OPTION_PREFIX, ""), os.environ.get(flag))
-
-
-COMP_OPTION_BOOL_PREFIX = "PYCBC_COMP_OPT_BOOL_"
-
-
-def comp_option_bool(flag):
-    return "-{}".format(flag.replace(COMP_OPTION_BOOL_PREFIX, ""))
-
-
-CLANG_SAN_OPTIONS={"address":"lsan","undefined":"ubsan"}
-
-CLANG_SAN_PREFIX = "PYCBC_SAN_OPT_"
-
-def comp_clang_san_option(flag):
-    san_option = flag.replace(CLANG_SAN_PREFIX, "")
-    fsanitize_statement = "-fsanitize={}".format(san_option)
-    extoptions['extra_link_args']+=["{}".format(fsanitize_statement)]
-    return fsanitize_statement
-
-
-def comp_option_pattern(prefix):
-    return re.escape(prefix) + ".*"
-
-
-comp_flags = {"PYCBC_STRICT":boolean_option,
-              "PYCBC_TABBED_CONTEXTS_ENABLE": boolean_option,
-              "PYCBC_REF_ACCOUNTING": boolean_option,
-              "PYCBC_TRACING_DISABLE": boolean_option, "PYCBC_DEBUG": boolean_option,
-              "PYCBC_CRYPTO_VERSION": boolean_option, comp_option_pattern(COMP_OPTION_PREFIX): comp_option,
-              comp_option_pattern(COMP_OPTION_BOOL_PREFIX): comp_option_bool,
-              comp_option_pattern(CLANG_SAN_PREFIX):comp_clang_san_option}
-
-debug_symbols = len(set(os.environ.keys()) & {"PYCBC_DEBUG", "PYCBC_DEBUG_SYMBOLS"}) > 0
-comp_arg_additions = (action(actual_flag) for flag, action in comp_flags.items() for actual_flag in os.environ.keys() if
-                      re.match(flag, actual_flag))
-extoptions['extra_compile_args'] += comp_arg_additions
-if sys.platform != 'win32':
-    extoptions['libraries'] = ['couchbase']
-    if debug_symbols:
-        extoptions['extra_compile_args'] += ['-O0', '-g3']
-        extoptions['extra_link_args'] += ['-O0', '-g3']
-    if sys.platform == 'darwin':
-        warnings.warn('Adding /usr/local to search path for OS X')
-        extoptions['library_dirs'] = ['/usr/local/lib']
-        extoptions['include_dirs'] = ['/usr/local/include']
-
-else:
-    if sys.version_info<(3,0,0):
-        if pip.__version__<"9.0.0":
-            raise pip.exceptions.InstallationError("Windows on Python earlier than v3 unsupported.")
-
-    warnings.warn("I'm detecting you're running windows."
-                  "You might want to modify "
-                  "the 'setup.py' script to use appropriate paths")
-
-
-    # The layout i have here is an ..\lcb-winbuild, in which there are subdirs
-    # called 'x86' and 'x64', for x86 and x64 architectures. The default
-    # 'nmake install' on libcouchbase will install them to 'deps'
-    bit_type = platform.architecture()[0]
-    lcb_root = os.path.join(os.path.pardir, 'lcb-winbuild')
-
-    if bit_type.startswith('32'):
-        lcb_root = os.path.join(lcb_root, 'x86')
-    else:
-        lcb_root = os.path.join(lcb_root, 'x64')
-
-    lcb_root = os.path.join(lcb_root, 'deps')
-
-    extoptions['libraries'] = ['libcouchbase']
-    ## Enable these lines for debug builds
-    if debug_symbols:
-        extoptions['extra_compile_args'] += ['/Zi','/DEBUG','/O0']
-        extoptions['extra_link_args'] += ['/DEBUG','-debug']
-    extoptions['library_dirs'] = [os.path.join(lcb_root, 'lib')]
-    extoptions['include_dirs'] = [os.path.join(lcb_root, 'include')]
-    extoptions['define_macros'] = [('_CRT_SECURE_NO_WARNINGS', 1)]
-    pkgdata['couchbase'] = ['libcouchbase.dll']
-
-
-SOURCEMODS = [
-        'exceptions',
-        'ext',
-        'result',
-        'opresult',
-        'callbacks',
-        'cntl',
-        'convert',
-        'bucket',
-        'store',
-        'constants',
-        'multiresult',
-        'miscops',
-        'typeutil',
-        'oputil',
-        'get',
-        'counter',
-        'http',
-        'htresult',
-        'ctranscoder',
-        'crypto',
-        'observe',
-        'iops',
-        'connevents',
-        'pipeline',
-        'views',
-        'n1ql',
-        'fts',
-        'ixmgmt'
-        ]
-
-if platform.python_implementation() != 'PyPy':
-    extoptions['sources'] = [ os.path.join("src", m + ".c") for m in SOURCEMODS ]
-    module = Extension('couchbase._libcouchbase', **extoptions)
-    setup_kw = {'ext_modules': [module]}
-else:
-    warnings.warn('The C extension libary does not work on PyPy. '
-            'You should install the couchbase_ffi module. Installation of this '
-            'module will continue but will be unusable without couchbase_ffi')
-    setup_kw = {}
-
-cmake_build=os.environ.get("PYCBC_CMAKE_BUILD")
-
 # Dummy dependency to prevent installation of Python < 3 package on Windows.
 
 pip_not_on_win_python_lt_3 = (
@@ -187,8 +54,114 @@ pip_not_on_win_python_lt_3 = (
     if pip.__version__ >= "9.0.0"
     else [])
 
-conan_and_cmake_deps = (['conan', 'cmake>=3.0.2'] if
-                        cmake_build and sys.platform.startswith('darwin') else [])
+
+build_type = os.getenv("PYCBC_BUILD",
+                       {"Windows": "CMAKE_HYBRID", "Darwin": "CMAKE_HYBRID", "Linux": "CMAKE_HYBRID"}.get(platform.system(),
+                                                                                                   "CMAKE_HYBRID"))
+
+
+class install_headers(install_headers_orig):
+    def run(self):
+        headers = self.distribution.headers or []
+        for header in headers:
+            dst = os.path.join(self.install_dir, os.path.dirname(header))
+            self.mkpath(dst)
+            (out, _) = self.copy_file(header, dst)
+            self.outfiles.append(out)
+
+
+def gen_cmake_build(extoptions, pkgdata):
+    from cmake_build import CMakeExtension, CMakeBuild, CMakeBuildInfo
+
+    class LazyCommandClass(dict):
+        """
+        Lazy command class that defers operations requiring given cmdclass until
+        they've actually been downloaded and installed by setup_requires.
+        """
+        def __init__(self, cmdclass_real):
+            self.cmdclass_real=cmdclass_real
+
+        def __contains__(self, key):
+            return (
+                    key == 'build_ext'
+                    or super(LazyCommandClass, self).__contains__(key)
+            )
+
+        def __setitem__(self, key, value):
+            if key == 'build_ext':
+                raise AssertionError("build_ext overridden!")
+            super(LazyCommandClass, self).__setitem__(key, value)
+
+        def __getitem__(self, key):
+            if key != 'build_ext':
+                return super(LazyCommandClass, self).__getitem__(key)
+            return self.cmdclass_real
+
+    CMakeBuild.hybrid = build_type in ['CMAKE_HYBRID']
+    CMakeBuild.info = CMakeBuildInfo()
+    CMakeBuild.info.pkgdata = pkgdata
+    CMakeBuild.info.pkg_data_dir = os.path.join(os.path.abspath("."), couchbase_core)
+    pkgdata['couchbase'] = list(CMakeBuild.info.lcb_pkgs_strlist())
+    e_mods = [CMakeExtension(str(couchbase_core+'._libcouchbase'), '', **extoptions)]
+    return e_mods, CMakeBuild.requires(), LazyCommandClass(CMakeBuild)
+
+
+def gen_distutils_build(extoptions,pkgdata):
+    b_ext = build_ext
+    e_mods = [gen_cmodule(extoptions)]
+    cmdclass = {'install_headers': install_headers, 'build_ext': b_ext}
+    return e_mods, cmdclass
+
+
+def handle_build_type_and_gen_deps():
+    cmake_build = build_type in ['CMAKE', 'CMAKE_HYBRID']
+    print("Build type: {}, cmake:{}".format(build_type, cmake_build))
+    general_requires = ['pyrsistent', "enum34; python_version < '3.5'"]
+    extoptions, pkgdata=get_ext_options()
+
+    if cmake_build:
+        e_mods, extra_requires, cmdclass = gen_cmake_build(extoptions,pkgdata)
+        general_requires += extra_requires
+    else:
+        print("Legacy build")
+        e_mods, cmdclass = gen_distutils_build(extoptions,pkgdata)
+
+    setup_kw = {'ext_modules': e_mods}
+    logging.error(setup_kw)
+
+    typing_requires = (['typing'] if sys.version_info < (3, 7) else [])
+
+    exec_requires = typing_requires + general_requires
+    conan_build = os.environ.get("PYCBC_CONAN_BUILD")
+    conan_deps = ['conan'] if conan_build else []
+    conan_and_cmake_deps = ((['scikit-build', 'cmake>=3.0.2'] + conan_deps) if
+                            cmake_build and sys.platform.startswith('darwin') else [])
+    setup_kw['setup_requires'] = exec_requires + conan_and_cmake_deps
+    setup_kw['install_requires'] = exec_requires + pip_not_on_win_python_lt_3
+    setup_kw['cmdclass']=cmdclass
+    setup_kw['package_data']=pkgdata
+    setup_kw['eager_resources']=pkgdata
+    return setup_kw
+
+
+setup_kw = handle_build_type_and_gen_deps()
+
+packages = {
+    'acouchbase',
+    'couchbase',
+    couchbase_core,
+    'couchbase.views',
+    'couchbase.iops',
+    'couchbase.asynchronous',
+    'couchbase.tests',
+    'couchbase.tests.cases',
+    'gcouchbase',
+    'txcouchbase',
+    'acouchbase',
+}.union({
+            'acouchbase.tests',
+            'acouchbase.py34only'
+        } if sys.version_info >= (3, 4) else set())
 
 setup(
     name = 'couchbase',
@@ -200,7 +173,6 @@ setup(
     description="Python Client for Couchbase",
     long_description=open("README.rst", "r").read(),
     keywords=["couchbase", "nosql", "pycouchbase", "libcouchbase"],
-
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "License :: OSI Approved :: Apache Software License",
@@ -214,25 +186,8 @@ setup(
         "Topic :: Software Development :: Libraries",
         "Topic :: Software Development :: Libraries :: Python Modules"],
 
-    packages = [
-        'acouchbase',
-        'couchbase',
-        'couchbase.views',
-        'couchbase.iops',
-        'couchbase.asynchronous',
-        'couchbase.tests',
-        'couchbase.tests.cases',
-        'gcouchbase',
-        'txcouchbase',
-        'acouchbase',
-    ] + ([
-        'acouchbase.tests',
-        'acouchbase.py34only'
-    ] if sys.version_info >= (3, 4) else []),
-    package_data=pkgdata,
-    setup_requires=['typing'] + conan_and_cmake_deps,
-    install_requires=['typing'] + pip_not_on_win_python_lt_3,
-    tests_require=['nose', 'testresources>=0.2.7', 'basictracer==2.2.0'],
+    packages = list(packages),
+    tests_require=['utilspie','nose', 'testresources>=0.2.7', 'basictracer==2.2.0'],
     test_suite='couchbase.tests.test_sync',
     **setup_kw
 )

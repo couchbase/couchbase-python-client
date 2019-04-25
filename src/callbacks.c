@@ -261,7 +261,7 @@ get_common_objects(const lcb_RESPBASE *resp, pycbc_Bucket **conn,
                                        "Found duplicate key",
                                        __FILE__,
                                        __LINE__,
-                                       "couchbase._libcouchbase",
+                                       PYCBC_PACKAGE_NAME "._libcouchbase",
                                        NULL);
 
                 } else {

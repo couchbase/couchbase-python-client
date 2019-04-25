@@ -1,0 +1,57 @@
+{
+  "source": [
+    "src/bucket.c",
+    "src/callbacks.c",
+    "src/cntl.c",
+    "src/connevents.c",
+    "src/constants.c",
+    "src/convert.c",
+    "src/crypto.c",
+    "src/counter.c",
+    "src/ctranscoder.c",
+    "src/exceptions.c",
+    "src/ext.c",
+    "src/fts.c",
+    "src/get.c",
+    "src/htresult.c",
+    "src/http.c",
+    "src/iops.c",
+    "src/iops.h",
+    "src/ixmgmt.c",
+    "src/miscops.c",
+    "src/mresdict.h",
+    "src/multiresult.c",
+    "src/n1ql.c",
+    "src/observe.c",
+    "src/opresult.c",
+    "src/oputil.c",
+    "src/oputil.h",
+    "src/pipeline.c",
+    "src/result.c",
+    "src/store.c",
+    "src/typeutil.c",
+    "src/views.c"
+  ],
+  "comp_options": {
+    "PYCBC_LCB_API": "0x030000",
+    "PYCBC_CORE": "couchbase"
+  },
+  "apis": {
+    "0x030000": {
+      "git": {
+        "repo": "https://github.com/couchbase/libcouchbase.git",
+        "tag": "fa499e8a8ff03acae6a8067e843b4d0e0c8c5451"
+      },
+      "sources": [
+      ]
+    },
+    "0x032000": {
+      "git": {
+        "repo": "https://github.com/couchbase/libcouchbase.git",
+        "tag": "3.0.0-alpha.3"
+      },
+      "sources": [
+      ]
+    }
+  }
+}

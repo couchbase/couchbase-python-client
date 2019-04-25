@@ -8,3 +8,4 @@ recursive-include tests *.py *.sample
 recursive-include examples *.py
 include couchbase libcouchbase.dll
 exclude MANIFEST.in
+include pyproject.toml

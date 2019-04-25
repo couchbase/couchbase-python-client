@@ -7,6 +7,8 @@ import os.path
 import warnings
 import re
 
+from cbuild_config import couchbase_core
+
 
 class CantInvokeGit(Exception):
     pass
@@ -24,7 +26,7 @@ RE_XYZ = re.compile(r'(\d+)\.(\d+)\.(\d)(?:-(.*))?')
 
 VERSION_FILE = os.path.join(
     os.path.dirname(__file__),
-    os.path.join("couchbase", "_version.py"))
+    os.path.join(couchbase_core, "_version.py"))
 
 
 class VersionInfo(object):
