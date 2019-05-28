@@ -102,6 +102,7 @@ def gen_cmake_build(extoptions, pkgdata):
     CMakeBuild.info.pkgdata = pkgdata
     CMakeBuild.info.pkg_data_dir = os.path.join(os.path.abspath("."), couchbase_core)
     pkgdata['couchbase'] = list(CMakeBuild.info.lcb_pkgs_strlist())
+    extoptions['library_dirs']=[CMakeBuild.info.pkg_data_dir]+extoptions.get('library_dirs',[])
     e_mods = [CMakeExtension(str(couchbase_core+'._libcouchbase'), '', **extoptions)]
     return e_mods, CMakeBuild.requires(), LazyCommandClass(CMakeBuild)
 

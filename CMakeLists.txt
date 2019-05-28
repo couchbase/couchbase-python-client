@@ -98,10 +98,13 @@ endif()
 message("got PYCBC_LCB_API... ${PYCBC_LCB_API}")
 
 set(PYCBC_SRC )
-if(HYBRID_BUILD)
-    set(ENABLE_HYBRID_BUILD)
+message("got HYBRID_BUILD=${HYBRID_BUILD}")
+if("${HYBRID_BUILD}")
+    message("enabling hybrid build")
+    set(ENABLE_HYBRID_BUILD TRUE)
 endif()
 if(ENABLE_HYBRID_BUILD)
+    message("Doing hybrid build")
 else()
     message("Scanning ${BUILD_CFG_FILE} for bindings/config, final PYCBC_LCB_API==[${PYCBC_LCB_API}]")
     foreach(var ${build_cfg})
@@ -162,6 +165,11 @@ if (LCB_SRC)
     SET(LIBCOUCHBASE_STATIC_LIBRARY_NAME "libcouchbase_d.lib")
     SET(LCB_CMAKE_ARGS -DLCB_NO_TOOLS=1 -DLCB_NO_TESTS=1)
     if (WIN32)
+        if (CMAKE_GENERATOR_PLATFORM MATCHES x64)
+            set(WIN_PLATFORM "Visual Studio 14 2015 Win64")
+        else()
+            set(WIN_PLATFORM "Visual Studio 14 2015")
+        endif()
         set(LCB_CMAKE_ARGS ${LCB_CMAKE_ARGS} -DLCB_NO_SSL=1 -DLCB_NO_MOCK=1)
         SET(LIBCOUCHBASE_LIBRARY_FILE "${LCB_BUILD_DIR}/lib/Release/${LIBCOUCHBASE_LIBRARY_NAME}")
         SET(LIBCOUCHBASE_DBG_LIBRARY_FILE "${LCB_BUILD_DIR}/lib/Debug/${LIBCOUCHBASE_DBG_LIBRARY_NAME}")
@@ -172,7 +180,7 @@ if (LCB_SRC)
             COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}/install
             COMMAND cd <SOURCE_DIR> && ${REF_CMDS}
 
-            COMMAND cd ${LCB_BUILD_DIR} && echo "in ${LCB_BUILD_DIR}" && cmake -DLCB_NO_PLUGINS=1  -B . -G "Visual Studio 14 2015 Win64" ${LCB_CMAKE_ARGS} -S <SOURCE_DIR>
+            COMMAND cd ${LCB_BUILD_DIR} && echo "in ${LCB_BUILD_DIR}" && cmake -DLCB_NO_PLUGINS=1  -B . -G ${WIN_PLATFORM} ${LCB_CMAKE_ARGS} -S <SOURCE_DIR>
             BUILD_COMMAND cd ${LCB_BUILD_DIR} && cmake --build ${LCB_BUILD_DIR} --config Release
 
             INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/install

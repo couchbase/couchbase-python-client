@@ -22,7 +22,6 @@ import platform
 import re
 import sys
 import warnings
-import pip
 
 
 def get_json_build_cfg():
@@ -118,8 +117,8 @@ def get_ext_options():
         print(pkgdata)
     else:
         if sys.version_info < (3, 0, 0):
-            if pip.__version__ < "9.0.0":
-                raise pip.exceptions.InstallationError("Windows on Python earlier than v3 unsupported.")
+            import pip
+            raise pip.exceptions.InstallationError("Windows on Python earlier than v3 unsupported.")
 
         warnings.warn("I'm detecting you're running windows."
                       "You might want to modify "

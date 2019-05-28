@@ -33,10 +33,19 @@
     "src/views.c"
   ],
   "comp_options": {
-    "PYCBC_LCB_API": "0x030000",
+    "PYCBC_LCB_API": "0x021003",
+    "PYCBC_LCB_API_ALL_SUPPORTED" : ["0x021003"],
     "PYCBC_CORE": "couchbase"
   },
   "apis": {
+    "0x021003": {
+      "git": {
+        "repo": "https://github.com/couchbase/libcouchbase.git",
+        "tag": "2.10.3"
+      },
+      "sources": [
+      ]
+    },
     "0x030000": {
       "git": {
         "repo": "https://github.com/couchbase/libcouchbase.git",

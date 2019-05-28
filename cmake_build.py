@@ -62,7 +62,7 @@ class CMakeBuildInfo:
         plat = get_plat_code()
 
         print("Got platform {}".format(plat))
-        default = ['libcouchbase.so', 'libcouchbase.so.3']
+        default = ['libcouchbase.so', 'libcouchbase.so.2', 'libcouchbase.so.3']
         return {'darwin': ['libcouchbase.2.dylib', 'libcouchbase.dylib'], 'linux': default,
                 'win': ['libcouchbase_d.dll','libcouchbase.dll']}.get(get_plat_code(), default)
 
@@ -118,7 +118,7 @@ class CMakeBuild(build_ext):
     def check_for_cmake():
         try:
             return subprocess.check_output(['cmake', '--version'])
-        except OSError:
+        except:
             return None
 
     @staticmethod
@@ -219,22 +219,12 @@ class CMakeBuild(build_ext):
             rpaths = [{'Darwin': '@loader_path', 'Linux': '$ORIGIN'}.get(platform.system(), "$ORIGIN"),
                       lib_path]
             print("adding rpaths {}".format(rpaths))
+            build_dir = os.path.realpath(self.build_lib)
+
             if CMakeBuild.hybrid:
                 if not self.compiler:
                     self.run()
 
-                from distutils.ccompiler import CCompiler
-                ext.extra_compile_args += lcb_api_flags
-                compiler = self.compiler  # type: CCompiler
-                compiler.add_include_dir(os.path.join(self.build_temp, "install", "include"))
-                compiler.add_library_dir(os.path.join(self.build_temp, "install", "lib", "Debug"))
-                compiler.add_library_dir(os.path.join(self.build_temp, "install", "lib", "Release"))
-                if platform.system() != 'Windows':
-                    for rpath in rpaths:
-                        compiler.add_runtime_library_dir(rpath)
-                        ext.extra_link_args.append('-Wl,-rpath,' + rpath)
-                build_ext.build_extension(self, ext)
-            build_dir = os.path.realpath(self.build_lib)
             for name in self.info.entries():
                 try:
                     pkg_build_dir=os.path.join(build_dir, cbuild_config.couchbase_core)
@@ -243,6 +233,36 @@ class CMakeBuild(build_ext):
                 except:
                     print("failure")
                     raise
+
+            if CMakeBuild.hybrid:
+                from distutils.ccompiler import CCompiler
+                ext.extra_compile_args += lcb_api_flags
+                compiler = self.compiler  # type: CCompiler
+
+                lcb_include = os.path.join(self.build_temp, "install", "include")
+                compiler.add_include_dir(lcb_include)
+                lib_dirs = [self.info.pkg_data_dir]+self.get_lcb_dirs()
+                try:
+                    existing_lib_dirs=compiler.library_dirs
+                    compiler.set_library_dirs(lib_dirs+existing_lib_dirs)
+                except:
+                    compiler.add_library_dirs(lib_dirs)
+                if platform.system() != 'Windows':
+                    try:
+                        existing_rpaths=compiler.runtime_library_dirs
+                        compiler.set_runtime_library_dirs(rpaths+existing_rpaths)
+                    except:
+                        pass
+                    for rpath in rpaths:
+                        compiler.add_runtime_library_dir(rpath)
+                        ext.extra_link_args.insert(0,'-Wl,-rpath,' + rpath)
+                build_ext.build_extension(self, ext)
+
+    def get_lcb_dirs(self):
+        lcb_dbg_build = os.path.join(*(self.info.base + ["install", "lib", "Debug"]))
+        lcb_build = os.path.join(*(self.info.base + ["install", "lib", "Release"]))
+        lib_dirs = [lcb_dbg_build, lcb_build]
+        return lib_dirs
 
     def copy_binary_to(self, cfg, dest_dir, lib_paths, name):
         try:
@@ -256,9 +276,10 @@ class CMakeBuild(build_ext):
         for rel_type, binary_path in lib_paths_prioritized:
             src = os.path.join(*(binary_path + [name]))
             try:
-                print("copying {} to {}".format(src, dest))
-                copyfile(src, dest)
-                print("success")
+                if os.path.exists(src):
+                    print("copying {} to {}".format(src, dest))
+                    copyfile(src, dest)
+                    print("success")
             except Exception as e:
                 failures[rel_type] = "copying {} to {}, got {}".format(src, dest, repr(e))
         if len(failures) == len(lib_paths):
