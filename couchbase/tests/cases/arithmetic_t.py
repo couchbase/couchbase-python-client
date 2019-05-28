@@ -14,9 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from unittest import SkipTest
 
 from couchbase.exceptions import (NotFoundError, DeltaBadvalError)
 from couchbase.tests.base import ConnectionTestCase
+import couchbase._libcouchbase as _LCB
 
 
 class ArithmeticTest(ConnectionTestCase):

@@ -97,25 +97,79 @@ struct pycbc_common_vars {
 /**
  * Handler for iterations
  */
-typedef int (*pycbc_oputil_keyhandler_raw)
-        (pycbc_Bucket *self,
-         struct pycbc_common_vars *cv,
-         int optype,
-         PyObject *key,
-         PyObject *value,
-         PyObject *options,
-         pycbc_Item *item,
-         void *arg,
-         pycbc_stack_context_handle context);
+#define PYCBC_UNITS(X) \
+    X(Bucket)          \
+    X(Collection)
 
-#ifdef PYCBC_TRACING
-typedef struct {
-    const char* category;
-    const char* name;
-    pycbc_oputil_keyhandler_raw cb;
-} pycbc_oputil_keyhandler;
+#define PYCBC_OPUTIL_CONTEXT_Bucket
+#define PYCBC_OPUTIL_CONTEXT_Collection \
+    pycbc_oputil_keyhandler_raw_Bucket *original,
+
+#define PYCBC_OPUTIL_KEYHANDLER_RAW(UNIT)                    \
+    typedef int (*pycbc_oputil_keyhandler_raw_##UNIT)(       \
+            PYCBC_OPUTIL_CONTEXT_##UNIT pycbc_##UNIT * self, \
+            struct pycbc_common_vars * cv,                   \
+            int optype,                                      \
+            PyObject *key,                                   \
+            PyObject *value,                                 \
+            PyObject *options,                               \
+            pycbc_Item *item,                                \
+            void *arg,                                       \
+            pycbc_stack_context_handle context);
+
+#ifndef PYCBC_GEN_UNIT
+
+typedef int (*pycbc_oputil_keyhandler_raw_Bucket)(
+        pycbc_Bucket *self,
+        struct pycbc_common_vars *cv,
+        int optype,
+        PyObject *key,
+        PyObject *value,
+        PyObject *options,
+        pycbc_Item *item,
+        void *arg,
+        pycbc_stack_context_handle context);
+
+typedef int (*pycbc_oputil_keyhandler_raw_Collection)(
+        pycbc_oputil_keyhandler_raw_Bucket *original,
+        pycbc_Collection *self,
+        struct pycbc_common_vars *cv,
+        int optype,
+        PyObject *key,
+        PyObject *value,
+        PyObject *options,
+        pycbc_Item *item,
+        void *arg,
+        pycbc_stack_context_handle context);
 #else
-typedef  pycbc_oputil_keyhandler_raw pycbc_oputil_keyhandler;
+PYCBC_UNITS(PYCBC_OPUTIL_KEYHANDLER_RAW)
+#endif
+
+#define PYCBC_OPUTIL_EXTRA_Bucket
+#define PYCBC_OPUTIL_EXTRA_Collection \
+    const pycbc_oputil_keyhandler_raw_Bucket *original;
+#define PYCBC_OPUTIL_KEYHANDLER(UNIT)          \
+    typedef struct {                           \
+        const char *category;                  \
+        const char *name;                      \
+        pycbc_oputil_keyhandler_raw_##UNIT cb; \
+        PYCBC_OPUTIL_EXTRA_##UNIT              \
+    } pycbc_oputil_keyhandler_##UNIT;
+#ifndef PYCBC_GEN_UNIT
+
+typedef struct {
+    const char *category;
+    const char *name;
+    pycbc_oputil_keyhandler_raw_Bucket cb;
+} pycbc_oputil_keyhandler_Bucket;
+typedef struct {
+    const char *category;
+    const char *name;
+    pycbc_oputil_keyhandler_raw_Collection cb;
+    pycbc_oputil_keyhandler_raw_Bucket *original;
+} pycbc_oputil_keyhandler_Collection;
+#else
+PYCBC_UNITS(PYCBC_OPUTIL_KEYHANDLER)
 #endif
 
 /**
@@ -211,16 +265,42 @@ int pycbc_common_vars_init(struct pycbc_common_vars *cv,
                            int argopts,
                            Py_ssize_t ncmds,
                            int want_vals);
-#ifdef PYCBC_TRACING
-pycbc_oputil_keyhandler pycbc_oputil_keyhandler_build(pycbc_oputil_keyhandler_raw cb, const char* category, const char* name);
-#define PYCBC_OPUTIL_KEYHANDLER(NAME) pycbc_oputil_keyhandler_build(NAME, NAME##_category(), #NAME)
-#define PYCBC_OPUTIL_ITER_MULTI(SELF,SEQTYPE,COLLECTION,CV,OPTYPE,HANDLER,CONTEXT,...)\
-    pycbc_oputil_iter_multi(SELF,SEQTYPE,COLLECTION,CV,OPTYPE,PYCBC_OPUTIL_KEYHANDLER(HANDLER),CONTEXT,__VA_ARGS__)
+
+#define PYCBC_OPUTIL_KEYHANDLER_BUILD_DECL(UNIT)                         \
+    pycbc_oputil_keyhandler_##UNIT pycbc_oputil_keyhandler_build_##UNIT( \
+            pycbc_oputil_keyhandler_raw_##UNIT cb,                       \
+            const char *category,                                        \
+            const char *name);
+
+#ifndef PYCBC_OPUTIL_GEN
+PYCBC_UNITS(PYCBC_OPUTIL_KEYHANDLER_BUILD_DECL)
 #else
-#define PYCBC_OPUTIL_KEYHANDLER(NAME) NAME
-#define PYCBC_OPUTIL_ITER_MULTI(SELF,SEQTYPE,COLLECTION,CV,OPTYPE,HANDLER,CONTEXT,...)\
-    pycbc_oputil_iter_multi(SELF,SEQTYPE,COLLECTION,CV,OPTYPE,PYCBC_OPUTIL_KEYHANDLER(HANDLER),CONTEXT,__VA_ARGS__)
+PYCBC_UNITS(PYCBC_OPUTIL_KEYHANDLER_BUILD_DECL)
 #endif
+#define PYCBC_OPUTIL_KEYHANDLER_BUILD(UNIT, NAME) \
+    pycbc_oputil_keyhandler_build_##UNIT(NAME, NAME##_category(), #NAME)
+#define PYCBC_OPUTIL_ITER_MULTI_BASE(                                       \
+        UNIT, SELF, SEQTYPE, COLLECTION, CV, OPTYPE, HANDLER, CONTEXT, ...) \
+    pycbc_oputil_iter_multi_##UNIT(                                         \
+            SELF,                                                           \
+            SEQTYPE,                                                        \
+            COLLECTION,                                                     \
+            CV,                                                             \
+            OPTYPE,                                                         \
+            PYCBC_OPUTIL_KEYHANDLER_BUILD(UNIT, HANDLER),                   \
+            CONTEXT,                                                        \
+            __VA_ARGS__)
+#define PYCBC_OPUTIL_ITER_MULTI(                                      \
+        SELF, SEQTYPE, COLLECTION, CV, OPTYPE, HANDLER, CONTEXT, ...) \
+    PYCBC_OPUTIL_ITER_MULTI_BASE(Bucket,                              \
+                                 SELF,                                \
+                                 SEQTYPE,                             \
+                                 COLLECTION,                          \
+                                 CV,                                  \
+                                 OPTYPE,                              \
+                                 HANDLER,                             \
+                                 CONTEXT,                             \
+                                 __VA_ARGS__)
 
 /**
  * Iterate over a sequence of command objects
@@ -232,15 +312,25 @@ pycbc_oputil_keyhandler pycbc_oputil_keyhandler_build(pycbc_oputil_keyhandler_ra
  * @param handler the actual handler to call for each key-value-item pair
  * @param arg an opaque pointer passed to the handler
  */
-int
-pycbc_oputil_iter_multi(pycbc_Bucket *self,
-                        pycbc_seqtype_t seqtype,
-                        PyObject *collection,
-                        struct pycbc_common_vars *cv,
-                        int optype,
-                        pycbc_oputil_keyhandler handler,
-                        void *arg,
-                        pycbc_stack_context_handle context);
+int pycbc_oputil_iter_multi_Bucket(pycbc_Bucket *self,
+                                   pycbc_seqtype_t seqtype,
+                                   PyObject *collection,
+                                   struct pycbc_common_vars *cv,
+                                   int optype,
+                                   pycbc_oputil_keyhandler_Bucket handler,
+                                   void *arg,
+                                   pycbc_stack_context_handle context);
+
+#define pycbc_oputil_iter_multi(...) pycbc_oputil_iter_multi(__VA_ARGS__)
+int pycbc_oputil_iter_multi_Collection(
+        pycbc_Collection *self,
+        pycbc_seqtype_t seqtype,
+        PyObject *collection,
+        struct pycbc_common_vars *cv,
+        int optype,
+        pycbc_oputil_keyhandler_Collection handler,
+        void *arg,
+        pycbc_stack_context_handle context);
 
 void pycbc_wait_for_scheduled(pycbc_Bucket *self,
                               PyObject *kwargs,
@@ -288,7 +378,8 @@ void pycbc_oputil_conn_unlock(pycbc_Bucket *self);
 int pycbc_handle_durability_args(pycbc_Bucket *self,
                                  pycbc_dur_params *params,
                                  char persist_to,
-                                 char replicate_to);
+                                 char replicate_to,
+                                 pycbc_DURABILITY_LEVEL dur_level);
 
 /**
  * Handle the 'key' argument for sub-document paths

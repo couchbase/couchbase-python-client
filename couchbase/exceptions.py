@@ -619,6 +619,11 @@ class CryptoProviderKeySizeException(CryptoError):
         super(CryptoProviderKeySizeException,self).__init__(params=params, message=
         "The key found does not match the size of the key that the algorithm expects for the alias: $alias. Expected key size was $expected_keysize and configured key size is $configured_keysize")
 
+
+class NotImplementedInV3(CouchbaseError):
+    """Not available on PYCBC>=3.0.0-alpha1"""
+    pass
+
 _PYCBC_CRYPTO_ERR_MAP ={
     C.PYCBC_CRYPTO_PROVIDER_NOT_FOUND: CryptoProviderNotFoundException,
     C.PYCBC_CRYPTO_PROVIDER_ALIAS_NULL: CryptoProviderAliasNullException,

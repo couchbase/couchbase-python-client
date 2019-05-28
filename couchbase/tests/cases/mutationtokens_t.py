@@ -15,12 +15,14 @@
 # limitations under the License.
 #
 import json
-
+from unittest import SkipTest
 
 from couchbase.tests.base import ConnectionTestCase
 from couchbase.connstr import ConnectionString
 from couchbase._pyport import long
 from couchbase.n1ql import MutationState
+from couchbase.exceptions import NotSupportedError
+import logging
 
 
 class MutationTokensTest(ConnectionTestCase):
@@ -47,20 +49,28 @@ class MutationTokensTest(ConnectionTestCase):
         self.assertEqual(cb.bucket, bktname)
 
         # Get all the mutation tokens
-        all_info = cb._mutinfo()
-        self.assertTrue(all_info)
-        self.assertEqual(1, len(all_info))
-        vb, uuid, seq = all_info[0]
-        self.assertIsInstance(vb, (int, long))
-        self.assertIsInstance(uuid, (int, long))
-        self.assertIsInstance(seq, (int, long))
+        try:
+            all_info = cb._mutinfo()
+            self.assertTrue(all_info)
+            self.assertEqual(1, len(all_info))
+            vb, uuid, seq = all_info[0]
+            self.assertIsInstance(vb, (int, long))
+            self.assertIsInstance(uuid, (int, long))
+            self.assertIsInstance(seq, (int, long))
+        except NotSupportedError as e:
+            # as per CCBC-1051
+            logging.info("Skipped VBucket mutation info test because not supported: {}".format(e))
 
     def test_mutinfo_disabled(self):
         cb = self.make_connection(no_mutinfo=True)
         key = self.gen_key('mutinfo')
         rv = cb.upsert(key, 'value')
         self.assertFalse(rv._mutinfo)
-        self.assertEqual(0, len(cb._mutinfo()))
+        try:
+            self.assertEqual(0, len(cb._mutinfo()))
+        except NotSupportedError as e:
+            # as per CCBC-1051
+            logging.info("Skipped VBucket mutation info test because not supported: {}".format(e))
 
     def test_mutation_state(self):
         cb = self.cb

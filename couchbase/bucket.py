@@ -825,6 +825,13 @@ class Bucket(_Base):
             sdflags |= _P.CMDSUBDOC_F_UPSERT_DOC
 
         kwargs['_sd_doc_flags'] = sdflags
+
+        # TODO: find a way of supporting this with LCB V4 API - PYCBC-584
+        if _LCB.PYCBC_LCB_API>0x02FF00 and (sdflags & _P.CMDSUBDOC_F_INSERT_DOC):
+            for spec in specs:
+                if spec[0] ==_LCB.LCB_SDCMD_DICT_UPSERT:
+                    raise NotSupportedError("Subdoc upsert + fulldoc insert Not supported in SDK 3 yet")
+
         return super(Bucket, self).mutate_in(key, specs, **kwargs)
 
     def lookup_in(self, key, *specs, **kwargs):
@@ -1288,6 +1295,8 @@ class Bucket(_Base):
 
         .. seealso:: :meth:`endure`
         """
+        if not _LCB.PYCBC_ENDURE:
+            raise NotImplementedInV3("Standalone endure")
         return _Base.endure_multi(self, keys, persist_to=persist_to,
                                   replicate_to=replicate_to,
                                   timeout=timeout, interval=interval,

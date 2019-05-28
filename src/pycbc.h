@@ -37,165 +37,45 @@
 #endif
 #endif
 
-#ifndef __FUNCTION_NAME__
-#if defined(_WIN32) || defined(WIN32) // WINDOWS
-#define __FUNCTION_NAME__ __FUNCTION__
-#else //*NIX
-#define __FUNCTION_NAME__ __func__
-#endif
-#endif
-
-typedef struct pycbc_stack_context_decl *pycbc_stack_context_handle;
-
-#define PYCBC_TABBED_CONTEXTS
-#ifndef  PYCBC_DEBUG
-#ifdef PYCBC_DEBUG_ENABLE
-#define PYCBC_DEBUG
-#endif
-#endif
-
-#ifdef PYCBC_DEBUG
-void pycbc_debug_log_prefix(const char* FILE, const char* FUNC, int LINE, pycbc_stack_context_handle CONTEXT);
-void pycbc_debug_log(const char* FILE, const char* FUNC, int LINE, pycbc_stack_context_handle CONTEXT, const char* format, ...);
-#define PYCBC_DEBUG_LOG_PREFIX(FILE, FUNC, LINE, CONTEXT)  pycbc_debug_log_prefix(FILE,FUNC,LINE,CONTEXT);
-#define PYCBC_DEBUG_LOG_CONTEXT_FULL(FILE,FUNC,LINE,CONTEXT,...) pycbc_debug_log(FILE,FUNC,LINE,CONTEXT,__VA_ARGS__);
-void pycbc_debug_log_prefix_nocontext(const char* FILE, const char* FUNC, int LINE);
-void pycbc_debug_log_nocontext(const char* FILE, const char* FUNC, int LINE, const char* format, ...);
-#define PYCBC_DEBUG_LOG_NOCONTEXT_FULL(FILE,FUNC,LINE,...) pycbc_debug_log_nocontext(FILE,FUNC,LINE,__VA_ARGS__);
-#define PYCBC_DEBUG_LOG_PREFIX_NOCONTEXT(FILE, FUNC, LINE) pycbc_debug_log_prefix_nocontext(FILE,FUNC,LINE);
-#else
-#define PYCBC_DEBUG_LOG_NOCONTEXT_FULL(FILE,FUNC,LINE,CONTEXT,...)
-#define PYCBC_DEBUG_LOG_CONTEXT_FULL(FILE,FUNC,LINE,CONTEXT,FORMAT,...)
-#define PYCBC_DEBUG_LOG_PREFIX(FILE, FUNC, LINE, CONTEXT)
-#define PYCBC_DEBUG_LOG_PREFIX_NOCONTEXT(FILE, FUNC, LINE)
-#endif
 
 #define PYCBC_GC 3
 #define PYCBC_AUTO_DEREF_FAILED
 
-#ifdef PYCBC_DEBUG
-#define PYCBC_DEBUG_LOG_RAW(...) fprintf(stderr,__VA_ARGS__);
-void pycbc_print_pyformat(const char *format, ...);
-void pycbc_exception_log(const char *file,
-                         const char *func,
-                         int line,
-                         int clear);
-#define PYCBC_DEBUG_PYFORMAT_FILE_FUNC_LINE_CONTEXT(  \
-        FILE, FUNC, LINE, CONTEXT, ...)       \
-    PYCBC_DEBUG_LOG_PREFIX(FILE, FUNC, LINE, CONTEXT) \
-    pycbc_print_pyformat(__VA_ARGS__);        \
-    fprintf(stderr, "\n");
-#define PYCBC_DEBUG_PYFORMAT_FILE_FUNC_LINE_NOCONTEXT( \
-        FILE, FUNC, LINE, ...)                 \
-    PYCBC_DEBUG_LOG_PREFIX_NOCONTEXT(FILE, FUNC, LINE) \
-    pycbc_print_pyformat(__VA_ARGS__);         \
-    fprintf(stderr, "\n");
+#include "python_wrappers.h"
+#define PYCBC_COLLECTIONS
 
-#define PYCBC_DEBUG_PYFORMAT_FILE_FUNC_AND_LINE(FILE, FUNC, LINE, ...) \
-    PYCBC_DEBUG_PYFORMAT_FILE_FUNC_LINE_NOCONTEXT(                             \
-            FILE, FUNC, LINE, __VA_ARGS__)
-#define PYCBC_DEBUG_PYFORMAT_CONTEXT(CONTEXT, ...)         \
-    PYCBC_DEBUG_PYFORMAT_FILE_FUNC_LINE_CONTEXT(__FILE__,          \
-                                                __FUNCTION_NAME__, \
-                                                __LINE__,          \
-                                                CONTEXT,           \
-                                                __VA_ARGS__)
-#define PYCBC_DEBUG_PYFORMAT(...)    \
-    PYCBC_DEBUG_PYFORMAT_FILE_FUNC_AND_LINE( \
-            __FILE__, __FUNCTION_NAME__, __LINE__, __VA_ARGS__)
-#define PYCBC_EXCEPTION_LOG_NOCLEAR \
-    pycbc_exception_log(__FILE__, __FUNCTION_NAME__, __LINE__, 0);
-#define PYCBC_EXCEPTION_LOG \
-    pycbc_exception_log(__FILE__, __FUNCTION_NAME__, __LINE__, 1);
-#define PYCBC_DEBUG_FLUSH fflush(stderr);
+/**
+ * This code supports both PYCBC V2 and PYCBC V3. The
+idea is to wrap the LCB V3 API and the features it supports
+in the V4 API, or V4-style functions/macros.
+
+Everything is, as far as possible,
+written against the V4 API or an abstraction thereof.
+
+Mostly the V4 API changes
+affect:
+
+1. creational logic:
+ wrapped using CMDSCOPE_NG etc, as defined in pycbc.h
+
+2. 'shared' attributes of structures.
+ The backport of the V4 API (see lcb_v4_backport.h) to
+ LCB API V3 replicates these interface changes as far as possible, so one
+ unified set of code can be used with both LCB API V3 and LCB API V4.
+
+ There are some mutually exclusive features between LCB API V3 and LCB API V4
+ (e.g. standalone ENDURE/OBSERVE commands)
+ that are currently implemented via conditional compilation.
+
+ PYCBC_LCB_API represents LCB_API version,
+ but we use 0x02FF0x for V3 alphas (e.g. 0x02FF04 for 3.0.0 Alpha 4).
+ */
+
+#if PYCBC_LCB_API > 0x02FF00
+#include "lcb_v4_wrapper.h"
 #else
-#define PYCBC_DEBUG_LOG_RAW(...)
-#define PYCBC_DEBUG_PYFORMAT_CONTEXT(CONTEXT, FORMAT, ...)
-#define PYCBC_DEBUG_PYFORMAT(...)
-#define PYCBC_EXCEPTION_LOG_NOCLEAR
-#define PYCBC_EXCEPTION_LOG PyErr_Clear();
-#define PYCBC_DEBUG_FLUSH
+#include "lcb_v4_backport.h"
 #endif
-
-#define PYCBC_DEBUG_LOG_WITH_FILE_FUNC_AND_LINE_POSTFIX( \
-        FILE, FUNC, LINE, CONTEXT, ...)         \
-    PYCBC_DEBUG_LOG_CONTEXT_FULL(FILE,FUNC, LINE,CONTEXT,__VA_ARGS__)
-
-#define PYCBC_DEBUG_LOG_WITH_FILE_FUNC_AND_LINE_POSTFIX_NOCONTEXT( \
-        FILE, FUNC, LINE, ...)                            \
-    PYCBC_DEBUG_LOG_NOCONTEXT_FULL(FILE,FUNC, LINE,__VA_ARGS__)
-
-#define PYCBC_DEBUG_LOG_WITH_FILE_FUNC_LINE_CONTEXT_NEWLINE( \
-        FILE, FUNC, LINE, CONTEXT, ...)                      \
-    PYCBC_DEBUG_LOG_WITH_FILE_FUNC_AND_LINE_POSTFIX(         \
-            FILE, FUNC, LINE, CONTEXT, __VA_ARGS__)
-#define PYCBC_DEBUG_LOG_WITH_FILE_FUNC_AND_LINE_NEWLINE(FILE, FUNC, LINE, ...) \
-    PYCBC_DEBUG_LOG_WITH_FILE_FUNC_AND_LINE_POSTFIX_NOCONTEXT(                 \
-            FILE, FUNC, LINE, __VA_ARGS__)
-#define PYCBC_DEBUG_LOG(...)                         \
-    PYCBC_DEBUG_LOG_WITH_FILE_FUNC_AND_LINE_NEWLINE( \
-            __FILE__, __FUNCTION_NAME__, __LINE__, __VA_ARGS__)
-#define PYCBC_DEBUG_LOG_CONTEXT(CONTEXT, ...)            \
-    PYCBC_DEBUG_LOG_WITH_FILE_FUNC_LINE_CONTEXT_NEWLINE( \
-            __FILE__, __FUNCTION_NAME__, __LINE__, CONTEXT, __VA_ARGS__)
-
-#ifdef PYCBC_DEBUG
-#define PYCBC_MALLOC(X) \
-    malloc_and_log(__FILE__, __FUNCTION_NAME__, __LINE__, 1, X, #X)
-#define PYCBC_MALLOC_TYPED(X, Y) \
-    malloc_and_log(__FILE__, __FUNCTION_NAME__, __LINE__, X, sizeof(Y), #Y)
-#define PYCBC_CALLOC(X, Y) \
-    calloc_and_log(__FILE__, __FUNCTION_NAME__, __LINE__, X, Y, "unknown")
-#define PYCBC_CALLOC_TYPED(X, Y) \
-    calloc_and_log(__FILE__, __FUNCTION_NAME__, __LINE__, X, sizeof(Y), #Y)
-#define PYCBC_FREE(X)                     \
-    if (X) {                              \
-        PYCBC_DEBUG_LOG("freeing %p", X); \
-    }                                     \
-    free(X);
-
-#define LOG_REFOP(Y, OP)                                                    \
-    {                                                                       \
-        pycbc_assert((Y) && Py_REFCNT(Y) > 0);                              \
-        PYCBC_DEBUG_PYFORMAT("%p has count of %ld: *** %R ***: OP: %s",     \
-                             Y,                                             \
-                             (long)(((PyObject *)(Y)) ? Py_REFCNT(Y) : 0),  \
-                             ((PyObject *)(Y) ? (PyObject *)(Y) : Py_None), \
-                             #OP);                                          \
-        Py_##OP((PyObject *)Y);                                             \
-    }
-#define LOG_REFOPX(Y, OP)                                                   \
-    {                                                                       \
-        pycbc_assert(!(Y) || Py_REFCNT(Y) > 0);                             \
-        PYCBC_DEBUG_PYFORMAT("%p has count of %ld: *** %R ***: OP: %s",     \
-                             Y,                                             \
-                             (long)(((PyObject *)(Y)) ? Py_REFCNT(Y) : 0),  \
-                             ((PyObject *)(Y) ? (PyObject *)(Y) : Py_None), \
-                             #OP);                                          \
-        Py_##X##OP((PyObject *)(Y));                                        \
-    }
-
-#else
-#define PYCBC_FREE(X) free(X)
-#define PYCBC_MALLOC(X) malloc(X)
-#define PYCBC_MALLOC_TYPED(X, Y) malloc((X) * sizeof(Y))
-#define PYCBC_CALLOC(X, Y) calloc(X, Y)
-#define PYCBC_CALLOC_TYPED(X, Y) calloc(X, sizeof(Y))
-#define LOG_REFOP(Y, OP) Py_##OP(Y)
-#define LOG_REFOPX(Y, OP) Py_X##OP(Y)
-#endif
-#define PYCBC_DECREF(X) LOG_REFOP(X, DECREF)
-#define PYCBC_XDECREF(X) LOG_REFOPX(X, DECREF)
-#define PYCBC_INCREF(X) LOG_REFOP(X, INCREF)
-#define PYCBC_XINCREF(X) LOG_REFOPX(X, INCREF)
-
-#include <Python.h>
-#include <libcouchbase/couchbase.h>
-#include <libcouchbase/api3.h>
-#include <libcouchbase/views.h>
-#include <libcouchbase/n1ql.h>
-#include <libcouchbase/cbft.h>
-#include <libcouchbase/ixmgmt.h>
 
 // TODO: fix in libcouchbase
 #ifdef _WIN32
@@ -225,6 +105,9 @@ void pycbc_exception_log(const char *file,
 
 void pycbc_fetch_error(PyObject *err[3]);
 void pycbc_store_error(PyObject *err[3]);
+lcb_STATUS pycbc_report_err(int res, const char *generic_errmsg, const char* FILE, int LINE);
+#define PYCBC_REPORT_ERR(RES, MSG) pycbc_report_err(RES,MSG, __FILE__, __LINE__);
+
 void *malloc_and_log(const char *file,
                      const char *func,
                      int line,
@@ -487,35 +370,212 @@ enum {
     PYCBC_CONN_F_ASYNC_DTOR = 1 << 5
 };
 
+#define PYCBX_X_SYNCREPERR(X)                                                 \
+    X(LCB_DURABILITY_INVALID_LEVEL,                                           \
+      0x63,                                                                   \
+      LCB_ERRTYPE_DURABILITY | LCB_ERRTYPE_INPUT | LCB_ERRTYPE_SRVGEN,        \
+      "Invalid durability level was specified")                               \
+    /** Valid request, but given durability requirements are impossible to    \
+     * achieve - because insufficient configured replicas are connected.      \
+     * Assuming level=majority and C=number of configured nodes, durability   \
+     * becomes impossible if floor((C + 1) / 2) nodes or greater are offline. \
+     */                                                                       \
+    X(LCB_DURABILITY_IMPOSSIBLE,                                              \
+      0x64,                                                                   \
+      LCB_ERRTYPE_DURABILITY | LCB_ERRTYPE_SRVGEN,                            \
+      "Given durability requirements are impossible to achieve")              \
+    /** Returned if an attempt is made to mutate a key which already has a    \
+     * SyncWrite pending. Client would typically retry (possibly with         \
+     * backoff). Similar to ELOCKED */                                                        \
+    X(LCB_DURABILITY_SYNC_WRITE_IN_PROGRESS,                                  \
+      0x65,                                                                   \
+      LCB_ERRTYPE_DURABILITY | LCB_ERRTYPE_SRVGEN | LCB_ERRTYPE_TRANSIENT,    \
+      "There is a synchronous mutation pending for given key")                \
+    /** The SyncWrite request has not completed in the specified time and has \
+     * ambiguous result - it may Succeed or Fail; but the final value is not  \
+     * yet known */                                                           \
+    X(LCB_DURABILITY_SYNC_WRITE_AMBIGUOUS,                                    \
+      0x66,                                                                   \
+      LCB_ERRTYPE_DURABILITY | LCB_ERRTYPE_SRVGEN,                            \
+      "Synchronous mutation has not completed in the specified time and has " \
+      "ambiguous result")
+
+#define PYCBC_X_DURLEVEL(X)           \
+    X(NONE)                           \
+    X(MAJORITY)                       \
+    X(MAJORITY_AND_PERSIST_ON_MASTER) \
+    X(PERSIST_TO_MAJORITY)
+
+#ifndef PYCBC_DUR_DISABLED
+#define PYCBC_DUR_ENABLED
+#endif
+
+#ifdef PYCBC_DUR_ENABLED
+#    define PYCBC_DUR_INIT(ERR, CMD, TYPE, DUR)                            \
+        if ((DUR).durability_level) {                                      \
+            ERR = lcb_cmd##TYPE##_durability(CMD, (DUR).durability_level); \
+            assert(!((DUR).persist_to || (DUR).replicate_to));             \
+        }                                                                  \
+        if ((DUR).persist_to || (DUR).replicate_to) {                      \
+            ERR = lcb_cmd##TYPE##_durability_observe(                      \
+                    CMD, (DUR).persist_to, (DUR).replicate_to);            \
+        }
+#else
+#    define PYCBC_DUR_INIT(ERR, CMD, TYPE, DUR)
+#endif
+
 typedef struct {
     char persist_to;
     char replicate_to;
+    pycbc_DURABILITY_LEVEL durability_level;
 } pycbc_dur_params;
 
 void pycbc_dict_add_text_kv(PyObject *dict, const char *key, const char *value);
 
 struct pycbc_Tracer;
 
-#ifndef PYCBC_TRACING_DISABLE
-#define PYCBC_TRACING_ENABLE
-#endif
-
-#ifdef LCB_TRACING
-#ifdef PYCBC_TRACING_ENABLE
 #define PYCBC_TRACING
-#endif
-#endif
+
+
+extern pycbc_strn pycbc_invalid_strn;
+
+extern const char PYCBC_UNKNOWN[];
+static char *const PYCBC_DEBUG_INFO_STR = "debug_info";
+#define sizeof_array(X) sizeof(X) / sizeof(X[0])
+
+#define PYCBC_STRN_FREE(BUF)                            \
+    PYCBC_DEBUG_LOG("Freeing string buffer %.*s at %p", \
+                    (int)(BUF).content.length,          \
+                    (BUF).content.buffer,               \
+                    (BUF).content.buffer)               \
+    pycbc_strn_free(BUF);
+
+#define PYCBC_DUMMY(...)
+
+#define CMDSCOPE_GENERIC_FAIL(PREFIX, UC, LC) \
+    fail = 1;                                 \
+    goto GT_##PREFIX##_##UC##_ERR;
+
+#define CMDSCOPE_GENERIC_DONE(PREFIX, UC, LC) goto GT_##PREFIX##_##UC##_DONE;
+
+#define CMDSCOPE_GENERIC_ALL_PREFIX(                                           \
+        PREFIX, UC, LC, INITIALIZER, DESTRUCTOR, CMDS, ...)                    \
+    INITIALIZER(UC, LC, CMDS, __VA_ARGS__);                                    \
+    PYCBC_DEBUG_LOG("Called initialzer for %s, %s, with args %s",              \
+                    #UC,                                                       \
+                    #LC,                                                       \
+                    #__VA_ARGS__)                                              \
+    goto SKIP_##PREFIX##_##UC##_FAIL;                                          \
+    goto GT_##PREFIX##_##UC##_DONE;                                            \
+    GT_##PREFIX##_##UC##_DONE : PYCBC_DEBUG_LOG("Cleanup up %s %s", #UC, #LC)( \
+                                        void)(DESTRUCTOR(UC, LC, CMDS));       \
+    goto GT_DONE;                                                              \
+    goto GT_##PREFIX##_##UC##_ERR;\
+    GT_##PREFIX##_##UC##_ERR : (void)(DESTRUCTOR(UC, LC, CMDS));               \
+    goto GT_ERR;                                                               \
+                                                                               \
+    SKIP_##PREFIX##_##UC##_FAIL                                                \
+        : for (int finished = 0, fail = 0; !(finished) && !fail;               \
+               (finished = (1 + DESTRUCTOR(UC, LC, CMDS))))
+
+#define CMDSCOPE_GENERIC_ALL(UC, LC, INITIALIZER, DESTRUCTOR, CMDS, ...) \
+    CMDSCOPE_GENERIC_ALL_PREFIX(                                         \
+            , UC, LC, INITIALIZER, DESTRUCTOR, CMDS, __VA_ARGS__)
+
+#define pycbc_verb_postfix(POSTFIX, VERB, INSTANCE, COOKIE, CMD) \
+    pycbc_logging_monad_verb(__FILE__,                           \
+                             __FUNCTION__,                       \
+                             __LINE__,                           \
+                             INSTANCE,                           \
+                             COOKIE,                             \
+                             CMD,                                \
+                             #CMD,                               \
+                             #VERB,                              \
+                             lcb_##VERB##POSTFIX(INSTANCE, COOKIE, CMD))
+
+lcb_STATUS pycbc_logging_monad_verb(const char *FILE,
+                                    const char *FUNC,
+                                    int LINE,
+                                    lcb_INSTANCE *instance,
+                                    void *COOKIE,
+                                    void *CMD,
+                                    const char *CMDNAME,
+                                    const char *VERB,
+                                    lcb_STATUS result);
+
+#define PYCBC_CMD_PROXY(UC, LC)                                     \
+    lcb_STATUS pycbc_##LC(                                          \
+            lcb_INSTANCE *instance, void *cookie, lcb_CMD##UC *cmd) \
+    {                                                               \
+        return pycbc_verb(LC, instance, cookie, cmd);               \
+    };
+#define PYCBC_CMD_PROXY_DECL(UC, LC) \
+    lcb_STATUS pycbc_##LC(           \
+            lcb_INSTANCE *instance, void *cookie, lcb_CMD##UC *cmd);
+#define PYCBC_X_VERBS(X) \
+    X(COUNTER, counter)  \
+    X(GET, get)          \
+    X(TOUCH, touch)      \
+    X(UNLOCK, unlock)    \
+    X(REMOVE, remove)    \
+    X(STORE, store)      \
+    X(HTTP, http)        \
+    X(PING, ping)        \
+    X(SUBDOC, subdoc)
+
+PYCBC_X_VERBS(PYCBC_CMD_PROXY_DECL);
+
+#define CMDSCOPE_SDCMD_CREATE_V4(TYPE, LC, CMD, ...) \
+    TYPE *CMD = NULL;                                \
+    lcb_##LC##_create(&(CMD), __VA_ARGS__);
+
+#define CMDSCOPE_SDCMD_DESTROY_RAW_V4(TYPE, LC, CMD, ...) \
+    lcb_##LC##_destroy(CMD)
+
+#define CMDSCOPE_CREATECMD_RAW_V4(UC, LC, CMD, ...) \
+    lcb_CMD##UC *CMD = NULL;                        \
+    lcb_cmd##LC##_create(&CMD)
+
+#define CMDSCOPE_CREATECMD_V4(UC, LC, CMD, ...) \
+    lcb_CMD##UC *CMD = NULL;                    \
+    lcb_cmd##LC##_create(&CMD, __VA_ARGS__)
+
+#define CMDSCOPE_DESTROYCMD_V4(UC, LC, CMD, ...) lcb_cmd##LC##_destroy(CMD)
+
+#define CMDSCOPE_DESTROYCMD_RAW_V4(UC, LC, CMD, ...) lcb_cmd##LC##_destroy(CMD)
+
+
+#define CMDSCOPE_NG_V4(UC, LC)                       \
+    CMDSCOPE_GENERIC_ALL(UC,                         \
+                         LC,                         \
+                         CMDSCOPE_CREATECMD_RAW_V4,  \
+                         CMDSCOPE_DESTROYCMD_RAW_V4, \
+                         cmd)
+#define CMDSCOPE_NG(UC, LC) \
+    CMDSCOPE_GENERIC_ALL(   \
+            UC, LC, CMDSCOPE_CREATECMD_RAW, CMDSCOPE_DESTROYCMD_RAW, cmd)
+
+#define CMDSCOPE_NG_PARAMS(UC, LC, ...) \
+    CMDSCOPE_GENERIC_ALL(               \
+            UC, LC, CMDSCOPE_CREATECMD, CMDSCOPE_DESTROYCMD, cmd, __VA_ARGS__)
+#define CMDSCOPE_NG_GENERIC_PARAMS(PREFIX, TYPE, LC, CMDNAME, ...) \
+    CMDSCOPE_GENERIC_ALL_PREFIX(PREFIX,                            \
+                                TYPE,                              \
+                                LC,                                \
+                                CMDSCOPE_SDCMD_CREATE_V4,          \
+                                CMDSCOPE_SDCMD_DESTROY_RAW_V4,     \
+                                CMDNAME,                           \
+                                __VA_ARGS__)
+
 
 typedef struct {
     PyObject_HEAD
 
     /** LCB instance */
-    lcb_t instance;
-#ifdef PYCBC_TRACING
+    lcb_INSTANCE *instance;
     /** Tracer **/
     struct pycbc_Tracer *tracer;
     PyObject *parent_tracer;
-#endif
     /** Transcoder object */
     PyObject *tc;
 
@@ -580,12 +640,52 @@ typedef struct {
 
 } pycbc_Bucket;
 
-#ifdef PYCBC_TRACING
-void *pycbc_null_or_capsule_value(PyObject *maybe_capsule,
-                                  const char *capsule_name);
-void *pycbc_capsule_value_or_null(PyObject *capsule, const char *capsule_name);
+/**
+ * Collection structures
+ */
 
-#define PYCBC_NULL_OR_CAPSULE(NAME) pycbc_null_or_capsule_value(NAME, #NAME)
+/** Text coordinates for collections */
+typedef struct {
+    pycbc_strn_unmanaged collection;
+    pycbc_strn_unmanaged scope;
+} pycbc_Collection_coords;
+
+/** Collection class **/
+
+typedef struct {
+    PyObject_HEAD pycbc_Bucket *bucket;
+    pycbc_Collection_coords collection;
+} pycbc_Collection;
+
+/**
+ * Server-provided IDs/handles for collections
+ */
+
+typedef struct {
+    lcb_U64 manifest_id;
+    lcb_U32 collection_id;
+} pycbc_coll_res_success_t;
+
+typedef struct {
+    pycbc_coll_res_success_t value;
+    lcb_STATUS err;
+} pycbc_coll_res_t;
+
+typedef struct {
+    pycbc_coll_res_t result;
+    pycbc_Collection *coll;
+} pycbc_coll_context;
+
+pycbc_Collection *pycbc_Bucket_init_collection(pycbc_Bucket *bucket,
+                                               PyObject *args,
+                                               PyObject *kwargs);
+
+
+void pycbc_Collection_free_unmanaged(const pycbc_Collection *collection);
+
+#    define PYCBC_COLLECTION_XARGS(X) X("collection", &collection, "O")
+
+void *pycbc_capsule_value_or_null(PyObject *capsule, const char *capsule_name);
 
 typedef struct pycbc_Tracer {
     PyObject_HEAD
@@ -594,9 +694,7 @@ typedef struct pycbc_Tracer {
 
 typedef struct {
     PyObject_HEAD
-#ifdef PYCBC_TRACING
     lcbtrace_SPAN *span;
-#endif
 } pycbc_Span_t;
 
 typedef struct pycbc_context_children_t {
@@ -605,7 +703,6 @@ typedef struct pycbc_context_children_t {
 } pycbc_context_children;
 
 typedef struct pycbc_stack_context_decl {
-#ifdef PYCBC_TRACING
     int is_stub;
     pycbc_Tracer_t* tracer;
     lcbtrace_SPAN* span;
@@ -623,35 +720,28 @@ typedef struct pycbc_stack_context_decl {
 #ifdef PYCBC_TABBED_CONTEXTS
     size_t depth;
 #endif
-#endif
 } pycbc_stack_context;
-
-typedef struct {
-    char *buffer;
-    size_t length;
-} pycbc_strn;
-
-typedef struct {
-    pycbc_strn content;
-} pycbc_strn_unmanaged;
-
-extern pycbc_strn pycbc_invalid_strn;
 
 pycbc_strn pycbc_get_string_tag_basic(lcbtrace_SPAN *span, const char *tagname);
 PyObject *pycbc_Context_capsule(pycbc_stack_context_handle context);
 void pycbc_Context_capsule_destructor(PyObject *context_capsule);
 void *pycbc_Context_capsule_value(PyObject *context_capsule);
 
-#else
-
-typedef void* pycbc_stack_context_handle;
-
-#endif
+#define PYCBC_RES_CONTEXT(MRES) (MRES) ? (MRES)->tracing_context : NULL
 
 typedef struct pycbc_Result pycbc_Result_t;
 typedef struct pycbc_MultiResult_st pycbc_MultiResult;
+void pycbc_set_dict_kv_object(PyObject *dict,
+                              PyObject *key,
+                              const char *value_str);
 
-#ifdef PYCBC_TRACING
+void pycbc_set_kv_ull(PyObject *dict,
+                      PyObject *keystr,
+                      lcb_uint64_t parenti_id);
+void pycbc_set_kv_ull_str(PyObject *dict,
+                          const char *keystr,
+                          lcb_uint64_t parenti_id);
+
 int pycbc_is_async_or_pipeline(const pycbc_Bucket *self);
 
 pycbc_stack_context_handle pycbc_Result_start_context(
@@ -830,49 +920,66 @@ void pycbc_Tracer_set_child(pycbc_Tracer_t *pTracer, lcbtrace_TRACER *pTRACER);
     PYCBC_TRACER_START_SPAN(                                                   \
             TRACER, KWARGS, CATEGORY, 0, NULL, LCBTRACE_REF_NONE, NAME)
 
-#define PYCBC_TRACECMD_PURE(CMD, CONTEXT)                          \
+
+#define PYCBC_TRACECMD_PURE(TYPE, CMD, CONTEXT)                    \
     {                                                              \
         if (PYCBC_CHECK_CONTEXT(CONTEXT)) {                        \
-            PYCBC_DEBUG_LOG("setting trace span on %.*s\n",        \
-                            (int)(CMD).key.contig.nbytes,          \
-                            (const char *)(CMD).key.contig.bytes); \
-            if (0) {                                               \
-                PYCBC_REF_CONTEXT(CONTEXT);                        \
-            }                                                      \
-            LCB_CMD_SET_TRACESPAN(&(CMD), (CONTEXT)->span);        \
+            PYCBC_LOG_KEY(CMD, key)                                \
+            PYCBC_CMD_SET_TRACESPAN(TYPE, (CMD), (CONTEXT)->span); \
         } else {                                                   \
             PYCBC_EXCEPTION_LOG_NOCLEAR;                           \
         }                                                          \
     }
 
-#define GENERIC_OPERAND(SCOPE, INSTANCE, HANDLE, CONTEXT) \
-    lcb_##SCOPE##_set_parent_span(INSTANCE, HANDLE, (CONTEXT)->span)
+#define GENERIC_OPERAND(SCOPE, INSTANCE, CMD, HANDLE, CONTEXT, COMMAND, ...) \
+    lcb_##SCOPE##_##COMMAND(INSTANCE, __VA_ARGS__);
 
-#define PYCBC_TRACECMD_SCOPED_GENERIC(                               \
-        RV, SCOPE, COMMAND, INSTANCE, HANDLE, CONTEXT, OPERAND, ...) \
-    if (PYCBC_CHECK_CONTEXT(CONTEXT)) {                              \
-        OPERAND(SCOPE, INSTANCE, HANDLE, CONTEXT);                   \
-    }                                                                \
-    RV = lcb_##SCOPE##_##COMMAND(INSTANCE, __VA_ARGS__);             \
-    if (RV) {                                                        \
-    }
+#define PYCBC_TRACECMD_SCOPED_GENERIC(RV,           \
+                                      SCOPE,        \
+                                      COMMAND,      \
+                                      INSTANCE,     \
+                                      CMD,          \
+                                      HANDLE,       \
+                                      CONTEXT,      \
+                                      SPAN_OPERAND, \
+                                      OPERAND,      \
+                                      ...)          \
+    SPAN_OPERAND(SCOPE, INSTANCE, CMD, HANDLE, CONTEXT);\
+    RV = OPERAND(SCOPE, INSTANCE, CMD, HANDLE, CONTEXT, COMMAND, __VA_ARGS__);
 
-#define PYCBC_TRACECMD_SCOPED(                              \
-        RV, SCOPE, COMMAND, INSTANCE, HANDLE, CONTEXT, ...) \
-    PYCBC_TRACECMD_SCOPED_GENERIC(RV,                       \
-                                  SCOPE,                    \
-                                  COMMAND,                  \
-                                  INSTANCE,                 \
-                                  HANDLE,                   \
-                                  CONTEXT,                  \
-                                  GENERIC_OPERAND,          \
-                                  __VA_ARGS__)
+#    define PYCBC_TRACECMD_SCOPED(                                   \
+            RV, SCOPE, COMMAND, INSTANCE, CMD, HANDLE, CONTEXT, ...) \
+        PYCBC_TRACECMD_SCOPED_GENERIC(RV,                            \
+                                      SCOPE,                         \
+                                      COMMAND,                       \
+                                      INSTANCE,                      \
+                                      CMD,                           \
+                                      HANDLE,                        \
+                                      CONTEXT,                       \
+                                      GENERIC_SPAN_OPERAND,          \
+                                      GENERIC_OPERAND,               \
+                                      __VA_ARGS__)
 
-#define PYCBC_TRACECMD(CMD, CONTEXT, MRES, CURKEY, BUCKET) \
-    PYCBC_TRACECMD_PURE(CMD, CONTEXT);                     \
-    pycbc_MultiResult_init_context(MRES, CURKEY, CONTEXT, BUCKET);
+#    define PYCBC_TRACECMD_SCOPED_NULL(                     \
+            RV, SCOPE, INSTANCE, CMD, HANDLE, CONTEXT, ...) \
+        PYCBC_TRACECMD_SCOPED_GENERIC(RV,                   \
+                                      SCOPE,                \
+                                      ,                     \
+                                      INSTANCE,             \
+                                      CMD,                  \
+                                      HANDLE,               \
+                                      CONTEXT,              \
+                                      GENERIC_SPAN_OPERAND, \
+                                      GENERIC_NULL_OPERAND, \
+                                      __VA_ARGS__)
+#    define PYCBC_TRACECMD_TYPED(TYPE, CMD, CONTEXT, MRES, CURKEY, BUCKET) \
+        PYCBC_TRACECMD_PURE(TYPE, CMD, CONTEXT);                           \
+        pycbc_MultiResult_init_context(MRES, CURKEY, CONTEXT, BUCKET);
+#    define PYCBC_TRACECMD(CMD, CONTEXT, MRES, CURKEY, BUCKET) \
+        PYCBC_TRACECMD_PURE(, CMD, CONTEXT);                   \
+        pycbc_MultiResult_init_context(MRES, CURKEY, CONTEXT, BUCKET);
 
-#define PYCBC_TRACE_POP_CONTEXT(CONTEXT) PYCBC_CONTEXT_DEREF((CONTEXT), 1);
+#    define PYCBC_TRACE_POP_CONTEXT(CONTEXT) PYCBC_CONTEXT_DEREF((CONTEXT), 1);
 
 pycbc_stack_context_handle pycbc_wrap_setup(const char *CATEGORY,
                                             const char *NAME,
@@ -883,16 +990,16 @@ pycbc_stack_context_handle pycbc_wrap_setup(const char *CATEGORY,
 void pycbc_wrap_teardown(pycbc_stack_context_handle sub_context,
                          pycbc_Bucket *self,
                          const char *NAME,
-                         void *RV);
+                         PyObject **RV);
 
-#define PYCBC_TRACE_WRAP_TOPLEVEL_WITHNAME(                                    \
-        RV, CATEGORY, NAME, TRACER, STRINGNAME, ...)                           \
-    {                                                                          \
-        pycbc_stack_context_handle sub_context =                               \
-                pycbc_wrap_setup(CATEGORY, #NAME, TRACER, STRINGNAME, kwargs); \
-        RV = NAME(__VA_ARGS__, sub_context);                                   \
-        pycbc_wrap_teardown(sub_context, self, #NAME, RV);                     \
-    }
+#    define PYCBC_TRACE_WRAP_TOPLEVEL_WITHNAME(                        \
+            RV, CATEGORY, NAME, TRACER, STRINGNAME, ...)               \
+        {                                                              \
+            pycbc_stack_context_handle sub_context = pycbc_wrap_setup( \
+                    CATEGORY, #NAME, TRACER, STRINGNAME, kwargs);      \
+            RV = NAME(__VA_ARGS__, sub_context);                       \
+            pycbc_wrap_teardown(sub_context, self, #NAME, &RV);        \
+        }
 
 typedef struct pycbc_common_vars pycbc_common_vars_t;
 int pycbc_wrap_and_pop(pycbc_stack_context_handle *contextptr,
@@ -932,7 +1039,7 @@ pycbc_stack_context_handle pycbc_explicit_named_setup(
         const char *COMPONENTNAME,
         const char *CATEGORY,
         PyObject *KWARGS,
-        pycbc_Bucket *self);
+        pycbc_Tracer_t *self);
 
 #define PYCBC_EXPLICIT_NAMED_SETUP(                        \
         CONTEXTPTR, COMPONENTNAME, CATEGORY, KWARGS, SELF) \
@@ -945,31 +1052,36 @@ pycbc_stack_context_handle pycbc_explicit_named_setup(
                                KWARGS,                     \
                                SELF)
 
-#define PYCBC_TRACE_WRAP_EXPLICIT_NAMED(CONTEXTPTR,                           \
-                                        NAME,                                 \
-                                        COMPONENTNAME,                        \
-                                        CATEGORY,                             \
-                                        KWARGS,                               \
-                                        NOTERV,                               \
-                                        CV,                                   \
-                                        SELF,                                 \
-                                        ...)                                  \
-    PYCBC_WRAP_AND_POP(                                                       \
-            CONTEXTPTR,                                                       \
-            NAME(__VA_ARGS__,                                                 \
-                 PYCBC_EXPLICIT_NAMED_SETUP(                                  \
-                         CONTEXTPTR, COMPONENTNAME, CATEGORY, KWARGS, SELF)), \
-            COMPONENTNAME,                                                    \
-            NOTERV,                                                           \
-            CV)
+#define PYCBC_TRACE_WRAP_EXPLICIT_NAMED(CONTEXTPTR,                      \
+                                        NAME,                            \
+                                        COMPONENTNAME,                   \
+                                        CATEGORY,                        \
+                                        KWARGS,                          \
+                                        NOTERV,                          \
+                                        CV,                              \
+                                        SELF,                            \
+                                        ...)                             \
+    PYCBC_WRAP_AND_POP(CONTEXTPTR,                                       \
+                       NAME(__VA_ARGS__,                                 \
+                            PYCBC_EXPLICIT_NAMED_SETUP(CONTEXTPTR,       \
+                                                       COMPONENTNAME,    \
+                                                       CATEGORY,         \
+                                                       KWARGS,           \
+                                                       (SELF)->tracer)), \
+                       COMPONENTNAME,                                    \
+                       NOTERV,                                           \
+                       CV)
 
 #define PYCBC_TRACE_WRAP_EXPLICIT_NAMED_VOID(                             \
         CONTEXTPTR, NAME, COMPONENTNAME, CATEGORY, KWARGS, CV, SELF, ...) \
     {                                                                     \
         NAME(__VA_ARGS__,                                                 \
-             PYCBC_EXPLICIT_NAMED_SETUP(                                  \
-                     CONTEXTPTR, COMPONENTNAME, CATEGORY, KWARGS, SELF)); \
-        PYCBC_WRAP_AND_POP(CONTEXTPTR, 0, COMPONENTNAME, 0, CV);          \
+             PYCBC_EXPLICIT_NAMED_SETUP(CONTEXTPTR,                       \
+                                        COMPONENTNAME,                    \
+                                        CATEGORY,                         \
+                                        KWARGS,                           \
+                                        SELF->tracer));                   \
+        (void)PYCBC_WRAP_AND_POP(CONTEXTPTR, 0, COMPONENTNAME, 0, CV);    \
     }
 
 #define PYCBC_TRACE_WRAP_NOTERV(NAME, KWARGS, NOTERV, CV, CONTEXT, SELF, ...) \
@@ -1000,29 +1112,6 @@ pycbc_stack_context_handle pycbc_explicit_named_setup(
     PYCBC_TRACE_WRAP_TOPLEVEL_WITHNAME(                            \
             RV, CATEGORY, NAME, TRACER, #NAME, __VA_ARGS__)
 
-#else
-
-#define PYCBC_CONTEXT_DEREF(X, Y)
-#define PYCBC_CONTEXT_DEREF_FROM_CONTEXT(                         \
-        CONTEXT, SHOULD_BE_FINAL, DEALLOC_CHILDREN, FROM_CONTEXT)
-#define PYCBC_GET_STACK_CONTEXT(CATEGORY,TRACER, PARENT_CONTEXT) NULL
-#define PYCBC_MULTIRESULT_EXTRACT_CONTEXT(MRES, KEY, RES) NULL
-#define PYCBC_RESULT_EXTRACT_CONTEXT(RESULT) NULL
-#define PYCBC_TRACECMD(...)
-#define PYCBC_TRACECMD_PURE(...)
-#define PYCBC_TRACE_POP_CONTEXT(X) NULL
-#define PYCBC_FINISH_IF_COMPLETE(SELF, CONTEXT)
-#define PYCBC_TRACE_WRAP_VOID(NAME, KWARGS, ...) NAME(__VA_ARGS__,NULL)
-#define PYCBC_TRACE_WRAP_TOPLEVEL_WITHNAME(RV, CATEGORY, NAME, TRACER, STRINGNAME, ...) { RV = NAME(__VA_ARGS__, NULL); }
-#define PYCBC_TRACE_WRAP_EXPLICIT_NAMED(NAME,COMPONENTNAME,CATEGORY,KWARGS,...) NAME(__VA_ARGS__, NULL)
-#define PYCBC_TRACE_WRAP_TOPLEVEL(RV,CATEGORY,NAME,TRACER,...) { RV=NAME(__VA_ARGS__,NULL); }
-#define PYCBC_TRACE_WRAP(NAME,KWARGS,...) NAME(__VA_ARGS__, NULL)
-#define PYCBC_TRACE_GET_STACK_CONTEXT_TOPLEVEL(...) NULL
-#define PYCBC_TRACECMD_SCOPED(                              \
-        RV, SCOPE, COMMAND, INSTANCE, HANDLE, CONTEXT, ...) \
-    RV = lcb_##SCOPE##_##COMMAND(INSTANCE, __VA_ARGS__)
-
-#endif
 
 
 #define TRACED_FUNCTION(CATEGORY,QUALIFIERS,RTYPE,NAME,...)\
@@ -1069,18 +1158,14 @@ pycbc_stack_context_handle pycbc_explicit_named_setup(
  * See result.c and opresult.c
  */
 
-#ifdef PYCBC_TRACING
 #define TRACING_DATA                            \
     pycbc_stack_context_handle tracing_context; \
     char is_tracing_stub;                       \
     PyObject *tracing_output;
-#else
-#define TRACING_DATA
-#endif
 
 #define pycbc_Result_HEAD \
     PyObject_HEAD \
-    lcb_error_t rc; \
+    lcb_STATUS rc; \
     PyObject *key; \
     TRACING_DATA
 
@@ -1133,33 +1218,6 @@ enum {
     PYCBC_HTTP_HNONE
 };
 
-typedef struct {
-    pycbc_Result_HEAD
-    PyObject *http_data;
-    PyObject *headers;
-    pycbc_Bucket *parent;
-    union {
-        lcb_http_request_t htreq;
-        lcb_VIEWHANDLE vh;
-        lcb_N1QLHANDLE nq;
-        lcb_FTSHANDLE fts;
-    } u;
-    unsigned int format;
-    unsigned short htcode;
-    unsigned char done;
-    unsigned char htype;
-} pycbc_HttpResult;
-
-typedef struct {
-    pycbc_HttpResult base;
-    PyObject *rows;
-    long rows_per_call;
-    char has_parse_error;
-#ifdef PYCBC_TRACING
-    PyObject *context_capsule;
-#endif
-} pycbc_ViewResult;
-
 
 enum {
     /** 'quiet' boolean set */
@@ -1189,6 +1247,13 @@ enum {
 /**
  * Contextual info for enhanced error logging
  */
+typedef struct {
+    const char *FILE;
+    const char *FUNC;
+    int LINE;
+} pycbc_debug_info;
+
+int pycbc_debug_info_is_valid(pycbc_debug_info *info);
 
 typedef PyObject pycbc_enhanced_err_info;
 
@@ -1251,7 +1316,7 @@ struct pycbc_exception_params {
     int line;
 
     /** LCB Error code, if any */
-    lcb_error_t err;
+    lcb_STATUS err;
 
     /** Error message, if any */
     const char *msg;
@@ -1347,13 +1412,8 @@ int pycbc_ResultType_ready(PyTypeObject *p, int flags);
 /**
  * Types used for tracing
  */
-#ifdef PYCBC_TRACING
 #define PYCBC_TRACING_TYPES(X)\
     X(Tracer, "The Tracer Object")
-
-#else
-#define PYCBC_TRACING_TYPES(X)
-#endif
 
 #define PYCBC_CRYPTO_TYPES(X)                         \
     X(CryptoProvider,                                 \
@@ -1361,9 +1421,14 @@ int pycbc_ResultType_ready(PyTypeObject *p, int flags);
       pycbc_CryptoProvideType_extra_init(ptr))        \
     X(NamedCryptoProvider, "A Named Cryptography Provider for Field Encryption")
 
+#define PYCBC_COLLECTION_TYPES(X) \
+    X(Collection,                 \
+      "A Couchbase Collection",   \
+      pycbc_CryptoProvideType_extra_init(ptr))
 #define PYCBC_AUTODEF_TYPES(X) \
-    PYCBC_CRYPTO_TYPES(X);     \
-    PYCBC_TRACING_TYPES(X);
+    PYCBC_CRYPTO_TYPES(X)      \
+    PYCBC_TRACING_TYPES(X)     \
+    PYCBC_COLLECTION_TYPES(X)
 
 /**
  * Extern PyTypeObject declaraions.
@@ -1508,7 +1573,7 @@ extern struct pycbc_helpers_ST pycbc_helpers;
 
 /** Initializes the constants, constants. */
 void pycbc_init_pyconstants(PyObject *module);
-PyObject *pycbc_lcb_errstr(lcb_t instance, lcb_error_t err);
+PyObject *pycbc_lcb_errstr(lcb_t instance, lcb_STATUS err);
 PyObject *pycbc_print_constants(PyObject *mod, PyObject *args);
 
 int pycbc_ResultType_init(PyObject **ptr);
@@ -1527,6 +1592,7 @@ int pycbc_IOEventType_init(PyObject **ptr);
 int pycbc_AsyncResultType_init(PyObject **ptr);
 int pycbc_IOPSWrapperType_init(PyObject **ptr);
 int pycbc_ViewResultType_init(PyObject **ptr);
+int pycbc_CollectionType_init(PyObject **ptr);
 
 #define PYCBC_TYPE_INIT_DECL(TYPENAME, TYPE_DOC, ...) \
     int pycbc_##TYPENAME##Type_init(PyObject **ptr);
@@ -1561,78 +1627,6 @@ pycbc__SDResult *pycbc_sdresult_new(pycbc_Bucket *parent, PyObject *specs);
 
 /* Add a result to a list of multi results. Specify the index */
 void pycbc_sdresult_addresult(pycbc__SDResult *obj, size_t ii, PyObject *item);
-
-/* Not an allocator per-se, but rather an initializer */
-void pycbc_httpresult_init(pycbc_HttpResult *self, pycbc_MultiResult *parent);
-
-/* For observe info */
-pycbc_ObserveInfo * pycbc_observeinfo_new(pycbc_Bucket *parent);
-
-/**
- * If an HTTP result was successful or not
- */
-int pycbc_httpresult_ok(pycbc_HttpResult *self);
-
-pycbc_ViewResult *pycbc_propagate_view_result(
-        pycbc_stack_context_handle context);
-
-/**
- * Append data to the HTTP result
- * @param mres The multi result
- * @param htres The HTTP result
- * @param bytes Data to append
- * @param nbytes Length of data
- */
-void
-pycbc_httpresult_add_data(pycbc_MultiResult *mres, pycbc_HttpResult *htres,
-                          const void *bytes, size_t nbytes);
-
-/**
- * Signal completion of an HTTP result.
- *
- * @param htres The HTTP result (Python)
- * @param mres The MultiResult object
- * @param err Error code (for the HTTP operation)
- * @param status The status code
- * @param headers The headers
- */
-void
-pycbc_httpresult_complete(pycbc_HttpResult *htres, pycbc_MultiResult *mres,
-                          lcb_error_t err, short status,
-                          const char * const *headers);
-
-/**
- * Add more data to the view's row list.
- *
- * This function will attempt to parse the data as JSON, and store an appropriate
- * error code otherwise.
- *
- * @param vres The ViewResult object
- * @param mres The MultiResult object
- * @param data Buffer
- * @param n Length of buffer
- */
-void
-pycbc_viewresult_addrow(pycbc_ViewResult *vres, pycbc_MultiResult *mres,
-                        const void *data, size_t n);
-
-/**
- * Attempt to notify the relevant callbacks for new data, if the constraints
- * allow it.
- *
- * This will invoke the callback in asynchronous mode, and will break
- * the event loop
- *
- * @param vres The ViewResult
- * @param mres The MultiResult
- * @param bucket The Bucket
- * @param force_callback whether the async callback should be forcefully invoked,
- * ignoring the rows_per_call setting (usually only required on error or when
- * there are no more rows).
- */
-void
-pycbc_viewresult_step(pycbc_ViewResult *vres, pycbc_MultiResult *mres,
-                      pycbc_Bucket *bucket, int force_callback);
 
 /**
  * Simple function, here because it's defined in result.c but needed in
@@ -1694,13 +1688,13 @@ void pycbc_exc_wrap_REAL(int mode, struct pycbc_exception_params *p);
  * @param err the libcouchbase error, if any
  * @return a borrowed reference to the appropriate exception class
  */
-PyObject* pycbc_exc_map(int mode, lcb_error_t err);
+PyObject* pycbc_exc_map(int mode, lcb_STATUS err);
 
 /**
  * Creates a simple exception with a given message. The exception
  * is not thrown.
  */
-PyObject* pycbc_exc_message(int mode, lcb_error_t err, const char *msg);
+PyObject* pycbc_exc_message(int mode, lcb_STATUS err, const char *msg);
 
 /**
  * Gets the error classifier categories (as a set of bit flags) for a given
@@ -1717,12 +1711,13 @@ PyObject* pycbc_exc_get_categories(PyObject *self, PyObject *arg);
  * @param e_key the key during the handling of which the error occurred
  * @param e_objextra the problematic object which actually caused the errror
  */
-#define PYCBC_EXC_WRAP_EX(e_mode, e_err, e_msg, e_key, e_objextra, e_err_info) \
+#define PYCBC_EXC_WRAP_EX_FILE_LINE(e_mode, e_err, e_msg, e_key, e_objextra, e_err_info, e_file, e_line) \
     {                                                                          \
+        PYCBC_DEBUG_LOG("Raising exception at %s, %d", e_file, e_line)     \
         struct pycbc_exception_params __pycbc_ep = {0};                        \
-        __pycbc_ep.file = __FILE__;                                            \
-        __pycbc_ep.line = __LINE__;                                            \
-        __pycbc_ep.err = (lcb_error_t)e_err;                                                \
+        __pycbc_ep.file = e_file;                                              \
+        __pycbc_ep.line = e_line;                                              \
+        __pycbc_ep.err = e_err;                                                \
         __pycbc_ep.msg = e_msg;                                                \
         __pycbc_ep.key = e_key;                                                \
         __pycbc_ep.objextra = e_objextra;                                      \
@@ -1730,6 +1725,9 @@ PyObject* pycbc_exc_get_categories(PyObject *self, PyObject *arg);
         Py_XINCREF(e_err_info);                                                \
         pycbc_exc_wrap_REAL(e_mode, &__pycbc_ep);                              \
     }
+
+#define PYCBC_EXC_WRAP_EX(e_mode, e_err, e_msg, e_key, e_objextra, e_err_info) \
+    PYCBC_EXC_WRAP_EX_FILE_LINE(e_mode, e_err, e_msg, e_key, e_objextra, e_err_info, __FILE__, __LINE__)
 
 #define PYCBC_EXC_WRAP(mode, err, msg) \
     PYCBC_EXC_WRAP_EX(mode, err, msg, NULL, NULL, NULL)
@@ -1781,17 +1779,6 @@ PyObject *pycbc_exc_mktuple(void);
 
 #define PYCBC_EXCTHROW_EMPTYKEY() PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, \
         "Empty key (i.e. '', empty string) passed")
-
-typedef struct {
-    PyObject *pyobj;
-    const void *buffer;
-    size_t length;
-} pycbc_pybuffer;
-
-#define PYCBC_PYBUF_RELEASE(buf) do { \
-    Py_XDECREF((buf)->pyobj); \
-    (buf)->pyobj = NULL; \
-} while (0)
 
 /**
  * Encodes a key into a buffer.
@@ -1874,7 +1861,7 @@ pycbc_iowrap_getiops(PyObject *iowrap);
 /**
  * Event callback handling
  */
-void pycbc_invoke_connected_event(pycbc_Bucket *conn, lcb_error_t err);
+void pycbc_invoke_connected_event(pycbc_Bucket *conn, lcb_STATUS err);
 
 /**
  * Schedule the dtor event
@@ -1941,14 +1928,6 @@ typedef enum {
 } pycbc_crypto_err;
 
 PyObject *pycbc_gen_crypto_exception_map(void);
-
-#ifndef PYCBC_CRYPTO_VERSION
-#if LCB_VERSION > 0x020807
-#define PYCBC_CRYPTO_VERSION 1
-#else
-#define PYCBC_CRYPTO_VERSION 0
-#endif
-#endif
 
 /**
  * Flag to check if logging is enabled for the library via Python's logging

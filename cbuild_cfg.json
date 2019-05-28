@@ -14,7 +14,6 @@
     "src/fts.c",
     "src/get.c",
     "src/htresult.c",
-    "src/http.c",
     "src/iops.c",
     "src/iops.h",
     "src/ixmgmt.c",
@@ -27,14 +26,16 @@
     "src/oputil.c",
     "src/oputil.h",
     "src/pipeline.c",
+    "src/pycbc_http.c",
+    "src/python_wrappers.h",
     "src/result.c",
     "src/store.c",
     "src/typeutil.c",
     "src/views.c"
   ],
   "comp_options": {
-    "PYCBC_LCB_API": "0x021004",
-    "PYCBC_LCB_API_ALL_SUPPORTED" : ["0x021004"],
+    "PYCBC_LCB_API": "0x02FF04",
+    "PYCBC_LCB_API_ALL_SUPPORTED" : ["0x021004","0x02FF04"],
     "PYCBC_CORE": "couchbase"
   },
   "apis": {
@@ -44,6 +45,8 @@
         "tag": [">2.10.3,<3.0.0","release-2.10"]
       },
       "sources": [
+        "src/lcb_v4_backport.h",
+        "src/lcb_v4_backport.c"
       ]
     },
     "0x02FF04": {
@@ -52,6 +55,8 @@
         "tag": [">3.0.0-alpha.3","master"]
       },
       "sources": [
+        "src/lcb_v4_wrapper.h",
+        "src/lcb_v4_wrapper.c"
       ]
     }
   }

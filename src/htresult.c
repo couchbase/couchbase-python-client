@@ -15,6 +15,7 @@
  **/
 
 #include "pycbc.h"
+#include "pycbc_http.h"
 #include "structmember.h"
 
 int
@@ -62,11 +63,11 @@ HttpResult_dealloc(pycbc_HttpResult *self)
             if (self->htype == PYCBC_HTTP_HVIEW) {
                 lcb_view_cancel(self->parent->instance, self->u.vh);
             } else if (self->htype == PYCBC_HTTP_HN1QL) {
-                lcb_n1ql_cancel(self->parent->instance, self->u.nq);
+                lcb_n1ql_cancel(self->parent->instance, self->u.n1ql);
             } else if (self->htype == PYCBC_HTTP_HFTS) {
                 lcb_fts_cancel(self->parent->instance, self->u.fts);
             } else {
-                lcb_cancel_http_request(self->parent->instance, self->u.htreq);
+                lcb_http_cancel(self->parent->instance, self->u.htreq);
             }
         }
         self->u.htreq = NULL;

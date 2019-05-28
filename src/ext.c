@@ -14,6 +14,8 @@
  *   limitations under the License.
  **/
 
+#include <libcouchbase/vbucket.h>
+#include "iops.h"
 #include "pycbc.h"
 #include "structmember.h"
 /**
@@ -335,15 +337,20 @@ init_libcouchbase(void)
     X(_IOPSWrapper, pycbc_IOPSWrapperType_init)        \
     X(_SDResult, pycbc_SDResultType_init)              \
     PYCBC_CRYPTO_TYPES(PYCBC_CRYPTO_TYPES_ADAPTER)
-#ifdef PYCBC_TRACING
-#define X_PYTYPES(X)       \
-    X_PYTYPES_NOTRACING(X) \
-    X(Tracer, pycbc_TracerType_init)
-#else
-#define X_PYTYPES(X) X_PYTYPES_NOTRACING(X)
-#endif
 
-#define X(name, inf) PyObject *cls_##name;
+#define X_PYTYPES_NOCOLLECTIONS(X)     \
+        X_PYTYPES_NOTRACING(X)         \
+        X(Tracer, pycbc_TracerType_init)
+
+#    ifdef PYCBC_COLLECTIONS_PROPER
+#        define X_PYTYPES(X)           \
+            X_PYTYPES_NOCOLLECTIONS(X) \
+            X(Collection, pycbc_CollectionType_init)
+#    else
+#        define X_PYTYPES(X) X_PYTYPES_NOCOLLECTIONS(X)
+#    endif
+
+#    define X(name, inf) PyObject *cls_##name;
     X_PYTYPES(X)
 #undef X
 
@@ -486,7 +493,19 @@ FAIL:
 #include <inttypes.h>
 #endif
 
+int pycbc_free_debug(const char *FILE, const char *FUNC, int LINE, void *X)
+{
+    if (X) {
+        PYCBC_DEBUG_LOG_WITH_FILE_FUNC_AND_LINE_NEWLINE(
+                FILE, FUNC, LINE, "freeing %p", X);
+    }
+    free(X);
+    return 0;
+}
+
 #include "oputil.h"
+#include "python_wrappers.h"
+
 #if PY_MAJOR_VERSION < 3
 const char *pycbc_cstrn(PyObject *object, Py_ssize_t *length)
 {
@@ -518,7 +537,7 @@ const char *pycbc_cstrn(PyObject *object, Py_ssize_t *length)
     if (PyBytes_Check(object)) {
         PyBytes_AsStringAndSize(object, &buffer, length);
     } else if (PyUnicode_Check(object)) {
-        buffer = PyUnicode_AsUTF8AndSize(object, length);
+        buffer = (char *)PyUnicode_AsUTF8AndSize(object, length);
     }
 FAIL:
     return buffer;
@@ -530,7 +549,7 @@ const char PYCBC_UNKNOWN[] = "Unknown";
 
 pycbc_strn pycbc_invalid_strn;
 
-char *pycbc_strn_buf(const pycbc_strn buf)
+const char *pycbc_strn_buf(const pycbc_strn buf)
 {
     return buf.buffer;
 }
@@ -540,9 +559,14 @@ int pycbc_strn_valid(const pycbc_strn buf)
     return buf.buffer ? 1 : 0;
 }
 
-size_t pycbc_strn_len(const pycbc_strn buf)
+size_t pycbc_strn_len(pycbc_strn_base_const buf)
 {
     return buf.length;
+}
+
+pycbc_strn_base_const pycbc_strn_const(pycbc_strn buf)
+{
+    return (pycbc_strn_base_const){buf.buffer, buf.length};
 }
 
 int pycbc_strn_repr_len(const pycbc_strn buf)
@@ -565,18 +589,30 @@ pycbc_strn_unmanaged pycbc_strn_ensure_psz_unmanaged(pycbc_strn *input)
     pycbc_strn_unmanaged output;
     output.content = pycbc_invalid_strn;
     if (pycbc_strn_valid(*input)) {
-        output.content.buffer = PYCBC_MALLOC_TYPED((*input).length + 1, char);
-        memcpy(output.content.buffer, input->buffer, input->length);
-        output.content.buffer[input->length] = '\0';
+        char *buffer = PYCBC_MALLOC_TYPED((*input).length + 1, char);
+        memcpy((void *)buffer, input->buffer, input->length);
+        buffer[input->length] = '\0';
+        output.content.buffer = buffer;
         output.content.length = input->length;
     }
+
     return output;
 }
 
-#ifdef PYCBC_FORCE_TAG_PSZ
 pycbc_strn_unmanaged pycbc_strn_ensure_psz(pycbc_strn *input)
 {
     return pycbc_strn_ensure_psz_unmanaged(input);
+}
+
+pycbc_strn_unmanaged pycbc_strn_from_managed(PyObject *source)
+{
+    size_t length = 0;
+    const char *buffer = (source && PyObject_IsTrue(source))
+                                 ? (PYCBC_CSTRN(source, &length))
+                                 : NULL;
+    pycbc_strn original = {.buffer = (char *)buffer, .length = length};
+
+    return pycbc_strn_ensure_psz_unmanaged(&original);
 }
 
 char *pycbc_strn_buf_psz(pycbc_strn_unmanaged buf)
@@ -584,24 +620,17 @@ char *pycbc_strn_buf_psz(pycbc_strn_unmanaged buf)
     return buf.content.buffer;
 }
 
-#else
-pycbc_strn pycbc_strn_ensure_psz(pycbc_strn *input)
-{
-    return *input;
-}
-
-char *pycbc_strn_buf_psz(pycbc_strn buf)
-{
-    return buf.buffer;
-}
-
-#endif
-
 void pycbc_strn_free(pycbc_strn_unmanaged buf)
 {
-    free(buf.content.buffer);
+    if (pycbc_strn_valid(buf.content)){
+        free((void *)buf.content.buffer);
+    }
 }
 
+pycbc_generic_array pycbc_strn_base_const_array(pycbc_strn_base_const orig)
+{
+    return (pycbc_generic_array){orig.buffer, orig.length};
+}
 #define PYCBC_STRN_FREE(BUF)                            \
     PYCBC_DEBUG_LOG("Freeing string buffer %.*s at %p", \
                     (int)(BUF).content.length,               \
@@ -665,7 +694,6 @@ void pycbc_debug_log_prefix(const char *FILE,
                         (CONTEXT) ? (CONTEXT->is_stub) : 9,
                         "");
 }
-
 void pycbc_debug_log(const char *FILE,
                             const char *FUNC,
                             int LINE,
@@ -799,6 +827,12 @@ void pycbc_exception_log(const char *file,
     }
 }
 #endif
+
+int pycbc_debug_info_is_valid(pycbc_debug_info *info)
+{
+    return info && info->FILE && info->FUNC && info->LINE;
+}
+
 void pycbc_print_pyformat(const char *format, ...)
 {
     va_list v1;
@@ -838,7 +872,30 @@ PyObject *pycbc_null_or_value(PyObject *tracer)
     return (tracer && PyObject_IsTrue(tracer)) ? tracer : NULL;
 }
 
-#ifdef PYCBC_TRACING
+lcb_STATUS pycbc_logging_monad_verb(const char *FILE,
+                                    const char *FUNC,
+                                    int LINE,
+                                    lcb_INSTANCE *instance,
+                                    void *COOKIE,
+                                    void *CMD,
+                                    const char *CMDNAME,
+                                    const char *VERB,
+                                    lcb_STATUS result)
+{
+    PYCBC_DEBUG_LOG_WITH_FILE_FUNC_AND_LINE_NEWLINE(
+            FILE,
+            FUNC,
+            LINE,
+            "Doing %s, %s==%llx: %llx, %llx, got result %d",
+            VERB,
+            CMDNAME,
+            CMD,
+            instance,
+            COOKIE,
+            result);
+    return result;
+}
+
 
 void *pycbc_null_or_capsule_value(PyObject *maybe_capsule,
                                   const char *capsule_name)
@@ -1216,12 +1273,17 @@ pycbc_stack_context_handle pycbc_wrap_setup(const char *CATEGORY,
 void pycbc_wrap_teardown(pycbc_stack_context_handle sub_context,
                          pycbc_Bucket *self,
                          const char *NAME,
-                         void *RV)
+                         PyObject **RV)
 {
-    PYCBC_DEBUG_LOG_CONTEXT(
-            sub_context, "Ended call to %s, return value %p", NAME, (void *)RV)
+    PYCBC_DEBUG_LOG_CONTEXT(sub_context,
+                            "Ended call to %s, return value %p",
+                            NAME,
+                            (void *)(RV ? (*RV) : NULL))
     PYCBC_CONTEXT_DEREF(sub_context, !pycbc_is_async_or_pipeline(self));
     PYCBC_EXCEPTION_LOG_NOCLEAR
+    if (PyErr_Occurred()) {
+        *RV = NULL;
+    }
     PYCBC_DEBUG_LOG("Finalised call to %s", NAME)
 }
 
@@ -1271,13 +1333,13 @@ pycbc_stack_context_handle pycbc_explicit_named_setup(
         const char *COMPONENTNAME,
         const char *CATEGORY,
         PyObject *KWARGS,
-        pycbc_Bucket *self)
+        pycbc_Tracer_t *tracer)
 {
     return pycbc_logging_monad(FILE,
                                LINE,
                                FUNCTION,
                                COMPONENTNAME,
-                               PYCBC_TRACER_START_SPAN(self->tracer,
+                               PYCBC_TRACER_START_SPAN(tracer,
                                                        KWARGS,
                                                        CATEGORY,
                                                        0,
@@ -1539,13 +1601,12 @@ pycbc_stack_context_handle pycbc_Tracer_start_span_debug(
         lcbtrace_REF_TYPE ref_type,
         const char *component)
 {
-    pycbc_stack_context_handle orig_context = context ? *context : NULL;
     pycbc_stack_context_handle subcontext;
     PYCBC_DEBUG_LOG_WITH_FILE_FUNC_LINE_CONTEXT_NEWLINE(
             FILE,
             FUNCTION,
             LINE,
-            orig_context,
+            context ? *context : NULL,
             "NEW SPAN: { optype %s, ref_type %s, component %s",
             operation,
             ref_type == LCBTRACE_REF_FOLLOWS_FROM
@@ -1558,7 +1619,7 @@ pycbc_stack_context_handle pycbc_Tracer_start_span_debug(
             FILE,
             FUNCTION,
             LINE,
-            orig_context,
+            context ? *context : NULL,
             "NEW SPAN: } optype %s, ref_type %s, component %s, got %p",
             operation,
             ref_type == LCBTRACE_REF_FOLLOWS_FROM
@@ -1686,15 +1747,14 @@ void pycbc_MultiResult_init_context(pycbc_MultiResult *self, PyObject *curkey,
                                  curkey);
     PYCBC_EXCEPTION_LOG_NOCLEAR;
     PYCBC_DEBUG_PYFORMAT_CONTEXT(context, "After insertion:[%R]", mres_dict);
+    PYCBC_XDECREF(curkey);
 DONE:
     PYCBC_PYBUF_RELEASE(&keybuf);
-    PYCBC_XDECREF(curkey);
 }
 
 int pycbc_is_async_or_pipeline(const pycbc_Bucket *self) { return self->flags & PYCBC_CONN_F_ASYNC || self->pipeline_queue; }
 
 #define LOGARGS(instance, lvl) instance->settings, "bootstrap", LCB_LOG_##lvl, __FILE__, __LINE__
-#endif
 
 void pycbc_set_dict_kv_object(PyObject *dict,
                               PyObject *key,
@@ -1720,12 +1780,21 @@ void pycbc_set_kv_ull(PyObject *dict, PyObject *keystr, lcb_uint64_t parenti_id)
     PyDict_SetItem(dict, keystr, pULL);
     PYCBC_DECREF(pULL);
 }
+
+void pycbc_set_kv_ull_str(PyObject *dict,
+                          const char *keystr,
+                          lcb_uint64_t parenti_id)
+{
+    PyObject *keyobj = pycbc_SimpleStringZ(keystr);
+    pycbc_set_kv_ull(dict, keyobj, parenti_id);
+    PYCBC_DECREF(keyobj);
+}
+
 #define PYCBC_TYPE_DEF(NAME, DOC, ...) \
     PyTypeObject pycbc_##NAME##Type = {PYCBC_POBJ_HEAD_INIT(NULL) 0};
 
 PYCBC_AUTODEF_TYPES(PYCBC_TYPE_DEF)
 
-#ifdef PYCBC_TRACING
 
 #define PYCBC_X_SPAN_ARGS(TEXT, ULL, TAGS, IDNUM) \
     TEXT(operation_name)                          \
@@ -1809,7 +1878,7 @@ void pycbc_Tracer_init_constants(void)
                               GENERIC_ABBREV,
                               GENERIC_ABBREV);
 #undef BLANK
-    memset(&pycbc_invalid_strn,0,sizeof(pycbc_strn));
+    memset((void *)&pycbc_invalid_strn, 0, sizeof(pycbc_strn));
 }
 
 #define PYCBC_TAG_TEXT(NAME) char *NAME;
@@ -1911,14 +1980,17 @@ PyObject* pycbc_set_finish_args_from_payload(pycbc_tracer_finish_args_t *args) {
 
 pycbc_strn pycbc_get_string_tag_basic(lcbtrace_SPAN *span, const char *tagname)
 {
-    pycbc_strn result =  pycbc_invalid_strn;
-    lcb_error_t err = lcbtrace_span_get_tag_str(
-            span, tagname, &result.buffer, &result.length);
+    char *buffer = NULL;
+    size_t length;
+    lcb_STATUS err =
+            lcbtrace_span_get_tag_str(span, tagname, &buffer, &length);
     if (err) {
-        result.buffer = NULL;
-        result.length = 0;
+        return pycbc_invalid_strn;
     }
-    return result;
+    {
+        pycbc_strn result = {.buffer = buffer, .length = length};
+        return result;
+    }
 }
 
 pycbc_strn pycbc_get_string_tag_basic_debug(const char* FILE, int LINE, lcbtrace_SPAN *span, const char *tagname)
@@ -1930,12 +2002,8 @@ pycbc_strn pycbc_get_string_tag_basic_debug(const char* FILE, int LINE, lcbtrace
 #define PYCBC_GET_STRING_TAG_BASIC(SPAN,TAGNAME)\
     pycbc_get_string_tag_basic_debug(__FILE__,__LINE__,SPAN,TAGNAME)
 
-#ifdef PYCBC_FORCE_TAG_PSZ
-pycbc_strn_unmanaged
-#else
-pycbc_strn
-#endif
-pycbc_dupe_strn_tag(const lcbtrace_SPAN *span, const char *tagname)
+pycbc_strn_unmanaged pycbc_dupe_strn_tag(const lcbtrace_SPAN *span,
+                                         const char *tagname)
 {
     pycbc_strn tag_contents =
             pycbc_get_string_tag_basic((lcbtrace_SPAN *)span, tagname);
@@ -1944,7 +2012,7 @@ pycbc_dupe_strn_tag(const lcbtrace_SPAN *span, const char *tagname)
     PYCBC_DEBUG_LOG("Looking for tagname %s from %p, got something: [%.*s]",
                     tagname,
                     span,
-                    (int)pycbc_strn_len(tag_contents),
+                    (int)pycbc_strn_len(pycbc_strn_const(tag_contents)),
                     pycbc_strn_buf(tag_contents));
     return tag_psz;
 }
@@ -1969,14 +2037,14 @@ char *pycbc_dupe_string_tag(const lcbtrace_SPAN *span,
 
 #ifdef PYCBC_DEBUG
 
-char *pycbc_dupe_string_tag_debug(const char *FILE,
-                                  const char *FUNC,
-                                  int LINE,
-                                  const lcbtrace_SPAN *span,
-                                  const char *tagname,
-                                  char **target_orig)
+const char *pycbc_dupe_string_tag_debug(const char *FILE,
+                                        const char *FUNC,
+                                        int LINE,
+                                        const lcbtrace_SPAN *span,
+                                        const char *tagname,
+                                        char **target_orig)
 {
-    char *result;
+    const char *result;
     PYCBC_DEBUG_LOG_WITH_FILE_FUNC_AND_LINE_NEWLINE(
             FILE,
             FUNC,
@@ -2024,7 +2092,7 @@ void pycbc_forward_string_tag(lcbtrace_SPAN *span,
 
 lcb_uint64_t pycbc_get_uint64_tag(const lcbtrace_SPAN *span,
                                   const char *tagname,
-                                  lcb_error_t *result)
+                                  lcb_STATUS *result)
 {
     lcb_uint64_t value = 0;
     (*result) = lcbtrace_span_get_tag_uint64(
@@ -2037,7 +2105,7 @@ void pycbc_dupe_uint64_tag(const lcbtrace_SPAN *span,
                            lcb_uint64_t **latency)
 {
     lcb_uint64_t value;
-    lcb_error_t result = lcbtrace_span_get_tag_uint64(
+    lcb_STATUS result = lcbtrace_span_get_tag_uint64(
             (lcbtrace_SPAN *)span, tagname, &value);
     if (result == LCB_SUCCESS) {
         *latency = PYCBC_MALLOC_TYPED(1, uint64_t);
@@ -2083,13 +2151,11 @@ pycbc_strn_unmanaged pycbc_print_aggregate_raw(pycbc_strn FIRST,
                                            receiver->content.buffer,
                                            receiver->content.length);
     if (result.content.length > receiver->content.length) {
-        result.content.buffer =
-                PYCBC_MALLOC_TYPED(result.content.length + 2, char);
-        pycbc_print_aggregate_raw_real(&FIRST,
-                                       &SECOND,
-                                       result.content.buffer,
-                                       result.content.length + 1);
-        result.content.buffer[result.content.length] = '\0';
+        char *buffer = PYCBC_MALLOC_TYPED(result.content.length + 2, char);
+        pycbc_print_aggregate_raw_real(
+                &FIRST, &SECOND, buffer, result.content.length + 1);
+        buffer[result.content.length] = '\0';
+        result.content.buffer = buffer;
     }
     return result;
 }
@@ -2358,16 +2424,10 @@ void pycbc_span_set_tag_from_strn(lcbtrace_SPAN *dest,
                                   const char *tagname,
                                   pycbc_strn *opcode_buffer)
 {
-#ifdef PYCBC_FORCE_TAG_PSZ
     pycbc_strn_unmanaged psz_buffer = pycbc_strn_ensure_psz(opcode_buffer);
-#else
-    pycbc_strn psz_buffer = *opcode_buffer;
-#endif
     lcbtrace_span_add_tag_str(dest, tagname, pycbc_strn_buf_psz(psz_buffer));
 
-#ifdef PYCBC_FORCE_TAG_PSZ
     PYCBC_STRN_FREE(psz_buffer);
-#endif
 }
 
 void pycbc_propagate_tag_str(lcbtrace_SPAN *span,
@@ -2439,7 +2499,7 @@ void pycbc_propagate_tag_ull(const lcbtrace_SPAN *span,
                              lcbtrace_SPAN *dest,
                              const char *tagname)
 {
-    lcb_error_t result = LCB_NOT_STORED;
+    lcb_STATUS result = LCB_NOT_STORED;
     pycbc_get_uint64_tag(dest, tagname, &result);
     if (result != LCB_SUCCESS) {
         lcb_uint64_t value = pycbc_get_uint64_tag(span, tagname, &result);
@@ -2467,7 +2527,7 @@ void pycbc_forward_opname_to_tag(lcbtrace_SPAN *span, lcbtrace_SPAN *dest)
 
 void pycbc_forward_opid_to_tag(lcbtrace_SPAN *span, lcbtrace_SPAN *dest, const char *tagname) {
     lcb_uint64_t value;
-    lcb_error_t lcb_result=lcbtrace_span_get_tag_uint64(span, tagname, &value);
+    lcb_STATUS lcb_result=lcbtrace_span_get_tag_uint64(span, tagname, &value);
     if (lcb_result)
     {
         value=lcbtrace_span_get_span_id(span);
@@ -2957,7 +3017,7 @@ static int Tracer__init__(pycbc_Tracer_t *self,
     PyObject *threshold_tracer_capsule = PyTuple_GetItem(args, 1);
     PyObject *parent = pycbc_null_or_value(tracer);
     lcbtrace_TRACER *child_tracer =
-            (lcbtrace_TRACER *)pycbc_null_or_capsule_value(
+            (lcbtrace_TRACER *)pycbc_capsule_value_or_null(
                     threshold_tracer_capsule, "threshold_tracer");
     self->tracer = pycbc_tracer_new(parent, child_tracer);
 
@@ -3014,4 +3074,61 @@ int pycbc_TracerType_init(PyObject **ptr) {
     return PyType_Ready(p);
 }
 
-#endif
+void pycbc_dict_add_text_kv_strn(PyObject *dict,
+                                 pycbc_strn_base_const strn_key,
+                                 pycbc_strn_base_const strn_value)
+{
+    PYCBC_DEBUG_LOG("adding %.*s to %.*s on %p\n",
+                    strn_value.length,
+                    strn_value.buffer,
+                    strn_key.length,
+                    strn_key.buffer,
+                    dict);
+    {
+        PyObject *valstr =
+                pycbc_SimpleStringN(strn_value.buffer, strn_value.length);
+        PyObject *keystr =
+                pycbc_SimpleStringN(strn_key.buffer, strn_key.length);
+        PyDict_SetItem(dict, keystr, valstr);
+        PYCBC_DECREF(valstr);
+        PYCBC_DECREF(keystr);
+    }
+}
+
+void pycbc_dict_add_text_kv(PyObject *dict, const char *key, const char *value)
+{
+    if (!key || !value || !dict) {
+        PYCBC_DEBUG_LOG(
+                "one of key %p value %p dict %p is NULL", key, value, dict);
+    }
+    pycbc_dict_add_text_kv_strn(
+            dict,
+            (pycbc_strn_base_const){.buffer = key, .length = strlen(key)},
+            (pycbc_strn_base_const){.buffer = value, .length = strlen(value)});
+}
+
+
+PYCBC_X_VERBS(PYCBC_CMD_PROXY)
+
+lcb_STATUS pycbc_report_err(int res, const char *generic_errmsg, const char* FILE, int LINE)
+{
+    if (res == LCB_NOT_SUPPORTED) {
+#define PYCBC_REPORT_BUF_LEN 500
+        char ERRBUF[PYCBC_REPORT_BUF_LEN] = {0};
+        snprintf(ERRBUF,
+                 PYCBC_REPORT_BUF_LEN,
+                 "%s - not supported in libcouchbase version: %s, "
+                 "PYCBC_LCB_API 0x%06X",
+                 generic_errmsg,
+                 lcb_get_version(NULL),
+                 PYCBC_LCB_API);
+        PYCBC_EXC_WRAP_EX_FILE_LINE(PYCBC_EXC_LCBERR, res, ERRBUF, NULL, NULL, NULL, FILE, LINE)
+    } else {
+        PYCBC_EXC_WRAP_EX_FILE_LINE(PYCBC_EXC_LCBERR,
+                       res ? res : LCB_GENERIC_TMPERR,
+                       generic_errmsg,NULL, NULL,NULL,
+                       FILE, LINE);
+    }
+#undef PYCBC_REPORT_BUF_LEN
+    return res;
+}

@@ -22,7 +22,7 @@
 #include "pycbc.h"
 
 void
-pycbc_invoke_connected_event(pycbc_Bucket *conn, lcb_error_t err)
+pycbc_invoke_connected_event(pycbc_Bucket *conn, lcb_STATUS err)
 {
     PyObject *argtuple;
     PyObject *arg;

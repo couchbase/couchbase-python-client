@@ -19,7 +19,7 @@
 #include "pycbc.h"
 
 struct storecmd_vars {
-    int operation;
+    lcb_STORE_OPERATION operation;
     int argopts;
     unsigned int sd_doc_flags;
     unsigned long ttl;
@@ -76,13 +76,15 @@ handle_item_kv(pycbc_Item *itm, PyObject *options, const struct storecmd_vars *s
         }
 
         if (frag_O == NULL) {
-            if (scv->operation == LCB_APPEND || scv->operation == LCB_PREPEND) {
+            if (scv->operation == LCB_STORE_APPEND ||
+                scv->operation == LCB_STORE_PREPEND) {
                 PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "append/prepend must provide options with 'fragment' specifier");
                 return -1;
             }
 
         } else {
-            if (scv->operation != LCB_APPEND && scv->operation != LCB_PREPEND) {
+            if (scv->operation != LCB_STORE_APPEND &&
+                scv->operation != LCB_STORE_PREPEND) {
                 PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "'fragment' only valid for append/prepend");
                 return -1;
             }
@@ -91,7 +93,8 @@ handle_item_kv(pycbc_Item *itm, PyObject *options, const struct storecmd_vars *s
         }
 
     } else {
-        if (scv->operation == LCB_APPEND || scv->operation == LCB_PREPEND) {
+        if (scv->operation == LCB_STORE_APPEND ||
+            scv->operation == LCB_STORE_PREPEND) {
             PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "append/prepend must provide options with 'fragment' specifier");
             return -1;
         }
@@ -113,8 +116,6 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,static, int,
     int rv;
     const struct storecmd_vars *scv = (const struct storecmd_vars *) arg;
     pycbc_pybuffer keybuf = {NULL};
-    lcb_CMDSUBDOC cmd = {0};
-
     if (itm) {
         PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Item not supported in subdoc mode");
         return -1;
@@ -123,16 +124,25 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,static, int,
     if (pycbc_tc_encode_key(self, curkey, &keybuf) != 0) {
         return -1;
     }
-
-    cmd.cas = scv->single_cas;
-    cmd.exptime = scv->ttl;
-    cmd.cmdflags |= scv->sd_doc_flags;
-    LCB_CMD_SET_KEY(&cmd, keybuf.buffer, keybuf.length);
-    rv = PYCBC_TRACE_WRAP(pycbc_sd_handle_speclist, NULL, self, cv->mres, curkey, curvalue, &cmd);
+    CMDSCOPE_NG(SUBDOC, subdoc)
+    {
+        lcb_cmdsubdoc_cas(cmd, scv->single_cas);
+        lcb_cmdsubdoc_expiration(cmd, scv->ttl);
+        pycbc_cmdsubdoc_flags_from_scv(scv->sd_doc_flags, cmd);
+        PYCBC_CMD_SET_KEY_SCOPE(subdoc, cmd, keybuf);
+        rv = PYCBC_TRACE_WRAP(pycbc_sd_handle_speclist,
+                              NULL,
+                              self,
+                              cv->mres,
+                              curkey,
+                              curvalue,
+                              cmd);
+    }
+GT_ERR:
+GT_DONE:
     PYCBC_PYBUF_RELEASE(&keybuf);
     return rv;
 }
-
 
 TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, int,
 handle_single_kv, pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
@@ -142,9 +152,8 @@ handle_single_kv, pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
     const struct storecmd_vars *scv = (struct storecmd_vars *) arg;
     struct single_key_context skc = {NULL};
     pycbc_pybuffer keybuf = {NULL}, valbuf = {NULL};
-    lcb_error_t err;
-    lcb_CMDSTORE cmd = {0};
-
+    lcb_STATUS err = LCB_SUCCESS;
+    lcb_U32 flags = 0;
     if (scv->argopts & PYCBC_ARGOPT_SDMULTI) {
         return PYCBC_TRACE_WRAP(handle_multi_mutate, NULL, self, cv, optype, curkey, curvalue, options, itm, arg);
     }
@@ -167,29 +176,35 @@ handle_single_kv, pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
         }
     }
 
-    rv = pycbc_tc_encode_value(self, skc.value, skc.flagsobj,
-                               &valbuf, &cmd.flags);
+    rv = pycbc_tc_encode_value(self, skc.value, skc.flagsobj, &valbuf, &flags);
     if (rv < 0) {
         rv = -1;
         goto GT_DONE;
     }
+    {
+        CMDSCOPE_NG_PARAMS(STORE, store, scv->operation)
+        {
+            lcb_cmdstore_flags(cmd, flags);
+            if (scv->operation == LCB_STORE_APPEND ||
+                scv->operation == LCB_STORE_PREPEND) {
+                /* The server ignores these flags and libcouchbase will throw an
+                 * error if the flags are present. We check elsewhere here to
+                 * ensure that only UTF8/BYTES are accepted for append/prepend
+                 * anyway */
+                lcb_cmdstore_flags(cmd, 0);
+            }
 
-    if (scv->operation == LCB_APPEND || scv->operation == LCB_PREPEND) {
-        /* The server ignores these flags and libcouchbase will throw an error
-         * if the flags are present. We check elsewhere here to ensure that
-         * only UTF8/BYTES are accepted for append/prepend anyway */
-        cmd.flags = 0;
+            PYCBC_CMD_SET_KEY_SCOPE(store, cmd, keybuf);
+            PYCBC_CMD_SET_VALUE_SCOPE(store, cmd, valbuf);
+
+            lcb_cmdstore_cas(cmd, skc.cas);
+            lcb_cmdstore_expiration(cmd, (uint32_t)skc.ttl);
+
+            PYCBC_TRACECMD_TYPED(store, cmd, context, cv->mres, curkey, self);
+            err = pycbc_store(self->instance, cv->mres, cmd);
+        }
     }
-
-    LCB_CMD_SET_KEY(&cmd, keybuf.buffer, keybuf.length);
-    LCB_CMD_SET_VALUE(&cmd, valbuf.buffer, valbuf.length);
-    cmd.cas = skc.cas;
-    cmd.operation = (lcb_storage_t) scv->operation;
-    cmd.exptime = skc.ttl;
-    PYCBC_TRACECMD(cmd, context, cv->mres, curkey, self);
-
-    err = lcb_store3(self->instance, cv->mres, &cmd);
-
+GT_ERR:
     PYCBC_DEBUG_LOG_CONTEXT(context, "got result %d", err)
     if (err == LCB_SUCCESS) {
         rv = 0;
@@ -254,35 +269,56 @@ set_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
     struct storecmd_vars scv = { 0 };
     char persist_to = 0, replicate_to = 0;
+    pycbc_DURABILITY_LEVEL dur_level = LCB_DURABILITYLEVEL_NONE;
 
+    static char *kwlist_multi[] = {"kv",
+                                   "ttl",
+                                   "format",
+                                   "persist_to",
+                                   "replicate_to",
+                                   "durability_level",
+                                   NULL};
 
-    static char *kwlist_multi[] = {
-            "kv", "ttl", "format",
-            "persist_to", "replicate_to",
-            NULL
-    };
-
-    static char *kwlist_single[] = {
-            "key", "value", "cas", "ttl", "format",
-            "persist_to", "replicate_to", "_sd_doc_flags",
-            NULL
-    };
+    static char *kwlist_single[] = {"key",
+                                    "value",
+                                    "cas",
+                                    "ttl",
+                                    "format",
+                                    "persist_to",
+                                    "replicate_to",
+                                    "_sd_doc_flags",
+                                    "durability_level",
+                                    NULL};
 
     scv.operation = operation;
     scv.argopts = argopts;
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
-        rv = PyArg_ParseTupleAndKeywords(args, kwargs, "O|OOBB", kwlist_multi,
+        rv = PyArg_ParseTupleAndKeywords(args,
+                                         kwargs,
+                                         "O|OOBBI",
+                                         kwlist_multi,
                                          &dict,
-                                         &ttl_O, &scv.flagsobj,
-                                         &persist_to, &replicate_to);
+                                         &ttl_O,
+                                         &scv.flagsobj,
+                                         &persist_to,
+                                         &replicate_to,
+                                         &dur_level);
 
     } else {
-        rv = PyArg_ParseTupleAndKeywords(args, kwargs, "OO|KOOBBI", kwlist_single,
-                                         &key, &value,
-                                         &scv.single_cas, &ttl_O, &scv.flagsobj,
-                                         &persist_to, &replicate_to,
-                                         &scv.sd_doc_flags);
+        rv = PyArg_ParseTupleAndKeywords(args,
+                                         kwargs,
+                                         "OO|KOOBBII",
+                                         kwlist_single,
+                                         &key,
+                                         &value,
+                                         &scv.single_cas,
+                                         &ttl_O,
+                                         &scv.flagsobj,
+                                         &persist_to,
+                                         &replicate_to,
+                                         &scv.sd_doc_flags,
+                                         &dur_level);
     }
 
     if (!rv) {
@@ -305,7 +341,7 @@ set_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
         ncmds = 1;
     }
 
-    if (operation == LCB_APPEND || operation == LCB_PREPEND) {
+    if (operation == LCB_STORE_APPEND || operation == LCB_STORE_PREPEND) {
         rv = handle_append_flags(self, &scv.flagsobj);
         if (rv < 0) {
             return NULL;
@@ -320,8 +356,8 @@ set_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
         return NULL;
     }
 
-    rv = pycbc_handle_durability_args(self, &cv.mres->dur,
-                                      persist_to, replicate_to);
+    rv = pycbc_handle_durability_args(
+            self, &cv.mres->dur, persist_to, replicate_to, dur_level);
 
     if (rv == 1) {
         cv.mres->mropts |= PYCBC_MRES_F_DURABILITY;
@@ -382,18 +418,18 @@ set_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
         return result;\
 }
 
-DECLFUNC(upsert_multi, LCB_SET, PYCBC_ARGOPT_MULTI)
-DECLFUNC(insert_multi, LCB_ADD, PYCBC_ARGOPT_MULTI)
-DECLFUNC(replace_multi, LCB_REPLACE, PYCBC_ARGOPT_MULTI)
+DECLFUNC(upsert_multi, LCB_STORE_SET, PYCBC_ARGOPT_MULTI)
+DECLFUNC(insert_multi, LCB_STORE_ADD, PYCBC_ARGOPT_MULTI)
+DECLFUNC(replace_multi, LCB_STORE_REPLACE, PYCBC_ARGOPT_MULTI)
 
-DECLFUNC(append_multi, LCB_APPEND, PYCBC_ARGOPT_MULTI)
-DECLFUNC(prepend_multi, LCB_PREPEND, PYCBC_ARGOPT_MULTI)
+DECLFUNC(append_multi, LCB_STORE_APPEND, PYCBC_ARGOPT_MULTI)
+DECLFUNC(prepend_multi, LCB_STORE_PREPEND, PYCBC_ARGOPT_MULTI)
 
-DECLFUNC(upsert, LCB_SET, PYCBC_ARGOPT_SINGLE)
-DECLFUNC(insert, LCB_ADD, PYCBC_ARGOPT_SINGLE)
-DECLFUNC(replace, LCB_REPLACE, PYCBC_ARGOPT_SINGLE)
+DECLFUNC(upsert, LCB_STORE_SET, PYCBC_ARGOPT_SINGLE)
+DECLFUNC(insert, LCB_STORE_ADD, PYCBC_ARGOPT_SINGLE)
+DECLFUNC(replace, LCB_STORE_REPLACE, PYCBC_ARGOPT_SINGLE)
 
-DECLFUNC(append, LCB_APPEND, PYCBC_ARGOPT_SINGLE)
-DECLFUNC(prepend, LCB_PREPEND, PYCBC_ARGOPT_SINGLE)
+DECLFUNC(append, LCB_STORE_APPEND, PYCBC_ARGOPT_SINGLE)
+DECLFUNC(prepend, LCB_STORE_PREPEND, PYCBC_ARGOPT_SINGLE)
 
 DECLFUNC(mutate_in, 0, PYCBC_ARGOPT_SINGLE | PYCBC_ARGOPT_SDMULTI)

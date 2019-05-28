@@ -74,7 +74,6 @@ endif()
 include(ExternalProject)
 
 
-set(LCB_CMAKE_ARGS -DLCB_NO_TESTS=1)
 set(CMAKE_MACOSX_RPATH 1)
 set(LCB_REPO_PROTOCOL http)
 if (LCB_REPO_USERNAME)

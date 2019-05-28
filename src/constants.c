@@ -14,8 +14,9 @@
  *   limitations under the License.
  **/
 
-#include "pycbc.h"
 #include "iops.h"
+#include "pycbc_http.h"
+#include <libcouchbase/crypto.h>
 
 /**
  * Very simple file that simply adds LCB constants to the module
@@ -89,6 +90,7 @@ typedef void *(*pycbc_constant_handler)(PyObject *,
 
 static void setup_compression_map(PyObject *module, PyObject* public_constants,
                                   pycbc_constant_handler handler);
+
 static void setup_tracing_map(PyObject *module, pycbc_constant_handler handler);
 
 static void setup_crypto_exceptions(PyObject *module,
@@ -104,6 +106,8 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
     #define ADD_CONSTANT(name, val) handler(module, name, val)
     #define ADD_STRING(name) PyModule_AddObject(module, #name, pycbc_SimpleStringZ(name) )
     #define LCB_CONSTANT(postfix, ...) ADD_CONSTANT(#postfix, LCB_##postfix)
+    #define ADD_MACRO_TERM(sym) ADD_MACRO(sym);
+
 #define LCB_PUBLIC_CONSTANT(postfix, ...)                              \
     {                                                                  \
         PyObject *py_longlong =                                        \
@@ -113,9 +117,9 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
     }
     #define X(b) ADD_MACRO(LCB_##b);
     XERR(X);
-    XSTORAGE(X);
     XHTTP(X);
-    #undef X
+#undef X
+    XSTORAGE(LCB_STORE_WRAPPER)
 
     ADD_MACRO(LCB_MAX_ERROR);
     ADD_MACRO(PYCBC_CMD_GET);
@@ -146,7 +150,8 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
     ADD_MACRO(PYCBC_RESFLD_RC);
     ADD_MACRO(PYCBC_RESFLD_HTCODE);
     ADD_MACRO(PYCBC_RESFLD_URL);
-
+    ADD_MACRO(PYCBC_LCB_API);
+    ADD_MACRO(PYCBC_ENDURE);
     ADD_CONSTANT("FMT_JSON", (lcb_U32)PYCBC_FMT_JSON);
     ADD_CONSTANT("FMT_BYTES", (lcb_U32)PYCBC_FMT_BYTES);
     ADD_CONSTANT("FMT_UTF8", (lcb_U32)PYCBC_FMT_UTF8);
@@ -211,7 +216,6 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
     /* View options */
     ADD_MACRO(LCB_CMDVIEWQUERY_F_INCLUDE_DOCS);
     ADD_MACRO(LCB_CMDVIEWQUERY_F_SPATIAL);
-
     ADD_MACRO(LCB_SDCMD_REPLACE);
     ADD_MACRO(LCB_SDCMD_DICT_ADD);
     ADD_MACRO(LCB_SDCMD_DICT_UPSERT);
@@ -223,24 +227,19 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
     ADD_MACRO(LCB_SDCMD_COUNTER);
     ADD_MACRO(LCB_SDCMD_REMOVE);
     ADD_MACRO(LCB_SDCMD_ARRAY_INSERT);
-
     /* Bucket types */
     ADD_MACRO(LCB_BTYPE_UNSPEC);
     ADD_MACRO(LCB_BTYPE_COUCHBASE);
     ADD_MACRO(LCB_BTYPE_EPHEMERAL);
     ADD_MACRO(LCB_BTYPE_MEMCACHED);
     /* Encryption options */
-    ADD_MACRO(LCBCRYPTO_KEY_ENCRYPT);
-    ADD_MACRO(LCBCRYPTO_KEY_DECRYPT);
+    PYCBC_PP_ENCRYPT_CONSTANTS(ADD_MACRO_TERM)
 
     LCB_CONSTANT(VERSION);
+    ADD_STRING(LCB_VERSION_STRING);
     ADD_MACRO(PYCBC_CRYPTO_VERSION);
-#ifdef PYCBC_TRACING
     ADD_CONSTANT("PYCBC_TRACING",1);
     setup_tracing_map(module, handler);
-#else
-    ADD_CONSTANT("PYCBC_TRACING",0);
-#endif
     setup_compression_map(module, public_constants, handler);
     setup_crypto_exceptions(module, handler);
     PyModule_AddObject(
@@ -289,7 +288,6 @@ static void setup_tracing_map(PyObject *module,
 #define convert_intbool_desc_val_units ""
     PyObject *result = PyDict_New();
     LCB_FOR_EACH_THRESHOLD_PARAM(LCB_CNTL_CONSTANT, ;);
-    LCB_CNTL_TRACING_THRESHOLD_KV;
 #define X(NAME, TYPE)                                       \
     {                                                       \
         PyObject *attrdict = PyDict_New();                  \
@@ -403,7 +401,7 @@ pycbc_init_pyconstants(PyObject *module)
 
 
 PyObject *
-pycbc_lcb_errstr(lcb_t instance, lcb_error_t err)
+pycbc_lcb_errstr(lcb_t instance, lcb_STATUS err)
 {
 #if PY_MAJOR_VERSION == 3
 

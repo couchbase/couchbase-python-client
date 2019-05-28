@@ -164,3 +164,11 @@ def run_init(m):
 run_init(C)
 
 C.FMT_AUTO = _FMT_AUTO
+
+
+def describe_lcb_api():
+    return "PYCBC_LCB_API {}, LCB API version {}".format(pycbc_lcb_api_str(), C.LCB_VERSION_STRING)
+
+
+def pycbc_lcb_api_str():
+    return '0x{0:0{1}X}'.format(C.PYCBC_LCB_API, 6)

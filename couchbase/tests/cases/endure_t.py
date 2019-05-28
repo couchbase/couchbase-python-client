@@ -14,13 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from unittest import SkipTest
 
 from couchbase.exceptions import NotFoundError, ArgumentError, TimeoutError
 from couchbase.tests.base import MockTestCase
 
-class EndureTest(MockTestCase):
-    #XXX: Require LCB 2.1.0
 
+class EndureTest(MockTestCase):
+    def setUp(self, **kwargs):
+        import couchbase._libcouchbase as _LCB
+        if not _LCB.PYCBC_ENDURE:
+            raise SkipTest("Standalone endure not supported in V4")
+        super(EndureTest,self).setUp(**kwargs)
     def test_excessive(self):
         self.assertRaises(ArgumentError,
                           self.cb.set,

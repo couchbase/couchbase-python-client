@@ -30,15 +30,14 @@ handle_single_arith, pycbc_Bucket *self, struct pycbc_common_vars *cv,
     pycbc_Item *item, void *arg)
 {
     int rv = 0;
-    lcb_error_t err;
-    lcb_CMDCOUNTER cmd;
+
+    lcb_STATUS err;
     struct arithmetic_common_vars my_params;
-    static char *kwlist[] = { "delta", "initial", "ttl", NULL };
+    static const char *kwlist[] = {"delta", "initial", "ttl", NULL};
     pycbc_pybuffer keybuf = { 0 };
     my_params = *(struct arithmetic_common_vars *)arg;
 
     (void)item;
-    memset(&cmd, 0, sizeof cmd);
 
     rv = pycbc_tc_encode_key(self, curkey, &keybuf);
     if (rv < 0) {
@@ -52,8 +51,13 @@ handle_single_arith, pycbc_Bucket *self, struct pycbc_common_vars *cv,
     if (curvalue) {
         if (PyDict_Check(curvalue)) {
             PyObject *initial_O = NULL;
-            rv = PyArg_ParseTupleAndKeywords(pycbc_DummyTuple, curvalue, "L|Ok",
-                kwlist, &my_params.delta, &initial_O, &my_params.ttl);
+            rv = PyArg_ParseTupleAndKeywords(pycbc_DummyTuple,
+                                             curvalue,
+                                             "L|Ok",
+                                             (char **)kwlist,
+                                             &my_params.delta,
+                                             &initial_O,
+                                             &my_params.ttl);
             if (!rv) {
                 PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ARGUMENTS, 0, "Couldn't parse parameter for key", curkey);
                 rv = -1;
@@ -77,14 +81,26 @@ handle_single_arith, pycbc_Bucket *self, struct pycbc_common_vars *cv,
         }
     }
 
-    LCB_CMD_SET_KEY(&cmd, keybuf.buffer, keybuf.length);
-    cmd.delta = my_params.delta;
-    cmd.create = my_params.create;
-    cmd.initial = my_params.initial;
-    cmd.exptime = my_params.ttl;
-
-    PYCBC_TRACECMD(cmd,context,cv->mres,curkey, self);
-    err = lcb_counter3(self->instance, cv->mres, &cmd);
+    {
+        CMDSCOPE_NG(COUNTER, counter)
+        {
+            PYCBC_DEBUG_LOG("Encoding delta %llu", my_params.delta)
+            lcb_cmdcounter_delta(cmd, my_params.delta);
+            PYCBC_DEBUG_LOG("Encoded delta %llu", my_params.delta)
+            PYCBC_DEBUG_LOG_CONTEXT(
+                    context, "Encoding initial %d", my_params.initial);
+            if (my_params.create) {
+                lcb_cmdcounter_initial(cmd, my_params.initial);
+            }
+            PYCBC_DEBUG_LOG_CONTEXT(
+                    context, "Encoding timeout %d", my_params.ttl);
+            lcb_cmdcounter_expiration(cmd, my_params.ttl);
+            PYCBC_CMD_SET_KEY_SCOPE(counter, cmd, keybuf);
+            PYCBC_TRACECMD_TYPED(counter, cmd, context, cv->mres, curkey, self);
+            err = pycbc_counter(self->instance, cv->mres, cmd);
+        }
+    }
+    GT_ERR:
     if (err != LCB_SUCCESS) {
         PYCBC_EXCTHROW_SCHED(err);
         rv = -1;
@@ -110,12 +126,18 @@ arithmetic_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
     PyObject *collection;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
 
-    static char *kwlist[] = { "keys", "delta", "initial", "ttl", NULL };
+    static const char *kwlist[] = {"keys", "delta", "initial", "ttl", NULL};
 
     global_params.delta = 1;
 
-    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "O|LOO", kwlist,
-        &collection, &global_params.delta, &all_initial_O, &all_ttl_O);
+    rv = PyArg_ParseTupleAndKeywords(args,
+                                     kwargs,
+                                     "O|LOO",
+                                     (char **)kwlist,
+                                     &collection,
+                                     &global_params.delta,
+                                     &all_initial_O,
+                                     &all_ttl_O);
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;

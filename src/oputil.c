@@ -14,10 +14,146 @@
  *   limitations under the License.
  **/
 
-//#include <libcouchbase/subdoc.h>
 #include "oputil.h"
 #include "pycbc.h"
+#include "pycbc_subdocops.h"
 #include "structmember.h"
+#include "python_wrappers.h"
+
+typedef enum {
+    PYCBC_NIL,
+    PYCBC_PATH_ONLY,
+    PYCBC_COUNTER,
+    PYCBC_STR
+} pycbc_sd_op_category;
+
+typedef struct {
+    int is_multival;
+    pycbc_sd_op_category category;
+    int has_valbuf;
+    lcb_STATUS err;
+} pycbc_sd_metainfo;
+
+
+typedef struct pycbc_sdspec_details{
+    lcb_SUBDOCOP op;
+    size_t index;
+    unsigned flags;
+    pycbc_pybuffer *pathbuf;
+    pycbc_pybuffer *valbuf;
+    int64_t delta;
+} pycbc_sdspec_details_t;
+
+
+#define PYCBC_SDCMD_CASE_GENERIC(UC, LC, FN, ...) \
+case LCB_SDCMD_##UC:                              \
+    PYCBC_DEBUG_LOG("Handling case :" #UC)        \
+    FN(UC, LC, __VA_ARGS__)                       \
+    break;
+
+pycbc_sd_metainfo pycbc_get_metainfo(const pycbc_sdspec_details_t* details)
+{
+    pycbc_sd_metainfo result = {0};
+#define PYCBC_METAINFO_PATH_ONLY(UC, LC, ...) \
+    result = (pycbc_sd_metainfo){.is_multival = 0, .category = PYCBC_PATH_ONLY};
+#define PYCBC_METAINFO_COUNTER(UC, LC, ...) \
+    result = (pycbc_sd_metainfo){.is_multival = 0, .category = PYCBC_COUNTER};
+#define PYCBC_METAINFO_NP(UC, LC, ...) \
+    result = (pycbc_sd_metainfo){.is_multival = 0, .category = PYCBC_NIL};
+#define PYCBC_METAINFO_VAL_GEN(UC, LC, ...) \
+    result = (pycbc_sd_metainfo){.is_multival = 0, .category = PYCBC_STR};
+#define PYCBC_METAINFO_IS_MVAL(UC, LC, ...) \
+    result = (pycbc_sd_metainfo){.is_multival = 1, .category = PYCBC_STR};
+
+#define PYCBC_METAINFO_SDCMD_CASE(UC, LC, ...) \
+    PYCBC_SDCMD_CASE_GENERIC(UC, LC, PYCBC_METAINFO_PATH_ONLY, __VA_ARGS__)
+#define PYCBC_METAINFO_SDCMD_CASE_NP(UC, LC, ...) \
+    PYCBC_SDCMD_CASE_GENERIC(UC, LC, PYCBC_METAINFO_NP, __VA_ARGS__)
+#define PYCBC_METAINFO_SDCMD_CASE_VAL(UC, LC, ...) \
+    PYCBC_SDCMD_CASE_GENERIC(UC, LC, PYCBC_METAINFO_VAL_GEN, __VA_ARGS__)
+#define PYCBC_METAINFO_SDCMD_CASE_MVAL(UC, LC, ...) \
+    PYCBC_SDCMD_CASE_GENERIC(UC, LC, PYCBC_METAINFO_IS_MVAL, __VA_ARGS__)
+#define PYCBC_METAINFO_SDCMD_CASE_COUNTER(UC, LC, ...) \
+    PYCBC_SDCMD_CASE_GENERIC(UC, LC, PYCBC_METAINFO_COUNTER, __VA_ARGS__)
+    switch (details->op) {
+        PYCBC_X_SD_OPS(PYCBC_METAINFO_SDCMD_CASE,
+                       PYCBC_METAINFO_SDCMD_CASE_NP,
+                       PYCBC_METAINFO_SDCMD_CASE_VAL,
+                       PYCBC_METAINFO_SDCMD_CASE_MVAL,
+                       PYCBC_METAINFO_SDCMD_CASE_COUNTER)
+        default:
+            result.err = LCB_SUBDOC_PATH_EINVAL;
+            break;
+    }
+    result.has_valbuf = (result.category == PYCBC_STR);
+    return result;
+#undef PYCBC_METAINFO_PATH_ONLY
+#undef PYCBC_METAINFO_COUNTER
+#undef PYCBC_METAINFO_NP
+#undef PYCBC_VAL_GEN
+#undef PYCBC_METAINFO_IS_MVAL
+
+#undef PYCBC_METAINFO_SDCMD_CASE
+#undef PYCBC_METAINFO_SDCMD_CASE_NP
+#undef PYCBC_METAINFO_SDCMD_CASE_VAL
+#undef PYCBC_METAINFO_SDCMD_CASE_MVAL
+#undef PYCBC_METAINFO_SDCMD_CASE_COUNTER
+}
+
+lcb_STATUS pycbc_build_spec(lcb_SUBDOCOPS *subdocops,
+                            const pycbc_sdspec_details_t *details)
+{
+    lcb_STATUS result = LCB_SUCCESS;
+
+#define PYCBC_BUILDSPEC_PATH_ONLY(UC, LC, ...)   \
+    lcb_subdocops_##LC(subdocops,                \
+                       details->index,           \
+                       details->flags,           \
+                       details->pathbuf->buffer, \
+                       details->pathbuf->length);
+#define PYCBC_BUILDSPEC_COUNTER(UC, LC, ...)                                  \
+    lcb_subdocops_##LC(                                                       \
+            subdocops,                                                        \
+            details->index,                                                   \
+            details->flags,                                                   \
+            details->pathbuf->buffer,                                         \
+            details->pathbuf->length,                                         \
+            (details->valbuf && details->valbuf->buffer)                      \
+                    ? strtol((const char *)details->valbuf->buffer, NULL, 10) \
+                    : 0);
+#define PYCBC_BUILDSPEC_NP(UC, LC, ...) \
+    lcb_subdocops_##LC(subdocops, details->index, details->flags);
+#define PYCBC_BUILDSPEC_VAL_GEN(UC, LC, ...)     \
+    lcb_subdocops_##LC(subdocops,                \
+                       details->index,           \
+                       details->flags,           \
+                       details->pathbuf->buffer, \
+                       details->pathbuf->length, \
+                       details->valbuf->buffer,  \
+                       details->valbuf->length);
+
+#define PYCBC_BUILDSPEC_SDCMD_CASE(UC, LC, ...) \
+    PYCBC_SDCMD_CASE_GENERIC(UC, LC, PYCBC_BUILDSPEC_PATH_ONLY, __VA_ARGS__)
+#define PYCBC_BUILDSPEC_SDCMD_CASE_NP(UC, LC, ...) \
+    PYCBC_SDCMD_CASE_GENERIC(UC, LC, PYCBC_BUILDSPEC_NP, __VA_ARGS__)
+#define PYCBC_BUILDSPEC_SDCMD_CASE_VAL(UC, LC, ...) \
+    PYCBC_SDCMD_CASE_GENERIC(UC, LC, PYCBC_BUILDSPEC_VAL_GEN, __VA_ARGS__)
+#define PYCBC_BUILDSPEC_SDCMD_CASE_MVAL(UC, LC, ...) \
+    PYCBC_SDCMD_CASE_GENERIC(UC, LC, PYCBC_BUILDSPEC_VAL_GEN, __VA_ARGS__)
+#define PYCBC_BUILDSPEC_SDCMD_CASE_COUNTER(UC, LC, ...) \
+    PYCBC_SDCMD_CASE_GENERIC(UC, LC, PYCBC_BUILDSPEC_COUNTER, __VA_ARGS__)
+    switch (details->op) {
+        PYCBC_X_SD_OPS(PYCBC_BUILDSPEC_SDCMD_CASE,
+                       PYCBC_BUILDSPEC_SDCMD_CASE_NP,
+                       PYCBC_BUILDSPEC_SDCMD_CASE_VAL,
+                       PYCBC_BUILDSPEC_SDCMD_CASE_MVAL,
+                       PYCBC_BUILDSPEC_SDCMD_CASE_COUNTER)
+    default:
+        result = LCB_SUBDOC_PATH_EINVAL;
+        break;
+    }
+    return result;
+}
 
 void
 pycbc_common_vars_finalize(struct pycbc_common_vars *cv, pycbc_Bucket *conn)
@@ -345,25 +481,96 @@ extract_item_params(struct pycbc_common_vars *cv,
     return 0;
 }
 
-#ifdef PYCBC_TRACING
-pycbc_oputil_keyhandler pycbc_oputil_keyhandler_build(pycbc_oputil_keyhandler_raw cb, const char* category, const char* name) {
-	pycbc_oputil_keyhandler handler;
-	handler.cb = cb;
-	handler.category = category;
-	handler.name = name;
-	return handler;
+#define PYCBC_OPUTIL_KEYHANDLER_BUILD_GEN(NAME)                          \
+    pycbc_oputil_keyhandler_##NAME pycbc_oputil_keyhandler_build_##NAME( \
+            pycbc_oputil_keyhandler_raw_##NAME cb,                       \
+            const char *category,                                        \
+            const char *name)                                            \
+    {                                                                    \
+        pycbc_oputil_keyhandler_##NAME handler;                          \
+        handler.cb = cb;                                                 \
+        handler.category = category;                                     \
+        handler.name = name;                                             \
+        return handler;                                                  \
+    }
+#ifndef PYCBC_OPUTIL_GEN
+
+pycbc_oputil_keyhandler_Bucket pycbc_oputil_keyhandler_build_Bucket(
+        pycbc_oputil_keyhandler_raw_Bucket cb,
+        const char *category,
+        const char *name)
+{
+    pycbc_oputil_keyhandler_Bucket handler;
+    handler.cb = cb;
+    handler.category = category;
+    handler.name = name;
+    return handler;
 }
+
+pycbc_oputil_keyhandler_Collection pycbc_oputil_keyhandler_build_Collection(
+        pycbc_oputil_keyhandler_raw_Collection cb,
+        const char *category,
+        const char *name)
+{
+    pycbc_oputil_keyhandler_Collection handler;
+    handler.cb = cb;
+    handler.category = category;
+    handler.name = name;
+    return handler;
+}
+#else
+PYCBC_UNITS(PYCBC_OPUTIL_KEYHANDLER_BUILD_GEN)
+
 #endif
 
-int
-pycbc_oputil_iter_multi(pycbc_Bucket *self,
-                        pycbc_seqtype_t seqtype,
-                        PyObject *collection,
-                        struct pycbc_common_vars *cv,
-                        int optype,
-                        pycbc_oputil_keyhandler handler,
-                        void *arg,
-                        pycbc_stack_context_handle context)
+int pycbc_wrap_bucket_callback(pycbc_oputil_keyhandler_raw_Bucket *original,
+                               pycbc_Collection *self,
+                               struct pycbc_common_vars *cv,
+                               int optype,
+                               PyObject *key,
+                               PyObject *value,
+                               PyObject *options,
+                               pycbc_Item *item,
+                               void *arg,
+                               pycbc_stack_context_handle context)
+{
+    return (*original)(
+            self->bucket, cv, optype, key, value, options, item, arg, context);
+}
+
+int pycbc_oputil_iter_multi_Bucket(pycbc_Bucket *self,
+                                   pycbc_seqtype_t seqtype,
+                                   PyObject *collection,
+                                   struct pycbc_common_vars *cv,
+                                   int optype,
+                                   pycbc_oputil_keyhandler_Bucket handler,
+                                   void *arg,
+                                   pycbc_stack_context_handle context)
+{
+    pycbc_oputil_keyhandler_Collection wrapper;
+    int rv = LCB_SUCCESS;
+    pycbc_Collection *coll = NULL;
+    wrapper.category = handler.category;
+    wrapper.name = handler.name;
+    wrapper.original = &handler.cb;
+    wrapper.cb = pycbc_wrap_bucket_callback;
+    coll = pycbc_Bucket_init_collection(
+            self, pycbc_DummyTuple, pycbc_DummyKeywords);
+    rv = pycbc_oputil_iter_multi_Collection(
+            coll, seqtype, collection, cv, optype, wrapper, arg, context);
+    pycbc_Collection_free_unmanaged(coll);
+    PYCBC_FREE(coll);
+    return rv;
+}
+int pycbc_oputil_iter_multi_Collection(
+        pycbc_Collection *collectionself,
+        pycbc_seqtype_t seqtype,
+        PyObject *collection,
+        struct pycbc_common_vars *cv,
+        int optype,
+        pycbc_oputil_keyhandler_Collection handler,
+        void *arg,
+        pycbc_stack_context_handle context)
 {
     int rv = 0;
     int ii;
@@ -397,7 +604,8 @@ pycbc_oputil_iter_multi(pycbc_Bucket *self,
             arg_k = k;
         }
 
-#ifdef PYCBC_TRACING
+        assert(collectionself);
+        assert(handler.cb);
         rv = PYCBC_TRACE_WRAP_EXPLICIT_NAMED(&context,
                                              (handler).cb,
                                              (handler).name,
@@ -405,8 +613,9 @@ pycbc_oputil_iter_multi(pycbc_Bucket *self,
                                              NULL,
                                              1,
                                              cv,
-                                             self,
-                                             self,
+                                             collectionself->bucket,
+                                             handler.original,
+                                             collectionself,
                                              cv,
                                              optype,
                                              arg_k,
@@ -414,15 +623,11 @@ pycbc_oputil_iter_multi(pycbc_Bucket *self,
                                              options,
                                              itm,
                                              arg);
-#else
-        rv = PYCBC_TRACE_WRAP_EXPLICIT_NAMED(handler, "", "", NULL, self, cv, optype, arg_k, v, options, itm, arg);
-#endif
-
     GT_ITER_DONE:
         Py_XDECREF(k);
         Py_XDECREF(v);
 
-        if (rv == -1) {
+        if (rv) {
             break;
         }
     }
@@ -523,16 +728,17 @@ pycbc_oputil_wait_common,pycbc_Bucket *self)
  * Returns 1 if durability was found, 0 if durability was not found, and -1
  * on error.
  */
-int
-pycbc_handle_durability_args(pycbc_Bucket *self,
-                             pycbc_dur_params *params,
-                             char persist_to,
-                             char replicate_to)
+int pycbc_handle_durability_args(pycbc_Bucket *self,
+                                 pycbc_dur_params *params,
+                                 char persist_to,
+                                 char replicate_to,
+                                 pycbc_DURABILITY_LEVEL dur_level)
 {
     if (self->dur_global.persist_to || self->dur_global.replicate_to) {
         if (persist_to == 0 && replicate_to == 0) {
             persist_to = self->dur_global.persist_to;
             replicate_to = self->dur_global.replicate_to;
+            dur_level = self->dur_global.durability_level;
         }
     }
 
@@ -547,8 +753,9 @@ pycbc_handle_durability_args(pycbc_Bucket *self,
         }
 
         return 1;
+    } else if (dur_level) {
+        params->durability_level = dur_level;
     }
-
     return 0;
 }
 
@@ -579,15 +786,18 @@ pycbc_encode_sd_keypath(pycbc_Bucket *conn, PyObject *src,
     return rv;
 }
 
-static int
-sd_convert_spec(PyObject *pyspec, lcb_SDSPEC *sdspec,
-    pycbc_pybuffer *pathbuf, pycbc_pybuffer *valbuf)
+static int sd_convert_spec(PyObject *pyspec,
+                           lcb_SUBDOCOPS *subdocops,
+                           pycbc_pybuffer *pathbuf_base,
+                           pycbc_pybuffer *valbuf_base,
+                           size_t index)
 {
     PyObject *path = NULL;
     PyObject *val = NULL;
     int op = 0;
     unsigned flags = 0;
-
+    pycbc_pybuffer *pathbuf = pathbuf_base + index;
+    pycbc_pybuffer *valbuf = valbuf_base + index;
     if (!PyTuple_Check(pyspec)) {
         PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0, "Expected tuple for spec", pyspec);
         return -1;
@@ -601,44 +811,48 @@ sd_convert_spec(PyObject *pyspec, lcb_SDSPEC *sdspec,
         goto GT_ERROR;
     }
 
-    sdspec->sdcmd = op;
-    sdspec->options = flags;
-    LCB_SDSPEC_SET_PATH(sdspec, pathbuf->buffer, pathbuf->length);
+    PYCBC_DEBUG_PYFORMAT("Got val %R from pyspec %R",
+                         pycbc_none_or_value(val),
+                         pycbc_none_or_value(pyspec))
+    pycbc_sdspec_details_t details = {.op = op,
+                                    .flags = flags,
+                                    .pathbuf = pathbuf,
+                                    .valbuf = valbuf,
+                                    .index = index};
     if (val != NULL) {
-        int is_multival = 0;
-
+        pycbc_sd_metainfo metainfo = pycbc_get_metainfo(&details);
         if (PyObject_IsInstance(val, pycbc_helpers.sd_multival_type)) {
             /* Verify the operation allows it */
-            switch (op) {
-            case LCB_SDCMD_ARRAY_ADD_FIRST:
-            case LCB_SDCMD_ARRAY_ADD_LAST:
-            case LCB_SDCMD_ARRAY_INSERT:
-                is_multival = 1;
-                break;
-            default:
-                PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0,
-                    "MultiValue not supported for operation", pyspec);
+            if (!metainfo.is_multival) {
+                PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS,
+                                   0,
+                                   "MultiValue not supported for operation",
+                                   pyspec);
                 goto GT_ERROR;
             }
         }
-
+        PYCBC_DEBUG_PYFORMAT("Encoding val %R", val)
         if (pycbc_tc_simple_encode(val, valbuf, PYCBC_FMT_JSON) != 0) {
             goto GT_ERROR;
         }
 
-        if (is_multival) {
+        PYCBC_DEBUG_PYFORMAT(
+                "Encoded val %R to %.*s", val, valbuf->length, valbuf->buffer)
+        if (metainfo.is_multival) {
             /* Strip first and last [ */
             const char *buf = (const char *)valbuf->buffer;
             size_t len = valbuf->length;
 
             for (; isspace(*buf) && len; len--, buf++) {
             }
-            for (; len && isspace(buf[len-1]); len--) {
+            for (; len && isspace(buf[len - 1]); len--) {
             }
-            if (len < 3 || buf[0] != '[' || buf[len-1] != ']') {
-                PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ENCODING, 0,
-                    "Serialized MultiValue shows invalid JSON (maybe empty?)",
-                    pyspec);
+            if (len < 3 || buf[0] != '[' || buf[len - 1] != ']') {
+                PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ENCODING,
+                                   0,
+                                   "Serialized MultiValue shows invalid JSON "
+                                   "(maybe empty?)",
+                                   pyspec);
                 goto GT_ERROR;
             }
 
@@ -647,8 +861,9 @@ sd_convert_spec(PyObject *pyspec, lcb_SDSPEC *sdspec,
             valbuf->buffer = buf;
             valbuf->length = len;
         }
-
-        LCB_SDSPEC_SET_VALUE(sdspec, valbuf->buffer, valbuf->length);
+    }
+    if (pycbc_build_spec(subdocops, &details)) {
+        goto GT_ERROR;
     }
     return 0;
 
@@ -664,15 +879,52 @@ sd_convert_spec(PyObject *pyspec, lcb_SDSPEC *sdspec,
 #endif
 #endif
 
+TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
+                ,
+                lcb_STATUS,
+                pycbc_call_subdoc,
+                const pycbc_Bucket *self,
+                pycbc_MultiResult *mres,
+                PyObject *key,
+                lcb_CMDSUBDOC *cmd,
+                int rv,
+                lcb_STATUS *err,
+                pycbc__SDResult *newitm)
+{
+    if (rv == 0) {
+        PYCBC_TRACECMD_PURE(subdoc, cmd, context);
+        newitm->tracing_context = context;
+        newitm->is_tracing_stub = 0;
+        PYCBC_DEBUG_LOG_CONTEXT(context, "Calling subdoc on %llx", cmd)
+        (*err) = pycbc_subdoc(self->instance, mres, cmd);
+        PYCBC_DEBUG_LOG_CONTEXT(context,
+                                "Called subdoc on %llx, got err %s",
+                                cmd,
+                                lcb_strerror(self->instance, *err))
+        if ((*err) == LCB_SUCCESS) {
+#ifdef PYCBC_GLOBAL_SCHED_SD
+            PYCBC_REF_CONTEXT(context);
+#endif
+            PyDict_SetItem((PyObject *)mres, key, (PyObject *)newitm);
+            pycbc_assert(Py_REFCNT(newitm) == 2);
+        } else {
+            PYCBC_DEBUG_LOG_CONTEXT(context,
+                                    "Got err %d %s",
+                                    *err,
+                                    lcb_strerror(self->instance, *err))
+        }
+    }
+    return (*err);
+}
+
 TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,, int,
 pycbc_sd_handle_speclist, pycbc_Bucket *self, pycbc_MultiResult *mres,
     PyObject *key, PyObject *spectuple, lcb_CMDSUBDOC *cmd)
 {
     int rv = 0;
-    lcb_error_t err = LCB_SUCCESS;
-    Py_ssize_t nspecs = 0;
+    lcb_STATUS err = LCB_SUCCESS;
+    size_t nspecs = 0;
     pycbc__SDResult *newitm = NULL;
-    lcb_SDSPEC *specs = NULL, spec_s = { 0 };
     pycbc_pybuffer pathbuf_s = { NULL }, valbuf_s = { NULL };
     pycbc_pybuffer *pathbufs = NULL, *valbufs = NULL;
 
@@ -681,7 +933,7 @@ pycbc_sd_handle_speclist, pycbc_Bucket *self, pycbc_MultiResult *mres,
         return -1;
     }
 
-    nspecs = PyTuple_GET_SIZE(spectuple);
+    nspecs = (size_t)(PyTuple_GET_SIZE(spectuple));
     if (nspecs == 0) {
         PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Need one or more commands!");
         return -1;
@@ -692,62 +944,62 @@ pycbc_sd_handle_speclist, pycbc_Bucket *self, pycbc_MultiResult *mres,
     Py_INCREF(newitm->key);
 
     if (nspecs == 1) {
-        PyObject *single_spec = PyTuple_GET_ITEM(spectuple, 0);
-        pathbufs = &pathbuf_s;
-        valbufs = &valbuf_s;
-
-        cmd->specs = &spec_s;
-        cmd->nspecs = 1;
-        rv = sd_convert_spec(single_spec, &spec_s, pathbufs, valbufs);
+        CMDSCOPE_NG_GENERIC_PARAMS(1, lcb_SUBDOCOPS, subdocops, ops, 1)
+        {
+            PyObject *single_spec = PyTuple_GET_ITEM(spectuple, 0);
+            pathbufs = &pathbuf_s;
+            valbufs = &valbuf_s;
+            rv = sd_convert_spec(single_spec, ops, pathbufs, valbufs, 0);
+            lcb_cmdsubdoc_operations(cmd, ops);
+            err = PYCBC_TRACE_WRAP(pycbc_call_subdoc,
+                                   NULL,
+                                   self,
+                                   mres,
+                                   key,
+                                   cmd,
+                                   rv,
+                                   &err,
+                                   newitm);
+        }
     } else {
-        Py_ssize_t ii;
-        specs = calloc(nspecs, sizeof *specs);
-        pathbufs = calloc(nspecs, sizeof *pathbufs);
-        valbufs = calloc(nspecs, sizeof *valbufs);
+        CMDSCOPE_NG_GENERIC_PARAMS(2, lcb_SUBDOCOPS, subdocops, ops, nspecs)
+        {
+            size_t ii;
+            pathbufs = calloc(nspecs, sizeof *pathbufs);
+            valbufs = calloc(nspecs, sizeof *valbufs);
 
-        cmd->specs = specs;
-        cmd->nspecs = nspecs;
-
-        for (ii = 0; ii < nspecs; ++ii) {
-            PyObject *cur = PyTuple_GET_ITEM(spectuple, ii);
-            rv = sd_convert_spec(cur, specs + ii, pathbufs + ii, valbufs + ii);
-            if (rv != 0) {
-                break;
+            for (ii = 0; ii < nspecs; ++ii) {
+                PyObject *cur = PyTuple_GET_ITEM(spectuple, ii);
+                rv = sd_convert_spec(cur, ops, pathbufs, valbufs, ii);
+                if (rv != 0) {
+                    break;
+                }
             }
+            lcb_cmdsubdoc_operations(cmd, ops);
+            err = PYCBC_TRACE_WRAP(pycbc_call_subdoc,
+                                   NULL,
+                                   self,
+                                   mres,
+                                   key,
+                                   cmd,
+                                   rv,
+                                   &err,
+                                   newitm);
         }
     }
-
-    if (rv == 0) {
-        PYCBC_TRACECMD_PURE((*cmd), context);
-#ifdef PYCBC_TRACING
-        newitm->tracing_context = context;
-        newitm->is_tracing_stub = 0;
-#endif
-        err = lcb_subdoc3(self->instance, mres, cmd);
-        if (err == LCB_SUCCESS) {
+GT_ERR:
+GT_DONE : {
+    size_t ii;
+    for (ii = 0; nspecs > 0 && ii < (size_t)nspecs; ++ii) {
 #ifdef PYCBC_GLOBAL_SCHED_SD
+        if (!err) {
             PYCBC_REF_CONTEXT(context);
-#endif
-            PyDict_SetItem((PyObject*)mres, key, (PyObject*)newitm);
-            pycbc_assert(Py_REFCNT(newitm) == 2);
         }
-    }
-
-    free(specs);
-    {
-        size_t ii;
-        for (ii = 0; nspecs > 0 && ii < (size_t) nspecs; ++ii) {
-#ifdef PYCBC_TRACING
-#ifdef PYCBC_GLOBAL_SCHED_SD
-            if (!err) {
-                PYCBC_REF_CONTEXT(context);
-            }
 #endif
-#endif
-            PYCBC_PYBUF_RELEASE(pathbufs + ii);
-            PYCBC_PYBUF_RELEASE(valbufs + ii);
-        }
+        PYCBC_PYBUF_RELEASE(pathbufs + ii);
+        PYCBC_PYBUF_RELEASE(valbufs + ii);
     }
+}
 
     if (nspecs > 1) {
         free(pathbufs);

@@ -65,7 +65,6 @@ static struct PyMemberDef Result_TABLE_members[] = {
                 READONLY,
                 PyDoc_STR("Key for the operation")
         },
-#ifdef PYCBC_TRACING
         { "is_tracing_stub", T_BOOL, offsetof(pycbc_Result, is_tracing_stub),
                 READONLY,
                 PyDoc_STR("Whether this is a tracing stub")
@@ -75,18 +74,13 @@ static struct PyMemberDef Result_TABLE_members[] = {
                 T_OBJECT, offsetof(pycbc_Result, tracing_output),
           READONLY, PyDoc_STR("Tracing output")
         },
-#endif
         { NULL }
 };
-
-#ifdef PYCBC_TRACING
 
 PyObject *Result_tracing_context(pycbc_Result *self, void *closure)
 {
     return PyLong_FromVoidPtr((void *)self->tracing_context);
 }
-
-#endif
 
 static struct PyGetSetDef Result_TABLE_getset[] = {
         { "success",
@@ -106,11 +100,9 @@ static struct PyGetSetDef Result_TABLE_getset[] = {
         { "cas", (getter)Result_int0,
                 NULL, NULL
         },
-#ifdef PYCBC_TRACING
         { "tracing_context", (getter)Result_tracing_context,
                 NULL, NULL
         },
-#endif
         { NULL }
 };
 
@@ -129,13 +121,10 @@ Result_dealloc(pycbc_Result *self)
     Py_XDECREF(self->key);
 #ifdef PYCBC_EXTRA_STRICT
     pycbc_assert(!self->tracing_context);
-#else
-    self->tracing_context=NULL;
+#endif
+    self->tracing_context = NULL;
     PYCBC_CONTEXT_DEREF_FROM_CONTEXT(self->tracing_context, 0, 0, NULL);
-#endif
-#ifdef PYCBC_TRACING
     Py_XDECREF(self->tracing_output);
-#endif
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -148,11 +137,9 @@ static int
 pycbc_Result_init(PyObject *self_raw,
                PyObject *args, PyObject *kwargs)
 {
-#ifdef PYCBC_TRACING
     pycbc_Result* self = (pycbc_Result*)self_raw;
     self->is_tracing_stub = 0;
     self->tracing_context = NULL;
-#endif
     PYCBC_EXCEPTION_LOG_NOCLEAR;
     return 0;
 }

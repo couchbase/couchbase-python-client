@@ -57,7 +57,7 @@ struct vbinfo_st {
 
 static PyObject *
 handle_float_tmo(lcb_t instance,
-                 int cmd, int mode, PyObject *val, lcb_error_t *err)
+                 int cmd, int mode, PyObject *val, lcb_STATUS *err)
 {
     lcb_uint32_t cval;
 
@@ -88,7 +88,7 @@ handle_float_tmo(lcb_t instance,
 
 static PyObject *
 handle_boolean(lcb_t instance,
-               int cmd, int mode, PyObject *val, lcb_error_t *err)
+               int cmd, int mode, PyObject *val, lcb_STATUS *err)
 {
     int cval;
     PyObject *ret;
@@ -112,7 +112,7 @@ handle_boolean(lcb_t instance,
 
 static PyObject *
 handle_intval(lcb_t instance,
-              int cmd, int mode, PyObject *val, lcb_error_t *err)
+              int cmd, int mode, PyObject *val, lcb_STATUS *err)
 {
     int cval;
 
@@ -268,7 +268,7 @@ handle_old_ctl(pycbc_Bucket *self, int cmd, PyObject *val)
 {
     PyObject *ret = NULL;
     int mode = (val == NULL) ? CNTL_GET : CNTL_SET;
-    lcb_error_t err = LCB_SUCCESS;
+    lcb_STATUS err = LCB_SUCCESS;
 
     switch (cmd) {
     /** Timeout parameters */
@@ -319,7 +319,7 @@ pycbc_Bucket__cntl(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     CTLTYPE type = CTL_TYPE_COMPAT;
     const char *argt = NULL;
     PyObject *val = NULL;
-    lcb_error_t err = LCB_SUCCESS;
+    lcb_STATUS err = LCB_SUCCESS;
     uCNTL input;
 
     char *kwnames[] = { "op", "value", "value_type", NULL };
@@ -368,7 +368,7 @@ PyObject *
 pycbc_Bucket__cntlstr(pycbc_Bucket *conn, PyObject *args, PyObject *kw)
 {
     const char *key, *value;
-    lcb_error_t err;
+    lcb_STATUS err=LCB_SUCCESS;
     char *kwlist[] = { "key", "value", NULL };
 
     if (!PyArg_ParseTupleAndKeywords(args, kw, "ss", kwlist, &key, &value)) {
@@ -391,7 +391,7 @@ pycbc_Bucket__vbmap(pycbc_Bucket *conn, PyObject *args)
     const char *s = NULL;
     PyObject *rtuple;
     struct vbinfo_st info;
-    lcb_error_t err;
+    lcb_STATUS err=LCB_SUCCESS;
 
     if (!PyArg_ParseTuple(args, "s#", &s, &slen)) {
         PYCBC_EXCTHROW_ARGS();

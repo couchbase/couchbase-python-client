@@ -1,7 +1,7 @@
-#include "pycbc.h"
 #include "oputil.h"
+#include "pycbc.h"
+#include "pycbc_http.h"
 #include "structmember.h"
-#include <libcouchbase/ixmgmt.h>
 
 #ifdef LCB_N1XSPEC_F_PRIMARY
 /* lcb callback for index management operations */
@@ -23,11 +23,19 @@ mgmt_callback(lcb_t instance, int ign, const lcb_RESPN1XMGMT *resp)
     }
 
     pycbc_viewresult_step(vres, mres, bucket, 1);
+
     if (resp->inner) {
-        pycbc_httpresult_add_data(mres, &vres->base, resp->inner->row, resp->inner->nrow);
-        if (resp->inner->htresp) {
-            hdrs = resp->inner->htresp->headers;
-            htcode = resp->inner->htresp->htstatus;
+        const char *row = NULL;
+        size_t row_count;
+        lcb_respn1ql_row(resp->inner, &row, &row_count);
+        pycbc_httpresult_add_data(mres, &vres->base, row, row_count);
+        {
+            const lcb_RESPHTTP *inner_http = NULL;
+            lcb_respn1ql_http_response(resp->inner, &inner_http);
+            if (inner_http) {
+                lcb_resphttp_headers(inner_http, &hdrs);
+                htcode = lcb_resphttp_status(inner_http);
+            }
         }
     }
     pycbc_httpresult_complete(&vres->base, mres, resp->rc, htcode, NULL);
@@ -44,13 +52,13 @@ pycbc_Bucket__ixmanage(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     PyObject *ret = NULL;
     pycbc_MultiResult *mres;
     pycbc_ViewResult *vres;
-    lcb_error_t rc;
+    lcb_STATUS rc=LCB_SUCCESS;
     unsigned cmdflags = 0;
     lcb_CMDN1XMGMT cmd = { { 0 } };
     const char *params;
     const char *action;
     pycbc_strlen_t nparams;
-    lcb_error_t (*action_fn)(lcb_t, const void *, const lcb_CMDN1XMGMT*);
+    lcb_STATUS (*action_fn)(lcb_t, const void *, const lcb_CMDN1XMGMT*);
 
     static char *kwlist[] = { "action", "index", "flags",  NULL };
     rv = PyArg_ParseTupleAndKeywords(args, kwargs,
@@ -126,7 +134,7 @@ pycbc_Bucket__ixwatch(pycbc_Bucket *self, PyObject *args, PyObject *kw)
     int rv;
     size_t ii;
     Py_ssize_t nspecs;
-    lcb_error_t rc;
+    lcb_STATUS rc=LCB_SUCCESS;
 
     static char *kwlist[] = { "indexes", "timeout_us", "interval_us", NULL};
 

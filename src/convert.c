@@ -331,25 +331,32 @@ pycbc_tc_encode_key(pycbc_Bucket *conn, PyObject *src, pycbc_pybuffer *dst)
     int rv;
     Py_ssize_t plen;
 
+    PYCBC_DEBUG_LOG("Inside %s", __FUNCTION__)
     if (!conn->tc) {
+        PYCBC_DEBUG_LOG("Encoding with default transcoder")
         rv = encode_common(src, dst, PYCBC_FMT_UTF8);
         if (rv == 0 && dst->length == 0) {
             PYCBC_EXCTHROW_EMPTYKEY();
             rv = -1;
         }
+        PYCBC_DEBUG_LOG("Encoded with default transcoder")
         return rv;
     }
 
     /* Swap out key and new key. Assign back later on */
 
+    PYCBC_DEBUG_LOG("Encoding with custom transcoder")
     rv = do_call_tc(conn, src, NULL, &dst->pyobj, ENCODE_KEY);
+    PYCBC_DEBUG_LOG("Encoded with custom transcoder")
 
     if (dst->pyobj == NULL || rv < 0) {
         dst->pyobj = NULL;
         return -1;
     }
 
+    PYCBC_DEBUG_LOG("Extracting buf with custom transcoder")
     rv = PyBytes_AsStringAndSize(dst->pyobj, (char**)&dst->buffer, &plen);
+    PYCBC_DEBUG_LOG("Extracted buf with custom transcoder")
 
     if (rv == -1) {
         PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ENCODING,
@@ -371,6 +378,7 @@ pycbc_tc_encode_key(pycbc_Bucket *conn, PyObject *src, pycbc_pybuffer *dst)
         return -1;
     }
     dst->length = plen;
+    PYCBC_DEBUG_LOG("Extracted buf with custom transcoder -final")
     return 0;
 }
 

@@ -16,6 +16,7 @@
 #
 from unittest import SkipTest
 
+from couchbase._bootstrap import describe_lcb_api
 from couchbase.tests.base import ConnectionTestCase
 import codecs
 import couchbase.exceptions
@@ -86,9 +87,9 @@ class ROT13PythonCryptoProvider(PythonCryptoProvider):
         return 'key'
 
 
-
-
 class FieldEncryptionTests(ConnectionTestCase):
+    def setUp(self, **kwargs):
+        super(FieldEncryptionTests,self).setUp(**kwargs)
 
     def test_keystore_returns_correct_value(self):
         keystore = InMemoryKeyStore()
@@ -194,7 +195,10 @@ class FieldEncryptionTests(ConnectionTestCase):
         provider = ROT13PythonCryptoProvider(keystore)
         document = {'sensitive': 'secret'}
         # register encryption provider with LCB
-        self.cb.register_crypto_provider('rot13', provider)
+        try:
+            self.cb.register_crypto_provider('rot13', provider)
+        except couchbase.exceptions.NotSupportedError as e:
+            raise SkipTest(e)
         return document, fieldspec, provider
 
     def test_encryption_exceptions(self):
@@ -217,7 +221,6 @@ class FieldEncryptionTests(ConnectionTestCase):
                 logging.error("Caught valid exception {}".format(e))
                 self.assertEqual('rot13', e.objextra['alias'])
                 valid_exception_raised = True
-
             self.assertTrue(valid_exception_raised, msg = "None of {} detected in [{}]".format(str(exceptions),repr(actual_e)))
 
     def test_keysize_exception(self):

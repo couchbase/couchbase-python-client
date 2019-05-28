@@ -1,40 +1,47 @@
-#include "pycbc.h"
 #include "oputil.h"
-#include "structmember.h"
-#include <libcouchbase/cbft.h>
+#include "pycbc_http.h"
 
-static void
-fts_row_callback(lcb_t instance, int ign, const lcb_RESPFTS *resp)
+
+static void fts_row_callback(lcb_t instance, int ign, const lcb_RESPFTS *resp)
 {
-    pycbc_MultiResult *mres = (pycbc_MultiResult *)resp->cookie;
-    pycbc_Bucket *bucket = mres->parent;
+    pycbc_MultiResult *mres = NULL;
+    pycbc_Bucket *bucket = NULL;
     pycbc_ViewResult *vres;
-    const char * const * hdrs = NULL;
+    const char *const *hdrs = NULL;
     short htcode = 0;
-
+    lcb_respfts_cookie(resp, (void **)&mres);
+    bucket = mres->parent;
     PYCBC_CONN_THR_END(bucket);
-    vres = (pycbc_ViewResult *)PyDict_GetItem((PyObject*)mres, Py_None);
-    if (resp->htresp) {
-        hdrs = resp->htresp->headers;
-        htcode = resp->htresp->htstatus;
+    vres = (pycbc_ViewResult *)PyDict_GetItem((PyObject *)mres, Py_None);
+    {
+        const lcb_RESPHTTP *lcb_resphttp = NULL;
+        lcb_respfts_http_response(resp, &lcb_resphttp);
+        if (lcb_resphttp) {
+            lcb_resphttp_headers(lcb_resphttp, &hdrs);
+            htcode = lcb_resphttp_status(lcb_resphttp);
+        }
     }
-
-    if (resp->rflags & LCB_RESP_F_FINAL) {
-        pycbc_httpresult_add_data(mres, &vres->base, resp->row, resp->nrow);
-    } else {
-        /* Like views, try to decode the row and invoke the callback; if we can */
-        /* Assume success! */
-        pycbc_viewresult_addrow(vres, mres, resp->row, resp->nrow);
+    {
+        pycbc_strn_base_const row = {0};
+        lcb_respfts_row(resp, &row.buffer, &row.length);
+        if (lcb_respfts_is_final(resp)) {
+            pycbc_httpresult_add_data_strn(mres, &vres->base, row);
+        } else {
+            /* Like views, try to decode the row and invoke the callback; if we
+             * can */
+            /* Assume success! */
+            pycbc_viewresult_addrow(vres, mres, row.buffer, row.length);
+        }
     }
-
-    pycbc_viewresult_step(vres, mres, bucket, resp->rflags & LCB_RESP_F_FINAL);
-
-    if (resp->rflags & LCB_RESP_F_FINAL) {
-        pycbc_httpresult_complete(&vres->base, mres, resp->rc, htcode, hdrs);
+    pycbc_viewresult_step(vres, mres, bucket, lcb_respfts_is_final(resp));
+    if (lcb_respfts_is_final(resp)) {
+        pycbc_httpresult_complete(
+                &vres->base, mres, lcb_respfts_status(resp), htcode, hdrs);
     } else {
         PYCBC_CONN_THR_BEGIN(bucket);
     }
 }
+
 
 PyObject *
 pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
@@ -43,8 +50,7 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     PyObject *ret = NULL;
     pycbc_MultiResult *mres;
     pycbc_ViewResult *vres;
-    lcb_error_t rc;
-    lcb_CMDFTS cmd = { 0 };
+    lcb_STATUS rc;
     pycbc_pybuffer buf = { 0 };
     PyObject *params_o = NULL;
     pycbc_stack_context_handle context = PYCBC_TRACE_GET_STACK_CONTEXT_TOPLEVEL(
@@ -74,14 +80,27 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     vres->rows = PyList_New(0);
     vres->base.format = PYCBC_FMT_JSON;
     vres->base.htype = PYCBC_HTTP_HFTS;
+    {
+        CMDSCOPE_NG(FTS, fts)
+        {
+            lcb_cmdfts_callback(cmd, fts_row_callback);
+            lcb_cmdfts_query(cmd, buf.buffer, buf.length);
+            lcb_cmdfts_handle(cmd, &vres->base.u.fts);
 
-    cmd.callback = fts_row_callback;
-    cmd.query = buf.buffer;
-    cmd.nquery = buf.length;
-    cmd.handle = &vres->base.u.fts;
-
-    PYCBC_TRACECMD_SCOPED(
-            rc, fts, query, self->instance, *cmd.handle, context, mres, &cmd);
+            PYCBC_TRACECMD_SCOPED_GENERIC(rc,
+                                          fts,
+                                          query,
+                                          self->instance,
+                                          cmd,
+                                          *cmd->handle,
+                                          context,
+                                          GENERIC_SPAN_OPERAND,
+                                          GENERIC_NULL_OPERAND,
+                                          mres,
+                                          cmd);
+        }
+    }
+    GT_ERR:
     PYCBC_PYBUF_RELEASE(&buf);
 
     if (rc != LCB_SUCCESS) {

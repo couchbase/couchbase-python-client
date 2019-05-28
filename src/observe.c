@@ -94,7 +94,7 @@ handle_single_observe(pycbc_Bucket *self, PyObject *curkey, int master_only,
     int rv;
     pycbc_pybuffer keybuf = { NULL };
     lcb_CMDOBSERVE cmd = { 0 };
-    lcb_error_t err;
+    lcb_STATUS err=LCB_SUCCESS;
 
     rv = pycbc_tc_encode_key(self, curkey, &keybuf);
     if (rv < 0) {
@@ -105,7 +105,7 @@ handle_single_observe(pycbc_Bucket *self, PyObject *curkey, int master_only,
     if (master_only) {
         cmd.cmdflags |= LCB_CMDOBSERVE_F_MASTER_ONLY;
     }
-    PYCBC_TRACECMD(cmd,context, cv->mres, curkey, self);
+    PYCBC_TRACECMD_TYPED(observe, &cmd, context, cv->mres, curkey, self);
     err = cv->mctx->addcmd(cv->mctx, (lcb_CMDBASE*)&cmd);
     if (err == LCB_SUCCESS) {
         rv = 0;

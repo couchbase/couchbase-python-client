@@ -52,7 +52,6 @@ class DupKeyTest(ConnectionTestCase):
                     pass
                 self._assertWarned(wlog)
 
-
             try:
                 self.cb.lock_multi(("foo", "foo"), ttl=5)
             except NotFoundError:

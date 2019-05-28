@@ -335,7 +335,7 @@ class TracingTest(TracedCase):
 
     @staticmethod
     def filter_tracing_output(x):
-        return {k: v for k, v in x.items() if k not in {'i', 'c'}}
+        return {k: v for k, v in x.items() if k not in {'i', 'c', 'FILE', 'FUNC', 'LINE', 'debug_info'}}
 
     def verify_exception_string(self, cb_exc, kv_missing, rvs):
         parsed_exception = exception_grammar.parse_exception(cb_exc)
