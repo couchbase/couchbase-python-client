@@ -30,7 +30,7 @@ def get_json_build_cfg():
 
 
 BUILD_CFG = get_json_build_cfg()
-PYCBC_LCB_API = os.getenv("PYCBC_LCB_API", BUILD_CFG.get('comp_options', {}).get('PYCBC_LCB_API', '0x032000'))
+PYCBC_LCB_API = os.getenv("PYCBC_LCB_API", BUILD_CFG.get('comp_options', {}).get('PYCBC_LCB_API'))
 
 
 def get_all_sources():

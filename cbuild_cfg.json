@@ -33,31 +33,23 @@
     "src/views.c"
   ],
   "comp_options": {
-    "PYCBC_LCB_API": "0x021003",
-    "PYCBC_LCB_API_ALL_SUPPORTED" : ["0x021003"],
+    "PYCBC_LCB_API": "0x021004",
+    "PYCBC_LCB_API_ALL_SUPPORTED" : ["0x021004"],
     "PYCBC_CORE": "couchbase"
   },
   "apis": {
-    "0x021003": {
+    "0x021004": {
       "git": {
         "repo": "https://github.com/couchbase/libcouchbase.git",
-        "tag": "2.10.3"
+        "tag": [">2.10.3,<3.0.0","release-2.10"]
       },
       "sources": [
       ]
     },
-    "0x030000": {
+    "0x02FF04": {
       "git": {
         "repo": "https://github.com/couchbase/libcouchbase.git",
-        "tag": "fa499e8a8ff03acae6a8067e843b4d0e0c8c5451"
-      },
-      "sources": [
-      ]
-    },
-    "0x032000": {
-      "git": {
-        "repo": "https://github.com/couchbase/libcouchbase.git",
-        "tag": "3.0.0-alpha.3"
+        "tag": [">3.0.0-alpha.3","master"]
       },
       "sources": [
       ]

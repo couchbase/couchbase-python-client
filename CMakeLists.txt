@@ -128,8 +128,119 @@ if (NOT LCB_REPO)
     set(LCB_REPO ${LCB_REPO_PROTOCOL}://${LCB_REPO_AT}${LCB_REPO_USERNAME}review.couchbase.org/libcouchbase)
 endif()
 
-if (NOT LCB_TAG)
-    set(LCB_TAG ${build_cfg.apis.${PYCBC_LCB_API}.git.tag})
+set(DEBUG_TAGSEARCH  TRUE)
+set(LCB_TAG_CANDIDATES ${build_cfg.apis.${PYCBC_LCB_API}.git.tag})
+if (LCB_TAG)
+    message("Got tag from environemtn: ${LCB_TAG}")
+elseif(NOT LCB_TAG_CANDIDATES)
+    message("Got no tag, defaulting to master")
+    set(LCB_TAG master)
+else()
+    message("Got tag candidates in order of preference: ${LCB_TAG_CANDIDATES}")
+    find_package (Git)
+    if (GIT_FOUND)
+        message("git found: ${GIT_EXECUTABLE} in version ${GIT_VERSION_STRING}")
+    endif (GIT_FOUND)
+
+    execute_process(
+            COMMAND ${GIT_EXECUTABLE} ls-remote ${LCB_REPO} tags/*
+            RESULT_VARIABLE RESULT
+            OUTPUT_VARIABLE OUTPUT)
+
+    set (DEFAULT_TAG "master")
+    set (REPO_TAG ${DEFAULT_TAG} CACHE STRING "Select a repo tag")
+
+    string (REGEX MATCHALL "([^/]+)[\^{}]\n" TAGS ${OUTPUT})
+    string (REGEX REPLACE "\n" ";"  TAGS ${TAGS})
+    set_property (CACHE REPO_TAG PROPERTY STRINGS ${TAGS})
+
+    message("got REPO_TAG ${TAGS}")
+    foreach(CAND_NUM IN LISTS LCB_TAG_CANDIDATES)
+        set(CANDIDATE ${build_cfg.apis.${PYCBC_LCB_API}.git.tag_${CAND_NUM}})
+        set(BROADEST_TAG ${CANDIDATE})
+        message("looking for ${CANDIDATE}")
+        foreach(TAG ${TAGS})
+            string(REGEX MATCH "${CANDIDATE}" MATCHRES "${TAG}")
+            if (DEBUG_TAGSEARCH)
+                message("comparing tag [${TAG}] against candidate [${CANDIDATE}], got ${MATCHRES}")
+            endif()
+            if (MATCHRES)
+                message("Got matching tag ${TAG}")
+                set(LCB_TAG ${TAG})
+                break()
+            else()
+                if (DEBUG_TAGSEARCH)
+                    message("[${CANDIDATE}] doesn't match [${TAG}], trying semver")
+                endif()
+                string(REGEX MATCHALL "[<>]((.+,)|(.+$))" TERMS ${CANDIDATE})
+                if (DEBUG_TAGSEARCH)
+                    message("Looking for semver spec in ${CANDIDATE}: [${TERMS}]")
+                endif()
+
+                string(REGEX REPLACE "-alpha." ".0." DEALPHAD_TAG ${TAG})
+                string(REGEX REPLACE "-beta." ".1." CANONICAL_TAG ${DEALPHAD_TAG})
+
+                if (((NOT BEST_CANONICAL_SEMVER) OR (CANONICAL_TAG VERSION_GREATER BEST_CANONICAL_SEMVER)) AND TERMS)
+                    if (DEBUG_TAGSEARCH)
+                        message("Appears to be a semver termlist, trying ${TERMS}")
+                    endif()
+                    set(TERMFAIL FALSE)
+                    foreach(RAW_TERM IN LISTS TERMS)
+                        string(REGEX REPLACE "(.+)," "\\1" TERM ${RAW_TERM})
+
+
+                        if (DEBUG_TAGSEARCH)
+                            message("Testing ${TERM}")
+                        endif()
+                        if (${TERM} MATCHES ">.*")
+                            string(REGEX REPLACE ">(.*)" "\\1" GT_TERM ${TERM})
+                            string(REGEX REPLACE "-alpha." ".0." DEALPHAD_TERM ${GT_TERM})
+                            string(REGEX REPLACE "-beta." ".1." GT_TERM_CANONICAL ${DEALPHAD_TERM})
+                            if (NOT (${CANONICAL_TAG} VERSION_GREATER ${GT_TERM_CANONICAL}))
+                                if (DEBUG_TAGSEARCH)
+                                    message("${TAG} not greater than ${GT_TERM}")
+                                endif()
+                                set(TERMFAIL TRUE)
+                                break()
+                            endif()
+                        elseif (${TERM} MATCHES "<.*")
+                            string(REGEX REPLACE "<(.*)" "\\1" LT_TERM ${TERM})
+                            string(REGEX REPLACE "-alpha." ".0." DEALPHAD_TERM ${LT_TERM})
+                            string(REGEX REPLACE "-beta." ".1." LT_TERM_CANONICAL ${DEALPHAD_TERM})
+                            if (NOT (${CANONICAL_TAG} VERSION_LESS ${LT_TERM_CANONICAL}))
+                                if (DEBUG_TAGSEARCH)
+                                    message("${TAG} not less than ${LT_TERM}")
+                                endif()
+                                set(TERMFAIL TRUE)
+                                break()
+                            endif()
+                        else()
+                            message("Unrecognised semver term, bailing out")
+                            set(TERMFAIL TRUE)
+                        endif()
+                    endforeach()
+                    if (NOT TERMFAIL)
+                        message("All terms satisfied, ${TAG} best so far, previous was [${BEST_SEMVER}]")
+                        set(BEST_SEMVER ${TAG})
+                        set(BEST_CANONICAL_SEMVER ${CANONICAL_TAG})
+                    endif()
+                endif()
+            endif()
+        endforeach()
+        if (LCB_TAG)
+            break()
+        endif()
+    endforeach()
+    if (NOT LCB_TAG)
+        message("Didn't find any of the tags listed, trying semver")
+        if (BEST_SEMVER)
+            message("Using best semver match: ${BEST_SEMVER}")
+            set(LCB_TAG ${BEST_SEMVER})
+        else()
+            message("using last entry ${BROADEST_TAG}")
+            set(LCB_TAG ${BROADEST_TAG})
+        endif()
+    endif()
 endif()
 
 function(make_dir path)
@@ -148,12 +259,31 @@ if (LCB_SRC)
 	        		&& git reset --hard
 	       		 	&& git clean -f
 	        		&& git checkout FETCH_HEAD)
-
     else()
         set (REF_CMDS echo "no ref required")
 	endif()
+    message("got build_cfg ${build_cfg}")
+    message("got build_cfg.patches.git ${build_cfg.patches.git.repo} ${build_cfg.patches.git.ref}")
+    set(PATCH_REPO ${build_cfg.apis.${PYCBC_LCB_API}.patches.git.repo})
+    if (PATCH_REPO)
+        set(PATCH_REF ${build_cfg.apis.${PYCBC_LCB_API}.patches.git.ref})
+    else()
+        set(PATCH_REPO ${build_cfg.patches.git.repo})
+        set(PATCH_REF ${build_cfg.patches.git.ref})
+    endif()
 
-    SET(LCB_BUILD_DIR "${CMAKE_BINARY_DIR}/Release/lcb_build")
+    if (PATCH_REPO)
+        set (PATCH_COMMAND git config user.email \"buildbot@couchbase.com\"
+                && git config user.name \"Couchbase Buildbot\"
+                && git fetch ${PATCH_REPO} ${PATCH_REF}
+                && git reset --hard
+                && git clean -f
+                && git cherry-pick FETCH_HEAD)
+    else()
+        set (PATCH_COMMAND echo "no patch required")
+    endif()
+    message("Got PATCH_COMMAND ${PATCH_COMMAND}")
+        SET(LCB_BUILD_DIR "${CMAKE_BINARY_DIR}/Release/lcb_build")
     SET(LCB_DBGBUILD_DIR "${CMAKE_BINARY_DIR}/Release/lcb_dbgbuild")
     if (CMAKE_BUILD_TYPE MATCHES DEBUG)
         set(LCB_SELECTED_BUILD_DIR ${LCB_DBGBUILD_DIR})
@@ -176,6 +306,7 @@ if (LCB_SRC)
         ExternalProject_Add(libcouchbase_src
             GIT_REPOSITORY ${LCB_REPO}
             GIT_TAG ${LCB_TAG}
+            PATCH_COMMAND ${PATCH_COMMAND}
             CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory ${LCB_BUILD_DIR}
             COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}/install
             COMMAND cd <SOURCE_DIR> && ${REF_CMDS}
@@ -185,7 +316,6 @@ if (LCB_SRC)
 
             INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/install
             INSTALL_COMMAND ${CMAKE_COMMAND} -E copy_directory <SOURCE_DIR>/include <INSTALL_DIR>/include
-
             COMMAND ${CMAKE_COMMAND} -E make_directory <INSTALL_DIR>/bin/
             COMMAND ${CMAKE_COMMAND} -E make_directory <INSTALL_DIR>/lib/
 
@@ -227,6 +357,7 @@ if (LCB_SRC)
                 GIT_REPOSITORY ${LCB_REPO}
                 GIT_TAG ${LCB_TAG}
                 UPDATE_COMMAND ""
+                PATCH_COMMAND ${PATCH_COMMAND}
                 CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory "${LCB_BUILD_DIR}"
                 make_dir ${LCB_SELECTED_BUILD_DIR}
 
