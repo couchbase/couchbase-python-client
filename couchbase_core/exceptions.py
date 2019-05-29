@@ -256,6 +256,9 @@ class InternalSDKError(CouchbaseError):
 class CouchbaseInternalError(InternalSDKError):
     pass
 
+class CouchbaseDurabilityError(InternalSDKError):
+    pass
+
 class CouchbaseNetworkError(CouchbaseError):
     """
     Base class for network-related errors. These indicate issues in the low
@@ -646,7 +649,36 @@ _LCB_ERRCAT_MAP = {
     C.LCB_ERRTYPE_TRANSIENT:    CouchbaseTransientError,
     C.LCB_ERRTYPE_FATAL:        CouchbaseFatalError,
     C.LCB_ERRTYPE_DATAOP:       CouchbaseDataError,
-    C.LCB_ERRTYPE_INTERNAL:     CouchbaseInternalError
+    C.LCB_ERRTYPE_INTERNAL:     CouchbaseInternalError,
+    C.LCB_ERRTYPE_DURABILITY:   CouchbaseDurabilityError
+}
+
+
+class DurabilityInvalidLevelException(CouchbaseDurabilityError):
+    """Given durability level is invalid"""
+
+
+class DurabilityImpossibleException(CouchbaseDurabilityError):
+    """Given durability requirements are impossible to achieve"""
+
+
+class DurabilitySyncWriteInProgressException(CouchbaseDurabilityError):
+    """Returned if an attempt is made to mutate a key which already has a
+    SyncWrite pending. Client would typically retry (possibly with backoff).
+    Similar to ELOCKED"""
+
+
+class DurabilitySyncWriteAmbiguousException(CouchbaseDurabilityError):
+    """There is a synchronous mutation pending for given key
+    The SyncWrite request has not completed in the specified time and has ambiguous
+    result - it may Succeed or Fail; but the final value is not yet known"""
+
+
+_LCB_SYNCREP_MAP = {
+    C.LCB_DURABILITY_INVALID_LEVEL: DurabilityInvalidLevelException,
+    C.LCB_DURABILITY_IMPOSSIBLE: DurabilityImpossibleException,
+    C.LCB_DURABILITY_SYNC_WRITE_IN_PROGRESS: DurabilitySyncWriteInProgressException,
+    C.LCB_DURABILITY_SYNC_WRITE_AMBIGUOUS: DurabilitySyncWriteAmbiguousException
 }
 
 _LCB_ERRNO_MAP = dict(list({
@@ -688,7 +720,7 @@ _LCB_ERRNO_MAP = dict(list({
     C.LCB_SUBDOC_BAD_DELTA: SubdocBadDeltaError,
     C.LCB_SUBDOC_NUM_ERANGE: SubdocNumberTooBigError,
     C.LCB_EMPTY_PATH: SubdocEmptyPathError,
-}.items()) + list(_PYCBC_CRYPTO_ERR_MAP.items()))
+}.items()) + list(_PYCBC_CRYPTO_ERR_MAP.items()) + list(_LCB_SYNCREP_MAP.items()))
 
 
 def _set_default_codes():

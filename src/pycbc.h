@@ -413,10 +413,17 @@ enum {
 #ifdef PYCBC_DUR_ENABLED
 #    define PYCBC_DUR_INIT(ERR, CMD, TYPE, DUR)                            \
         if ((DUR).durability_level) {                                      \
+            PYCBC_DEBUG_LOG("Setting sync durability level %d",            \
+                            (DUR).durability_level)                        \
             ERR = lcb_cmd##TYPE##_durability(CMD, (DUR).durability_level); \
             assert(!((DUR).persist_to || (DUR).replicate_to));             \
         }                                                                  \
         if ((DUR).persist_to || (DUR).replicate_to) {                      \
+            PYCBC_DEBUG_LOG(                                               \
+                    "Setting client durability level persist_to=%d, "      \
+                    "replicate_to=%d",                                     \
+                    (DUR).persist_to,                                      \
+                    (DUR).replicate_to)                                    \
             ERR = lcb_cmd##TYPE##_durability_observe(                      \
                     CMD, (DUR).persist_to, (DUR).replicate_to);            \
         }

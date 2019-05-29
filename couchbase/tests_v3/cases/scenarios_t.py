@@ -29,13 +29,14 @@ import time
 from couchbase_core.transcodable import Transcodable
 
 import couchbase_core.connstr
-import couchbase_core.exceptions
+import couchbase.exceptions
 
-from couchbase import JSONDocument
+from couchbase import JSONDocument, Durability
 from couchbase.cluster import Cluster
 from couchbase import ReplicateTo, PersistTo, FiniteDuration, copy, \
     Seconds, ReplicaNotConfiguredException, DocumentConcurrentlyModifiedException, \
     DocumentMutationLostException, ReplicaNotAvailableException, MutateSpec, CASMismatchException, \
+    Durations, \
     MutationResult, MutateInOptions
 from couchbase import CBCollection, GetOptions, RemoveOptions, ReplaceOptions
 from couchbase import Bucket
@@ -179,7 +180,7 @@ class Scenarios(ConnectionTestCase):
             try:
                 callback(replicate_to)
                 success = True
-            except couchbase_core.exceptions.KeyExistsError:
+            except couchbase.exceptions.KeyNotFoundException:
                 print("Our work here is done")
                 break
 
@@ -205,6 +206,47 @@ class Scenarios(ConnectionTestCase):
                                   ReplicateTo.THREE: ReplicateTo.TWO}.get(replicate_to, ReplicateTo.NONE)
                 print("Temporary replica failure, retrying with lower durability {}".format(newReplicateTo))
                 replicate_to = newReplicateTo
+
+    def test_scenario_c_server_side_durability(self):
+        # Use a helper wrapper to retry our operation in the face of durability failures
+        # remove is idempotent iff the app guarantees that the doc's id won't be reused (e.g. if it's a UUID).  This seems
+        # a reasonable restriction.
+        for durability_type in Durability:
+            self.coll.upsert("id","fred",durability_level=Durability.NONE)
+            self.retry_idempotent_remove_server_side(
+                lambda: self.coll.remove("id", RemoveOptions().dur_server(durability_type)))
+
+    def retry_idempotent_remove_server_side(self,
+                                            callback,  # type: Callable[None],
+                                            until=Durations.seconds(10)  # type: FiniteDuration
+                                            ):
+        """
+          * Automatically retries an idempotent operation in the face of durability failures
+          * TODO Should this be folded into the client as a per-operation retry strategy?
+          * @param callback an idempotent remove operation to perform
+          * @param until prevent the operation looping indefinitely
+          */"""
+        deadline=FiniteDuration.time()+until
+        while FiniteDuration.time() < deadline:
+
+            try:
+                callback()
+                return
+                # Not entirely clear what failures need to be handled yet, but will be considerably easier than observe() based
+                # logic.  I think the only case to handle is:
+            except couchbase.exceptions.DurabilitySyncWriteAmbiguousException:
+                # A guarantee is that the mutation is either written to a majority of nodes, or none.  But we don't know which.
+                if self.coll.get("id").success():
+                    continue
+                logging.info("Our work here is done")
+                return
+
+            except couchbase.exceptions.KeyNotFoundException:
+                logging.info("Our work here is done")
+                return
+        # Depending on the durability requirements, may want to also log this to an external system for human review
+        # and reconciliation
+        raise RuntimeError("Failed to durably write operation")
 
     def test_scenario_D(self):
         """  Scenario D (variation of A):

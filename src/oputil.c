@@ -751,9 +751,10 @@ int pycbc_handle_durability_args(pycbc_Bucket *self,
                            "Durability requirements will never be satisfied");
             return -1;
         }
-
+        PYCBC_DEBUG_LOG("Setting persist_to %d and replicate_to %d on params ", persist_to, replicate_to)
         return 1;
     } else if (dur_level) {
+        PYCBC_DEBUG_LOG("Setting durability_level %d on params ",dur_level)
         params->durability_level = dur_level;
     }
     return 0;

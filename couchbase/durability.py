@@ -3,6 +3,14 @@ from enum import Enum, IntEnum
 import couchbase_core._libcouchbase as _LCB
 from typing import *
 
+
+class Durability(IntEnum):
+    MAJORITY_AND_PERSIST_ACTIVE = _LCB.LCB_DURABILITYLEVEL_MAJORITY_AND_PERSIST_ON_MASTER
+    NONE = _LCB.LCB_DURABILITYLEVEL_NONE
+    MAJORITY = _LCB.LCB_DURABILITYLEVEL_MAJORITY
+    PERSIST_TO_MAJORITY = _LCB.LCB_DURABILITYLEVEL_PERSIST_TO_MAJORITY
+
+
 from .options import Cardinal, OptionBlock
 
 
@@ -32,3 +40,11 @@ class ClientDurableOption(object):
         self['persist_to'] = persist_to
         return self
 
+
+class ServerDurableOption(object):
+    def dur_server(self,  # type: T
+                   level,  # type: Durability
+                   ):
+        # type: (...)->T.ServerDurable
+        self['durability_level'] = level
+        return self

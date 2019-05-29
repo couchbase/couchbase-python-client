@@ -4,16 +4,17 @@ from .result import GetResult, get_result_wrapper, SDK2Result
 from .options import forward_args, Seconds, OptionBlockTimeOut
 from .mutate_in import mutation_result, MutationResult, MutateInSpec, MutateInOptions
 from .options import OptionBlock
-from .durability import ReplicateTo, PersistTo, ClientDurableOption
+from .durability import ReplicateTo, PersistTo, ClientDurableOption, ServerDurableOption
 from couchbase_core._libcouchbase import Bucket as _Base
 import couchbase.exceptions
 from couchbase_core.bucket import Bucket as CoreBucket
 import copy
 import pyrsistent
 from typing import *
+from .durability import Durability
 
 
-class ReplaceOptions(OptionBlockTimeOut, ClientDurableOption):
+class ReplaceOptions(OptionBlockTimeOut, ClientDurableOption, ServerDurableOption):
     def __init__(self, *args, **kwargs):
         super(ReplaceOptions, self).__init__(*args, **kwargs)
 
@@ -34,7 +35,7 @@ class RemoveOptionsBase(OptionBlock):
         super(RemoveOptionsBase, self).__init__(*args, **kwargs)
 
 
-class RemoveOptions(RemoveOptionsBase, ClientDurableOption):
+class RemoveOptions(RemoveOptionsBase, ClientDurableOption, ServerDurableOption):
 
     ServerDurable=RemoveOptionsBase
     ClientDurable=RemoveOptionsBase
@@ -53,7 +54,7 @@ class UnlockOptions(OptionBlock):
         super(UnlockOptions, self).__init__(*args, **kwargs)
 
 
-class CounterOptions(OptionBlock):
+class CounterOptions(OptionBlock, ServerDurableOption):
     def __init__(self, *args, **kwargs):
         super(CounterOptions, self).__init__(*args, **kwargs)
 
@@ -141,7 +142,7 @@ def _mutate_result_and_inject(func  # type: RawCollectionMethod
 ResultPrecursor = Tuple[SDK2Result, Any]
 
 
-class InsertOptions(OptionBlock, ClientDurableOption):
+class InsertOptions(OptionBlock, ServerDurableOption, ClientDurableOption):
     pass
 
 
@@ -396,7 +397,7 @@ class CBCollection(object):
         :raises: Any exceptions raised by the underlying platform
         """
 
-    class UpsertOptions(OptionBlock, ClientDurableOption):
+    class UpsertOptions(OptionBlock, ClientDurableOption, ServerDurableOption):
         def __init__(self, *args, **kwargs):
             super(CBCollection.UpsertOptions, self).__init(*args, **kwargs)
 
@@ -413,7 +414,8 @@ class CBCollection(object):
                timeout=0,  # type: Seconds
                format=None,
                persist_to=PersistTo.NONE,  # type: PersistTo.Value
-               replicate_to=ReplicateTo.NONE  # type: ReplicateTo.Value
+               replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
+               durability_level=Durability.NONE  # type: DurabilityLevel
                ):
         # type: (...) -> MutationResult
         pass
@@ -464,6 +466,8 @@ class CBCollection(object):
         :param int replicate_to: Perform durability checking on this
             many replicas for presence in memory. See :meth:`endure` for
             more information.
+
+        :param DurabilityLevel durability_level: Durability level
 
         :raise: :exc:`.ArgumentError` if an argument is supplied that is
             not applicable in this context. For example setting the CAS
@@ -522,7 +526,8 @@ class CBCollection(object):
                timeout=Seconds(0),  # type: Seconds
                format=None,  # type: str
                persist_to=PersistTo.NONE,  # type: PersistTo.Value
-               replicate_to=ReplicateTo.NONE  # type: ReplicateTo.Value
+               replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
+               durability_level=Durability.NONE  # type: DurabilityLevel
                ):
         pass
 
@@ -553,7 +558,8 @@ class CBCollection(object):
                 timeout=None,  # type: Seconds
                 format=None,  # type: bool
                 persist_to=PersistTo.NONE,  # type: PersistTo.Value
-                replicate_to=ReplicateTo.NONE  # type: ReplicateTo.Value
+                replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
+                durability_level=Durability.NONE  # type: DurabilityLevel
                 ):
         # type: (...)->MutationResult
         pass
@@ -590,7 +596,8 @@ class CBCollection(object):
                id,  # type: str
                cas=0,  # type: int
                persist_to=PersistTo.NONE,  # type: PersistTo.Value
-               replicate_to=ReplicateTo.NONE  # type: ReplicateTo.Value
+               replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
+               durability_level=Durability.NONE  # type: DurabilityLevel
                ):
         # type: (...)->MutationResult
         pass
@@ -716,7 +723,8 @@ class CBCollection(object):
                cas=0,  # type: int
                format=None,  # type: long
                persist_to=PersistTo.NONE,  # type: PersistTo.Value
-               replicate_to=ReplicateTo.NONE  # type: ReplicateTo.Value
+               replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
+               durability_level=Durability.NONE  # type: DurabilityLevel
                ):
         pass
 
@@ -764,7 +772,8 @@ class CBCollection(object):
                 cas=0,  # type: int
                 format=None,  # type: int
                 persist_to=PersistTo.NONE,  # type: PersistTo.Value
-                replicate_to=ReplicateTo.NONE  # type: ReplicateTo.Value
+                replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
+                durability_level=Durability.NONE  # type: DurabilityLevel
                 ):
         # type: (...)->MutationResult
         pass

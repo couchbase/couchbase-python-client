@@ -185,6 +185,10 @@ handle_single_kv, pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
         CMDSCOPE_NG_PARAMS(STORE, store, scv->operation)
         {
             lcb_cmdstore_flags(cmd, flags);
+            PYCBC_DUR_INIT(err, cmd, store, cv->mres->dur);
+            if (err) {
+                CMDSCOPE_GENERIC_FAIL(,STORE,store)
+            };
             if (scv->operation == LCB_STORE_APPEND ||
                 scv->operation == LCB_STORE_PREPEND) {
                 /* The server ignores these flags and libcouchbase will throw an

@@ -240,6 +240,11 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
     ADD_MACRO(PYCBC_CRYPTO_VERSION);
     ADD_CONSTANT("PYCBC_TRACING",1);
     setup_tracing_map(module, handler);
+#define PYCBC_DURLEVEL(X) ADD_MACRO(LCB_DURABILITYLEVEL_##X);
+    PYCBC_X_DURLEVEL(PYCBC_DURLEVEL);
+#define PYCBC_ERR(ERRNAME, ...) ADD_MACRO(ERRNAME);
+    PYCBX_X_SYNCREPERR(PYCBC_ERR)
+    ADD_MACRO(LCB_ERRTYPE_DURABILITY);
     setup_compression_map(module, public_constants, handler);
     setup_crypto_exceptions(module, handler);
     PyModule_AddObject(

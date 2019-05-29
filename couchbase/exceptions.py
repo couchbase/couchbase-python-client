@@ -281,6 +281,13 @@ _LCB_ERRCAT_MAP = {
     C.LCB_ERRTYPE_INTERNAL:     couchbase_core.exceptions.CouchbaseInternalError
 }
 
+_LCB_SYNCREP_MAP = {
+    C.LCB_DURABILITY_INVALID_LEVEL: DurabilityInvalidLevelException,
+    C.LCB_DURABILITY_IMPOSSIBLE: DurabilityImpossibleException,
+    C.LCB_DURABILITY_SYNC_WRITE_IN_PROGRESS: DurabilitySyncWriteInProgressException,
+    C.LCB_DURABILITY_SYNC_WRITE_AMBIGUOUS: DurabilitySyncWriteAmbiguousException
+}
+
 V3Mapping=dict(list({
            C.LCB_AUTH_ERROR:       AuthenticationException,
            C.LCB_DELTA_BADVAL: couchbase_core.exceptions.DeltaBadvalError,
@@ -320,7 +327,7 @@ V3Mapping=dict(list({
            C.LCB_SUBDOC_BAD_DELTA: couchbase_core.exceptions.SubdocBadDeltaError,
            C.LCB_SUBDOC_NUM_ERANGE: couchbase_core.exceptions.SubdocNumberTooBigError,
            C.LCB_EMPTY_PATH: couchbase_core.exceptions.SubdocEmptyPathError
-}.items()) + list(_PYCBC_CRYPTO_ERR_MAP.items()))
+}.items()) + list(_PYCBC_CRYPTO_ERR_MAP.items()) + list(_LCB_SYNCREP_MAP.items()))
 
 
 _EXCTYPE_MAP = {
