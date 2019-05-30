@@ -4,6 +4,6 @@ import couchbase_v2.tests.cases
 
 caseslist += [couchbase_v2.tests.cases]
 
-import couchbase_v3.tests.cases
+import couchbase.tests_v3.cases as latest_cases
 
-caseslist += [couchbase_v3.tests.cases]
+caseslist += [latest_cases]

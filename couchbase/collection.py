@@ -6,7 +6,7 @@ from .mutate_in import mutation_result, MutationResult, MutateInSpec, MutateInOp
 from .options import OptionBlock
 from .durability import ReplicateTo, PersistTo, ClientDurableOption
 from couchbase_core._libcouchbase import Bucket as _Base
-import couchbase_v3.exceptions
+import couchbase.exceptions
 from couchbase_core.bucket import Bucket as CoreBucket
 import copy
 import pyrsistent
@@ -117,7 +117,7 @@ def _inject_scope_and_collection(func  # type: RawCollectionMethod
     def wrapped(self, *args, **kwargs):
         if self.true_collections:
             if self.name and not self._scope:
-                raise couchbase_v3.exceptions.CollectionMissingException
+                raise couchbase.exceptions.CollectionMissingException
             if self._scope and self.name:
                 kwargs['scope'] = self._scope
                 kwargs['collection'] = self.name
@@ -301,8 +301,8 @@ class CBCollection(object):
         # type: (...)->Tuple[SDK2Result, Tuple[Tuple[GetAndTouchOptions]]]
         kwargs_final = forward_args(kwargs, *options)
         if 'durability' in kwargs_final.keys():
-            raise couchbase_v3.exceptions.ReplicaNotAvailableException()
-        cb = self._bucket  # type: CoreBucket
+            raise couchbase.exceptions.ReplicaNotAvailableException()
+        cb = self._bucket  # type: SDK2Bucket
         kwargs_final['ttl'] = 0
         x = cb.get(id, **kwargs_final)
         return x, options
@@ -851,7 +851,7 @@ class CBCollection(object):
 
 class Scope(object):
     def __init__(self,
-                 parent,  # type: couchbase_v3.bucket.Bucket
+                 parent,  # type: couchbase.bucket.Bucket
                  name=None  # type: str
                  ):
         if name:

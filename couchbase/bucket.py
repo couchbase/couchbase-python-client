@@ -46,7 +46,7 @@ class Bucket(object):
               scope_name  # type: str
               ):
         # type: (...)->Scope
-        from couchbase_v3 import Scope
+        from couchbase import Scope
 
         return Scope(self, scope_name)
 

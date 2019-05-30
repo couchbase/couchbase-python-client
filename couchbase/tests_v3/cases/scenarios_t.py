@@ -31,14 +31,14 @@ from couchbase_core.transcodable import Transcodable
 import couchbase_core.connstr
 import couchbase_core.exceptions
 
-from couchbase_v3 import JSONDocument
-from couchbase_v3.cluster import Cluster
-from couchbase_v3 import ReplicateTo, PersistTo, FiniteDuration, copy, \
+from couchbase import JSONDocument
+from couchbase.cluster import Cluster
+from couchbase import ReplicateTo, PersistTo, FiniteDuration, copy, \
     Seconds, ReplicaNotConfiguredException, DocumentConcurrentlyModifiedException, \
     DocumentMutationLostException, ReplicaNotAvailableException, MutateSpec, CASMismatchException, \
     MutationResult, MutateInOptions
-from couchbase_v3 import CBCollection, GetOptions, RemoveOptions, ReplaceOptions
-from couchbase_v3 import Bucket
+from couchbase import CBCollection, GetOptions, RemoveOptions, ReplaceOptions
+from couchbase import Bucket
 
 from couchbase_tests.base import ConnectionTestCase
 
