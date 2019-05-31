@@ -3,7 +3,6 @@ import logging
 import os.path
 import os
 import couchbase_version
-import pip
 
 from cbuild_config import get_ext_options, couchbase_core
 from cmodule import gen_cmodule
@@ -49,10 +48,8 @@ pkgversion = couchbase_version.get_version()
 
 # Dummy dependency to prevent installation of Python < 3 package on Windows.
 
-pip_not_on_win_python_lt_3 = (
-    ["pip>=9.0; (sys_platform != 'win32' and python_version >= '2.7') or (python_version >= '3.0')"]
-    if pip.__version__ >= "9.0.0"
-    else [])
+
+pip_not_on_win_python_lt_3 = ["pip>=20.0; (sys_platform == 'win32' and python_version <= '2.7')"]
 
 
 build_type = os.getenv("PYCBC_BUILD",
@@ -186,7 +183,7 @@ setup(
         "Topic :: Database",
         "Topic :: Software Development :: Libraries",
         "Topic :: Software Development :: Libraries :: Python Modules"],
-
+    python_requires=(">=3" if platform.system().lower().startswith("win") else ">=2.7"),
     packages = list(packages),
     tests_require=['utilspie','nose', 'testresources>=0.2.7', 'basictracer==2.2.0'],
     test_suite='couchbase.tests.test_sync',

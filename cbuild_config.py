@@ -117,8 +117,7 @@ def get_ext_options():
         print(pkgdata)
     else:
         if sys.version_info < (3, 0, 0):
-            import pip
-            raise pip.exceptions.InstallationError("Windows on Python earlier than v3 unsupported.")
+            raise RuntimeError("Windows on Python earlier than v3 unsupported.")
 
         warnings.warn("I'm detecting you're running windows."
                       "You might want to modify "
