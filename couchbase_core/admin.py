@@ -18,9 +18,12 @@
 The contents of this module do not have a stable API and are subject to
 change
 """
+from json import JSONEncoder
 from time import time, sleep
 
 import couchbase_core._libcouchbase as LCB
+
+from couchbase_core import JSON
 import couchbase_core.exceptions as E
 from couchbase_core._pyport import ulp, basestring
 from couchbase_core.auth_domain import AuthDomain
@@ -221,6 +224,34 @@ class Admin(LCB.Bucket):
                                  method='DELETE')
 
     bucket_delete = bucket_remove
+
+    class BucketInfo(object):
+        """
+        Information about a bucket
+        """
+        def __init__(self,
+                     raw_json  # type: JSON
+                     ):
+            self.raw_json = raw_json
+
+        def name(self):
+            """
+            Name of the bucket.
+            :return: A :class:`str` containing the bucket name.
+            """
+            return self.raw_json.get("name")
+
+        def __str__(self):
+            return "Bucket named {}".format(self.name)
+
+    def buckets_list(self):
+        """
+        Retrieve the list of buckets from the server
+        :return: An iterable of :Class:`Admin.BucketInfo` objects describing
+        the buckets currently active on the cluster.
+        """
+        buckets_list = self.http_request(path='/pools/default/buckets', method='GET')
+        return map(Admin.BucketInfo, buckets_list.value)
 
     def bucket_info(self, name):
         """
