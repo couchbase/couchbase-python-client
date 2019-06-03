@@ -222,6 +222,34 @@ class Admin(LCB.Bucket):
 
     bucket_delete = bucket_remove
 
+    class BucketInfo(object):
+        """
+        Information about a bucket
+        """
+        def __init__(self,
+                     raw_json  # type: JSON
+                     ):
+            self.raw_json = raw_json
+
+        def name(self):
+            """
+            Name of the bucket.
+            :return: A :class:`str` containing the bucket name.
+            """
+            return self.raw_json.get("name")
+
+        def __str__(self):
+            return "Bucket named {}".format(self.name)
+
+    def buckets_list(self):
+        """
+        Retrieve the list of buckets from the server
+        :return: An iterable of :Class:`Admin.BucketInfo` objects describing
+        the buckets currently active on the cluster.
+        """
+        buckets_list = self.http_request(path='/pools/default/buckets', method='GET')
+        return map(Admin.BucketInfo, buckets_list.value)
+
     def bucket_info(self, name):
         """
         Retrieve information about the bucket.

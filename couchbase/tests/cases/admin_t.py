@@ -30,7 +30,7 @@ from couchbase.auth_domain import AuthDomain
 
 import couchbase
 import time
-
+import json
 class AdminSimpleTest(CouchbaseTestCase):
     def setUp(self):
         super(AdminSimpleTest, self).setUp()
@@ -69,6 +69,18 @@ class AdminSimpleTest(CouchbaseTestCase):
                       port=self.cluster_info.port,
                       bucket='default')
         self.assertIsNotNone(admin)
+
+    def test_bucket_list(self):
+        buckets_to_add = {'fred': {}, 'jane': {}, 'sally': {}}
+        try:
+            for bucket, kwargs in buckets_to_add.items():
+                self.admin.bucket_create(bucket, bucket_password='password', **kwargs)
+
+            self.assertEqual(set(), {"fred", "jane", "sally"}.difference(
+                set(map(Admin.BucketInfo.name, self.admin.buckets_list()))))
+        finally:
+            for bucket, kwargs in buckets_to_add.items():
+                self.admin.bucket_remove(bucket)
 
     def test_bad_request(self):
         self.assertRaises(HTTPError, self.admin.http_request, '/badpath')
