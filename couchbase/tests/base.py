@@ -559,6 +559,17 @@ class ConnectionTestCaseBase(CouchbaseTestCase):
         super(ConnectionTestCaseBase, self).setUp()
         self.cb = self.make_connection(**kwargs)
 
+    def sleep(self, duration):
+        expected_end=time.time()+duration
+        while True:
+            remaining_time=expected_end-time.time()
+            if remaining_time<=0:
+                break
+            try:
+                self.cb.get("dummy",ttl=remaining_time)
+            except:
+                pass
+
     def tearDown(self):
         super(ConnectionTestCaseBase, self).tearDown()
         if hasattr(self, '_implDtorHook'):
