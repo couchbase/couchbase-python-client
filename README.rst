@@ -33,6 +33,7 @@ version by issuing the following incantation
 Prerequisites
 ~~~~~~~~~~~~~
 .. |libcouchbase_version| replace:: 2.9.0
+
 - Couchbase Server (http://couchbase.com/download)
 - libcouchbase_. version |libcouchbase_version| or greater (Bundled in Windows installer)
 - libcouchbase development files.
