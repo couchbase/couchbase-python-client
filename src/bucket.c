@@ -566,11 +566,11 @@ static PyGetSetDef Bucket_TABLE_getset[] = {
         { "transcoder",
                 (getter)Bucket_get_transcoder,
                 (setter)Bucket_set_transcoder,
-                PyDoc_STR("The :class:`~couchbase.transcoder.Transcoder` "
+                PyDoc_STR("The :class:`~couchbase_core.transcoder.Transcoder` "
                         "object being used.\n\n"
                         ""
                         "This is normally ``None`` unless a custom "
-                        ":class:`couchbase.transcoder.Transcoder` "
+                        ":class:`couchbase_core.transcoder.Transcoder` "
                         "is being used\n")
         },
 

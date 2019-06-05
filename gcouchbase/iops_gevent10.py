@@ -2,13 +2,7 @@ from gevent.hub import get_hub
 from gevent.core import timer as _PyxTimer
 from time import time
 
-from couchbase.iops.base import (
-    IOEvent, TimerEvent,
-    LCB_READ_EVENT, LCB_WRITE_EVENT, LCB_RW_EVENT,
-    PYCBC_EVACTION_WATCH, PYCBC_EVACTION_UNWATCH
-)
-
-from couchbase.iops.base import (
+from couchbase_core.iops.base import (
     IOEvent, TimerEvent,
     LCB_READ_EVENT, LCB_WRITE_EVENT, LCB_RW_EVENT,
     PYCBC_EVACTION_WATCH, PYCBC_EVACTION_UNWATCH

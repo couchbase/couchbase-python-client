@@ -2,7 +2,7 @@ from gevent.core import event as LibeventEvent
 from gevent.core import timer as LibeventTimer
 from gevent.core import EV_READ, EV_WRITE
 
-from couchbase.iops.base import (
+from couchbase_core.iops.base import (
     IOEvent, TimerEvent,
     LCB_READ_EVENT, LCB_WRITE_EVENT, LCB_RW_EVENT,
     PYCBC_EVACTION_WATCH, PYCBC_EVACTION_UNWATCH

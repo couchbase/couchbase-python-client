@@ -16,10 +16,10 @@
 from twisted.internet import defer
 
 from txcouchbase.bucket import BatchedView
-from couchbase.exceptions import HTTPError, ArgumentError
-from couchbase.asynchronous.view import AsyncViewBase
+from couchbase_core.exceptions import HTTPError
+from couchbase_core.asynchronous.view import AsyncViewBase
 
-from couchbase.tests.base import ViewTestCase
+from couchbase_tests.base import ViewTestCase
 from txcouchbase.tests.base import gen_base
 
 class RowsHandler(AsyncViewBase):

@@ -142,7 +142,7 @@ setlocal enabledelayedexpansion
 call {vcvars_line}
 {pyexe} setup.py build_ext --include-dirs {lcb}\include --library-dirs {lcb}\lib --inplace
 {pyexe} setup.py build_ext --include-dirs {lcb}\include --library-dirs {lcb}\lib
-{pyexe} -c "import couchbase; print(couchbase.__version__)"
+{pyexe} -c "import couchbase_core; print(couchbase_core.__version__)"
 '''.format(vcvars_line = vcvars_line,
            pyexe = PY_EXE,
            lcb=lcb_deproot))

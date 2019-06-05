@@ -13,13 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from twisted.internet import reactor, defer
-from couchbase.exceptions import (
+from twisted.internet import defer
+from couchbase_core.exceptions import (
     BucketNotFoundError,
     ObjectDestroyedError)
 
-from couchbase.tests.base import ConnectionTestCase
-from couchbase.connstr import ConnectionString
+from couchbase_tests.base import ConnectionTestCase
+from couchbase_core.connstr import ConnectionString
 from txcouchbase.tests.base import gen_base
 from txcouchbase.bucket import Bucket
 

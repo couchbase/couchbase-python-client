@@ -2,14 +2,14 @@
 def gen_role(real_role, real_name,  new_prefix):
     def myrole(rtype, rawtext, text, lineno, inliner, options={}, content={}):
 
-        # new_prefix=couchbase.bucket
+        # new_prefix=couchbase_core.bucket
         # text=upsert
         # rtype=cb_bmeth
 
-        # e.g couchbase.bucket.upsert
+        # e.g couchbase_core.bucket.upsert
         new_text = '{0}.{1}'.format(new_prefix, text)
 
-        # e.g. :meth:`couchbase.bucket.upsert
+        # e.g. :meth:`couchbase_core.bucket.upsert
         new_rawtext = ':{0}:`{1}`'.format(real_name, new_text)
 
         # e.g. py:meth
@@ -25,9 +25,9 @@ def gen_role(real_role, real_name,  new_prefix):
 def on_inited(app):
     from sphinx.domains.python import PythonDomain as p
     fns = [
-        ('cb_bmeth', '~couchbase.bucket.Bucket', 'meth'),
-        ('cb_sdmeth', '~couchbase.subdocument', 'func'),
-        ('cb_exc', 'couchbase.exceptions', 'exc')
+        ('cb_bmeth', '~couchbase_core.bucket.Bucket', 'meth'),
+        ('cb_sdmeth', '~couchbase_core.subdocument', 'func'),
+        ('cb_exc', 'couchbase_core.exceptions', 'exc')
     ]
 
     for newname, target, pyrole_name in fns:

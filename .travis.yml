@@ -28,7 +28,7 @@ install:
 script:
   - python -m couchbase.bucket
   - cp .tests.ini.travis tests.ini
-  - nosetests -v couchbase.tests.test_sync
+  - nosetests -v couchbase_tests.test_sync
   - nosetests -v acouchbase
   - nosetests -v gcouchbase.tests.test_api || echo "Gevent tests failed"
   - nosetests -v txcouchbase || echo "Twisted tests failed"

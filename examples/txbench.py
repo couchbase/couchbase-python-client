@@ -20,8 +20,8 @@ from time import time
 from twisted.internet import reactor
 
 from txcouchbase.bucket import RawBucket, Bucket
-from couchbase import FMT_BYTES
-from couchbase.transcoder import Transcoder
+from couchbase_core import FMT_BYTES
+from couchbase_core.transcoder import Transcoder
 
 ap = argparse.ArgumentParser()
 

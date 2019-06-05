@@ -1,5 +1,5 @@
-from couchbase.transcoder import Transcoder
-from couchbase.bucket import Bucket
+from couchbase_core.transcoder import Transcoder
+from couchbase_v2.bucket import Bucket
 
 
 class ReverseTranscoder(Transcoder):

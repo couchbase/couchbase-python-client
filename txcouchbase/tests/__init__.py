@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-from couchbase.tests.base import SkipTest
+from couchbase_tests.base import SkipTest
 import sys
 
 vi = sys.version_info

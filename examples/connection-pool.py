@@ -16,7 +16,7 @@
 """
 This file shows how to make a simple connection pool using Couchbase.
 """
-from couchbase.bucket import Bucket
+from couchbase_v2.bucket import Bucket
 from Queue import Queue, Empty
 from threading import Lock, Thread
 from time import time

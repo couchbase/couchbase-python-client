@@ -27,10 +27,10 @@ import requests
 # Uncomment to use the cffi module (useful with pypy)
 # import couchbase_ffi
 
-from couchbase.user_constants import FMT_JSON, FMT_BYTES
-from couchbase.transcoder import Transcoder
-from couchbase.bucket import Bucket
-from couchbase.exceptions import CouchbaseNetworkError, CouchbaseTransientError
+from couchbase_core.user_constants import FMT_JSON, FMT_BYTES
+from couchbase_core.transcoder import Transcoder
+from couchbase_v2.bucket import Bucket
+from couchbase_v2.exceptions import CouchbaseNetworkError, CouchbaseTransientError
 
 
 class DocLoader(object):
@@ -209,7 +209,7 @@ def grouper(iterable, n, fillvalue=None):
 
 if __name__ == '__main__':
     import sys
-    import couchbase
+    import couchbase_v2
     from argparse import ArgumentParser
 
     ap = ArgumentParser()
@@ -242,7 +242,7 @@ if __name__ == '__main__':
         stream=sys.stderr, level=lvl,
         format='%(created)f - %(name)s - %(levelname)s - %(message)s')
 
-    couchbase.enable_logging()
+    couchbase_v2.enable_logging()
     loader = DocLoader(
         bucket=options.bucket, srcfile=options.file, username=options.username,
         password=options.password, quota=options.size, cluster=options.node,

@@ -1,11 +1,11 @@
-from couchbase.tests.base import ApiImplementationMixin, SkipTest
+from couchbase_tests.base import ApiImplementationMixin, SkipTest
 try:
     import gevent
 except ImportError as e:
     raise SkipTest(e)
 
 from gcouchbase.bucket import Bucket, GView
-from couchbase.tests.importer import get_configured_classes
+from couchbase_tests.importer import get_configured_classes
 
 
 class GEventImplMixin(ApiImplementationMixin):

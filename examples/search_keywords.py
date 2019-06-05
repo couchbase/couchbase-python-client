@@ -24,7 +24,7 @@ from argparse import ArgumentParser
 import random
 import pprint
 
-from couchbase.bucket import Bucket
+from couchbase_v2.bucket import Bucket
 
 ap = ArgumentParser()
 

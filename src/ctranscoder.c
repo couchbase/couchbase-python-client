@@ -214,7 +214,7 @@ PyDoc_STRVAR(determine_format_doc,
 "Guess the suitable format for the object specified.\n"
 "  .. versionadded:: 1.1.0\n"
 "\n"
-"Used primarily if received a :data:`~couchbase.FMT_AUTO` for the\n"
+"Used primarily if received a :data:`~couchbase_core.FMT_AUTO` for the\n"
 "`format` parameter in one of the encode methods\n"
 "\n"
 ":param object value: The value whose format should be guessed\n"

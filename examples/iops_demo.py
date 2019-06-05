@@ -1,8 +1,7 @@
-import gevent
 import gevent.monkey; gevent.monkey.patch_all()
 import sys
 
-from couchbase.bucket import Bucket
+from couchbase_v2.bucket import Bucket
 
 def test(x):
     c = Bucket('couchbase://localhost/default', experimental_gevent_support=True)

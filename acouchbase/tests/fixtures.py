@@ -1,7 +1,7 @@
 import asyncio
 import unittest
 
-from couchbase.tests.base import ConnectionConfiguration, MockResourceManager, MockTestCase
+from couchbase_tests.base import ConnectionConfiguration, MockResourceManager, MockTestCase
 from acouchbase.bucket import Bucket
 
 from functools import wraps

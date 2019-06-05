@@ -1,13 +1,13 @@
 from itertools import cycle
 
-from couchbase.tests.base import SkipTest
+from couchbase_tests.base import SkipTest
 try:
     import gevent
 except ImportError as e:
     raise SkipTest(e)
 
 from gcouchbase.bucket import Bucket, GView
-from couchbase.tests.base import ConnectionTestCase
+from couchbase_tests.base import ConnectionTestCase
 
 
 class GeventSpecificTest(ConnectionTestCase):

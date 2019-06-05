@@ -5,8 +5,8 @@ except ImportError:
 
 from acouchbase.asyncio_iops import IOPS
 from acouchbase.iterator import AView, AN1QLRequest
-from couchbase.asynchronous.bucket import AsyncBucket
-from couchbase.experimental import enabled_or_raise; enabled_or_raise()
+from couchbase_v2.asynchronous.bucket import AsyncBucket
+from couchbase_core.experimental import enabled_or_raise; enabled_or_raise()
 
 
 class Bucket(AsyncBucket):

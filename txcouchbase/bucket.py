@@ -20,14 +20,13 @@ This file contains the twisted-specific bits for the Couchbase client.
 
 from twisted.internet import reactor
 from twisted.internet.defer import Deferred
-from twisted.python.failure import Failure
 
-from couchbase.asynchronous.bucket import AsyncBucket
-from couchbase.asynchronous.view import AsyncViewBase
-from couchbase.asynchronous.n1ql import AsyncN1QLRequest
-from couchbase.asynchronous.fulltext import AsyncSearchRequest
-from couchbase.asynchronous.events import EventQueue
-from couchbase.exceptions import CouchbaseError
+from couchbase_v2.asynchronous.bucket import AsyncBucket
+from couchbase_core.asynchronous.view import AsyncViewBase
+from couchbase_core.asynchronous.n1ql import AsyncN1QLRequest
+from couchbase_v2.asynchronous import AsyncSearchRequest
+from couchbase_core.asynchronous.events import EventQueue
+from couchbase_core.exceptions import CouchbaseError
 from txcouchbase.iops import v0Iops
 
 
@@ -40,7 +39,7 @@ class BatchedRowMixin(object):
         query has been completed.
 
         Additional metadata may be obtained by examining the object. See
-        :class:`~couchbase.views.iterator.Views` for more details.
+        :class:`~couchbase_core.views.iterator.Views` for more details.
 
         You will normally not need to construct this object manually.
         """
@@ -195,7 +194,7 @@ class RawBucket(AsyncBucket):
 
     def defer(self, opres):
         """
-        Converts a raw :class:`couchbase.results.AsyncResult` object
+        Converts a raw :class:`couchbase_core.results.AsyncResult` object
         into a :class:`Deferred`.
 
         This is shorthand for the following "non-idiom"::
@@ -211,7 +210,7 @@ class RawBucket(AsyncBucket):
           return d
 
         :param opres: The operation to wrap
-        :type opres: :class:`couchbase.results.AsyncResult`
+        :type opres: :class:`couchbase_core.results.AsyncResult`
 
         :return: a :class:`Deferred` object.
 
@@ -246,7 +245,7 @@ class RawBucket(AsyncBucket):
 
         Other arguments are passed to the standard `query` method.
 
-        This functions exactly like the :meth:`~couchbase.asynchronous.AsyncBucket.query`
+        This functions exactly like the :meth:`~couchbase_v2.asynchronous.AsyncBucket.query`
         method, except it automatically schedules operations if the connection
         has not yet been negotiated.
         """
@@ -266,7 +265,7 @@ class RawBucket(AsyncBucket):
         with a :class:`BatchedView` when the results are complete.
 
         Parameters follow conventions of
-        :meth:`~couchbase.bucket.Bucket.query`.
+        :meth:`~couchbase_v2.bucket.Bucket.query`.
 
         Example::
 
@@ -318,7 +317,7 @@ class RawBucket(AsyncBucket):
         with a :class:`~.N1QLRequest` object. The object may be iterated
         over to yield the rows in the result set.
 
-        This method is similar to :meth:`~couchbase.bucket.Bucket.n1ql_query`
+        This method is similar to :meth:`~couchbase_v2.bucket.Bucket.n1ql_query`
         in its arguments.
 
         Example::
@@ -333,7 +332,7 @@ class RawBucket(AsyncBucket):
 
         :return: A :class:`Deferred`
 
-        .. seealso:: :meth:`~couchbase.bucket.Bucket.n1ql_query`
+        .. seealso:: :meth:`~couchbase_v2.bucket.Bucket.n1ql_query`
         """
         if not self.connected:
             cb = lambda x: self.n1qlQueryAll(*args, **kwargs)
@@ -378,7 +377,7 @@ class RawBucket(AsyncBucket):
         with a :class:`~.SearchRequest` object. The object may be iterated
         over to yield the rows in the result set.
 
-        This method is similar to :meth:`~couchbase.bucket.Bucket.search`
+        This method is similar to :meth:`~couchbase_v2.bucket.Bucket.search`
         in its arguments.
 
         Example::
@@ -392,7 +391,7 @@ class RawBucket(AsyncBucket):
 
         :return: A :class:`Deferred`
 
-        .. seealso:: :meth:`~couchbase.bucket.Bucket.search`
+        .. seealso:: :meth:`~couchbase_v2.bucket.Bucket.search`
         """
 
         if not self.connected:
@@ -416,16 +415,16 @@ class Bucket(RawBucket):
         :attr:`Deferred.callback` with the result object when the result is
         complete, or they will invoke the :attr:`Deferred.errback` with an
         exception (or :class:`Failure`) in case of an error. The rules of the
-        :attr:`~couchbase.connection.Connection.quiet` attribute for raising
+        :attr:`~couchbase_v2.connection.Connection.quiet` attribute for raising
         exceptions apply to the invocation of the ``errback``. This means that
         in the case where the synchronous client would raise an exception,
         the Deferred API will have its ``errback`` invoked. Otherwise, the
-        result's :attr:`~couchbase.result.Result.success` field should be
+        result's :attr:`~couchbase_v2.result.Result.success` field should be
         inspected.
 
 
         Likewise multi operations will be invoked with a
-        :class:`~couchbase.result.MultiResult` compatible object.
+        :class:`~couchbase_v2.result.MultiResult` compatible object.
 
         Some examples:
 

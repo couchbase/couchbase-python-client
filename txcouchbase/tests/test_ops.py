@@ -13,12 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from couchbase.tests.base import ConnectionTestCase
+from couchbase_tests.base import ConnectionTestCase
 
 from txcouchbase.tests.base import gen_base
-from couchbase.exceptions import NotFoundError
-from couchbase.result import (
-    Result, OperationResult, ValueResult, MultiResult)
+from couchbase_core.exceptions import NotFoundError
+from couchbase_core.result import (
+    OperationResult, ValueResult)
 
 
 class OperationTestCase(gen_base(ConnectionTestCase)):

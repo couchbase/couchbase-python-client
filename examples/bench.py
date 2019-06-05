@@ -18,8 +18,8 @@
 import argparse
 from threading import Thread
 from time import sleep, time
-from couchbase.bucket import Bucket, FMT_BYTES
-from couchbase.transcoder import Transcoder
+from couchbase_v2.bucket import Bucket, FMT_BYTES
+from couchbase_core.transcoder import Transcoder
 
 ap = argparse.ArgumentParser()
 

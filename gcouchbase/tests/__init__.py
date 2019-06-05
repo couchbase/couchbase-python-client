@@ -1,1 +1,1 @@
-from couchbase.tests import *
+from couchbase_v2.tests import *

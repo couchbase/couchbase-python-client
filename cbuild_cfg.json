@@ -36,7 +36,7 @@
   "comp_options": {
     "PYCBC_LCB_API": "0x02FF04",
     "PYCBC_LCB_API_ALL_SUPPORTED" : ["0x021004","0x02FF04"],
-    "PYCBC_CORE": "couchbase"
+    "PYCBC_CORE": "couchbase_core"
   },
   "apis": {
     "0x021004": {

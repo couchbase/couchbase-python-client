@@ -14,9 +14,8 @@
 # limitations under the License.
 #
 
-from couchbase.bucket import Bucket
-from couchbase import FMT_PICKLE
-from couchbase.exceptions import KeyExistsError
+from couchbase_v2.bucket import Bucket
+from couchbase_core.exceptions import KeyExistsError
 
 
 # Connect to the default bucket on local host
