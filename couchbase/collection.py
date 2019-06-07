@@ -1,7 +1,12 @@
+from abc import abstractmethod
+
+from boltons.funcutils import wraps
+from mypy_extensions import VarArg, KwArg, Arg
+
 from .subdoc import LookupInSpec, spec_to_SDK2
 from .subdoc import gen_projection_spec
-from .result import GetResult, get_result_wrapper, SDK2Result
-from .options import forward_args, Seconds, OptionBlockTimeOut
+from .result import GetResult, get_result_wrapper, SDK2Result, ResultPrecursor
+from .options import forward_args, Seconds, OptionBlockTimeOut, OptionBlockDeriv
 from .mutate_in import mutation_result, MutationResult, MutateInSpec, MutateInOptions
 from .options import OptionBlock
 from .durability import ReplicateTo, PersistTo, ClientDurableOption, ServerDurableOption
@@ -18,10 +23,11 @@ class ReplaceOptions(OptionBlockTimeOut, ClientDurableOption, ServerDurableOptio
     def __init__(self, *args, **kwargs):
         super(ReplaceOptions, self).__init__(*args, **kwargs)
 
-    def cas(self, cas  # type: int
+    def cas(self,  # type: ReplaceOptions
+            cas  # type: int
            ):
         # type: (...)->ReplaceOptions
-        self.cas = cas
+        self.__setitem__('cas',cas)
         return self
 
 
@@ -108,23 +114,21 @@ class GetAndLockOptions(GetOptions, LockOptions):
     pass
 
 
-RawCollectionMethod = TypeVar('T', bound=Callable[[Tuple['CBCollection',...]], Any])
+class InsertOptions(OptionBlock, ServerDurableOption, ClientDurableOption):
+    pass
 
 
-def _inject_scope_and_collection(func  # type: RawCollectionMethod
-                                 ):
-    # type: (...) ->RawCollectionMethod
+class GetFromReplicaOptions(OptionBlock):
+    pass
 
-    def wrapped(self, *args, **kwargs):
-        if self.true_collections:
-            if self.name and not self._scope:
-                raise couchbase.exceptions.CollectionMissingException
-            if self._scope and self.name:
-                kwargs['scope'] = self._scope
-                kwargs['collection'] = self.name
-        return func(self, *args, **kwargs)
 
-    return wrapped
+
+T= TypeVar('T', bound='CBCollection')
+R= TypeVar("R")
+
+RawCollectionMethodDefault = Callable[[Arg('CBCollection','self'), Arg(str, 'key'), VarArg(OptionBlockDeriv),KwArg(Any)],R]
+RawCollectionMethodInt = Callable[[Arg('CBCollection','self'), Arg(str, 'key'), int, VarArg(OptionBlockDeriv),KwArg(Any)],R]
+RawCollectionMethod = Union[RawCollectionMethodDefault,RawCollectionMethodInt]
 
 
 def _get_result_and_inject(func  # type: RawCollectionMethod
@@ -139,12 +143,42 @@ def _mutate_result_and_inject(func  # type: RawCollectionMethod
     return _inject_scope_and_collection(mutation_result(func))
 
 
-ResultPrecursor = Tuple[SDK2Result, Any]
+def _inject_scope_and_collection(func  # type: RawCollectionMethod
+                                 ):
+    # type: (...) -> RawCollectionMethod
+    @wraps(func)
+    def wrapped(self,  # type: CBCollection
+                *args,  # type: Any
+                **kwargs  # type:  Any
+                ):
+        # type: (...)->Any
+        if self.true_collections:
+            if self.name and not self._scope:
+                raise couchbase.exceptions.CollectionMissingException
+            if self._scope and self.name:
+                kwargs['scope'] = self._scope
+                kwargs['collection'] = self.name
+
+        return func(self, *args, **kwargs)
+
+    return wrapped
 
 
-class InsertOptions(OptionBlock, ServerDurableOption, ClientDurableOption):
+class BinaryCollection(object):
     pass
 
+
+class TouchOptions(OptionBlock):
+    pass
+
+
+class IExistsResult(object):
+    @abstractmethod
+    def exists(self):
+        pass
+
+class LookupInOptions(OptionBlock):
+    pass
 
 class GetFromReplicaOptions(OptionBlock):
     pass
@@ -171,26 +205,28 @@ class CBCollection(object):
     def _scope(self):
         return self.parent.name
 
-
+    MAX_GET_OPS=16
     def _get_generic(self, key, kwargs, options):
         options = forward_args(kwargs, *options)
         options.pop('key', None)
         spec = options.pop('spec', [])
         project = options.pop('project', None)
         if project:
-            if len(project) < 17:
+            if len(project) <= CBCollection.MAX_GET_OPS:
                 spec = gen_projection_spec(project)
+            else:
+                raise couchbase.exceptions.ArgumentError("Project only accepts {} operations or less".format(CBCollection.MAX_GET_OPS))
         if not project:
             x = _Base.get(self.bucket, key, **options)
         else:
             x = self.bucket.lookup_in(key, *spec, **options)
-        return x, options
+        return ResultPrecursor(x, options)
 
 
     @overload
     def get(self,
             key,  # type:str
-            options=None,  # type: GetOptions
+            *options  # type: GetOptions
             ):
         # type: (...) -> GetResult
         pass
@@ -198,28 +234,15 @@ class CBCollection(object):
     @overload
     def get(self,
             key,  # type:str
-            project=None,  # type: couchbase_core.JSON
+            project=None,  # type: Iterable[str]
             timeout=None,  # type: Seconds
             quiet=None,  # type: bool
             replica=False,  # type: bool
             no_format=False  # type: bool
             ):
         # type: (...) -> GetResult
-        pass
-
-    @_get_result_and_inject
-    def get(self,
-            key,  # type: str
-            *options,  # type: GetOptions
-            **kwargs  # type: Any
-            ):
-        # type: (...) -> GetResult
-        """Obtain an object stored in Couchbase by given key.
-
-        :param string key: The key to fetch. The type of key is the same
-            as mentioned in :meth:`upsert`
-
-        :param Durat timeout: If specified, indicates that the key's expiration
+        """
+        :param couchbase_core.options.Duration timeout: If specified, indicates that the key's expiration
             time should be *modified* when retrieving the value.
 
         :param boolean quiet: causes `get` to return None instead of
@@ -252,6 +275,23 @@ class CBCollection(object):
             object as being of :data:`~couchbase_core.FMT_BYTES`. This is a
             item-local equivalent of using the :attr:`data_passthrough`
             option
+        :return:
+        """
+        pass
+
+    @_get_result_and_inject
+    def get(self,
+            key,  # type: str
+            *options,  # type: GetOptions
+            **kwargs  # type: Any
+            ):
+        # type: (...) -> GetResult
+        """Obtain an object stored in Couchbase by given key.
+
+        :param string key: The key to fetch. The type of key is the same
+            as mentioned in :meth:`upsert`
+
+
 
         :raise: :exc:`.NotFoundError` if the key does not exist
         :raise: :exc:`.CouchbaseNetworkError`
@@ -287,26 +327,24 @@ class CBCollection(object):
     def get_and_touch(self,
                       id,  # type: str
                       expiration,  # type: int
-                      options=None  # type: GetAndTouchOptions
+                      *options  # type: GetAndTouchOptions
                       ):
-        # type: (...)->IGetResult
+        # type: (...)->GetResult
         pass
 
     @_get_result_and_inject
     def get_and_touch(self,
                       id,  # type: str
                       expiration,  # type: int
-                      *options,  # type: Tuple[GetAndTouchOptions]
+                      *options,  # type: GetAndTouchOptions
                       **kwargs  # type: Any
                       ):
         # type: (...)->Tuple[SDK2Result, Tuple[Tuple[GetAndTouchOptions]]]
         kwargs_final = forward_args(kwargs, *options)
-        if 'durability' in kwargs_final.keys():
+        if 'durability' in set(kwargs.keys()).union(options[0][0].keys()):
             raise couchbase.exceptions.ReplicaNotAvailableException()
-        cb = self._bucket  # type: SDK2Bucket
-        kwargs_final['ttl'] = 0
-        x = cb.get(id, **kwargs_final)
-        return x, options
+
+        return self._get_generic(id, kwargs, options)
 
     @_get_result_and_inject
     def get_and_lock(self,
@@ -315,7 +353,7 @@ class CBCollection(object):
                      *options,  # type: GetAndLockOptions
                      **kwargs
                      ):
-        # type: (...)->IGetResult
+        # type: (...)->GetResult
         x = _Base.get(self.bucket, id, expiration, **forward_args(kwargs, *options))
         _Base.lock(self.bucket, id, options)
         return x, options
@@ -323,11 +361,11 @@ class CBCollection(object):
     @_get_result_and_inject
     def get_from_replica(self,
                          id,  # type: str
-                         replica_index,  # type: ReplicaMode
+                         replica_index,  # type: int
                          *options,  # type: GetFromReplicaOptions
-                         **kwargs  # type: any
+                         **kwargs  # type: Any
                          ):
-        # type: (...)->IGetResult
+        # type: (...)->GetResult
         return self.bucket.rget(id, replica_index, **forward_args(kwargs, *options))
 
     def touch(self,
@@ -382,7 +420,77 @@ class CBCollection(object):
         """
         return _Base.unlock(self.bucket, id, **forward_args({}, *options))
 
-    def exists(self, id,  # type: str,
+    def lock(self, key, timeout=0):
+        """Lock and retrieve a key-value entry in Couchbase.
+
+        :param key: A string which is the key to lock.
+
+        :param ttl: a TTL for which the lock should be valid.
+            While the lock is active, attempts to access the key (via
+            other :meth:`lock`, :meth:`upsert` or other mutation calls)
+            will fail with an :exc:`.KeyExistsError`. Note that the
+            value for this option is limited by the maximum allowable
+            lock time determined by the server (currently, this is 30
+            seconds). If passed a higher value, the server will silently
+            lower this to its maximum limit.
+
+
+        This function otherwise functions similarly to :meth:`get`;
+        specifically, it will return the value upon success. Note the
+        :attr:`~.Result.cas` value from the :class:`.Result` object.
+        This will be needed to :meth:`unlock` the key.
+
+        Note the lock will also be implicitly released if modified by
+        one of the :meth:`upsert` family of functions when the valid CAS
+        is supplied
+
+        :raise: :exc:`.TemporaryFailError` if the key is already locked.
+        :raise: See :meth:`get` for possible exceptions
+
+        Lock a key ::
+
+            rv = cb.lock("locked_key", ttl=5)
+            # This key is now locked for the next 5 seconds.
+            # attempts to access this key will fail until the lock
+            # is released.
+
+            # do important stuff...
+
+            cb.unlock("locked_key", rv.cas)
+
+        Lock a key, implicitly unlocking with :meth:`upsert` with CAS ::
+
+            rv = self.cb.lock("locked_key", ttl=5)
+            new_value = rv.value.upper()
+            cb.upsert("locked_key", new_value, rv.cas)
+
+
+        Poll and Lock ::
+
+            rv = None
+            begin_time = time.time()
+            while time.time() - begin_time < 15:
+                try:
+                    rv = cb.lock("key", ttl=10)
+                    break
+                except TemporaryFailError:
+                    print("Key is currently locked.. waiting")
+                    time.sleep(1)
+
+            if not rv:
+                raise Exception("Waited too long..")
+
+            # Do stuff..
+
+            cb.unlock("key", rv.cas)
+
+
+        .. seealso:: :meth:`get`, :meth:`lock_multi`, :meth:`unlock`
+        """
+        return _Base.lock(self.bucket, key, **forward_args({}, *options))
+
+    def exists(self,  # type: CBCollection
+               id,  # type: str
                timeout=None,  # type: Seconds
                ):
         # type: (...)->IExistsResult
@@ -415,7 +523,7 @@ class CBCollection(object):
                format=None,
                persist_to=PersistTo.NONE,  # type: PersistTo.Value
                replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
-               durability_level=Durability.NONE  # type: DurabilityLevel
+               durability_level=Durability.NONE  # type: Durability
                ):
         # type: (...) -> MutationResult
         pass
@@ -451,7 +559,7 @@ class CBCollection(object):
             will only be stored if it already exists with the supplied
             CAS
 
-        :param Seconds timeout: If specified, the key will expire after this
+        :param timeout: If specified, the key will expire after this
             many seconds
 
         :param int format: If specified, indicates the `format` to use
@@ -509,7 +617,8 @@ class CBCollection(object):
         .. seealso:: :meth:`upsert_multi`
         """
 
-        return _Base.upsert(self.bucket, id, value, **forward_args(kwargs, *options))
+        final_options=forward_args(kwargs, *options)
+        return ResultPrecursor(_Base.upsert(self.bucket, id, value, **final_options),final_options)
 
     def insert(self,
                id,  # type: str
@@ -527,7 +636,7 @@ class CBCollection(object):
                format=None,  # type: str
                persist_to=PersistTo.NONE,  # type: PersistTo.Value
                replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
-               durability_level=Durability.NONE  # type: DurabilityLevel
+               durability_level=Durability.NONE  # type: Durability
                ):
         pass
 
@@ -559,7 +668,7 @@ class CBCollection(object):
                 format=None,  # type: bool
                 persist_to=PersistTo.NONE,  # type: PersistTo.Value
                 replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
-                durability_level=Durability.NONE  # type: DurabilityLevel
+                durability_level=Durability.NONE  # type: Durability
                 ):
         # type: (...)->MutationResult
         pass
@@ -597,7 +706,7 @@ class CBCollection(object):
                cas=0,  # type: int
                persist_to=PersistTo.NONE,  # type: PersistTo.Value
                replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
-               durability_level=Durability.NONE  # type: DurabilityLevel
+               durability_level=Durability.NONE  # type: Durability
                ):
         # type: (...)->MutationResult
         pass
@@ -672,46 +781,122 @@ class CBCollection(object):
             for more information on the ``persist_to`` and
             ``replicate_to`` options.
         """
-        return _Base.remove(self.bucket, id, **forward_args(kwargs, *options))
+        final_options = forward_args(kwargs, *options)
+        return ResultPrecursor(_Base.remove(self.bucket, id, **final_options),final_options)
 
     @overload
     def lookup_in(self,
-                  id,  # type: str,
+                  id,  # type: str
                   spec,  # type: LookupInSpec
                   *options  # type: LookupInOptions
                   ):
-        # type: (...)->ILookupInResult
+        # type: (...)->GetResult
         pass
 
     @_get_result_and_inject
     def lookup_in(self,
-                  id,  # type: str,
-                  spec,  # type: LookupInSpec
+                  id,  # type: str
+                  spec,  # type: SubdocSpec
                   *options,  # type: LookupInOptions
                   **kwargs
                   ):
-        # type: (...)->ILookupInResult
-        return self.bucket.lookup_in(id, *(spec_to_SDK2(spec)), **forward_args(kwargs, *options))
+        # type: (...)->GetResult
+        """Atomically retrieve one or more paths from a document.
+
+        :param key: The key of the document to lookup
+        :param spec: A list of specs (see :mod:`.couchbase_core.subdocument`)
+        :return: A :class:`.couchbase_core.result.SubdocResult` object.
+            This object contains the results and any errors of the
+            operation.
+
+        Example::
+
+            import couchbase_core.subdocument as SD
+            rv = cb.lookup_in('user',
+                              SD.get('email'),
+                              SD.get('name'),
+                              SD.exists('friends.therock'))
+
+            email = rv[0]
+            name = rv[1]
+            friend_exists = rv.exists(2)
+
+        .. seealso:: :meth:`retrieve_in` which acts as a convenience wrapper
+        """
+
+        final_options=forward_args(kwargs, *options)
+        return ResultPrecursor(self.bucket.lookup_in(id, *spec, **final_options ),final_options)
+
+    @overload
+    def mutate_in(self,
+                  id,  # type: str
+                  spec,  # type: MutateInSpec
+                  *options  # type: MutateInOptions
+                  ):
+        # type: (...)->MutationResult
+        pass
+
+    @overload
+    def mutate_in(self,
+                  id,  # type: str
+                  spec,  # type: MutateInSpec
+                  create_doc = False,  # type: bool
+                  insert_doc = False,  # type: bool
+                  upsert_doc = False  # type: bool
+                  ):
+        # type: (...)->MutationResult
+        pass
 
     @_mutate_result_and_inject
-    def mutate_in(self,
-                  id,  # type: str,
+    def mutate_in(self,  # type: CBCollection
+                  id,  # type: str
                   spec,  # type: MutateInSpec
                   *options,  # type: MutateInOptions
-                  **kwargs
+                  **kwargs  # type: Any
                   ):
-        # type: (...)->MutateInResult
-        return self.bucket.mutate_in(id, *spec, **forward_args(kwargs, *options))
+        # type: (...)->ResultPrecursor
+        """Perform multiple atomic modifications within a document.
+
+        :param key: The key of the document to modify
+        :param MutateInSpec spec: An iterable of specs (See :mod:`.couchbase.mutate_in.MutateInSpecItemBase`)
+        :param bool create_doc:
+            Whether the document should be create if it doesn't exist
+        :param bool insert_doc: If the document should be created anew, and the
+            operations performed *only* if it does not exist.
+        :param bool upsert_doc: If the document should be created anew if it
+            does not exist. If it does exist the commands are still executed.
+        :param kwargs: CAS, etc.
+        :return: A :class:`~.couchbase.MutationResult` object.
+
+        Here's an example of adding a new tag to a "user" document
+        and incrementing a modification counter::
+
+            import couchbase_core.subdocument as SD
+            # ....
+            cb.mutate_in('user',
+                          SD.array_addunique('tags', 'dog'),
+                          SD.counter('updates', 1))
+
+        .. note::
+
+            The `insert_doc` and `upsert_doc` options are mutually exclusive.
+            Use `insert_doc` when you wish to create a new document with
+            extended attributes (xattrs).
+
+        .. seealso:: :mod:`.couchbase_core.subdocument`
+        """
+        final_options = forward_args(kwargs, *options)
+        return ResultPrecursor(self.bucket.mutate_in(id, *spec, **final_options),final_options)
 
     def binary(self):
-        # type: (...)->IBinaryCollection
+        # type: (...)->BinaryCollection
         pass
 
     @overload
     def append(self,
                id,  # type: str
                value,  # type: str
-               options=None,  # type: AppendOptions
+               *options  # type: AppendOptions
                ):
         # type: (...)->MutationResult
         pass
@@ -721,10 +906,10 @@ class CBCollection(object):
                id,  # type: str
                value,  # type: str
                cas=0,  # type: int
-               format=None,  # type: long
+               format=None,  # type: int
                persist_to=PersistTo.NONE,  # type: PersistTo.Value
                replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
-               durability_level=Durability.NONE  # type: DurabilityLevel
+               durability_level=Durability.NONE  # type: Durability
                ):
         pass
 
@@ -763,17 +948,17 @@ class CBCollection(object):
         .. seealso:: :meth:`upsert`, :meth:`append_multi`)
         """
         x = _Base.append(self.bucket, id, value, forward_args(kwargs, *options))
-        return x, options
+        return ResultPrecursor(x, options)
 
     @overload
     def prepend(self,
                 id,  # type: str
-                value,  # type: Any,
+                value,  # type: Any
                 cas=0,  # type: int
                 format=None,  # type: int
                 persist_to=PersistTo.NONE,  # type: PersistTo.Value
                 replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
-                durability_level=Durability.NONE  # type: DurabilityLevel
+                durability_level=Durability.NONE  # type: Durability
                 ):
         # type: (...)->MutationResult
         pass
@@ -795,7 +980,7 @@ class CBCollection(object):
                 ):
         # type: (...)->ResultPrecursor
         x = _Base.prepend(self.bucket, id, value, **forward_args(kwargs, *options))
-        return x, options
+        return ResultPrecursor(x, options)
 
     @overload
     def increment(self,
@@ -825,7 +1010,7 @@ class CBCollection(object):
                   ):
         # type: (...)->ResultPrecursor
         x = _Base.counter(self.bucket, id, delta, **forward_args(kwargs, *options))
-        return x, options
+        return ResultPrecursor(x, options)
 
     @overload
     def decrement(self,
@@ -855,7 +1040,7 @@ class CBCollection(object):
                   ):
         # type: (...)->ResultPrecursor
         x = _Base.counter(self.bucket, id, -delta, **forward_args(kwargs, *options))
-        return x, options
+        return ResultPrecursor(x, options)
 
 
 class Scope(object):
@@ -884,7 +1069,7 @@ class Scope(object):
         return self._name
 
     def default_collection(self, *options, **kwargs):
-        return CBCollection(self, name=None, **forward_args(kwargs,*options))
+        return CBCollection(self, name=None, **forward_args(kwargs, *options))
 
     def open_collection(self,
                         collection_name,  # type: str
@@ -892,26 +1077,19 @@ class Scope(object):
                         ):
         # type: (...) -> CBCollection
         """
-
-        :param collection_name:
-        :param options:
-        :return:
-        """
-        """
-        Gets an ICollection instance given a collection name.
-        
-        Response
-        A ICollection implementation for a collection with a given name.
-        Throws
-        Any exceptions raised by the underlying platform
-        CollectionNotFoundException
-        AuthorizationException
+        Gets an :class:`.Collection` instance given a collection name.
 
         :param collection_name: string identifier for a given collection.
         :param options: collection options
-        :return:
+        :return: A :class:`.Collection` for a collection with the given name.
+
+        :raises CollectionNotFoundException
+        :raises AuthorizationException
+
         """
         return CBCollection(self, collection_name, *options)
 
+
+Collection=CBCollection
 
 UpsertOptions = CBCollection.UpsertOptions

@@ -1,5 +1,5 @@
 from couchbase_core.bucket import Bucket as CoreBucket
-from .collection import CBCollection as SDK3Collection, CollectionOptions, CBCollection
+from .collection import Collection as SDK3Collection, CollectionOptions, Collection
 from .options import OptionBlock, forward_args
 from .result import *
 
@@ -12,6 +12,10 @@ class IViewResult(IResult):
     def __init__(self, sdk2_result # type: couchbase_core.ViewResult
                 ):
         pass
+
+
+class ViewOptions(object):
+    pass
 
 
 class Bucket(object):
@@ -53,15 +57,15 @@ class Bucket(object):
     def default_collection(self,
                            options=None  # type: CollectionOptions
                            ):
-        # type: (...)->CBCollection
-        return CBCollection(self)
+        # type: (...)->Collection
+        return Collection(self)
 
     def collection(self,
                    collection_name,  # type: str
                    options=None  # type: CollectionOptions
                    ):
-        # type: (...)->CBCollection
-        return CBCollection(self, collection_name)
+        # type: (...)->Collection
+        return Collection(self, collection_name)
 
     def view_query(self,
                    design_doc,  # type: str

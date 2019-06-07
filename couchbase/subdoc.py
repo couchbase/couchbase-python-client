@@ -24,19 +24,19 @@ def MutateSpec():
 
 
 def GetOperation(path,  # type: str
-                 xattr  # type: bool
+                 xattr=False  # type: bool
                  ):
         return SD.get(path,xattr=xattr)
 
 
 def GetFullDocumentOperation(path,  # type: str
-                 xattr  # type: bool
+                 xattr=False  # type: bool
                  ):
     return SD.get(path,xattr=xattr)
 
 def ExistsOperation(
                  path,  # type: str
-                 xattr  # type: bool
+                 xattr=False  # type: bool
                  ):
         return SD.exists(path,xattr=xattr)
 
@@ -59,7 +59,7 @@ class SubdocSpecItem(object):
         pass
 
 
-SubdocSpec = Tuple[SubdocSpecItem, ...]
+SubdocSpec = Iterable[SubdocSpecItem]
 
 
 def spec_to_SDK2(wrapped  # type: SubdocSpec

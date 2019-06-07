@@ -78,9 +78,9 @@ class OptionBlockTimeOut(OptionBlock):
         # type: (*Any, **Any) -> None
         super(OptionBlockTimeOut, self).__init__(**kwargs)
 
-    def timeout(self, # type: T
+    def timeout(self,  # type: T
                 duration):
-        # type: (Seconds)->T
+        # type: (...)->T
         self['ttl'] = duration.__int__()
         return self
 
@@ -108,7 +108,7 @@ class Cardinal(OptionBlock):
     NONE = Value(0)
 
 
-OptionBlockDeriv = TypeVar('U')
+OptionBlockDeriv = TypeVar('OptionBlockDeriv', bound=OptionBlock)
 
 
 def forward_args(arg_vars,  # type: Optional[Dict[str,Any]]

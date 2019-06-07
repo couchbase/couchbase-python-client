@@ -1,7 +1,10 @@
 from typing import *
+
+from boltons.funcutils import wraps
+
 import couchbase_core.subdocument
 from .subdoc import SubdocSpecItem
-from .result import IResult, SDK2Result
+from .result import IResult, ResultPrecursor
 from .options import OptionBlockTimeOut
 
 try:
@@ -96,16 +99,25 @@ class MutationResult(IResult):
         return self.mutationToken
 
 
-def get_mutation_result(result):
-    return MutationResult(result.cas, SDK2MutationToken(result._mutinfo) if hasattr(result, '_mutinfo') else None)
+def get_mutation_result(result  # type: ResultPrecursor
+                        ):
+    # type (...)->MutationResult
+    return MutationResult(result.orig_result.cas, SDK2MutationToken(result.orig_result._mutinfo) if hasattr(result.orig_result._mutinfo, '_mutinfo') else None)
 
 
-def mutation_result(func  # type: Callable[[Any...],SDK2Result]
+SDK2Result=TypeVar('SDK2Result')
+
+
+def mutation_result(func  # type: Callable[[Any,...],SDK2Result]
                     ):
+    # type: (...)->Callable[[Any,...],MutationResult]
+    @wraps(func)
     def mutated(*args, **kwargs):
         result = func(*args, **kwargs)
         return get_mutation_result(result)
 
+    mutated.__name__=func.__name__
+    mutated.__doc__=func.__doc__
     return mutated
 
 

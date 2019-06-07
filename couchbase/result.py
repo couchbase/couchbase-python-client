@@ -1,10 +1,10 @@
-from typing import *
-
 from couchbase_core.subdocument import Spec
 from .options import Seconds
 from couchbase_core.transcodable import Transcodable
-from couchbase_core._libcouchbase import Result as SDK2Result
+from couchbase_core._libcouchbase import Result as SDK2Result, Result
+from typing import *
 
+import boltons.funcutils
 
 Proxy_T = TypeVar('Proxy_T')
 
@@ -32,7 +32,7 @@ class ContentProxy:
     def __getitem__(self,
                     item  # type: Type[Proxy_T]
                     ):
-        # type: (...)->Proxy_T
+        # type: (...)->Union[Proxy_T,Mapping[str,Proxy_T]]
         decode_canonical = getattr(item, 'decode_canonical', None) if issubclass(item, Transcodable) else item
         if isinstance(self.content, MultiResult):
             return {k: decode_canonical(self.content[k].value) for k,v, in self.content}
@@ -46,13 +46,15 @@ class IResult(object):
                  cas,  # type: int
                  error=None  # type: Optional[int]
                  ):
-        self.cas = cas
-        self.error = error
+        self._cas = cas
+        self._error = error
 
+    @property
     def cas(self):
         # type: ()->int
-        return self.cas
+        return self._cas
 
+    @property
     def error(self):
         # type: ()->int
         return self.error
@@ -119,15 +121,26 @@ class GetResult(IGetResult):
         return self._content
 
 
+ResultPrecursor = NamedTuple('ResultPrecursor', [('orig_result',SDK2Result), ('orig_options',Mapping[str,Any])])
+
+
 def get_result(x,  # type: SDK2Result
-               options=None):
+               options=None  # type: Dict[str,Any]
+               ):
+    # type: (...)->GetResult
     options = options or {}
-    return GetResult(x, cas=x.cas, expiry=options.pop('timeout', None), id=x.key)
+    return GetResult(x, cas=getattr(x, 'cas'), expiry=options.pop('timeout', None), id=x.key)
 
 
-def get_result_wrapper(func):
+def get_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
+                       ):
+    # type: (...)->Callable[[Any], GetResult]
+    @boltons.funcutils.wraps(func)
     def wrapped(*args, **kwargs):
         x, options = func(*args,**kwargs)
         return get_result(x, options)
+    wrapped.__name__=func.__name__
+    wrapped.__doc__=func.__name__
     return wrapped
+
 

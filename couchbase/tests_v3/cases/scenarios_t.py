@@ -31,7 +31,7 @@ from couchbase_core.transcodable import Transcodable
 import couchbase_core.connstr
 import couchbase.exceptions
 
-from couchbase import JSONDocument, Durability
+from couchbase import JSONDocument, Durability, LookupInSpec
 from couchbase.cluster import Cluster
 from couchbase import ReplicateTo, PersistTo, FiniteDuration, copy, \
     Seconds, ReplicaNotConfiguredException, DocumentConcurrentlyModifiedException, \
@@ -42,7 +42,7 @@ from couchbase import CBCollection, GetOptions, RemoveOptions, ReplaceOptions
 from couchbase import Bucket
 
 from couchbase_tests.base import ConnectionTestCase
-
+from couchbase.subdoc import GetOperation
 
 class Scenarios(ConnectionTestCase):
     # implicit val ec = ExecutionContext.Implicits.global
@@ -384,7 +384,11 @@ class Scenarios(ConnectionTestCase):
         subdoc = self.coll.get("id", project=("name", "age"))
 
         user = subdoc.content_as[Scenarios.UserPartial]
+        altuser=self.coll.lookup_in("id", (GetOperation("name"),GetOperation("age"))).content_as[Scenarios.UserPartial]
+        self.assertEqual(altuser,user)
         changed = user.with_attr(age=25)
+        self.assertEqual(Scenarios.UserPartial("fred", 25), changed)
+
 
         # Note: I have misgivings over whether this update-with-a-projection should be allowed
         # mergeUpsert will upsert fields user.name & user.age, leaving user.address alone

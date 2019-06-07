@@ -114,7 +114,7 @@ def gen_distutils_build(extoptions,pkgdata):
 def handle_build_type_and_gen_deps():
     cmake_build = build_type in ['CMAKE', 'CMAKE_HYBRID']
     print("Build type: {}, cmake:{}".format(build_type, cmake_build))
-    general_requires = ['pyrsistent', "enum34; python_version < '3.5'"]
+    general_requires = ['pyrsistent', "enum34; python_version < '3.5'", 'boltons']
     extoptions, pkgdata=get_ext_options()
 
     if cmake_build:
@@ -127,7 +127,7 @@ def handle_build_type_and_gen_deps():
     setup_kw = {'ext_modules': e_mods}
     logging.error(setup_kw)
 
-    typing_requires = (['typing'] if sys.version_info < (3, 7) else [])
+    typing_requires = ["typing; python_version<'3.7'", "typing-extensions; python_version<'3.7'", "mypy_extensions"]
 
     exec_requires = typing_requires + general_requires
     conan_build = os.environ.get("PYCBC_CONAN_BUILD")

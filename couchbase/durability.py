@@ -2,6 +2,8 @@ from enum import Enum, IntEnum
 
 import couchbase_core._libcouchbase as _LCB
 from typing import *
+import couchbase.options
+from .options import Cardinal, OptionBlock
 
 
 class Durability(IntEnum):
@@ -11,20 +13,12 @@ class Durability(IntEnum):
     PERSIST_TO_MAJORITY = _LCB.LCB_DURABILITYLEVEL_PERSIST_TO_MAJORITY
 
 
-from .options import Cardinal, OptionBlock
-
-
 class ReplicateTo(Cardinal):
-    pass
-
-
-class PersistToOne(Cardinal.ONE):
-    def __init__(self, *args, **kwargs):
-        super(PersistTo.ONE, self).__init__(*args, **kwargs)
+    Value = couchbase.options.Value
 
 
 class PersistTo(Cardinal):
-    ONE = PersistToOne
+    Value = couchbase.options.Value
 
 
 T = TypeVar('T', bound=OptionBlock)
