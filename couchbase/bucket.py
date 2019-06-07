@@ -73,14 +73,6 @@ class Bucket(object):
         res=cb.query(design_doc, view_name, **forward_args(None,*view_options))
         return IViewResult(res)
 
-    def spatial_view_query(self,
-                           design_doc,  # type: str
-                           view_name,  # type: str
-                           options=None  # type: ViewOptions
-                           ):
-        # type: (...)->ISpatialViewResult
-        pass
-
     def views(self):
         # type: (...)->IViewManager
         pass
