@@ -114,6 +114,8 @@ def get_ext_options():
             extoptions['library_dirs'] = ['/usr/local/lib',
                                           '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/10.0.0/lib/darwin/']
             extoptions['include_dirs'] = ['/usr/local/include']
+        else:
+            extoptions['extra_compile_args'] += ['-std=c11']
         print(pkgdata)
     else:
         if sys.version_info < (3, 0, 0):
