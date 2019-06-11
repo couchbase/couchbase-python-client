@@ -78,12 +78,12 @@ class Scenarios(ConnectionTestCase):
         result = self.coll.replace(doc.id, content, ReplaceOptions().timeout(Seconds(10)), cas=doc.cas)
 
         result = self.coll.replace(doc.id, content, ReplaceOptions().timeout(Seconds(10)).cas(result.cas))
-        result = self.coll.replace(doc.id, content, timeout=Seconds(10), cas=result.cas)
+        result = self.coll.replace(doc.id, content, expiration=Seconds(10), cas=result.cas)
         # Default params also supported for all methods
-        doc2 = self.coll.get("id", timeout=Seconds(10))
+        doc2 = self.coll.get("id", expiration=Seconds(10))
         content2 = doc2.content_as[dict].update({"value": "bar"})
 
-        self.coll.replace(doc2.id, content2, cas=doc2.cas, timeout=Seconds(10))
+        self.coll.replace(doc2.id, content2, cas=doc2.cas, expiration=Seconds(10))
 
         # I include type annotations and getOrError above to make things clearer,
         # but it'd be more idiomatic to write this:
@@ -99,7 +99,7 @@ class Scenarios(ConnectionTestCase):
                               .put("field", "value")
                               .put("foo", "bar"),
                               cas=result.cas,
-                              timeout=Seconds(10))
+                              expiration=Seconds(10))
         except:
             print("could not get doc")
 
@@ -253,14 +253,14 @@ class Scenarios(ConnectionTestCase):
         """
 
         def respond():
-            result = self.coll.get("id", timeout=Seconds(10))
+            result = self.coll.get("id", expiration=Seconds(10))
             if result:
                 self.coll.replace(result.id,
                                   result.content_as[JSONDocument]
                                   .put("field", "value")
                                   .put("foo", "bar"),
                                   cas=result.cas,
-                                  timeout=Seconds(10))
+                                  expiration=Seconds(10))
             else:
                 logging.error("could not get doc")
 
@@ -348,11 +348,11 @@ class Scenarios(ConnectionTestCase):
         3) store it back on the server with a replace
         """
         self.coll.upsert("id",dict(name="fred"))
-        result = self.coll.get("id", timeout=Seconds(10))
+        result = self.coll.get("id", expiration=Seconds(10))
         if result:
             entry = result.content_as[Scenarios.AddressedUser]
             entry=entry.with_attr(age=25)
-            self.coll.replace(result.id, entry, cas=result.cas, timeout=Seconds(10))
+            self.coll.replace(result.id, entry, cas=result.cas, expiration=Seconds(10))
         else:
             logging.error("could not get doc")
 

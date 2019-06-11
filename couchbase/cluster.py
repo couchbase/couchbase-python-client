@@ -73,7 +73,7 @@ class QueryOptions(OptionBlock, IQueryResult):
     def is_live(self):
         return False
 
-    def __init__(self, statement = None, parameters=None, timeout = None):
+    def __init__(self, statement=None, parameters=None, timeout=None):
 
         """
         Executes a N1QL query against the remote cluster returning a IQueryResult with the results of the query.

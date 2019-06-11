@@ -246,7 +246,7 @@ class CBCollection(object):
     def get(self,
             key,  # type:str
             project=None,  # type: Iterable[str]
-            timeout=None,  # type: Seconds
+            expiration=None,  # type: Seconds
             quiet=None,  # type: bool
             replica=False,  # type: bool
             no_format=False  # type: bool
@@ -327,7 +327,7 @@ class CBCollection(object):
 
         Update the expiration time::
 
-            rv = cb.get("key", timeout=10)
+            rv = cb.get("key", expiration=10)
             # Expires in ten seconds
 
         .. seealso:: :meth:`get_multi`
@@ -365,9 +365,10 @@ class CBCollection(object):
                      **kwargs
                      ):
         # type: (...)->GetResult
-        x = _Base.get(self.bucket, id, expiration, **forward_args(kwargs, *options))
+        final_options=forward_args(kwargs, *options)
+        x = _Base.get(self.bucket, id, expiration, **final_options)
         _Base.lock(self.bucket, id, options)
-        return x, options
+        return ResultPrecursor(x, options)
 
     @_get_result_and_inject
     def get_from_replica(self,
@@ -376,8 +377,9 @@ class CBCollection(object):
                          *options,  # type: GetFromReplicaOptions
                          **kwargs  # type: Any
                          ):
-        # type: (...)->GetResult
-        return self.bucket.rget(id, replica_index, **forward_args(kwargs, *options))
+        # type: (...)->ResultPrecursor
+        final_options = forward_args(kwargs, *options)
+        return ResultPrecursor(self.bucket.rget(id, replica_index, **final_options), final_options)
 
     def touch(self,
               id,  # type: str
@@ -395,9 +397,9 @@ class CBCollection(object):
 
         Update the expiration time of a key ::
 
-            cb.upsert("key", timeout=100)
+            cb.upsert("key", expiration=Durations.seconds(100))
             # expires in 100 seconds
-            cb.touch("key", timeout=0)
+            cb.touch("key", expiration=0)
             # key should never expire now
 
         :raise: The same things that :meth:`get` does
@@ -431,7 +433,11 @@ class CBCollection(object):
         """
         return _Base.unlock(self.bucket, id, **forward_args({}, *options))
 
-    def lock(self, key, timeout=0):
+    def lock(self,  # type: CBCollection
+             key,  # type: str
+             *options,  # type: LockOptions
+             **kwargs  # type: Any
+             ):
         """Lock and retrieve a key-value entry in Couchbase.
 
         :param key: A string which is the key to lock.
@@ -498,7 +504,8 @@ class CBCollection(object):
 
         .. seealso:: :meth:`get`, :meth:`lock_multi`, :meth:`unlock`
         """
-        return _Base.lock(self.bucket, key, **forward_args({}, *options))
+        final_options = forward_args(kwargs, *options)
+        return _Base.lock(self.bucket, key, **final_options)
 
     def exists(self,  # type: CBCollection
                id,  # type: str
@@ -530,7 +537,7 @@ class CBCollection(object):
                id,  # type: str
                value,  # type: Any
                cas=0,  # type: int
-               timeout=0,  # type: Seconds
+               expiration=0,  # type: Seconds
                format=None,
                persist_to=PersistTo.NONE,  # type: PersistTo.Value
                replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
@@ -570,7 +577,7 @@ class CBCollection(object):
             will only be stored if it already exists with the supplied
             CAS
 
-        :param timeout: If specified, the key will expire after this
+        :param expiration: If specified, the key will expire after this
             many seconds
 
         :param int format: If specified, indicates the `format` to use
@@ -643,7 +650,7 @@ class CBCollection(object):
     def insert(self,
                id,  # type: str
                value,  # type: Any
-               timeout=Seconds(0),  # type: Seconds
+               expiration=Seconds(0),  # type: Seconds
                format=None,  # type: str
                persist_to=PersistTo.NONE,  # type: PersistTo.Value
                replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
@@ -675,7 +682,7 @@ class CBCollection(object):
                 id,  # type: str
                 value,  # type: Any
                 cas=0,  # type: int
-                timeout=None,  # type: Seconds
+                expiration=None,  # type: Seconds
                 format=None,  # type: bool
                 persist_to=PersistTo.NONE,  # type: PersistTo.Value
                 replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
@@ -1002,7 +1009,7 @@ class CBCollection(object):
                   id,  # type: str
                   delta,  # type: UINT64
                   initial=None,  # type: int
-                  timeout=Seconds(0)  # type: Seconds
+                  expiration=Seconds(0)  # type: Seconds
                   ):
         # type: (...)->ResultPrecursor
         pass
@@ -1080,7 +1087,7 @@ class CBCollection(object):
                   id,  # type: str
                   delta,  # type: UINT64
                   initial=None,  # type: int
-                  timeout=Seconds(0)  # type: Seconds
+                  expiration=Seconds(0)  # type: Seconds
                   ):
         # type: (...)->ResultPrecursor
         pass

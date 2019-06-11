@@ -125,7 +125,8 @@ def forward_args(arg_vars,  # type: Optional[Dict[str,Any]]
     arg_mapping = {'spec': {'specs': lambda x: x}, 'id': {},
                    'replicate_to': {"replicate_to":int},
                    'persist_to': {"persist_to":int},
-                   'timeout': {'ttl': int}, 'self': {}, 'options': {}}
+                   'timeout' : {'ttl': int},
+                   'expiration': {'ttl': int}, 'self': {}, 'options': {}}
     end_options = {}
     for k, v in temp_options.items():
         map_item = arg_mapping.get(k, None)
