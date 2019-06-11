@@ -3,7 +3,7 @@ from abc import abstractmethod
 from boltons.funcutils import wraps
 from mypy_extensions import VarArg, KwArg, Arg
 
-from .subdoc import LookupInSpec, spec_to_SDK2
+from .subdoc import LookupInSpec, SubdocSpec
 from .subdoc import gen_projection_spec
 from .result import GetResult, get_result_wrapper, SDK2Result, ResultPrecursor
 from .options import forward_args, Seconds, OptionBlockTimeOut, OptionBlockDeriv
@@ -25,9 +25,9 @@ class ReplaceOptions(OptionBlockTimeOut, ClientDurableOption, ServerDurableOptio
 
     def cas(self,  # type: ReplaceOptions
             cas  # type: int
-           ):
+            ):
         # type: (...)->ReplaceOptions
-        self.__setitem__('cas',cas)
+        self.__setitem__('cas', cas)
         return self
 
 
@@ -42,9 +42,8 @@ class RemoveOptionsBase(OptionBlock):
 
 
 class RemoveOptions(RemoveOptionsBase, ClientDurableOption, ServerDurableOption):
-
-    ServerDurable=RemoveOptionsBase
-    ClientDurable=RemoveOptionsBase
+    ServerDurable = RemoveOptionsBase
+    ClientDurable = RemoveOptionsBase
 
     def __init__(self, *args, **kwargs):
         super(RemoveOptions, self).__init__(*args, **kwargs)
@@ -81,13 +80,13 @@ class LockOptions(OptionBlock):
 
 class GetOptionsProject(OptionBlock):
     def __init__(self, parent, *args):
-        self['project']=args
-        super(GetOptionsProject,self).__init__(**parent)
+        self['project'] = args
+        super(GetOptionsProject, self).__init__(**parent)
 
 
 class GetOptionsNonProject(OptionBlock):
     def __init__(self, parent):
-        super(GetOptionsNonProject,self).__init__(**parent)
+        super(GetOptionsNonProject, self).__init__(**parent)
 
 
 class GetOptions(OptionBlock):
@@ -103,7 +102,7 @@ class GetOptions(OptionBlock):
                 duration  # type: Seconds
                 ):
         # type: (...)->GetOptionsNonProject
-        self['timeout']=duration.__int__()
+        self['timeout'] = duration.__int__()
         return GetOptionsNonProject(self)
 
     def __copy__(self):
@@ -122,13 +121,14 @@ class GetFromReplicaOptions(OptionBlock):
     pass
 
 
+T = TypeVar('T', bound='CBCollection')
+R = TypeVar("R")
 
-T= TypeVar('T', bound='CBCollection')
-R= TypeVar("R")
-
-RawCollectionMethodDefault = Callable[[Arg('CBCollection','self'), Arg(str, 'key'), VarArg(OptionBlockDeriv),KwArg(Any)],R]
-RawCollectionMethodInt = Callable[[Arg('CBCollection','self'), Arg(str, 'key'), int, VarArg(OptionBlockDeriv),KwArg(Any)],R]
-RawCollectionMethod = Union[RawCollectionMethodDefault,RawCollectionMethodInt]
+RawCollectionMethodDefault = Callable[
+    [Arg('CBCollection', 'self'), Arg(str, 'key'), VarArg(OptionBlockDeriv), KwArg(Any)], R]
+RawCollectionMethodInt = Callable[
+    [Arg('CBCollection', 'self'), Arg(str, 'key'), int, VarArg(OptionBlockDeriv), KwArg(Any)], R]
+RawCollectionMethod = Union[RawCollectionMethodDefault, RawCollectionMethodInt]
 
 
 def _get_result_and_inject(func  # type: RawCollectionMethod
@@ -180,9 +180,6 @@ class IExistsResult(object):
 class LookupInOptions(OptionBlock):
     pass
 
-class GetFromReplicaOptions(OptionBlock):
-    pass
-
 
 class CBCollection(object):
     def __init__(self,
@@ -205,7 +202,8 @@ class CBCollection(object):
     def _scope(self):
         return self.parent.name
 
-    MAX_GET_OPS=16
+    MAX_GET_OPS = 16
+
     def _get_generic(self, key, kwargs, options):
         options = forward_args(kwargs, *options)
         options.pop('key', None)
@@ -215,13 +213,13 @@ class CBCollection(object):
             if len(project) <= CBCollection.MAX_GET_OPS:
                 spec = gen_projection_spec(project)
             else:
-                raise couchbase.exceptions.ArgumentError("Project only accepts {} operations or less".format(CBCollection.MAX_GET_OPS))
+                raise couchbase.exceptions.ArgumentError(
+                    "Project only accepts {} operations or less".format(CBCollection.MAX_GET_OPS))
         if not project:
             x = _Base.get(self.bucket, key, **options)
         else:
             x = self.bucket.lookup_in(key, *spec, **options)
         return ResultPrecursor(x, options)
-
 
     @overload
     def get(self,
@@ -394,7 +392,7 @@ class CBCollection(object):
         .. seealso:: :meth:`get` - which can be used to get *and* update the
             expiration, :meth:`touch_multi`
         """
-        return _Base.touch(self.bucket,id, **forward_args(kwargs, *options))
+        return _Base.touch(self.bucket, id, **forward_args(kwargs, *options))
 
     @mutation_result
     def unlock(self,
@@ -617,8 +615,8 @@ class CBCollection(object):
         .. seealso:: :meth:`upsert_multi`
         """
 
-        final_options=forward_args(kwargs, *options)
-        return ResultPrecursor(_Base.upsert(self.bucket, id, value, **final_options),final_options)
+        final_options = forward_args(kwargs, *options)
+        return ResultPrecursor(_Base.upsert(self.bucket, id, value, **final_options), final_options)
 
     def insert(self,
                id,  # type: str
@@ -782,7 +780,7 @@ class CBCollection(object):
             ``replicate_to`` options.
         """
         final_options = forward_args(kwargs, *options)
-        return ResultPrecursor(_Base.remove(self.bucket, id, **final_options),final_options)
+        return ResultPrecursor(_Base.remove(self.bucket, id, **final_options), final_options)
 
     @overload
     def lookup_in(self,
@@ -886,7 +884,7 @@ class CBCollection(object):
         .. seealso:: :mod:`.couchbase_core.subdocument`
         """
         final_options = forward_args(kwargs, *options)
-        return ResultPrecursor(self.bucket.mutate_in(id, *spec, **final_options),final_options)
+        return ResultPrecursor(self.bucket.mutate_in(id, *spec, **final_options), final_options)
 
     def binary(self):
         # type: (...)->BinaryCollection
@@ -1068,7 +1066,11 @@ class Scope(object):
         """
         return self._name
 
-    def default_collection(self, *options, **kwargs):
+    def default_collection(self,  # type: Scope
+                           *options,  # type: Any
+                           **kwargs  # type: Any
+                           ):
+        # type: (...)->CBCollection
         return CBCollection(self, name=None, **forward_args(kwargs, *options))
 
     def open_collection(self,
@@ -1090,6 +1092,6 @@ class Scope(object):
         return CBCollection(self, collection_name, *options)
 
 
-Collection=CBCollection
+Collection = CBCollection
 
 UpsertOptions = CBCollection.UpsertOptions

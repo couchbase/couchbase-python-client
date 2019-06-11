@@ -26,8 +26,8 @@ T = TypeVar('T', bound=OptionBlock)
 
 class ClientDurableOption(object):
     def dur_client(self,  # type: T
-                   replicate_to,  # type: ReplicateTo
-                   persist_to,  # type: PersistTo
+                   replicate_to,  # type: couchbase.options.Value
+                   persist_to,  # type: couchbase.options.Value
                    ):
         # type: (...)->T.ClientDurable
         self['replicate_to'] = replicate_to

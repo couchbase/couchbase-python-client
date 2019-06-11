@@ -44,6 +44,7 @@ from couchbase import Bucket
 from couchbase_tests.base import ConnectionTestCase
 from couchbase.subdoc import GetOperation
 
+
 class Scenarios(ConnectionTestCase):
     # implicit val ec = ExecutionContext.Implicits.global
 
@@ -87,12 +88,12 @@ class Scenarios(ConnectionTestCase):
         # I include type annotations and getOrError above to make things clearer,
         # but it'd be more idiomatic to write this:
         try:
-            self.coll.get("cheese", options=GetOptions(replica=True))
+            self.coll.get("cheese", GetOptions(replica=True))
             self.coll.get("cheese", replica=True)
             # invalid syntax:
             self.coll.get("cheese", options=GetOptions(replica=True), replica=True)
 
-            result = self.coll.get("id", options=GetOptions().timeout(Seconds(10)))
+            result = self.coll.get("id", GetOptions().timeout(Seconds(10)))
             self.coll.replace(result.id,
                               result.content
                               .put("field", "value")
@@ -194,7 +195,7 @@ class Scenarios(ConnectionTestCase):
                 continue
 
             except DocumentMutationLostException:
-                # Mutation lost during a hard failover.  I *think* we just retry with the original replicate_to.  If enough replicas
+                # Mutation lost during a hard failover. If enough replicas
                 # still aren't available, it will presumably raise ReplicaNotAvailableException and retry with lower.
                 # self.retryIdempotentRemoveClientSide(callback, original_replicate_to, original_replicate_to, until)
                 replicate_to = original_replicate_to
@@ -216,8 +217,8 @@ class Scenarios(ConnectionTestCase):
             self.retry_idempotent_remove_server_side(
                 lambda: self.coll.remove("id", RemoveOptions().dur_server(durability_type)))
 
-    def retry_idempotent_remove_server_side(self,
-                                            callback,  # type: Callable[None],
+    def retry_idempotent_remove_server_side(self,  # type: Scenarios
+                                            callback,  # type: Callable[[],Any]
                                             until=Durations.seconds(10)  # type: FiniteDuration
                                             ):
         """
@@ -232,10 +233,7 @@ class Scenarios(ConnectionTestCase):
             try:
                 callback()
                 return
-                # Not entirely clear what failures need to be handled yet, but will be considerably easier than observe() based
-                # logic.  I think the only case to handle is:
             except couchbase.exceptions.DurabilitySyncWriteAmbiguousException:
-                # A guarantee is that the mutation is either written to a majority of nodes, or none.  But we don't know which.
                 if self.coll.get("id").success():
                     continue
                 logging.info("Our work here is done")
@@ -389,9 +387,6 @@ class Scenarios(ConnectionTestCase):
         changed = user.with_attr(age=25)
         self.assertEqual(Scenarios.UserPartial("fred", 25), changed)
 
-
-        # Note: I have misgivings over whether this update-with-a-projection should be allowed
-        # mergeUpsert will upsert fields user.name & user.age, leaving user.address alone
         self.coll.mutate_in(subdoc.id, [MutateSpec().upsert("user", changed)])
 
     def test_upsert(self):

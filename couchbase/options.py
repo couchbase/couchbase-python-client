@@ -87,9 +87,11 @@ class OptionBlockTimeOut(OptionBlock):
 
 class Value(object):
     def __init__(self,
-                 value  # type: Union[str,bytes,SupportsInt]
+                 value,  # type: Union[str,bytes,SupportsInt]
+                 **kwargs  # type: Any
                  ):
         self.value = value
+        self.kwargs = kwargs
 
     def __int__(self):
         return self.value
@@ -100,8 +102,8 @@ class Value(object):
 
 class Cardinal(OptionBlock):
     class ONE(Value):
-        def __init__(self, *args, **kwargs):
-            super(Cardinal.ONE, self).__init__(1)
+        def __init__(self, **kwargs):
+            super(Cardinal.ONE, self).__init__(1, **kwargs)
 
     TWO = Value(2)
     THREE = Value(3)
