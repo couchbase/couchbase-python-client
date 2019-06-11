@@ -17,6 +17,19 @@ import copy
 import pyrsistent
 from typing import *
 from .durability import Durability
+from ctypes import c_uint64
+
+
+class UnsignedInt64(object):
+    def __init__(self,
+                 value  # type: int
+                 ):
+        # type: (...) -> None
+        if value < 0:
+            raise couchbase.exceptions.ArgumentError("Negative arguments not accepted")
+        self.value=value
+
+UINT64 = Union[UnsignedInt64,c_uint64]
 
 
 class ReplaceOptions(OptionBlockTimeOut, ClientDurableOption, ServerDurableOption):
@@ -977,13 +990,17 @@ class CBCollection(object):
                 **kwargs  # type: Any
                 ):
         # type: (...)->ResultPrecursor
+        """Prepend a string to an existing value in Couchbase.
+
+        .. seealso:: :meth:`append`, :meth:`prepend_multi`
+        """
         x = _Base.prepend(self.bucket, id, value, **forward_args(kwargs, *options))
         return ResultPrecursor(x, options)
 
     @overload
     def increment(self,
                   id,  # type: str
-                  delta,  # type: int
+                  delta,  # type: UINT64
                   initial=None,  # type: int
                   timeout=Seconds(0)  # type: Seconds
                   ):
@@ -993,7 +1010,7 @@ class CBCollection(object):
     @overload
     def increment(self,
                   id,  # type: str
-                  delta,  # type: int
+                  delta,  # type: UINT64
                   *options,  # type: CounterOptions
                   **kwargs
                   ):
@@ -1002,18 +1019,66 @@ class CBCollection(object):
 
     def increment(self,
                   id,  # type: str
-                  delta,  # type: int
+                  delta,  # type: UINT64
                   *options,  # type: CounterOptions
                   **kwargs
                   ):
         # type: (...)->ResultPrecursor
-        x = _Base.counter(self.bucket, id, delta, **forward_args(kwargs, *options))
+        """Increment the numeric value of an item.
+
+        This method instructs the server to treat the item stored under
+        the given key as a numeric counter.
+
+        Counter operations require that the stored value
+        exists as a string representation of a number (e.g. ``123``). If
+        storing items using the :meth:`upsert` family of methods, and
+        using the default :const:`couchbase_v2.FMT_JSON` then the value
+        will conform to this constraint.
+
+        :param string key: A key whose counter value is to be modified
+        :param UINT64 delta: an amount by which the key should be incremented.
+           If the number is negative then this number will be
+           *added* to the current value.
+        :param initial: The initial value for the key, if it does not
+           exist. If the key does not exist, this value is used, and
+           `delta` is ignored. If this parameter is `None` then no
+           initial value is used
+        :type initial: int or `None`
+        :param int ttl: The lifetime for the key, after which it will
+           expire
+        :raise: :exc:`.NotFoundError` if the key does not exist on the
+           bucket (and `initial` was `None`)
+        :raise: :exc:`.DeltaBadvalError` if the key exists, but the
+           existing value is not numeric
+        :return: A :class:`.Result` object. The current value of the
+           counter may be obtained by inspecting the return value's
+           `value` attribute.
+
+        Simple increment::
+
+           rv = cb.increment("key")
+           rv.value
+           # 42
+
+        Increment by 10::
+
+           rv = cb.increment("key", delta=10)
+
+
+        Increment by 20, set initial value to 5 if it does not exist::
+
+           rv = cb.increment("key", delta=20, initial=5)
+
+        """
+        if not (isinstance(delta, UnsignedInt64) or isinstance(delta, c_uint64)):
+            raise couchbase.exceptions.ArgumentError("Increment only accepts unsigned integers as delta value")
+        x = _Base.counter(self.bucket, id, delta.value, **forward_args(kwargs, *options))
         return ResultPrecursor(x, options)
 
     @overload
     def decrement(self,
                   id,  # type: str
-                  delta,  # type: int
+                  delta,  # type: UINT64
                   initial=None,  # type: int
                   timeout=Seconds(0)  # type: Seconds
                   ):
@@ -1023,7 +1088,7 @@ class CBCollection(object):
     @overload
     def decrement(self,
                   id,  # type: str
-                  delta,  # type: int
+                  delta,  # type: UINT64
                   *options,  # type: CounterOptions
                   **kwargs
                   ):
@@ -1032,17 +1097,65 @@ class CBCollection(object):
 
     def decrement(self,
                   id,  # type: str
-                  delta,  # type: int
+                  delta,  # type: UINT64
                   *options,  # type: CounterOptions
                   **kwargs
                   ):
         # type: (...)->ResultPrecursor
-        x = _Base.counter(self.bucket, id, -delta, **forward_args(kwargs, *options))
+        """Decrement the numeric value of an item.
+
+        This method instructs the server to treat the item stored under
+        the given key as a numeric counter.
+
+        Counter operations require that the stored value
+        exists as a string representation of a number (e.g. ``123``). If
+        storing items using the :meth:`upsert` family of methods, and
+        using the default :const:`couchbase_v2.FMT_JSON` then the value
+        will conform to this constraint.
+
+        :param string key: A key whose counter value is to be modified
+        :param UINT64 delta: an amount by which the key should be decremented.
+           If the number is negative then this number will be
+           *subtracted* from the current value.
+        :param initial: The initial value for the key, if it does not
+           exist. If the key does not exist, this value is used, and
+           `delta` is ignored. If this parameter is `None` then no
+           initial value is used
+        :type initial: int or `None`
+        :param int ttl: The lifetime for the key, after which it will
+           expire
+        :raise: :exc:`.NotFoundError` if the key does not exist on the
+           bucket (and `initial` was `None`)
+        :raise: :exc:`.DeltaBadvalError` if the key exists, but the
+           existing value is not numeric
+        :return: A :class:`.Result` object. The current value of the
+           counter may be obtained by inspecting the return value's
+           `value` attribute.
+
+        Simple decrement::
+
+           rv = cb.decrement("key")
+           rv.value
+           # 42
+
+        Decrement by 10::
+
+           rv = cb.decrement("key", delta=10)
+
+
+        Decrement by 20, set initial value to 5 if it does not exist::
+
+           rv = cb.decrement("key", delta=20, initial=5)
+
+        """
+        if not (isinstance(delta, UnsignedInt64) or isinstance(delta, c_uint64)):
+            raise couchbase.exceptions.ArgumentError("Decrement only accepts unsigned integers as delta value")
+        x = _Base.counter(self.bucket, id, -delta.value, **forward_args(kwargs, *options))
         return ResultPrecursor(x, options)
 
 
 class Scope(object):
-    def __init__(self,
+    def __init__(self,  # type: Scope
                  parent,  # type: couchbase.bucket.Bucket
                  name=None  # type: str
                  ):

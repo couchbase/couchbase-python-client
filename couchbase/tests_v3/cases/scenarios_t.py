@@ -31,7 +31,7 @@ from couchbase_core.transcodable import Transcodable
 import couchbase_core.connstr
 import couchbase.exceptions
 
-from couchbase import JSONDocument, Durability, LookupInSpec
+from couchbase import JSONDocument, Durability, LookupInSpec, UnsignedInt64
 from couchbase.cluster import Cluster
 from couchbase import ReplicateTo, PersistTo, FiniteDuration, copy, \
     Seconds, ReplicaNotConfiguredException, DocumentConcurrentlyModifiedException, \
@@ -393,3 +393,21 @@ class Scenarios(ConnectionTestCase):
 
         self.coll.upsert("fish", "banana")
         self.assertEquals("banana", self.coll.get("fish").content_as[str])
+
+    def test_unsigned_int(self):
+        self.assertRaises(couchbase.exceptions.ArgumentError, UnsignedInt64, -1)
+        x=UnsignedInt64(5)
+        self.assertEqual(5,x.value)
+
+    def test_decrement(self):
+        self.coll.upsert("counter",10)
+        self.coll.decrement("counter",UnsignedInt64(1))
+        self.assertRaises(couchbase.exceptions.ArgumentError, self.coll.decrement, "counter",-3)
+        intvalue=self.coll.get("counter").content_as[int]
+        self.assertEqual(9,intvalue)
+
+    def test_increment(self):
+        self.coll.upsert("counter",10)
+        self.coll.increment("counter",UnsignedInt64(1))
+        self.assertRaises(couchbase.exceptions.ArgumentError, self.coll.increment, "counter",-3)
+        self.assertEqual(11,self.coll.get("counter").content_as[int])
