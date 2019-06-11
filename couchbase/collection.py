@@ -685,7 +685,8 @@ class CBCollection(object):
         .. seealso:: :meth:`upsert`, :meth:`insert_multi`
         """
 
-        return _Base.insert(self.bucket, key, value, **forward_args(kwargs, *options))
+        final_options = forward_args(kwargs, *options)
+        return ResultPrecursor(_Base.insert(self.bucket, key, value, final_options), final_options)
 
     @overload
     def replace(self,
@@ -710,6 +711,7 @@ class CBCollection(object):
         # type: (...)->MutationResult
         pass
 
+    @_mutate_result_and_inject
     def replace(self,
                 id,  # type: str
                 value,  # type: Any
@@ -726,7 +728,8 @@ class CBCollection(object):
 
            .. seealso:: :meth:`upsert`, :meth:`replace_multi`"""
 
-        return _Base.replace(self.bucket, id, value, **forward_args(kwargs, *options))
+        final_options = forward_args(kwargs, *options)
+        return ResultPrecursor(_Base.replace(self.bucket, id, value, **final_options), final_options)
 
     @overload
     def remove(self,  # type: CBCollection
