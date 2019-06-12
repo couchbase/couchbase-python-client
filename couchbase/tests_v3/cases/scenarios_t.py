@@ -31,7 +31,7 @@ from couchbase_core.transcodable import Transcodable
 import couchbase_core.connstr
 import couchbase.exceptions
 
-from couchbase import JSONDocument, Durability, LookupInSpec, UnsignedInt64
+from couchbase import JSONDocument, Durability, LookupInSpec, DeltaValue, SignedInt64
 from couchbase.cluster import Cluster
 from couchbase import ReplicateTo, PersistTo, FiniteDuration, copy, \
     Seconds, ReplicaNotConfiguredException, DocumentConcurrentlyModifiedException, \
@@ -395,19 +395,53 @@ class Scenarios(ConnectionTestCase):
         self.assertEquals("banana", self.coll.get("fish").content_as[str])
 
     def test_unsigned_int(self):
-        self.assertRaises(couchbase.exceptions.ArgumentError, UnsignedInt64, -1)
-        x=UnsignedInt64(5)
+        self.assertRaises(couchbase.exceptions.ArgumentError, DeltaValue, -1)
+        self.assertRaises(couchbase.exceptions.ArgumentError, DeltaValue, 0x7FFFFFFFFFFFFFFF + 1)
+        x=DeltaValue(5)
         self.assertEqual(5,x.value)
 
+    def test_signed_int_64(self):
+        self.assertRaises(couchbase.exceptions.ArgumentError, SignedInt64, -0x7FFFFFFFFFFFFFFF-2)
+        self.assertRaises(couchbase.exceptions.ArgumentError, SignedInt64, 0x7FFFFFFFFFFFFFFF + 1)
+        x=SignedInt64(0x7FFFFFFFFFFFFFFF)
+        self.assertEqual(0x7FFFFFFFFFFFFFFF,x.value)
+        x=SignedInt64(-0x7FFFFFFFFFFFFFFF-1)
+        self.assertEqual(-0x7FFFFFFFFFFFFFFF-1,x.value)
+
     def test_decrement(self):
-        self.coll.upsert("counter",10)
-        self.coll.decrement("counter",UnsignedInt64(1))
+        try:
+            self.coll.remove("counter")
+        except:
+            pass
+        self.coll.decrement("counter", DeltaValue(0), initial=SignedInt64(43))
+        self.assertEqual(43,self.coll.get("counter").content_as[int])
+        self.coll.decrement("counter", DeltaValue(1))
+        self.assertEqual(42,self.coll.get("counter").content_as[int])
+
+        self.coll.remove("counter")
+        self.coll.upsert("counter", 43)
+        self.coll.decrement("counter", DeltaValue(1))
+        self.assertEqual(42,self.coll.get("counter").content_as[int])
+
+        self.assertRaises(couchbase.exceptions.ArgumentError, self.coll.decrement, "counter", DeltaValue(5), initial=10)
+        self.assertRaises(couchbase.exceptions.ArgumentError, self.coll.decrement, "counter", 5)
         self.assertRaises(couchbase.exceptions.ArgumentError, self.coll.decrement, "counter",-3)
-        intvalue=self.coll.get("counter").content_as[int]
-        self.assertEqual(9,intvalue)
 
     def test_increment(self):
-        self.coll.upsert("counter",10)
-        self.coll.increment("counter",UnsignedInt64(1))
+        try:
+            self.coll.remove("counter")
+        except:
+            pass
+        self.coll.increment("counter", DeltaValue(0), initial=SignedInt64(43))
+        self.assertEqual(43,self.coll.get("counter").content_as[int])
+        self.coll.increment("counter", DeltaValue(1))
+        self.assertEqual(44,self.coll.get("counter").content_as[int])
+
+        self.coll.remove("counter")
+        self.coll.upsert("counter", 43)
+        self.coll.increment("counter", DeltaValue(1))
+        self.assertEqual(44,self.coll.get("counter").content_as[int])
+
+        self.assertRaises(couchbase.exceptions.ArgumentError, self.coll.increment, "counter", DeltaValue(5), initial=10)
+        self.assertRaises(couchbase.exceptions.ArgumentError, self.coll.increment, "counter", 5)
         self.assertRaises(couchbase.exceptions.ArgumentError, self.coll.increment, "counter",-3)
-        self.assertEqual(11,self.coll.get("counter").content_as[int])

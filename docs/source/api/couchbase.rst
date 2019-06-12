@@ -229,13 +229,23 @@ Counter Operations
 These are atomic counter operations for Couchbase. They increment
 or decrement a counter. A counter is a key whose value can be parsed
 as an integer. Counter values may be retrieved (without modification)
-using the :meth:`Bucket.get` method
+using the :meth:`couchbase.collection.Collection.get` method
 
-.. currentmodule:: couchbase.bucket
+.. currentmodule:: couchbase.options
+.. class:: SignedInt64
 
-.. class:: Bucket
+    .. automethod:: __init__
 
-    .. automethod:: counter
+
+.. currentmodule:: couchbase.collection
+.. class:: DeltaValue
+
+    .. automethod:: __init__
+
+.. class:: Collection
+
+    .. automethod:: increment
+    .. automethod:: decrement
 
 
 Multi-Key Data Methods

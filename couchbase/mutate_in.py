@@ -102,7 +102,7 @@ class MutationResult(IResult):
 def get_mutation_result(result  # type: ResultPrecursor
                         ):
     # type (...)->MutationResult
-    return MutationResult(result.orig_result.cas, SDK2MutationToken(result.orig_result._mutinfo) if hasattr(result.orig_result._mutinfo, '_mutinfo') else None)
+    return MutationResult(result.orig_result.cas, SDK2MutationToken(result.orig_result._mutinfo) if hasattr(result.orig_result, '_mutinfo') else None)
 
 
 SDK2Result=TypeVar('SDK2Result')

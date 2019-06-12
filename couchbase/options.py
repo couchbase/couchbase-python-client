@@ -2,6 +2,8 @@ import time
 import copy
 from typing import *
 
+import couchbase.exceptions
+import ctypes
 
 class FiniteDuration(object):
     def __init__(self, seconds  # type: Union[float,int]
@@ -138,3 +140,63 @@ def forward_args(arg_vars,  # type: Optional[Dict[str,Any]]
     return end_options
 
 
+AcceptableInts = Union['ConstrainedValue', ctypes.c_int64, ctypes.c_uint64, int]
+
+
+class ConstrainedInt(object):
+    def __init__(self,value):
+        """
+        A signed integer between cls.min() and cls.max() inclusive
+
+        :param couchbase.options.AcceptableInts value: the value to initialise this with.
+        :raise couchbase.exceptions.ArgumentError if not in range
+        """
+        self.value = type(self).verified_value(value)
+
+    @classmethod
+    def verified_value(cls, item  # type: AcceptableInts
+                        ):
+        # type: (...)->int
+        value = getattr(item, 'value', item)
+        if not isinstance(value, int) or not (cls.min()<=value<=cls.max()):
+            raise couchbase.exceptions.ArgumentError("Integer in range {} and {} inclusiverequired".format(cls.min(), cls.max()))
+        return value
+
+    @classmethod
+    def verified(cls,
+                 item  # type: AcceptableInts
+                 ):
+        if isinstance(item, cls):
+            return item
+        raise couchbase.exceptions.ArgumentError("Argument is not {}".format(cls))
+
+    def __neg__(self):
+        return -self.value
+
+    def __int__(self):
+        return self.value
+
+    @classmethod
+    def max(cls):
+        raise NotImplementedError()
+
+    @classmethod
+    def min(cls):
+        raise NotImplementedError()
+
+
+class SignedInt64(ConstrainedInt):
+    def __init__(self, value):
+        """
+        A signed integer between -0x8000000000000000 and +0x7FFFFFFFFFFFFFFF inclusive.
+
+        :param couchbase.options.AcceptableInts value: the value to initialise this with.
+        :raise couchbase.exceptions.ArgumentError if not in range
+        """
+        super(SignedInt64,self).__init__(value)
+    @classmethod
+    def max(cls):
+        return 0x7FFFFFFFFFFFFFFF
+    @classmethod
+    def min(cls):
+        return -0x8000000000000000

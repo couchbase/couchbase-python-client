@@ -6,9 +6,9 @@ from mypy_extensions import VarArg, KwArg, Arg
 from .subdoc import LookupInSpec, SubdocSpec
 from .subdoc import gen_projection_spec
 from .result import GetResult, get_result_wrapper, SDK2Result, ResultPrecursor
-from .options import forward_args, Seconds, OptionBlockTimeOut, OptionBlockDeriv
+from .options import forward_args, Seconds, OptionBlockTimeOut, OptionBlockDeriv, ConstrainedInt, SignedInt64, AcceptableInts
 from .mutate_in import mutation_result, MutationResult, MutateInSpec, MutateInOptions
-from .options import OptionBlock
+from .options import OptionBlock, AcceptableInts
 from .durability import ReplicateTo, PersistTo, ClientDurableOption, ServerDurableOption
 from couchbase_core._libcouchbase import Bucket as _Base
 import couchbase.exceptions
@@ -17,19 +17,29 @@ import copy
 import pyrsistent
 from typing import *
 from .durability import Durability
-from ctypes import c_uint64
 
 
-class UnsignedInt64(object):
+class DeltaValue(ConstrainedInt):
     def __init__(self,
-                 value  # type: int
+                 value  # type: AcceptableInts
                  ):
-        # type: (...) -> None
-        if value < 0:
-            raise couchbase.exceptions.ArgumentError("Negative arguments not accepted")
-        self.value=value
+        # type: (...)->None
+        """
+        A non-negative integer between 0 and +0x7FFFFFFFFFFFFFFF inclusive.
+        Used as an argument for :meth:`Collection.increment` and :meth:`Collection.decrement`
 
-UINT64 = Union[UnsignedInt64,c_uint64]
+        :param couchbase.options.AcceptableInts value: the value to initialise this with.
+        :raise couchbase.exceptions.ArgumentError if not in range
+        """
+        super(DeltaValue,self).__init__(value)
+
+    @classmethod
+    def max(cls):
+        return 0x7FFFFFFFFFFFFFFF
+
+    @classmethod
+    def min(cls):
+        return 0
 
 
 class ReplaceOptions(OptionBlockTimeOut, ClientDurableOption, ServerDurableOption):
@@ -1007,8 +1017,8 @@ class CBCollection(object):
     @overload
     def increment(self,
                   id,  # type: str
-                  delta,  # type: UINT64
-                  initial=None,  # type: int
+                  delta,  # type: DeltaValue
+                  initial=None,  # type: SignedInt64
                   expiration=Seconds(0)  # type: Seconds
                   ):
         # type: (...)->ResultPrecursor
@@ -1017,16 +1027,17 @@ class CBCollection(object):
     @overload
     def increment(self,
                   id,  # type: str
-                  delta,  # type: UINT64
+                  delta,  # type: DeltaValue
                   *options,  # type: CounterOptions
                   **kwargs
                   ):
         # type: (...)->ResultPrecursor
         pass
 
+    @_mutate_result_and_inject
     def increment(self,
                   id,  # type: str
-                  delta,  # type: UINT64
+                  delta,  # type: DeltaValue
                   *options,  # type: CounterOptions
                   **kwargs
                   ):
@@ -1039,54 +1050,49 @@ class CBCollection(object):
         Counter operations require that the stored value
         exists as a string representation of a number (e.g. ``123``). If
         storing items using the :meth:`upsert` family of methods, and
-        using the default :const:`couchbase_v2.FMT_JSON` then the value
+        using the default :const:`couchbase_core.FMT_JSON` then the value
         will conform to this constraint.
 
         :param string key: A key whose counter value is to be modified
-        :param UINT64 delta: an amount by which the key should be incremented.
-           If the number is negative then this number will be
-           *added* to the current value.
-        :param initial: The initial value for the key, if it does not
+        :param DeltaValue delta: an amount by which the key should be incremented.
+        :param couchbase.options.SignedInt64 initial: The initial value for the key, if it does not
            exist. If the key does not exist, this value is used, and
            `delta` is ignored. If this parameter is `None` then no
            initial value is used
-        :type initial: int or `None`
-        :param int ttl: The lifetime for the key, after which it will
+        :type SignedInt64 initial: :class:`couchbase.options.SignedInt64` or `None`
+        :param Seconds expiration: The lifetime for the key, after which it will
            expire
         :raise: :exc:`.NotFoundError` if the key does not exist on the
            bucket (and `initial` was `None`)
         :raise: :exc:`.DeltaBadvalError` if the key exists, but the
            existing value is not numeric
-        :return: A :class:`.Result` object. The current value of the
-           counter may be obtained by inspecting the return value's
-           `value` attribute.
+        :return: A :class:`couchbase.result.MutationResult` object.
 
         Simple increment::
 
            rv = cb.increment("key")
-           rv.value
+           cb.get("key").content_as[int]
            # 42
 
         Increment by 10::
 
-           rv = cb.increment("key", delta=10)
+           rv = cb.increment("key", DeltaValue(10))
 
 
         Increment by 20, set initial value to 5 if it does not exist::
 
-           rv = cb.increment("key", delta=20, initial=5)
+           rv = cb.increment("key", DeltaValue(20), initial=SignedInt64(5))
 
         """
-        if not (isinstance(delta, UnsignedInt64) or isinstance(delta, c_uint64)):
-            raise couchbase.exceptions.ArgumentError("Increment only accepts unsigned integers as delta value")
-        x = _Base.counter(self.bucket, id, delta.value, **forward_args(kwargs, *options))
-        return ResultPrecursor(x, options)
+        final_opts = self._check_delta_initial(kwargs, *options)
+        x = _Base.counter(self.bucket, id, delta=int(DeltaValue.verified(delta)), **final_opts)
+        return ResultPrecursor(x, final_opts)
 
     @overload
     def decrement(self,
                   id,  # type: str
-                  delta,  # type: UINT64
-                  initial=None,  # type: int
+                  delta,  # type: DeltaValue
+                  initial=None,  # type: SignedInt64
                   expiration=Seconds(0)  # type: Seconds
                   ):
         # type: (...)->ResultPrecursor
@@ -1095,16 +1101,17 @@ class CBCollection(object):
     @overload
     def decrement(self,
                   id,  # type: str
-                  delta,  # type: UINT64
+                  delta,  # type: DeltaValue
                   *options,  # type: CounterOptions
                   **kwargs
                   ):
         # type: (...)->ResultPrecursor
         pass
 
+    @_mutate_result_and_inject
     def decrement(self,
                   id,  # type: str
-                  delta,  # type: UINT64
+                  delta,  # type: DeltaValue
                   *options,  # type: CounterOptions
                   **kwargs
                   ):
@@ -1117,48 +1124,53 @@ class CBCollection(object):
         Counter operations require that the stored value
         exists as a string representation of a number (e.g. ``123``). If
         storing items using the :meth:`upsert` family of methods, and
-        using the default :const:`couchbase_v2.FMT_JSON` then the value
+        using the default :const:`couchbase_core.FMT_JSON` then the value
         will conform to this constraint.
 
         :param string key: A key whose counter value is to be modified
-        :param UINT64 delta: an amount by which the key should be decremented.
-           If the number is negative then this number will be
-           *subtracted* from the current value.
-        :param initial: The initial value for the key, if it does not
+        :param DeltaValue delta: an amount by which the key should be decremented.
+        :param couchbase.options.SignedInt64 initial: The initial value for the key, if it does not
            exist. If the key does not exist, this value is used, and
            `delta` is ignored. If this parameter is `None` then no
            initial value is used
-        :type initial: int or `None`
-        :param int ttl: The lifetime for the key, after which it will
+        :type SignedInt64 initial: :class:`couchbase.options.SignedInt64` or `None`
+        :param Seconds expiration: The lifetime for the key, after which it will
            expire
         :raise: :exc:`.NotFoundError` if the key does not exist on the
            bucket (and `initial` was `None`)
         :raise: :exc:`.DeltaBadvalError` if the key exists, but the
            existing value is not numeric
-        :return: A :class:`.Result` object. The current value of the
-           counter may be obtained by inspecting the return value's
-           `value` attribute.
+        :return: A :class:`couchbase.result.MutationResult` object.
 
         Simple decrement::
 
            rv = cb.decrement("key")
-           rv.value
+           cb.get("key").content_as[int]
            # 42
 
         Decrement by 10::
 
-           rv = cb.decrement("key", delta=10)
+           rv = cb.decrement("key", DeltaValue(10))
 
 
         Decrement by 20, set initial value to 5 if it does not exist::
 
-           rv = cb.decrement("key", delta=20, initial=5)
+           rv = cb.decrement("key", DeltaValue(20), initial=SignedInt64(5))
 
         """
-        if not (isinstance(delta, UnsignedInt64) or isinstance(delta, c_uint64)):
-            raise couchbase.exceptions.ArgumentError("Decrement only accepts unsigned integers as delta value")
-        x = _Base.counter(self.bucket, id, -delta.value, **forward_args(kwargs, *options))
-        return ResultPrecursor(x, options)
+        final_opts = self._check_delta_initial(kwargs, *options)
+
+        final_opts = self._check_delta_initial(kwargs, *options)
+        x = _Base.counter(self.bucket, id, delta=-int(DeltaValue.verified(delta)), **final_opts)
+        return ResultPrecursor(x, final_opts)
+
+    def _check_delta_initial(self, kwargs, *options):
+        final_opts = forward_args(kwargs, *options)
+        init_arg = final_opts.get('initial')
+        initial = None if init_arg == None else int(SignedInt64.verified(init_arg))
+        if initial != None:
+            final_opts['initial'] = initial
+        return final_opts
 
 
 class Scope(object):
