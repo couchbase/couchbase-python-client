@@ -134,7 +134,7 @@ class Scenarios(ConnectionTestCase):
 
         somecontents['some']['path']='fred'
         somecontents['some'].update({'other':{'path':'martha'}})
-        self.assertEqual(somecontents,self.coll.get('somekey').content.value)
+        self.assertEqual(somecontents,self.coll.get('somekey').content)
 
     def test_scenario_C_clientSideDurability(self):
         """

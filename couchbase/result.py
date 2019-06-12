@@ -16,29 +16,35 @@ except:
 from couchbase_core.result import MultiResult, SubdocResult
 
 
+def canonical_sdresult(content):
+    sdresult=content  # type: SubdocResult
+    result = {}
+    cursor=iter(sdresult)
+    for index in range(0,sdresult.result_count):
+        spec = sdresult._specs[index]  # type: Spec
+        result[spec[1]]=next(cursor)
+    return result
+
+
+def extract_value(content, decode_canonical):
+    if isinstance(content, MultiResult):
+        return {k: decode_canonical(content[k].value) for k, v, in content}
+    elif isinstance(content, SubdocResult):
+        return decode_canonical(canonical_sdresult(content))
+    return decode_canonical(content.value)
+
+
 class ContentProxy:
     def __init__(self, content):
         self.content = content
-
-    def canonical_sdresult(self):
-        sdresult=self.content  # type: SubdocResult
-        result = {}
-        cursor=iter(sdresult)
-        for index in range(0,sdresult.result_count):
-            spec = sdresult._specs[index]  # type: Spec
-            result[spec[1]]=next(cursor)
-        return result
 
     def __getitem__(self,
                     item  # type: Type[Proxy_T]
                     ):
         # type: (...)->Union[Proxy_T,Mapping[str,Proxy_T]]
         decode_canonical = getattr(item, 'decode_canonical', None) if issubclass(item, Transcodable) else item
-        if isinstance(self.content, MultiResult):
-            return {k: decode_canonical(self.content[k].value) for k,v, in self.content}
-        elif isinstance(self.content, SubdocResult):
-            return decode_canonical(self.canonical_sdresult())
-        return decode_canonical(self.content.value)
+        return extract_value(self.content, decode_canonical)
+
 
 
 class IResult(object):
@@ -76,7 +82,6 @@ class IGetResult(IResult):
     def expiry(self):
         # type: ()->FiniteDuration
         pass
-
 
 class GetResult(IGetResult):
     def __init__(self,
@@ -118,7 +123,7 @@ class GetResult(IGetResult):
     @property
     def content(self):
         # type: () -> SDK2Result
-        return self._content
+        return extract_value(self._content, lambda x:x)
 
 
 ResultPrecursor = NamedTuple('ResultPrecursor', [('orig_result',SDK2Result), ('orig_options',Mapping[str,Any])])
@@ -129,6 +134,7 @@ def get_result(x,  # type: SDK2Result
                ):
     # type: (...)->GetResult
     options = options or {}
+
     return GetResult(x, cas=getattr(x, 'cas'), expiry=options.pop('timeout', None), id=x.key)
 
 
