@@ -135,16 +135,23 @@ class Cluster:
         # type: (...)->IQueryResult
         pass
 
-    def query_real(self,
-                   statement,
-                   *options, **kwargs):
+    def query(self,
+              statement,
+              *options,  # type: QueryOptions
+              **kwargs):
         # type: (str, Any, Any) -> IQueryResult
+        """
+
+        :param str statement: the N1QL query statement to execute
+        :param QueryOptions options: the optional parameters that the Query service takes.
+            See The N1QL Query API for details or a SDK 2.0 implementation for detail.
+
+        :return: An :class:`IQueryResult` object with the results of the query or error message
+        if the query failed on the server.
+
+        """
         result = self._cluster.n1ql_query(statement, forward_args(kwargs, *options))
         return result
-
-    @options_to_func(QueryOptions, query_real)
-    class query:
-        __doc__ = QueryOptions.__doc__
 
     def _operate_on_first_bucket(self, verb, failtype, *args, **kwargs):
         first_bucket = next(iter(self._cluster._buckets), None)  # type: Optional[couchbase.CoreBucket]
