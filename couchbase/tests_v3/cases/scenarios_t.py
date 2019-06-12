@@ -31,18 +31,19 @@ from couchbase_core.transcodable import Transcodable
 import couchbase_core.connstr
 import couchbase.exceptions
 
-from couchbase import JSONDocument, Durability, LookupInSpec, DeltaValue, SignedInt64
+from couchbase import JSONDocument, Durability, LookupInSpec, DeltaValue, SignedInt64, MutateInResult, MutationResult, \
+    LookupInResult
 from couchbase.cluster import Cluster
 from couchbase import ReplicateTo, PersistTo, FiniteDuration, copy, \
     Seconds, ReplicaNotConfiguredException, DocumentConcurrentlyModifiedException, \
     DocumentMutationLostException, ReplicaNotAvailableException, MutateSpec, CASMismatchException, \
     Durations, \
-    MutationResult, MutateInOptions
+    MutateInOptions
 from couchbase import CBCollection, GetOptions, RemoveOptions, ReplaceOptions
 from couchbase import Bucket
 
 from couchbase_tests.base import ConnectionTestCase
-from couchbase.subdoc import GetOperation
+import couchbase.subdoc as SD
 
 
 class Scenarios(ConnectionTestCase):
@@ -119,17 +120,17 @@ class Scenarios(ConnectionTestCase):
             arr = subdoc.content_as_array()
             arr.append("foo")
 
-            result = self.coll.mutate_in("id", [MutateSpec().upsert("someArray", arr)],
+            result = self.coll.mutate_in("id", [SD.upsert("someArray", arr)],
                                       MutateInOptions().timeout(Seconds(10)))
 
-        self.assertIsInstance(result, MutationResult)
+        self.assertIsInstance(result, MutateInResult)
 
     def test_mutatein(self):
         somecontents={'some':{'path':'keith'}}
         self.coll.upsert('somekey',somecontents)
         self.coll.mutate_in('somekey', (
-            MutateSpec().replace('some.path', "fred"),
-            MutateSpec().insert('some.other.path', 'martha', create_parents=True),
+            SD.replace('some.path', "fred"),
+            SD.insert('some.other.path', 'martha', create_parents=True),
         ))
 
         somecontents['some']['path']='fred'
@@ -382,8 +383,9 @@ class Scenarios(ConnectionTestCase):
         subdoc = self.coll.get("id", project=("name", "age"))
 
         user = subdoc.content_as[Scenarios.UserPartial]
-        altuser=self.coll.lookup_in("id", (GetOperation("name"),GetOperation("age"))).content_as[Scenarios.UserPartial]
-        self.assertEqual(altuser,user)
+        altuser=self.coll.lookup_in("id", (SD.get("name"), SD.get("age")))
+        self.assertEqual("fred",altuser.content_as[str](0))
+        self.assertEqual(21,altuser.content_as[int](1))
         changed = user.with_attr(age=25)
         self.assertEqual(Scenarios.UserPartial("fred", 25), changed)
 

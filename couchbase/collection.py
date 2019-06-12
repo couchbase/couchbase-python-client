@@ -3,11 +3,11 @@ from abc import abstractmethod
 from boltons.funcutils import wraps
 from mypy_extensions import VarArg, KwArg, Arg
 
-from .subdoc import LookupInSpec, SubdocSpec
-from .subdoc import gen_projection_spec
-from .result import GetResult, get_result_wrapper, SDK2Result, ResultPrecursor
+from .subdoc import LookupInSpec, SubdocSpec, MutateInSpec, MutateInOptions, \
+    gen_projection_spec
+from .result import GetResult, get_result_wrapper, SDK2Result, ResultPrecursor, LookupInResult, MutateInResult, \
+    MutationResult, _wrap_in_mutation_result
 from .options import forward_args, Seconds, OptionBlockTimeOut, OptionBlockDeriv, ConstrainedInt, SignedInt64, AcceptableInts
-from .mutate_in import mutation_result, MutationResult, MutateInSpec, MutateInOptions
 from .options import OptionBlock, AcceptableInts
 from .durability import ReplicateTo, PersistTo, ClientDurableOption, ServerDurableOption
 from couchbase_core._libcouchbase import Bucket as _Base
@@ -163,12 +163,13 @@ def _get_result_and_inject(func  # type: RawCollectionMethod
 def _mutate_result_and_inject(func  # type: RawCollectionMethod
                               ):
     # type: (...) ->RawCollectionMethod
-    return _inject_scope_and_collection(mutation_result(func))
+    return _inject_scope_and_collection(_wrap_in_mutation_result(func))
 
 
-def _inject_scope_and_collection(func  # type: RawCollectionMethod
+RawCollectionMethodSpecial = TypeVar('RawCollectionMethodSpecial',bound=RawCollectionMethod)
+def _inject_scope_and_collection(func  # type: RawCollectionMethodSpecial
                                  ):
-    # type: (...) -> RawCollectionMethod
+    # type: (...) -> RawCollectionMethodSpecial
     @wraps(func)
     def wrapped(self,  # type: CBCollection
                 *args,  # type: Any
@@ -419,7 +420,7 @@ class CBCollection(object):
         """
         return _Base.touch(self.bucket, id, **forward_args(kwargs, *options))
 
-    @mutation_result
+    @_wrap_in_mutation_result
     def unlock(self,
                id,  # type: str
                *options  # type: UnlockOptions
@@ -821,17 +822,17 @@ class CBCollection(object):
                   spec,  # type: LookupInSpec
                   *options  # type: LookupInOptions
                   ):
-        # type: (...)->GetResult
+        # type: (...)->LookupInResult
         pass
 
-    @_get_result_and_inject
+    @_inject_scope_and_collection
     def lookup_in(self,
                   id,  # type: str
                   spec,  # type: SubdocSpec
                   *options,  # type: LookupInOptions
                   **kwargs
                   ):
-        # type: (...)->GetResult
+        # type: (...)->LookupInResult
         """Atomically retrieve one or more paths from a document.
 
         :param key: The key of the document to lookup
@@ -856,7 +857,7 @@ class CBCollection(object):
         """
 
         final_options=forward_args(kwargs, *options)
-        return ResultPrecursor(self.bucket.lookup_in(id, *spec, **final_options ),final_options)
+        return LookupInResult(self.bucket.lookup_in(id, *spec, **final_options ),final_options)
 
     @overload
     def mutate_in(self,
@@ -878,7 +879,7 @@ class CBCollection(object):
         # type: (...)->MutationResult
         pass
 
-    @_mutate_result_and_inject
+    @_inject_scope_and_collection
     def mutate_in(self,  # type: CBCollection
                   id,  # type: str
                   spec,  # type: MutateInSpec
@@ -917,7 +918,7 @@ class CBCollection(object):
         .. seealso:: :mod:`.couchbase_core.subdocument`
         """
         final_options = forward_args(kwargs, *options)
-        return ResultPrecursor(self.bucket.mutate_in(id, *spec, **final_options), final_options)
+        return MutateInResult(self.bucket.mutate_in(id, *spec, **final_options), **final_options)
 
     def binary(self):
         # type: (...)->BinaryCollection
