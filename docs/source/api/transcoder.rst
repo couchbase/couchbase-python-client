@@ -2,7 +2,7 @@
 Transcoder Interface
 ====================
 
-.. module:: couchbase.transcoder
+.. module:: couchbase_core.transcoder
 
 The **Transcoder** interface may be used to provide custom value and
 key formats. Among the uses of the transcoder class, one may:

@@ -29,7 +29,8 @@ class DeltaValue(ConstrainedInt):
         Used as an argument for :meth:`Collection.increment` and :meth:`Collection.decrement`
 
         :param couchbase.options.AcceptableInts value: the value to initialise this with.
-        :raise couchbase.exceptions.ArgumentError if not in range
+
+        :raise: :exc:`~couchbase.exceptions.ArgumentError` if not in range
         """
         super(DeltaValue,self).__init__(value)
 
@@ -157,19 +158,24 @@ RawCollectionMethod = Union[RawCollectionMethodDefault, RawCollectionMethodInt]
 def _get_result_and_inject(func  # type: RawCollectionMethod
                            ):
     # type: (...) ->RawCollectionMethod
-    return _inject_scope_and_collection(get_result_wrapper(func))
+    result=_inject_scope_and_collection(get_result_wrapper(func))
+    result.__doc__=func.__doc__
+    result.__name__=func.__name__
+    return result
 
 
 def _mutate_result_and_inject(func  # type: RawCollectionMethod
                               ):
     # type: (...) ->RawCollectionMethod
-    return _inject_scope_and_collection(_wrap_in_mutation_result(func))
-
+    result=_inject_scope_and_collection(_wrap_in_mutation_result(func))
+    result.__doc__=func.__doc__
+    result.__name__=func.__name__
+    return result
 
 RawCollectionMethodSpecial = TypeVar('RawCollectionMethodSpecial',bound=RawCollectionMethod)
 def _inject_scope_and_collection(func  # type: RawCollectionMethodSpecial
                                  ):
-    # type: (...) -> RawCollectionMethodSpecial
+    # type: (...) -> RawCollectionMethod
     @wraps(func)
     def wrapped(self,  # type: CBCollection
                 *args,  # type: Any
@@ -201,6 +207,7 @@ class IExistsResult(object):
     def exists(self):
         pass
 
+
 class LookupInOptions(OptionBlock):
     pass
 
@@ -212,6 +219,23 @@ class CBCollection(object):
                  options=None  # type: CollectionOptions
                  ):
         # type: (...)->None
+        """
+        Couchbase collection. Should only be invoked by internal API, e.g.
+        by :meth:`couchbase.collection.scope.Scope.collection` or
+        :meth:`couchbase.bucket.Bucket.default_collection`.
+
+
+        .. _JIRA: https://issues.couchbase.com/browse/PYCBC-585
+
+        .. warning::
+            Non-default collections support not available yet.
+            These are be completed in a later alpha - see JIRA_.
+
+        :param couchbase.collections.Scope parent: parent scope
+        :param str name: name of collection
+        :param CollectionOptions options: miscellaneous options
+        """
+
         super(CBCollection, self).__init__()
         self.parent = parent  # type: Scope
         self.name = name
@@ -263,8 +287,22 @@ class CBCollection(object):
             no_format=False  # type: bool
             ):
         # type: (...) -> GetResult
-        """
-        :param couchbase_core.options.Duration timeout: If specified, indicates that the key's expiration
+
+        pass
+
+    @_get_result_and_inject
+    def get(self,
+            key,  # type: str
+            *options,  # type: GetOptions
+            **kwargs  # type: Any
+            ):
+        # type: (...) -> ResultPrecursor
+        """Obtain an object stored in Couchbase by given key.
+
+        :param string key: The key to fetch. The type of key is the same
+            as mentioned in :meth:`upsert`
+
+        :param couchbase.options.Seconds expiration: If specified, indicates that the key's expiration
             time should be *modified* when retrieving the value.
 
         :param boolean quiet: causes `get` to return None instead of
@@ -293,55 +331,32 @@ class CBCollection(object):
                     res = c.get("key", replica=True, quiet=True)
 
         :param bool no_format: If set to ``True``, then the value will
-            always be delivered in the :class:`~couchbase_core.result.Result`
+            always be delivered in the :class:`~couchbase.result.GetResult`
             object as being of :data:`~couchbase_core.FMT_BYTES`. This is a
             item-local equivalent of using the :attr:`data_passthrough`
             option
-        :return:
-        """
-        pass
-
-    @_get_result_and_inject
-    def get(self,
-            key,  # type: str
-            *options,  # type: GetOptions
-            **kwargs  # type: Any
-            ):
-        # type: (...) -> GetResult
-        """Obtain an object stored in Couchbase by given key.
-
-        :param string key: The key to fetch. The type of key is the same
-            as mentioned in :meth:`upsert`
-
-
 
         :raise: :exc:`.NotFoundError` if the key does not exist
         :raise: :exc:`.CouchbaseNetworkError`
         :raise: :exc:`.ValueFormatError` if the value cannot be
             deserialized with chosen decoder, e.g. if you try to
             retreive an object stored with an unrecognized format
-        :return: A :class:`~.Result` object
+        :return: A :class:`couchbase.result.GetResult` object
 
         Simple get::
 
-            value = cb.get('key').value
+            value = cb.get('key').content_as[str]
 
-        Get multiple values::
-
-            cb.get_multi(['foo', 'bar'])
-            # { 'foo' : <Result(...)>, 'bar' : <Result(...)> }
-
-        Inspect the flags::
+        Inspect CAS value::
 
             rv = cb.get("key")
-            value, flags, cas = rv.value, rv.flags, rv.cas
+            value, cas = rv.content, rv.cas
 
         Update the expiration time::
 
-            rv = cb.get("key", expiration=10)
+            rv = cb.get("key", expiration=Seconds(10))
             # Expires in ten seconds
 
-        .. seealso:: :meth:`get_multi`
         """
         return self._get_generic(key, kwargs, options)
 
@@ -408,15 +423,15 @@ class CBCollection(object):
 
         Update the expiration time of a key ::
 
-            cb.upsert("key", expiration=Durations.seconds(100))
+            cb.upsert("key", expiration=Seconds(100))
             # expires in 100 seconds
-            cb.touch("key", expiration=0)
+            cb.touch("key", expiration=Seconds(0))
             # key should never expire now
 
         :raise: The same things that :meth:`get` does
 
         .. seealso:: :meth:`get` - which can be used to get *and* update the
-            expiration, :meth:`touch_multi`
+            expiration
         """
         return _Base.touch(self.bucket, id, **forward_args(kwargs, *options))
 
@@ -432,7 +447,7 @@ class CBCollection(object):
 
         :param key: The key to unlock
         :param cas: The cas returned from :meth:`lock`'s
-            :class:`.Result` object.
+            :class:`.MutationResult` object.
 
         See :meth:`lock` for an example.
 
@@ -440,7 +455,7 @@ class CBCollection(object):
             match the CAS on the server (possibly because it was
             unlocked by previous call).
 
-        .. seealso:: :meth:`lock` :meth:`unlock_multi`
+        .. seealso:: :meth:`lock`
         """
         return _Base.unlock(self.bucket, id, **forward_args({}, *options))
 
@@ -465,7 +480,7 @@ class CBCollection(object):
 
         This function otherwise functions similarly to :meth:`get`;
         specifically, it will return the value upon success. Note the
-        :attr:`~.Result.cas` value from the :class:`.Result` object.
+        :attr:`~.MutationResult.cas` value from the :class:`.MutationResult` object.
         This will be needed to :meth:`unlock` the key.
 
         Note the lock will also be implicitly released if modified by
@@ -513,7 +528,7 @@ class CBCollection(object):
             cb.unlock("key", rv.cas)
 
 
-        .. seealso:: :meth:`get`, :meth:`lock_multi`, :meth:`unlock`
+        .. seealso:: :meth:`get`, :meth:`unlock`
         """
         final_options = forward_args(kwargs, *options)
         return _Base.lock(self.bucket, key, **final_options)
@@ -548,7 +563,7 @@ class CBCollection(object):
                id,  # type: str
                value,  # type: Any
                cas=0,  # type: int
-               expiration=0,  # type: Seconds
+               expiration=Seconds(0),  # type: Seconds
                format=None,
                persist_to=PersistTo.NONE,  # type: PersistTo.Value
                replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
@@ -638,12 +653,6 @@ class CBCollection(object):
         Perform optimistic locking by specifying last known CAS version::
 
             cb.upsert('foo', 'bar', cas=8835713818674332672)
-
-        Several sets at the same time (mutli-set)::
-
-            cb.upsert_multi({'foo': 'bar', 'baz': 'value'})
-
-        .. seealso:: :meth:`upsert_multi`
         """
 
         final_options = forward_args(kwargs, *options)
@@ -671,6 +680,7 @@ class CBCollection(object):
 
     @_mutate_result_and_inject
     def insert(self, key, value, *options, **kwargs):
+        # type: (...)->ResultPrecursor
         """Store an object in Couchbase unless it already exists.
 
         Follows the same conventions as :meth:`upsert` but the value is
@@ -683,7 +693,7 @@ class CBCollection(object):
 
         :raise: :exc:`.KeyExistsError` if the key already exists
 
-        .. seealso:: :meth:`upsert`, :meth:`insert_multi`
+        .. seealso:: :meth:`upsert`
         """
 
         final_options = forward_args(kwargs, *options)
@@ -727,7 +737,8 @@ class CBCollection(object):
 
            :raise: :exc:`.NotFoundError` if the key does not exist
 
-           .. seealso:: :meth:`upsert`, :meth:`replace_multi`"""
+           .. seealso:: :meth:`upsert`
+        """
 
         final_options = forward_args(kwargs, *options)
         return ResultPrecursor(_Base.replace(self.bucket, id, value, **final_options), final_options)
@@ -796,22 +807,6 @@ class CBCollection(object):
 
             rv = cb.get("key")
             cb.remove("key", cas=rv.cas)
-
-        Remove multiple keys::
-
-            oks = cb.remove_multi(["key1", "key2", "key3"])
-
-        Remove multiple keys with CAS::
-
-            oks = cb.remove({
-                "key1" : cas1,
-                "key2" : cas2,
-                "key3" : cas3
-            })
-
-        .. seealso:: :meth:`remove_multi`, :meth:`endure`
-            for more information on the ``persist_to`` and
-            ``replicate_to`` options.
         """
         final_options = forward_args(kwargs, *options)
         return ResultPrecursor(_Base.remove(self.bucket, id, **final_options), final_options)
@@ -976,8 +971,6 @@ class CBCollection(object):
         still use the :attr:`data_passthrough` to overcome this).
 
         :raise: :exc:`.NotStoredError` if the key does not exist
-
-        .. seealso:: :meth:`upsert`, :meth:`append_multi`)
         """
         x = _Base.append(self.bucket, id, value, forward_args(kwargs, *options))
         return ResultPrecursor(x, options)
@@ -1013,7 +1006,7 @@ class CBCollection(object):
         # type: (...)->ResultPrecursor
         """Prepend a string to an existing value in Couchbase.
 
-        .. seealso:: :meth:`append`, :meth:`prepend_multi`
+        .. seealso:: :meth:`append`
         """
         x = _Base.prepend(self.bucket, id, value, **forward_args(kwargs, *options))
         return ResultPrecursor(x, options)
@@ -1063,9 +1056,10 @@ class CBCollection(object):
            exist. If the key does not exist, this value is used, and
            `delta` is ignored. If this parameter is `None` then no
            initial value is used
-        :type SignedInt64 initial: :class:`couchbase.options.SignedInt64` or `None`
+        :param SignedInt64 initial: :class:`couchbase.options.SignedInt64` or `None`
         :param Seconds expiration: The lifetime for the key, after which it will
            expire
+
         :raise: :exc:`.NotFoundError` if the key does not exist on the
            bucket (and `initial` was `None`)
         :raise: :exc:`.DeltaBadvalError` if the key exists, but the
@@ -1137,9 +1131,10 @@ class CBCollection(object):
            exist. If the key does not exist, this value is used, and
            `delta` is ignored. If this parameter is `None` then no
            initial value is used
-        :type SignedInt64 initial: :class:`couchbase.options.SignedInt64` or `None`
+        :param SignedInt64 initial: :class:`couchbase.options.SignedInt64` or `None`
         :param Seconds expiration: The lifetime for the key, after which it will
            expire
+
         :raise: :exc:`.NotFoundError` if the key does not exist on the
            bucket (and `initial` was `None`)
         :raise: :exc:`.DeltaBadvalError` if the key exists, but the
@@ -1182,6 +1177,14 @@ class Scope(object):
                  parent,  # type: couchbase.bucket.Bucket
                  name=None  # type: str
                  ):
+        # type: (...)->Any
+        """
+        Collection scope representation.
+        Constructor should only be invoked internally.
+
+        :param parent: parent bucket.
+        :param name: name of scope to open
+        """
         if name:
             self._name = name
         self.record = pyrsistent.PRecord()

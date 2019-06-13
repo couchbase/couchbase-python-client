@@ -7,8 +7,3 @@ from .JSONdocument import *
 from .options import *
 from .result import *
 from .subdoc import *
-
-
-import couchbase.tests
-
-import couchbase_tests as tests

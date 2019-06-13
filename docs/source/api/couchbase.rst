@@ -164,8 +164,8 @@ Storing Data
 Retrieving Data
 ---------------
 
-.. currentmodule:: couchbase.bucket
-.. class:: Bucket
+.. currentmodule:: couchbase.collection
+.. class:: Collection
 
     .. automethod:: get
 
