@@ -47,6 +47,7 @@ class VersionInfo(object):
         # Per PEP-440, replace any 'DP' with an 'a', and any beta with 'b'
         if self.ver_extra:
             self.ver_extra = re.sub(r'^dp', 'a', self.ver_extra, count=1)
+            self.ver_extra = re.sub(r'^alpha', 'a', self.ver_extra, count=1)
             self.ver_extra = re.sub(r'^beta', 'b', self.ver_extra, count=1)
             m = re.search(r'^([ab])(\d+)?', self.ver_extra)
             if m.group(2) is None:
