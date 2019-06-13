@@ -148,6 +148,10 @@ class CouchbaseError(Exception):
         return self.categories & C.LCB_ERRTYPE_TRANSIENT
 
     @property
+    def is_retryable(self):
+        return self.is_transient
+
+    @property
     def is_fatal(self):
         return self.categories & C.LCB_ERRTYPE_FATAL
 
