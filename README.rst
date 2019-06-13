@@ -6,9 +6,9 @@ Client for Couchbase_.
 
 .. note::
 
-    This is the documentation for the 2.x version of the client. This is
+    This is the documentation for the 3.x version of the client. This is
     mostly compatible with the older version. Please refer to the
-    *release12* branch for the older version.
+    *release25* branch for the older version.
 
 -----------------------
 Building and Installing
@@ -32,13 +32,11 @@ version by issuing the following incantation
 ~~~~~~~~~~~~~
 Prerequisites
 ~~~~~~~~~~~~~
-.. |libcouchbase_version| replace:: 2.9.0
 
 - Couchbase Server (http://couchbase.com/download)
-- libcouchbase_. version |libcouchbase_version| or greater (Bundled in Windows installer)
-- libcouchbase development files.
-- Python development files
-- A C compiler (except on Windows)
+- You may need a C compiler and Python development files, unless a
+  binary wheel is available for your platform. These are available for
+  at least Python 3.7 on Windows, but we will endeavour to add more.
 
 ~~~~~~~~
 Building
@@ -52,11 +50,13 @@ functionality including running the examples.
     python setup.py build_ext --inplace
 
 
-If your libcouchbase install is in an alternate location (for example,
-`/opt/local/libcouchbase`), you may add extra directives, like so
+If you have a libcouchbase install already (in, for example,
+`/opt/local/libcouchbase`), you may build using it by setting PYCBC_BUILD=DISTUTILS
+and some add extra directives, like so:
 
 .. code-block:: sh
 
+    export PYCBC_BUILD=DISTUTILS
     python setup.py build_ext --inplace \
         --library-dir /opt/local/libcouchbase/lib \
         --include-dir /opt/local/libcouchbase/include
@@ -79,7 +79,7 @@ Installing
 ^^^^^^^^^^
 .. code-block:: sh
 
-    python setup.py install
+    pip install .
 
 -----
 Using
@@ -96,10 +96,11 @@ are only working with password-less buckets.
 
 .. code-block:: pycon
 
-    >>> from couchbase.cluster import Cluster, ClassicAuthenticator
+    >>> from couchbase.cluster import Cluster
+    >>> from couchbase_core.cluster import ClassicAuthenticator
     >>> cluster = Cluster('couchbase://localhost')
     >>> cluster.authenticate(ClassicAuthenticator(buckets={'bucket-name': 'password'}))
-    >>> bucket = cluster.open_bucket('bucket-name')
+    >>> bucket = cluster.bucket('bucket-name')
 
 ~~~~~~~~~~~~~~~~~~~~~~~
 Couchbase Server >= 5.0
@@ -109,21 +110,20 @@ application that allow fine-grained control. The authenticator is always require
 
 .. code-block:: pycon
 
-    >>> from couchbase.cluster import Cluster, PasswordAuthenticator
+    >>> from couchbase.cluster import Cluster
+    >>> from couchbase_core.cluster import PasswordAuthenticator
     >>> cluster = Cluster('couchbase://localhost')
     >>> cluster.authenticate(PasswordAuthenticator('username', 'password'))
-    >>> bucket = cluster.open_bucket('bucket-name')
+    >>> bucket = cluster.bucket('bucket-name')
+    >>> collection = bucket.default_collection()
 
 Here's an example code snippet which sets a key and then reads it
 
 .. code-block:: pycon
 
-    >>> bucket.upsert("key", "value")
-    OperationResult<RC=0x0, Key=key, CAS=0x31c0e3f3fc4b0000>
-    >>> res = bucket.get("key")
-    >>> res
-    ValueResult<RC=0x0, Key=key, Value=u'value', CAS=0x31c0e3f3fc4b0000, Flags=0x0>
-    >>> res.value
+    >>> collection.upsert("key", "value")
+    >>> res = collection.get("key")
+    >>> res.content
     u'value'
     >>>
 
@@ -131,7 +131,7 @@ You can also use views
 
 .. code-block:: pycon
 
-    >>> resultset = bucket.query("beer", "brewery_beers", limit=5)
+    >>> resultset = cluster.query("beer", "brewery_beers", limit=5)
     >>> resultset
     View<Design=beer, View=brewery_beers, Query=Query:'limit=5', Rows Fetched=0>
     >>> for row in resultset: print row.key
@@ -142,9 +142,18 @@ You can also use views
     [u'21st_amendment_brewery_cafe', u'21st_amendment_brewery_cafe-amendment_pale_ale']
     [u'21st_amendment_brewery_cafe', u'21st_amendment_brewery_cafe-bitter_american']
 
+
+.. _PYCBC-590: https://issues.couchbase.com/browse/PYCBC-590
+
+.. warning::
+    The async APIs below are from SDK2 and currently only available
+    from the couchbase_v2 legacy support package. They will
+    be updated to support SDK3 shortly. See PYCBC-590_.*
+
 ~~~~~~~~~~~
 Twisted API
 ~~~~~~~~~~~
+
 
 The Python client now has support for the Twisted async network framework.
 To use with Twisted, simply import ``txcouchbase.connection`` instead of
@@ -181,6 +190,9 @@ error.
 GEvent API
 ~~~~~~~~~~
 
+*NOTE: this API is from SDK2 and is currently only supports SDK2-style
+access. It will be updated to support SDK3 shortly.*
+
 .. code-block:: python
 
     from gcouchbase.bucket import Bucket
@@ -195,6 +207,9 @@ implementation is significantly different.
 ------------------------
 Asynchronous (Tulip) API
 ------------------------
+
+*NOTE: this API is from SDK2 and is currently only supports SDK2-style
+access. It will be updated to support SDK3 shortly.*
 
 This module also supports Python 3.4/3.5 asynchronous I/O. To use this
 functionality, import the `couchbase.experimental` module (since this
@@ -221,15 +236,6 @@ client:
     rv = loop.run_until_complete(write_and_read('foo', 'bar'))
     print(rv.value)
 
-
-~~~~
-PyPy
-~~~~
-
-`PyPy <http://pypy.org>`_ is an alternative high performance Python
-implementation. Since PyPy does not work well with C extension modules,
-this module will not work directly. You may refer to the alternate
-implementation based on the *cffi* module: https://github.com/couchbaselabs/couchbase-python-cffi
 
 ~~~~~~~~~~~~~~
 Other Examples
@@ -283,14 +289,6 @@ file must be present, containing various connection parameters.
 An example of this file may be found in `tests.ini.sample`.
 You may copy this file to `tests.ini` and modify the values as needed.
 
-The simplest way to run the tests is to declare a `bucket_prefix` in
-the `tests.ini` file and run the `setup_tests.py` script to create
-them for you.
-
-.. code-block:: sh
-
-    python setup_tests.py
-
 To run the tests::
 
     nosetests
@@ -314,8 +312,8 @@ License
 The Couchbase Python SDK is licensed under the Apache License 2.0.
 
 .. _Couchbase: http://couchbase.com
-.. _libcouchbase: http://developer.couchbase.com/documentation/server/4.5/sdk/c/start-using-sdk.html
-.. _official documentation: http://developer.couchbase.com/documentation/server/4.5/sdk/python/start-using-sdk.html
+.. _libcouchbase: https://github.com/couchbase/libcouchbase
+.. _official documentation: https://docs.couchbase.com/python-sdk/3.0/hello-world/start-using-sdk.html
 .. _JIRA: http://couchbase.com/issues/browse/pycbc
 .. _freenode: http://freenode.net/irc_servers.shtml
 .. _pypi: http://pypi.python.org/pypi/couchbase

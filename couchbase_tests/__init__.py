@@ -1,2 +1,5 @@
 caseslist=[]
-import couchbase.tests
+try:
+    import couchbase.tests
+except:
+    pass

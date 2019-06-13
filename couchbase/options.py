@@ -149,7 +149,7 @@ class ConstrainedInt(object):
         A signed integer between cls.min() and cls.max() inclusive
 
         :param couchbase.options.AcceptableInts value: the value to initialise this with.
-        :raise couchbase.exceptions.ArgumentError if not in range
+        :raise: :exc:`~couchbase.exceptions.ArgumentError` if not in range
         """
         self.value = type(self).verified_value(value)
 
@@ -191,7 +191,7 @@ class SignedInt64(ConstrainedInt):
         A signed integer between -0x8000000000000000 and +0x7FFFFFFFFFFFFFFF inclusive.
 
         :param couchbase.options.AcceptableInts value: the value to initialise this with.
-        :raise couchbase.exceptions.ArgumentError if not in range
+        :raise: :exc:`~couchbase.exceptions.ArgumentError` if not in range
         """
         super(SignedInt64,self).__init__(value)
     @classmethod
