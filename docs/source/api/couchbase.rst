@@ -6,14 +6,44 @@ Bucket object
 .. class:: Bucket
 
     .. automethod:: __init__
-
+    .. automethod:: scope
+    .. automethod:: default_collection
 
 .. _argtypes:
+
+
+
+
+
+=================
+Scope object
+=================
+
+.. module:: couchbase.collection
+.. class:: Scope
+
+    .. automethod:: __init__
+    .. automethod:: default_collection
+    .. automethod:: open_collection
+
+
+=================
+Collection object
+=================
+
+.. class:: Collection
+
+    .. automethod:: __init__
+
+
+Used internally by the SDK.
+This constructor is not intended for external use.
+
 
 Passing Arguments
 =================
 
-.. currentmodule:: couchbase.bucket
+.. currentmodule:: couchbase.collection
 
 All keyword arguments passed to methods should be specified as keyword
 arguments, and the user should not rely on their position within the keyword
@@ -31,29 +61,7 @@ and never like ::
 
     obj.foo(key, fooval, barval, bazval)
 
-Arguments To ``*_multi`` Methods
---------------------------------
 
-Arguments passed to ``*_multi`` methods involves passing an iterable of keys.
-The iterable must have ``__len__`` and ``__iter__`` implemented.
-
-For operations which require values (i.e. the
-:meth:`~couchbase.bucket.Bucket.upsert_multi` family), a ``dict`` must
-be passed with the values set as the values which should be stored for the keys.
-
-Some of the multi methods accept keyword arguments; these arguments apply to
-*all* the keys within the iterable passed.
-
-
-You can also pass an
-:class:`~couchbase.items.ItemCollection` as the ``keys`` or ``kv`` parameter.
-The `Item` interfaces allows in-place modifications to an object across multiple
-operations avoiding the need for copying the result into your own data structure.
-
-See the documentation for :class:`~couchbase.items.Item` for more information.
-
-
-.. _format_info:
 
 Key and Value Format
 ====================
@@ -70,9 +78,9 @@ Format Options
 
 The following constants may be used as values to the `format` option
 in methods where this is supported. This is also the value returned in the
-:attr:`~couchbase.result.ValueResult.flags` attribute of the
-:class:`~couchbase.result.ValueResult` object from a
-:meth:`~couchbase.bucket.Bucket.get` operation.
+:attr:`~couchbase_core.result.ValueResult.flags` attribute of the
+:class:`~couchbase_core.result.ValueResult` object from a
+:meth:`~couchbase.collection.Collection.get` operation.
 
 Each format specifier has specific rules about what data types it accepts.
 
@@ -132,24 +140,24 @@ Key Format
 ----------
 
 The above format options are only valid for *values* being passed to one
-of the storage methods (see :meth:`couchbase.bucket.Bucket.upsert`).
+of the storage methods (see :meth:`couchbase.collection.Collection.upsert`).
 
 For *keys*, the acceptable inputs are those for :const:`FMT_UTF8`
 
 Single-Key Data Methods
 =======================
 
-These methods all return a :class:`~couchbase.result.Result` object containing
+These methods all return a :class:`~couchbase_core.result.Result` object containing
 information about the operation (such as status and value).
 
-.. currentmodule:: couchbase.bucket
+.. currentmodule:: couchbase.collection
 
 
 Storing Data
 ------------
 
-.. currentmodule:: couchbase.bucket
-.. class:: Bucket
+.. currentmodule:: couchbase.collection
+.. class:: Collection
 
     These methods set the contents of a key in Couchbase. If successful,
     they replace the existing contents (if any) of the key.
@@ -174,8 +182,8 @@ Modifying Data
 
 These methods modify existing values in Couchbase
 
-.. currentmodule:: couchbase.bucket
-.. class:: Bucket
+.. currentmodule:: couchbase.collection
+.. class:: Collection
 
 
     .. automethod:: append
@@ -190,8 +198,8 @@ directly modify the value, but may affect the entry's accessibility
 or duration.
 
 
-.. currentmodule:: couchbase.bucket
-.. class:: Bucket
+.. currentmodule:: couchbase.collection
+.. class:: Collection
 
     .. automethod:: remove
 
@@ -216,12 +224,11 @@ Couchbase.
     The server and SDK implementations and APIs are subject to change
 
 
-.. currentmodule:: couchbase.bucket
-.. class:: Bucket
+.. currentmodule:: couchbase.collection
+.. class:: Collection
 
     .. automethod:: lookup_in
     .. automethod:: mutate_in
-    .. automethod:: retrieve_in
 
 Counter Operations
 ------------------
@@ -251,12 +258,17 @@ using the :meth:`couchbase.collection.Collection.get` method
 Multi-Key Data Methods
 ======================
 
+.. warning::
+    The APIs below are from SDK2 and currently only available
+    from the couchbase_v2 legacy support package. We plan
+    to update these to support SDK3 shortly.
+
 These methods tend to be more efficient than their single-key
 equivalents. They return a :class:`couchbase.result.MultiResult` object (which is
 a dict subclass) which contains class:`couchbase.result.Result` objects as the
 values for its keys
 
-.. currentmodule:: couchbase.bucket
+.. currentmodule:: couchbase_v2.bucket
 .. class:: Bucket
 
     .. automethod:: upsert_multi
@@ -284,10 +296,15 @@ values for its keys
 Batch Operation Pipeline
 ========================
 
+.. warning::
+    The APIs below are from SDK2 and currently only available
+    from the couchbase_v2 legacy support package. We plan
+    to update these to support SDK3 shortly.
+
 In addition to the multi methods, you may also use the `Pipeline` context
 manager to schedule multiple operations of different types
 
-.. currentmodule:: couchbase.bucket
+.. currentmodule:: couchbase_v2.bucket
 .. class:: Bucket
 
     .. automethod:: pipeline
@@ -300,38 +317,44 @@ manager to schedule multiple operations of different types
 MapReduce/View Methods
 ======================
 
-.. currentmodule:: couchbase.bucket
-.. class:: Bucket
+.. currentmodule:: couchbase.cluster
+.. class:: Cluster
 
     .. automethod:: query
 
 N1QL Query Methods
 ==================
 
-.. currentmodule:: couchbase.bucket
-.. class:: Bucket
+.. currentmodule:: couchbase.cluster
+.. class:: Cluster
 
-    .. automethod:: n1ql_query
+    .. automethod:: query
 
 
 Full-Text Search Methods
 ========================
 
-.. currentmodule:: couchbase.bucket
-.. class:: Bucket
+.. currentmodule:: couchbase.cluster
+.. class:: Cluster
 
-    .. automethod:: search
+    .. automethod:: search_query
+
 
 Design Document Management
 ==========================
 
-.. currentmodule:: couchbase.bucketmanager
+.. warning::
+    The APIs below are from SDK2 and currently only available
+    from the couchbase_v2 legacy support package. We plan
+    to update these to support SDK3 shortly.
+
+.. currentmodule:: couchbase_core.bucketmanager
 
 
 To perform design document management operations, you must first get
 an instance of the :class:`BucketManager`. You can do this by invoking
-the :meth:`~couchbase.bucket.Bucket.bucket_manager` method on the
-:class:`~couchbase.bucket.Bucket` object.
+the :meth:`~couchbase_v2.bucket.Bucket.bucket_manager` method on the
+:class:`~couchbase_v2.bucket.Bucket` object.
 
 .. note::
     Design document management functions are async. This means that any
@@ -370,7 +393,12 @@ the :meth:`~couchbase.bucket.Bucket.bucket_manager` method on the
 N1QL Index Management
 =====================
 
-.. currentmodule:: couchbase.bucketmanager
+.. warning::
+    The APIs below are from SDK2 and currently only available
+    from the couchbase_v2 legacy support package. We plan
+    to update these to support SDK3 shortly.
+
+.. currentmodule:: couchbase_core.bucketmanager
 
 Before issuing any N1QL query using :cb_bmeth:`n1ql_query`, the bucket being
 queried must have an index defined for the query. The simplest index is the
@@ -394,7 +422,7 @@ You can create additional indexes using::
     .. automethod:: n1ql_index_watch
     .. automethod:: n1ql_index_list
 
-.. currentmodule:: couchbase.bucket
+.. currentmodule:: couchbase_v2.bucket
 .. class:: Bucket
 
     .. automethod:: bucket_manager
@@ -403,10 +431,15 @@ You can create additional indexes using::
 Flushing (clearing) the Bucket
 ==============================
 
+.. warning::
+    The APIs below are from SDK2 and currently only available
+    from the couchbase_v2 legacy support package. We plan
+    to update these to support SDK3 shortly.
+
 For some stages of development and/or deployment, it might be useful
 to be able to clear the bucket of its contents.
 
-.. currentmodule:: couchbase.bucket
+.. currentmodule:: couchbase_core.bucket
 .. class:: Bucket
 
     .. automethod:: flush
@@ -415,10 +448,15 @@ to be able to clear the bucket of its contents.
 Informational Methods
 =====================
 
+.. warning::
+    The APIs below are from SDK2 and currently only available
+    from the couchbase_v2 legacy support package. We plan
+    to update these to support SDK3 shortly.
+
 These methods do not operate on keys directly, but offer various
 information about things
 
-.. currentmodule:: couchbase.bucket
+.. currentmodule:: couchbase_v2.bucket
 .. class:: Bucket
 
     .. automethod:: stats
@@ -432,11 +470,16 @@ information about things
 Item API Methods
 ================
 
+.. warning::
+    The APIs below are from SDK2 and currently only available
+    from the couchbase_v2 legacy support package. We plan
+    to update these to support SDK3 shortly.
+
 These methods are specifically for the :class:`~couchbase.items.Item`
 API. Most of the `multi` methods will accept `Item` objects as well,
 however there are some special methods for this interface
 
-.. currentmodule:: couchbase.bucket
+.. currentmodule:: couchbase_v2.bucket
 .. class:: Bucket
 
     .. automethod:: append_items
@@ -445,9 +488,14 @@ however there are some special methods for this interface
 Durability Constraints
 ======================
 
+.. warning::
+    The APIs below are from SDK2 and currently only available
+    from the couchbase_v2 legacy support package. We plan
+    to update these to support SDK3 shortly.
+
 Durability constraints ensure safer protection against data loss.
 
-.. currentmodule:: couchbase.bucket
+.. currentmodule:: couchbase_v2.bucket
 .. class:: Bucket
 
     .. automethod:: endure
@@ -457,7 +505,12 @@ Durability constraints ensure safer protection against data loss.
 Attributes
 ==========
 
-.. currentmodule:: couchbase.bucket
+.. warning::
+    The APIs below are from SDK2 and currently only available
+    from the couchbase_v2 legacy support package. We plan
+    to update these to support SDK3 shortly.
+
+.. currentmodule:: couchbase_core.bucket
 .. class:: Bucket
 
     .. autoattribute:: quiet
@@ -513,7 +566,12 @@ Attributes
 Private APIs
 ============
 
-.. currentmodule:: couchbase.bucket
+.. warning::
+    The APIs below are from SDK2 and currently only available
+    from the couchbase_v2 legacy support package. We plan
+    to update these to support SDK3 shortly.
+
+.. currentmodule:: couchbase_v2.bucket
 .. class:: Bucket
 
    The following APIs are not supported because using them is inherently
@@ -524,7 +582,7 @@ Private APIs
    .. automethod:: _close
 
    .. automethod:: _cntl
-   
+
    .. automethod:: _cntlstr
 
    .. automethod:: _vbmap

@@ -2,7 +2,7 @@
 Analytics Queries
 #################
 
-.. currentmodule:: couchbase.analytics
+.. currentmodule:: couchbase_core.analytics
 
 .. class:: AnalyticsQuery
 
@@ -33,7 +33,7 @@ Analytics Queries
     .. autoattribute:: meta
     .. automethod:: get_single_result
 
-.. currentmodule:: couchbase.analytics_ingester
+.. currentmodule:: couchbase_core.analytics_ingester
 
 .. class:: AnalyticsIngester
 

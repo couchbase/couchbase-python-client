@@ -2,7 +2,7 @@
 Asynchronous Interface
 ======================
 
-.. module:: couchbase.asynchronous
+.. module:: couchbase_core.asynchronous
 
 
 .. _async_intro:
@@ -22,26 +22,26 @@ Key-Value Interface
 The Key-Value interface of the async subsystem functions as closely
 as possible like its synchronous counterpart. The primary difference is that
 where the synchronous interface would return an instance of a
-:class:`~couchbase.result.Result` or a
-:class:`~couchbase.result.MultiResult`,
+:class:`~couchbase_core.result.Result` or a
+:class:`~couchbase_core.result.MultiResult`,
 the asynchronous interface returns an
-:class:`~couchbase.result.AsyncResult` object.
+:class:`~couchbase_core.result.AsyncResult` object.
 
-The :class:`~couchbase.result.AsyncResult`
+The :class:`~couchbase_core.result.AsyncResult`
 object contains fields for two callbacks which are
 invoked when the result is ready. One is the
-:attr:`~couchbase.result.AsyncResult.callback`
+:attr:`~couchbase_core.result.AsyncResult.callback`
 field which is called with a ``Result`` or ``MultiResult`` upon success,
 and the other is the
-:attr:`~couchbase.result.AsyncResult.errback` field which is invoked
+:attr:`~couchbase_core.result.AsyncResult.errback` field which is invoked
 with an exception object upon error.
 
 The semantics of when an exception is passed follows the rules of the
 ``quiet`` parameter just like the synchronous API.
 
-.. currentmodule:: couchbase.asynchronous.bucket
+.. currentmodule:: couchbase_core.asynchronous.bucket
 
-.. class:: couchbase.result.AsyncResult
+.. class:: couchbase_core.result.AsyncResult
 
     .. autoattribute:: callback
 
@@ -56,12 +56,12 @@ Views Interface
 ===============
 
 Different from the key-value interface, the synchronous view API
-returns a :class:`~couchbase.views.iterator.View` object which
+returns a :class:`~couchbase_core.views.iterator.View` object which
 is itself an iterator which yields results. Because this is a synchronous
 API, the iterator interface must be replaced with a class interface
 which must be subclassed by a user.
 
-.. currentmodule:: couchbase.asynchronous.view
+.. currentmodule:: couchbase_core.asynchronous.view
 
 .. class:: AsyncViewBase
 
@@ -82,7 +82,7 @@ API is entirely separate from the key-value API and should be treated as
 belonging to a different library. It is simply the extension's I/O
 abstraction.
 
-.. currentmodule:: couchbase.iops.base
+.. currentmodule:: couchbase_core.iops.base
 
 .. class:: Event
 

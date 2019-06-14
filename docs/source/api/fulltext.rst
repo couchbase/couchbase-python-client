@@ -2,7 +2,7 @@
 Full Text Queries
 #################
 
-.. module:: couchbase.fulltext
+.. module:: couchbase_core.fulltext
 
 Full-text queries search the cluster for documents matching certain terms or
 strings of texts. Unlike N1QL queries which are designed to be structured, i.e.
@@ -11,7 +11,7 @@ are more free-form, allowing the ability to search multiple fields and to
 add variance in queries.
 
 Couchbase offers full-text queries in version 4.5. To issue a query from the
-Python SDK, use the :cb_bmeth:`search` bucket method.
+Python SDK, use the :cb_bmeth:`search` cluster method.
 
 To perform an actual search, define a search index (via Couchbase web UI, or
 using the REST interface), create a :class:`Query` object and then pass the
@@ -20,7 +20,7 @@ index name and the query object to the `search` method:
 .. code-block:: python
 
     query = ConjunctionQuery(TermQuery("couchbase"), MatchQuery("nosql"))
-    for hit in bucket.search('indexName', query):
+    for hit in cluster.search('indexName', query):
         print(hit)
 
 
@@ -31,7 +31,7 @@ this kind of query
 .. code-block:: python
 
     query = PhraseQuery('couchbase', 'nosql')
-    for hit in bucket.search('indexName', query):
+    for hit in cluster.search('indexName', query):
         print(hit)
 
 -----------

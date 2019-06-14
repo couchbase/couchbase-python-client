@@ -42,8 +42,7 @@ rst_epilog = """
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.viewcode', 'numpydoc', 'sphinx.ext.autosummary',
-              'pycbc_xref']
-#extensions = ['sphinx.ext.autodoc', 'sphinx.ext.viewcode', 'numpydoc']
+              'pycbc_xref'] + (['sphinx_autodoc_typehints'] if sys.version_info>(3,0,0) else [])
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
