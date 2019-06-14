@@ -19,7 +19,7 @@ class ViewOptions(object):
 
 
 class Bucket(object):
-    _bucket=None  # type: CoreBucket
+    _bucket = None  # type: CoreBucket
 
     @overload
     def __init__(self,
