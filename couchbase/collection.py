@@ -3,7 +3,7 @@ from abc import abstractmethod
 from boltons.funcutils import wraps
 from mypy_extensions import VarArg, KwArg, Arg
 
-from .subdoc import LookupInSpec, SubdocSpec, MutateInSpec, MutateInOptions, \
+from .subdocument import LookupInSpec, SubdocSpec, MutateInSpec, MutateInOptions, \
     gen_projection_spec
 from .result import GetResult, get_result_wrapper, SDK2Result, ResultPrecursor, LookupInResult, MutateInResult, \
     MutationResult, _wrap_in_mutation_result

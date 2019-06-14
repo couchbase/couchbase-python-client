@@ -43,7 +43,7 @@ from couchbase import CBCollection, GetOptions, RemoveOptions, ReplaceOptions
 from couchbase import Bucket
 
 from couchbase_tests.base import ConnectionTestCase
-import couchbase.subdoc as SD
+import couchbase.subdocument as SD
 
 
 class Scenarios(ConnectionTestCase):
