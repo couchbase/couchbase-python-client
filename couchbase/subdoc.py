@@ -2,7 +2,7 @@ from typing import *
 from couchbase_core import subdocument as SD
 import couchbase_core.priv_constants as _P
 from .options import OptionBlockTimeOut
-from couchbase_core.subdocument import array_addunique, array_append, array_insert, array_prepend, insert, remove, replace, upsert, Spec
+from couchbase_core.subdocument import array_addunique, array_append, array_insert, array_prepend, insert, remove, replace, upsert, counter, Spec
 
 try:
     from abc import abstractmethod
