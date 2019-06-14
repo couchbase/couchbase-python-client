@@ -76,6 +76,7 @@ class AnalyticsQuery(N.N1QLQuery):
             AnalyticsQuery('SELECT VALUE bw FROM breweries bw WHERE bw.name IN ?',
                       "[\\"Kona Brewing\\",\\"21st Amendment Brewery Cafe\\"]")
         Since the placeholders are serialized to JSON internally anyway.
+        
         """
         querystr = querystr.rstrip()
         if not querystr.endswith(';'):

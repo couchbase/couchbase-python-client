@@ -24,7 +24,7 @@ from twisted.internet.defer import Deferred
 from couchbase_v2.asynchronous.bucket import AsyncBucket
 from couchbase_core.asynchronous.view import AsyncViewBase
 from couchbase_core.asynchronous.n1ql import AsyncN1QLRequest
-from couchbase_v2.asynchronous import AsyncSearchRequest
+from couchbase_core.asynchronous.fulltext import AsyncSearchRequest
 from couchbase_core.asynchronous.events import EventQueue
 from couchbase_core.exceptions import CouchbaseError
 from txcouchbase.iops import v0Iops

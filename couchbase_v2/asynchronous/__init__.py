@@ -38,6 +38,8 @@ import couchbase_core.asynchronous.view as view
 
 sys.modules[__name__ + '.view'] = view
 
+from .bucket import AsyncBucket
+
 import couchbase_core.asynchronous as asynchronous
 from couchbase_core.asynchronous import *
 sys.modules[__name__] = asynchronous
