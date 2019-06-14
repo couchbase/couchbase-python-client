@@ -4,41 +4,17 @@ from uuid import UUID
 
 from typing import *
 
+from .n1ql import QueryResult, IQueryResult
 from .options import OptionBlock, forward_args, OptionBlockDeriv
 from .bucket import BucketOptions, Bucket, CoreBucket
 from couchbase_core.cluster import Cluster as SDK2Cluster, Authenticator as SDK2Authenticator
-from .exceptions import SearchException
-T=TypeVar('T')
+from .exceptions import SearchException, DiagnosticsException, QueryException
+
+T = TypeVar('T')
 
 
 class QueryMetrics(object):
     pass
-
-
-class IQueryResult:
-    def request_id(self):
-        # type: (...) ->UUID
-        pass
-
-    def client_context_id(self):
-        # type: (...)->str
-        pass
-
-    def signature(self):
-        # type: (...)->Any
-        pass
-
-    def rows(self):
-        # type: (...)->List[T]
-        pass
-
-    def warnings(self):
-        # type: (...)->List[Warning]
-        pass
-
-    def metrics(self):
-        # type: (...)->QueryMetrics
-        pass
 
 
 CallableOnOptionBlock = Callable[[OptionBlockDeriv, Any], Any]
@@ -136,28 +112,29 @@ class Cluster:
         pass
 
     def query(self,
-              statement,
+              statement,  # type: str
               *options,  # type: QueryOptions
-              **kwargs):
-        # type: (str, Any, Any) -> IQueryResult
+              **kwargs  # type: Any
+              ):
+        # type: (...) -> QueryResult
         """
+        Perform a N1QL query.
 
         :param str statement: the N1QL query statement to execute
         :param QueryOptions options: the optional parameters that the Query service takes.
             See The N1QL Query API for details or a SDK 2.0 implementation for detail.
 
         :return: An :class:`IQueryResult` object with the results of the query or error message
-        if the query failed on the server.
+            if the query failed on the server.
 
         """
-        result = self._cluster.n1ql_query(statement, forward_args(kwargs, *options))
-        return result
+        return QueryResult(self._operate_on_first_bucket(CoreBucket.query, QueryException, statement, **forward_args(kwargs, *options)))
 
     def _operate_on_first_bucket(self, verb, failtype, *args, **kwargs):
-        first_bucket = next(iter(self._cluster._buckets), None)  # type: Optional[couchbase.CoreBucket]
+        first_bucket = next(iter(self._cluster._buckets.items()), None)  # type: Optional[couchbase.CoreBucket]
         if not first_bucket:
             raise failtype("Need at least one bucket active to perform search")
-        return verb(first_bucket, *args, **kwargs)
+        return verb(first_bucket[1]()._bucket, *args, **kwargs)
 
     def analytics_query(self,
                         statement,  # type: str,
@@ -205,7 +182,7 @@ class Cluster:
         :return:A IDiagnosticsResult object with the results of the query or error message if the query failed on the server.
 
         """
-        return self._operate_on_first_bucket(CoreBucket.diagnostics, couchbase.DiagnosticsException)
+        return self._operate_on_first_bucket(CoreBucket.diagnostics, DiagnosticsException)
 
     def users(self):
         # type: (...)->IUserManager
