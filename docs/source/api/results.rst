@@ -2,7 +2,7 @@
 Result Objects
 ##############
 
-.. currentmodule:: couchbase.result
+.. currentmodule:: couchbase_core.result
 
 This is the base class for all result operations
 
@@ -49,7 +49,7 @@ This is the base class for all result operations
 
     The :attr:`all_ok` field can be used to quickly examine the object for errors
     (in case something like ``quiet`` was passed to
-    :meth:`~couchbase.bucket.Bucket.get_multi`), e.g.
+    :meth:`~couchbase_v2.bucket.Bucket.get_multi`), e.g.
 
     Using the `all_ok` field::
 
@@ -91,20 +91,20 @@ Observe Constants
 These constants are returned as values for :attr:`ObserveInfo.flags`
 field.
 
-.. data:: couchbase.OBS_FOUND
+.. data:: couchbase_core.OBS_FOUND
 
     The key exists on the given node's cache, though it may not have been
     stored to disk yet.
 
-.. data:: couchbase.OBS_PERSISTED
+.. data:: couchbase_core.OBS_PERSISTED
 
     The key is persisted to the given node's disk.
 
-.. data:: couchbase.OBS_NOTFOUND
+.. data:: couchbase_core.OBS_NOTFOUND
 
     The key is not present in the node's cache.
 
-.. data:: couchbase.OBS_LOGICALLY_DELETED
+.. data:: couchbase_core.OBS_LOGICALLY_DELETED
 
     The key is not present in the node's cache, however it is still present
     on the persistent store. If the node would crash at this moment, the key
@@ -116,7 +116,7 @@ field.
 `ObserveInfo` Object
 --------------------
 
-.. module:: couchbase.result
+.. module:: couchbase_core.result
 
-.. autoclass:: couchbase.result.ObserveInfo
+.. autoclass:: couchbase_core.result.ObserveInfo
     :members:

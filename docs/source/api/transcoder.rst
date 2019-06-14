@@ -16,7 +16,7 @@ key formats. Among the uses of the transcoder class, one may:
     complex and user-friendly type in the native client language. Some
     clients may have different ideas about which flags mean which value format,
     and some clients may use formats which are specific to that platform
-    (for example, :const:`~couchbase.FMT_PICKLE` which
+    (for example, :const:`~couchbase_core.FMT_PICKLE` which
     is typically only native to Python objects). One may implement a
     custom transcoder class which understands a wider variety of types
     and flags
@@ -42,11 +42,11 @@ Typically one would subclass the :class:`Transcoder` class, and
 implement the needed methods, allowing for high efficient built-in
 methods to perform the un-needed operations.
 
-Note that the :class:`~couchbase.bucket.Bucket` does not
+Note that the :class:`~couchbase_core.bucket.Bucket` does not
 use a :class:`Transcoder` object by default (however it internally uses
 the same routines that the C-implemented :class:`Transcoder` does). Thus,
 if no custom transcoding is needed, it is more efficient to set the
-:attr:`~couchbase.bucket.Bucket.transcoder` to ``None``, which
+:attr:`~couchbase_core.bucket.Bucket.transcoder` to ``None``, which
 is the default.
 
 .. class:: Transcoder

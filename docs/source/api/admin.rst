@@ -2,7 +2,7 @@
 Administrative Operations
 =========================
 
-.. module:: couchbase.admin
+.. module:: couchbase_core.admin
 
 The :class:`~.Admin` provides several convenience methods
 to perform common API requests.

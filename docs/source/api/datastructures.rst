@@ -1,11 +1,22 @@
-.. module:: couchbase.datastructures
 
+.. module:: couchbase_v2.bucket
 
 ==================
 Datastructures API
 ==================
 
-.. currentmodule:: couchbase.bucket
+.. _JIRA: https://issues.couchbase.com/browse/PYCBC-589
+
+.. warning::
+
+    This API is from SDK2 and is currently only available
+    from the couchbase_v2 legacy support package. It will
+    be updated to support SDK3 shortly. See JIRA_.
+
+
+
+
+.. currentmodule:: couchbase_v2.bucket
 
 .. versionadded:: 2.1.1
 
@@ -13,13 +24,13 @@ The datastructure API allows your application to view Couchbase documents as
 common data structures such as lists, maps, and queues.
 
 Datastructure operations are implemented largely using
-:mod:`couchbase.subdocument` operations, and also carry with some more
+:mod:`couchbase_core.subdocument` operations, and also carry with some more
 efficiency.
 
 
 Couchbase datatypes are still JSON underneath, and use the
-:meth:`couchbase.bucket.Bucket.mutate_in` and
-:meth:`couchbase.bucket.Bucket.lookup_in` methods to access the structures
+:meth:`couchbase_v2.bucket.Bucket.mutate_in` and
+:meth:`couchbase_v2.bucket.Bucket.lookup_in` methods to access the structures
 themselves.
 
 The datastructures are:
@@ -48,7 +59,7 @@ The datastructures are:
     methods.
 
 
-.. currentmodule:: couchbase.bucket
+.. currentmodule:: couchbase_v2.bucket
 
 .. class:: Bucket
     :noindex:

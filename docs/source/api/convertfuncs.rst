@@ -2,7 +2,7 @@
 Conversion Functions
 ====================
 
-.. module:: couchbase
+.. module:: couchbase_core
 
 By default, this library uses the default ``pickle`` and ``json``
 modules of the standard Python installation to perform conversion
@@ -16,10 +16,10 @@ There are two functions available to change the default Pickle and JSON
 converters.
 
 Note that these immediately affect *all*
-:class:`~couchbase.bucket.Bucket` objects. If you wish to have
+:class:`~couchbase_core.bucket.Bucket` objects. If you wish to have
 a finer grained control over which object uses which converters, you
 may wish to consider writing your own
-:class:`~couchbase.transcoder.Transcoder`
+:class:`~couchbase_core.transcoder.Transcoder`
 implementation instead.
 
 .. autofunction:: set_json_converters
