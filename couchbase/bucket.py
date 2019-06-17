@@ -1,17 +1,11 @@
 from couchbase_core.bucket import Bucket as CoreBucket
-from .collection import Collection as SDK3Collection, CollectionOptions, Collection
+from .collection import CBCollection, CollectionOptions
 from .options import OptionBlock, forward_args
 from .result import *
 
 
 class BucketOptions(OptionBlock):
     pass
-
-
-class IViewResult(IResult):
-    def __init__(self, sdk2_result # type: couchbase_core.ViewResult
-                ):
-        pass
 
 
 class ViewOptions(object):
@@ -120,7 +114,6 @@ class Bucket(object):
     def name(self):
         # type: (...)->str
         return self._name
-    from .collection import Scope
 
     def scope(self,
               scope_name  # type: str
@@ -133,7 +126,7 @@ class Bucket(object):
     def default_collection(self,
                            options=None  # type: CollectionOptions
                            ):
-        # type: (...)->Collection
+        # type: (...)->CBCollection
         """
         Open the default collection
         :param CollectionOptions options: any options to pass to the Collection constructor
@@ -145,7 +138,7 @@ class Bucket(object):
                    collection_name,  # type: str
                    options=None  # type: CollectionOptions
                    ):
-        # type: (...)->Collection
+        # type: (...)->CBCollection
         """
         Open a collection in the default scope
         :param collection_name: collection name

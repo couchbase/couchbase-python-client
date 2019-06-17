@@ -1,19 +1,17 @@
 from couchbase_core.subdocument import Spec
 from .options import Seconds, FiniteDuration
 from couchbase_core.transcodable import Transcodable
-from couchbase_core._libcouchbase import Result as SDK2Result, Result
+from couchbase_core._libcouchbase import Result as SDK2Result
+from couchbase_core.result import MultiResult, SubdocResult
 from typing import *
 from boltons.funcutils import wraps
-
-
-Proxy_T = TypeVar('Proxy_T')
 
 try:
     from abc import abstractmethod
 except:
     pass
 
-from couchbase_core.result import MultiResult, SubdocResult
+Proxy_T = TypeVar('Proxy_T')
 
 
 def canonical_sdresult(content):
@@ -65,6 +63,26 @@ class ContentProxySubdoc(object):
 
 
 class IResult(object):
+    @property
+    @abstractmethod
+    def cas(self):
+        # type: ()->int
+        raise NotImplementedError()
+
+    @property
+    @abstractmethod
+    def error(self):
+        # type: ()->int
+        raise NotImplementedError()
+
+    @property
+    @abstractmethod
+    def success(self):
+        # type: ()->bool
+        raise NotImplementedError()
+
+
+class Result(IResult):
     def __init__(self,
                  cas,  # type: int
                  error=None  # type: Optional[int]
@@ -101,7 +119,7 @@ class IGetResult(IResult):
         pass
 
 
-class LookupInResult(IResult):
+class LookupInResult(Result):
     def __init__(self,
                  content,  # type: SDK2Result
                  *args,  # type: Any
@@ -112,6 +130,7 @@ class LookupInResult(IResult):
         LookupInResult is the return type for lookup_in operations.
         Constructed internally by the API.
         """
+        super(LookupInResult, self).__init__(content.cas, content.rc)
         self._content = content  # type: SDK2Result
         self.dict = kwargs
 
@@ -126,7 +145,7 @@ class LookupInResult(IResult):
         return len(canonical_sdresult(self._content))>index
 
 
-class MutationResult(IResult):
+class MutationResult(Result):
     def __init__(self,
                  cas,  # type: int
                  mutation_token=None  # type: MutationToken
@@ -157,9 +176,12 @@ class MutateInResult(MutationResult):
         return ContentProxy(self._content)
 
 
-class GetResult(IGetResult):
+class GetResult(Result, IGetResult):
     def __init__(self,
-                 content,  # type: SDK2Result
+                 id,  # type: str
+                 cas,  # type: int
+                 rc,  # type: int
+                 expiry,  # type: Seconds
                  *args,  # type: Any
                  **kwargs  # type: Any
                  ):
@@ -168,7 +190,9 @@ class GetResult(IGetResult):
         GetResult is the return type for full read operations.
         Constructed internally by the API.
         """
-        self._content = content  # type: SDK2Result
+        super(GetResult, self).__init__(cas, rc)
+        self._id = id
+        self._expiry = expiry
         self.dict = kwargs
 
     def content_as_array(self):
@@ -176,44 +200,36 @@ class GetResult(IGetResult):
         return list(self.content)
 
     @property
-    def content_as(self):
-        # type: (...)->ContentProxy
-        return ContentProxy(self._content)
-
-    def __getitem__(self, t):
-        return
-
-    @property
     def id(self):
         # type: () -> str
-        return self.dict['id']
-
-    @property
-    def cas(self):
-        # type: () -> int
-        return self.dict['cas']
+        return self._id
 
     @property
     def expiry(self):
         # type: () -> Seconds
-        return Seconds(self.dict['expiry'])
+        return self._expiry
+
+
+class SDK2ResultWrapped(GetResult):
+    def __init__(self,
+                 sdk2_result,  # type: SDK2Result
+                 expiry=None,  # type: Seconds
+                 **kwargs):
+        super(SDK2ResultWrapped, self).__init__(sdk2_result.key, sdk2_result.cas, sdk2_result.rc, expiry, **kwargs)
+        self._original = sdk2_result
+
+    @property
+    def content_as(self):
+        # type: (...)->ContentProxy
+        return ContentProxy(self._original)
 
     @property
     def content(self):
-        # type: () -> SDK2Result
-        return extract_value(self._content, lambda x:x)
+        # type: () -> Any
+        return extract_value(self._original, lambda x: x)
 
 
-ResultPrecursor = NamedTuple('ResultPrecursor', [('orig_result',SDK2Result), ('orig_options', Mapping[str,Any])])
-
-
-def get_result(x,  # type: SDK2Result
-               options=None  # type: Dict[str,Any]
-               ):
-    # type: (...)->GetResult
-    options = options or {}
-
-    return GetResult(x, cas=getattr(x, 'cas'), expiry=options.pop('timeout', None), id=x.key)
+ResultPrecursor = NamedTuple('ResultPrecursor', [('orig_result', SDK2Result), ('orig_options', Mapping[str, Any])])
 
 
 def get_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
@@ -221,10 +237,11 @@ def get_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
     # type: (...)->Callable[[Any], GetResult]
     @wraps(func)
     def wrapped(*args, **kwargs):
-        x, options = func(*args,**kwargs)
-        return get_result(x, options)
-    wrapped.__name__=func.__name__
-    wrapped.__doc__=func.__name__
+        x, options = func(*args, **kwargs)
+        return SDK2ResultWrapped(x, **(options or {}))
+
+    wrapped.__name__ = func.__name__
+    wrapped.__doc__ = func.__name__
     return wrapped
 
 
@@ -277,3 +294,23 @@ def _wrap_in_mutation_result(func  # type: Callable[[Any,...],SDK2Result]
     mutated.__name__=func.__name__
     mutated.__doc__=func.__doc__
     return mutated
+
+
+class IViewResult(IResult):
+    @property
+    def error(self):
+        raise NotImplementedError()
+
+    @property
+    def success(self):
+        raise NotImplementedError()
+
+    @property
+    def cas(self):
+        raise NotImplementedError()
+
+
+class ViewResult(Result):
+    def __init__(self, sdk2_result # type: SDK2Result
+                ):
+        super(ViewResult, self).__init__(sdk2_result)
