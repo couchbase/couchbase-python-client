@@ -46,12 +46,6 @@ except couchbase_version.CantInvokeGit:
 
 pkgversion = couchbase_version.get_version()
 
-# Dummy dependency to prevent installation of Python < 3 package on Windows.
-
-
-pip_not_on_win_python_lt_3 = ["pip>=20.0; (sys_platform == 'win32' and python_version <= '2.7')"]
-
-
 build_type = os.getenv("PYCBC_BUILD",
                        {"Windows": "CMAKE_HYBRID", "Darwin": "CMAKE_HYBRID", "Linux": "CMAKE_HYBRID"}.get(platform.system(),
                                                                                                    "CMAKE_HYBRID"))
@@ -114,7 +108,7 @@ def gen_distutils_build(extoptions,pkgdata):
 def handle_build_type_and_gen_deps():
     cmake_build = build_type in ['CMAKE', 'CMAKE_HYBRID']
     print("Build type: {}, cmake:{}".format(build_type, cmake_build))
-    general_requires = ['pyrsistent', "enum34; python_version < '3.5'", 'boltons']
+    general_requires = open('requirements.txt').readlines()
     extoptions, pkgdata=get_ext_options()
 
     if cmake_build:
@@ -127,18 +121,11 @@ def handle_build_type_and_gen_deps():
     setup_kw = {'ext_modules': e_mods}
     logging.error(setup_kw)
 
-    typing_requires = ["typing; python_version<'3.7'", "typing-extensions; python_version<'3.7'", "mypy_extensions"]
-
-    exec_requires = typing_requires + general_requires
-    conan_build = os.environ.get("PYCBC_CONAN_BUILD")
-    conan_deps = ['conan'] if conan_build else []
-    conan_and_cmake_deps = ((['scikit-build', 'cmake>=3.0.2'] + conan_deps) if
-                            cmake_build and sys.platform.startswith('darwin') else [])
-    setup_kw['setup_requires'] = exec_requires + conan_and_cmake_deps
-    setup_kw['install_requires'] = exec_requires + pip_not_on_win_python_lt_3
-    setup_kw['cmdclass']=cmdclass
-    setup_kw['package_data']=pkgdata
-    setup_kw['eager_resources']=pkgdata
+    setup_kw['setup_requires'] = general_requires
+    setup_kw['install_requires'] = general_requires
+    setup_kw['cmdclass'] = cmdclass
+    setup_kw['package_data'] = pkgdata
+    setup_kw['eager_resources'] = pkgdata
     return setup_kw
 
 
