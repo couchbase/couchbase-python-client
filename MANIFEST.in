@@ -1,5 +1,7 @@
 include *.txt *.rst LICENSE
-include couchbase_version.py
+include *.py
+include CMakeLists.txt
+include cbuild_cfg.json
 recursive-include couchbase *.py
 recursive-include src *.c *.h
 recursive-include docs *
