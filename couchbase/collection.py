@@ -1,5 +1,6 @@
 from abc import abstractmethod
 
+import wrapt
 from boltons.funcutils import wraps
 from mypy_extensions import VarArg, KwArg, Arg
 
@@ -153,12 +154,13 @@ RawCollectionMethodDefault = Callable[
 RawCollectionMethodInt = Callable[
     [Arg('CBCollection', 'self'), Arg(str, 'key'), int, VarArg(OptionBlockDeriv), KwArg(Any)], R]
 RawCollectionMethod = Union[RawCollectionMethodDefault, RawCollectionMethodInt]
+RawCollectionMethodSpecial = TypeVar('RawCollectionMethodSpecial',bound=RawCollectionMethod)
 
 
 def _get_result_and_inject(func  # type: RawCollectionMethod
                            ):
     # type: (...) ->RawCollectionMethod
-    result=_inject_scope_and_collection(get_result_wrapper(func))
+    result = _inject_scope_and_collection(get_result_wrapper(func))
     result.__doc__=func.__doc__
     result.__name__=func.__name__
     return result
@@ -172,7 +174,7 @@ def _mutate_result_and_inject(func  # type: RawCollectionMethod
     result.__name__=func.__name__
     return result
 
-RawCollectionMethodSpecial = TypeVar('RawCollectionMethodSpecial',bound=RawCollectionMethod)
+
 def _inject_scope_and_collection(func  # type: RawCollectionMethodSpecial
                                  ):
     # type: (...) -> RawCollectionMethod
@@ -183,7 +185,7 @@ def _inject_scope_and_collection(func  # type: RawCollectionMethodSpecial
                 ):
         # type: (...)->Any
         if self.true_collections:
-            if self.name and not self._scope:
+            if self.name and not self._self_parent:
                 raise couchbase.exceptions.CollectionMissingException
             if self._scope and self.name:
                 kwargs['scope'] = self._scope
@@ -212,11 +214,11 @@ class LookupInOptions(OptionBlock):
     pass
 
 
-class CBCollection(object):
+class CBCollection(wrapt.ObjectProxy):
     def __init__(self,
                  parent,  # type: Scope
                  name=None,  # type: Optional[str]
-                 options=None  # type: CollectionOptions
+                 *options  # type: CollectionOptions
                  ):
         # type: (...)->None
         """
@@ -235,20 +237,36 @@ class CBCollection(object):
         :param str name: name of collection
         :param CollectionOptions options: miscellaneous options
         """
+        assert issubclass(type(parent._realbucket), CoreBucket)
+        super(CBCollection, self).__init__(parent._realbucket, **forward_args({}, *options))
+        self._init(name, parent)
 
-        super(CBCollection, self).__init__()
-        self.parent = parent  # type: Scope
-        self.name = name
-        self.true_collections = self.name and self._scope
+    def _init(self,
+              name,  # type: Optional[str]
+              scope  # type: Scope
+              ):
+        self._self_scope = scope  # type: Scope
+        self._self_name = name  # type: Optional[str]
+        self._self_true_collections = name and scope
+
+    @property
+    def true_collections(self):
+        return self._self_true_collections
+
+    @classmethod
+    def cast(cls,
+             parent,  # type: Scope
+             name,  # type Optional[str]
+             *options  # type: CollectionOptions
+            ):
+        # type: (...)->CBCollection
+        result = CBCollection(parent, name, *options)
+        return result
 
     @property
     def bucket(self):
         # type: (...) -> CoreBucket
-        return self.parent.bucket._bucket
-
-    @property
-    def _scope(self):
-        return self.parent.name
+        return self.__wrapped__
 
     MAX_GET_OPS = 16
 
@@ -1187,12 +1205,16 @@ class Scope(object):
         """
         if name:
             self._name = name
-        self.record = pyrsistent.PRecord()
         self.bucket = parent
 
     def __deepcopy__(self, memodict={}):
         result = copy.copy(self)
         return result
+
+    @property
+    def _realbucket(self):
+        # type: (...)->CoreBucket
+        return self.bucket._bucket
 
     @property
     def name(self):
@@ -1210,7 +1232,24 @@ class Scope(object):
                            **kwargs  # type: Any
                            ):
         # type: (...)->CBCollection
-        return CBCollection(self, name=None, **forward_args(kwargs, *options))
+        """
+        Returns the default collection for this bucket.
+
+        :param collection_name: string identifier for a given collection.
+        :param options: collection options
+        :return: A :class:`.Collection` for a collection with the given name.
+
+        :raises CollectionNotFoundException
+        :raises AuthorizationException
+        """
+        return self._gen_collection(None, *options)
+
+    def _gen_collection(self,
+                        collection_name,  # type: Optional[str]
+                        *options  # type: CollectionOptions
+                        ):
+        # type: (...)->CBCollection
+        return CBCollection.cast(self, collection_name, *options)
 
     def open_collection(self,
                         collection_name,  # type: str
@@ -1218,7 +1257,7 @@ class Scope(object):
                         ):
         # type: (...) -> CBCollection
         """
-        Gets an :class:`.Collection` instance given a collection name.
+        Gets the named collection for this bucket.
 
         :param collection_name: string identifier for a given collection.
         :param options: collection options
@@ -1228,7 +1267,7 @@ class Scope(object):
         :raises AuthorizationException
 
         """
-        return CBCollection(self, collection_name, *options)
+        return self._gen_collection(collection_name, *options)
 
 
 Collection = CBCollection

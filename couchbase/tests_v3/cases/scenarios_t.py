@@ -47,9 +47,6 @@ import couchbase.subdocument as SD
 
 
 class Scenarios(ConnectionTestCase):
-    # implicit val ec = ExecutionContext.Implicits.global
-
-    # private val cluster = CouchbaseCluster.create("localhost")
     coll = None  # type: CBCollection
 
     def setUp(self):
@@ -446,12 +443,16 @@ class Scenarios(ConnectionTestCase):
 
         self.assertRaises(couchbase.exceptions.ArgumentError, self.coll.increment, "counter", DeltaValue(5), initial=10)
         self.assertRaises(couchbase.exceptions.ArgumentError, self.coll.increment, "counter", 5)
-        self.assertRaises(couchbase.exceptions.ArgumentError, self.coll.increment, "counter",-3)
+        self.assertRaises(couchbase.exceptions.ArgumentError, self.coll.increment, "counter", -3)
 
     def test_cluster_query(self):
         result = self.cluster.query("SELECT mockrow")
-        self.assertEquals([{"row":"value"}],result.rows())
-        self.assertEquals([{"row":"value"}],list(result))
-        self.assertEquals([{"row":"value"}],list(result))
-        self.assertEquals([{"row":"value"}],result.rows())
+        self.assertEquals([{"row": "value"}], result.rows())
+        self.assertEquals([{"row": "value"}], list(result))
+        self.assertEquals([{"row": "value"}], list(result))
+        self.assertEquals([{"row": "value"}], result.rows())
 
+    def test_multi(self):
+        self.coll.upsert_multi({"Fred": "Wilma", "Barney": "Betty"})
+        self.assertEquals(self.coll.get("Fred").content, "Wilma")
+        self.assertEquals(self.coll.get("Barney").content, "Betty")

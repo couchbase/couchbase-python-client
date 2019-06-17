@@ -2,6 +2,7 @@ from couchbase_core.bucket import Bucket as CoreBucket
 from .collection import CBCollection, CollectionOptions
 from .options import OptionBlock, forward_args
 from .result import *
+from .collection import Scope
 
 
 class BucketOptions(OptionBlock):
@@ -107,8 +108,8 @@ class Bucket(object):
 
 
         """
-        self._name=name
-        self._bucket=CoreBucket(connection_string, **forward_args(kwargs, *options))
+        self._name = name
+        self._bucket = CoreBucket(connection_string, **forward_args(kwargs, *options))
 
     @property
     def name(self):
@@ -119,8 +120,6 @@ class Bucket(object):
               scope_name  # type: str
               ):
         # type: (...)->Scope
-        from couchbase import Scope
-
         return Scope(self, scope_name)
 
     def default_collection(self,
@@ -132,7 +131,7 @@ class Bucket(object):
         :param CollectionOptions options: any options to pass to the Collection constructor
         :return: the default :class:`Collection` object.
         """
-        return Collection(self)
+        return Scope(self).default_collection()
 
     def collection(self,
                    collection_name,  # type: str
@@ -145,7 +144,7 @@ class Bucket(object):
         :param CollectionOptions options: any options to pass to the Collection constructor
         :return: the default :class:`.Collection` object.
         """
-        return Collection(self, collection_name)
+        return Scope(self).open_collection(collection_name)
 
     def view_query(self,
                    design_doc,  # type: str

@@ -12,4 +12,5 @@ pip>=20.0; sys_platform == 'win32' and python_version <= '2.7'
 # General dependencies
 pyrsistent
 boltons
+wrapt
 

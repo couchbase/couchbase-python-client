@@ -118,6 +118,18 @@ class IGetResult(IResult):
         # type: ()->FiniteDuration
         pass
 
+    @property
+    @abstractmethod
+    def content_as(self):
+        # type: (...)->ContentProxy
+        raise NotImplementedError()
+
+    @property
+    @abstractmethod
+    def content(self):
+        # type: () -> Any
+        raise NotImplementedError()
+
 
 class LookupInResult(Result):
     def __init__(self,
