@@ -2,6 +2,7 @@ include *.txt *.rst LICENSE
 include *.py
 include CMakeLists.txt
 include cbuild_cfg.json
+recursive-include cmake *
 recursive-include couchbase *.py
 recursive-include src *.c *.h
 recursive-include docs *
