@@ -81,23 +81,13 @@ const lcb_RESPGET* pycbc_view_document(const lcb_RESPVIEW *ctx)
 pycbc_strn_base_const pycbc_view_key(const lcb_RESPVIEW *ctx)
 {
     pycbc_strn_base_const temp;
-    ;
     lcb_respview_key(ctx, &temp.buffer, &temp.length);
-    return temp;
-};
-
-pycbc_strn_base_const pycbc_view_geometry(const lcb_RESPVIEW *ctx)
-{
-    pycbc_strn_base_const temp;
-    ;
-    lcb_respview_geometry(ctx, &temp.buffer, &temp.length);
     return temp;
 };
 
 pycbc_strn_base_const pycbc_view_row(const lcb_RESPVIEW *ctx)
 {
     pycbc_strn_base_const temp;
-    ;
     lcb_respview_row(ctx, &temp.buffer, &temp.length);
     return temp;
 };
@@ -150,8 +140,9 @@ static int parse_row_json(pycbc_Bucket *bucket,
                    pycbc_helpers.helpname, \
                    pycbc_strn_base_const_array(pycbc_view_##fbase(resp)))
 
-    is_ok = ADD_FIELD(vkey_key, key) == 0 && ADD_FIELD(vkey_value, row) == 0 &&
-            ADD_FIELD(vkey_geo, geometry) == 0;
+#define VIEW_FIELD_OK(VKEY_POSTFIX, RHS) ADD_FIELD(vkey_##VKEY_POSTFIX, RHS)==0
+    is_ok = VIEW_FIELDS_REDUCE(VIEW_FIELD_OK,&&);
+
 #undef ADD_FIELD
     if (!is_ok) {
         rv = -1;
@@ -313,8 +304,11 @@ TRACED_FUNCTION_WRAPPER(_view_request, LCBTRACE_OP_REQUEST_ENCODING, Bucket)
     if (rv != 0) {
         goto GT_DONE;
     }
+    CMDSCOPE_NG(VIEW, view)
     {
-        lcb_CMDVIEW *vcmd = NULL;
+        lcb_CMDVIEW *vcmd = cmd;
+        int is_spatial = flags & LCB_CMDVIEWQUERY_F_SPATIAL;
+        rc = is_spatial ? pycbc_cmdview_spatial(vcmd, is_spatial) : LCB_SUCCESS;
         lcb_cmdview_create(&vcmd);
         lcb_cmdview_design_document(vcmd, design, strlen(design));
         lcb_cmdview_view_name(vcmd, view, strlen(view));
@@ -325,7 +319,9 @@ TRACED_FUNCTION_WRAPPER(_view_request, LCBTRACE_OP_REQUEST_ENCODING, Bucket)
 
         lcb_cmdview_include_docs(vcmd, flags & LCB_CMDVIEWQUERY_F_INCLUDE_DOCS);
         lcb_cmdview_no_row_parse(vcmd, flags & LCB_CMDVIEWQUERY_F_NOROWPARSE);
-        lcb_cmdview_spatial(vcmd, flags & LCB_CMDVIEWQUERY_F_SPATIAL);
+        if (rc) {
+            CMDSCOPE_GENERIC_FAIL(, VIEW, view)
+        }
 
         vres->rows = PyList_New(0);
         vres->base.format = PYCBC_FMT_JSON;
@@ -341,8 +337,8 @@ TRACED_FUNCTION_WRAPPER(_view_request, LCBTRACE_OP_REQUEST_ENCODING, Bucket)
                                       GENERIC_NULL_OPERAND,
                                       mres,
                                       vcmd);
-        lcb_cmdview_destroy(vcmd);
     }
+GT_ERR:
     if (rc != LCB_SUCCESS) {
         PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, rc, "Couldn't schedule view");
         goto GT_DONE;

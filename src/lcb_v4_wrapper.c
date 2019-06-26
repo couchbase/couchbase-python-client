@@ -132,5 +132,14 @@ lcb_STATUS pycbc_cmdn1ql_multiauth(lcb_CMDN1QL* cmd, int enable) {
 
 lcb_STATUS pycbc_cmdanalytics_host(lcb_CMDANALYTICS* CMD, const char* host)
 {
+    (void)CMD;
+    (void)host;
+    return LCB_NOT_SUPPORTED;
+}
+
+lcb_STATUS pycbc_cmdview_spatial(lcb_CMDVIEW *pCmdview, int is_spatial)
+{
+    (void)pCmdview;
+    (void)is_spatial;
     return LCB_NOT_SUPPORTED;
 }

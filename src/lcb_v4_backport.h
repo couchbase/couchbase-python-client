@@ -146,6 +146,14 @@
 #define lcb_respview_geometry(CTX, DEST, NDEST) \
     *(DEST) = (CTX)->geometry;                  \
     *(NDEST) = (CTX)->ngeometry;
+
+pycbc_strn_base_const pycbc_view_geometry(const lcb_RESPVIEW *ctx);
+
+#define VIEW_FIELDS_REDUCE(X, SEP)\
+    X(key,key) SEP \
+    X(value,row) SEP \
+    X(geo, geometry)
+
 #define lcb_respview_row(CTX, DEST, NDEST) \
     *(DEST) = (CTX)->value;                \
     *(NDEST) = (CTX)->nvalue;
@@ -193,6 +201,8 @@
 #define lcb_cmdview_spatial(VCMD, ENABLE)                                 \
     (VCMD)->cmdflags = ((VCMD)->cmdflags & ~LCB_CMDVIEWQUERY_F_SPATIAL) | \
                        (ENABLE ? LCB_CMDVIEWQUERY_F_SPATIAL : 0)
+lcb_STATUS pycbc_cmdview_spatial(lcb_CMDVIEW *pCmdview, int is_spatial);
+
 #define lcb_view(...) lcb_view_query(__VA_ARGS__)
 
 #define lcb_cmdview_parent_span(...) lcb_view_set_parent_span(__VA_ARGS__)

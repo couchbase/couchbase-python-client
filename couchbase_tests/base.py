@@ -19,6 +19,8 @@ import sys
 import types
 import platform
 import warnings
+from unittest import SkipTest
+
 from testfixtures import LogCapture
 
 from testresources import ResourcedTestCase as ResourcedTestCaseReal, TestResourceManager
@@ -728,3 +730,10 @@ class DDocTestCase(ConnectionTestCase):
 
 class ViewTestCase(ConnectionTestCase):
     pass
+
+
+class SkipUnsupported(SkipTest):
+    def __init__(self,
+                 cause
+                 ):
+        super(SkipUnsupported,self).__init__(traceback.format_exc())

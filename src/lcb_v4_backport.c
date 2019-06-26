@@ -280,3 +280,15 @@ lcb_STATUS lcb_cmdfts_handle(lcb_CMDFTS *cmd, pycbc_FTS_HANDLE *pFTSREQ) {
     cmd->handle=pFTSREQ;
     return LCB_SUCCESS;
 }
+
+lcb_STATUS pycbc_cmdview_spatial(lcb_CMDVIEW *pCmdview, int is_spacial)
+{
+    return lcb_cmdview_spatial(pCmdview, is_spacial);
+}
+
+pycbc_strn_base_const pycbc_view_geometry(const lcb_RESPVIEW *ctx)
+{
+    pycbc_strn_base_const temp;
+    lcb_respview_geometry(ctx, &temp.buffer, &temp.length);
+    return temp;
+};
