@@ -44,6 +44,7 @@ from couchbase import Bucket
 
 from couchbase_tests.base import ConnectionTestCase
 import couchbase.subdocument as SD
+import couchbase.admin
 
 
 class Scenarios(ConnectionTestCase):
@@ -59,7 +60,15 @@ class Scenarios(ConnectionTestCase):
         connstr_abstract= couchbase_core.connstr.ConnectionString.parse(connargs.pop('connection_string'))
         bucket_name=connstr_abstract.bucket
         connstr_abstract.bucket=None
+        connstr_abstract.set_option('enable_collections','true')
         self.cluster = Cluster(connstr_abstract)
+        self.admin=self.make_admin_connection()
+        cm=couchbase.admin.CollectionManager(self.admin,bucket_name)
+        try:
+            cm.insert_scope("bedrock")
+            cm.insert_collection("flintstones","bedrock")
+        except:
+            pass
         self.bucket = self.cluster.bucket(bucket_name,**connargs)
         self.scope = self.bucket.scope("scope")
         # 2) Open a Collection
