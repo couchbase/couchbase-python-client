@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 import logging
-import os.path
 import os
 import couchbase_version
 
-from cbuild_config import get_ext_options, couchbase_core
-from cmodule import gen_cmodule
+from cbuild_config import get_ext_options, couchbase_core, build_type
+from cmodule import gen_distutils_build
+from cmake_build import gen_cmake_build
 
 try:
     if os.environ.get('PYCBC_NO_DISTRIBUTE'):
@@ -15,13 +15,9 @@ try:
 except ImportError:
     from distutils.core import setup, Extension
 
-from distutils.command.install_headers import install_headers as install_headers_orig
-
 import os
 import sys
 import platform
-
-from setuptools.command.build_ext import build_ext
 
 lcb_min_version = (2, 9, 0)
 
@@ -46,64 +42,6 @@ except couchbase_version.CantInvokeGit:
 
 pkgversion = couchbase_version.get_version()
 
-build_type = os.getenv("PYCBC_BUILD",
-                       {"Windows": "CMAKE_HYBRID", "Darwin": "CMAKE_HYBRID", "Linux": "CMAKE_HYBRID"}.get(platform.system(),
-                                                                                                   "CMAKE_HYBRID"))
-
-
-class install_headers(install_headers_orig):
-    def run(self):
-        headers = self.distribution.headers or []
-        for header in headers:
-            dst = os.path.join(self.install_dir, os.path.dirname(header))
-            self.mkpath(dst)
-            (out, _) = self.copy_file(header, dst)
-            self.outfiles.append(out)
-
-
-def gen_cmake_build(extoptions, pkgdata):
-    from cmake_build import CMakeExtension, CMakeBuild, CMakeBuildInfo
-
-    class LazyCommandClass(dict):
-        """
-        Lazy command class that defers operations requiring given cmdclass until
-        they've actually been downloaded and installed by setup_requires.
-        """
-        def __init__(self, cmdclass_real):
-            self.cmdclass_real=cmdclass_real
-
-        def __contains__(self, key):
-            return (
-                    key == 'build_ext'
-                    or super(LazyCommandClass, self).__contains__(key)
-            )
-
-        def __setitem__(self, key, value):
-            if key == 'build_ext':
-                raise AssertionError("build_ext overridden!")
-            super(LazyCommandClass, self).__setitem__(key, value)
-
-        def __getitem__(self, key):
-            if key != 'build_ext':
-                return super(LazyCommandClass, self).__getitem__(key)
-            return self.cmdclass_real
-
-    CMakeBuild.hybrid = build_type in ['CMAKE_HYBRID']
-    CMakeBuild.info = CMakeBuildInfo()
-    CMakeBuild.info.pkgdata = pkgdata
-    CMakeBuild.info.pkg_data_dir = os.path.join(os.path.abspath("."), couchbase_core)
-    pkgdata['couchbase'] = list(CMakeBuild.info.lcb_pkgs_strlist())
-    extoptions['library_dirs']=[CMakeBuild.info.pkg_data_dir]+extoptions.get('library_dirs',[])
-    e_mods = [CMakeExtension(str(couchbase_core+'._libcouchbase'), '', **extoptions)]
-    return e_mods, CMakeBuild.requires(), LazyCommandClass(CMakeBuild)
-
-
-def gen_distutils_build(extoptions,pkgdata):
-    b_ext = build_ext
-    e_mods = [gen_cmodule(extoptions)]
-    cmdclass = {'install_headers': install_headers, 'build_ext': b_ext}
-    return e_mods, cmdclass
-
 
 def handle_build_type_and_gen_deps():
     cmake_build = build_type in ['CMAKE', 'CMAKE_HYBRID']
@@ -112,11 +50,11 @@ def handle_build_type_and_gen_deps():
     extoptions, pkgdata=get_ext_options()
 
     if cmake_build:
-        e_mods, extra_requires, cmdclass = gen_cmake_build(extoptions,pkgdata)
+        e_mods, extra_requires, cmdclass = gen_cmake_build(extoptions, pkgdata)
         general_requires += extra_requires
     else:
         print("Legacy build")
-        e_mods, cmdclass = gen_distutils_build(extoptions,pkgdata)
+        e_mods, cmdclass = gen_distutils_build(extoptions, pkgdata)
 
     setup_kw = {'ext_modules': e_mods}
     logging.error(setup_kw)

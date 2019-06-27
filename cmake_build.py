@@ -23,64 +23,12 @@ import subprocess
 import sys
 
 from distutils.version import LooseVersion
-from shutil import copyfile, copymode
 
 from setuptools import Extension
 from setuptools.command.build_ext import build_ext
 
 import cbuild_config
-
-
-def get_plat_code():
-    plat = sys.platform.lower()
-    substitutions = {'win': r'^win.*$'}
-    for target, pattern in substitutions.items():
-        plat = re.compile(pattern).sub(target, plat)
-    return plat
-
-
-class CMakeBuildInfo:
-    def __init__(self, cmake_base=None):
-        self.setbase(cmake_base)
-        self.cfg="Release"
-        self.pkg_data_dir=os.path.join(cbuild_config.couchbase_core)
-    @property
-    def base(self):
-        print("self.base is {}".format(self._cmake_base))
-
-        return self._cmake_base
-
-    def setbase(self, path):
-        self._cmake_base=(path if isinstance(path,list) else list(os.path.split(path))) if path else None
-        print("set base as {}".format(self._cmake_base))
-
-    @base.setter
-    def base(self, path):
-        self.setbase(path)
-
-    def entries(self):
-        plat = get_plat_code()
-
-        print("Got platform {}".format(plat))
-        default = ['libcouchbase.so', 'libcouchbase.so.2', 'libcouchbase.so.3']
-        return {'darwin': ['libcouchbase.2.dylib', 'libcouchbase.dylib'], 'linux': default,
-                'win': ['libcouchbase_d.dll','libcouchbase.dll']}.get(get_plat_code(), default)
-
-    def lcb_build_base(self):
-        print("self.base is {}".format(self.base))
-        return self._cmake_base + ['install', 'lib']
-
-    def lcb_pkgs_srcs(self):
-        return {'Debug':self.lcb_build_base() + ['Debug'],'Release':self.lcb_build_base() + ['Release']}
-
-    def lcb_pkgs(self, cfg):
-        return map(lambda x: self.lcb_pkgs_srcs()[cfg] + [x], self.entries())
-
-    def lcb_pkgs_strlist(self):
-        print("got pkgs {}".format(self.entries()))
-        for x in self.entries():
-            print("yielding binary {} : {}".format(x, os.path.join(self.pkg_data_dir,x)))
-            yield os.path.join(self.pkg_data_dir, x)
+from cbuild_config import couchbase_core, build_type
 
 
 class CMakeExtension(Extension):
@@ -89,10 +37,11 @@ class CMakeExtension(Extension):
         self.sourcedir = os.path.abspath(sourcedir)
 
 
-class CMakeBuild(build_ext):
+class CMakeBuild(cbuild_config.CBuildCommon):
     hasrun = False
     hasbuilt = False
     hybrid = False
+    info = None  # type: cbuild_config.CBuildInfo
 
     def run(self):
         if not CMakeBuild.hasrun:
@@ -125,14 +74,13 @@ class CMakeBuild(build_ext):
     def requires():
         return "" if CMakeBuild.check_for_cmake() else ["cmake"]
 
-    def build_extension(self, ext):
+    def prep_build(self, ext):
         if not CMakeBuild.hasbuilt:
             from distutils.sysconfig import get_python_inc
             import distutils.sysconfig as sysconfig
-            cfg = 'Debug' if self.debug else 'Release'
+            cfg = self.cfg_type()
             extdir = os.path.abspath(
                 os.path.dirname(self.get_ext_fullpath(ext.name)))
-            import cmodule
             pycbc_lcb_api=os.getenv("PYCBC_LCB_API",
                                     cbuild_config.BUILD_CFG.get('comp_options', {}).get('PYCBC_LCB_API', None))
             lcb_api_flags = ['-DPYCBC_LCB_API={}'.format(pycbc_lcb_api)] if pycbc_lcb_api else []
@@ -141,8 +89,6 @@ class CMakeBuild(build_ext):
             cmake_args += ['-DPYTHON_INCLUDE_DIR={}'.format(get_python_inc())]
             self.info.setbase(self.build_temp)
             self.info.cfg=cfg
-            lib_paths=self.info.lcb_pkgs_srcs()
-            lib_path = os.path.join(*lib_paths[cfg])
             from distutils import sysconfig
             import os.path as op
             v = sysconfig.get_config_vars()
@@ -216,9 +162,6 @@ class CMakeBuild(build_ext):
             subprocess.check_call(['cmake', '--build', '.'] + build_args,
                                   cwd=self.build_temp)
             CMakeBuild.hasbuilt = True
-            rpaths = [{'Darwin': '@loader_path', 'Linux': '$ORIGIN'}.get(platform.system(), "$ORIGIN"),
-                      lib_path]
-            print("adding rpaths {}".format(rpaths))
             build_dir = os.path.realpath(self.build_lib)
 
             if CMakeBuild.hybrid:
@@ -228,8 +171,8 @@ class CMakeBuild(build_ext):
             for name in self.info.entries():
                 try:
                     pkg_build_dir=os.path.join(build_dir, cbuild_config.couchbase_core)
-                    self.copy_binary_to(cfg, pkg_build_dir, lib_paths, name)
-                    self.copy_binary_to(cfg, self.info.pkg_data_dir, lib_paths, name)
+                    self.copy_binary_to(cfg, pkg_build_dir, self.info.lcb_pkgs_srcs(), name)
+                    self.copy_binary_to(cfg, self.info.pkg_data_dir, self.info.lcb_pkgs_srcs(), name)
                 except:
                     print("failure")
                     raise
@@ -241,65 +184,44 @@ class CMakeBuild(build_ext):
 
                 lcb_include = os.path.join(self.build_temp, "install", "include")
                 compiler.add_include_dir(lcb_include)
-                lib_dirs = [self.info.pkg_data_dir]+self.get_lcb_dirs()
+                lib_dirs = [self.info.pkg_data_dir]+self.info.get_lcb_dirs()
                 try:
                     existing_lib_dirs=compiler.library_dirs
                     compiler.set_library_dirs(lib_dirs+existing_lib_dirs)
                 except:
                     compiler.add_library_dirs(lib_dirs)
-                if platform.system() != 'Windows':
-                    try:
-                        existing_rpaths=compiler.runtime_library_dirs
-                        compiler.set_runtime_library_dirs(rpaths+existing_rpaths)
-                    except:
-                        pass
-                    for rpath in rpaths:
-                        compiler.add_runtime_library_dir(rpath)
-                        ext.extra_link_args.insert(0,'-Wl,-rpath,' + rpath)
-                build_ext.build_extension(self, ext)
 
-    def get_lcb_dirs(self):
-        lcb_dbg_build = os.path.join(*(self.info.base + ["install", "lib", "Debug"]))
-        lcb_build = os.path.join(*(self.info.base + ["install", "lib", "Release"]))
-        lib_dirs = [lcb_dbg_build, lcb_build]
-        return lib_dirs
 
-    def copy_binary_to(self, cfg, dest_dir, lib_paths, name):
-        try:
-            os.makedirs(dest_dir)
-        except:
-            pass
-        dest = os.path.join(dest_dir, name)
-        failures = {}
-        lib_paths_prioritized = [(k, v) for k, v in lib_paths.items() if k == cfg]
-        lib_paths_prioritized += [(k, v) for k, v in lib_paths.items() if k != cfg]
-        for rel_type, binary_path in lib_paths_prioritized:
-            src = os.path.join(*(binary_path + [name]))
-            try:
-                if os.path.exists(src):
-                    print("copying {} to {}".format(src, dest))
-                    copyfile(src, dest)
-                    print("success")
-            except Exception as e:
-                failures[rel_type] = "copying {} to {}, got {}".format(src, dest, repr(e))
-        if len(failures) == len(lib_paths):
-            raise Exception("Failed to copy binary: {}".format(failures))
+def gen_cmake_build(extoptions, pkgdata):
+    from cmake_build import CMakeExtension, CMakeBuild
 
-    def copy_test_file(self, src_file):
-        '''
-        Copy ``src_file`` to ``dest_file`` ensuring parent directory exists.
-        By default, message like `creating directory /path/to/package` and
-        `copying directory /src/path/to/package -> path/to/package` are displayed on standard output. Adapted from scikit-build.
-        '''
-        # Create directory if needed
-        dest_dir = os.path.join(os.path.dirname(
-            os.path.abspath(__file__)), 'tests', 'bin')
-        if dest_dir != "" and not os.path.exists(dest_dir):
-            print("creating directory {}".format(dest_dir))
-            os.makedirs(dest_dir)
+    class LazyCommandClass(dict):
+        """
+        Lazy command class that defers operations requiring given cmdclass until
+        they've actually been downloaded and installed by setup_requires.
+        """
+        def __init__(self, cmdclass_real):
+            self.cmdclass_real=cmdclass_real
 
-        # Copy file
-        dest_file = os.path.join(dest_dir, os.path.basename(src_file))
-        print("copying {} -> {}".format(src_file, dest_file))
-        copyfile(src_file, dest_file)
-        copymode(src_file, dest_file)
+        def __contains__(self, key):
+            return (
+                    key == 'build_ext'
+                    or super(LazyCommandClass, self).__contains__(key)
+            )
+
+        def __setitem__(self, key, value):
+            if key == 'build_ext':
+                raise AssertionError("build_ext overridden!")
+            super(LazyCommandClass, self).__setitem__(key, value)
+
+        def __getitem__(self, key):
+            if key != 'build_ext':
+                return super(LazyCommandClass, self).__getitem__(key)
+            return self.cmdclass_real
+
+    CMakeBuild.hybrid = build_type in ['CMAKE_HYBRID']
+    CMakeBuild.setup_build_info(extoptions, pkgdata)
+    e_mods = [CMakeExtension(str(couchbase_core+'._libcouchbase'), '', **extoptions)]
+    return e_mods, CMakeBuild.requires(), LazyCommandClass(CMakeBuild)
+
+

@@ -17,11 +17,16 @@
 
 import itertools
 import json
+import os
 import os.path
 import platform
 import re
 import sys
 import warnings
+from distutils.command.install_headers import install_headers as install_headers_orig
+from shutil import copyfile, copymode
+
+from setuptools.command.build_ext import build_ext
 
 
 def get_json_build_cfg():
@@ -110,10 +115,7 @@ def get_ext_options():
             extoptions['extra_compile_args'] += ['-O0', '-g3']
             extoptions['extra_link_args'] += ['-O0', '-g3']
         if sys.platform == 'darwin':
-            warnings.warn('Adding /usr/local to search path for OS X')
-            extoptions['library_dirs'] = ['/usr/local/lib',
-                                          '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/10.0.0/lib/darwin/']
-            extoptions['include_dirs'] = ['/usr/local/include']
+            extoptions['library_dirs'] = ['/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/10.0.0/lib/darwin/']
         else:
             extoptions['extra_compile_args'] += ['-std=c11']
         print(pkgdata)
@@ -150,4 +152,171 @@ def get_ext_options():
     extoptions['extra_compile_args']+=['-DPYCBC_LCB_API={}'.format(PYCBC_LCB_API)]
     extoptions.update(get_sources())
     return extoptions, pkgdata
+
+
+class CBuildInfo:
+    def __init__(self, cmake_base=None):
+        self.setbase(cmake_base)
+        self.cfg="Release"
+        self.pkg_data_dir=os.path.join(couchbase_core)
+    @property
+    def base(self):
+        print("self.base is {}".format(self._cmake_base))
+
+        return self._cmake_base
+
+    def setbase(self, path):
+        self._cmake_base=(path if isinstance(path,list) else list(os.path.split(path))) if path else None
+        print("set base as {}".format(self._cmake_base))
+
+    @base.setter
+    def base(self, path):
+        self.setbase(path)
+
+    def entries(self):
+        plat = get_plat_code()
+
+        print("Got platform {}".format(plat))
+        default = ['libcouchbase.so', 'libcouchbase.so.2', 'libcouchbase.so.3']
+        return {'darwin': ['libcouchbase.2.dylib', 'libcouchbase.dylib'], 'linux': default,
+                'win': ['libcouchbase_d.dll','libcouchbase.dll']}.get(get_plat_code(), default)
+
+    def lcb_build_base(self):
+        print("self.base is {}".format(self.base))
+        return self._cmake_base + ['install', 'lib']
+
+    def lcb_pkgs_srcs(self):
+        return {'Debug':self.lcb_build_base() + ['Debug'],'Release':self.lcb_build_base() + ['Release']}
+
+    def lcb_pkgs(self, cfg):
+        return map(lambda x: self.lcb_pkgs_srcs()[cfg] + [x], self.entries())
+
+    def lcb_pkgs_strlist(self):
+        print("got pkgs {}".format(self.entries()))
+        for x in self.entries():
+            print("yielding binary {} : {}".format(x, os.path.join(self.pkg_data_dir,x)))
+            yield os.path.join(self.pkg_data_dir, x)
+
+    def get_rpaths(self, cfg):
+        result= [{'Darwin': '@loader_path', 'Linux': '$ORIGIN'}.get(platform.system(), "$ORIGIN"),
+                 os.path.join(*self.lcb_pkgs_srcs()[cfg])]
+        print("got rpaths {}".format(result))
+        return result
+
+    def get_lcb_dirs(self):
+        lcb_dbg_build = os.path.join(*(self.base + ["install", "lib", "Debug"]))
+        lcb_build = os.path.join(*(self.base + ["install", "lib", "Release"]))
+        lib_dirs = [lcb_dbg_build, lcb_build]
+        return lib_dirs
+
+
+class CBuildCommon(build_ext):
+    @classmethod
+    def setup_build_info(cls, extoptions, pkgdata):
+        cls.info = CBuildInfo()
+        cls.info.pkgdata = pkgdata
+        cls.info.pkg_data_dir = os.path.join(os.path.abspath("."), couchbase_core)
+        pkgdata['couchbase'] = list(cls.info.lcb_pkgs_strlist())
+        extoptions['library_dirs'] = [cls.info.pkg_data_dir] + extoptions.get('library_dirs', [])
+
+    def build_extension(self, ext):
+        self.init_info_and_rpaths(ext)
+        self.prep_build(ext)
+        build_ext.build_extension(self, ext)
+
+    def prep_build(self, ext):
+        pass
+
+    def init_info_and_rpaths(self, ext):
+        self.info.setbase(self.build_temp)
+        self.info.cfg = self.cfg_type()
+        self.compiler.add_include_dir(os.path.join(*self.info.base+["install","include"]))
+        self.compiler.add_library_dir(os.path.join(*self.info.base+["install","lib",self.cfg_type()]))
+        if sys.platform == 'darwin':
+            warnings.warn('Adding /usr/local to lib search path for OS X')
+            self.compiler.add_library_dir('/usr/local/lib')
+            self.compiler.add_include_dir('/usr/local/include')
+        self.add_rpaths(ext)
+
+    def add_rpaths(self, ext=None, extoptions=None):
+        rpaths=self.info.get_rpaths(self.cfg_type())
+        if platform.system() != 'Windows':
+            if self.compiler:
+                try:
+                    existing_rpaths = self.compiler.runtime_library_dirs
+                    self.compiler.set_runtime_library_dirs(rpaths + existing_rpaths)
+                except:
+                    pass
+            for rpath in rpaths:
+                if self.compiler:
+                    self.compiler.add_runtime_library_dir(rpath)
+                linker_arg='-Wl,-rpath,' + rpath
+                (extoptions['extra_link_args'] if extoptions else ext.extra_link_args if ext else []).insert(0,linker_arg)
+
+    def cfg_type(self):
+        return 'Debug' if self.debug else 'Release'
+
+    def copy_binary_to(self, cfg, dest_dir, lib_paths, name):
+        try:
+            os.makedirs(dest_dir)
+        except:
+            pass
+        dest = os.path.join(dest_dir, name)
+        failures = {}
+        lib_paths_prioritized = [(k, v) for k, v in lib_paths.items() if k == cfg]
+        lib_paths_prioritized += [(k, v) for k, v in lib_paths.items() if k != cfg]
+        for rel_type, binary_path in lib_paths_prioritized:
+            src = os.path.join(*(binary_path + [name]))
+            try:
+                if os.path.exists(src):
+                    print("copying {} to {}".format(src, dest))
+                    copyfile(src, dest)
+                    print("success")
+            except Exception as e:
+                failures[rel_type] = "copying {} to {}, got {}".format(src, dest, repr(e))
+        if len(failures) == len(lib_paths):
+            raise Exception("Failed to copy binary: {}".format(failures))
+
+    def copy_test_file(self, src_file):
+        '''
+        Copy ``src_file`` to ``dest_file`` ensuring parent directory exists.
+        By default, message like `creating directory /path/to/package` and
+        `copying directory /src/path/to/package -> path/to/package` are displayed on standard output. Adapted from scikit-build.
+        '''
+        # Create directory if needed
+        dest_dir = os.path.join(os.path.dirname(
+            os.path.abspath(__file__)), 'tests', 'bin')
+        if dest_dir != "" and not os.path.exists(dest_dir):
+            print("creating directory {}".format(dest_dir))
+            os.makedirs(dest_dir)
+
+        # Copy file
+        dest_file = os.path.join(dest_dir, os.path.basename(src_file))
+        print("copying {} -> {}".format(src_file, dest_file))
+        copyfile(src_file, dest_file)
+        copymode(src_file, dest_file)
+
+
+class install_headers(install_headers_orig):
+    def run(self):
+        headers = self.distribution.headers or []
+        for header in headers:
+            dst = os.path.join(self.install_dir, os.path.dirname(header))
+            self.mkpath(dst)
+            (out, _) = self.copy_file(header, dst)
+            self.outfiles.append(out)
+
+
+def get_plat_code():
+    plat = sys.platform.lower()
+    substitutions = {'win': r'^win.*$'}
+    for target, pattern in substitutions.items():
+        plat = re.compile(pattern).sub(target, plat)
+    return plat
+
+
+build_type = os.getenv("PYCBC_BUILD",
+                       {"Windows": "CMAKE_HYBRID", "Darwin": "CMAKE_HYBRID", "Linux": "CMAKE_HYBRID"}.get(platform.system(),
+                                                                                                   "CMAKE_HYBRID"))
+
 
