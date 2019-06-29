@@ -56,18 +56,19 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     pycbc_stack_context_handle context = PYCBC_TRACE_GET_STACK_CONTEXT_TOPLEVEL(
             kwargs, LCBTRACE_OP_REQUEST_ENCODING, self->tracer, "fts_query");
     static char *kwlist[] = { "params", NULL };
+    pycbc_Collection_t collection = pycbc_Collection_as_value(self, kwargs);
     rv = PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &params_o);
 
     if (!rv) {
-        return NULL;
+        goto GT_FAIL;
     }
 
     if (pycbc_tc_simple_encode(params_o, &buf, PYCBC_FMT_UTF8) != 0) {
-        return NULL;
+        goto GT_FAIL;
     }
 
     if (-1 == pycbc_oputil_conn_lock(self)) {
-        return NULL;
+        goto GT_FAIL;
     }
     if (self->pipeline_queue) {
         PYCBC_EXC_WRAP(PYCBC_EXC_PIPELINE, 0,
@@ -114,5 +115,10 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     GT_DONE:
     Py_XDECREF(mres);
     pycbc_oputil_conn_unlock(self);
-    return ret;
+    GT_FINAL:
+        pycbc_Collection_free_unmanaged_contents(&collection);
+        return ret;
+    GT_FAIL:
+        ret = NULL;
+        goto GT_FINAL;
 }

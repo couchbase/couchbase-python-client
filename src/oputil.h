@@ -97,9 +97,6 @@ struct pycbc_common_vars {
 /**
  * Handler for iterations
  */
-#define PYCBC_UNITS(X) \
-    X(Bucket)          \
-    X(Collection)
 
 #define PYCBC_OPUTIL_CONTEXT_Bucket
 #define PYCBC_OPUTIL_CONTEXT_Collection \
@@ -132,7 +129,7 @@ typedef int (*pycbc_oputil_keyhandler_raw_Bucket)(
 
 typedef int (*pycbc_oputil_keyhandler_raw_Collection)(
         pycbc_oputil_keyhandler_raw_Bucket *original,
-        pycbc_Collection *self,
+        pycbc_Collection_t *self,
         struct pycbc_common_vars *cv,
         int optype,
         PyObject *key,
@@ -272,10 +269,18 @@ int pycbc_common_vars_init(struct pycbc_common_vars *cv,
             const char *category,                                        \
             const char *name);
 
-#ifndef PYCBC_OPUTIL_GEN
+#ifdef PYCBC_OPUTIL_GEN
 PYCBC_UNITS(PYCBC_OPUTIL_KEYHANDLER_BUILD_DECL)
 #else
-PYCBC_UNITS(PYCBC_OPUTIL_KEYHANDLER_BUILD_DECL)
+pycbc_oputil_keyhandler_Bucket pycbc_oputil_keyhandler_build_Bucket(
+        pycbc_oputil_keyhandler_raw_Bucket cb,
+        const char *category,
+        const char *name);
+
+pycbc_oputil_keyhandler_Collection pycbc_oputil_keyhandler_build_Collection(
+        pycbc_oputil_keyhandler_raw_Collection cb,
+        const char *category,
+        const char *name);
 #endif
 #define PYCBC_OPUTIL_KEYHANDLER_BUILD(UNIT, NAME) \
     pycbc_oputil_keyhandler_build_##UNIT(NAME, NAME##_category(), #NAME)
@@ -293,6 +298,18 @@ PYCBC_UNITS(PYCBC_OPUTIL_KEYHANDLER_BUILD_DECL)
 #define PYCBC_OPUTIL_ITER_MULTI(                                      \
         SELF, SEQTYPE, COLLECTION, CV, OPTYPE, HANDLER, CONTEXT, ...) \
     PYCBC_OPUTIL_ITER_MULTI_BASE(Bucket,                              \
+                                 SELF,                                \
+                                 SEQTYPE,                             \
+                                 COLLECTION,                          \
+                                 CV,                                  \
+                                 OPTYPE,                              \
+                                 HANDLER,                             \
+                                 CONTEXT,                             \
+                                 __VA_ARGS__)
+
+#define PYCBC_OPUTIL_ITER_MULTI_COLLECTION(                           \
+        SELF, SEQTYPE, COLLECTION, CV, OPTYPE, HANDLER, CONTEXT, ...) \
+    PYCBC_OPUTIL_ITER_MULTI_BASE(Collection,                          \
                                  SELF,                                \
                                  SEQTYPE,                             \
                                  COLLECTION,                          \
@@ -323,7 +340,7 @@ int pycbc_oputil_iter_multi_Bucket(pycbc_Bucket *self,
 
 #define pycbc_oputil_iter_multi(...) pycbc_oputil_iter_multi(__VA_ARGS__)
 int pycbc_oputil_iter_multi_Collection(
-        pycbc_Collection *self,
+        pycbc_Collection_t *self,
         pycbc_seqtype_t seqtype,
         PyObject *collection,
         struct pycbc_common_vars *cv,
@@ -394,9 +411,13 @@ pycbc_encode_sd_keypath(pycbc_Bucket *conn, PyObject *src,
                         pycbc_pybuffer *keybuf, pycbc_pybuffer *pathbuf);
 
 TRACED_FUNCTION_DECL(,
-int,
-pycbc_sd_handle_speclist, pycbc_Bucket *self, pycbc_MultiResult *mres,
-                PyObject *key, PyObject *spectuple, lcb_CMDSUBDOC *cmd);
+                     int,
+                     pycbc_sd_handle_speclist,
+                     pycbc_Collection_t *self,
+                     pycbc_MultiResult *mres,
+                     PyObject *key,
+                     PyObject *spectuple,
+                     lcb_CMDSUBDOC *cmd);
 
 /**
  * Macro to declare prototypes for entry points.

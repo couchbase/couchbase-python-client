@@ -15,7 +15,7 @@ from couchbase_core._libcouchbase import Bucket as _Base
 import couchbase.exceptions
 from couchbase_core.bucket import Bucket as CoreBucket
 import copy
-import pyrsistent
+
 from typing import *
 from .durability import Durability
 
@@ -185,11 +185,11 @@ def _inject_scope_and_collection(func  # type: RawCollectionMethodSpecial
                 ):
         # type: (...)->Any
         if self.true_collections:
-            if self.name and not self._self_parent:
+            if self._self_name and not self._self_scope:
                 raise couchbase.exceptions.CollectionMissingException
-            if self._scope and self.name:
-                kwargs['scope'] = self._scope
-                kwargs['collection'] = self.name
+            if self._self_scope and self._self_name:
+                kwargs['scope'] = self._self_scope.name
+                kwargs['collection'] = self._self_name
 
         return func(self, *args, **kwargs)
 
@@ -248,6 +248,20 @@ class CBCollection(wrapt.ObjectProxy):
         self._self_scope = scope  # type: Scope
         self._self_name = name  # type: Optional[str]
         self._self_true_collections = name and scope
+
+    def __getattr__(self, item):
+        attr = getattr(self.__wrapped__, item)
+        if attr and hasattr(attr, '__call__'):
+            def wrapped(*args, **kwargs):
+                scope_name=self._self_scope.name
+                collection_name=self._self_name
+                if scope_name and collection_name:
+                    kwargs.update(scope=scope_name, collection=collection_name)
+                return attr(*args, **kwargs)
+
+            return wrapped
+        else:
+            return attr
 
     @property
     def true_collections(self):
@@ -1203,8 +1217,7 @@ class Scope(object):
         :param parent: parent bucket.
         :param name: name of scope to open
         """
-        if name:
-            self._name = name
+        self._name = name
         self.bucket = parent
 
     def __deepcopy__(self, memodict={}):
@@ -1251,7 +1264,7 @@ class Scope(object):
         # type: (...)->CBCollection
         return CBCollection.cast(self, collection_name, *options)
 
-    def open_collection(self,
+    def collection(self,
                         collection_name,  # type: str
                         *options  # type: CollectionOptions
                         ):

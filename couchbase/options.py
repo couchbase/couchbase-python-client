@@ -103,10 +103,7 @@ class Value(object):
 
 
 class Cardinal(OptionBlock):
-    class ONE(Value):
-        def __init__(self, **kwargs):
-            super(Cardinal.ONE, self).__init__(1, **kwargs)
-
+    ONE = Value(1)
     TWO = Value(2)
     THREE = Value(3)
     NONE = Value(0)
@@ -134,7 +131,10 @@ def forward_args(arg_vars,  # type: Optional[Dict[str,Any]]
         map_item = arg_mapping.get(k, None)
         if not (map_item is None):
             for out_k, out_f in map_item.items():
-                end_options[out_k] = out_f(v)
+                try:
+                    end_options[out_k] = out_f(v)
+                except:
+                    pass
         else:
             end_options[k] = v
     return end_options

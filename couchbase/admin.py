@@ -40,7 +40,7 @@ class CollectionManager(object):
 
         form = self.admin_bucket._mk_formstr(params)
         return self.admin_bucket.http_request(path=path,
-                                 method='PUT',
+                                 method='POST',
                                  content_type='application/x-www-form-urlencoded',
                                  content=form)
 
@@ -64,6 +64,6 @@ class CollectionManager(object):
 
         form = self.admin_bucket._mk_formstr(params)
         return self.admin_bucket.http_request(path=path,
-                                 method='PUT',
+                                 method='POST',
                                  content_type='application/x-www-form-urlencoded',
                                  content=form)

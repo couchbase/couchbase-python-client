@@ -675,6 +675,25 @@ void pycbc_debug_log(const char *FILE,
     fprintf(stderr,"\n");
     PYCBC_DEBUG_FLUSH
 }
+lcb_STATUS pycbc_log_coll(const char *TYPE,
+                          void *CMD,
+                          const char *SCOPE,
+                          size_t NSCOPE,
+                          const char *COLLECTION,
+                          size_t NCOLLECTION,
+                          lcb_STATUS RC)
+{
+    PYCBC_DEBUG_LOG(
+            "Setting scope %.*s and collection %.*s on %s cmd %p and got RC %d",
+            NSCOPE,
+            SCOPE,
+            NCOLLECTION,
+            COLLECTION,
+            TYPE,
+            CMD,
+            RC)
+    return RC;
+}
 
 void pycbc_debug_log_prefix_nocontext(const char *FILE,
                                       const char *FUNC,
@@ -2794,6 +2813,14 @@ PyObject *pycbc_tracer_payload_start_span_args(
 void pycbc_Tracer_span_finish(const pycbc_tracer_payload_t *payload,
                               const pycbc_tracer_state *state,
                               PyObject *fresh_span);
+
+pycbc_Collection_t pycbc_Collection_as_value(pycbc_Bucket *self,
+                                             PyObject *kwargs)
+{
+    pycbc_Collection_t unit = {{0}, 0, {{{0}}, {{0}}}};
+    pycbc_collection_init_from_fn_args(&unit, self, kwargs);
+    return unit;
+}
 pycbc_tracer_payload_t *pycbc_Tracer_propagate_span(
         pycbc_Tracer_t *tracer, pycbc_tracer_payload_t *payload)
 {
@@ -3077,8 +3104,7 @@ void pycbc_dict_add_text_kv(PyObject *dict, const char *key, const char *value)
             (pycbc_strn_base_const){.buffer = value, .length = strlen(value)});
 }
 
-
-PYCBC_X_VERBS(PYCBC_CMD_PROXY)
+PYCBC_X_VERBS(PYCBC_CMD_PROXY, COLLECTION, NOCOLLECTION, IMPL);
 
 lcb_STATUS pycbc_report_err(int res, const char *generic_errmsg, const char* FILE, int LINE)
 {

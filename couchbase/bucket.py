@@ -144,7 +144,7 @@ class Bucket(object):
         :param CollectionOptions options: any options to pass to the Collection constructor
         :return: the default :class:`.Collection` object.
         """
-        return Scope(self).open_collection(collection_name)
+        return Scope(self).collection(collection_name)
 
     def view_query(self,
                    design_doc,  # type: str

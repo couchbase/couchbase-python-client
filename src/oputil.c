@@ -528,7 +528,7 @@ PYCBC_UNITS(PYCBC_OPUTIL_KEYHANDLER_BUILD_GEN)
 #endif
 
 int pycbc_wrap_bucket_callback(pycbc_oputil_keyhandler_raw_Bucket *original,
-                               pycbc_Collection *self,
+                               pycbc_Collection_t *self,
                                struct pycbc_common_vars *cv,
                                int optype,
                                PyObject *key,
@@ -553,21 +553,20 @@ int pycbc_oputil_iter_multi_Bucket(pycbc_Bucket *self,
 {
     pycbc_oputil_keyhandler_Collection wrapper;
     int rv = LCB_SUCCESS;
-    pycbc_Collection *coll = NULL;
+    pycbc_Collection_t coll =
+            pycbc_Collection_as_value(self, pycbc_DummyKeywords);
     wrapper.category = handler.category;
     wrapper.name = handler.name;
     wrapper.original = &handler.cb;
     wrapper.cb = pycbc_wrap_bucket_callback;
-    coll = pycbc_Bucket_init_collection(
-            self, pycbc_DummyTuple, pycbc_DummyKeywords);
+
     rv = pycbc_oputil_iter_multi_Collection(
-            coll, seqtype, collection, cv, optype, wrapper, arg, context);
-    pycbc_Collection_free_unmanaged(coll);
-    PYCBC_FREE(coll);
+            &coll, seqtype, collection, cv, optype, wrapper, arg, context);
+    pycbc_Collection_free_unmanaged_contents(&coll);
     return rv;
 }
 int pycbc_oputil_iter_multi_Collection(
-        pycbc_Collection *collectionself,
+        pycbc_Collection_t *collectionself,
         pycbc_seqtype_t seqtype,
         PyObject *collection,
         struct pycbc_common_vars *cv,
@@ -888,7 +887,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                 ,
                 lcb_STATUS,
                 pycbc_call_subdoc,
-                const pycbc_Bucket *self,
+                pycbc_Collection_t *collection,
                 pycbc_MultiResult *mres,
                 PyObject *key,
                 lcb_CMDSUBDOC *cmd,
@@ -896,12 +895,14 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                 lcb_STATUS *err,
                 pycbc__SDResult *newitm)
 {
+    pycbc_Bucket *self = collection->bucket;
+    (void)self;
     if (rv == 0) {
         PYCBC_TRACECMD_PURE(subdoc, cmd, context);
         newitm->tracing_context = context;
         newitm->is_tracing_stub = 0;
         PYCBC_DEBUG_LOG_CONTEXT(context, "Calling subdoc on %llx", cmd)
-        (*err) = pycbc_subdoc(self->instance, mres, cmd);
+        (*err) = pycbc_subdoc(collection, mres, cmd);
         PYCBC_DEBUG_LOG_CONTEXT(context,
                                 "Called subdoc on %llx, got err %s",
                                 cmd,
@@ -922,10 +923,17 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     return (*err);
 }
 
-TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,, int,
-pycbc_sd_handle_speclist, pycbc_Bucket *self, pycbc_MultiResult *mres,
-    PyObject *key, PyObject *spectuple, lcb_CMDSUBDOC *cmd)
+TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
+                ,
+                int,
+                pycbc_sd_handle_speclist,
+                pycbc_Collection_t *collection,
+                pycbc_MultiResult *mres,
+                PyObject *key,
+                PyObject *spectuple,
+                lcb_CMDSUBDOC *cmd)
 {
+    pycbc_Bucket *self = collection->bucket;
     int rv = 0;
     lcb_STATUS err = LCB_SUCCESS;
     size_t nspecs = 0;
@@ -958,7 +966,7 @@ pycbc_sd_handle_speclist, pycbc_Bucket *self, pycbc_MultiResult *mres,
             lcb_cmdsubdoc_operations(cmd, ops);
             err = PYCBC_TRACE_WRAP(pycbc_call_subdoc,
                                    NULL,
-                                   self,
+                                   collection,
                                    mres,
                                    key,
                                    cmd,
@@ -983,7 +991,7 @@ pycbc_sd_handle_speclist, pycbc_Bucket *self, pycbc_MultiResult *mres,
             lcb_cmdsubdoc_operations(cmd, ops);
             err = PYCBC_TRACE_WRAP(pycbc_call_subdoc,
                                    NULL,
-                                   self,
+                                   collection,
                                    mres,
                                    key,
                                    cmd,

@@ -28,18 +28,28 @@
 /**
  * This is called during each iteration of delete/unlock
  */
-TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,static,int,
-handle_single_keyop, pycbc_Bucket *self, struct pycbc_common_vars *cv, int optype,
-    PyObject *curkey, PyObject *curval, PyObject *options, pycbc_Item *item,
-    void *arg)
+TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
+                static,
+                int,
+                handle_single_keyop,
+                pycbc_oputil_keyhandler_raw_Bucket *handler,
+                pycbc_Collection_t *collection,
+                struct pycbc_common_vars *cv,
+                int optype,
+                PyObject *curkey,
+                PyObject *curval,
+                PyObject *options,
+                pycbc_Item *item,
+                void *arg)
 {
     int rv;
     pycbc_pybuffer keybuf = { NULL };
     lcb_uint64_t cas = 0;
     lcb_STATUS err = LCB_SUCCESS;
-
-    (void)options; (void)arg;
-
+    pycbc_Bucket *self = collection->bucket;
+    (void)options;
+    (void)arg;
+    (void)handler;
 
     if ( (optype == PYCBC_CMD_UNLOCK || optype == PYCBC_CMD_ENDURE)
             && PYCBC_OPRES_CHECK(curkey)) {
@@ -53,7 +63,6 @@ handle_single_keyop, pycbc_Bucket *self, struct pycbc_common_vars *cv, int optyp
 
     if (item) {
         cas = item->cas;
-
     } else if (curval) {
         if (PyDict_Check(curval)) {
             PyObject *cas_o = PyDict_GetItemString(curval, "cas");
@@ -93,7 +102,7 @@ handle_single_keyop, pycbc_Bucket *self, struct pycbc_common_vars *cv, int optyp
             CMDSCOPE_NG(UNLOCK, unlock)
             {
                 COMMON_OPTS(cmd, PYCBC_unlock_ATTR, unl, unlock);
-                err = pycbc_unlock(self->instance, cv->mres, cmd);
+                err = pycbc_unlock(collection, cv->mres, cmd);
             }
         }
     }
@@ -112,7 +121,7 @@ handle_single_keyop, pycbc_Bucket *self, struct pycbc_common_vars *cv, int optyp
                 CMDSCOPE_GENERIC_FAIL(,REMOVE,remove)
             }
             COMMON_OPTS(cmd, PYCBC_remove_ATTR, rm, remove);
-            err = pycbc_remove(self->instance, cv->mres, cmd);
+            err = pycbc_remove(collection, cv->mres, cmd);
         }
     }
 GT_ERR:
@@ -150,6 +159,9 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, p
                              "replicate_to",
                              "durability_level",
                              NULL};
+
+    pycbc_Collection_t collection = pycbc_Collection_as_value(self, kwargs);
+
     PYCBC_DEBUG_LOG_CONTEXT(context, "Parsing args %R", kwargs)
     rv = PyArg_ParseTupleAndKeywords(args,
                                      kwargs,
@@ -164,13 +176,13 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, p
 
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
-        return NULL;
+        goto GT_FAIL;
     }
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
         rv = pycbc_oputil_check_sequence(kobj, 1, &ncmds, &seqtype);
         if (rv < 0) {
-            return NULL;
+            goto GT_FAIL;
         }
 
         if (casobj && PyObject_IsTrue(casobj)) {
@@ -184,12 +196,18 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, p
 
     rv = pycbc_common_vars_init(&cv, self, argopts, ncmds, 0);
     if (rv < 0) {
-        return NULL;
+        goto GT_FAIL;
     }
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
-        rv = PYCBC_OPUTIL_ITER_MULTI(self, seqtype, kobj, &cv, optype,
-                                     handle_single_keyop, NULL, context);
+        rv = PYCBC_OPUTIL_ITER_MULTI_COLLECTION(&collection,
+                                                seqtype,
+                                                kobj,
+                                                &cv,
+                                                optype,
+                                                handle_single_keyop,
+                                                NULL,
+                                                context);
     } else {
         rv = PYCBC_TRACE_WRAP_NOTERV(handle_single_keyop,
                                      kwargs,
@@ -197,7 +215,8 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, p
                                      &cv,
                                      &context,
                                      self,
-                                     self,
+                                     NULL,
+                                     &collection,
                                      &cv,
                                      optype,
                                      kobj,
@@ -240,7 +259,11 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, p
 
     GT_DONE:
     pycbc_common_vars_finalize(&cv, self);
+    pycbc_Collection_free_unmanaged_contents(&collection);
     return cv.ret;
+    GT_FAIL:
+        cv.ret = NULL;
+        goto GT_DONE;
 }
 #if PYCBC_ENDURE
 TRACED_FUNCTION_WRAPPER(endure_multi, LCBTRACE_OP_REQUEST_ENCODING, Bucket)
@@ -266,23 +289,24 @@ TRACED_FUNCTION_WRAPPER(endure_multi, LCBTRACE_OP_REQUEST_ENCODING, Bucket)
             "interval",
             NULL
     };
-
+    struct pycbc_Collection collection =
+            pycbc_Collection_as_value(self, kwargs);
     rv = PyArg_ParseTupleAndKeywords(args, kwargs, "OBB|Off", kwlist,
                                      &keys,
                                      &persist_to, &replicate_to,
                                      &is_delete_O, &timeout, &interval);
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
-        return NULL;
+        goto GT_ERR;
     }
 
     rv = pycbc_oputil_check_sequence(keys, 1, &ncmds, &seqtype);
     if (rv < 0) {
-        return NULL;
+        goto GT_ERR;
     }
     rv = pycbc_common_vars_init(&cv, self, PYCBC_ARGOPT_MULTI, ncmds, 0);
     if (rv < 0) {
-        return NULL;
+        goto GT_ERR;
     }
 
     dopts.v.v0.cap_max = persist_to < 0 || replicate_to < 0;
@@ -297,7 +321,14 @@ TRACED_FUNCTION_WRAPPER(endure_multi, LCBTRACE_OP_REQUEST_ENCODING, Bucket)
         goto GT_DONE;
     }
 
-    rv = PYCBC_OPUTIL_ITER_MULTI(self, seqtype, keys, &cv, PYCBC_CMD_ENDURE, handle_single_keyop, NULL, context);
+    rv = PYCBC_OPUTIL_ITER_MULTI_COLLECTION(&collection,
+                                            seqtype,
+                                            keys,
+                                            &cv,
+                                            PYCBC_CMD_ENDURE,
+                                            handle_single_keyop,
+                                            NULL,
+                                            context);
     if (rv < 0) {
         pycbc_wait_for_scheduled(self, kwargs, &context, &cv);
         goto GT_DONE;
@@ -309,8 +340,12 @@ TRACED_FUNCTION_WRAPPER(endure_multi, LCBTRACE_OP_REQUEST_ENCODING, Bucket)
 
     GT_DONE:
     pycbc_common_vars_finalize(&cv, self);
-    return cv.ret;
-
+    GT_FINAL:
+        pycbc_Collection_free_unmanaged_contents(&collection);
+        return cv.ret;
+    GT_ERR:
+        cv.ret = NULL;
+        goto GT_FINAL;
 }
 #else
 TRACED_FUNCTION_WRAPPER(endure_multi, LCBTRACE_OP_REQUEST_ENCODING, Bucket)

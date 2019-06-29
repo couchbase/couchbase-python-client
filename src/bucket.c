@@ -846,97 +846,101 @@ static PyMethodDef Bucket_TABLE_methods[] = {
 
 void pycbc_Bucket_init_tracer(pycbc_Bucket *self);
 
-lcb_STATUS pycbc_Collection_init_coords(pycbc_Collection *self,
+lcb_STATUS pycbc_Collection_init_coords(pycbc_Collection_t *self,
+                                        pycbc_Bucket *bucket,
                                         PyObject *collection,
                                         PyObject *scope)
 {
     lcb_STATUS err = LCB_SUCCESS;
+    self->bucket = bucket;
     self->collection.scope = scope?pycbc_strn_from_managed(scope):(pycbc_strn_unmanaged){.content=pycbc_invalid_strn};
     self->collection.collection = collection?pycbc_strn_from_managed(collection):(pycbc_strn_unmanaged){.content=pycbc_invalid_strn};
     return err;
 }
 
-
-void pycbc_Collection_free_unmanaged(const pycbc_Collection *collection) {
+void pycbc_Collection_free_unmanaged_contents(
+        const pycbc_Collection_t *collection)
+{
     pycbc_strn_free(collection->collection.scope);
     pycbc_strn_free(collection->collection.collection);
+    PYCBC_XDECREF(collection->bucket);
 }
 
-static void Collection_dtor(pycbc_Collection *collection)
+static void Collection_dtor(pycbc_Collection_t *collection)
 {
-    pycbc_Collection_free_unmanaged(collection);
+    pycbc_Collection_free_unmanaged_contents(collection);
     Py_TYPE(collection)->tp_free((PyObject*)collection);
 
 }
 
-int pycbc_collection_init_from_fn_args(pycbc_Collection *self,
+int pycbc_collection_init_from_fn_args(pycbc_Collection_t *self,
                                        pycbc_Bucket *bucket,
-                                       PyObject *args,
                                        PyObject *kwargs)
 {
     int rv = LCB_SUCCESS;
-    PyObject *collection = NULL;
     PyObject *scope = NULL;
-    PyObject *kwargs_remaining = NULL;
-#define XCTOR_ARGS(X)                 \
-    X("bucket", &self->bucket, "O")   \
-    X("scope", &scope, "O")           \
-    X("collection", &collection, "O") \
-    X("kwargs", &kwargs_remaining, "O")
+    PyObject *collection = NULL;
 
-    static char *kwlist[] = {
-#define X(s, target, type) s,
-            XCTOR_ARGS(X)
-#undef X
-                    NULL};
-
-#define X(s, target, type) type
-    static char *argspec = "|" XCTOR_ARGS(X);
-#undef X
-
-#define X(s, target, type) target,
-    PYCBC_DEBUG_PYFORMAT("Got args %R kwargs %R", args, kwargs)
     PYCBC_EXCEPTION_LOG_NOCLEAR
-    rv = PyArg_ParseTupleAndKeywords(
-            args, kwargs, argspec, kwlist, XCTOR_ARGS(X) NULL);
-    PYCBC_EXCEPTION_LOG_NOCLEAR
-#undef X
-#undef XCTOR_ARGS
-    pycbc_Collection_init_coords(self, collection, scope);
-    if (!self->bucket){
+    if (!self->bucket) {
         self->bucket = bucket;
     }
+    PYCBC_XINCREF(self->bucket);
+    if (!kwargs) {
+        return LCB_SUCCESS;
+    }
+    PYCBC_DEBUG_PYFORMAT("Got kwargs %R", kwargs)
+    scope = kwargs ? PyDict_GetItemString(kwargs, "scope") : NULL;
+    collection = kwargs ? PyDict_GetItemString(kwargs, "collection") : NULL;
+
+    if (scope && collection) {
+        pycbc_Collection_init_coords(self, bucket, collection, scope);
+    }
+    if (scope) {
+        rv = PyDict_DelItemString(kwargs, "scope");
+        if (rv) {
+            PYCBC_DEBUG_LOG("Failed to delete from %S", kwargs);
+            PYCBC_EXCEPTION_LOG_NOCLEAR;
+        }
+    }
+    if (collection) {
+        PyDict_DelItemString(kwargs, "collection");
+    }
+    PYCBC_DEBUG_PYFORMAT("Kwargs are now %S", kwargs);
     if (PyErr_Occurred()) {
+        PYCBC_DEBUG_LOG("Problems")
         rv = LCB_COLLECTION_UNKNOWN;
         PYCBC_EXCEPTION_LOG_NOCLEAR
     }
     return rv;
 }
 
-static int Collection__init__(pycbc_Collection *self,
+static int Collection__init__(pycbc_Collection_t *self,
                               PyObject *args,
                               PyObject *kwargs)
 {
     int rv = 0;
-    rv = pycbc_collection_init_from_fn_args(self, NULL, args, kwargs);
+    PyObject *maybe_bucket =
+            (PyObject_IsInstance(args, (PyObject *)&PyTuple_Type) &&
+             PyTuple_Size(args) > 0)
+                    ? PyTuple_GetItem(args, 0)
+                    : NULL;
+    if (!maybe_bucket &&
+        PyObject_IsInstance(maybe_bucket, (PyObject *)&BucketType)) {
+        PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS,
+                       0,
+                       "First argument must be the parent bucket")
+        return -1;
+    }
+
+    rv = pycbc_collection_init_from_fn_args(
+            self, (pycbc_Bucket *)maybe_bucket, kwargs);
 
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
         return -1;
     }
     return 0;
-}
-
-pycbc_Collection *pycbc_Bucket_init_collection(pycbc_Bucket *bucket,
-                                               PyObject *args,
-                                               PyObject *kwargs)
-{
-    pycbc_Collection *result = NULL;
-    result = PYCBC_CALLOC_TYPED(1, pycbc_Collection);
-    result->collection.collection=(pycbc_strn_unmanaged){.content=pycbc_invalid_strn};
-    result->collection.scope=(pycbc_strn_unmanaged){.content=pycbc_invalid_strn};
-    result->bucket=bucket;
-    return result;
 }
 
 static PyMethodDef Collection_TABLE_methods[] = {{NULL, NULL, 0, NULL}};
@@ -963,12 +967,14 @@ int pycbc_CollectionType_init(PyObject **ptr)
     p->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
     p->tp_doc = PyDoc_STR("The collection object");
 
-    p->tp_basicsize = sizeof(pycbc_Collection);
+    p->tp_basicsize = sizeof(pycbc_Collection_t);
 
     p->tp_methods = Collection_TABLE_methods;
     p->tp_members = Collection_TABLE_members;
     p->tp_getset = Collection_TABLE_getset;
-
+#ifdef PYCBC_COLLECTIONS_AS_SUBCLASS
+    p->tp_base = &BucketType;
+#endif
     pycbc_DummyTuple = PyTuple_New(0);
     pycbc_DummyKeywords = PyDict_New();
 
