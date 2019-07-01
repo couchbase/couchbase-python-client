@@ -26,6 +26,13 @@
 #include "libcouchbase/cbft.h"
 #include <libcouchbase/crypto.h>
 #include "pycbc_subdocops.h"
+#include "util_wrappers.h"
+
+typedef lcb_PINGSVCTYPE lcb_PING_SERVICE;
+typedef lcb_RESPVIEWQUERY lcb_RESPVIEW;
+typedef lcb_CMDVIEWQUERY lcb_CMDVIEW;
+typedef lcb_RESPN1QL lcb_RESPANALYTICS;
+typedef lcb_error_t lcb_STATUS;
 
 #define PYCBC_ENDURE 1
 
@@ -299,7 +306,7 @@ typedef int pycbc_DURABILITY_LEVEL;
 #define LCB_DURABILITYLEVEL_MAJORITY_AND_PERSIST_ON_MASTER -1
 #define LCB_COLLECTION_UNKNOWN -1;
 #endif
-typedef lcb_error_t lcb_STATUS;
+
 typedef const lcb_RESPGET *pycbc_RESPGET;
 typedef lcb_PINGSVCTYPE lcb_PING_SERVICE;
 typedef lcb_RESPGET lcb_RESPGETREPLICA;
@@ -378,11 +385,6 @@ uint64_t pycbc_mutation_token_uuid(const struct lcb_MUTATION_TOKEN *pToken);
 #endif
 
 #define GET_ATTRIBS(X) X(get, lcb_CMDGET *, locktime, lock, int);
-
-typedef lcb_PINGSVCTYPE lcb_PING_SERVICE;
-typedef lcb_RESPVIEWQUERY lcb_RESPVIEW;
-typedef lcb_CMDVIEWQUERY lcb_CMDVIEW;
-typedef lcb_RESPN1QL lcb_RESPANALYTICS;
 
 lcb_STATUS lcb_respview_http_response(const lcb_RESPVIEW *resp,
                                       const lcb_RESPHTTP **dest);
@@ -585,7 +587,6 @@ PYCBC_X_FOR_EACH_OP_POSTFIX(, PYCBC_DECL, PYCBC_DUMMY)
 typedef lcb_SDENTRY pycbc_SDENTRY;
 
 lcb_STATUS pycbc_respsubdoc_status(const pycbc_SDENTRY *ent);
-#include "python_wrappers.h"
 pycbc_strn_base_const pycbc_respsubdoc_value(const pycbc_SDENTRY *ent);
 
 int pycbc_sdresult_next(const lcb_RESPSUBDOC *resp,
@@ -836,5 +837,14 @@ typedef lcb_error_t lcb_STATUS;
 LIBCOUCHBASE_API lcb_STATUS
 lcb_cmdremove_durability(lcb_CMDREMOVE *cmd, pycbc_DURABILITY_LEVEL level);
 
+#define PYCBC_X_DURLEVEL(X)
+#define PYCBX_X_SYNCREPERR(X)
+#define PYCBC_LCB_ERRTYPES(X) \
+    X(LCB_ERRTYPE_DATAOP);    \
+    X(LCB_ERRTYPE_FATAL);     \
+    X(LCB_ERRTYPE_INTERNAL);  \
+    X(LCB_ERRTYPE_NETWORK);   \
+    X(LCB_ERRTYPE_TRANSIENT); \
+    X(LCB_ERRTYPE_INPUT);
 
 #endif // COUCHBASE_PYTHON_CLIENT_LCB_V4_BACKPORT_H

@@ -549,21 +549,6 @@ const char PYCBC_UNKNOWN[] = "Unknown";
 
 pycbc_strn pycbc_invalid_strn;
 
-const char *pycbc_strn_buf(const pycbc_strn buf)
-{
-    return buf.buffer;
-}
-
-int pycbc_strn_valid(const pycbc_strn buf)
-{
-    return buf.buffer ? 1 : 0;
-}
-
-size_t pycbc_strn_len(pycbc_strn_base_const buf)
-{
-    return buf.length;
-}
-
 pycbc_strn_base_const pycbc_strn_const(pycbc_strn buf)
 {
     return (pycbc_strn_base_const){buf.buffer, buf.length};
@@ -615,22 +600,6 @@ pycbc_strn_unmanaged pycbc_strn_from_managed(PyObject *source)
     return pycbc_strn_ensure_psz_unmanaged(&original);
 }
 
-char *pycbc_strn_buf_psz(pycbc_strn_unmanaged buf)
-{
-    return buf.content.buffer;
-}
-
-void pycbc_strn_free(pycbc_strn_unmanaged buf)
-{
-    if (pycbc_strn_valid(buf.content)){
-        free((void *)buf.content.buffer);
-    }
-}
-
-pycbc_generic_array pycbc_strn_base_const_array(pycbc_strn_base_const orig)
-{
-    return (pycbc_generic_array){orig.buffer, orig.length};
-}
 #define PYCBC_STRN_FREE(BUF)                            \
     PYCBC_DEBUG_LOG("Freeing string buffer %.*s at %p", \
                     (int)(BUF).content.length,               \
@@ -1256,6 +1225,7 @@ pycbc_stack_context_handle pycbc_Context_deref(
     return parent;
 }
 #include "oputil.h"
+#include "util_wrappers.h"
 
 pycbc_stack_context_handle pycbc_wrap_setup(const char *CATEGORY,
                                             const char *NAME,

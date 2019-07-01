@@ -31,7 +31,9 @@
     "src/result.c",
     "src/store.c",
     "src/typeutil.c",
-    "src/views.c"
+    "src/views.c",
+    "src/util_wrappers.c",
+    "src/util_wrappers.h"
   ],
   "comp_options": {
     "PYCBC_LCB_API": "0x02FF04",

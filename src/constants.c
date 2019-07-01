@@ -191,12 +191,6 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
     ADD_MACRO(LCB_WRITE_EVENT);
     ADD_MACRO(LCB_RW_EVENT);
 
-    ADD_MACRO(LCB_ERRTYPE_DATAOP);
-    ADD_MACRO(LCB_ERRTYPE_FATAL);
-    ADD_MACRO(LCB_ERRTYPE_INTERNAL);
-    ADD_MACRO(LCB_ERRTYPE_NETWORK);
-    ADD_MACRO(LCB_ERRTYPE_TRANSIENT);
-    ADD_MACRO(LCB_ERRTYPE_INPUT);
 
     /* For CNTL constants */
     ADD_MACRO(LCB_CNTL_OP_TIMEOUT);
@@ -244,7 +238,7 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
     PYCBC_X_DURLEVEL(PYCBC_DURLEVEL);
 #define PYCBC_ERR(ERRNAME, ...) ADD_MACRO(ERRNAME);
     PYCBX_X_SYNCREPERR(PYCBC_ERR)
-    ADD_MACRO(LCB_ERRTYPE_DURABILITY);
+    PYCBC_LCB_ERRTYPES(ADD_MACRO)
     setup_compression_map(module, public_constants, handler);
     setup_crypto_exceptions(module, handler);
     PyModule_AddObject(
