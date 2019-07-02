@@ -21,10 +21,11 @@ from couchbase.deprecation import deprecate_module_attribute
 from couchbase.views.iterator import AlreadyQueriedError
 from couchbase.exceptions import CouchbaseError
 import sys
+from typing import Iterator
 
 # Not used internally, but by other modules
 from couchbase.mutation_state import MutationState, MissingTokenError
-
+from couchbase import JSON
 
 class N1QLError(CouchbaseError):
     @property
@@ -428,10 +429,22 @@ class N1QLRequest(object):
 
     @property
     def meta(self):
+        """
+        The metadata as a property
+
+        :return: the query metadata
+        :rtype: JSON
+        """
         return self.meta_retrieve()
 
     @property
     def metrics(self):
+        """
+        Get query metrics from the metadata
+
+        :return: a dictionary containing the metrics metadata
+        :rtype: JSON
+        """
         return self.meta_retrieve().get('metrics', None)
 
     def meta_retrieve(self, meta_lookahead = None):
@@ -512,7 +525,12 @@ class N1QLRequest(object):
             return r
 
     def __iter__(self):
-        # type: ()->JSON
+        # type: ()->Iterator[JSON]
+        """
+        An iterator through the results.
+
+        :returns: Iterator[JSON]
+        """
         if self.buffered_remainder:
             while len(self.buffered_remainder)>0:
                 yield self.buffered_remainder.pop(0)

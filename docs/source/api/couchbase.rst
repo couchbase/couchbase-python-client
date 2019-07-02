@@ -312,6 +312,13 @@ N1QL Query Methods
 
     .. automethod:: n1ql_query
 
+Analytics Query Methods
+=======================
+
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
+
+    .. automethod:: analytics_query
 
 Full-Text Search Methods
 ========================
