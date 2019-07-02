@@ -1,4 +1,13 @@
 =================
+Cluster object
+=================
+
+.. module:: couchbase.cluster
+
+.. autoclass:: Cluster
+    :members:
+
+=================
 Bucket object
 =================
 

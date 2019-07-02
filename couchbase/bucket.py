@@ -1504,7 +1504,7 @@ class Bucket(_Base):
         otherwise defaulting to :class:`~.N1QLRequest`.
 
         :param query: The query to execute. This may either be a
-            :class:`.N1QLQuery` object, or a string (which will be
+            :class:`~.N1QLQuery` object, or a string (which will be
             implicitly converted to one).
         :param kwargs: Arguments for :class:`.N1QLRequest`.
         :return: An iterator which yields rows. Each row is a dictionary

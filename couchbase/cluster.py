@@ -56,6 +56,7 @@ class Cluster(object):
                  bucket_class=Bucket):
         """
         Creates a new Cluster object
+
         :param connection_string: Base connection string. It is an error to
             specify a bucket in the string.
         :param bucket_class: :class:`couchbase.bucket.Bucket` implementation to
@@ -75,6 +76,7 @@ class Cluster(object):
         """
         Set the type of authenticator to use when opening buckets or performing
         cluster management operations
+
         :param authenticator: The new authenticator to use
         :param username: The username to authenticate with
         :param password: The password to authenticate with
@@ -92,6 +94,7 @@ class Cluster(object):
         # type: (str, str) -> Bucket
         """
         Open a new connection to a Couchbase bucket
+
         :param bucket_name: The name of the bucket to open
         :param kwargs: Additional arguments to provide to the constructor
         :return: An instance of the `bucket_class` object provided to
@@ -301,8 +304,11 @@ class Cluster(object):
 
     def cluster_manager(self):
         """
-        Returns an instance of :class:`~.couchbase.admin.Admin` which may be
+        Returns an object which may be
         used to create and manage buckets in the cluster.
+
+        :returns: the cluster manager
+        :rtype: couchbase.admin.Admin
         """
         credentials = self.authenticator.get_credentials()['options']
         connection_string = str(self.connstr)
@@ -312,6 +318,7 @@ class Cluster(object):
         """
         Issue a "cluster-level" query. This requires that at least one
         connection to a bucket is active.
+
         :param query: The query string or object
         :param args: Additional arguments to :cb_bmeth:`n1ql_query`
 
