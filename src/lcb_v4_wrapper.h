@@ -403,6 +403,7 @@ typedef lcb_DURABILITY_LEVEL pycbc_DURABILITY_LEVEL;
       "Synchronous mutation has not completed in the specified time and has " \
       "ambiguous result")
 
+#define PYCBC_DURABILITY 1
 #define PYCBC_LCB_ERRTYPES(X) \
     X(LCB_ERRTYPE_DATAOP);    \
     X(LCB_ERRTYPE_FATAL);     \

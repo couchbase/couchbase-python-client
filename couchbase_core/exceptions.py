@@ -19,6 +19,8 @@ from collections import defaultdict
 from string import Template
 import json
 
+from couchbase_core import CompatibilityEnum
+
 
 class CouchbaseError(Exception):
     """Base exception for Couchbase errors
@@ -678,12 +680,17 @@ class DurabilitySyncWriteAmbiguousException(CouchbaseDurabilityError):
     result - it may Succeed or Fail; but the final value is not yet known"""
 
 
-_LCB_SYNCREP_MAP = {
-    C.LCB_DURABILITY_INVALID_LEVEL: DurabilityInvalidLevelException,
-    C.LCB_DURABILITY_IMPOSSIBLE: DurabilityImpossibleException,
-    C.LCB_DURABILITY_SYNC_WRITE_IN_PROGRESS: DurabilitySyncWriteInProgressException,
-    C.LCB_DURABILITY_SYNC_WRITE_AMBIGUOUS: DurabilitySyncWriteAmbiguousException
-}
+class DurabilityErrorCode(CompatibilityEnum):
+    @classmethod
+    def prefix(cls):
+        return "LCB_DURABILITY_"
+    INVALID_LEVEL = DurabilityInvalidLevelException
+    IMPOSSIBLE = DurabilityImpossibleException
+    SYNC_WRITE_IN_PROGRESS = DurabilitySyncWriteInProgressException
+    SYNC_WRITE_AMBIGUOUS = DurabilitySyncWriteAmbiguousException
+
+
+_LCB_SYNCREP_MAP = {item.value:item.orig_value for item in DurabilityErrorCode}
 
 _LCB_ERRNO_MAP = dict(list({
     C.LCB_AUTH_ERROR:       AuthError,

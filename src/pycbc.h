@@ -19,6 +19,7 @@
  * This file contains the base header for the Python Couchbase Client
  * @author Mark Nunberg
  */
+
 #define PYCBC_TRACE_FINISH_SPANS
 #define PYCBC_GLOBAL_SCHED
 #define PYCBC_POSTINCREMENT
@@ -370,41 +371,6 @@ enum {
     PYCBC_CONN_F_ASYNC_DTOR = 1 << 5
 };
 
-#define PYCBX_X_SYNCREPERR(X)                                                 \
-    X(LCB_DURABILITY_INVALID_LEVEL,                                           \
-      0x63,                                                                   \
-      LCB_ERRTYPE_DURABILITY | LCB_ERRTYPE_INPUT | LCB_ERRTYPE_SRVGEN,        \
-      "Invalid durability level was specified")                               \
-    /** Valid request, but given durability requirements are impossible to    \
-     * achieve - because insufficient configured replicas are connected.      \
-     * Assuming level=majority and C=number of configured nodes, durability   \
-     * becomes impossible if floor((C + 1) / 2) nodes or greater are offline. \
-     */                                                                       \
-    X(LCB_DURABILITY_IMPOSSIBLE,                                              \
-      0x64,                                                                   \
-      LCB_ERRTYPE_DURABILITY | LCB_ERRTYPE_SRVGEN,                            \
-      "Given durability requirements are impossible to achieve")              \
-    /** Returned if an attempt is made to mutate a key which already has a    \
-     * SyncWrite pending. Client would typically retry (possibly with         \
-     * backoff). Similar to ELOCKED */                                                        \
-    X(LCB_DURABILITY_SYNC_WRITE_IN_PROGRESS,                                  \
-      0x65,                                                                   \
-      LCB_ERRTYPE_DURABILITY | LCB_ERRTYPE_SRVGEN | LCB_ERRTYPE_TRANSIENT,    \
-      "There is a synchronous mutation pending for given key")                \
-    /** The SyncWrite request has not completed in the specified time and has \
-     * ambiguous result - it may Succeed or Fail; but the final value is not  \
-     * yet known */                                                           \
-    X(LCB_DURABILITY_SYNC_WRITE_AMBIGUOUS,                                    \
-      0x66,                                                                   \
-      LCB_ERRTYPE_DURABILITY | LCB_ERRTYPE_SRVGEN,                            \
-      "Synchronous mutation has not completed in the specified time and has " \
-      "ambiguous result")
-
-#define PYCBC_X_DURLEVEL(X)           \
-    X(NONE)                           \
-    X(MAJORITY)                       \
-    X(MAJORITY_AND_PERSIST_ON_MASTER) \
-    X(PERSIST_TO_MAJORITY)
 
 #ifndef PYCBC_DUR_DISABLED
 #define PYCBC_DUR_ENABLED
@@ -938,9 +904,6 @@ void pycbc_Tracer_set_child(pycbc_Tracer_t *pTracer, lcbtrace_TRACER *pTRACER);
         }                                                          \
     }
 
-#define GENERIC_OPERAND(SCOPE, INSTANCE, CMD, HANDLE, CONTEXT, COMMAND, ...) \
-    lcb_##SCOPE##_##COMMAND(INSTANCE, __VA_ARGS__);
-
 #define PYCBC_TRACECMD_SCOPED_GENERIC(RV,           \
                                       SCOPE,        \
                                       COMMAND,      \
@@ -953,19 +916,6 @@ void pycbc_Tracer_set_child(pycbc_Tracer_t *pTracer, lcbtrace_TRACER *pTRACER);
                                       ...)          \
     SPAN_OPERAND(SCOPE, INSTANCE, CMD, HANDLE, CONTEXT);\
     RV = OPERAND(SCOPE, INSTANCE, CMD, HANDLE, CONTEXT, COMMAND, __VA_ARGS__);
-
-#    define PYCBC_TRACECMD_SCOPED(                                   \
-            RV, SCOPE, COMMAND, INSTANCE, CMD, HANDLE, CONTEXT, ...) \
-        PYCBC_TRACECMD_SCOPED_GENERIC(RV,                            \
-                                      SCOPE,                         \
-                                      COMMAND,                       \
-                                      INSTANCE,                      \
-                                      CMD,                           \
-                                      HANDLE,                        \
-                                      CONTEXT,                       \
-                                      GENERIC_SPAN_OPERAND,          \
-                                      GENERIC_OPERAND,               \
-                                      __VA_ARGS__)
 
 #    define PYCBC_TRACECMD_SCOPED_NULL(                     \
             RV, SCOPE, INSTANCE, CMD, HANDLE, CONTEXT, ...) \
@@ -981,9 +931,6 @@ void pycbc_Tracer_set_child(pycbc_Tracer_t *pTracer, lcbtrace_TRACER *pTRACER);
                                       __VA_ARGS__)
 #    define PYCBC_TRACECMD_TYPED(TYPE, CMD, CONTEXT, MRES, CURKEY, BUCKET) \
         PYCBC_TRACECMD_PURE(TYPE, CMD, CONTEXT);                           \
-        pycbc_MultiResult_init_context(MRES, CURKEY, CONTEXT, BUCKET);
-#    define PYCBC_TRACECMD(CMD, CONTEXT, MRES, CURKEY, BUCKET) \
-        PYCBC_TRACECMD_PURE(, CMD, CONTEXT);                   \
         pycbc_MultiResult_init_context(MRES, CURKEY, CONTEXT, BUCKET);
 
 #    define PYCBC_TRACE_POP_CONTEXT(CONTEXT) PYCBC_CONTEXT_DEREF((CONTEXT), 1);

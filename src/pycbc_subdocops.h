@@ -17,20 +17,19 @@
 #ifndef COUCHBASE_PYTHON_CLIENT_PYCBC_SUBDOCOPS_H
 #define COUCHBASE_PYTHON_CLIENT_PYCBC_SUBDOCOPS_H
 
-#define PYCBC_X_SD_OPS(X, NP, VAL, MVAL, CTR, ...)       \
-    X(GET, get, __VA_ARGS__)                             \
-    X(EXISTS, exists, __VA_ARGS__)                       \
-    VAL(REPLACE, replace, __VA_ARGS__)                   \
-    VAL(DICT_ADD, dict_add, __VA_ARGS__)                 \
-    VAL(DICT_UPSERT, dict_upsert, __VA_ARGS__)           \
-    MVAL(ARRAY_ADD_FIRST, array_add_first, __VA_ARGS__)  \
-    MVAL(ARRAY_ADD_LAST, array_add_last, __VA_ARGS__)    \
-    VAL(ARRAY_ADD_UNIQUE, array_add_unique, __VA_ARGS__) \
-    MVAL(ARRAY_INSERT, array_insert, __VA_ARGS__)        \
-    CTR(COUNTER, counter, __VA_ARGS__)                   \
-    X(REMOVE, remove, __VA_ARGS__)                       \
-    X(GET_COUNT, get_count, __VA_ARGS__)                 \
-    PYCBC_X_SD_OPS_FULLDOC(X, NP, VAL, MVAL, CTR, __VA_ARGS__)
-
+#define PYCBC_X_SD_OPS(X, NP, VAL, MVAL, CTR, EXP_TYPE) \
+    X(GET, get, EXP_TYPE)                               \
+    X(EXISTS, exists, EXP_TYPE)                         \
+    VAL(REPLACE, replace, EXP_TYPE)                     \
+    VAL(DICT_ADD, dict_add, EXP_TYPE)                   \
+    VAL(DICT_UPSERT, dict_upsert, EXP_TYPE)             \
+    MVAL(ARRAY_ADD_FIRST, array_add_first, EXP_TYPE)    \
+    MVAL(ARRAY_ADD_LAST, array_add_last, EXP_TYPE)      \
+    VAL(ARRAY_ADD_UNIQUE, array_add_unique, EXP_TYPE)   \
+    MVAL(ARRAY_INSERT, array_insert, EXP_TYPE)          \
+    CTR(COUNTER, counter, EXP_TYPE)                     \
+    X(REMOVE, remove, EXP_TYPE)                         \
+    X(GET_COUNT, get_count, EXP_TYPE)                   \
+    PYCBC_X_SD_OPS_FULLDOC(X, NP, VAL, MVAL, CTR, EXP_TYPE)
 
 #endif //COUCHBASE_PYTHON_CLIENT_PYCBC_SUBDOCOPS_COMMON_H

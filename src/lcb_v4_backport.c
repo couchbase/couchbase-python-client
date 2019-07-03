@@ -138,8 +138,7 @@ void lcb_cmdgetreplica_create(lcb_CMDGETREPLICA **pcmd, int strategy)
     }
 }
 #include "pycbc_subdocops.h"
-LIBCOUCHBASE_API lcb_STATUS lcb_subdocops_create(lcb_SUBDOCOPS **operations,
-                                                 size_t capacity)
+lcb_STATUS lcb_subdocops_create(lcb_SUBDOCOPS **operations, size_t capacity)
 {
     lcb_SUBDOCOPS *res = (lcb_SUBDOCOPS *)calloc(1, sizeof(lcb_SUBDOCOPS));
     res->nspecs = capacity;
@@ -147,8 +146,8 @@ LIBCOUCHBASE_API lcb_STATUS lcb_subdocops_create(lcb_SUBDOCOPS **operations,
     *operations = res;
     return LCB_SUCCESS;
 }
-LIBCOUCHBASE_API lcb_STATUS
-lcb_cmdsubdoc_operations(lcb_CMDSUBDOC *cmd, const lcb_SUBDOCOPS *operations)
+lcb_STATUS lcb_cmdsubdoc_operations(lcb_CMDSUBDOC *cmd,
+                                    const lcb_SUBDOCOPS *operations)
 {
     cmd->specs = operations->specs;
     cmd->nspecs = operations->nspecs;
@@ -172,8 +171,7 @@ void pycbc_cmdsubdoc_flags_from_scv(unsigned int sd_doc_flags, lcb_CMDSUBDOC *cm
     cmd->cmdflags |= sd_doc_flags;
 }
 
-
-LIBCOUCHBASE_API lcb_STATUS lcb_subdocops_destroy(lcb_SUBDOCOPS *operations)
+lcb_STATUS lcb_subdocops_destroy(lcb_SUBDOCOPS *operations)
 {
     if (operations) {
         if (operations->specs) {
@@ -191,8 +189,8 @@ LIBCOUCHBASE_API lcb_STATUS lcb_subdocops_destroy(lcb_SUBDOCOPS *operations)
     return LCB_SUCCESS;
 }
 
-LIBCOUCHBASE_API lcb_STATUS
-lcb_cmdremove_durability(lcb_CMDREMOVE *cmd, pycbc_DURABILITY_LEVEL level)
+lcb_STATUS lcb_cmdremove_durability(lcb_CMDREMOVE *cmd,
+                                    pycbc_DURABILITY_LEVEL level)
 {
 #if PYCBC_LCB_API>0x02FF00
     cmd->dur_level=level;
@@ -202,8 +200,8 @@ lcb_cmdremove_durability(lcb_CMDREMOVE *cmd, pycbc_DURABILITY_LEVEL level)
 #endif
 }
 
-LIBCOUCHBASE_API lcb_STATUS
-lcb_cmdstore_durability(lcb_CMDSTORE *cmd, pycbc_DURABILITY_LEVEL level)
+lcb_STATUS lcb_cmdstore_durability(lcb_CMDSTORE *cmd,
+                                   pycbc_DURABILITY_LEVEL level)
 {
 #if PYCBC_LCB_API>0x02FF00
     cmd->dur_level=level;
@@ -221,8 +219,7 @@ PYCBC_X_SD_OPS(PYCBC_SDCMD_CASE,
                PYCBC_SDCMD_CASE_VAL,
                PYCBC_SDCMD_CASE_MVAL,
                PYCBC_SDCMD_CASE_COUNTER,
-               LITERAL,
-               LITERAL)
+               IMPL)
 
 void lcb_cmdhttp_path(lcb_CMDHTTP *htcmd, const char *path, size_t length)
 {
@@ -244,6 +241,16 @@ lcb_STATUS pycbc_cmdanalytics_host(lcb_CMDANALYTICS *CMD, const char *host) {
     return LCB_SUCCESS;
 }
 
+lcb_STATUS lcb_n1ql(lcb_t instance, const void *cookie, const lcb_CMDN1QL *cmd)
+{
+    return lcb_n1ql_query(instance, cookie, cmd);
+}
+lcb_STATUS lcb_analytics(lcb_t instance,
+                         const void *cookie,
+                         const lcb_CMDN1QL *cmd)
+{
+    return lcb_n1ql_query(instance, cookie, cmd);
+}
 
 lcb_STATUS lcb_respfts_http_response(const lcb_RESPFTS *resp, const lcb_RESPHTTP **ptr) {
     *ptr=resp->htresp;

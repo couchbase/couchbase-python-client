@@ -17,6 +17,8 @@
 #ifndef COUCHBASE_PYTHON_CLIENT_LCB_V4_BACKPORT_H
 #define COUCHBASE_PYTHON_CLIENT_LCB_V4_BACKPORT_H
 
+#include "util_wrappers.h"
+#include <stdint.h>
 #include <libcouchbase/api3.h>
 #include <libcouchbase/couchbase.h>
 #include <libcouchbase/ixmgmt.h>
@@ -26,7 +28,6 @@
 #include "libcouchbase/cbft.h"
 #include <libcouchbase/crypto.h>
 #include "pycbc_subdocops.h"
-#include "util_wrappers.h"
 
 typedef lcb_PINGSVCTYPE lcb_PING_SERVICE;
 typedef lcb_RESPVIEWQUERY lcb_RESPVIEW;
@@ -75,12 +76,6 @@ typedef lcb_error_t lcb_STATUS;
 #define lcb_cmdcounter_timeout(cmd, x) (cmd)->exptime = x;
 #define lcb_cmdcounter_expiration(cmd, x) (cmd)->exptime = x
 #define lcb_cmdstore_flags(CMD, VAL) cmd->flags = VAL;
-/*#define lcb_cmdgetreplica_create_all(ptr) (*(ptr))->strategy = LCB_REPLICA_ALL
-#define lcb_cmdgetreplica_create_select(ptr, INDEX) \
-    (*(ptr))->strategy = LCB_REPLICA_SELECT;        \
-    (*(ptr))->index = INDEX;
-#define lcb_cmdgetreplica_create_first(ptr) \
-    (*(ptr))->strategy = LCB_REPLICA_FIRST*/
 #define lcb_cmdgetreplica_expiration(CMD, TTL) (CMD)->exptime = TTL
 #define lcb_cmdstore_create(CMD, OP) \
     PYCBC_ASSIGN((*CMD)->operation, (lcb_storage_t)(OP));
@@ -138,11 +133,11 @@ typedef lcb_error_t lcb_STATUS;
 #define lcb_cmdanalytics_handle(CMD, HANDLE) (CMD)->handle = HANDLE
 #define lcb_cmdanalytics_parent_span(...) lcb_n1ql_set_parent_span(__VA_ARGS__)
 
-#define lcb_n1ql(INSTANCE, COOKIE, QUERY) \
-    lcb_n1ql_query(INSTANCE, COOKIE, QUERY)
+lcb_STATUS lcb_n1ql(lcb_t instance, const void *cookie, const lcb_CMDN1QL *cmd);
 
-#define lcb_analytics(INSTANCE, COOKIE, QUERY) \
-    lcb_n1ql_query(INSTANCE, COOKIE, QUERY)
+lcb_STATUS lcb_analytics(lcb_t instance,
+                         const void *cookie,
+                         const lcb_CMDN1QL *cmd);
 
 #define lcb_fts lcb_fts_query
 
@@ -343,8 +338,8 @@ typedef lcb_FTSHANDLE pycbc_FTS_HANDLE;
 typedef lcb_N1QLHANDLE pycbc_N1QL_HANDLE;
 typedef lcb_N1QLHANDLE pycbc_ANALYTICS_HANDLE;
 
-LIBCOUCHBASE_API lcb_STATUS
-lcb_cmdstore_durability(lcb_CMDSTORE *cmd, pycbc_DURABILITY_LEVEL level);
+lcb_STATUS lcb_cmdstore_durability(lcb_CMDSTORE *cmd,
+                                   pycbc_DURABILITY_LEVEL level);
 
 lcb_STATUS lcb_respfts_http_response(const lcb_RESPFTS *resp, const lcb_RESPHTTP **ptr);
 
@@ -603,12 +598,11 @@ typedef enum {
 
 struct lcb_SUBDOCOPS;
 
-LIBCOUCHBASE_API lcb_STATUS lcb_subdocops_create(lcb_SUBDOCOPS **operations,
-                                                 size_t capacity);
-LIBCOUCHBASE_API lcb_STATUS
-lcb_cmdsubdoc_operations(lcb_CMDSUBDOC *cmd, const lcb_SUBDOCOPS *operations);
+lcb_STATUS lcb_subdocops_create(lcb_SUBDOCOPS **operations, size_t capacity);
+lcb_STATUS lcb_cmdsubdoc_operations(lcb_CMDSUBDOC *cmd,
+                                    const lcb_SUBDOCOPS *operations);
 
-LIBCOUCHBASE_API lcb_STATUS lcb_subdocops_destroy(lcb_SUBDOCOPS *operations);
+lcb_STATUS lcb_subdocops_destroy(lcb_SUBDOCOPS *operations);
 #define LCB_PING_GET_TYPE_S(X, Y)  \
     case LCB_PINGSVC_##X: \
         return #Y;
@@ -631,74 +625,66 @@ typedef lcb_U64 lcb_STORE_OPERATION;
         PYCBC_SDSPEC_SET_XX(PATH, DEST, BUF, BUF_LEN)
 #    define PYCBC_SDSPEC_SET_VALUE(DEST, BUF, BUF_LEN) \
         PYCBC_SDSPEC_SET_XX(VALUE, DEST, BUF, BUF_LEN)
-#    define PYCBC_PATH_ONLY(UC, LC, DECL, BODY, ...)                          \
-        DECL(lcb_subdocops_##LC(lcb_SUBDOCOPS *operations,                    \
-                                size_t index,                                 \
-                                uint32_t flags,                               \
-                                const char *path,                             \
-                                size_t path_len))                             \
-        BODY({                                                                \
-            PYCBC_SDSPEC_SET_PATH(&operations->specs[index], path, path_len); \
-            operations->specs[index].options = flags;                         \
-            operations->specs[index].sdcmd = LCB_SDCMD_##UC;                  \
-            return LCB_SUCCESS;                                               \
-        })
-#    define PYCBC_COUNTER(UC, LC, DECL, BODY, ...)                            \
-        DECL(lcb_subdocops_##LC(lcb_SUBDOCOPS *operations,                    \
-                                size_t index,                                 \
-                                uint32_t flags,                               \
-                                const char *path,                             \
-                                size_t path_len,                              \
-                                int64_t delta))                               \
-        BODY({                                                                \
-            char *value = (char *)calloc(22, sizeof(char));                   \
-            size_t value_len = snprintf(value, 21, "%" PRId64, delta);        \
-            PYCBC_SDSPEC_SET_PATH(&operations->specs[index], path, path_len); \
-            PYCBC_SDSPEC_SET_VALUE(                                           \
-                    &operations->specs[index], value, value_len);             \
-            operations->specs[index].options = flags;                         \
-            operations->specs[index].sdcmd = LCB_SDCMD_##UC;                  \
-            return LCB_SUCCESS;                                               \
-        })
-#    define PYCBC_NP(UC, LC, DECL, BODY, ...)                             \
-        DECL(lcb_subdocops_##LC(                                          \
-                lcb_SUBDOCOPS *operations, size_t index, uint32_t flags)) \
-        BODY({                                                            \
-            operations->specs[index].options = flags;                     \
-            operations->specs[index].sdcmd = LCB_SDCMD_##UC;              \
-            return LCB_SUCCESS;                                           \
-        })
-#    define PYCBC_VAL_GEN(UC, LC, DECL, BODY, ...)                            \
-        DECL(lcb_subdocops_##LC(lcb_SUBDOCOPS *operations,                    \
-                                size_t index,                                 \
-                                uint32_t flags,                               \
-                                const char *path,                             \
-                                size_t path_len,                              \
-                                const char *value,                            \
-                                size_t value_len))                            \
-        BODY({                                                                \
-            PYCBC_SDSPEC_SET_PATH(&operations->specs[index], path, path_len); \
-            PYCBC_SDSPEC_SET_VALUE(                                           \
-                    &operations->specs[index], value, value_len);             \
-            operations->specs[index].options = flags;                         \
-            operations->specs[index].sdcmd = LCB_SDCMD_##UC;                  \
-            return LCB_SUCCESS;                                               \
-        })
+#define PYCBC_PATH_ONLY(UC, LC, EXP_TYPE)                                  \
+    DECL_##EXP_TYPE(lcb_subdocops_##LC(lcb_SUBDOCOPS *operations,          \
+                                       size_t index,                       \
+                                       uint32_t flags,                     \
+                                       const char *path,                   \
+                                       size_t path_len)) IMPL_##EXP_TYPE({ \
+        PYCBC_SDSPEC_SET_PATH(&operations->specs[index], path, path_len);  \
+        operations->specs[index].options = flags;                          \
+        operations->specs[index].sdcmd = LCB_SDCMD_##UC;                   \
+        return LCB_SUCCESS;                                                \
+    })
+#define PYCBC_COUNTER(UC, LC, EXP_TYPE)                                      \
+    DECL_##EXP_TYPE(lcb_subdocops_##LC(lcb_SUBDOCOPS *operations,            \
+                                       size_t index,                         \
+                                       uint32_t flags,                       \
+                                       const char *path,                     \
+                                       size_t path_len,                      \
+                                       int64_t delta)) IMPL_##EXP_TYPE({     \
+        char *value = (char *)calloc(22, sizeof(char));                      \
+        size_t value_len = snprintf(value, 21, "%" PRId64, delta);           \
+        PYCBC_SDSPEC_SET_PATH(&operations->specs[index], path, path_len);    \
+        PYCBC_SDSPEC_SET_VALUE(&operations->specs[index], value, value_len); \
+        operations->specs[index].options = flags;                            \
+        operations->specs[index].sdcmd = LCB_SDCMD_##UC;                     \
+        return LCB_SUCCESS;                                                  \
+    })
+#define PYCBC_NP(UC, LC, EXP_TYPE)                                    \
+    DECL_##EXP_TYPE(lcb_subdocops_##LC(                               \
+            lcb_SUBDOCOPS *operations, size_t index, uint32_t flags)) \
+            IMPL_##EXP_TYPE({                                         \
+                operations->specs[index].options = flags;             \
+                operations->specs[index].sdcmd = LCB_SDCMD_##UC;      \
+                return LCB_SUCCESS;                                   \
+            })
+#define PYCBC_VAL_GEN(UC, LC, EXP_TYPE)                                      \
+    DECL_##EXP_TYPE(lcb_subdocops_##LC(lcb_SUBDOCOPS *operations,            \
+                                       size_t index,                         \
+                                       uint32_t flags,                       \
+                                       const char *path,                     \
+                                       size_t path_len,                      \
+                                       const char *value,                    \
+                                       size_t value_len)) IMPL_##EXP_TYPE({  \
+        PYCBC_SDSPEC_SET_PATH(&operations->specs[index], path, path_len);    \
+        PYCBC_SDSPEC_SET_VALUE(&operations->specs[index], value, value_len); \
+        operations->specs[index].options = flags;                            \
+        operations->specs[index].sdcmd = LCB_SDCMD_##UC;                     \
+        return LCB_SUCCESS;                                                  \
+    })
 
-#    define LITERAL(...) __VA_ARGS__
-#    define LITERAL_DECL(...) __VA_ARGS__;
-#    define PYCBC_SDCMD_FN_DEF(UC, LC, FN, ...) \
-        LIBCOUCHBASE_API lcb_STATUS FN(UC, LC, __VA_ARGS__)
-#    define PYCBC_SDCMD_CASE(UC, LC, ...) \
-        PYCBC_SDCMD_FN_DEF(UC, LC, PYCBC_PATH_ONLY, __VA_ARGS__)
-#    define PYCBC_SDCMD_CASE_NP(UC, LC, ...) \
-        PYCBC_SDCMD_FN_DEF(UC, LC, PYCBC_NP, __VA_ARGS__)
-#    define PYCBC_SDCMD_CASE_VAL(UC, LC, ...) \
-        PYCBC_SDCMD_FN_DEF(UC, LC, PYCBC_VAL_GEN, __VA_ARGS__)
-#    define PYCBC_SDCMD_CASE_MVAL(UC, LC, ...) \
-        PYCBC_SDCMD_FN_DEF(UC, LC, PYCBC_VAL_GEN, __VA_ARGS__)
-#    define PYCBC_SDCMD_CASE_COUNTER(UC, LC, ...) \
-        PYCBC_SDCMD_FN_DEF(UC, LC, PYCBC_COUNTER, __VA_ARGS__)
+#define PYCBC_SDCMD_FN_DEF(UC, LC, FN, EXP_TYPE) lcb_STATUS FN(UC, LC, EXP_TYPE)
+#define PYCBC_SDCMD_CASE(UC, LC, EXP_TYPE) \
+    PYCBC_SDCMD_FN_DEF(UC, LC, PYCBC_PATH_ONLY, EXP_TYPE)
+#define PYCBC_SDCMD_CASE_NP(UC, LC, EXP_TYPE) \
+    PYCBC_SDCMD_FN_DEF(UC, LC, PYCBC_NP, EXP_TYPE)
+#define PYCBC_SDCMD_CASE_VAL(UC, LC, EXP_TYPE) \
+    PYCBC_SDCMD_FN_DEF(UC, LC, PYCBC_VAL_GEN, EXP_TYPE)
+#define PYCBC_SDCMD_CASE_MVAL(UC, LC, EXP_TYPE) \
+    PYCBC_SDCMD_FN_DEF(UC, LC, PYCBC_VAL_GEN, EXP_TYPE)
+#define PYCBC_SDCMD_CASE_COUNTER(UC, LC, EXP_TYPE) \
+    PYCBC_SDCMD_FN_DEF(UC, LC, PYCBC_COUNTER, EXP_TYPE)
 
 #    define PYCBC_X_SD_OPS_FULLDOC(X, NP, VAL, MVAL, CTR, ...) \
         NP(GET_FULLDOC, get_fulldoc, __VA_ARGS__)              \
@@ -708,68 +694,23 @@ typedef lcb_U64 lcb_STORE_OPERATION;
 
 #    define lcb_subdoc lcb_subdoc3
 
-
-#    define PYCBC_SD_OPS_GEN
-#    ifdef PYCBC_SD_OPS_GEN
 #define DUMMY(...)
+#    define PYCBC_SD_OPS_GEN
+#undef PYCBC_SD_OPS_GEN
+#    ifdef PYCBC_SD_OPS_GEN
 PYCBC_X_SD_OPS(PYCBC_SDCMD_CASE,
                PYCBC_SDCMD_CASE_NP,
                PYCBC_SDCMD_CASE_VAL,
                PYCBC_SDCMD_CASE_MVAL,
                PYCBC_SDCMD_CASE_COUNTER,
-               LITERAL_DECL,
-               DUMMY)
+               DECL)
 #else
-
-lcb_STATUS
-lcb_subdocops_get(lcb_SUBDOCOPS *operations, size_t index, uint32_t flags, const char *path, size_t path_len);
-
-lcb_STATUS
-lcb_subdocops_exists(lcb_SUBDOCOPS *operations, size_t index, uint32_t flags, const char *path, size_t path_len);
-
-lcb_STATUS
-lcb_subdocops_replace(lcb_SUBDOCOPS *operations, size_t index, uint32_t flags, const char *path, size_t path_len,
-                      const char *value, size_t value_len);
-
-lcb_STATUS
-lcb_subdocops_dict_add(lcb_SUBDOCOPS *operations, size_t index, uint32_t flags, const char *path, size_t path_len,
-                       const char *value, size_t value_len);
-
-lcb_STATUS
-lcb_subdocops_dict_upsert(lcb_SUBDOCOPS *operations, size_t index, uint32_t flags, const char *path, size_t path_len,
-                          const char *value, size_t value_len);
-
-lcb_STATUS lcb_subdocops_array_add_first(lcb_SUBDOCOPS *operations, size_t index, uint32_t flags, const char *path,
-                                         size_t path_len, const char *value, size_t value_len);
-
-lcb_STATUS
-lcb_subdocops_array_add_last(lcb_SUBDOCOPS *operations, size_t index, uint32_t flags, const char *path, size_t path_len,
-                             const char *value, size_t value_len);
-
-lcb_STATUS lcb_subdocops_array_add_unique(lcb_SUBDOCOPS *operations, size_t index, uint32_t flags, const char *path,
-                                          size_t path_len, const char *value, size_t value_len);
-
-lcb_STATUS
-lcb_subdocops_array_insert(lcb_SUBDOCOPS *operations, size_t index, uint32_t flags, const char *path, size_t path_len,
-                           const char *value, size_t value_len);
-
-lcb_STATUS
-lcb_subdocops_counter(lcb_SUBDOCOPS *operations, size_t index, uint32_t flags, const char *path, size_t path_len,
-                      int64_t delta);
-
-lcb_STATUS
-lcb_subdocops_remove(lcb_SUBDOCOPS *operations, size_t index, uint32_t flags, const char *path, size_t path_len);
-
-lcb_STATUS
-lcb_subdocops_get_count(lcb_SUBDOCOPS *operations, size_t index, uint32_t flags, const char *path, size_t path_len);
-
-lcb_STATUS lcb_subdocops_get_fulldoc(lcb_SUBDOCOPS *operations, size_t index, uint32_t flags);
-
-lcb_STATUS
-lcb_subdocops_set_fulldoc(lcb_SUBDOCOPS *operations, size_t index, uint32_t flags, const char *path, size_t path_len);
-
-lcb_STATUS lcb_subdocops_remove_fulldoc(lcb_SUBDOCOPS *operations, size_t index, uint32_t flags);
-
+PYCBC_X_SD_OPS(PYCBC_SDCMD_CASE,
+               PYCBC_SDCMD_CASE_NP,
+               PYCBC_SDCMD_CASE_VAL,
+               PYCBC_SDCMD_CASE_MVAL,
+               PYCBC_SDCMD_CASE_COUNTER,
+               DECL)
 #    endif
 
 
@@ -834,8 +775,10 @@ typedef lcb_RESPVIEWQUERY lcb_RESPVIEW;
 typedef lcb_error_t lcb_STATUS;
 #    define lcb_cmdremove_durability_observe(...) LCB_EINTERNAL
 #    define lcb_cmdstore_durability_observe(...) LCB_EINTERNAL
-LIBCOUCHBASE_API lcb_STATUS
-lcb_cmdremove_durability(lcb_CMDREMOVE *cmd, pycbc_DURABILITY_LEVEL level);
+lcb_STATUS lcb_cmdremove_durability(lcb_CMDREMOVE *cmd,
+                                    pycbc_DURABILITY_LEVEL level);
+
+#define PYCBC_DURABILITY 0
 
 #define PYCBC_X_DURLEVEL(X)
 #define PYCBX_X_SYNCREPERR(X)

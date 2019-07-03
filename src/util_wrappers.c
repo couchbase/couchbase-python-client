@@ -4,12 +4,12 @@
 
 #include "util_wrappers.h"
 #include <stdlib.h>
-const char *pycbc_strn_buf(const pycbc_strn buf)
+const char *pycbc_strn_buf(pycbc_strn buf)
 {
     return buf.buffer;
 }
 
-int pycbc_strn_valid(const pycbc_strn buf)
+int pycbc_strn_valid(pycbc_strn buf)
 {
     return buf.buffer ? 1 : 0;
 }

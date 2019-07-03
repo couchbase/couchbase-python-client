@@ -14,13 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import enum
 import warnings
+from collections import defaultdict
 
 # Pythons > (2.7||3.2) silence deprecation warnings by default.
 # Many folks are not happy about this, as it avoids letting them
 # know about potential upcoming breaking changes in their code.
 # Here we add a warning filter for any deprecation warning thrown
 # by Couchbase
+from enum import Enum
+
 warnings.filterwarnings(action='default',
                         category=DeprecationWarning,
                         module=r"^couchbase($|\..*)")
@@ -135,3 +139,25 @@ def enable_logging():
 def disable_logging():
     import couchbase_core._logutil
     couchbase_core._logutil.configure(False)
+
+
+_enum_counts = defaultdict(lambda: 0)
+
+
+def real_or_placeholder(cls, name):
+    result = getattr(_LCB, name, _enum_counts[cls])
+    _enum_counts[cls] += 1
+    return result
+
+
+class CompatibilityEnum(enum.Enum):
+    @classmethod
+    def prefix(cls):
+        return ""
+
+    def __init__(self, value=None):
+        self.orig_value = value
+        self._value_ = real_or_placeholder(type(self), type(self).prefix() + self._name_)
+
+    def __int__(self):
+        return self.value

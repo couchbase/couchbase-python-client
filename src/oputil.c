@@ -51,6 +51,8 @@ case LCB_SDCMD_##UC:                              \
     FN(UC, LC, __VA_ARGS__)                       \
     break;
 
+#define DECL_INLINE
+#define IMPL_INLINE(...) __VA_ARGS__
 pycbc_sd_metainfo pycbc_get_metainfo(const pycbc_sdspec_details_t* details)
 {
     pycbc_sd_metainfo result = {0};
@@ -80,7 +82,8 @@ pycbc_sd_metainfo pycbc_get_metainfo(const pycbc_sdspec_details_t* details)
                        PYCBC_METAINFO_SDCMD_CASE_NP,
                        PYCBC_METAINFO_SDCMD_CASE_VAL,
                        PYCBC_METAINFO_SDCMD_CASE_MVAL,
-                       PYCBC_METAINFO_SDCMD_CASE_COUNTER)
+                       PYCBC_METAINFO_SDCMD_CASE_COUNTER,
+                       INLINE)
         default:
             result.err = LCB_SUBDOC_PATH_EINVAL;
             break;
@@ -147,7 +150,8 @@ lcb_STATUS pycbc_build_spec(lcb_SUBDOCOPS *subdocops,
                        PYCBC_BUILDSPEC_SDCMD_CASE_NP,
                        PYCBC_BUILDSPEC_SDCMD_CASE_VAL,
                        PYCBC_BUILDSPEC_SDCMD_CASE_MVAL,
-                       PYCBC_BUILDSPEC_SDCMD_CASE_COUNTER)
+                       PYCBC_BUILDSPEC_SDCMD_CASE_COUNTER,
+                       INLINE)
     default:
         result = LCB_SUBDOC_PATH_EINVAL;
         break;

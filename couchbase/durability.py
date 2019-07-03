@@ -1,16 +1,17 @@
-from enum import Enum, IntEnum
-
-import couchbase_core._libcouchbase as _LCB
 from typing import *
 import couchbase.options
 from .options import Cardinal, OptionBlock
+from couchbase_core import CompatibilityEnum
 
 
-class Durability(IntEnum):
-    MAJORITY_AND_PERSIST_ACTIVE = _LCB.LCB_DURABILITYLEVEL_MAJORITY_AND_PERSIST_ON_MASTER
-    NONE = _LCB.LCB_DURABILITYLEVEL_NONE
-    MAJORITY = _LCB.LCB_DURABILITYLEVEL_MAJORITY
-    PERSIST_TO_MAJORITY = _LCB.LCB_DURABILITYLEVEL_PERSIST_TO_MAJORITY
+class Durability(CompatibilityEnum):
+    @classmethod
+    def prefix(cls):
+        return "LCB_DURABILITYLEVEL_"
+    MAJORITY_AND_PERSIST_ON_MASTER = ()
+    NONE = ()
+    MAJORITY = ()
+    PERSIST_TO_MAJORITY = ()
 
 
 class ReplicateTo(Cardinal):

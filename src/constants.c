@@ -226,6 +226,7 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
     ADD_MACRO(LCB_BTYPE_COUCHBASE);
     ADD_MACRO(LCB_BTYPE_EPHEMERAL);
     ADD_MACRO(LCB_BTYPE_MEMCACHED);
+    ADD_MACRO(PYCBC_DURABILITY);
     /* Encryption options */
     PYCBC_PP_ENCRYPT_CONSTANTS(ADD_MACRO_TERM)
 

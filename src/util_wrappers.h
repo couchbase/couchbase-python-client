@@ -198,4 +198,9 @@ void pycbc_strn_free(pycbc_strn_unmanaged buf);
 
 pycbc_generic_array pycbc_strn_base_const_array(pycbc_strn_base_const orig);
 
+#define IMPL_DECL(...)
+#define DECL_IMPL(...) __VA_ARGS__
+#define DECL_DECL(...) DECL_IMPL(__VA_ARGS__);
+#define IMPL_IMPL(...) __VA_ARGS__
+
 #endif // COUCHBASE_PYTHON_CLIENT_UTIL_WRAPPERS_H
