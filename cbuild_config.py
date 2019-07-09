@@ -222,6 +222,7 @@ class CBuildCommon(build_ext):
     def build_extension(self, ext):
         self.init_info_and_rpaths(ext)
         self.prep_build(ext)
+        self.add_inc_and_lib_bundled(ext, self.get_lcb_api_flags())
         build_ext.build_extension(self, ext)
 
     def prep_build(self, ext):
@@ -251,6 +252,8 @@ class CBuildCommon(build_ext):
                 if self.compiler:
                     self.compiler.add_runtime_library_dir(rpath)
                 linker_arg='-Wl,-rpath,' + rpath
+                ext.runtime_library_dirs=(ext.runtime_library_dirs if ext.runtime_library_dirs else [])+[rpath]
+                ext.extra_link_args+=[linker_arg]
                 (extoptions['extra_link_args'] if extoptions else ext.extra_link_args if ext else []).insert(0,linker_arg)
 
     def cfg_type(self):
@@ -295,6 +298,27 @@ class CBuildCommon(build_ext):
         print("copying {} -> {}".format(src_file, dest_file))
         copyfile(src_file, dest_file)
         copymode(src_file, dest_file)
+
+    def add_inc_and_lib_bundled(self, ext, lcb_api_flags):
+        from distutils.ccompiler import CCompiler
+        ext.extra_compile_args += lcb_api_flags
+        compiler = self.compiler  # type: CCompiler
+        lcb_include = os.path.join(self.build_temp, "install", "include")
+        compiler.add_include_dir(lcb_include)
+        lib_dirs = [self.info.pkg_data_dir] + self.info.get_lcb_dirs()
+        try:
+            existing_lib_dirs = compiler.library_dirs
+            compiler.set_library_dirs(lib_dirs + existing_lib_dirs)
+        except:
+            compiler.add_library_dirs(lib_dirs)
+
+    def get_pycbc_lcb_api(self):
+        return os.getenv("PYCBC_LCB_API",
+                         BUILD_CFG.get('comp_options', {}).get('PYCBC_LCB_API', None))
+
+    def get_lcb_api_flags(self):
+        pycbc_lcb_api=self.get_pycbc_lcb_api()
+        return ['-DPYCBC_LCB_API={}'.format(pycbc_lcb_api)] if pycbc_lcb_api else []
 
 
 class install_headers(install_headers_orig):

@@ -81,9 +81,8 @@ class CMakeBuild(cbuild_config.CBuildCommon):
             cfg = self.cfg_type()
             extdir = os.path.abspath(
                 os.path.dirname(self.get_ext_fullpath(ext.name)))
-            pycbc_lcb_api=os.getenv("PYCBC_LCB_API",
-                                    cbuild_config.BUILD_CFG.get('comp_options', {}).get('PYCBC_LCB_API', None))
-            lcb_api_flags = ['-DPYCBC_LCB_API={}'.format(pycbc_lcb_api)] if pycbc_lcb_api else []
+
+            lcb_api_flags = self.get_lcb_api_flags()
             cmake_args = lcb_api_flags + ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=' + extdir,
                                           '-DPYTHON_EXECUTABLE=' + sys.executable]
             cmake_args += ['-DPYTHON_INCLUDE_DIR={}'.format(get_python_inc())]
@@ -176,20 +175,6 @@ class CMakeBuild(cbuild_config.CBuildCommon):
                 except:
                     print("failure")
                     raise
-
-            if CMakeBuild.hybrid:
-                from distutils.ccompiler import CCompiler
-                ext.extra_compile_args += lcb_api_flags
-                compiler = self.compiler  # type: CCompiler
-
-                lcb_include = os.path.join(self.build_temp, "install", "include")
-                compiler.add_include_dir(lcb_include)
-                lib_dirs = [self.info.pkg_data_dir]+self.info.get_lcb_dirs()
-                try:
-                    existing_lib_dirs=compiler.library_dirs
-                    compiler.set_library_dirs(lib_dirs+existing_lib_dirs)
-                except:
-                    compiler.add_library_dirs(lib_dirs)
 
 
 def gen_cmake_build(extoptions, pkgdata):
