@@ -1736,7 +1736,6 @@ void pycbc_MultiResult_init_context(pycbc_MultiResult *self, PyObject *curkey,
                                  curkey);
     PYCBC_EXCEPTION_LOG_NOCLEAR;
     PYCBC_DEBUG_PYFORMAT_CONTEXT(context, "After insertion:[%R]", mres_dict);
-    PYCBC_XDECREF(curkey);
 DONE:
     PYCBC_PYBUF_RELEASE(&keybuf);
 }
