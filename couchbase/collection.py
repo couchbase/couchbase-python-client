@@ -651,7 +651,7 @@ class CBCollection(wrapt.ObjectProxy):
             many replicas for presence in memory. See :meth:`endure` for
             more information.
 
-        :param DurabilityLevel durability_level: Durability level
+        :param Durability durability_level: Durability level
 
         :raise: :exc:`.ArgumentError` if an argument is supplied that is
             not applicable in this context. For example setting the CAS
@@ -685,6 +685,11 @@ class CBCollection(wrapt.ObjectProxy):
         Perform optimistic locking by specifying last known CAS version::
 
             cb.upsert('foo', 'bar', cas=8835713818674332672)
+
+        Simple set with durability::
+
+            cb.upsert('key', 'value', durability_level=Durability.MAJORITY_AND_PERSIST_ON_MASTER)
+
         """
 
         final_options = forward_args(kwargs, *options)
