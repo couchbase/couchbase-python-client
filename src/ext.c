@@ -1688,7 +1688,6 @@ void pycbc_MultiResult_init_context(pycbc_MultiResult *self, PyObject *curkey,
     PYCBC_DEBUG_PYFORMAT_CONTEXT(context, "After insertion:[%R]", mres_dict);
 DONE:
     PYCBC_PYBUF_RELEASE(&keybuf);
-    PYCBC_XDECREF(curkey);
 }
 
 int pycbc_is_async_or_pipeline(const pycbc_Bucket *self) { return self->flags & PYCBC_CONN_F_ASYNC || self->pipeline_queue; }
