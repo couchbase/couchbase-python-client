@@ -19,6 +19,8 @@
 from typing import *
 from unittest import SkipTest
 
+from couchbase_core import recursive_reload
+
 try:
     from abc import ABC
 except:
@@ -46,6 +48,8 @@ from couchbase import Bucket
 from couchbase_tests.base import ConnectionTestCase
 import couchbase.subdocument as SD
 import couchbase.admin
+import couchbase_core._bootstrap
+import couchbase_core._libcouchbase as _LCB
 
 
 class Scenarios(ConnectionTestCase):
@@ -484,3 +488,22 @@ class Scenarios(ConnectionTestCase):
         self.coll.upsert_multi({"Fred": "Wilma", "Barney": "Betty"})
         self.assertEquals(self.coll.get("Fred").content, "Wilma")
         self.assertEquals(self.coll.get("Barney").content, "Betty")
+
+    def test_PYCBC_607(self  # type: Scenarios
+                       ):
+        messed_helpers = copy.deepcopy(couchbase_core._bootstrap._default_helpers)
+
+        def dummy_call(*args, **kwargs):
+            raise Exception("failed")
+
+        messed_helpers['json_encode'] = dummy_call
+        messed_helpers['pickle_encode'] = dummy_call
+        _LCB._init_helpers(**messed_helpers)
+
+        def do_upsert():
+            self.coll.upsert('king_arthur', {'name': 'Arthur', 'email': 'kingarthur@couchbase.com',
+                                             'interests': ['Holy Grail', 'African Swallows']})
+
+        self.assertRaises(Exception, do_upsert)
+        recursive_reload(couchbase)
+        do_upsert()

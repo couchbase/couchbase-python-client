@@ -40,6 +40,16 @@ try:
 except ImportError:
     __version__ = "0.0.0-could-not-find-git"
 
+try:
+    from importlib import reload  # Python 3.4+
+except ImportError:
+    # Needed for Python 3.0-3.3; harmless in Python 2.7 where imp.reload is just an
+    # alias for the builtin reload.
+    from imp import reload
+
+from types import ModuleType
+import os, sys
+
 
 def set_json_converters(encode, decode):
     """
@@ -161,3 +171,24 @@ class CompatibilityEnum(enum.Enum):
 
     def __int__(self):
         return self.value
+
+
+def recursive_reload(module, paths=None, mdict=None):
+    """Recursively reload modules."""
+    if paths is None:
+        paths = ['']
+    if mdict is None:
+        mdict = {}
+    if module not in mdict:
+        # modules reloaded from this module
+        mdict[module] = []
+    reload(module)
+    for attribute_name in dir(module):
+        attribute = getattr(module, attribute_name)
+        if type(attribute) is ModuleType:
+            if attribute not in mdict[module]:
+                if attribute.__name__ not in sys.builtin_module_names:
+                    if os.path.dirname(attribute.__file__) in paths:
+                        mdict[module].append(attribute)
+                        recursive_reload(attribute, paths, mdict)
+    reload(module)

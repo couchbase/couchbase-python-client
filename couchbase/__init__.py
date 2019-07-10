@@ -1,3 +1,5 @@
+import couchbase_core._bootstrap
+couchbase_core._bootstrap.do_init()
 from .bucket import *
 from .cluster import *
 from .collection import *
