@@ -293,7 +293,6 @@ class TracingTest(TracedCase):
                              quiet=True)
 
         self.cb.tracing_threshold_kv = 0.00000000001
-        self.cb.timeout = 0.000001
         self.cb.upsert_multi(kv_existing)
 
         rvs = self.cb.get_multi(
