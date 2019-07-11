@@ -34,9 +34,8 @@ from couchbase_core.transcodable import Transcodable
 import couchbase_core.connstr
 import couchbase.exceptions
 
-from couchbase import JSONDocument, Durability, LookupInSpec, DeltaValue, SignedInt64, MutateInResult, MutationResult, \
-    LookupInResult
-from couchbase.cluster import Cluster
+from couchbase import JSONDocument, Durability, DeltaValue, SignedInt64, MutateInResult
+from couchbase.cluster import Cluster, ClusterOptions
 from couchbase import ReplicateTo, PersistTo, FiniteDuration, copy, \
     Seconds, ReplicaNotConfiguredException, DocumentConcurrentlyModifiedException, \
     DocumentMutationLostException, ReplicaNotAvailableException, MutateSpec, CASMismatchException, \
@@ -50,6 +49,7 @@ import couchbase.subdocument as SD
 import couchbase.admin
 import couchbase_core._bootstrap
 import couchbase_core._libcouchbase as _LCB
+from couchbase_core.cluster import ClassicAuthenticator
 from couchbase_core.connstr import ConnectionString
 
 
@@ -62,7 +62,7 @@ class ClusterTestCase(ConnectionTestCase):
         bucket_name = connstr_abstract.bucket
         connstr_abstract.bucket = None
         connstr_abstract.set_option('enable_collections', 'true')
-        self.cluster = Cluster(connstr_abstract)
+        self.cluster = Cluster(connstr_abstract, ClusterOptions(ClassicAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)))
         self.admin = self.make_admin_connection()
         self.bucket = self.cluster.bucket(bucket_name, **connargs)
         self.bucket_name=bucket_name
