@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
+from collections import defaultdict
 from typing import *
 from unittest import SkipTest
 
@@ -50,49 +50,64 @@ import couchbase.subdocument as SD
 import couchbase.admin
 import couchbase_core._bootstrap
 import couchbase_core._libcouchbase as _LCB
+from couchbase_core.connstr import ConnectionString
 
 
-class Scenarios(ConnectionTestCase):
-    coll = None  # type: CBCollection
-
-    @classmethod
-    def setupClass(cls):
-        Scenarios.initialised=False
-    def setUp(self):
+class ClusterTestCase(ConnectionTestCase):
+    def setUp(self, **kwargs):
         self.factory = Bucket
-        super(Scenarios, self).setUp()
+        super(ClusterTestCase, self).setUp()
+        connargs = self.cluster_info.make_connargs()
+        connstr_abstract = ConnectionString.parse(connargs.pop('connection_string'))
+        bucket_name = connstr_abstract.bucket
+        connstr_abstract.bucket = None
+        connstr_abstract.set_option('enable_collections', 'true')
+        self.cluster = Cluster(connstr_abstract)
+        self.admin = self.make_admin_connection()
+        self.bucket = self.cluster.bucket(bucket_name, **connargs)
+        self.bucket_name=bucket_name
 
+
+class CollectionTestCase(ClusterTestCase):
+    coll = None  # type: CBCollection
+    initialised = defaultdict(lambda: {})
+
+    def setUp(self, mock_collections, real_collections):
         # prepare:
         # 1) Connect to a Cluster
-        connargs=self.cluster_info.make_connargs()
-        connstr_abstract= couchbase_core.connstr.ConnectionString.parse(connargs.pop('connection_string'))
-        bucket_name=connstr_abstract.bucket
-        connstr_abstract.bucket=None
-        connstr_abstract.set_option('enable_collections','true')
-        self.cluster = Cluster(connstr_abstract)
-        self.admin=self.make_admin_connection()
-        cm=couchbase.admin.CollectionManager(self.admin,bucket_name)
-        my_collections={None: {None:"coll"}} if self.is_mock else {"bedrock":{"flintstones":'coll'}}
-        self.bucket = self.cluster.bucket(bucket_name,**connargs)
-
+        super(CollectionTestCase,self).setUp()
+        cm = couchbase.admin.CollectionManager(self.admin, self.bucket_name)
+        my_collections = mock_collections if self.is_mock else real_collections
         for scope_name, collections in my_collections.items():
-            try:
-                if scope_name and not Scenarios.initialised:
-                    cm.insert_scope(scope_name)
-            except:
-                pass
+            CollectionTestCase._upsert_scope(cm, scope_name)
             scope = self.bucket.scope(scope_name) if scope_name else self.bucket
             for collection_name, dest in collections.items():
-                if not Scenarios.initialised:
-                    try:
-                        cm.insert_collection(collection_name,scope_name)
-                    except:
-                        pass
+                CollectionTestCase._upsert_collection(cm, collection_name, scope_name)
                 # 2) Open a Collection
                 coll = scope.collection(collection_name) if collection_name else scope.default_collection()
                 setattr(self, dest, coll)
 
-        Scenarios.initialised=True
+    @staticmethod
+    def _upsert_collection(cm, collection_name, scope_name):
+        if not collection_name in CollectionTestCase.initialised[scope_name].keys():
+            try:
+                cm.insert_collection(collection_name, scope_name)
+                CollectionTestCase.initialised[scope_name][collection_name]=None
+            except:
+                pass
+
+    @staticmethod
+    def _upsert_scope(cm, scope_name):
+        try:
+            if scope_name and not scope_name in CollectionTestCase.initialised.keys():
+                cm.insert_scope(scope_name)
+        except:
+            pass
+
+
+class Scenarios(CollectionTestCase):
+    def setUp(self, **kwargs):
+        super(Scenarios, self).setUp({None: {None: "coll"}}, {"bedrock": {"flintstones": 'coll'}})
 
     def test_scenario_A(self):
         # 1) fetch a full document that is a json document
