@@ -1,15 +1,17 @@
+import json
 from warnings import warn
 
 from couchbase_core._libcouchbase import Bucket as _Base
 
 import couchbase_core.exceptions as E
+from couchbase_core.analytics import AnalyticsQuery
 from couchbase_core.n1ql import N1QLQuery, N1QLRequest
 from couchbase_core.views.iterator import View
 from .views.params import make_options_string, make_dvpath
 import couchbase_core._libcouchbase as _LCB
 
-from couchbase_core import priv_constants as _P
-
+from couchbase_core import priv_constants as _P, fulltext as _FTS
+import couchbase_core.analytics
 
 class Bucket(_Base):
     def __init__(self, *args, **kwargs):
@@ -765,7 +767,7 @@ class Bucket(_Base):
             :class:`~.View`
                 contains more extensive documentation and examples
 
-            :class:`couchbase_v2.views.params.Query`
+            :class:`couchbase_core.views.params.Query`
                 contains documentation on the available query options
 
             :class:`~.SpatialQuery`
@@ -782,6 +784,124 @@ class Bucket(_Base):
         design = self._mk_devmode(design, use_devmode)
         itercls = kwargs.pop('itercls', View)
         return itercls(self, design, view, **kwargs)
+
+    def ping(self):
+        """Ping cluster for latency/status information per-service
+
+        Pings each node in the cluster, and
+        returns a `dict` with 'type' keys (e.g 'n1ql', 'kv')
+        and node service summary lists as a value.
+
+
+        :raise: :exc:`.CouchbaseNetworkError`
+        :return: `dict` where keys are stat keys and values are
+            host-value pairs
+
+        Ping cluster (works on couchbase buckets)::
+
+            cb.ping()
+            # {'services': {...}, ...}
+        """
+        resultdict = self._ping()
+        return resultdict['services_struct']
+
+    def diagnostics(self):
+        """Request diagnostics report about network connections
+
+        Generates diagnostics for each node in the cluster.
+        It returns a `dict` with details
+
+
+        :raise: :exc:`.CouchbaseNetworkError`
+        :return: `dict` where keys are stat keys and values are
+            host-value pairs
+
+        Get health info (works on couchbase buckets)::
+
+            cb.diagnostics()
+            # {
+                  'config':
+                  {
+                     'id': node ID,
+                     'last_activity_us': time since last activity in nanoseconds
+                     'local': local server and port,
+                     'remote': remote server and port,
+                     'status': connection status
+                  }
+                  'id': client ID,
+                  'sdk': sdk version,
+                  'version': diagnostics API version
+              }
+        """
+        return json.loads(self._diagnostics()['health_json'])
+
+    def analytics_query(self, query, *args, **kwargs):
+        """
+        Execute an Analytics query.
+
+        This method is mainly a wrapper around the :class:`~.AnalyticsQuery`
+        and :class:`~.AnalyticsRequest` objects, which contain the inputs
+        and outputs of the query.
+
+        Using an explicit :class:`~.AnalyticsQuery`::
+
+            query = AnalyticsQuery(
+                "SELECT VALUE bw FROM breweries bw WHERE bw.name = ?", "Kona Brewing")
+            for row in cb.analytics_query(query, "127.0.0.1"):
+                print('Entry: {0}'.format(row))
+
+        Using an implicit :class:`~.AnalyticsQuery`::
+
+            for row in cb.analytics_query(
+                "SELECT VALUE bw FROM breweries bw WHERE bw.name = ?", "127.0.0.1", "Kona Brewing"):
+                print('Entry: {0}'.format(row))
+
+        :param query: The query to execute. This may either be a
+            :class:`.AnalyticsQuery` object, or a string (which will be
+            implicitly converted to one).
+        :param host: The host to send the request to.
+        :param args: Positional arguments for :class:`.AnalyticsQuery`.
+        :param kwargs: Named arguments for :class:`.AnalyticsQuery`.
+        :return: An iterator which yields rows. Each row is a dictionary
+            representing a single result
+        """
+        if not isinstance(query, AnalyticsQuery):
+            query = AnalyticsQuery(query, *args, **kwargs)
+        else:
+            query.update(*args, **kwargs)
+
+        return couchbase_core.analytics.gen_request(query, None, self)
+
+    def search(self, index, query, **kwargs):
+        """
+        Perform full-text searches
+
+        .. versionadded:: 2.0.9
+
+        .. warning::
+
+            The full-text search API is experimental and subject to change
+
+        :param str index: Name of the index to query
+        :param couchbase_core.fulltext.SearchQuery query: Query to issue
+        :param couchbase_core.fulltext.Params params: Additional query options
+        :return: An iterator over query hits
+
+        .. note:: You can avoid instantiating an explicit `Params` object
+            and instead pass the parameters directly to the `search` method.
+
+        .. code-block:: python
+
+            it = cb.search('name', ft.MatchQuery('nosql'), limit=10)
+            for hit in it:
+                print(hit)
+
+        """
+        itercls = kwargs.pop('itercls', _FTS.SearchRequest)
+        iterargs = itercls.mk_kwargs(kwargs)
+        params = kwargs.pop('params', _FTS.Params(**kwargs))
+        body = _FTS.make_search_body(index, query, params)
+        return itercls(body, self, **iterargs)
 
 
 def _depr(fn, usage, stacklevel=3):

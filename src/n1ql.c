@@ -289,7 +289,8 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                 unsigned nparams,
                 const char *host,
                 int is_prepared,
-                int is_xbucket)
+                int is_xbucket,
+                int is_analytics)
 {
     PyObject *ret = NULL;
     pycbc_MultiResult *mres;
@@ -314,7 +315,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
 
     static pycbc_query_handler handlers[] = {pycbc_handle_n1ql,
                                              pycbc_handle_analytics};
-    rc = (handlers[host ? 1 : 0])(
+    rc = (handlers[is_analytics])(
             self, params, nparams, host, is_prepared, is_xbucket, mres, vres, context);
     if (rc != LCB_SUCCESS) {
         PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, rc, "Couldn't schedule n1ql query");
@@ -354,32 +355,44 @@ pycbc_Bucket__n1ql_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
                               nparams,
                               NULL,
                               prepared,
-                              cross_bucket);
+                              cross_bucket,
+                              0);
     return result;
 }
 
-PyObject *
-pycbc_Bucket__cbas_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
+PyObject *pycbc_Bucket__cbas_query(pycbc_Bucket *self,
+                                   PyObject *args,
+                                   PyObject *kwargs)
 {
-    const char *host = NULL;
+    PyObject *pyhost = Py_None;
     const char *params = NULL;
     pycbc_strlen_t nparams = 0;
-    static char *kwlist[] = { "params", "host", NULL };
+    static char *kwlist[] = {"params", "host", NULL};
     PyObject *result = NULL;
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s#s", kwlist,
-        &params, &nparams, &host)) {
+    if (!PyArg_ParseTupleAndKeywords(
+                args, kwargs, "s#O", kwlist, &params, &nparams, &pyhost)) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;
     }
-    PYCBC_TRACE_WRAP_TOPLEVEL(result,
-                              LCBTRACE_OP_REQUEST_ENCODING,
-                              query_common,
-                              self->tracer,
-                              self,
-                              params,
-                              nparams,
-                              host,
-                              0,
-                              0);
+    {
+        const char *host = NULL;
+        if (PyObject_IsTrue(pyhost)) {
+            host = pycbc_cstr(pyhost);
+            if (!host) {
+                PYCBC_EXCTHROW_ARGS();
+            }
+        }
+        PYCBC_TRACE_WRAP_TOPLEVEL(result,
+                                  LCBTRACE_OP_REQUEST_ENCODING,
+                                  query_common,
+                                  self->tracer,
+                                  self,
+                                  params,
+                                  nparams,
+                                  host,
+                                  0,
+                                  0,
+                                  1);
+    }
     return result;
 }
