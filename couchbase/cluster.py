@@ -1,6 +1,8 @@
 from typing import *
 
 from couchbase.diagnostics import DiagnosticsResult, EndPointDiagnostics, IDiagnosticsResult
+from couchbase.fulltext import ISearchResult, SearchResult, SearchOptions
+from couchbase_core.fulltext import Query, Facet, Params
 from .analytics import AnalyticsResult
 from .n1ql import QueryResult, IQueryResult
 from .options import OptionBlock, forward_args, OptionBlockDeriv
@@ -182,9 +184,24 @@ class Cluster:
 
         return AnalyticsResult(self._operate_on_cluster(CoreBucket.analytics_query, AnalyticsException, statement, **forward_args(kwargs,*options)))
 
+    @overload
     def search_query(self,
                      index,  # type: str
-                     query,  # type: str
+                     query,  # type: Union[str, Query]
+                     facets=None  # type: Mapping[str,Facet]
+                     ):
+        pass
+
+    def search_query(self,
+                     index,  # type: str
+                     query,  # type: Union[str, Query]
+                     options,  # type: SearchOptions
+                     ):
+        pass
+
+    def search_query(self,
+                     index,  # type: str
+                     query,  # type: Union[str, Query]
                      *options,  # type: SearchOptions
                      **kwargs
                      ):
@@ -199,7 +216,7 @@ class Cluster:
         :except    ServiceNotFoundException - service does not exist or cannot be located.
 
         """
-        return self._operate_on_cluster(CoreBucket.search, SearchException, index, query, **forward_args(kwargs, *options))
+        return SearchResult(self._operate_on_cluster(CoreBucket.search, SearchException, index, query, **forward_args(kwargs, *options)))
 
     _root_diag_data = {'id', 'version', 'sdk'}
 

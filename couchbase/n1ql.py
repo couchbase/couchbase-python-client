@@ -14,17 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from couchbase_core import IterableWrapper
+
 try:
     from abc import abstractmethod
 except:
     import abstractmethod
 
-try:
-    StopAsyncIteration = StopAsyncIteration
-except:
-    StopAsyncIteration = StopIteration
 
 from couchbase_core.n1ql import N1QLRequest
+from typing import *
 
 
 class IQueryResult(object):
@@ -60,33 +59,15 @@ class IQueryResult(object):
         pass
 
 
-class QueryResult(IQueryResult):
+class QueryResult(IterableWrapper, IQueryResult):
     def __init__(self,
                  parent  # type: N1QLRequest
                  ):
         # type (...)->None
-        self.parent = parent
-        self.buffered_rows=[]
-        self.done = False
-
-    def metadata(self):
-        return self.parent.meta
+        IterableWrapper.__init__(self, parent)
 
     def rows(self):
         return list(x for x in self)
-
-    def __iter__(self):
-        for row in self.buffered_rows:
-            yield row
-        while not self.done:
-            parent_iter=iter(self.parent)
-            try:
-                next_item = next(parent_iter)
-                self.buffered_rows.append(next_item)
-                yield next_item
-            except (StopAsyncIteration, StopIteration):
-                self.done=True
-                break
 
     def metrics(self):  # type: (...)->QueryMetrics
         return self.parent.metrics

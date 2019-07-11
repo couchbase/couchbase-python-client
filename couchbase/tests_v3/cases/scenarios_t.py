@@ -20,6 +20,7 @@ from collections import defaultdict
 from typing import *
 from unittest import SkipTest
 
+from couchbase.fulltext import IMetaData, ISearchResult
 from couchbase_core import recursive_reload
 from couchbase_core._pyport import ANY_STR
 
@@ -46,7 +47,7 @@ from couchbase import ReplicateTo, PersistTo, FiniteDuration, copy, \
 from couchbase import CBCollection, GetOptions, RemoveOptions, ReplaceOptions
 from couchbase import Bucket
 
-from couchbase_tests.base import ConnectionTestCase
+from couchbase_tests.base import ConnectionTestCase, ConnectionTestCaseBase
 import couchbase.subdocument as SD
 import couchbase.admin
 import couchbase_core._bootstrap
@@ -57,6 +58,7 @@ import couchbase_core.tests.analytics_harness
 from couchbase_core.cluster import ClassicAuthenticator
 from couchbase_core.connstr import ConnectionString
 from couchbase.diagnostics import ServiceType
+import couchbase_core.fulltext as FT
 
 
 class ClusterTestCase(ConnectionTestCase):
@@ -504,6 +506,39 @@ class Scenarios(CollectionTestCase):
         self.assertEquals([{"row": "value"}], list(result))
         self.assertEquals([{"row": "value"}], list(result))
         self.assertEquals([{"row": "value"}], result.rows())
+
+    def test_cluster_search(self  # type: ClusterTestCase
+                            ):
+        if self.is_mock:
+            raise SkipTest("FTS not supported by mock")
+        most_common_term_max = 10
+        initial=time.time()
+        x = self.cluster.search_query("beer-search", FT.TermQuery("category"),
+                                      facets={'fred': FT.TermFacet('category', most_common_term_max)})
+        first_entry = x.hits()[0]
+        self.assertEquals("brasserie_de_brunehaut-mont_st_aubert", first_entry.get('id'))
+        min_hits = 6
+        metadata = x.metadata()
+        duration=time.time()-initial
+        self.assertIsInstance(metadata, IMetaData)
+        self.assertIsInstance(metadata.error_count(), int)
+        self.assertIsInstance(metadata.max_score(), float)
+        self.assertIsInstance(metadata.success_count(), int)
+        took=metadata.took()
+        self.assertIsInstance(took, Seconds)
+        self.assertAlmostEqual(took.value, duration, delta=0.1)
+        self.assertGreater(took.value, 0)
+        self.assertIsInstance(metadata.total_hits(), int)
+        self.assertGreaterEqual(metadata.success_count(), min_hits)
+        self.assertGreaterEqual(metadata.total_hits(), min_hits)
+        self.assertGreaterEqual(len(x.hits()), min_hits)
+        fred_facet = x.facets()['fred']
+        self.assertIsInstance(fred_facet, ISearchResult.Facet)
+        self.assertEqual(len(fred_facet['terms']), most_common_term_max)
+
+        self.assertRaises(couchbase.exceptions.SearchException, self.cluster.search_query, "beer-search",
+                          FT.TermQuery("category"),
+                          facets={'fred': None})
 
     def test_diagnostics(self  # type: Scenarios
                          ):

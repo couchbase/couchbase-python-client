@@ -35,7 +35,7 @@ warnings.filterwarnings(action='default',
 
 import couchbase_core._libcouchbase as _LCB
 
-from typing import Callable, Any, Union, NewType, Mapping, List, Type, TypeVar
+from typing import *
 
 JSON = Union[str, int, float, bool, None, Mapping[str, 'JSON'], List['JSON']]
 
@@ -54,6 +54,11 @@ except ImportError:
 
 from types import ModuleType
 import os, sys
+
+try:
+    StopAsyncIteration = StopAsyncIteration
+except:
+    StopAsyncIteration = StopIteration
 
 
 def set_json_converters(encode, decode):
@@ -226,3 +231,35 @@ def recursive_reload(module, paths=None, mdict=None):
                         mdict[module].append(attribute)
                         recursive_reload(attribute, paths, mdict)
     reload(module)
+
+
+from couchbase_core.fulltext import SearchRequest
+from couchbase_core.n1ql import N1QLRequest
+
+IterableQuery = Union[SearchRequest, N1QLRequest]
+
+
+class IterableWrapper(object):
+    def __init__(self,
+                 parent  # type: IterableQuery
+                 ):
+        self.done = False
+        self.buffered_rows = []
+        self.parent = parent
+
+    def metadata(self):
+        # type: (...)->JSON
+        return self.parent.meta
+
+    def __iter__(self):
+        for row in self.buffered_rows:
+            yield row
+        parent_iter = iter(self.parent)
+        while not self.done:
+            try:
+                next_item = next(parent_iter)
+                self.buffered_rows.append(next_item)
+                yield next_item
+            except (StopAsyncIteration, StopIteration) as e:
+                self.done = True
+                break
