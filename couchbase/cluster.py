@@ -1,5 +1,6 @@
 from typing import *
 
+from couchbase.diagnostics import DiagnosticsResult, EndPointDiagnostics, IDiagnosticsResult
 from .analytics import AnalyticsResult
 from .n1ql import QueryResult, IQueryResult
 from .options import OptionBlock, forward_args, OptionBlockDeriv
@@ -8,6 +9,9 @@ from couchbase_core.cluster import Cluster as SDK2Cluster, Authenticator as SDK2
 from .exceptions import SearchException, DiagnosticsException, QueryException, ArgumentError, AnalyticsException
 import couchbase_core._libcouchbase as _LCB
 from couchbase_core import abstractmethod
+import multiprocessing
+from multiprocessing.pool import ThreadPool
+import couchbase.exceptions
 
 T = TypeVar('T')
 
@@ -197,9 +201,11 @@ class Cluster:
         """
         return self._operate_on_cluster(CoreBucket.search, SearchException, index, query, **forward_args(kwargs, *options))
 
+    _root_diag_data = {'id', 'version', 'sdk'}
 
     def diagnostics(self,
-                    reportId=None  # type: str
+                    reportId=None,  # type: str
+                    timeout=None
                     ):
         # type: (...)->IDiagnosticsResult
         """
@@ -208,7 +214,24 @@ class Cluster:
         :return:A IDiagnosticsResult object with the results of the query or error message if the query failed on the server.
 
         """
-        return self._operate_on_cluster(CoreBucket.diagnostics, DiagnosticsException)
+
+        pool = ThreadPool(processes=1)
+        diag_results_async_result = pool.apply_async(self._operate_on_cluster,
+                                                     (CoreBucket.diagnostics, DiagnosticsException))
+        try:
+            diag_results = diag_results_async_result.get(timeout)
+        except multiprocessing.TimeoutError as e:
+            raise couchbase.exceptions.TimeoutError(params=dict(inner_cause=e))
+
+        final_results = {'services': {}}
+
+        for k, v in diag_results.items():
+            if k in Cluster._root_diag_data:
+                final_results[k] = v
+            else:
+                for item in v:
+                    final_results['services'][k] = EndPointDiagnostics(k, item)
+        return DiagnosticsResult(final_results)
 
     def users(self):
         # type: (...)->IUserManager

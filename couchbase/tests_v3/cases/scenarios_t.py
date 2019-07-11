@@ -15,11 +15,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import traceback
 from collections import defaultdict
 from typing import *
 from unittest import SkipTest
 
 from couchbase_core import recursive_reload
+from couchbase_core._pyport import ANY_STR
 
 try:
     from abc import ABC
@@ -54,6 +56,7 @@ import couchbase.admin
 import couchbase_core.tests.analytics_harness
 from couchbase_core.cluster import ClassicAuthenticator
 from couchbase_core.connstr import ConnectionString
+from couchbase.diagnostics import ServiceType
 
 
 class ClusterTestCase(ConnectionTestCase):
@@ -501,6 +504,24 @@ class Scenarios(CollectionTestCase):
         self.assertEquals([{"row": "value"}], list(result))
         self.assertEquals([{"row": "value"}], list(result))
         self.assertEquals([{"row": "value"}], result.rows())
+
+    def test_diagnostics(self  # type: Scenarios
+                         ):
+        try:
+            diagnostics = self.cluster.diagnostics(timeout=(5 if self.is_mock else None))
+        except couchbase.exceptions.TimeoutError:
+            if self.is_mock:
+                raise SkipTest("LCB Diagnostics still blocks indefinitely with mock: {}".format(traceback.format_exc()))
+
+        self.assertRegex(diagnostics.sdk(), r'.*PYCBC.*')
+        self.assertGreaterEqual(diagnostics.version(), 1)
+        self.assertIsNotNone(diagnostics.id())
+        config = diagnostics.services().get('config')
+        self.assertEquals(config.type(), ServiceType.Config)
+        for key, value in diagnostics.services().items():
+            self.assertIn(type(value.type()), (ServiceType, str))
+            self.assertIn(type(value.id()), ANY_STR)
+            self.assertIn(type(value.local()), ANY_STR)
 
     def test_multi(self):
         self.coll.upsert_multi({"Fred": "Wilma", "Barney": "Betty"})
