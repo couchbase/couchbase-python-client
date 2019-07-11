@@ -9,7 +9,7 @@ class BucketOptions(OptionBlock):
     pass
 
 
-class ViewOptions(object):
+class ViewOptions(OptionBlock):
     pass
 
 

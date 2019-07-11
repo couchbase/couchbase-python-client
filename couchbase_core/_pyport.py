@@ -50,3 +50,5 @@ else:
     def single_dict_key(d):
         for k in d.keys():
             return k
+
+ANY_STR = (basestring, str)

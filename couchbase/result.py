@@ -5,11 +5,8 @@ from couchbase_core._libcouchbase import Result as SDK2Result
 from couchbase_core.result import MultiResult, SubdocResult
 from typing import *
 from boltons.funcutils import wraps
+from couchbase_core import abstractmethod
 
-try:
-    from abc import abstractmethod
-except:
-    pass
 
 Proxy_T = TypeVar('Proxy_T')
 

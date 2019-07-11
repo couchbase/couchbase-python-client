@@ -1,4 +1,4 @@
-from abc import abstractmethod
+from couchbase_core import abstractmethod
 
 import wrapt
 from boltons.funcutils import wraps

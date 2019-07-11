@@ -17,6 +17,10 @@
 import enum
 import warnings
 from collections import defaultdict
+try:
+    from abc import abstractmethod
+except:
+    import abstractmethod
 
 # Pythons > (2.7||3.2) silence deprecation warnings by default.
 # Many folks are not happy about this, as it avoids letting them
@@ -31,7 +35,8 @@ warnings.filterwarnings(action='default',
 
 import couchbase_core._libcouchbase as _LCB
 
-from typing import Callable, Any, Union, NewType, Mapping, List
+from typing import Callable, Any, Union, NewType, Mapping, List, Type, TypeVar
+
 JSON = Union[str, int, float, bool, None, Mapping[str, 'JSON'], List['JSON']]
 
 try:
@@ -171,6 +176,35 @@ class CompatibilityEnum(enum.Enum):
 
     def __int__(self):
         return self.value
+
+
+T = TypeVar('T', bound=JSON)
+
+
+class JSONMapping(object):
+    def __init__(self,  # type: JSONMapping
+                 raw_json  # type: JSON
+                 ):
+        self._raw_json = raw_json
+
+    @staticmethod
+    def _genprop(dictkey,
+                 type  # type: Type[T]
+                 ):
+        # type->
+        def fget(self):
+            return self._raw_json.get(dictkey, None)
+
+        def fset(self, val):
+            self._raw_json[dictkey] = val
+
+        def fdel(self):
+            try:
+                del self._raw_json[dictkey]
+            except KeyError:
+                pass
+
+        return property(fget, fset, fdel)
 
 
 def recursive_reload(module, paths=None, mdict=None):
