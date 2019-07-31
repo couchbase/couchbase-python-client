@@ -64,11 +64,18 @@ pycbc_common_vars_wait, struct pycbc_common_vars *cv, pycbc_Bucket *self)
     }
     pycbc_oputil_wait_common(self, context);
 
-    if (!pycbc_assert(self->nremaining == 0)) {
+    if (self->nremaining || self->check_type == PYCBC_CHECK_FAIL) {
         fprintf(stderr,
                 "Remaining count %d!= 0. Adjusting",
                 (int)self->nremaining);
         self->nremaining = 0;
+        if (self->check_type != PYCBC_CHECK_NONE) {
+            cv->ret = NULL;
+            PYCBC_EXC_WRAP(PYCBC_EXC_INTERNAL,
+                           0,
+                           "self->nremaining!=0, resetting to 0");
+            goto FAIL;
+        }
     }
 
     if (pycbc_multiresult_maybe_raise(cv->mres)) {
@@ -76,6 +83,7 @@ pycbc_common_vars_wait, struct pycbc_common_vars *cv, pycbc_Bucket *self)
     }
 
     cv->ret = pycbc_multiresult_get_result(cv->mres);
+FAIL:
     Py_DECREF(cv->mres);
     cv->mres = NULL;
 

@@ -617,6 +617,11 @@ static struct PyMemberDef Bucket_TABLE_members[] = {
                 "This attribute can only be set from the constructor.\n")
         },
 
+        { "check_type", T_UINT, offsetof(pycbc_Bucket, check_type),
+                0,
+                PyDoc_STR("What sort of nremaining consistency check to do after a wait.")
+        },
+
         { "bucket", T_OBJECT_EX, offsetof(pycbc_Bucket, bucket),
                 READONLY,
                 PyDoc_STR("Name of the bucket this object is connected to")
@@ -859,13 +864,13 @@ Bucket__init__(pycbc_Bucket *self,
     PyObject *dfl_fmt = NULL;
     PyObject *tc = NULL;
     struct lcb_create_st create_opts = { 0 };
-
+    self->check_type = PYCBC_CHECK_STRICT;
     /**
      * This xmacro enumerates the constructor keywords, targets, and types.
      * This was converted into an xmacro to ease the process of adding or
      * removing various parameters.
      */
-#define XCTOR_ARGS_NOTRACING(X)                                      \
+#define XCTOR_ARGS_NOTRACING(X)                            \
     X("connection_string", &create_opts.v.v3.connstr, "z") \
     X("connstr", &create_opts.v.v3.connstr, "z")           \
     X("username", &create_opts.v.v3.username, "z")         \
@@ -878,7 +883,7 @@ Bucket__init__(pycbc_Bucket *self,
     X("_flags", &self->flags, "I")                         \
     X("_conntype", &conntype, "i")                         \
     X("_iops", &iops_O, "O")                               \
-
+    X("_check_inconsistent", &self->check_type, "I")
 #ifdef PYCBC_TRACING
 #define XCTOR_ARGS(X)\
     XCTOR_ARGS_NOTRACING(X)\

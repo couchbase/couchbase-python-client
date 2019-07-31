@@ -29,7 +29,7 @@ except ImportError:
 
 from couchbase.tests.base import ConnectionTestCaseBase
 from couchbase.user_constants import FMT_JSON, FMT_AUTO, FMT_JSON, FMT_PICKLE
-from couchbase.exceptions import ClientTemporaryFailError
+from couchbase.exceptions import ClientTemporaryFailError, InternalSDKError
 from couchbase.exceptions import CouchbaseError
 import couchbase
 import re
@@ -37,6 +37,7 @@ import couchbase._libcouchbase as _LCB
 from couchbase import enable_logging
 from couchbase import COMPRESS_INOUT
 import logging
+import time
 
 
 class MiscTest(ConnectionTestCaseBase):
@@ -243,3 +244,25 @@ class MiscTest(ConnectionTestCaseBase):
         import couchbase._libcouchbase as _LCB
         cb = self.make_connection()
         cb.compression =couchbase.COMPRESS_INOUT
+
+    def test_consistency_check_pyexception(self):
+        items = {str(k): str(v) for k, v in zip(range(0, 100), range(0, 100))}
+        self.cb.upsert_multi(items)
+        self.cb.get_multi(items.keys())
+        self.cb.check_type = _LCB.PYCBC_CHECK_FAIL
+
+        for x in range(0, 10):
+            init_time = time.time()
+            exception = None
+            while (time.time() - init_time) < 10:
+                try:
+                    self.cb.get_multi(items.keys())
+                except Exception as e:
+                    exception = e
+                    break
+
+            def raiser():
+                raise exception
+
+            self.assertRaisesRegex(InternalSDKError, r'self->nremaining!=0, resetting to 0', raiser)
+
