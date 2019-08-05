@@ -223,19 +223,59 @@ class MiscTest(ConnectionTestCaseBase):
         self.assertRaises(ValueError, cb.add_bucket_creds, 'bkt', '')
 
     def test_compression(self):
-        import couchbase_core._libcouchbase as _LCB
+        import couchbase._libcouchbase as _LCB
         items = list(_LCB.COMPRESSION.items())
-        for entry in range(0, len(items)*2):
+        for entry in range(0, len(items) * 2):
             connstr, cntl = items[entry % len(items)]
             print(connstr + "," + str(cntl))
-            cb = self.make_connection(compression=connstr)
-            self.assertEqual(cb.compression, cntl)
-            value = "world" + str(entry)
-            cb.upsert("hello", value)
-            cb.compression = items[(entry + 1) % len(items)][1]
-            self.assertEqual(value, cb.get("hello").value)
-            cb.remove("hello")
+            sends_compressed = self.send_compressed(entry)
+            for min_size in [0, 31, 32] if sends_compressed else [None]:
+                for min_ratio in [0, 0.5] if sends_compressed else [None]:
+                    def set_comp():
+                        cb.compression_min_size = min_size
+
+                    cb = self.make_connection(compression=connstr)
+                    if min_size:
+                        if min_size < 32:
+                            self.assertRaises(CouchbaseInputError, set_comp)
+                        else:
+                            set_comp()
+
+                    if min_ratio:
+                        cb.compression_min_ratio = min_ratio
+                    self.assertEqual(cb.compression, cntl)
+                    value = "world" + str(entry)
+                    cb.upsert("hello", value)
+                    cb.compression = items[(entry + 1) % len(items)][1]
+                    self.assertEqual(value, cb.get("hello").value)
+                    cb.remove("hello")
+
+    @staticmethod
+    def send_compressed(entry):
+        return entry in map(_LCB.__getattribute__, ('COMPRESS_FORCE', 'COMPRESS_INOUT', 'COMPRESS_OUT'))
 
     def test_compression_named(self):
         cb = self.make_connection()
         cb.compression =couchbase_v2.COMPRESS_INOUT
+
+    def test_consistency_check_pyexception(self):
+        items = {str(k): str(v) for k, v in zip(range(0, 100), range(0, 100))}
+        self.cb.upsert_multi(items)
+        self.cb.get_multi(items.keys())
+        self.cb.check_type = _LCB.PYCBC_CHECK_FAIL
+
+        for x in range(0, 10):
+            init_time = time.time()
+            exception = None
+            while (time.time() - init_time) < 10:
+                try:
+                    self.cb.get_multi(items.keys())
+                except Exception as e:
+                    exception = e
+                    break
+
+            def raiser():
+                raise exception
+
+            self.assertRaisesRegex(InternalSDKError, r'self->nremaining!=0, resetting to 0', raiser)
+

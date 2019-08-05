@@ -535,6 +535,10 @@ Attributes
 
     .. autoattribute:: compression
 
+    .. autoattribute:: compression_min_size
+
+    .. autoattribute:: compression_min_ratio
+
     .. attribute:: default_format
 
         Specify the default format (default: :const:`~couchbase.FMT_JSON`)
