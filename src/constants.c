@@ -247,6 +247,8 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
     ADD_CONSTANT("PYCBC_TRACING",0);
 #endif
     setup_compression_map(module, public_constants, handler);
+    ADD_MACRO(LCB_CNTL_COMPRESSION_MIN_SIZE);
+    ADD_MACRO(LCB_CNTL_COMPRESSION_MIN_RATIO);
     setup_crypto_exceptions(module, handler);
     PyModule_AddObject(
             module, "CRYPTO_EXCEPTIONS", pycbc_gen_crypto_exception_map());

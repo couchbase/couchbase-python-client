@@ -29,7 +29,7 @@ except ImportError:
 
 from couchbase.tests.base import ConnectionTestCaseBase
 from couchbase.user_constants import FMT_JSON, FMT_AUTO, FMT_JSON, FMT_PICKLE
-from couchbase.exceptions import ClientTemporaryFailError, InternalSDKError
+from couchbase.exceptions import ClientTemporaryFailError, InternalSDKError, ArgumentError, CouchbaseInputError
 from couchbase.exceptions import CouchbaseError
 import couchbase
 import re
@@ -229,16 +229,34 @@ class MiscTest(ConnectionTestCaseBase):
     def test_compression(self):
         import couchbase._libcouchbase as _LCB
         items = list(_LCB.COMPRESSION.items())
-        for entry in range(0, len(items)*2):
+        for entry in range(0, len(items) * 2):
             connstr, cntl = items[entry % len(items)]
             print(connstr + "," + str(cntl))
-            cb = self.make_connection(compression=connstr)
-            self.assertEqual(cb.compression, cntl)
-            value = "world" + str(entry)
-            cb.upsert("hello", value)
-            cb.compression = items[(entry + 1) % len(items)][1]
-            self.assertEqual(value, cb.get("hello").value)
-            cb.remove("hello")
+            sends_compressed = self.send_compressed(entry)
+            for min_size in [0, 31, 32] if sends_compressed else [None]:
+                for min_ratio in [0, 0.5] if sends_compressed else [None]:
+                    def set_comp():
+                        cb.compression_min_size = min_size
+
+                    cb = self.make_connection(compression=connstr)
+                    if min_size:
+                        if min_size < 32:
+                            self.assertRaises(CouchbaseInputError, set_comp)
+                        else:
+                            set_comp()
+
+                    if min_ratio:
+                        cb.compression_min_ratio = min_ratio
+                    self.assertEqual(cb.compression, cntl)
+                    value = "world" + str(entry)
+                    cb.upsert("hello", value)
+                    cb.compression = items[(entry + 1) % len(items)][1]
+                    self.assertEqual(value, cb.get("hello").value)
+                    cb.remove("hello")
+
+    @staticmethod
+    def send_compressed(entry):
+        return entry in map(_LCB.__getattribute__, ('COMPRESS_FORCE', 'COMPRESS_INOUT', 'COMPRESS_OUT'))
 
     def test_compression_named(self):
         import couchbase._libcouchbase as _LCB

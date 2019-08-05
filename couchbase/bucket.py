@@ -1737,6 +1737,32 @@ class Bucket(_Base):
         self._cntl(_LCB.LCB_CNTL_COMPRESSION_OPTS, value_type='int', value=value)
 
     @property
+    def compression_min_size(self):
+        """
+        Minimum size (in bytes) of the document payload to be compressed when compression enabled.
+
+        :type: int
+        """
+        return self._cntl(_LCB.LCB_CNTL_COMPRESSION_MIN_SIZE, value_type='uint32_t')
+
+    @compression_min_size.setter
+    def compression_min_size(self, value):
+        self._cntl(_LCB.LCB_CNTL_COMPRESSION_MIN_SIZE, value_type='uint32_t', value=value)
+
+    @property
+    def compression_min_ratio(self):
+        """
+        Minimum compression ratio (compressed / original) of the compressed payload to allow sending it to cluster.
+
+        :type: float
+        """
+        return self._cntl(_LCB.LCB_CNTL_COMPRESSION_MIN_RATIO, value_type='float')
+
+    @compression_min_ratio.setter
+    def compression_min_ratio(self, value):
+        self._cntl(_LCB.LCB_CNTL_COMPRESSION_MIN_RATIO, value_type='float', value=value)
+
+    @property
     def is_ssl(self):
         """
         Read-only boolean property indicating whether SSL is used for
