@@ -155,6 +155,8 @@ You can also use views
 Twisted API
 ~~~~~~~~~~~
 
+*NOTE: this API is from SDK2 and is currently only supports SDK2-style
+access. It will be updated to support SDK3 shortly.*
 
 The Python client now has support for the Twisted async network framework.
 To use with Twisted, simply import ``txcouchbase.connection`` instead of
@@ -209,9 +211,6 @@ implementation is significantly different.
 Asynchronous (Tulip) API
 ------------------------
 
-*NOTE: this API is from SDK2 and is currently only supports SDK2-style
-access. It will be updated to support SDK3 shortly.*
-
 This module also supports Python 3.4/3.5 asynchronous I/O. To use this
 functionality, import the `couchbase.experimental` module (since this
 functionality is considered experimental) and then import the `acouchbase`
@@ -229,9 +228,10 @@ client:
 
     async def write_and_read(key, value):
         cb = Bucket('couchbase://10.0.0.31/default')
-        await cb.connect()
-        await cb.upsert(key, value)
-        return await cb.get(key)
+        cb_coll = cb.default_collection()
+        await cb_coll.connect()
+        await cb_coll.upsert(key, value)
+        return await cb_coll.get(key)
 
     loop = asyncio.get_event_loop()
     rv = loop.run_until_complete(write_and_read('foo', 'bar'))

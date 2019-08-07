@@ -13,7 +13,7 @@ basictracer==2.2.0
 zipkin==0.1.0
 pyparsing==2.2.0
 configparser2
-parameterized==0.6.1
+parameterized==0.7.0
 utilspie==0.1.0
 python-vagrant>=0.5.15
 pytest

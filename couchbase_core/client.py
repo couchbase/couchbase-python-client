@@ -3,6 +3,7 @@ from warnings import warn
 
 from couchbase_core._libcouchbase import Bucket as _Base
 
+from couchbase_core.subdocument import Spec
 import couchbase_core.exceptions as E
 from couchbase_core.analytics import AnalyticsQuery
 from couchbase_core.exceptions import NotImplementedInV3
@@ -18,7 +19,14 @@ from .durability import Durability
 from .result import Result
 
 
+
 class Client(_Base):
+    _MEMCACHED_NOMULTI = ('stats', 'lookup_in', 'mutate_in')
+    _MEMCACHED_OPERATIONS = ('upsert', 'get', 'insert', 'append', 'prepend',
+                             'replace', 'remove', 'counter', 'touch',
+                             'lock', 'unlock', 'stats',
+                             'lookup_in', 'mutate_in')
+
     def __init__(self, *args, **kwargs):
         """Connect to a bucket.
 
@@ -93,7 +101,7 @@ class Client(_Base):
 
         Initialize bucket using default options::
 
-            from couchbase_core.bucket import Client
+            from couchbase_core.client import Client
             cb = Client('couchbase:///mybucket')
 
         Connect to protected bucket::
@@ -617,7 +625,7 @@ class Client(_Base):
     def tracing_threshold_analytics(self, val):
         self._cntl(op=_LCB.TRACING_THRESHOLD_ANALYTICS, value=val, value_type="timeout")
 
-    def mutate_in(self, key, *specs, **kwargs):
+    def mutate_in(self, key, specs, **kwargs):
         """Perform multiple atomic modifications within a document.
 
         :param key: The key of the document to modify
@@ -665,9 +673,9 @@ class Client(_Base):
                     raise E.NotSupportedError("Subdoc upsert + fulldoc insert Not supported in SDK 3 yet")
 
         kwargs['_sd_doc_flags'] = sdflags
-        return super(Client, self).mutate_in(key, specs, **kwargs)
+        return super(Client, self).mutate_in(key, tuple(specs), **kwargs)
 
-    def lookup_in(self, key, *specs, **kwargs):
+    def lookup_in(self, key, specs, **kwargs):
         """Atomically retrieve one or more paths from a document.
 
         :param key: The key of the document to lookup
@@ -690,7 +698,10 @@ class Client(_Base):
 
         .. seealso:: :meth:`retrieve_in` which acts as a convenience wrapper
         """
-        return super(Client, self).lookup_in({key: specs}, **kwargs)
+        return super(Client, self).lookup_in({key: tuple(specs)}, **kwargs)
+
+    def get(self, *args, **kwargs):
+        return super(Client, self).get(*args,**kwargs)
 
     def rget(self, key, replica_index=None, quiet=None):
         """Get an item from a replica node
@@ -962,7 +973,7 @@ class Client(_Base):
             which will be used for _all_ the keys.
         :param int persist_to: Durability constraint for persistence.
             Note that it is more efficient to use :meth:`endure_multi`
-            on the returned :class:`~couchbase.result.MultiResult` than
+            on the returned :class:`~couchbase_core.result.MultiResult` than
             using these parameters for a high volume of keys. Using
             these parameters however does save on latency as the
             constraint checking for each item is performed as soon as it
@@ -1024,7 +1035,7 @@ class Client(_Base):
             which will be used for _all_ the keys.
         :param int persist_to: Durability constraint for persistence.
             Note that it is more efficient to use :meth:`endure_multi`
-            on the returned :class:`~couchbase_v2.result.MultiResult` than
+            on the returned :class:`~couchbase_core.result.MultiResult` than
             using these parameters for a high volume of keys. Using
             these parameters however does save on latency as the
             constraint checking for each item is performed as soon as it
@@ -1194,9 +1205,9 @@ class Client(_Base):
 
         The type of keys may be one of the following:
             * Sequence of keys
-            * A :class:`~couchbase_v2.result.MultiResult` object
+            * A :class:`~couchbase_core.result.MultiResult` object
             * A ``dict`` with CAS values as the dictionary value
-            * A sequence of :class:`~couchbase_v2.result.Result` objects
+            * A sequence of :class:`~couchbase_core.result.Result` objects
 
         :return: A :class:`~.MultiResult` object
             of :class:`~.OperationResult` items.
@@ -1277,6 +1288,30 @@ class Client(_Base):
         """
         return _Base.counter_multi(self, kvs, initial=initial, delta=delta,
                                    ttl=ttl, durability_level=durability_level)
+
+    @classmethod
+    def _gen_memd_wrappers(cls, factory):
+        """Generates wrappers for all the memcached operations.
+        :param factory: A function to be called to return the wrapped
+            method. It will be called with two arguments; the first is
+            the unbound method being wrapped, and the second is the name
+            of such a method.
+
+          The factory shall return a new unbound method
+
+        :return: A dictionary of names mapping the API calls to the
+            wrapped functions
+        """
+        d = {}
+        for n in cls._MEMCACHED_OPERATIONS:
+            for variant in (n, n + "_multi"):
+                try:
+                    d[variant] = factory(getattr(cls, variant), variant)
+                except AttributeError:
+                    if n in cls._MEMCACHED_NOMULTI:
+                        continue
+                    raise
+        return d
 
 
 def _depr(fn, usage, stacklevel=3):

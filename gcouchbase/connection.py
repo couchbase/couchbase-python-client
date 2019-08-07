@@ -1,5 +1,5 @@
 from gcouchbase.bucket import Bucket
-from couchbase_core.bucket import _depr
+from couchbase_core.client import _depr
 from couchbase_core.connstr import convert_1x_args
 
 class GConnection(Bucket):

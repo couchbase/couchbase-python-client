@@ -6,7 +6,7 @@ from couchbase_core.fulltext import Query, Facet, Params
 from .analytics import AnalyticsResult
 from .n1ql import QueryResult, IQueryResult
 from .options import OptionBlock, forward_args, OptionBlockDeriv
-from .bucket import BucketOptions, Bucket, CoreBucket
+from .bucket import BucketOptions, Bucket, CoreClient
 from couchbase_core.cluster import Cluster as SDK2Cluster, Authenticator as SDK2Authenticator
 from .exceptions import SearchException, DiagnosticsException, QueryException, ArgumentError, AnalyticsException
 import couchbase_core._libcouchbase as _LCB
@@ -72,7 +72,7 @@ class QueryOptions(OptionBlock, IQueryResult):
 
 
 class Cluster:
-    clusterbucket = None  # type: CoreBucket
+    clusterbucket = None  # type: CoreClient
 
     class ClusterOptions(OptionBlock):
         def __init__(self,
@@ -106,7 +106,7 @@ class Cluster:
         authenticator=cluster_opts.pop('authenticator',None)
         if not authenticator:
             raise ArgumentError("Authenticator is mandatory")
-        cluster_opts.update(bucket_class=lambda connstr, bname=None, **kwargs: Bucket(connstr,bname, BucketOptions(**kwargs)))
+        cluster_opts.update(bucket_class=lambda connstr, bname=None, **kwargs: Bucket(connstr,name=bname,**kwargs))
         self._cluster = SDK2Cluster(connection_string, **cluster_opts)  # type: SDK2Cluster
         self._authenticate(authenticator)
 
@@ -118,7 +118,7 @@ class Cluster:
         self._cluster.authenticate(authenticator, username, password)
         credentials=authenticator.get_credentials()
         clusteropts=credentials.get('options',{})
-        self.clusterbucket=CoreBucket(str(self.connstr),_conntype=_LCB.LCB_TYPE_CLUSTER, **clusteropts)
+        self.clusterbucket=CoreClient(str(self.connstr),_conntype=_LCB.LCB_TYPE_CLUSTER, **clusteropts)
 
 
     def bucket(self,
@@ -167,7 +167,7 @@ class Cluster:
             if the query failed on the server.
 
         """
-        return QueryResult(self._operate_on_cluster(CoreBucket.query, QueryException, statement, **(forward_args(kwargs, *options))))
+        return QueryResult(self._operate_on_cluster(CoreClient.query, QueryException, statement, **(forward_args(kwargs, *options))))
 
     def _operate_on_cluster(self, verb, failtype, *args, **kwargs):
         try:
@@ -190,7 +190,7 @@ class Cluster:
         :except ServiceNotFoundException - service does not exist or cannot be located.
         """
 
-        return AnalyticsResult(self._operate_on_cluster(CoreBucket.analytics_query, AnalyticsException, statement, **forward_args(kwargs,*options)))
+        return AnalyticsResult(self._operate_on_cluster(CoreClient.analytics_query, AnalyticsException, statement, **forward_args(kwargs,*options)))
 
     @overload
     def search_query(self,
@@ -224,7 +224,7 @@ class Cluster:
         :except    ServiceNotFoundException - service does not exist or cannot be located.
 
         """
-        return SearchResult(self._operate_on_cluster(CoreBucket.search, SearchException, index, query, **forward_args(kwargs, *options)))
+        return SearchResult(self._operate_on_cluster(CoreClient.search, SearchException, index, query, **forward_args(kwargs, *options)))
 
     _root_diag_data = {'id', 'version', 'sdk'}
 
@@ -242,7 +242,7 @@ class Cluster:
 
         pool = ThreadPool(processes=1)
         diag_results_async_result = pool.apply_async(self._operate_on_cluster,
-                                                     (CoreBucket.diagnostics, DiagnosticsException))
+                                                     (CoreClient.diagnostics, DiagnosticsException))
         try:
             diag_results = diag_results_async_result.get(timeout)
         except multiprocessing.TimeoutError as e:

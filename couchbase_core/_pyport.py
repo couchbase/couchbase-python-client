@@ -52,3 +52,8 @@ else:
             return k
 
 ANY_STR = (basestring, str)
+
+try:
+    from six import with_metaclass
+except:
+    from future.utils import with_metaclass

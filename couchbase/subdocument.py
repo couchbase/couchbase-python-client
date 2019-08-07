@@ -13,7 +13,9 @@ def GetSpec():
     # type: ()-> SDType
     return SD
 
+
 LookupInSpec=Iterable[Spec]
+MutateInSpec = Iterable[Spec]
 
 
 # noinspection PyPep8Naming
@@ -79,28 +81,7 @@ def gen_projection_spec(project):
     return map(SD.get, project)
 
 
-class SubdocSpecItem(object):
-    def __init__(self,
-                 path,  # type: str
-                 xattr=None,
-                 **kwargs):
-        self.kwargs = kwargs
-        self.xattr = xattr
-        self.path = path
-
-    @abstractmethod
-    def _as_spec(self):
-        pass
-
-
-SubdocSpec = Iterable[SubdocSpecItem]
-
-
 class MutateInOptions(OptionBlockTimeOut):
     def __init__(self, *args, **kwargs):
         super(MutateInOptions, self).__init__(*args, **kwargs)
-
-
-MutateInSpec = Iterable[Spec]
-
 

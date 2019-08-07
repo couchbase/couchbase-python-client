@@ -1,4 +1,4 @@
-from couchbase_core.client import Client as CoreBucket
+from couchbase_core.client import Client as CoreClient
 from .collection import CBCollection, CollectionOptions
 from .options import OptionBlock, forward_args
 from .result import *
@@ -14,7 +14,7 @@ class ViewOptions(OptionBlock):
 
 
 class Bucket(object):
-    _bucket = None  # type: CoreBucket
+    _bucket = None  # type: CoreClient
 
     @overload
     def __init__(self,
@@ -28,6 +28,7 @@ class Bucket(object):
     def __init__(self,
                  connection_string,  # type: str
                  name=None,
+                 corebucket_class=CBCollection,  # type: Type[CoreClient]
                  *options,
                  **kwargs
                 ):
@@ -109,7 +110,11 @@ class Bucket(object):
 
         """
         self._name = name
-        self._bucket = CoreBucket(connection_string, **forward_args(kwargs, *options))
+        self._connstr=connection_string
+        self._bucket_args=forward_args(kwargs, *options)
+        self._corebucket_class=corebucket_class
+
+        self._bucket = CoreClient(connection_string, **self._bucket_args)
 
     @property
     def name(self):
@@ -159,7 +164,7 @@ class Bucket(object):
         :param view_options:
         :return: IViewResult containing the view results
         """
-        cb = self._bucket  # type: CoreBucket
+        cb = self._bucket  # type: CoreClient
         res = cb.query(design_doc, view_name, **forward_args(None, *view_options))
         return IViewResult(res)
 

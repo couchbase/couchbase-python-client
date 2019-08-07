@@ -20,7 +20,7 @@ import couchbase_core._libcouchbase as _LCB
 from couchbase_core._libcouchbase import Bucket as _Base
 
 import couchbase_v2
-from couchbase_core.client import Client as CoreBucket, _depr
+from couchbase_core.client import Client as CoreClient, _depr
 from couchbase_v2.exceptions_shim import *
 from couchbase_core.result import *
 from couchbase_core.bucketmanager import BucketManager
@@ -109,7 +109,9 @@ def _dsop(create_type=None, wrap_missing_path=True):
     return real_decorator
 
 
-class Bucket(CoreBucket):
+class Bucket(CoreClient):
+    _MEMCACHED_OPERATIONS = CoreClient._MEMCACHED_OPERATIONS+('endure',
+                                                   'observe', 'rget', 'set', 'add', 'delete')
 
     def pipeline(self):
         """
@@ -653,6 +655,64 @@ class Bucket(CoreBucket):
         """
         return _Base.counter(self, key, delta=delta, initial=initial, ttl=ttl)
 
+    def lookup_in(self, key, *specs, **kwargs):
+        """Atomically retrieve one or more paths from a document.
+
+        :param key: The key of the document to lookup
+        :param spec: A list of specs (see :mod:`.couchbase_core.subdocument`)
+        :return: A :class:`.couchbase_core.result.SubdocResult` object.
+            This object contains the results and any errors of the
+            operation.
+
+        Example::
+
+            import couchbase_core.subdocument as SD
+            rv = cb.lookup_in('user',
+                              SD.get('email'),
+                              SD.get('name'),
+                              SD.exists('friends.therock'))
+
+            email = rv[0]
+            name = rv[1]
+            friend_exists = rv.exists(2)
+
+        .. seealso:: :meth:`retrieve_in` which acts as a convenience wrapper
+        """
+        return super(Bucket, self).lookup_in(key,specs,**kwargs)
+
+    def mutate_in(self, key, *specs, **kwargs):
+        """Perform multiple atomic modifications within a document.
+
+        :param key: The key of the document to modify
+        :param specs: A list of specs (See :mod:`.couchbase_core.subdocument`)
+        :param bool create_doc:
+            Whether the document should be create if it doesn't exist
+        :param bool insert_doc: If the document should be created anew, and the
+            operations performed *only* if it does not exist.
+        :param bool upsert_doc: If the document should be created anew if it
+            does not exist. If it does exist the commands are still executed.
+        :param kwargs: CAS, etc.
+        :return: A :class:`~.couchbase_core.result.SubdocResult` object.
+
+        Here's an example of adding a new tag to a "user" document
+        and incrementing a modification counter::
+
+            import couchbase_core.subdocument as SD
+            # ....
+            cb.mutate_in('user',
+                         SD.array_addunique('tags', 'dog'),
+                         SD.counter('updates', 1))
+
+        .. note::
+
+            The `insert_doc` and `upsert_doc` options are mutually exclusive.
+            Use `insert_doc` when you wish to create a new document with
+            extended attributes (xattrs).
+
+        .. seealso:: :mod:`.couchbase_core.subdocument`
+        """
+        return super(Bucket, self).mutate_in(key, specs, **kwargs)
+
     def retrieve_in(self, key, *paths, **kwargs):
         """Atomically fetch one or more paths from a document.
 
@@ -866,8 +926,8 @@ class Bucket(CoreBucket):
         """
         return BucketManager(self)
 
-    n1ql_query = CoreBucket.query
-    query = CoreBucket.view_query
+    n1ql_query = CoreClient.query
+    query = CoreClient.view_query
 
     def _analytics_query(self, query, _, *args, **kwargs):
         # we used to take the CBAS host as the second parameter, but
@@ -938,37 +998,6 @@ class Bucket(CoreBucket):
     Lists the names of all the memcached operations. This is useful
     for classes which want to wrap all the methods
     """
-    _MEMCACHED_OPERATIONS = ('upsert', 'get', 'insert', 'append', 'prepend',
-                             'replace', 'remove', 'counter', 'touch',
-                             'lock', 'unlock', 'endure',
-                             'observe', 'rget', 'stats',
-                             'set', 'add', 'delete', 'lookup_in', 'mutate_in')
-
-    _MEMCACHED_NOMULTI = ('stats', 'lookup_in', 'mutate_in')
-
-    @classmethod
-    def _gen_memd_wrappers(cls, factory):
-        """Generates wrappers for all the memcached operations.
-        :param factory: A function to be called to return the wrapped
-            method. It will be called with two arguments; the first is
-            the unbound method being wrapped, and the second is the name
-            of such a method.
-
-          The factory shall return a new unbound method
-
-        :return: A dictionary of names mapping the API calls to the
-            wrapped functions
-        """
-        d = {}
-        for n in cls._MEMCACHED_OPERATIONS:
-            for variant in (n, n + "_multi"):
-                try:
-                    d[variant] = factory(getattr(cls, variant), variant)
-                except AttributeError:
-                    if n in cls._MEMCACHED_NOMULTI:
-                        continue
-                    raise
-        return d
 
     def design_get(self, *args, **kwargs):
         _depr('design_get', 'bucket_manager().design_get')

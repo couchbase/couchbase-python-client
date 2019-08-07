@@ -2,14 +2,14 @@
 def gen_role(real_role, real_name,  new_prefix):
     def myrole(rtype, rawtext, text, lineno, inliner, options={}, content={}):
 
-        # new_prefix=couchbase_core.bucket
+        # new_prefix=couchbase_core.client
         # text=upsert
         # rtype=cb_bmeth
 
-        # e.g couchbase_core.bucket.upsert
+        # e.g couchbase_core.client.upsert
         new_text = '{0}.{1}'.format(new_prefix, text)
 
-        # e.g. :meth:`couchbase_core.bucket.upsert
+        # e.g. :meth:`couchbase_core.client.upsert
         new_rawtext = ':{0}:`{1}`'.format(real_name, new_text)
 
         # e.g. py:meth

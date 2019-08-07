@@ -1,1 +1,1 @@
-from couchbase_core.asynchronous.bucket import AsyncBucket
+from couchbase_core.asynchronous.bucket import AsyncClientFactory

@@ -25,7 +25,7 @@ from time import time
 
 from couchbase_core.user_constants import FMT_BYTES
 from couchbase_core.experimental import enable; enable()
-from acouchbase.bucket import Bucket
+from acouchbase.bucket import V2Bucket
 
 ap = argparse.ArgumentParser()
 
@@ -62,10 +62,10 @@ def make_instance():
     global GLOBAL_INSTANCE
     if options.global_instance:
         if not GLOBAL_INSTANCE:
-            GLOBAL_INSTANCE = Bucket(**CONN_OPTIONS)
+            GLOBAL_INSTANCE = V2Bucket(**CONN_OPTIONS)
         return GLOBAL_INSTANCE
     else:
-        return Bucket(**CONN_OPTIONS)
+        return V2Bucket(**CONN_OPTIONS)
 
 
 class Worker(object):
