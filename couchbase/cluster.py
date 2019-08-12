@@ -76,7 +76,8 @@ class Cluster:
 
     class ClusterOptions(OptionBlock):
         def __init__(self,
-                     authenticator  # type: SDK2Authenticator
+                     authenticator,  # type: SDK2Authenticator
+                     **kwargs
                      ):
             super(ClusterOptions, self).__init__()
             self['authenticator'] = authenticator
@@ -93,6 +94,13 @@ class Cluster:
                  *options,  # type: ClusterOptions
                  **kwargs
                  ):
+        """
+        Create a Cluster object.
+        An Authenticator must be provided either as the first argument or within the options argument.
+        :param connection_string: the connection string for the cluster
+        :param options: options for the cluster
+        :type Cluster.ClusterOptions
+        """
         self.connstr=connection_string
         cluster_opts=forward_args(kwargs, *options)
         authenticator=cluster_opts.pop('authenticator',None)
