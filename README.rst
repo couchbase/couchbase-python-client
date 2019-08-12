@@ -37,6 +37,7 @@ Prerequisites
 - You may need a C compiler and Python development files, unless a
   binary wheel is available for your platform. These are available for
   at least Python 3.7 on Windows, but we will endeavour to add more.
+- Git, if a binary wheel is not available.
 
 ~~~~~~~~
 Building
