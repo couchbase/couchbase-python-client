@@ -140,6 +140,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
             CMDSCOPE_NG_V4(TOUCH, touch)
             {
                 COMMON_OPTS(PYCBC_touch_ATTR, touch, touch);
+                PYCBC_SYNCREP_INIT(err, cmd, touch, cv->durability_level);
                 err = pycbc_touch(collection, cv->mres, cmd);
             }
         } break;
@@ -238,22 +239,24 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
     PyObject *ttl_O = NULL;
     PyObject *replica_O = NULL;
     PyObject *nofmt_O = NULL;
+    pycbc_DURABILITY_LEVEL durability_level = LCB_DURABILITYLEVEL_NONE;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
     struct getcmd_vars_st gv = { 0 };
 #define X(name, target, type) name,
     static char *kwlist[] = {
-            "keys", "ttl", "quiet", "replica", "no_format", NULL};
+            "keys", "ttl", "quiet", "replica", "no_format", "durability_level", NULL};
 #undef X
     pycbc_Collection_t collection = pycbc_Collection_as_value(self, kwargs);
     int rv = PyArg_ParseTupleAndKeywords(args,
                                          kwargs,
-                                         "O|OOOO",
+                                         "O|OOOOI",
                                          kwlist,
                                          &kobj,
                                          &ttl_O,
                                          &is_quiet,
                                          &replica_O,
-                                         &nofmt_O);
+                                         &nofmt_O,
+                                         &durability_level);
 
     if (!rv) {
         if (!PyErr_Occurred()) {
@@ -311,6 +314,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
     }
 
     rv = pycbc_common_vars_init(&cv, self, argopts, ncmds, 0);
+    cv.durability_level = durability_level;
 
     if (rv < 0) {
         return NULL;

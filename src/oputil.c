@@ -902,6 +902,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
         newitm->tracing_context = context;
         newitm->is_tracing_stub = 0;
         PYCBC_DEBUG_LOG_CONTEXT(context, "Calling subdoc on %llx", cmd)
+        lcb_cmdsubdoc_durability(cmd, mres->dur.durability_level);
         (*err) = pycbc_subdoc(collection, mres, cmd);
         PYCBC_DEBUG_LOG_CONTEXT(context,
                                 "Called subdoc on %llx, got err %s",

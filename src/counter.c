@@ -22,6 +22,7 @@ struct arithmetic_common_vars {
     lcb_uint64_t initial;
     unsigned long ttl;
     int create;
+    pycbc_DURABILITY_LEVEL durability_level;
 };
 
 TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
@@ -42,7 +43,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     int rv = 0;
     lcb_STATUS err;
     struct arithmetic_common_vars my_params;
-    static const char *kwlist[] = {"delta", "initial", "ttl", NULL};
+    static const char *kwlist[] = {"delta", "initial", "ttl", "durability_level", NULL};
     pycbc_pybuffer keybuf = { 0 };
     (void)original;
     my_params = *(struct arithmetic_common_vars *)arg;
@@ -63,11 +64,12 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
             PyObject *initial_O = NULL;
             rv = PyArg_ParseTupleAndKeywords(pycbc_DummyTuple,
                                              curvalue,
-                                             "L|Ok",
+                                             "L|OkI",
                                              (char **)kwlist,
                                              &my_params.delta,
                                              &initial_O,
-                                             &my_params.ttl);
+                                             &my_params.ttl,
+                                             &my_params.durability_level);
             if (!rv) {
                 PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ARGUMENTS, 0, "Couldn't parse parameter for key", curkey);
                 rv = -1;
@@ -107,6 +109,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
             lcb_cmdcounter_expiration(cmd, my_params.ttl);
             PYCBC_CMD_SET_KEY_SCOPE(counter, cmd, keybuf);
             PYCBC_TRACECMD_TYPED(counter, cmd, context, cv->mres, curkey, self);
+            PYCBC_SYNCREP_INIT(err,cmd, counter,my_params.durability_level);
             err = pycbc_counter(collection, cv->mres, cmd);
         }
     }
@@ -140,18 +143,19 @@ PyObject *arithmetic_common(pycbc_Collection_t *cb_collection,
     PyObject *sequence;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
 
-    static const char *kwlist[] = {"keys", "delta", "initial", "ttl", NULL};
+    static const char *kwlist[] = {"keys", "delta", "initial", "ttl", "durability_level", NULL};
 
     global_params.delta = 1;
 
     rv = PyArg_ParseTupleAndKeywords(args,
                                      kwargs,
-                                     "O|LOO",
+                                     "O|LOOI",
                                      (char **)kwlist,
                                      &sequence,
                                      &global_params.delta,
                                      &all_initial_O,
-                                     &all_ttl_O);
+                                     &all_ttl_O,
+                                     &global_params.durability_level);
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;

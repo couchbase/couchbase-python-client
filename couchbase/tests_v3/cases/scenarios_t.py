@@ -60,7 +60,7 @@ from couchbase_core.cluster import ClassicAuthenticator
 from couchbase_core.connstr import ConnectionString
 from couchbase.diagnostics import ServiceType
 import couchbase_core.fulltext as FT
-from couchbase.exceptions import KeyNotFoundException, KeyExistsException
+from couchbase.exceptions import KeyNotFoundException, KeyExistsException, NotSupportedError
 
 
 class ClusterTestCase(ConnectionTestCase):
@@ -177,16 +177,35 @@ class Scenarios(CollectionTestCase):
         self.assertIsInstance(result, MutateInResult)
 
     def test_mutatein(self):
-        somecontents={'some':{'path':'keith'}}
-        self.coll.upsert('somekey',somecontents)
-        self.coll.mutate_in('somekey', (
-            SD.replace('some.path', "fred"),
-            SD.insert('some.other.path', 'martha', create_parents=True),
-        ))
 
-        somecontents['some']['path']='fred'
-        somecontents['some'].update({'other':{'path':'martha'}})
-        self.assertEqual(somecontents,self.coll.get('somekey').content)
+        count = 0
+
+        for durability in Durability:
+            somecontents = {'some': {'path': 'keith'}}
+            key="somekey_{}".format(count)
+            try:
+                self.coll.remove(key)
+            except:
+                pass
+            self.coll.insert(key, somecontents)
+            inserted_value = "inserted_{}".format(count)
+            replacement_value = "replacement_{}".format(count)
+            count += 1
+            try:
+                self.coll.mutate_in(key, (
+                    SD.replace('some.path', replacement_value),
+                    SD.insert('some.other.path', inserted_value, create_parents=True),
+                ), durability_level=durability)
+
+
+                somecontents['some']['path'] = replacement_value
+                somecontents['some'].update({'other': {'path': inserted_value}})
+                self.assertEqual(somecontents, self.coll.get(key).content)
+            except NotSupportedError as e:
+                if not self.is_mock:
+                    raise
+                else:
+                    logging.error("Assuming failure is due to mock not supporting durability")
 
     def test_scenario_C_clientSideDurability(self):
         """
@@ -575,26 +594,26 @@ class Scenarios(CollectionTestCase):
                 self.coll.remove_multi(test_dict.keys())
             except:
                 pass
-            mutate_kwargs=dict(durability_level=dur_level)
+            mutate_kwargs = dict(durability_level=dur_level)
             self.assertRaises(KeyNotFoundException, self.coll.get, "Fred")
             self.assertRaises(KeyNotFoundException, self.coll.get, "Barney")
-            self.coll.upsert_multi(test_dict,**mutate_kwargs)
+            self.coll.upsert_multi(test_dict, **mutate_kwargs)
             result = self.coll.get_multi(test_dict.keys())
             self.assertEquals(Scenarios.get_multi_result_as_dict(result), test_dict)
-            self.coll.remove_multi(test_dict.keys(),**mutate_kwargs)
+            self.coll.remove_multi(test_dict.keys(), **mutate_kwargs)
             self.assertRaises(KeyNotFoundException, self.coll.get_multi, test_dict.keys())
-            self.coll.insert_multi(test_dict,**mutate_kwargs)
+            self.coll.insert_multi(test_dict, **mutate_kwargs)
             self.assertRaises(KeyExistsException, self.coll.insert_multi, test_dict)
             result = self.coll.get_multi(test_dict.keys())
             self.assertEquals(Scenarios.get_multi_result_as_dict(result), test_dict)
             self.assertEquals(self.coll.get("Fred").content, "Wilma")
             self.assertEquals(self.coll.get("Barney").content, "Betty")
-            self.coll.remove_multi(test_dict.keys(),**mutate_kwargs)
+            self.coll.remove_multi(test_dict.keys(), **mutate_kwargs)
             self.assertRaises(KeyNotFoundException, self.coll.get_multi, test_dict.keys())
             self.coll.insert_multi(test_dict)
             test_dict_2 = {"Fred": "Cassandra", "Barney": "Raquel"}
             result = self.coll.replace_multi(test_dict_2)
-            expected_result = {k: True for k,v in test_dict_2.items()}
+            expected_result = {k: True for k, v in test_dict_2.items()}
             self.assertEquals(Scenarios.get_multi_mutationresult_as_dict(result), expected_result)
             self.assertEquals(Scenarios.get_multi_result_as_dict(self.coll.get_multi(test_dict_2.keys())),test_dict_2)
 

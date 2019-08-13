@@ -586,6 +586,8 @@ class CBCollection(wrapt.ObjectProxy):
         :param int timeout: The new expiration time. If the expiration time
             is `0` then the key never expires (and any existing
             expiration is removed)
+        :param Durability durability_level: Sync replication durability level.
+
         :return: :class:`.OperationResult`
 
         Update the expiration time of a key ::
@@ -1039,9 +1041,10 @@ class CBCollection(wrapt.ObjectProxy):
     def mutate_in(self,
                   id,  # type: str
                   spec,  # type: MutateInSpec
-                  create_doc = False,  # type: bool
-                  insert_doc = False,  # type: bool
-                  upsert_doc = False  # type: bool
+                  create_doc=False,  # type: bool
+                  insert_doc=False,  # type: bool
+                  upsert_doc=False,  # type: bool
+                  durability_level=Durability.NONE  # type: Durability
                   ):
         # type: (...)->MutationResult
         pass
@@ -1188,7 +1191,8 @@ class CBCollection(wrapt.ObjectProxy):
                   id,  # type: str
                   delta,  # type: DeltaValue
                   initial=None,  # type: SignedInt64
-                  expiration=Seconds(0)  # type: Seconds
+                  expiration=Seconds(0),  # type: Seconds
+                  durability_level=Durability.NONE  # type: Durability
                   ):
         # type: (...)->ResultPrecursor
         pass
@@ -1231,6 +1235,7 @@ class CBCollection(wrapt.ObjectProxy):
         :param SignedInt64 initial: :class:`couchbase.options.SignedInt64` or `None`
         :param Seconds expiration: The lifetime for the key, after which it will
            expire
+        :param Durability durability_level: Sync replication durability level.
 
         :raise: :exc:`.NotFoundError` if the key does not exist on the
            bucket (and `initial` was `None`)
@@ -1263,7 +1268,8 @@ class CBCollection(wrapt.ObjectProxy):
                   id,  # type: str
                   delta,  # type: DeltaValue
                   initial=None,  # type: SignedInt64
-                  expiration=Seconds(0)  # type: Seconds
+                  expiration=Seconds(0),  # type: Seconds
+                  durability_level=Durability.NONE  # type: Durability
                   ):
         # type: (...)->ResultPrecursor
         pass
@@ -1306,6 +1312,7 @@ class CBCollection(wrapt.ObjectProxy):
         :param SignedInt64 initial: :class:`couchbase.options.SignedInt64` or `None`
         :param Seconds expiration: The lifetime for the key, after which it will
            expire
+        :param Durability durability_level: Sync replication durability level.
 
         :raise: :exc:`.NotFoundError` if the key does not exist on the
            bucket (and `initial` was `None`)

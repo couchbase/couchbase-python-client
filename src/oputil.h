@@ -90,6 +90,8 @@ struct pycbc_common_vars {
     char is_seqcmd;
 
     lcb_MULTICMD_CTX *mctx;
+
+    pycbc_DURABILITY_LEVEL durability_level;
 };
 
 #define PYCBC_COMMON_VARS_STATIC_INIT { 0 }
