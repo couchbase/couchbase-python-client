@@ -18,6 +18,7 @@ except ImportError:
 import os
 import sys
 import platform
+import itertools
 
 lcb_min_version = (2, 9, 0)
 
@@ -63,7 +64,7 @@ def handle_build_type_and_gen_deps():
     setup_kw['install_requires'] = general_requires
     setup_kw['cmdclass'] = cmdclass
     setup_kw['package_data'] = pkgdata
-    setup_kw['eager_resources'] = pkgdata
+    setup_kw['eager_resources'] = list(itertools.chain.from_iterable(pkgdata.values()))
     return setup_kw
 
 
