@@ -258,18 +258,13 @@ using the :meth:`couchbase.collection.Collection.get` method
 Multi-Key Data Methods
 ======================
 
-.. warning::
-    The APIs below are from SDK2 and currently only available
-    from the couchbase_v2 legacy support package. We plan
-    to update these to support SDK3 shortly.
-
 These methods tend to be more efficient than their single-key
 equivalents. They return a :class:`couchbase.result.MultiResult` object (which is
 a dict subclass) which contains class:`couchbase.result.Result` objects as the
 values for its keys
 
-.. currentmodule:: couchbase_v2.bucket
-.. class:: Bucket
+.. currentmodule:: couchbase.collection
+.. class:: Collection
 
     .. automethod:: upsert_multi
 
@@ -279,19 +274,20 @@ values for its keys
 
     .. automethod:: replace_multi
 
-    .. automethod:: append_multi
-
-    .. automethod:: prepend_multi
-
-    .. automethod:: remove_multi
-
-    .. automethod:: counter_multi
-
     .. automethod:: lock_multi
 
     .. automethod:: unlock_multi
 
     .. automethod:: touch_multi
+
+    .. automethod:: remove_multi
+
+    .. automethod:: append_multi
+
+    .. automethod:: prepend_multi
+
+    .. automethod:: counter_multi
+
 
 Batch Operation Pipeline
 ========================

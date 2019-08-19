@@ -37,7 +37,8 @@ from couchbase_core.transcodable import Transcodable
 import couchbase_core.connstr
 import couchbase.exceptions
 
-from couchbase import JSONDocument, Durability, DeltaValue, SignedInt64, MutateInResult
+from couchbase import JSONDocument, DeltaValue, SignedInt64, MutateInResult
+from couchbase_core.durability import Durability
 from couchbase.cluster import Cluster, ClusterOptions
 from couchbase import ReplicateTo, PersistTo, FiniteDuration, copy, \
     Seconds, ReplicaNotConfiguredException, DocumentConcurrentlyModifiedException, \
@@ -59,6 +60,7 @@ from couchbase_core.cluster import ClassicAuthenticator
 from couchbase_core.connstr import ConnectionString
 from couchbase.diagnostics import ServiceType
 import couchbase_core.fulltext as FT
+from couchbase.exceptions import KeyNotFoundException, KeyExistsException
 
 
 class ClusterTestCase(ConnectionTestCase):
@@ -558,10 +560,43 @@ class Scenarios(CollectionTestCase):
             self.assertIn(type(value.id()), ANY_STR)
             self.assertIn(type(value.local()), ANY_STR)
 
+    @staticmethod
+    def get_multi_result_as_dict(result):
+        return {k: v.content for k, v in result.items()}
+
+    @staticmethod
+    def get_multi_mutationresult_as_dict(result):
+        return {k: v.success() for k, v in result.items()}
+
     def test_multi(self):
-        self.coll.upsert_multi({"Fred": "Wilma", "Barney": "Betty"})
-        self.assertEquals(self.coll.get("Fred").content, "Wilma")
-        self.assertEquals(self.coll.get("Barney").content, "Betty")
+        test_dict = {"Fred": "Wilma", "Barney": "Betty"}
+        for dur_level in [Durability.NONE] if self.is_mock else Durability:
+            try:
+                self.coll.remove_multi(test_dict.keys())
+            except:
+                pass
+            mutate_kwargs=dict(durability_level=dur_level)
+            self.assertRaises(KeyNotFoundException, self.coll.get, "Fred")
+            self.assertRaises(KeyNotFoundException, self.coll.get, "Barney")
+            self.coll.upsert_multi(test_dict,**mutate_kwargs)
+            result = self.coll.get_multi(test_dict.keys())
+            self.assertEquals(Scenarios.get_multi_result_as_dict(result), test_dict)
+            self.coll.remove_multi(test_dict.keys(),**mutate_kwargs)
+            self.assertRaises(KeyNotFoundException, self.coll.get_multi, test_dict.keys())
+            self.coll.insert_multi(test_dict,**mutate_kwargs)
+            self.assertRaises(KeyExistsException, self.coll.insert_multi, test_dict)
+            result = self.coll.get_multi(test_dict.keys())
+            self.assertEquals(Scenarios.get_multi_result_as_dict(result), test_dict)
+            self.assertEquals(self.coll.get("Fred").content, "Wilma")
+            self.assertEquals(self.coll.get("Barney").content, "Betty")
+            self.coll.remove_multi(test_dict.keys(),**mutate_kwargs)
+            self.assertRaises(KeyNotFoundException, self.coll.get_multi, test_dict.keys())
+            self.coll.insert_multi(test_dict)
+            test_dict_2 = {"Fred": "Cassandra", "Barney": "Raquel"}
+            result = self.coll.replace_multi(test_dict_2)
+            expected_result = {k: True for k,v in test_dict_2.items()}
+            self.assertEquals(Scenarios.get_multi_mutationresult_as_dict(result), expected_result)
+            self.assertEquals(Scenarios.get_multi_result_as_dict(self.coll.get_multi(test_dict_2.keys())),test_dict_2)
 
     def test_PYCBC_607(self  # type: Scenarios
                        ):

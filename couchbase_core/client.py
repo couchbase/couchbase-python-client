@@ -5,6 +5,7 @@ from couchbase_core._libcouchbase import Bucket as _Base
 
 import couchbase_core.exceptions as E
 from couchbase_core.analytics import AnalyticsQuery
+from couchbase_core.exceptions import NotImplementedInV3
 from couchbase_core.n1ql import N1QLQuery, N1QLRequest
 from couchbase_core.views.iterator import View
 from .views.params import make_options_string, make_dvpath
@@ -12,9 +13,16 @@ import couchbase_core._libcouchbase as _LCB
 
 from couchbase_core import priv_constants as _P, fulltext as _FTS
 import couchbase_core.analytics
+from typing import *
+from .durability import Durability
+from .result import Result
 
 
 class Client(_Base):
+    @classmethod
+    def get_doc(cls, item):
+        return getattr(item,'__doc__')
+
     def __init__(self, *args, **kwargs):
         """Connect to a bucket.
 
@@ -929,6 +937,329 @@ class Client(_Base):
         params = kwargs.pop('params', _FTS.Params(**kwargs))
         body = _FTS.make_search_body(index, query, params)
         return itercls(body, self, **iterargs)
+
+    def upsert_multi(self,  # type: Client
+                     keys,  # type: Mapping[str,Any]
+                     ttl=0,  # type: int
+                     format=None,  # type: int
+                     persist_to=0,  # type: int
+                     replicate_to=0,  # type: int
+                     durability_level=Durability.NONE  # type: Durability
+                     ):
+        # type: (...)->Result
+        """
+        Write multiple items to the cluster. Multi version of :meth:`upsert`
+
+        :param dict keys: A dictionary of keys to set. The keys are the
+            keys as they should be on the server, and the values are the
+            values for the keys to be stored.
+
+            `keys` may also be a :class:`~.ItemCollection`. If using a
+            dictionary variant for item collections, an additional
+            `ignore_cas` parameter may be supplied with a boolean value.
+            If not specified, the operation will fail if the CAS value
+            on the server does not match the one specified in the
+            `Item`'s `cas` field.
+        :param int ttl: If specified, sets the expiration value
+            for all keys
+        :param int format: If specified, this is the conversion format
+            which will be used for _all_ the keys.
+        :param int persist_to: Durability constraint for persistence.
+            Note that it is more efficient to use :meth:`endure_multi`
+            on the returned :class:`~couchbase_v2.result.MultiResult` than
+            using these parameters for a high volume of keys. Using
+            these parameters however does save on latency as the
+            constraint checking for each item is performed as soon as it
+            is successfully stored.
+        :param int replicate_to: Durability constraints for replication.
+            See notes on the `persist_to` parameter for usage.
+        :return: A :class:`~.MultiResult` object, which is a
+            `dict`-like object
+
+        The multi methods are more than just a convenience, they also
+        save on network performance by batch-scheduling operations,
+        reducing latencies. This is especially noticeable on smaller
+        value sizes.
+
+        .. seealso:: :meth:`upsert`
+        """
+        return _Base.upsert_multi(self, keys, ttl=ttl, format=format,
+                                  persist_to=persist_to,
+                                  replicate_to=replicate_to,
+                                  durability_level=durability_level)
+
+    def insert_multi(self,  # type: Client
+                     keys,  # type: Mapping[str,Any]
+                     ttl=0,  # type: int
+                     format=None,  # type: int
+                     persist_to=0,  # type: int
+                     replicate_to=0,  # type: int
+                     durability_level=Durability.NONE  # type: Durability
+                     ):
+        # type: (...)->Result
+        """Add multiple keys. Multi variant of :meth:`insert`
+
+        .. seealso:: :meth:`insert`, :meth:`upsert_multi`, :meth:`upsert`
+        """
+        return _Base.insert_multi(self, keys, ttl=ttl, format=format,
+                                  persist_to=persist_to,
+                                  replicate_to=replicate_to,
+                                  durability_level=durability_level)
+
+    def replace_multi(self,  # type: Client
+                      keys,  # type: Mapping[str,Any]
+                      ttl=0,  # type: int
+                      format=None,  # type: int
+                      persist_to=0,  # type: int
+                      replicate_to=0,  # type: int
+                      durability_level=Durability.NONE  # type: Durability
+                      ):
+        # type: (...)->Result
+        """
+        Replace multiple keys. Multi variant of :meth:`replace`
+
+        :param dict keys: replacement entries
+        :param int ttl: If specified, sets the expiration value
+            for all keys
+        :param int format: If specified, this is the conversion format
+            which will be used for _all_ the keys.
+        :param int persist_to: Durability constraint for persistence.
+            Note that it is more efficient to use :meth:`endure_multi`
+            on the returned :class:`~couchbase_v2.result.MultiResult` than
+            using these parameters for a high volume of keys. Using
+            these parameters however does save on latency as the
+            constraint checking for each item is performed as soon as it
+            is successfully stored.
+        :param int replicate_to: Durability constraints for replication.
+            See notes on the `persist_to` parameter for usage.
+        :return:
+
+        .. seealso:: :meth:`replace`, :meth:`upsert_multi`, :meth:`upsert`
+        """
+        return _Base.replace_multi(self, keys, ttl=ttl, format=format,
+                                   persist_to=persist_to,
+                                   replicate_to=replicate_to,
+                                   durability_level=durability_level)
+
+    def append_multi(self,  # type: Client
+                     keys,  # type: Mapping[str,Any]
+                     ttl=0,  # type: int
+                     format=None,  # type: int
+                     persist_to=0,  # type: int
+                     replicate_to=0  # type: int
+                     ):
+        # type: (...)->Result
+        """Append to multiple keys. Multi variant of :meth:`append`.
+
+        .. warning::
+
+            If using the `Item` interface, use the :meth:`append_items`
+            and :meth:`prepend_items` instead, as those will
+            automatically update the :attr:`.Item.value`
+            property upon successful completion.
+
+        .. seealso:: :meth:`append`, :meth:`upsert_multi`, :meth:`upsert`
+        """
+        return _Base.append_multi(self, keys, format=format,
+                                  persist_to=persist_to,
+                                  replicate_to=replicate_to)
+
+    def prepend_multi(self,  # type: Client
+                      keys,  # type: Mapping[str,Any]
+                      ttl=0,  # type: int
+                      format=None,  # type: int
+                      persist_to=0,  # type: int
+                      replicate_to=0  # type: int
+                      ):
+        # type: (...)->Result
+        """Prepend to multiple keys. Multi variant of :meth:`prepend`
+
+        .. seealso:: :meth:`prepend`, :meth:`upsert_multi`, :meth:`upsert`
+        """
+        return _Base.prepend_multi(self, keys, format=format,
+                                   persist_to=persist_to,
+                                   replicate_to=replicate_to)
+
+    def get_multi(self, # type: Client
+                  keys,  # type: Iterable[str]
+                  ttl=0,  # type: int
+                  quiet=None,  # type: bool
+                  replica=False,  # type: bool
+                  no_format=False  # type: bool
+                  ):
+        # type: (...)->Result
+        """Get multiple keys. Multi variant of :meth:`get`
+
+        :param keys: keys the keys to fetch
+        :type keys: :ref:`iterable<argtypes>`
+        :param int ttl: Set the expiration for all keys when retrieving
+        :param boolean replica:
+            Whether the results should be obtained from a replica
+            instead of the master. See :meth:`get` for more information
+            about this parameter.
+        :return: A :class:`~.MultiResult` object. This is a dict-like
+            object  and contains the keys (passed as) `keys` as the
+            dictionary keys, and :class:`~.Result` objects as values
+        """
+        return _Base.get_multi(self, keys, ttl=ttl, quiet=quiet,
+                               replica=replica, no_format=no_format)
+
+    def touch_multi(self,  # type: Client
+                    keys,  # type: Iterable[str]
+                    ttl=0  # type: int
+                    ):
+        # type: (...)->Result
+        """Touch multiple keys. Multi variant of :meth:`touch`
+
+        :param keys: the keys to touch
+        :type keys: :ref:`iterable<argtypes>`.
+            ``keys`` can also be a dictionary with values being
+            integers, in which case the value for each key will be used
+            as the TTL instead of the global one (i.e. the one passed to
+            this function)
+        :param int ttl: The new expiration time
+        :return: A :class:`~.MultiResult` object
+
+        Update three keys to expire in 10 seconds ::
+
+            cb.touch_multi(("key1", "key2", "key3"), ttl=10)
+
+        Update three keys with different expiration times ::
+
+            cb.touch_multi({"foo" : 1, "bar" : 5, "baz" : 10})
+
+        .. seealso:: :meth:`touch`
+        """
+        return _Base.touch_multi(self, keys, ttl=ttl)
+
+    def lock_multi(self,  # type: Client
+                   keys,  # type: Iterable[str]
+                   ttl=0  # type: int
+                   ):
+        # type: (...)->Result
+        """Lock multiple keys. Multi variant of :meth:`lock`
+
+        :param keys: the keys to lock
+        :type keys: :ref:`iterable<argtypes>`
+        :param int ttl: The lock timeout for all keys
+
+        :return: a :class:`~.MultiResult` object
+
+        .. seealso:: :meth:`lock`
+        """
+        return _Base.lock_multi(self, keys, ttl=ttl)
+
+    def unlock_multi(self,  # type: Client
+                     keys  # type: Iterable[str]
+                     ):
+        # type: (...)->Result
+
+        """Unlock multiple keys. Multi variant of :meth:`unlock`
+
+        :param dict keys: the keys to unlock
+        :return: a :class:`~couchbase_core.result.MultiResult` object
+
+        The value of the ``keys`` argument should be either the CAS, or
+        a previously returned :class:`Result` object from a :meth:`lock`
+        call. Effectively, this means you may pass a
+        :class:`~.MultiResult` as the ``keys`` argument.
+
+        Thus, you can do something like ::
+
+            keys = (....)
+            rvs = cb.lock_multi(keys, ttl=5)
+            # do something with rvs
+            cb.unlock_multi(rvs)
+
+        .. seealso:: :meth:`unlock`
+        """
+        return _Base.unlock_multi(self, keys)
+
+    def observe_multi(self, keys, master_only=False):
+        """Multi-variant of :meth:`observe`"""
+        return _Base.observe_multi(self, keys, master_only=master_only)
+
+    def endure_multi(self, keys, persist_to=-1, replicate_to=-1,
+                     timeout=5.0, interval=0.010, check_removed=False):
+        """Check durability requirements for multiple keys
+
+        :param keys: The keys to check
+
+        The type of keys may be one of the following:
+            * Sequence of keys
+            * A :class:`~couchbase_v2.result.MultiResult` object
+            * A ``dict`` with CAS values as the dictionary value
+            * A sequence of :class:`~couchbase_v2.result.Result` objects
+
+        :return: A :class:`~.MultiResult` object
+            of :class:`~.OperationResult` items.
+
+        .. seealso:: :meth:`endure`
+        """
+        if not _LCB.PYCBC_ENDURE:
+            raise NotImplementedInV3("Standalone endure")
+        return _Base.endure_multi(self, keys, persist_to=persist_to,
+                                  replicate_to=replicate_to,
+                                  timeout=timeout, interval=interval,
+                                  check_removed=check_removed)
+
+    def remove_multi(self, kvs, quiet=None, durability_level=Durability.NONE):
+        """Remove multiple items from the cluster
+
+        :param kvs: Iterable of keys to delete from the cluster. If you wish
+            to specify a CAS for each item, then you may pass a dictionary
+            of keys mapping to cas, like `remove_multi({k1:cas1, k2:cas2}`)
+        :param quiet: Whether an exception should be raised if one or more
+            items were not found
+        :return: A :class:`~.MultiResult` containing :class:`~.OperationResult`
+            values.
+        """
+        return _Base.remove_multi(self, kvs, quiet=quiet, durability_level=durability_level)
+
+    def counter_multi(self, kvs, initial=None, delta=1, ttl=0):
+        """Perform counter operations on multiple items
+
+        :param kvs: Keys to operate on. See below for more options
+        :param initial: Initial value to use for all keys.
+        :param delta: Delta value for all keys.
+        :param ttl: Expiration value to use for all keys
+
+        :return: A :class:`~.MultiResult` containing :class:`~.ValueResult`
+            values
+
+
+        The `kvs` can be a:
+
+        - Iterable of keys
+            .. code-block:: python
+
+                cb.counter_multi((k1, k2))
+
+        - A dictionary mapping a key to its delta
+            .. code-block:: python
+
+                cb.counter_multi({
+                    k1: 42,
+                    k2: 99
+                })
+
+        - A dictionary mapping a key to its additional options
+            .. code-block:: python
+
+                cb.counter_multi({
+                    k1: {'delta': 42, 'initial': 9, 'ttl': 300},
+                    k2: {'delta': 99, 'initial': 4, 'ttl': 700}
+                })
+
+
+        When using a dictionary, you can override settings for each key on
+        a per-key basis (for example, the initial value). Global settings
+        (global here means something passed as a parameter to the method)
+        will take effect for those values which do not have a given option
+        specified.
+        """
+        return _Base.counter_multi(self, kvs, initial=initial, delta=delta,
+                                   ttl=ttl)
 
 
 def _depr(fn, usage, stacklevel=3):

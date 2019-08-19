@@ -1,5 +1,5 @@
 from couchbase_core.subdocument import Spec
-from .options import Seconds, FiniteDuration
+from .options import Seconds, FiniteDuration, forward_args
 from couchbase_core.transcodable import Transcodable
 from couchbase_core._libcouchbase import Result as SDK2Result
 from couchbase_core.result import MultiResult, SubdocResult
@@ -95,11 +95,11 @@ class Result(IResult):
     @property
     def error(self):
         # type: ()->int
-        return self.error
+        return self._error
 
     def success(self):
         # type: ()->bool
-        return not self.error
+        return not self._error
 
 
 class IGetResult(IResult):
@@ -291,6 +291,11 @@ def get_mutation_result(result  # type: ResultPrecursor
     # type (...)->MutationResult
     return MutationResult(result.orig_result.cas, SDK2MutationToken(result.orig_result._mutinfo) if hasattr(result.orig_result, '_mutinfo') else None)
 
+
+def get_multi_mutation_result(target, wrapped, keys, *options, **kwargs):
+    final_options = forward_args(kwargs, *options)
+    raw_result = wrapped(target, keys, **final_options)
+    return {k: get_mutation_result(ResultPrecursor(v, final_options)) for k, v in raw_result.items()}
 
 def _wrap_in_mutation_result(func  # type: Callable[[Any,...],SDK2Result]
                              ):
