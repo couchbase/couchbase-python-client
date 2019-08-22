@@ -321,7 +321,10 @@ pycbc_Bucket__cntl(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     PyObject *val = NULL;
     lcb_STATUS err = LCB_SUCCESS;
     uCNTL input;
-
+    if (!self->instance)
+    {
+        Py_RETURN_NONE;
+    }
     char *kwnames[] = { "op", "value", "value_type", NULL };
     if (!PyArg_ParseTupleAndKeywords(
         args, kwargs, "i|Os", kwnames, &cmd, &val, &argt)) {
