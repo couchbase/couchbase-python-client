@@ -17,7 +17,7 @@
 
 from typing import Callable, Any, Union
 
-from couchbase_core.bucket import Bucket
+from couchbase_core.client import Client
 from couchbase_core.analytics import AnalyticsQuery
 from couchbase_core import JSON
 import uuid
@@ -70,7 +70,7 @@ class AnalyticsIngester:
         self.operation = operation
 
     def __call__(self, bucket, query, host, ignore_ingest_error=False, *args, **kwargs):
-        # type: (Bucket, Query, str, bool, *Any, **Any) -> None
+        # type: (Client, Query, str, bool, *Any, **Any) -> None
         """
         Run an analytics query, pass the results through the data converter, and the results of that
         into the id_generator, then apply the bucket operator to the bucket using the id generator

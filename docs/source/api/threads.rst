@@ -5,7 +5,7 @@ Using With and Without Threads
 .. module:: couchbase_core
     :noindex:
 
-You can use a single :class:`~couchbase_core.bucket.Bucket` object in
+You can use a single :class:`~couchbase_core.client.Client` object in
 a single thread, and attain reasonable performance by having one
 `Bucket` object per thread. However, you **cannot** use the same object
 from multiple threads concurrently (but see below)
@@ -44,12 +44,12 @@ other threads in the case where an I/O operation takes a prolonged amount
 of time.
 
 This behavior itself can be controlled by the
-:attr:`~couchbase_core.bucket.Bucket.unlock_gil` attribute
+:attr:`~couchbase_core.client.Client.unlock_gil` attribute
 
 
 .. _multiple_threads:
 
-Using a :class:`Bucket` from multiple threads
+Using a :class:`Client` from multiple threads
 ---------------------------------------------------
 
 Sometimes it may be necessary to use a :class:`Bucket` object from

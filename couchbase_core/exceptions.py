@@ -372,8 +372,8 @@ class TemporaryFailError(CouchbaseError):
 
     .. seealso::
 
-        :meth:`couchbase_core.bucket.Bucket.lock`
-        :meth:`couchbase_core.bucket.Bucket.unlock`
+        :meth:`couchbase_core.client.Client.lock`
+        :meth:`couchbase_core.client.Client.unlock`
     """
 
 

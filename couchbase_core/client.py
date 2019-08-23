@@ -13,7 +13,8 @@ import couchbase_core._libcouchbase as _LCB
 from couchbase_core import priv_constants as _P, fulltext as _FTS
 import couchbase_core.analytics
 
-class Bucket(_Base):
+
+class Client(_Base):
     def __init__(self, *args, **kwargs):
         """Connect to a bucket.
 
@@ -83,25 +84,25 @@ class Bucket(_Base):
         :raise: :exc:`.InvalidError` if the connection string
             was malformed.
 
-        :return: instance of :class:`~couchbase_core.bucket.Bucket`
+        :return: instance of :class:`~couchbase_core.client.Client`
 
 
         Initialize bucket using default options::
 
-            from couchbase_core.bucket import Bucket
-            cb = Bucket('couchbase:///mybucket')
+            from couchbase_core.bucket import Client
+            cb = Client('couchbase:///mybucket')
 
         Connect to protected bucket::
 
-            cb = Bucket('couchbase:///protected', password='secret')
+            cb = Client('couchbase:///protected', password='secret')
 
         Connect using a list of servers::
 
-            cb = Bucket('couchbase://host1,host2,host3/mybucket')
+            cb = Client('couchbase://host1,host2,host3/mybucket')
 
         Connect using SSL::
 
-            cb = Bucket('couchbases://securehost/bucketname?certpath=/var/cb-cert.pem')
+            cb = Client('couchbases://securehost/bucketname?certpath=/var/cb-cert.pem')
 
         """
         _no_connect_exceptions = kwargs.pop('_no_connect_exceptions', False)
@@ -124,7 +125,7 @@ class Bucket(_Base):
         if isinstance(tc, type):
             kwargs['transcoder'] = tc()
 
-        super(Bucket, self).__init__(*args, **kwargs)
+        super(Client, self).__init__(*args, **kwargs)
         # Enable detailed error codes for network errors:
         self._cntlstr("detailed_errcodes", "1")
 
@@ -660,7 +661,7 @@ class Bucket(_Base):
                     raise E.NotSupportedError("Subdoc upsert + fulldoc insert Not supported in SDK 3 yet")
 
         kwargs['_sd_doc_flags'] = sdflags
-        return super(Bucket, self).mutate_in(key, specs, **kwargs)
+        return super(Client, self).mutate_in(key, specs, **kwargs)
 
     def lookup_in(self, key, *specs, **kwargs):
         """Atomically retrieve one or more paths from a document.
@@ -685,7 +686,7 @@ class Bucket(_Base):
 
         .. seealso:: :meth:`retrieve_in` which acts as a convenience wrapper
         """
-        return super(Bucket, self).lookup_in({key: specs}, **kwargs)
+        return super(Client, self).lookup_in({key: specs}, **kwargs)
 
     def rget(self, key, replica_index=None, quiet=None):
         """Get an item from a replica node

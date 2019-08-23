@@ -45,7 +45,7 @@ class MutationState(object):
         This feature requires Couchbase Server 4.5 or greater,
         and also requires that `fetch_mutation_tokens=true`
         be specified in the connection string when creating
-        a :class:`~couchbase_core.bucket.Bucket`
+        a :class:`~couchbase_core.client.Client`
 
     .. code-block:: python
 
@@ -146,7 +146,7 @@ class MutationState(object):
         mutations performed by the given bucket, and passing them to
         :meth:`~add_result`
 
-        :param bucket: A :class:`~couchbase_core.bucket.Bucket` object
+        :param bucket: A :class:`~couchbase_core.client.Client` object
             used for the mutations
         :param quiet: If the bucket contains no valid mutations, this
             option suppresses throwing exceptions.

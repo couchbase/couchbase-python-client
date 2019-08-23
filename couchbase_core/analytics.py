@@ -143,7 +143,7 @@ class AnalyticsRequest(N.N1QLRequest):
 
         :param params: An :class:`AnalyticsQuery` object.
         :param host: the host to send the request to.
-        :param parent: The parent :class:`~.couchbase_core.bucket.Bucket` object
+        :param parent: The parent :class:`~.couchbase_core.client.Client` object
 
         To actually receive results of the query, iterate over this
         object.
@@ -158,7 +158,7 @@ class AnalyticsRequest(N.N1QLRequest):
 
 class DeferredAnalyticsRequest(AnalyticsRequest):
     def __init__(self, params, host, parent, timeout = None, interval = None):
-        # type: (DeferredAnalyticsQuery, str, couchbase_core.bucket.Bucket, Optional[float], Optional[float]) -> None
+        # type: (DeferredAnalyticsQuery, str, couchbase_core.client.Client, Optional[float], Optional[float]) -> None
         """
         Object representing the execution of a deferred request on the
         server.
@@ -173,7 +173,7 @@ class DeferredAnalyticsRequest(AnalyticsRequest):
 
         :param params: An :class:`DeferredAnalyticsQuery` object.
         :param host: the host to send the request to.
-        :param parent: The parent :class:`~.couchbase_core.bucket.Bucket` object.
+        :param parent: The parent :class:`~.couchbase_core.client.Client` object.
         :param timeout: Timeout in seconds.
         :param interval: Interval in seconds for deferred polling.
 

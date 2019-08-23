@@ -26,7 +26,7 @@ a :class:`Deferred` which will have its callback invoked with a result.
 
 As such, we will omit the mentions of the normal key value operations, which
 function identially to their synchronous conterparts documented in the
-:class:`~couchbase.bucket.Bucket` class.
+:class:`~couchbase_v2.bucket.Bucket` class.
 
 The :class:`Bucket` interface for Twisted is subclassed from the lower-level
 :class:`RawBucket` which returns :class:`~couchbase_core.result.AsyncResult`

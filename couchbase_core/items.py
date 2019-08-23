@@ -63,7 +63,7 @@ class Item(_Item):
                     def key(self, newkey):
                         self._key = key
 
-        To use this class with the :class:`couchbase_core.bucket.Bucket`
+        To use this class with the :class:`couchbase_core.client.Client`
         API methods, you must take care to:
 
         1. Use only the ``*_multi`` methods

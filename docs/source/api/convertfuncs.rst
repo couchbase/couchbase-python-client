@@ -16,7 +16,7 @@ There are two functions available to change the default Pickle and JSON
 converters.
 
 Note that these immediately affect *all*
-:class:`~couchbase_core.bucket.Bucket` objects. If you wish to have
+:class:`~couchbase_core.client.Client` objects. If you wish to have
 a finer grained control over which object uses which converters, you
 may wish to consider writing your own
 :class:`~couchbase_core.transcoder.Transcoder`

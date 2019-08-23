@@ -14,7 +14,7 @@ defined in the superclass (i.e. it has a ``__dict__`` field).
 These objects may be passed (via either the
 :class:`couchbase_core.items.ItemOptionDict` or
 :class:`couchbase_core.items.ItemSequence` containers) to any of the ``_multi``
-functions of the :class:`~couchbase_core.bucket.Bucket` objects.
+functions of the :class:`~couchbase_core.client.Client` objects.
 
 Since the `Item` structure is backwards-compatible (and therefore,
 interchangeable) with any of the key-value subtypes of the
@@ -58,7 +58,7 @@ options::
     itmdict.add(it, format=couchbase_core.FMT_UTF8)
 
 To actually store the item, you pass the *collection* to the
-:meth:`~couchbase_core.bucket.Bucket.upsert_multi` method, and it will function as
+:meth:`~couchbase_core.client.Client.upsert_multi` method, and it will function as
 normally::
 
     mres = cb.set_multi(itmdict)

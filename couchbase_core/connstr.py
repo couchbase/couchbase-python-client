@@ -27,12 +27,12 @@ except ImportError:
 class ConnectionString(object):
     """
     This class parses the connection string and may be passed
-    to the :class:`~.Bucket` constructor instead of a raw
+    to the :class:`~.Client` constructor instead of a raw
     string.
 
     .. note::
 
-        Raw strings passed to the :class:`~.Bucket` constructor
+        Raw strings passed to the :class:`~.Client` constructor
         are *not* first converted into a `ConnectionString`
         object. This is an internal implementation detail, but
         may be helpful to know in case of bugs encountered in

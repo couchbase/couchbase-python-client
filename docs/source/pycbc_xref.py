@@ -25,7 +25,7 @@ def gen_role(real_role, real_name,  new_prefix):
 def on_inited(app):
     from sphinx.domains.python import PythonDomain as p
     fns = [
-        ('cb_bmeth', '~couchbase_core.bucket.Bucket', 'meth'),
+        ('cb_bmeth', '~couchbase_core.client.Client', 'meth'),
         ('cb_sdmeth', '~couchbase_core.subdocument', 'func'),
         ('cb_exc', 'couchbase_core.exceptions', 'exc')
     ]

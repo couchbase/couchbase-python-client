@@ -253,14 +253,14 @@ def counter(path, delta, create_parents=False, **kwargs):
 
     .. note::
 
-        Unlike :meth:`couchbase_core.bucket.Bucket.counter`,
+        Unlike :meth:`couchbase_core.client.Client.counter`,
         there is no `initial` argument. If the counter does not exist
         within the document (but its parent does, or `create_parents`
         is true), it will be initialized with the value of the `delta`.
 
     This operation is only valid in :cb_bmeth:`mutate_in`.
 
-    .. seealso:: :func:`upsert`, :cb_bmeth:`counter` (in `Bucket`)
+    .. seealso:: :func:`upsert`, :cb_bmeth:`counter` (in `Client`)
     """
     if not delta:
         raise ValueError("Delta must be positive or negative!")

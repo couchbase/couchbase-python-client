@@ -64,7 +64,7 @@ except:
 def set_json_converters(encode, decode):
     """
     Modify the default JSON conversion functions. This affects all
-    :class:`~couchbase_core.bucket.Bucket` instances.
+    :class:`~couchbase_core.client.Client` instances.
 
     These functions will called instead of the default ones (``json.dumps``
     and ``json.loads``) to encode and decode JSON (when :const:`FMT_JSON` is
@@ -92,7 +92,7 @@ def set_json_converters(encode, decode):
 def set_pickle_converters(encode, decode):
     """
     Modify the default Pickle conversion functions. This affects all
-    :class:`~couchbase_v2.bucket.Bucket` instances.
+    :class:`~couchbase_core.client.Client` instances.
 
     These functions will be called instead of the default ones
     (``pickle.dumps`` and ``pickle.loads``) to encode and decode values to and
@@ -145,7 +145,7 @@ def enable_logging():
     This function enables the C library's logging to be propagated to
     the Python standard `logging` module.
 
-    Calling this function affects any :class:`~couchbase_core.bucket.Bucket` objects created
+    Calling this function affects any :class:`~couchbase_core.client.Client` objects created
     afterwards (but not before). Note that currently this will also
     override any ``LCB_LOGLEVEL`` directive inside the environment as
     well.

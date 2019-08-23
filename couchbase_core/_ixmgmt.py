@@ -98,7 +98,7 @@ class IxmgmtRequest(object):
     """
     def __init__(self, parent, cmd, index, **kwargs):
         """
-        :param Bucket parent: parent Bucket object
+        :param Client parent: parent Client object
         :param str cmd: Type of command to execute. Can be `watch`, `drop`,
             `create`, `list`, or `build`
         :param index: serialized JSON which should correspond to an index

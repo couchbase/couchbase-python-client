@@ -1,4 +1,4 @@
-from couchbase_core.bucket import Bucket as CoreBucket
+from couchbase_core.client import Client as CoreBucket
 from .collection import CBCollection, CollectionOptions
 from .options import OptionBlock, forward_args
 from .result import *

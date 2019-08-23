@@ -53,7 +53,7 @@ class Admin(LCB.Bucket):
     the cluster.
 
     This object should **not** be used to perform Key/Value operations. The
-    :class:`~couchbase_core.bucket.Bucket` is used for that.
+    :class:`~couchbase_core.client.Client` is used for that.
     """
     def __init__(self, username, password, host='localhost', port=8091,
                  **kwargs):

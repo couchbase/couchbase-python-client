@@ -29,8 +29,8 @@ from couchbase_core._ixmgmt import IxmgmtRequest, N1qlIndex, N1QL_PRIMARY_INDEX
 class BucketManager(object):
     """
     The `BucketManager` class allows access to common maintenance APIs related
-    to a :class:`~couchbase_core.bucket.Bucket` object. It is normally returned via
-    the :meth:`~couchbase_core.bucket.Bucket.bucket_manager` method
+    to a :class:`~couchbase_core.client.Client` object. It is normally returned via
+    the :meth:`~couchbase_core.client.Client.bucket_manager` method
     """
     def __init__(self, cb):
         self._cb = cb

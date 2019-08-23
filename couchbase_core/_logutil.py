@@ -34,12 +34,12 @@ def pylog_log_handler(**kwargs):
 
 
 def configure(val):
-    from couchbase_core.bucket import Bucket
+    from couchbase_core.client import Client
     import couchbase_core._libcouchbase
     if val:
         couchbase_core._libcouchbase.lcb_logging(pylog_log_handler)
         initmsg = 'Initializing Couchbase logging. lcb_version={0}'.format(
-            Bucket.lcb_version())
+            Client.lcb_version())
         logging.getLogger('couchbase').info(initmsg)
     else:
         couchbase_core._libcouchbase.lcb_logging(None)

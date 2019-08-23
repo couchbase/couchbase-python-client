@@ -547,7 +547,7 @@ Attributes
 
         See :ref:`format_info` for the possible values
 
-        On a :meth:`~couchbase.bucket.Bucket.get` the
+        On a :meth:`~couchbase_v2.bucket.Bucket.get` the
         original value will be returned. This means the JSON will be
         decoded, respectively the object will be unpickled.
 
@@ -597,11 +597,11 @@ Private APIs
 Additional Connection Options
 =============================
 
-.. currentmodule:: couchbase.bucket
+.. currentmodule:: couchbase_core.client
 
 This section is intended to document some of the less common connection
 options and formats of the connection string
-(see :meth:`couchbase.bucket.Bucket.__init__`).
+(see :meth:`couchbase_core.client.Client.__init__`).
 
 
 Using Custom Ports

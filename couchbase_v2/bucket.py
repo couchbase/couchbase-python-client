@@ -20,7 +20,7 @@ import couchbase_core._libcouchbase as _LCB
 from couchbase_core._libcouchbase import Bucket as _Base
 
 import couchbase_v2
-from couchbase_core.bucket import Bucket as CoreBucket, _depr
+from couchbase_core.client import Client as CoreBucket, _depr
 from couchbase_v2.exceptions_shim import *
 from couchbase_core.result import *
 from couchbase_core.bucketmanager import BucketManager
@@ -1643,6 +1643,3 @@ class Bucket(CoreBucket):
             :return:
             """
             return self.decrypt_fields_real(document, fieldspec, prefix)
-
-class HLBucket(Bucket):
-    pass

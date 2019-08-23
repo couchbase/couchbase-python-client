@@ -13,7 +13,7 @@ from .options import OptionBlock, AcceptableInts
 from .durability import ReplicateTo, PersistTo, ClientDurableOption, ServerDurableOption
 from couchbase_core._libcouchbase import Bucket as _Base
 import couchbase.exceptions
-from couchbase_core.bucket import Bucket as CoreBucket
+from couchbase_core.client import Client as CoreBucket
 import copy
 
 from typing import *

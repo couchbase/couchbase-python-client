@@ -17,7 +17,7 @@
 import weakref
 
 from .admin import Admin
-from .bucket import Bucket
+from .client import Client
 from .connstr import ConnectionString
 from .exceptions import CouchbaseError
 import itertools
@@ -53,12 +53,12 @@ class Cluster(object):
     # list of all authentication types, keep up to date, used to identify connstr/kwargs auth styles
 
     def __init__(self, connection_string='couchbase://localhost',
-                 bucket_class=Bucket):
+                 bucket_class=Client):
         """
         Creates a new Cluster object
         :param connection_string: Base connection string. It is an error to
             specify a bucket in the string.
-        :param bucket_class: :class:`couchbase_core.bucket.Bucket` implementation to
+        :param bucket_class: :class:`couchbase_core.client.Client` implementation to
             use.
         """
         self.connstr = ConnectionString.parse(str(connection_string))
@@ -89,7 +89,7 @@ class Cluster(object):
         self.authenticator = authenticator
 
     def open_bucket(self, bucket_name, **kwargs):
-        # type: (str, str) -> Bucket
+        # type: (str, str) -> Client
         """
         Open a new connection to a Couchbase bucket
         :param bucket_name: The name of the bucket to open

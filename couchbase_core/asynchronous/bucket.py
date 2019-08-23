@@ -29,7 +29,7 @@ from couchbase.exceptions import ArgumentError
 class AsyncBucket(Bucket):
     """
     This class contains the low-level async implementation of the
-    :class:`~couchbase.bucket.Bucket` interface. **This module is not intended to be
+    :class:`~couchbase_core.client.Client` interface. **This module is not intended to be
     used directly by applications**.
 
     .. warning::
@@ -78,7 +78,7 @@ class AsyncBucket(Bucket):
 
     In both event models, the internal I/O notification system is
     callback-based. The main difference is in how the high-level
-    `Bucket` functions (for example, :meth:`~couchbase.bucket.Bucket.get` operate:
+    `Bucket` functions (for example, :meth:`~couchbase_core.client.Client.get` operate:
 
     In callback-based models, these return objects which allow a
     callback to be assigned to them, whereas in coroutine-based
@@ -132,7 +132,7 @@ class AsyncBucket(Bucket):
           instances, and is owned by the connection object.
 
         :param kwargs: Additional arguments to pass to
-          the :class:`~couchbase.bucket.Bucket` constructor
+          the :class:`~couchbase_core.client.Client` constructor
         """
         if not iops:
             raise ValueError("Must have IOPS")
@@ -156,7 +156,7 @@ class AsyncBucket(Bucket):
         Reimplemented from base class.
 
         This method does not add additional functionality of the
-        base class' :meth:`~couchbase.bucket.Bucket.query` method (all the
+        base class' :meth:`~couchbase_core.client.Client.query` method (all the
         functionality is encapsulated in the view class anyway). However it
         does require one additional keyword argument
 

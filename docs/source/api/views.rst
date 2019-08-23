@@ -222,7 +222,7 @@ The following properties allow you to
             :ref:`viewtype_range` of :ref:`viewtype_string` elements.
 
         Specify the range based on the contents of the keys as they are stored
-        by :meth:`~couchbase.bucket.Bucket.upsert`. These are
+        by :meth:`~couchbase_v2.bucket.Bucket.upsert`. These are
         returned as the "Document IDs" in each view result.
 
         You *must* use this attribute in conjunction with
@@ -342,7 +342,7 @@ and for which the ``reduce`` value is enabled
         :Value Type: :ref:`viewtype_boolean`
 
         Note that if the view specified in the query (to e.g.
-        :meth:`couchbase.bucket.Bucket.view_query`) does not have a
+        :meth:`couchbase_v2.bucket.Bucket.view_query`) does not have a
         reduce function specified, an exception will be thrown once the query
         begins.
 

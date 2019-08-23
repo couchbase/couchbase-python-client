@@ -251,10 +251,10 @@ class N1QLQuery(object):
         .. note::
 
             The effective timeout for the query will be either this property
-            or the value of :attr:`couchbase_core.bucket.Bucket.n1ql_timeout`
+            or the value of :attr:`couchbase_core.client.Client.n1ql_timeout`
             property, whichever is *lower*.
 
-        .. seealso:: couchbase_core.bucket.Bucket.n1ql_timeout
+        .. seealso:: couchbase_core.client.Client.n1ql_timeout
         """
         value = self._body.get('timeout', '0s')
         value = value[:-1]
@@ -383,11 +383,11 @@ class N1QLRequest(object):
         .. warning::
 
             You should typically not call this constructor by
-            yourself, rather use the :meth:`~.Bucket.n1ql_query`
+            yourself, rather use the :meth:`~.Client.n1ql_query`
             method (or one of its async derivatives).
 
         :param params: An :class:`N1QLQuery` object.
-        :param parent: The parent :class:`~.couchbase_core.bucket.Bucket` object
+        :param parent: The parent :class:`~.couchbase_core.client.Client` object
         :param row_factory: Callable which accepts the raw dictionary
             of each row, and can wrap them in a customized class.
             The default is simply to return the dictionary itself.

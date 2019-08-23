@@ -1100,7 +1100,7 @@ class SearchRequest(object):
     def __init__(self, body, parent, row_factory=lambda x: x):
         """
         :param str body: serialized JSON string
-        :param Bucket parent:
+        :param Client parent:
         """
         self._body = _to_json(body)
         self._parent = parent
