@@ -238,6 +238,13 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
     ADD_MACRO(LCBCRYPTO_KEY_ENCRYPT);
     ADD_MACRO(LCBCRYPTO_KEY_DECRYPT);
 
+#define PYCBC_PING_STATUS(X) ADD_MACRO(LCB_PINGSTATUS_##X);
+#define PYCBC_PP_PING_STATUS(X) \
+    X(OK)                       \
+    X(TIMEOUT)                  \
+    X(ERROR)
+
+    PYCBC_PP_PING_STATUS(PYCBC_PING_STATUS)
     LCB_CONSTANT(VERSION);
     ADD_MACRO(PYCBC_CRYPTO_VERSION);
 #ifdef PYCBC_TRACING

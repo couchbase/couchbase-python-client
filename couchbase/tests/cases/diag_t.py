@@ -21,6 +21,7 @@ from couchbase.tests.base import ConnectionTestCase, PYCBC_CB_VERSION
 import jsonschema
 import re
 import couchbase._libcouchbase as LCB
+from couchbase.bucket import PingStatus
 
 # For Python 2/3 compatibility
 try:
@@ -32,7 +33,8 @@ service_schema = {"type": "object",
              "properties": {"details": {"type": "string"},
                             "latency": {"anyOf": [{"type": "number"}, {"type": "string"}]},
                             "server": {"type": "string"},
-                            "status": {"type": "number"}
+                            "status": {"type": "number",
+                                       "enum": list(PingStatus)}
                             },
              "required": ["latency", "server", "status"]}
 

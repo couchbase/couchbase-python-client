@@ -36,10 +36,14 @@ import couchbase.priv_constants as _P
 import json
 from couchbase.analytics import AnalyticsRequest, AnalyticsQuery
 from couchbase.connstr import ConnectionString
-
+from enum import IntEnum
 ### Private constants. This is to avoid imposing a dependency requirement
 ### For simple flags:
 
+class PingStatus(IntEnum):
+    OK=_LCB.LCB_PINGSTATUS_OK
+    TIMEOUT=_LCB.LCB_PINGSTATUS_TIMEOUT
+    ERROR=_LCB.LCB_PINGSTATUS_ERROR
 
 def _depr(fn, usage, stacklevel=3):
     """Internal convenience function for deprecation warnings"""
@@ -933,8 +937,17 @@ class Bucket(_Base):
 
 
         :raise: :exc:`.CouchbaseNetworkError`
-        :return: `dict` where keys are stat keys and values are
-            host-value pairs
+        :return: `dict` where keys are service types and values are
+            lists of dictionaries, each one describing a single
+            node.
+
+        The 'status' entry of each value corresponds to an integer enum:
+
+        PingStatus.OK(0) = ping responded in time
+
+        PingStatus.TIMEOUT(1) = ping timed out
+
+        PingStatus.ERROR(2) = there was some other error while trying to ping the host.
 
         Ping cluster (works on couchbase buckets)::
 

@@ -190,6 +190,9 @@ pip_not_on_win_python_lt_3 = (
 conan_and_cmake_deps = (['conan', 'cmake>=3.0.2'] if
                         cmake_build and sys.platform.startswith('darwin') else [])
 
+gen_reqs = ["typing; python_version<'3.7'",
+            "enum34; python_version<'3.5'"]
+
 setup(
     name = 'couchbase',
     version = pkgversion,
@@ -230,8 +233,8 @@ setup(
         'acouchbase.py34only'
     ] if sys.version_info >= (3, 4) else []),
     package_data=pkgdata,
-    setup_requires=["typing; python_version<'3.7'"] + conan_and_cmake_deps,
-    install_requires=["typing; python_version<'3.7'"] + pip_not_on_win_python_lt_3,
+    setup_requires=gen_reqs + conan_and_cmake_deps,
+    install_requires=gen_reqs + pip_not_on_win_python_lt_3,
     tests_require=['nose', 'testresources>=0.2.7', 'basictracer==2.2.0'],
     test_suite='couchbase.tests.test_sync',
     **setup_kw
