@@ -22,9 +22,9 @@ from couchbase_core.admin import Admin
 from couchbase_v2.bucket import Bucket
 from couchbase_core.result import HttpResult
 from couchbase_core.connstr import ConnectionString
-from couchbase_v2.exceptions import (
+from couchbase.exceptions import (
     ArgumentError, AuthError, CouchbaseError,
-    CouchbaseNetworkError, HTTPError)
+    NetworkError, HTTPError)
 from couchbase_tests.base import CouchbaseTestCase, SkipTest
 from couchbase_core.auth_domain import AuthDomain
 
@@ -111,8 +111,11 @@ class AdminSimpleTest(CouchbaseTestCase):
 
     def test_bad_host(self):
         # admin connections don't really connect until an action is performed
-        admin = Admin('username', 'password', host='127.0.0.1', port=1)
-        self.assertRaises(CouchbaseNetworkError, admin.bucket_info, 'default')
+        try:
+            admin = Admin('username', 'password', host='127.0.0.1', port=1)
+            self.assertRaises(NetworkError, admin.bucket_info, 'default')
+        except NetworkError:
+            pass
 
     def test_bad_handle(self):
         self.assertRaises(CouchbaseError, self.admin.upsert, "foo", "bar")
