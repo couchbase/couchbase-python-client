@@ -18,6 +18,7 @@
 #include "iops.h"
 #include "pycbc.h"
 #include "structmember.h"
+#include <libcouchbase/logger.h>
 /**
  * This file contains boilerplate for the module itself
  */
@@ -26,11 +27,16 @@ struct pycbc_helpers_ST pycbc_helpers;
 
 PyObject *pycbc_log_handler = NULL;
 
-static void log_handler(struct lcb_logprocs_st *procs, unsigned int iid,
-    const char *subsys, int severity, const char *srcfile, int srcline,
-    const char *fmt, va_list ap);
+void log_handler(lcb_LOGGER *procs,
+                 uint64_t iid,
+                 const char *subsys,
+                 lcb_LOG_SEVERITY severity,
+                 const char *srcfile,
+                 int srcline,
+                 const char *fmt,
+                 va_list ap);
 
-struct lcb_logprocs_st pycbc_lcb_logprocs = { 0 };
+lcb_LOGGER *pycbc_lcb_logger = NULL;
 
 static PyObject *
 _libcouchbase_init_helpers(PyObject *self, PyObject *args, PyObject *kwargs) {
@@ -398,8 +404,8 @@ init_libcouchbase(void)
     PyModule_AddIntConstant(m, "_IMPL_INCLUDE_DOCS", 0);
 
     /* Initialize the logging routines */
-    pycbc_lcb_logprocs.v.v0.callback = log_handler;
-
+    lcb_logger_create(&pycbc_lcb_logger, NULL);
+    lcb_logger_callback(pycbc_lcb_logger, log_handler);
 #if PY_MAJOR_VERSION >= 3
     return m;
 #endif
@@ -410,14 +416,14 @@ init_libcouchbase(void)
 #endif
 
 /* Logging functionality */
-static void log_handler(struct lcb_logprocs_st *procs,
-                        unsigned int iid,
-                        const char *subsys,
-                        int severity,
-                        const char *srcfile,
-                        int srcline,
-                        const char *fmt,
-                        va_list ap)
+void log_handler(lcb_LOGGER *procs,
+                 uint64_t iid,
+                 const char *subsys,
+                 lcb_LOG_SEVERITY severity,
+                 const char *srcfile,
+                 int srcline,
+                 const char *fmt,
+                 va_list ap)
 {
     PyGILState_STATE gil_prev;
     PyObject *tmp = NULL;

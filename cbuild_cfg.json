@@ -53,8 +53,8 @@
     },
     "0x02FF04": {
       "git": {
-        "repo": "https://github.com/couchbase/libcouchbase.git",
-        "tag": [">3.0.0-alpha.4","3.0.0-alpha.4"]
+        "repo": "http://review.couchbase.org/libcouchbase.git",
+        "tag": [">3.0.0-alpha.5","master"]
       },
       "sources": [
         "src/lcb_v4_wrapper.h",

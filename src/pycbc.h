@@ -400,12 +400,6 @@ enum {
 #    define PYCBC_DUR_INIT(ERR, CMD, TYPE, DUR)
 #endif
 
-typedef struct {
-    char persist_to;
-    char replicate_to;
-    pycbc_DURABILITY_LEVEL durability_level;
-} pycbc_dur_params;
-
 void pycbc_dict_add_text_kv(PyObject *dict, const char *key, const char *value);
 
 struct pycbc_Tracer;
@@ -1945,7 +1939,7 @@ PyObject *pycbc_gen_crypto_exception_map(void);
  * Flag to check if logging is enabled for the library via Python's logging
  */
 extern PyObject* pycbc_log_handler;
-extern struct lcb_logprocs_st pycbc_lcb_logprocs;
+extern lcb_LOGGER *pycbc_lcb_logger;
 
 /**
  * Dummy tuple/keywords, used for PyArg_ParseTupleAndKeywordArgs, which dies

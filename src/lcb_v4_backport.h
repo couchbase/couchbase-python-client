@@ -110,6 +110,17 @@ typedef lcb_error_t lcb_STATUS;
 #define lcb_respanalytics_is_final(RESP) (RESP)->rflags &LCB_RESP_F_FINAL
 #define lcb_respanalytics_status(RESP) (RESP)->rc
 
+#define lcb_respobserve_is_master(RESP, DEST) *(DEST) = RESP->ismaster;
+#define pycbc_cmdendure_key(...) LCB_CMD_SET_KEY(__VA_ARGS__)
+#define pycbc_cmdendure_addcmd(mctx, ...) mctx->addcmd(mctx, __VA_ARGS__)
+#define pycbc_create_cmdendure(cmd) \
+    lcb_CMDENDURE cmd_real = {0};   \
+    *cmd = &cmd_real
+#define pycbc_cmdendure_cas(cmd, cas) cmd->cas = cas
+#define pycbc_mctx_done(mctx, cookie) mctx->done(mctx, cookie)
+#define pycbc_mctx_fail(mctx) mctx->fail(mctx)
+#define lcb_respobserve_flags(RESP, DEST) *(DEST) = (RESP)->flags;
+
 #define lcb_cmdn1ql_create(CMD) \
     lcb_CMDN1QL cmd_real = {0}; \
     cmd = &cmd_real;
@@ -598,11 +609,11 @@ typedef enum {
 
 struct lcb_SUBDOCOPS;
 
-lcb_STATUS lcb_subdocops_create(lcb_SUBDOCOPS **operations, size_t capacity);
+lcb_STATUS lcb_subdocspecs_create(lcb_SUBDOCOPS **operations, size_t capacity);
 lcb_STATUS lcb_cmdsubdoc_operations(lcb_CMDSUBDOC *cmd,
                                     const lcb_SUBDOCOPS *operations);
 
-lcb_STATUS lcb_subdocops_destroy(lcb_SUBDOCOPS *operations);
+lcb_STATUS lcb_subdocspecs_destroy(lcb_SUBDOCOPS *operations);
 #define LCB_PING_GET_TYPE_S(X, Y)  \
     case LCB_PINGSVC_##X: \
         return #Y;
@@ -625,24 +636,24 @@ typedef lcb_U64 lcb_STORE_OPERATION;
         PYCBC_SDSPEC_SET_XX(PATH, DEST, BUF, BUF_LEN)
 #    define PYCBC_SDSPEC_SET_VALUE(DEST, BUF, BUF_LEN) \
         PYCBC_SDSPEC_SET_XX(VALUE, DEST, BUF, BUF_LEN)
-#define PYCBC_PATH_ONLY(UC, LC, EXP_TYPE)                                  \
-    DECL_##EXP_TYPE(lcb_subdocops_##LC(lcb_SUBDOCOPS *operations,          \
-                                       size_t index,                       \
-                                       uint32_t flags,                     \
-                                       const char *path,                   \
-                                       size_t path_len)) IMPL_##EXP_TYPE({ \
-        PYCBC_SDSPEC_SET_PATH(&operations->specs[index], path, path_len);  \
-        operations->specs[index].options = flags;                          \
-        operations->specs[index].sdcmd = LCB_SDCMD_##UC;                   \
-        return LCB_SUCCESS;                                                \
+#define PYCBC_PATH_ONLY(UC, LC, EXP_TYPE)                                    \
+    DECL_##EXP_TYPE(lcb_subdocspecs_##LC(lcb_SUBDOCOPS *operations,          \
+                                         size_t index,                       \
+                                         uint32_t flags,                     \
+                                         const char *path,                   \
+                                         size_t path_len)) IMPL_##EXP_TYPE({ \
+        PYCBC_SDSPEC_SET_PATH(&operations->specs[index], path, path_len);    \
+        operations->specs[index].options = flags;                            \
+        operations->specs[index].sdcmd = LCB_SDCMD_##UC;                     \
+        return LCB_SUCCESS;                                                  \
     })
 #define PYCBC_COUNTER(UC, LC, EXP_TYPE)                                      \
-    DECL_##EXP_TYPE(lcb_subdocops_##LC(lcb_SUBDOCOPS *operations,            \
-                                       size_t index,                         \
-                                       uint32_t flags,                       \
-                                       const char *path,                     \
-                                       size_t path_len,                      \
-                                       int64_t delta)) IMPL_##EXP_TYPE({     \
+    DECL_##EXP_TYPE(lcb_subdocspecs_##LC(lcb_SUBDOCOPS *operations,          \
+                                         size_t index,                       \
+                                         uint32_t flags,                     \
+                                         const char *path,                   \
+                                         size_t path_len,                    \
+                                         int64_t delta)) IMPL_##EXP_TYPE({   \
         char *value = (char *)calloc(22, sizeof(char));                      \
         size_t value_len = snprintf(value, 21, "%" PRId64, delta);           \
         PYCBC_SDSPEC_SET_PATH(&operations->specs[index], path, path_len);    \
@@ -652,26 +663,26 @@ typedef lcb_U64 lcb_STORE_OPERATION;
         return LCB_SUCCESS;                                                  \
     })
 #define PYCBC_NP(UC, LC, EXP_TYPE)                                    \
-    DECL_##EXP_TYPE(lcb_subdocops_##LC(                               \
+    DECL_##EXP_TYPE(lcb_subdocspecs_##LC(                             \
             lcb_SUBDOCOPS *operations, size_t index, uint32_t flags)) \
             IMPL_##EXP_TYPE({                                         \
                 operations->specs[index].options = flags;             \
                 operations->specs[index].sdcmd = LCB_SDCMD_##UC;      \
                 return LCB_SUCCESS;                                   \
             })
-#define PYCBC_VAL_GEN(UC, LC, EXP_TYPE)                                      \
-    DECL_##EXP_TYPE(lcb_subdocops_##LC(lcb_SUBDOCOPS *operations,            \
-                                       size_t index,                         \
-                                       uint32_t flags,                       \
-                                       const char *path,                     \
-                                       size_t path_len,                      \
-                                       const char *value,                    \
-                                       size_t value_len)) IMPL_##EXP_TYPE({  \
-        PYCBC_SDSPEC_SET_PATH(&operations->specs[index], path, path_len);    \
-        PYCBC_SDSPEC_SET_VALUE(&operations->specs[index], value, value_len); \
-        operations->specs[index].options = flags;                            \
-        operations->specs[index].sdcmd = LCB_SDCMD_##UC;                     \
-        return LCB_SUCCESS;                                                  \
+#define PYCBC_VAL_GEN(UC, LC, EXP_TYPE)                                       \
+    DECL_##EXP_TYPE(lcb_subdocspecs_##LC(lcb_SUBDOCOPS *operations,           \
+                                         size_t index,                        \
+                                         uint32_t flags,                      \
+                                         const char *path,                    \
+                                         size_t path_len,                     \
+                                         const char *value,                   \
+                                         size_t value_len)) IMPL_##EXP_TYPE({ \
+        PYCBC_SDSPEC_SET_PATH(&operations->specs[index], path, path_len);     \
+        PYCBC_SDSPEC_SET_VALUE(&operations->specs[index], value, value_len);  \
+        operations->specs[index].options = flags;                             \
+        operations->specs[index].sdcmd = LCB_SDCMD_##UC;                      \
+        return LCB_SUCCESS;                                                   \
     })
 
 #define PYCBC_SDCMD_FN_DEF(UC, LC, FN, EXP_TYPE) lcb_STATUS FN(UC, LC, EXP_TYPE)
@@ -789,5 +800,24 @@ lcb_STATUS lcb_cmdremove_durability(lcb_CMDREMOVE *cmd,
     X(LCB_ERRTYPE_NETWORK);   \
     X(LCB_ERRTYPE_TRANSIENT); \
     X(LCB_ERRTYPE_INPUT);
+
+typedef lcb_durability_opts_t pycbc_dur_opts;
+
+typedef lcb_MULTICMD_CTX pycbc_MULTICMD_CTX;
+typedef lcb_dur_opts_t pycbc_dur_opts;
+typedef lcb_CMDENDURE pycbc_CMDENDURE;
+
+#define PYCBC_OBSERVE_FROM_LCB(X) PYCBC_OBSERVE_##X
+
+#include "lcb_dur_wrappers.h"
+#define pycbc_cmdobserve_create(cmd) \
+    pycbc_CMDOBSERVE cmd_real = {0}; \
+    cmd = &cmd_real;
+#define pycbc_cmdobserve_key(cmd, buffer, nbuffer) \
+    LCB_CMD_SET_KEY(&cmd, buffer, nbuffer);
+#define pycbc_cmdobserve_master_only(cmd) \
+    cmd->cmdflags |= LCB_CMDOBSERVE_F_MASTER_ONLY;
+#define pycbc_mctx_create(instance, dest) \
+    ((*dest = lcb_observe3_ctxnew(instance)) ? LCB_SUCCESS : LCB_CLIENT_ENOMEM)
 
 #endif // COUCHBASE_PYTHON_CLIENT_LCB_V4_BACKPORT_H

@@ -207,7 +207,7 @@ static void complete_callback(lcb_t instance,
 
 void pycbc_http_callbacks_init(lcb_t instance)
 {
-    lcb_install_callback3(instance, LCB_CALLBACK_HTTP, complete_callback);
+    lcb_install_callback(instance, LCB_CALLBACK_HTTP, complete_callback);
     pycbc_views_callbacks_init(instance);
 }
 

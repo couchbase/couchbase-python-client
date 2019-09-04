@@ -138,7 +138,7 @@ void lcb_cmdgetreplica_create(lcb_CMDGETREPLICA **pcmd, int strategy)
     }
 }
 #include "pycbc_subdocops.h"
-lcb_STATUS lcb_subdocops_create(lcb_SUBDOCOPS **operations, size_t capacity)
+lcb_STATUS lcb_subdocspecs_create(lcb_SUBDOCOPS **operations, size_t capacity)
 {
     lcb_SUBDOCOPS *res = (lcb_SUBDOCOPS *)calloc(1, sizeof(lcb_SUBDOCOPS));
     res->nspecs = capacity;
@@ -171,7 +171,7 @@ void pycbc_cmdsubdoc_flags_from_scv(unsigned int sd_doc_flags, lcb_CMDSUBDOC *cm
     cmd->cmdflags |= sd_doc_flags;
 }
 
-lcb_STATUS lcb_subdocops_destroy(lcb_SUBDOCOPS *operations)
+lcb_STATUS lcb_subdocspecs_destroy(lcb_SUBDOCOPS *operations)
 {
     if (operations) {
         if (operations->specs) {
@@ -299,3 +299,25 @@ pycbc_strn_base_const pycbc_view_geometry(const lcb_RESPVIEW *ctx)
     lcb_respview_geometry(ctx, &temp.buffer, &temp.length);
     return temp;
 };
+
+lcb_STATUS pycbc_set_dur_opts(lcb_durability_opts_t *dopts,
+                              pycbc_dur_params *dur,
+                              int is_delete,
+                              int timeout)
+{
+    dopts->v.v0.persist_to = dur->persist_to;
+    dopts->v.v0.replicate_to = dur->replicate_to;
+    dopts->v.v0.timeout = timeout;
+    dopts->v.v0.check_delete = is_delete;
+    if (mres->dur.persist_to < 0 || mres->dur.replicate_to < 0) {
+        dopts->v.v0.cap_max = 1;
+    }
+    return LCB_SUCCESS;
+}
+
+pycbc_MULTICMD_CTX *pycbc_endure_ctxnew(lcb_INSTANCE *instance,
+                                        pycbc_dur_opts *dopts,
+                                        lcb_STATUS *err)
+{
+    return lcb_endure3_ctxnew(instance, dopts, err);
+}

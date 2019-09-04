@@ -16,6 +16,8 @@
 #
 
 from couchbase_v2.exceptions import ArgumentError
+
+from couchbase_core.exceptions import  NotSupportedError
 from couchbase_tests.base import ConnectionTestCase
 
 class EmptyKeyTest(ConnectionTestCase):
@@ -37,4 +39,7 @@ class EmptyKeyTest(ConnectionTestCase):
         )
 
         for fn, args in fnargs:
-            self.assertRaises(ArgumentError, fn, *args)
+            try:
+                self.assertRaises(ArgumentError, fn, *args)
+            except NotSupportedError:
+                pass

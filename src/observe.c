@@ -93,20 +93,22 @@ handle_single_observe(pycbc_Bucket *self, PyObject *curkey, int master_only,
 {
     int rv;
     pycbc_pybuffer keybuf = { NULL };
-    lcb_CMDOBSERVE cmd = { 0 };
+    pycbc_CMDOBSERVE *cmd = NULL;
+
+    pycbc_cmdobserve_create(&cmd);
     lcb_STATUS err=LCB_SUCCESS;
 
     rv = pycbc_tc_encode_key(self, curkey, &keybuf);
     if (rv < 0) {
         return -1;
     }
-    LCB_CMD_SET_KEY(&cmd, keybuf.buffer, keybuf.length);
+    pycbc_cmdobserve_key(cmd, keybuf.buffer, keybuf.length);
 
     if (master_only) {
-        cmd.cmdflags |= LCB_CMDOBSERVE_F_MASTER_ONLY;
+        pycbc_cmdobserve_master_only(cmd);
     }
     PYCBC_TRACECMD_TYPED(observe, &cmd, context, cv->mres, curkey, self);
-    err = cv->mctx->addcmd(cv->mctx, (lcb_CMDBASE*)&cmd);
+    err = pycbc_cmdendure_addcmd(cv->mctx, cmd);
     if (err == LCB_SUCCESS) {
         rv = 0;
     } else {
@@ -128,6 +130,7 @@ observe_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopts
     pycbc_seqtype_t seqtype;
     int master_only = 0;
     PyObject *master_only_O = NULL;
+    lcb_STATUS err = LCB_SUCCESS;
 
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
 
@@ -155,9 +158,9 @@ observe_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopts
         return NULL;
     }
 
-    cv.mctx = lcb_observe3_ctxnew(self->instance);
-    if (cv.mctx == NULL) {
-        PYCBC_EXCTHROW_SCHED(LCB_CLIENT_ENOMEM);
+    err = pycbc_mctx_create(self->instance, &cv.mctx);
+    if (err) {
+        PYCBC_EXCTHROW_SCHED(err);
         goto GT_DONE;
     }
 

@@ -26,7 +26,6 @@
 #define PYCBC_V4
 #include "python_wrappers.h"
 
-
 typedef lcb_DURABILITY_LEVEL pycbc_DURABILITY_LEVEL;
 
 typedef lcb_INSTANCE *lcb_t;
@@ -95,7 +94,7 @@ enum replica_legacy { LCB_REPLICA_FIRST, LCB_REPLICA_SELECT, LCB_REPLICA_ALL };
     lcb_cmd##SCOPE##_value(CMD, (KEY).buffer, (KEY).length)
 
 #ifndef LIBCOUCHBASE_couchbase_internalstructs_h__
-typedef lcb_SUBDOCOPS pycbc_SDSPEC;
+typedef lcb_SUBDOCSPECS pycbc_SDSPEC;
 
 /**@ingroup lcb-public-api
  * @defgroup lcb-subdoc Sub-Document API
@@ -269,21 +268,22 @@ typedef enum {
 
 #define PYCBC_CRYPTO_VERSION 2
 
-#define ENDUREOPS(X, ...) X(ENDURE, endure)
-#define OBSERVEOPS(X, ...) X(OBSERVE, observe)
+#define ENDUREOPS(X, ...)
+#define OBSERVEOPS(X, ...)
 #define lcb_respendure_cookie(RESP, DEST) *(DEST)=(RESP)->cookie;
 #define lcb_respendure_status(RESP) (RESP)->rc
 #define lcb_respendure_cas(RESP, DEST) *(DEST)=(RESP)->cas;
 #define lcb_respendure_key(RESP, DEST, NDEST) *(DEST)=(RESP)->key; *(NDEST)=(RESP)->nkey;
 
-#define lcb_cmdobserve_parent_span(CMD, SPAN) \
-    LCB_CMD_SET_TRACESPAN((CMD), (SPAN));
-#define lcb_respobserve_status(RESP) (RESP)->rc
-#define lcb_respobserve_cas(RESP, DEST) *(DEST)=(RESP)->cas;
-#define lcb_respobserve_key(RESP, DEST, NDEST) *(DEST)=(RESP)->key; *(NDEST)=(RESP)->nkey;
-#define lcb_respobserve_cookie(RESP, DEST) *(DEST)=(RESP)->cookie;
+#define lcb_cmdobserve_parent_span(CMD, SPAN) LCB_NOT_SUPPORTED
+#define lcb_respobserve_status(RESP) LCB_NOT_SUPPORTED
+#define lcb_respobserve_cas(RESP, DEST) LCB_NOT_SUPPORTED
+#define lcb_respobserve_key(RESP, DEST, NDEST) LCB_NOT_SUPPORTED
+#define lcb_respobserve_cookie(RESP, DEST) LCB_NOT_SUPPORTED
+#define lcb_respobserve_is_master(RESP, DEST) LCB_NOT_SUPPORTED;
+#define lcb_respobserve_flags(RESP, DEST) LCB_NOT_SUPPORTED
 
-
+#define PYCBC_OBSERVE_FROM_LCB(X) PYCBC_OBSERVE_##X
 #define lcb_cmdgetreplica_expiration(CMD, TTL)
 
 #define lcb_cmdstats_create(DEST) \
@@ -360,7 +360,7 @@ lcb_STATUS pycbc_cmdview_spatial(lcb_CMDVIEW *pCmdview, int is_spacial);
 #define PYCBC_X_SD_OPS_FULLDOC(X, NP, VAL, MVAL, CTR, ...) \
     NP(FULLDOC_GET, fulldoc_get, __VA_ARGS__)              \
     X(FULLDOC_UPSERT, fulldoc_upsert, __VA_ARGS__)         \
-    X(FULLDOC_ADD, fulldoc_add, __VA_ARGS__)               \
+    X(FULLDOC_ADD, fulldoc_insert, __VA_ARGS__)            \
     X(FULLDOC_REPLACE, fulldoc_replace, __VA_ARGS__)       \
     NP(FULLDOC_REMOVE, fulldoc_remove, __VA_ARGS__)
 
@@ -415,5 +415,24 @@ typedef lcb_DURABILITY_LEVEL pycbc_DURABILITY_LEVEL;
 
 #define PYCBC_DO_COLL(TYPE, CMD, SCOPE, NSCOPE, COLLECTION, NCOLLECTION) \
     lcb_cmd##TYPE##_collection(CMD, SCOPE, NSCOPE, COLLECTION, NCOLLECTION)
+
+typedef void pycbc_MULTICMD_CTX;
+typedef void pycbc_dur_opts;
+typedef void pycbc_CMDENDURE;
+
+#include "lcb_dur_wrappers.h"
+#define pycbc_cmdendure_key(...) LCB_NOT_SUPPORTED
+#define pycbc_cmdendure_addcmd(...) LCB_NOT_SUPPORTED
+#define pycbc_create_cmdendure(cmd) LCB_NOT_SUPPORTED
+#define pycbc_cmdendure_cas(cmd, cas) LCB_NOT_SUPPORTED
+#define pycbc_mctx_done(mctx, cookie) LCB_NOT_SUPPORTED
+#define pycbc_mctx_fail(mctx) LCB_NOT_SUPPORTED
+#define lcb_respobserve_is_master(RESP, DEST) LCB_NOT_SUPPORTED;
+typedef void pycbc_RESPOBSERVE;
+typedef void pycbc_CMDOBSERVE;
+#define pycbc_cmdobserve_create(cmd) LCB_NOT_SUPPORTED
+#define pycbc_cmdobserve_key(cmd, buffer, nbuffer) LCB_NOT_SUPPORTED
+#define pycbc_cmdobserve_master_only(cmd) LCB_NOT_SUPPORTED
+#define pycbc_mctx_create(instance, dest) LCB_NOT_SUPPORTED
 
 #endif // COUCHBASE_PYTHON_CLIENT_LCB_V4_WRAPPER_H

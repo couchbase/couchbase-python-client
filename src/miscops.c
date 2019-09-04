@@ -109,7 +109,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     else if (optype == PYCBC_CMD_ENDURE) {
         CMDSCOPE_NG_PARAMS(STORE,store, LCB_STORE_UPSERT) {
             COMMON_OPTS(cmd, PYCBC_endure_ATTR, endure, endure);
-            err = cv->mctx->addcmd(cv->mctx, (lcb_CMDBASE *) cmd);
+            err = pycbc_cmdendure_addcmd(cv->mctx, (lcb_CMDBASE *)cmd);
         }
     }
     else {

@@ -986,48 +986,36 @@ Bucket__init__(pycbc_Bucket *self,
                        PyObject *args, PyObject *kwargs)
 {
     int rv;
-    int conntype = LCB_TYPE_BUCKET;
 
     lcb_STATUS err=LCB_SUCCESS;
-    PyObject *unlock_gil_O = NULL;
-    PyObject *iops_O = NULL;
-    PyObject *dfl_fmt = NULL;
-    PyObject *tc = NULL;
-    struct lcb_create_st create_opts = { 0 };
 
     /**
      * This xmacro enumerates the constructor keywords, targets, and types.
      * This was converted into an xmacro to ease the process of adding or
      * removing various parameters.
      */
-#define XCTOR_ARGS_NOTRACING(X)                            \
-    X("connection_string", &create_opts.v.v3.connstr, "z") \
-    X("connstr", &create_opts.v.v3.connstr, "z")           \
-    X("username", &create_opts.v.v3.username, "z")         \
-    X("password", &create_opts.v.v3.passwd, "z")           \
-    X("quiet", &self->quiet, "I")                          \
-    X("unlock_gil", &unlock_gil_O, "O")                    \
-    X("transcoder", &tc, "O")                              \
-    X("default_format", &dfl_fmt, "O")                     \
-    X("lockmode", &self->lockmode, "i")                    \
-    X("_flags", &self->flags, "I")                         \
-    X("_conntype", &conntype, "i")                         \
-    X("_iops", &iops_O, "O")
 
-#define XCTOR_ARGS(X)\
-    XCTOR_ARGS_NOTRACING(X)\
-    X("tracer", &self->parent_tracer, "O")
+#define XCTOR_CREATEOPTS(CLASS)         \
+    CLASS##_TYPEOP(type, _conntype)     \
+    CLASS##_BUILD_CRED(                 \
+        CLASS##_CREDENTIAL(username),   \
+        CLASS##_CREDENTIAL(password))   \
+    CLASS##_STRING(connstr)
 
-    static char *kwlist[] = {
-        #define X(s, target, type) s,
-            XCTOR_ARGS(X)
-        #undef X
-            NULL
-    };
+#define XCTOR_NON_CREATEOPTS(CLASS)                                         \
+    CLASS##_STRINGALIAS(connection_string, connstr)                         \
+    CLASS##_TARGET_UINT(*self,quiet)                                        \
+    CLASS##_OBJECT(unlock_gil)                                              \
+    CLASS##_OBJECT(transcoder)                                              \
+    CLASS##_OBJECT(default_format)                                          \
+    CLASS##_TARGET_INT(*self, lockmode)                                     \
+    CLASS##_TARGET_UINTALIAS(*self, _flags, flags)                          \
+    CLASS##_OBJECT(_iops)                                                   \
+    CLASS##_TARGET_OBJECTALIAS(*self, tracer, parent_tracer)
 
-    #define X(s, target, type) type
-    static char *argspec = "|" XCTOR_ARGS(X);
-    #undef X
+#define XCTOR_ARGS(CLASS)       \
+    XCTOR_NON_CREATEOPTS(CLASS) \
+    XCTOR_CREATEOPTS(CLASS)
 
     if (self->init_called) {
         PyErr_SetString(PyExc_RuntimeError, "__init__ was already called");
@@ -1038,63 +1026,70 @@ Bucket__init__(pycbc_Bucket *self,
     self->flags = 0;
     self->unlock_gil = 1;
     self->lockmode = PYCBC_LOCKMODE_EXC;
+    {
+        PYCBC_KWLIST(XCTOR_ARGS, opts)
 
-    #define X(s, target, type) target,
-    rv = PyArg_ParseTupleAndKeywords(args, kwargs, argspec, kwlist,
-        XCTOR_ARGS(X) NULL);
-    #undef X
+        if (opts.unlock_gil && PyObject_IsTrue(opts.unlock_gil) == 0) {
+            self->unlock_gil = 0;
+        }
 
-    if (!rv) {
-        PYCBC_EXCTHROW_ARGS();
-        return -1;
-    }
+        if (opts._iops && opts._iops != Py_None) {
+            self->iopswrap = pycbc_iowrap_new(self, opts._iops);
+            self->unlock_gil = 0;
+        }
 
-    if (unlock_gil_O && PyObject_IsTrue(unlock_gil_O) == 0) {
-        self->unlock_gil = 0;
-    }
-    create_opts.version = 3;
-    create_opts.v.v3.type = conntype;
+        if (opts.default_format == Py_None || opts.default_format == NULL) {
+            /** Set to 0 if None or NULL */
+            opts.default_format = pycbc_IntFromL(PYCBC_FMT_JSON);
 
-    if (iops_O && iops_O != Py_None) {
-        self->iopswrap = pycbc_iowrap_new(self, iops_O);
-        create_opts.v.v3.io = pycbc_iowrap_getiops(self->iopswrap);
-        self->unlock_gil = 0;
-    }
+        } else {
+            Py_INCREF(opts.default_format); /* later decref */
+        }
 
-    if (dfl_fmt == Py_None || dfl_fmt == NULL) {
-        /** Set to 0 if None or NULL */
-        dfl_fmt = pycbc_IntFromL(PYCBC_FMT_JSON);
+        rv = Bucket_set_format(self, opts.default_format, NULL);
+        Py_XDECREF(opts.default_format);
+        if (rv == -1) {
+            return rv;
+        }
 
-    } else {
-        Py_INCREF(dfl_fmt); /* later decref */
-    }
-
-    rv = Bucket_set_format(self, dfl_fmt, NULL);
-    Py_XDECREF(dfl_fmt);
-    if (rv == -1) {
-        return rv;
-    }
-
-    /** Set the transcoder */
-    if (tc && Bucket_set_transcoder(self, tc, NULL) == -1) {
-        return -1;
-    }
+        /** Set the transcoder */
+        if (opts.transcoder &&
+            Bucket_set_transcoder(self, opts.transcoder, NULL) == -1) {
+            return -1;
+        }
 
 #if defined(WITH_THREAD)
-    if (!self->unlock_gil) {
-        self->lockmode = PYCBC_LOCKMODE_NONE;
-    }
+        if (!self->unlock_gil) {
+            self->lockmode = PYCBC_LOCKMODE_NONE;
+        }
 
-    if (self->lockmode != PYCBC_LOCKMODE_NONE) {
-        self->lock = PyThread_allocate_lock();
-    }
+        if (self->lockmode != PYCBC_LOCKMODE_NONE) {
+            self->lock = PyThread_allocate_lock();
+        }
 #else
-    self->unlock_gil = 0;
-    self->lockmode = PYCBC_LOCKMODE_NONE;
+        self->unlock_gil = 0;
+        self->lockmode = PYCBC_LOCKMODE_NONE;
 #endif
+        {
+            lcb_CREATEOPTS *lcb_create_opts = NULL;
 
-    err = lcb_create(&self->instance, &create_opts);
+#define CREATE_TYPEOP(X, NAME) lcb_createopts_create(&lcb_create_opts, opts.X);
+#define CREATE_CREDENTIAL(X) opts.X, opts.X##_len
+#define CREATE_STRING(X) \
+    lcb_createopts_##X(lcb_create_opts, opts.X, opts.X##_len);
+#define CREATE_BUILD_CRED(USERNAME, PASSWORD) \
+    lcb_createopts_credentials(lcb_create_opts, USERNAME, PASSWORD);
+#define BUILD_OPTS(...) lcb_createopts_create(&lcb_create_opts, opts.type);
+            XCTOR_CREATEOPTS(CREATE);
 
+            if (self->iopswrap) {
+                lcb_createopts_io(lcb_create_opts,
+                                  pycbc_iowrap_getiops(self->iopswrap));
+            }
+            err = lcb_create(&self->instance, lcb_create_opts);
+            lcb_createopts_destroy(lcb_create_opts);
+        }
+    }
     if (err != LCB_SUCCESS) {
         self->instance = NULL;
         PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err,
@@ -1106,8 +1101,10 @@ Bucket__init__(pycbc_Bucket *self,
     }
 
     if (pycbc_log_handler) {
-        err = lcb_cntl(self->instance, LCB_CNTL_SET, LCB_CNTL_LOGGER,
-                       &pycbc_lcb_logprocs);
+        err = lcb_cntl(self->instance,
+                       LCB_CNTL_SET,
+                       LCB_CNTL_LOGGER,
+                       pycbc_lcb_logger);
         if (err != LCB_SUCCESS) {
             self->instance = NULL;
             PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, err, "Couldn't create log handler");

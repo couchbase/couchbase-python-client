@@ -43,13 +43,13 @@ class MutationState(object):
     .. note::
 
         This feature requires Couchbase Server 4.5 or greater,
-        and also requires that `fetch_mutation_tokens=true`
+        and also requires that `enable_mutation_tokens=true`
         be specified in the connection string when creating
         a :class:`~couchbase_core.client.Client`
 
     .. code-block:: python
 
-        cb = Bucket('couchbase://localhost/default?fetch_mutation_tokens=true')
+        cb = Bucket('couchbase://localhost/default?enable_mutation_tokens=true')
 
         rvs = cb.upsert_multi({
             'foo': {'type': 'user', 'value': 'a foo value'},
@@ -112,7 +112,7 @@ class MutationState(object):
         Changes the state to reflect the mutation which yielded the given
         result.
 
-        In order to use the result, the `fetch_mutation_tokens` option must
+        In order to use the result, the `enable_mutation_tokens` option must
         have been specified in the connection string, _and_ the result
         must have been successful.
 

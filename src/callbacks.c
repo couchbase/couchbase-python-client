@@ -431,16 +431,12 @@ invoke_endure_test_notification(pycbc_Bucket *self, pycbc_Result *resp)
     Py_XDECREF(ret);
     Py_XDECREF(argtuple);
 }
-
 static void
 dur_chain2(pycbc_Bucket *conn,
     pycbc_MultiResult *mres,
     pycbc_OperationResult *res, int cbtype, const lcb_RESPBASE *resp)
 {
     lcb_STATUS err=LCB_SUCCESS;
-    lcb_durability_opts_t dopts = { 0 };
-    lcb_CMDENDURE cmd = { 0 };
-    lcb_MULTICMD_CTX *mctx = NULL;
     int is_delete = cbtype == LCB_CALLBACK_REMOVE;
     PYCBC_DEBUG_LOG_CONTEXT(res ? res->tracing_context : NULL,
                             "durability chain callback")
@@ -481,37 +477,39 @@ dur_chain2(pycbc_Bucket *conn,
         invoke_endure_test_notification(conn, (pycbc_Result *)res);
     }
 
-    /** Setup global options */
-    dopts.v.v0.persist_to = mres->dur.persist_to;
-    dopts.v.v0.replicate_to = mres->dur.replicate_to;
-    dopts.v.v0.timeout = conn->dur_timeout;
-    dopts.v.v0.check_delete = is_delete;
-    if (mres->dur.persist_to < 0 || mres->dur.replicate_to < 0) {
-        dopts.v.v0.cap_max = 1;
-    }
-
     lcb_sched_enter(conn->instance);
-    mctx = lcb_endure3_ctxnew(conn->instance, &dopts, &err);
-    if (mctx == NULL) {
-        goto GT_DONE;
-    }
+    {
+        pycbc_MULTICMD_CTX *mctx = NULL;
+        pycbc_dur_opts *dopts = NULL;
+        /** Setup global options */
 
-    cmd.cas = handler.cas;
-    LCB_CMD_SET_KEY(&cmd, handler.key.buffer, handler.key.length);
-    err = mctx->addcmd(mctx, (lcb_CMDBASE*)&cmd);
-    if (err != LCB_SUCCESS) {
-        goto GT_DONE;
-    }
+        err = pycbc_set_dur_opts(
+                dopts, &mres->dur, is_delete, conn->dur_timeout);
+        mctx = pycbc_endure_ctxnew(conn->instance, &dopts, &err);
+        if (mctx == NULL) {
+            goto GT_DONE;
+        }
+        {
+            pycbc_CMDENDURE *cmd = NULL;
 
-    err = mctx->done(mctx, mres);
-    if (err == LCB_SUCCESS) {
-        mctx = NULL;
-        lcb_sched_leave(conn->instance);
-    }
+            pycbc_cmdendure_key(&cmd, handler.key.buffer, handler.key.length);
+            err = pycbc_cmdendure_addcmd(mctx, (lcb_CMDBASE *)&cmd);
+            pycbc_create_cmdendure(&cmd);
+            pycbc_cmdendure_cas(cmd, handler.cas);
+        }
+        if (err != LCB_SUCCESS) {
+            goto GT_DONE;
+        }
+        err = pycbc_mctx_done(mctx, mres);
+        if (err == LCB_SUCCESS) {
+            mctx = NULL;
+            lcb_sched_leave(conn->instance);
+        }
 
     GT_DONE:
-    if (mctx) {
-        mctx->fail(mctx);
+        if (mctx) {
+            pycbc_mctx_fail(mctx);
+        }
     }
     if (err != LCB_SUCCESS) {
         res->rc = err;
@@ -835,11 +833,12 @@ observe_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp_base)
     pycbc_Bucket *conn;
     pycbc_ValueResult *vres = NULL;
     pycbc_MultiResult *mres = NULL;
-    const lcb_RESPOBSERVE *oresp = (const lcb_RESPOBSERVE *)resp_base;
+    const pycbc_RESPOBSERVE *oresp = (const pycbc_RESPOBSERVE *)resp_base;
     response_handler handler = {.cbtype = cbtype};
+    lcb_uint64_t flags = 0;
     PYCBC_DEBUG_LOG("observe callback")
-    if (oresp->rflags & LCB_RESP_F_FINAL) {
-        mres = (pycbc_MultiResult *)oresp->cookie;
+    if (!lcb_respobserve_flags(oresp, flags) && (flags & LCB_RESP_F_FINAL)) {
+        lcb_respobserve_cookie(oresp, &mres);
         operation_completed_with_err_info(
                 mres->parent, mres, cbtype, resp_base, (pycbc_Result *)vres);
         return;
@@ -874,10 +873,9 @@ observe_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp_base)
         pycbc_multiresult_adderr(mres);
         goto GT_DONE;
     }
-
-    oi->from_master = oresp->ismaster;
-    oi->flags = oresp->status;
-    oi->cas = oresp->cas;
+    lcb_respobserve_cas(oresp, &oi->cas);
+    lcb_respobserve_is_master(oresp, &oi->from_master);
+    oi->flags = lcb_respobserve_status(oresp);
     PyList_Append(vres->value, (PyObject*)oi);
     Py_DECREF(oi);
 
@@ -1157,26 +1155,26 @@ PYCBC_FOR_EACH_GEN_CALLBACK(PYCBC_CALLBACK_GENERIC)
 void
 pycbc_callbacks_init(lcb_t instance)
 {
-    lcb_install_callback3(instance, LCB_CALLBACK_STORE, durability_chain_common);
-    lcb_install_callback3(instance, LCB_CALLBACK_REMOVE, durability_chain_common);
-    lcb_install_callback3(instance, LCB_CALLBACK_UNLOCK, keyop_simple_callback);
-    lcb_install_callback3(instance, LCB_CALLBACK_TOUCH, keyop_simple_callback);
-    lcb_install_callback3(instance, LCB_CALLBACK_ENDURE, keyop_simple_callback);
-    lcb_install_callback3(instance, LCB_CALLBACK_GET, value_callback);
-    lcb_install_callback3(instance, LCB_CALLBACK_GETREPLICA, value_callback);
-    lcb_install_callback3(instance, LCB_CALLBACK_COUNTER, value_callback);
-    lcb_install_callback3(instance, LCB_CALLBACK_OBSERVE, observe_callback);
-    lcb_install_callback3(instance, LCB_CALLBACK_STATS, stats_callback);
-    lcb_install_callback3(instance, LCB_CALLBACK_PING, ping_callback);
-    lcb_install_callback3(instance, LCB_CALLBACK_DIAG, diag_callback);
+    lcb_install_callback(instance, LCB_CALLBACK_STORE, durability_chain_common);
+    lcb_install_callback(instance, LCB_CALLBACK_REMOVE, durability_chain_common);
+    lcb_install_callback(instance, LCB_CALLBACK_UNLOCK, keyop_simple_callback);
+    lcb_install_callback(instance, LCB_CALLBACK_TOUCH, keyop_simple_callback);
+    lcb_install_callback(instance, LCB_CALLBACK_ENDURE, keyop_simple_callback);
+    lcb_install_callback(instance, LCB_CALLBACK_GET, value_callback);
+    lcb_install_callback(instance, LCB_CALLBACK_GETREPLICA, value_callback);
+    lcb_install_callback(instance, LCB_CALLBACK_COUNTER, value_callback);
+    lcb_install_callback(instance, LCB_CALLBACK_OBSERVE, observe_callback);
+    lcb_install_callback(instance, LCB_CALLBACK_STATS, stats_callback);
+    lcb_install_callback(instance, LCB_CALLBACK_PING, ping_callback);
+    lcb_install_callback(instance, LCB_CALLBACK_DIAG, diag_callback);
 #ifdef PYCBC_EXTRA_CALLBACK_WRAPPERS
 #define X(NAME) lcb_install_callback3(instance, NAME, NAME##_cb);
     PYCBC_FOR_EACH_GEN_CALLBACK(X)
 #undef X
 #endif
     /* Subdoc */
-    lcb_install_callback3(instance, LCB_CALLBACK_SDLOOKUP, subdoc_callback);
-    lcb_install_callback3(instance, LCB_CALLBACK_SDMUTATE, subdoc_callback);
+    lcb_install_callback(instance, LCB_CALLBACK_SDLOOKUP, subdoc_callback);
+    lcb_install_callback(instance, LCB_CALLBACK_SDMUTATE, subdoc_callback);
 
     lcb_set_bootstrap_callback(instance, bootstrap_callback);
 

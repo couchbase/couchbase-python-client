@@ -103,19 +103,19 @@ pycbc_sd_metainfo pycbc_get_metainfo(const pycbc_sdspec_details_t* details)
 #undef PYCBC_METAINFO_SDCMD_CASE_COUNTER
 }
 
-lcb_STATUS pycbc_build_spec(lcb_SUBDOCOPS *subdocops,
+lcb_STATUS pycbc_build_spec(pycbc_SDSPEC *subdocops,
                             const pycbc_sdspec_details_t *details)
 {
     lcb_STATUS result = LCB_SUCCESS;
 
-#define PYCBC_BUILDSPEC_PATH_ONLY(UC, LC, ...)   \
-    lcb_subdocops_##LC(subdocops,                \
-                       details->index,           \
-                       details->flags,           \
-                       details->pathbuf->buffer, \
-                       details->pathbuf->length);
+#define PYCBC_BUILDSPEC_PATH_ONLY(UC, LC, ...)     \
+    lcb_subdocspecs_##LC(subdocops,                \
+                         details->index,           \
+                         details->flags,           \
+                         details->pathbuf->buffer, \
+                         details->pathbuf->length);
 #define PYCBC_BUILDSPEC_COUNTER(UC, LC, ...)                                  \
-    lcb_subdocops_##LC(                                                       \
+    lcb_subdocspecs_##LC(                                                     \
             subdocops,                                                        \
             details->index,                                                   \
             details->flags,                                                   \
@@ -125,15 +125,15 @@ lcb_STATUS pycbc_build_spec(lcb_SUBDOCOPS *subdocops,
                     ? strtol((const char *)details->valbuf->buffer, NULL, 10) \
                     : 0);
 #define PYCBC_BUILDSPEC_NP(UC, LC, ...) \
-    lcb_subdocops_##LC(subdocops, details->index, details->flags);
-#define PYCBC_BUILDSPEC_VAL_GEN(UC, LC, ...)     \
-    lcb_subdocops_##LC(subdocops,                \
-                       details->index,           \
-                       details->flags,           \
-                       details->pathbuf->buffer, \
-                       details->pathbuf->length, \
-                       details->valbuf->buffer,  \
-                       details->valbuf->length);
+    lcb_subdocspecs_##LC(subdocops, details->index, details->flags);
+#define PYCBC_BUILDSPEC_VAL_GEN(UC, LC, ...)       \
+    lcb_subdocspecs_##LC(subdocops,                \
+                         details->index,           \
+                         details->flags,           \
+                         details->pathbuf->buffer, \
+                         details->pathbuf->length, \
+                         details->valbuf->buffer,  \
+                         details->valbuf->length);
 
 #define PYCBC_BUILDSPEC_SDCMD_CASE(UC, LC, ...) \
     PYCBC_SDCMD_CASE_GENERIC(UC, LC, PYCBC_BUILDSPEC_PATH_ONLY, __VA_ARGS__)
@@ -163,7 +163,7 @@ void
 pycbc_common_vars_finalize(struct pycbc_common_vars *cv, pycbc_Bucket *conn)
 {
     if (cv->mctx) {
-        cv->mctx->fail(cv->mctx);
+        pycbc_mctx_fail(cv->mctx);
         cv->mctx = NULL;
     }
     lcb_sched_fail(conn->instance);
@@ -181,7 +181,7 @@ pycbc_common_vars_wait, struct pycbc_common_vars *cv, pycbc_Bucket *self)
     Py_ssize_t nsched = cv->is_seqcmd ? 1 : cv->ncmds;
 
     if (cv->mctx) {
-        cv->mctx->done(cv->mctx, cv->mres);
+        pycbc_mctx_done(cv->mctx, cv->mres);
         cv->mctx = NULL;
     }
     lcb_sched_leave(self->instance);
@@ -791,7 +791,7 @@ pycbc_encode_sd_keypath(pycbc_Bucket *conn, PyObject *src,
 }
 
 static int sd_convert_spec(PyObject *pyspec,
-                           lcb_SUBDOCOPS *subdocops,
+                           pycbc_SDSPEC *subdocops,
                            pycbc_pybuffer *pathbuf_base,
                            pycbc_pybuffer *valbuf_base,
                            size_t index)
@@ -958,13 +958,13 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     Py_INCREF(newitm->key);
 
     if (nspecs == 1) {
-        CMDSCOPE_NG_GENERIC_PARAMS(1, lcb_SUBDOCOPS, subdocops, ops, 1)
+        CMDSCOPE_NG_GENERIC_PARAMS(1, pycbc_SDSPEC, subdocspecs, ops, 1)
         {
             PyObject *single_spec = PyTuple_GET_ITEM(spectuple, 0);
             pathbufs = &pathbuf_s;
             valbufs = &valbuf_s;
             rv = sd_convert_spec(single_spec, ops, pathbufs, valbufs, 0);
-            lcb_cmdsubdoc_operations(cmd, ops);
+            lcb_cmdsubdoc_specs(cmd, ops);
             err = PYCBC_TRACE_WRAP(pycbc_call_subdoc,
                                    NULL,
                                    collection,
@@ -976,7 +976,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                                    newitm);
         }
     } else {
-        CMDSCOPE_NG_GENERIC_PARAMS(2, lcb_SUBDOCOPS, subdocops, ops, nspecs)
+        CMDSCOPE_NG_GENERIC_PARAMS(2, pycbc_SDSPEC, subdocspecs, ops, nspecs)
         {
             size_t ii;
             pathbufs = calloc(nspecs, sizeof *pathbufs);
@@ -989,7 +989,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                     break;
                 }
             }
-            lcb_cmdsubdoc_operations(cmd, ops);
+            lcb_cmdsubdoc_specs(cmd, ops);
             err = PYCBC_TRACE_WRAP(pycbc_call_subdoc,
                                    NULL,
                                    collection,

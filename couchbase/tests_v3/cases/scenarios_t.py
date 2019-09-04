@@ -219,11 +219,14 @@ class Scenarios(CollectionTestCase):
         # a reasonable restriction.
         self.coll.upsert("id","test")
         self.assertEqual(self.coll.get("id").content_as[str],"test")
-        self.retry_idempotent_remove_client_side(lambda replicateTo:
-                                             self.coll.remove("id",
-                                                              RemoveOptions().dur_client(replicateTo,
-                                                                                         PersistTo.ONE)),
-                                                 ReplicateTo.TWO, ReplicateTo.TWO, FiniteDuration.time() + Seconds(30))
+        try:
+            self.retry_idempotent_remove_client_side(lambda replicateTo:
+                                                 self.coll.remove("id",
+                                                                  RemoveOptions().dur_client(replicateTo,
+                                                                                             PersistTo.ONE)),
+                                                     ReplicateTo.TWO, ReplicateTo.TWO, FiniteDuration.time() + Seconds(30))
+        except NotSupportedError:
+            raise SkipTest("Skipping as not supported")
 
     @staticmethod
     def retry_idempotent_remove_client_side(callback,  # type: Callable[[ReplicateTo.Value],Any]

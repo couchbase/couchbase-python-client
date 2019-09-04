@@ -32,7 +32,7 @@ class MutationTokensTest(ConnectionTestCase):
         connstr = kwargs.get('connection_string', '')
         connstr = ConnectionString.parse(connstr)
         if not no_mutinfo:
-            connstr.options['fetch_mutation_tokens'] = '1'
+            connstr.options['enable_mutation_tokens'] = '1'
         kwargs['connection_string'] = connstr.encode()
         return super(MutationTokensTest, self).make_connection(**kwargs)
 
