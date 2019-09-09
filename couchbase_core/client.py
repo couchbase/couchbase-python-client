@@ -1,9 +1,7 @@
 import json
-from warnings import warn
 
 from couchbase_core._libcouchbase import Bucket as _Base
 
-from couchbase_core.subdocument import Spec
 import couchbase_core.exceptions as E
 from couchbase_core.analytics import AnalyticsQuery
 from couchbase_core.exceptions import NotImplementedInV3
@@ -12,7 +10,7 @@ from couchbase_core.views.iterator import View
 from .views.params import make_options_string, make_dvpath
 import couchbase_core._libcouchbase as _LCB
 
-from couchbase_core import priv_constants as _P, fulltext as _FTS
+from couchbase_core import priv_constants as _P, fulltext as _FTS, _depr
 import couchbase_core.analytics
 from typing import *
 from .durability import Durability
@@ -1314,7 +1312,3 @@ class Client(_Base):
         return d
 
 
-def _depr(fn, usage, stacklevel=3):
-    """Internal convenience function for deprecation warnings"""
-    warn('{0} is deprecated. Use {1} instead'.format(fn, usage),
-         stacklevel=stacklevel, category=DeprecationWarning)

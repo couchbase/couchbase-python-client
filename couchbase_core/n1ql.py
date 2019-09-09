@@ -17,7 +17,7 @@
 import json
 
 from couchbase_core._pyport import basestring
-from couchbase_core.deprecation import deprecate_module_attribute
+from couchbase_core.supportability import deprecate_module_attribute
 from couchbase_core.views.iterator import AlreadyQueriedError
 from couchbase_core.exceptions import CouchbaseError
 import sys

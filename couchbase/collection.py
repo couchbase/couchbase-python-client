@@ -1,6 +1,6 @@
+from couchbase_core.supportability import uncommitted
 from couchbase_core import abstractmethod, JSON
 
-import wrapt
 from boltons.funcutils import wraps
 from mypy_extensions import VarArg, KwArg, Arg
 
@@ -704,7 +704,7 @@ class CBCollection(CoreClient):
         :param timeout: the time allowed for the operation to be terminated. This is controlled by the client.
         :type: str
         :return: An IExistsResult object with a boolean value indicating the presence of the document.
-        :raises: Any exceptions raised by the underlying platform
+        :raise: Any exceptions raised by the underlying platform
         """
 
     class UpsertOptions(OptionBlock, ClientDurableOption, ServerDurableOption):
@@ -1316,7 +1316,6 @@ class CBCollection(CoreClient):
            rv = cb.decrement("key", DeltaValue(20), initial=SignedInt64(5))
 
         """
-        final_opts = self._check_delta_initial(kwargs, *options)
 
         final_opts = self._check_delta_initial(kwargs, *options)
         x = super(CBCollection,self).counter(id, delta=-int(DeltaValue.verified(delta)), **final_opts)
@@ -1379,8 +1378,8 @@ class Scope(object):
         :param options: collection options
         :return: A :class:`.Collection` for a collection with the given name.
 
-        :raises CollectionNotFoundException
-        :raises AuthorizationException
+        :raise: CollectionNotFoundException
+        :raise: AuthorizationException
         """
         return self._gen_collection(None, *options)
 
@@ -1391,6 +1390,7 @@ class Scope(object):
         # type: (...)->CBCollection
         return CBCollection.cast(self, collection_name, *options)
 
+    @uncommitted
     def collection(self,
                         collection_name,  # type: str
                         *options  # type: CollectionOptions
@@ -1403,8 +1403,8 @@ class Scope(object):
         :param options: collection options
         :return: A :class:`.Collection` for a collection with the given name.
 
-        :raises CollectionNotFoundException
-        :raises AuthorizationException
+        :raise: CollectionNotFoundException
+        :raise: AuthorizationException
 
         """
         return self._gen_collection(collection_name, *options)

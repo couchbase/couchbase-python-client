@@ -1,3 +1,4 @@
+from couchbase_core.supportability import uncommitted
 from couchbase_core.client import Client as CoreClient
 from .collection import CBCollection, CollectionOptions
 from .options import OptionBlock, forward_args
@@ -121,9 +122,17 @@ class Bucket(object):
         # type: (...)->str
         return self._name
 
+    @uncommitted
     def scope(self,
               scope_name  # type: str
               ):
+        """
+        Open the named scope.
+
+        :param scope_name:
+        :return: the named scope
+        :rtype: Scope
+        """
         # type: (...)->Scope
         return Scope(self, scope_name)
 
@@ -132,19 +141,22 @@ class Bucket(object):
                            ):
         # type: (...)->CBCollection
         """
-        Open the default collection
+        Open the default collection.
+
         :param CollectionOptions options: any options to pass to the Collection constructor
         :return: the default :class:`Collection` object.
         """
         return Scope(self).default_collection()
 
+    @uncommitted
     def collection(self,
                    collection_name,  # type: str
                    options=None  # type: CollectionOptions
                    ):
         # type: (...)->CBCollection
         """
-        Open a collection in the default scope
+        Open a collection in the default scope.
+
         :param collection_name: collection name
         :param CollectionOptions options: any options to pass to the Collection constructor
         :return: the default :class:`.Collection` object.

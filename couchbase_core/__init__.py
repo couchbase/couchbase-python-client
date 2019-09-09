@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from warnings import warn
+
 import enum
 import warnings
 from collections import defaultdict
@@ -263,3 +265,9 @@ class IterableWrapper(object):
             except (StopAsyncIteration, StopIteration) as e:
                 self.done = True
                 break
+
+
+def _depr(fn, usage, stacklevel=3):
+    """Internal convenience function for deprecation warnings"""
+    warn('{0} is deprecated. Use {1} instead'.format(fn, usage),
+         stacklevel=stacklevel, category=DeprecationWarning)

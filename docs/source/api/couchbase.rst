@@ -8,6 +8,7 @@ Bucket object
     .. automethod:: __init__
     .. automethod:: scope
     .. automethod:: default_collection
+    .. automethod:: collection
 
 .. _argtypes:
 
@@ -24,7 +25,7 @@ Scope object
 
     .. automethod:: __init__
     .. automethod:: default_collection
-    .. automethod:: open_collection
+    .. automethod:: collection
 
 
 =================

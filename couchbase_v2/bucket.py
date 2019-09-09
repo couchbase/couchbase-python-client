@@ -20,7 +20,8 @@ import couchbase_core._libcouchbase as _LCB
 from couchbase_core._libcouchbase import Bucket as _Base
 
 import couchbase_v2
-from couchbase_core.client import Client as CoreClient, _depr
+from couchbase_core.client import Client as CoreClient
+from couchbase_core import _depr
 from couchbase_v2.exceptions_shim import *
 from couchbase_core.result import *
 from couchbase_core.bucketmanager import BucketManager
