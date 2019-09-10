@@ -71,7 +71,7 @@ class QueryOptions(OptionBlock, IQueryResult):
         super(QueryOptions, self).__init__(statement=statement, parameters=parameters, timeout=timeout)
 
 
-class Cluster:
+class Cluster(object):
     clusterbucket = None  # type: CoreClient
 
     class ClusterOptions(OptionBlock):
@@ -109,6 +109,13 @@ class Cluster:
         cluster_opts.update(bucket_class=lambda connstr, bname=None, **kwargs: Bucket(connstr,name=bname,**kwargs))
         self._cluster = SDK2Cluster(connection_string, **cluster_opts)  # type: SDK2Cluster
         self._authenticate(authenticator)
+
+    @staticmethod
+    def connect(connection_string,  # type: str
+                *options,  # type: ClusterOptions
+                **kwargs
+                ):
+        return Cluster(connection_string, *options, **kwargs)
 
     def _authenticate(self,
                      authenticator=None,  # type: SDK2Authenticator

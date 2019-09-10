@@ -61,9 +61,14 @@ from couchbase_core.connstr import ConnectionString
 from couchbase.diagnostics import ServiceType
 import couchbase_core.fulltext as FT
 from couchbase.exceptions import KeyNotFoundException, KeyExistsException, NotSupportedError
+from parameterized import parameterized_class
 
 
 class ClusterTestCase(ConnectionTestCase):
+    def __init__(self, *args, **kwargs):
+        super(ClusterTestCase, self).__init__(*args, **kwargs)
+        self.cluster_factory = getattr(self, 'cluster_factory', Cluster.connect)
+
     def setUp(self, **kwargs):
         self.factory = Bucket
         super(ClusterTestCase, self).setUp()
@@ -72,15 +77,22 @@ class ClusterTestCase(ConnectionTestCase):
         bucket_name = connstr_abstract.bucket
         connstr_abstract.bucket = None
         connstr_abstract.set_option('enable_collections', 'true')
-        self.cluster = Cluster(connstr_abstract, ClusterOptions(ClassicAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)))
+        self.cluster = self.cluster_factory(connstr_abstract, ClusterOptions(
+            ClassicAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)))
         self.admin = self.make_admin_connection()
         self.bucket = self.cluster.bucket(bucket_name, **connargs)
-        self.bucket_name=bucket_name
+        self.bucket_name = bucket_name
+
+
+ParamClusterTestCase = parameterized_class(('cluster_factory',), [(Cluster,), (Cluster.connect,)])(ClusterTestCase)
 
 
 class CollectionTestCase(ClusterTestCase):
     coll = None  # type: CBCollection
     initialised = defaultdict(lambda: {})
+
+    def __init__(self, *args, **kwargs):
+        super(CollectionTestCase,self).__init__(*args,**kwargs)
 
     def setUp(self, mock_collections, real_collections):
         # prepare:
