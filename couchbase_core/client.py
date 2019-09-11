@@ -665,11 +665,6 @@ class Client(_Base):
             sdflags |= _P.CMDSUBDOC_F_UPSERT_DOC
 
         # TODO: find a way of supporting this with LCB V4 API - PYCBC-584
-        if _LCB.PYCBC_LCB_API>0x02FF00 and (sdflags & _P.CMDSUBDOC_F_INSERT_DOC):
-            for spec in specs:
-                if spec[0] ==_LCB.LCB_SDCMD_DICT_UPSERT:
-                    raise E.NotSupportedError("Subdoc upsert + fulldoc insert Not supported in SDK 3 yet")
-
         kwargs['_sd_doc_flags'] = sdflags
         return super(Client, self).mutate_in(key, tuple(specs), **kwargs)
 

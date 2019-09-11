@@ -80,7 +80,14 @@ pycbc_strn_base_const pycbc_respsubdoc_value(const pycbc_SDENTRY *ent)
 
 void pycbc_cmdsubdoc_flags_from_scv(unsigned int sd_doc_flags, lcb_CMDSUBDOC *cmd) {
 
-    lcb_cmdsubdoc_create_if_missing(cmd, (sd_doc_flags & CMDSUBDOC_F_UPSERT_DOC) ? 1 : 0);
+    if  (sd_doc_flags & CMDSUBDOC_F_UPSERT_DOC)
+    {
+        lcb_cmdsubdoc_store_semantics(cmd, LCB_SUBDOC_STORE_UPSERT);
+    }
+    if  (sd_doc_flags & CMDSUBDOC_F_INSERT_DOC)
+    {
+        lcb_cmdsubdoc_store_semantics(cmd, LCB_SUBDOC_STORE_INSERT);
+    }
 }
 
 

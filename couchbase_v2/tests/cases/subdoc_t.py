@@ -289,15 +289,8 @@ class SubdocTest(ConnectionTestCase):
 
         # Check 'insert_doc'
 
-        # TODO: need to find a way to support this on LCB V4 API if it is still a desired use case - PYCBC-584
-        try:
-            self.assertRaises(E.KeyExistsError, cb.mutate_in,key, SD.upsert('new.path', 'newval'), insert_doc=True)
-        except E.NotSupportedError:
-            logging.error(traceback.format_exc())
+        self.assertRaises(E.KeyExistsError, cb.mutate_in,key, SD.upsert('new.path', 'newval'), insert_doc=True)
         cb.remove(key)
 
-        try:
-            cb.mutate_in(key, SD.upsert('new.path', 'newval'), insert_doc=True)
-            self.assertEqual('newval', cb.retrieve_in(key, 'new.path')[0])
-        except E.NotSupportedError:
-            logging.error(traceback.format_exc())
+        cb.mutate_in(key, SD.upsert('new.path', 'newval'), insert_doc=True)
+        self.assertEqual('newval', cb.retrieve_in(key, 'new.path')[0])
