@@ -47,7 +47,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                 void *arg)
 
 {
-    pycbc_Bucket *self = collection->bucket;
+    pycbc_Bucket *self = (pycbc_Bucket *)collection;
     int rv;
     unsigned int lock = 0;
     struct getcmd_vars_st *gv = (struct getcmd_vars_st *)arg;
@@ -246,7 +246,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
     static char *kwlist[] = {
             "keys", "ttl", "quiet", "replica", "no_format", "durability_level", NULL};
 #undef X
-    pycbc_Collection_t collection = pycbc_Collection_as_value(self, kwargs);
+    PYCBC_COLLECTION_INIT(self, kwargs)
     int rv = PyArg_ParseTupleAndKeywords(args,
                                          kwargs,
                                          "O|OOOOI",
@@ -328,7 +328,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
         // temporary wrapping code until everything is migrated to collections
 
         if (argopts & PYCBC_ARGOPT_MULTI) {
-            rv = PYCBC_OPUTIL_ITER_MULTI_COLLECTION(&collection,
+            rv = PYCBC_OPUTIL_ITER_MULTI_COLLECTION(pcb_collection,
                                                     seqtype,
                                                     kobj,
                                                     &cv,
@@ -345,7 +345,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
                                          &context,
                                          self,
                                          NULL,
-                                         &collection,
+                                         pcb_collection,
                                          &cv,
                                          optype,
                                          kobj,
@@ -398,7 +398,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
 GT_DONE:
     pycbc_common_vars_finalize(&cv, self);
 GT_FINALLY:
-    pycbc_Collection_free_unmanaged_contents(&collection);
+    pycbc_Collection_free_if_stack_allocated(pcb_collection);
     return cv.ret;
 }
 
@@ -416,7 +416,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                 pycbc_Item *itm,
                 void *arg)
 {
-    pycbc_Bucket *self = collection->bucket;
+    pycbc_Bucket *self = (pycbc_Bucket *)collection;
     pycbc_pybuffer keybuf = {NULL};
     int rv = 0;
     if (itm) {
@@ -453,7 +453,7 @@ sdlookup_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argop
     pycbc_seqtype_t seqtype;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
     static char *kwlist[] = { "ks", "quiet", NULL };
-    pycbc_Collection_t collection = pycbc_Collection_as_value(self, kwargs);
+    PYCBC_COLLECTION_INIT(self, kwargs)
     if (!PyArg_ParseTupleAndKeywords(
         args, kwargs, "O|O", kwlist, &kobj, &quiet_key)) {
         PYCBC_EXCTHROW_ARGS();
@@ -468,7 +468,7 @@ sdlookup_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argop
         goto GT_FAIL;
     }
 
-    if (PYCBC_OPUTIL_ITER_MULTI_COLLECTION(&collection,
+    if (PYCBC_OPUTIL_ITER_MULTI_COLLECTION(pcb_collection,
                                            seqtype,
                                            kobj,
                                            &cv,
@@ -489,7 +489,7 @@ sdlookup_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argop
     GT_DONE:
     pycbc_common_vars_finalize(&cv, self);
     GT_FINAL:
-        pycbc_Collection_free_unmanaged_contents(&collection);
+        pycbc_Collection_free_if_stack_allocated(pcb_collection);
         return cv.ret;
     GT_FAIL:
         cv.ret = NULL;

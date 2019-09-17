@@ -519,77 +519,74 @@ lcb_STATUS pycbc_logging_monad_verb(const char *FILE,
                                 CMDNAME,                           \
                                 __VA_ARGS__)
 
-
 typedef struct {
-    PyObject_HEAD
-
-    /** LCB instance */
-    lcb_INSTANCE *instance;
-    /** Tracer **/
-    struct pycbc_Tracer *tracer;
-    PyObject *parent_tracer;
-    /** Transcoder object */
-    PyObject *tc;
-
-    /** Default format, PyInt */
-    PyObject *dfl_fmt;
-
-    /** Callback to be invoked when connected */
-    PyObject *conncb;
-
-    /**
-     * Callback to be invoked upon destruction. Because we can fall out
-     * of scope in middle of an LCB function, this is required.
-     *
-     * The dtorcb is first called when the refcount of the connection
-     */
-    PyObject *dtorcb;
-
-    /**
-     * Test hook for reacting to durability/persistence settings from within
-     * mutator functions
-     */
-    PyObject *dur_testhook;
-
-
-    /** String bucket */
-    PyObject *bucket;
-
-    /** Bucket type */
-    PyObject *btype;
-
-    /** Pipeline MultiResult container */
-    PyObject *pipeline_queue;
-
-    /** If using a custom IOPS, this contains it */
-    PyObject *iopswrap;
-
-    /** Thread state. Used to lock/unlock the GIL */
-    PyThreadState *thrstate;
-
-    PyThread_type_lock lock;
-    unsigned int lockmode;
-
-    /** Whether to not raise any exceptions */
-    unsigned int quiet;
-
-    /** Whether GIL handling is in effect */
-    unsigned int unlock_gil;
-
-    /** Don't decode anything */
-    unsigned int data_passthrough;
-
-    /** whether __init__ has already been called */
-    unsigned char init_called;
-
-    /** How many operations are waiting for a reply */
-    Py_ssize_t nremaining;
-
-    unsigned int flags;
-
-    pycbc_dur_params dur_global;
+#define PYCBC_BUCKET_BASE                                                    \
+    PyObject_HEAD /** LCB instance */                                        \
+            lcb_INSTANCE *instance;                                          \
+    /** Tracer **/                                                           \
+    struct pycbc_Tracer *tracer;                                             \
+    PyObject *parent_tracer;                                                 \
+    /** Transcoder object */                                                 \
+    PyObject *tc;                                                            \
+                                                                             \
+    /** Default format, PyInt */                                             \
+    PyObject *dfl_fmt;                                                       \
+                                                                             \
+    /** Callback to be invoked when connected */                             \
+    PyObject *conncb;                                                        \
+                                                                             \
+    /**                                                                      \
+     * Callback to be invoked upon destruction. Because we can fall out      \
+     * of scope in middle of an LCB function, this is required.              \
+     *                                                                       \
+     * The dtorcb is first called when the refcount of the connection        \
+     */                                                                      \
+    PyObject *dtorcb;                                                        \
+                                                                             \
+    /**                                                                      \
+     * Test hook for reacting to durability/persistence settings from within \
+     * mutator functions                                                     \
+     */                                                                      \
+    PyObject *dur_testhook;                                                  \
+                                                                             \
+    /** String bucket */                                                     \
+    PyObject *bucket;                                                        \
+                                                                             \
+    /** Bucket type */                                                       \
+    PyObject *btype;                                                         \
+                                                                             \
+    /** Pipeline MultiResult container */                                    \
+    PyObject *pipeline_queue;                                                \
+                                                                             \
+    /** If using a custom IOPS, this contains it */                          \
+    PyObject *iopswrap;                                                      \
+                                                                             \
+    /** Thread state. Used to lock/unlock the GIL */                         \
+    PyThreadState *thrstate;                                                 \
+                                                                             \
+    PyThread_type_lock lock;                                                 \
+    unsigned int lockmode;                                                   \
+                                                                             \
+    /** Whether to not raise any exceptions */                               \
+    unsigned int quiet;                                                      \
+                                                                             \
+    /** Whether GIL handling is in effect */                                 \
+    unsigned int unlock_gil;                                                 \
+                                                                             \
+    /** Don't decode anything */                                             \
+    unsigned int data_passthrough;                                           \
+                                                                             \
+    /** whether __init__ has already been called */                          \
+    unsigned char init_called;                                               \
+                                                                             \
+    /** How many operations are waiting for a reply */                       \
+    Py_ssize_t nremaining;                                                   \
+                                                                             \
+    unsigned int flags;                                                      \
+                                                                             \
+    pycbc_dur_params dur_global;                                             \
     unsigned long dur_timeout;
-
+    PYCBC_BUCKET_BASE
 } pycbc_Bucket;
 
 /**
@@ -607,8 +604,9 @@ typedef struct {
 typedef struct pycbc_Collection pycbc_Collection_t;
 
 struct pycbc_Collection {
-    PyObject_HEAD pycbc_Bucket *bucket;
+    PYCBC_BUCKET_BASE
     pycbc_Collection_coords collection;
+    int stack_allocated;
 };
 
 /**
@@ -631,10 +629,19 @@ typedef struct {
 } pycbc_coll_context;
 
 int pycbc_collection_init_from_fn_args(pycbc_Collection_t *self,
-                                       pycbc_Bucket *bucket,
                                        PyObject *kwargs);
 pycbc_Collection_t pycbc_Collection_as_value(pycbc_Bucket *self,
                                              PyObject *kwargs);
+
+pycbc_Collection_t *pycbc_Collection_ptr(pycbc_Bucket *self,
+                                         pycbc_Collection_t *in_place,
+                                         PyObject *kwargs);
+#define PYCBC_COLLECTION_INIT(SELF, KWARGS) \
+    pycbc_Collection_t cb_collection = {0}; \
+    pycbc_Collection_t *pcb_collection =    \
+            pycbc_Collection_ptr(self, &cb_collection, KWARGS);
+void pycbc_Collection_free_if_stack_allocated(
+        const pycbc_Collection_t *collection);
 void pycbc_Collection_free_unmanaged_contents(
         const pycbc_Collection_t *collection);
 #define PYCBC_COLLECTION_XARGS(X) X("collection", &collection, "O")
@@ -703,7 +710,7 @@ lcb_STATUS pycbc_log_coll(const char *TYPE,
 
 #define COLLECTION_ARG pycbc_Collection_t *
 #define NOCOLLECTION_ARG lcb_INSTANCE *
-#define COLLECTION_GETINSTANCE subject->bucket->instance
+#define COLLECTION_GETINSTANCE subject->instance
 #define NOCOLLECTION_GETINSTANCE subject
 #define COLLECTION_SET_COLL(UC, LC, CMD, SUBJECT) \
     PYCBC_CMD_COLLECTION(LC, CMD, SUBJECT)
@@ -1583,7 +1590,7 @@ PyObject *pycbc_lcb_errstr(lcb_t instance, lcb_STATUS err);
 PyObject *pycbc_print_constants(PyObject *mod, PyObject *args);
 
 int pycbc_ResultType_init(PyObject **ptr);
-int pycbc_BucketType_init(PyObject **ptr);
+int pycbc_ClientType_init(PyObject **ptr);
 int pycbc_MultiResultType_init(PyObject **ptr);
 int pycbc_ValueResultType_init(PyObject **ptr);
 int pycbc_OperationResultType_init(PyObject **ptr);

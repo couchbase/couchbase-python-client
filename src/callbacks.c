@@ -491,7 +491,7 @@ dur_chain2(pycbc_Bucket *conn,
         }
         {
             pycbc_CMDENDURE *cmd = NULL;
-
+            (void)cmd;
             pycbc_cmdendure_key(&cmd, handler.key.buffer, handler.key.length);
             err = pycbc_cmdendure_addcmd(mctx, (lcb_CMDBASE *)&cmd);
             pycbc_create_cmdendure(&cmd);
@@ -834,6 +834,7 @@ observe_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp_base)
     pycbc_ValueResult *vres = NULL;
     pycbc_MultiResult *mres = NULL;
     const pycbc_RESPOBSERVE *oresp = (const pycbc_RESPOBSERVE *)resp_base;
+    (void)oresp;
     response_handler handler = {.cbtype = cbtype};
     lcb_uint64_t flags = 0;
     PYCBC_DEBUG_LOG("observe callback")

@@ -94,7 +94,7 @@ handle_single_observe(pycbc_Bucket *self, PyObject *curkey, int master_only,
     int rv;
     pycbc_pybuffer keybuf = { NULL };
     pycbc_CMDOBSERVE *cmd = NULL;
-
+    (void)cmd;
     pycbc_cmdobserve_create(&cmd);
     lcb_STATUS err=LCB_SUCCESS;
 

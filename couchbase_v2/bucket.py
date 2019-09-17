@@ -17,7 +17,7 @@
 
 import couchbase_core._bootstrap
 import couchbase_core._libcouchbase as _LCB
-from couchbase_core._libcouchbase import Bucket as _Base
+from couchbase_core._libcouchbase import Collection as _Base
 
 import couchbase_v2
 from couchbase_core.client import Client as CoreClient

@@ -11,7 +11,7 @@ from .result import GetResult, get_result_wrapper, SDK2Result, ResultPrecursor, 
 from .options import forward_args, Seconds, OptionBlockTimeOut, OptionBlockDeriv, ConstrainedInt, SignedInt64, AcceptableInts
 from .options import OptionBlock, AcceptableInts
 from .durability import ReplicateTo, PersistTo, ClientDurableOption, ServerDurableOption
-from couchbase_core._libcouchbase import Bucket as _Base
+from couchbase_core._libcouchbase import Collection as _Base
 import couchbase.exceptions
 from couchbase_core.client import Client as CoreClient
 import copy
@@ -180,22 +180,7 @@ def _mutate_result_and_inject(func  # type: RawCollectionMethod
 def _inject_scope_and_collection(func  # type: RawCollectionMethodSpecial
                                  ):
     # type: (...) -> RawCollectionMethod
-    @wraps(func)
-    def wrapped(self,  # type: CBCollection
-                *args,  # type: Any
-                **kwargs  # type:  Any
-                ):
-        # type: (...)->Any
-        if self.true_collections:
-            if self._self_name and not self._self_scope:
-                raise couchbase.exceptions.CollectionMissingException
-            if self._self_scope and self._self_name:
-                kwargs['scope'] = self._self_scope.name
-                kwargs['collection'] = self._self_name
-
-        return func(self, *args, **kwargs)
-
-    return wrapped
+    return func
 
 
 class BinaryCollection(object):
@@ -252,30 +237,21 @@ class CBCollection(CoreClient):
         connstr = kwargs.pop('connection_string', kwargs.pop('connstr', None))
         connstr = connstr or args.pop(0)
         final_args = [connstr] + args
+        if parent:
+            kwargs['scope']=parent.name
+            kwargs['collection']=name
         super(CBCollection, self).__init__(*final_args, **kwargs)
-        self._init(name, parent)
 
-    def _init(self,
-              name,  # type: Optional[str]
-              scope  # type: Scope
-              ):
-        self._self_scope = scope  # type: Scope
-        self._self_name = name  # type: Optional[str]
-        self._self_true_collections = name and scope
-
-    @property
-    def true_collections(self):
-        return self._self_true_collections
 
     @classmethod
     def cast(cls,
              parent,  # type: Scope
              name,  # type Optional[str]
              *options  # type: CollectionOptions
-            ):
+             ):
         # type: (...)->CBCollection
-        coll_args=copy.deepcopy(parent.bucket._bucket_args)
-        coll_args.update(name=name,parent=parent)
+        coll_args = copy.deepcopy(parent.bucket._bucket_args)
+        coll_args.update(name=name, parent=parent)
         result = parent.bucket._corebucket_class(parent.bucket._connstr, **parent.bucket._bucket_args)
         return result
 
@@ -1321,11 +1297,12 @@ class CBCollection(CoreClient):
         x = super(CBCollection,self).counter(id, delta=-int(DeltaValue.verified(delta)), **final_opts)
         return ResultPrecursor(x, final_opts)
 
-    def _check_delta_initial(self, kwargs, *options):
+    @staticmethod
+    def _check_delta_initial(kwargs, *options):
         final_opts = forward_args(kwargs, *options)
         init_arg = final_opts.get('initial')
-        initial = None if init_arg == None else int(SignedInt64.verified(init_arg))
-        if initial != None:
+        initial = None if init_arg is None else int(SignedInt64.verified(init_arg))
+        if initial is not None:
             final_opts['initial'] = initial
         return final_opts
 

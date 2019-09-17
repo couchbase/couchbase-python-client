@@ -352,8 +352,9 @@ class SDK2MutationToken(MutationToken):
 def get_mutation_result(result  # type: ResultPrecursor
                         ):
     # type (...)->MutationResult
-    factory_class = SDK2AsyncMutationResult if issubclass(type(result.orig_result), AsyncResult) else SDK2MutationResult
-    return factory_class(result.orig_result)
+    orig_result = getattr(result,'orig_result',result)
+    factory_class = SDK2AsyncMutationResult if issubclass(type(orig_result), AsyncResult) else SDK2MutationResult
+    return factory_class(orig_result)
 
 
 def get_multi_mutation_result(target, wrapped, keys, *options, **kwargs):

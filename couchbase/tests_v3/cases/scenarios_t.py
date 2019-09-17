@@ -16,7 +16,6 @@
 # limitations under the License.
 #
 import traceback
-from collections import defaultdict
 from typing import *
 from unittest import SkipTest
 
@@ -39,16 +38,15 @@ import couchbase.exceptions
 
 from couchbase import JSONDocument, DeltaValue, SignedInt64, MutateInResult
 from couchbase_core.durability import Durability
-from couchbase.cluster import Cluster, ClusterOptions
 from couchbase import ReplicateTo, PersistTo, FiniteDuration, copy, \
     Seconds, ReplicaNotConfiguredException, DocumentConcurrentlyModifiedException, \
     DocumentMutationLostException, ReplicaNotAvailableException, MutateSpec, CASMismatchException, \
     Durations, \
     MutateInOptions
-from couchbase import CBCollection, GetOptions, RemoveOptions, ReplaceOptions
+from couchbase import GetOptions, RemoveOptions, ReplaceOptions
 from couchbase import Bucket
 
-from couchbase_tests.base import ConnectionTestCase, ConnectionTestCaseBase
+from couchbase_tests.base import ClusterTestCase, CollectionTestCase
 import couchbase.subdocument as SD
 import couchbase.admin
 import couchbase_core._bootstrap
@@ -56,80 +54,13 @@ import couchbase_core._libcouchbase as _LCB
 import couchbase_core.cluster
 import couchbase.admin
 import couchbase_core.tests.analytics_harness
-from couchbase_core.cluster import ClassicAuthenticator
-from couchbase_core.connstr import ConnectionString
 from couchbase.diagnostics import ServiceType
 import couchbase_core.fulltext as FT
 from couchbase.exceptions import KeyNotFoundException, KeyExistsException, NotSupportedError
-from parameterized import parameterized_class
-
-
-class ClusterTestCase(ConnectionTestCase):
-    def __init__(self, *args, **kwargs):
-        super(ClusterTestCase, self).__init__(*args, **kwargs)
-        self.cluster_factory = getattr(self, 'cluster_factory', Cluster.connect)
-
-    def setUp(self, **kwargs):
-        self.factory = Bucket
-        super(ClusterTestCase, self).setUp()
-        connargs = self.cluster_info.make_connargs()
-        connstr_abstract = ConnectionString.parse(connargs.pop('connection_string'))
-        bucket_name = connstr_abstract.bucket
-        connstr_abstract.bucket = None
-        connstr_abstract.set_option('enable_collections', 'true')
-        self.cluster = self.cluster_factory(connstr_abstract, ClusterOptions(
-            ClassicAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)))
-        self.admin = self.make_admin_connection()
-        self.bucket = self.cluster.bucket(bucket_name, **connargs)
-        self.bucket_name = bucket_name
-
-
-ParamClusterTestCase = parameterized_class(('cluster_factory',), [(Cluster,), (Cluster.connect,)])(ClusterTestCase)
-
-
-class CollectionTestCase(ClusterTestCase):
-    coll = None  # type: CBCollection
-    initialised = defaultdict(lambda: {})
-
-    def __init__(self, *args, **kwargs):
-        super(CollectionTestCase,self).__init__(*args,**kwargs)
-
-    def setUp(self, mock_collections, real_collections):
-        # prepare:
-        # 1) Connect to a Cluster
-        super(CollectionTestCase,self).setUp()
-        cm = couchbase.admin.CollectionManager(self.admin, self.bucket_name)
-        my_collections = mock_collections if self.is_mock else real_collections
-        for scope_name, collections in my_collections.items():
-            CollectionTestCase._upsert_scope(cm, scope_name)
-            scope = self.bucket.scope(scope_name) if scope_name else self.bucket
-            for collection_name, dest in collections.items():
-                CollectionTestCase._upsert_collection(cm, collection_name, scope_name)
-                # 2) Open a Collection
-                coll = scope.collection(collection_name) if collection_name else scope.default_collection()
-                setattr(self, dest, coll)
-
-    @staticmethod
-    def _upsert_collection(cm, collection_name, scope_name):
-        if not collection_name in CollectionTestCase.initialised[scope_name].keys():
-            try:
-                cm.insert_collection(collection_name, scope_name)
-                CollectionTestCase.initialised[scope_name][collection_name]=None
-            except:
-                pass
-
-    @staticmethod
-    def _upsert_scope(cm, scope_name):
-        try:
-            if scope_name and not scope_name in CollectionTestCase.initialised.keys():
-                cm.insert_scope(scope_name)
-        except:
-            pass
 
 
 class Scenarios(CollectionTestCase):
-    def setUp(self, **kwargs):
-        super(Scenarios, self).setUp({None: {None: "coll"}}, {"bedrock": {"flintstones": 'coll'}})
+
 
     def test_scenario_A(self):
         # 1) fetch a full document that is a json document

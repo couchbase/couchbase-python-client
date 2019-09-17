@@ -64,11 +64,11 @@ class ClusterTest(CouchbaseTestCase):
         cb = cluster.open_bucket(bucket_name)
         row = cluster.n1ql_query('select mockrow').get_single_result()
 
-        # Should fail again once the bucket has been GC'd
+        # With G3CP/cluster-wide operations, should still work once the bucket has been GC'd
         del cb
         gc.collect()
 
-        self.assertRaises(NoBucketError, cluster.n1ql_query, 'select mockrow')
+        cluster.n1ql_query('select mockrow')
 
     def test_no_mixed_auth(self):
         cluster, bucket_name = self._create_cluster()

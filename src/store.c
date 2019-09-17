@@ -123,7 +123,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                 pycbc_Item *itm,
                 void *arg)
 {
-    pycbc_Bucket *self = collection->bucket;
+    pycbc_Bucket *self = (pycbc_Bucket *)collection;
     int rv;
     const struct storecmd_vars *scv = (const struct storecmd_vars *) arg;
     pycbc_pybuffer keybuf = {NULL};
@@ -169,7 +169,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                 pycbc_Item *itm,
                 void *arg)
 {
-    pycbc_Bucket *self = collection->bucket;
+    pycbc_Collection_t *self = collection;
     int rv;
     const struct storecmd_vars *scv = (struct storecmd_vars *) arg;
     struct single_key_context skc = {NULL};
@@ -196,7 +196,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     skc.value = curvalue;
     skc.cas = scv->single_cas;
 
-    rv = pycbc_tc_encode_key(self, curkey, &keybuf);
+    rv = pycbc_tc_encode_key((pycbc_Bucket *)self, curkey, &keybuf);
     if (rv < 0) {
         return -1;
     }
@@ -209,7 +209,8 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
         }
     }
 
-    rv = pycbc_tc_encode_value(self, skc.value, skc.flagsobj, &valbuf, &flags);
+    rv = pycbc_tc_encode_value(
+            (pycbc_Bucket *)self, skc.value, skc.flagsobj, &valbuf, &flags);
     if (rv < 0) {
         rv = -1;
         goto GT_DONE;
@@ -237,7 +238,12 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
             lcb_cmdstore_cas(cmd, skc.cas);
             lcb_cmdstore_expiry(cmd, (uint32_t)skc.ttl);
 
-            PYCBC_TRACECMD_TYPED(store, cmd, context, cv->mres, curkey, self);
+            PYCBC_TRACECMD_TYPED(store,
+                                 cmd,
+                                 context,
+                                 cv->mres,
+                                 curkey,
+                                 (pycbc_Bucket *)self);
             err = pycbc_store(collection, cv->mres, cmd);
         }
     }
@@ -307,7 +313,7 @@ set_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
     struct storecmd_vars scv = { 0 };
     char persist_to = 0, replicate_to = 0;
     pycbc_DURABILITY_LEVEL dur_level = LCB_DURABILITYLEVEL_NONE;
-    pycbc_Collection_t collection = pycbc_Collection_as_value(self, kwargs);
+    PYCBC_COLLECTION_INIT(self, kwargs);
     static char *kwlist_multi[] = {"kv",
                                    "ttl",
                                    "format",
@@ -404,7 +410,7 @@ set_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
     }
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
-        rv = PYCBC_OPUTIL_ITER_MULTI_COLLECTION(&collection,
+        rv = PYCBC_OPUTIL_ITER_MULTI_COLLECTION(pcb_collection,
                                                 seqtype,
                                                 dict,
                                                 &cv,
@@ -420,7 +426,7 @@ set_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
                                      &context,
                                      self,
                                      NULL,
-                                     &collection,
+                                     pcb_collection,
                                      &cv,
                                      0,
                                      key,
@@ -452,7 +458,7 @@ set_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
     GT_DONE:
     pycbc_common_vars_finalize(&cv, self);
     GT_FINALLY:
-        pycbc_Collection_free_unmanaged_contents(&collection);
+        pycbc_Collection_free_if_stack_allocated(pcb_collection);
         return cv.ret;
     GT_FAIL:
         cv.ret = NULL;

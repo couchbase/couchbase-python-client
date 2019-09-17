@@ -19,13 +19,19 @@ import sys
 import types
 import platform
 import warnings
+from collections import defaultdict
 from unittest import SkipTest
 
+from parameterized import parameterized_class
 from testfixtures import LogCapture
 
 from testresources import ResourcedTestCase as ResourcedTestCaseReal, TestResourceManager
 
+import couchbase.admin
 import couchbase_core
+from couchbase import Cluster, Bucket, ClusterOptions
+from couchbase_core.cluster import ClassicAuthenticator
+from couchbase_core.connstr import ConnectionString
 
 try:
     import unittest2 as unittest
@@ -737,3 +743,91 @@ class SkipUnsupported(SkipTest):
                  cause
                  ):
         super(SkipUnsupported,self).__init__(traceback.format_exc())
+
+from couchbase.bucket import Bucket as V3Bucket
+
+class ClusterTestCase(ConnectionTestCase):
+    def __init__(self, *args, **kwargs):
+        super(ClusterTestCase, self).__init__(*args, **kwargs)
+        self.cluster_factory = getattr(self, 'cluster_factory', Cluster.connect)
+
+    def setUp(self, **kwargs):
+        self.factory = V3Bucket
+        super(ClusterTestCase, self).setUp()
+        connargs = self.cluster_info.make_connargs()
+        connstr_abstract = ConnectionString.parse(connargs.pop('connection_string'))
+        bucket_name = connstr_abstract.bucket
+        connstr_abstract.bucket = None
+        connstr_abstract.set_option('enable_collections', 'true')
+        self.cluster = self.cluster_factory(connstr_abstract, ClusterOptions(
+            ClassicAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)))
+        self.admin = self.make_admin_connection()
+        self.bucket = self.cluster.bucket(bucket_name, **connargs)
+        self.bucket_name = bucket_name
+
+
+ParamClusterTestCase = parameterized_class(('cluster_factory',), [(Cluster,), (Cluster.connect,)])(ClusterTestCase)
+
+
+class CollectionTestCase(ClusterTestCase):
+    coll = None  # type: CBCollection
+    initialised = defaultdict(lambda: {})
+    class ItemValidator(object):
+        def __init__(self, parent):
+            self._parent=parent
+
+        def assertDsValue(self, expected, item):
+            self._parent.assertEquals(expected, item)
+
+        def assertSuccess(self, item):
+            pass
+
+        def assertCas(self, item):
+            pass
+    def assertValue(self, expected, result):
+        self.assertEqual(expected,result.content)
+    def assertDsValue(self, expected, item):
+        self.validator.assertDsValue(expected, item)
+    def assertSuccess(self, item):
+        self.validator.assertSuccess(item)
+
+    def assertCas(self, item):
+        self.validator.assertCas(item)
+    def __init__(self, *args, **kwargs):
+        self.validator=CollectionTestCase.ItemValidator(self)
+        super(CollectionTestCase,self).__init__(*args,**kwargs)
+    def setUp(self, mock_collections=None, real_collections=None):
+        mock_collections = mock_collections or {None: {None: "coll"}}
+        real_collections = real_collections or {"bedrock": {"flintstones": 'coll'}}
+        # prepare:
+        # 1) Connect to a Cluster
+        super(CollectionTestCase,self).setUp()
+        cm = couchbase.admin.CollectionManager(self.admin, self.bucket_name)
+        my_collections = mock_collections if self.is_mock else real_collections
+        for scope_name, collections in my_collections.items():
+            CollectionTestCase._upsert_scope(cm, scope_name)
+            scope = self.bucket.scope(scope_name) if scope_name else self.bucket
+            for collection_name, dest in collections.items():
+                CollectionTestCase._upsert_collection(cm, collection_name, scope_name)
+                # 2) Open a Collection
+                coll = scope.collection(collection_name) if collection_name else scope.default_collection()
+                setattr(self, dest, coll)
+
+        self.cb=self.coll
+
+    @staticmethod
+    def _upsert_collection(cm, collection_name, scope_name):
+        if not collection_name in CollectionTestCase.initialised[scope_name].keys():
+            try:
+                cm.insert_collection(collection_name, scope_name)
+                CollectionTestCase.initialised[scope_name][collection_name]=None
+            except:
+                pass
+
+    @staticmethod
+    def _upsert_scope(cm, scope_name):
+        try:
+            if scope_name and not scope_name in CollectionTestCase.initialised.keys():
+                cm.insert_scope(scope_name)
+        except:
+            pass

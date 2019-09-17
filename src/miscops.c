@@ -46,7 +46,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     pycbc_pybuffer keybuf = { NULL };
     lcb_uint64_t cas = 0;
     lcb_STATUS err = LCB_SUCCESS;
-    pycbc_Bucket *self = collection->bucket;
+    pycbc_Bucket *self = (pycbc_Bucket *)collection;
     (void)options;
     (void)arg;
     (void)handler;
@@ -160,7 +160,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, p
                              "durability_level",
                              NULL};
 
-    pycbc_Collection_t collection = pycbc_Collection_as_value(self, kwargs);
+    PYCBC_COLLECTION_INIT(self, kwargs);
 
     PYCBC_DEBUG_LOG_CONTEXT(context, "Parsing args %R", kwargs)
     rv = PyArg_ParseTupleAndKeywords(args,
@@ -200,7 +200,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, p
     }
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
-        rv = PYCBC_OPUTIL_ITER_MULTI_COLLECTION(&collection,
+        rv = PYCBC_OPUTIL_ITER_MULTI_COLLECTION(pcb_collection,
                                                 seqtype,
                                                 kobj,
                                                 &cv,
@@ -216,7 +216,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, p
                                      &context,
                                      self,
                                      NULL,
-                                     &collection,
+                                     pcb_collection,
                                      &cv,
                                      optype,
                                      kobj,
@@ -258,9 +258,9 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, p
     }
 
     GT_DONE:
-    pycbc_common_vars_finalize(&cv, self);
-    pycbc_Collection_free_unmanaged_contents(&collection);
-    return cv.ret;
+        pycbc_common_vars_finalize(&cv, self);
+        pycbc_Collection_free_if_stack_allocated(pcb_collection);
+        return cv.ret;
     GT_FAIL:
         cv.ret = NULL;
         goto GT_DONE;
