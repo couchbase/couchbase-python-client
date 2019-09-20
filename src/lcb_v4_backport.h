@@ -60,31 +60,31 @@ typedef lcb_error_t lcb_STATUS;
 #define pycbc_stats(...) lcb_stats3(__VA_ARGS__)
 
 
-#define lcb_cmdget_expiration(cmd, time) cmd->exptime = time;
+#define lcb_cmdget_expiry(cmd, time) cmd->exptime = time;
 #define lcb_cmdget_timeout(cmd, time) cmd->exptime = time;
 #define lcb_cmdtouch_create(CMD) \
     lcb_CMDTOUCH cmd_real = {0}; \
     *(CMD) = &cmd_real;
 #define lcb_cmdtouch_destroy(CMD) 0
-#define lcb_cmdtouch_expiration(cmd, time) cmd->exptime = time;
+#define lcb_cmdtouch_expiry(cmd, time) cmd->exptime = time;
 #define lcb_cmdtouch_timeout(cmd, time) cmd->exptime = time;
-#define lcb_cmdrget_expiration(cmd, time) cmd->exptime = time;
+#define lcb_cmdrget_expiry(cmd, time) cmd->exptime = time;
 #define lcb_cmdcounter_delta(cmd, x) (cmd)->delta = x;
 #define lcb_cmdcounter_initial(cmd, x) \
     (cmd)->initial = x;                \
     (cmd)->create = 1;
 #define lcb_cmdcounter_timeout(cmd, x) (cmd)->exptime = x;
-#define lcb_cmdcounter_expiration(cmd, x) (cmd)->exptime = x
+#define lcb_cmdcounter_expiry(cmd, x) (cmd)->exptime = x
 #define lcb_cmdstore_flags(CMD, VAL) cmd->flags = VAL;
-#define lcb_cmdgetreplica_expiration(CMD, TTL) (CMD)->exptime = TTL
+#define lcb_cmdgetreplica_expiry(CMD, TTL) (CMD)->exptime = TTL
 #define lcb_cmdstore_create(CMD, OP) \
     PYCBC_ASSIGN((*CMD)->operation, (lcb_storage_t)(OP));
 #define lcb_cmdstore_destroy(...) 0
 #define lcb_cmdstore_cas(CMD, CAS) PYCBC_ASSIGN((CMD)->cas, CAS);
-#define lcb_cmdstore_expiration(CMD, TTL) \
+#define lcb_cmdstore_expiry(CMD, TTL) \
     PYCBC_ASSIGN((CMD)->exptime, (lcb_U32)(TTL));
 #define lcb_cmdsubdoc_cas(CMD, CAS) (CMD)->cas = (lcb_U32)(CAS)
-#define lcb_cmdsubdoc_expiration(CMD, EXP) (CMD)->exptime = (lcb_U32)(EXP)
+#define lcb_cmdsubdoc_expiry(CMD, EXP) (CMD)->exptime = (lcb_U32)(EXP)
 
 #define lcb_resphttp_headers(htresp, dest) *(dest) = htresp->headers
 #define lcb_resphttp_http_status(resp, dest) *(dest) = (resp)->htstatus

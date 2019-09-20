@@ -79,9 +79,9 @@ class Admin(LCB.Bucket):
         :return: an instance of :class:`Admin`
         """
         connection_string = kwargs.pop('connection_string', None)
+        bucket = kwargs.pop('bucket', 'default')
         if not connection_string:
             connection_string = "http://{0}:{1}".format(host, port)
-            bucket = kwargs.pop('bucket', 'default')
             connection_string += "/{0}".format(bucket)
             connection_string += "?ipv6=" + kwargs.pop('ipv6', 'disabled')
 
@@ -91,6 +91,7 @@ class Admin(LCB.Bucket):
             'connection_string': connection_string,
             '_conntype': LCB.LCB_TYPE_CLUSTER
         })
+        kwargs['bucket']=bucket
         super(Admin, self).__init__(**kwargs)
         self._connect()
 

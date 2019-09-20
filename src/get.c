@@ -104,7 +104,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
         }
     }
 #define COMMON_OPTS(X, NAME, CMDNAME)              \
-    lcb_cmd##CMDNAME##_expiration(cmd, ttl);       \
+    lcb_cmd##CMDNAME##_expiry(cmd, ttl);       \
     PYCBC_CMD_SET_KEY_SCOPE(CMDNAME, cmd, keybuf); \
     PYCBC_TRACECMD_TYPED(CMDNAME, cmd, context, cv->mres, curkey, self);
 

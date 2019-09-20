@@ -138,7 +138,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     CMDSCOPE_NG(SUBDOC, subdoc)
     {
         lcb_cmdsubdoc_cas(cmd, scv->single_cas);
-        lcb_cmdsubdoc_expiration(cmd, scv->ttl);
+        lcb_cmdsubdoc_expiry(cmd, scv->ttl);
         pycbc_cmdsubdoc_flags_from_scv(scv->sd_doc_flags, cmd);
         PYCBC_CMD_SET_KEY_SCOPE(subdoc, cmd, keybuf);
         rv = PYCBC_TRACE_WRAP(pycbc_sd_handle_speclist,
@@ -235,7 +235,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
             PYCBC_CMD_SET_VALUE_SCOPE(store, cmd, valbuf);
 
             lcb_cmdstore_cas(cmd, skc.cas);
-            lcb_cmdstore_expiration(cmd, (uint32_t)skc.ttl);
+            lcb_cmdstore_expiry(cmd, (uint32_t)skc.ttl);
 
             PYCBC_TRACECMD_TYPED(store, cmd, context, cv->mres, curkey, self);
             err = pycbc_store(collection, cv->mres, cmd);

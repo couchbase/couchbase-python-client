@@ -284,7 +284,7 @@ typedef enum {
 #define lcb_respobserve_flags(RESP, DEST) LCB_NOT_SUPPORTED
 
 #define PYCBC_OBSERVE_FROM_LCB(X) PYCBC_OBSERVE_##X
-#define lcb_cmdgetreplica_expiration(CMD, TTL)
+#define lcb_cmdgetreplica_expiry(CMD, TTL)
 
 #define lcb_cmdstats_create(DEST) \
     lcb_CMDSTATS cmd_real = {0};  \
@@ -357,12 +357,7 @@ lcb_STATUS pycbc_cmdview_spatial(lcb_CMDVIEW *pCmdview, int is_spacial);
     X(value,row)
 
 #define PYCBC_PP_ENCRYPT_CONSTANTS(X)
-#define PYCBC_X_SD_OPS_FULLDOC(X, NP, VAL, MVAL, CTR, ...) \
-    NP(FULLDOC_GET, fulldoc_get, __VA_ARGS__)              \
-    X(FULLDOC_UPSERT, fulldoc_upsert, __VA_ARGS__)         \
-    X(FULLDOC_ADD, fulldoc_insert, __VA_ARGS__)            \
-    X(FULLDOC_REPLACE, fulldoc_replace, __VA_ARGS__)       \
-    NP(FULLDOC_REMOVE, fulldoc_remove, __VA_ARGS__)
+#define PYCBC_X_SD_OPS_FULLDOC(X, NP, VAL, MVAL, CTR, ...)
 
 typedef lcb_DURABILITY_LEVEL pycbc_DURABILITY_LEVEL;
 #    define lcb_cmdremove_durability_observe(...) LCB_EINTERNAL

@@ -141,6 +141,7 @@ class Cluster(object):
         else:
             kwargs['password'] = auth_credentials.get('password', None)
         connstr.scheme = auth_credentials_full.get('scheme', connstr.scheme)
+        kwargs['bucket']=bucket_name
         rv = self.bucket_class(str(connstr), **kwargs)
         self._buckets[bucket_name] = weakref.ref(rv)
         if isinstance(self.authenticator, ClassicAuthenticator):

@@ -113,6 +113,7 @@ class Bucket(object):
         self._name = name
         self._connstr=connection_string
         self._bucket_args=forward_args(kwargs, *options)
+        self._bucket_args['bucket']=name
         self._corebucket_class=corebucket_class
 
         self._bucket = CoreClient(connection_string, **self._bucket_args)

@@ -1000,7 +1000,8 @@ Bucket__init__(pycbc_Bucket *self,
     CLASS##_BUILD_CRED(                 \
         CLASS##_CREDENTIAL(username),   \
         CLASS##_CREDENTIAL(password))   \
-    CLASS##_STRING(connstr)
+    CLASS##_STRING(connstr)\
+    CLASS##_STRING(bucket)
 
 #define XCTOR_NON_CREATEOPTS(CLASS)                                         \
     CLASS##_STRINGALIAS(connection_string, connstr)                         \
