@@ -10,12 +10,37 @@ from couchbase_core.views.iterator import View
 from .views.params import make_options_string, make_dvpath
 import couchbase_core._libcouchbase as _LCB
 
-from couchbase_core import priv_constants as _P, fulltext as _FTS, _depr
+from couchbase_core import priv_constants as _P, fulltext as _FTS, _depr, subdocument as SD, exceptions
 import couchbase_core.analytics
 from typing import *
 from .durability import Durability
 from .result import Result
+from boltons.funcutils import wraps
 
+def _dsop(create_type=None, wrap_missing_path=True):
+    import functools
+
+    def real_decorator(fn):
+        @functools.wraps(fn)
+        def newfn(self, key, *args, **kwargs):
+            try:
+                return fn(self, key, *args, **kwargs)
+            except E.NotFoundError:
+                if kwargs.get('create'):
+                    try:
+                        self.insert(key, create_type())
+                    except E.KeyExistsError:
+                        pass
+                    return fn(self, key, *args, **kwargs)
+                else:
+                    raise
+            except E.SubdocPathNotFoundError:
+                if wrap_missing_path:
+                    raise IndexError(args[0])
+
+        return newfn
+
+    return real_decorator
 
 
 class Client(_Base):
@@ -319,7 +344,7 @@ class Client(_Base):
         return self._http_request(type=_LCB.LCB_HTTP_TYPE_MANAGEMENT,
                                   path=path, method=_LCB.LCB_HTTP_METHOD_POST)
 
-    def _wrap_dsop(self, sdres, has_value=False):
+    def _wrap_dsop(self, sdres, has_value=False, **kwargs):
         from couchbase_core.items import Item
         it = Item(sdres.key)
         it.cas = sdres.cas
@@ -1306,4 +1331,350 @@ class Client(_Base):
                     raise
         return d
 
+    @_dsop(create_type=dict)
+    def map_add(self, key, mapkey, value, create=False, **kwargs):
+        """
+        Set a value for a key in a map.
 
+        .. warning::
+
+            The functionality of the various `map_*`, `list_*`, `queue_*`
+            and `set_*` functions are considered experimental and are included
+            in the library to demonstrate new functionality.
+            They may change in the future or be removed entirely!
+
+            These functions are all wrappers around the :meth:`mutate_in` or
+            :meth:`lookup_in` methods.
+
+        :param key: The document ID of the map
+        :param mapkey: The key in the map to set
+        :param value: The value to use (anything serializable to JSON)
+        :param create: Whether the map should be created if it does not exist
+        :param kwargs: Additional arguments passed to :meth:`mutate_in`
+        :return: A :class:`~.OperationResult`
+        :raise: :cb_exc:`NotFoundError` if the document does not exist.
+            and `create` was not specified
+
+        .. Initialize a map and add a value
+
+            cb.upsert('a_map', {})
+            cb.map_add('a_map', 'some_key', 'some_value')
+            cb.map_get('a_map', 'some_key').value  # => 'some_value'
+            cb.get('a_map').value  # => {'some_key': 'some_value'}
+
+        """
+        op = SD.upsert(mapkey, value)
+        sdres = Client.mutate_in(self, key, (op,), **kwargs)
+        return self._wrap_dsop(sdres, **kwargs)
+
+    @_dsop()
+    def map_get(self, key, mapkey):
+        """
+        Retrieve a value from a map.
+
+        :param str key: The document ID
+        :param str mapkey: Key within the map to retrieve
+        :return: :class:`~.ValueResult`
+        :raise: :exc:`IndexError` if the mapkey does not exist
+        :raise: :cb_exc:`NotFoundError` if the document does not exist.
+
+        .. seealso:: :meth:`map_add` for an example
+        """
+        op = SD.get(mapkey)
+        sdres = Client.lookup_in(self, key, (op,))
+        return self._wrap_dsop(sdres, True)
+
+    @_dsop()
+    def map_remove(self, key, mapkey, **kwargs):
+        """
+        Remove an item from a map.
+
+        :param str key: The document ID
+        :param str mapkey: The key in the map
+        :param kwargs: See :meth:`mutate_in` for options
+        :raise: :exc:`IndexError` if the mapkey does not exist
+        :raise: :cb_exc:`NotFoundError` if the document does not exist.
+
+        .. Remove a map key-value pair:
+
+            cb.map_remove('a_map', 'some_key')
+
+        .. seealso:: :meth:`map_add`
+        """
+        op = SD.remove(mapkey)
+        sdres = Client.mutate_in(self, key, (op,), **kwargs)
+        return self._wrap_dsop(sdres, **kwargs)
+
+    @_dsop()
+    def map_size(self, key):
+        """
+        Get the number of items in the map.
+
+        :param str key: The document ID of the map
+        :return int: The number of items in the map
+        :raise: :cb_exc:`NotFoundError` if the document does not exist.
+
+        .. seealso:: :meth:`map_add`
+        """
+
+        return Client.lookup_in(self, key, (SD.get_count(''),))[0]
+
+    @_dsop(create_type=list)
+    def list_append(self, key, value, create=False, **kwargs):
+        """
+        Add an item to the end of a list.
+
+        :param str key: The document ID of the list
+        :param value: The value to append
+        :param create: Whether the list should be created if it does not
+               exist. Note that this option only works on servers >= 4.6
+        :param kwargs: Additional arguments to :meth:`mutate_in`
+        :return: :class:`~.OperationResult`.
+        :raise: :cb_exc:`NotFoundError` if the document does not exist.
+            and `create` was not specified.
+
+        example::
+
+            cb.list_append('a_list', 'hello')
+            cb.list_append('a_list', 'world')
+
+        .. seealso:: :meth:`map_add`
+        """
+        op = SD.array_append('', value)
+        sdres = Client.mutate_in(self, key, (op,), **kwargs)
+        return self._wrap_dsop(sdres, **kwargs)
+
+    @_dsop(create_type=list)
+    def list_prepend(self, key, value, create=False, **kwargs):
+        """
+        Add an item to the beginning of a list.
+
+        :param str key: Document ID
+        :param value: Value to prepend
+        :param bool create:
+            Whether the list should be created if it does not exist
+        :param kwargs: Additional arguments to :meth:`mutate_in`.
+        :return: :class:`OperationResult`.
+        :raise: :cb_exc:`NotFoundError` if the document does not exist.
+            and `create` was not specified.
+
+        This function is identical to :meth:`list_append`, except for prepending
+        rather than appending the item
+
+        .. seealso:: :meth:`list_append`, :meth:`map_add`
+        """
+        op = SD.array_prepend('', value)
+        sdres = Client.mutate_in(self, key, (op,), **kwargs)
+        return self._wrap_dsop(sdres, **kwargs)
+
+    @_dsop()
+    def list_set(self, key, index, value, **kwargs):
+        """
+        Sets an item within a list at a given position.
+
+        :param key: The key of the document
+        :param index: The position to replace
+        :param value: The value to be inserted
+        :param kwargs: Additional arguments to :meth:`mutate_in`
+        :return: :class:`OperationResult`
+        :raise: :cb_exc:`NotFoundError` if the list does not exist
+        :raise: :exc:`IndexError` if the index is out of bounds
+
+        example::
+
+            cb.upsert('a_list', ['hello', 'world'])
+            cb.list_set('a_list', 1, 'good')
+            cb.get('a_list').value # => ['hello', 'good']
+
+        .. seealso:: :meth:`map_add`, :meth:`list_append`
+        """
+        op = SD.replace('[{0}]'.format(index), value)
+        sdres = Client.mutate_in(self, key, (op,), **kwargs)
+        return self._wrap_dsop(sdres, **kwargs)
+
+    @_dsop(create_type=list)
+    def set_add(self, key, value, create=False, **kwargs):
+        """
+        Add an item to a set if the item does not yet exist.
+
+        :param key: The document ID
+        :param value: Value to add
+        :param create: Create the set if it does not exist
+        :param kwargs: Arguments to :meth:`mutate_in`
+        :return: A :class:`~.OperationResult` if the item was added,
+        :raise: :cb_exc:`NotFoundError` if the document does not exist
+            and `create` was not specified.
+
+        .. seealso:: :meth:`map_add`
+        """
+        op = SD.array_addunique('', value)
+        try:
+            sdres = Client.mutate_in(self, key, (op,), **kwargs)
+            return self._wrap_dsop(sdres, **kwargs)
+        except E.SubdocPathExistsError:
+            pass
+
+    @_dsop()
+    def set_remove(self, key, value, **kwargs):
+        """
+        Remove an item from a set.
+
+        :param key: The docuent ID
+        :param value: Value to remove
+        :param kwargs: Arguments to :meth:`mutate_in`
+        :return: A :class:`OperationResult` if the item was removed, false
+                 otherwise
+        :raise: :cb_exc:`NotFoundError` if the set does not exist.
+
+        .. seealso:: :meth:`set_add`, :meth:`map_add`
+        """
+        while True:
+            rv = Client.get(self, key)
+            try:
+                ix = rv.value.index(value)
+                kwargs['cas'] = rv.cas
+                return Client.list_remove(self, key, ix, **kwargs)
+            except E.KeyExistsError:
+                pass
+            except ValueError:
+                return
+
+    def set_size(self, key):
+        """
+        Get the length of a set.
+
+        :param key: The document ID of the set
+        :return: The length of the set
+        :raise: :cb_exc:`NotFoundError` if the set does not exist.
+
+        """
+        return Client.list_size(self, key)
+
+    def set_contains(self, key, value):
+        """
+        Determine if an item exists in a set
+        :param key: The document ID of the set
+        :param value: The value to check for
+        :return: True if `value` exists in the set
+        :raise: :cb_exc:`NotFoundError` if the document does not exist
+        """
+        rv = Client.get(self, key)
+        return value in rv.value
+
+    @_dsop()
+    def list_get(self, key, index):
+        """
+        Get a specific element within a list.
+
+        :param key: The document ID
+        :param index: The index to retrieve
+        :return: :class:`ValueResult` for the element
+        :raise: :exc:`IndexError` if the index does not exist
+        :raise: :cb_exc:`NotFoundError` if the list does not exist
+        """
+        return Client.map_get(self, key, '[{0}]'.format(index))
+
+    @_dsop()
+    def list_remove(self, key, index, **kwargs):
+        """
+        Remove the element at a specific index from a list.
+
+        :param key: The document ID of the list
+        :param index: The index to remove
+        :param kwargs: Arguments to :meth:`mutate_in`
+        :return: :class:`OperationResult`
+        :raise: :exc:`IndexError` if the index does not exist
+        :raise: :cb_exc:`NotFoundError` if the list does not exist
+        """
+        return Client.map_remove(self, key, '[{0}]'.format(index), **kwargs)
+
+    @_dsop()
+    def list_size(self, key):
+        """
+        Retrieve the number of elements in the list.
+
+        :param key: The document ID of the list
+        :return: The number of elements within the list
+        :raise: :cb_exc:`NotFoundError` if the list does not exist
+        """
+        return Client.map_size(self, key)
+
+    @_dsop(create_type=list)
+    def queue_push(self, key, value, create=False, **kwargs):
+        """
+        Add an item to the end of a queue.
+
+        :param key: The document ID of the queue
+        :param value: The item to add to the queue
+        :param create: Whether the queue should be created if it does not exist
+        :param kwargs: Arguments to pass to :meth:`mutate_in`
+        :return: :class:`OperationResult`
+        :raise: :cb_exc:`NotFoundError` if the queue does not exist and
+            `create` was not specified.
+
+        example::
+
+            # Ensure it's removed first
+
+            cb.remove('a_queue')
+            cb.queue_push('a_queue', 'job9999', create=True)
+            cb.queue_pop('a_queue').value  # => job9999
+        """
+        return Client.list_prepend(self, key, value, **kwargs)
+
+    @_dsop()
+    def queue_pop(self, key, **kwargs):
+        """
+        Remove and return the first item queue.
+
+        :param key: The document ID
+        :param kwargs: Arguments passed to :meth:`mutate_in`
+        :return: A :class:`ValueResult`
+        :raise: :cb_exc:`QueueEmpty` if there are no items in the queue.
+        :raise: :cb_exc:`NotFoundError` if the queue does not exist.
+        """
+        while True:
+            try:
+                itm = Client.list_get(self, key, -1)
+            except IndexError:
+                raise E.QueueEmpty
+
+            kwargs.update({k:v for k,v in getattr(itm,'__dict__',{}).items() if k in {'cas'}})
+            try:
+                Client.list_remove(self, key, -1, **kwargs)
+                return itm
+            except E.KeyExistsError:
+                pass
+            except IndexError:
+                raise E.QueueEmpty
+
+    @_dsop()
+    def queue_size(self, key):
+        """
+        Get the length of the queue.
+
+        :param key: The document ID of the queue
+        :return: The length of the queue
+        :raise: :cb_exc:`NotFoundError` if the queue does not exist.
+        """
+        return Client.list_size(self, key)
+
+    dsops = (map_get,
+             map_add,
+             map_remove,
+             queue_push,
+             list_size,
+             map_size,
+             queue_pop,
+
+             list_set,
+             list_remove,
+             list_prepend,
+             list_get,
+             queue_size,
+
+             list_append,
+             set_add,
+             set_contains,
+             set_remove,
+             set_size)

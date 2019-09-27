@@ -180,6 +180,7 @@ class MutateInResult(MutationResult):
         MutateInResult is the return type for mutate_in operations.
         Constructed internally by the API.
         """
+        super(MutateInResult,self).__init__(content.cas)
         self._content = content  # type: SDK2Result
         self.dict = options
 
@@ -187,6 +188,9 @@ class MutateInResult(MutationResult):
         # type: (...)->ContentProxy
         return ContentProxy(self._content)
 
+    @property
+    def key(self):
+        return self._content.key
 
 class GetResult(Result, IGetResult):
     def __init__(self,

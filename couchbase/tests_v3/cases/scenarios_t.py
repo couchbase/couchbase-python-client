@@ -582,6 +582,11 @@ class Scenarios(CollectionTestCase):
         recursive_reload(couchbase)
         do_upsert()
 
+    def test_datastructures(self  # type: Scenarios
+                            ):
+        self.coll.upsert("Fred", {"cheese": "potato"})
+        self.coll.map_add("Fred", "Gail", "Porter")
+        self.assertEquals("Porter", self.coll.map_get("Fred", "Gail"))
 
 class AnalyticsTest(couchbase_core.tests.analytics_harness.CBASTestSpecific, ClusterTestCase):
     def setUp(self):

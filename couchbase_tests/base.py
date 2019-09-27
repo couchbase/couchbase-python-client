@@ -696,12 +696,9 @@ class TracedCase(ConnectionTestCaseBase):
             except:
                 pass
 
-
+ConnectionTestCase = ConnectionTestCaseBase
 if os.environ.get("PYCBC_TRACE_ALL") and couchbase_core._libcouchbase.PYCBC_TRACING:
     ConnectionTestCase = TracedCase
-else:
-    ConnectionTestCase = ConnectionTestCaseBase
-
 
 class RealServerTestCase(ConnectionTestCase):
     def setUp(self, **kwargs):
