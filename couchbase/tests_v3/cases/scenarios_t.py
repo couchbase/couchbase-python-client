@@ -48,11 +48,10 @@ from couchbase import Bucket
 
 from couchbase_tests.base import ClusterTestCase, CollectionTestCase
 import couchbase.subdocument as SD
-import couchbase.admin
+import couchbase.management
 import couchbase_core._bootstrap
 import couchbase_core._libcouchbase as _LCB
 import couchbase_core.cluster
-import couchbase.admin
 import couchbase_core.tests.analytics_harness
 from couchbase.diagnostics import ServiceType
 import couchbase_core.fulltext as FT

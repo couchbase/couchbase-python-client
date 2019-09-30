@@ -1,3 +1,5 @@
+from couchbase.management import CollectionManager
+from couchbase_core.admin import Admin
 from couchbase_core.supportability import uncommitted
 from couchbase_core.client import Client as CoreClient
 from .collection import CBCollection, CollectionOptions
@@ -21,6 +23,7 @@ class Bucket(object):
     def __init__(self,
                  connection_string,  # type: str
                  name=None,
+                 admin=None,  # type: Admin
                  *options  # type: BucketOptions
                  ):
         # type: (...)->None
@@ -30,6 +33,7 @@ class Bucket(object):
                  connection_string,  # type: str
                  name=None,
                  corebucket_class=CBCollection,  # type: Type[CoreClient]
+                 admin=None,  # type: Admin
                  *options,
                  **kwargs
                 ):
@@ -117,6 +121,7 @@ class Bucket(object):
         self._corebucket_class=corebucket_class
 
         self._bucket = CoreClient(connection_string, **self._bucket_args)
+        self._admin = admin
 
     @property
     def name(self):
@@ -163,6 +168,9 @@ class Bucket(object):
         :return: the default :class:`.Collection` object.
         """
         return Scope(self).collection(collection_name)
+
+    def collections(self):
+        return CollectionManager(self._admin, self._name)
 
     def view_query(self,
                    design_doc,  # type: str

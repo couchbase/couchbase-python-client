@@ -20,16 +20,15 @@ import types
 import platform
 import warnings
 from collections import defaultdict
-from unittest import SkipTest
 
 from parameterized import parameterized_class
 from testfixtures import LogCapture
 
 from testresources import ResourcedTestCase as ResourcedTestCaseReal, TestResourceManager
 
-import couchbase.admin
+import couchbase.management
 import couchbase_core
-from couchbase import Cluster, Bucket, ClusterOptions
+from couchbase import Cluster, ClusterOptions
 from couchbase_core.cluster import ClassicAuthenticator
 from couchbase_core.connstr import ConnectionString
 
@@ -51,6 +50,7 @@ if os.environ.get("PYCBC_TRACE_GC") in ['FULL', 'STATS_LEAK_ONLY']:
     gc.set_debug(gc.DEBUG_STATS | gc.DEBUG_LEAK)
 
 from utilspie.collectionsutils import frozendict
+from couchbase.management.collections import ICollectionSpec
 
 loglevel=os.environ.get("PYCBC_DEBUG_LOG_LEVEL")
 if loglevel:
@@ -799,7 +799,7 @@ class CollectionTestCase(ClusterTestCase):
         # prepare:
         # 1) Connect to a Cluster
         super(CollectionTestCase,self).setUp()
-        cm = couchbase.admin.CollectionManager(self.admin, self.bucket_name)
+        cm = self.bucket.collections()
         my_collections = mock_collections if self.is_mock else real_collections
         for scope_name, collections in my_collections.items():
             CollectionTestCase._upsert_scope(cm, scope_name)
@@ -816,7 +816,7 @@ class CollectionTestCase(ClusterTestCase):
     def _upsert_collection(cm, collection_name, scope_name):
         if not collection_name in CollectionTestCase.initialised[scope_name].keys():
             try:
-                cm.insert_collection(collection_name, scope_name)
+                cm.create_collection(ICollectionSpec(collection_name,scope_name))
                 CollectionTestCase.initialised[scope_name][collection_name]=None
             except:
                 pass
@@ -825,6 +825,6 @@ class CollectionTestCase(ClusterTestCase):
     def _upsert_scope(cm, scope_name):
         try:
             if scope_name and not scope_name in CollectionTestCase.initialised.keys():
-                cm.insert_scope(scope_name)
+                cm.create_scope(scope_name)
         except:
             pass

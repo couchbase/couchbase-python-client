@@ -1,25 +1,28 @@
 from typing import *
 
+from couchbase_core.connstr import  ConnectionString
+from couchbase_core.admin import Admin
 from couchbase.diagnostics import DiagnosticsResult, EndPointDiagnostics, IDiagnosticsResult
 from couchbase.fulltext import ISearchResult, SearchResult, SearchOptions
-from couchbase_core.fulltext import Query, Facet, Params
+from couchbase_core.fulltext import Query, Facet
 from .analytics import AnalyticsResult
 from .n1ql import QueryResult, IQueryResult
 from .options import OptionBlock, forward_args, OptionBlockDeriv
 from .bucket import BucketOptions, Bucket, CoreClient
 from couchbase_core.cluster import Cluster as SDK2Cluster, Authenticator as SDK2Authenticator
 from .exceptions import SearchException, DiagnosticsException, QueryException, ArgumentError, AnalyticsException
-import couchbase_core._libcouchbase as _LCB
 from couchbase_core import abstractmethod
 import multiprocessing
 from multiprocessing.pool import ThreadPool
 import couchbase.exceptions
+import couchbase_core._libcouchbase as _LCB
 
 T = TypeVar('T')
 
 
 class QueryMetrics(object):
     pass
+
 
 CallableOnOptionBlock = Callable[[OptionBlockDeriv, Any], Any]
 
@@ -106,7 +109,7 @@ class Cluster(object):
         authenticator=cluster_opts.pop('authenticator',None)
         if not authenticator:
             raise ArgumentError("Authenticator is mandatory")
-        cluster_opts.update(bucket_class=lambda connstr, bname=None, **kwargs: Bucket(connstr,name=bname,**kwargs))
+        cluster_opts.update(bucket_class=lambda connstr, bname=None, **kwargs: Bucket(connstr,name=bname,admin=self.admin,**kwargs))
         self._cluster = SDK2Cluster(connection_string, **cluster_opts)  # type: SDK2Cluster
         self._authenticate(authenticator)
 
@@ -118,16 +121,17 @@ class Cluster(object):
         return Cluster(connection_string, *options, **kwargs)
 
     def _authenticate(self,
-                     authenticator=None,  # type: SDK2Authenticator
-                     username=None,  # type: str
-                     password=None  # type: str
-                     ):
+                      authenticator=None,  # type: SDK2Authenticator
+                      username=None,  # type: str
+                      password=None  # type: str
+                      ):
         self._cluster.authenticate(authenticator, username, password)
-        credentials=authenticator.get_credentials()
-        clusteropts=credentials.get('options',{})
-        clusteropts['bucket']="default"
+        credentials = authenticator.get_credentials()
+        clusteropts = credentials.get('options', {})
+        clusteropts['bucket'] = "default"
         self.clusterbucket=CoreClient(str(self.connstr),_conntype=_LCB.LCB_TYPE_CLUSTER, **clusteropts)
-
+        auth=credentials.get('options')
+        self.admin = Admin(auth.get('username'), auth.get('password'), connstr=str(self.connstr))
 
     def bucket(self,
                name,  # type: str,

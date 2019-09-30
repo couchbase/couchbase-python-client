@@ -53,7 +53,7 @@ nevertheless be helpful for debugging or extending existing functionality.
    api/async
 
 
-Administrative APIs
+Management APIs
 ===================
 
 These APIs allow simple manipulation of buckets themselves. They require
@@ -63,7 +63,7 @@ the synchronous `couchbase` interface.
 .. toctree::
    :maxdepth: 2
 
-   api/admin
+   api/management
 
 
 Indices and tables
