@@ -397,7 +397,7 @@ TRACED_FUNCTION_WRAPPER(_ping,LCBTRACE_OP_REQUEST_ENCODING,Bucket)
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
     lcb_CMDPING cmd = {0};
     cmd.services = LCB_PINGSVC_F_KV | LCB_PINGSVC_F_N1QL | LCB_PINGSVC_F_VIEWS |
-                   LCB_PINGSVC_F_FTS;
+                   LCB_PINGSVC_F_FTS | LCB_PINGSVC_F_ANALYTICS;
     cmd.options = LCB_PINGOPT_F_JSON | LCB_PINGOPT_F_JSONPRETTY;
     if (1) {
         cmd.options |= LCB_PINGOPT_F_JSONDETAILS;
