@@ -85,7 +85,7 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
         CMDSCOPE_NG(FTS, fts)
         {
             lcb_cmdfts_callback(cmd, fts_row_callback);
-            lcb_cmdfts_query(cmd, buf.buffer, buf.length);
+            lcb_cmdfts_payload(cmd, buf.buffer, buf.length);
             lcb_cmdfts_handle(cmd, &vres->base.u.fts);
 
             PYCBC_TRACECMD_SCOPED_GENERIC(rc,
