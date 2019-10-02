@@ -20,6 +20,7 @@ from nose.plugins.attrib import attr
 
 from couchbase_tests.base import ConnectionTestCase
 import couchbase_v2.exceptions as E
+from flaky import flaky
 
 
 @attr('slow')
@@ -44,6 +45,7 @@ class TouchTest(ConnectionTestCase):
         self.assertFalse(rv.success)
         self.assertTrue(E.NotFoundError._can_derive(rv.rc))
 
+    @flaky(5,2)
     def test_trivial_multi_touch(self):
         kv = self.gen_kv_dict(prefix="trivial_multi_touch")
         self.cb.upsert_multi(kv, ttl=1)
