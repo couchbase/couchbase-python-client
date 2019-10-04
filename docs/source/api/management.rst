@@ -21,3 +21,9 @@ to perform common API requests.
 .. autoclass:: BucketManager
     :members:
 
+
+.. module:: couchbase.management.users
+
+.. autoclass:: UserManager
+    :members:
+

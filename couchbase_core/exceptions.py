@@ -20,6 +20,10 @@ from string import Template
 import json
 
 from couchbase_core import CompatibilityEnum
+from typing import *
+import inspect
+import re
+from boltons.funcutils import wraps
 
 
 class CouchbaseError(Exception):
@@ -822,3 +826,43 @@ class QueueEmpty(Exception):
     """
     Thrown if a datastructure queue is empty
     """
+
+
+HTTPErrorType = TypeVar('HTTPErrorType', bound=HTTPError)
+
+
+class HttpErrorHandler(object):
+    @classmethod
+    def mgmt_exc_wrap(cls, func):
+        @wraps(func)
+        def wrapped(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except HTTPError as e:
+                extra = getattr(e, 'objextra', None)
+                if extra:
+                    value = getattr(extra, 'value', "")
+                    for pattern, exc in cls._compiled_mapping().items():
+                        if pattern.match(value):
+                            raise exc.pyexc(value, extra, e)
+                raise
+
+        return wrapped
+
+    @classmethod
+    def _compiled_mapping(cls):
+        if not getattr(cls, '_cm', None):
+            cls._cm = {re.compile(k): v for k, v in cls.mapping().items()}
+        return cls._cm
+
+    @staticmethod
+    def mapping():
+        # type (...)->Mapping[str, CBErrorType]
+        return None
+
+    @classmethod
+    def wrap(cls, dest):
+        for name, method in inspect.getmembers(dest, inspect.isfunction):
+            if not name.startswith('_'):
+                setattr(dest, name, cls.mgmt_exc_wrap(method))
+        return dest

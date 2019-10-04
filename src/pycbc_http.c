@@ -239,6 +239,7 @@ PyObject *pycbc_Bucket__http_request(pycbc_Bucket *self,
     pycbc_HttpResult *htres = NULL;
     pycbc_MultiResult *mres = NULL;
     const char *host = NULL;
+    PyObject* timeout=NULL;
     static char *kwlist[] = {"type",
                              "method",
                              "path",
@@ -247,11 +248,12 @@ PyObject *pycbc_Bucket__http_request(pycbc_Bucket *self,
                              "response_format",
                              "quiet",
                              "host",
+                             "timeout",
                              NULL};
 
     rv = PyArg_ParseTupleAndKeywords(args,
                                      kwargs,
-                                     "iis|zz#IOs",
+                                     "iis|zz#IOsO",
                                      kwlist,
                                      &reqtype,
                                      &method,
@@ -261,7 +263,8 @@ PyObject *pycbc_Bucket__http_request(pycbc_Bucket *self,
                                      &nbody,
                                      &value_format,
                                      &quiet_O,
-                                     &host);
+                                     &host,
+                                     &timeout);
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;
@@ -311,6 +314,9 @@ PyObject *pycbc_Bucket__http_request(pycbc_Bucket *self,
                         cmd, content_type, pycbc_strlen_safe(content_type));
             }
             lcb_cmdhttp_method(cmd, method);
+            if (timeout && PyNumber_Check(timeout)) {
+                lcb_cmdhttp_timeout(cmd, PyFloat_AsDouble(timeout)*10e6);
+            }
             lcb_cmdhttp_handle(cmd, &htres->u.htreq);
             PYCBC_DEBUG_LOG("Encoding path [%s]", path ? path : "")
             if (PYCBC_BYPASS_SAFETY || pycbc_strlen_safe(path)) {

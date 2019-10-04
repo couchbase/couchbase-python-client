@@ -22,12 +22,14 @@ from json import JSONEncoder
 from time import time, sleep
 
 import couchbase_core._libcouchbase as LCB
+from boltons.funcutils import wraps
 
 from couchbase_core import JSON, mk_formstr
 import couchbase_core.exceptions as E
 from couchbase_core._pyport import basestring
 from couchbase_core.auth_domain import AuthDomain
 from couchbase_core._libcouchbase import FMT_JSON
+import re
 
 METHMAP = {
     'GET': LCB.LCB_HTTP_METHOD_GET,
@@ -100,7 +102,8 @@ class Admin(LCB.Collection):
                      method='GET',
                      content=None,
                      content_type="application/json",
-                     response_format=FMT_JSON):
+                     response_format=FMT_JSON,
+                     timeout=None):
         """
         Perform an administrative HTTP request. This request is sent out to
         the administrative API interface (i.e. the "Management/REST API")
@@ -154,7 +157,8 @@ class Admin(LCB.Collection):
                                   method=imeth,
                                   content_type=content_type,
                                   post_data=content,
-                                  response_format=response_format)
+                                  response_format=response_format,
+                                  timeout=timeout)
 
     bc_defaults=dict(bucket_type='couchbase',
                   bucket_password='', replicas=0, ram_quota=1024,
@@ -320,7 +324,7 @@ class Admin(LCB.Collection):
         return self.http_request(path=path,
                                  method='GET')
 
-    def user_get(self, domain, userid):
+    def user_get(self, domain, userid, **kwargs):
         """
         Retrieve a user from the server
 
@@ -332,7 +336,8 @@ class Admin(LCB.Collection):
         """
         path = self._get_management_path(domain, userid)
         return self.http_request(path=path,
-                                 method='GET')
+                                 method='GET',
+                                 **kwargs)
 
     def user_upsert(self, domain, userid, password=None, roles=None, name=None):
         """
@@ -368,14 +373,7 @@ class Admin(LCB.Collection):
 
         if password and domain == AuthDomain.External:
             raise E.ArgumentError("External domains must not have passwords")
-        tmplist = []
-        for role in roles:
-            if isinstance(role, basestring):
-                tmplist.append(role)
-            else:
-                tmplist.append('{0}[{1}]'.format(*role))
-
-        role_string = ','.join(tmplist)
+        role_string = self.gen_role_list(roles)
         params = {
             'roles': role_string,
         }
@@ -392,7 +390,39 @@ class Admin(LCB.Collection):
                                  content_type='application/x-www-form-urlencoded',
                                  content=form)
 
-    def user_remove(self, domain, userid):
+    @staticmethod
+    def gen_role_list(roles):
+        tmplist = []
+        for role in roles:
+            tmplist.append(Admin.role_to_str(role))
+        role_string = ','.join(tmplist)
+        return role_string
+
+    @staticmethod
+    def role_to_str(role):
+        name=None
+        bucket=None
+        try:
+            if isinstance(role, basestring):
+                name=role
+            elif isinstance(role, dict):
+                name, bucket = map(role.get, ('role','bucket'))
+            else:
+                name, bucket = role
+        except Exception as e:
+            pass
+        if name and bucket:
+            return '{0}[{1}]'.format(name,bucket)
+        else:
+            return name
+
+    role_format = re.compile(r'^(?P<role>.*?)(|\[(?P<bucket>.*?)\])$')
+
+    @staticmethod
+    def str_to_role(param):
+        return Admin.role_format.match(param).groupdict()
+
+    def user_remove(self, domain, userid, **kwargs):
         """
         Remove a user
         :param AuthDomain domain: The authentication domain for the user.
@@ -402,7 +432,8 @@ class Admin(LCB.Collection):
         """
         path = self._get_management_path(domain, userid)
         return self.http_request(path=path,
-                                 method='DELETE')
+                                 method='DELETE',
+                                 **kwargs)
 
     # Add aliases to match RFC
     # Python SDK so far has used object-verb where RFC uses verb-object

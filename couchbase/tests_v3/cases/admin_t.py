@@ -16,7 +16,6 @@
 #
 
 import sys
-import os
 
 from couchbase.management.admin import Admin
 from couchbase_core.result import HttpResult
@@ -185,72 +184,3 @@ class AdminSimpleTest(CouchbaseTestCase):
 
         path = self.admin._get_management_path(AuthDomain.Local, 'user')
         self.assertEqual('/settings/rbac/users/local/user', path)
-
-    def test_create_list_get_remove_internal_user(self):
-
-        userid = 'custom-user'
-        password = 's3cr3t'
-        roles = [('data_reader', 'default'), ('data_writer', 'default')]
-
-        # add user
-        self.admin.user_upsert(AuthDomain.Local, userid, password, roles)
-
-        # get all users
-        users = self.admin.users_get(AuthDomain.Local)
-        self.assertIsNotNone(users)
-
-        # get single user
-        user = self.admin.user_get(AuthDomain.Local, userid)
-        self.assertIsNotNone(user)
-
-        # remove user
-        self.admin.user_remove(AuthDomain.Local, userid)
-
-    def test_invalid_domain_raises_argument_error(self):
-
-        userid = 'custom-user'
-        password = 's3cr3t'
-        roles = [('data_reader', 'default'), ('data_writer', 'default')]
-
-        # invalid domain generates argument error
-        self.assertRaises(ArgumentError, self.admin.users_get, None)
-        self.assertRaises(ArgumentError, self.admin.user_get, None, userid)
-        self.assertRaises(ArgumentError, self.admin.user_upsert, None, userid, password, roles)
-        self.assertRaises(ArgumentError, self.admin.user_remove, None, userid)
-
-    def test_external_nopassword(self):
-
-        userid = 'custom-user'
-        password = 's3cr3t'
-        roles = [('data_reader', 'default'), ('data_writer', 'default')]
-
-        # password with external generates argument error
-        self.assertRaises(ArgumentError, self.admin.user_upsert, AuthDomain.External, userid, password, roles)
-        self.assertRaises(ArgumentError, self.admin.user_upsert, AuthDomain.External, userid, password, None)
-        self.assertRaises(ArgumentError, self.admin.user_upsert, AuthDomain.External, userid, password, [])
-        try:
-            self.admin.user_upsert(AuthDomain.External, userid, None, roles)
-        except ArgumentError:
-            raise
-        except:
-            pass
-
-    def test_user_api_aliases(self):
-
-        userid = 'custom-user'
-        password = 's3cr3t'
-        roles = [('data_reader', 'default'), ('data_writer', 'default')]
-
-        # add user
-        self.admin.upsert_user(AuthDomain.Local, userid, password, roles)
-
-        # get all users
-        users = self.admin.get_users(AuthDomain.Local)
-        self.assertIsNotNone(users)
-
-        # get single user
-        user = self.admin.get_user(AuthDomain.Local, userid)
-        self.assertIsNotNone(user)
-
-        # remove user
-        self.admin.remove_user(AuthDomain.Local, userid)

@@ -20,7 +20,7 @@ import enum
 import warnings
 from collections import defaultdict
 try:
-    from abc import abstractmethod
+    from abc import abstractmethod, ABCMeta
 except:
     import abstractmethod
 
@@ -62,7 +62,7 @@ try:
 except:
     StopAsyncIteration = StopIteration
 
-from couchbase_core._pyport import ulp
+from couchbase_core._pyport import ulp, with_metaclass
 
 
 def set_json_converters(encode, decode):
@@ -187,18 +187,22 @@ class CompatibilityEnum(enum.Enum):
         return self.value
 
 
-T = TypeVar('T', bound=JSON)
+T = TypeVar('T', bound=str)
 
 
 class JSONMapping(object):
     def __init__(self,  # type: JSONMapping
                  raw_json  # type: JSON
                  ):
-        self._raw_json = raw_json
 
+        self._raw_json = dict(**self.defaults)
+        for k,v in raw_json.items():
+            try:
+                setattr(self,k, v)
+            except:
+                self._raw_json[k]=v
     @staticmethod
-    def _genprop(dictkey,
-                 type  # type: Type[T]
+    def _genprop(dictkey
                  ):
         # type->
         def fget(self):
@@ -215,6 +219,30 @@ class JSONMapping(object):
 
         return property(fget, fset, fdel)
 
+
+class Mapped(with_metaclass(ABCMeta)):
+    @classmethod
+    def of(cls, *args, **kwargs):
+        return Mapped._of(cls, *args, **kwargs)
+
+    @staticmethod
+    def _of(cls, *args, **kwargs):
+        final_args = cls.defaults()
+        final_args.update(*args)
+        final_args.update({cls.mappings().get(k, k): v for k, v in kwargs.items()})
+        try:
+            return cls.factory(**final_args)
+        except Exception as e:
+            pass
+    factory = None
+
+    @staticmethod
+    def mappings():
+        return None
+
+    @staticmethod
+    def defaults():
+        return None
 
 def recursive_reload(module, paths=None, mdict=None):
     """Recursively reload modules."""

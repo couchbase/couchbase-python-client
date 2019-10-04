@@ -14,12 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from enum import IntEnum
 
 
-class AuthDomain(object):
+class AuthDomain(IntEnum):
     """
     The Authentication domain for a user.
     Local: Users managed by Couchbase Server.
     External: Users managed by an external resource, eg LDAP.
     """
-    Local, External = range(2)
+    Local = 0
+    External = 1

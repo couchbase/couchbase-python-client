@@ -4,6 +4,9 @@ from typing import *
 
 import couchbase.exceptions
 import ctypes
+from couchbase_core import abstractmethod, ABCMeta
+from couchbase_core._pyport import with_metaclass
+
 
 class FiniteDuration(object):
     def __init__(self, seconds  # type: Union[float,int]
@@ -18,7 +21,7 @@ class FiniteDuration(object):
         return float(self.value)
 
     def __int__(self):
-        return self.value
+        return int(self.value)
 
     def __add__(self, other):
         result = copy.deepcopy(self)
@@ -87,6 +90,18 @@ class OptionBlockTimeOut(OptionBlock):
         return self
 
 
+class OptionBlockTimeOutVerbatim(OptionBlock):
+    def __init__(self, *args, **kwargs):
+        # type: (*Any, **Any) -> None
+        super(OptionBlockTimeOutVerbatim, self).__init__(**kwargs)
+
+    def timeout(self,  # type: T
+                duration):
+        # type: (...)->T
+        self['timeout'] = duration.__float__()
+        return self
+
+
 class Value(object):
     def __init__(self,
                  value,  # type: Union[str,bytes,SupportsInt]
@@ -112,33 +127,55 @@ class Cardinal(OptionBlock):
 OptionBlockDeriv = TypeVar('OptionBlockDeriv', bound=OptionBlock)
 
 
-def forward_args(arg_vars,  # type: Optional[Dict[str,Any]]
-                 *options  # type: Tuple[OptionBlockDeriv,...]
-                 ):
-    # type: (...)->OptionBlockDeriv[str,Any]
-    arg_vars = copy.copy(arg_vars) if arg_vars else {}
-    temp_options = copy.copy(options[0]) if (options and options[0]) else OptionBlock()
-    kwargs = arg_vars.pop('kwargs', {})
-    temp_options.update(kwargs)
-    temp_options.update(arg_vars)
-    arg_mapping = {'spec': {'specs': lambda x: x}, 'id': {},
-                   'replicate_to': {"replicate_to":int},
-                   'persist_to': {"persist_to":int},
-                   'timeout' : {'ttl': int},
-                   'expiration': {'ttl': int}, 'self': {}, 'options': {}}
-    end_options = {}
-    for k, v in temp_options.items():
-        map_item = arg_mapping.get(k, None)
-        if not (map_item is None):
-            for out_k, out_f in map_item.items():
-                try:
-                    end_options[out_k] = out_f(v)
-                except:
-                    pass
-        else:
-            end_options[k] = v
-    return end_options
+class Forwarder(with_metaclass(ABCMeta)):
+    def forward_args(self, arg_vars,  # type: Optional[Dict[str,Any]]
+                     *options  # type: Tuple[OptionBlockDeriv,...]
+                     ):
+        # type: (...)->OptionBlockDeriv[str,Any]
+        arg_vars = copy.copy(arg_vars) if arg_vars else {}
+        temp_options = copy.copy(options[0]) if (options and options[0]) else OptionBlock()
+        kwargs = arg_vars.pop('kwargs', {})
+        temp_options.update(kwargs)
+        temp_options.update(arg_vars)
 
+        end_options = {}
+        for k, v in temp_options.items():
+            map_item = self.arg_mapping().get(k, None)
+            if not (map_item is None):
+                for out_k, out_f in map_item.items():
+                    try:
+                        end_options[out_k] = out_f(v)
+                    except:
+                        pass
+            else:
+                end_options[k] = v
+        return end_options
+
+    @abstractmethod
+    def arg_mapping(self):
+        pass
+
+
+class DefaultForwarder(Forwarder):
+    def arg_mapping(self):
+        return {'spec': {'specs': lambda x: x}, 'id': {},
+                'replicate_to': {"replicate_to": int},
+                'persist_to': {"persist_to": int},
+                'timeout': {'ttl': int},
+                'expiration': {'ttl': int}, 'self': {}, 'options': {}}
+
+
+class TimeoutForwarder(Forwarder):
+    def arg_mapping(self):
+        return {'spec': {'specs': lambda x: x}, 'id': {},
+                'replicate_to': {"replicate_to": int},
+                'persist_to': {"persist_to": int},
+                'timeout': {'timeout': float},
+                'expiration': {'ttl': int}, 'self': {}, 'options': {}}
+
+
+forward_args = DefaultForwarder().forward_args
+timeout_forward_args = TimeoutForwarder().forward_args
 
 AcceptableInts = Union['ConstrainedValue', ctypes.c_int64, ctypes.c_uint64, int]
 

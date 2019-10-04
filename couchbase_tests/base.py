@@ -737,7 +737,7 @@ class SkipUnsupported(SkipTest):
         super(SkipUnsupported, self).__init__(traceback.format_exc())
 
 
-class ClusterTestCase(ConnectionTestCase):
+class ClusterTestCase(CouchbaseTestCase):
     def __init__(self, *args, **kwargs):
         super(ClusterTestCase, self).__init__(*args, **kwargs)
         self.cluster_factory = getattr(self, 'cluster_factory', Cluster.connect)

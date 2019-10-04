@@ -1,5 +1,6 @@
 from typing import *
 
+from .management.users import UserManager
 from .management.buckets import BucketManager
 from couchbase.management.admin import Admin
 from couchbase.diagnostics import DiagnosticsResult, EndPointDiagnostics, IDiagnosticsResult
@@ -127,9 +128,9 @@ class Cluster(object):
                       ):
         self._cluster.authenticate(authenticator, username, password)
         credentials = authenticator.get_credentials()
-        clusteropts = credentials.get('options', {})
-        clusteropts['bucket'] = "default"
-        self.clusterbucket=CoreClient(str(self.connstr),_conntype=_LCB.LCB_TYPE_CLUSTER, **clusteropts)
+        self._clusteropts = credentials.get('options', {})
+        self._clusteropts['bucket'] = "default"
+        self._clusterclient=None
         auth=credentials.get('options')
         self.admin = Admin(auth.get('username'), auth.get('password'), connstr=str(self.connstr))
 
@@ -182,8 +183,10 @@ class Cluster(object):
         return QueryResult(self._operate_on_cluster(CoreClient.query, QueryException, statement, **(forward_args(kwargs, *options))))
 
     def _operate_on_cluster(self, verb, failtype, *args, **kwargs):
+        if not self._clusterclient:
+            self._clusterclient = CoreClient(str(self.connstr), _conntype=_LCB.LCB_TYPE_CLUSTER, **self._clusteropts)
         try:
-            return verb(self.clusterbucket, *args, **kwargs)
+            return verb(self._clusterclient, *args, **kwargs)
         except Exception as e:
             raise failtype(str(e))
 
@@ -272,8 +275,8 @@ class Cluster(object):
         return DiagnosticsResult(final_results)
 
     def users(self):
-        # type: (...)->IUserManager
-        raise NotImplementedError("To be implemented in SDK3 full release")
+        # type: (...)->UserManager
+        return UserManager(self.admin)
 
     def indexes(self):
         # type: (...)->IIndexManager
