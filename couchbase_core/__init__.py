@@ -62,6 +62,8 @@ try:
 except:
     StopAsyncIteration = StopIteration
 
+from couchbase_core._pyport import ulp
+
 
 def set_json_converters(encode, decode):
     """
@@ -271,3 +273,11 @@ def _depr(fn, usage, stacklevel=3):
     """Internal convenience function for deprecation warnings"""
     warn('{0} is deprecated. Use {1} instead'.format(fn, usage),
          stacklevel=stacklevel, category=DeprecationWarning)
+
+
+def mk_formstr(d):
+    l = []
+    for k, v in d.items():
+        l.append('{0}={1}'.format(ulp.quote(k), ulp.quote(str(v))))
+
+    return '&'.join(l)

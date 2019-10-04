@@ -1,9 +1,9 @@
 from couchbase.management import CollectionManager
-from couchbase_core.admin import Admin
+from couchbase.management.admin import Admin
 from couchbase_core.supportability import uncommitted
 from couchbase_core.client import Client as CoreClient
 from .collection import CBCollection, CollectionOptions
-from .options import OptionBlock, forward_args
+from .options import OptionBlock
 from .result import *
 from .collection import Scope
 

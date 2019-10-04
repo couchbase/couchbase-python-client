@@ -42,16 +42,6 @@ class ClusterTest(CouchbaseTestCase):
         key = self.gen_key('cluster_test')
         cb.upsert(key, 'cluster test')
 
-    def test_cluster_manager(self):
-        cluster, bucket_name = self._create_cluster()
-
-        # Create an Admin object from the cluster
-        admin = cluster.cluster_manager()
-
-        # Ensure we can retrieve bucket info
-        # If we don't error out, this works
-        bucket_info = admin.bucket_info(bucket_name)
-
     def test_query(self):
         self.skipUnlessMock()
 

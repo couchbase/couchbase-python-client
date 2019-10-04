@@ -1,6 +1,4 @@
-from typing import *
-
-from couchbase_core.admin import Admin
+from couchbase.management.admin import Admin
 
 
 class GenericManager(object):

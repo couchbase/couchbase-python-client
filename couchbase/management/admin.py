@@ -23,9 +23,9 @@ from time import time, sleep
 
 import couchbase_core._libcouchbase as LCB
 
-from couchbase_core import JSON
+from couchbase_core import JSON, mk_formstr
 import couchbase_core.exceptions as E
-from couchbase_core._pyport import ulp, basestring
+from couchbase_core._pyport import basestring
 from couchbase_core.auth_domain import AuthDomain
 from couchbase_core._libcouchbase import FMT_JSON
 
@@ -156,16 +156,11 @@ class Admin(LCB.Collection):
                                   post_data=content,
                                   response_format=response_format)
 
-    def _mk_formstr(self, d):
-        l = []
-        for k, v in d.items():
-            l.append('{0}={1}'.format(ulp.quote(k), ulp.quote(str(v))))
+    bc_defaults=dict(bucket_type='couchbase',
+                  bucket_password='', replicas=0, ram_quota=1024,
+                  flush_enabled=False)
 
-        return '&'.join(l)
-
-    def bucket_create(self, name, bucket_type='couchbase',
-                      bucket_password='', replicas=0, ram_quota=1024,
-                      flush_enabled=False):
+    def bucket_create(self, name, **kwargs):
         """
         Create a new bucket
 
@@ -197,20 +192,22 @@ class Admin(LCB.Collection):
         :return: A :class:`~.HttpResult`
         :raise: :exc:`~.HTTPError` if the bucket could not be created.
         """
+        final_opts = dict(**Admin.bc_defaults)
+        final_opts.update(**{k: v for k, v in kwargs.items() if (v is not None)})
         params = {
             'name': name,
-            'bucketType': bucket_type,
+            'bucketType': final_opts['bucket_type'],
             'authType': 'sasl',
-            'saslPassword': bucket_password if bucket_password else '',
-            'flushEnabled': int(flush_enabled),
-            'ramQuotaMB': ram_quota
+            'saslPassword': final_opts['bucket_password'],
+            'flushEnabled': int(final_opts['flush_enabled']),
+            'ramQuotaMB': final_opts['ram_quota']
         }
-        if bucket_type in ('couchbase', 'membase', 'ephemeral'):
-            params['replicaNumber'] = replicas
+        if final_opts['bucket_type'] in ('couchbase', 'membase', 'ephemeral'):
+            params['replicaNumber'] = final_opts['replicas']
 
         return self.http_request(
             path='/pools/default/buckets', method='POST',
-            content=self._mk_formstr(params),
+            content=mk_formstr(params),
             content_type='application/x-www-form-urlencoded')
 
     def bucket_remove(self, name):
@@ -294,71 +291,6 @@ class Admin(LCB.Collection):
                 if time() + sleep_interval > end:
                     raise
                 sleep(sleep_interval)
-
-    def bucket_update(self, name, current, bucket_password=None, replicas=None,
-                      ram_quota=None, flush_enabled=None):
-        """
-        Update an existing bucket's settings.
-
-        :param string name: The name of the bucket to update
-        :param dict current: Current state of the bucket.
-            This can be retrieve from :meth:`bucket_info`
-        :param str bucket_password: Change the bucket's password
-        :param int replicas: The number of replicas for the bucket
-        :param int ram_quota: The memory available to the bucket
-            on each node.
-        :param bool flush_enabled: Whether the flush API should be allowed
-            from normal clients
-        :return: A :class:`~.HttpResult` object
-        :raise: :exc:`~.HTTPError` if the request could not be
-            completed
-
-
-        .. note::
-
-            The default value for all options in this method is
-            ``None``. If a value is set to something else, it will
-            modify the setting.
-
-
-        Change the bucket password::
-
-            adm.bucket_update('a_bucket', adm.bucket_info('a_bucket'),
-                              bucket_password='n3wpassw0rd')
-
-        Enable the flush API::
-
-            adm.bucket_update('a_bucket', adm.bucket_info('a_bucket'),
-                              flush_enabled=True)
-        """
-        params = {}
-        current = current.value
-
-        # Merge params
-        params['authType'] = current['authType']
-        if 'saslPassword' in current:
-            params['saslPassword'] = current['saslPassword']
-
-        if bucket_password is not None:
-            params['authType'] = 'sasl'
-            params['saslPassword'] = bucket_password
-
-        params['replicaNumber'] = (
-            replicas if replicas is not None else current['replicaNumber'])
-
-        if ram_quota:
-            params['ramQuotaMB'] = ram_quota
-        else:
-            params['ramQuotaMB'] = current['quota']['ram'] / 1024 / 1024
-
-        if flush_enabled is not None:
-            params['flushEnabled'] = int(flush_enabled)
-
-        params['proxyPort'] = current['proxyPort']
-        return self.http_request(path='/pools/default/buckets/' + name,
-                                 method='POST',
-                                 content_type='application/x-www-form-urlencoded',
-                                 content=self._mk_formstr(params))
 
     @staticmethod
     def _get_management_path(auth_domain, userid=None):
@@ -453,7 +385,7 @@ class Admin(LCB.Collection):
         if name:
             params['name'] = name
 
-        form = self._mk_formstr(params)
+        form = mk_formstr(params)
         path = self._get_management_path(domain, userid)
         return self.http_request(path=path,
                                  method='PUT',

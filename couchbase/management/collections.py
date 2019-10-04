@@ -1,5 +1,5 @@
 from ..options import OptionBlock
-from couchbase_core.admin import Admin
+from couchbase.management.admin import Admin
 from typing import *
 from .generic import GenericManager
 

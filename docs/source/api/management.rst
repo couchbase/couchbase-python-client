@@ -16,3 +16,8 @@ to perform common API requests.
 .. autoclass:: CollectionManager
     :members:
 
+.. module:: couchbase.management.buckets
+
+.. autoclass:: BucketManager
+    :members:
+

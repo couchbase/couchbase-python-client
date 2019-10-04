@@ -16,7 +16,6 @@
 #
 import weakref
 
-from .admin import Admin
 from .client import Client
 from .connstr import ConnectionString
 from .exceptions import CouchbaseError
@@ -300,14 +299,6 @@ class Cluster(object):
         def _warning(self, clash_param_dict, auth_type):
             warnings.warn(self._get_generic_complaint(clash_param_dict, auth_type))
 
-    def cluster_manager(self):
-        """
-        Returns an instance of :class:`~.couchbase_core.admin.Admin` which may be
-        used to create and manage buckets in the cluster.
-        """
-        credentials = self.authenticator.get_credentials()['options']
-        connection_string = str(self.connstr)
-        return Admin(credentials.get('username'), credentials.get('password'), connection_string=connection_string)
 
     def n1ql_query(self, query, *args, **kwargs):
         """

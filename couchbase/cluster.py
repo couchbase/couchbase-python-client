@@ -1,7 +1,7 @@
 from typing import *
 
-from couchbase_core.connstr import  ConnectionString
-from couchbase_core.admin import Admin
+from .management.buckets import BucketManager
+from couchbase.management.admin import Admin
 from couchbase.diagnostics import DiagnosticsResult, EndPointDiagnostics, IDiagnosticsResult
 from couchbase.fulltext import ISearchResult, SearchResult, SearchOptions
 from couchbase_core.fulltext import Query, Facet
@@ -212,6 +212,7 @@ class Cluster(object):
                      ):
         pass
 
+    @overload
     def search_query(self,
                      index,  # type: str
                      query,  # type: Union[str, Query]
@@ -283,8 +284,8 @@ class Cluster(object):
         return self._cluster
 
     def buckets(self):
-        # type: (...)->IBucketManager
-        return self._cluster._buckets
+        # type: (...)->BucketManager
+        return BucketManager(self.admin)
 
     def disconnect(self,
                    options=None  # type: DisconnectOptions
