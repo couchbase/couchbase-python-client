@@ -83,6 +83,7 @@ packages = {
     'couchbase_v2.asynchronous',
     'couchbase_v2.tests',
     'couchbase_v2.tests.cases',
+    'couchbase.management',
     'gcouchbase',
     'txcouchbase',
     'acouchbase',
