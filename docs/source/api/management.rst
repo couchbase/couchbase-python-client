@@ -27,3 +27,8 @@ to perform common API requests.
 .. autoclass:: UserManager
     :members:
 
+.. module:: couchbase.management.queries
+
+.. autoclass:: QueryIndexManager
+    :members:
+

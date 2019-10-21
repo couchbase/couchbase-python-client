@@ -337,12 +337,13 @@ class BucketManager(object):
         ret.value.update(real_rows)
         return ret
 
-    def _mk_index_def(self, ix, primary=False):
+    @staticmethod
+    def _mk_index_def(bucket_name, ix, primary=False):
         if isinstance(ix, N1qlIndex):
             return N1qlIndex(ix)
 
         info = N1qlIndex()
-        info.keyspace = self._cb.bucket
+        info.keyspace = bucket_name
         info.primary = primary
 
         if ix:
@@ -352,7 +353,11 @@ class BucketManager(object):
 
         return info
 
-    def n1ql_index_create(self, ix, **kwargs):
+    def n1ql_index_create(self, ix,  **kwargs):
+        self._n1ql_index_create(self._cb.bucket, self._cb, **kwargs)
+
+    @staticmethod
+    def _n1ql_index_create(bucketname, bucket, ix, defer=False, ignore_exists=False, primary=False, fields=None, cond=None, **kwargs):
         """
         Create an index for use with N1QL.
 
@@ -376,16 +381,12 @@ class BucketManager(object):
 
         .. seealso:: :meth:`n1ql_index_create_primary`
         """
-        defer = kwargs.pop('defer', False)
-        ignore_exists = kwargs.pop('ignore_exists', False)
-        primary = kwargs.pop('primary', False)
-        fields = kwargs.pop('fields', [])
-        cond = kwargs.pop('condition', None)
+        fields = fields or []
 
         if kwargs:
             raise TypeError('Unknown keyword arguments', kwargs)
 
-        info = self._mk_index_def(ix, primary)
+        info = BucketManager._mk_index_def(bucketname, ix, primary)
 
         if primary and fields:
             raise TypeError('Cannot create primary index with explicit fields')
@@ -409,7 +410,7 @@ class BucketManager(object):
         }
 
         # Now actually create the indexes
-        return IxmgmtRequest(self._cb, 'create', info, **options).execute()
+        return IxmgmtRequest(bucket, 'create', info, **options).execute()
 
     def n1ql_index_create_primary(self, defer=False, ignore_exists=False):
         """
@@ -427,7 +428,7 @@ class BucketManager(object):
         return self.n1ql_index_create(
             '', defer=defer, primary=True, ignore_exists=ignore_exists)
 
-    def n1ql_index_drop(self, ix, primary=False, **kwargs):
+    def n1ql_index_drop(self, ix, primary=False, ignore_missing=False):
         """
         Delete an index from the cluster.
 
@@ -438,7 +439,8 @@ class BucketManager(object):
         :raise: :exc:`~.NotFoundError` if the index does not exist and
             `ignore_missing` was not specified
         """
-        info = self._mk_index_def(ix, primary)
+        info = BucketManager._mk_index_def(self._cb.bucket, ix, primary)
+        kwargs['ignore_missing']=ignore_missing
         return IxmgmtRequest(self._cb, 'drop', info, **kwargs).execute()
 
     def n1ql_index_drop_primary(self, **kwargs):
@@ -462,6 +464,13 @@ class BucketManager(object):
         if not other_buckets:
             info.keyspace = self._cb.bucket
         return IxmgmtRequest(self._cb, 'list', info).execute()
+
+    @staticmethod
+    def _n1ql_index_build_deferred(bucketname, bucket, other_buckets=False):
+        info = N1qlIndex()
+        if not other_buckets:
+            info.keyspace = bucketname
+            return IxmgmtRequest(bucket, 'build', info).execute()
 
     def n1ql_index_build_deferred(self, other_buckets=False):
         """
@@ -491,10 +500,7 @@ class BucketManager(object):
             mgr.n1ql_index_watch(indexes, timeout=30, interval=1)
 
         """
-        info = N1qlIndex()
-        if not other_buckets:
-            info.keyspace = self._cb.bucket
-            return IxmgmtRequest(self._cb, 'build', info).execute()
+        return self._n1ql_index_build_deferred(self._cb.bucket, self._cb, other_buckets)
 
     def n1ql_index_watch(self, indexes,
                          timeout=30, interval=0.2, watch_primary=False):

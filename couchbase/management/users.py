@@ -10,7 +10,7 @@ from couchbase_core import ABCMeta
 from couchbase_core.exceptions import HTTPError
 from typing import *
 from couchbase.options import OptionBlockTimeOutVerbatim
-from couchbase_core.exceptions import HttpErrorHandler
+from couchbase_core.exceptions import ErrorMapper
 
 
 class GroupNotFoundException(HTTPError):
@@ -21,12 +21,12 @@ class UserNotFoundException(HTTPError):
     """ The RBAC User was not found"""
 
 
-class UserErrorHandler(HttpErrorHandler):
+class UserErrorHandler(ErrorMapper):
     @staticmethod
     def mapping():
         # type (...)->Mapping[str, CBErrorType]
-        return {'Unknown group': GroupNotFoundException,
-                'Unknown user': UserNotFoundException}
+        return {HTTPError: {'Unknown group': GroupNotFoundException,
+                            'Unknown user': UserNotFoundException}}
 
 
 @UserErrorHandler.wrap

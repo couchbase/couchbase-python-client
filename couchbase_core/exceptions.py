@@ -828,23 +828,36 @@ class QueueEmpty(Exception):
     """
 
 
-HTTPErrorType = TypeVar('HTTPErrorType', bound=HTTPError)
+CBErrorType = TypeVar('CBErrorType', bound=CouchbaseError)
 
 
-class HttpErrorHandler(object):
+class AnyPattern(object):
+    def match(self, *args, **kwargs):
+        return True
+
+    def __hash__(self):
+        return hash(True)
+
+    def __eq__(self, other):
+        return isinstance(other, AnyPattern)
+
+
+class ErrorMapper(object):
     @classmethod
     def mgmt_exc_wrap(cls, func):
         @wraps(func)
         def wrapped(*args, **kwargs):
             try:
                 return func(*args, **kwargs)
-            except HTTPError as e:
-                extra = getattr(e, 'objextra', None)
-                if extra:
-                    value = getattr(extra, 'value', "")
-                    for pattern, exc in cls._compiled_mapping().items():
-                        if pattern.match(value):
-                            raise exc.pyexc(value, extra, e)
+            except CouchbaseError as e:
+                for orig_exc, text_to_final_exc in cls._compiled_mapping().items():
+                    if isinstance(e, orig_exc):
+                        extra = getattr(e, 'objextra', None)
+                        if extra:
+                            value = getattr(extra, 'value', "")
+                            for pattern, exc in text_to_final_exc.items():
+                                if pattern.match(value):
+                                    raise exc.pyexc(e.message, extra, e)
                 raise
 
         return wrapped
@@ -852,12 +865,15 @@ class HttpErrorHandler(object):
     @classmethod
     def _compiled_mapping(cls):
         if not getattr(cls, '_cm', None):
-            cls._cm = {re.compile(k): v for k, v in cls.mapping().items()}
+            cls._cm = {
+                orig_exc: {{str: re.compile}.get(type(k), lambda x: x)(k): v for k, v in mapping.items()} for
+                orig_exc, mapping in cls.mapping().items()
+            }
         return cls._cm
 
     @staticmethod
     def mapping():
-        # type (...)->Mapping[str, CBErrorType]
+        # type (...)->Mapping[CBErrorType, Mapping[str, CBErrorType]]
         return None
 
     @classmethod
