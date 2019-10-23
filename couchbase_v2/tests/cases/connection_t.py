@@ -21,8 +21,8 @@ import os
 from nose.plugins.attrib import attr
 
 from couchbase_core.exceptions import (AuthError, BucketNotFoundError, CouchbaseNetworkError,
-                                     NotFoundError, InvalidError,
-                                     TimeoutError)
+                                       NotFoundError, InvalidError,
+                                       TimeoutError, ArgumentError)
 from couchbase_tests.base import CouchbaseTestCase, SkipTest, ConnectionTestCase
 from couchbase_core.connstr import ConnectionString
 
@@ -91,7 +91,7 @@ class ConnectionTest(CouchbaseTestCase):
         # apparently libcouchbase does not report this failure.
 
     def test_invalid_hostname(self):
-        self.assertRaises(InvalidError, self.factory,
+        self.assertRaises(ArgumentError, self.factory,
                           str('couchbase://12345:qwer###/default'))
 
     def test_multi_hosts(self):

@@ -934,11 +934,11 @@ static int Collection__init__(pycbc_Collection_t *self,
 {
     int rv = 0;
 
-    rv = Bucket__init__((pycbc_Bucket *)self, args, kwargs);
+    rv = pycbc_collection_init_from_fn_args(self, kwargs);
     if (rv) {
         return -1;
     }
-    rv = pycbc_collection_init_from_fn_args(self, kwargs);
+    rv = Bucket__init__((pycbc_Bucket *)self, args, kwargs);
     self->stack_allocated = 0;
     if (rv) {
         PYCBC_EXCTHROW_ARGS();

@@ -2,6 +2,7 @@ from ..options import OptionBlock
 from couchbase.management.admin import Admin
 from typing import *
 from .generic import GenericManager
+from couchbase_core import mk_formstr
 
 
 class CollectionManager(GenericManager):
@@ -98,7 +99,7 @@ class CollectionManager(GenericManager):
 
     def create_collection(self,  # type: CollectionManager
                           collection,  # type: ICollectionSpec
-                          options  # type: CreateCollectionOptions
+                          *options  # type: CreateCollectionOptions
                           ):
         """
         Create Collection
@@ -125,8 +126,8 @@ class CollectionManager(GenericManager):
             'name': collection.name
         }
 
-        form = self.admin_bucket._mk_formstr(params)
-        return self.admin_bucket.http_request(path=path,
+        form = mk_formstr(params)
+        return self._admin_bucket.http_request(path=path,
                                               method='POST',
                                               content_type='application/x-www-form-urlencoded',
                                               content=form)
@@ -154,7 +155,7 @@ class CollectionManager(GenericManager):
 
     def create_scope(self,  # type: CollectionManager
                      scope_name,  # type: str
-                     options  # type: CreateScopeOptions
+                     *options  # type: CreateScopeOptions
                      ):
         """Create Scope
         Creates a new scope.
@@ -178,8 +179,8 @@ class CollectionManager(GenericManager):
             'name': scope_name
         }
 
-        form = self.admin_bucket._mk_formstr(params)
-        self.admin_bucket.http_request(path=path,
+        form = mk_formstr(params)
+        self._admin_bucket.http_request(path=path,
                                               method='POST',
                                               content_type='application/x-www-form-urlencoded',
                                               content=form)

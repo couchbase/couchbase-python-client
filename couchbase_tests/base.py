@@ -26,6 +26,7 @@ from testfixtures import LogCapture
 
 from testresources import ResourcedTestCase as ResourcedTestCaseReal, TestResourceManager
 
+from couchbase.exceptions import HTTPError
 import couchbase_core
 from couchbase import Cluster, ClusterOptions
 from couchbase_core.cluster import ClassicAuthenticator
@@ -819,15 +820,17 @@ class CollectionTestCase(ClusterTestCase):
             try:
                 cm.create_collection(ICollectionSpec(collection_name, scope_name))
                 CollectionTestCase.initialised[scope_name][collection_name] = None
-            except:
-                pass
+            except HTTPError as e:
+                warnings.warn(e.message)
+
 
     @staticmethod
     def _upsert_scope(cm, scope_name):
         try:
             if scope_name and not scope_name in CollectionTestCase.initialised.keys():
                 cm.create_scope(scope_name)
-        except:
+        except HTTPError as e:
+            warnings.warn(e.message)
             pass
 
 
@@ -835,5 +838,5 @@ class DDocTestCase(ConnectionTestCase):
     pass
 
 
-class ViewTestCase(ClusterTestCase):
+class ViewTestCase(ConnectionTestCase):
     pass
