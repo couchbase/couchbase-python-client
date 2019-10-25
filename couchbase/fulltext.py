@@ -15,44 +15,44 @@ class ISearchResult(object):
     Facet = object
     @abstractmethod
     def hits(self):
-        # type: (...)->List[SearchQueryRow]
+        # type: (...) -> List[SearchQueryRow]
         pass
 
     @abstractmethod
     def facets(self):
-        # type: (...)->Mapping[str, Facet]
+        # type: (...) -> Mapping[str, Facet]
         pass
 
     @abstractmethod
     def metadata(self):
-        # type: (...)->IMetaData
+        # type: (...) -> IMetaData
         pass
 
 
 class IMetaData(object):
     @abstractmethod
     def success_count(self):
-        # type: (...)->int
+        # type: (...) -> int
         pass
 
     @abstractmethod
     def error_count(self):
-        # type: (...)->int
+        # type: (...) -> int
         pass
 
     @abstractmethod
     def took(self):
-        # type: (...)->Seconds
+        # type: (...) -> Seconds
         pass
 
     @abstractmethod
     def total_hits(self):
-        # type: (...)->int
+        # type: (...) -> int
         pass
 
     @abstractmethod
     def max_score(self):
-        # type: (...)->float
+        # type: (...) -> float
         pass
 
 
@@ -64,27 +64,27 @@ class MetaData(IMetaData):
 
     @property
     def _status(self):
-        # type: (...)->Dict[str,int]
+        # type: (...) -> Dict[str,int]
         return self._raw_data.get('status',{})
 
     def success_count(self):
-        # type: (...)->int
+        # type: (...) -> int
         return self._status.get('successful')
 
     def error_count(self):
-        # type: (...)->int
+        # type: (...) -> int
         return self._status.get('failed')
 
     def took(self):
-        # type: (...)->Seconds
+        # type: (...) -> Seconds
         return Seconds(self._raw_data.get('took')/10e6)
 
     def total_hits(self):
-        # type: (...)->int
+        # type: (...) -> int
         return self._raw_data.get('total_hits')
 
     def max_score(self):
-        # type: (...)->float
+        # type: (...) -> float
         return self._raw_data.get('max_score')
 
 
@@ -95,12 +95,12 @@ class SearchResult(ISearchResult, IterableWrapper):
         IterableWrapper.__init__(self, raw_result)
 
     def hits(self):
-        # type: (...)->Iterable[JSON]
+        # type: (...) -> Iterable[JSON]
         return list(x for x in self)
 
     def facets(self):
-        # type: (...)->Dict[str,ISearchResult.Facet]
+        # type: (...) -> Dict[str,ISearchResult.Facet]
         return self.parent.facets
 
-    def metadata(self):  # type: (...)->IMetaData
+    def metadata(self):  # type: (...) -> IMetaData
         return MetaData(IterableWrapper.metadata(self))

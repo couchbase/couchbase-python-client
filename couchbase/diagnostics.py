@@ -16,32 +16,32 @@ class ServiceType(Enum):
 class IEndPointDiagnostics:
     @abstractmethod
     def type(self):
-        # type: (...)->ServiceType
+        # type: (...) -> ServiceType
         pass
 
     @abstractmethod
     def id(self):
-        # type: (...)->str
+        # type: (...) -> str
         pass
 
     @abstractmethod
     def local(self):
-        # type: (...)->str
+        # type: (...) -> str
         pass
 
     @abstractmethod
     def remote(self):
-        # type: (...)->str
+        # type: (...) -> str
         pass
 
     @abstractmethod
     def last_activity(self):
-        # type: (...)->int
+        # type: (...) -> int
         pass
 
     @abstractmethod
     def latency(self):
-        # type: (...)->Optional[int]
+        # type: (...) -> Optional[int]
         pass
 
     @abstractmethod
@@ -53,22 +53,22 @@ class IEndPointDiagnostics:
 class IDiagnosticsResult:
     @abstractmethod
     def id(self):
-        # type: (...)->str
+        # type: (...) -> str
         pass
 
     @abstractmethod
     def version(self):
-        # type: (...)->int
+        # type: (...) -> int
         pass
 
     @abstractmethod
     def sdk(self):
-        # type: (...)->str
+        # type: (...) -> str
         pass
 
     @abstractmethod
     def services(self):
-        # type: (...)->Mapping[str, IEndPointDiagnostics]
+        # type: (...) -> Mapping[str, IEndPointDiagnostics]
         pass
 
 
@@ -87,31 +87,31 @@ class EndPointDiagnostics(IEndPointDiagnostics):
                 self._service_type = service_type
 
     def type(self):
-        # type: (...)->Union[ServiceType,str]
+        # type: (...) -> Union[ServiceType,str]
         return self._service_type
 
     def id(self):
-        # type: (...)->str
+        # type: (...) -> str
         return self._raw_endpoint.get('id')
 
     def local(self):
-        # type: (...)->str
+        # type: (...) -> str
         return self._raw_endpoint.get('local')
 
     def remote(self):
-        # type: (...)->str
+        # type: (...) -> str
         return self._raw_endpoint.get('remote')
 
     def last_activity(self):
-        # type: (...)->int
+        # type: (...) -> int
         return self._raw_endpoint.get('last_activity_us')
 
     def latency(self):
-        # type: (...)->Optional[int]
+        # type: (...) -> Optional[int]
         return self._raw_endpoint.get('latency')
 
     def scope(self):
-        # type: (...)->str
+        # type: (...) -> str
         return self._raw_endpoint.get('scope')
 
 
@@ -122,17 +122,17 @@ class DiagnosticsResult(IDiagnosticsResult):
         self._src_diagnostics = source_diagnostics
 
     def id(self):
-        # type: (...)->str
+        # type: (...) -> str
         return self._src_diagnostics.get('id')
 
     def version(self):
-        # type: (...)->int
+        # type: (...) -> int
         return self._src_diagnostics.get('version')
 
     def sdk(self):
-        # type: (...)->str
+        # type: (...) -> str
         return self._src_diagnostics.get('sdk')
 
     def services(self):
-        # type: (...)->Mapping[str, IEndPointDiagnostics]
+        # type: (...) -> Mapping[str, IEndPointDiagnostics]
         return self._src_diagnostics.get('services', {})

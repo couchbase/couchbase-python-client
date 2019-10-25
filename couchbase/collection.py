@@ -26,7 +26,7 @@ class DeltaValue(ConstrainedInt):
     def __init__(self,
                  value  # type: AcceptableInts
                  ):
-        # type: (...)->None
+        # type: (...) -> None
         """
         A non-negative integer between 0 and +0x7FFFFFFFFFFFFFFF inclusive.
         Used as an argument for :meth:`Collection.increment` and :meth:`Collection.decrement`
@@ -53,7 +53,7 @@ class ReplaceOptions(OptionBlockTimeOut, ClientDurableOption, ServerDurableOptio
     def cas(self,  # type: ReplaceOptions
             cas  # type: int
             ):
-        # type: (...)->ReplaceOptions
+        # type: (...) -> ReplaceOptions
         self.__setitem__('cas', cas)
         return self
 
@@ -122,13 +122,13 @@ class GetOptions(OptionBlock):
 
     def project(self,
                 *args):
-        # type: (...)->GetOptionsProject
+        # type: (...) -> GetOptionsProject
         return GetOptionsProject(self, *args)
 
     def timeout(self,
                 duration  # type: Seconds
                 ):
-        # type: (...)->GetOptionsNonProject
+        # type: (...) -> GetOptionsNonProject
         self['timeout'] = duration.__int__()
         return GetOptionsNonProject(self)
 
@@ -186,7 +186,7 @@ CoreBucketOp = TypeVar("CoreBucketOp", Callable[[Any], SDK2Result], Callable[[An
 
 def _wrap_multi_mutation_result(wrapped  # type: CoreBucketOp
                                ):
-    # type: (...)->CoreBucketOp
+    # type: (...) -> CoreBucketOp
     @wraps(wrapped)
     def wrapper(target, keys, *options, **kwargs
                 ):
@@ -199,7 +199,7 @@ class CBCollection(CoreClient):
                  *args,
                  **kwargs
                  ):
-        # type: (...)->None
+        # type: (...) -> None
         """
         Couchbase collection. Should only be invoked by internal API, e.g.
         by :meth:`couchbase.collection.scope.Scope.collection` or
@@ -231,7 +231,7 @@ class CBCollection(CoreClient):
              name,  # type Optional[str]
              *options  # type: CollectionOptions
              ):
-        # type: (...)->CBCollection
+        # type: (...) -> CBCollection
         coll_args = copy.deepcopy(parent.bucket._bucket_args)
         coll_args.update(name=name, parent=parent)
         result = parent.bucket._corebucket_class(parent.bucket._connstr, **coll_args)
@@ -358,7 +358,7 @@ class CBCollection(CoreClient):
                       expiration,  # type: int
                       *options  # type: GetAndTouchOptions
                       ):
-        # type: (...)->GetResult
+        # type: (...) -> GetResult
         pass
 
     @get_result_wrapper
@@ -368,7 +368,7 @@ class CBCollection(CoreClient):
                       *options,  # type: GetAndTouchOptions
                       **kwargs  # type: Any
                       ):
-        # type: (...)->Tuple[SDK2Result, Tuple[Tuple[GetAndTouchOptions]]]
+        # type: (...) -> Tuple[SDK2Result, Tuple[Tuple[GetAndTouchOptions]]]
         kwargs_final = forward_args(kwargs, *options)
         if 'durability' in set(kwargs.keys()).union(options[0][0].keys()):
             raise couchbase.exceptions.ReplicaNotAvailableException()
@@ -382,7 +382,7 @@ class CBCollection(CoreClient):
                      *options,  # type: GetAndLockOptions
                      **kwargs
                      ):
-        # type: (...)->GetResult
+        # type: (...) -> GetResult
         final_options=forward_args(kwargs, *options)
         x = _Base.get(self, id, expiration, **final_options)
         _Base.lock(self, id, options)
@@ -395,7 +395,7 @@ class CBCollection(CoreClient):
                          *options,  # type: GetFromReplicaOptions
                          **kwargs  # type: Any
                          ):
-        # type: (...)->ResultPrecursor
+        # type: (...) -> ResultPrecursor
         final_options = forward_args(kwargs, *options)
         return ResultPrecursor(super(CBCollection,self).rget(id, replica_index, **final_options), final_options)
 
@@ -404,7 +404,7 @@ class CBCollection(CoreClient):
                   *options,  # type: GetOptions
                   **kwargs
                   ):
-        # type: (...)->Dict[str,GetResult]
+        # type: (...) -> Dict[str,GetResult]
         """
         Get multiple keys from the collection
 
@@ -432,7 +432,7 @@ class CBCollection(CoreClient):
                      *options,  # type: GetOptions
                      **kwargs
                      ):
-        # type: (...)->Dict[str,MutationResult]
+        # type: (...) -> Dict[str,MutationResult]
         """
         Write multiple items to the cluster. Multi version of :meth:`upsert`
 
@@ -480,7 +480,7 @@ class CBCollection(CoreClient):
                      *options,  # type: GetOptions
                      **kwargs
                      ):
-        # type: (...)->Dict[str, MutationResult]
+        # type: (...) -> Dict[str, MutationResult]
         """
         Insert multiple items into the collection.
 
@@ -497,7 +497,7 @@ class CBCollection(CoreClient):
                      *options,  # type: GetOptions
                      **kwargs
                      ):
-        # type: (...)->Dict[str, MutationResult]
+        # type: (...) -> Dict[str, MutationResult]
         """
         Remove multiple items from the collection.
 
@@ -521,7 +521,7 @@ class CBCollection(CoreClient):
               id,  # type: str
               *options,  # type: TouchOptions
               **kwargs):
-        # type: (...)->MutationResult
+        # type: (...) -> MutationResult
         """Update a key's expiration time
 
         :param string key: The key whose expiration time should be
@@ -552,7 +552,7 @@ class CBCollection(CoreClient):
                id,  # type: str
                *options  # type: UnlockOptions
                ):
-        # type: (...)->MutationResult
+        # type: (...) -> MutationResult
         """Unlock a Locked Key in Couchbase.
 
         This unlocks an item previously locked by :meth:`lock`
@@ -649,7 +649,7 @@ class CBCollection(CoreClient):
                id,  # type: str
                timeout=None,  # type: Seconds
                ):
-        # type: (...)->IExistsResult
+        # type: (...) -> IExistsResult
         """
         Any exceptions raised by the underlying platform
 
@@ -691,7 +691,7 @@ class CBCollection(CoreClient):
                *options,  # type: UpsertOptions
                **kwargs  # type: Any
                ):
-        # type: (...)->MutationResult
+        # type: (...) -> MutationResult
         """Unconditionally store the object in Couchbase.
 
         :param key:
@@ -780,7 +780,7 @@ class CBCollection(CoreClient):
                value,  # type: Any
                *options  # type: InsertOptions
                ):
-        # type: (...)->MutationResult
+        # type: (...) -> MutationResult
         pass
 
     @overload
@@ -797,7 +797,7 @@ class CBCollection(CoreClient):
 
     @_wrap_in_mutation_result
     def insert(self, key, value, *options, **kwargs):
-        # type: (...)->ResultPrecursor
+        # type: (...) -> ResultPrecursor
         """Store an object in Couchbase unless it already exists.
 
         Follows the same conventions as :meth:`upsert` but the value is
@@ -827,7 +827,7 @@ class CBCollection(CoreClient):
                 replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
                 durability_level=Durability.NONE  # type: Durability
                 ):
-        # type: (...)->MutationResult
+        # type: (...) -> MutationResult
         pass
 
     @overload
@@ -836,7 +836,7 @@ class CBCollection(CoreClient):
                 value,  # type: Any
                 options,  # type: ReplaceOptions
                 ):
-        # type: (...)->MutationResult
+        # type: (...) -> MutationResult
         pass
 
     @_wrap_in_mutation_result
@@ -846,7 +846,7 @@ class CBCollection(CoreClient):
                 *options,
                 **kwargs
                 ):
-        # type: (...)->MutationResult
+        # type: (...) -> MutationResult
         """Store an object in Couchbase only if it already exists.
 
            Follows the same conventions as :meth:`upsert`, but the value is
@@ -868,7 +868,7 @@ class CBCollection(CoreClient):
                replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
                durability_level=Durability.NONE  # type: Durability
                ):
-        # type: (...)->MutationResult
+        # type: (...) -> MutationResult
         pass
 
     @overload
@@ -876,7 +876,7 @@ class CBCollection(CoreClient):
                id,  # type: str
                *options  # type: RemoveOptions
                ):
-        # type: (...)->MutationResult
+        # type: (...) -> MutationResult
         pass
 
     @_wrap_in_mutation_result
@@ -885,7 +885,7 @@ class CBCollection(CoreClient):
                *options,  # type: RemoveOptions
                **kwargs
                ):
-        # type: (...)->MutationResult
+        # type: (...) -> MutationResult
         """Remove the key-value entry for a given key in Couchbase.
 
         :param key: A string which is the key to remove. The format and
@@ -934,7 +934,7 @@ class CBCollection(CoreClient):
                   *options,  # type: LookupInOptions
                   **kwargs
                   ):
-        # type: (...)->LookupInResult
+        # type: (...) -> LookupInResult
         """Atomically retrieve one or more paths from a document.
 
         :param id: The key of the document to lookup
@@ -967,7 +967,7 @@ class CBCollection(CoreClient):
                   spec,  # type: MutateInSpec
                   *options  # type: MutateInOptions
                   ):
-        # type: (...)->MutationResult
+        # type: (...) -> MutationResult
         pass
 
     @overload
@@ -979,7 +979,7 @@ class CBCollection(CoreClient):
                   upsert_doc=False,  # type: bool
                   durability_level=Durability.NONE  # type: Durability
                   ):
-        # type: (...)->MutationResult
+        # type: (...) -> MutationResult
         pass
 
     def mutate_in(self,  # type: CBCollection
@@ -988,7 +988,7 @@ class CBCollection(CoreClient):
                   *options,  # type: MutateInOptions
                   **kwargs  # type: Any
                   ):
-        # type: (...)->ResultPrecursor
+        # type: (...) -> ResultPrecursor
         """Perform multiple atomic modifications within a document.
 
         :param key: The key of the document to modify
@@ -1023,7 +1023,7 @@ class CBCollection(CoreClient):
         return MutateInResult(self.bucket.mutate_in(id, spec, **final_options), **final_options)
 
     def binary(self):
-        # type: (...)->BinaryCollection
+        # type: (...) -> BinaryCollection
         pass
 
     @overload
@@ -1032,7 +1032,7 @@ class CBCollection(CoreClient):
                value,  # type: str
                *options  # type: AppendOptions
                ):
-        # type: (...)->MutationResult
+        # type: (...) -> MutationResult
         pass
 
     @overload
@@ -1054,7 +1054,7 @@ class CBCollection(CoreClient):
                *options,  # type: Any
                **kwargs  # type: Any
                ):
-        # type: (...)->ResultPrecursor
+        # type: (...) -> ResultPrecursor
         """Append a string to an existing value in Couchbase.
 
         :param string value: The data to append to the existing value.
@@ -1092,7 +1092,7 @@ class CBCollection(CoreClient):
                 replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
                 durability_level=Durability.NONE  # type: Durability
                 ):
-        # type: (...)->MutationResult
+        # type: (...) -> MutationResult
         pass
 
     @overload
@@ -1101,7 +1101,7 @@ class CBCollection(CoreClient):
                 value,  # type: str
                 *options  # type: PrependOptions
                 ):
-        # type: (...)->MutationResult
+        # type: (...) -> MutationResult
         pass
 
     def prepend(self,
@@ -1110,7 +1110,7 @@ class CBCollection(CoreClient):
                 *options,  # type: PrependOptions
                 **kwargs  # type: Any
                 ):
-        # type: (...)->ResultPrecursor
+        # type: (...) -> ResultPrecursor
         """Prepend a string to an existing value in Couchbase.
 
         .. seealso:: :meth:`append`
@@ -1126,7 +1126,7 @@ class CBCollection(CoreClient):
                   expiration=Seconds(0),  # type: Seconds
                   durability_level=Durability.NONE  # type: Durability
                   ):
-        # type: (...)->ResultPrecursor
+        # type: (...) -> ResultPrecursor
         pass
 
     @overload
@@ -1136,7 +1136,7 @@ class CBCollection(CoreClient):
                   *options,  # type: CounterOptions
                   **kwargs
                   ):
-        # type: (...)->ResultPrecursor
+        # type: (...) -> ResultPrecursor
         pass
 
     @_wrap_in_mutation_result
@@ -1146,7 +1146,7 @@ class CBCollection(CoreClient):
                   *options,  # type: CounterOptions
                   **kwargs
                   ):
-        # type: (...)->ResultPrecursor
+        # type: (...) -> ResultPrecursor
         """Increment the numeric value of an item.
 
         This method instructs the server to treat the item stored under
@@ -1203,7 +1203,7 @@ class CBCollection(CoreClient):
                   expiration=Seconds(0),  # type: Seconds
                   durability_level=Durability.NONE  # type: Durability
                   ):
-        # type: (...)->ResultPrecursor
+        # type: (...) -> ResultPrecursor
         pass
 
     @overload
@@ -1213,7 +1213,7 @@ class CBCollection(CoreClient):
                   *options,  # type: CounterOptions
                   **kwargs
                   ):
-        # type: (...)->ResultPrecursor
+        # type: (...) -> ResultPrecursor
         pass
 
     @_wrap_in_mutation_result
@@ -1223,7 +1223,7 @@ class CBCollection(CoreClient):
                   *options,  # type: CounterOptions
                   **kwargs
                   ):
-        # type: (...)->ResultPrecursor
+        # type: (...) -> ResultPrecursor
         """Decrement the numeric value of an item.
 
         This method instructs the server to treat the item stored under
@@ -1288,7 +1288,7 @@ class Scope(object):
                  parent,  # type: couchbase.bucket.Bucket
                  name=None  # type: str
                  ):
-        # type: (...)->Any
+        # type: (...) -> Any
         """
         Collection scope representation.
         Constructor should only be invoked internally.
@@ -1305,7 +1305,7 @@ class Scope(object):
 
     @property
     def _realbucket(self):
-        # type: (...)->CoreClient
+        # type: (...) -> CoreClient
         return self.bucket._bucket
 
     @property
@@ -1323,7 +1323,7 @@ class Scope(object):
                            *options,  # type: Any
                            **kwargs  # type: Any
                            ):
-        # type: (...)->CBCollection
+        # type: (...) -> CBCollection
         """
         Returns the default collection for this bucket.
 
@@ -1340,7 +1340,7 @@ class Scope(object):
                         collection_name,  # type: Optional[str]
                         *options  # type: CollectionOptions
                         ):
-        # type: (...)->CBCollection
+        # type: (...) -> CBCollection
         return CBCollection.cast(self, collection_name, *options)
 
     @uncommitted

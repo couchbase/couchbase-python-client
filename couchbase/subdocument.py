@@ -10,7 +10,7 @@ SDType = type(SD)
 
 # noinspection PyPep8Naming
 def GetSpec():
-    # type: ()-> SDType
+    # type: () -> SDType
     return SD
 
 
@@ -20,7 +20,7 @@ MutateInSpec = Iterable[Spec]
 
 # noinspection PyPep8Naming
 def MutateSpec():
-    # type: ()-> SDType
+    # type: () -> SDType
     return SD
 
 
@@ -28,7 +28,7 @@ def exists(
         path,  # type: str
         xattr=False  # type: bool
 ):
-    # type: (...)->Spec
+    # type: (...) -> Spec
     """
     Checks for the existence of a field given a path.
 
@@ -42,7 +42,7 @@ def exists(
 def get(path,  # type: str
         xattr=False  # type: bool
         ):
-    # type: (...)->Spec
+    # type: (...) -> Spec
     """
     Fetches an element's value given a path.
 
@@ -56,7 +56,7 @@ def get(path,  # type: str
 def count(path,  # type: str
                   xattr=False  # type; bool
                   ):
-    # type: (...)->Spec
+    # type: (...) -> Spec
     """
     Gets the count of a list or dictionary element given a path
 
@@ -68,7 +68,7 @@ def count(path,  # type: str
 
 
 def get_full():
-    # type: (...)->Spec
+    # type: (...) -> Spec
     """
     Fetches the entire document.
 

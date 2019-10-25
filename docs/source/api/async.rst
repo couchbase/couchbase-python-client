@@ -48,10 +48,6 @@ The semantics of when an exception is passed follows the rules of the
     .. autoattribute:: errback
 
 
-.. autoclass:: AsyncBucket
-    :members:
-    :show-inheritance:
-
 Views Interface
 ===============
 

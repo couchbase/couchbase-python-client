@@ -26,7 +26,7 @@ class Bucket(object):
                  admin=None,  # type: Admin
                  *options  # type: BucketOptions
                  ):
-        # type: (...)->None
+        # type: (...) -> None
         pass
 
     def __init__(self,
@@ -37,7 +37,7 @@ class Bucket(object):
                  *options,
                  **kwargs
                 ):
-        # type: (...)->None
+        # type: (...) -> None
         """
         Connect to a bucket.
         Typically invoked by :meth:`couchbase.cluster.Cluster.open_bucket`
@@ -125,13 +125,14 @@ class Bucket(object):
 
     @property
     def name(self):
-        # type: (...)->str
+        # type: (...) -> str
         return self._name
 
     @uncommitted
     def scope(self,
               scope_name  # type: str
               ):
+        # type: (...) -> Scope
         """
         Open the named scope.
 
@@ -139,13 +140,12 @@ class Bucket(object):
         :return: the named scope
         :rtype: Scope
         """
-        # type: (...)->Scope
         return Scope(self, scope_name)
 
     def default_collection(self,
                            options=None  # type: CollectionOptions
                            ):
-        # type: (...)->CBCollection
+        # type: (...) -> CBCollection
         """
         Open the default collection.
 
@@ -159,7 +159,7 @@ class Bucket(object):
                    collection_name,  # type: str
                    options=None  # type: CollectionOptions
                    ):
-        # type: (...)->CBCollection
+        # type: (...) -> CBCollection
         """
         Open a collection in the default scope.
 
@@ -177,7 +177,7 @@ class Bucket(object):
                    view_name,  # type: str
                    *view_options # type: ViewOptions
                    ):
-        # type: (...)->IViewResult
+        # type: (...) -> IViewResult
         """
         Run a View Query
         :param str design_doc: design document
@@ -190,11 +190,11 @@ class Bucket(object):
         return IViewResult(res)
 
     def views(self):
-        # type: (...)->IViewManager
+        # type: (...) -> IViewManager
         pass
 
     def ping(self,
              options=None  # type: PingOptions
              ):
-        # type: (...)->IPingResult
+        # type: (...) -> IPingResult
         pass

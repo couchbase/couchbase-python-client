@@ -22,7 +22,7 @@ class IndexAlreadyExistsException(KeyExistsException):
 class QueryErrorMapper(ErrorMapper):
     @staticmethod
     def mapping():
-        # type: (...)->Dict[CBErrorType,Dict[Any, CBErrorType]]
+        # type: (...) -> Dict[CBErrorType,Dict[Any, CBErrorType]]
         return {KeyNotFoundException: {AnyPattern(): QueryIndexNotFoundException},
                 KeyExistsException: {AnyPattern(): IndexAlreadyExistsException}}
 
@@ -56,7 +56,7 @@ class QueryIndexManager(GenericManager):
                         *options,  # type: GetAllQueryIndexOptions
                         **kwargs
                         ):
-        # type: (...)->List[QueryIndex]
+        # type: (...) -> List[QueryIndex]
         """
         Fetches all indexes from the server.
 
@@ -164,8 +164,7 @@ class QueryIndexManager(GenericManager):
                      num_replicas=0,  # type: int
                      deferred=False,  # type: bool
                      timeout=None,  # type: Duration
-                     condition=None,  # type: str
-                     primary=False  # type: bool
+                     condition=None  # type: str
                      ):
         pass
 
@@ -183,12 +182,10 @@ class QueryIndexManager(GenericManager):
         :param str index_name: the name of the index.
         :param Iterable[str] fields: the fields to create the index over.
         :param bool ignore_if_exists: Don't error/throw if the index already exists.
-        :param int num_replicas : The number of replicas that this index should have. Uses the WITH keyword and num_replica.
+        :param int num_replicas: The number of replicas that this index should have. Uses the WITH keyword and num_replica.
         :param bool deferred: Whether the index should be created as a deferred index.
         :param Duration timeout:  the time allowed for the operation to be terminated. This is controlled by the client.
-        :param condition:
-        :param primary:
-
+        :param condition: condition on which to filter
         :raises: IndexAlreadyExistsException
         :raises: InvalidArgumentsException
         """
@@ -312,7 +309,7 @@ class QueryIndexManager(GenericManager):
         Watch polls indexes until they are online.
 
         :param str bucket_name: name of the bucket.
-        :param Iteralbe[str] index_names: name(s) of the index(es).
+        :param Iterable[str] index_names: name(s) of the index(es).
         :param Duration timeout: the time allowed for the operation to be terminated. This is controlled by the client.
         :param: bool watch_primary: whether or not to watch the primary index.
 

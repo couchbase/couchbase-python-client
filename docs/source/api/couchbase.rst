@@ -436,8 +436,8 @@ Flushing (clearing) the Bucket
 For some stages of development and/or deployment, it might be useful
 to be able to clear the bucket of its contents.
 
-.. currentmodule:: couchbase_core.bucket
-.. class:: Bucket
+.. currentmodule:: couchbase_core.client
+.. class:: Client
 
     .. automethod:: flush
 
@@ -507,8 +507,8 @@ Attributes
     from the couchbase_v2 legacy support package. We plan
     to update these to support SDK3 shortly.
 
-.. currentmodule:: couchbase_core.bucket
-.. class:: Bucket
+.. currentmodule:: couchbase_core.client
+.. class:: Client
 
     .. autoattribute:: quiet
 

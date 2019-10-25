@@ -280,7 +280,7 @@ class IterableWrapper(object):
         self.parent = parent
 
     def metadata(self):
-        # type: (...)->JSON
+        # type: (...) -> JSON
         return self.parent.meta
 
     def __iter__(self):

@@ -55,7 +55,7 @@ class UserManager(GenericManager):
                  *options,  # type: GetUserOptions
                  **kwargs
                  ):
-        # type: (...)->UserAndMetadata
+        # type: (...) -> UserAndMetadata
         """
         Gets a user.
 
@@ -92,7 +92,7 @@ class UserManager(GenericManager):
                       *options,  # type: GetAllUsersOptions
                       **kwargs
                       ):
-        # type: (...)->Iterable[UserAndMetadata]
+        # type: (...) -> Iterable[UserAndMetadata]
         """
 
         :param domain_name: name of the user domain. Defaults to local.
@@ -180,7 +180,7 @@ class UserManager(GenericManager):
                   *options,  # type: GetRolesOptions
                   **kwargs
                   ):
-        # type: (...)->Iterable[RoleAndDescription]
+        # type: (...) -> Iterable[RoleAndDescription]
         """
         Returns the roles supported by the server.
 
@@ -203,7 +203,7 @@ class UserManager(GenericManager):
                   *options,  # type: GetGroupOptions
                   **kwargs
                   ):
-        # type: (...)->Group
+        # type: (...) -> Group
         """
         Get info about the named group.
 
@@ -228,7 +228,7 @@ class UserManager(GenericManager):
                        *options,  # type: GetAllGroupsOptions
                        **kwargs
                        ):
-        # type: (...)->Iterable[Group]
+        # type: (...) -> Iterable[Group]
         """
         Get all groups.
 
@@ -366,25 +366,25 @@ class RoleAndDescription(with_metaclass(ABCMeta, Mapped)):
     @property
     @abstractmethod
     def role(self):
-        # type: (...)->Role
+        # type: (...) -> Role
         return None
 
     @property
     @abstractmethod
     def ce(self):
-        # type: (...)->Role
+        # type: (...) -> Role
         return None
 
     @property
     @abstractmethod
     def display_name(self):
-        # type: (...)->str
+        # type: (...) -> str
         return None
 
     @property
     @abstractmethod
     def description(self):
-        # type: (...)->str
+        # type: (...) -> str
         pass
 
     @classmethod
@@ -399,12 +399,12 @@ class Origin(object):
 
     @property
     def type(self):
-        # type: (...)->str
+        # type: (...) -> str
         pass
 
     @property
     def name(self):
-        # type: (...)->str
+        # type: (...) -> str
         return None
 
 
@@ -415,12 +415,12 @@ class RoleAndOrigins(object):
 
     @property
     def role(self):
-        # type: (...)->Role
+        # type: (...) -> Role
         pass
 
     @property
     def origins(self):
-        # type: (...)->List[Origin]
+        # type: (...) -> List[Origin]
         pass
 
 
@@ -432,33 +432,33 @@ class IUser(object):
     @property
     @abstractmethod
     def username(self):
-        # type: (...)->str
+        # type: (...) -> str
         pass
 
     @property
     @abstractmethod
     def display_name(self):
-        # type: (...)->str
+        # type: (...) -> str
         pass
 
     @property
     @abstractmethod
     def groups(self):
-        # type: (...)->Set[str]
+        # type: (...) -> Set[str]
         pass
         """names of the groups"""
 
     @property
     @abstractmethod
     def roles(self):
-        # type: (...)->Set[Role]
+        # type: (...) -> Set[Role]
         """only roles assigned directly to the user (not inherited from groups)"""
         pass
 
     @property
     @abstractmethod
     def password(self):
-        # type: (...)->None
+        # type: (...) -> None
         pass
         """ From the user's perspective the password property is "write-only".
         The accessor SHOULD be hidden from the user and be visible only to the manager implementation."""
@@ -484,29 +484,29 @@ class User(IUser):
 
     @property
     def username(self):
-        # type: (...)->str
+        # type: (...) -> str
         return self._raw_data.get('username')
 
     @property
     def display_name(self):
-        # type: (...)->str
+        # type: (...) -> str
         return self._raw_data.get('username')
 
     @property
     def groups(self):
-        # type: (...)->Set[str]
+        # type: (...) -> Set[str]
         """names of the groups"""
         return set(self._raw_data.get('groups', []))
 
     @property
     def roles(self):
-        # type: (...)->Set[Role]
+        # type: (...) -> Set[Role]
         """only roles assigned directly to the user (not inherited from groups)"""
         return self._raw_data.get('roles')
 
     @property
     def password(self):
-        # type: (...)->None
+        # type: (...) -> None
         """ From the user's perspective the password property is "write-only".
         The accessor SHOULD be hidden from the user and be visible only to the manager implementation."""
         return self._raw_data.get('password')
@@ -526,35 +526,35 @@ class UserAndMetadata(object):
 
     @property
     def domain(self):
-        # type: (...)->AuthDomain
+        # type: (...) -> AuthDomain
         """ AuthDomain is an enumeration with values "local" and "external".
         It MAY alternatively be represented as String."""
 
     @property
     def user(self):
-        # type: (...)->IUser
+        # type: (...) -> IUser
         """- returns a new mutable User object each time this method is called.
         Modifying the fields of the returned User MUST have no effect on the UserAndMetadata object it came from."""
 
     @property
     def effective_roles(self):
-        # type: (...)->Set[Role]
+        # type: (...) -> Set[Role]
         """all roles, regardless of origin."""
 
     @property
     def effective_roles_and_origins(self):
-        # type: (...)->List[RoleAndOrigins]
+        # type: (...) -> List[RoleAndOrigins]
         """same as effectiveRoles, but with origin information included."""
         pass
 
     @property
     def password_changed(self):
-        # type: (...)->Optional[float]
+        # type: (...) -> Optional[float]
         pass
 
     @property
     def external_groups(self):
-        # type: (...)->Set[str]
+        # type: (...) -> Set[str]
         pass
 
 
@@ -564,38 +564,38 @@ class RawUserAndMetadata(UserAndMetadata):
 
     @property
     def domain(self):
-        # type: (...)->AuthDomain
+        # type: (...) -> AuthDomain
         """ AuthDomain is an enumeration with values "local" and "external".
         It MAY alternatively be represented as String."""
         return self._raw_data.get('domain')
 
     @property
     def user(self):
-        # type: (...)->IUser
+        # type: (...) -> IUser
         """- returns a new mutable User object each time this method is called.
         Modifying the fields of the returned User MUST have no effect on the UserAndMetadata object it came from."""
         return User(**self._raw_data.get('user'))
 
     @property
     def effective_roles(self):
-        # type: (...)->Set[Role]
+        # type: (...) -> Set[Role]
         """all roles, regardless of origin."""
         return set(map(Role, self._raw_data.get('effective_roles')))
 
     @property
     def effective_roles_and_origins(self):
-        # type: (...)->List[RoleAndOrigins]
+        # type: (...) -> List[RoleAndOrigins]
         """same as effectiveRoles, but with origin information included."""
         return list(map(RoleAndOrigins, self._raw_data.get('effective_roles_and_origins')))
 
     @property
     def password_changed(self):
-        # type: (...)->Optional[float]
+        # type: (...) -> Optional[float]
         return self._raw_data.get('password_changed')
 
     @property
     def external_groups(self):
-        # type: (...)->Set[str]
+        # type: (...) -> Set[str]
         return set(self._raw_data.get('external_groups'))
 
 
@@ -606,31 +606,31 @@ class IGroup(object):
     @property
     @abstractmethod
     def name(self):
-        # type: (...)->str
+        # type: (...) -> str
         pass
 
     @property
     @abstractmethod
     def description(self):
-        # type: (...)->str
+        # type: (...) -> str
         pass
 
     @property
     @abstractmethod
     def roles(self):
-        # type: (...)->Set[Role]
+        # type: (...) -> Set[Role]
         """- Role as defined in the User Manager section"""
         pass
 
     @property
     @abstractmethod
     def ldap_group_reference(self):
-        # type: (...)->str
+        # type: (...) -> str
         pass
 
     @abstractmethod
     def as_dict(self):
-        # type: (...)->Mapping[str, Any]
+        # type: (...) -> Mapping[str, Any]
         pass
 
 

@@ -376,7 +376,7 @@ class CouchbaseTestCase(ResourcedTestCase):
 
     @property
     def cluster_info(self):
-        # type: (Any)->ClusterInformation
+        # type: (Any) -> ClusterInformation
         for v in [self._realserver_info, self._mock_info]:
             if v:
                 return v

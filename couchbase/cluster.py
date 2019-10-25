@@ -33,18 +33,18 @@ def options_to_func(orig,  # type: U
                     verb  # type: CallableOnOptionBlock
                     ):
     class invocation:
-        # type: (...)->Callable[[T,Tuple[OptionBlockDeriv,...],Any],Any]
+        # type: (...) -> Callable[[T,Tuple[OptionBlockDeriv,...],Any],Any]
         def __init__(self,  # type: T
                        *options,  # type: OptionBlockDeriv
                        **kwargs  # type: Any
                        ):
-            # type: (...)->None
+            # type: (...) -> None
             self.orig=orig
             self.options=options
             self.kwargs=kwargs
 
         def __call__(self, *args, **kwargs):
-            # type: (...)->Callable[[T,Tuple[OptionBlockDeriv,...],Any],Any]
+            # type: (...) -> Callable[[T,Tuple[OptionBlockDeriv,...],Any],Any]
             def invocator(self, *options, **kwargs):
                 return verb(self, forward_args(kwargs, *options))
             return invocator
@@ -140,7 +140,7 @@ class Cluster(object):
                *options,  # type: BucketOptions
                **kwargs
                ):
-        # type: (...)->Bucket
+        # type: (...) -> Bucket
         args=forward_args(kwargs,*options)
         args.update(bname=name)
         return self._cluster.open_bucket(name, **args)
@@ -161,7 +161,7 @@ class Cluster(object):
               statement,  # type: str,
               *options  # type: QueryOptions
               ):
-        # type: (...)->IQueryResult
+        # type: (...) -> IQueryResult
         pass
 
     def query(self,
@@ -196,7 +196,7 @@ class Cluster(object):
                         *options,  # type: AnalyticsOptions
                         **kwargs
                         ):
-        # type: (...)->IAnalyticsResult
+        # type: (...) -> IAnalyticsResult
         """
         Executes an Analytics query against the remote cluster and returns a IAnalyticsResult with the results of the query.
         :param statement: the analytics statement to execute
@@ -230,7 +230,7 @@ class Cluster(object):
                      *options,  # type: SearchOptions
                      **kwargs
                      ):
-        # type: (...)->ISearchResult
+        # type: (...) -> ISearchResult
         """
         Executes a Search or FTS query against the remote cluster and returns a ISearchResult implementation with the results of the query.
 
@@ -249,7 +249,7 @@ class Cluster(object):
                     reportId=None,  # type: str
                     timeout=None
                     ):
-        # type: (...)->IDiagnosticsResult
+        # type: (...) -> IDiagnosticsResult
         """
         Creates a diagnostics report that can be used to determine the healthfulness of the Cluster.
         :param reportId - an optional string name for the generated report.
@@ -276,25 +276,25 @@ class Cluster(object):
         return DiagnosticsResult(final_results)
 
     def users(self):
-        # type: (...)->UserManager
+        # type: (...) -> UserManager
         return UserManager(self.admin)
 
     def query_indexes(self):
-        # type: (...)->QueryIndexManager
+        # type: (...) -> QueryIndexManager
         return QueryIndexManager(self.admin)
 
     def nodes(self):
-        # type: (...)->INodeManager
+        # type: (...) -> INodeManager
         return self._cluster
 
     def buckets(self):
-        # type: (...)->BucketManager
+        # type: (...) -> BucketManager
         return BucketManager(self.admin)
 
     def disconnect(self,
                    options=None  # type: DisconnectOptions
                    ):
-        # type: (...)->None
+        # type: (...) -> None
         """
         Closes and cleans up any resources used by the Cluster and any objects it owns. Note the name is platform idiomatic.
 
@@ -306,7 +306,7 @@ class Cluster(object):
         raise NotImplementedError("To be implemented in full SDK3 release")
 
     def manager(self):
-        # type: (...)->ClusterManager
+        # type: (...) -> ClusterManager
         """
 
         Manager

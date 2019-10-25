@@ -30,32 +30,32 @@ class IQueryResult(object):
 
     @abstractmethod
     def request_id(self):
-        # type: (...) ->UUID
+        # type: (...) -> UUID
         pass
 
     @abstractmethod
     def client_context_id(self):
-        # type: (...)->str
+        # type: (...) -> str
         pass
 
     @abstractmethod
     def signature(self):
-        # type: (...)->Any
+        # type: (...) -> Any
         pass
 
     @abstractmethod
     def rows(self):
-        # type: (...)->List[T]
+        # type: (...) -> List[T]
         pass
 
     @abstractmethod
     def warnings(self):
-        # type: (...)->List[Warning]
+        # type: (...) -> List[Warning]
         pass
 
     @abstractmethod
     def metrics(self):
-        # type: (...)->QueryMetrics
+        # type: (...) -> QueryMetrics
         pass
 
 
@@ -69,7 +69,7 @@ class QueryResult(IterableWrapper, IQueryResult):
     def rows(self):
         return list(x for x in self)
 
-    def metrics(self):  # type: (...)->QueryMetrics
+    def metrics(self):  # type: (...) -> QueryMetrics
         return self.parent.metrics
 
     def request_id(self):

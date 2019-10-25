@@ -38,7 +38,7 @@ class FiniteDuration(object):
 class Duration(float):
     def __init__(self, seconds  # type: Union[float,int]
                  ):
-        # type: (...)->None
+        # type: (...) -> None
         super(Duration, self).__init__(seconds)
 
 
@@ -46,7 +46,7 @@ class Seconds(FiniteDuration):
     def __init__(self,
                  seconds  # type: Union[float,int]
                  ):
-        # type: (...)->None
+        # type: (...) -> None
         super(Seconds, self).__init__(seconds)
 
 
@@ -85,7 +85,7 @@ class OptionBlockTimeOut(OptionBlock):
 
     def timeout(self,  # type: T
                 duration):
-        # type: (...)->T
+        # type: (...) -> T
         self['ttl'] = duration.__int__()
         return self
 
@@ -97,7 +97,7 @@ class OptionBlockTimeOutVerbatim(OptionBlock):
 
     def timeout(self,  # type: T
                 duration):
-        # type: (...)->T
+        # type: (...) -> T
         self['timeout'] = duration.__float__()
         return self
 
@@ -131,7 +131,7 @@ class Forwarder(with_metaclass(ABCMeta)):
     def forward_args(self, arg_vars,  # type: Optional[Dict[str,Any]]
                      *options  # type: Tuple[OptionBlockDeriv,...]
                      ):
-        # type: (...)->OptionBlockDeriv[str,Any]
+        # type: (...) -> OptionBlockDeriv[str,Any]
         arg_vars = copy.copy(arg_vars) if arg_vars else {}
         temp_options = copy.copy(options[0]) if (options and options[0]) else OptionBlock()
         kwargs = arg_vars.pop('kwargs', {})
@@ -193,7 +193,7 @@ class ConstrainedInt(object):
     @classmethod
     def verified_value(cls, item  # type: AcceptableInts
                         ):
-        # type: (...)->int
+        # type: (...) -> int
         value = getattr(item, 'value', item)
         if not isinstance(value, int) or not (cls.min()<=value<=cls.max()):
             raise couchbase.exceptions.ArgumentError("Integer in range {} and {} inclusiverequired".format(cls.min(), cls.max()))

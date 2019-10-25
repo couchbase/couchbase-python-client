@@ -310,7 +310,7 @@ class Bucket(CoreClient):
 
     def prepend(self, key, value, cas=0, format=None,
                 persist_to=0, replicate_to=0):
-        # type: (...)->Result
+        # type: (...) -> Result
         """Prepend a string to an existing value in Couchbase.
 
         .. seealso:: :meth:`append`, :meth:`prepend_multi`
@@ -326,7 +326,7 @@ class Bucket(CoreClient):
             replica=False,  # type: bool
             no_format=False  # type: bool
             ):
-        # type: (...)->couchbase_v2.result.Result
+        # type: (...) -> couchbase_v2.result.Result
         """Obtain an object stored in Couchbase by given key.
 
         :param string key: The key to fetch. The type of key is the same

@@ -119,7 +119,7 @@ class BucketManager(GenericManager):
                     bucket_name,  # type: str
                     *options  # type: DropBucketOptions
                     ):
-        # type: (...)->None
+        # type: (...) -> None
         """
         Removes a bucket.
 
@@ -133,7 +133,7 @@ class BucketManager(GenericManager):
                    bucket_name,  # type: str
                    *options  # type: GetBucketOptions
                    ):
-        # type: (...)->IBucketSettings
+        # type: (...) -> IBucketSettings
         """
         Gets a bucket's settings.
 
@@ -150,7 +150,7 @@ class BucketManager(GenericManager):
     def get_all_buckets(self,  # type: BucketManager
                         *options  # type: GetAllBucketOptions
                         ):
-        # type: (...)->Iterable[IBucketSettings]
+        # type: (...) -> Iterable[IBucketSettings]
 
         """
         Gets all bucket settings. Note,  # type: the ram quota returned is in bytes
@@ -184,61 +184,61 @@ class IBucketSettings(object):
     @property
     @abstractmethod
     def name(self):
-        # type: (...)->str
+        # type: (...) -> str
         """Name (string) - The name of the bucket."""
         pass
 
     @property
     @abstractmethod
     def flush_enabled(self):
-        # type: (...)->bool
+        # type: (...) -> bool
         """Whether or not flush should be enabled on the bucket. Default to false."""
         pass
 
     @property
     @abstractmethod
     def ram_quota_mb(self):
-        # type: (...)->int
+        # type: (...) -> int
         """Ram Quota in mb for the bucket. (rawRAM in the server payload)"""
         pass
 
     @property
     @abstractmethod
     def num_replicas(self):
-        # type: (...)->int
+        # type: (...) -> int
         """NumReplicas (int) - The number of replicas for documents."""
         pass
 
     @property
     @abstractmethod
     def replica_indexes(self):
-        # type: (...)->bool
+        # type: (...) -> bool
         """ Whether replica indexes should be enabled for the bucket."""
 
     @property
     @abstractmethod
     def bucket_type(self):
-        # type: (...)->int
+        # type: (...) -> int
         """BucketType  - The type of the bucket. Default to couchbase.
         Sent on wire as {membase, memcached, ephemeral}"""
 
     @property
     @abstractmethod
     def ejection_method(self):
-        # type: (...)->int
+        # type: (...) -> int
         """{fullEviction | valueOnly}. The eviction policy to use."""
 
     @property
     @abstractmethod
     def max_ttl(self):
-        # type: (...)->int
+        # type: (...) -> int
         """Value for the maxTTL of new documents created without a ttl."""
         pass
 
     @property
     @abstractmethod
     def compression_mode(self):
-        # type: (...)->int
+        # type: (...) -> int
         """""""{off | passive | active} - The compression mode to use."""
 
     @property
@@ -264,56 +264,56 @@ class BucketSettings(IBucketSettings, dict):
 
     @property
     def name(self):
-        # type: (...)->str
+        # type: (...) -> str
         """Name (string) - The name of the bucket."""
         return self.get('name')
 
     @property
     def flush_enabled(self):
-        # type: (...)->bool
+        # type: (...) -> bool
         """Whether or not flush should be enabled on the bucket. Default to false."""
         return self.get('flush_enabled', False)
 
     @property
     def ram_quota_mb(self):
-        # type: (...)->int
+        # type: (...) -> int
         """Ram Quota in mb for the bucket. (rawRAM in the server payload)"""
         return self.get('rawRAM')
 
     @property
     def num_replicas(self):
-        # type: (...)->int
+        # type: (...) -> int
         """NumReplicas (int) - The number of replicas for documents."""
         return self.get('num_replicas')
 
     @property
     def replica_indexes(self):
-        # type: (...)->bool
+        # type: (...) -> bool
         """ Whether replica indexes should be enabled for the bucket."""
         return self.get('replica_indexes')
 
     @property
     def bucket_type(self):
-        # type: (...)->int
+        # type: (...) -> int
         """BucketType {couchbase (sent on wire as membase), memcached, ephemeral}
         The type of the bucket. Default to couchbase."""
         return self.get('bucket_type')
 
     @property
     def ejection_method(self):
-        # type: (...)->int
+        # type: (...) -> int
         """{fullEviction | valueOnly}. The eviction policy to use."""
         return self.get('ejection_method')
 
     @property
     def max_ttl(self):
-        # type: (...)->int
+        # type: (...) -> int
         """Value for the maxTTL of new documents created without a ttl."""
         return self.get('maxTTL')
 
     @property
     def compression_mode(self):
-        # type: (...)->int
+        # type: (...) -> int
         """""""{off | passive | active} - The compression mode to use."""
         return self.get('compression_mode')
 
@@ -329,7 +329,7 @@ class ICreateBucketSettings(IBucketSettings):
     @property
     @abstractmethod
     def conflict_resolution_type(self):
-        # type: (...)->int
+        # type: (...) -> int
         """{Timestamp (sent as lww) | SequenceNumber (sent as seqno)}. The conflict resolution type to use."""
         pass
 

@@ -17,7 +17,7 @@ class CollectionManager(GenericManager):
                           collection,  # type: ICollectionSpec
                           *options  # type: CollectionExistsOptions
                           ):
-        # type: (...)->bool
+        # type: (...) -> bool
         """
         Checks for existence of a collection. This will fetch a manifest and then interrogate it to check that the scope name exists and then that the collection name exists within that scope.
 
@@ -39,7 +39,7 @@ class CollectionManager(GenericManager):
                      scope_name,  # type: str
                      *options  # type: ScopeExistsOptions
                      ):
-        # type: (...)->bool
+        # type: (...) -> bool
         """
         Scope Exists
         Checks for existence of a scope. This will fetch a manifest and then interrogate it to check that the scope name exists.
@@ -60,7 +60,7 @@ class CollectionManager(GenericManager):
                   scopeName,  # type: str
                   options  # type: GetScopeOptions
                   ):
-        # type: (...)->IScopeSpec
+        # type: (...) -> IScopeSpec
         """
         Get Scope
         Gets a scope. This will fetch a manifest and then pull the scope out of it.
@@ -82,7 +82,7 @@ class CollectionManager(GenericManager):
     def get_all_scopes(self,  # type: CollectionManager
                        options  # type: GetAllScopesOptions
                        ):
-        # type: (...)->Iterable[IScopeSpec]
+        # type: (...) -> Iterable[IScopeSpec]
         """Get All Scopes
         Gets all scopes. This will fetch a manifest and then pull the scopes out of it.
         Signature
@@ -220,24 +220,24 @@ class ICollectionSpec(object):
         self._name, self._scope_name=collection_name,scope_name
     @property
     def name(self):
-        # type: (...)->str
+        # type: (...) -> str
         return self._name
 
     @property
     def scope_name(self):
-        # type: (...)->str
+        # type: (...) -> str
         return self._scope_name
 
 
 class IScopeSpec(object):
     @property
     def name(self):
-        # type: (...)->str
+        # type: (...) -> str
         pass
 
     @property
     def collections(self):
-        # type: (...)->Iterable[ICollectionSpec]
+        # type: (...) -> Iterable[ICollectionSpec]
         pass
 
 

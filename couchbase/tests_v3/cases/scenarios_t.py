@@ -183,7 +183,7 @@ class Scenarios(CollectionTestCase):
                                             original_replicate_to,  # type: ReplicateTo.Value
                                             until  # type: FiniteDuration
                                             ):
-        # type: (...)->None
+        # type: (...) -> None
         """
           * Automatically retries an idempotent operation in the face of durability failures
           * TODO this is quite complex logic.  Should this be folded into the client as a per-operation retry strategy?

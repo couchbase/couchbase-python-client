@@ -43,7 +43,7 @@ class ContentProxy(object):
     def __getitem__(self,
                     item  # type: Type[Proxy_T]
                     ):
-        # type: (...)->Union[Proxy_T,Mapping[str,Proxy_T]]
+        # type: (...) -> Union[Proxy_T,Mapping[str,Proxy_T]]
         return extract_value(self.content, get_decoder(item))
 
 
@@ -57,7 +57,7 @@ class ContentProxySubdoc(object):
     def __getitem__(self,
                     item  # type: Type[Proxy_T]
                     ):
-        # type: (...)->Callable[[int],Union[Proxy_T,Mapping[str,Proxy_T]]]
+        # type: (...) -> Callable[[int],Union[Proxy_T,Mapping[str,Proxy_T]]]
         return lambda index: self.index_proxy(item, index)
 
 
@@ -65,19 +65,19 @@ class IResult(object):
     @property
     @abstractmethod
     def cas(self):
-        # type: ()->int
+        # type: () -> int
         raise NotImplementedError()
 
     @property
     @abstractmethod
     def error(self):
-        # type: ()->int
+        # type: () -> int
         raise NotImplementedError()
 
     @property
     @abstractmethod
     def success(self):
-        # type: ()->bool
+        # type: () -> bool
         raise NotImplementedError()
 
 
@@ -91,16 +91,16 @@ class Result(IResult):
 
     @property
     def cas(self):
-        # type: ()->int
+        # type: () -> int
         return self._cas
 
     @property
     def error(self):
-        # type: ()->int
+        # type: () -> int
         return self._error
 
     def success(self):
-        # type: ()->bool
+        # type: () -> bool
         return not self.error
 
 
@@ -108,19 +108,19 @@ class IGetResult(IResult):
     @property
     @abstractmethod
     def id(self):
-        # type: ()->str
+        # type: () -> str
         pass
 
     @property
     @abstractmethod
     def expiry(self):
-        # type: ()->FiniteDuration
+        # type: () -> FiniteDuration
         pass
 
     @property
     @abstractmethod
     def content_as(self):
-        # type: (...)->ContentProxy
+        # type: (...) -> ContentProxy
         raise NotImplementedError()
 
     @property
@@ -136,7 +136,7 @@ class LookupInResult(Result):
                  *args,  # type: Any
                  **kwargs  # type: Any
                  ):
-        # type: (...) ->None
+        # type: (...) -> None
         """
         LookupInResult is the return type for lookup_in operations.
         Constructed internally by the API.
@@ -147,7 +147,7 @@ class LookupInResult(Result):
 
     @property
     def content_as(self):
-        # type: (...)->ContentProxySubdoc
+        # type: (...) -> ContentProxySubdoc
         return ContentProxySubdoc(self._content)
 
     def exists(self,
@@ -175,7 +175,7 @@ class MutateInResult(MutationResult):
                  content,  # type: SDK2Result
                  **options  # type: Any
                  ):
-        # type: (...) ->None
+        # type: (...) -> None
         """
         MutateInResult is the return type for mutate_in operations.
         Constructed internally by the API.
@@ -185,7 +185,7 @@ class MutateInResult(MutationResult):
         self.dict = options
 
     def content_as(self):
-        # type: (...)->ContentProxy
+        # type: (...) -> ContentProxy
         return ContentProxy(self._content)
 
     @property
@@ -201,7 +201,7 @@ class GetResult(Result, IGetResult):
                  *args,  # type: Any
                  **kwargs  # type: Any
                  ):
-        # type: (...) ->None
+        # type: (...) -> None
         """
         GetResult is the return type for full read operations.
         Constructed internally by the API.
@@ -212,7 +212,7 @@ class GetResult(Result, IGetResult):
         self.dict = kwargs
 
     def content_as_array(self):
-        # type: (...) ->List
+        # type: (...) -> List
         return list(self.content)
 
     @property
@@ -235,7 +235,7 @@ class AsyncWrapper(type):
                 bases,  # type: T
                 attrs  # type: Mapping[str,Any]
                 ):
-        # type: (...)->T[0]
+        # type: (...) -> T[0]
 
         base = bases[0]
 
@@ -271,7 +271,7 @@ class SDK2GetResult(GetResult):
 
     @property
     def content_as(self):
-        # type: (...)->ContentProxy
+        # type: (...) -> ContentProxy
         return ContentProxy(self._original)
 
     @property
@@ -309,7 +309,7 @@ ResultPrecursor = NamedTuple('ResultPrecursor', [('orig_result', SDK2Result), ('
 
 def get_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
                        ):
-    # type: (...)->Callable[[Any], GetResult]
+    # type: (...) -> Callable[[Any], GetResult]
     @wraps(func)
     def wrapped(*args, **kwargs):
         x, options = func(*args, **kwargs)
@@ -331,19 +331,19 @@ class MutationToken(object):
         self.vbucketUUID = vbucketUUID
 
     def partition_id(self):
-        # type: (...)->int
+        # type: (...) -> int
         pass
 
     def partition_uuid(self):
-        # type: (...)->int
+        # type: (...) -> int
         pass
 
     def sequence_number(self):
-        # type: (...)->int
+        # type: (...) -> int
         pass
 
     def bucket_name(self):
-        # type: (...)->str
+        # type: (...) -> str
         pass
 
 
@@ -369,7 +369,7 @@ def get_multi_mutation_result(target, wrapped, keys, *options, **kwargs):
 
 def _wrap_in_mutation_result(func  # type: Callable[[Any,...],SDK2Result]
                              ):
-    # type: (...)->Callable[[Any,...],MutationResult]
+    # type: (...) -> Callable[[Any,...],MutationResult]
     @wraps(func)
     def mutated(*args, **kwargs):
         result = func(*args, **kwargs)

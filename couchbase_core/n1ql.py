@@ -511,7 +511,7 @@ class N1QLRequest(object):
             return r
 
     def __iter__(self):
-        # type: ()->JSON
+        # type: () -> JSON
         if self.buffered_remainder:
             while len(self.buffered_remainder)>0:
                 yield self.buffered_remainder.pop(0)
