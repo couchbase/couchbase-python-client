@@ -703,7 +703,7 @@ class CBCollection(CoreClient):
 
     class UpsertOptions(OptionBlock, ClientDurableOption, ServerDurableOption):
         def __init__(self, *args, **kwargs):
-            super(CBCollection.UpsertOptions, self).__init(*args, **kwargs)
+            super(CBCollection.UpsertOptions, self).__init__(*args, **kwargs)
 
     @overload
     def upsert(self, key, value, *options  # type: UpsertOptions
