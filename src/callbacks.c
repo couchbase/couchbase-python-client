@@ -230,19 +230,21 @@ typedef struct {
     uint64_t cas;
 } response_handler;
 
-#define PYCBC_X_FOR_EACH_OP(X, NOKEY, STATSOPS, GETOP, COUNTERSOPS) \
-    X(REMOVE, remove)                                               \
-    X(UNLOCK, unlock)                                               \
-    X(TOUCH, touch)                                                 \
-    GETOP(GET, get)                                                 \
-    X(GETREPLICA, getreplica)                                       \
-    COUNTERSOPS(COUNTER, counter)                                   \
-    STATSOPS(STATS, stats)                                          \
-    NOKEY(PING, ping)                                               \
-    NOKEY(DIAG, diag)                                               \
-    OBSERVEOPS(X)                                                   \
-    ENDUREOPS(X)                                                    \
-    X(HTTP, http)
+#define PYCBC_X_FOR_EACH_OP(X, NOKEY, STATSOPS, GETOP, COUNTERSOPS, SDOPS) \
+    X(STORE, store)                                                        \
+    X(REMOVE, remove)                                                      \
+    X(UNLOCK, unlock)                                                      \
+    X(TOUCH, touch)                                                        \
+    GETOP(GET, get)                                                        \
+    X(GETREPLICA, getreplica)                                              \
+    COUNTERSOPS(COUNTER, counter)                                          \
+    STATSOPS(STATS, stats)                                                 \
+    NOKEY(PING, ping)                                                      \
+    NOKEY(DIAG, diag)                                                      \
+    OBSERVEOPS(X)                                                          \
+    ENDUREOPS(X)                                                           \
+    X(HTTP, http)                                                          \
+    SDOPS(SUBDOC, subdoc)
 
 int pycbc_extract_respdata(const lcb_RESPBASE *resp,
                            pycbc_MultiResult *const *mres,
@@ -250,16 +252,23 @@ int pycbc_extract_respdata(const lcb_RESPBASE *resp,
 {
     lcb_STATUS result = LCB_SUCCESS;
     switch (handler->cbtype) {
-#define PYCBC_UPDATE_ALL(UC, LC)                                          \
-    case LCB_CALLBACK_##UC:                                               \
-        lcb_resp##LC##_key((const lcb_RESP##UC *)resp,                    \
-                           &handler->key.buffer,                          \
-                           &handler->key.length);                         \
-        handler->rc = lcb_resp##LC##_status((lcb_RESP##UC *)resp);        \
-        lcb_resp##LC##_cookie((const lcb_RESP##UC *)resp, (void **)mres); \
-        lcb_resp##LC##_cas((const lcb_RESP##UC *)resp,                    \
-                           (uint64_t *)&handler->cas);                    \
-        break;
+#define PYCBC_UPDATE_ALL_GENERIC(UC, LC, RESPPOSTFIX, FNPOSTFIX)               \
+    lcb_resp##FNPOSTFIX##_key((const lcb_RESP##RESPPOSTFIX *)resp,             \
+                              &(handler->key.buffer),                          \
+                              &(handler->key.length));                         \
+    handler->rc = lcb_resp##FNPOSTFIX##_status((lcb_RESP##RESPPOSTFIX *)resp); \
+    lcb_resp##FNPOSTFIX##_cookie((const lcb_RESP##RESPPOSTFIX *)resp,          \
+                                 (void **)mres);                               \
+    lcb_resp##FNPOSTFIX##_cas((const lcb_RESP##RESPPOSTFIX *)resp,             \
+                              (uint64_t *)&(handler->cas));                    \
+    break;
+#define PYCBC_UPDATE_ALL(UC, LC) \
+    case LCB_CALLBACK_##UC:      \
+        PYCBC_UPDATE_ALL_GENERIC(UC, LC, UC, LC)
+#define PYCBC_UPDATE_SDOPS(UC, LC) \
+    case LCB_CALLBACK_SDMUTATE:    \
+    case LCB_CALLBACK_SDLOOKUP:    \
+        PYCBC_UPDATE_ALL_GENERIC(UC, LC, SUBDOC, LC)
 #define PYCBC_UPDATE_ALL_NOKEYORCAS(UC, LC)                               \
     case LCB_CALLBACK_##UC:                                               \
         handler->rc = lcb_resp##LC##_status((lcb_RESP##UC *)resp);        \
@@ -269,21 +278,103 @@ int pycbc_extract_respdata(const lcb_RESPBASE *resp,
     case LCB_CALLBACK_##UC:                                               \
         lcb_resp##LC##_cookie((const lcb_RESP##UC *)resp, (void **)mres); \
         break;
+#ifdef PYCBC_GEN_OPS
         PYCBC_X_FOR_EACH_OP(PYCBC_UPDATE_ALL,
                             PYCBC_UPDATE_ALL_NOKEYORCAS,
                             PYCBC_UPDATE_ALL_NO_KEY_OR_COOKIE_OR_CAS,
                             PYCBC_UPDATE_ALL,
-                            PYCBC_UPDATE_ALL)
-
-    default:
-
-        result = lcb_respget_key((const lcb_RESPGET *)resp,
-                                 &handler->key.buffer,
-                                 &handler->key.length);
+                            PYCBC_UPDATE_ALL,
+                            PYCBC_UPDATE_SDOPS)
+#else
+    case LCB_CALLBACK_STORE:
+        lcb_respstore_key((const lcb_RESPSTORE *)resp,
+                          &(handler->key.buffer),
+                          &(handler->key.length));
+        handler->rc = lcb_respstore_status((lcb_RESPSTORE *)resp);
+        lcb_respstore_cookie((const lcb_RESPSTORE *)resp, (void **)mres);
+        lcb_respstore_cas((const lcb_RESPSTORE *)resp,
+                          (uint64_t *)&(handler->cas));
+        break;
+    case LCB_CALLBACK_REMOVE:
+        lcb_respremove_key((const lcb_RESPREMOVE *)resp,
+                           &(handler->key.buffer),
+                           &(handler->key.length));
+        handler->rc = lcb_respremove_status((lcb_RESPREMOVE *)resp);
+        lcb_respremove_cookie((const lcb_RESPREMOVE *)resp, (void **)mres);
+        lcb_respremove_cas((const lcb_RESPREMOVE *)resp,
+                           (uint64_t *)&(handler->cas));
+        break;
+    case LCB_CALLBACK_UNLOCK:
+        lcb_respunlock_key((const lcb_RESPUNLOCK *)resp,
+                           &(handler->key.buffer),
+                           &(handler->key.length));
+        handler->rc = lcb_respunlock_status((lcb_RESPUNLOCK *)resp);
+        lcb_respunlock_cookie((const lcb_RESPUNLOCK *)resp, (void **)mres);
+        lcb_respunlock_cas((const lcb_RESPUNLOCK *)resp,
+                           (uint64_t *)&(handler->cas));
+        break;
+    case LCB_CALLBACK_TOUCH:
+        lcb_resptouch_key((const lcb_RESPTOUCH *)resp,
+                          &(handler->key.buffer),
+                          &(handler->key.length));
+        handler->rc = lcb_resptouch_status((lcb_RESPTOUCH *)resp);
+        lcb_resptouch_cookie((const lcb_RESPTOUCH *)resp, (void **)mres);
+        lcb_resptouch_cas((const lcb_RESPTOUCH *)resp,
+                          (uint64_t *)&(handler->cas));
+        break;
+    case LCB_CALLBACK_GET:
+        lcb_respget_key((const lcb_RESPGET *)resp,
+                        &(handler->key.buffer),
+                        &(handler->key.length));
         handler->rc = lcb_respget_status((lcb_RESPGET *)resp);
         lcb_respget_cookie((const lcb_RESPGET *)resp, (void **)mres);
-        lcb_respget_cas((const lcb_RESPGET *)resp, (uint64_t *)&handler->cas);
+        lcb_respget_cas((const lcb_RESPGET *)resp, (uint64_t *)&(handler->cas));
         break;
+    case LCB_CALLBACK_GETREPLICA:
+        lcb_respgetreplica_key((const lcb_RESPGETREPLICA *)resp,
+                               &(handler->key.buffer),
+                               &(handler->key.length));
+        handler->rc = lcb_respgetreplica_status((lcb_RESPGETREPLICA *)resp);
+        lcb_respgetreplica_cookie((const lcb_RESPGETREPLICA *)resp,
+                                  (void **)mres);
+        lcb_respgetreplica_cas((const lcb_RESPGETREPLICA *)resp,
+                               (uint64_t *)&(handler->cas));
+        break;
+    case LCB_CALLBACK_COUNTER:
+        lcb_respcounter_key((const lcb_RESPCOUNTER *)resp,
+                            &(handler->key.buffer),
+                            &(handler->key.length));
+        handler->rc = lcb_respcounter_status((lcb_RESPCOUNTER *)resp);
+        lcb_respcounter_cookie((const lcb_RESPCOUNTER *)resp, (void **)mres);
+        lcb_respcounter_cas((const lcb_RESPCOUNTER *)resp,
+                            (uint64_t *)&(handler->cas));
+        break;
+    case LCB_CALLBACK_STATS:;
+        break;
+    case LCB_CALLBACK_PING:
+        handler->rc = lcb_respping_status((lcb_RESPPING *)resp);
+        lcb_respping_cookie((const lcb_RESPPING *)resp, (void **)mres);
+        break;
+    case LCB_CALLBACK_DIAG:
+        handler->rc = lcb_respdiag_status((lcb_RESPDIAG *)resp);
+        lcb_respdiag_cookie((const lcb_RESPDIAG *)resp, (void **)mres);
+        break;
+    case LCB_CALLBACK_HTTP:;
+        handler->rc = lcb_resphttp_status((lcb_RESPHTTP *)resp);
+        lcb_resphttp_cookie((const lcb_RESPHTTP *)resp, (void **)mres);
+        ;
+        break;
+    case LCB_CALLBACK_SDMUTATE:
+    case LCB_CALLBACK_SDLOOKUP:
+        lcb_respsubdoc_key((const lcb_RESPSUBDOC *)resp,
+                           &(handler->key.buffer),
+                           &(handler->key.length));
+        handler->rc = lcb_respsubdoc_status((lcb_RESPSUBDOC *)resp);
+        lcb_respsubdoc_cookie((const lcb_RESPSUBDOC *)resp, (void **)mres);
+        lcb_respsubdoc_cas((const lcb_RESPSUBDOC *)resp,
+                           (uint64_t *)&(handler->cas));
+        break;
+#endif
     }
     return result;
 }
@@ -529,7 +620,7 @@ durability_chain_common(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
 {
     pycbc_Bucket *conn;
     pycbc_OperationResult *res = NULL;
-    pycbc_MultiResult *mres;
+    pycbc_MultiResult *mres = NULL;
     int restype = RESTYPE_VARCOUNT;
     response_handler dur_handler = {.cbtype = cbtype};
     PYCBC_DEBUG_LOG("Durability chain callback")
@@ -663,8 +754,8 @@ subdoc_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *rb)
 {
     int rv;
     pycbc_Bucket *conn;
-    pycbc__SDResult *res;
-    pycbc_MultiResult *mres;
+    pycbc__SDResult *res = NULL;
+    pycbc_MultiResult *mres = NULL;
     pycbc_SDENTRY cur;
     response_handler handler = {.cbtype = cbtype};
     size_t vii = 0, oix = 0;
