@@ -118,36 +118,43 @@ class Scenarios(CollectionTestCase):
 
         self.assertIsInstance(result, MutateInResult)
 
-    def test_mutatein(self):
-
+    from parameterized import parameterized
+    @parameterized.expand(
+        x for x in tuple(list(Durability._member_names_))
+    )
+    def test_mutatein(self,  # type: Scenarios
+                      dur_name):
+        durability=Durability[dur_name]
         count = 0
 
-        for durability in Durability:
-            somecontents = {'some': {'path': 'keith'}}
-            key="somekey_{}".format(count)
-            try:
-                self.coll.remove(key)
-            except:
-                pass
-            self.coll.insert(key, somecontents)
-            inserted_value = "inserted_{}".format(count)
-            replacement_value = "replacement_{}".format(count)
-            count += 1
-            try:
-                self.coll.mutate_in(key, (
-                    SD.replace('some.path', replacement_value),
-                    SD.insert('some.other.path', inserted_value, create_parents=True),
-                ), durability_level=durability)
+        somecontents = {'some': {'path': 'keith'}}
+        key="{}_{}".format("somekey_{}", count)
+        try:
+            self.coll.remove(key)
+        except:
+            pass
+        self.coll.insert(key, somecontents)
+        inserted_value = "inserted_{}".format(count)
+        replacement_value = "replacement_{}".format(count)
+        count += 1
+        try:
+            self.coll.mutate_in(key, (
+                SD.replace('some.path', replacement_value),
+                SD.insert('some.other.path', inserted_value, create_parents=True),
+            ), durability_level=durability)
 
 
-                somecontents['some']['path'] = replacement_value
-                somecontents['some'].update({'other': {'path': inserted_value}})
-                self.assertEqual(somecontents, self.coll.get(key).content)
-            except NotSupportedError as e:
-                if not self.is_mock:
-                    raise
-                else:
-                    logging.error("Assuming failure is due to mock not supporting durability")
+            somecontents['some']['path'] = replacement_value
+            somecontents['some'].update({'other': {'path': inserted_value}})
+            self.assertEqual(somecontents, self.coll.get(key).content)
+        except NotSupportedError as e:
+            if not self.is_mock:
+                raise
+            else:
+                logging.error("Assuming failure is due to mock not supporting durability")
+        except couchbase.TimeoutError as e:
+            self.assertIn("Operational",e.message)
+            raise SkipTest("Raised {}, skipped pending further verification".format(e.message))
 
     def test_scenario_C_clientSideDurability(self):
         """

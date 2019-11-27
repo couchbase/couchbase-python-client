@@ -28,7 +28,7 @@ from testresources import ResourcedTestCase as ResourcedTestCaseReal, TestResour
 
 from couchbase.exceptions import HTTPError
 import couchbase_core
-from couchbase import Cluster, ClusterOptions
+from couchbase import Cluster, ClusterOptions, CBCollection
 from couchbase_core.cluster import ClassicAuthenticator
 from couchbase_core.connstr import ConnectionString
 
