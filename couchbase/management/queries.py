@@ -6,7 +6,7 @@ from typing import *
 from couchbase.management.generic import GenericManager
 import attr
 from attr.validators import instance_of as io, deep_mapping as dm
-from typing_extensions import Protocol
+from couchbase_core._pyport import Protocol
 
 from couchbase_core.exceptions import HTTPError, ErrorMapper, AnyPattern
 

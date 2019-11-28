@@ -409,7 +409,7 @@ class Scenarios(CollectionTestCase):
     def test_upsert(self):
 
         self.coll.upsert("fish", "banana")
-        self.assertEquals("banana", self.coll.get("fish").content_as[str])
+        self.assertEqual("banana", self.coll.get("fish").content_as[str])
 
     def test_unsigned_int(self):
         self.assertRaises(couchbase.exceptions.ArgumentError, DeltaValue, -1)
@@ -468,10 +468,10 @@ class Scenarios(CollectionTestCase):
             # TODO: fix for real server
             raise SkipTest()
         result = self.cluster.query("SELECT mockrow")
-        self.assertEquals([{"row": "value"}], result.rows())
-        self.assertEquals([{"row": "value"}], list(result))
-        self.assertEquals([{"row": "value"}], list(result))
-        self.assertEquals([{"row": "value"}], result.rows())
+        self.assertEqual([{"row": "value"}], result.rows())
+        self.assertEqual([{"row": "value"}], list(result))
+        self.assertEqual([{"row": "value"}], list(result))
+        self.assertEqual([{"row": "value"}], result.rows())
 
     def test_cluster_search(self  # type: ClusterTestCase
                             ):
@@ -482,7 +482,7 @@ class Scenarios(CollectionTestCase):
         x = self.cluster.search_query("beer-search", FT.TermQuery("category"),
                                       facets={'fred': FT.TermFacet('category', most_common_term_max)})
         first_entry = x.hits()[0]
-        self.assertEquals("brasserie_de_brunehaut-mont_st_aubert", first_entry.get('id'))
+        self.assertEqual("brasserie_de_brunehaut-mont_st_aubert", first_entry.get('id'))
         min_hits = 6
         metadata = x.metadata()
         duration=time.time()-initial
@@ -518,7 +518,7 @@ class Scenarios(CollectionTestCase):
         self.assertGreaterEqual(diagnostics.version(), 1)
         self.assertIsNotNone(diagnostics.id())
         config = diagnostics.services().get('config')
-        self.assertEquals(config.type(), ServiceType.Config)
+        self.assertEqual(config.type(), ServiceType.Config)
         for key, value in diagnostics.services().items():
             self.assertIn(type(value.type()), (ServiceType, str))
             self.assertIn(type(value.id()), ANY_STR)
@@ -544,23 +544,23 @@ class Scenarios(CollectionTestCase):
             self.assertRaises(KeyNotFoundException, self.coll.get, "Barney")
             self.coll.upsert_multi(test_dict, **mutate_kwargs)
             result = self.coll.get_multi(test_dict.keys())
-            self.assertEquals(Scenarios.get_multi_result_as_dict(result), test_dict)
+            self.assertEqual(Scenarios.get_multi_result_as_dict(result), test_dict)
             self.coll.remove_multi(test_dict.keys(), **mutate_kwargs)
             self.assertRaises(KeyNotFoundException, self.coll.get_multi, test_dict.keys())
             self.coll.insert_multi(test_dict, **mutate_kwargs)
             self.assertRaises(KeyExistsException, self.coll.insert_multi, test_dict)
             result = self.coll.get_multi(test_dict.keys())
-            self.assertEquals(Scenarios.get_multi_result_as_dict(result), test_dict)
-            self.assertEquals(self.coll.get("Fred").content, "Wilma")
-            self.assertEquals(self.coll.get("Barney").content, "Betty")
+            self.assertEqual(Scenarios.get_multi_result_as_dict(result), test_dict)
+            self.assertEqual(self.coll.get("Fred").content, "Wilma")
+            self.assertEqual(self.coll.get("Barney").content, "Betty")
             self.coll.remove_multi(test_dict.keys(), **mutate_kwargs)
             self.assertRaises(KeyNotFoundException, self.coll.get_multi, test_dict.keys())
             self.coll.insert_multi(test_dict)
             test_dict_2 = {"Fred": "Cassandra", "Barney": "Raquel"}
             result = self.coll.replace_multi(test_dict_2)
             expected_result = {k: True for k, v in test_dict_2.items()}
-            self.assertEquals(Scenarios.get_multi_mutationresult_as_dict(result), expected_result)
-            self.assertEquals(Scenarios.get_multi_result_as_dict(self.coll.get_multi(test_dict_2.keys())),test_dict_2)
+            self.assertEqual(Scenarios.get_multi_mutationresult_as_dict(result), expected_result)
+            self.assertEqual(Scenarios.get_multi_result_as_dict(self.coll.get_multi(test_dict_2.keys())),test_dict_2)
 
     def test_PYCBC_607(self  # type: Scenarios
                        ):
@@ -585,7 +585,7 @@ class Scenarios(CollectionTestCase):
                             ):
         self.coll.upsert("Fred", {"cheese": "potato"})
         self.coll.map_add("Fred", "Gail", "Porter")
-        self.assertEquals("Porter", self.coll.map_get("Fred", "Gail"))
+        self.assertEqual("Porter", self.coll.map_get("Fred", "Gail"))
 
 class AnalyticsTest(couchbase_core.tests.analytics_harness.CBASTestSpecific, ClusterTestCase):
     def setUp(self):

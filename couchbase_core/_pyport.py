@@ -57,3 +57,13 @@ try:
     from six import with_metaclass
 except:
     from future.utils import with_metaclass
+
+try:
+    from typing import *
+except:
+    pass
+
+try:
+    from typing_extensions import *
+except:
+    pass

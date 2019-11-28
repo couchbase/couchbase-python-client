@@ -161,7 +161,7 @@ class DefaultForwarder(Forwarder):
         return {'spec': {'specs': lambda x: x}, 'id': {},
                 'replicate_to': {"replicate_to": int},
                 'persist_to': {"persist_to": int},
-                'timeout': {'ttl': int},
+                'timeout': {'ttl': Duration.__float__},
                 'expiration': {'ttl': int}, 'self': {}, 'options': {}}
 
 
@@ -170,7 +170,7 @@ class TimeoutForwarder(Forwarder):
         return {'spec': {'specs': lambda x: x}, 'id': {},
                 'replicate_to': {"replicate_to": int},
                 'persist_to': {"persist_to": int},
-                'timeout': {'timeout': float},
+                'timeout': {'timeout': Duration.__float__},
                 'expiration': {'ttl': int}, 'self': {}, 'options': {}}
 
 
