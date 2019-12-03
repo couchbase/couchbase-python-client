@@ -952,15 +952,14 @@ void pycbc_Tracer_set_child(pycbc_Tracer_t *pTracer, lcbtrace_TRACER *pTRACER);
     PYCBC_TRACER_START_SPAN(                                                   \
             TRACER, KWARGS, CATEGORY, 0, NULL, LCBTRACE_REF_NONE, NAME)
 
-
-#define PYCBC_TRACECMD_PURE(TYPE, CMD, CONTEXT)                    \
-    {                                                              \
-        if (PYCBC_CHECK_CONTEXT(CONTEXT)) {                        \
-            PYCBC_LOG_KEY(CMD, key)                                \
-            PYCBC_CMD_SET_TRACESPAN(TYPE, (CMD), (CONTEXT)->span); \
-        } else {                                                   \
-            PYCBC_EXCEPTION_LOG_NOCLEAR;                           \
-        }                                                          \
+#define PYCBC_TRACECMD_PURE(TYPE, CMD, CONTEXT)                          \
+    {                                                                    \
+        if (PYCBC_CHECK_CONTEXT(CONTEXT)) {                              \
+            PYCBC_LOG_KEY(CMD, key)                                      \
+            (void)PYCBC_CMD_SET_TRACESPAN(TYPE, (CMD), (CONTEXT)->span); \
+        } else {                                                         \
+            PYCBC_EXCEPTION_LOG_NOCLEAR;                                 \
+        }                                                                \
     }
 
 #define PYCBC_TRACECMD_SCOPED_GENERIC(RV,           \
@@ -1227,10 +1226,10 @@ enum {
     PYCBC_HTTP_HVIEW = 1,
     PYCBC_HTTP_HRAW,
     PYCBC_HTTP_HN1QL,
+    PYCBC_HTTP_HANALYTICS,
     PYCBC_HTTP_HFTS,
     PYCBC_HTTP_HNONE
 };
-
 
 enum {
     /** 'quiet' boolean set */

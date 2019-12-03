@@ -15,8 +15,8 @@
  **/
 
 
-#include "oputil.h"
 #include "pycbc.h"
+#include "oputil.h"
 
 struct storecmd_vars {
     lcb_STORE_OPERATION operation;

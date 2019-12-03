@@ -14,8 +14,8 @@
  *   limitations under the License.
  **/
 
-#include "oputil.h"
 #include "pycbc.h"
+#include "oputil.h"
 
 struct arithmetic_common_vars {
     lcb_S64 delta;

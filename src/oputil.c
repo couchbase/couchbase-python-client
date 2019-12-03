@@ -14,11 +14,11 @@
  *   limitations under the License.
  **/
 
-#include "oputil.h"
+#include "python_wrappers.h"
 #include "pycbc.h"
+#include "oputil.h"
 #include "pycbc_subdocops.h"
 #include "structmember.h"
-#include "python_wrappers.h"
 
 typedef enum {
     PYCBC_NIL,
@@ -163,7 +163,7 @@ void
 pycbc_common_vars_finalize(struct pycbc_common_vars *cv, pycbc_Bucket *conn)
 {
     if (cv->mctx) {
-        pycbc_mctx_fail(cv->mctx);
+        (void)pycbc_mctx_fail(cv->mctx);
         cv->mctx = NULL;
     }
     lcb_sched_fail(conn->instance);
@@ -181,7 +181,7 @@ pycbc_common_vars_wait, struct pycbc_common_vars *cv, pycbc_Bucket *self)
     Py_ssize_t nsched = cv->is_seqcmd ? 1 : cv->ncmds;
 
     if (cv->mctx) {
-        pycbc_mctx_done(cv->mctx, cv->mres);
+        (void)pycbc_mctx_done(cv->mctx, cv->mres);
         cv->mctx = NULL;
     }
     lcb_sched_leave(self->instance);

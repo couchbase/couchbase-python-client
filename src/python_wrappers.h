@@ -17,9 +17,9 @@
 #ifndef COUCHBASE_PYTHON_CLIENT_PYTHON_WRAPPERS_H
 #define COUCHBASE_PYTHON_CLIENT_PYTHON_WRAPPERS_H
 
+#include "Python.h"
 #include "util_wrappers.h"
 
-#include "Python.h"
 void pycbc_dict_add_text_kv_strn(PyObject *dict,
                                  pycbc_strn_base_const strn_key,
                                  pycbc_strn_base_const strn_value);

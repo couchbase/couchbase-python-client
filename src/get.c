@@ -14,8 +14,8 @@
  *   limitations under the License.
  **/
 
-#include "oputil.h"
 #include "pycbc.h"
+#include "oputil.h"
 
 /**
  * Covers 'lock', 'touch', and 'get_and_touch'

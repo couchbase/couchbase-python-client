@@ -425,7 +425,7 @@ typedef void pycbc_CMDENDURE;
 #define lcb_respobserve_is_master(RESP, DEST) LCB_NOT_SUPPORTED;
 typedef void pycbc_RESPOBSERVE;
 typedef void pycbc_CMDOBSERVE;
-#define pycbc_cmdobserve_create(cmd) LCB_NOT_SUPPORTED
+#define pycbc_cmdobserve_create(cmd)
 #define pycbc_cmdobserve_key(cmd, buffer, nbuffer) LCB_NOT_SUPPORTED
 #define pycbc_cmdobserve_master_only(cmd) LCB_NOT_SUPPORTED
 #define pycbc_mctx_create(instance, dest) LCB_NOT_SUPPORTED

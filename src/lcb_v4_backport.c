@@ -14,8 +14,8 @@
  *   limitations under the License.
  **/
 
-#include "lcb_v4_backport.h"
 #include "pycbc.h"
+#include "lcb_v4_backport.h"
 
 lcb_STATUS pycbc_crypto_register(lcb_INSTANCE *instance,
                                  const char *name,

@@ -583,10 +583,11 @@ dur_chain2(pycbc_Bucket *conn,
         {
             pycbc_CMDENDURE *cmd = NULL;
             (void)cmd;
-            pycbc_cmdendure_key(&cmd, handler.key.buffer, handler.key.length);
-            err = pycbc_cmdendure_addcmd(mctx, (lcb_CMDBASE *)&cmd);
-            pycbc_create_cmdendure(&cmd);
-            pycbc_cmdendure_cas(cmd, handler.cas);
+            err = pycbc_cmdendure_key(
+                    &cmd, handler.key.buffer, handler.key.length);
+            err = err ? err : pycbc_cmdendure_addcmd(mctx, (lcb_CMDBASE *)&cmd);
+            err = err ? err : pycbc_create_cmdendure(&cmd);
+            err = err ? err : pycbc_cmdendure_cas(cmd, handler.cas);
         }
         if (err != LCB_SUCCESS) {
             goto GT_DONE;
@@ -599,7 +600,7 @@ dur_chain2(pycbc_Bucket *conn,
 
     GT_DONE:
         if (mctx) {
-            pycbc_mctx_fail(mctx);
+            err = err ? err : pycbc_mctx_fail(mctx);
         }
     }
     if (err != LCB_SUCCESS) {
@@ -930,7 +931,7 @@ observe_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp_base)
     lcb_uint64_t flags = 0;
     PYCBC_DEBUG_LOG("observe callback")
     if (!lcb_respobserve_flags(oresp, flags) && (flags & LCB_RESP_F_FINAL)) {
-        lcb_respobserve_cookie(oresp, &mres);
+        (void)lcb_respobserve_cookie(oresp, &mres);
         operation_completed_with_err_info(
                 mres->parent, mres, cbtype, resp_base, (pycbc_Result *)vres);
         return;
@@ -965,8 +966,8 @@ observe_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp_base)
         pycbc_multiresult_adderr(mres);
         goto GT_DONE;
     }
-    lcb_respobserve_cas(oresp, &oi->cas);
-    lcb_respobserve_is_master(oresp, &oi->from_master);
+    (void)lcb_respobserve_cas(oresp, &oi->cas);
+    (void)lcb_respobserve_is_master(oresp, &oi->from_master);
     oi->flags = lcb_respobserve_status(oresp);
     PyList_Append(vres->value, (PyObject*)oi);
     Py_DECREF(oi);
@@ -1015,15 +1016,18 @@ bootstrap_callback(lcb_t instance, lcb_STATUS err)
 }
 
 #define LCB_PING_FOR_ALL_TYPES(X) \
-    X(KV, kv)            \
-    X(VIEWS, views)      \
-    X(N1QL, n1ql)        \
-    X(FTS, fts)
+    X(KV, kv)                     \
+    X(VIEWS, views)               \
+    X(N1QL, n1ql)                 \
+    X(FTS, fts)                   \
+    X(ANALYTICS, analytics)
 
 const char *get_type_s(lcb_PING_SERVICE type)
 {
     switch (type) {
         LCB_PING_FOR_ALL_TYPES(LCB_PING_GET_TYPE_S)
+    case LCB_PING_SERVICE__MAX:
+        pycbc_assert(type != LCB_PING_SERVICE__MAX);
     default:
         break;
     }
@@ -1082,19 +1086,14 @@ static void ping_callback(lcb_t instance,
                 PyObject *mrdict = PyDict_New();
                 PyList_Append(struct_server_list, mrdict);
 
-                switch (lcb_respping_result_status(resp, ii)) {
-                case LCB_PING_STATUS_OK:
-                    break;
-                case LCB_PING_STATUS_TIMEOUT:
-                    break;
-                default:
-                    pycbc_dict_add_text_kv(
-                            mrdict,
-                            "details",
-                            lcb_strerror_long(
-                                    (lcb_STATUS)lcb_respping_result_status(
-                                            resp, ii)));
-                }
+                pycbc_assert(lcb_respping_result_status(resp, ii) !=
+                             LCB_PING_STATUS__MAX);
+                pycbc_dict_add_text_kv(
+                        mrdict,
+                        "details",
+                        lcb_strerror_long(
+                                (lcb_STATUS)lcb_respping_result_status(resp,
+                                                                       ii)));
                 {
                     pycbc_strn_base_const server_name;
                     lcb_respping_result_remote(

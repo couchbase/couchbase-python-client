@@ -55,19 +55,46 @@ HttpResult_headers(pycbc_HttpResult *self, void *unused)
     return self->headers;
 }
 
+#define PYCBC_FOR_EACH_HTTP_OPTYPE(X) \
+    X(VIEW, vh, view)                 \
+    X(N1QL, n1ql, n1ql)               \
+    X(FTS, fts, fts)                  \
+    X(RAW, htreq, http)               \
+    X(ANALYTICS, analytics, analytics)
+
 static void
 HttpResult_dealloc(pycbc_HttpResult *self)
 {
     if (self->u.htreq) {
         if (self->parent) {
-            if (self->htype == PYCBC_HTTP_HVIEW) {
+            switch (self->htype) {
+#define PYCBC_CASE(UC, LC, ACCESSOR)                                       \
+    case PYCBC_HTTP_H##UC:                                                 \
+        PYCBC_DEBUG_LOG(                                                   \
+                "Cancelling %s operation %S at %p", #UC, self, self->u.LC) \
+        lcb_##ACCESSOR##_cancel(self->parent->instance, self->u.LC);       \
+        break;
+#define PYCBC_GEN_HTTP_OPS
+#ifdef PYCBC_GEN_HTTP_OPS
+                PYCBC_FOR_EACH_HTTP_OPTYPE(PYCBC_CASE);
+#else
+            case PYCBC_HTTP_HVIEW:
                 lcb_view_cancel(self->parent->instance, self->u.vh);
-            } else if (self->htype == PYCBC_HTTP_HN1QL) {
+                break;
+            case PYCBC_HTTP_HN1QL:
                 lcb_n1ql_cancel(self->parent->instance, self->u.n1ql);
-            } else if (self->htype == PYCBC_HTTP_HFTS) {
+                break;
+            case PYCBC_HTTP_HFTS:
                 lcb_fts_cancel(self->parent->instance, self->u.fts);
-            } else {
+                break;
+            case PYCBC_HTTP_HRAW:
                 lcb_http_cancel(self->parent->instance, self->u.htreq);
+                break;
+            case PYCBC_HTTP_HANALYTICS:
+                lcb_analytics_cancel(self->parent->instance, self->u.analytics);
+                break;
+                ;
+#endif
             }
         }
         self->u.htreq = NULL;

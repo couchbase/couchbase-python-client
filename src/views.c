@@ -1,6 +1,6 @@
+#include "pycbc.h"
 #include <libcouchbase/couchbase.h>
 #include "oputil.h"
-#include "pycbc.h"
 #include "pycbc_http.h"
 #include "structmember.h"
 
@@ -437,6 +437,7 @@ ViewResult__init__(PyObject *self_raw,
 static void
 ViewResult_dealloc(pycbc_ViewResult *vres)
 {
+    PYCBC_DEBUG_LOG("Deallocing ViewResult %S at %p", vres, vres)
     Py_CLEAR(vres->rows);
     Py_XDECREF(vres->context_capsule);
     Py_TYPE(vres)->tp_base->tp_dealloc((PyObject*)vres);

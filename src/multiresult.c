@@ -372,8 +372,8 @@ pycbc_multiresult_get_result(pycbc_MultiResult *self)
 void pycbc_asyncresult_invoke(pycbc_AsyncResult *ares,
                               pycbc_enhanced_err_info *err_info)
 {
-    PyObject *argtuple;
-    PyObject *cbmeth;
+    PyObject *argtuple = NULL;
+    PyObject *cbmeth = NULL;
     if (!pycbc_multiresult_maybe_raise2(&ares->base, err_info)) {
         /** All OK */
         PyObject *eres = pycbc_multiresult_get_result(&ares->base);

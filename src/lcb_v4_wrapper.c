@@ -14,8 +14,8 @@
  *   limitations under the License.
  **/
 
-#include "lcb_v4_wrapper.h"
 #include "pycbc.h"
+#include "lcb_v4_wrapper.h"
 #include <libcouchbase/crypto.h>
 
 // TODO: these crypto functions are now accessible but seem to return an error, so disabled for now

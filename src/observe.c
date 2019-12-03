@@ -94,21 +94,22 @@ handle_single_observe(pycbc_Bucket *self, PyObject *curkey, int master_only,
     int rv;
     pycbc_pybuffer keybuf = { NULL };
     pycbc_CMDOBSERVE *cmd = NULL;
-    (void)cmd;
-    pycbc_cmdobserve_create(&cmd);
     lcb_STATUS err=LCB_SUCCESS;
-
+    pycbc_cmdobserve_create(&cmd);
+    (void)cmd;
     rv = pycbc_tc_encode_key(self, curkey, &keybuf);
     if (rv < 0) {
         return -1;
     }
-    pycbc_cmdobserve_key(cmd, keybuf.buffer, keybuf.length);
+    err = err ? err : pycbc_cmdobserve_key(cmd, keybuf.buffer, keybuf.length);
 
     if (master_only) {
-        pycbc_cmdobserve_master_only(cmd);
+        err = err ? err : pycbc_cmdobserve_master_only(cmd);
     }
-    PYCBC_TRACECMD_TYPED(observe, &cmd, context, cv->mres, curkey, self);
-    err = pycbc_cmdendure_addcmd(cv->mctx, cmd);
+    if (!err) {
+        PYCBC_TRACECMD_TYPED(observe, &cmd, context, cv->mres, curkey, self);
+    }
+    err = err ? err : pycbc_cmdendure_addcmd(cv->mctx, cmd);
     if (err == LCB_SUCCESS) {
         rv = 0;
     } else {

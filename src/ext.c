@@ -14,9 +14,10 @@
  *   limitations under the License.
  **/
 
+#include "python_wrappers.h"
+#include "pycbc.h"
 #include <libcouchbase/vbucket.h>
 #include "iops.h"
-#include "pycbc.h"
 #include "structmember.h"
 #include <libcouchbase/logger.h>
 /**
@@ -27,7 +28,7 @@ struct pycbc_helpers_ST pycbc_helpers;
 
 PyObject *pycbc_log_handler = NULL;
 
-void log_handler(lcb_LOGGER *procs,
+void log_handler(const lcb_LOGGER *procs,
                  uint64_t iid,
                  const char *subsys,
                  lcb_LOG_SEVERITY severity,
@@ -416,7 +417,7 @@ init_libcouchbase(void)
 #endif
 
 /* Logging functionality */
-void log_handler(lcb_LOGGER *procs,
+void log_handler(const lcb_LOGGER *procs,
                  uint64_t iid,
                  const char *subsys,
                  lcb_LOG_SEVERITY severity,
@@ -510,7 +511,6 @@ int pycbc_free_debug(const char *FILE, const char *FUNC, int LINE, void *X)
 }
 
 #include "oputil.h"
-#include "python_wrappers.h"
 
 #if PY_MAJOR_VERSION < 3
 const char *pycbc_cstrn(PyObject *object, Py_ssize_t *length)

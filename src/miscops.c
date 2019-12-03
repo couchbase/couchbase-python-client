@@ -14,8 +14,8 @@
  *   limitations under the License.
  **/
 
-#include "oputil.h"
 #include "pycbc.h"
+#include "oputil.h"
 /**
  * This file contains 'miscellaneous' operations. Functions contained here
  * might move to other files if they become more complex.

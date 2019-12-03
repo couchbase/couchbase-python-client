@@ -1,5 +1,5 @@
-#include "oputil.h"
 #include "pycbc.h"
+#include "oputil.h"
 #include "pycbc_http.h"
 #include "structmember.h"
 

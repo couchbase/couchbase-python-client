@@ -55,7 +55,7 @@ set (LCB_CXXFLAGS ${CFLAGS} -fPIC)
 if (WIN32)
 else(WIN32)
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -fPIC -fno-strict-aliasing -Wall -Wstrict-prototypes -pthread")
-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-common -dynamic -DNDEBUG -g -fwrapv")
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-common -dynamic -DNDEBUG -g -fwrapv -Wswitch")
 endif()
 
 if ("$PYCBC_USE_CONAN")

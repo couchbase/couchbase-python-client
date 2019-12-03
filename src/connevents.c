@@ -17,9 +17,9 @@
 /**
  * This file contains connection events
  */
+#include "pycbc.h"
 #include <assert.h>
 #include "iops.h"
-#include "pycbc.h"
 
 void
 pycbc_invoke_connected_event(pycbc_Bucket *conn, lcb_STATUS err)

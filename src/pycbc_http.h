@@ -16,9 +16,9 @@
 
 #ifndef COUCHBASE_PYTHON_CLIENT_HTTP_H
 #define COUCHBASE_PYTHON_CLIENT_HTTP_H
+#include "pycbc.h"
 #include <libcouchbase/couchbase.h>
 #include <libcouchbase/ixmgmt.h>
-#include "pycbc.h"
 
 typedef struct {
     pycbc_Result_HEAD PyObject *http_data;

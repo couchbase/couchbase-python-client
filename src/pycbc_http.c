@@ -14,9 +14,9 @@
  *   limitations under the License.
  **/
 
+#include "pycbc.h"
 #include "pycbc_http.h"
 #include "oputil.h"
-#include "pycbc.h"
 
 static void get_headers(pycbc_HttpResult *htres, const char *const *headers)
 {
@@ -126,6 +126,8 @@ void pycbc_httpresult_complete(pycbc_HttpResult *htres,
 {
     int should_raise = 0;
     pycbc_Bucket *bucket = htres->parent;
+    PYCBC_DEBUG_LOG(
+            "Completed HttpResult %R @ %p, MultiResult %R @ %p", htres, mres)
 
     if (htres->rc == LCB_SUCCESS) {
         htres->rc = err;
