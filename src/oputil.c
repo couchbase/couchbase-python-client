@@ -919,7 +919,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
         PYCBC_DEBUG_LOG_CONTEXT(context,
                                 "Called subdoc on %llx, got err %s",
                                 cmd,
-                                lcb_strerror(self->instance, *err))
+                                lcb_strerror_short(*err))
         if ((*err) == LCB_SUCCESS) {
 #ifdef PYCBC_GLOBAL_SCHED_SD
             PYCBC_REF_CONTEXT(context);
@@ -930,7 +930,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
             PYCBC_DEBUG_LOG_CONTEXT(context,
                                     "Got err %d %s",
                                     *err,
-                                    lcb_strerror(self->instance, *err))
+                                    lcb_strerror_short(*err))
         }
     }
     return (*err);

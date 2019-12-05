@@ -173,7 +173,7 @@ static void n1ql_row_callback(lcb_t instance, int ign, const lcb_RESPN1QL *respb
         if (ma_status) {                                                     \
             PYCBC_DEBUG_LOG_CONTEXT(context,                                 \
                                     "Couldn't set multiauth: %s",            \
-                                    lcb_strerror(self->instance, ma_status)) \
+                                    lcb_strerror_short(ma_status))           \
         }                                                                    \
     }
 

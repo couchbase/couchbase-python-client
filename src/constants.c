@@ -17,7 +17,7 @@
 #include "iops.h"
 #include "pycbc_http.h"
 #include <libcouchbase/crypto.h>
-
+#include <libcouchbase/error.h>
 /**
  * Very simple file that simply adds LCB constants to the module
  */
@@ -407,9 +407,9 @@ pycbc_lcb_errstr(lcb_t instance, lcb_STATUS err)
 {
 #if PY_MAJOR_VERSION == 3
 
-    return PyUnicode_InternFromString(lcb_strerror(instance, err));
+    return PyUnicode_InternFromString(lcb_strerror_short(err));
 #else
-    return PyString_InternFromString(lcb_strerror(instance, err));
+    return PyString_InternFromString(lcb_strerror_short(err));
 #endif
 }
 
