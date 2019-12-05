@@ -1,18 +1,36 @@
 import os
 from unittest import SkipTest
+from functools import wraps
 
 from couchbase import ArgumentError
 from couchbase.management.users import User, Role, Group, RawRole, GroupNotFoundException, UserNotFoundException
 from couchbase_core.auth_domain import AuthDomain
 from couchbase_tests.base import CollectionTestCase
+from couchbase_core.exceptions import  NotSupportedError
 from typing import *
 import re
 
 
 UG_WORKING = os.getenv("PYCBC_UPSERT_GROUP_WORKING")
 
+def skip_if_no_groups(func):
+  @wraps(func)
+  def wrap(self, *args, **kwargs):
+    if not self.supports_groups():
+      raise SkipTest('groups not supported (server < 6.5?)')
+    func(self, *args, **kwargs)
+  return wrap
 
 class UserManagementTests(CollectionTestCase):
+
+    def supports_groups(self):
+      # get_all_groups will raise NotSupported when we are hiting < 6.5
+      try:
+        self.um.get_all_groups()
+        return True
+      except NotSupportedError:
+        return False
+
     def setUp(self, *args, **kwargs):
         super(UserManagementTests, self).setUp(*args, **kwargs)
         self.um = self.cluster.users()
@@ -104,6 +122,7 @@ class UserManagementTests(CollectionTestCase):
         # remove user
         self.um.drop_user(userid, AuthDomain.Local)
 
+    @skip_if_no_groups
     def test_groups(self):
         fresh_group = Group(name='qweqwe', roles={Role.of(name='admin')})
         if UG_WORKING:
@@ -114,10 +133,12 @@ class UserManagementTests(CollectionTestCase):
         actual_roles = result.roles
         self.assertSetEqual(expected_roles, actual_roles)
 
+    @skip_if_no_groups
     def test_get_all_groups(self):
         all_groups = self.um.get_all_groups()
         self.assertEqual([Group('qweqwe', roles={RawRole('admin', None)})], all_groups)
 
+    @skip_if_no_groups
     def test_timeout(self):
         self.um.get_all_groups(timeout=0.1)
 
@@ -131,6 +152,7 @@ class UserManagementTests(CollectionTestCase):
                 return
         self.fail("No admin role found")
 
+    @skip_if_no_groups
     def test_missing_group(self):
         self.assertRaises(GroupNotFoundException, self.um.get_group, 'fred')
 

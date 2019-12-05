@@ -10,7 +10,7 @@ from couchbase_core import ABCMeta
 from couchbase_core.exceptions import HTTPError
 from typing import *
 from couchbase.options import OptionBlockTimeOutVerbatim
-from couchbase_core.exceptions import ErrorMapper
+from couchbase_core.exceptions import ErrorMapper, NotSupportedWrapper
 
 
 class GroupNotFoundException(HTTPError):
@@ -224,6 +224,7 @@ class UserManager(GenericManager):
                        ):
         pass
 
+    @NotSupportedWrapper.a_404_means_not_supported
     def get_all_groups(self,  # type: UserManager
                        *options,  # type: GetAllGroupsOptions
                        **kwargs
@@ -287,7 +288,7 @@ class UserManager(GenericManager):
         """
         Removes a group.
 
-        :param str group_name: name of the group. 
+        :param str group_name: name of the group.
         :param Duration timeout: the time allowed for the operation to be terminated. This is controlled by the client.
 
         :raises: GroupNotFoundException

@@ -841,6 +841,19 @@ class AnyPattern(object):
     def __eq__(self, other):
         return isinstance(other, AnyPattern)
 
+class NotSupportedWrapper(object):
+    @classmethod
+    def a_404_means_not_supported(cls, func):
+        def wrapped(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except HTTPError as e:
+                extra = getattr(e, 'objextra', None)
+                status = getattr(extra, 'http_status', None)
+                if status == 404:
+                    raise NotSupportedError('Server does not support this api call')
+                raise
+        return wrapped
 
 class ErrorMapper(object):
     @classmethod
@@ -855,6 +868,12 @@ class ErrorMapper(object):
                         extra = getattr(e, 'objextra', None)
                         if extra:
                             value = getattr(extra, 'value', "")
+                            # 404s in particular can have bytes for the body, so call
+                            # decode (which uses utf-8 by default) to convert to string to make the regex happy
+                            try:
+                              value = value.decode()
+                            except:
+                              pass
                             for pattern, exc in text_to_final_exc.items():
                                 if pattern.match(value):
                                     raise exc.pyexc(e.message, extra, e)
