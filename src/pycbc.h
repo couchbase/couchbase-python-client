@@ -1660,7 +1660,7 @@ void pycbc_multiresult_adderr(pycbc_MultiResult* mres);
  * Raise an exception from a multi result. This will raise an exception if:
  * 1) There is a 'fatal' error in the 'exceptions' list
  * 2) There is an 'operr'. 'operr' can be a failed LCB code (if no_raise_enoent
- * is on, this is not present if the failed code was LCB_KEY_ENOENT)
+ * is on, this is not present if the failed code was LCB_ERR_DOCUMENT_NOT_FOUND)
  */
 int pycbc_multiresult_maybe_raise(pycbc_MultiResult *self);
 

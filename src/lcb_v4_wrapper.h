@@ -275,13 +275,13 @@ typedef enum {
 #define lcb_respendure_cas(RESP, DEST) *(DEST)=(RESP)->cas;
 #define lcb_respendure_key(RESP, DEST, NDEST) *(DEST)=(RESP)->key; *(NDEST)=(RESP)->nkey;
 
-#define lcb_cmdobserve_parent_span(CMD, SPAN) LCB_NOT_SUPPORTED
-#define lcb_respobserve_status(RESP) LCB_NOT_SUPPORTED
-#define lcb_respobserve_cas(RESP, DEST) LCB_NOT_SUPPORTED
-#define lcb_respobserve_key(RESP, DEST, NDEST) LCB_NOT_SUPPORTED
-#define lcb_respobserve_cookie(RESP, DEST) LCB_NOT_SUPPORTED
-#define lcb_respobserve_is_master(RESP, DEST) LCB_NOT_SUPPORTED;
-#define lcb_respobserve_flags(RESP, DEST) LCB_NOT_SUPPORTED
+#define lcb_cmdobserve_parent_span(CMD, SPAN) LCB_ERR_UNSUPPORTED_OPERATION
+#define lcb_respobserve_status(RESP) LCB_ERR_UNSUPPORTED_OPERATION
+#define lcb_respobserve_cas(RESP, DEST) LCB_ERR_UNSUPPORTED_OPERATION
+#define lcb_respobserve_key(RESP, DEST, NDEST) LCB_ERR_UNSUPPORTED_OPERATION
+#define lcb_respobserve_cookie(RESP, DEST) LCB_ERR_UNSUPPORTED_OPERATION
+#define lcb_respobserve_is_master(RESP, DEST) LCB_ERR_UNSUPPORTED_OPERATION;
+#define lcb_respobserve_flags(RESP, DEST) LCB_ERR_UNSUPPORTED_OPERATION
 
 #define PYCBC_OBSERVE_FROM_LCB(X) PYCBC_OBSERVE_##X
 #define lcb_cmdgetreplica_expiry(CMD, TTL)
@@ -360,7 +360,7 @@ lcb_STATUS pycbc_cmdview_spatial(lcb_CMDVIEW *pCmdview, int is_spacial);
 #define PYCBC_X_SD_OPS_FULLDOC(X, NP, VAL, MVAL, CTR, ...)
 
 typedef lcb_DURABILITY_LEVEL pycbc_DURABILITY_LEVEL;
-#    define lcb_cmdremove_durability_observe(...) LCB_EINTERNAL
+#define lcb_cmdremove_durability_observe(...) LCB_ERR_SDK_INTERNAL
 
 #define PYCBC_X_DURLEVEL(X)           \
     X(NONE)                           \
@@ -369,44 +369,49 @@ typedef lcb_DURABILITY_LEVEL pycbc_DURABILITY_LEVEL;
     X(PERSIST_TO_MAJORITY)
 
 #define PYCBX_X_SYNCREPERR(X)                                                 \
-    X(LCB_DURABILITY_INVALID_LEVEL,                                           \
-      0x63,                                                                   \
-      LCB_ERRTYPE_DURABILITY | LCB_ERRTYPE_INPUT | LCB_ERRTYPE_SRVGEN,        \
+    X(LCB_ERR_DURABILITY_LEVEL_NOT_AVAILABLE,                                 \
+      307,                                                                    \
+      LCB_ERROR_TYPE_KEYVALUE,                                                \
       "Invalid durability level was specified")                               \
     /** Valid request, but given durability requirements are impossible to    \
      * achieve - because insufficient configured replicas are connected.      \
      * Assuming level=majority and C=number of configured nodes, durability   \
      * becomes impossible if floor((C + 1) / 2) nodes or greater are offline. \
      */                                                                       \
-    X(LCB_DURABILITY_IMPOSSIBLE,                                              \
-      0x64,                                                                   \
-      LCB_ERRTYPE_DURABILITY | LCB_ERRTYPE_SRVGEN,                            \
+    X(LCB_ERR_DURABILITY_IMPOSSIBLE,                                          \
+      308,                                                                    \
+      LCB_ERROR_TYPE_KEYVALUE,                                                \
       "Given durability requirements are impossible to achieve")              \
     /** Returned if an attempt is made to mutate a key which already has a    \
      * SyncWrite pending. Client would typically retry (possibly with         \
      * backoff). Similar to ELOCKED */                                        \
-    X(LCB_DURABILITY_SYNC_WRITE_IN_PROGRESS,                                  \
-      0x65,                                                                   \
-      LCB_ERRTYPE_DURABILITY | LCB_ERRTYPE_SRVGEN | LCB_ERRTYPE_TRANSIENT,    \
+    X(LCB_ERR_DURABLE_WRITE_IN_PROGRESS,                                      \
+      310,                                                                    \
+      LCB_ERROR_TYPE_KEYVALUE,                                                \
       "There is a synchronous mutation pending for given key")                \
     /** The SyncWrite request has not completed in the specified time and has \
      * ambiguous result - it may Succeed or Fail; but the final value is not  \
      * yet known */                                                           \
-    X(LCB_DURABILITY_SYNC_WRITE_AMBIGUOUS,                                    \
-      0x66,                                                                   \
-      LCB_ERRTYPE_DURABILITY | LCB_ERRTYPE_SRVGEN,                            \
-      "Synchronous mutation has not completed in the specified time and has " \
-      "ambiguous result")
+    X(LCB_ERR_DURABILITY_AMBIGUOUS,                                           \
+      309,                                                                    \
+      LCB_ERROR_TYPE_KEYVALUE,                                                \
+      "Synhronous mutation has not completed in the specified time and has "  \
+      "ambiguous result")                                                     \
+    X(LCB_ERR_DURABLE_WRITE_RE_COMMIT_IN_PROGRESS,                            \
+      311,                                                                    \
+      LCB_ERROR_TYPE_KEYVALUE,                                                \
+      "Durable write re-commit in progress")
 
 #define PYCBC_DURABILITY 1
-#define PYCBC_LCB_ERRTYPES(X) \
-    X(LCB_ERRTYPE_DATAOP);    \
-    X(LCB_ERRTYPE_FATAL);     \
-    X(LCB_ERRTYPE_INTERNAL);  \
-    X(LCB_ERRTYPE_NETWORK);   \
-    X(LCB_ERRTYPE_TRANSIENT); \
-    X(LCB_ERRTYPE_INPUT);     \
-    X(LCB_ERRTYPE_DURABILITY);
+#define PYCBC_LCB_ERRTYPES(X)    \
+    X(LCB_ERROR_TYPE_BASE);      \
+    X(LCB_ERROR_TYPE_SHARED);    \
+    X(LCB_ERROR_TYPE_KEYVALUE);  \
+    X(LCB_ERROR_TYPE_QUERY);     \
+    X(LCB_ERROR_TYPE_ANALYTICS); \
+    X(LCB_ERROR_TYPE_SEARCH);    \
+    X(LCB_ERROR_TYPE_VIEW);      \
+    X(LCB_ERROR_TYPE_SDK);
 
 #define PYCBC_DO_COLL(TYPE, CMD, SCOPE, NSCOPE, COLLECTION, NCOLLECTION) \
     lcb_cmd##TYPE##_collection(CMD, SCOPE, NSCOPE, COLLECTION, NCOLLECTION)
@@ -416,18 +421,18 @@ typedef void pycbc_dur_opts;
 typedef void pycbc_CMDENDURE;
 
 #include "lcb_dur_wrappers.h"
-#define pycbc_cmdendure_key(...) LCB_NOT_SUPPORTED
-#define pycbc_cmdendure_addcmd(...) LCB_NOT_SUPPORTED
-#define pycbc_create_cmdendure(cmd) LCB_NOT_SUPPORTED
-#define pycbc_cmdendure_cas(cmd, cas) LCB_NOT_SUPPORTED
-#define pycbc_mctx_done(mctx, cookie) LCB_NOT_SUPPORTED
-#define pycbc_mctx_fail(mctx) LCB_NOT_SUPPORTED
-#define lcb_respobserve_is_master(RESP, DEST) LCB_NOT_SUPPORTED;
+#define pycbc_cmdendure_key(...) LCB_ERR_UNSUPPORTED_OPERATION
+#define pycbc_cmdendure_addcmd(...) LCB_ERR_UNSUPPORTED_OPERATION
+#define pycbc_create_cmdendure(cmd) LCB_ERR_UNSUPPORTED_OPERATION
+#define pycbc_cmdendure_cas(cmd, cas) LCB_ERR_UNSUPPORTED_OPERATION
+#define pycbc_mctx_done(mctx, cookie) LCB_ERR_UNSUPPORTED_OPERATION
+#define pycbc_mctx_fail(mctx) LCB_ERR_UNSUPPORTED_OPERATION
+#define lcb_respobserve_is_master(RESP, DEST) LCB_ERR_UNSUPPORTED_OPERATION;
 typedef void pycbc_RESPOBSERVE;
 typedef void pycbc_CMDOBSERVE;
 #define pycbc_cmdobserve_create(cmd)
-#define pycbc_cmdobserve_key(cmd, buffer, nbuffer) LCB_NOT_SUPPORTED
-#define pycbc_cmdobserve_master_only(cmd) LCB_NOT_SUPPORTED
-#define pycbc_mctx_create(instance, dest) LCB_NOT_SUPPORTED
+#define pycbc_cmdobserve_key(cmd, buffer, nbuffer) LCB_ERR_UNSUPPORTED_OPERATION
+#define pycbc_cmdobserve_master_only(cmd) LCB_ERR_UNSUPPORTED_OPERATION
+#define pycbc_mctx_create(instance, dest) LCB_ERR_UNSUPPORTED_OPERATION
 
 #endif // COUCHBASE_PYTHON_CLIENT_LCB_V4_WRAPPER_H

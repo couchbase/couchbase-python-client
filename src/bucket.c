@@ -21,6 +21,7 @@
 #include "iops.h"
 #include "python_wrappers.h"
 #include <libcouchbase/vbucket.h>
+#include <libcouchbase/error.h>
 
 PyObject *pycbc_DummyTuple;
 PyObject *pycbc_DummyKeywords;
@@ -116,7 +117,8 @@ Bucket_register_crypto_provider(pycbc_Bucket *self, PyObject *args) {
     }
 
     if (!provider || !provider->lcb_provider) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, LCB_EINVAL, "Invalid provider");
+        PYCBC_EXC_WRAP(
+                PYCBC_EXC_LCBERR, LCB_ERR_INVALID_ARGUMENT, "Invalid provider");
         return NULL;
     }
     {
@@ -197,7 +199,7 @@ size_t pycbc_populate_fieldspec(lcbcrypto_FIELDSPEC **fields,
         (*fields)[i].alg = pycbc_dict_cstr(dict, "alg");
         if (kid_value && strlen(kid_value) > 0) {
             PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR,
-                           LCB_EINVAL,
+                           LCB_ERR_INVALID_ARGUMENT,
                            "Fieldspec should not include Key ID - this should "
                            "be provided by get_key_id instead");
             goto FAIL;
@@ -535,7 +537,7 @@ Bucket__mutinfo(pycbc_Bucket *self) {
         kb.contig.nbytes = (size_t) ii;
 
         mt = pycbc_get_vbucket_mutation_token(self->instance, &kb, &rc);
-        if (rc == LCB_NOT_SUPPORTED) {
+        if (rc == LCB_ERR_UNSUPPORTED_OPERATION) {
             PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, rc, "Mutation token info on VBucket not supported")
             goto GT_FAIL;
         }
@@ -922,7 +924,7 @@ int pycbc_collection_init_from_fn_args(pycbc_Collection_t *self,
     PYCBC_DEBUG_PYFORMAT("Kwargs are now %S", kwargs);
     if (PyErr_Occurred()) {
         PYCBC_DEBUG_LOG("Problems")
-        rv = LCB_COLLECTION_UNKNOWN;
+        rv = LCB_ERR_COLLECTION_NOT_FOUND;
         PYCBC_EXCEPTION_LOG_NOCLEAR
     }
     return rv;

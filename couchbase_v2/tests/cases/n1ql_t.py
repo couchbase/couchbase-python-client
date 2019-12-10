@@ -17,11 +17,13 @@
 
 from __future__ import print_function
 
-from couchbase_v2.exceptions import HTTPError
+from couchbase.exceptions import QueryException
+from couchbase_core.exceptions import HTTPError, CouchbaseQueryError
+
 from couchbase_tests.base import MockTestCase
 from couchbase_v2.n1ql import N1QLQuery
 import json
-
+import couchbase_core._libcouchbase as C
 
 class N1QLTest(MockTestCase):
     def test_onerow(self):
@@ -52,10 +54,10 @@ class N1QLTest(MockTestCase):
     def test_httperror_str(self):
         q = self.cb.n1ql_query('CREATE INDEX abc#123 ON abc (col_1)')
 
-        with self.assertRaises(HTTPError) as c:
+        with self.assertRaises(QueryException) as c:
             q.execute()
 
-        self.assertIn('0x3B', str(c.exception))
+        self.assertIn(hex(C.LCB_ERR_QUERY_INDEX), str(c.exception))
         ok, failed = c.exception.split_results()
         self.assertTrue(':nokey:' in k for k in failed.keys())
 

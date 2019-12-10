@@ -89,7 +89,8 @@ static int maybe_push_operr(pycbc_MultiResult *mres,
                 res, res->tracing_context, mres ? mres->parent : NULL);
     }
     if (check_enoent && (mres->mropts & PYCBC_MRES_F_QUIET) &&
-        (err == LCB_KEY_ENOENT || err == LCB_SUBDOC_PATH_ENOENT)) {
+        (err == LCB_ERR_DOCUMENT_NOT_FOUND ||
+         err == LCB_ERR_SUBDOC_PATH_NOT_FOUND)) {
         return 0;
     }
 
@@ -535,11 +536,13 @@ dur_chain2(pycbc_Bucket *conn,
     pycbc_extract_respdata(resp,&mres,&handler);
     res->rc = handler.rc;
     if(res->rc == LCB_SUCCESS) {
-        const lcb_MUTATION_TOKEN *mutinfo = lcb_resp_get_mutation_token(cbtype, resp);
-        Py_XDECREF(res->mutinfo);
+#ifdef PYCBC_MUTATION_TOKENS_ENABLED
+
+        const lcb_MUTATION_TOKEN *mutinfo = lcb_resp_get_mutation_token(cbtype,
+        resp); Py_XDECREF(res->mutinfo);
 
         if (mutinfo && lcb_mutation_token_is_valid(mutinfo)) {
-            /* Create the mutation token tuple: (vb,uuid,seqno) */
+            // Create the mutation token tuple: (vb,uuid,seqno)
             res->mutinfo = Py_BuildValue("HKKO",
                                          pycbc_mutation_token_vbid(mutinfo),
                                          pycbc_mutation_token_uuid(mutinfo),
@@ -551,6 +554,15 @@ dur_chain2(pycbc_Bucket *conn,
             Py_INCREF(Py_None);
             res->mutinfo = Py_None;
         }
+
+#else
+        /*
+        Until mlcb_resp_get_mutation_token is back in libcouchbase includes, do
+            this:*/
+        Py_INCREF(Py_None);
+        res->mutinfo = Py_None;
+#endif
+
         res->cas = handler.cas;
     }
 
@@ -773,7 +785,7 @@ subdoc_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *rb)
     }
 
     PYCBC_DEBUG_LOG_CONTEXT(PYCBC_RES_CONTEXT(res), "Subdoc callback continues")
-    if (handler.rc == LCB_SUCCESS || handler.rc == LCB_SUBDOC_MULTI_FAILURE) {
+    if (handler.rc == LCB_SUCCESS || handler.rc == LCB_ERR_SUBDOC_GENERIC) {
         res->cas = handler.cas;
     } else {
         MAYBE_PUSH_OPERR(mres, (pycbc_Result *)res, handler.rc, 0);
@@ -800,7 +812,7 @@ subdoc_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *rb)
         if (rc != LCB_SUCCESS) {
             if (cbtype == LCB_CALLBACK_SDMUTATE) {
                 mk_sd_error(res, mres, rc, cur_index);
-            } else if (rc != LCB_SUBDOC_PATH_ENOENT) {
+            } else if (rc != LCB_ERR_SUBDOC_PATH_NOT_FOUND) {
                 mk_sd_error(res, mres, rc, cur_index);
             }
         }
@@ -851,7 +863,7 @@ keyop_simple_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
     (void)instance;
 
 }
-
+/* comment out until lcb_RESPSTATS exists again
 static void
 stats_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp_base)
 {
@@ -878,7 +890,7 @@ stats_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp_base)
         }
     }
     if (resp->rflags & LCB_RESP_F_FINAL) {
-        /* Note this can happen in both success and error cases! */
+        // Note this can happen in both success and error cases!
         do_return = 1;
         operation_completed_with_err_info(parent, mres, cbtype, resp_base, res);
     }
@@ -916,7 +928,7 @@ stats_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp_base)
     CB_THR_BEGIN(parent);
     (void)instance;
 }
-
+*/
 static void
 observe_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp_base)
 {
@@ -1255,7 +1267,8 @@ pycbc_callbacks_init(lcb_t instance)
     lcb_install_callback(instance, LCB_CALLBACK_GETREPLICA, value_callback);
     lcb_install_callback(instance, LCB_CALLBACK_COUNTER, value_callback);
     lcb_install_callback(instance, LCB_CALLBACK_OBSERVE, observe_callback);
-    lcb_install_callback(instance, LCB_CALLBACK_STATS, stats_callback);
+    // Comment out until stats are back in lcb lcb_install_callback(instance,
+    // LCB_CALLBACK_STATS, stats_callback);
     lcb_install_callback(instance, LCB_CALLBACK_PING, ping_callback);
     lcb_install_callback(instance, LCB_CALLBACK_DIAG, diag_callback);
 #ifdef PYCBC_EXTRA_CALLBACK_WRAPPERS

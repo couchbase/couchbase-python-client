@@ -14,9 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from unittest import SkipTest
 
 from couchbase_tests.base import ConnectionTestCase, RealServerTestCase
-
+from couchbase.exceptions import NotSupportedError
 
 # For Python 2/3 compatibility
 try:
@@ -28,7 +29,10 @@ except NameError:
 class StatsTest(ConnectionTestCase):
 
     def test_trivial_stats_without_argument(self):
-        stats = self.cb.stats()
+        try:
+            stats = self.cb.stats()
+        except NotSupportedError as e:
+            raise SkipTest(e.message)
         self.assertIsInstance(stats, dict)
         self.assertTrue('curr_connections' in stats)
         val = list(stats['curr_connections'].values())[0]
@@ -38,7 +42,10 @@ class StatsTest(ConnectionTestCase):
         self.assertIsInstance(info, dict)
 
     def test_stats_with_argument(self):
-        stats = self.cb.stats('memory')
+        try:
+            stats = self.cb.stats('memory')
+        except NotSupportedError as e:
+            raise SkipTest(e.message)
         self.assertIsInstance(stats, dict)
         self.assertTrue('mem_used' in stats)
         self.assertFalse('ep_tap_count' in stats)
@@ -48,7 +55,11 @@ class StatsTest(ConnectionTestCase):
 
     def test_stats_with_argument_list(self):
         second_entry = {True: {'tap': "ep_tap_count"}, False: {'config': "ep_dcp_conn_buffer_size"}}[self.is_mock]
-        stats = self.cb.stats(['memory'] + list(second_entry.keys()))
+
+        try:
+            stats = self.cb.stats(['memory'] + list(second_entry.keys()))
+        except NotSupportedError as e:
+            raise SkipTest(e.message)
         self.assertIsInstance(stats, dict)
         self.assertTrue('mem_used' in stats)
         self.assertSetEqual(set(), set(second_entry.values()).difference(stats.keys()))

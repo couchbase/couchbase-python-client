@@ -310,7 +310,7 @@ typedef lcb_DURABILITYLEVEL pycbc_DURABILITY_LEVEL;
 typedef int pycbc_DURABILITY_LEVEL;
 #define LCB_DURABILITYLEVEL_NONE 0
 #define LCB_DURABILITYLEVEL_MAJORITY_AND_PERSIST_ON_MASTER -1
-#define LCB_COLLECTION_UNKNOWN -1;
+#    define LCB_ERR_COLLECTION_NOT_FOUND -1;
 #endif
 
 typedef const lcb_RESPGET *pycbc_RESPGET;
@@ -793,13 +793,15 @@ lcb_STATUS lcb_cmdremove_durability(lcb_CMDREMOVE *cmd,
 
 #define PYCBC_X_DURLEVEL(X)
 #define PYCBX_X_SYNCREPERR(X)
-#define PYCBC_LCB_ERRTYPES(X) \
-    X(LCB_ERRTYPE_DATAOP);    \
-    X(LCB_ERRTYPE_FATAL);     \
-    X(LCB_ERRTYPE_INTERNAL);  \
-    X(LCB_ERRTYPE_NETWORK);   \
-    X(LCB_ERRTYPE_TRANSIENT); \
-    X(LCB_ERRTYPE_INPUT);
+#define PYCBC_LCB_ERRTYPES(X)   \
+    X(LCB_ERROR_TYPE_BASE)      \
+    X(LCB_ERROR_TYPE_SHARED)    \
+    X(LCB_ERROR_TYPE_KEYVALUE)  \
+    X(LCB_ERROR_TYPE_QUERY)     \
+    X(LCB_ERROR_TYPE_ANALYTICS) \
+    X(LCB_ERROR_TYPE_SEARCH)    \
+    X(LCB_ERROR_TYPE_VIEW)      \
+    X(LCB_ERROR_TYPE_SDK);
 
 typedef lcb_durability_opts_t pycbc_dur_opts;
 

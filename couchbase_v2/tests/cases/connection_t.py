@@ -38,7 +38,7 @@ class ConnectionTest(CouchbaseTestCase):
             self.factory, **connargs)
 
         cs.hosts = [ self.cluster_info.host + ':' + str(34567)]
-        self.assertRaises(CouchbaseNetworkError, self.factory, **connargs)
+        self.assertRaises(TimeoutError, self.factory, **connargs)
 
     def test_bucket(self):
         cb = self.factory(**self.make_connargs())

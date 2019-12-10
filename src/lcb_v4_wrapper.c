@@ -28,7 +28,7 @@ lcb_STATUS pycbc_crypto_register(lcb_INSTANCE* instance, const char *name, lcbcr
     (void)instance;
     (void)name;
     (void)provider;
-    return LCB_NOT_SUPPORTED;
+    return LCB_ERR_UNSUPPORTED_OPERATION;
 #endif
 }
 
@@ -39,7 +39,7 @@ lcb_STATUS pycbc_crypto_unregister(lcb_INSTANCE* instance, const char *name){
 #else
     (void)instance;
     (void)name;
-    return LCB_NOT_SUPPORTED;
+    return LCB_ERR_UNSUPPORTED_OPERATION;
 #endif
 }
 
@@ -50,7 +50,7 @@ lcb_STATUS pycbc_encrypt_fields(lcb_INSTANCE* instance, lcbcrypto_CMDENCRYPT* cm
 #else
     (void)instance;
     (void)cmd;
-    return LCB_NOT_SUPPORTED;
+    return LCB_ERR_UNSUPPORTED_OPERATION;
 #endif
 }
 
@@ -60,7 +60,7 @@ lcb_STATUS pycbc_decrypt_fields(lcb_INSTANCE* instance, lcbcrypto_CMDDECRYPT* cm
 #else
     (void)instance;
     (void)cmd;
-    return LCB_NOT_SUPPORTED;
+    return LCB_ERR_UNSUPPORTED_OPERATION;
 #endif
 }
 
@@ -127,28 +127,28 @@ const lcb_MUTATION_TOKEN *pycbc_get_vbucket_mutation_token(
 {
     (void)instance;
     (void)kb;
-    *rc = LCB_NOT_SUPPORTED;
+    *rc = LCB_ERR_UNSUPPORTED_OPERATION;
     return NULL;
 }
 
 lcb_STATUS pycbc_cmdn1ql_multiauth(lcb_CMDN1QL* cmd, int enable) {
     (void)cmd;
     (void)enable;
-    return LCB_NOT_SUPPORTED;
+    return LCB_ERR_UNSUPPORTED_OPERATION;
 }
 
 lcb_STATUS pycbc_cmdanalytics_host(lcb_CMDANALYTICS* CMD, const char* host)
 {
     (void)CMD;
     (void)host;
-    return LCB_NOT_SUPPORTED;
+    return LCB_ERR_UNSUPPORTED_OPERATION;
 }
 
 lcb_STATUS pycbc_cmdview_spatial(lcb_CMDVIEW *pCmdview, int is_spatial)
 {
     (void)pCmdview;
     (void)is_spatial;
-    return LCB_NOT_SUPPORTED;
+    return LCB_ERR_UNSUPPORTED_OPERATION;
 }
 
 lcb_STATUS pycbc_set_dur_opts(pycbc_dur_opts *dopts,
@@ -160,7 +160,7 @@ lcb_STATUS pycbc_set_dur_opts(pycbc_dur_opts *dopts,
     (void)dur;
     (void)is_delete;
     (void)timeout;
-    return LCB_NOT_SUPPORTED;
+    return LCB_ERR_UNSUPPORTED_OPERATION;
 }
 
 pycbc_MULTICMD_CTX *pycbc_endure_ctxnew(lcb_INSTANCE *instance,
@@ -169,6 +169,6 @@ pycbc_MULTICMD_CTX *pycbc_endure_ctxnew(lcb_INSTANCE *instance,
 {
     (void)instance;
     (void)dopts;
-    *err = LCB_NOT_SUPPORTED;
+    *err = LCB_ERR_UNSUPPORTED_OPERATION;
     return NULL;
 }

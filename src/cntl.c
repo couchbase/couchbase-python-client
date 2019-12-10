@@ -19,8 +19,8 @@
 /**
  * We're only using a subset of commands we actually care about. We're not
  * including the header directly because we might be using constants not
- * defined in older headers (which would result in a runtime NOT_SUPPORTED
- * error rather than a compilation failure).
+ * defined in older headers (which would result in a runtime
+ * ERR_UNSUPPORTED_OPERATION error rather than a compilation failure).
  */
 #define CNTL_SET 0x01
 #define CNTL_GET 0x00

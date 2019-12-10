@@ -207,7 +207,7 @@ class FieldEncryptionTests(ConnectionTestCase):
             exceptions = list(type(couchbase_v2.exceptions.exc_from_rc(rc)) for rc in rcs)
             document, fieldspec, provider = self._setup_encryption()
             def dummy(*args,**kwargs):
-                raise couchbase_v2.exceptions.TemporaryFailError(params=dict(rc=_LCB.LCB_ETMPFAIL))
+                raise couchbase_v2.exceptions.TemporaryFailError(params=dict(rc=_LCB.LCB_ERR_TEMPORARY_FAILURE))
             logging.error("corrupting method:{}".format(name))
             setattr(provider, name, dummy)
             valid_exception_raised = False

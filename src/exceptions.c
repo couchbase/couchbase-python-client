@@ -168,7 +168,7 @@ pycbc_exc_get_categories(PyObject *self, PyObject *arg)
     if (!rv) {
         return NULL;
     }
-    rv = lcb_get_errtype(rc);
+    rv = lcb_error_flags(rc);
     return pycbc_IntFromL(rv);
 }
 

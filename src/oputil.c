@@ -85,7 +85,7 @@ pycbc_sd_metainfo pycbc_get_metainfo(const pycbc_sdspec_details_t* details)
                        PYCBC_METAINFO_SDCMD_CASE_COUNTER,
                        INLINE)
         default:
-            result.err = LCB_SUBDOC_PATH_EINVAL;
+            result.err = LCB_ERR_SUBDOC_PATH_INVALID;
             break;
     }
     result.has_valbuf = (result.category == PYCBC_STR);
@@ -153,7 +153,7 @@ lcb_STATUS pycbc_build_spec(pycbc_SDSPEC *subdocops,
                        PYCBC_BUILDSPEC_SDCMD_CASE_COUNTER,
                        INLINE)
     default:
-        result = LCB_SUBDOC_PATH_EINVAL;
+        result = LCB_ERR_SUBDOC_PATH_INVALID;
         break;
     }
     return result;
@@ -762,7 +762,8 @@ int pycbc_handle_durability_args(pycbc_Bucket *self,
         params->persist_to = persist_to;
         params->replicate_to = replicate_to;
         if (replicate_to > nreplicas || persist_to > (nreplicas + 1)) {
-            PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, LCB_DURABILITY_ETOOMANY,
+            PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR,
+                           LCB_ERR_DURABILITY_TOO_MANY,
                            "Durability requirements will never be satisfied");
             return -1;
         }

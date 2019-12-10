@@ -196,7 +196,7 @@ lcb_STATUS lcb_cmdremove_durability(lcb_CMDREMOVE *cmd,
     cmd->dur_level=level;
     return LCB_SUCCESS;
 #else
-    return LCB_NOT_SUPPORTED;
+    return LCB_ERR_UNSUPPORTED_OPERATION;
 #endif
 }
 
@@ -207,7 +207,7 @@ lcb_STATUS lcb_cmdstore_durability(lcb_CMDSTORE *cmd,
     cmd->dur_level=level;
     return LCB_SUCCESS;
 #else
-    return LCB_NOT_SUPPORTED;
+    return LCB_ERR_UNSUPPORTED_OPERATION;
 #endif
 }
 

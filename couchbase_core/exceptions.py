@@ -20,6 +20,7 @@ from string import Template
 import json
 
 from couchbase_core import CompatibilityEnum
+
 from typing import *
 import inspect
 import re
@@ -150,24 +151,37 @@ class CouchbaseError(Exception):
         return C._get_errtype(self.rc)
 
     @property
-    def is_transient(self):
-        return self.categories & C.LCB_ERRTYPE_TRANSIENT
+    def is_base(self):
+      return self.categories & C.LCB_ERROR_TYPE_BASE
 
     @property
-    def is_retryable(self):
-        return self.is_transient
+    def is_shared(self):
+      return self.categories & C.LCB_ERROR_TYPE_SHARED
 
     @property
-    def is_fatal(self):
-        return self.categories & C.LCB_ERRTYPE_FATAL
+    def is_keyvalue(self):
+      return self.categories & C.LCB_ERROR_TYPE_KEYVALUE
 
     @property
-    def is_network(self):
-        return self.categories & C.LCB_ERRTYPE_NETWORK
+    def is_query(self):
+      return self.categories & C.LCB_ERROR_TYPE_QUERY
 
     @property
-    def is_data(self):
-        return self.categories & C.LCB_ERRTYPE_DATAOP
+    def is_analytics(self):
+      return self.categories & C.LCB_ERROR_TYPE_ANALYTICS
+
+    @property
+    def is_search(self):
+      return self.categories & C.LCB_ERROR_TYPE_SEARCH
+
+    @property
+    def is_view(self):
+      return self.categories & C.LCB_ERROR_TYPE_VIEW
+
+    @property
+    def is_sdk(self):
+      return self.categories & C.LCB_ERROR_TYPE_SDK
+
 
     def split_results(self):
         """
@@ -256,19 +270,104 @@ class CouchbaseError(Exception):
         return s
 
 
-class InternalSDKError(CouchbaseError):
-    """
-    This means the SDK has done something wrong. Get support.
-    (this doesn't mean *you* didn't do anything wrong, it does mean you should
-    not be seeing this message)
-    """
+"""
+Service Exceptions
+A Service level exception is any error or exception thrown or handled by one of the specific Couchbase Services: Query/N1QL, FTS, Analytics, View and Key/Value (Memcached). The exception or error names for each service are:
 
-class CouchbaseInternalError(InternalSDKError):
+QueryException
+SearchException
+ViewException
+KeyValueException
+AnalyticsException
+SDKException
+BaseException
+
+All Service exceptions derived from the base CouchbaseException and have an internal exception which can be either a system error/exception raised by the platform or a generic or shared error/exception across all services.
+
+"""
+class QueryException(CouchbaseError):
+    """
+    A server error occurred while executing a N1QL query. Assumes that that the service has returned a response.
+    Message
+    The error message returned by the Query service
+    Properties
+    The error(s) returned by response from the server by the Query/N1QL service
+    Any additional information returned by the server, the node it executed on, payload, HTTP status
+    """
     pass
 
-class CouchbaseDurabilityError(InternalSDKError):
+class SearchException(CouchbaseError):
     pass
 
+    """Message
+    The error message returned by the Search service
+    Properties
+    The error(s) returned by response from the server by the FTS Service
+    Any additional information returned by the server, the node it executed on, payload, HTTP status
+    """
+
+"""Derived Exceptions
+TBD? May be nothing to extend...
+"""
+class AnalyticsException(CouchbaseError):
+    pass
+    """A server error occurred while executing an Analytics query. Assumes that that the service has returned a response
+    Message
+    The error message returned by the Analytics service
+    Properties
+    The error(s) returned by response from the server, contextId, any additional information returned by the server, the node it executed on, payload, HTTP status.
+    """
+"""
+Derived Exceptions
+TBD? May be nothing to extend...
+"""
+class ViewException(CouchbaseError):
+    """A server error occurred while executing a View query.  Assumes that that the service has returned a response.
+    Message
+    The error message returned by the View service
+    Properties
+    The error(s) returned by response from the server, contextId, any additional information returned by the server, the node it executed on, payload, HTTP status.
+    """
+    pass
+
+class KeyValueException(CouchbaseError):
+    """
+    A server error occurred while executing a K/V operation. Assumes that the service has returned a response.
+    Message
+    The XError message returned by the memcached server
+    Properties
+    The memcached response status
+    XError and Enhanced error message information
+    The document id
+    The opaque used in the request"""
+    pass
+
+class SDKException(CouchbaseError):
+  """
+  An error occured within the SDK, while executing a command.
+  Message
+  The error message returned from the SDK itself
+  Properties
+  """
+  pass
+
+class SharedException(CouchbaseError):
+  """
+  A server error occured, and it is of a sort that several services would all raise.
+  Message
+  The error message returned by the server
+  Properties
+  """
+
+class BaseException(CouchbaseError):
+  """
+  An error occured which doesn't  fit into any of the other categories
+  Message
+  The error message describing the error
+  Properties
+  """
+
+#BEGIN V2 exception types.  These need to go as we move to V3 types, eventually
 class CouchbaseNetworkError(CouchbaseError):
     """
     Base class for network-related errors. These indicate issues in the low
@@ -297,7 +396,20 @@ class CouchbaseDataError(CouchbaseError):
     indicate that the server could not satisfy the request because of certain
     data constraints (such as an item not being present, or a CAS mismatch)
     """
+# END V2 exception types -- needs to go eventually
 
+class InternalSDKError(CouchbaseError):
+    """
+    This means the SDK has done something wrong. Get support.
+    (this doesn't mean *you* didn't do anything wrong, it does mean you should
+    not be seeing this message)
+    """
+
+class CouchbaseInternalError(InternalSDKError):
+    pass
+
+class CouchbaseDurabilityError(InternalSDKError):
+    pass
 
 class ArgumentError(CouchbaseError):
     """Invalid argument
@@ -539,11 +651,6 @@ class SubdocBadDeltaError(CouchbaseError):
     """Bad delta supplied for counter command"""
 
 
-class SubdocMultipleErrors(CouchbaseError):
-    """One or more subcommands failed. Inspect the individual operation"""
-    CODE = C.LCB_SUBDOC_MULTI_FAILURE
-
-
 class SubdocEmptyPathError(CouchbaseError):
     """Empty path passed as subdoc spec"""
 
@@ -652,17 +759,16 @@ _PYCBC_CRYPTO_ERR_MAP ={
     C.PYCBC_CRYPTO_PROVIDER_KEY_SIZE_EXCEPTION: CryptoProviderKeySizeException
 }
 
-
 _LCB_ERRCAT_MAP = {
-    C.LCB_ERRTYPE_NETWORK:      CouchbaseNetworkError,
-    C.LCB_ERRTYPE_INPUT:        CouchbaseInputError,
-    C.LCB_ERRTYPE_TRANSIENT:    CouchbaseTransientError,
-    C.LCB_ERRTYPE_FATAL:        CouchbaseFatalError,
-    C.LCB_ERRTYPE_DATAOP:       CouchbaseDataError,
-    C.LCB_ERRTYPE_INTERNAL:     CouchbaseInternalError,
-    C.LCB_ERRTYPE_DURABILITY:   CouchbaseDurabilityError
+    C.LCB_ERROR_TYPE_BASE: BaseException,
+    C.LCB_ERROR_TYPE_SHARED: SharedException,
+    C.LCB_ERROR_TYPE_KEYVALUE: KeyValueException,
+    C.LCB_ERROR_TYPE_QUERY: QueryException,
+    C.LCB_ERROR_TYPE_ANALYTICS: AnalyticsException,
+    C.LCB_ERROR_TYPE_SEARCH: SearchException,
+    C.LCB_ERROR_TYPE_VIEW: ViewException,
+    C.LCB_ERROR_TYPE_SDK: SDKException
 }
-
 
 class DurabilityInvalidLevelException(CouchbaseDurabilityError):
     """Given durability level is invalid"""
@@ -696,45 +802,52 @@ class DurabilityErrorCode(CompatibilityEnum):
 
 _LCB_SYNCREP_MAP = {item.value:item.orig_value for item in DurabilityErrorCode}
 
+
+class SubdocGenericError(CouchbaseError):
+    pass
+
+
 _LCB_ERRNO_MAP = dict(list({
-    C.LCB_AUTH_ERROR:       AuthError,
-    C.LCB_DELTA_BADVAL:     DeltaBadvalError,
-    C.LCB_E2BIG:            TooBigError,
-    C.LCB_EBUSY:            BusyError,
-    C.LCB_ENOMEM:           NoMemoryError,
-    C.LCB_ETMPFAIL:         TemporaryFailError,
-    C.LCB_KEY_EEXISTS:      KeyExistsError,
-    C.LCB_KEY_ENOENT:       NotFoundError,
-    C.LCB_DLOPEN_FAILED:    DlopenFailedError,
-    C.LCB_DLSYM_FAILED:     DlsymFailedError,
-    C.LCB_NETWORK_ERROR:    NetworkError,
-    C.LCB_NOT_MY_VBUCKET:   NotMyVbucketError,
-    C.LCB_NOT_STORED:       NotStoredError,
-    C.LCB_NOT_SUPPORTED:    NotSupportedError,
-    C.LCB_UNKNOWN_HOST:     UnknownHostError,
-    C.LCB_PROTOCOL_ERROR:   ProtocolError,
-    C.LCB_ETIMEDOUT:        TimeoutError,
-    C.LCB_CONNECT_ERROR:    ConnectError,
-    C.LCB_BUCKET_ENOENT:    BucketNotFoundError,
-    C.LCB_EBADHANDLE:       BadHandleError,
-    C.LCB_INVALID_HOST_FORMAT: InvalidError,
-    C.LCB_INVALID_CHAR:     InvalidError,
-    C.LCB_EINVAL:           InvalidError,
-    C.LCB_DURABILITY_ETOOMANY: ArgumentError,
-    C.LCB_DUPLICATE_COMMANDS: ArgumentError,
-    C.LCB_CLIENT_ETMPFAIL:  ClientTemporaryFailError,
-    C.LCB_HTTP_ERROR:       HTTPError,
-    C.LCB_SUBDOC_PATH_ENOENT: SubdocPathNotFoundError,
-    C.LCB_SUBDOC_PATH_EEXISTS: SubdocPathExistsError,
-    C.LCB_SUBDOC_PATH_EINVAL: SubdocPathInvalidError,
-    C.LCB_SUBDOC_DOC_E2DEEP: DocumentTooDeepError,
-    C.LCB_SUBDOC_DOC_NOTJSON: DocumentNotJsonError,
-    C.LCB_SUBDOC_VALUE_E2DEEP: SubdocValueTooDeepError,
-    C.LCB_SUBDOC_PATH_MISMATCH: SubdocPathMismatchError,
-    C.LCB_SUBDOC_VALUE_CANTINSERT: SubdocCantInsertValueError,
-    C.LCB_SUBDOC_BAD_DELTA: SubdocBadDeltaError,
-    C.LCB_SUBDOC_NUM_ERANGE: SubdocNumberTooBigError,
-    C.LCB_EMPTY_PATH: SubdocEmptyPathError,
+    C.LCB_ERR_AUTHENTICATION:       AuthError,
+    C.LCB_ERR_INVALID_DELTA:     DeltaBadvalError,
+    C.LCB_ERR_VALUE_TOO_LARGE:            TooBigError,
+    C.LCB_ERR_TEMPORARY_FAILURE:            BusyError,
+    C.LCB_ERR_SERVER_OUT_OF_MEMORY:           NoMemoryError,
+    C.LCB_ERR_TEMPORARY_FAILURE:         TemporaryFailError,
+    C.LCB_ERR_DOCUMENT_EXISTS:      KeyExistsError,
+    C.LCB_ERR_DOCUMENT_NOT_FOUND:       NotFoundError,
+    C.LCB_ERR_DLOPEN_FAILED:    DlopenFailedError,
+    C.LCB_ERR_DLSYM_FAILED:     DlsymFailedError,
+    C.LCB_ERR_NETWORK:    NetworkError,
+    C.LCB_ERR_NOT_MY_VBUCKET:   NotMyVbucketError,
+    C.LCB_ERR_NOT_STORED:       NotStoredError,
+    C.LCB_ERR_UNSUPPORTED_OPERATION:    NotSupportedError,
+    C.LCB_ERR_UNKNOWN_HOST:     UnknownHostError,
+    C.LCB_ERR_PROTOCOL_ERROR:   ProtocolError,
+    C.LCB_ERR_TIMEOUT:        TimeoutError,
+    C.LCB_ERR_CONNECT_ERROR:    ConnectError,
+    C.LCB_ERR_BUCKET_NOT_FOUND:    BucketNotFoundError,
+    C.LCB_ERR_QUERY: QueryException,
+    C.LCB_ERR_QUERY_INDEX: QueryException,
+    #C.LCB_EBADHANDLE:       BadHandleError,
+    C.LCB_ERR_INVALID_HOST_FORMAT: InvalidError,
+    C.LCB_ERR_INVALID_CHAR:     InvalidError,
+    C.LCB_ERR_INVALID_ARGUMENT:           InvalidError,
+    C.LCB_ERR_DURABILITY_TOO_MANY: ArgumentError,
+    C.LCB_ERR_DUPLICATE_COMMANDS: ArgumentError,
+    C.LCB_ERR_NO_CONFIGURATION:  ClientTemporaryFailError,
+    C.LCB_ERR_HTTP:       HTTPError,
+    C.LCB_ERR_SUBDOC_PATH_NOT_FOUND: SubdocPathNotFoundError,
+    C.LCB_ERR_SUBDOC_PATH_EXISTS: SubdocPathExistsError,
+    C.LCB_ERR_SUBDOC_PATH_INVALID: SubdocPathInvalidError,
+    C.LCB_ERR_SUBDOC_DOCUMENT_TOO_DEEP: DocumentTooDeepError,
+    C.LCB_ERR_SUBDOC_DOCUMENT_NOT_JSON: DocumentNotJsonError,
+    C.LCB_ERR_SUBDOC_VALUE_TOO_DEEP: SubdocValueTooDeepError,
+    C.LCB_ERR_SUBDOC_PATH_MISMATCH: SubdocPathMismatchError,
+    C.LCB_ERR_SUBDOC_CANNOT_INSERT_VALUE: SubdocCantInsertValueError,
+    C.LCB_ERR_SUBDOC_DELTA_RANGE: SubdocBadDeltaError,
+    C.LCB_ERR_SUBDOC_NUMBER_TOO_BIG: SubdocNumberTooBigError,
+    C.LCB_ERR_SUBDOC_GENERIC: SubdocGenericError
 }.items()) + list(_PYCBC_CRYPTO_ERR_MAP.items()) + list(_LCB_SYNCREP_MAP.items()))
 
 

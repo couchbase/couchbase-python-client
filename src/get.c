@@ -155,7 +155,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
             }
         } break;
         default:
-            err = LCB_ERROR;
+            err = LCB_ERR_GENERIC;
             abort();
             break;
     }

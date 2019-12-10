@@ -29,7 +29,7 @@ CryptoProvider_dtor(pycbc_CryptoProvider *self);
 lcb_STATUS pycbc_cstrndup(char **key, size_t *key_len, PyObject *result)
 {
     const char *data = NULL;
-    lcb_STATUS lcb_result = LCB_EINTERNAL;
+    lcb_STATUS lcb_result = LCB_ERR_SDK_INTERNAL;
 
     data = PYCBC_CSTRN(result, key_len);;
     if (data) {
@@ -58,16 +58,16 @@ const char *pycbc_cstrdup_or_default_and_exception(
 
     if (!buffer_data) {
         PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR,
-                       LCB_GENERIC_TMPERR,
+                       LCB_ERR_TEMPORARY_FAILURE,
                        "CryptoProviderMissingPublicKeyException")
     }
     return buffer_data ? buffer_data : fallback;
 }
 
 lcb_STATUS pycbc_is_true(uint8_t *key, const size_t key_len, PyObject *result) {
-    return (result && PyObject_IsTrue(result) && !PyErr_Occurred())?
-           LCB_SUCCESS:
-           LCB_EINTERNAL;
+    return (result && PyObject_IsTrue(result) && !PyErr_Occurred())
+                   ? LCB_SUCCESS
+                   : LCB_ERR_SDK_INTERNAL;
 }
 
 #define PYCBC_SIZE(X) (sizeof(X)/sizeof(char))
@@ -89,7 +89,9 @@ static PyObject* pycbc_retrieve_method(lcbcrypto_PROVIDER* provider, const char*
                                                         method_name)
                                : NULL;
     if (!method || !PyObject_IsTrue(method)) {
-        pycbc_report_method_exception(LCB_GENERIC_TMPERR, "Method %s does not exist", method_name);
+        pycbc_report_method_exception(LCB_ERR_TEMPORARY_FAILURE,
+                                      "Method %s does not exist",
+                                      method_name);
         return NULL;
     }
     PYCBC_DEBUG_LOG("Got method pointer %p for %s", method, method_name);
@@ -110,8 +112,8 @@ PyObject* pycbc_python_proxy(PyObject *method, PyObject *args, const char* metho
     PYCBC_DEBUG_PYFORMAT("Called %R with %R, got %p", method, args, result);
     PYCBC_DEBUG_PYFORMAT("%p is %S", result, pycbc_none_or_value(result));
     if (!result || PyErr_Occurred()) {
-        pycbc_report_method_exception(LCB_EINTERNAL, "Problem calling method %s",
-                                      method_name);
+        pycbc_report_method_exception(
+                LCB_ERR_SDK_INTERNAL, "Problem calling method %s", method_name);
         result =NULL;
     };
 
@@ -242,7 +244,7 @@ pycbc_crypto_buf pycbc_gen_buf(const uint8_t *data, size_t len)
 
 typedef const char *PYCBC_CSTR_T;
 PYCBC_CSTR_T PYCBC_CSTR_T_ERRVALUE = "[VALUE NOT FOUND]";
-lcb_STATUS lcb_STATUS_ERRVALUE = LCB_GENERIC_TMPERR;
+lcb_STATUS lcb_STATUS_ERRVALUE = LCB_ERR_TEMPORARY_FAILURE;
 
 #define PYCBC_CSTRDUP_WRAPPER(DUMMY, DUMMY2, OBJECT) \
     pycbc_cstrdup_or_default_and_exception(          \
@@ -822,7 +824,7 @@ void pycbc_release_bytes(lcbcrypto_PROVIDER *provider, void *bytes)
         Py_DecRef(method);                                                  \
     } else if (!self->lcb_provider->v.PYCBC_CRYPTO_VVERSION.METHOD) {       \
         pycbc_report_method_exception(                                      \
-                LCB_EINVAL, "Missing method %s", #METHOD);                  \
+                LCB_ERR_INVALID_ARGUMENT, "Missing method %s", #METHOD);    \
     }
 
 void pycbc_named_crypto_provider_destructor(lcbcrypto_PROVIDER *provider)

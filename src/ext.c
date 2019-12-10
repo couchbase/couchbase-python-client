@@ -2493,7 +2493,7 @@ void pycbc_propagate_tag_ull(const lcbtrace_SPAN *span,
                              lcbtrace_SPAN *dest,
                              const char *tagname)
 {
-    lcb_STATUS result = LCB_NOT_STORED;
+    lcb_STATUS result = LCB_ERR_NOT_STORED;
     pycbc_get_uint64_tag(dest, tagname, &result);
     if (result != LCB_SUCCESS) {
         lcb_uint64_t value = pycbc_get_uint64_tag(span, tagname, &result);
@@ -3126,7 +3126,7 @@ PYCBC_X_VERBS(PYCBC_CMD_PROXY, COLLECTION, NOCOLLECTION, IMPL);
 
 lcb_STATUS pycbc_report_err(int res, const char *generic_errmsg, const char* FILE, int LINE)
 {
-    if (res == LCB_NOT_SUPPORTED) {
+    if (res == LCB_ERR_UNSUPPORTED_OPERATION) {
 #define PYCBC_REPORT_BUF_LEN 500
         char ERRBUF[PYCBC_REPORT_BUF_LEN] = {0};
         snprintf(ERRBUF,
@@ -3139,9 +3139,13 @@ lcb_STATUS pycbc_report_err(int res, const char *generic_errmsg, const char* FIL
         PYCBC_EXC_WRAP_EX_FILE_LINE(PYCBC_EXC_LCBERR, res, ERRBUF, NULL, NULL, NULL, FILE, LINE)
     } else {
         PYCBC_EXC_WRAP_EX_FILE_LINE(PYCBC_EXC_LCBERR,
-                       res ? res : LCB_GENERIC_TMPERR,
-                       generic_errmsg,NULL, NULL,NULL,
-                       FILE, LINE);
+                                    res ? res : LCB_ERR_TEMPORARY_FAILURE,
+                                    generic_errmsg,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    FILE,
+                                    LINE);
     }
 #undef PYCBC_REPORT_BUF_LEN
     return res;

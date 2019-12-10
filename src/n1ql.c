@@ -243,7 +243,7 @@ lcb_STATUS pycbc_handle_analytics(const pycbc_Bucket *self,
         CMDSCOPE_NG(ANALYTICS, analytics)
         {
             lcb_cmdanalytics_callback(cmd, analytics_row_callback);
-            lcb_cmdanalytics_query(cmd, params, nparams);
+            lcb_cmdanalytics_payload(cmd, params, nparams);
             lcb_cmdanalytics_handle(cmd, &(vres->base.u.analytics));
             if (host) {
                 pycbc_cmdanalytics_host(cmd, host);
@@ -273,7 +273,7 @@ pycbc_handle_n1ql(const pycbc_Bucket *self, const char *params, unsigned int npa
         CMDSCOPE_NG(N1QL, n1ql)
         {
             lcb_cmdn1ql_callback(cmd, n1ql_row_callback);
-            lcb_cmdn1ql_query(cmd, params, nparams);
+            lcb_cmdn1ql_payload(cmd, params, nparams);
             lcb_cmdn1ql_handle(cmd, &(vres->base.u.n1ql));
             if (is_prepared) {
                 lcb_cmdn1ql_adhoc(cmd, 1);
