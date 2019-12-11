@@ -1,6 +1,7 @@
 from typing import *
 
 from couchbase.management.queries import QueryIndexManager
+from couchbase_core.exceptions import CouchbaseError
 from .management.users import UserManager
 from .management.buckets import BucketManager
 from couchbase.management.admin import Admin
@@ -18,6 +19,8 @@ import multiprocessing
 from multiprocessing.pool import ThreadPool
 import couchbase.exceptions
 import couchbase_core._libcouchbase as _LCB
+from couchbase_core._pyport import raise_from
+
 
 T = TypeVar('T')
 
@@ -183,13 +186,17 @@ class Cluster(object):
         """
         return QueryResult(self._operate_on_cluster(CoreClient.query, QueryException, statement, **(forward_args(kwargs, *options))))
 
-    def _operate_on_cluster(self, verb, failtype, *args, **kwargs):
+    def _operate_on_cluster(self,
+                            verb,
+                            failtype,  # type: Type[CouchbaseError]
+                            *args,
+                            **kwargs):
         if not self._clusterclient:
             self._clusterclient = CoreClient(str(self.connstr), _conntype=_LCB.LCB_TYPE_CLUSTER, **self._clusteropts)
         try:
             return verb(self._clusterclient, *args, **kwargs)
         except Exception as e:
-            raise failtype(str(e))
+            raise_from(failtype(params=CouchbaseError.ParamType(message="Cluster operation failed", inner_cause=e)), e)
 
     def analytics_query(self,  # type: Cluster
                         statement,  # type: str,

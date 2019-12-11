@@ -67,3 +67,5 @@ try:
     from typing_extensions import *
 except:
     pass
+
+from six import raise_from

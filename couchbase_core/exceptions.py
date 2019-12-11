@@ -25,6 +25,10 @@ from typing import *
 import inspect
 import re
 from boltons.funcutils import wraps
+try:
+    from typing import TypedDict
+except:
+    from typing_extensions import TypedDict
 
 
 class CouchbaseError(Exception):
@@ -119,7 +123,21 @@ class CouchbaseError(Exception):
         """
         return issubclass(cls.rc_to_exctype(rc), cls)
 
-    def __init__(self, params=None):
+    ParamType = TypedDict('ParamType',
+                          {'rc': int,
+                           'all_results': Mapping,
+                           'result': Any,
+                           'inner_cause': Exception,
+                           'csrc_info': Any,
+                           'key': str,
+                           'objextra': Any,
+                           'message': str,
+                           'context': Any,
+                           'ref': Any})
+
+    def __init__(self,  # type: CouchbaseError
+                 params=None  # type: CouchbaseError.ParamType
+                 ):
         if isinstance(params, str):
             params = {'message': params}
         elif isinstance(params, CouchbaseError):
