@@ -34,8 +34,7 @@ class ConnectionTest(CouchbaseTestCase):
         cs = ConnectionString.parse(connargs['connection_string'])
         cs.hosts = [ 'example.com' ]
         connargs['connection_string'] = cs.encode()
-        self.assertRaises((CouchbaseNetworkError, TimeoutError),
-            self.factory, **connargs)
+        self.assertRaises(TimeoutError, self.factory, **connargs)
 
         cs.hosts = [ self.cluster_info.host + ':' + str(34567)]
         self.assertRaises(TimeoutError, self.factory, **connargs)

@@ -4,6 +4,7 @@ from typing import *
 from .generic import GenericManager
 from couchbase_core import mk_formstr
 
+from couchbase_core.exceptions import NotSupportedWrapper
 
 class CollectionManager(GenericManager):
     def __init__(self,  # type: CollectionManager
@@ -32,6 +33,7 @@ class CollectionManager(GenericManager):
         colls = self.get_all_collections()
         return collection in colls
 
+    @NotSupportedWrapper.a_404_means_not_supported
     def get_all_collections(self):
         return self._admin_bucket.http_request("/pools/default/buckets/{}/collections".format(self.bucket_name), "GET")
 

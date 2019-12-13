@@ -26,11 +26,12 @@ from testfixtures import LogCapture
 
 from testresources import ResourcedTestCase as ResourcedTestCaseReal, TestResourceManager
 
-from couchbase.exceptions import HTTPError
+from couchbase.exceptions import HTTPError, NotSupportedError
 import couchbase_core
 from couchbase import Cluster, ClusterOptions, CBCollection
 from couchbase_core.cluster import ClassicAuthenticator
 from couchbase_core.connstr import ConnectionString
+import couchbase_core._libcouchbase as _LCB
 
 try:
     import unittest2 as unittest
@@ -788,6 +789,14 @@ class ClusterTestCase(CouchbaseTestCase):
 ParamClusterTestCase = parameterized_class(('cluster_factory',), [(Cluster,), (Cluster.connect,)])(ClusterTestCase)
 
 
+def skip_if_no_collections(func):
+  @wraps(func)
+  def wrap(self, *args, **kwargs):
+    if not self.supports_collections():
+      raise SkipTest('groups not supported (server < 6.5?)')
+    func(self, *args, **kwargs)
+  return wrap
+
 class CollectionTestCase(ClusterTestCase):
     coll = None  # type: CBCollection
     initialised = defaultdict(lambda: {})
@@ -795,14 +804,26 @@ class CollectionTestCase(ClusterTestCase):
     def __init__(self, *args, **kwargs):
         super(CollectionTestCase, self).__init__(*args, **kwargs)
 
-    def setUp(self, mock_collections=None, real_collections=None):
-        mock_collections = mock_collections or {None: {None: "coll"}}
+    def supports_collections(self):
+      cm = self.bucket.collections()
+      try:
+        cm.get_all_collections()
+        return True
+      except NotSupportedError:
+          return False
+
+    def setUp(self, default_collections=None, real_collections=None):
+        default_collections = default_collections or {None: {None: "coll"}}
         real_collections = real_collections or {"bedrock": {"flintstones": 'coll'}}
         # prepare:
         # 1) Connect to a Cluster
         super(CollectionTestCase, self).setUp()
+
         cm = self.bucket.collections()
-        my_collections = mock_collections if self.is_mock else real_collections
+
+        # check for collection support.  Return use default_collection otherwise
+        my_collections = real_collections if self.supports_collections() else default_collections
+
         for scope_name, collections in my_collections.items():
             CollectionTestCase._upsert_scope(cm, scope_name)
             scope = self.bucket.scope(scope_name) if scope_name else self.bucket

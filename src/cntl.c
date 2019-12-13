@@ -38,7 +38,7 @@
 #define CNTL_RANDOMIZE_BOOTSTRAP_HOSTS 0x14
 #define CNTL_CONFIG_CACHE_LOADED 0x15
 #define CNTL_MAX_REDIRECTS 0x17
-
+#define CNTL_ENABLE_COLLECTIONS 0x4a
 
 struct vbinfo_st {
     int version;
@@ -288,7 +288,8 @@ handle_old_ctl(pycbc_Bucket *self, int cmd, PyObject *val)
     /** Boolean values */
     case CNTL_SKIP_CONFIGURATION_ERRORS_ON_CONNECT:
     case CNTL_RANDOMIZE_BOOTSTRAP_HOSTS:
-    case CNTL_CONFIG_CACHE_LOADED: {
+    case CNTL_CONFIG_CACHE_LOADED:
+    case CNTL_ENABLE_COLLECTIONS: {
         ret = handle_boolean(self->instance, cmd, mode, val, &err);
         break;
     }
