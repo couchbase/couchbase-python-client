@@ -273,7 +273,7 @@ if (LCB_SRC)
 
     if (PATCH_REPO)
         set (PATCH_TYPE ${build_cfg.apis.${PYCBC_LCB_API}.patches.git.type})
-        if (NOT PATCH_TYPE})
+        if (NOT PATCH_TYPE)
             set (PATCH_TYPE cherry-pick)
         endif()
         set (PATCH_COMMAND git config user.email \"buildbot@couchbase.com\"
