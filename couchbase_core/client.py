@@ -986,7 +986,7 @@ class Client(_Base):
             If not specified, the operation will fail if the CAS value
             on the server does not match the one specified in the
             `Item`'s `cas` field.
-        :param int ttl: If specified, sets the expiration value
+        :param int ttl: If specified, sets the expiry value
             for all keys
         :param int format: If specified, this is the conversion format
             which will be used for _all_ the keys.
@@ -1048,7 +1048,7 @@ class Client(_Base):
         Replace multiple keys. Multi variant of :meth:`replace`
 
         :param dict keys: replacement entries
-        :param int ttl: If specified, sets the expiration value
+        :param int ttl: If specified, sets the expiry value
             for all keys
         :param int format: If specified, this is the conversion format
             which will be used for _all_ the keys.
@@ -1124,7 +1124,7 @@ class Client(_Base):
 
         :param keys: keys the keys to fetch
         :type keys: :ref:`iterable<argtypes>`
-        :param int ttl: Set the expiration for all keys when retrieving
+        :param int ttl: Set the expiry for all keys when retrieving
         :param boolean replica:
             Whether the results should be obtained from a replica
             instead of the master. See :meth:`get` for more information
@@ -1152,7 +1152,7 @@ class Client(_Base):
             integers, in which case the value for each key will be used
             as the TTL instead of the global one (i.e. the one passed to
             this function)
-        :param int ttl: The new expiration time
+        :param int ttl: The new expiry time
         :param Durability durability_level: Sync replication durability level.
 
         :return: A :class:`~.MultiResult` object
@@ -1161,7 +1161,7 @@ class Client(_Base):
 
             cb.touch_multi(("key1", "key2", "key3"), ttl=10)
 
-        Update three keys with different expiration times ::
+        Update three keys with different expiry times ::
 
             cb.touch_multi({"foo" : 1, "bar" : 5, "baz" : 10})
 

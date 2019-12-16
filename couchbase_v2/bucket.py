@@ -332,7 +332,7 @@ class Bucket(CoreClient):
         :param string key: The key to fetch. The type of key is the same
             as mentioned in :meth:`upsert`
 
-        :param int ttl: If specified, indicates that the key's expiration
+        :param int ttl: If specified, indicates that the key's expiry
             time should be *modified* when retrieving the value.
 
         :param boolean quiet: causes `get` to return None instead of
@@ -387,7 +387,7 @@ class Bucket(CoreClient):
             rv = cb.get("key")
             value, flags, cas = rv.value, rv.flags, rv.cas
 
-        Update the expiration time::
+        Update the expiry time::
 
             rv = cb.get("key", ttl=10)
             # Expires in ten seconds
@@ -399,16 +399,16 @@ class Bucket(CoreClient):
                          replica=replica, no_format=no_format)
 
     def touch(self, key, ttl=0):
-        """Update a key's expiration time
+        """Update a key's expiry time
 
-        :param string key: The key whose expiration time should be
+        :param string key: The key whose expiry time should be
             modified
-        :param int ttl: The new expiration time. If the expiration time
+        :param int ttl: The new expiry time. If the expiry time
             is `0` then the key never expires (and any existing
-            expiration is removed)
+            expiry is removed)
         :return: :class:`.OperationResult`
 
-        Update the expiration time of a key ::
+        Update the expiry time of a key ::
 
             cb.upsert("key", ttl=100)
             # expires in 100 seconds
@@ -418,7 +418,7 @@ class Bucket(CoreClient):
         :raise: The same things that :meth:`get` does
 
         .. seealso:: :meth:`get` - which can be used to get *and* update the
-            expiration, :meth:`touch_multi`
+            expiry, :meth:`touch_multi`
         """
         return _Base.touch(self, key, ttl=ttl)
 

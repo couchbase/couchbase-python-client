@@ -162,7 +162,7 @@ class DefaultForwarder(Forwarder):
                 'replicate_to': {"replicate_to": int},
                 'persist_to': {"persist_to": int},
                 'timeout': {'ttl': Duration.__float__},
-                'expiration': {'ttl': int}, 'self': {}, 'options': {}}
+                'expiry': {'ttl': int}, 'self': {}, 'options': {}}
 
 
 class TimeoutForwarder(Forwarder):
@@ -171,7 +171,7 @@ class TimeoutForwarder(Forwarder):
                 'replicate_to': {"replicate_to": int},
                 'persist_to': {"persist_to": int},
                 'timeout': {'timeout': Duration.__float__},
-                'expiration': {'ttl': int}, 'self': {}, 'options': {}}
+                'expiry': {'ttl': int}, 'self': {}, 'options': {}}
 
 
 forward_args = DefaultForwarder().forward_args

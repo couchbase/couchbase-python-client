@@ -273,7 +273,7 @@ class CBCollection(CoreClient):
     def get(self,
             key,  # type:str
             project=None,  # type: Iterable[str]
-            expiration=None,  # type: Seconds
+            expiry=None,  # type: Seconds
             quiet=None,  # type: bool
             replica=False,  # type: bool
             no_format=False  # type: bool
@@ -294,7 +294,7 @@ class CBCollection(CoreClient):
         :param string key: The key to fetch. The type of key is the same
             as mentioned in :meth:`upsert`
 
-        :param couchbase.options.Seconds expiration: If specified, indicates that the key's expiration
+        :param couchbase.options.Seconds expiry: If specified, indicates that the key's expiry
             time should be *modified* when retrieving the value.
 
         :param boolean quiet: causes `get` to return None instead of
@@ -344,9 +344,9 @@ class CBCollection(CoreClient):
             rv = cb.get("key")
             value, cas = rv.content, rv.cas
 
-        Update the expiration time::
+        Update the expiry time::
 
-            rv = cb.get("key", expiration=Seconds(10))
+            rv = cb.get("key", expiry=Seconds(10))
             # Expires in ten seconds
 
         """
@@ -355,7 +355,7 @@ class CBCollection(CoreClient):
     @overload
     def get_and_touch(self,
                       id,  # type: str
-                      expiration,  # type: int
+                      expiry,  # type: int
                       *options  # type: GetAndTouchOptions
                       ):
         # type: (...) -> GetResult
@@ -364,7 +364,7 @@ class CBCollection(CoreClient):
     @get_result_wrapper
     def get_and_touch(self,
                       id,  # type: str
-                      expiration,  # type: int
+                      expiry,  # type: int
                       *options,  # type: GetAndTouchOptions
                       **kwargs  # type: Any
                       ):
@@ -378,13 +378,13 @@ class CBCollection(CoreClient):
     @get_result_wrapper
     def get_and_lock(self,
                      id,  # type: str
-                     expiration,  # type: int
+                     expiry,  # type: int
                      *options,  # type: GetAndLockOptions
                      **kwargs
                      ):
         # type: (...) -> GetResult
         final_options=forward_args(kwargs, *options)
-        x = _Base.get(self, id, expiration, **final_options)
+        x = _Base.get(self, id, expiry, **final_options)
         _Base.lock(self, id, options)
         return ResultPrecursor(x, options)
 
@@ -446,7 +446,7 @@ class CBCollection(CoreClient):
             If not specified, the operation will fail if the CAS value
             on the server does not match the one specified in the
             `Item`'s `cas` field.
-        :param int ttl: If specified, sets the expiration value
+        :param int ttl: If specified, sets the expiry value
             for all keys
         :param int format: If specified, this is the conversion format
             which will be used for _all_ the keys.
@@ -522,28 +522,28 @@ class CBCollection(CoreClient):
               *options,  # type: TouchOptions
               **kwargs):
         # type: (...) -> MutationResult
-        """Update a key's expiration time
+        """Update a key's expiry time
 
-        :param string key: The key whose expiration time should be
+        :param string key: The key whose expiry time should be
             modified
-        :param int timeout: The new expiration time. If the expiration time
+        :param int timeout: The new expiry time. If the expiry time
             is `0` then the key never expires (and any existing
-            expiration is removed)
+            expiry is removed)
         :param Durability durability_level: Sync replication durability level.
 
         :return: :class:`.OperationResult`
 
-        Update the expiration time of a key ::
+        Update the expiry time of a key ::
 
-            cb.upsert("key", expiration=Seconds(100))
+            cb.upsert("key", expiry=Seconds(100))
             # expires in 100 seconds
-            cb.touch("key", expiration=Seconds(0))
+            cb.touch("key", expiry=Seconds(0))
             # key should never expire now
 
         :raise: The same things that :meth:`get` does
 
         .. seealso:: :meth:`get` - which can be used to get *and* update the
-            expiration
+            expiry
         """
         return _Base.touch(self, id, **forward_args(kwargs, *options))
 
@@ -675,7 +675,7 @@ class CBCollection(CoreClient):
                id,  # type: str
                value,  # type: Any
                cas=0,  # type: int
-               expiration=Seconds(0),  # type: Seconds
+               expiry=Seconds(0),  # type: Seconds
                format=None,
                persist_to=PersistTo.NONE,  # type: PersistTo.Value
                replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
@@ -715,7 +715,7 @@ class CBCollection(CoreClient):
             will only be stored if it already exists with the supplied
             CAS
 
-        :param expiration: If specified, the key will expire after this
+        :param expiry: If specified, the key will expire after this
             many seconds
 
         :param int format: If specified, indicates the `format` to use
@@ -787,7 +787,7 @@ class CBCollection(CoreClient):
     def insert(self,
                id,  # type: str
                value,  # type: Any
-               expiration=Seconds(0),  # type: Seconds
+               expiry=Seconds(0),  # type: Seconds
                format=None,  # type: str
                persist_to=PersistTo.NONE,  # type: PersistTo.Value
                replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
@@ -821,7 +821,7 @@ class CBCollection(CoreClient):
                 id,  # type: str
                 value,  # type: Any
                 cas=0,  # type: int
-                expiration=None,  # type: Seconds
+                expiry=None,  # type: Seconds
                 format=None,  # type: bool
                 persist_to=PersistTo.NONE,  # type: PersistTo.Value
                 replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
@@ -1123,7 +1123,7 @@ class CBCollection(CoreClient):
                   id,  # type: str
                   delta,  # type: DeltaValue
                   initial=None,  # type: SignedInt64
-                  expiration=Seconds(0),  # type: Seconds
+                  expiry=Seconds(0),  # type: Seconds
                   durability_level=Durability.NONE  # type: Durability
                   ):
         # type: (...) -> ResultPrecursor
@@ -1165,7 +1165,7 @@ class CBCollection(CoreClient):
            `delta` is ignored. If this parameter is `None` then no
            initial value is used
         :param SignedInt64 initial: :class:`couchbase.options.SignedInt64` or `None`
-        :param Seconds expiration: The lifetime for the key, after which it will
+        :param Seconds expiry: The lifetime for the key, after which it will
            expire
         :param Durability durability_level: Sync replication durability level.
 
@@ -1200,7 +1200,7 @@ class CBCollection(CoreClient):
                   id,  # type: str
                   delta,  # type: DeltaValue
                   initial=None,  # type: SignedInt64
-                  expiration=Seconds(0),  # type: Seconds
+                  expiry=Seconds(0),  # type: Seconds
                   durability_level=Durability.NONE  # type: Durability
                   ):
         # type: (...) -> ResultPrecursor
@@ -1242,7 +1242,7 @@ class CBCollection(CoreClient):
            `delta` is ignored. If this parameter is `None` then no
            initial value is used
         :param SignedInt64 initial: :class:`couchbase.options.SignedInt64` or `None`
-        :param Seconds expiration: The lifetime for the key, after which it will
+        :param Seconds expiry: The lifetime for the key, after which it will
            expire
         :param Durability durability_level: Sync replication durability level.
 
