@@ -45,7 +45,7 @@ class TouchTest(ConnectionTestCase):
         self.assertFalse(rv.success)
         self.assertTrue(E.NotFoundError._can_derive(rv.rc))
 
-    @flaky(5,2)
+    @flaky(20,1)
     def test_trivial_multi_touch(self):
         kv = self.gen_kv_dict(prefix="trivial_multi_touch")
         self.cb.upsert_multi(kv, ttl=1)
