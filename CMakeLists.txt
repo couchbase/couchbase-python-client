@@ -272,12 +272,16 @@ if (LCB_SRC)
     endif()
 
     if (PATCH_REPO)
+        set (PATCH_TYPE ${build_cfg.apis.${PYCBC_LCB_API}.patches.git.type})
+        if (NOT PATCH_TYPE})
+            set (PATCH_TYPE cherry-pick)
+        endif()
         set (PATCH_COMMAND git config user.email \"buildbot@couchbase.com\"
                 && git config user.name \"Couchbase Buildbot\"
                 && git fetch ${PATCH_REPO} ${PATCH_REF}
                 && git reset --hard
                 && git clean -f
-                && git cherry-pick FETCH_HEAD)
+                && git ${PATCH_TYPE} FETCH_HEAD)
     else()
         set (PATCH_COMMAND echo "no patch required")
     endif()
