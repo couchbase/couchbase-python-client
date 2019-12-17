@@ -20,7 +20,7 @@ class MalformedGitTag(Exception):
     pass
 
 
-RE_XYZ = re.compile(r'(\d+)\.(\d+)\.(\d)(?:-(.*))?')
+RE_XYZ = re.compile(r'(\d+)\.(\d+)\.(\d+)(?:-(.*))?')
 
 VERSION_FILE = os.path.join(
     os.path.dirname(__file__),
