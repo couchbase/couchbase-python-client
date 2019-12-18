@@ -22,52 +22,52 @@
  * Very simple file that simply adds LCB constants to the module
  */
 
-#define XERR(X)                       \
-    X(SUCCESS)                        \
-    X(ERR_AUTH_CONTINUE)              \
-    X(ERR_AUTHENTICATION)             \
-    X(ERR_INVALID_DELTA)              \
-    X(ERR_VALUE_TOO_LARGE)            \
-    X(ERR_BUSY)                       \
-    X(ERR_SERVER_OUT_OF_MEMORY)       \
-    X(ERR_INVALID_RANGE)              \
-    X(ERR_GENERIC)                    \
-    X(ERR_TEMPORARY_FAILURE)          \
-    X(ERR_INVALID_ARGUMENT)           \
-    X(ERR_NO_CONFIGURATION)           \
-    X(ERR_DOCUMENT_EXISTS)            \
-    X(ERR_DOCUMENT_NOT_FOUND)         \
-    X(ERR_DLOPEN_FAILED)              \
-    X(ERR_DLSYM_FAILED)               \
-    X(ERR_NETWORK)                    \
-    X(ERR_NOT_MY_VBUCKET)             \
-    X(ERR_NOT_STORED)                 \
-    X(ERR_UNSUPPORTED_OPERATION)      \
-    X(ERR_UNKNOWN_HOST)               \
-    X(ERR_PROTOCOL_ERROR)             \
-    X(ERR_TIMEOUT)                    \
-    X(ERR_BUCKET_NOT_FOUND)           \
-    X(ERR_CONNECT_ERROR)              \
-    X(ERR_PLUGIN_VERSION_MISMATCH)    \
-    X(ERR_INVALID_HOST_FORMAT)        \
-    X(ERR_INVALID_CHAR)               \
-    X(ERR_DURABILITY_TOO_MANY)        \
-    X(ERR_DUPLICATE_COMMANDS)         \
-    X(ERR_HTTP)                       \
-    X(ERR_SUBDOC_PATH_NOT_FOUND)      \
-    X(ERR_SUBDOC_PATH_MISMATCH)       \
-    X(ERR_SUBDOC_PATH_INVALID)        \
-    X(ERR_SUBDOC_DOCUMENT_TOO_DEEP)   \
-    X(ERR_SUBDOC_VALUE_TOO_DEEP)      \
-    X(ERR_SUBDOC_CANNOT_INSERT_VALUE) \
-    X(ERR_SUBDOC_DOCUMENT_NOT_JSON)   \
-    X(ERR_SUBDOC_NUMBER_TOO_BIG)      \
-    X(ERR_SUBDOC_DELTA_RANGE)         \
-    X(ERR_SUBDOC_PATH_EXISTS)         \
-    X(ERR_SUBDOC_GENERIC)             \
-    X(ERR_SUBDOC_PATH_INVALID)        \
-    X(ERR_QUERY)                      \
-    X(ERR_QUERY_INDEX)
+#define XERR(X)                     \
+    X(SUCCESS)                      \
+    X(ERR_AUTH_CONTINUE)            \
+    X(ERR_AUTHENTICATION_FAILURE)   \
+    X(ERR_INVALID_DELTA)            \
+    X(ERR_VALUE_TOO_LARGE)          \
+    X(ERR_BUSY)                     \
+    X(ERR_NO_MEMORY)                \
+    X(ERR_INVALID_RANGE)            \
+    X(ERR_GENERIC)                  \
+    X(ERR_TEMPORARY_FAILURE)        \
+    X(ERR_INVALID_ARGUMENT)         \
+    X(ERR_NO_CONFIGURATION)         \
+    X(ERR_DOCUMENT_EXISTS)          \
+    X(ERR_DOCUMENT_NOT_FOUND)       \
+    X(ERR_DLOPEN_FAILED)            \
+    X(ERR_DLSYM_FAILED)             \
+    X(ERR_NETWORK)                  \
+    X(ERR_NOT_MY_VBUCKET)           \
+    X(ERR_NOT_STORED)               \
+    X(ERR_UNSUPPORTED_OPERATION)    \
+    X(ERR_UNKNOWN_HOST)             \
+    X(ERR_PROTOCOL_ERROR)           \
+    X(ERR_TIMEOUT)                  \
+    X(ERR_BUCKET_NOT_FOUND)         \
+    X(ERR_CONNECT_ERROR)            \
+    X(ERR_PLUGIN_VERSION_MISMATCH)  \
+    X(ERR_INVALID_HOST_FORMAT)      \
+    X(ERR_INVALID_CHAR)             \
+    X(ERR_DURABILITY_TOO_MANY)      \
+    X(ERR_DUPLICATE_COMMANDS)       \
+    X(ERR_HTTP)                     \
+    X(ERR_SUBDOC_PATH_NOT_FOUND)    \
+    X(ERR_SUBDOC_PATH_MISMATCH)     \
+    X(ERR_SUBDOC_PATH_INVALID)      \
+    X(ERR_SUBDOC_PATH_TOO_DEEP)     \
+    X(ERR_SUBDOC_VALUE_TOO_DEEP)    \
+    X(ERR_SUBDOC_VALUE_INVALID)     \
+    X(ERR_SUBDOC_DOCUMENT_NOT_JSON) \
+    X(ERR_SUBDOC_NUMBER_TOO_BIG)    \
+    X(ERR_SUBDOC_DELTA_INVALID)     \
+    X(ERR_SUBDOC_PATH_EXISTS)       \
+    X(ERR_SUBDOC_GENERIC)           \
+    X(ERR_SUBDOC_PATH_INVALID)      \
+    X(ERR_QUERY)                    \
+    X(ERR_INDEX_NOT_FOUND)
 
 #define XHTTP(X) \
     X(HTTP_METHOD_GET) \
@@ -113,7 +113,18 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
         Py_DecRef(py_longlong);                                        \
     }
     #define X(b) ADD_MACRO(LCB_##b);
+#ifdef PYCBC_AUTOGEN_ERR
+    // generate errors on the fly from header
+    // ERR_MAPPING can be redefined for non-standard mappings
+    // not sure if this is desirable as not yet checked against Python codebase
+    // perhaps can be checked with a linter?
+#define ERR_MAPPING(X) #X
+    ADD_CONSTANT(ERR_MAPPING(cname), code);
+    #define CODE_TO_CONSTANT(cname, code, cat, flags, desc) \
+    LCB_XERROR(CODE_TO_CONSTANT)
+#else
     XERR(X);
+#endif
     XHTTP(X);
 #undef X
     XSTORAGE(LCB_STORE_WRAPPER)

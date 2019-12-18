@@ -221,15 +221,15 @@ _LCB_SYNCREP_MAP = {
 }
 
 V3Mapping=dict(list({
-           C.LCB_ERR_AUTHENTICATION:       AuthenticationException,
+           C.LCB_ERR_AUTHENTICATION_FAILURE:       AuthenticationException,
            C.LCB_ERR_INVALID_DELTA: couchbase_core.exceptions.DeltaBadvalError,
            C.LCB_ERR_VALUE_TOO_LARGE:            ValueTooBigException,
            C.LCB_ERR_TEMPORARY_FAILURE: couchbase_core.exceptions.BusyError,
-           C.LCB_ERR_SERVER_OUT_OF_MEMORY: couchbase_core.exceptions.NoMemoryError,
+           C.LCB_ERR_NO_MEMORY: couchbase_core.exceptions.NoMemoryError,
            C.LCB_ERR_TEMPORARY_FAILURE:         TempFailException,
            C.LCB_ERR_DOCUMENT_EXISTS:      KeyExistsException,
            C.LCB_ERR_DOCUMENT_NOT_FOUND:       KeyNotFoundException,
-           C.LCB_ERR_QUERY_INDEX: QueryException,
+           C.LCB_ERR_INDEX_NOT_FOUND: QueryException,
            C.LCB_ERR_DLOPEN_FAILED: couchbase_core.exceptions.DlopenFailedError,
            C.LCB_ERR_DLSYM_FAILED: couchbase_core.exceptions.DlsymFailedError,
            C.LCB_ERR_NETWORK:    couchbase_core.exceptions.NetworkError,
@@ -252,12 +252,12 @@ V3Mapping=dict(list({
            C.LCB_ERR_SUBDOC_PATH_NOT_FOUND: PathNotFoundException,
            C.LCB_ERR_SUBDOC_PATH_EXISTS: PathExistsException,
            C.LCB_ERR_SUBDOC_PATH_INVALID: couchbase_core.exceptions.SubdocPathInvalidError,
-           C.LCB_ERR_SUBDOC_DOCUMENT_TOO_DEEP: couchbase_core.exceptions.DocumentTooDeepError,
+           C.LCB_ERR_SUBDOC_PATH_TOO_DEEP: couchbase_core.exceptions.DocumentTooDeepError,
            C.LCB_ERR_SUBDOC_DOCUMENT_NOT_JSON: couchbase_core.exceptions.DocumentNotJsonError,
            C.LCB_ERR_SUBDOC_VALUE_TOO_DEEP: couchbase_core.exceptions.SubdocValueTooDeepError,
            C.LCB_ERR_SUBDOC_PATH_MISMATCH: couchbase_core.exceptions.SubdocPathMismatchError,
-           C.LCB_ERR_SUBDOC_CANNOT_INSERT_VALUE: couchbase_core.exceptions.SubdocCantInsertValueError,
-           C.LCB_ERR_SUBDOC_DELTA_RANGE: couchbase_core.exceptions.SubdocBadDeltaError,
+           C.LCB_ERR_SUBDOC_VALUE_INVALID: couchbase_core.exceptions.SubdocCantInsertValueError,
+           C.LCB_ERR_SUBDOC_DELTA_INVALID: couchbase_core.exceptions.SubdocBadDeltaError,
            C.LCB_ERR_SUBDOC_NUMBER_TOO_BIG: couchbase_core.exceptions.SubdocNumberTooBigError
 }.items()) + list(_PYCBC_CRYPTO_ERR_MAP.items()) + list(_LCB_SYNCREP_MAP.items()))
 

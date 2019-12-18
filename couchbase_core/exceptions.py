@@ -808,11 +808,11 @@ class SubdocGenericError(CouchbaseError):
 
 
 _LCB_ERRNO_MAP = dict(list({
-    C.LCB_ERR_AUTHENTICATION:       AuthError,
+    C.LCB_ERR_AUTHENTICATION_FAILURE:       AuthError,
     C.LCB_ERR_INVALID_DELTA:     DeltaBadvalError,
     C.LCB_ERR_VALUE_TOO_LARGE:            TooBigError,
     C.LCB_ERR_TEMPORARY_FAILURE:            BusyError,
-    C.LCB_ERR_SERVER_OUT_OF_MEMORY:           NoMemoryError,
+    C.LCB_ERR_NO_MEMORY:           NoMemoryError,
     C.LCB_ERR_TEMPORARY_FAILURE:         TemporaryFailError,
     C.LCB_ERR_DOCUMENT_EXISTS:      KeyExistsError,
     C.LCB_ERR_DOCUMENT_NOT_FOUND:       NotFoundError,
@@ -828,7 +828,7 @@ _LCB_ERRNO_MAP = dict(list({
     C.LCB_ERR_CONNECT_ERROR:    ConnectError,
     C.LCB_ERR_BUCKET_NOT_FOUND:    BucketNotFoundError,
     C.LCB_ERR_QUERY: QueryException,
-    C.LCB_ERR_QUERY_INDEX: QueryException,
+    C.LCB_ERR_INDEX_NOT_FOUND: QueryException,
     #C.LCB_EBADHANDLE:       BadHandleError,
     C.LCB_ERR_INVALID_HOST_FORMAT: InvalidError,
     C.LCB_ERR_INVALID_CHAR:     InvalidError,
@@ -840,12 +840,12 @@ _LCB_ERRNO_MAP = dict(list({
     C.LCB_ERR_SUBDOC_PATH_NOT_FOUND: SubdocPathNotFoundError,
     C.LCB_ERR_SUBDOC_PATH_EXISTS: SubdocPathExistsError,
     C.LCB_ERR_SUBDOC_PATH_INVALID: SubdocPathInvalidError,
-    C.LCB_ERR_SUBDOC_DOCUMENT_TOO_DEEP: DocumentTooDeepError,
+    C.LCB_ERR_SUBDOC_PATH_TOO_DEEP: DocumentTooDeepError,
     C.LCB_ERR_SUBDOC_DOCUMENT_NOT_JSON: DocumentNotJsonError,
     C.LCB_ERR_SUBDOC_VALUE_TOO_DEEP: SubdocValueTooDeepError,
     C.LCB_ERR_SUBDOC_PATH_MISMATCH: SubdocPathMismatchError,
-    C.LCB_ERR_SUBDOC_CANNOT_INSERT_VALUE: SubdocCantInsertValueError,
-    C.LCB_ERR_SUBDOC_DELTA_RANGE: SubdocBadDeltaError,
+    C.LCB_ERR_SUBDOC_VALUE_INVALID: SubdocCantInsertValueError,
+    C.LCB_ERR_SUBDOC_DELTA_INVALID: SubdocBadDeltaError,
     C.LCB_ERR_SUBDOC_NUMBER_TOO_BIG: SubdocNumberTooBigError,
     C.LCB_ERR_SUBDOC_GENERIC: SubdocGenericError
 }.items()) + list(_PYCBC_CRYPTO_ERR_MAP.items()) + list(_LCB_SYNCREP_MAP.items()))
