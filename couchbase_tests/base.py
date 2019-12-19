@@ -28,7 +28,7 @@ from testresources import ResourcedTestCase as ResourcedTestCaseReal, TestResour
 
 from couchbase.exceptions import HTTPError, NotSupportedError
 import couchbase_core
-from couchbase import Cluster, ClusterOptions, CBCollection
+from couchbase import Cluster, ClusterOptions, CBCollection, JSONDocument
 from couchbase_core.cluster import ClassicAuthenticator
 from couchbase_core.connstr import ConnectionString
 import couchbase_core._libcouchbase as _LCB
@@ -51,6 +51,7 @@ if os.environ.get("PYCBC_TRACE_GC") in ['FULL', 'STATS_LEAK_ONLY']:
     gc.set_debug(gc.DEBUG_STATS | gc.DEBUG_LEAK)
 
 from utilspie.collectionsutils import frozendict
+from pyrsistent import PRecord
 from couchbase.management.collections import ICollectionSpec
 from couchbase.bucket import Bucket as V3Bucket
 
@@ -87,7 +88,7 @@ def sanitize_json(input, ignored_parts):
             elif isinstance(ignored_parts,str) and ignored_parts == key:
                 continue
             result[key]=sanitize_json(value, sub_ignored_parts or {})
-        input = frozendict(result)
+        input = frozendict(**result)
     return input
 
 
@@ -108,6 +109,7 @@ class ResourcedTestCase(ResourcedTestCaseReal):
         self.maxDiff = None
 
     def assertSanitizedEqual(self, actual, expected, ignored={}):
+        from deepdiff import DeepDiff
         actual_json_sanitized = sanitize_json(actual, ignored)
         expected_json_sanitized = sanitize_json(expected, ignored)
         logging.warning(("\n"
@@ -115,7 +117,7 @@ class ResourcedTestCase(ResourcedTestCaseReal):
                        "{}\n"
                        "sanitized actual:{} and\n"
                        "sanitized expected:{}").format(actual, expected, actual_json_sanitized, expected_json_sanitized))
-        self.assertEqual(actual_json_sanitized, expected_json_sanitized)
+        self.assertEqual({},DeepDiff(expected_json_sanitized,actual_json_sanitized,ignore_order=True, significant_digits=5,ignore_numeric_type_changes=True,ignore_type_subclasses=True, ignore_string_type_changes=True))
 
     def assertLogs(self, *args, **kwargs):
         try:

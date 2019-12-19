@@ -27,3 +27,10 @@ class JSONDocument(Transcodable):
         result = cls()
         result.record = pyrsistent.freeze(input)
         return result
+
+    def __eq__(self,
+               other):
+        return type(other)==type(self) and other.record==self.record
+
+    def __hash__(self):
+        return hash(self.record)
