@@ -71,7 +71,17 @@ class InvalidRangeException(KeyValueException, couchbase_core.exceptions.RangeEr
 class KeyDeletedException(KeyValueException):
     pass
 
+class CollectionAlreadyExistsException(KeyValueException):
+  pass
 
+class CollectionNotFoundException(KeyValueException):
+  pass
+
+class ScopeAlreadyExistsException(KeyValueException):
+  pass
+
+class ScopeNotFoundException(KeyValueException):
+  pass
 
 class PartialViewResultException(ViewException):
     #? (returns rows that it did get)

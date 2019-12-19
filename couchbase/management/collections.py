@@ -4,7 +4,17 @@ from typing import *
 from .generic import GenericManager
 from couchbase_core import mk_formstr
 
-from couchbase_core.exceptions import NotSupportedWrapper
+from couchbase_core.exceptions import ErrorMapper, NotSupportedWrapper, HTTPError
+from couchbase.exceptions import ScopeNotFoundException, ScopeAlreadyExistsException, CollectionNotFoundException, CollectionAlreadyExistsException
+
+class CollectionsErrorHandler(ErrorMapper):
+    @staticmethod
+    def mapping():
+        # type (...)->Mapping[str, CBErrorType]
+        return {HTTPError: {'Scope with this name already exists': ScopeAlreadyExistsException,
+                            'Scope with this name is not found': ScopeNotFoundException,
+                            'Collection with this name is not found': CollectionNotFoundException,
+                            'Collection with this name already exists': CollectionAlreadyExistsException}}
 
 class CollectionManager(GenericManager):
     def __init__(self,  # type: CollectionManager
@@ -14,63 +24,19 @@ class CollectionManager(GenericManager):
         super(CollectionManager, self).__init__(admin_bucket)
         self.bucket_name = bucket_name
 
-    def collection_exists(self,  # type: CollectionManager
-                          collection,  # type: ICollectionSpec
-                          *options  # type: CollectionExistsOptions
-                          ):
-        # type: (...) -> bool
-        """
-        Checks for existence of a collection. This will fetch a manifest and then interrogate it to check that the scope name exists and then that the collection name exists within that scope.
-
-        :param ICollectionSpec collection: spec of the collection.
-        Timeout or timeoutMillis (int/duration) - the time allowed for the operation to be terminated. This is controlled by the client.
-        :param options:
-        :return whether the collection exists.
-        :rtype bool
-        :raises: InvalidArgumentsException
-        Uri
-        GET /pools/default/buckets/<bucket>/collections"""
-        colls = self.get_all_collections()
-        return collection in colls
-
-    @NotSupportedWrapper.a_404_means_not_supported
-    def get_all_collections(self):
-        return self._admin_bucket.http_request("/pools/default/buckets/{}/collections".format(self.bucket_name), "GET")
-
-    def scope_exists(self,  # type: CollectionManager
-                     scope_name,  # type: str
-                     *options  # type: ScopeExistsOptions
-                     ):
-        # type: (...) -> bool
-        """
-        Scope Exists
-        Checks for existence of a scope. This will fetch a manifest and then interrogate it to check that the scope name exists.
-        Signature
-        boolean ScopeExists(String scopeName,  [options])
-        Parameters
-        Required:
-        scopeName: string - name of the scope.
-        Optional:
-        Timeout or timeoutMillis (int/duration) - the time allowed for the operation to be terminated. This is controlled by the client.
-        Returns
-        Throws
-        Any exceptions raised by the underlying platform
-        Uri
-        GET /pools/default/buckets/<bucket>/collections"""
-
     def get_scope(self,  # type: CollectionManager
-                  scopeName,  # type: str
-                  options  # type: GetScopeOptions
+                  scope_name,  # type: str
+                  *options  # type: GetScopeOptions
                   ):
-        # type: (...) -> IScopeSpec
+        # type: (...) -> ScopeSpec
         """
         Get Scope
         Gets a scope. This will fetch a manifest and then pull the scope out of it.
         Signature
-        IScopeSpec GetScope(string scopeName,  [options])
+        ScopeSpec GetScope(string scope_name,  [options])
         Parameters
         Required:
-        scopeName: string - name of the scope.
+        scope_name: string - name of the scope.
         Optional:
         Timeout or timeoutMillis (int/duration) - the time allowed for the operation to be terminated. This is controlled by the client.
         Returns
@@ -80,15 +46,19 @@ class CollectionManager(GenericManager):
         Uri
         GET /pools/default/buckets/<bucket>/collections
         """
+        try:
+          return next(s for s in self.get_all_scopes() if s.name == scope_name)
+        except StopIteration:
+          raise ScopeNotFoundException("no scope with name {}".format(scope_name))
 
-    def get_all_scopes(self,  # type: CollectionManager
-                       options  # type: GetAllScopesOptions
-                       ):
-        # type: (...) -> Iterable[IScopeSpec]
+
+    @NotSupportedWrapper.a_404_means_not_supported
+    def get_all_scopes(self):
+        # type: (...) -> Iterable[ScopeSpec]
         """Get All Scopes
         Gets all scopes. This will fetch a manifest and then pull the scopes out of it.
         Signature
-        iterable<IScopeSpec> GetAllScopes([options])
+        iterable<ScopeSpec> GetAllScopes([options])
         Parameters
         Required:
         Optional:
@@ -98,9 +68,22 @@ class CollectionManager(GenericManager):
         Any exceptions raised by the underlying platform
         Uri
         GET /pools/default/buckets/<bucket>/collections"""
+        path = "/pools/default/buckets/{}/collections".format(self.bucket_name)
+        response = self._admin_bucket.http_request(path=path, method='GET')
+        # now lets turn the response into a list of ScopeSpec...
+        # the response looks like:
+        # {'uid': '0', 'scopes': [{'name': '_default', 'uid': '0', 'collections': [{'name': '_default', 'uid': '0'}]}]}
+        retval = list()
+        for s in response.value['scopes']:
+          scope = ScopeSpec(s['name'], list())
+          for c in s['collections']:
+            scope.collections.append(CollectionSpec(c['name'], scope.name))
+          retval.append(scope)
+        return retval
 
+    @CollectionsErrorHandler.mgmt_exc_wrap
     def create_collection(self,  # type: CollectionManager
-                          collection,  # type: ICollectionSpec
+                          collection,  # type: CollectionSpec
                           *options  # type: CreateCollectionOptions
                           ):
         """
@@ -122,7 +105,7 @@ class CollectionManager(GenericManager):
         Uri
         POST http://localhost:8091/pools/default/buckets/<bucket>/collections/<scope_name> -d name=<collection_name>
         """
-        path = "pools/default/buckets/default/collections/{}".format(collection.scope_name)
+        path = "pools/default/buckets/{}/collections/{}".format(self.bucket_name, collection.scope_name)
 
         params = {
             'name': collection.name
@@ -130,21 +113,22 @@ class CollectionManager(GenericManager):
 
         form = mk_formstr(params)
         return self._admin_bucket.http_request(path=path,
-                                              method='POST',
-                                              content_type='application/x-www-form-urlencoded',
-                                              content=form)
+                                               method='POST',
+                                               content_type='application/x-www-form-urlencoded',
+                                               content=form)
 
+    @CollectionsErrorHandler.mgmt_exc_wrap
     def drop_collection(self,  # type: CollectionManager
-                        collection,  # type: ICollectionSpec
-                        options  # type: DropCollectionOptions
+                        collection,  # type: CollectionSpec
+                        *options # type: DropCollectionOptions
                         ):
         """Drop Collection
         Removes a collection.
         Signature
-        void DropCollection(ICollectionSpec collection, [options])
+        void DropCollection(CollectionSpec collection, [options])
         Parameters
         Required:
-        collection: ICollectionSpec - namspece of the collection.
+        collection: CollectionSpec - namspece of the collection.
         Optional:
         Timeout or timeoutMillis (int/duration) - the time allowed for the operation to be terminated. This is controlled by the client.
         Returns
@@ -154,7 +138,10 @@ class CollectionManager(GenericManager):
         Uri
         DELETE http://localhost:8091/pools/default/buckets/<bucket>/collections/<scope_name>/<collection_name>
         """
+        path = "pools/default/buckets/{}/collections/{}/{}".format(self.bucket_name, collection.scope_name, collection.name)
+        self._admin_bucket.http_request(path, "DELETE")
 
+    @CollectionsErrorHandler.mgmt_exc_wrap
     def create_scope(self,  # type: CollectionManager
                      scope_name,  # type: str
                      *options  # type: CreateScopeOptions
@@ -162,10 +149,10 @@ class CollectionManager(GenericManager):
         """Create Scope
         Creates a new scope.
         Signature
-        Void CreateScope(string scopeName, [options])
+        Void CreateScope(string scope_name, [options])
         Parameters
         Required:
-        scopeName: String - name of the scope.
+        scope_name: String - name of the scope.
         Optional:
         Timeout or timeoutMillis (int/duration) - the time allowed for the operation to be terminated. This is controlled by the client.
         Returns
@@ -173,9 +160,9 @@ class CollectionManager(GenericManager):
         InvalidArgumentsException
         Any exceptions raised by the underlying platform
         Uri
-        POST http://localhost:8091/pools/default/buckets/<bucket>/collections -d name=<scope_name>"""
-
-        path = "pools/default/buckets/default/collections"
+        POST http://localhost:8091/pools/default/buckets/<bucket>/collections -d name=<scope_name>
+        """
+        path = "pools/default/buckets/{}/collections".format(self.bucket_name)
 
         params = {
             'name': scope_name
@@ -183,19 +170,20 @@ class CollectionManager(GenericManager):
 
         form = mk_formstr(params)
         self._admin_bucket.http_request(path=path,
-                                              method='POST',
-                                              content_type='application/x-www-form-urlencoded',
-                                              content=form)
+                                        method='POST',
+                                        content_type='application/x-www-form-urlencoded',
+                                        content=form)
 
+    @CollectionsErrorHandler.mgmt_exc_wrap
     def drop_scope(self,  # type: CollectionManager
-                   scopeName,  # type: str
-                   options  # type: DropScopeOptions
+                   scope_name,  # type: str
+                   *options  # type: DropScopeOptions
                    ):
         """
         Drop Scope
         Removes a scope.
         Signature
-        void DropScope(string scopeName, [options])
+        void DropScope(string scope_name, [options])
         Parameters
         Required:
         collectionName: string - name of the collection.
@@ -206,18 +194,15 @@ class CollectionManager(GenericManager):
         ScopeNotFoundException
         Any exceptions raised by the underlying platform
         Uri
-        DELETE http://localhost:8091/pools/default/buckets/<bucket>/collections/<scope_name>"""
+        DELETE http://localhost:8091/pools/default/buckets/<bucket>/collections/<scope_name>
+        """
+        path = "pools/default/buckets/{}/collections/{}".format(self.bucket_name, scope_name)
+        self._admin_bucket.http_request(path=path, method='DELETE')
 
-    def flush_collection(self,  # type: CollectionManager
-                         collection,  # type: ICollectionSpec
-                         options  # type: FlushCollectionOptions
-                         ):
-        pass
-
-class ICollectionSpec(object):
+class CollectionSpec(object):
     def __init__(self,
                  collection_name,  # type: str
-                 scope_name  # type: str
+                 scope_name = '_default'  # type: str
                  ):
         self._name, self._scope_name=collection_name,scope_name
     @property
@@ -231,16 +216,22 @@ class ICollectionSpec(object):
         return self._scope_name
 
 
-class IScopeSpec(object):
+class ScopeSpec(object):
+    def __init__(self,
+                 name, # type : str
+                 collections, # type: Iterable[CollectionSpec]
+                 ):
+      self._name, self._collections = name, collections
+
     @property
     def name(self):
         # type: (...) -> str
-        pass
+        return self._name
 
     @property
     def collections(self):
-        # type: (...) -> Iterable[ICollectionSpec]
-        pass
+        # type: (...) -> Iterable[CollectionSpec]
+        return self._collections
 
 
 class InsertCollectionOptions(OptionBlock):
@@ -248,14 +239,6 @@ class InsertCollectionOptions(OptionBlock):
 
 
 class InsertScopeOptions(OptionBlock):
-    pass
-
-
-class CollectionExistsOptions(object):
-    pass
-
-
-class ScopeExistsOptions(object):
     pass
 
 
@@ -271,10 +254,6 @@ class CreateCollectionOptions(object):
     pass
 
 
-class IScopeSpec(object):
-    pass
-
-
 class DropCollectionOptions(object):
     pass
 
@@ -286,6 +265,3 @@ class CreateScopeOptions(object):
 class DropScopeOptions(object):
     pass
 
-
-class FlushCollectionOptions(object):
-    pass

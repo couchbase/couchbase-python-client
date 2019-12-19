@@ -26,7 +26,7 @@ from testfixtures import LogCapture
 
 from testresources import ResourcedTestCase as ResourcedTestCaseReal, TestResourceManager
 
-from couchbase.exceptions import HTTPError, NotSupportedError
+from couchbase.exceptions import CollectionAlreadyExistsException, ScopeAlreadyExistsException, NotSupportedError
 import couchbase_core
 from couchbase import Cluster, ClusterOptions, CBCollection, JSONDocument
 from couchbase_core.cluster import ClassicAuthenticator
@@ -52,7 +52,7 @@ if os.environ.get("PYCBC_TRACE_GC") in ['FULL', 'STATS_LEAK_ONLY']:
 
 from utilspie.collectionsutils import frozendict
 from pyrsistent import PRecord
-from couchbase.management.collections import ICollectionSpec
+from couchbase.management.collections import CollectionSpec
 from couchbase.bucket import Bucket as V3Bucket
 from flaky import flaky
 
@@ -825,7 +825,7 @@ class CollectionTestCase(ClusterTestCase):
     def supports_collections(self):
       cm = self.bucket.collections()
       try:
-        cm.get_all_collections()
+        cm.get_all_scopes()
         return True
       except NotSupportedError:
           return False
@@ -840,7 +840,12 @@ class CollectionTestCase(ClusterTestCase):
         cm = self.bucket.collections()
 
         # check for collection support.  Return use default_collection otherwise
-        my_collections = real_collections if self.supports_collections() else default_collections
+        if (self.supports_collections()):
+          my_collections = real_collections
+        else:
+          self.cb = self.bucket.default_collection()
+          self.coll = self.bucket.default_collection()
+          return
 
         for scope_name, collections in my_collections.items():
             CollectionTestCase._upsert_scope(cm, scope_name)
@@ -857,9 +862,9 @@ class CollectionTestCase(ClusterTestCase):
     def _upsert_collection(cm, collection_name, scope_name):
         if not collection_name in CollectionTestCase.initialised[scope_name].keys():
             try:
-                cm.create_collection(ICollectionSpec(collection_name, scope_name))
+                cm.create_collection(CollectionSpec(collection_name, scope_name))
                 CollectionTestCase.initialised[scope_name][collection_name] = None
-            except HTTPError as e:
+            except CollectionAlreadyExistsException as e:
                 warnings.warn(e.message)
 
 
@@ -868,7 +873,7 @@ class CollectionTestCase(ClusterTestCase):
         try:
             if scope_name and not scope_name in CollectionTestCase.initialised.keys():
                 cm.create_scope(scope_name)
-        except HTTPError as e:
+        except ScopeAlreadyExistsException as e:
             warnings.warn(e.message)
             pass
 
