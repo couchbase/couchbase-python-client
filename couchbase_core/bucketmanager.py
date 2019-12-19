@@ -20,6 +20,7 @@ import time
 
 import couchbase_core._libcouchbase as _LCB
 import couchbase_core.exceptions as exceptions
+from couchbase_core.client import Client
 from couchbase_core.exceptions import CouchbaseError, ArgumentError
 from couchbase_core.views.params import Query, SpatialQuery, STALE_OK
 from couchbase_core._pyport import single_dict_key
@@ -32,8 +33,13 @@ class BucketManager(object):
     to a :class:`~couchbase_core.client.Client` object. It is normally returned via
     the :meth:`~couchbase_core.client.Client.bucket_manager` method
     """
-    def __init__(self, cb):
+    def __init__(self, cb, bucket_name=None):
         self._cb = cb
+        self._bname = bucket_name or self._cb.bucket
+
+    @property
+    def _bucketname(self):
+        return self._bname
 
     def _http_request(self, **kwargs):
         return self._cb._http_request(**kwargs)
@@ -44,7 +50,8 @@ class BucketManager(object):
     def _view(self, *args, **kwargs):
         return self._cb._view(*args, **kwargs)
 
-    def _doc_rev(self, res):
+    @staticmethod
+    def _doc_rev(res):
         """
         Returns the rev id from the header
         """
@@ -75,7 +82,7 @@ class BucketManager(object):
         query.stale = STALE_OK
         query.limit = 1
 
-        for r in self._cb.query(dname, vname, use_devmode=use_devmode,
+        for r in self._cb.view_query(dname, vname, use_devmode=use_devmode,
                                 query=query):
             pass
         return True
@@ -163,7 +170,8 @@ class BucketManager(object):
             :meth:`design_publish`
 
         """
-        name = self._cb._mk_devmode(name, use_devmode)
+        client = self._cb
+        name = Client._mk_devmode(name, use_devmode)
 
         fqname = "_design/{0}".format(name)
         if not isinstance(ddoc, dict):
@@ -180,7 +188,7 @@ class BucketManager(object):
             except CouchbaseError:
                 pass
 
-        ret = self._cb._http_request(
+        ret = client._http_request(
             type=_LCB.LCB_HTTP_TYPE_VIEW, path=fqname,
             method=_LCB.LCB_HTTP_METHOD_PUT, post_data=ddoc,
             content_type="application/json")
@@ -206,7 +214,7 @@ class BucketManager(object):
         .. seealso:: :meth:`design_create`, :meth:`design_list`
 
         """
-        name = self._mk_devmode(name, use_devmode)
+        name = Client._mk_devmode(name, use_devmode)
 
         existing = self._http_request(type=_LCB.LCB_HTTP_TYPE_VIEW,
                                       path="_design/" + name,
@@ -325,7 +333,7 @@ class BucketManager(object):
         """
         ret = self._http_request(
             type=_LCB.LCB_HTTP_TYPE_MANAGEMENT,
-            path="/pools/default/buckets/{0}/ddocs".format(self._cb.bucket),
+            path="/pools/default/buckets/{0}/ddocs".format(self._bucketname),
             method=_LCB.LCB_HTTP_METHOD_GET)
 
         real_rows = {}
@@ -354,7 +362,7 @@ class BucketManager(object):
         return info
 
     def n1ql_index_create(self, ix,  **kwargs):
-        self._n1ql_index_create(self._cb.bucket, self._cb, **kwargs)
+        self._n1ql_index_create(self._bucketname, self._cb, **kwargs)
 
     @staticmethod
     def _n1ql_index_create(bucketname, bucket, ix, defer=False, ignore_exists=False, primary=False, fields=None, cond=None, **kwargs):
@@ -439,7 +447,7 @@ class BucketManager(object):
         :raise: :exc:`~.NotFoundError` if the index does not exist and
             `ignore_missing` was not specified
         """
-        info = BucketManager._mk_index_def(self._cb.bucket, ix, primary)
+        info = BucketManager._mk_index_def(self._bucketname, ix, primary)
         kwargs['ignore_missing']=ignore_missing
         return IxmgmtRequest(self._cb, 'drop', info, **kwargs).execute()
 
@@ -462,7 +470,7 @@ class BucketManager(object):
         """
         info = N1qlIndex()
         if not other_buckets:
-            info.keyspace = self._cb.bucket
+            info.keyspace = self._bucketname
         return IxmgmtRequest(self._cb, 'list', info).execute()
 
     @staticmethod
@@ -500,7 +508,7 @@ class BucketManager(object):
             mgr.n1ql_index_watch(indexes, timeout=30, interval=1)
 
         """
-        return self._n1ql_index_build_deferred(self._cb.bucket, self._cb, other_buckets)
+        return self._n1ql_index_build_deferred(self._bucketname, self._cb, other_buckets)
 
     def n1ql_index_watch(self, indexes,
                          timeout=30, interval=0.2, watch_primary=False):
@@ -527,10 +535,10 @@ class BucketManager(object):
             'timeout_us': int(timeout * 1000000),
             'interval_us': int(interval * 1000000)
         }
-        ixlist = [N1qlIndex.from_any(x, self._cb.bucket) for x in indexes]
+        ixlist = [N1qlIndex.from_any(x, self._bucketname) for x in indexes]
         if watch_primary:
             ixlist.append(
-                N1qlIndex.from_any(N1QL_PRIMARY_INDEX, self._cb.bucket))
+                N1qlIndex.from_any(N1QL_PRIMARY_INDEX, self._bucketname))
         return IxmgmtRequest(self._cb, 'watch', ixlist, **kwargs).execute()
 
     create_n1ql_index = n1ql_index_create

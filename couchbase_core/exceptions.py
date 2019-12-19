@@ -1,5 +1,5 @@
 #
-# Copyright 2013, Couchbase, Inc.
+# Copyright 2019, Couchbase, Inc.
 # All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -985,6 +985,23 @@ class NotSupportedWrapper(object):
                     raise NotSupportedError('Server does not support this api call')
                 raise
         return wrapped
+
+class DictMatcher(object):
+    def __init__(self, **kwargs):
+        self._pattern=tuple(kwargs.items())
+
+    def match(self, dict):
+        for k, v in self._pattern:
+            if not k in dict or not v.match(dict[k]):
+                return False
+        return True
+
+    def __hash__(self):
+        return hash(self._pattern)
+
+    def __eq__(self, other):
+        return isinstance(other, DictMatcher) and other._pattern == self._pattern
+
 
 class ErrorMapper(object):
     @classmethod

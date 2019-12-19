@@ -1,4 +1,4 @@
-from couchbase.management import CollectionManager
+from couchbase.management import CollectionManager, ViewIndexManager
 from couchbase.management.admin import Admin
 from couchbase_core.supportability import uncommitted
 from couchbase_core.client import Client as CoreClient
@@ -172,10 +172,18 @@ class Bucket(object):
     def collections(self):
         return CollectionManager(self._admin, self._name)
 
+    @overload
     def view_query(self,
                    design_doc,  # type: str
                    view_name,  # type: str
-                   *view_options # type: ViewOptions
+                   ):
+        pass
+
+    def view_query(self,
+                   design_doc,  # type: str
+                   view_name,  # type: str
+                   *view_options, # type: ViewOptions
+                   **kwargs
                    ):
         # type: (...) -> IViewResult
         """
@@ -186,12 +194,13 @@ class Bucket(object):
         :return: IViewResult containing the view results
         """
         cb = self._bucket  # type: CoreClient
-        res = cb.query(design_doc, view_name, **forward_args(None, *view_options))
-        return IViewResult(res)
+        res = cb.view_query(design_doc, view_name, **forward_args(kwargs, *view_options))
+        return ViewResult(res)
 
-    def views(self):
-        # type: (...) -> IViewManager
-        pass
+    def views(self  # type: Bucket
+              ):
+        # type: (...)->IViewManager
+        return ViewIndexManager(self._bucket, self._name)
 
     def ping(self,
              options=None  # type: PingOptions

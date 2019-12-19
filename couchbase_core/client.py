@@ -1,6 +1,6 @@
 import json
 
-from couchbase_core._libcouchbase import Collection as _Base
+from couchbase_core._libcouchbase import Collection as _Base, FMT_JSON
 
 import couchbase_core.exceptions as E
 from couchbase_core.analytics import AnalyticsQuery
@@ -42,6 +42,9 @@ def _dsop(create_type=None, wrap_missing_path=True):
         return newfn
 
     return real_decorator
+
+ViewInstance = TypeVar('T', bound = View)
+ViewSubType = TypeVar('U', bound = Type[ViewInstance])
 
 
 class Client(_Base):
@@ -802,7 +805,14 @@ class Client(_Base):
             return n
         return 'dev_' + n
 
-    def view_query(self, design, view, use_devmode=False, **kwargs):
+    def view_query(self,
+                   design,  # type: str
+                   view,  # type: str
+                   use_devmode=False,  # type: bool
+                   itercls = View,  # type: ViewSubType
+                   **kwargs  # type: Any
+                   ):
+        # type: (...)->ViewInstance
         """
         Query a pre-defined MapReduce view, passing parameters.
 
@@ -843,7 +853,6 @@ class Client(_Base):
 
         """
         design = self._mk_devmode(design, use_devmode)
-        itercls = kwargs.pop('itercls', View)
         return itercls(self, design, view, **kwargs)
 
     def ping(self):

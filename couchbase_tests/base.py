@@ -54,7 +54,23 @@ from utilspie.collectionsutils import frozendict
 from pyrsistent import PRecord
 from couchbase.management.collections import ICollectionSpec
 from couchbase.bucket import Bucket as V3Bucket
+from flaky import flaky
 
+
+class FlakyCounter(object):
+    def __init__(self, max_runs, min_passes, **kwargs):
+        self.count=0
+        self.kwargs=kwargs
+        self.kwargs['rerun_filter']=self.flaky_count
+        self.kwargs['max_runs']=max_runs
+        self.kwargs['min_passes']=min_passes
+
+    def __call__(self, func):
+        return flaky(**self.kwargs)(func)
+    def flaky_count(self, err, name, test, plugin):
+        self.count+=1
+        print("trying test {}: {}/{}".format(name,self.count,self.kwargs['max_runs']))
+        return True
 
 loglevel=os.environ.get("PYCBC_DEBUG_LOG_LEVEL")
 if loglevel:
@@ -531,7 +547,7 @@ class CouchbaseTestCase(ResourcedTestCase):
 
 class ConnectionTestCaseBase(CouchbaseTestCase):
     def __init__(self, *args, **kwargs):
-        self.cb =None # type: self.factory
+        self.cb =None
         super(ConnectionTestCaseBase,self).__init__(*args,**kwargs)
     def checkCbRefcount(self):
         if not self.should_check_refcount:
@@ -857,7 +873,7 @@ class CollectionTestCase(ClusterTestCase):
             pass
 
 
-class DDocTestCase(ConnectionTestCase):
+class DDocTestCase(RealServerTestCase):
     pass
 
 

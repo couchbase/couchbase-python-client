@@ -5,9 +5,10 @@ from couchbase_core._libcouchbase import Result as SDK2Result
 from couchbase_core.result import MultiResult, SubdocResult
 from typing import *
 from boltons.funcutils import wraps
-from couchbase_core import abstractmethod
+from couchbase_core import abstractmethod, IterableWrapper, ABCMeta
 from couchbase_core.result import AsyncResult
 from couchbase_core._pyport import with_metaclass
+from couchbase_core.views.iterator import View as SDK2View
 
 
 Proxy_T = TypeVar('Proxy_T')
@@ -61,7 +62,7 @@ class ContentProxySubdoc(object):
         return lambda index: self.index_proxy(item, index)
 
 
-class IResult(object):
+class IResult(with_metaclass(ABCMeta)):
     @property
     @abstractmethod
     def cas(self):
@@ -382,19 +383,37 @@ def _wrap_in_mutation_result(func  # type: Callable[[Any,...],SDK2Result]
 
 class IViewResult(IResult):
     @property
+    @abstractmethod
     def error(self):
-        raise NotImplementedError()
+        pass
+
+    @property
+    @abstractmethod
+    def success(self):
+        pass
+
+    @property
+    @abstractmethod
+    def cas(self):
+        pass
+
+
+class ViewResult(IterableWrapper, IViewResult):
+    def __init__(self, sdk2_view  # type: SDK2View
+                ):
+        super(ViewResult, self).__init__(sdk2_view)
+
+    @property
+    def error(self):
+        return self.parent.errors
 
     @property
     def success(self):
-        raise NotImplementedError()
+        return not self.parent.errors
 
     @property
     def cas(self):
         raise NotImplementedError()
 
 
-class ViewResult(Result):
-    def __init__(self, sdk2_result  # type: SDK2Result
-                ):
-        super(ViewResult, self).__init__(sdk2_result)
+
