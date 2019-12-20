@@ -150,31 +150,38 @@ pycbc_BufFromString(PyObject *obj, char **key, Py_ssize_t *nkey, PyObject **newk
 #endif /* PY_MAJOR_VERSION == 3*/
 
 
+
 int
-pycbc_get_ttl(PyObject *obj, unsigned long *ttl, int nonzero)
+pycbc_get_duration(PyObject *obj, unsigned long *ttl, int canbezero)
 {
+    int rc=0;
     if (obj == NULL || PyObject_IsTrue(obj) == 0) {
-        if (!nonzero) {
-            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0, "TTL must be specified "
+        if (!canbezero) {
+            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0, "duration must be specified "
                            "and must not be 0 or False or None",
                            obj);
-            return -1;
+            rc=-1;
+            goto GT_DONE;
         }
         *ttl = 0;
-        return 0;
+        goto GT_DONE;
     }
 
     if (!PyNumber_Check(obj)) {
-        PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0, "TTL must be numeric", obj);
-        return -1;
+        PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0, "duration must be numeric", obj);
+        rc=-1;
+        goto GT_DONE;
     }
     *ttl = pycbc_IntAsUL(obj);
     if (*ttl == (unsigned long)-1) {
         PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ARGUMENTS, 0,
-                           "TTL must be a valid Unix timestamp ", obj);
-        return -1;
+                           "duration must be a valid Unix timestamp ", obj);
+        rc=-1;
+        goto GT_DONE;
     }
-    return 0;
+    GT_DONE:
+
+    return rc;
 }
 
 int

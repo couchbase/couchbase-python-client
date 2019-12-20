@@ -161,7 +161,7 @@ PyObject *arithmetic_common(pycbc_Collection_t *cb_collection,
         return NULL;
     }
 
-    rv = pycbc_get_ttl(all_ttl_O, &global_params.ttl, 1);
+    rv = pycbc_get_duration(all_ttl_O, &global_params.ttl, 1);
     if (rv < 0) {
         return NULL;
     }

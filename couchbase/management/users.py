@@ -1,7 +1,7 @@
 from abc import abstractmethod
 
 from couchbase.management.admin import Admin
-from couchbase.options import Duration, timeout_forward_args as forward_args
+from couchbase.options import timedelta, timeout_forward_args as forward_args
 from couchbase.management.generic import GenericManager
 from couchbase_core import mk_formstr, JSONMapping, Mapped
 from couchbase_core.auth_domain import AuthDomain
@@ -9,7 +9,7 @@ from couchbase_core._pyport import ulp, with_metaclass
 from couchbase_core import ABCMeta
 from couchbase_core.exceptions import HTTPError
 from typing import *
-from couchbase.options import OptionBlockTimeOutVerbatim
+from couchbase.options import OptionBlockTimeOut
 from couchbase_core.exceptions import ErrorMapper, NotSupportedWrapper
 
 
@@ -44,7 +44,7 @@ class UserManager(GenericManager):
     def get_user(self,  # type: UserManager
                  username,  # type: str
                  domain_name=AuthDomain.Local,  # type: str
-                 timeout=None  # Duration
+                 timeout=None  # timedelta
                  ):
         pass
 
@@ -61,7 +61,7 @@ class UserManager(GenericManager):
 
         :param str username: ID of the user.
         :param AuthDomain domain_name: name of the user domain. Defaults to local.
-        :param Duration timeout: the time allowed for the operation to be terminated. This is controlled by the client.
+        :param timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
 
         :returns: An instance of UserAndMetadata.
 
@@ -83,7 +83,7 @@ class UserManager(GenericManager):
     @overload
     def get_all_users(self,  # type: UserManager
                       domain_name,  # type: str
-                      timeout=None  # type: Duration
+                      timeout=None  # type: timedelta
                       ):
         pass
 
@@ -97,7 +97,7 @@ class UserManager(GenericManager):
 
         :param domain_name: name of the user domain. Defaults to local.
         :param options:
-        :param Duration timeout: the time allowed for the operation to be terminated. This is controlled by the client.
+        :param timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
 
         :return: An iterable collection of UserAndMetadata.
 
@@ -110,7 +110,7 @@ class UserManager(GenericManager):
     def upsert_user(self,  # type: UserManager
                     user,  # type: IUser
                     domain=AuthDomain.Local,  # type: AuthDomain
-                    timeout=None  # type: Duration
+                    timeout=None  # type: timedelta
                     ):
         pass
 
@@ -125,7 +125,7 @@ class UserManager(GenericManager):
 
         :param IUser user: the new version of the user.
         :param AuthDomain domain: name of the user domain (local | external). Defaults to local.
-        :param Duration timeout: the time allowed for the operation to be terminated. This is controlled by the client.
+        :param timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
 
         :raises: InvalidArgumentsException
         """
@@ -146,7 +146,7 @@ class UserManager(GenericManager):
     def drop_user(self,  # type: UserManager
                   user_name,  # type: str
                   domain=AuthDomain.Local,  # type: AuthDomain
-                  timeout=None  # type: Duration
+                  timeout=None  # type: timedelta
                   ):
         pass
 
@@ -161,7 +161,7 @@ class UserManager(GenericManager):
 
         :param str user_name: ID of the user.
         :param AuthDomain domain: name of the user domain. Defaults to local.
-        :param Duration timeout: the time allowed for the operation to be terminated. This is controlled by the client.
+        :param timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
         :return:
 
         :raises: UserNotFoundException
@@ -172,7 +172,7 @@ class UserManager(GenericManager):
 
     @overload
     def get_roles(self,  # type: UserManager
-                  timeout=None,  # type: Duration
+                  timeout=None,  # type: timedelta
                   *options):
         pass
 
@@ -185,7 +185,7 @@ class UserManager(GenericManager):
         Returns the roles supported by the server.
 
         :param options: misc options
-        :param Duration timeout: the time allowed for the operation to be terminated. This is controlled by the client.
+        :param timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
         :return: An iterable collection of RoleAndDescription.
         """
         return list(map(lambda x: RoleAndDescription.of(**x), self._admin_bucket.http_request("/settings/rbac/roles/",
@@ -194,7 +194,7 @@ class UserManager(GenericManager):
     @overload
     def get_group(self,  # type: UserManager
                   group_name,  # type: str
-                  timeout=None  # type: Duration
+                  timeout=None  # type: timedelta
                   ):
         pass
 
@@ -208,7 +208,7 @@ class UserManager(GenericManager):
         Get info about the named group.
 
         :param str group_name: name of the group to get.
-        :param Duration timeout: the time allowed for the operation to be terminated. This is controlled by the client.
+        :param timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
         :return: An instance of Group.
         :raises: GroupNotFoundException
         :raises: InvalidArgumentsException
@@ -219,7 +219,7 @@ class UserManager(GenericManager):
 
     @overload
     def get_all_groups(self,  # type: UserManager
-                       timeout=None,  # type: Duration
+                       timeout=None,  # type: timedelta
                        *options  # type: GetAllGroupsOptions
                        ):
         pass
@@ -233,7 +233,7 @@ class UserManager(GenericManager):
         """
         Get all groups.
 
-        :param Duration timeout: the time allowed for the operation to be terminated. This is controlled by the client.
+        :param timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
         :returns: An iterable collection of Group.
         """
         groups = self._admin_bucket.http_request("/settings/rbac/groups/",
@@ -244,7 +244,7 @@ class UserManager(GenericManager):
     @overload
     def upsert_group(self,  # type: UserManager
                      group,  # type: Group
-                     timeout=None  # type: Duration
+                     timeout=None  # type: timedelta
                      ):
         pass
 
@@ -259,7 +259,7 @@ class UserManager(GenericManager):
         :warning: Does not appear to work correctly yet - tracked here: https://issues.couchbase.com/browse/PYCBC-667
 
         :param Group group: the new version of the group.
-        :param Duration timeout: the time allowed for the operation to be terminated. This is controlled by the client.
+        :param timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
         :raises: InvalidArgumentsException
         """
         # This endpoint accepts application/x-www-form-urlencoded and requires the data be sent as form data.
@@ -276,7 +276,7 @@ class UserManager(GenericManager):
     @overload
     def drop_group(self,  # type: UserManager
                    group_name,  # type: str
-                   timeout=None  # type: Duration
+                   timeout=None  # type: timedelta
                    ):
         pass
 
@@ -289,7 +289,7 @@ class UserManager(GenericManager):
         Removes a group.
 
         :param str group_name: name of the group.
-        :param Duration timeout: the time allowed for the operation to be terminated. This is controlled by the client.
+        :param timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
 
         :raises: GroupNotFoundException
         :raises: InvalidArgumentsException
@@ -676,37 +676,37 @@ class Group(JSONMapping, IGroup):
         return '{}:{}'.format(self.name, repr(self._raw_json))
 
 
-class GetUserOptions(OptionBlockTimeOutVerbatim):
+class GetUserOptions(OptionBlockTimeOut):
     pass
 
 
-class UpsertUserOptions(OptionBlockTimeOutVerbatim):
+class UpsertUserOptions(OptionBlockTimeOut):
     pass
 
 
-class GetRolesOptions(OptionBlockTimeOutVerbatim):
+class GetRolesOptions(OptionBlockTimeOut):
     pass
 
 
-class GetGroupOptions(OptionBlockTimeOutVerbatim):
+class GetGroupOptions(OptionBlockTimeOut):
     pass
 
 
-class GetAllGroupsOptions(OptionBlockTimeOutVerbatim):
+class GetAllGroupsOptions(OptionBlockTimeOut):
     pass
 
 
-class DropGroupOptions(OptionBlockTimeOutVerbatim):
+class DropGroupOptions(OptionBlockTimeOut):
     pass
 
 
-class DropUserOptions(OptionBlockTimeOutVerbatim):
+class DropUserOptions(OptionBlockTimeOut):
     pass
 
 
-class GetAllUsersOptions(OptionBlockTimeOutVerbatim):
+class GetAllUsersOptions(OptionBlockTimeOut):
     pass
 
 
-class UpsertGroupOptions(OptionBlockTimeOutVerbatim):
+class UpsertGroupOptions(OptionBlockTimeOut):
     pass

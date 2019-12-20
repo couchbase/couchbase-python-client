@@ -52,6 +52,10 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     unsigned int lock = 0;
     struct getcmd_vars_st *gv = (struct getcmd_vars_st *)arg;
     unsigned long ttl = gv->u.ttl;
+    unsigned long timeout = cv->timeout;
+    PyObject *ttl_O = NULL;
+    PyObject *timeout_O = NULL;
+
     lcb_STATUS err = LCB_SUCCESS;
     pycbc_pybuffer keybuf = { NULL };
 
@@ -69,13 +73,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
         options = curval;
     }
     if (options) {
-        static char *kwlist[] = { "ttl", NULL };
-        PyObject *ttl_O = NULL;
-        if (gv->u.ttl) {
-            PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Both global and single TTL specified");
-            rv = -1;
-            goto GT_DONE;
-        }
+        static char *kwlist[] = { "ttl", "timeout", NULL };
 
         /* Note, options only comes when ItemOptionsCollection and friends
          * are used. When this is in effect, options is the options for the
@@ -87,7 +85,18 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
 
         if (PyDict_Check(curval)) {
             rv = PyArg_ParseTupleAndKeywords(pycbc_DummyTuple,
-                curval, "|O", kwlist, &ttl_O);
+                curval, "|OO", kwlist, &ttl_O, &timeout_O);
+            if (gv->u.ttl && ttl_O) {
+                PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Both global and single TTL specified");
+                rv = -1;
+                goto GT_DONE;
+            }
+            if (cv->timeout && timeout_O) {
+                PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Both global and single TTL specified");
+                rv = -1;
+                goto GT_DONE;
+            }
+
             if (!rv) {
                 PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ARGUMENTS, 0, "Couldn't get sub-parmeters for key", curkey);
                 rv = -1;
@@ -97,7 +106,8 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
             ttl_O = curval;
         }
 
-        rv = pycbc_get_ttl(ttl_O, &ttl, 1);
+        rv = pycbc_get_duration(ttl_O, &ttl, 1);
+        rv = rv? rv: pycbc_get_duration(timeout_O, &timeout, 1);
         if (rv < 0) {
             rv = -1;
             goto GT_DONE;
@@ -105,9 +115,9 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     }
 #define COMMON_OPTS(X, NAME, CMDNAME)              \
     lcb_cmd##CMDNAME##_expiry(cmd, ttl);       \
+    lcb_cmd##CMDNAME##_timeout(cmd, timeout);       \
     PYCBC_CMD_SET_KEY_SCOPE(CMDNAME, cmd, keybuf); \
     PYCBC_TRACECMD_TYPED(CMDNAME, cmd, context, cv->mres, curkey, self);
-
     switch (optype) {
         case PYCBC_CMD_GAT:
             if (!ttl) {
@@ -239,24 +249,26 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
     PyObject *ttl_O = NULL;
     PyObject *replica_O = NULL;
     PyObject *nofmt_O = NULL;
+    PyObject *timeout_O = NULL;
     pycbc_DURABILITY_LEVEL durability_level = LCB_DURABILITYLEVEL_NONE;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
     struct getcmd_vars_st gv = { 0 };
 #define X(name, target, type) name,
     static char *kwlist[] = {
-            "keys", "ttl", "quiet", "replica", "no_format", "durability_level", NULL};
+            "keys", "ttl", "quiet", "replica", "no_format", "durability_level", "timeout", NULL};
 #undef X
     PYCBC_COLLECTION_INIT(self, kwargs)
     int rv = PyArg_ParseTupleAndKeywords(args,
                                          kwargs,
-                                         "O|OOOOI",
+                                         "O|OOOOIO",
                                          kwlist,
                                          &kobj,
                                          &ttl_O,
                                          &is_quiet,
                                          &replica_O,
                                          &nofmt_O,
-                                         &durability_level);
+                                         &durability_level,
+                                         &timeout_O);
 
     if (!rv) {
         if (!PyErr_Occurred()) {
@@ -267,7 +279,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
 
     gv.optype = optype;
 
-    rv = pycbc_get_ttl(ttl_O, &gv.u.ttl, 1);
+    rv = pycbc_get_duration(ttl_O, &gv.u.ttl, 1);
     if (rv < 0) {
         goto GT_FINALLY;
     }
@@ -315,7 +327,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
 
     rv = pycbc_common_vars_init(&cv, self, argopts, ncmds, 0);
     cv.durability_level = durability_level;
-
+    rv = pycbc_get_duration(timeout_O, &cv.timeout, 1);
     if (rv < 0) {
         return NULL;
     }

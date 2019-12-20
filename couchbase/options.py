@@ -1,4 +1,3 @@
-import time
 import copy
 from typing import *
 
@@ -6,73 +5,14 @@ import couchbase.exceptions
 import ctypes
 from couchbase_core import abstractmethod, ABCMeta
 from couchbase_core._pyport import with_metaclass
-
-
-class FiniteDuration(object):
-    def __init__(self, seconds  # type: Union[float,int]
-                 ):
-        self.value = seconds
-
-    @staticmethod
-    def time():
-        return FiniteDuration(time.time())
-
-    def __float__(self):
-        return float(self.value)
-
-    def __int__(self):
-        return int(self.value)
-
-    def __add__(self, other):
-        result = copy.deepcopy(self)
-        result.value += other.value
-        return result
-
-    def __lt__(self, other):
-        return self.value < other.value
-
-    def __gt__(self, other):
-        return self.value > other.value
-
-
-class Duration(float):
-    def __init__(self, seconds  # type: Union[float,int]
-                 ):
-        # type: (...) -> None
-        super(Duration, self).__init__(seconds)
-
-
-class Seconds(FiniteDuration):
-    def __init__(self,
-                 seconds  # type: Union[float,int]
-                 ):
-        # type: (...) -> None
-        super(Seconds, self).__init__(seconds)
-
-
-class Durations:
-    def __init__(self):
-        pass
-
-    @staticmethod
-    def minutes(minutes  # type: int
-                ):
-        return Seconds(minutes * 60)
-
-    @staticmethod
-    def days(days  # type: int
-             ):
-        return Durations.minutes(days * 24 * 60)
-
-    @staticmethod
-    def seconds(seconds):
-        return Seconds(seconds)
+from datetime import timedelta
 
 
 class OptionBlock(dict):
     def __init__(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
         super(OptionBlock, self).__init__(**kwargs)
+        self._args = args
 
 
 T = TypeVar('T', bound=OptionBlock)
@@ -84,21 +24,10 @@ class OptionBlockTimeOut(OptionBlock):
         super(OptionBlockTimeOut, self).__init__(**kwargs)
 
     def timeout(self,  # type: T
-                duration):
+                duration  # type: timedelta
+                ):
         # type: (...) -> T
-        self['ttl'] = duration.__int__()
-        return self
-
-
-class OptionBlockTimeOutVerbatim(OptionBlock):
-    def __init__(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
-        super(OptionBlockTimeOutVerbatim, self).__init__(**kwargs)
-
-    def timeout(self,  # type: T
-                duration):
-        # type: (...) -> T
-        self['timeout'] = duration.__float__()
+        self['timeout'] = duration
         return self
 
 
@@ -143,10 +72,7 @@ class Forwarder(with_metaclass(ABCMeta)):
             map_item = self.arg_mapping().get(k, None)
             if not (map_item is None):
                 for out_k, out_f in map_item.items():
-                    try:
-                        end_options[out_k] = out_f(v)
-                    except:
-                        pass
+                    end_options[out_k] = out_f(v)
             else:
                 end_options[k] = v
         return end_options
@@ -156,13 +82,23 @@ class Forwarder(with_metaclass(ABCMeta)):
         pass
 
 
+def timedelta_as_timestamp(duration  # type: timedelta
+                        ):
+    # type: (...)->int
+    return int(duration.total_seconds())
+
+def timedelta_as_microseconds(duration  # type: timedelta
+                           ):
+    # type: (...)->int
+    return int(duration.total_seconds()*10e6)
+
 class DefaultForwarder(Forwarder):
     def arg_mapping(self):
         return {'spec': {'specs': lambda x: x}, 'id': {},
                 'replicate_to': {"replicate_to": int},
                 'persist_to': {"persist_to": int},
-                'timeout': {'ttl': Duration.__float__},
-                'expiry': {'ttl': int}, 'self': {}, 'options': {}}
+                'timeout': {'timeout': timedelta_as_microseconds},
+                'expiry': {'ttl': timedelta_as_timestamp}, 'self': {}, 'options': {}}
 
 
 class TimeoutForwarder(Forwarder):
@@ -170,8 +106,8 @@ class TimeoutForwarder(Forwarder):
         return {'spec': {'specs': lambda x: x}, 'id': {},
                 'replicate_to': {"replicate_to": int},
                 'persist_to': {"persist_to": int},
-                'timeout': {'timeout': Duration.__float__},
-                'expiry': {'ttl': int}, 'self': {}, 'options': {}}
+                'timeout': {'timeout': timedelta_as_microseconds},
+                'expiry': {'ttl': timedelta_as_timestamp}, 'self': {}, 'options': {}}
 
 
 forward_args = DefaultForwarder().forward_args

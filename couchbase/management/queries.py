@@ -1,7 +1,7 @@
 from couchbase.exceptions import KeyNotFoundException, KeyExistsException
 from couchbase_core._ixmgmt import N1QL_PRIMARY_INDEX, IxmgmtRequest, N1qlIndex
 from couchbase_core.bucketmanager import BucketManager
-from couchbase.options import (OptionBlockTimeOutVerbatim, timeout_forward_args as forward_args, Duration)
+from couchbase.options import (OptionBlockTimeOut, timeout_forward_args as forward_args, timedelta)
 from typing import *
 from couchbase.management.generic import GenericManager
 import attr
@@ -40,7 +40,7 @@ class QueryIndexManager(GenericManager):
     @overload
     def get_all_indexes(self,  # type: QueryIndexManager
                         bucket_name,  # type: str
-                        timeout=None,  # type: Duration
+                        timeout=None,  # type: timedelta
                         ):
         pass
 
@@ -61,7 +61,7 @@ class QueryIndexManager(GenericManager):
         Fetches all indexes from the server.
 
         :param str bucket_name: the name of the bucket.
-        :param Duration timeout: the time allowed for the operation to be terminated. This is controlled by the client.
+        :param timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
         :return: A list of QueryIndex objects.
 
 
@@ -91,7 +91,7 @@ class QueryIndexManager(GenericManager):
 
         return info
 
-    def _n1ql_index_create(self, bucket_name, ix, defer=False, ignore_exists=False, primary=False, fields=None, cond = None, **kwargs):
+    def _n1ql_index_create(self, bucket_name, ix, defer=False, ignore_exists=False, primary=False, fields=None, cond = None, timeout=None, **kwargs):
         """
         Create an index for use with N1QL.
 
@@ -143,6 +143,8 @@ class QueryIndexManager(GenericManager):
             'defer': defer
         }
 
+        if timeout:
+            options['timeout']=timeout
         # Now actually create the indexes
         return IxmgmtRequest(self._admin_bucket, 'create', info, **options).execute()
 
@@ -163,7 +165,7 @@ class QueryIndexManager(GenericManager):
                      ignore_if_exists=None,  # type: bool
                      num_replicas=0,  # type: int
                      deferred=False,  # type: bool
-                     timeout=None,  # type: Duration
+                     timeout=None,  # type: timedelta
                      condition=None  # type: str
                      ):
         pass
@@ -184,7 +186,7 @@ class QueryIndexManager(GenericManager):
         :param bool ignore_if_exists: Don't error/throw if the index already exists.
         :param int num_replicas: The number of replicas that this index should have. Uses the WITH keyword and num_replica.
         :param bool deferred: Whether the index should be created as a deferred index.
-        :param Duration timeout:  the time allowed for the operation to be terminated. This is controlled by the client.
+        :param timedelta timeout:  the time allowed for the operation to be terminated. This is controlled by the client.
         :param condition: condition on which to filter
         :raises: IndexAlreadyExistsException
         :raises: InvalidArgumentsException
@@ -207,7 +209,7 @@ class QueryIndexManager(GenericManager):
                              deferred=False,  # type: bool
                              ignore_if_exists=False,  # type: bool
                              num_replicas=None,  # type: int
-                             timeout=None  # type: Duration
+                             timeout=None  # type: timedelta
                              ):
         pass
 
@@ -224,7 +226,7 @@ class QueryIndexManager(GenericManager):
         :param book deferred: Whether the index should be created as a deferred index.
         :param bool ignore_if_exists:  Don't error/throw if the index already exists.
         :param int num_replicas: The number of replicas that this index should have. Uses the WITH keyword and num_replica.
-        :param: Duration timeout: the time allowed for the operation to be terminated. This is controlled by the client.
+        :param: timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
 
         :raises: QueryIndexAlreadyExistsException
         :raises: InvalidArgumentsException
@@ -244,7 +246,7 @@ class QueryIndexManager(GenericManager):
                    bucket_name,  # type: str
                    index_name,  # type: str
                    ignore_if_not_exists=False,  # type: bool
-                   timeout=None  # type: Duration
+                   timeout=None  # type: timedelta
                    ):
         pass
 
@@ -259,7 +261,7 @@ class QueryIndexManager(GenericManager):
         :param str bucket_name: name of the bucket.
         :param str index_name: name of the index.
         :param bool ignore_if_not_exists: Don't error/throw if the index does not exist.
-        :param Duration timeout: the time allowed for the operation to be terminated. This is controlled by the client.
+        :param timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
 
         :raises: QueryIndexNotFoundException
         :raises: InvalidArgumentsException
@@ -271,7 +273,7 @@ class QueryIndexManager(GenericManager):
                            bucket_name,  # type: str
                            index_name="",  # type: str
                            ignore_if_not_exists=False,  # type: str
-                           timeout=None  # type: Duration
+                           timeout=None  # type: timedelta
                            ):
         pass
 
@@ -296,7 +298,7 @@ class QueryIndexManager(GenericManager):
     def watch_indexes(self,  # type: QueryIndexManager
                       bucket_name,  # type: str
                       index_names,  # type: Iterable[str]
-                      timeout=None,  # type: Duration
+                      timeout=None,  # type: timedelta
                       ):
         pass
 
@@ -310,7 +312,7 @@ class QueryIndexManager(GenericManager):
 
         :param str bucket_name: name of the bucket.
         :param Iterable[str] index_names: name(s) of the index(es).
-        :param Duration timeout: the time allowed for the operation to be terminated. This is controlled by the client.
+        :param timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
         :param: bool watch_primary: whether or not to watch the primary index.
 
         :raises: QueryIndexNotFoundException
@@ -322,7 +324,7 @@ class QueryIndexManager(GenericManager):
     @overload
     def build_deferred_indexes(self,  # type: QueryIndexManager
                                bucket_name,  # type: str
-                               timeout=None  # type: Duration
+                               timeout=None  # type: timedelta
                                ):
         pass
 
@@ -365,29 +367,29 @@ class QueryIndex(Protocol):
         return cls(n1qlindex.name, bool(n1qlindex.primary), IndexType(), n1qlindex.state, n1qlindex.keyspace, [], n1qlindex.condition or "")
 
 
-class GetAllQueryIndexOptions(OptionBlockTimeOutVerbatim):
+class GetAllQueryIndexOptions(OptionBlockTimeOut):
     pass
 
 
-class CreateQueryIndexOptions(OptionBlockTimeOutVerbatim):
+class CreateQueryIndexOptions(OptionBlockTimeOut):
     pass
 
 
-class CreatePrimaryQueryIndexOptions(OptionBlockTimeOutVerbatim):
+class CreatePrimaryQueryIndexOptions(OptionBlockTimeOut):
     pass
 
 
-class DropQueryIndexOptions(OptionBlockTimeOutVerbatim):
+class DropQueryIndexOptions(OptionBlockTimeOut):
     pass
 
 
-class DropPrimaryQueryIndexOptions(OptionBlockTimeOutVerbatim):
+class DropPrimaryQueryIndexOptions(OptionBlockTimeOut):
     pass
 
 
-class WatchQueryIndexOptions(OptionBlockTimeOutVerbatim):
+class WatchQueryIndexOptions(OptionBlockTimeOut):
     pass
 
 
-class BuildQueryIndexOptions(OptionBlockTimeOutVerbatim):
+class BuildQueryIndexOptions(OptionBlockTimeOut):
     pass

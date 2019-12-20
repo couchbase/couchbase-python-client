@@ -1,5 +1,7 @@
+from datetime import timedelta
+
 from couchbase_core.subdocument import Spec
-from .options import Seconds, FiniteDuration, forward_args
+from .options import timedelta, forward_args
 from couchbase_core.transcodable import Transcodable
 from couchbase_core._libcouchbase import Result as SDK2Result
 from couchbase_core.result import MultiResult, SubdocResult
@@ -115,7 +117,7 @@ class IGetResult(IResult):
     @property
     @abstractmethod
     def expiry(self):
-        # type: () -> FiniteDuration
+        # type: () -> timedelta
         pass
 
     @property
@@ -198,7 +200,7 @@ class GetResult(Result, IGetResult):
                  id,  # type: str
                  cas,  # type: int
                  rc,  # type: int
-                 expiry,  # type: Seconds
+                 expiry,  # type: timedelta
                  *args,  # type: Any
                  **kwargs  # type: Any
                  ):
@@ -223,7 +225,7 @@ class GetResult(Result, IGetResult):
 
     @property
     def expiry(self):
-        # type: () -> Seconds
+        # type: () -> timedelta
         return self._expiry
 
 
@@ -265,7 +267,7 @@ class AsyncWrapper(type):
 class SDK2GetResult(GetResult):
     def __init__(self,
                  sdk2_result,  # type: SDK2Result
-                 expiry=None,  # type: Seconds
+                 expiry=None,  # type: timedelta
                  **kwargs):
         super(SDK2GetResult, self).__init__(sdk2_result.key, sdk2_result.cas, sdk2_result.rc, expiry, **kwargs)
         self._original = sdk2_result
@@ -284,7 +286,7 @@ class SDK2GetResult(GetResult):
 class SDK2AsyncResult(with_metaclass(AsyncWrapper, SDK2GetResult)):
     def __init__(self,
                  sdk2_result,  # type: SDK2Result
-                 expiry=None,  # type: Seconds
+                 expiry=None,  # type: timedelta
                  **kwargs):
         kwargs['expiry'] = expiry
         super(SDK2AsyncResult, self).__init__(sdk2_result, **kwargs)

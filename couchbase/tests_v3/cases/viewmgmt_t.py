@@ -1,6 +1,6 @@
 from flaky import flaky
 
-from couchbase.options import  Durations
+from couchbase.options import timedelta
 from couchbase.management.queries import QueryIndex
 from couchbase.management.views import DesignDocumentNamespace, DesignDocument, DesignDocumentNotFoundException
 from typing import *
@@ -66,15 +66,15 @@ class DesignDocManagementTest(ClusterTestCase):
         del self.mgr
         super(DesignDocManagementTest, self).tearDown()
 
-    @FlakyCounter(50,1)
+    @FlakyCounter(5,1)
     def test_design_management(self):
-        self.mgr.upsert_design_document(DOCUMENT_FROM_JSON, DesignDocumentNamespace.DEVELOPMENT, syncwait=50)
+        self.mgr.upsert_design_document(DOCUMENT_FROM_JSON, DesignDocumentNamespace.DEVELOPMENT, syncwait=500)
 
         rv = self.bucket.view_query(DNAME, VNAME, use_devmode=True,
                            limit=10)
         print(list(rv))
         self.assertTrue(rv.success)
-        self.mgr.publish_design_document(DNAME, timeout=Durations.seconds(10), syncwait=5)
+        self.mgr.publish_design_document(DNAME, timeout=timedelta(seconds=10), syncwait=5)
 
         rv = self.bucket.view_query(DNAME, VNAME,
                            limit=10)

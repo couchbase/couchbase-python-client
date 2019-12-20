@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from datetime import datetime, timedelta
 from warnings import warn
 
 import enum
@@ -314,3 +315,8 @@ def mk_formstr(d):
         l.append('{0}={1}'.format(ulp.quote(k), ulp.quote(str(v))))
 
     return '&'.join(l)
+
+
+def syncwait_or_deadline_time(syncwait, timeout):
+    deadline = (datetime.now() + timedelta(microseconds=timeout)) if timeout else None
+    return lambda: syncwait if syncwait else (deadline - datetime.now()).total_seconds()

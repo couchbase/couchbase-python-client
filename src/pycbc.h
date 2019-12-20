@@ -220,10 +220,10 @@ PyObject *pycbc_none_or_value(PyObject *maybe_value);
  * Fetches a valid TTL from the object
  * @param obj an object to be parsed as the TTL
  * @param ttl a pointer to the TTL itself
- * @param nonzero whether to allow a value of 0 for the TTL
+ * @param canbezero whether to allow a value of 0 for the TTL
  * @return 0 on success, nonzero on error.
  */
-int pycbc_get_ttl(PyObject *obj, unsigned long *ttl, int nonzero);
+int pycbc_get_duration(PyObject *obj, unsigned long *ttl, int canbezero);
 
 /**
  * Fetches a valid 32 bit integer from the object. The object must be a long

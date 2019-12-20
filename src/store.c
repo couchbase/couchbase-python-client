@@ -58,7 +58,7 @@ handle_item_kv(pycbc_Item *itm, PyObject *options, const struct storecmd_vars *s
         }
 
         if (ttl_O) {
-            if (-1 == pycbc_get_ttl(ttl_O, &skc->ttl, 1)) {
+            if (-1 == pycbc_get_duration(ttl_O, &skc->ttl, 1)) {
                 return -1;
             }
 
@@ -237,7 +237,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
 
             lcb_cmdstore_cas(cmd, skc.cas);
             lcb_cmdstore_expiry(cmd, (uint32_t)skc.ttl);
-
+            lcb_cmdstore_timeout(cmd, cv->timeout);
             PYCBC_TRACECMD_TYPED(store,
                                  cmd,
                                  context,
@@ -305,6 +305,7 @@ set_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
 
     Py_ssize_t ncmds = 0;
     PyObject *ttl_O = NULL;
+    PyObject *timeout_O =NULL;
     PyObject *dict = NULL;
     PyObject *key;
     PyObject *value;
@@ -320,6 +321,7 @@ set_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
                                    "persist_to",
                                    "replicate_to",
                                    "durability_level",
+                                   "timeout",
                                    NULL};
 
     static char *kwlist_single[] = {"key",
@@ -331,6 +333,7 @@ set_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
                                     "replicate_to",
                                     "_sd_doc_flags",
                                     "durability_level",
+                                    "timeout",
                                     NULL};
 
     scv.operation = operation;
@@ -339,19 +342,20 @@ set_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
     if (argopts & PYCBC_ARGOPT_MULTI) {
         rv = PyArg_ParseTupleAndKeywords(args,
                                          kwargs,
-                                         "O|OOBBI",
+                                         "O|OOBBIO",
                                          kwlist_multi,
                                          &dict,
                                          &ttl_O,
                                          &scv.flagsobj,
                                          &persist_to,
                                          &replicate_to,
-                                         &dur_level);
+                                         &dur_level,
+                                         &timeout_O);
 
     } else {
         rv = PyArg_ParseTupleAndKeywords(args,
                                          kwargs,
-                                         "OO|KOOBBII",
+                                         "OO|KOOBBIIO",
                                          kwlist_single,
                                          &key,
                                          &value,
@@ -361,7 +365,8 @@ set_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
                                          &persist_to,
                                          &replicate_to,
                                          &scv.sd_doc_flags,
-                                         &dur_level);
+                                         &dur_level,
+                                         &timeout_O);
     }
 
     if (!rv) {
@@ -369,7 +374,12 @@ set_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs,
         goto GT_FAIL;
     }
 
-    rv = pycbc_get_ttl(ttl_O, &scv.ttl, 1);
+    rv = pycbc_get_duration(ttl_O, &scv.ttl, 1);
+    if (rv < 0) {
+        goto GT_FAIL;
+    }
+
+    rv = pycbc_get_duration(timeout_O, &cv.timeout, 1);
     if (rv < 0) {
         goto GT_FAIL;
     }

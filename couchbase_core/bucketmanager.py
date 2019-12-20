@@ -17,9 +17,11 @@
 
 import json
 import time
+from datetime import timedelta, datetime
 
 import couchbase_core._libcouchbase as _LCB
 import couchbase_core.exceptions as exceptions
+from couchbase_core import syncwait_or_deadline_time
 from couchbase_core.client import Client
 from couchbase_core.exceptions import CouchbaseError, ArgumentError
 from couchbase_core.views.params import Query, SpatialQuery, STALE_OK
@@ -222,7 +224,11 @@ class BucketManager(object):
                                       content_type="application/json")
         return existing
 
-    def design_publish(self, name, syncwait=0):
+    def design_publish(self,
+                       name,  # type: str
+                       syncwait=0,  # type: int
+                       timeout=None  # type: int
+                       ):
         """
         Convert a development mode view into a production mode views.
         Production mode views, as opposed to development views, operate on the
@@ -245,13 +251,17 @@ class BucketManager(object):
         .. seealso:: :meth:`design_create`, :meth:`design_delete`,
             :meth:`design_get`
         """
+
         existing = self.design_get(name, use_devmode=True)
+
+        syncwait_fn = syncwait_or_deadline_time(syncwait, timeout)
+
         rv = self.design_create(name, existing.value, use_devmode=False,
-                           syncwait=syncwait)
+                                syncwait=syncwait_fn())
         self.design_delete(name, use_devmode=True,
-                           syncwait=syncwait)
+                           syncwait=syncwait_fn())
         self._design_poll(name, 'add', None,
-                          timeout=syncwait, use_devmode=False)
+                          timeout=syncwait_fn(), use_devmode=False)
         return rv
 
     def design_delete(self, name, use_devmode=True, syncwait=0):

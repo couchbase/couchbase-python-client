@@ -92,6 +92,8 @@ struct pycbc_common_vars {
     pycbc_MULTICMD_CTX *mctx;
 
     pycbc_DURABILITY_LEVEL durability_level;
+
+    unsigned long timeout;
 };
 
 #define PYCBC_COMMON_VARS_STATIC_INIT { 0 }

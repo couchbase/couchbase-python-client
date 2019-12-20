@@ -16,12 +16,14 @@
 # limitations under the License.
 #
 import traceback
+from datetime import timedelta
 from typing import *
 from unittest import SkipTest
 
 from couchbase.fulltext import IMetaData, ISearchResult
 from couchbase_core import recursive_reload
 from couchbase_core._pyport import ANY_STR
+import datetime
 
 try:
     from abc import ABC
@@ -38,10 +40,9 @@ import couchbase.exceptions
 
 from couchbase import JSONDocument, DeltaValue, SignedInt64, MutateInResult
 from couchbase_core.durability import Durability
-from couchbase import ReplicateTo, PersistTo, FiniteDuration, copy, \
-    Seconds, ReplicaNotConfiguredException, DocumentConcurrentlyModifiedException, \
+from couchbase import ReplicateTo, PersistTo, copy, \
+    timedelta, ReplicaNotConfiguredException, DocumentConcurrentlyModifiedException, \
     DocumentMutationLostException, ReplicaNotAvailableException, MutateSpec, CASMismatchException, \
-    Durations, \
     MutateInOptions
 from couchbase import GetOptions, RemoveOptions, ReplaceOptions
 from couchbase import Bucket
@@ -64,20 +65,20 @@ class Scenarios(CollectionTestCase):
     def test_scenario_A(self):
         # 1) fetch a full document that is a json document
         self.coll.upsert("id",{"kettle":"fish"})
-        doc = self.coll.get("id", GetOptions().timeout(Seconds(10)))
+        doc = self.coll.get("id", GetOptions().timeout(timedelta(seconds=10)))
         # 2) Make a modification to the content
         content = doc.content_as[JSONDocument].put("field", "value")
         # 3) replace the document on the server
         # not formally allowed syntax - can't mix OptionBlocks and named params
-        result = self.coll.replace(doc.id, content, ReplaceOptions().timeout(Seconds(10)), cas=doc.cas)
+        result = self.coll.replace(doc.id, content, ReplaceOptions().timeout(timedelta(seconds=10)), cas=doc.cas)
 
-        result = self.coll.replace(doc.id, content, ReplaceOptions().timeout(Seconds(10)).cas(result.cas))
-        result = self.coll.replace(doc.id, content, expiry=Seconds(10), cas=result.cas)
+        result = self.coll.replace(doc.id, content, ReplaceOptions().timeout(timedelta(seconds=10)).cas(result.cas))
+        result = self.coll.replace(doc.id, content, expiry=timedelta(seconds=10), cas=result.cas)
         # Default params also supported for all methods
-        doc2 = self.coll.get("id", expiry=Seconds(10))
+        doc2 = self.coll.get("id", expiry=timedelta(seconds=10))
         content2 = doc2.content_as[dict].update({"value": "bar"})
 
-        self.coll.replace(doc2.id, content2, cas=doc2.cas, expiry=Seconds(10))
+        self.coll.replace(doc2.id, content2, cas=doc2.cas, expiry=timedelta(seconds=10))
 
         # I include type annotations and getOrError above to make things clearer,
         # but it'd be more idiomatic to write this:
@@ -87,13 +88,13 @@ class Scenarios(CollectionTestCase):
             # invalid syntax:
             self.coll.get("cheese", options=GetOptions(replica=True), replica=True)
 
-            result = self.coll.get("id", GetOptions().timeout(Seconds(10)))
+            result = self.coll.get("id", GetOptions().timeout(timedelta(seconds=10)))
             self.coll.replace(result.id,
                               result.content
                               .put("field", "value")
                               .put("foo", "bar"),
                               cas=result.cas,
-                              expiry=Seconds(10))
+                              expiry=timedelta(seconds=10))
         except:
             print("could not get doc")
 
@@ -114,7 +115,7 @@ class Scenarios(CollectionTestCase):
             arr.append("foo")
 
             result = self.coll.mutate_in("id", [SD.upsert("someArray", arr)],
-                                      MutateInOptions().timeout(Seconds(10)))
+                                      MutateInOptions().timeout(timedelta(seconds=10)))
 
         self.assertIsInstance(result, MutateInResult)
 
@@ -173,7 +174,7 @@ class Scenarios(CollectionTestCase):
                                                  self.coll.remove("id",
                                                                   RemoveOptions().dur_client(replicateTo,
                                                                                              PersistTo.ONE)),
-                                                     ReplicateTo.TWO, ReplicateTo.TWO, FiniteDuration.time() + Seconds(30))
+                                                     ReplicateTo.TWO, ReplicateTo.TWO, datetime.datetime.now() + timedelta(seconds=30))
         except NotSupportedError:
             raise SkipTest("Skipping as not supported")
 
@@ -181,7 +182,7 @@ class Scenarios(CollectionTestCase):
     def retry_idempotent_remove_client_side(callback,  # type: Callable[[ReplicateTo.Value],Any]
                                             replicate_to,  # type: ReplicateTo.Value
                                             original_replicate_to,  # type: ReplicateTo.Value
-                                            until  # type: FiniteDuration
+                                            until  # type: datetime.datetime
                                             ):
         # type: (...) -> None
         """
@@ -194,7 +195,7 @@ class Scenarios(CollectionTestCase):
           """
         success = False
         while not success:
-            if time.time() >= float(until):
+            if datetime.datetime.now() >= until:
                 # Depending on the durability requirements, may want to also log this to an external system for human review
                 # and reconciliation
                 raise RuntimeError("Failed to durably write operation")
@@ -240,7 +241,7 @@ class Scenarios(CollectionTestCase):
 
     def retry_idempotent_remove_server_side(self,  # type: Scenarios
                                             callback,  # type: Callable[[],Any]
-                                            until=Durations.seconds(10)  # type: FiniteDuration
+                                            until=timedelta(seconds=10)  # type: timedelta
                                             ):
         """
           * Automatically retries an idempotent operation in the face of durability failures
@@ -248,14 +249,14 @@ class Scenarios(CollectionTestCase):
           * @param callback an idempotent remove operation to perform
           * @param until prevent the operation looping indefinitely
           */"""
-        deadline=FiniteDuration.time()+until
-        while FiniteDuration.time() < deadline:
+        deadline=datetime.datetime.now()+until
+        while datetime.datetime.now() < deadline:
 
             try:
                 callback()
                 return
             except couchbase.exceptions.DurabilitySyncWriteAmbiguousException:
-                if self.coll.get("id").success():
+                if self.coll.get("id").success:
                     continue
                 logging.info("Our work here is done")
                 return
@@ -276,14 +277,14 @@ class Scenarios(CollectionTestCase):
         entry=entry.put("field","value")
         self.coll.upsert("id",entry)
         def respond():
-            result = self.coll.get("id", expiry=Seconds(10))
+            result = self.coll.get("id", expiry=timedelta(seconds=10))
             if result:
                 self.coll.replace(result.id,
                                   result.content_as[JSONDocument]
                                   .put("field", "value")
                                   .put("foo", "bar"),
                                   cas=result.cas,
-                                  expiry=Seconds(10))
+                                  expiry=timedelta(seconds=10))
             else:
                 logging.error("could not get doc")
 
@@ -371,11 +372,11 @@ class Scenarios(CollectionTestCase):
         3) store it back on the server with a replace
         """
         self.coll.upsert("id",dict(name="fred"))
-        result = self.coll.get("id", expiry=Seconds(10))
+        result = self.coll.get("id", expiry=timedelta(seconds=10))
         if result:
             entry = result.content_as[Scenarios.AddressedUser]
             entry=entry.with_attr(age=25)
-            self.coll.replace(result.id, entry, cas=result.cas, expiry=Seconds(10))
+            self.coll.replace(result.id, entry, cas=result.cas, expiry=timedelta(seconds=10))
         else:
             logging.error("could not get doc")
 

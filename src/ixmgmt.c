@@ -59,10 +59,10 @@ pycbc_Bucket__ixmanage(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     const char *action;
     pycbc_strlen_t nparams;
     lcb_STATUS (*action_fn)(lcb_t, const void *, const lcb_CMDN1XMGMT*);
-
-    static char *kwlist[] = { "action", "index", "flags",  NULL };
+    double timeout=0;
+    static char *kwlist[] = { "action", "index", "flags", "timeout", NULL };
     rv = PyArg_ParseTupleAndKeywords(args, kwargs,
-        "ss#|I", kwlist, &action, &params, &nparams, &cmdflags);
+        "ss#|Id", kwlist, &action, &params, &nparams, &cmdflags, &timeout);
 
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();

@@ -22,7 +22,7 @@ from attr import ib as attrib, s as attrs, asdict
 from attr.validators import instance_of as io, deep_mapping as dm
 
 from couchbase.management.generic import GenericManager
-from couchbase.options import Duration, timeout_forward_args as forward_args
+from couchbase.options import timeout_forward_args as forward_args
 from couchbase_core import JSON
 from couchbase_core._pyport import *
 from couchbase_core.bucketmanager import BucketManager
@@ -61,7 +61,7 @@ class ViewIndexManager(object):
     def get_design_document(self,  # type: ViewIndexManager
                             design_doc_name,  # type: str
                             namespace,  # type: DesignDocumentNamespace
-                            timeout = None,  # type: Duration
+                            timeout = None,  # type: timedelta
                             **options):
         # type: (...)->DesignDocument
         """
@@ -71,7 +71,7 @@ class ViewIndexManager(object):
         :param DesignDocumentNamespace namespace: PRODUCTION if the user is requesting a document from the production namespace
         or DEVELOPMENT if from the development namespace.
         :param options:
-        :param Duration timeout: the time allowed for the operation to be terminated. This is controlled by the client.
+        :param timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
         :return: An instance of DesignDocument.
 
         :raises: DesignDocumentNotFoundException
@@ -96,7 +96,7 @@ class ViewIndexManager(object):
         Fetches all design documents from the server.
 
         :param DesignDocumentNamespace namespace: indicates whether the user wants to get production documents (PRODUCTION) or development documents (DEVELOPMENT).
-        :param Duration timeout: the time allowed for the operation to be terminated. This is controlled by the client.
+        :param timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
         :return: An iterable of DesignDocument.
         """
 
@@ -128,7 +128,7 @@ class ViewIndexManager(object):
     def drop_design_document(self,  # type: ViewIndexManager
                              design_doc_name,  # type: str
                              namespace,  # type: DesignDocumentNamespace
-                             timeout=None  # type: Duration
+                             timeout=None  # type: timedelta
                              ):
         pass
 
@@ -154,8 +154,8 @@ class ViewIndexManager(object):
     @overload
     def publish_design_document(self,  # type: ViewIndexManager
                                 design_doc_name,  # type: str
-                                timeout=None,  # type: Duration
-                                syncwait=None  # type: Duration
+                                timeout=None,  # type: timedelta
+                                syncwait=None  # type: timedelta
                                 ):
         pass
 

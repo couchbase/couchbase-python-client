@@ -1,8 +1,10 @@
 from typing import *
-from .options import OptionBlock, Seconds
+from .options import OptionBlock, timedelta
 from couchbase_core import abstractmethod, IterableWrapper, JSON
 
 from couchbase_core.fulltext import SearchRequest
+from datetime import timedelta
+
 
 SearchQueryRow = JSON
 
@@ -42,7 +44,7 @@ class IMetaData(object):
 
     @abstractmethod
     def took(self):
-        # type: (...) -> Seconds
+        # type: (...) -> timedelta
         pass
 
     @abstractmethod
@@ -76,8 +78,8 @@ class MetaData(IMetaData):
         return self._status.get('failed')
 
     def took(self):
-        # type: (...) -> Seconds
-        return Seconds(self._raw_data.get('took')/10e6)
+        # type: (...) -> timedelta
+        return timedelta(microseconds=self._raw_data.get('took'))
 
     def total_hits(self):
         # type: (...) -> int
