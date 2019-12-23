@@ -64,7 +64,6 @@
     X(ERR_SUBDOC_NUMBER_TOO_BIG)    \
     X(ERR_SUBDOC_DELTA_INVALID)     \
     X(ERR_SUBDOC_PATH_EXISTS)       \
-    X(ERR_SUBDOC_GENERIC)           \
     X(ERR_SUBDOC_PATH_INVALID)      \
     X(ERR_QUERY)                    \
     X(ERR_INDEX_NOT_FOUND)

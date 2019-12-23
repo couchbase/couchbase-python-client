@@ -785,7 +785,7 @@ subdoc_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *rb)
     }
 
     PYCBC_DEBUG_LOG_CONTEXT(PYCBC_RES_CONTEXT(res), "Subdoc callback continues")
-    if (handler.rc == LCB_SUCCESS || handler.rc == LCB_ERR_SUBDOC_GENERIC) {
+    if (handler.rc == LCB_SUCCESS || handler.rc == LCB_ERR_SUBDOC_PATH_NOT_FOUND)  {
         res->cas = handler.cas;
     } else {
         MAYBE_PUSH_OPERR(mres, (pycbc_Result *)res, handler.rc, 0);

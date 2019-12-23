@@ -821,10 +821,6 @@ class DurabilityErrorCode(CompatibilityEnum):
 _LCB_SYNCREP_MAP = {item.value:item.orig_value for item in DurabilityErrorCode}
 
 
-class SubdocGenericError(CouchbaseError):
-    pass
-
-
 _LCB_ERRNO_MAP = dict(list({
     C.LCB_ERR_AUTHENTICATION_FAILURE:       AuthError,
     C.LCB_ERR_INVALID_DELTA:     DeltaBadvalError,
@@ -864,8 +860,7 @@ _LCB_ERRNO_MAP = dict(list({
     C.LCB_ERR_SUBDOC_PATH_MISMATCH: SubdocPathMismatchError,
     C.LCB_ERR_SUBDOC_VALUE_INVALID: SubdocCantInsertValueError,
     C.LCB_ERR_SUBDOC_DELTA_INVALID: SubdocBadDeltaError,
-    C.LCB_ERR_SUBDOC_NUMBER_TOO_BIG: SubdocNumberTooBigError,
-    C.LCB_ERR_SUBDOC_GENERIC: SubdocGenericError
+    C.LCB_ERR_SUBDOC_NUMBER_TOO_BIG: SubdocNumberTooBigError
 }.items()) + list(_PYCBC_CRYPTO_ERR_MAP.items()) + list(_LCB_SYNCREP_MAP.items()))
 
 

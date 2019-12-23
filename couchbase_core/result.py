@@ -161,7 +161,7 @@ class SubdocResult(C._SDResult):
 
         :return: True if the document is accessible, False otherwise
         """
-        return self.rc == 0 or self.rc == C.LCB_ERR_SUBDOC_GENERIC
+        return self.rc == 0 or self.rc == C.LCB_ERR_SUBDOC_PATH_NOT_FOUND
 
     @property
     def value(self):

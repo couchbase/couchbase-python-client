@@ -35,9 +35,7 @@ class SubdocTest(ConnectionTestCase):
 
         # Try when path is not found
         rv = cb.retrieve_in(key, 'path2')
-        # TODO: this fails, with the subdoc generic code.  Odd.  I don't
-        # want to make it pass yet, as I think that is wrong.
-        self.assertIn(rv.rc, (E.SubdocPathNotFoundError.CODE, E.SubdocGenericError.CODE))
+        self.assertEqual(rv.rc, E.SubdocPathNotFoundError.CODE)
         self.assertRaises(E.SubdocPathNotFoundError, rv.__getitem__, 0)
         self.assertRaises(E.SubdocPathNotFoundError, rv.__getitem__, 'path2')
 
@@ -189,7 +187,11 @@ class SubdocTest(ConnectionTestCase):
             quiet=True
         )
 
-        self.assertFalse(rvs.success)
+
+        # LCB used to be consider success to be true only if it found
+        # _all_ the paths.  Now, however, lcb returns success if it found
+        # any of them, so...
+        self.assertTrue(rvs.success)
         self.assertEqual(3, rvs.result_count)
 
         self.assertEqual((0, 'value1'), rvs.get(0))
@@ -253,7 +255,9 @@ class SubdocTest(ConnectionTestCase):
         self.assertEqual(3, v3)
 
         vals = cb.retrieve_in(key, '[0]', '[34]', '[3]')
-        self.assertFalse(vals.success)
+        # even though 34 isn't there, since it did find the
+        # others, lcb says success.
+        self.assertTrue(vals.success)
         it = iter(vals)
         self.assertEqual(1, next(it))
         self.assertRaises(E.SubdocPathNotFoundError, next, it)

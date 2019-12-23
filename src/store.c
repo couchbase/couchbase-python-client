@@ -45,7 +45,7 @@ handle_item_kv(pycbc_Item *itm, PyObject *options, const struct storecmd_vars *s
     static char *itm_optlist[] = {
             "ttl", "format", "ignore_cas", "fragment", NULL };
 
-    lcb_cas_t itmcas = itm->cas;
+    unsigned long itmcas = itm->cas;
     skc->value = itm->value;
 
     if (options) {
