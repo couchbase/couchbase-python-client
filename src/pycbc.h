@@ -275,7 +275,8 @@ enum {
     /** "Extended" get replica, provides for more options */
     PYCBC_CMD_GETREPLICA_INDEX,
     PYCBC_CMD_GETREPLICA_ALL,
-    PYCBC_CMD_ENDURE
+    PYCBC_CMD_ENDURE,
+    PYCBC_CMD_EXISTS
 };
 
 /**
@@ -706,6 +707,7 @@ lcb_STATUS pycbc_log_coll(const char *TYPE,
     X(STORE, store, COLLECTION, IMPL_TYPE)                    \
     X(HTTP, http, NOCOLLECTION, IMPL_TYPE)                    \
     X(PING, ping, NOCOLLECTION, IMPL_TYPE)                    \
+    X(EXISTS, exists, COLLECTION, IMPL_TYPE)                  \
     X(SUBDOC, subdoc, COLLECTION, IMPL_TYPE)
 
 #define COLLECTION_ARG pycbc_Collection_t *
@@ -1903,7 +1905,6 @@ PyObject *pycbc_Bucket__ping(pycbc_Bucket *self,
 PyObject *pycbc_Bucket__diagnostics(pycbc_Bucket *self,
                                     PyObject *args,
                                     PyObject *kwargs);
-
 /**
  * Encryption Provider
  */

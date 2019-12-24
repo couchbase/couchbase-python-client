@@ -245,7 +245,8 @@ typedef struct {
     OBSERVEOPS(X)                                                          \
     ENDUREOPS(X)                                                           \
     X(HTTP, http)                                                          \
-    SDOPS(SUBDOC, subdoc)
+    SDOPS(SUBDOC, subdoc)                                                  \
+    X(EXISTS, exists)
 
 int pycbc_extract_respdata(const lcb_RESPBASE *resp,
                            pycbc_MultiResult *const *mres,
@@ -313,6 +314,13 @@ int pycbc_extract_respdata(const lcb_RESPBASE *resp,
         lcb_respunlock_cookie((const lcb_RESPUNLOCK *)resp, (void **)mres);
         lcb_respunlock_cas((const lcb_RESPUNLOCK *)resp,
                            (uint64_t *)&(handler->cas));
+        break;
+    case LCB_CALLBACK_EXISTS:
+        lcb_respexists_key((const lcb_RESPEXISTS *)resp,
+                           &(handler->key.buffer),
+                           &(handler->key.length));
+        handler->rc = lcb_respexists_status((lcb_RESPEXISTS *)resp);
+        lcb_respexists_cookie((const lcb_RESPEXISTS *)resp, (void **)mres);
         break;
     case LCB_CALLBACK_TOUCH:
         lcb_resptouch_key((const lcb_RESPTOUCH *)resp,
@@ -1271,6 +1279,7 @@ pycbc_callbacks_init(lcb_t instance)
     // LCB_CALLBACK_STATS, stats_callback);
     lcb_install_callback(instance, LCB_CALLBACK_PING, ping_callback);
     lcb_install_callback(instance, LCB_CALLBACK_DIAG, diag_callback);
+    lcb_install_callback(instance, LCB_CALLBACK_EXISTS, keyop_simple_callback);
 #ifdef PYCBC_EXTRA_CALLBACK_WRAPPERS
 #define X(NAME) lcb_install_callback3(instance, NAME, NAME##_cb);
     PYCBC_FOR_EACH_GEN_CALLBACK(X)

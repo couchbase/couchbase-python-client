@@ -476,6 +476,7 @@ PYCBC_DECL_OP(lock);
 PYCBC_DECL_OP(get_multi);
 PYCBC_DECL_OP(touch_multi);
 PYCBC_DECL_OP(lock_multi);
+PYCBC_DECL_OP(exists);
 
 /* get.c (replicas) */
 PYCBC_DECL_OP(_rget);

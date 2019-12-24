@@ -172,10 +172,15 @@ class TouchOptions(OptionBlock):
     pass
 
 
-class IExistsResult(object):
-    @abstractmethod
-    def exists(self):
-        pass
+class ExistsResult(object):
+  def __init__(self,
+               exists # type: Boolean
+                ):
+    self._exists = exists
+
+  @property
+  def exists(self):
+      return self._exists
 
 
 class LookupInOptions(OptionBlock):
@@ -650,7 +655,7 @@ class CBCollection(CoreClient):
                id,  # type: str
                timeout=None,  # type: timedelta
                ):
-        # type: (...) -> IExistsResult
+        # type: (...) -> ExistsResult
         """
         Any exceptions raised by the underlying platform
 
@@ -658,9 +663,15 @@ class CBCollection(CoreClient):
         :type: str
         :param timeout: the time allowed for the operation to be terminated. This is controlled by the client.
         :type: str
-        :return: An IExistsResult object with a boolean value indicating the presence of the document.
+        :return: An ExistsResult object with a boolean value indicating the presence of the document.
         :raise: Any exceptions raised by the underlying platform
         """
+        try:
+          # there probably is a better way...
+          _Base.exists(self, id)
+          return ExistsResult(True)
+        except couchbase.exceptions.KeyNotFoundException:
+          return ExistsResult(False)
 
     class UpsertOptions(OptionBlock, ClientDurableOption, ServerDurableOption):
         def __init__(self, *args, **kwargs):

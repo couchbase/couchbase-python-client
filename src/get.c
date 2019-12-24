@@ -146,6 +146,15 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
             }
         } break;
 
+        case PYCBC_CMD_EXISTS: {
+            CMDSCOPE_NG_V4(EXISTS, exists)
+            {
+                PYCBC_CMD_SET_KEY_SCOPE(exists, cmd, keybuf);
+                PYCBC_TRACECMD_TYPED(exists, cmd, context, cv->mres, curkey, self);
+                err = pycbc_exists(collection, cv->mres, cmd);
+            }
+        } break;
+
         case PYCBC_CMD_TOUCH: {
             CMDSCOPE_NG_V4(TOUCH, touch)
             {
@@ -313,6 +322,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
         gv.allow_dval = 1;
         break;
 
+    case PYCBC_CMD_EXISTS:
     case PYCBC_CMD_GETREPLICA:
     case PYCBC_CMD_GETREPLICA_INDEX:
     case PYCBC_CMD_GETREPLICA_ALL:
@@ -546,6 +556,7 @@ DECLFUNC(lock, PYCBC_CMD_LOCK, PYCBC_ARGOPT_SINGLE)
 DECLFUNC(get_multi, PYCBC_CMD_GET, PYCBC_ARGOPT_MULTI)
 DECLFUNC(touch_multi, PYCBC_CMD_TOUCH, PYCBC_ARGOPT_MULTI)
 DECLFUNC(lock_multi, PYCBC_CMD_LOCK, PYCBC_ARGOPT_MULTI)
+DECLFUNC(exists, PYCBC_CMD_EXISTS, PYCBC_ARGOPT_SINGLE)
 
 DECLFUNC(_rget, PYCBC_CMD_GETREPLICA, PYCBC_ARGOPT_SINGLE)
 DECLFUNC(_rget_multi, PYCBC_CMD_GETREPLICA, PYCBC_ARGOPT_MULTI)

@@ -348,6 +348,7 @@ typedef lcb_http_request_t pycbc_HTTP_HANDLE;
 typedef lcb_FTSHANDLE pycbc_FTS_HANDLE;
 typedef lcb_N1QLHANDLE pycbc_N1QL_HANDLE;
 typedef lcb_N1QLHANDLE pycbc_ANALYTICS_HANDLE;
+typedef lcb_CMDEXISTS pycbc_CMDEXISTS;
 
 lcb_STATUS lcb_cmdstore_durability(lcb_CMDSTORE *cmd,
                                    pycbc_DURABILITY_LEVEL level);

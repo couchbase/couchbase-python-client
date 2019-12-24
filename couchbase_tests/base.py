@@ -20,7 +20,7 @@ import types
 import platform
 import warnings
 from collections import defaultdict
-
+from functools import wraps
 from parameterized import parameterized_class
 from testfixtures import LogCapture
 
@@ -811,7 +811,7 @@ def skip_if_no_collections(func):
   @wraps(func)
   def wrap(self, *args, **kwargs):
     if not self.supports_collections():
-      raise SkipTest('groups not supported (server < 6.5?)')
+      raise SkipTest('collections not supported (server < 6.5?)')
     func(self, *args, **kwargs)
   return wrap
 

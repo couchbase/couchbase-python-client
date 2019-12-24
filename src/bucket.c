@@ -722,6 +722,7 @@ static PyMethodDef Bucket_TABLE_methods[] = {
         OPFUNC(lock_multi, NULL),
         OPFUNC(_rget, NULL),
         OPFUNC(_rgetix, NULL),
+        OPFUNC(exists, "See if key exists in collection"),
 
         OPFUNC(mutate_in, "Perform mutations in document paths"),
         OPFUNC(lookup_in, "Perform lookups in document paths"),
