@@ -92,6 +92,7 @@ def timedelta_as_microseconds(duration  # type: timedelta
     # type: (...)->int
     return int(duration.total_seconds()*1e6)
 
+
 class DefaultForwarder(Forwarder):
     def arg_mapping(self):
         return {'spec': {'specs': lambda x: x}, 'id': {},
@@ -101,17 +102,7 @@ class DefaultForwarder(Forwarder):
                 'expiry': {'ttl': timedelta_as_timestamp}, 'self': {}, 'options': {}}
 
 
-class TimeoutForwarder(Forwarder):
-    def arg_mapping(self):
-        return {'spec': {'specs': lambda x: x}, 'id': {},
-                'replicate_to': {"replicate_to": int},
-                'persist_to': {"persist_to": int},
-                'timeout': {'timeout': timedelta_as_microseconds},
-                'expiry': {'ttl': timedelta_as_timestamp}, 'self': {}, 'options': {}}
-
-
 forward_args = DefaultForwarder().forward_args
-timeout_forward_args = TimeoutForwarder().forward_args
 
 AcceptableInts = Union['ConstrainedValue', ctypes.c_int64, ctypes.c_uint64, int]
 

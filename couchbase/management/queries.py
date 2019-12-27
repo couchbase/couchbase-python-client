@@ -1,7 +1,7 @@
 from couchbase.exceptions import KeyNotFoundException, KeyExistsException
 from couchbase_core._ixmgmt import N1QL_PRIMARY_INDEX, IxmgmtRequest, N1qlIndex
 from couchbase_core.bucketmanager import BucketManager
-from couchbase.options import (OptionBlockTimeOut, timeout_forward_args as forward_args, timedelta)
+from couchbase.options import (OptionBlockTimeOut, forward_args, timedelta)
 from typing import *
 from couchbase.management.generic import GenericManager
 import attr

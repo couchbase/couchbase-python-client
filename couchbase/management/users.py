@@ -1,7 +1,7 @@
 from abc import abstractmethod
 
 from couchbase.management.admin import Admin
-from couchbase.options import timedelta, timeout_forward_args as forward_args
+from couchbase.options import timedelta, forward_args
 from couchbase.management.generic import GenericManager
 from couchbase_core import mk_formstr, JSONMapping, Mapped
 from couchbase_core.auth_domain import AuthDomain

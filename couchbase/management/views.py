@@ -22,7 +22,7 @@ from attr import ib as attrib, s as attrs, asdict
 from attr.validators import instance_of as io, deep_mapping as dm
 
 from couchbase.management.generic import GenericManager
-from couchbase.options import timeout_forward_args as forward_args
+from couchbase.options import forward_args
 from couchbase_core import JSON
 from couchbase_core._pyport import *
 from couchbase_core.bucketmanager import BucketManager
