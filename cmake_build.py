@@ -146,8 +146,9 @@ class CMakeBuild(cbuild_config.CBuildCommon):
 
             env = os.environ.copy()
             cmake_args += ['-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON']
+            cxx_compile_args=filter(re.compile(r'^(?!-std\s*=\s*c(11|99)).*').match, ext.extra_compile_args)
             env['CXXFLAGS'] = '{} {} -DVERSION_INFO=\\"{}\\"'.format(
-                env.get('CXXFLAGS', ''), ' '.join(ext.extra_compile_args),
+                env.get('CXXFLAGS', ''), ' '.join(cxx_compile_args),
                 self.distribution.get_version())
 
             env['CFLAGS'] = '{} {}'.format(

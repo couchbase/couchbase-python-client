@@ -109,7 +109,7 @@ def get_ext_options():
     extoptions, debug_symbols = get_cbuild_options()
     pkgdata = {}
     if sys.platform != 'win32':
-        extoptions['extra_compile_args'] += ['-Wno-strict-prototypes', '-fPIC']
+        extoptions['extra_compile_args'] += ['-Wno-strict-prototypes', '-fPIC','-std=c11']
         extoptions['libraries'] = ['couchbase']
         if debug_symbols:
             extoptions['extra_compile_args'] += ['-O0', '-g3']
