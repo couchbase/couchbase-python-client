@@ -16,3 +16,4 @@ utilspie==0.1.0
 python-vagrant>=0.5.15
 beautifulsoup4==4.7.1
 jira==2.0.0
+flaky>=3.6.1
