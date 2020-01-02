@@ -90,7 +90,7 @@ def timedelta_as_timestamp(duration  # type: timedelta
 def timedelta_as_microseconds(duration  # type: timedelta
                            ):
     # type: (...)->int
-    return int(duration.total_seconds()*10e6)
+    return int(duration.total_seconds()*1e6)
 
 class DefaultForwarder(Forwarder):
     def arg_mapping(self):

@@ -1,4 +1,4 @@
-from ..options import OptionBlock
+from ..options import OptionBlockTimeOut, forward_args
 from couchbase.management.admin import Admin
 from typing import *
 from .generic import GenericManager
@@ -24,9 +24,10 @@ class CollectionManager(GenericManager):
         super(CollectionManager, self).__init__(admin_bucket)
         self.bucket_name = bucket_name
 
-    def get_scope(self,  # type: CollectionManager
-                  scope_name,  # type: str
-                  *options  # type: GetScopeOptions
+    def get_scope(self,           # type: CollectionManager
+                  scope_name,     # type: str
+                  *options,       # type: GetScopeOptions
+                  **kwargs        # type: Any
                   ):
         # type: (...) -> ScopeSpec
         """
@@ -38,7 +39,8 @@ class CollectionManager(GenericManager):
         Required:
         scope_name: string - name of the scope.
         Optional:
-        Timeout or timeoutMillis (int/duration) - the time allowed for the operation to be terminated. This is controlled by the client.
+        GetScopeOptions and/or
+        keyword options (currently just timeout).
         Returns
         Throws
         ScopeNotFoundException
@@ -47,13 +49,16 @@ class CollectionManager(GenericManager):
         GET /pools/default/buckets/<bucket>/collections
         """
         try:
-          return next(s for s in self.get_all_scopes() if s.name == scope_name)
+          return next(s for s in self.get_all_scopes(*options, **kwargs) if s.name == scope_name)
         except StopIteration:
           raise ScopeNotFoundException("no scope with name {}".format(scope_name))
 
 
     @NotSupportedWrapper.a_404_means_not_supported
-    def get_all_scopes(self):
+    def get_all_scopes(self,            # type: CollectionManager
+                       *options,        # type: GetAllScopesOptions
+                       **kwargs         # type: Any
+                       ):
         # type: (...) -> Iterable[ScopeSpec]
         """Get All Scopes
         Gets all scopes. This will fetch a manifest and then pull the scopes out of it.
@@ -62,14 +67,18 @@ class CollectionManager(GenericManager):
         Parameters
         Required:
         Optional:
-        Timeout or timeoutMillis (int/duration) - the time allowed for the operation to be terminated. This is controlled by the client.
+        GetAllScopesOptions and/or
+        keyword options (currently just timeout).
         Returns
         Throws
         Any exceptions raised by the underlying platform
         Uri
         GET /pools/default/buckets/<bucket>/collections"""
-        path = "/pools/default/buckets/{}/collections".format(self.bucket_name)
-        response = self._admin_bucket.http_request(path=path, method='GET')
+        kwargs.update({
+          "path": "/pools/default/buckets/{}/collections".format(self.bucket_name),
+          "method": "GET"
+          })
+        response = self._admin_bucket.http_request(**forward_args(kwargs, *options))
         # now lets turn the response into a list of ScopeSpec...
         # the response looks like:
         # {'uid': '0', 'scopes': [{'name': '_default', 'uid': '0', 'collections': [{'name': '_default', 'uid': '0'}]}]}
@@ -82,9 +91,10 @@ class CollectionManager(GenericManager):
         return retval
 
     @CollectionsErrorHandler.mgmt_exc_wrap
-    def create_collection(self,  # type: CollectionManager
-                          collection,  # type: CollectionSpec
-                          *options  # type: CreateCollectionOptions
+    def create_collection(self,           # type: CollectionManager
+                          collection,     # type: CollectionSpec
+                          *options,       # type: CreateCollectionOptions
+                          **kwargs        # type: Any
                           ):
         """
         Create Collection
@@ -95,7 +105,8 @@ class CollectionManager(GenericManager):
         Required:
         collection: CollectionSpec - specification of the collection.
         Optional:
-        Timeout or timeoutMillis (int/duration) - the time allowed for the operation to be terminated. This is controlled by the client.
+        CreateCollectionOptions and/or
+        keyword options (currently just timeout).
         Returns
         Throws
         InvalidArgumentsException
@@ -112,15 +123,17 @@ class CollectionManager(GenericManager):
         }
 
         form = mk_formstr(params)
-        return self._admin_bucket.http_request(path=path,
-                                               method='POST',
-                                               content_type='application/x-www-form-urlencoded',
-                                               content=form)
+        kwargs.update({'path': path,
+                       'method': 'POST',
+                       'content_type': 'application/x-www-form-urlencoded',
+                       'content': form})
+        return self._admin_bucket.http_request(**forward_args(kwargs, *options))
 
     @CollectionsErrorHandler.mgmt_exc_wrap
-    def drop_collection(self,  # type: CollectionManager
-                        collection,  # type: CollectionSpec
-                        *options # type: DropCollectionOptions
+    def drop_collection(self,           # type: CollectionManager
+                        collection,     # type: CollectionSpec
+                        *options,       # type: DropCollectionOptions
+                        **kwargs        # type: Any
                         ):
         """Drop Collection
         Removes a collection.
@@ -130,7 +143,8 @@ class CollectionManager(GenericManager):
         Required:
         collection: CollectionSpec - namspece of the collection.
         Optional:
-        Timeout or timeoutMillis (int/duration) - the time allowed for the operation to be terminated. This is controlled by the client.
+        DropCollectionOptions and/or
+        keyword options (currently just timeout).
         Returns
         Throws
         CollectionNotFoundException
@@ -138,13 +152,15 @@ class CollectionManager(GenericManager):
         Uri
         DELETE http://localhost:8091/pools/default/buckets/<bucket>/collections/<scope_name>/<collection_name>
         """
-        path = "pools/default/buckets/{}/collections/{}/{}".format(self.bucket_name, collection.scope_name, collection.name)
-        self._admin_bucket.http_request(path, "DELETE")
+        kwargs.update({ 'path': "pools/default/buckets/{}/collections/{}/{}".format(self.bucket_name, collection.scope_name, collection.name),
+                        'method': 'DELETE'})
+        self._admin_bucket.http_request(**forward_args(kwargs, *options))
 
     @CollectionsErrorHandler.mgmt_exc_wrap
-    def create_scope(self,  # type: CollectionManager
-                     scope_name,  # type: str
-                     *options  # type: CreateScopeOptions
+    def create_scope(self,            # type: CollectionManager
+                     scope_name,      # type: str
+                     *options,        # type: CreateScopeOptions
+                     **kwargs         # type: Any
                      ):
         """Create Scope
         Creates a new scope.
@@ -154,7 +170,8 @@ class CollectionManager(GenericManager):
         Required:
         scope_name: String - name of the scope.
         Optional:
-        Timeout or timeoutMillis (int/duration) - the time allowed for the operation to be terminated. This is controlled by the client.
+        CreateScopeOptions and/or
+        keyword options (currently just timeout).
         Returns
         Throws
         InvalidArgumentsException
@@ -162,22 +179,23 @@ class CollectionManager(GenericManager):
         Uri
         POST http://localhost:8091/pools/default/buckets/<bucket>/collections -d name=<scope_name>
         """
-        path = "pools/default/buckets/{}/collections".format(self.bucket_name)
-
         params = {
             'name': scope_name
         }
 
         form = mk_formstr(params)
-        self._admin_bucket.http_request(path=path,
-                                        method='POST',
-                                        content_type='application/x-www-form-urlencoded',
-                                        content=form)
+        kwargs.update({'path': "pools/default/buckets/{}/collections".format(self.bucket_name),
+                       'method': 'POST',
+                       'content_type': 'application/x-www-form-urlencoded',
+                       'content': form})
+
+        self._admin_bucket.http_request(**forward_args(kwargs, *options))
 
     @CollectionsErrorHandler.mgmt_exc_wrap
-    def drop_scope(self,  # type: CollectionManager
-                   scope_name,  # type: str
-                   *options  # type: DropScopeOptions
+    def drop_scope(self,            # type: CollectionManager
+                   scope_name,      # type: str
+                   *options,        # type: DropScopeOptions
+                   **kwargs         # type: Any
                    ):
         """
         Drop Scope
@@ -188,7 +206,8 @@ class CollectionManager(GenericManager):
         Required:
         collectionName: string - name of the collection.
         Optional:
-        Timeout or timeoutMillis (int/duration) - the time allowed for the operation to be terminated. This is controlled by the client.
+        DropScopeOptions and/or
+        keyword options (currently just timeout).
         Returns
         Throws
         ScopeNotFoundException
@@ -197,7 +216,9 @@ class CollectionManager(GenericManager):
         DELETE http://localhost:8091/pools/default/buckets/<bucket>/collections/<scope_name>
         """
         path = "pools/default/buckets/{}/collections/{}".format(self.bucket_name, scope_name)
-        self._admin_bucket.http_request(path=path, method='DELETE')
+        kwargs.update({ 'path': path,
+                        'method': 'DELETE'})
+        self._admin_bucket.http_request(**forward_args(kwargs, *options))
 
 class CollectionSpec(object):
     def __init__(self,
@@ -234,34 +255,22 @@ class ScopeSpec(object):
         return self._collections
 
 
-class InsertCollectionOptions(OptionBlock):
+
+class GetAllScopesOptions(OptionBlockTimeOut):
     pass
 
-
-class InsertScopeOptions(OptionBlock):
+class GetScopeOptions(GetAllScopesOptions):
     pass
 
-
-class GetScopeOptions(object):
+class CreateCollectionOptions(OptionBlockTimeOut):
     pass
 
-
-class GetAllScopesOptions(object):
+class DropCollectionOptions(OptionBlockTimeOut):
     pass
 
-
-class CreateCollectionOptions(object):
+class CreateScopeOptions(OptionBlockTimeOut):
     pass
 
-
-class DropCollectionOptions(object):
-    pass
-
-
-class CreateScopeOptions(object):
-    pass
-
-
-class DropScopeOptions(object):
+class DropScopeOptions(OptionBlockTimeOut):
     pass
 
