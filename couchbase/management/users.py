@@ -270,7 +270,10 @@ class UserManager(GenericManager):
 
         group_dict = group.as_dict()
         form_data = mk_formstr(group_dict)
-        self._admin_bucket.http_request("/settings/rbac/groups/{}".format(group.name), 'PUT', form_data,
+        self._admin_bucket.http_request(path="/settings/rbac/groups/{}".format(group.name),
+                                        method='PUT',
+                                        content=form_data,
+                                        content_type='application/x-www-form-urlencoded',
                                         **forward_args(kwargs, *options))
 
     @overload
@@ -425,57 +428,8 @@ class RoleAndOrigins(object):
         pass
 
 
-class IUser(object):
-    def __init__(self):
-        """Mutable. Models the user properties that may be updated via this API.
-        All properties of the User class MUST have associated setters except for "username" which is fixed when the object is created"""
 
-    @property
-    @abstractmethod
-    def username(self):
-        # type: (...) -> str
-        pass
-
-    @property
-    @abstractmethod
-    def display_name(self):
-        # type: (...) -> str
-        pass
-
-    @property
-    @abstractmethod
-    def groups(self):
-        # type: (...) -> Set[str]
-        pass
-        """names of the groups"""
-
-    @property
-    @abstractmethod
-    def roles(self):
-        # type: (...) -> Set[Role]
-        """only roles assigned directly to the user (not inherited from groups)"""
-        pass
-
-    @property
-    @abstractmethod
-    def password(self):
-        # type: (...) -> None
-        pass
-        """ From the user's perspective the password property is "write-only".
-        The accessor SHOULD be hidden from the user and be visible only to the manager implementation."""
-
-    @password.setter
-    @abstractmethod
-    def password(self, value):
-        pass
-
-    @property
-    @abstractmethod
-    def as_dict(self):
-        pass
-
-
-class User(IUser):
+class User(object):
     @overload
     def __init__(self, username=None, display_name=None, password=None, groups=None, roles=None):
         pass
@@ -600,43 +554,10 @@ class RawUserAndMetadata(UserAndMetadata):
         return set(self._raw_data.get('external_groups'))
 
 
-class IGroup(object):
-    """Mutable. Defines a set of roles that may be inherited by users.
-    All properties of the Group class MUST have associated setters except for "name" which is fixed when the object is created."""
-
-    @property
-    @abstractmethod
-    def name(self):
-        # type: (...) -> str
-        pass
-
-    @property
-    @abstractmethod
-    def description(self):
-        # type: (...) -> str
-        pass
-
-    @property
-    @abstractmethod
-    def roles(self):
-        # type: (...) -> Set[Role]
-        """- Role as defined in the User Manager section"""
-        pass
-
-    @property
-    @abstractmethod
-    def ldap_group_reference(self):
-        # type: (...) -> str
-        pass
-
-    @abstractmethod
-    def as_dict(self):
-        # type: (...) -> Mapping[str, Any]
-        pass
-
-
-class Group(JSONMapping, IGroup):
-    defaults = {'description': '', 'ldap_group_ref': ''}
+class Group(JSONMapping):
+    @staticmethod
+    def defaults():
+      return {'description': '', 'ldap_group_ref': ''}
 
     @overload
     def __init__(self, name, description=None, roles=None, ldap_group_reference=None):
@@ -666,7 +587,10 @@ class Group(JSONMapping, IGroup):
 
     def as_dict(self):
         result = {k: v for k, v in self._raw_json.items() if v}
-        result['roles'] = ','.join(map(ulp.quote, result['roles']))
+        if 'roles' in result:
+          result['roles'] = ','.join(map(ulp.quote, result['roles']))
+        else:
+          result['roles'] = []
         return result
 
     def __eq__(self, other):

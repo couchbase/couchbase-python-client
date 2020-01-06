@@ -9,7 +9,7 @@ from couchbase_tests.base import CollectionTestCase
 from couchbase_core.exceptions import  NotSupportedError
 from typing import *
 import re
-
+from datetime import timedelta
 
 UG_WORKING = os.getenv("PYCBC_UPSERT_GROUP_WORKING")
 
@@ -36,18 +36,14 @@ class UserManagementTests(CollectionTestCase):
         self.um = self.cluster.users()
         if not self.is_realserver:
             raise SkipTest('Real server must be used for admin tests')
-        try:
-            self.um.upsert_group(Group('qweqwe'))
-        except:
-            pass
+
+        if self.supports_groups():
+          self.um.upsert_group(Group('qweqwe', roles={Role.of(name='admin')}))
+
 
     def tearDown(self):
-        try:
-            if UG_WORKING:
-                self.um.drop_group('qweqwe')
-            pass
-        except:
-            pass
+      if self.supports_groups():
+        self.um.drop_group('qweqwe')
 
     def test_create_list_get_remove_internal_user(self):
 
@@ -124,9 +120,9 @@ class UserManagementTests(CollectionTestCase):
 
     @skip_if_no_groups
     def test_groups(self):
-        fresh_group = Group(name='qweqwe', roles={Role.of(name='admin')})
-        if UG_WORKING:
-            self.um.upsert_group(fresh_group)
+        role = Role.of(name='admin')
+        fresh_group = Group(name='qweqwe', roles={role})
+        self.um.upsert_group(fresh_group)
         result = self.um.get_group('qweqwe')
         admin_role = Role.of(name='admin')
         expected_roles = {admin_role}
@@ -136,11 +132,17 @@ class UserManagementTests(CollectionTestCase):
     @skip_if_no_groups
     def test_get_all_groups(self):
         all_groups = self.um.get_all_groups()
-        self.assertEqual([Group('qweqwe', roles={RawRole('admin', None)})], all_groups)
+        # NOTE: we could well have other groups on this server, apart from the one we added, so
+        # lets be ok with there being more of them.  However, the one we added _MUST_ be there.
+        known_group = Group('qweqwe', roles={RawRole('admin', None)})
+        for g in all_groups:
+          if known_group == g:
+            return
+        self.fail("didn't find expected group in get_all_groups")
 
     @skip_if_no_groups
     def test_timeout(self):
-        self.um.get_all_groups(timeout=0.1)
+        self.um.get_all_groups(timeout=timedelta(seconds = 0.1))
 
     def test_get_roles(self):
         roles = self.um.get_roles()
