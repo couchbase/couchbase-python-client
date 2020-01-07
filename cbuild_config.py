@@ -303,7 +303,10 @@ class CBuildCommon(build_ext):
         ext.extra_compile_args += lcb_api_flags
         compiler = self.compiler  # type: CCompiler
         lcb_include = os.path.join(self.build_temp, "install", "include")
-        compiler.add_include_dir(lcb_include)
+        try:
+            compiler.set_include_dirs([lcb_include]+compiler.include_dirs)
+        except:
+            compiler.add_include_dirs([lcb_include])
         lib_dirs = [self.info.pkg_data_dir] + self.info.get_lcb_dirs()
         try:
             existing_lib_dirs = compiler.library_dirs
