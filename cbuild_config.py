@@ -176,7 +176,7 @@ class CBuildInfo:
         plat = get_plat_code()
 
         print("Got platform {}".format(plat))
-        default = ['libcouchbase.so', 'libcouchbase.so.2', 'libcouchbase.so.3','libcouchbase.so.4']
+        default = ['libcouchbase.so.5']
         return {'darwin': ['libcouchbase.2.dylib', 'libcouchbase.dylib'], 'linux': default,
                 'win': ['libcouchbase_d.dll','libcouchbase.dll']}.get(get_plat_code(), default)
 
