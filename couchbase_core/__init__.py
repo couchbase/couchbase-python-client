@@ -207,23 +207,25 @@ class JSONMapping(object):
                 self._raw_json[k] = v
 
     @staticmethod
-    def _genprop(dict_key
+    def _genprop(dict_key  # type: str
                  ):
-        # type->
+        # type: (...) -> property
         def fget(self):
-            return self._raw_json.get(dictkey, None)
+            return self._raw_json.get(dict_key, None)
 
         def fset(self, val):
-            self._raw_json[dictkey] = val
+            self._raw_json[dict_key] = val
 
         def fdel(self):
             try:
-                del self._raw_json[dictkey]
+                del self._raw_json[dict_key]
             except KeyError:
                 pass
 
         return property(fget, fset, fdel)
 
+    def defaults(self):
+        return {}
 
 class Mapped(with_metaclass(ABCMeta)):
     @classmethod
