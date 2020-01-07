@@ -1009,8 +1009,22 @@ class ErrorMapper(object):
                 for orig_exc, text_to_final_exc in cls._compiled_mapping().items():
                     if isinstance(e, orig_exc):
                         extra = getattr(e, 'objextra', None)
+                        # TODO: this parsing is fragile, lets ponder a better approach, if any
                         if extra:
                             value = getattr(extra, 'value', "")
+                            # this value could be a string or a json-encoded string...
+                            try:
+                              value = json.loads(value)
+                            except:
+                              #try:
+                              #  value.decode()
+                              #except:
+                               pass
+                            if isinstance(value, dict):
+                              # there should be a key with the error
+                              errors = value.get('errors', None)
+                              if isinstance(errors, dict):
+                                value = errors['name']
                             # 404s in particular can have bytes for the body, so call
                             # decode (which uses utf-8 by default) to convert to string to make the regex happy
                             try:

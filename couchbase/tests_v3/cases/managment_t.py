@@ -2,7 +2,7 @@ import os
 from unittest import SkipTest
 
 from couchbase import CBCollection
-from couchbase.exceptions import CouchbaseError
+from couchbase.exceptions import CouchbaseError, BucketDoesNotExistException, BucketAlreadyExistsException
 from couchbase_core.connstr import ConnectionString
 from couchbase.management.buckets import CreateBucketSettings, BucketSettings
 from couchbase_tests.base import CollectionTestCase
@@ -15,14 +15,28 @@ class BucketManagementTests(CollectionTestCase):
         if not self.is_realserver:
             raise SkipTest('Real server must be used for admin tests')
 
-        #if not os.environ.get('PYCBC_TEST_ADMIN'):
-        #    raise SkipTest('PYCBC_TEST_ADMIN must be set in the environment')
+        # clean up test bucket just in case
+        try:
+          self.bm.drop_bucket('fred')
+        except:
+          pass
 
     def test_bucket_create(self):
         try:
             self.bm.create_bucket(CreateBucketSettings(name="fred", bucket_type="couchbase", ram_quota_mb=100))
         finally:
             self.bm.drop_bucket('fred')
+
+    def test_bucket_create_fail(self):
+      settings = CreateBucketSettings(name='fred', bucket_type='couchbase', ram_quota_mb=100)
+      self.bm.create_bucket(settings)
+      self.assertRaises(BucketAlreadyExistsException, self.bm.create_bucket, settings)
+
+    def test_bucket_drop_fail(self):
+      settings = CreateBucketSettings(name='fred', bucket_type='couchbase', ram_quota_mb=100)
+      self.bm.create_bucket(settings)
+      self.bm.drop_bucket('fred')
+      self.assertRaises(BucketDoesNotExistException, self.bm.drop_bucket, 'fred')
 
     def test_bucket_list(self):
         buckets_to_add = {'fred': {}, 'jane': {}, 'sally': {}}

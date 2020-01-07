@@ -83,6 +83,12 @@ class ScopeAlreadyExistsException(KeyValueException):
 class ScopeNotFoundException(KeyValueException):
   pass
 
+class BucketAlreadyExistsException(KeyValueException):
+  pass
+
+class BucketDoesNotExistException(KeyValueException):
+  pass
+
 class PartialViewResultException(ViewException):
     #? (returns rows that it did get)
     pass

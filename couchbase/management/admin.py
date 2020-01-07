@@ -161,7 +161,7 @@ class Admin(LCB.Collection):
                                   timeout=timeout)
 
     bc_defaults=dict(bucket_type='couchbase',
-                  bucket_password='', replicas=0, ram_quota=1024,
+                  bucket_password='', replicas=0,
                   flush_enabled=False)
 
     def bucket_create(self, name, **kwargs):
@@ -179,20 +179,20 @@ class Admin(LCB.Collection):
             not have strict disk persistence requirements
         :param string bucket_password: The bucket password. This can be
             empty to disable authentication. This can be changed later on
-            using :meth:`bucket_update`
+            using :meth:`update_bucket`
         :param int replicas: The number of replicas to use for this
             bucket. The maximum number of replicas is currently 3.
-            This setting can be changed via :meth:`bucket_update`
+            This setting can be changed via :meth:`update_bucket`
         :param int ram_quota:
             The maximum amount of memory (per node) that this bucket
             may use, in megabytes. The minimum for this value is 100.
-            This setting may be changed via :meth:`bucket_update`.
+            This setting may be changed via :meth:`update_bucket`.
         :param bool flush_enabled:
             Whether the flush API is enabled. When the flush API is
             enabled, any client connected to the bucket is able to
             clear its contents. This may be useful in development but
             not recommended in production. This setting may be changed
-            via :meth:`bucket_update`
+            via :meth:`update_bucket`
         :return: A :class:`~.HttpResult`
         :raise: :exc:`~.HTTPError` if the bucket could not be created.
         """
@@ -264,7 +264,7 @@ class Admin(LCB.Collection):
             :attr:`~.HttpResult.value` attribute contains
             A dictionary containing the bucket's information.
             The returned object is considered to be opaque, and is
-            intended primarily for use with :meth:`bucket_update`.
+            intended primarily for use with :meth:`update_bucket`.
             Currently this returns the raw decoded JSON as emitted
             by the corresponding server-side API
         :raise: :exc:`~.HTTPError` if the request failed
