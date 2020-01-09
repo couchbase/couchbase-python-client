@@ -22,7 +22,7 @@ from couchbase_v2.bucket import Bucket
 from couchbase_core._pyport import with_metaclass
 
 
-class AsyncBucket(with_metaclass(CoreAsyncBucketFactory, Bucket)):
+class AsyncBucket(CoreAsyncBucketFactory.gen_async_client(Bucket)):
     def __init__(self, *args, **kwargs):
         super(AsyncBucket,self).__init__(*args,**kwargs)
 

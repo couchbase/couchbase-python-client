@@ -232,16 +232,9 @@ class GetResult(Result, IGetResult):
 T = TypeVar('T', bound=Tuple[IResult, ...])
 
 
-class AsyncWrapper(type):
-    def __new__(cls,  # type: Type
-                name,  # type: str
-                bases,  # type: T
-                attrs  # type: Mapping[str,Any]
-                ):
-        # type: (...) -> T[0]
-
-        base = bases[0]
-
+class AsyncWrapper(object):
+    @staticmethod
+    def gen_wrapper(base):
         class Wrapped(base):
             def __init__(self,
                          sdk2_result,
@@ -283,7 +276,7 @@ class SDK2GetResult(GetResult):
         return extract_value(self._original, lambda x: x)
 
 
-class SDK2AsyncResult(with_metaclass(AsyncWrapper, SDK2GetResult)):
+class SDK2AsyncResult(AsyncWrapper.gen_wrapper(SDK2GetResult)):
     def __init__(self,
                  sdk2_result,  # type: SDK2Result
                  expiry=None,  # type: timedelta
@@ -299,7 +292,7 @@ class SDK2MutationResult(MutationResult):
         super(SDK2MutationResult, self).__init__(sdk2_result.cas, error=sdk2_result.rc, mutation_token=muttoken)
 
 
-class SDK2AsyncMutationResult(with_metaclass(AsyncWrapper, SDK2MutationResult)):
+class SDK2AsyncMutationResult(AsyncWrapper.gen_wrapper(SDK2MutationResult)):
     def __init__(self,
                  sdk2_result  # type: SDK2Result
                  ):

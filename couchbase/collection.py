@@ -1380,6 +1380,6 @@ Collection = CBCollection
 UpsertOptions = CBCollection.UpsertOptions
 
 
-class AsyncCBCollection(with_metaclass(AsyncClientFactory, CBCollection)):
+class AsyncCBCollection(AsyncClientFactory.gen_async_client(CBCollection)):
     def __init__(self, *args, **kwargs):
         super(AsyncCBCollection, self).__init__(*args, **kwargs)

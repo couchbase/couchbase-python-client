@@ -29,9 +29,9 @@ from couchbase_core.client import Client as CoreClient
 
 
 class AsyncClientFactory(type):
-    def __new__(cls, name, bases, attrs):
-        syncbase=bases[0]
-        class AsyncClient(syncbase):
+    @staticmethod
+    def gen_async_client(syncbase):
+        class AsyncClientSpecialised(syncbase):
             """
             This class contains the low-level async implementation of the
             :class:`~couchbase_core.client.Client` interface. **This module is not intended to be
@@ -154,7 +154,7 @@ class AsyncClientFactory(type):
                 # kwargs['unlock_gil'] = False
                 # This is always set to false in connection.c
 
-                super(AsyncClient, self).__init__(*args, **kwargs)
+                super(AsyncClientSpecialised, self).__init__(*args, **kwargs)
 
             def view_query(self, *args, **kwargs):
                 """
@@ -173,16 +173,16 @@ class AsyncClientFactory(type):
                     raise ArgumentError.pyexc("itercls must be defined "
                                               "and must be derived from AsyncViewBase")
 
-                return super(AsyncClient, self).view_query(*args, **kwargs)
+                return super(AsyncClientSpecialised, self).view_query(*args, **kwargs)
 
             def endure(self, key, *args, **kwargs):
-                res = super(AsyncClient, self).endure_multi([key], *args, **kwargs)
+                res = super(AsyncClientSpecialised, self).endure_multi([key], *args, **kwargs)
                 res._set_single()
                 return res
 
-        return AsyncClient
+        return AsyncClientSpecialised
 
 
-class AsyncClient(with_metaclass(AsyncClientFactory, CoreClient)):
+class AsyncClient(AsyncClientFactory.gen_async_client(CoreClient)):
     def __init__(self, *args, **kwargs):
         super(AsyncClient, self).__init__(*args, **kwargs)

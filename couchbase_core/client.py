@@ -1024,7 +1024,7 @@ class Client(_Base):
         return _Base.upsert_multi(self, keys, ttl=ttl, format=format,
                                   persist_to=persist_to,
                                   replicate_to=replicate_to,
-                                  durability_level=durability_level)
+                                  durability_level=durability_level.value)
 
     def insert_multi(self,  # type: Client
                      keys,  # type: Mapping[str,Any]
@@ -1042,7 +1042,7 @@ class Client(_Base):
         return _Base.insert_multi(self, keys, ttl=ttl, format=format,
                                   persist_to=persist_to,
                                   replicate_to=replicate_to,
-                                  durability_level=durability_level)
+                                  durability_level=durability_level.value)
 
     def replace_multi(self,  # type: Client
                       keys,  # type: Mapping[str,Any]
@@ -1080,7 +1080,7 @@ class Client(_Base):
         return _Base.replace_multi(self, keys, ttl=ttl, format=format,
                                    persist_to=persist_to,
                                    replicate_to=replicate_to,
-                                   durability_level=durability_level)
+                                   durability_level=durability_level.value)
 
     def append_multi(self,  # type: Client
                      keys,  # type: Mapping[str,Any]
@@ -1176,7 +1176,7 @@ class Client(_Base):
 
         .. seealso:: :meth:`touch`
         """
-        return _Base.touch_multi(self, keys, ttl=ttl, durability_level=durability_level)
+        return _Base.touch_multi(self, keys, ttl=ttl, durability_level=durability_level.value)
 
     def lock_multi(self,  # type: Client
                    keys,  # type: Iterable[str]
@@ -1264,7 +1264,7 @@ class Client(_Base):
             values.
         :param Durability durability_level: Sync replication durability level.
         """
-        return _Base.remove_multi(self, kvs, quiet=quiet, durability_level=durability_level)
+        return _Base.remove_multi(self, kvs, quiet=quiet, durability_level=durability_level.value)
 
     def counter_multi(self,
                       kvs,
@@ -1315,7 +1315,7 @@ class Client(_Base):
         specified.
         """
         return _Base.counter_multi(self, kvs, initial=initial, delta=delta,
-                                   ttl=ttl, durability_level=durability_level)
+                                   ttl=ttl, durability_level=durability_level.value)
 
     @classmethod
     def _gen_memd_wrappers(cls, factory):

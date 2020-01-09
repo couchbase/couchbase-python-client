@@ -14,8 +14,8 @@ from couchbase.collection import AsyncCBCollection as BaseAsyncCBCollection
 
 
 class AsyncBucketFactory(type):
-    def __new__(cls, name, bases, attrs):
-        asyncbase = bases[0]
+    @staticmethod
+    def gen_async_bucket(asyncbase):
         n1ql_query = getattr(asyncbase, 'n1ql_query', getattr(asyncbase, 'query', None))
         view_query = getattr(asyncbase, 'view_query', getattr(asyncbase, 'query', None))
 
@@ -51,35 +51,37 @@ class AsyncBucketFactory(type):
                     self._connect()
                     return self._cft
 
-        def _meth_factory(meth, name):
-            def ret(self, *args, **kwargs):
-                rv = meth(self, *args, **kwargs)
-                ft = asyncio.Future()
+            locals().update(asyncbase._gen_memd_wrappers(AsyncBucketFactory._meth_factory))
 
-                def on_ok(res):
-                    ft.set_result(res)
-                    rv.clear_callbacks()
+        return Bucket
 
-                def on_err(res, excls, excval, exctb):
-                    err = excls(excval)
-                    ft.set_exception(err)
-                    rv.clear_callbacks()
+    @staticmethod
+    def _meth_factory(meth, name):
+        def ret(self, *args, **kwargs):
+            rv = meth(self, *args, **kwargs)
+            ft = asyncio.Future()
 
-                rv.set_callbacks(on_ok, on_err)
-                return ft
+            def on_ok(res):
+                ft.set_result(res)
+                rv.clear_callbacks()
 
-            return ret
+            def on_err(res, excls, excval, exctb):
+                err = excls(excval)
+                ft.set_exception(err)
+                rv.clear_callbacks()
 
-        attrs.update(asyncbase._gen_memd_wrappers(_meth_factory))
-        return super(AsyncBucketFactory, cls).__new__(cls, name, (Bucket,) + bases[1:], attrs)
+            rv.set_callbacks(on_ok, on_err)
+            return ft
+
+        return ret
 
 
-class V3CoreClient(with_metaclass(AsyncBucketFactory, CoreAsyncClient)):
+class V3CoreClient(AsyncBucketFactory.gen_async_bucket(CoreAsyncClient)):
     def __init__(self, *args, **kwargs):
         super(V3CoreClient, self).__init__(*args, **kwargs)
 
 
-class AsyncCBCollection(with_metaclass(AsyncBucketFactory, BaseAsyncCBCollection)):
+class AsyncCBCollection(AsyncBucketFactory.gen_async_bucket(BaseAsyncCBCollection)):
     def __init__(self,
                  *args,
                  **kwargs
