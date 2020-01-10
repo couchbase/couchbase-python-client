@@ -788,6 +788,15 @@ class ClusterTestCase(CouchbaseTestCase):
     def assertCas(self, item):
         self.validator.assertCas(item)
 
+    def try_n_times(self, num_times, seconds_between, func, *args):
+      for _ in range(num_times):
+        try:
+          ret = func(*args)
+          return ret
+        except:
+          time.sleep(seconds_between)
+      self.fail("unsuccessful {} after {} times, waiting {} seconds between calls".format(func, num_times, seconds_between))
+
     def factory(self, *args, **kwargs):
         return V3Bucket(*args, username="default", **kwargs).default_collection()
     def setUp(self, **kwargs):

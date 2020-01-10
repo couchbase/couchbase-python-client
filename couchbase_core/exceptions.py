@@ -1013,24 +1013,9 @@ class ErrorMapper(object):
                         if extra:
                             value = getattr(extra, 'value', "")
                             # this value could be a string or a json-encoded string...
-                            try:
-                              value = json.loads(value)
-                            except:
-                              #try:
-                              #  value.decode()
-                              #except:
-                               pass
                             if isinstance(value, dict):
                               # there should be a key with the error
-                              errors = value.get('errors', None)
-                              if isinstance(errors, dict):
-                                value = errors['name']
-                            # 404s in particular can have bytes for the body, so call
-                            # decode (which uses utf-8 by default) to convert to string to make the regex happy
-                            try:
-                              value = value.decode()
-                            except:
-                              pass
+                              value = value.get('error', None)
                             for pattern, exc in text_to_final_exc.items():
                                 if pattern.match(value):
                                     raise exc.pyexc(e.message, extra, e)

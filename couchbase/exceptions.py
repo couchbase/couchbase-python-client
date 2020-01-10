@@ -35,6 +35,9 @@ Etc.
 Expected to be handled specifically by the application to perform an additional action such as retrying to check if the key has become unlocked.
 """
 
+class SearchIndexNotFoundException(SearchException):
+  pass
+
 
 class KeyNotFoundException(KeyValueException, couchbase_core.exceptions.NotFoundError):
     pass
@@ -200,7 +203,8 @@ class DocumentMutationLostException(CouchbaseError):
 class ReplicaNotAvailableException(CouchbaseError):
     pass
 
-
+class InvalidArgumentsException(CouchbaseError):
+  pass
 
 _PYCBC_CRYPTO_ERR_MAP ={
     C.PYCBC_CRYPTO_PROVIDER_NOT_FOUND: couchbase_core.exceptions.CryptoProviderNotFoundException,

@@ -1,6 +1,7 @@
 from typing import *
 
 from couchbase.management.queries import QueryIndexManager
+from couchbase.management.search import SearchIndexManager
 from couchbase_core.exceptions import CouchbaseError
 from .management.users import UserManager
 from .management.buckets import BucketManager
@@ -289,6 +290,10 @@ class Cluster(object):
     def query_indexes(self):
         # type: (...) -> QueryIndexManager
         return QueryIndexManager(self.admin)
+
+    def search_indexes(self):
+      # type: (...) => SearchIndexManager
+      return SearchIndexManager(self.admin)
 
     def nodes(self):
         # type: (...) -> INodeManager

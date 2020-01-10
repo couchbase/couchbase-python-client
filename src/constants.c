@@ -149,6 +149,7 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
     ADD_MACRO(LCB_HTTP_TYPE_CBAS);
     ADD_MACRO(LCB_HTTP_TYPE_RAW);
     ADD_MACRO(LCB_HTTP_TYPE_MANAGEMENT);
+    ADD_MACRO(LCB_HTTP_TYPE_FTS);
 
     ADD_MACRO(PYCBC_RESFLD_CAS);
     ADD_MACRO(PYCBC_RESFLD_FLAGS);
