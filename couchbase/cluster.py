@@ -240,10 +240,10 @@ class Cluster(object):
                      ):
         # type: (...) -> ISearchResult
         """
-        Executes a Search or FTS query against the remote cluster and returns a ISearchResult implementation with the results of the query.
+        Executes a Search or F.T.S. query against the remote cluster and returns a ISearchResult implementation with the results of the query.
 
-        :param query: the fluent search API to construct a query for FTS
-        :param options: the options to pass to the cluster with the query based off the FTS/Search RFC
+        :param query: the fluent search API to construct a query for F.T.S.
+        :param options: the options to pass to the cluster with the query based off the F.T.S./Search RFC
         :return: An ISearchResult object with the results of the query or error message if the query failed on the server.
         Any exceptions raised by the underlying platform - HTTP_TIMEOUT for example.
         :except    ServiceNotFoundException - service does not exist or cannot be located.

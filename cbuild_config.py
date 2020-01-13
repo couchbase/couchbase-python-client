@@ -92,6 +92,7 @@ def get_cbuild_options():
                   "PYCBC_LCB_API": string_option,
                   "PYCBC_REF_ACCOUNTING": boolean_option,
                   "PYCBC_TRACING_DISABLE": boolean_option, "PYCBC_DEBUG": boolean_option,
+                  "PYCBC_GEN_PYTHON": boolean_option,
                   "PYCBC_CRYPTO_VERSION": boolean_option, comp_option_pattern(COMP_OPTION_PREFIX): comp_option,
                   comp_option_pattern(COMP_OPTION_BOOL_PREFIX): comp_option_bool,
                   comp_option_pattern(CLANG_SAN_PREFIX): comp_clang_san_option}

@@ -290,7 +290,7 @@ class CouchbaseError(Exception):
 
 """
 Service Exceptions
-A Service level exception is any error or exception thrown or handled by one of the specific Couchbase Services: Query/N1QL, FTS, Analytics, View and Key/Value (Memcached). The exception or error names for each service are:
+A Service level exception is any error or exception thrown or handled by one of the specific Couchbase Services: Query/N1QL, F.T.S., Analytics, View and Key/Value (Memcached). The exception or error names for each service are:
 
 QueryException
 SearchException
@@ -320,7 +320,7 @@ class SearchException(CouchbaseError):
     """Message
     The error message returned by the Search service
     Properties
-    The error(s) returned by response from the server by the FTS Service
+    The error(s) returned by response from the server by the F.T.S. Service
     Any additional information returned by the server, the node it executed on, payload, HTTP status
     """
 

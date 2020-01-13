@@ -88,7 +88,7 @@ class MutationState(object):
 
     def _to_fts_encodable(self):
         if len(self._sv) > 1:
-            raise TypeError('Cannot use more than a single bucket with FTS')
+            raise TypeError('Cannot use more than a single bucket with F.T.S.')
         from couchbase_core._pyport import single_dict_key
         out = {}
         for vb, params in self._sv[single_dict_key(self._sv)].items():

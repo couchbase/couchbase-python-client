@@ -5,7 +5,7 @@ import couchbase_core.fulltext as cbft
 from couchbase_v2.mutation_state import MutationState
 
 
-class FTStringsTest(CouchbaseTestCase):
+class SearchStringsTest(CouchbaseTestCase):
     def test_fuzzy(self):
         q = cbft.TermQuery('someterm', field='field', boost=1.5,
                            prefix_length=23, fuzziness=12)

@@ -11,7 +11,7 @@ from .views.params import make_options_string, make_dvpath
 import couchbase_core._libcouchbase as _LCB
 from couchbase_core._libcouchbase import FMT_JSON, FMT_BYTES
 
-from couchbase_core import priv_constants as _P, fulltext as _FTS, _depr, subdocument as SD, exceptions
+from couchbase_core import priv_constants as _P, fulltext as _SEARCH, _depr, subdocument as SD, exceptions
 import couchbase_core.analytics
 from typing import *
 from .durability import Durability
@@ -595,11 +595,11 @@ class Client(_Base):
 
         """
 
-        return self._cntl(op=_LCB.TRACING_THRESHOLD_N1QL, value_type="timeout")
+        return self._cntl(op=_LCB.TRACING_THRESHOLD_QUERY, value_type="timeout")
 
     @tracing_threshold_n1ql.setter
     def tracing_threshold_n1ql(self, val):
-        self._cntl(op=_LCB.TRACING_THRESHOLD_N1QL, value=val, value_type="timeout")
+        self._cntl(op=_LCB.TRACING_THRESHOLD_QUERY, value=val, value_type="timeout")
 
     @property
     def tracing_threshold_view(self):
@@ -629,11 +629,11 @@ class Client(_Base):
 
         """
 
-        return self._cntl(op=_LCB.TRACING_THRESHOLD_FTS, value_type="timeout")
+        return self._cntl(op=_LCB.TRACING_THRESHOLD_SEARCH, value_type="timeout")
 
     @tracing_threshold_fts.setter
     def tracing_threshold_fts(self, val):
-        self._cntl(op=_LCB.TRACING_THRESHOLD_FTS, value=val, value_type="timeout")
+        self._cntl(op=_LCB.TRACING_THRESHOLD_SEARCH, value=val, value_type="timeout")
 
     @property
     def tracing_threshold_analytics(self):
@@ -967,10 +967,10 @@ class Client(_Base):
                 print(hit)
 
         """
-        itercls = kwargs.pop('itercls', _FTS.SearchRequest)
+        itercls = kwargs.pop('itercls', _SEARCH.SearchRequest)
         iterargs = itercls.mk_kwargs(kwargs)
-        params = kwargs.pop('params', _FTS.Params(**kwargs))
-        body = _FTS.make_search_body(index, query, params)
+        params = kwargs.pop('params', _SEARCH.Params(**kwargs))
+        body = _SEARCH.make_search_body(index, query, params)
         return itercls(body, self, **iterargs)
 
     def upsert_multi(self,  # type: Client

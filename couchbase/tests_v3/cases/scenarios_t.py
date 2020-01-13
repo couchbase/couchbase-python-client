@@ -484,7 +484,7 @@ class Scenarios(CollectionTestCase):
     def test_cluster_search(self  # type: ClusterTestCase
                             ):
         if self.is_mock:
-            raise SkipTest("FTS not supported by mock")
+            raise SkipTest("F.T.S. not supported by mock")
         most_common_term_max = 10
         initial=time.time()
         x = self.cluster.search_query("beer-search", FT.TermQuery("category"),

@@ -149,7 +149,7 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
     ADD_MACRO(LCB_HTTP_TYPE_CBAS);
     ADD_MACRO(LCB_HTTP_TYPE_RAW);
     ADD_MACRO(LCB_HTTP_TYPE_MANAGEMENT);
-    ADD_MACRO(LCB_HTTP_TYPE_FTS);
+    ADD_MACRO(LCB_HTTP_TYPE_SEARCH);
 
     ADD_MACRO(PYCBC_RESFLD_CAS);
     ADD_MACRO(PYCBC_RESFLD_FLAGS);
@@ -208,8 +208,8 @@ do_all_constants(PyObject *module, pycbc_constant_handler handler)
     ADD_MACRO(LCB_CNTL_VIEW_TIMEOUT);
     ADD_MACRO(LCB_CNTL_SSL_MODE);
     ADD_MACRO(LCB_SSL_ENABLED);
-    ADD_MACRO(LCB_CNTL_N1QL_TIMEOUT);
-	ADD_MACRO(LCB_CNTL_COMPRESSION_OPTS);
+    ADD_MACRO(LCB_CNTL_QUERY_TIMEOUT);
+    ADD_MACRO(LCB_CNTL_COMPRESSION_OPTS);
     ADD_MACRO(LCB_CNTL_LOG_REDACTION);
     ADD_MACRO(LCB_CNTL_ENABLE_COLLECTIONS);
     ADD_STRING(LCB_LOG_MD_OTAG);
@@ -283,9 +283,9 @@ static void setup_tracing_map(PyObject *module,
     X(TRACING_THRESHOLD_QUEUE_FLUSH_INTERVAL, convert_timevalue) DIV\
     X(TRACING_THRESHOLD_QUEUE_SIZE, convert_u32) DIV\
     X(TRACING_THRESHOLD_KV, convert_timevalue) DIV\
-    X(TRACING_THRESHOLD_N1QL, convert_timevalue) DIV\
+    X(TRACING_THRESHOLD_QUERY, convert_timevalue) DIV\
     X(TRACING_THRESHOLD_VIEW, convert_timevalue) DIV\
-    X(TRACING_THRESHOLD_FTS, convert_timevalue) DIV\
+    X(TRACING_THRESHOLD_SEARCH, convert_timevalue) DIV\
     X(TRACING_THRESHOLD_ANALYTICS, convert_timevalue)
 
     PyObject* convert_timevalue = pycbc_SimpleStringZ("timeout");
@@ -318,7 +318,9 @@ static void setup_tracing_map(PyObject *module,
 #define X(NAME,TYPE)\
     {\
         PyObject* as_string = pycbc_SimpleStringZ(#NAME);\
-        PyObject* as_lower_case = PyObject_CallMethod(as_string, "lower","");\
+        PyObject* as_lower_case_raw = PyObject_CallMethod(as_string, "lower","");\
+        PyObject* as_string_fts = PyObject_CallMethod(as_lower_case_raw, "replace", "ss", "search","fts");\
+        PyObject* as_lower_case = PyObject_CallMethod(as_string_fts, "replace", "ss", "query","n1ql");\
         PyObject* as_words = PyObject_CallMethod(as_lower_case, "replace", "ss", "_", " ");\
         pycbc_replace_str(&as_words, "analytics", "for analytics");\
         pycbc_replace_str(&as_words, "n1ql", "for N1QL");\
@@ -333,7 +335,7 @@ static void setup_tracing_map(PyObject *module,
         "\n"\
         "    ::\n"\
         "        # Set %S to " TYPE##_desc_val TYPE##_desc_val_units "\n"\
-        "        cb.%S=" TYPE##_desc_val "\n" \
+        "        cb.%S = " TYPE##_desc_val "\n" \
         "\n"\
         "    \"\"\"\n"\
         "    \n"\
@@ -341,12 +343,13 @@ static void setup_tracing_map(PyObject *module,
         pycbc_print_pyformat(\
         "@%S.setter\n"\
         "def %S(self, val):\n"\
-        "    return self._cntl(op=_LCB." #NAME ", value=val, value_type=\"%S\")\n\n", as_lower_case, as_lower_case, TYPE);\
+        "    self._cntl(op=_LCB." #NAME ", value=val, value_type=\"%S\")\n\n", as_lower_case, as_lower_case, TYPE);\
         Py_DecRef(as_words);\
         Py_DecRef(as_lower_case);\
+        Py_DecRef(as_string_fts);\
+        Py_DecRef(as_lower_case_raw);\
         Py_DecRef(as_string);\
     }
-
 #ifdef PYCBC_GEN_PYTHON
 LCB_FOR_EACH_THRESHOLD_PARAM(X, ; );
 #endif

@@ -16,7 +16,7 @@
 #
 
 """
-This file contains the FTS implementation for Async
+This file contains the F.T.S. implementation for Async
 """
 
 from couchbase_core.fulltext import SearchRequest

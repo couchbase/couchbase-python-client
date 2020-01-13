@@ -27,8 +27,8 @@ typedef struct {
     union {
         pycbc_HTTP_HANDLE htreq;
         pycbc_VIEW_HANDLE vh;
-        pycbc_N1QL_HANDLE n1ql;
-        pycbc_FTS_HANDLE fts;
+        pycbc_QUERY_HANDLE query;
+        pycbc_SEARCH_HANDLE search;
         pycbc_ANALYTICS_HANDLE analytics;
     } u;
     unsigned int format;

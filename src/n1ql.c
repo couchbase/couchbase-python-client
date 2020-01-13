@@ -88,7 +88,7 @@ void pycbc_add_row_or_data(pycbc_MultiResult *mres,
 
 #ifdef PYCBC_QUERY_GEN
 PYCBC_QUERY_CALLBACK(ANALYTICS, analytics)
-PYCBC_QUERY_CALLBACK(N1QL, n1ql)
+PYCBC_QUERY_CALLBACK(QUERY, query)
 #else
 
 static void analytics_row_callback(lcb_t instance, int ign, const lcb_RESPANALYTICS *respbase) {
@@ -126,55 +126,60 @@ static void analytics_row_callback(lcb_t instance, int ign, const lcb_RESPANALYT
     }
 }
 
-static void n1ql_row_callback(lcb_t instance, int ign, const lcb_RESPN1QL *respbase) {
+static void query_row_callback(lcb_t instance,
+                               int ign,
+                               const lcb_RESPQUERY *respbase)
+{
     pycbc_MultiResult *mres = ((void *) 0);
     pycbc_Bucket *bucket = ((void *) 0);
     pycbc_ViewResult *vres = ((void *)0);
     const char *const *hdrs = ((void *) 0);
     short htcode = 0;
     const lcb_RESPHTTP *htresp = ((void *) 0);
-    const lcb_RESPN1QL *resp = (const lcb_RESPN1QL *) respbase;
-    lcb_respn1ql_cookie(resp, (void **) &mres);
+    const lcb_RESPQUERY *resp = (const lcb_RESPQUERY *)respbase;
+    lcb_respquery_cookie(resp, (void **)&mres);
     pycbc_extract_unlock_bucket(mres, &bucket, &vres);
-    lcb_respn1ql_http_response(resp, &htresp);
+    lcb_respquery_http_response(resp, &htresp);
     pycbc_get_headers_status(htresp, &hdrs, &htcode);
     if (vres) {
         const char *rows = ((void *) 0);
         size_t row_count = 0;
-        int is_final = lcb_respn1ql_is_final(resp);
-        lcb_respn1ql_row(resp, &rows, &row_count);
+        int is_final = lcb_respquery_is_final(resp);
+        lcb_respquery_row(resp, &rows, &row_count);
         pycbc_add_row_or_data(mres, vres, rows, row_count, is_final);
-        pycbc_viewresult_step(vres, mres, bucket, lcb_respn1ql_is_final(resp));
+        pycbc_viewresult_step(vres, mres, bucket, lcb_respquery_is_final(resp));
     }
-    if (lcb_respn1ql_is_final(resp)) {
+    if (lcb_respquery_is_final(resp)) {
         if (vres) {
-            pycbc_httpresult_complete(
-                    &vres->base, mres, lcb_respn1ql_status(resp), htcode, hdrs);
+            pycbc_httpresult_complete(&vres->base,
+                                      mres,
+                                      lcb_respquery_status(resp),
+                                      htcode,
+                                      hdrs);
         }
-    }
-    else {
+    } else {
         PYCBC_CONN_THR_BEGIN(bucket);
     }
 }
 #endif
 
-#define PYCBC_ADHOC(CMD, PREPARED) \
-    if (PREPARED) {                \
-        lcb_cmdn1ql_adhoc(cmd, 1); \
+#define PYCBC_ADHOC(CMD, PREPARED)  \
+    if (PREPARED) {                 \
+        lcb_cmdquery_adhoc(cmd, 1); \
     }
 #define PYCBC_HOST(CMD, HOST)               \
     if (HOST) {                             \
         pycbc_cmdanalytics_host(CMD, HOST); \
     }
-#define PYCBC_N1QL_MULTIAUTH(CMD, IS_XBUCKET)                                \
-    {                                                                        \
-        lcb_STATUS ma_status =                                               \
-                is_xbucket ? pycbc_cmdn1ql_multiauth(cmd, 1) : rc;           \
-        if (ma_status) {                                                     \
-            PYCBC_DEBUG_LOG_CONTEXT(context,                                 \
-                                    "Couldn't set multiauth: %s",            \
-                                    lcb_strerror_short(ma_status))           \
-        }                                                                    \
+#define PYCBC_QUERY_MULTIAUTH(CMD, IS_XBUCKET)                      \
+    {                                                               \
+        lcb_STATUS ma_status =                                      \
+                is_xbucket ? pycbc_cmdquery_multiauth(cmd, 1) : rc; \
+        if (ma_status) {                                            \
+            PYCBC_DEBUG_LOG_CONTEXT(context,                        \
+                                    "Couldn't set multiauth: %s",   \
+                                    lcb_strerror_short(ma_status))  \
+        }                                                           \
     }
 
 #define PYCBC_HANDLE_QUERY(UC, LC, ADHOC, HOST, MULTIAUTH)      \
@@ -223,7 +228,8 @@ typedef lcb_STATUS (*pycbc_query_handler)(const pycbc_Bucket *self,
 #undef PYCBC_QUERY_GEN
 #ifdef PYCBC_QUERY_GEN
 PYCBC_HANDLE_QUERY(ANALYTICS, analytics, PYCBC_DUMMY, PYCBC_HOST, PYCBC_DUMMY);
-PYCBC_HANDLE_QUERY(N1QL, n1ql, PYCBC_ADHOC, PYCBC_DUMMY, PYCBC_N1QL_MULTIAUTH);
+PYCBC_HANDLE_QUERY(
+        QUERY, query, PYCBC_ADHOC, PYCBC_DUMMY, PYCBC_QUERY_MULTIAUTH);
 
 #else
 lcb_STATUS pycbc_handle_analytics(const pycbc_Bucket *self,
@@ -263,32 +269,38 @@ GT_DONE:
     return rc;
 };
 
-lcb_STATUS
-pycbc_handle_n1ql(const pycbc_Bucket *self, const char *params, unsigned int nparams, const char *host, int is_prepared,
-                  int is_xbucket, pycbc_MultiResult *mres, pycbc_ViewResult *vres, pycbc_stack_context_handle context)
+lcb_STATUS pycbc_handle_query(const pycbc_Bucket *self,
+                              const char *params,
+                              unsigned int nparams,
+                              const char *host,
+                              int is_prepared,
+                              int is_xbucket,
+                              pycbc_MultiResult *mres,
+                              pycbc_ViewResult *vres,
+                              pycbc_stack_context_handle context)
 {
     (void)host;
     lcb_STATUS rc = LCB_SUCCESS;
     {
-        CMDSCOPE_NG(N1QL, n1ql)
+        CMDSCOPE_NG(QUERY, query)
         {
-            lcb_cmdn1ql_callback(cmd, n1ql_row_callback);
-            lcb_cmdn1ql_payload(cmd, params, nparams);
-            lcb_cmdn1ql_handle(cmd, &(vres->base.u.n1ql));
+            lcb_cmdquery_callback(cmd, query_row_callback);
+            lcb_cmdquery_payload(cmd, params, nparams);
+            lcb_cmdquery_handle(cmd, &(vres->base.u.query));
             if (is_prepared) {
-                lcb_cmdn1ql_adhoc(cmd, 1);
+                lcb_cmdquery_adhoc(cmd, 1);
             }
             {
                 lcb_STATUS ma_status =
-                        is_xbucket ? pycbc_cmdn1ql_multiauth(cmd, 1) : rc;
+                        is_xbucket ? pycbc_cmdquery_multiauth(cmd, 1) : rc;
                 if (ma_status) {
                 }
             }
             PYCBC_TRACECMD_SCOPED_NULL(rc,
-                                       n1ql,
+                                       query,
                                        self->instance,
                                        cmd,
-                                       vres->base.u.n1ql,
+                                       vres->base.u.query,
                                        context,
                                        mres,
                                        cmd)
@@ -333,9 +345,9 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     pycbc_httpresult_init(&vres->base, mres);
     vres->rows = PyList_New(0);
     vres->base.format = PYCBC_FMT_JSON;
-    vres->base.htype = is_analytics ? PYCBC_HTTP_HANALYTICS : PYCBC_HTTP_HN1QL;
+    vres->base.htype = is_analytics ? PYCBC_HTTP_HANALYTICS : PYCBC_HTTP_HQUERY;
 
-    static pycbc_query_handler handlers[] = {pycbc_handle_n1ql,
+    static pycbc_query_handler handlers[] = {pycbc_handle_query,
                                              pycbc_handle_analytics};
     rc = (handlers[is_analytics])(
             self, params, nparams, host, is_prepared, is_xbucket, mres, vres, context);

@@ -32,8 +32,8 @@ typedef lcb_INSTANCE *lcb_t;
 
 typedef lcb_VIEW_HANDLE *pycbc_VIEW_HANDLE;
 typedef lcb_HTTP_HANDLE *pycbc_HTTP_HANDLE;
-typedef lcb_FTS_HANDLE *pycbc_FTS_HANDLE;
-typedef lcb_N1QL_HANDLE *pycbc_N1QL_HANDLE;
+typedef lcb_SEARCH_HANDLE *pycbc_SEARCH_HANDLE;
+typedef lcb_QUERY_HANDLE *pycbc_QUERY_HANDLE;
 typedef lcb_ANALYTICS_HANDLE *pycbc_ANALYTICS_HANDLE;
 
 /** Set this flag to execute an actual get with each response */
@@ -342,7 +342,7 @@ int pycbc_sdresult_next(const lcb_RESPSUBDOC *resp,
 
 void pycbc_cmdsubdoc_flags_from_scv(unsigned int flags, lcb_CMDSUBDOC *cmd);
 
-lcb_STATUS pycbc_cmdn1ql_multiauth(lcb_CMDN1QL* cmd, int enable);
+lcb_STATUS pycbc_cmdquery_multiauth(lcb_CMDQUERY *cmd, int enable);
 
 lcb_STATUS pycbc_cmdanalytics_host(lcb_CMDANALYTICS* CMD, const char* host);
 
@@ -365,7 +365,7 @@ typedef lcb_DURABILITY_LEVEL pycbc_DURABILITY_LEVEL;
 #define PYCBC_X_DURLEVEL(X)           \
     X(NONE)                           \
     X(MAJORITY)                       \
-    X(MAJORITY_AND_PERSIST_ON_MASTER) \
+    X(MAJORITY_AND_PERSIST_TO_ACTIVE) \
     X(PERSIST_TO_MAJORITY)
 
 #define PYCBX_X_SYNCREPERR(X)                                                 \

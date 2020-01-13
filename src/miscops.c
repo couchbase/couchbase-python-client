@@ -149,7 +149,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, p
     PyObject *kobj = NULL;
     char persist_to = 0, replicate_to = 0;
     pycbc_DURABILITY_LEVEL durability_level =
-            LCB_DURABILITYLEVEL_MAJORITY_AND_PERSIST_ON_MASTER;
+            LCB_DURABILITYLEVEL_MAJORITY_AND_PERSIST_TO_ACTIVE;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
 
     static char *kwlist[] = {"keys",

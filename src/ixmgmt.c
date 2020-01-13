@@ -27,11 +27,11 @@ mgmt_callback(lcb_t instance, int ign, const lcb_RESPN1XMGMT *resp)
     if (resp->inner) {
         const char *row = NULL;
         size_t row_count;
-        lcb_respn1ql_row(resp->inner, &row, &row_count);
+        lcb_respquery_row(resp->inner, &row, &row_count);
         pycbc_httpresult_add_data(mres, &vres->base, row, row_count);
         {
             const lcb_RESPHTTP *inner_http = NULL;
-            lcb_respn1ql_http_response(resp->inner, &inner_http);
+            lcb_respquery_http_response(resp->inner, &inner_http);
             if (inner_http) {
                 lcb_resphttp_headers(inner_http, &hdrs);
                 htcode = lcb_resphttp_status(inner_http);

@@ -229,62 +229,79 @@ void lcb_cmdhttp_path(lcb_CMDHTTP *htcmd, const char *path, size_t length)
     }
 }
 
-lcb_STATUS pycbc_cmdn1ql_multiauth(lcb_CMDN1QL* cmd, int enable) {
-
+lcb_STATUS pycbc_cmdquery_multiauth(lcb_CMDQUERY *cmd, int enable)
+{
     (cmd)->cmdflags = ((cmd)->cmdflags & ~LCB_CMD_F_MULTIAUTH) | ((enable)? LCB_CMD_F_MULTIAUTH: 0);
     return LCB_SUCCESS;
 }
 
 lcb_STATUS pycbc_cmdanalytics_host(lcb_CMDANALYTICS *CMD, const char *host) {
-    CMD->cmdflags |= LCB_CMDN1QL_F_ANALYTICSQUERY;
+    CMD->cmdflags |= LCB_CMDQUERY_F_ANALYTICSQUERY;
     CMD->host = host;
     return LCB_SUCCESS;
 }
 
-lcb_STATUS lcb_n1ql(lcb_t instance, const void *cookie, const lcb_CMDN1QL *cmd)
+lcb_STATUS lcb_query(lcb_t instance,
+                     const void *cookie,
+                     const lcb_CMDQUERY *cmd)
 {
     return lcb_n1ql_query(instance, cookie, cmd);
 }
 lcb_STATUS lcb_analytics(lcb_t instance,
                          const void *cookie,
-                         const lcb_CMDN1QL *cmd)
+                         const lcb_CMDQUERY *cmd)
 {
     return lcb_n1ql_query(instance, cookie, cmd);
 }
 
-lcb_STATUS lcb_respfts_http_response(const lcb_RESPFTS *resp, const lcb_RESPHTTP **ptr) {
+lcb_STATUS lcb_respsearch_http_response(const lcb_RESPSEARCH *resp,
+                                        const lcb_RESPHTTP **ptr)
+{
     *ptr=resp->htresp;
     return LCB_SUCCESS;
 }
 
-lcb_STATUS lcb_respfts_row(const lcb_RESPFTS *resp, const char **pString, size_t *pInt) {
+lcb_STATUS lcb_respsearch_row(const lcb_RESPSEARCH *resp,
+                              const char **pString,
+                              size_t *pInt)
+{
     *pString=resp->row;
     *pInt=resp->nrow;
     return LCB_SUCCESS;
 }
 
-int lcb_respfts_is_final(const lcb_RESPFTS *resp) {
+int lcb_respsearch_is_final(const lcb_RESPSEARCH *resp)
+{
     return resp->rflags && LCB_RESP_F_FINAL;
 }
 
-lcb_STATUS lcb_respfts_status(const lcb_RESPFTS *resp) {
+lcb_STATUS lcb_respsearch_status(const lcb_RESPSEARCH *resp)
+{
     return resp->rc;
 }
 
-
-lcb_STATUS lcb_cmdfts_callback(lcb_CMDFTS *cmd, void (*callback)(lcb_t, int, const lcb_RESPFTS *)) {
+lcb_STATUS lcb_cmdsearch_callback(lcb_CMDSEARCH *cmd,
+                                  void (*callback)(lcb_t,
+                                                   int,
+                                                   const lcb_RESPSEARCH *))
+{
     cmd->callback=callback;
     return LCB_SUCCESS;
 }
 
-lcb_STATUS lcb_cmdfts_query(lcb_CMDFTS *cmd, const void *pVoid, size_t length) {
+lcb_STATUS lcb_cmdsearch_query(lcb_CMDSEARCH *cmd,
+                               const void *pVoid,
+                               size_t length)
+{
     cmd->query=pVoid;
     cmd->nquery=length;
     return LCB_SUCCESS;
 }
 
-lcb_STATUS lcb_cmdfts_handle(lcb_CMDFTS *cmd, pycbc_FTS_HANDLE *pFTSREQ) {
-    cmd->handle=pFTSREQ;
+lcb_STATUS lcb_cmdsearch_handle(lcb_CMDSEARCH *cmd,
+                                pycbc_SEARCH_HANDLE *pSEARCHREQ)
+{
+    cmd->handle = pSEARCHREQ;
     return LCB_SUCCESS;
 }
 

@@ -30,7 +30,7 @@ class SearchIndexManager(GenericManager):
 
     imeth = METHMAP[method]
     return self._admin_bucket._http_request(
-        type=LCB.LCB_HTTP_TYPE_FTS,
+        type=LCB.LCB_HTTP_TYPE_SEARCH,
         path=kwargs['path'],
         method=imeth,
         content_type=kwargs.get('content_type', 'application/json'),

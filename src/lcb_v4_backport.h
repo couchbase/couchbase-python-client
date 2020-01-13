@@ -91,15 +91,15 @@ typedef lcb_error_t lcb_STATUS;
 #define lcb_resphttp_body(resp, bodybuffer, bodylength) \
     *(bodybuffer) = resp->body;                         \
     (*bodylength) = resp->nbody;
-#define lcb_respn1ql_http_response(INNER, DEST) *(DEST) = INNER->htresp;
-#define lcb_respn1ql_row(INNER, ROW, ROW_COUNT) \
-    {                                           \
-        *(ROW) = (INNER)->row;                  \
-        *(ROW_COUNT) = (INNER)->nrow;           \
+#define lcb_respquery_http_response(INNER, DEST) *(DEST) = INNER->htresp;
+#define lcb_respquery_row(INNER, ROW, ROW_COUNT) \
+    {                                            \
+        *(ROW) = (INNER)->row;                   \
+        *(ROW_COUNT) = (INNER)->nrow;            \
     }
-#define lcb_respn1ql_cookie(RESP, DEST) *(DEST) = (RESP)->cookie;
-#define lcb_respn1ql_is_final(RESP) (RESP)->rflags &LCB_RESP_F_FINAL
-#define lcb_respn1ql_status(RESP) (RESP)->rc
+#define lcb_respquery_cookie(RESP, DEST) *(DEST) = (RESP)->cookie;
+#define lcb_respquery_is_final(RESP) (RESP)->rflags &LCB_RESP_F_FINAL
+#define lcb_respquery_status(RESP) (RESP)->rc
 #define lcb_respanalytics_http_response(INNER, DEST) *(DEST) = INNER->htresp;
 #define lcb_respanalytics_row(INNER, ROW, ROW_COUNT) \
     {                                           \
@@ -121,21 +121,21 @@ typedef lcb_error_t lcb_STATUS;
 #define pycbc_mctx_fail(mctx) mctx->fail(mctx)
 #define lcb_respobserve_flags(RESP, DEST) *(DEST) = (RESP)->flags;
 
-#define lcb_cmdn1ql_create(CMD) \
-    lcb_CMDN1QL cmd_real = {0}; \
+#define lcb_cmdquery_create(CMD) \
+    lcb_CMDQUERY cmd_real = {0}; \
     cmd = &cmd_real;
-#define lcb_cmdn1ql_callback(CMD, CALLBACK) (CMD)->callback = (CALLBACK)
-#define lcb_cmdn1ql_query(CMD, PARAMS, NPARAMS) \
-    (CMD)->query = PARAMS;                      \
+#define lcb_cmdquery_callback(CMD, CALLBACK) (CMD)->callback = (CALLBACK)
+#define lcb_cmdquery_query(CMD, PARAMS, NPARAMS) \
+    (CMD)->query = PARAMS;                       \
     (CMD)->nquery = NPARAMS;
-#define lcb_cmdn1ql_handle(CMD, HANDLE) (CMD)->handle = HANDLE
-#define lcb_cmdn1ql_adhoc(CMD, ENABLE)               \
+#define lcb_cmdquery_handle(CMD, HANDLE) (CMD)->handle = HANDLE
+#define lcb_cmdquery_adhoc(CMD, ENABLE)              \
     ((CMD)->cmdflags) &= (~LCB_CMDN1QL_F_PREPCACHE); \
     ((CMD)->cmdflags) |= (ENABLE ? LCB_CMDN1QL_F_PREPCACHE : 0);
-#define lcb_cmdn1ql_parent_span(...) lcb_n1ql_set_parent_span(__VA_ARGS__)
+#define lcb_cmdquery_parent_span(...) lcb_n1ql_set_parent_span(__VA_ARGS__)
 
 #define lcb_cmdanalytics_create(CMD) \
-    lcb_CMDN1QL cmd_real = {0}; \
+    lcb_CMDQUERY cmd_real = {0};     \
     cmd = &cmd_real;
 #define lcb_cmdanalytics_callback(CMD, CALLBACK) (CMD)->callback = (CALLBACK)
 #define lcb_cmdanalytics_query(CMD, PARAMS, NPARAMS) \
@@ -144,11 +144,13 @@ typedef lcb_error_t lcb_STATUS;
 #define lcb_cmdanalytics_handle(CMD, HANDLE) (CMD)->handle = HANDLE
 #define lcb_cmdanalytics_parent_span(...) lcb_n1ql_set_parent_span(__VA_ARGS__)
 
-lcb_STATUS lcb_n1ql(lcb_t instance, const void *cookie, const lcb_CMDN1QL *cmd);
+lcb_STATUS lcb_query(lcb_t instance,
+                     const void *cookie,
+                     const lcb_CMDQUERY *cmd);
 
 lcb_STATUS lcb_analytics(lcb_t instance,
                          const void *cookie,
-                         const lcb_CMDN1QL *cmd);
+                         const lcb_CMDQUERY *cmd);
 
 #define lcb_fts lcb_fts_query
 
@@ -238,12 +240,12 @@ lcb_STATUS pycbc_cmdview_spatial(lcb_CMDVIEW *pCmdview, int is_spatial);
     LCB_CMD_SET_TRACESPAN((CMD), (SPAN));
 #define lcb_cmdendure_parent_span(CMD, ...) \
     LCB_CMD_SET_TRACESPAN((CMD), __VA_ARGS__);
-#define lcb_cmdfts_parent_span(...) lcb_fts_set_parent_span(__VA_ARGS__)
+#define lcb_cmdsearch_parent_span(...) lcb_fts_set_parent_span(__VA_ARGS__)
 #define lcb_cmdping_create(CMD) \
     lcb_CMDPING cmd_real = {0}; \
     *(CMD) = &cmd_real;
 
-#define lcb_respfts_cookie(RESP,DEST) *(DEST)=(RESP)->cookie;
+#define lcb_respsearch_cookie(RESP, DEST) *(DEST) = (RESP)->cookie;
 
 #define pycbc_resphttp_cookie(resp, type, target) \
     (*((type *)(target))) = resp->cookie;
@@ -277,8 +279,8 @@ lcb_STATUS pycbc_cmdview_spatial(lcb_CMDVIEW *pCmdview, int is_spatial);
 
 #define LCB_PING_SERVICE_KV LCB_PINGSVC_KV
 #define LCB_PING_SERVICE_VIEWS LCB_PINGSVC_VIEWS
-#define LCB_PING_SERVICE_N1QL LCB_PINGSVC_N1QL
-#define LCB_PING_SERVICE_FTS LCB_PINGSVC_FTS
+#define LCB_PING_SERVICE_QUERY LCB_PINGSVC_QUERY
+#define LCB_PING_SERVICE_SEARCH LCB_PINGSVC_FTS
 #define LCB_PING_SERVICE_ANALYTICS LCB_PINGSVC_ANALYTICS
 #define LCB_PING_SERVICE__MAX LCB_PINGSVC__MAX
 
@@ -309,7 +311,7 @@ typedef lcb_DURABILITYLEVEL pycbc_DURABILITY_LEVEL;
 #else
 typedef int pycbc_DURABILITY_LEVEL;
 #define LCB_DURABILITYLEVEL_NONE 0
-#define LCB_DURABILITYLEVEL_MAJORITY_AND_PERSIST_ON_MASTER -1
+#    define LCB_DURABILITYLEVEL_MAJORITY_AND_PERSIST_TO_ACTIVE -1
 #    define LCB_ERR_COLLECTION_NOT_FOUND -1;
 #endif
 
@@ -341,32 +343,42 @@ typedef lcb_CMDUNLOCK *pycbc_CMDUNLOCK;
 typedef lcb_CMDENDURE *pycbc_CMDENDURE;
 typedef lcb_CMDHTTP *pycbc_CMDHTTP;
 typedef lcb_CMDSTORE *pycbc_CMDSTORE;
-typedef lcb_CMDN1QL lcb_CMDANALYTICS;
+typedef lcb_CMDQUERY lcb_CMDANALYTICS;
 typedef lcb_SDSPEC pycbc_SDSPEC;
 typedef lcb_VIEWHANDLE pycbc_VIEW_HANDLE;
 typedef lcb_http_request_t pycbc_HTTP_HANDLE;
-typedef lcb_FTSHANDLE pycbc_FTS_HANDLE;
-typedef lcb_N1QLHANDLE pycbc_N1QL_HANDLE;
+typedef lcb_FTSHANDLE pycbc_SEARCH_HANDLE;
+typedef lcb_N1QLHANDLE pycbc_QUERY_HANDLE;
 typedef lcb_N1QLHANDLE pycbc_ANALYTICS_HANDLE;
 typedef lcb_CMDEXISTS pycbc_CMDEXISTS;
+typedef lcb_RESPFTS lcb_RESPSEARCH;
+typedef lcb_CMDFTS lcb_CMDSEARCH;
 
 lcb_STATUS lcb_cmdstore_durability(lcb_CMDSTORE *cmd,
                                    pycbc_DURABILITY_LEVEL level);
 
-lcb_STATUS lcb_respfts_http_response(const lcb_RESPFTS *resp, const lcb_RESPHTTP **ptr);
+lcb_STATUS lcb_respsearch_http_response(const lcb_RESPSEARCH *resp,
+                                        const lcb_RESPHTTP **ptr);
 
-lcb_STATUS lcb_respfts_row(const lcb_RESPFTS *resp, const char **pString, size_t *pInt);
+lcb_STATUS lcb_respsearch_row(const lcb_RESPSEARCH *resp,
+                              const char **pString,
+                              size_t *pInt);
 
-int lcb_respfts_is_final(const lcb_RESPFTS *resp);
+int lcb_respsearch_is_final(const lcb_RESPSEARCH *resp);
 
-lcb_STATUS lcb_respfts_status(const lcb_RESPFTS *resp);
+lcb_STATUS lcb_respsearch_status(const lcb_RESPSEARCH *resp);
 
+lcb_STATUS lcb_cmdsearch_callback(lcb_CMDSEARCH *cmd,
+                                  void (*callback)(lcb_t,
+                                                   int,
+                                                   const lcb_RESPSEARCH *));
 
-lcb_STATUS lcb_cmdfts_callback(lcb_CMDFTS *cmd, void (*callback)(lcb_t, int, const lcb_RESPFTS *));
+lcb_STATUS lcb_cmdsearch_query(lcb_CMDSEARCH *cmd,
+                               const void *pVoid,
+                               size_t length);
 
-lcb_STATUS lcb_cmdfts_query(lcb_CMDFTS *cmd, const void *pVoid, size_t length);
-
-lcb_STATUS lcb_cmdfts_handle(lcb_CMDFTS *cmd, pycbc_FTS_HANDLE *pFTSREQ);
+lcb_STATUS lcb_cmdsearch_handle(lcb_CMDSEARCH *cmd,
+                                pycbc_SEARCH_HANDLE *pSEARCHREQ);
 
 int lcb_mutation_token_is_valid(const lcb_MUTATION_TOKEN *pTOKEN);
 
@@ -740,7 +752,7 @@ struct lcb_CMDHTTP;
 void lcb_cmdhttp_path(lcb_CMDHTTP *htcmd, const char *path, size_t length);
 typedef lcb_U64 lcb_STORE_OPERATION;
 
-lcb_STATUS pycbc_cmdn1ql_multiauth(lcb_CMDN1QL* cmd, int enable);
+lcb_STATUS pycbc_cmdquery_multiauth(lcb_CMDQUERY *cmd, int enable);
 lcb_STATUS pycbc_cmdanalytics_host(lcb_CMDANALYTICS *CMD, const char *host);
 
 #define CMDSCOPE_CREATECMD_RAW_V3(UC, LC, CMD, ...) \

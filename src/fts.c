@@ -1,21 +1,22 @@
 #include "oputil.h"
 #include "pycbc_http.h"
 
-
-static void fts_row_callback(lcb_t instance, int ign, const lcb_RESPFTS *resp)
+static void fts_row_callback(lcb_t instance,
+                             int ign,
+                             const lcb_RESPSEARCH *resp)
 {
     pycbc_MultiResult *mres = NULL;
     pycbc_Bucket *bucket = NULL;
     pycbc_ViewResult *vres;
     const char *const *hdrs = NULL;
     short htcode = 0;
-    lcb_respfts_cookie(resp, (void **)&mres);
+    lcb_respsearch_cookie(resp, (void **)&mres);
     bucket = mres->parent;
     PYCBC_CONN_THR_END(bucket);
     vres = (pycbc_ViewResult *)PyDict_GetItem((PyObject *)mres, Py_None);
     {
         const lcb_RESPHTTP *lcb_resphttp = NULL;
-        lcb_respfts_http_response(resp, &lcb_resphttp);
+        lcb_respsearch_http_response(resp, &lcb_resphttp);
         if (lcb_resphttp) {
             lcb_resphttp_headers(lcb_resphttp, &hdrs);
             htcode = lcb_resphttp_status(lcb_resphttp);
@@ -23,8 +24,8 @@ static void fts_row_callback(lcb_t instance, int ign, const lcb_RESPFTS *resp)
     }
     {
         pycbc_strn_base_const row = {0};
-        lcb_respfts_row(resp, &row.buffer, &row.length);
-        if (lcb_respfts_is_final(resp)) {
+        lcb_respsearch_row(resp, &row.buffer, &row.length);
+        if (lcb_respsearch_is_final(resp)) {
             pycbc_httpresult_add_data_strn(mres, &vres->base, row);
         } else {
             /* Like views, try to decode the row and invoke the callback; if we
@@ -33,10 +34,10 @@ static void fts_row_callback(lcb_t instance, int ign, const lcb_RESPFTS *resp)
             pycbc_viewresult_addrow(vres, mres, row.buffer, row.length);
         }
     }
-    pycbc_viewresult_step(vres, mres, bucket, lcb_respfts_is_final(resp));
-    if (lcb_respfts_is_final(resp)) {
+    pycbc_viewresult_step(vres, mres, bucket, lcb_respsearch_is_final(resp));
+    if (lcb_respsearch_is_final(resp)) {
         pycbc_httpresult_complete(
-                &vres->base, mres, lcb_respfts_status(resp), htcode, hdrs);
+                &vres->base, mres, lcb_respsearch_status(resp), htcode, hdrs);
     } else {
         PYCBC_CONN_THR_BEGIN(bucket);
     }
@@ -71,8 +72,9 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
         goto GT_FAIL;
     }
     if (self->pipeline_queue) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_PIPELINE, 0,
-                       "FTS queries cannot be executed in pipeline context");
+        PYCBC_EXC_WRAP(PYCBC_EXC_PIPELINE,
+                       0,
+                       "Search queries cannot be executed in pipeline context");
     }
 
     mres = (pycbc_MultiResult *)pycbc_multiresult_new(self);
@@ -80,16 +82,16 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     pycbc_httpresult_init(&vres->base, mres);
     vres->rows = PyList_New(0);
     vres->base.format = PYCBC_FMT_JSON;
-    vres->base.htype = PYCBC_HTTP_HFTS;
+    vres->base.htype = PYCBC_HTTP_HSEARCH;
     {
-        CMDSCOPE_NG(FTS, fts)
+        CMDSCOPE_NG(SEARCH, search)
         {
-            lcb_cmdfts_callback(cmd, fts_row_callback);
-            lcb_cmdfts_payload(cmd, buf.buffer, buf.length);
-            lcb_cmdfts_handle(cmd, &vres->base.u.fts);
+            lcb_cmdsearch_callback(cmd, fts_row_callback);
+            lcb_cmdsearch_payload(cmd, buf.buffer, buf.length);
+            lcb_cmdsearch_handle(cmd, &vres->base.u.search);
 
             PYCBC_TRACECMD_SCOPED_GENERIC(rc,
-                                          fts,
+                                          search,
                                           query,
                                           self->instance,
                                           cmd,

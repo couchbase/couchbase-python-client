@@ -57,8 +57,8 @@ HttpResult_headers(pycbc_HttpResult *self, void *unused)
 
 #define PYCBC_FOR_EACH_HTTP_OPTYPE(X) \
     X(VIEW, vh, view)                 \
-    X(N1QL, n1ql, n1ql)               \
-    X(FTS, fts, fts)                  \
+    X(QUERY, query, query)            \
+    X(SEARCH, search, search)         \
     X(RAW, htreq, http)               \
     X(ANALYTICS, analytics, analytics)
 
@@ -81,11 +81,11 @@ HttpResult_dealloc(pycbc_HttpResult *self)
             case PYCBC_HTTP_HVIEW:
                 lcb_view_cancel(self->parent->instance, self->u.vh);
                 break;
-            case PYCBC_HTTP_HN1QL:
-                lcb_n1ql_cancel(self->parent->instance, self->u.n1ql);
+            case PYCBC_HTTP_HQUERY:
+                lcb_query_cancel(self->parent->instance, self->u.query);
                 break;
-            case PYCBC_HTTP_HFTS:
-                lcb_fts_cancel(self->parent->instance, self->u.fts);
+            case PYCBC_HTTP_HSEARCH:
+                lcb_fts_cancel(self->parent->instance, self->u.search);
                 break;
             case PYCBC_HTTP_HRAW:
                 lcb_http_cancel(self->parent->instance, self->u.htreq);

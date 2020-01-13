@@ -1038,8 +1038,8 @@ bootstrap_callback(lcb_t instance, lcb_STATUS err)
 #define LCB_PING_FOR_ALL_TYPES(X) \
     X(KV, kv)                     \
     X(VIEWS, views)               \
-    X(N1QL, n1ql)                 \
-    X(FTS, fts)                   \
+    X(QUERY, query)               \
+    X(SEARCH, search)             \
     X(ANALYTICS, analytics)
 
 const char *get_type_s(lcb_PING_SERVICE type)

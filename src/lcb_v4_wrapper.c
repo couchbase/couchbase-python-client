@@ -131,7 +131,8 @@ const lcb_MUTATION_TOKEN *pycbc_get_vbucket_mutation_token(
     return NULL;
 }
 
-lcb_STATUS pycbc_cmdn1ql_multiauth(lcb_CMDN1QL* cmd, int enable) {
+lcb_STATUS pycbc_cmdquery_multiauth(lcb_CMDQUERY *cmd, int enable)
+{
     (void)cmd;
     (void)enable;
     return LCB_ERR_UNSUPPORTED_OPERATION;

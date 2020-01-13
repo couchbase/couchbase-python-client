@@ -780,7 +780,7 @@ class CBCollection(CoreClient):
 
         Simple set with durability::
 
-            cb.upsert('key', 'value', durability_level=Durability.MAJORITY_AND_PERSIST_ON_MASTER)
+            cb.upsert('key', 'value', durability_level=Durability.MAJORITY_AND_PERSIST_TO_ACTIVE)
 
         """
 
