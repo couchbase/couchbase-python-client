@@ -734,7 +734,7 @@ pycbc_oputil_wait_common,pycbc_Bucket *self)
 
     PYCBC_CONN_THR_BEGIN(self);
     PYCBC_DEBUG_LOG_CONTEXT(context, "Beginning wait")
-    lcb_wait3(self->instance, LCB_WAIT_NOCHECK);
+    lcb_wait(self->instance, LCB_WAIT_NOCHECK);
     PYCBC_DEBUG_LOG_CONTEXT(context, "Finished wait")
     PYCBC_CONN_THR_END(self);
 }
