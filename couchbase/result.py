@@ -135,12 +135,12 @@ class LookupInResult(Result):
 
 class MutationResult(Result):
     def __init__(self,
-                 cas,  # type: int
-                 error=None,  # type: int
-                 mutation_token=None  # type: MutationToken
-                 ):
-        super(MutationResult, self).__init__(cas,error)
-        self.mutationToken = mutation_token
+                sdk2_result    # type: SDK2Result
+                ):
+      super(MutationResult, self).__init__(sdk2_result.cas, sdk2_result.rc)
+      mutinfo = getattr(sdk2_result, '_mutinfo', None)
+      muttoken = SDK2MutationToken(mutinfo) if mutinfo else None
+      self.mutationToken = muttoken
 
     def mutation_token(self):
         # type: () -> MutationToken
@@ -157,7 +157,7 @@ class MutateInResult(MutationResult):
         MutateInResult is the return type for mutate_in operations.
         Constructed internally by the API.
         """
-        super(MutateInResult,self).__init__(content.cas)
+        super(MutateInResult,self).__init__(content)
         self._content = content  # type: SDK2Result
         self.dict = options
 
@@ -243,20 +243,12 @@ class AsyncGetResult(AsyncWrapper.gen_wrapper(GetResult)):
                  ):
         super(AsyncGetResult, self).__init__(sdk2_result)
 
-
-class SDK2MutationResult(MutationResult):
-    def __init__(self, sdk2_result, **kwargs):
-        mutinfo = getattr(sdk2_result, '_mutinfo', None)
-        muttoken = SDK2MutationToken(mutinfo) if mutinfo else None
-        super(SDK2MutationResult, self).__init__(sdk2_result.cas, error=sdk2_result.rc, mutation_token=muttoken)
-
-
-class SDK2AsyncMutationResult(AsyncWrapper.gen_wrapper(SDK2MutationResult)):
+class AsyncMutationResult(AsyncWrapper.gen_wrapper(MutationResult)):
     def __init__(self,
                  sdk2_result  # type: SDK2Result
                  ):
         # type (...)->None
-        super(SDK2AsyncMutationResult, self).__init__(sdk2_result)
+        super(AsyncMutationResult, self).__init__(sdk2_result)
 
 
 # TODO: eliminate the options shortly.  They serve no purpose
@@ -313,7 +305,7 @@ def get_mutation_result(result  # type: ResultPrecursor
                         ):
     # type (...)->MutationResult
     orig_result = getattr(result,'orig_result',result)
-    factory_class = SDK2AsyncMutationResult if issubclass(type(orig_result), AsyncResult) else SDK2MutationResult
+    factory_class = AsyncMutationResult if issubclass(type(orig_result), AsyncResult) else MutationResult
     return factory_class(orig_result)
 
 

@@ -475,7 +475,7 @@ class CBCollection(CoreClient):
             expiry is removed)
         :param Durability durability_level: Sync replication durability level.
 
-        :return: :class:`.OperationResult`
+        :return: :class:`.MutationResult`
 
         Update the expiry time of a key ::
 
