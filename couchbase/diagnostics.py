@@ -13,66 +13,7 @@ class ServiceType(Enum):
     Config = "config"
 
 
-class IEndPointDiagnostics:
-    @abstractmethod
-    def type(self):
-        # type: (...) -> ServiceType
-        pass
-
-    @abstractmethod
-    def id(self):
-        # type: (...) -> str
-        pass
-
-    @abstractmethod
-    def local(self):
-        # type: (...) -> str
-        pass
-
-    @abstractmethod
-    def remote(self):
-        # type: (...) -> str
-        pass
-
-    @abstractmethod
-    def last_activity(self):
-        # type: (...) -> int
-        pass
-
-    @abstractmethod
-    def latency(self):
-        # type: (...) -> Optional[int]
-        pass
-
-    @abstractmethod
-    def scope(self):
-        # type: (...)-Optional[>str]
-        pass
-
-
-class IDiagnosticsResult:
-    @abstractmethod
-    def id(self):
-        # type: (...) -> str
-        pass
-
-    @abstractmethod
-    def version(self):
-        # type: (...) -> int
-        pass
-
-    @abstractmethod
-    def sdk(self):
-        # type: (...) -> str
-        pass
-
-    @abstractmethod
-    def services(self):
-        # type: (...) -> Mapping[str, IEndPointDiagnostics]
-        pass
-
-
-class EndPointDiagnostics(IEndPointDiagnostics):
+class EndPointDiagnostics(object):
     def __init__(self,  # type: EndPointDiagnostics
                  service_type,  # type: Union[ServiceType,str]
                  raw_endpoint  # type: JSON
@@ -115,7 +56,7 @@ class EndPointDiagnostics(IEndPointDiagnostics):
         return self._raw_endpoint.get('scope')
 
 
-class DiagnosticsResult(IDiagnosticsResult):
+class DiagnosticsResult(object):
     def __init__(self,  # type: DiagnosticsResult
                  source_diagnostics  # type: Mapping[str,Any]
                  ):
@@ -134,5 +75,5 @@ class DiagnosticsResult(IDiagnosticsResult):
         return self._src_diagnostics.get('sdk')
 
     def services(self):
-        # type: (...) -> Mapping[str, IEndPointDiagnostics]
+        # type: (...) -> Mapping[str, EndPointDiagnostics]
         return self._src_diagnostics.get('services', {})

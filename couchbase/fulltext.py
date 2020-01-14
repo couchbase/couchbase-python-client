@@ -13,52 +13,7 @@ class SearchOptions(OptionBlock):
     pass
 
 
-class ISearchResult(object):
-    Facet = object
-    @abstractmethod
-    def hits(self):
-        # type: (...) -> List[SearchQueryRow]
-        pass
-
-    @abstractmethod
-    def facets(self):
-        # type: (...) -> Mapping[str, Facet]
-        pass
-
-    @abstractmethod
-    def metadata(self):
-        # type: (...) -> IMetaData
-        pass
-
-
-class IMetaData(object):
-    @abstractmethod
-    def success_count(self):
-        # type: (...) -> int
-        pass
-
-    @abstractmethod
-    def error_count(self):
-        # type: (...) -> int
-        pass
-
-    @abstractmethod
-    def took(self):
-        # type: (...) -> timedelta
-        pass
-
-    @abstractmethod
-    def total_hits(self):
-        # type: (...) -> int
-        pass
-
-    @abstractmethod
-    def max_score(self):
-        # type: (...) -> float
-        pass
-
-
-class MetaData(IMetaData):
+class MetaData(object):
     def __init__(self,
                  raw_data  # type: JSON
                  ):
@@ -90,7 +45,9 @@ class MetaData(IMetaData):
         return self._raw_data.get('max_score')
 
 
-class SearchResult(ISearchResult, IterableWrapper):
+class SearchResult(IterableWrapper):
+    Facet = object
+
     def __init__(self,
                  raw_result  # type: SearchRequest
                  ):
@@ -101,8 +58,8 @@ class SearchResult(ISearchResult, IterableWrapper):
         return list(x for x in self)
 
     def facets(self):
-        # type: (...) -> Dict[str,ISearchResult.Facet]
+        # type: (...) -> Dict[str, SearchResult.Facet]
         return self.parent.facets
 
-    def metadata(self):  # type: (...) -> IMetaData
+    def metadata(self):  # type: (...) -> MetaData
         return MetaData(IterableWrapper.metadata(self))

@@ -20,7 +20,7 @@ from datetime import timedelta
 from typing import *
 from unittest import SkipTest
 
-from couchbase.fulltext import IMetaData, ISearchResult
+from couchbase.fulltext import SearchResult, MetaData
 from couchbase_core import recursive_reload
 from couchbase_core._pyport import ANY_STR
 import datetime
@@ -494,12 +494,12 @@ class Scenarios(CollectionTestCase):
         min_hits = 6
         metadata = x.metadata()
         duration=time.time()-initial
-        self.assertIsInstance(metadata, IMetaData)
+        self.assertIsInstance(metadata, MetaData)
         self.assertIsInstance(metadata.error_count(), int)
         self.assertIsInstance(metadata.max_score(), float)
         self.assertIsInstance(metadata.success_count(), int)
         took=metadata.took()
-        self.assertIsInstance(took, Seconds)
+        self.assertIsInstance(took, timedelta)
         self.assertAlmostEqual(took.value, duration, delta=0.1)
         self.assertGreater(took.value, 0)
         self.assertIsInstance(metadata.total_hits(), int)
@@ -507,7 +507,7 @@ class Scenarios(CollectionTestCase):
         self.assertGreaterEqual(metadata.total_hits(), min_hits)
         self.assertGreaterEqual(len(x.hits()), min_hits)
         fred_facet = x.facets()['fred']
-        self.assertIsInstance(fred_facet, ISearchResult.Facet)
+        self.assertIsInstance(fred_facet, SearchResult.Facet)
         self.assertEqual(len(fred_facet['terms']), most_common_term_max)
 
         self.assertRaises(couchbase.exceptions.SearchException, self.cluster.search_query, "beer-search",
