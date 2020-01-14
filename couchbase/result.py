@@ -9,7 +9,7 @@ from typing import *
 from boltons.funcutils import wraps
 from couchbase_core import abstractmethod, IterableWrapper, ABCMeta
 from couchbase_core.result import AsyncResult
-from couchbase_core._pyport import with_metaclass
+from couchbase_core._pyport import with_metaclass, Protocol
 from couchbase_core.views.iterator import View as SDK2View
 
 
@@ -64,7 +64,7 @@ class ContentProxySubdoc(object):
         return lambda index: self.index_proxy(item, index)
 
 
-class IResult(with_metaclass(ABCMeta)):
+class ResultProtocol(Protocol):
     @property
     @abstractmethod
     def cas(self):
@@ -84,7 +84,7 @@ class IResult(with_metaclass(ABCMeta)):
         raise NotImplementedError()
 
 
-class Result(IResult):
+class Result(ResultProtocol):
     def __init__(self,
                  cas,  # type: int
                  error=None  # type: Optional[int]
@@ -107,7 +107,7 @@ class Result(IResult):
         return not self.error
 
 
-class IGetResult(IResult):
+class GetResultProtocol(ResultProtocol, Protocol):
     @property
     @abstractmethod
     def id(self):
@@ -195,7 +195,8 @@ class MutateInResult(MutationResult):
     def key(self):
         return self._content.key
 
-class GetResult(Result, IGetResult):
+
+class GetResult(Result, GetResultProtocol):
     def __init__(self,
                  id,  # type: str
                  cas,  # type: int
@@ -229,7 +230,7 @@ class GetResult(Result, IGetResult):
         return self._expiry
 
 
-T = TypeVar('T', bound=Tuple[IResult, ...])
+T = TypeVar('T', bound=Tuple[ResultProtocol, ...])
 
 
 class AsyncWrapper(object):
@@ -376,7 +377,7 @@ def _wrap_in_mutation_result(func  # type: Callable[[Any,...],SDK2Result]
     return mutated
 
 
-class IViewResult(IResult):
+class ViewResultProtocol(ResultProtocol, Protocol):
     @property
     @abstractmethod
     def error(self):
@@ -393,7 +394,7 @@ class IViewResult(IResult):
         pass
 
 
-class ViewResult(IterableWrapper, IViewResult):
+class ViewResult(IterableWrapper):
     def __init__(self, sdk2_view  # type: SDK2View
                 ):
         super(ViewResult, self).__init__(sdk2_view)

@@ -26,40 +26,7 @@ from couchbase_core.n1ql import N1QLRequest
 from typing import *
 
 
-class IQueryResult(object):
-
-    @abstractmethod
-    def request_id(self):
-        # type: (...) -> UUID
-        pass
-
-    @abstractmethod
-    def client_context_id(self):
-        # type: (...) -> str
-        pass
-
-    @abstractmethod
-    def signature(self):
-        # type: (...) -> Any
-        pass
-
-    @abstractmethod
-    def rows(self):
-        # type: (...) -> List[T]
-        pass
-
-    @abstractmethod
-    def warnings(self):
-        # type: (...) -> List[Warning]
-        pass
-
-    @abstractmethod
-    def metrics(self):
-        # type: (...) -> QueryMetrics
-        pass
-
-
-class QueryResult(IterableWrapper, IQueryResult):
+class QueryResult(IterableWrapper):
     def __init__(self,
                  parent  # type: N1QLRequest
                  ):

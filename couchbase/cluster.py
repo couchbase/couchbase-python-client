@@ -10,7 +10,7 @@ from couchbase.diagnostics import DiagnosticsResult, EndPointDiagnostics
 from couchbase.fulltext import SearchResult, SearchOptions
 from couchbase_core.fulltext import Query, Facet
 from .analytics import AnalyticsResult
-from .n1ql import QueryResult, IQueryResult
+from .n1ql import QueryResult
 from .options import OptionBlock, forward_args, OptionBlockDeriv
 from .bucket import BucketOptions, Bucket, CoreClient
 from couchbase_core.cluster import Cluster as SDK2Cluster, Authenticator as SDK2Authenticator
@@ -60,7 +60,7 @@ class AnalyticsOptions(OptionBlock):
     pass
 
 
-class QueryOptions(OptionBlock, IQueryResult):
+class QueryOptions(OptionBlock):
     @property
     @abstractmethod
     def is_live(self):
@@ -69,10 +69,10 @@ class QueryOptions(OptionBlock, IQueryResult):
     def __init__(self, statement=None, parameters=None, timeout=None):
 
         """
-        Executes a N1QL query against the remote cluster returning a IQueryResult with the results of the query.
+        Executes a N1QL query against the remote cluster returning a QueryResult with the results of the query.
         :param statement: N1QL query
         :param options: the optional parameters that the Query service takes. See The N1QL Query API for details or a SDK 2.0 implementation for detail.
-        :return: An IQueryResult object with the results of the query or error message if the query failed on the server.
+        :return: A QueryResult object with the results of the query or error message if the query failed on the server.
         :except Any exceptions raised by the underlying platform - HTTP_TIMEOUT for example.
         :except ServiceNotFoundException - service does not exist or cannot be located.
 
@@ -165,7 +165,7 @@ class Cluster(object):
               statement,  # type: str,
               *options  # type: QueryOptions
               ):
-        # type: (...) -> IQueryResult
+        # type: (...) -> QueryResult
         pass
 
     def query(self,
@@ -173,7 +173,7 @@ class Cluster(object):
               *options,  # type: QueryOptions
               **kwargs  # type: Any
               ):
-        # type: (...) -> IQueryResult
+        # type: (...) -> QueryResult
         """
         Perform a N1QL query.
 
@@ -181,7 +181,7 @@ class Cluster(object):
         :param QueryOptions options: the optional parameters that the Query service takes.
             See The N1QL Query API for details or a SDK 2.0 implementation for detail.
 
-        :return: An :class:`IQueryResult` object with the results of the query or error message
+        :return: An :class:`QueryResult` object with the results of the query or error message
             if the query failed on the server.
 
         """
@@ -204,12 +204,12 @@ class Cluster(object):
                         *options,  # type: AnalyticsOptions
                         **kwargs
                         ):
-        # type: (...) -> IAnalyticsResult
+        # type: (...) -> AnalyticsResult
         """
-        Executes an Analytics query against the remote cluster and returns a IAnalyticsResult with the results of the query.
+        Executes an Analytics query against the remote cluster and returns a AnalyticsResult with the results of the query.
         :param statement: the analytics statement to execute
         :param options: the optional parameters that the Analytics service takes based on the Analytics RFC.
-        :return: An IAnalyticsResult object with the results of the query or error message if the query failed on the server.
+        :return: An AnalyticsResult object with the results of the query or error message if the query failed on the server.
         Throws Any exceptions raised by the underlying platform - HTTP_TIMEOUT for example.
         :except ServiceNotFoundException - service does not exist or cannot be located.
         """
@@ -240,11 +240,11 @@ class Cluster(object):
                      ):
         # type: (...) -> SearchResult
         """
-        Executes a Search or F.T.S. query against the remote cluster and returns a ISearchResult implementation with the results of the query.
+        Executes a Search or F.T.S. query against the remote cluster and returns a SearchResult implementation with the results of the query.
 
         :param query: the fluent search API to construct a query for F.T.S.
         :param options: the options to pass to the cluster with the query based off the F.T.S./Search RFC
-        :return: An ISearchResult object with the results of the query or error message if the query failed on the server.
+        :return: An SearchResult object with the results of the query or error message if the query failed on the server.
         Any exceptions raised by the underlying platform - HTTP_TIMEOUT for example.
         :except    ServiceNotFoundException - service does not exist or cannot be located.
 
@@ -261,7 +261,7 @@ class Cluster(object):
         """
         Creates a diagnostics report that can be used to determine the healthfulness of the Cluster.
         :param reportId - an optional string name for the generated report.
-        :return:A IDiagnosticsResult object with the results of the query or error message if the query failed on the server.
+        :return:A DiagnosticsResult object with the results of the query or error message if the query failed on the server.
 
         """
 
@@ -292,12 +292,8 @@ class Cluster(object):
         return QueryIndexManager(self.admin)
 
     def search_indexes(self):
-      # type: (...) => SearchIndexManager
+      # type: (...) -> SearchIndexManager
       return SearchIndexManager(self.admin)
-
-    def nodes(self):
-        # type: (...) -> INodeManager
-        return self._cluster
 
     def buckets(self):
         # type: (...) -> BucketManager

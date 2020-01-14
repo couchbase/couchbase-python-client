@@ -185,13 +185,13 @@ class Bucket(object):
                    *view_options, # type: ViewOptions
                    **kwargs
                    ):
-        # type: (...) -> IViewResult
+        # type: (...) -> ViewResult
         """
         Run a View Query
         :param str design_doc: design document
         :param str view_name: view name
         :param view_options:
-        :return: IViewResult containing the view results
+        :return: ViewResult containing the view results
         """
         cb = self._bucket  # type: CoreClient
         res = cb.view_query(design_doc, view_name, **forward_args(kwargs, *view_options))
@@ -199,11 +199,5 @@ class Bucket(object):
 
     def views(self  # type: Bucket
               ):
-        # type: (...)->IViewManager
+        # type: (...)->ViewIndexManager
         return ViewIndexManager(self._bucket, self._name)
-
-    def ping(self,
-             options=None  # type: PingOptions
-             ):
-        # type: (...) -> IPingResult
-        pass

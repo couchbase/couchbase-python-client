@@ -5,7 +5,7 @@ from couchbase.options import timedelta, forward_args
 from couchbase.management.generic import GenericManager
 from couchbase_core import mk_formstr, JSONMapping, Mapped
 from couchbase_core.auth_domain import AuthDomain
-from couchbase_core._pyport import ulp, with_metaclass
+from couchbase_core._pyport import ulp, with_metaclass, Protocol
 from couchbase_core import ABCMeta
 from couchbase_core.exceptions import HTTPError
 from typing import *
@@ -108,14 +108,14 @@ class UserManager(GenericManager):
 
     @overload
     def upsert_user(self,  # type: UserManager
-                    user,  # type: IUser
+                    user,  # type: User
                     domain=AuthDomain.Local,  # type: AuthDomain
                     timeout=None  # type: timedelta
                     ):
         pass
 
     def upsert_user(self,  # type: UserManager
-                    user,  # type: IUser
+                    user,  # type: User
                     domain=AuthDomain.Local,  # type: AuthDomain
                     *options,  # type: UpsertUserOptions
                     **kwargs
@@ -123,7 +123,7 @@ class UserManager(GenericManager):
         """
         Creates or updates a user.
 
-        :param IUser user: the new version of the user.
+        :param User user: the new version of the user.
         :param AuthDomain domain: name of the user domain (local | external). Defaults to local.
         :param timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
 
@@ -428,7 +428,6 @@ class RoleAndOrigins(object):
         pass
 
 
-
 class User(object):
     @overload
     def __init__(self, username=None, display_name=None, password=None, groups=None, roles=None):
@@ -487,7 +486,7 @@ class UserAndMetadata(object):
 
     @property
     def user(self):
-        # type: (...) -> IUser
+        # type: (...) -> User
         """- returns a new mutable User object each time this method is called.
         Modifying the fields of the returned User MUST have no effect on the UserAndMetadata object it came from."""
 
@@ -526,7 +525,7 @@ class RawUserAndMetadata(UserAndMetadata):
 
     @property
     def user(self):
-        # type: (...) -> IUser
+        # type: (...) -> User
         """- returns a new mutable User object each time this method is called.
         Modifying the fields of the returned User MUST have no effect on the UserAndMetadata object it came from."""
         return User(**self._raw_data.get('user'))
