@@ -108,7 +108,7 @@ class Scenarios(CollectionTestCase):
 
         """
         self.coll.upsert("id",{'someArray':['wibble','gronk']})
-        subdoc = self.coll.get("id", GetOptions().project("someArray"))
+        subdoc = self.coll.get("id", GetOptions(project = ["someArray"]))
         result = None
         if subdoc:
             arr = subdoc.content_as_array()

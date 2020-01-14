@@ -107,32 +107,6 @@ class Result(ResultProtocol):
         return not self.error
 
 
-class GetResultProtocol(ResultProtocol, Protocol):
-    @property
-    @abstractmethod
-    def id(self):
-        # type: () -> str
-        pass
-
-    @property
-    @abstractmethod
-    def expiry(self):
-        # type: () -> timedelta
-        pass
-
-    @property
-    @abstractmethod
-    def content_as(self):
-        # type: (...) -> ContentProxy
-        raise NotImplementedError()
-
-    @property
-    @abstractmethod
-    def content(self):
-        # type: () -> Any
-        raise NotImplementedError()
-
-
 class LookupInResult(Result):
     def __init__(self,
                  content,  # type: SDK2Result
@@ -196,24 +170,20 @@ class MutateInResult(MutationResult):
         return self._content.key
 
 
-class GetResult(Result, GetResultProtocol):
+class GetResult(Result):
+
     def __init__(self,
-                 id,  # type: str
-                 cas,  # type: int
-                 rc,  # type: int
-                 expiry,  # type: timedelta
-                 *args,  # type: Any
-                 **kwargs  # type: Any
-                 ):
-        # type: (...) -> None
-        """
-        GetResult is the return type for full read operations.
-        Constructed internally by the API.
-        """
-        super(GetResult, self).__init__(cas, rc)
-        self._id = id
-        self._expiry = expiry
-        self.dict = kwargs
+                 original,     # type: SDK2Result,
+                 expiry = None # type: timedelta
+                ):
+      """
+      GetResult is the return type for full read operations.
+      Constructed internally by the API.
+      """
+      super(GetResult, self).__init__(original.cas, original.rc)
+      self._id = original.key
+      self._original = original
+      self._expiry = expiry
 
     def content_as_array(self):
         # type: (...) -> List
@@ -229,6 +199,15 @@ class GetResult(Result, GetResultProtocol):
         # type: () -> timedelta
         return self._expiry
 
+    @property
+    def content_as(self):
+        # type: (...) -> ContentProxy
+        return ContentProxy(self._original)
+
+    @property
+    def content(self):
+        # type: () -> Any
+        return extract_value(self._original, lambda x: x)
 
 T = TypeVar('T', bound=Tuple[ResultProtocol, ...])
 
@@ -258,32 +237,11 @@ class AsyncWrapper(object):
         return Wrapped
 
 
-class SDK2GetResult(GetResult):
+class AsyncGetResult(AsyncWrapper.gen_wrapper(GetResult)):
     def __init__(self,
-                 sdk2_result,  # type: SDK2Result
-                 expiry=None,  # type: timedelta
-                 **kwargs):
-        super(SDK2GetResult, self).__init__(sdk2_result.key, sdk2_result.cas, sdk2_result.rc, expiry, **kwargs)
-        self._original = sdk2_result
-
-    @property
-    def content_as(self):
-        # type: (...) -> ContentProxy
-        return ContentProxy(self._original)
-
-    @property
-    def content(self):
-        # type: () -> Any
-        return extract_value(self._original, lambda x: x)
-
-
-class SDK2AsyncResult(AsyncWrapper.gen_wrapper(SDK2GetResult)):
-    def __init__(self,
-                 sdk2_result,  # type: SDK2Result
-                 expiry=None,  # type: timedelta
-                 **kwargs):
-        kwargs['expiry'] = expiry
-        super(SDK2AsyncResult, self).__init__(sdk2_result, **kwargs)
+                 sdk2_result  # type: SDK2Result
+                 ):
+        super(AsyncGetResult, self).__init__(sdk2_result)
 
 
 class SDK2MutationResult(MutationResult):
@@ -301,6 +259,7 @@ class SDK2AsyncMutationResult(AsyncWrapper.gen_wrapper(SDK2MutationResult)):
         super(SDK2AsyncMutationResult, self).__init__(sdk2_result)
 
 
+# TODO: eliminate the options shortly.  They serve no purpose
 ResultPrecursor = NamedTuple('ResultPrecursor', [('orig_result', SDK2Result), ('orig_options', Mapping[str, Any])])
 
 
@@ -310,8 +269,8 @@ def get_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
     @wraps(func)
     def wrapped(*args, **kwargs):
         x, options = func(*args, **kwargs)
-        factory_class=SDK2AsyncResult if issubclass(type(x), AsyncResult) else SDK2GetResult
-        return factory_class(x, **(options or {}))
+        factory_class=AsyncGetResult if issubclass(type(x), AsyncResult) else GetResult
+        return factory_class(x)
 
     wrapped.__name__ = func.__name__
     wrapped.__doc__ = func.__name__

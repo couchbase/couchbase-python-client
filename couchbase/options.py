@@ -85,12 +85,12 @@ class Forwarder(with_metaclass(ABCMeta)):
 def timedelta_as_timestamp(duration  # type: timedelta
                         ):
     # type: (...)->int
-    return int(duration.total_seconds())
+    return int(duration.total_seconds() if duration else 0)
 
 def timedelta_as_microseconds(duration  # type: timedelta
                            ):
     # type: (...)->int
-    return int(duration.total_seconds()*1e6)
+    return int(duration.total_seconds()*1e6 if duration else 0)
 
 
 class DefaultForwarder(Forwarder):

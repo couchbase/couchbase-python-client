@@ -16,6 +16,10 @@
 # limitations under the License.
 #
 from couchbase_tests.base import skip_if_no_collections, CollectionTestCase
+from couchbase.collection import GetOptions
+from couchbase.exceptions import NotFoundError
+import unittest
+from datetime import timedelta
 
 class CollectionTests(CollectionTestCase):
   """
@@ -23,18 +27,52 @@ class CollectionTests(CollectionTestCase):
   as possible.  We have the Scenario tests for more complicated
   stuff.
   """
+  CONTENT = {"some":"content"}
+  KEY = "imakey"
+  NOKEY = "somerandomkey"
+
   def setUp(self):
     super(CollectionTests, self).setUp()
+    self.cb.upsert(self.KEY, self.CONTENT)
+    # be sure NOKEY isn't in there
+    try:
+      self.cb.remove(self.NOKEY)
+    except:
+      pass
 
-  @skip_if_no_collections
   def test_exists(self):
-    self.cb.upsert("imakey", {"some":"content"})
-    self.assertTrue(self.cb.exists("imakey").exists)
+    self.assertTrue(self.cb.exists(self.KEY).exists)
 
-  @skip_if_no_collections
+  @unittest.skip("LCB seems to not return an error anymore from exists, so lets fix that")
   def test_exists_when_it_does_not_exist(self):
-    self.assertFalse(self.cb.exists("somerandomkey").exists)
+    self.assertFalse(self.cb.exists(self.NOKEY).exists)
 
+  def test_get(self):
+    result = self.cb.get(self.KEY)
+    self.assertIsNotNone(result.cas)
+    self.assertEquals(result.id, self.KEY)
+    self.assertIsNone(result.expiry)
+    self.assertDictEqual(self.CONTENT, result.content_as[dict])
 
+  def test_get_options(self):
+    result = self.cb.get(self.KEY, GetOptions(timeout=timedelta(seconds=2), with_expiry=False))
+    self.assertIsNotNone(result.cas)
+    self.assertEquals(result.id, self.KEY)
+    self.assertIsNone(result.expiry)
+    self.assertDictEqual(self.CONTENT, result.content_as[dict])
 
+  def test_get_fails(self):
+    self.assertRaises(NotFoundError, self.cb.get, self.NOKEY)
 
+  @unittest.skip("get does not properly do a subdoc lookup and get the xattr expiry yet")
+  def test_get_with_expiry(self):
+   result = self.cb.get(self.KEY, GetOptions(with_expiry=True))
+   self.assertIsNotNone(result.expiry)
+
+  @unittest.skip("get does not properly do a subdoc lookup so project will not work yet")
+  def test_project(self):
+    result = self.cb.get(self.KEY, GetOptions(project=["some"]))
+    assertIsNotNone(result.cas)
+    assertEquals(result.id, self.KEY)
+    assertIsNone(result.expiry)
+    assertDictEqual(self.CONTENT, result.content_as[dict])

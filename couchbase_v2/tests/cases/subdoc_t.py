@@ -35,7 +35,6 @@ class SubdocTest(ConnectionTestCase):
 
         # Try when path is not found
         rv = cb.retrieve_in(key, 'path2')
-        self.assertEqual(rv.rc, 0)
         self.assertRaises(E.SubdocPathNotFoundError, rv.__getitem__, 0)
         self.assertRaises(E.SubdocPathNotFoundError, rv.__getitem__, 'path2')
 

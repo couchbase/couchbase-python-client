@@ -7,7 +7,7 @@ from mypy_extensions import VarArg, KwArg, Arg
 from .subdocument import LookupInSpec, MutateInSpec, MutateInOptions, \
     gen_projection_spec
 from .result import GetResult, get_result_wrapper, SDK2Result, ResultPrecursor, LookupInResult, MutateInResult, \
-    MutationResult, _wrap_in_mutation_result, SDK2AsyncResult, get_mutation_result, get_multi_mutation_result
+    MutationResult, _wrap_in_mutation_result, AsyncGetResult, get_mutation_result, get_multi_mutation_result
 from .options import forward_args, timedelta, OptionBlockTimeOut, OptionBlockDeriv, ConstrainedInt, SignedInt64, AcceptableInts
 from .options import OptionBlock, AcceptableInts
 from .durability import ReplicateTo, PersistTo, ClientDurableOption, ServerDurableOption
@@ -97,47 +97,36 @@ class CollectionOptions(OptionBlock):
         super(CollectionOptions, self).__init__(*args, **kwargs)
 
 
-class GetAndTouchOptions(OptionBlock):
+class GetOptions(OptionBlockTimeOut):
+    @overload
+    def __init__(self,
+                 timeout=None,  # type: timedelta
+                 with_expiry=None,  # type: bool
+                 project=None  # type: Iterable[str]
+                 ):
+        pass
+
+    def __init__(self,
+                 **kwargs
+                 ):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super(GetOptions, self).__init__(**kwargs)
+
+    @property
+    def with_expiry(self):
+      # type: (...) -> bool
+      return self.get('with_expiry', False)
+
+    @property
+    def project(self):
+        # type: (...) -> Iterable[str]
+        return self.get('project', [])
+
+class GetAndTouchOptions(GetOptions):
     def __init__(self, *args, **kwargs):
         super(GetAndTouchOptions, self).__init__(*args, **kwargs)
 
-
-class LockOptions(OptionBlock):
-    pass
-
-
-class GetOptionsProject(OptionBlock):
-    def __init__(self, parent, *args):
-        self['project'] = args
-        super(GetOptionsProject, self).__init__(**parent)
-
-
-class GetOptionsNonProject(OptionBlock):
-    def __init__(self, parent):
-        super(GetOptionsNonProject, self).__init__(**parent)
-
-
-class GetOptions(OptionBlock):
-    def __init__(self, *args, **kwargs):
-        super(GetOptions, self).__init__(*args, **kwargs)
-
-    def project(self,
-                *args):
-        # type: (...) -> GetOptionsProject
-        return GetOptionsProject(self, *args)
-
-    def timeout(self,
-                duration  # type: timedelta
-                ):
-        # type: (...) -> GetOptionsNonProject
-        self['timeout'] = duration
-        return GetOptionsNonProject(self)
-
-    def __copy__(self):
-        return GetOptionsNonProject(**self)
-
-
-class GetAndLockOptions(GetOptions, LockOptions):
+class GetAndLockOptions(GetOptions):
     pass
 
 
@@ -251,42 +240,29 @@ class CBCollection(CoreClient):
     MAX_GET_OPS = 16
 
     def _get_generic(self, key, kwargs, options):
-        options = forward_args(kwargs, *options)
-        options.pop('key', None)
-        spec = options.pop('spec', [])
-        project = options.pop('project', None)
+        opts = forward_args(kwargs, *options)
+        opts.pop('key', None)
+        spec = opts.pop('spec', [])
+        project = opts.pop('project', None)
+        with_expiry = opts.pop('with_expiry', False)
         if project:
             if len(project) <= CBCollection.MAX_GET_OPS:
                 spec = gen_projection_spec(project)
             else:
                 raise couchbase.exceptions.ArgumentError(
                     "Project only accepts {} operations or less".format(CBCollection.MAX_GET_OPS))
-        if not project:
-            x = super(CBCollection,self).get(key, **options)
+        if not project and not opts.get('with_expiry', False):
+            x = super(CBCollection,self).get(key, **opts)
         else:
-            x = super(CBCollection,self).lookup_in(key, spec, **options)
+            # if you want the expiry, or a projection, need to do a subdoc lookup
+            # NOTE: this currently doesn't work for with_expiry.  We need to add that
+            x = super(CBCollection,self).lookup_in(key, spec, **opts)
+
+        # NOTE: there is no reason for the options in the ResultPrecursor below.  Once
+        # we get expiry done correctly, lets eliminate that as well.  Previously the
+        # expiry you passed in was just duplicated into the result, which of course made
+        # no sense since expiry should have been with_expiry (a bool) in the options.
         return ResultPrecursor(x, options)
-
-    @overload
-    def get(self,
-            key,  # type:str
-            *options  # type: GetOptions
-            ):
-        # type: (...) -> GetResult
-        pass
-
-    @overload
-    def get(self,
-            key,  # type:str
-            project=None,  # type: Iterable[str]
-            expiry=None,  # type: timedelta
-            quiet=None,  # type: bool
-            replica=False,  # type: bool
-            no_format=False  # type: bool
-            ):
-        # type: (...) -> GetResult
-
-        pass
 
     @get_result_wrapper
     def get(self,
@@ -299,46 +275,10 @@ class CBCollection(CoreClient):
 
         :param string key: The key to fetch. The type of key is the same
             as mentioned in :meth:`upsert`
-
-        :param timedelta expiry: If specified, indicates that the key's expiry
-            time should be *modified* when retrieving the value.
-
-        :param boolean quiet: causes `get` to return None instead of
-            raising an exception when the key is not found. It defaults
-            to the value set by :attr:`~quiet` on the instance. In
-            `quiet` mode, the error may still be obtained by inspecting
-            the :attr:`~.Result.rc` attribute of the :class:`.Result`
-            object, or checking :attr:`.Result.success`.
-
-            Note that the default value is `None`, which means to use
-            the :attr:`quiet`. If it is a boolean (i.e. `True` or
-            `False`) it will override the `couchbase_core.client.Client`-level
-            :attr:`quiet` attribute.
-
-        :param bool replica: Whether to fetch this key from a replica
-            rather than querying the master server. This is primarily
-            useful when operations with the master fail (possibly due to
-            a configuration change). It should normally be used in an
-            exception handler like so
-
-            Using the ``replica`` option::
-
-                try:
-                    res = c.get("key", quiet=True) # suppress not-found errors
-                catch CouchbaseError:
-                    res = c.get("key", replica=True, quiet=True)
-
-        :param bool no_format: If set to ``True``, then the value will
-            always be delivered in the :class:`~couchbase.result.GetResult`
-            object as being of :data:`~couchbase_core.FMT_BYTES`. This is a
-            item-local equivalent of using the :attr:`data_passthrough`
-            option
+        :param: GetOptions options: The options to use for this get request.
+        :param: Any kwargs: Override corresponding value in options.
 
         :raise: :exc:`.NotFoundError` if the key does not exist
-        :raise: :exc:`.CouchbaseNetworkError`
-        :raise: :exc:`.ValueFormatError` if the value cannot be
-            deserialized with chosen decoder, e.g. if you try to
-            retreive an object stored with an unrecognized format
         :return: A :class:`couchbase.result.GetResult` object
 
         Simple get::
@@ -348,13 +288,11 @@ class CBCollection(CoreClient):
         Inspect CAS value::
 
             rv = cb.get("key")
-            value, cas = rv.content, rv.cas
+            value, cas = rv.content_as[str], rv.cas
 
-        Update the expiry time::
-
-            rv = cb.get("key", expiry=timedelta(seconds=10))
-            # Expires in ten seconds
-
+        Request the expiry::
+            rv = cb.get("key", GetOptions(with_expiry=True))
+            value, expiry = rv.content_as[str], rv.expiry
         """
         return self._get_generic(key, kwargs, options)
 
@@ -420,7 +358,7 @@ class CBCollection(CoreClient):
         :rtype: dict
         """
         raw_result = super(CBCollection,self).get_multi(keys, **forward_args(kwargs, *options))
-        return {k: SDK2AsyncResult(v) for k, v in raw_result.items()}
+        return {k: AsyncGetResult(v) for k, v in raw_result.items()}
 
     @overload
     def upsert_multi(self,  # type: CBCollection
@@ -668,7 +606,6 @@ class CBCollection(CoreClient):
         """
         try:
           # there probably is a better way...
-          _Base.exists(self, id)
           return ExistsResult(True)
         except couchbase.exceptions.KeyNotFoundException:
           return ExistsResult(False)
