@@ -423,6 +423,8 @@ GT_FINALLY:
     pycbc_Collection_free_if_stack_allocated(pcb_collection);
     return cv.ret;
 }
+#define PYCBC_COMMON_ARGS_TIMEOUT(CLASS) CLASS##_OBJECT(timeout)
+PYCBC_KWSTRUCT(PYCBC_COMMON_ARGS_TIMEOUT, pycbc_common_args_timeout);
 
 TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                 static,
@@ -449,8 +451,8 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
       return -1;
     }
     CMDSCOPE_NG(SUBDOC, subdoc) {
-
-
+        PYCBC_DEBUG_LOG_CONTEXT(context, "setting timeout to %llu", cv->timeout)
+        lcb_cmdsubdoc_timeout(cmd, cv->timeout);
         PYCBC_CMD_SET_KEY_SCOPE(subdoc, cmd, keybuf);
         rv = PYCBC_TRACE_WRAP(pycbc_sd_handle_speclist,
                               NULL,
@@ -465,6 +467,7 @@ GT_DONE:
     PYCBC_PYBUF_RELEASE(&keybuf);
   return rv;
 }
+
 TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
 static, PyObject *,
 sdlookup_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopts)
@@ -474,10 +477,17 @@ sdlookup_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argop
     PyObject *quiet_key = NULL;
     pycbc_seqtype_t seqtype;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
-    static char *kwlist[] = { "ks", "quiet", NULL };
+    static char *kwlist[] = {
+            "ks", "quiet", PYCBC_COMMON_ARGS_TIMEOUT(KEYWORDS) NULL};
+    pycbc_common_args_timeout_t opts = {0};
     PYCBC_COLLECTION_INIT(self, kwargs)
-    if (!PyArg_ParseTupleAndKeywords(
-        args, kwargs, "O|O", kwlist, &kobj, &quiet_key)) {
+    if (!PyArg_ParseTupleAndKeywords(args,
+                                     kwargs,
+                                     "O|O" PYCBC_COMMON_ARGS_TIMEOUT(ARGSPEC),
+                                     kwlist,
+                                     &kobj,
+                                     &quiet_key,
+                                     &opts.timeout)) {
         PYCBC_EXCTHROW_ARGS();
         goto GT_FAIL;
     }
@@ -489,7 +499,9 @@ sdlookup_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argop
     if (pycbc_common_vars_init(&cv, self, argopts, ncmds, 1) != 0) {
         goto GT_FAIL;
     }
-
+    if (pycbc_get_duration(opts.timeout, &cv.timeout, 1)) {
+        goto GT_FAIL;
+    }
     if (PYCBC_OPUTIL_ITER_MULTI_COLLECTION(pcb_collection,
                                            seqtype,
                                            kobj,

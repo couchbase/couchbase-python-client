@@ -16,10 +16,12 @@
 # limitations under the License.
 #
 from couchbase_tests.base import skip_if_no_collections, CollectionTestCase
-from couchbase.collection import GetOptions
-from couchbase.exceptions import NotFoundError
+from couchbase.collection import GetOptions, LookupInOptions
+from couchbase.exceptions import NotFoundError, InvalidArgumentsException
 import unittest
 from datetime import timedelta
+import couchbase.subdocument as SD
+
 
 class CollectionTests(CollectionTestCase):
   """
@@ -76,3 +78,13 @@ class CollectionTests(CollectionTestCase):
     assertEquals(result.id, self.KEY)
     assertIsNone(result.expiry)
     assertDictEqual(self.CONTENT, result.content_as[dict])
+
+  def test_lookup_in_timeout(self):
+    self.coll.upsert("id", {'someArray': ['wibble', 'gronk']})
+    self.coll.get("id", GetOptions(project=["someArray"], timeout=timedelta(seconds=1.0)))
+    self.assertRaisesRegex(InvalidArgumentsException, "Expected timedelta", self.coll.get, "id",
+                           GetOptions(project=["someArray"], timeout=456))
+    sdresult_2 = self.coll.lookup_in("id", (SD.get("someArray"),), LookupInOptions(timeout=timedelta(microseconds=1)))
+    self.assertEqual(['wibble', 'gronk'],sdresult_2.content_as[list](0))
+    sdresult_2 = self.coll.lookup_in("id", (SD.get("someArray"),), LookupInOptions(timeout=timedelta(seconds=1)), timeout=timedelta(microseconds=1))
+    self.assertEqual(['wibble', 'gronk'],sdresult_2.content_as[list](0))

@@ -14,7 +14,7 @@ def GetSpec():
     return SD
 
 
-LookupInSpec=Iterable[Spec]
+LookupInSpec = Iterable[Spec]
 MutateInSpec = Iterable[Spec]
 
 

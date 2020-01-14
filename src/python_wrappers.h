@@ -69,12 +69,16 @@ typedef struct pycbc_pybuffer_real {
 #define ARGSPEC_TARGET_UINTALIAS(TARGET, X, DEST) \
     ARGSPEC_TARGET_UINT(TARGET, DEST)
 
+#define PYCBC_KWSTRUCT(XCTOR_ARGS, struct_name) \
+    typedef struct {                            \
+        XCTOR_ARGS(STRUCT)                      \
+    } struct_name##_t;
+
 #define PYCBC_KWLIST(XCTOR_ARGS, struct_name)                           \
     static char *kwlist[] = {XCTOR_ARGS(KEYWORDS) NULL};                \
     static char *argspec = "|" XCTOR_ARGS(ARGSPEC);                     \
-    struct {                                                            \
-        XCTOR_ARGS(STRUCT)                                              \
-    } struct_name = {0};                                                \
+    PYCBC_KWSTRUCT(XCTOR_ARGS, struct_name);                            \
+    struct_name##_t struct_name = {0};                                  \
     rv = PyArg_ParseTupleAndKeywords(                                   \
             args, kwargs, argspec, kwlist, XCTOR_ARGS(MEMACCESS) NULL); \
     if (!rv) {                                                          \
@@ -113,5 +117,4 @@ typedef struct pycbc_pybuffer_real {
 #define MEMACCESS_UINT(X) MEMACCESS_TARGET_UINT(opts, X)
 #define MEMACCESS_TARGET_UINTALIAS(TARGET, X, DEST) \
     MEMACCESS_TARGET_UINT(TARGET, DEST)
-
 #endif // COUCHBASE_PYTHON_CLIENT_PYTHON_WRAPPERS_H

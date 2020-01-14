@@ -19,8 +19,16 @@ T = TypeVar('T', bound=OptionBlock)
 
 
 class OptionBlockTimeOut(OptionBlock):
-    def __init__(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
+    @overload
+    def __init__(self,
+                 timeout=None  # type: timedelta
+                 ):
+        pass
+
+    def __init__(self,
+                 **kwargs  # type: Any
+                 ):
+        # type: (...) -> None
         super(OptionBlockTimeOut, self).__init__(**kwargs)
 
     def timeout(self,  # type: T
@@ -85,11 +93,16 @@ class Forwarder(with_metaclass(ABCMeta)):
 def timedelta_as_timestamp(duration  # type: timedelta
                         ):
     # type: (...)->int
+    if not isinstance(duration,timedelta):
+        raise couchbase.exceptions.InvalidArgumentsException("Expected timedelta instead of {}".format(duration))
     return int(duration.total_seconds() if duration else 0)
+
 
 def timedelta_as_microseconds(duration  # type: timedelta
                            ):
     # type: (...)->int
+    if not isinstance(duration,timedelta):
+        raise couchbase.exceptions.InvalidArgumentsException("Expected timedelta instead of {}".format(duration))
     return int(duration.total_seconds()*1e6 if duration else 0)
 
 

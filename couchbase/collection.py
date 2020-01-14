@@ -172,7 +172,7 @@ class ExistsResult(object):
       return self._exists
 
 
-class LookupInOptions(OptionBlock):
+class LookupInOptions(OptionBlockTimeOut):
     pass
 
 
@@ -879,15 +879,18 @@ class CBCollection(CoreClient):
 
     def lookup_in(self,
                   id,  # type: str
-                  spec,  # type: SubdocSpec
+                  spec,  # type: LookupInSpec
                   *options,  # type: LookupInOptions
                   **kwargs
                   ):
         # type: (...) -> LookupInResult
+
         """Atomically retrieve one or more paths from a document.
 
-        :param id: The key of the document to lookup
-        :param spec: An iterable sequence of specs (see :mod:`.couchbase_core.subdocument`)
+        :param str id: The key of the document to lookup
+        :param LookupInSpec spec: An iterable sequence of Specs (see :mod:`.couchbase_core.subdocument`)
+        :param timedelta timeout: Timeout for operation
+
         :return: A :class:`.couchbase.LookupInResult` object.
             This object contains the results and any errors of the
             operation.
@@ -907,8 +910,8 @@ class CBCollection(CoreClient):
         .. seealso:: :meth:`retrieve_in` which acts as a convenience wrapper
         """
 
-        final_options=forward_args(kwargs, *options)
-        return LookupInResult(self.bucket.lookup_in(id, spec, **final_options ),final_options)
+        final_options = forward_args(kwargs, *options)
+        return LookupInResult(self.bucket.lookup_in(id, spec, **final_options))
 
     @overload
     def mutate_in(self,

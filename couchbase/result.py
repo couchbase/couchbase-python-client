@@ -110,7 +110,6 @@ class Result(ResultProtocol):
 class LookupInResult(Result):
     def __init__(self,
                  content,  # type: SDK2Result
-                 *args,  # type: Any
                  **kwargs  # type: Any
                  ):
         # type: (...) -> None

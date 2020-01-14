@@ -57,6 +57,8 @@ enum replica_legacy { LCB_REPLICA_FIRST, LCB_REPLICA_SELECT, LCB_REPLICA_ALL };
 
 #define PYCBC_get_ATTR(CMD, attrib, ...) \
     lcb_cmdget_##attrib((CMD), __VA_ARGS__);
+#define PYCBC_subdoc_ATTR(CMD, attrib, ...) \
+    lcb_cmdsubdoc_##attrib((CMD), __VA_ARGS__);
 #define PYCBC_touch_ATTR(CMD, attrib, ...) \
     lcb_cmdtouch_##attrib((CMD), __VA_ARGS__);
 #define PYCBC_getreplica_ATTR(CMD, attrib, ...) \
