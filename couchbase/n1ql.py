@@ -39,6 +39,9 @@ class QueryResult(IterableWrapper):
     def metrics(self):  # type: (...) -> QueryMetrics
         return self.parent.metrics
 
+    def profile(self):
+      return self.parent.profile
+
     def request_id(self):
         raise NotImplementedError("To be implemented")
 

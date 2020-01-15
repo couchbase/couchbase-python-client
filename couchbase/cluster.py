@@ -11,10 +11,11 @@ from couchbase.fulltext import SearchResult, SearchOptions
 from couchbase_core.fulltext import Query, Facet
 from .analytics import AnalyticsResult
 from .n1ql import QueryResult
-from .options import OptionBlock, forward_args, OptionBlockDeriv
+from couchbase_core.n1ql import N1QLQuery
+from .options import OptionBlock, OptionBlockTimeOut, forward_args, OptionBlockDeriv
 from .bucket import BucketOptions, Bucket, CoreClient
 from couchbase_core.cluster import Cluster as SDK2Cluster, Authenticator as SDK2Authenticator
-from .exceptions import SearchException, DiagnosticsException, QueryException, ArgumentError, AnalyticsException
+from .exceptions import InvalidArgumentsException, SearchException, DiagnosticsException, QueryException, ArgumentError, AnalyticsException
 from couchbase_core import abstractmethod
 import multiprocessing
 from multiprocessing.pool import ThreadPool
@@ -59,26 +60,158 @@ def options_to_func(orig,  # type: U
 class AnalyticsOptions(OptionBlock):
     pass
 
+class QueryScanConsistency(object):
+  REQUEST_PLUS="request_plus"
+  NOT_BOUNDED="not_bounded"
 
-class QueryOptions(OptionBlock):
-    @property
-    @abstractmethod
-    def is_live(self):
-        return False
+  def __init__(self, val):
+    if val == self.REQUEST_PLUS or val == self.NOT_BOUNDED:
+      self._value = val
+    else:
+      raise InvalidArgumentsException("QueryScanConsistency can only be {} or {}".format(self.REQUEST_PLUS, self.NOT_BOUNDED))
 
-    def __init__(self, statement=None, parameters=None, timeout=None):
+  @classmethod
+  def request_plus(cls):
+    return cls(cls.REQUEST_PLUS)
 
-        """
-        Executes a N1QL query against the remote cluster returning a QueryResult with the results of the query.
-        :param statement: N1QL query
-        :param options: the optional parameters that the Query service takes. See The N1QL Query API for details or a SDK 2.0 implementation for detail.
-        :return: A QueryResult object with the results of the query or error message if the query failed on the server.
-        :except Any exceptions raised by the underlying platform - HTTP_TIMEOUT for example.
-        :except ServiceNotFoundException - service does not exist or cannot be located.
+  @classmethod
+  def not_bounded(cls):
+    return cls(cls.NOT_BOUNDED)
 
-        """
-        super(QueryOptions, self).__init__(statement=statement, parameters=parameters, timeout=timeout)
+  def as_string(self):
+    return getattr(self, '_value', self.NOT_BOUNDED)
 
+class QueryProfile(object):
+  OFF='off'
+  PHASES='phases'
+  TIMINGS='timings'
+
+  @classmethod
+  def off(cls):
+    return cls(cls.OFF)
+
+  @classmethod
+  def phases(cls):
+    return cls(cls.PHASES)
+
+  @classmethod
+  def timings(cls):
+    return cls(cls.TIMINGS)
+
+  def __init__(self, val):
+    if val == self.OFF or val == self.PHASES or val==self.TIMINGS:
+      self._value = val
+    else:
+      raise InvalidArgumentsException("QueryProfile can only be {}, {}, {}".format(self.OFF, self.TIMINGS, self.PHASES))
+
+  def as_string(self):
+    return getattr(self, '_value', self.OFF)
+
+class QueryOptions(OptionBlockTimeOut):
+  VALID_OPTS=['timeout', 'read_only', 'scan_consistency','adhoc', 'client_context_id', 'consistent_with',
+              'max_parallelism', 'positional_parameters', 'named_parameters', 'pipeline_batch', 'pipeline_cap',
+              'profile', 'raw', 'scan_wait', 'scan_cap', 'metrics']
+  @overload
+  def __init__(self,
+               timeout,                # type: timedelta
+               read_only,              # type: bool
+               scan_consistency,       # type: QueryScanConsistency
+               adhoc,                  # type: bool
+               client_context_id,      # type: str
+               consistent_with,        # type: MutationState
+               max_parallelism,        # type: int
+               positional_parameters,  # type: Iterable[str]
+               named_parameters,       # type: dict[str, str]
+               pipeline_batch,         # type: int
+               pipeline_cap,           # type: int
+               profile,                # type: QueryProfile
+               raw,                    # type: dict[str,Any]
+               scan_wait,              # type: timedelta
+               scan_cap,               # type: int
+               metrics=False           # type: bool
+               ):
+
+    pass
+
+  def __init__(self,
+               **kwargs
+               ):
+    super(QueryOptions, self).__init__(**kwargs)
+
+  def to_n1ql_query(self, statement, *options, **kwargs):
+    # lets make a copy of the options, and update with kwargs...
+    args = self.copy()
+    args.update(kwargs)
+
+    # now lets get positional parameters.  Actual positional
+    # params OVERRIDE positional_parameters
+    positional_parameters = args.pop('positional_parameters', [])
+    if options and len(options) > 0:
+      positional_parameters = options
+
+    # now the named parameters.  NOTE: all the kwargs that are
+    # not VALID_OPTS must be named parameters, and the kwargs
+    # OVERRIDE the list of named_parameters
+    new_keys = list(filter(lambda x: x not in self.VALID_OPTS, args.keys()))
+    named_parameters = args.pop('named_parameters',{})
+    for k in new_keys:
+      named_parameters[k] = args[k]
+
+    query = N1QLQuery(statement, *positional_parameters, **named_parameters)
+    # now lets try to setup the options.  TODO: rework this after beta.3
+    # but for now we will use the existing N1QLQuery.  Could be we can
+    # add to it, etc...
+
+    # default to false on metrics
+    query.metrics = args.get('metrics', False)
+
+    # TODO: there is surely a cleaner way...
+    for k in self.VALID_OPTS:
+      v = args.get(k, None)
+      if (v):
+        if k == 'scan_consistency':
+          query.consistency = v.as_string()
+        if k == 'consistent_with':
+          query.consistent_with = v
+        if k == 'adhoc':
+          query.adhoc = v
+        if k == 'timeout':
+          query.timeout = v
+        if k == 'scan_cap':
+          query.scan_cap = v
+        if k == 'pipeline_batch':
+          query.pipeline_batch = v
+        if k == 'pipeline_cap':
+          query.pipeline_cap = v
+        if k == 'read_only':
+          query.readonly = v
+        if k == 'profile':
+          query.profile = v.as_string()
+    return query
+
+  # this will change the options for export.
+  # NOT USED CURRENTLY
+  def as_dict(self):
+    for key, val in self.items():
+      if key == 'positional_parameters':
+        self.pop(key, None)
+        self['args'] = val
+      if key == 'named_parameters':
+        self.pop(key, None)
+        for k, v in val.items():
+          self["${}".format(k)]=v
+      if key == 'scan_consistency':
+        self[key] = value.as_string()
+      if key == 'consistent_with':
+        self[key] = value.encode()
+      if key == 'profile':
+        self[key] = val.as_string()
+      if key == 'scan_wait':
+        # scan_wait should be in ms
+        self[key] = val.total_seconds() * 1000
+    if self.get('consistent_with', None):
+      self['scan_consistency'] = 'at_plus'
+    return self
 
 class Cluster(object):
     clusterbucket = None  # type: CoreClient
@@ -149,29 +282,10 @@ class Cluster(object):
         args.update(bname=name)
         return self._cluster.open_bucket(name, **args)
 
-    class QueryParameters(OptionBlock):
-        def __init__(self, *args, **kwargs):
-            super(Cluster.QueryParameters, self).__init__(*args, **kwargs)
-
-    @overload
     def query(self,
-              statement,
-              parameters=None,
-              timeout=None):
-        pass
-
-    @overload
-    def query(self,
-              statement,  # type: str,
-              *options  # type: QueryOptions
-              ):
-        # type: (...) -> QueryResult
-        pass
-
-    def query(self,
-              statement,  # type: str
-              *options,  # type: QueryOptions
-              **kwargs  # type: Any
+              statement,            # type: str
+              *options,             # type: Any
+              **kwargs              # type: Any
               ):
         # type: (...) -> QueryResult
         """
@@ -179,13 +293,25 @@ class Cluster(object):
 
         :param str statement: the N1QL query statement to execute
         :param QueryOptions options: the optional parameters that the Query service takes.
-            See The N1QL Query API for details or a SDK 2.0 implementation for detail.
+        :param Any options: if present, assumed to be the positional parameters in the query.
+        :param Any kwargs: Override the corresponding value in the Options.  If they don't match
+          any value in the options, assumed to be named parameters for the query.
 
         :return: An :class:`QueryResult` object with the results of the query or error message
             if the query failed on the server.
 
         """
-        return QueryResult(self._operate_on_cluster(CoreClient.query, QueryException, statement, **(forward_args(kwargs, *options))))
+        # we could have multiple positional parameters passed in, one of which may or may not be
+        # a QueryOptions.  Note if multiple QueryOptions are passed in for some strange reason,
+        # all but the last are ignored.
+        opt = QueryOptions()
+        opts = list(options)
+        for o in opts:
+          if isinstance(o, QueryOptions):
+            opt = o
+            opts.remove(o)
+
+        return QueryResult(self._operate_on_cluster(CoreClient.query, QueryException, opt.to_n1ql_query(statement, *opts, **kwargs)))
 
     def _operate_on_cluster(self,
                             verb,
@@ -332,5 +458,4 @@ class Cluster(object):
         return self._cluster.cluster_manager()
 
 
-QueryParameters = Cluster.QueryParameters
 ClusterOptions = Cluster.ClusterOptions

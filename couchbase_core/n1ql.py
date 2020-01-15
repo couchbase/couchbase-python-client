@@ -121,7 +121,6 @@ class N1QLQuery(object):
 
         Since the placeholders are serialized to JSON internally anyway.
         """
-
         self._adhoc = True
         self._cross_bucket = False
         self._body = {'statement': query}
@@ -432,6 +431,10 @@ class N1QLRequest(object):
     @property
     def metrics(self):
         return self.meta_retrieve().get('metrics', None)
+
+    @property
+    def profile(self):
+      return self.meta_retrieve().get('profile', None)
 
     def meta_retrieve(self, meta_lookahead = None):
         """

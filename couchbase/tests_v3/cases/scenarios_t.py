@@ -472,14 +472,14 @@ class Scenarios(CollectionTestCase):
         self.assertRaises(couchbase.exceptions.ArgumentError, self.coll.increment, "counter", -3)
 
     def test_cluster_query(self):
-        if not self.is_mock:
-            # TODO: fix for real server
-            raise SkipTest()
-        result = self.cluster.query("SELECT mockrow")
-        self.assertEqual([{"row": "value"}], result.rows())
-        self.assertEqual([{"row": "value"}], list(result))
-        self.assertEqual([{"row": "value"}], list(result))
-        self.assertEqual([{"row": "value"}], result.rows())
+        if self.is_mock:
+          raise SkipTest("Query not supported in mock")
+        result = self.cluster.query("SELECT * from `beer-sample` LIMIT 1")
+        self.assertIsNotNone(result)
+        count = 0
+        for row in result.rows():
+          count += 1
+        self.assertEquals(1, count)
 
     def test_cluster_search(self  # type: ClusterTestCase
                             ):
