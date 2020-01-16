@@ -1,35 +1,66 @@
 from typing import *
 import couchbase.options
-from .options import Cardinal, OptionBlock
+from .options import Cardinal, OptionBlock, OptionBlockBase
 from couchbase_core.durability import Durability
+from couchbase_core._pyport import TypedDict, with_metaclass
+from couchbase_core import ABCMeta
+try:
+    from typing import TypedDict
+except:
+    from typing_extensions import TypedDict
 
-
-class ReplicateTo(Cardinal):
-    Value = couchbase.options.Value
-
-
-class PersistTo(Cardinal):
-    Value = couchbase.options.Value
+ReplicateTo=Cardinal
+PersistTo=Cardinal
 
 
 T = TypeVar('T', bound=OptionBlock)
 
 
-class ClientDurableOption(object):
-    def dur_client(self,  # type: T
-                   replicate_to,  # type: couchbase.options.Value
-                   persist_to,  # type: couchbase.options.Value
-                   ):
-        # type: (...) -> T.ClientDurable
-        self['replicate_to'] = replicate_to
-        self['persist_to'] = persist_to
-        return self
+class DurabilityTypeBase(dict):
+    def __init__(self, content):
+        super(DurabilityTypeBase,self).__init__(**content)
 
 
-class ServerDurableOption(object):
-    def dur_server(self,  # type: T
-                   level,  # type: Durability
-                   ):
-        # type: (...) -> T.ServerDurable
-        self['durability_level'] = level
-        return self
+class DurabilityType(DurabilityTypeBase):
+    def __init__(self, content):
+        super(DurabilityType,self).__init__(content)
+
+
+class ClientDurability(DurabilityType):
+    Storage = TypedDict('Storage', {'replicate_to': ReplicateTo, 'persist_to': PersistTo}, total=True)
+
+    def __init__(self,  # type: T
+                 replicate_to,  # type: ReplicateTo
+                 persist_to  # type: PersistTo
+                 ):
+        # type: (...) -> None
+        """
+        Client Durability
+
+        :param int persist_to: If set, wait for the item to be removed
+        from the storage of at least these many nodes
+        :param int replicate_to: If set, wait for the item to be removed
+        from the cache of at least these many nodes
+        (excluding the master)
+        """
+        super(ClientDurability,self).__init__(ClientDurability.Storage(replicate_to=replicate_to, persist_to=persist_to))
+
+
+class ServerDurability(DurabilityType):
+    Storage = TypedDict('Storage', {'level': Durability}, total=True)
+
+    def __init__(self,  # type: T
+                 level,  # type: Durability
+                 ):
+        # type: (...) -> None
+        """
+        Server-based Durability (Synchronous Replication)
+
+        :param Durability level: durability level
+        """
+        super(ServerDurability,self).__init__(ServerDurability.Storage(level=level))
+
+
+ClientDurableOptionBlock = TypedDict("ClientDurableOptionBlock", {'durability': ClientDurability}, total=False)
+ServerDurableOptionBlock = TypedDict("ServerDurableOptionBlock", {'durability': ServerDurability}, total=False)
+DurabilityOptionBlock = TypedDict("DurabilityOptionBlock", {'durability': DurabilityType}, total=False)

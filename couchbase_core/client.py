@@ -973,13 +973,22 @@ class Client(_Base):
         body = _SEARCH.make_search_body(index, query, params)
         return itercls(body, self, **iterargs)
 
+    @overload
     def upsert_multi(self,  # type: Client
                      keys,  # type: Mapping[str,Any]
                      ttl=0,  # type: int
                      format=None,  # type: int
                      persist_to=0,  # type: int
                      replicate_to=0,  # type: int
-                     durability_level=Durability.NONE  # type: Durability
+                     durability_level=None  # type: Durability
+                     ):
+        pass
+
+    def upsert_multi(self,  # type: Client
+                     keys,  # type: Mapping[str,Any]
+                     ttl=0,  # type: int
+                     format=None,  # type: int
+                     **kwargs
                      ):
         # type: (...) -> Result
         """
@@ -1022,9 +1031,7 @@ class Client(_Base):
         .. seealso:: :meth:`upsert`
         """
         return _Base.upsert_multi(self, keys, ttl=ttl, format=format,
-                                  persist_to=persist_to,
-                                  replicate_to=replicate_to,
-                                  durability_level=durability_level.value)
+                                  **kwargs)
 
     def insert_multi(self,  # type: Client
                      keys,  # type: Mapping[str,Any]

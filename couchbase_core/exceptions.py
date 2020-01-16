@@ -136,7 +136,7 @@ class CouchbaseError(Exception):
                            'ref': Any})
 
     def __init__(self,  # type: CouchbaseError
-                 params=None  # type: CouchbaseError.ParamType
+                 params=None  # type: Union[CouchbaseError.ParamType,str]
                  ):
         if isinstance(params, str):
             params = {'message': params}

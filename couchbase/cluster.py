@@ -22,6 +22,7 @@ from multiprocessing.pool import ThreadPool
 import couchbase.exceptions
 import couchbase_core._libcouchbase as _LCB
 from couchbase_core._pyport import raise_from
+from couchbase.options import OptionBlockTimeOut
 
 
 T = TypeVar('T')

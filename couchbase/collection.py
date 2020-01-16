@@ -8,19 +8,25 @@ from .subdocument import LookupInSpec, MutateInSpec, MutateInOptions, \
     gen_projection_spec
 from .result import GetResult, get_result_wrapper, CoreResult, ResultPrecursor, LookupInResult, MutateInResult, \
     MutationResult, _wrap_in_mutation_result, AsyncGetResult, get_mutation_result, get_multi_mutation_result
-from .options import forward_args, timedelta, OptionBlockTimeOut, OptionBlockDeriv, ConstrainedInt, SignedInt64, AcceptableInts
-from .options import OptionBlock, AcceptableInts
-from .durability import ReplicateTo, PersistTo, ClientDurableOption, ServerDurableOption
+from .options import forward_args, timedelta, OptionBlockTimeOut, OptionBlockDeriv, ConstrainedInt, SignedInt64, \
+    AcceptableInts
+from .options import OptionBlock, AcceptableInts, OptionBlockBase
+from .durability import ReplicateTo, PersistTo, ClientDurability, ServerDurability, DurabilityType, \
+    ServerDurableOptionBlock, DurabilityOptionBlock
 from couchbase_core._libcouchbase import Collection as _Base
 import couchbase.exceptions
 from couchbase_core.client import Client as CoreClient
 import copy
 
 from typing import *
-from couchbase_core.durability import Durability
-from couchbase_core._pyport import with_metaclass, xrange
+from couchbase.durability import Durability, DurabilityType, ServerDurability, ClientDurability, ServerDurableOptionBlock, ClientDurableOptionBlock, DurabilityOptionBlock
 from couchbase_core.asynchronous.bucket import AsyncClientFactory
 from datetime import timedelta
+
+try:
+    from typing import TypedDict
+except:
+    from typing_extensions import TypedDict
 
 
 class DeltaValue(ConstrainedInt):
@@ -47,7 +53,11 @@ class DeltaValue(ConstrainedInt):
         return 0
 
 
-class ReplaceOptions(OptionBlockTimeOut, ClientDurableOption, ServerDurableOption):
+class ReplaceOptionsBase(OptionBlockTimeOut, DurabilityOptionBlock):
+    pass
+
+
+class ReplaceOptions(ReplaceOptionsBase):
     def __init__(self, *args, **kwargs):
         super(ReplaceOptions, self).__init__(*args, **kwargs)
 
@@ -64,17 +74,30 @@ class AppendOptions(OptionBlock):
         super(AppendOptions, self).__init__(*args, **kwargs)
 
 
-class RemoveOptionsBase(OptionBlock):
-    def __init__(self, *args, **kwargs):
-        super(RemoveOptionsBase, self).__init__(*args, **kwargs)
+class RemoveOptionsBase(OptionBlockTimeOut, DurabilityOptionBlock):
+    pass
 
 
-class RemoveOptions(RemoveOptionsBase, ClientDurableOption, ServerDurableOption):
-    ServerDurable = RemoveOptionsBase
-    ClientDurable = RemoveOptionsBase
+class RemoveOptions(RemoveOptionsBase):
+    def __init__(self,
+                 durability=None,  # type: DurabilityType
+                 cas=0,  # type: int
+                 **kwargs):
+        """
+        Remove Options
 
-    def __init__(self, *args, **kwargs):
-        super(RemoveOptions, self).__init__(*args, **kwargs)
+        :param DurabilityType durability: durability type
+
+        :param int cas: The CAS to use for the removal operation.
+        If specified, the key will only be removed from the server
+        if it has the same CAS as specified. This is useful to
+        remove a key only if its value has not been changed from the
+        version currently visible to the client. If the CAS on the
+        server does not match the one specified, an exception is
+        thrown.
+        """
+        kwargs.update(durability=durability,cas=cas)
+        super(RemoveOptions,self).__init__(**kwargs)
 
 
 class PrependOptions(OptionBlock):
@@ -87,7 +110,7 @@ class UnlockOptions(OptionBlock):
         super(UnlockOptions, self).__init__(*args, **kwargs)
 
 
-class CounterOptions(OptionBlock, ServerDurableOption):
+class CounterOptions(OptionBlock, ServerDurableOptionBlock):
     def __init__(self, *args, **kwargs):
         super(CounterOptions, self).__init__(*args, **kwargs)
 
@@ -130,7 +153,7 @@ class GetAndLockOptions(GetOptions):
     pass
 
 
-class InsertOptions(OptionBlock, ServerDurableOption, ClientDurableOption):
+class InsertOptions(DurabilityOptionBlock):
     pass
 
 
@@ -365,9 +388,7 @@ class CBCollection(CoreClient):
                      keys,  # type: Mapping[str,Any]
                      ttl=0,  # type: int
                      format=None,  # type: int
-                     persist_to=0,  # type: int
-                     replicate_to=0,  # type: int
-                     durability_level=Durability.NONE  # type: Durability
+                     durability=None  # type: DurabilityType
                      ):
         pass
 
@@ -610,7 +631,7 @@ class CBCollection(CoreClient):
         except couchbase.exceptions.KeyNotFoundException:
           return ExistsResult(False)
 
-    class UpsertOptions(OptionBlock, ClientDurableOption, ServerDurableOption):
+    class UpsertOptions(DurabilityOptionBlock):
         def __init__(self, *args, **kwargs):
             super(CBCollection.UpsertOptions, self).__init__(*args, **kwargs)
 
@@ -625,10 +646,8 @@ class CBCollection(CoreClient):
                value,  # type: Any
                cas=0,  # type: int
                expiry=None,  # type: timedelta
-               format=None,
-               persist_to=PersistTo.NONE,  # type: PersistTo.Value
-               replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
-               durability_level=Durability.NONE  # type: Durability
+               format=None,  # type: Any
+               durability=None  # type: DurabilityType
                ):
         # type: (...) -> MutationResult
         pass
@@ -738,9 +757,7 @@ class CBCollection(CoreClient):
                value,  # type: Any
                expiry=None,  # type: timedelta
                format=None,  # type: str
-               persist_to=PersistTo.NONE,  # type: PersistTo.Value
-               replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
-               durability_level=Durability.NONE  # type: Durability
+               durability=None  # type: DurabilityType
                ):
         pass
 
@@ -772,9 +789,7 @@ class CBCollection(CoreClient):
                 cas=0,  # type: int
                 expiry=None,  # type: timedelta
                 format=None,  # type: bool
-                persist_to=PersistTo.NONE,  # type: PersistTo.Value
-                replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
-                durability_level=Durability.NONE  # type: Durability
+                durability=None  # type: DurabilityType
                 ):
         # type: (...) -> MutationResult
         pass
@@ -784,6 +799,7 @@ class CBCollection(CoreClient):
                 id,  # type: str
                 value,  # type: Any
                 options,  # type: ReplaceOptions
+                **kwargs  # type: Any
                 ):
         # type: (...) -> MutationResult
         pass
@@ -813,9 +829,7 @@ class CBCollection(CoreClient):
     def remove(self,  # type: CBCollection
                id,  # type: str
                cas=0,  # type: int
-               persist_to=PersistTo.NONE,  # type: PersistTo.Value
-               replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
-               durability_level=Durability.NONE  # type: Durability
+               durability_level=None  # type: DurabilityType
                ):
         # type: (...) -> MutationResult
         pass
@@ -842,20 +856,7 @@ class CBCollection(CoreClient):
             :meth:`upsert`
         :type key: string, dict, or tuple/list
 
-        :param int cas: The CAS to use for the removal operation.
-            If specified, the key will only be removed from the server
-            if it has the same CAS as specified. This is useful to
-            remove a key only if its value has not been changed from the
-            version currently visible to the client. If the CAS on the
-            server does not match the one specified, an exception is
-            thrown.
-        :param boolean quiet:
-            Follows the same semantics as `quiet` in :meth:`get`
-        :param int persist_to: If set, wait for the item to be removed
-            from the storage of at least these many nodes
-        :param int replicate_to: If set, wait for the item to be removed
-            from the cache of at least these many nodes
-            (excluding the master)
+        :param kwargs: options as for :class:`.RemoveOptions`
         :raise: :exc:`.NotFoundError` if the key does not exist.
         :raise: :exc:`.KeyExistsError` if a CAS was specified, but
             the CAS on the server had changed
@@ -877,11 +878,11 @@ class CBCollection(CoreClient):
         final_options = forward_args(kwargs, *options)
         return ResultPrecursor(self.bucket.remove(id, **final_options), final_options)
 
-    def lookup_in(self,
+    def lookup_in(self,  # type: CBCollection
                   id,  # type: str
                   spec,  # type: LookupInSpec
                   *options,  # type: LookupInOptions
-                  **kwargs
+                  **kwargs  # type: Any
                   ):
         # type: (...) -> LookupInResult
 
@@ -907,9 +908,7 @@ class CBCollection(CoreClient):
             name = rv[1]
             friend_exists = rv.exists(2)
 
-        .. seealso:: :meth:`retrieve_in` which acts as a convenience wrapper
         """
-
         final_options = forward_args(kwargs, *options)
         return LookupInResult(self.bucket.lookup_in(id, spec, **final_options))
 
@@ -993,9 +992,7 @@ class CBCollection(CoreClient):
                value,  # type: str
                cas=0,  # type: int
                format=None,  # type: int
-               persist_to=PersistTo.NONE,  # type: PersistTo.Value
-               replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
-               durability_level=Durability.NONE  # type: Durability
+               durability=None  # type: DurabilityType
                ):
         pass
 
@@ -1040,9 +1037,7 @@ class CBCollection(CoreClient):
                 value,  # type: Any
                 cas=0,  # type: int
                 format=None,  # type: int
-                persist_to=PersistTo.NONE,  # type: PersistTo.Value
-                replicate_to=ReplicateTo.NONE,  # type: ReplicateTo.Value
-                durability_level=Durability.NONE  # type: Durability
+                durability=None  # type: DurabilityType
                 ):
         # type: (...) -> MutationResult
         pass

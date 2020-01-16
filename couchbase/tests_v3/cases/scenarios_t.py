@@ -45,7 +45,7 @@ from couchbase import ReplicateTo, PersistTo, copy, \
     DocumentMutationLostException, ReplicaNotAvailableException, MutateSpec, CASMismatchException, \
     MutateInOptions
 from couchbase import GetOptions, RemoveOptions, ReplaceOptions
-from couchbase import Bucket
+from couchbase import Bucket, raise_from
 
 from couchbase_tests.base import ClusterTestCase, CollectionTestCase
 import couchbase.subdocument as SD
@@ -57,7 +57,7 @@ import couchbase_core.tests.analytics_harness
 from couchbase.diagnostics import ServiceType
 import couchbase_core.fulltext as FT
 from couchbase.exceptions import KeyNotFoundException, KeyExistsException, NotSupportedError
-
+from couchbase.durability import ClientDurability, ServerDurability
 
 class Scenarios(CollectionTestCase):
 
@@ -65,14 +65,14 @@ class Scenarios(CollectionTestCase):
     def test_scenario_A(self):
         # 1) fetch a full document that is a json document
         self.coll.upsert("id",{"kettle":"fish"})
-        doc = self.coll.get("id", GetOptions().timeout(timedelta(seconds=10)))
+        doc = self.coll.get("id", GetOptions(timeout=timedelta(seconds=10)))
         # 2) Make a modification to the content
         content = doc.content_as[JSONDocument].put("field", "value")
         # 3) replace the document on the server
         # not formally allowed syntax - can't mix OptionBlocks and named params
-        result = self.coll.replace(doc.id, content, ReplaceOptions().timeout(timedelta(seconds=10)), cas=doc.cas)
+        result = self.coll.replace(doc.id, content, ReplaceOptions(timeout=timedelta(seconds=10)), cas=doc.cas)
 
-        result = self.coll.replace(doc.id, content, ReplaceOptions().timeout(timedelta(seconds=10)).cas(result.cas))
+        result = self.coll.replace(doc.id, content, ReplaceOptions(timeout=timedelta(seconds=10), cas=result.cas))
         result = self.coll.replace(doc.id, content, expiry=timedelta(seconds=10), cas=result.cas)
         # Default params also supported for all methods
         doc2 = self.coll.get("id", expiry=timedelta(seconds=10))
@@ -88,7 +88,7 @@ class Scenarios(CollectionTestCase):
             # invalid syntax:
             self.coll.get("cheese", options=GetOptions(replica=True), replica=True)
 
-            result = self.coll.get("id", GetOptions().timeout(timedelta(seconds=10)))
+            result = self.coll.get("id", GetOptions(timeout=timedelta(seconds=10)))
             self.coll.replace(result.id,
                               result.content
                               .put("field", "value")
@@ -115,12 +115,13 @@ class Scenarios(CollectionTestCase):
             arr.append("foo")
 
             result = self.coll.mutate_in("id", [SD.upsert("someArray", arr)],
-                                      MutateInOptions().timeout(timedelta(seconds=10)))
+                                      MutateInOptions(timeout=timedelta(seconds=10)))
 
         self.assertIsInstance(result, MutateInResult)
         self.assertEqual('None',result.content_as[str](0))
 
     from parameterized import parameterized
+
     @parameterized.expand(
         x for x in tuple(list(Durability._member_names_))
     )
@@ -173,16 +174,17 @@ class Scenarios(CollectionTestCase):
         try:
             self.retry_idempotent_remove_client_side(lambda replicateTo:
                                                  self.coll.remove("id",
-                                                                  RemoveOptions().dur_client(replicateTo,
-                                                                                             PersistTo.ONE)),
+                                                                  RemoveOptions(durability=ClientDurability(replicateTo,
+                                                                                                            PersistTo.ONE))),
                                                      ReplicateTo.TWO, ReplicateTo.TWO, datetime.datetime.now() + timedelta(seconds=30))
-        except NotSupportedError:
-            raise SkipTest("Skipping as not supported")
+        except NotSupportedError as f:
+            raise SkipTest("Skipping as not supported: {}".format(str(f)))
 
-    @staticmethod
-    def retry_idempotent_remove_client_side(callback,  # type: Callable[[ReplicateTo.Value],Any]
-                                            replicate_to,  # type: ReplicateTo.Value
-                                            original_replicate_to,  # type: ReplicateTo.Value
+
+    def retry_idempotent_remove_client_side(self,
+                                            callback,  # type: Callable[[ReplicateTo],Any]
+                                            replicate_to,  # type: ReplicateTo
+                                            original_replicate_to,  # type: ReplicateTo
                                             until  # type: datetime.datetime
                                             ):
         # type: (...) -> None
@@ -208,9 +210,12 @@ class Scenarios(CollectionTestCase):
                 print("Our work here is done")
                 break
 
-            except ReplicaNotConfiguredException:
+            except ReplicaNotConfiguredException as e:
                 print("Not enough replicas configured, aborting")
-                break
+                if self.is_mock:
+                    raise_from(NotSupportedError("Not enough replicas configured, aborting"),e)
+                else:
+                    raise
 
             except DocumentConcurrentlyModifiedException:
                 # Just retry
@@ -224,11 +229,11 @@ class Scenarios(CollectionTestCase):
                 replicate_to = original_replicate_to
                 continue
 
-            except (ReplicaNotAvailableException, couchbase.ArgumentError):
+            except (ReplicaNotAvailableException) as e:
                 newReplicateTo = {ReplicateTo.ONE: ReplicateTo.NONE,
                                   ReplicateTo.TWO: ReplicateTo.ONE,
                                   ReplicateTo.THREE: ReplicateTo.TWO}.get(replicate_to, ReplicateTo.NONE)
-                print("Temporary replica failure, retrying with lower durability {}".format(newReplicateTo))
+                print("Temporary replica failure [{}], retrying with lower durability {}".format(str(e), newReplicateTo))
                 replicate_to = newReplicateTo
 
     def test_scenario_c_server_side_durability(self):
@@ -236,9 +241,9 @@ class Scenarios(CollectionTestCase):
         # remove is idempotent iff the app guarantees that the doc's id won't be reused (e.g. if it's a UUID).  This seems
         # a reasonable restriction.
         for durability_type in Durability:
-            self.coll.upsert("id","fred",durability_level=Durability.NONE)
+            self.coll.upsert("id","fred",durability=ServerDurability(Durability.NONE))
             self.retry_idempotent_remove_server_side(
-                lambda: self.coll.remove("id", RemoveOptions().dur_server(durability_type)))
+                lambda: self.coll.remove("id", RemoveOptions(durability=ServerDurability(durability_type))))
 
     def retry_idempotent_remove_server_side(self,  # type: Scenarios
                                             callback,  # type: Callable[[],Any]
@@ -444,7 +449,6 @@ class Scenarios(CollectionTestCase):
         self.coll.decrement("counter", DeltaValue(1))
         self.assertEqual(42,self.coll.get("counter").content_as[int])
 
-        self.coll.remove("counter")
         self.coll.upsert("counter", 43)
         self.coll.decrement("counter", DeltaValue(1))
         self.assertEqual(42,self.coll.get("counter").content_as[int])
@@ -462,7 +466,6 @@ class Scenarios(CollectionTestCase):
         self.assertEqual(43,self.coll.get("counter").content_as[int])
         self.coll.increment("counter", DeltaValue(1))
         self.assertEqual(44,self.coll.get("counter").content_as[int])
-
         self.coll.remove("counter")
         self.coll.upsert("counter", 43)
         self.coll.increment("counter", DeltaValue(1))
@@ -501,8 +504,8 @@ class Scenarios(CollectionTestCase):
         self.assertIsInstance(metadata.success_count(), int)
         took=metadata.took()
         self.assertIsInstance(took, timedelta)
-        self.assertAlmostEqual(took.value, duration, delta=0.1)
-        self.assertGreater(took.value, 0)
+        self.assertAlmostEqual(took.total_seconds(), duration, delta=0.1)
+        self.assertGreater(took.total_seconds(), 0)
         self.assertIsInstance(metadata.total_hits(), int)
         self.assertGreaterEqual(metadata.success_count(), min_hits)
         self.assertGreaterEqual(metadata.total_hits(), min_hits)
@@ -522,6 +525,7 @@ class Scenarios(CollectionTestCase):
         except couchbase.exceptions.TimeoutError:
             if self.is_mock:
                 raise SkipTest("LCB Diagnostics still blocks indefinitely with mock: {}".format(traceback.format_exc()))
+            raise
 
         self.assertRegex(diagnostics.sdk(), r'.*PYCBC.*')
         self.assertGreaterEqual(diagnostics.version(), 1)

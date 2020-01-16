@@ -6,9 +6,16 @@ import ctypes
 from couchbase_core import abstractmethod, ABCMeta
 from couchbase_core._pyport import with_metaclass
 from datetime import timedelta
+from enum import IntEnum
+try:
+    from typing import TypedDict
+except:
+    from typing_extensions import TypedDict
+
+OptionBlockBase = dict
 
 
-class OptionBlock(dict):
+class OptionBlock(OptionBlockBase):
     def __init__(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
         super(OptionBlock, self).__init__(**kwargs)
@@ -50,15 +57,11 @@ class Value(object):
     def __int__(self):
         return self.value
 
-    def __float__(self):
-        return self.value
-
-
-class Cardinal(OptionBlock):
-    ONE = Value(1)
-    TWO = Value(2)
-    THREE = Value(3)
-    NONE = Value(0)
+class Cardinal(IntEnum):
+    ONE = 1
+    TWO = 2
+    THREE = 3
+    NONE = 0
 
 
 OptionBlockDeriv = TypeVar('OptionBlockDeriv', bound=OptionBlock)
@@ -80,7 +83,9 @@ class Forwarder(with_metaclass(ABCMeta)):
             map_item = self.arg_mapping().get(k, None)
             if not (map_item is None):
                 for out_k, out_f in map_item.items():
-                    end_options[out_k] = out_f(v)
+                    converted = out_f(v)
+                    if converted is not None:
+                        end_options[out_k] = converted
             else:
                 end_options[k] = v
         return end_options
@@ -109,10 +114,13 @@ def timedelta_as_microseconds(duration  # type: timedelta
 class DefaultForwarder(Forwarder):
     def arg_mapping(self):
         return {'spec': {'specs': lambda x: x}, 'id': {},
-                'replicate_to': {"replicate_to": int},
-                'persist_to': {"persist_to": int},
                 'timeout': {'timeout': timedelta_as_microseconds},
-                'expiry': {'ttl': timedelta_as_timestamp}, 'self': {}, 'options': {}}
+                'expiry': {'ttl': timedelta_as_timestamp},
+                'self': {},
+                'options': {},
+                'durability': {'durability_level': lambda durability: durability.get('level', None),
+                               "replicate_to": lambda client_dur: client_dur.get('replicate_to', None),
+                               "persist_to": lambda client_dur: client_dur.get('persist_to', None)}}
 
 
 forward_args = DefaultForwarder().forward_args
