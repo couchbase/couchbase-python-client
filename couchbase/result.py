@@ -1,16 +1,14 @@
-from datetime import timedelta
-
 from couchbase_core.subdocument import Spec
 from .options import timedelta, forward_args
 from couchbase_core.transcodable import Transcodable
-from couchbase_core._libcouchbase import Result as SDK2Result
+from couchbase_core._libcouchbase import Result as CoreResult
 from couchbase_core.result import MultiResult, SubdocResult
 from typing import *
 from boltons.funcutils import wraps
-from couchbase_core import abstractmethod, IterableWrapper, ABCMeta
+from couchbase_core import abstractmethod, IterableWrapper
 from couchbase_core.result import AsyncResult
-from couchbase_core._pyport import with_metaclass, Protocol
-from couchbase_core.views.iterator import View as SDK2View
+from couchbase_core._pyport import Protocol
+from couchbase_core.views.iterator import View as CoreView
 
 
 Proxy_T = TypeVar('Proxy_T')
@@ -109,7 +107,7 @@ class Result(ResultProtocol):
 
 class LookupInResult(Result):
     def __init__(self,
-                 content,  # type: SDK2Result
+                 content,  # type: CoreResult
                  **kwargs  # type: Any
                  ):
         # type: (...) -> None
@@ -118,7 +116,7 @@ class LookupInResult(Result):
         Constructed internally by the API.
         """
         super(LookupInResult, self).__init__(content.cas, content.rc)
-        self._content = content  # type: SDK2Result
+        self._content = content  # type: CoreResult
         self.dict = kwargs
 
     @property
@@ -134,11 +132,11 @@ class LookupInResult(Result):
 
 class MutationResult(Result):
     def __init__(self,
-                sdk2_result    # type: SDK2Result
+                core_result    # type: CoreResult
                 ):
-      super(MutationResult, self).__init__(sdk2_result.cas, sdk2_result.rc)
-      mutinfo = getattr(sdk2_result, '_mutinfo', None)
-      muttoken = SDK2MutationToken(mutinfo) if mutinfo else None
+      super(MutationResult, self).__init__(core_result.cas, core_result.rc)
+      mutinfo = getattr(core_result, '_mutinfo', None)
+      muttoken = MutationToken(mutinfo) if mutinfo else None
       self.mutationToken = muttoken
 
     def mutation_token(self):
@@ -148,7 +146,7 @@ class MutationResult(Result):
 
 class MutateInResult(MutationResult):
     def __init__(self,
-                 content,  # type: SDK2Result
+                 content,  # type: CoreResult
                  **options  # type: Any
                  ):
         # type: (...) -> None
@@ -157,7 +155,7 @@ class MutateInResult(MutationResult):
         Constructed internally by the API.
         """
         super(MutateInResult,self).__init__(content)
-        self._content = content  # type: SDK2Result
+        self._content = content  # type: CoreResult
         self.dict = options
 
     def content_as(self):
@@ -172,7 +170,7 @@ class MutateInResult(MutationResult):
 class GetResult(Result):
 
     def __init__(self,
-                 original,     # type: SDK2Result,
+                 original,     # type: CoreResult,
                  expiry = None # type: timedelta
                 ):
       """
@@ -216,9 +214,9 @@ class AsyncWrapper(object):
     def gen_wrapper(base):
         class Wrapped(base):
             def __init__(self,
-                         sdk2_result,
+                         core_result,
                          **kwargs):
-                self._original = sdk2_result
+                self._original = core_result
                 self._kwargs = kwargs
 
             def set_callbacks(self, on_ok_orig, on_err_orig):
@@ -238,20 +236,20 @@ class AsyncWrapper(object):
 
 class AsyncGetResult(AsyncWrapper.gen_wrapper(GetResult)):
     def __init__(self,
-                 sdk2_result  # type: SDK2Result
+                 core_result  # type: CoreResult
                  ):
-        super(AsyncGetResult, self).__init__(sdk2_result)
+        super(AsyncGetResult, self).__init__(core_result)
 
 class AsyncMutationResult(AsyncWrapper.gen_wrapper(MutationResult)):
     def __init__(self,
-                 sdk2_result  # type: SDK2Result
+                 core_result  # type: CoreResult
                  ):
         # type (...)->None
-        super(AsyncMutationResult, self).__init__(sdk2_result)
+        super(AsyncMutationResult, self).__init__(core_result)
 
 
 # TODO: eliminate the options shortly.  They serve no purpose
-ResultPrecursor = NamedTuple('ResultPrecursor', [('orig_result', SDK2Result), ('orig_options', Mapping[str, Any])])
+ResultPrecursor = NamedTuple('ResultPrecursor', [('orig_result', CoreResult), ('orig_options', Mapping[str, Any])])
 
 
 def get_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
@@ -269,35 +267,25 @@ def get_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
 
 
 class MutationToken(object):
-    def __init__(self, sequenceNumber,  # type: int
-                 vbucketId,  # type: int
-                 vbucketUUID  # type: int
-                 ):
-        self.sequenceNumber = sequenceNumber
-        self.vbucketId = vbucketId
-        self.vbucketUUID = vbucketUUID
+    def __init__(self, token):
+        token = token or (None, None, None)
+        (self.vbucketId, self.vbucketUUID, self.sequenceNumber)=token
 
     def partition_id(self):
         # type: (...) -> int
-        pass
+        return self.vbucketId
 
     def partition_uuid(self):
         # type: (...) -> int
-        pass
+        return self.vbucketUUID
 
     def sequence_number(self):
         # type: (...) -> int
-        pass
+        return self.sequenceNumber
 
     def bucket_name(self):
         # type: (...) -> str
-        pass
-
-
-class SDK2MutationToken(MutationToken):
-    def __init__(self, token):
-        token = token or (None, None, None)
-        super(SDK2MutationToken, self).__init__(token[2], token[0], token[1])
+        raise NotImplementedError()
 
 
 def get_mutation_result(result  # type: ResultPrecursor
@@ -314,7 +302,7 @@ def get_multi_mutation_result(target, wrapped, keys, *options, **kwargs):
     return {k: get_mutation_result(ResultPrecursor(v, final_options)) for k, v in raw_result.items()}
 
 
-def _wrap_in_mutation_result(func  # type: Callable[[Any,...],SDK2Result]
+def _wrap_in_mutation_result(func  # type: Callable[[Any,...],CoreResult]
                              ):
     # type: (...) -> Callable[[Any,...],MutationResult]
     @wraps(func)
@@ -345,9 +333,9 @@ class ViewResultProtocol(ResultProtocol, Protocol):
 
 
 class ViewResult(IterableWrapper):
-    def __init__(self, sdk2_view  # type: SDK2View
+    def __init__(self, core_view  # type: CoreView
                 ):
-        super(ViewResult, self).__init__(sdk2_view)
+        super(ViewResult, self).__init__(core_view)
 
     @property
     def error(self):

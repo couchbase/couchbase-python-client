@@ -14,7 +14,7 @@ from .n1ql import QueryResult
 from couchbase_core.n1ql import N1QLQuery
 from .options import OptionBlock, OptionBlockTimeOut, forward_args, OptionBlockDeriv
 from .bucket import BucketOptions, Bucket, CoreClient
-from couchbase_core.cluster import Cluster as SDK2Cluster, Authenticator as SDK2Authenticator
+from couchbase_core.cluster import Cluster as CoreCluster, Authenticator as CoreAuthenticator
 from .exceptions import InvalidArgumentsException, SearchException, DiagnosticsException, QueryException, ArgumentError, AnalyticsException
 from couchbase_core import abstractmethod
 import multiprocessing
@@ -218,7 +218,7 @@ class Cluster(object):
 
     class ClusterOptions(OptionBlock):
         def __init__(self,
-                     authenticator,  # type: SDK2Authenticator
+                     authenticator,  # type: CoreAuthenticator
                      **kwargs
                      ):
             super(ClusterOptions, self).__init__()
@@ -249,7 +249,7 @@ class Cluster(object):
         if not authenticator:
             raise ArgumentError("Authenticator is mandatory")
         cluster_opts.update(bucket_class=lambda connstr, bname=None, **kwargs: Bucket(connstr,name=bname,admin=self.admin,**kwargs))
-        self._cluster = SDK2Cluster(connection_string, **cluster_opts)  # type: SDK2Cluster
+        self._cluster = CoreCluster(connection_string, **cluster_opts)  # type: CoreCluster
         self._authenticate(authenticator)
 
     @staticmethod
@@ -260,7 +260,7 @@ class Cluster(object):
         return Cluster(connection_string, *options, **kwargs)
 
     def _authenticate(self,
-                      authenticator=None,  # type: SDK2Authenticator
+                      authenticator=None,  # type: CoreAuthenticator
                       username=None,  # type: str
                       password=None  # type: str
                       ):

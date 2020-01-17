@@ -6,7 +6,7 @@ from mypy_extensions import VarArg, KwArg, Arg
 
 from .subdocument import LookupInSpec, MutateInSpec, MutateInOptions, \
     gen_projection_spec
-from .result import GetResult, get_result_wrapper, SDK2Result, ResultPrecursor, LookupInResult, MutateInResult, \
+from .result import GetResult, get_result_wrapper, CoreResult, ResultPrecursor, LookupInResult, MutateInResult, \
     MutationResult, _wrap_in_mutation_result, AsyncGetResult, get_mutation_result, get_multi_mutation_result
 from .options import forward_args, timedelta, OptionBlockTimeOut, OptionBlockDeriv, ConstrainedInt, SignedInt64, AcceptableInts
 from .options import OptionBlock, AcceptableInts
@@ -150,7 +150,7 @@ RawCollectionMethodSpecial = TypeVar('RawCollectionMethodSpecial', bound=RawColl
 
 
 
-CoreBucketOpRead = TypeVar("CoreBucketOpRead", Callable[[Any], SDK2Result], Callable[[Any], GetResult])
+CoreBucketOpRead = TypeVar("CoreBucketOpRead", Callable[[Any], CoreResult], Callable[[Any], GetResult])
 
 
 class BinaryCollection(object):
@@ -176,7 +176,7 @@ class LookupInOptions(OptionBlockTimeOut):
     pass
 
 
-CoreBucketOp = TypeVar("CoreBucketOp", Callable[[Any], SDK2Result], Callable[[Any], MutationResult])
+CoreBucketOp = TypeVar("CoreBucketOp", Callable[[Any], CoreResult], Callable[[Any], MutationResult])
 
 
 def _wrap_multi_mutation_result(wrapped  # type: CoreBucketOp
@@ -312,7 +312,7 @@ class CBCollection(CoreClient):
                       *options,  # type: GetAndTouchOptions
                       **kwargs  # type: Any
                       ):
-        # type: (...) -> Tuple[SDK2Result, Tuple[Tuple[GetAndTouchOptions]]]
+        # type: (...) -> Tuple[CoreResult, Tuple[Tuple[GetAndTouchOptions]]]
         kwargs_final = forward_args(kwargs, *options)
         if 'durability' in set(kwargs.keys()).union(options[0][0].keys()):
             raise couchbase.exceptions.ReplicaNotAvailableException()
