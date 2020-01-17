@@ -507,8 +507,8 @@ Attributes
     from the couchbase_v2 legacy support package. We plan
     to update these to support SDK3 shortly.
 
-.. currentmodule:: couchbase_core.client
-.. class:: Client
+.. currentmodule:: couchbase.collection
+.. class:: Collection
 
     .. autoattribute:: quiet
 
