@@ -118,6 +118,7 @@ class Scenarios(CollectionTestCase):
                                       MutateInOptions().timeout(timedelta(seconds=10)))
 
         self.assertIsInstance(result, MutateInResult)
+        self.assertEqual('None',result.content_as[str](0))
 
     from parameterized import parameterized
     @parameterized.expand(

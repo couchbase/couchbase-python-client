@@ -158,9 +158,10 @@ class MutateInResult(MutationResult):
         self._content = content  # type: CoreResult
         self.dict = options
 
+    @property
     def content_as(self):
-        # type: (...) -> ContentProxy
-        return ContentProxy(self._content)
+        # type: (...) -> ContentProxySubdoc
+        return ContentProxySubdoc(self._content)
 
     @property
     def key(self):
