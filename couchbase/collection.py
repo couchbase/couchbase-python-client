@@ -6,8 +6,8 @@ from mypy_extensions import VarArg, KwArg, Arg
 
 from .subdocument import LookupInSpec, MutateInSpec, MutateInOptions, \
     gen_projection_spec
-from .result import GetResult, ExistsResult, get_result_wrapper, CoreResult, ResultPrecursor, LookupInResult, MutateInResult, \
-    MutationResult, _wrap_in_mutation_result, AsyncGetResult, get_mutation_result, get_multi_mutation_result
+from .result import GetResult, GetReplicaResult, ExistsResult, get_result_wrapper, CoreResult, ResultPrecursor, LookupInResult, MutateInResult, \
+    MutationResult, _wrap_in_mutation_result, AsyncGetResult, get_replica_result_wrapper, get_mutation_result, get_multi_mutation_result
 from .options import forward_args, timedelta, OptionBlockTimeOut, OptionBlockDeriv, ConstrainedInt, SignedInt64, \
     AcceptableInts
 from .options import OptionBlock, AcceptableInts, OptionBlockBase
@@ -154,13 +154,15 @@ class GetAndTouchOptions(GetOptions):
 class GetAndLockOptions(GetOptions):
     pass
 
+class GetAnyReplicaOptions(GetOptions):
+  pass
+
+class GetAllReplicasOptions(GetOptions):
+  pass
 
 class InsertOptions(DurabilityOptionBlock):
     pass
 
-
-class GetFromReplicaOptions(OptionBlock):
-    pass
 
 
 T = TypeVar('T', bound='CBCollection')
@@ -344,16 +346,48 @@ class CBCollection(CoreClient):
         _Base.lock(self, id, options)
         return ResultPrecursor(x, options)
 
-    @get_result_wrapper
-    def get_from_replica(self,
-                         id,  # type: str
-                         replica_index,  # type: int
+    @get_replica_result_wrapper
+    def get_any_replica(self,
+                         id,        # type: str
                          *options,  # type: GetFromReplicaOptions
-                         **kwargs  # type: Any
+                         **kwargs   # type: Any
                          ):
-        # type: (...) -> ResultPrecursor
+        # type: (...) -> GetReplicaResult
+        """Obtain an object stored in Couchbase by given key, from a replica.
+
+        :param string key: The key to fetch. The type of key is the same
+            as mentioned in :meth:`upsert`
+        :param: GetFromReplicaOptions options: The options to use for this get request.
+        :param: Any kwargs: Override corresponding value in options.
+
+        :raise: :exc:`.NotFoundError` if the key does not exist
+                :exc:`.DocumentUnretrievableError` if no replicas exist
+        :return: A :class:`couchbase.result.GetReplicaResult` object
+
+        """
         final_options = forward_args(kwargs, *options)
-        return ResultPrecursor(super(CBCollection,self).rget(id, replica_index, **final_options), final_options)
+        return ResultPrecursor(super(CBCollection, self).rget(id, **final_options), final_options)
+
+    def get_all_replicas(self,
+                         id,         # type: str
+                         *options,   # type: GetAllReplicasOptions
+                         **kwargs    # type: Any
+                         ):
+      # type: (...) -> Iterable[GetReplicaResult]
+      """Obtain an object stored in Couchbase by given key, from every replica.
+
+      :param string key: The key to fetch. The type of key is the same
+          as mentioned in :meth:`upsert`
+      :param: GetFromReplicaOptions options: The options to use for this get request.
+      :param: Any kwargs: Override corresponding value in options.
+
+      :raise: :exc:`.NotFoundError` if the key does not exist
+              :exc:`.DocumentUnretrievableError` if no replicas exist
+      :return: A list(:class:`couchbase.result.GetReplicaResult`) object
+      """
+      # NOTE: currently rgetall in the client returns a single result.  Lets
+      # raise NotImplementedException for now.
+      raise NotImplementedError("To be implemented in full SDK3 release")
 
     def get_multi(self,  # type: CBCollection
                   keys,  # type: Iterable[str]

@@ -277,6 +277,11 @@ class GetResult(Result):
 
 T = TypeVar('T', bound=Tuple[ResultProtocol, ...])
 
+class GetReplicaResult(GetResult):
+  @property
+  def is_replica(self):
+    raise NotImplementedError("To be implemented in final sdk3 release")
+
 
 class AsyncWrapper(object):
     @staticmethod
@@ -309,6 +314,12 @@ class AsyncGetResult(AsyncWrapper.gen_wrapper(GetResult)):
                  ):
         super(AsyncGetResult, self).__init__(core_result)
 
+class AsyncGetReplicaResult(AsyncWrapper.gen_wrapper(GetReplicaResult)):
+    def __init__(self,
+                 sdk2_result  # type: SDK2Result
+                 ):
+        super(AsyncGetReplicaResult, self).__init__(sdk2_result)
+
 class AsyncMutationResult(AsyncWrapper.gen_wrapper(MutationResult)):
     def __init__(self,
                  core_result  # type: CoreResult
@@ -328,6 +339,19 @@ def get_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
     def wrapped(*args, **kwargs):
         x, options = func(*args, **kwargs)
         factory_class=AsyncGetResult if issubclass(type(x), AsyncResult) else GetResult
+        return factory_class(x)
+
+    wrapped.__name__ = func.__name__
+    wrapped.__doc__ = func.__name__
+    return wrapped
+
+def get_replica_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
+                       ):
+    # type: (...) -> Callable[[Any], GetResult]
+    @wraps(func)
+    def wrapped(*args, **kwargs):
+        x, options = func(*args, **kwargs)
+        factory_class=AsyncGetReplicaResult if issubclass(type(x), AsyncResult) else GetReplicaResult
         return factory_class(x)
 
     wrapped.__name__ = func.__name__

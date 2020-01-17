@@ -725,7 +725,7 @@ class Client(_Base):
     def get(self, *args, **kwargs):
         return super(Client, self).get(*args,**kwargs)
 
-    def rget(self, key, replica_index=None, quiet=None):
+    def rget(self, key, replica_index=None, quiet=None, **kwargs):
         """Get an item from a replica node
 
         :param string key: The key to fetch
@@ -748,9 +748,12 @@ class Client(_Base):
         .. seealso:: :meth:`get` :meth:`rget_multi`
         """
         if replica_index is not None:
-            return _Base._rgetix(self, key, replica=replica_index, quiet=quiet)
+            return _Base._rgetix(self, key, replica=replica_index, **kwargs)
         else:
-            return _Base._rget(self, key, quiet=quiet)
+            return _Base._rget(self, key, **kwargs)
+
+    def rgetall(self, key, **kwargs):
+      return _Base._rgetall(self, key, **kwargs)
 
     def rget_multi(self, keys, replica_index=None, quiet=None):
         if replica_index is not None:

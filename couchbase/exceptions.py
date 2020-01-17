@@ -54,6 +54,8 @@ class ValueTooBigException(KeyValueException, couchbase_core.exceptions.TooBigEr
 class KeyLockedException(KeyValueException):
     pass
 
+class DocumentUnretrievableException(KeyValueException):
+  pass
 
 class TempFailException(KeyValueException, couchbase_core.exceptions.TemporaryFailError):
     pass
@@ -261,6 +263,7 @@ V3Mapping=dict(list({
            C.LCB_ERR_TIMEOUT:        couchbase_core.exceptions.TimeoutError,
            C.LCB_ERR_CONNECT_ERROR:    couchbase_core.exceptions.ConnectError,
            C.LCB_ERR_BUCKET_NOT_FOUND:    BucketMissingException,
+           C.LCB_ERR_NO_MATCHING_SERVER:  DocumentUnretrievableException,
            #C.LCB_EBADHANDLE:       couchbase_core.exceptions.BadHandleError,
            C.LCB_ERR_INVALID_HOST_FORMAT: couchbase_core.exceptions.InvalidError,
            C.LCB_ERR_INVALID_CHAR:     couchbase_core.exceptions.InvalidError,

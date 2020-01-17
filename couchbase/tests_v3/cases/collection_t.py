@@ -17,11 +17,11 @@
 #
 from couchbase_tests.base import skip_if_no_collections, CollectionTestCase
 from couchbase.collection import GetOptions, LookupInOptions
-from couchbase.exceptions import NotFoundError, InvalidArgumentsException
+from couchbase.exceptions import NotFoundError, InvalidArgumentsException, DocumentUnretrievableException
 import unittest
 from datetime import timedelta
 import couchbase.subdocument as SD
-
+from unittest import SkipTest
 
 class CollectionTests(CollectionTestCase):
   """
@@ -55,14 +55,14 @@ class CollectionTests(CollectionTestCase):
   def test_get(self):
     result = self.cb.get(self.KEY)
     self.assertIsNotNone(result.cas)
-    self.assertEquals(result.id, self.KEY)
+    self.assertEqual(result.id, self.KEY)
     self.assertIsNone(result.expiry)
     self.assertDictEqual(self.CONTENT, result.content_as[dict])
 
   def test_get_options(self):
     result = self.cb.get(self.KEY, GetOptions(timeout=timedelta(seconds=2), with_expiry=False))
     self.assertIsNotNone(result.cas)
-    self.assertEquals(result.id, self.KEY)
+    self.assertEqual(result.id, self.KEY)
     self.assertIsNone(result.expiry)
     self.assertDictEqual(self.CONTENT, result.content_as[dict])
 
@@ -78,7 +78,7 @@ class CollectionTests(CollectionTestCase):
   def test_project(self):
     result = self.cb.get(self.KEY, GetOptions(project=["some"]))
     assertIsNotNone(result.cas)
-    assertEquals(result.id, self.KEY)
+    assertEqual(result.id, self.KEY)
     assertIsNone(result.expiry)
     assertDictEqual(self.CONTENT, result.content_as[dict])
 
@@ -91,3 +91,23 @@ class CollectionTests(CollectionTestCase):
     self.assertEqual(['wibble', 'gronk'],sdresult_2.content_as[list](0))
     sdresult_2 = self.coll.lookup_in("id", (SD.get("someArray"),), LookupInOptions(timeout=timedelta(seconds=1)), timeout=timedelta(microseconds=1))
     self.assertEqual(['wibble', 'gronk'],sdresult_2.content_as[list](0))
+
+  def test_get_any_replica(self):
+    if self.bucket._bucket.configured_replica_count < 1:
+      raise SkipTest('need replicas to test get_any_replica')
+
+    try:
+      self.coll.upsert('imakey100', self.CONTENT)
+      result = self.coll.get_any_replica('imakey100')
+      self.assertDictEqual(self.CONTENT, result.content_as[dict])
+    except DocumentUnretrievableException as e:
+      # probably, you have replicas enabled, but on single node
+      print("Perhaps your test server configured the default bucket to have replicas, but no other servers are up?")
+      raise
+
+  def test_get_any_replica_fail(self):
+    if self.bucket._bucket.configured_replica_count < 1:
+      raise SkipTest('need replicas to test get_any_replica')
+
+    self.assertRaises(NotFoundError, self.coll.get_any_replica, self.NOKEY)
+
