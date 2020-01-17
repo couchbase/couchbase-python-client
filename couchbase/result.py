@@ -1,4 +1,5 @@
 from couchbase_core.subdocument import Spec
+from couchbase_core.supportability import internal
 from .options import timedelta, forward_args
 from couchbase_core.transcodable import Transcodable
 from couchbase_core._libcouchbase import Result as CoreResult
@@ -38,17 +39,30 @@ def get_decoder(item  # type: Type[Union[Transcodable,Any]]
 
 
 class ContentProxy(object):
+    """
+    Used to provide access to Result content via Result.content_as[type]
+    """
+    @internal
     def __init__(self, content):
         self.content = content
 
     def __getitem__(self,
                     item  # type: Type[Proxy_T]
                     ):
-        # type: (...) -> Union[Proxy_T,Mapping[str,Proxy_T]]
+        # type: (...) -> Union[Proxy_T, Mapping[str,Proxy_T]]
+        """
+
+        :param item: the type to attempt to cast the result to
+        :return: the content cast to the given type, if possible
+        """
         return extract_value(self.content, get_decoder(item))
 
 
 class ContentProxySubdoc(object):
+    """
+    Used to provide access to Result content via Result.content_as[type]
+    """
+    @internal
     def __init__(self, content):
         self.content=content
 
@@ -59,10 +73,19 @@ class ContentProxySubdoc(object):
                     item  # type: Type[Proxy_T]
                     ):
         # type: (...) -> Callable[[int],Union[Proxy_T,Mapping[str,Proxy_T]]]
+        """
+        Returns a proxy for an array of subdoc results cast to the given type
+
+        :param item: type to cast the array elements to
+        :return: the proxy, which is callable with an index to extract from the array and cast
+        """
         return lambda index: self.index_proxy(item, index)
 
 
 class ResultProtocol(Protocol):
+    """
+    This is the base protocol for all Result Objects
+    """
     @property
     @abstractmethod
     def cas(self):
@@ -83,16 +106,28 @@ class ResultProtocol(Protocol):
 
 
 class Result(ResultProtocol):
+    @internal
     def __init__(self,
                  cas,  # type: int
                  error=None  # type: Optional[int]
                  ):
+        """
+        This is the base implementation for most (but not all) :class:`~.ResultProtocol` objects.
+
+        :param int cas: CAS value
+        :param Optional[int] error: error code if applicable
+        """
         self._cas = cas
         self._error = error
 
     @property
     def cas(self):
         # type: () -> int
+        """
+        The CAS value
+
+        :return: the CAS value
+        """
         return self._cas
 
     @property
@@ -106,6 +141,7 @@ class Result(ResultProtocol):
 
 
 class LookupInResult(Result):
+    @internal
     def __init__(self,
                  content,  # type: CoreResult
                  **kwargs  # type: Any
@@ -113,7 +149,6 @@ class LookupInResult(Result):
         # type: (...) -> None
         """
         LookupInResult is the return type for lookup_in operations.
-        Constructed internally by the API.
         """
         super(LookupInResult, self).__init__(content.cas, content.rc)
         self._content = content  # type: CoreResult
@@ -122,6 +157,15 @@ class LookupInResult(Result):
     @property
     def content_as(self):
         # type: (...) -> ContentProxySubdoc
+        """
+        Return a proxy that allows extracting the content as a provided type.
+
+        Get first value as a string::
+
+            value = cb.get('key').content_as[str](0)
+
+        :return: returns as ContentProxySubdoc
+        """
         return ContentProxySubdoc(self._content)
 
     def exists(self,
@@ -145,6 +189,7 @@ class MutationResult(Result):
 
 
 class MutateInResult(MutationResult):
+    @internal
     def __init__(self,
                  content,  # type: CoreResult
                  **options  # type: Any
@@ -152,7 +197,6 @@ class MutateInResult(MutationResult):
         # type: (...) -> None
         """
         MutateInResult is the return type for mutate_in operations.
-        Constructed internally by the API.
         """
         super(MutateInResult,self).__init__(content)
         self._content = content  # type: CoreResult
@@ -161,22 +205,34 @@ class MutateInResult(MutationResult):
     @property
     def content_as(self):
         # type: (...) -> ContentProxySubdoc
+        """
+        Return a proxy that allows extracting the content as a provided type.
+
+        Get first result as a string::
+
+            cb.mutate_in('user',
+                          SD.array_addunique('tags', 'dog'),
+                          SD.counter('updates', 1)).content_as[str](0)
+
+        :return: returns a :class:`~.ContentProxySubdoc`
+        """
         return ContentProxySubdoc(self._content)
 
     @property
     def key(self):
+        # type: (...) -> str
+        """ Original key of the operation """
         return self._content.key
 
 
 class GetResult(Result):
-
+    @internal
     def __init__(self,
                  original,     # type: CoreResult,
                  expiry = None # type: timedelta
                 ):
       """
       GetResult is the return type for full read operations.
-      Constructed internally by the API.
       """
       super(GetResult, self).__init__(original.cas, original.rc)
       self._id = original.key
@@ -206,6 +262,7 @@ class GetResult(Result):
     def content(self):
         # type: () -> Any
         return extract_value(self._original, lambda x: x)
+
 
 T = TypeVar('T', bound=Tuple[ResultProtocol, ...])
 

@@ -20,12 +20,16 @@ class Level(object):
 
         func_name = getattr(function, '__qualname__', function.__name__)
 
+        result = cls.get_final_fn(function, message, func_name)
+        result.__doc__ = (function.__doc__+"\n\n" if function.__doc__ else "") + "    :warning: " + message % "This"
+        return result
+
+    @classmethod
+    def get_final_fn(cls, function, message, func_name):
         @wraps(function)
         def fn_wrapper(*args, **kwargs):
             warnings.warn(message % "'{}'".format(func_name))
             return function(*args, **kwargs)
-
-        fn_wrapper.__doc__ = (function.__doc__+"\n\n" if function.__doc__ else "") + "    :warning: " + message % "This"
 
         return fn_wrapper
 
@@ -56,6 +60,10 @@ class Internal(Level):
 
     Components external to Couchbase Python Client should not rely on it is not intended for use outside the module, even to other Couchbase components.
     """
+
+    @classmethod
+    def get_final_fn(cls, function, *args):
+        return function
 
 
 internal = Internal.wrap
