@@ -1,6 +1,6 @@
 from couchbase.management import CollectionManager, ViewIndexManager
 from couchbase.management.admin import Admin
-from couchbase_core.supportability import uncommitted
+from couchbase_core.supportability import uncommitted, volatile
 from couchbase_core.client import Client as CoreClient
 from .collection import CBCollection, CollectionOptions
 from .options import OptionBlock
@@ -128,7 +128,7 @@ class Bucket(object):
         # type: (...) -> str
         return self._name
 
-    @uncommitted
+    @volatile
     def scope(self,
               scope_name  # type: str
               ):
@@ -154,7 +154,7 @@ class Bucket(object):
         """
         return Scope(self).default_collection()
 
-    @uncommitted
+    @volatile
     def collection(self,
                    collection_name,  # type: str
                    options=None  # type: CollectionOptions

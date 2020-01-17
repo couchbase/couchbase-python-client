@@ -7,24 +7,67 @@ def deprecate_module_attribute(mod, deprecated=[]):
     return warn_on_attribute_access(mod, deprecated, "deprecated")
 
 
-def uncommitted(function):
+class Level(object):
+    @classmethod
+    def wrap(cls, function):
+        """
+        Mark a function as uncommitted
+
+        :param function: input function
+        :return: marked function
+        """
+        message = cls.__doc__+"\n"
+
+        func_name = getattr(function, '__qualname__', function.__name__)
+
+        @wraps(function)
+        def fn_wrapper(*args, **kwargs):
+            warnings.warn(message % "'{}'".format(func_name))
+            return function(*args, **kwargs)
+
+        fn_wrapper.__doc__ = (function.__doc__+"\n\n" if function.__doc__ else "") + "    :warning: " + message % "This"
+
+        return fn_wrapper
+
+
+class Uncommitted(Level):
     """
-    Mark a function as uncommitted
-    :param function: input function
-    :return: marked function
+    %s is an uncommitted API call that is unlikely to change, but may still change as final consensus on its behavior has not yet been reached.
     """
-    message = "%s is an uncommitted API call which may be subject to change in future.\n"
 
-    func_name = getattr(function, '__qualname__', function.__name__)
 
-    @wraps(function)
-    def uncommitted_wrapper(*args, **kwargs):
-        warnings.warn(message % "'{}'".format(func_name))
-        return function(*args, **kwargs)
+uncommitted = Uncommitted.wrap
 
-    uncommitted_wrapper.__doc__ = (function.__doc__+"\n\n" if function.__doc__ else "") + "    :warning: " + message % "This"
 
-    return uncommitted_wrapper
+class Volatile(Level):
+    """
+    %s is a volatile API call that is still in flux and may likely be changed.
+
+    It may also be an inherently private API call that may be exposed, but "YMMV" (your mileage may vary) principles apply.
+    """
+
+
+volatile = Volatile.wrap
+
+
+class Internal(Level):
+    """
+    %s is an internal API call.
+
+    Components external to Couchbase Python Client should not rely on it is not intended for use outside the module, even to other Couchbase components.
+    """
+
+
+internal = Internal.wrap
+
+
+class Committed(Level):
+    """
+    %s is guaranteed to be supported and remain stable between SDK versions.
+    """
+
+
+committed = Committed.wrap
 
 
 def warn_on_attribute_access(obj, applicable, status):

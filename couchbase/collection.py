@@ -1,4 +1,4 @@
-from couchbase_core.supportability import uncommitted
+from couchbase_core.supportability import uncommitted, volatile
 from couchbase_core import abstractmethod, JSON
 
 from boltons.funcutils import wraps
@@ -1295,7 +1295,7 @@ class Scope(object):
         # type: (...) -> CBCollection
         return CBCollection.cast(self, collection_name, *options)
 
-    @uncommitted
+    @volatile
     def collection(self,
                         collection_name,  # type: str
                         *options  # type: CollectionOptions
