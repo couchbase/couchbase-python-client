@@ -224,6 +224,17 @@ class MutateInResult(MutationResult):
         """ Original key of the operation """
         return self._content.key
 
+class ExistsResult(Result):
+  @internal
+  def __init__(self,
+               original # type: CoreResult
+              ):
+      super(ExistsResult, self).__init__(original.cas, original.rc)
+      self._exists = (original.cas != 0)
+
+  @property
+  def exists(self):
+      return self._exists
 
 class GetResult(Result):
     @internal

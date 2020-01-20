@@ -6,7 +6,7 @@ from mypy_extensions import VarArg, KwArg, Arg
 
 from .subdocument import LookupInSpec, MutateInSpec, MutateInOptions, \
     gen_projection_spec
-from .result import GetResult, get_result_wrapper, CoreResult, ResultPrecursor, LookupInResult, MutateInResult, \
+from .result import GetResult, ExistsResult, get_result_wrapper, CoreResult, ResultPrecursor, LookupInResult, MutateInResult, \
     MutationResult, _wrap_in_mutation_result, AsyncGetResult, get_mutation_result, get_multi_mutation_result
 from .options import forward_args, timedelta, OptionBlockTimeOut, OptionBlockDeriv, ConstrainedInt, SignedInt64, \
     AcceptableInts
@@ -119,6 +119,8 @@ class CollectionOptions(OptionBlock):
     def __init__(self, *args, **kwargs):
         super(CollectionOptions, self).__init__(*args, **kwargs)
 
+class ExistsOptions(OptionBlockTimeOut):
+    pass
 
 class GetOptions(OptionBlockTimeOut):
     @overload
@@ -179,21 +181,8 @@ CoreBucketOpRead = TypeVar("CoreBucketOpRead", Callable[[Any], CoreResult], Call
 class BinaryCollection(object):
     pass
 
-
 class TouchOptions(OptionBlock):
     pass
-
-
-class ExistsResult(object):
-  def __init__(self,
-               exists # type: Boolean
-                ):
-    self._exists = exists
-
-  @property
-  def exists(self):
-      return self._exists
-
 
 class LookupInOptions(OptionBlockTimeOut):
     pass
@@ -610,26 +599,21 @@ class CBCollection(CoreClient):
         final_options = forward_args(kwargs, *options)
         return _Base.lock(self, key, **final_options)
 
-    def exists(self,  # type: CBCollection
-               id,  # type: str
-               timeout=None,  # type: timedelta
-               ):
+    def exists(self,      # type: CBCollection
+               id,        # type: str
+               *options,  # type: timedelta
+               **kwargs   # type: Any
+                ):
         # type: (...) -> ExistsResult
-        """
-        Any exceptions raised by the underlying platform
+        """Check to see if a key exists in this collection.
 
-        :param id: the id of the document
-        :type: str
-        :param timeout: the time allowed for the operation to be terminated. This is controlled by the client.
-        :type: str
+        :param str id: the id of the document.
+        :param ExistsOptions *options: options for checking if a key exists.
         :return: An ExistsResult object with a boolean value indicating the presence of the document.
-        :raise: Any exceptions raised by the underlying platform
+        :raise: Any exceptions raised by the underlying platform.
         """
-        try:
-          # there probably is a better way...
-          return ExistsResult(True)
-        except couchbase.exceptions.KeyNotFoundException:
-          return ExistsResult(False)
+        return ExistsResult(super(CBCollection,self).exists(id), **forward_args(kwargs, *options))
+
 
     class UpsertOptions(DurabilityOptionBlock):
         def __init__(self, *args, **kwargs):

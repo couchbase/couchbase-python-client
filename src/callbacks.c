@@ -321,6 +321,8 @@ int pycbc_extract_respdata(const lcb_RESPBASE *resp,
                            &(handler->key.length));
         handler->rc = lcb_respexists_status((lcb_RESPEXISTS *)resp);
         lcb_respexists_cookie((const lcb_RESPEXISTS *)resp, (void **)mres);
+        lcb_respexists_cas((const lcb_RESPEXISTS *)resp,
+                           (uint64_t *)&(handler->cas));
         break;
     case LCB_CALLBACK_TOUCH:
         lcb_resptouch_key((const lcb_RESPTOUCH *)resp,

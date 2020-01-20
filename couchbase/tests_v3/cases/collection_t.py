@@ -42,11 +42,14 @@ class CollectionTests(CollectionTestCase):
     except:
       pass
 
+  # TODO: lets turn skipIfMock into an annotation
   def test_exists(self):
+    self.skipIfMock()
     self.assertTrue(self.cb.exists(self.KEY).exists)
 
-  @unittest.skip("LCB seems to not return an error anymore from exists, so lets fix that")
+  # TODO: lets turn skipIfMock into an annotation
   def test_exists_when_it_does_not_exist(self):
+    self.skipIfMock()
     self.assertFalse(self.cb.exists(self.NOKEY).exists)
 
   def test_get(self):
