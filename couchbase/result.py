@@ -347,12 +347,18 @@ def get_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
 
 def get_replica_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
                        ):
+
+    def factory_class(x):
+        factory=AsyncGetReplicaResult if issubclass(type(x), AsyncResult) else GetReplicaResult
+        return factory(x)
+
     # type: (...) -> Callable[[Any], GetResult]
     @wraps(func)
     def wrapped(*args, **kwargs):
-        x, options = func(*args, **kwargs)
-        factory_class=AsyncGetReplicaResult if issubclass(type(x), AsyncResult) else GetReplicaResult
-        return factory_class(x)
+        x = list(map(factory_class, func(*args, **kwargs)))
+        if (len(x) > 1):
+            return x
+        return x[0]
 
     wrapped.__name__ = func.__name__
     wrapped.__doc__ = func.__name__

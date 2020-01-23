@@ -65,7 +65,11 @@ enum {
     RESTYPE_EXISTS_OK = 1 << 3,
 
     /* Don't modify "remaining" count */
-    RESTYPE_VARCOUNT = 1 << 4
+    RESTYPE_VARCOUNT = 1 << 4,
+
+    /* return an array (whose value you can indicate
+     * with one of the flags above) */
+    RESTYPE_ARRAY = 1 << 5
 };
 
 /* Returns true if an error has been added... */
@@ -421,7 +425,19 @@ static int get_common_objects(const lcb_RESPBASE *resp,
     pycbc_store_error(pycbc_err);
     {
         mrdict = pycbc_multiresult_dict(*mres);
-        *res = (pycbc_Result *) PyDict_GetItem(mrdict, hkey);
+        *res = (pycbc_Result*)PyDict_GetItem(mrdict, hkey);
+        if (restype & RESTYPE_ARRAY) {
+            if (!*res || !PyList_Check((PyObject*)*res)) {
+                /* we need to create the empty array */
+                PyObject* list = PyList_New(0);
+                PYCBC_DEBUG_LOG("creating new array for %.*s", handler->key.length, handler->key.buffer);
+                PyDict_SetItem(mrdict, hkey, list);
+                PYCBC_DECREF(list);
+            }
+            /* no matter what, *res needs to be NULL now */
+            *res = NULL;
+        }
+
 
         PYCBC_INCREF(hkey);
         parent_context = PYCBC_MULTIRESULT_EXTRACT_CONTEXT(
@@ -485,7 +501,18 @@ static int get_common_objects(const lcb_RESPBASE *resp,
                 }
             }
             if (*res) {
-                PyDict_SetItem(mrdict, hkey, (PyObject *)*res);
+                if (restype & RESTYPE_ARRAY) {
+                    /* we actually need to put *res into the array, not directly into
+                     * the dict, so...*/
+                     PyObject* list = PyDict_GetItem(mrdict, hkey);
+                     if (!list) {
+                        pycbc_multiresult_adderr((pycbc_MultiResult *)*mres);
+                        return -1;
+                     }
+                     PyList_Append(list, (PyObject *)*res);
+                } else {
+                    PyDict_SetItem(mrdict, hkey, (PyObject *)*res);
+                }
                 (*res)->key = hkey;
                 PYCBC_DECREF(*res);
 
@@ -670,6 +697,7 @@ durability_chain_common(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
                             "durability_chain_common")
     dur_chain2(conn, mres, res, cbtype, resp);
 }
+
 static void
 value_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
 {
@@ -678,9 +706,14 @@ value_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
     pycbc_ValueResult *res = NULL;
     pycbc_MultiResult *mres = NULL;
     response_handler handler = {.cbtype = cbtype};
-    PYCBC_DEBUG_LOG("Value callback")
+    PYCBC_DEBUG_LOG("Value callback");
+    int restype = RESTYPE_VALUE;
+    if (cbtype == LCB_CALLBACK_GETREPLICA) {
+        restype |= RESTYPE_EXISTS_OK | RESTYPE_ARRAY;
+    }
+    int is_final = 1;
     rv = get_common_objects(
-            resp, &conn, (pycbc_Result **)&res, RESTYPE_VALUE, &mres, &handler);
+            resp, &conn, (pycbc_Result **)&res, restype, &mres, &handler);
 
     if (rv < 0) {
         goto GT_DONE;
@@ -697,7 +730,32 @@ value_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
         goto GT_DONE;
     }
 
-    if (cbtype == LCB_CALLBACK_GET || cbtype == LCB_CALLBACK_GETREPLICA) {
+    if (cbtype == LCB_CALLBACK_GETREPLICA) {
+        const lcb_RESPGETREPLICA *gresp = (const lcb_RESPGETREPLICA *)resp;
+        lcb_U32 eflags;
+        lcb_respgetreplica_flags(gresp, &res->flags);
+        is_final = lcb_respgetreplica_is_final(gresp);
+        if (mres->mropts & PYCBC_MRES_F_FORCEBYTES) {
+            eflags = PYCBC_FMT_BYTES;
+        } else {
+            lcb_respgetreplica_flags(gresp, &eflags);
+        }
+
+        if (res->value) {
+            Py_DECREF(res->value);
+            res->value = NULL;
+        }
+        {
+            const char *value = NULL;
+            size_t nvalue = 0;
+            lcb_respgetreplica_value(gresp, &value, &nvalue);
+            rv = pycbc_tc_decode_value(
+                    mres->parent, value, nvalue, eflags, &res->value);
+        }
+        if (rv < 0) {
+            pycbc_multiresult_adderr(mres);
+        }
+    } else if (cbtype == LCB_CALLBACK_GET) {
         const lcb_RESPGET *gresp = (const lcb_RESPGET *)resp;
         lcb_U32 eflags;
         lcb_respget_flags(gresp, &res->flags);
@@ -729,8 +787,10 @@ value_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
         res->value = pycbc_IntFromULL(value);
     }
     GT_DONE:
-        operation_completed_with_err_info(
-                conn, mres, cbtype, resp, (pycbc_Result *)res);
+        if(!(mres->mropts & PYCBC_MRES_F_MULTI) || is_final) {
+            operation_completed_with_err_info(
+                    conn, mres, cbtype, resp, (pycbc_Result *)res);
+        }
         CB_THR_BEGIN(conn);
         (void)instance;
 }

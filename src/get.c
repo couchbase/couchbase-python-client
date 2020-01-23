@@ -293,7 +293,8 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
         goto GT_FINALLY;
     }
 
-    if (replica_O && replica_O != Py_None && replica_O != Py_False) {
+    if ((replica_O && replica_O != Py_None && replica_O != Py_False) ||
+       (optype == PYCBC_CMD_GETREPLICA || optype == PYCBC_CMD_GETREPLICA_ALL)) {
         if (-1 == handle_replica_options(&optype, &gv, replica_O)) {
             goto GT_FINALLY;
         }
@@ -322,10 +323,10 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
         gv.allow_dval = 1;
         break;
 
+    case PYCBC_CMD_GETREPLICA_ALL:
     case PYCBC_CMD_EXISTS:
     case PYCBC_CMD_GETREPLICA:
     case PYCBC_CMD_GETREPLICA_INDEX:
-    case PYCBC_CMD_GETREPLICA_ALL:
         gv.allow_dval = 0;
         break;
 
@@ -341,7 +342,9 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
     if (rv < 0) {
         return NULL;
     }
-
+    if (optype == PYCBC_CMD_GETREPLICA_ALL) {
+        cv.mres->mropts |= PYCBC_MRES_F_MULTI;
+    }
     if (nofmt_O && nofmt_O != Py_None) {
         cv.mres->mropts |= PyObject_IsTrue(nofmt_O)
                 ? PYCBC_MRES_F_FORCEBYTES : 0;
