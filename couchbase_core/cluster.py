@@ -425,6 +425,11 @@ class Authenticator(object):
             result.update(self.get_cred_not_bucket())
         return result
 
+    def supports_tls(self):
+        return True
+    def supports_non_tls(self):
+        return True
+
 
 class PasswordAuthenticator(Authenticator):
     def __init__(self, username, password, cert_path=None):
@@ -528,6 +533,9 @@ class CertAuthenticator(Authenticator):
 
     def get_cred_not_bucket(self):
         return super(CertAuthenticator, self).get_cred_not_bucket(**{'options': {'password': self.password}})
+
+    def supports_non_tls(self):
+        return False
 
     @classmethod
     def unwanted_keys(cls):
