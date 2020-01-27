@@ -19,6 +19,12 @@ from couchbase_tests.base import CouchbaseTestCase
 from couchbase_core.connstr import ConnectionString
 from couchbase_v2.cluster import Cluster, ClassicAuthenticator,PasswordAuthenticator, NoBucketError, MixedAuthError, CertAuthenticator
 import gc
+import os
+import warnings
+from couchbase_core.exceptions import CouchbaseNetworkError, CouchbaseFatalError, CouchbaseInputError, ArgumentError
+
+
+CERT_PATH = os.getenv("PYCBC_CERT_PATH")
 
 
 class ClusterTest(CouchbaseTestCase):
@@ -158,3 +164,45 @@ class ClusterTest(CouchbaseTestCase):
 
         bucket = cluster.open_bucket(bucket_name)
         self.assertIsNotNone(bucket)
+
+    def _test_allow_cert_path_with_SSL_mock_errors(self, func, *args, **kwargs):
+        try:
+            func(*args,**kwargs)
+        except Exception as e:
+            if self.is_realserver and CERT_PATH:
+                raise
+            try:
+                raise e
+            except CouchbaseNetworkError as f:
+                self.assertRegex(str(e),r'.*(refused the connection).*')
+            except CouchbaseFatalError as f:
+                self.assertRegex(str(e),r'.*(SSL subsystem).*')
+            except CouchbaseInputError as f:
+                self.assertRegex(str(e),r'.*(not supported).*')
+            except ArgumentError as f:
+                self.assertRegex(str(e),r'.*(LCB_ERR_SSL_ERROR|LCB_ERR_SDK_FEATURE_UNAVAILABLE).*')
+
+            warnings.warn("Got exception {} but acceptable error for Mock with  SSL+cert_path tests".format(str(e)))
+
+    def test_can_authenticate_with_cert_path_and_username_password_via_PasswordAuthenticator(self):
+        cluster = Cluster(
+            'couchbases://{host}?certpath={certpath}'.format(host=self.cluster_info.host, certpath=CERT_PATH))
+        authenticator = PasswordAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)
+        cluster.authenticate(authenticator)
+        self._test_allow_cert_path_with_SSL_mock_errors(cluster.open_bucket, self.cluster_info.bucket_name)
+
+    def test_can_authenticate_with_cert_path_and_username_password_via_ClassicAuthenticator(self):
+        cluster = Cluster(
+            'couchbases://{host}?certpath={certpath}'.format(host=self.cluster_info.host, certpath=CERT_PATH))
+        authenticator = ClassicAuthenticator(buckets={self.cluster_info.bucket_name: self.cluster_info.bucket_password},
+                                             cluster_username=self.cluster_info.admin_username,
+                                             cluster_password=self.cluster_info.admin_password)
+        cluster.authenticate(authenticator)
+        self._test_allow_cert_path_with_SSL_mock_errors(cluster.open_bucket, self.cluster_info.bucket_name)
+
+    def test_can_authenticate_with_cert_path_and_username_password_via_kwargs(self):
+        cluster = Cluster(
+            'couchbases://{host}?certpath={certpath}'.format(host=self.cluster_info.host, certpath=CERT_PATH))
+        self._test_allow_cert_path_with_SSL_mock_errors(cluster.open_bucket, self.cluster_info.bucket_name,
+                                                        username=self.cluster_info.admin_username,
+                                                        password=self.cluster_info.admin_password)

@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import logging
 import weakref
 
 from .client import Client
@@ -329,7 +330,29 @@ class Cluster(object):
         raise NoBucketError('Must have at least one active bucket for query')
 
 
+def _recursive_creds_merge(base, overlay):
+    for k, v in overlay.items():
+        base_k = base.get(k, None)
+        if not base_k:
+            base[k] = v
+            continue
+        if isinstance(v, dict):
+            if isinstance(base_k, dict):
+                base[k] = _recursive_creds_merge(base_k, v)
+            else:
+                raise Exception("Cannot merge dict and {}".format(v))
+        else:
+            raise Exception("Cannot merge non dicts")
+    return base
+
+
 class Authenticator(object):
+    def __init__(self, cert_path = None):
+        """
+        :param cert_path: Path for SSL certificate (last in chain if multiple)
+        """
+        self._cert_path = cert_path
+
     def get_credentials(self, bucket=None):
         """
         Gets the credentials for a specified bucket. If bucket is
@@ -366,23 +389,27 @@ class Authenticator(object):
         """
         return {}
 
-    def get_cred_bucket(self, bucket):
+    def _base_options(self, bucket, overlay):
+        base_dict = {'options': {'cert_path': self._cert_path} if self._cert_path else {}}
+        return _recursive_creds_merge(base_dict, overlay)
+
+    def get_cred_bucket(self, bucket, **overlay):
         """
         :param bucket:
         :return: returns the non-unique parts of the credentials for bucket authentication,
         as a dictionary of functions, e.g.:
         'options': {'username': self.username}, 'scheme': 'couchbases'}
         """
-        raise NotImplementedError()
+        return self._base_options(bucket, overlay)
 
-    def get_cred_not_bucket(self):
+    def get_cred_not_bucket(self, **overlay):
         """
         :param bucket:
         :return: returns the non-unique parts of the credentials for admin access
         as a dictionary of functions, e.g.:
         {'options':{'password': self.password}}
         """
-        raise NotImplementedError()
+        return self._base_options(None, overlay)
 
     def get_auto_credentials(self, bucket):
         """
@@ -400,10 +427,7 @@ class Authenticator(object):
 
 
 class PasswordAuthenticator(Authenticator):
-    def __init__(self,
-                 username,  # type: str
-                 password  # type: str
-                 ):
+    def __init__(self, username, password, cert_path=None):
         """
         This class uses a single credential pair of username and password, and
         is designed to be used either with cluster management operations or
@@ -414,19 +438,23 @@ class PasswordAuthenticator(Authenticator):
 
         :param username:
         :param password:
+        :param cert_path:
+            Path of the CA key
 
         .. warning:: This functionality is experimental both in API and
             implementation.
 
         """
+        super(PasswordAuthenticator,self).__init__(cert_path=cert_path)
         self.username = username
         self.password = password
 
-    def get_cred_bucket(self, *unused):
-        return {'options': {'username': self.username, 'password': self.password}}
+    def get_cred_bucket(self, bucket, **overlay):
+        return self.get_cred_not_bucket(**overlay)
 
-    def get_cred_not_bucket(self):
-        return self.get_cred_bucket()
+    def get_cred_not_bucket(self, **overlay):
+        merged = _recursive_creds_merge({'options': {'username': self.username, 'password': self.password}}, overlay)
+        return super(PasswordAuthenticator, self).get_cred_not_bucket(**merged)
 
     @classmethod
     def unwanted_keys(cls):
@@ -436,8 +464,8 @@ class PasswordAuthenticator(Authenticator):
 class ClassicAuthenticator(Authenticator):
     def __init__(self, cluster_username=None,
                  cluster_password=None,
-                 buckets=None):
-        # type: (str, str, Mapping[str,str]) -> None
+                 buckets=None,
+                 cert_path=None):
         """
         Classic authentication mechanism.
         :param cluster_username:
@@ -447,16 +475,20 @@ class ClassicAuthenticator(Authenticator):
             Global cluster password. Only required for management operations
         :param buckets:
             A dictionary of `{bucket_name: bucket_password}`.
+        :param cert_path:
+            Path of the CA key
         """
+        super(ClassicAuthenticator, self).__init__(cert_path=cert_path)
         self.username = cluster_username
         self.password = cluster_password
         self.buckets = buckets if buckets else {}
 
     def get_cred_not_bucket(self):
-        return {'options': {'username': self.username, 'password': self.password}}
+        return super(ClassicAuthenticator, self).get_cred_not_bucket(**{'options': {'username': self.username, 'password': self.password}})
 
-    def get_cred_bucket(self, bucket):
-        return {'options': {'password': self.buckets.get(bucket)}}
+    def get_cred_bucket(self, bucket, **overlay):
+        merged=_recursive_creds_merge({'options': {'password': self.buckets.get(bucket)}}, overlay)
+        return super(ClassicAuthenticator, self).get_cred_bucket(bucket, **merged)
 
 
 class CertAuthenticator(Authenticator):
@@ -476,22 +508,26 @@ class CertAuthenticator(Authenticator):
         :param trust_store_path:
             Path of the certificate trust store.
         """
+        super(CertAuthenticator, self).__init__(cert_path=cert_path)
+
         self.username = cluster_username
         self.password = cluster_password
-        self.certpath = cert_path
         self.keypath = key_path
         self.trust_store_path = trust_store_path
 
     @classmethod
     def get_unique_creds_dict(clazz):
-        return {'certpath': lambda self: self.certpath, 'keypath': lambda self: self.keypath,
-                'truststorepath': lambda self: self.trust_store_path}
+        return { 'keypath': lambda self: self.keypath,
+                 'truststorepath': lambda self: self.trust_store_path}
 
-    def get_cred_bucket(self, *unused):
-        return {'options': {'username': self.username}, 'scheme': 'couchbases'}
+    def get_cred_bucket(self, bucket, **overlay):
+        merged = _recursive_creds_merge(
+            {'options': {'username': self.username}, 'scheme': 'couchbases'},
+            overlay)
+        return super(CertAuthenticator, self).get_cred_bucket(bucket, **merged)
 
     def get_cred_not_bucket(self):
-        return {'options': {'password': self.password}}
+        return super(CertAuthenticator, self).get_cred_not_bucket(**{'options': {'password': self.password}})
 
     @classmethod
     def unwanted_keys(cls):
