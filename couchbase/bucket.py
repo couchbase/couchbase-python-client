@@ -1,39 +1,91 @@
 from couchbase.management import CollectionManager, ViewIndexManager
 from couchbase.management.admin import Admin
+from couchbase.management.views import DesignDocumentNamespace
 from couchbase_core.supportability import uncommitted, volatile
 from couchbase_core.client import Client as CoreClient
 from .collection import CBCollection, CollectionOptions
-from .options import OptionBlock
+from .options import OptionBlockTimeOut
 from .result import *
 from .collection import Scope
+from datetime import timedelta
+from enum import Enum
 
+class ViewScanConsistency(Enum):
+    NOT_BOUNDED = 'ok'
+    REQUEST_PLUS = 'false'
+    UPDATE_AFTER = 'update_after'
 
-class BucketOptions(OptionBlock):
-    pass
+class ViewOrdering(Enum):
+    DESCENDING  = 'true'
+    ASCENDING = 'false'
 
+class ViewErrorMode(Enum):
+    CONTINUE = 'continue'
+    STOP = 'stop'
 
-class ViewOptions(OptionBlock):
-    pass
+class ViewOptions(OptionBlockTimeOut):
+    @overload
+    def __init__(self,
+                 timeout,               # type: timedelta
+                 scan_consistency,      # type: ViewScanConsistency
+                 skip,                  # type: int
+                 limit,                 # type: int
+                 startkey,              # type: Any
+                 endkey,                # type: Any
+                 startkey_docid,        # type: str
+                 endkey_docid,          # type: str
+                 inclusive_end,         # type: bool
+                 group,                 # type: bool
+                 group_level,           # type: int
+                 key,                   # type: Any
+                 keys,                  # type: Any
+                 order,                 # type: ViewOrdering
+                 reduce,                # type: bool
+                 on_error,              # type: ViewErrorMode
+                 debug,                 # type: bool
+                 raw,                   # type: Tuple(str,str)
+                 namespace              # type: DesignDocumentNamespace
+                 ):
+        pass
 
+    def __init__(self, **kwargs):
+        # massage them into the form needed by the existing
+        # view infrastructure... TODO: get rid of this when
+        # we kill off the v2 stuff
+        val = kwargs.pop('scan_consistency', None)
+        if val:
+            kwargs['stale'] = val.value()
+        val = kwargs.pop('order', None)
+        if val:
+            kwargs['descending'] = val.value()
+        val = kwargs.pop('on_error', None)
+        if val:
+            kwargs['on_error'] = val.value()
+        val = kwargs.pop('raw', None)
+        if val:
+            kwargs[val[0]] =  val[1]
+        val = kwargs.pop('namespace', None)
+        if val:
+           kwargs['use_devmode'] = (val == DesignDocumentNamespace.DEVELOPMENT)
+        super(ViewOptions, self).__init__(**kwargs)
 
 class Bucket(object):
     _bucket = None  # type: CoreClient
 
     @overload
     def __init__(self,
-                 connection_string,  # type: str
-                 name=None,
-                 admin=None,  # type: Admin
-                 *options  # type: BucketOptions
+                 connection_string,     # type: str
+                 name=None,             # type: str
+                 admin=None,            # type: Admin
                  ):
         # type: (...) -> None
         pass
 
     def __init__(self,
-                 connection_string,  # type: str
-                 name=None,
+                 connection_string,              # type: str
+                 name=None,                      # type: str
                  corebucket_class=CBCollection,  # type: Type[CoreClient]
-                 admin=None,  # type: Admin
+                 admin=None,                     # type: Admin
                  *options,
                  **kwargs
                 ):
@@ -143,28 +195,24 @@ class Bucket(object):
         return Scope(self, scope_name)
 
     def default_collection(self,
-                           options=None  # type: CollectionOptions
                            ):
         # type: (...) -> CBCollection
         """
         Open the default collection.
 
-        :param CollectionOptions options: any options to pass to the Collection constructor
         :return: the default :class:`Collection` object.
         """
         return Scope(self).default_collection()
 
     @volatile
     def collection(self,
-                   collection_name,  # type: str
-                   options=None  # type: CollectionOptions
+                   collection_name  # type: str
                    ):
         # type: (...) -> CBCollection
         """
         Open a collection in the default scope.
 
         :param collection_name: collection name
-        :param CollectionOptions options: any options to pass to the Collection constructor
         :return: the default :class:`.Collection` object.
         """
         return Scope(self).collection(collection_name)
@@ -172,17 +220,10 @@ class Bucket(object):
     def collections(self):
         return CollectionManager(self._admin, self._name)
 
-    @overload
     def view_query(self,
-                   design_doc,  # type: str
-                   view_name,  # type: str
-                   ):
-        pass
-
-    def view_query(self,
-                   design_doc,  # type: str
-                   view_name,  # type: str
-                   *view_options, # type: ViewOptions
+                   design_doc,      # type: str
+                   view_name,       # type: str
+                   *view_options,   # type: ViewOptions
                    **kwargs
                    ):
         # type: (...) -> ViewResult
@@ -190,7 +231,7 @@ class Bucket(object):
         Run a View Query
         :param str design_doc: design document
         :param str view_name: view name
-        :param view_options:
+        :param ViewOptions view_options: Options to use when querying a view index.
         :return: ViewResult containing the view results
         """
         cb = self._bucket  # type: CoreClient

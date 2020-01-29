@@ -1,9 +1,11 @@
 from typing import *
 import couchbase.options
-from .options import Cardinal, OptionBlock, OptionBlockBase
+from .options import Cardinal, OptionBlock, OptionBlockTimeOut
 from couchbase_core.durability import Durability
 from couchbase_core._pyport import TypedDict, with_metaclass
 from couchbase_core import ABCMeta
+from datetime import timedelta
+
 try:
     from typing import TypedDict
 except:
@@ -21,7 +23,7 @@ class DurabilityTypeBase(dict):
         super(DurabilityTypeBase,self).__init__(**content)
 
 
-class DurabilityType(DurabilityTypeBase):
+class DurabilityType(dict):
     def __init__(self, content):
         super(DurabilityType,self).__init__(content)
 
@@ -60,7 +62,39 @@ class ServerDurability(DurabilityType):
         """
         super(ServerDurability,self).__init__(ServerDurability.Storage(level=level))
 
+class ClientDurableOptionBlock(OptionBlockTimeOut):
+    @overload
+    def __init__(self,
+                 timeout,       # type: timedelta
+                 durability     # type: ClientDurability
+                ):
+        pass
+    def __init__(self,
+                 **kwargs
+                ):
+        super(ClientDurableOptionBlock, self).__init__(**kwargs)
 
-ClientDurableOptionBlock = TypedDict("ClientDurableOptionBlock", {'durability': ClientDurability}, total=False)
-ServerDurableOptionBlock = TypedDict("ServerDurableOptionBlock", {'durability': ServerDurability}, total=False)
-DurabilityOptionBlock = TypedDict("DurabilityOptionBlock", {'durability': DurabilityType}, total=False)
+class ServerDurableOptionBlock(OptionBlockTimeOut):
+    @overload
+    def __init__(self,
+                 timeout,       # type: timedelta
+                 durability     # type: ServerDurability
+                ):
+        pass
+    def __init__(self,
+                 **kwargs
+                ):
+        super(ServerDurableOptionBlock, self).__init__(**kwargs)
+
+class DurabilityOptionBlock(OptionBlockTimeOut):
+    @overload
+    def __init__(self,
+                 timeout,       # type: timedelta
+                 durability     # type: DurabilityType
+                 ):
+        pass
+    def __init__(self,
+                 **kwargs
+                 ):
+        super(DurabilityOptionBlock, self).__init__(**kwargs)
+

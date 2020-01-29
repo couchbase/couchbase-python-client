@@ -53,35 +53,31 @@ class DeltaValue(ConstrainedInt):
         return 0
 
 
-class ReplaceOptionsBase(OptionBlockTimeOut, DurabilityOptionBlock):
-    pass
-
-
-class ReplaceOptions(ReplaceOptionsBase):
-    def __init__(self, *args, **kwargs):
-        super(ReplaceOptions, self).__init__(*args, **kwargs)
-
-    def cas(self,  # type: ReplaceOptions
-            cas  # type: int
-            ):
-        # type: (...) -> ReplaceOptions
-        self.__setitem__('cas', cas)
-        return self
-
-
-class AppendOptions(OptionBlock):
-    def __init__(self, *args, **kwargs):
-        super(AppendOptions, self).__init__(*args, **kwargs)
-
-
-class RemoveOptionsBase(OptionBlockTimeOut, DurabilityOptionBlock):
-    pass
-
-
-class RemoveOptions(RemoveOptionsBase):
+class ReplaceOptions(DurabilityOptionBlock):
+    @overload
     def __init__(self,
-                 durability=None,  # type: DurabilityType
-                 cas=0,  # type: int
+                 timeout,       # type: timedelta
+                 durability,    # type: DurabilityType
+                 cas            # type: int
+                 ):
+        pass
+
+    def __init__(self,
+                 **kwargs
+                ):
+        if 'cas' not in kwargs:
+            kwargs['cas'] = 0
+        super(ReplaceOptions, self).__init__(**kwargs)
+
+
+class AppendOptions(OptionBlockTimeOut):
+    pass
+
+class RemoveOptions(DurabilityOptionBlock):
+    @overload
+    def __init__(self,
+                 durability,    # type: DurabilityType
+                 cas,           # type: int
                  **kwargs):
         """
         Remove Options
@@ -96,28 +92,26 @@ class RemoveOptions(RemoveOptionsBase):
         server does not match the one specified, an exception is
         thrown.
         """
-        kwargs.update(durability=durability,cas=cas)
+        pass
+    def __init__(self,
+                 **kwargs
+                ):
+        if 'cas' not in kwargs:
+            kwargs['cas'] = 0
         super(RemoveOptions,self).__init__(**kwargs)
 
 
-class PrependOptions(OptionBlock):
-    def __init__(self, *args, **kwargs):
-        super(PrependOptions, self).__init__(*args, **kwargs)
+class PrependOptions(OptionBlockTimeOut):
+    pass
 
+class UnlockOptions(OptionBlockTimeOut):
+    pass
 
-class UnlockOptions(OptionBlock):
-    def __init__(self, *args, **kwargs):
-        super(UnlockOptions, self).__init__(*args, **kwargs)
-
-
-class CounterOptions(OptionBlock, ServerDurableOptionBlock):
-    def __init__(self, *args, **kwargs):
-        super(CounterOptions, self).__init__(*args, **kwargs)
-
+class CounterOptions(ServerDurableOptionBlock):
+    pass
 
 class CollectionOptions(OptionBlock):
-    def __init__(self, *args, **kwargs):
-        super(CollectionOptions, self).__init__(*args, **kwargs)
+    pass
 
 class ExistsOptions(OptionBlockTimeOut):
     pass
@@ -148,8 +142,7 @@ class GetOptions(OptionBlockTimeOut):
         return self.get('project', [])
 
 class GetAndTouchOptions(GetOptions):
-    def __init__(self, *args, **kwargs):
-        super(GetAndTouchOptions, self).__init__(*args, **kwargs)
+    pass
 
 class GetAndLockOptions(GetOptions):
     pass
@@ -163,7 +156,8 @@ class GetAllReplicasOptions(GetOptions):
 class InsertOptions(DurabilityOptionBlock):
     pass
 
-
+class UpsertOptions(DurabilityOptionBlock):
+    pass
 
 T = TypeVar('T', bound='CBCollection')
 R = TypeVar("R")
@@ -175,15 +169,13 @@ RawCollectionMethodInt = Callable[
 RawCollectionMethod = Union[RawCollectionMethodDefault, RawCollectionMethodInt]
 RawCollectionMethodSpecial = TypeVar('RawCollectionMethodSpecial', bound=RawCollectionMethod)
 
-
-
 CoreBucketOpRead = TypeVar("CoreBucketOpRead", Callable[[Any], CoreResult], Callable[[Any], GetResult])
 
 
 class BinaryCollection(object):
     pass
 
-class TouchOptions(OptionBlock):
+class TouchOptions(OptionBlockTimeOut):
     pass
 
 class LookupInOptions(OptionBlockTimeOut):
@@ -280,11 +272,11 @@ class CBCollection(CoreClient):
 
     @get_result_wrapper
     def get(self,
-            key,  # type: str
-            *options,  # type: GetOptions
-            **kwargs  # type: Any
+            key,        # type: str
+            *options,   # type: GetOptions
+            **kwargs    # type: Any
             ):
-        # type: (...) -> ResultPrecursor
+        # type: (...) -> GetResult
         """Obtain an object stored in Couchbase by given key.
 
         :param string key: The key to fetch. The type of key is the same
@@ -310,23 +302,14 @@ class CBCollection(CoreClient):
         """
         return self._get_generic(key, kwargs, options)
 
-    @overload
-    def get_and_touch(self,
-                      id,  # type: str
-                      expiry,  # type: int
-                      *options  # type: GetAndTouchOptions
-                      ):
-        # type: (...) -> GetResult
-        pass
-
     @get_result_wrapper
     def get_and_touch(self,
-                      id,  # type: str
-                      expiry,  # type: int
-                      *options,  # type: GetAndTouchOptions
-                      **kwargs  # type: Any
+                      id,       # type: str
+                      expiry,   # type: int
+                      *options, # type: GetAndTouchOptions
+                      **kwargs
                       ):
-        # type: (...) -> Tuple[CoreResult, Tuple[Tuple[GetAndTouchOptions]]]
+        # type: (...) -> GetResult
         kwargs_final = forward_args(kwargs, *options)
         if 'durability' in set(kwargs.keys()).union(options[0][0].keys()):
             raise couchbase.exceptions.ReplicaNotAvailableException()
@@ -335,8 +318,8 @@ class CBCollection(CoreClient):
 
     @get_result_wrapper
     def get_and_lock(self,
-                     id,  # type: str
-                     expiry,  # type: int
+                     id,        # type: str
+                     expiry,    # type: int
                      *options,  # type: GetAndLockOptions
                      **kwargs
                      ):
@@ -350,7 +333,7 @@ class CBCollection(CoreClient):
     def get_any_replica(self,
                          id,        # type: str
                          *options,  # type: GetFromReplicaOptions
-                         **kwargs   # type: Any
+                         **kwargs
                          ):
         # type: (...) -> GetReplicaResult
         """Obtain an object stored in Couchbase by given key, from a replica.
@@ -634,7 +617,7 @@ class CBCollection(CoreClient):
 
     def exists(self,      # type: CBCollection
                id,        # type: str
-               *options,  # type: timedelta
+               *options,  # type: ExistsOptions
                **kwargs   # type: Any
                 ):
         # type: (...) -> ExistsResult
@@ -648,33 +631,12 @@ class CBCollection(CoreClient):
         return ExistsResult(super(CBCollection,self).exists(id), **forward_args(kwargs, *options))
 
 
-    class UpsertOptions(DurabilityOptionBlock):
-        def __init__(self, *args, **kwargs):
-            super(CBCollection.UpsertOptions, self).__init__(*args, **kwargs)
-
-    @overload
-    def upsert(self, key, value, *options  # type: UpsertOptions
-               ):
-        pass
-
-    @overload
-    def upsert(self,
-               id,  # type: str
-               value,  # type: Any
-               cas=0,  # type: int
-               expiry=None,  # type: timedelta
-               format=None,  # type: Any
-               durability=None  # type: DurabilityType
-               ):
-        # type: (...) -> MutationResult
-        pass
-
     @_wrap_in_mutation_result
     def upsert(self,
-               id,  # type: str
-               value,  # type: Any
-               *options,  # type: UpsertOptions
-               **kwargs  # type: Any
+               id,          # type: str
+               value,       # type: Any
+               *options,    # type: UpsertOptions
+               **kwargs     # type: Any
                ):
         # type: (...) -> MutationResult
         """Unconditionally store the object in Couchbase.
@@ -842,42 +804,24 @@ class CBCollection(CoreClient):
         final_options = forward_args(kwargs, *options)
         return ResultPrecursor(_Base.replace(self, id, value, **final_options), final_options)
 
-    @overload
-    def remove(self,  # type: CBCollection
-               id,  # type: str
-               cas=0,  # type: int
-               durability_level=None  # type: DurabilityType
-               ):
-        # type: (...) -> MutationResult
-        pass
-
-    @overload
-    def remove(self,  # type: CBCollection
-               id,  # type: str
-               *options  # type: RemoveOptions
-               ):
-        # type: (...) -> MutationResult
-        pass
-
     @_wrap_in_mutation_result
-    def remove(self,  # type: CBCollection
-               id,  # type: str
-               *options,  # type: RemoveOptions
+    def remove(self,        # type: CBCollection
+               id,          # type: str
+               *options,    # type: RemoveOptions
                **kwargs
                ):
         # type: (...) -> MutationResult
         """Remove the key-value entry for a given key in Couchbase.
 
-        :param key: A string which is the key to remove. The format and
+        :param str key: A string which is the key to remove. The format and
             type of the key follows the same conventions as in
             :meth:`upsert`
-        :type key: string, dict, or tuple/list
-
-        :param kwargs: options as for :class:`.RemoveOptions`
+        :param RemoveOptions options: Options for removing key.
+        :param Any kwargs: Override corresponding value in options
         :raise: :exc:`.NotFoundError` if the key does not exist.
         :raise: :exc:`.KeyExistsError` if a CAS was specified, but
             the CAS on the server had changed
-        :return: A :class:`~.Result` object.
+        :return: A :class:`~.MutationResult` object.
 
         Simple remove::
 
@@ -1307,30 +1251,7 @@ class Scope(object):
         # type: (...) -> CBCollection
         return CBCollection.cast(self, collection_name, *options)
 
-    @volatile
-    def collection(self,
-                        collection_name,  # type: str
-                        *options  # type: CollectionOptions
-                        ):
-        # type: (...) -> CBCollection
-        """
-        Gets the named collection for this bucket.
-
-        :param collection_name: string identifier for a given collection.
-        :param options: collection options
-        :return: A :class:`.Collection` for a collection with the given name.
-
-        :raise: CollectionNotFoundException
-        :raise: AuthorizationException
-
-        """
-        return self._gen_collection(collection_name, *options)
-
-
 Collection = CBCollection
-
-UpsertOptions = CBCollection.UpsertOptions
-
 
 class AsyncCBCollection(AsyncClientFactory.gen_async_client(CBCollection)):
     def __init__(self, *args, **kwargs):

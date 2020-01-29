@@ -13,7 +13,7 @@ from .analytics import AnalyticsResult
 from .n1ql import QueryResult
 from couchbase_core.n1ql import N1QLQuery
 from .options import OptionBlock, OptionBlockTimeOut, forward_args, OptionBlockDeriv
-from .bucket import BucketOptions, Bucket, CoreClient
+from .bucket import Bucket, CoreClient
 from couchbase_core.cluster import Cluster as CoreCluster, Authenticator as CoreAuthenticator
 from .exceptions import InvalidArgumentsException, SearchException, DiagnosticsException, QueryException, ArgumentError, AnalyticsException
 from couchbase_core import abstractmethod
@@ -23,7 +23,7 @@ import couchbase.exceptions
 import couchbase_core._libcouchbase as _LCB
 from couchbase_core._pyport import raise_from
 from couchbase.options import OptionBlockTimeOut
-
+from datetime import timedelta
 
 T = TypeVar('T')
 
@@ -58,8 +58,44 @@ def options_to_func(orig,  # type: U
     return invocation(orig)
 
 
-class AnalyticsOptions(OptionBlock):
+class AnalyticsOptions(OptionBlockTimeOut):
+  @overload
+  def __init__(self,
+               timeout,                # type: timedelta
+               read_only,              # type: bool
+               scan_consistency,       # type: QueryScanConsistency
+               client_context_id,      # type: str
+               priority,               # type: bool
+               positional_parameters,  # type: Iterable[str]
+               named_parameters,       # type: dict[str, str]
+               raw,                    # type: dict[str,Any]
+               ):
+
     pass
+
+  def __init__(self,
+               **kwargs
+               ):
+    super(QueryOptions, self).__init__(**kwargs)
+    # lets modify the underlying dict to conform to the
+    # expected format for AnalyticsOptions...
+    for key, val in self.items():
+      if key == 'positional_parameters':
+        self.pop(key, None)
+        self['args'] = val
+      if key == 'named_parameters':
+        self.pop(key, None)
+        for k, v in val.items():
+          self["${}".format(k)]=v
+      if key == 'scan_consistency':
+        self[key] = value.as_string()
+      if key == 'consistent_with':
+        self[key] = value.encode()
+      if key == 'priority':
+        self[key] = -1 if val else 0
+    if self.get('consistent_with', None):
+      self['scan_consistency'] = 'at_plus'
+
 
 class QueryScanConsistency(object):
   REQUEST_PLUS="request_plus"
@@ -225,24 +261,17 @@ class Cluster(object):
             super(ClusterOptions, self).__init__()
             self['authenticator'] = authenticator
 
-    @overload
     def __init__(self,
                  connection_string,  # type: str
-                 options  # type: ClusterOptions
-                 ):
-        pass
-
-    def __init__(self,
-                 connection_string,  # type: str
-                 *options,  # type: ClusterOptions
-                 **kwargs
+                 *options,           # type: ClusterOptions
+                 **kwargs            # type: Any
                  ):
         """
         Create a Cluster object.
-        An Authenticator must be provided either as the first argument or within the options argument.
-        :param connection_string: the connection string for the cluster
-        :param options: options for the cluster
-        :type Cluster.ClusterOptions
+        An Authenticator must be provided, either as the authenticator named parameter, or within the options argument.
+        :param str connection_string: the connection string for the cluster.
+        :param ClusterOptions options: options for the cluster.
+        :param Any kwargs: Override corresponding value in options.
         """
         self.connstr=connection_string
         cluster_opts=forward_args(kwargs, *options)
@@ -258,6 +287,13 @@ class Cluster(object):
                 *options,  # type: ClusterOptions
                 **kwargs
                 ):
+        """
+        Create a Cluster object.
+        An Authenticator must be provided, either as the authenticator named parameter, or within the options argument.
+        :param str connection_string: the connection string for the cluster.
+        :param ClusterOptions options: options for the cluster.
+        :param Any kwargs: Override corresponding value in options.
+        """
         return Cluster(connection_string, *options, **kwargs)
 
     def _authenticate(self,
@@ -273,19 +309,20 @@ class Cluster(object):
         auth=credentials.get('options')
         self.admin = Admin(auth.get('username'), auth.get('password'), connstr=str(self.connstr))
 
+    # TODO: There should be no reason for these kwargs.  However, our tests against the mock
+    # will all fail with auth errors without it...  So keeping it just for now, but lets fix it
+    # and remove this for 3.0.0
     def bucket(self,
-               name,  # type: str,
-               *options,  # type: BucketOptions
-               **kwargs
+               name,    # type: str
+               **kwargs # type: Any
                ):
         # type: (...) -> Bucket
-        args=forward_args(kwargs,*options)
-        args.update(bname=name)
-        return self._cluster.open_bucket(name, **args)
+        kwargs['bname'] = name
+        return self._cluster.open_bucket(name, **kwargs)
 
     def query(self,
               statement,            # type: str
-              *options,             # type: Any
+              *options,             # type: QueryOptions
               **kwargs              # type: Any
               ):
         # type: (...) -> QueryResult
@@ -326,9 +363,9 @@ class Cluster(object):
         except Exception as e:
             raise_from(failtype(params=CouchbaseError.ParamType(message="Cluster operation failed", inner_cause=e)), e)
 
-    def analytics_query(self,  # type: Cluster
+    def analytics_query(self,       # type: Cluster
                         statement,  # type: str,
-                        *options,  # type: AnalyticsOptions
+                        *options,   # type: AnalyticsOptions
                         **kwargs
                         ):
         # type: (...) -> AnalyticsResult
@@ -340,28 +377,11 @@ class Cluster(object):
         Throws Any exceptions raised by the underlying platform - HTTP_TIMEOUT for example.
         :except ServiceNotFoundException - service does not exist or cannot be located.
         """
-
         return AnalyticsResult(self._operate_on_cluster(CoreClient.analytics_query, AnalyticsException, statement, **forward_args(kwargs,*options)))
 
-    @overload
     def search_query(self,
-                     index,  # type: str
-                     query,  # type: Union[str, Query]
-                     facets=None  # type: Mapping[str,Facet]
-                     ):
-        pass
-
-    @overload
-    def search_query(self,
-                     index,  # type: str
-                     query,  # type: Union[str, Query]
-                     options,  # type: SearchOptions
-                     ):
-        pass
-
-    def search_query(self,
-                     index,  # type: str
-                     query,  # type: Union[str, Query]
+                     index,     # type: str
+                     query,     # type: couchbase_core.Query
                      *options,  # type: SearchOptions
                      **kwargs
                      ):
@@ -369,8 +389,10 @@ class Cluster(object):
         """
         Executes a Search or F.T.S. query against the remote cluster and returns a SearchResult implementation with the results of the query.
 
-        :param query: the fluent search API to construct a query for F.T.S.
-        :param options: the options to pass to the cluster with the query based off the F.T.S./Search RFC
+        :param str index: Name of the index to use for this query.
+        :param couchbase_core.Query query: the fluent search API to construct a query for F.T.S.
+        :param QueryOptions options: the options to pass to the cluster with the query.
+        :param Any kwargs: Overrides corresponding value in options.
         :return: An SearchResult object with the results of the query or error message if the query failed on the server.
         Any exceptions raised by the underlying platform - HTTP_TIMEOUT for example.
         :except    ServiceNotFoundException - service does not exist or cannot be located.
@@ -427,7 +449,7 @@ class Cluster(object):
         return BucketManager(self.admin)
 
     def disconnect(self,
-                   options=None  # type: DisconnectOptions
+                   timeout=None     # type: timedelta
                    ):
         # type: (...) -> None
         """

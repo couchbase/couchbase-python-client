@@ -4,8 +4,9 @@ from couchbase.options import timedelta
 from couchbase.management.queries import QueryIndex
 from couchbase.management.views import DesignDocumentNamespace, DesignDocument, DesignDocumentNotFoundException
 from typing import *
-
-0#
+from couchbase.bucket import ViewOptions
+from time import sleep
+#
 # Copyright 2013, Couchbase, Inc.
 # All Rights Reserved
 #
@@ -69,9 +70,10 @@ class DesignDocManagementTest(ClusterTestCase):
     @FlakyCounter(5,1)
     def test_design_management(self):
         self.mgr.upsert_design_document(DOCUMENT_FROM_JSON, DesignDocumentNamespace.DEVELOPMENT, syncwait=500)
+        sleep(5)
 
-        rv = self.bucket.view_query(DNAME, VNAME, use_devmode=True,
-                           limit=10)
+        rv = self.bucket.view_query(DNAME, VNAME,
+                                    ViewOptions(namespace=DesignDocumentNamespace.DEVELOPMENT,limit=10))
         print(list(rv))
         self.assertTrue(rv.success)
         self.mgr.publish_design_document(DNAME, timeout=timedelta(seconds=10), syncwait=5)

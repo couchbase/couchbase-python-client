@@ -1,16 +1,47 @@
 from typing import *
-from .options import OptionBlock, timedelta
+from .options import OptionBlockTimeOut, timedelta
 from couchbase_core import abstractmethod, IterableWrapper, JSON
-
+from enum import Enum
 from couchbase_core.fulltext import SearchRequest
 from datetime import timedelta
 
 
-SearchQueryRow = JSON
+#SearchQueryRow = JSON
 
+# there is a v2 Params class that does what we want here -
+# so for now the SearchOptions can just use it under the
+# hood.  Later when we eliminate the v2 stuff, we can move
+# that logic over into SearchOptions itself
 
-class SearchOptions(OptionBlock):
-    pass
+class HighlightStyle(Enum):
+    Ansi = 'ansi'
+    Html = 'html'
+
+class SearchOptions(OptionBlockTimeOut):
+    @overload
+    def __init__(self,
+                 timeout,           # type: timedelta
+                 limit,             # type: int
+                 skip,              # type: int
+                 explain,           # type: bool
+                 fields,            # type: list[str]
+                 highlight_style,   # type: HighlightStyle
+                 highlight_fields,  # type: list[str]
+                 scan_consistency,  # type: cluster.QueryScanConsistency
+                 consistent_with,   # type: couchbase_core.MutationState
+                 facets             # type: Dict[str, couchbase_core.fulltext.Facet]
+                 ):
+        pass
+
+    def __init__(self,
+                 **kwargs   # type: Any
+                 ):
+        # convert highlight_style to str if it is present...
+        style = kwargs.get('highlight_style', None)
+        if(style) :
+            kwargs['highlight_style'] = style.value
+
+        super(SearchOptions, self).__init__(**kwargs)
 
 
 class MetaData(object):

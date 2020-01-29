@@ -806,9 +806,11 @@ class ClusterTestCase(CouchbaseTestCase):
         bucket_name = connstr_abstract.bucket
         connstr_abstract.bucket = None
         connstr_abstract.set_option('enable_collections', 'true')
+        # FIXME: we should not be using classic here!  But, somewhere in the tests, we need
+        # this for hitting the mock, it seems
         self.cluster = self.cluster_factory(connstr_abstract, ClusterOptions(
-            ClassicAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)))  # type: Cluster
-        # self.admin = self.cluster.admin#self.make_admin_connection()
+            ClassicAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)))
+        # TODO: why do we need the connargs?  '
         self.bucket = self.cluster.bucket(bucket_name, **connargs)
         self.bucket_name = bucket_name
 
@@ -832,12 +834,13 @@ class CollectionTestCase(ClusterTestCase):
         super(CollectionTestCase, self).__init__(*args, **kwargs)
 
     def supports_collections(self):
-      cm = self.bucket.collections()
-      try:
-        cm.get_all_scopes()
-        return True
-      except NotSupportedError:
-          return False
+        cm = self.bucket.collections()
+        try:
+            cm.get_all_scopes()
+            return True
+        except NotSupportedError:
+            return False
+
 
     def setUp(self, default_collections=None, real_collections=None):
         default_collections = default_collections or {None: {None: "coll"}}
@@ -845,16 +848,14 @@ class CollectionTestCase(ClusterTestCase):
         # prepare:
         # 1) Connect to a Cluster
         super(CollectionTestCase, self).setUp()
-
         cm = self.bucket.collections()
-
         # check for collection support.  Return use default_collection otherwise
-        if (self.supports_collections()):
-          my_collections = real_collections
+        if self.supports_collections():
+            my_collections = real_collections
         else:
-          self.cb = self.bucket.default_collection()
-          self.coll = self.bucket.default_collection()
-          return
+            self.cb = self.bucket.default_collection()
+            self.coll = self.bucket.default_collection()
+            return
 
         for scope_name, collections in my_collections.items():
             CollectionTestCase._upsert_scope(cm, scope_name)
