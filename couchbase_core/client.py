@@ -858,7 +858,7 @@ class Client(_Base):
         design = self._mk_devmode(design, use_devmode)
         return itercls(self, design, view, **kwargs)
 
-    def ping(self):
+    def ping(self, *options, **kwargs):
         """Ping cluster for latency/status information per-service
 
         Pings each node in the cluster, and
@@ -875,8 +875,8 @@ class Client(_Base):
             cb.ping()
             # {'services': {...}, ...}
         """
-        resultdict = self._ping()
-        return resultdict['services_struct']
+        resultdict = self._ping(*options, **kwargs )
+        return json.loads(resultdict['services_json'])
 
     def diagnostics(self):
         """Request diagnostics report about network connections

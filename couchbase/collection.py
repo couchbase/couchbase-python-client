@@ -1250,6 +1250,25 @@ class Scope(object):
                         ):
         # type: (...) -> CBCollection
         return CBCollection.cast(self, collection_name, *options)
+    @volatile
+    def collection(self,
+                        collection_name,  # type: str
+                        *options  # type: CollectionOptions
+                        ):
+        # type: (...) -> CBCollection
+        """
+        Gets the named collection for this bucket.
+
+        :param collection_name: string identifier for a given collection.
+        :param options: collection options
+        :return: A :class:`.Collection` for a collection with the given name.
+
+        :raise: CollectionNotFoundException
+        :raise: AuthorizationException
+
+        """
+        return self._gen_collection(collection_name, *options)
+
 
 Collection = CBCollection
 

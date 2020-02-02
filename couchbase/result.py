@@ -10,7 +10,7 @@ from couchbase_core import abstractmethod, IterableWrapper
 from couchbase_core.result import AsyncResult
 from couchbase_core._pyport import Protocol
 from couchbase_core.views.iterator import View as CoreView
-
+from couchbase.diagnostics import EndpointPingReport, ServiceType
 
 Proxy_T = TypeVar('Proxy_T')
 
@@ -223,6 +223,39 @@ class MutateInResult(MutationResult):
         # type: (...) -> str
         """ Original key of the operation """
         return self._content.key
+
+class PingResult(object):
+    @internal
+    def __init__(self,
+                 original   # Mapping[str, Any]
+                ):
+        self._id = original.get("id", None)
+        self._sdk = original.get("sdk", None)
+        self._version = original.get("version", None)
+        self._endpoints = dict()
+        for k, v in original['services'].items():
+            # construct an EndpointPingReport for each
+            k = ServiceType(k)
+            self._endpoints[k] = list()
+            for value in v :
+                self._endpoints[k] = EndpointPingReport(k, value)
+
+    @property
+    def endpoints(self):
+        return self._endpoints
+
+    @property
+    def id(self):
+        # the actual format is "0xdeaddeadbeef/<the string you passed in the options>"
+        return self._id
+
+    @property
+    def sdk(self):
+        return self._sdk
+
+    @property
+    def version(self):
+        return self._version;
 
 class ExistsResult(Result):
   @internal

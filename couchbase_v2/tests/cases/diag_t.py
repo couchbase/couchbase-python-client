@@ -101,10 +101,6 @@ class DiagnosticsTests(ConnectionTestCase):
     def setUp(self):
         super(DiagnosticsTests, self).setUp()
 
-    def test_ping(self):
-        result = self.cb.ping()
-        jsonschema.validate(result, any_of_required_services_schema)
-
     def test_diagnostics(self):
         if getattr(self.cluster_info,"network","") == "external":
             raise SkipTest("Issue with diagnostics on external network")

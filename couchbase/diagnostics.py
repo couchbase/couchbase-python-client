@@ -2,10 +2,11 @@ from abc import abstractmethod
 from typing import Optional, Mapping, Union, Any
 from enum import Enum
 from couchbase_core import JSON
+from datetime import timedelta
 
 
 class ServiceType(Enum):
-    View = "view"
+    View = "views"
     KeyValue = "kv"
     Query = "n1ql"
     Search = "fts"
@@ -77,3 +78,37 @@ class DiagnosticsResult(object):
     def services(self):
         # type: (...) -> Mapping[str, EndPointDiagnostics]
         return self._src_diagnostics.get('services', {})
+
+
+class EndpointPingReport(object):
+    def __init__(self,
+                 service_type,  # type: ServiceType
+                 source  # type: Mapping[str, Any]
+                 ):
+        self._src_ping = source
+        self._src_ping['service_type'] = service_type
+
+    @property
+    def service_type(self):
+        return self._src_ping.get('service_type', None)
+
+    @property
+    def id(self):
+        return self._src_ping.get('id', None)
+
+    @property
+    def local(self):
+        return self._src_ping.get('local', None)
+
+    @property
+    def remote(self):
+        return self._src_ping.get('remote', None)
+
+    @property
+    def namespace(self):
+        # TODO: check if LCB will update this to namespace (like java)
+        return self._src_ping.get('scope', None)
+
+    @property
+    def latency(self):
+        return timedelta(microseconds=self._src_ping.get('latency_us', None))

@@ -475,9 +475,67 @@ TRACED_FUNCTION_WRAPPER(_ping,LCBTRACE_OP_REQUEST_ENCODING,Bucket)
     Py_ssize_t ncmds = 0;
     lcb_STATUS err = LCB_ERR_GENERIC;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
+
+    PyObject* service_types = NULL;
+    char* report_id = NULL;
+    PyObject* timeout_O = NULL;
+    unsigned long timeout;
+    static char *kwlist[] = {  "service_types", "report_id", "timeout",  NULL };
+
+    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "|OsO", kwlist,
+                        &service_types, &report_id, &timeout_O);
+    if (!rv) {
+        PYCBC_DEBUG_LOG("couldn't parse the options to ping!");
+        goto GT_ERR;
+    }
+
+
     CMDSCOPE_NG(PING, ping)
     {
-        lcb_cmdping_all(cmd);
+        if (timeout_O) {
+            rv = pycbc_get_duration(timeout_O, &timeout, 1);
+            if (rv < 0) {
+                goto GT_ERR;
+            }
+            /* there is no lcb_cmdping_timeout call in 3.0.0 - but we have
+               CCBC-1175 to track its eventual implementation.  When it is
+               in, we can call it here - that is tracked in PYCBC-797 */
+        }
+        if (report_id) {
+            lcb_cmdping_report_id(cmd, report_id, strlen(report_id));
+        }
+        if (service_types) {
+            for(int i=0; i<PyList_Size(service_types); i++) {
+                char *svc;
+                Py_ssize_t nsvc;
+                PyObject *newsvc = NULL;
+
+                PyObject *curr_svc = PySequence_GetItem(service_types, i);
+                rv = pycbc_BufFromString(curr_svc, &svc, &nsvc, &newsvc);
+                Py_XDECREF(newsvc);
+                if (!svc) {
+                    PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "empty string for service");
+                    goto GT_ERR;
+                }
+                if (0 == strcmp("views", svc)) {
+                    lcb_cmdping_views(cmd, 1);
+                } else if (0 == strcmp("kv", svc)) {
+                    lcb_cmdping_kv(cmd, 1);
+                } else if (0 == strcmp("n1ql", svc)) {
+                    lcb_cmdping_query(cmd, 1);
+                } else if (0 == strcmp("fts", svc)) {
+                    lcb_cmdping_search(cmd, 1);
+                } else if (0 == strcmp("cbas", svc)) {
+                    lcb_cmdping_analytics(cmd, 1);
+                } else {
+                    /* this should result in an argument error, ideally */
+                    PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "unknown service type");
+                    goto GT_ERR;
+                }
+            }
+        } else {
+            lcb_cmdping_all(cmd);
+        }
         lcb_cmdping_encode_json(cmd, 1, 1, 1);
         rv = pycbc_common_vars_init(&cv, self, PYCBC_ARGOPT_MULTI, ncmds, 0);
         if (rv < 0) {

@@ -9,6 +9,7 @@ from .result import *
 from .collection import Scope
 from datetime import timedelta
 from enum import Enum
+import logging
 
 class ViewScanConsistency(Enum):
     NOT_BOUNDED = 'ok'
@@ -68,6 +69,33 @@ class ViewOptions(OptionBlockTimeOut):
         if val:
            kwargs['use_devmode'] = (val == DesignDocumentNamespace.DEVELOPMENT)
         super(ViewOptions, self).__init__(**kwargs)
+
+class PingOptions(OptionBlockTimeOut):
+    @overload
+    def __init__(self,
+                 timeout,       # type: timedelta
+                 report_id,     # type: str
+                 service_types  # type: Iterable[diagnostics.ServiceType]
+                ):
+        """
+        Create options used for ping command.
+
+        :param timedelta timeout: Currently not implemented, coming soon.
+        :param str report_id: Add an id to the request, which you can track in logging, etc...
+        :param Itertable[diagnostics.ServiceType] service_types: Restrict the ping to the services passed in here.
+        """
+        pass
+
+    def __init__(self,
+                 **kwargs
+                 ):
+        if 'timeout' in kwargs:
+            logging.warning("Ping has not implemented timeout yet - using defaults for now.")
+        if 'service_types' in kwargs:
+            kwargs['service_types'] = list(map(lambda x : x.value, kwargs['service_types']))
+
+        super(PingOptions, self).__init__(**kwargs)
+
 
 class Bucket(object):
     _bucket = None  # type: CoreClient
@@ -242,3 +270,18 @@ class Bucket(object):
               ):
         # type: (...)->ViewIndexManager
         return ViewIndexManager(self._bucket, self._name)
+
+    def ping(self,
+             *options,   # type: PingOptions
+             **kwargs
+             ):
+        # type: (...) -> PingResult
+        """
+        Actively contacts each of the  services and returns their pinged status.
+
+        :param (PingOptions) options: Options for sending the ping request.
+        :param kwargs: Overrides corresponding value in options.
+        :return: PingResult representing the state of all the pinged services.
+        :raise: CouchbaseError for various communication issues.
+        """
+        return PingResult(self._bucket.ping(**forward_args(kwargs, *options)))
