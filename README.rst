@@ -42,6 +42,31 @@ Prerequisites
 ~~~~~~~~
 Building
 ~~~~~~~~
+You will need a few tools installed to be able to build locally. A compiler
+and CMake (2.8.9 or above), to compile the C extensions that communicate with
+libcouchbase, git, pip and python's setuptools.
+
+Linux (example is for debian-like linux):
+
+.. code-block:: sh
+
+    sudo apt install git-all
+    sudo apt install python3-dev
+    sudo apt install python3-pip
+    sudo apt install python3-setuptools
+    sudo apt install cmake
+    sudo apt install build-essential
+
+MacOSX:
+
+.. code-block:: sh
+
+    # mac (I'm assuming you use homebrew)
+    git --version # this will prompt you to install if not already installed
+    brew install cmake
+    xcode-select --install
+    pip3 install setuptools
+
 
 The following will compile the module locally; you can then test basic
 functionality including running the examples.
@@ -74,13 +99,18 @@ Or you can modify the environment ``CFLAGS`` and ``LDFLAGS`` variables.
     throwing an exception stating that the ``couchbase`` module could not
     be found.
 
-
 ^^^^^^^^^^
 Installing
 ^^^^^^^^^^
 .. code-block:: sh
 
     pip install .
+
+.. warning::
+
+    If you are on *macOS x* you may need to remove the build directory:
+    `rm -rf ./build` before installing with pip: `pip3 install .`.
+
 
 -----
 Using
