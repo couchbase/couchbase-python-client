@@ -24,7 +24,7 @@ from couchbase.fulltext import SearchResult, MetaData
 from couchbase_core import recursive_reload
 from couchbase_core._pyport import ANY_STR
 import datetime
-from couchbase import Cluster, ClusterOptions
+from couchbase import Cluster, ClusterOptions, UpsertOptions
 from couchbase_core.cluster import PasswordAuthenticator
 
 try:
@@ -59,7 +59,8 @@ import couchbase_core.tests.analytics_harness
 from couchbase.diagnostics import ServiceType
 import couchbase_core.fulltext as FT
 from couchbase.exceptions import KeyNotFoundException, KeyExistsException, NotSupportedError
-from couchbase.durability import ClientDurability, ServerDurability
+from couchbase.durability import ClientDurability, ServerDurability, DurabilityOptionBlock
+
 
 class Scenarios(CollectionTestCase):
 
@@ -536,21 +537,21 @@ class Scenarios(CollectionTestCase):
                 self.coll.remove_multi(test_dict.keys())
             except:
                 pass
-            mutate_kwargs = dict(durability_level=dur_level)
+            dur_options = DurabilityOptionBlock(durability=ServerDurability(dur_level))
             self.assertRaises(KeyNotFoundException, self.coll.get, "Fred")
             self.assertRaises(KeyNotFoundException, self.coll.get, "Barney")
-            self.coll.upsert_multi(test_dict, **mutate_kwargs)
+            self.coll.upsert_multi(test_dict)
             result = self.coll.get_multi(test_dict.keys())
             self.assertEqual(Scenarios.get_multi_result_as_dict(result), test_dict)
-            self.coll.remove_multi(test_dict.keys(), **mutate_kwargs)
+            self.coll.remove_multi(test_dict.keys(), **dur_options)
             self.assertRaises(KeyNotFoundException, self.coll.get_multi, test_dict.keys())
-            self.coll.insert_multi(test_dict, **mutate_kwargs)
+            self.coll.insert_multi(test_dict, **dur_options)
             self.assertRaises(KeyExistsException, self.coll.insert_multi, test_dict)
             result = self.coll.get_multi(test_dict.keys())
             self.assertEqual(Scenarios.get_multi_result_as_dict(result), test_dict)
             self.assertEqual(self.coll.get("Fred").content, "Wilma")
             self.assertEqual(self.coll.get("Barney").content, "Betty")
-            self.coll.remove_multi(test_dict.keys(), **mutate_kwargs)
+            self.coll.remove_multi(test_dict.keys(), **dur_options)
             self.assertRaises(KeyNotFoundException, self.coll.get_multi, test_dict.keys())
             self.coll.insert_multi(test_dict)
             test_dict_2 = {"Fred": "Cassandra", "Barney": "Raquel"}

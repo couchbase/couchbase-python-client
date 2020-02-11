@@ -56,28 +56,27 @@ class DeltaValue(ConstrainedInt):
 class ReplaceOptions(DurabilityOptionBlock):
     @overload
     def __init__(self,
-                 timeout,       # type: timedelta
-                 durability,    # type: DurabilityType
-                 cas            # type: int
+                 timeout=None,       # type: timedelta
+                 durability=None,    # type: DurabilityType
+                 cas=0            # type: int
                  ):
         pass
 
     def __init__(self,
                  **kwargs
                 ):
-        if 'cas' not in kwargs:
-            kwargs['cas'] = 0
         super(ReplaceOptions, self).__init__(**kwargs)
 
 
 class AppendOptions(OptionBlockTimeOut):
     pass
 
+
 class RemoveOptions(DurabilityOptionBlock):
     @overload
     def __init__(self,
-                 durability,    # type: DurabilityType
-                 cas,           # type: int
+                 durability=None,  # type: DurabilityType
+                 cas=0,            # type: int
                  **kwargs):
         """
         Remove Options
@@ -93,16 +92,16 @@ class RemoveOptions(DurabilityOptionBlock):
         thrown.
         """
         pass
+
     def __init__(self,
                  **kwargs
-                ):
-        if 'cas' not in kwargs:
-            kwargs['cas'] = 0
-        super(RemoveOptions,self).__init__(**kwargs)
+                 ):
+        super(RemoveOptions, self).__init__(**kwargs)
 
 
 class PrependOptions(OptionBlockTimeOut):
     pass
+
 
 class UnlockOptions(OptionBlockTimeOut):
     pass
@@ -140,6 +139,7 @@ class GetOptions(OptionBlockTimeOut):
     def project(self):
         # type: (...) -> Iterable[str]
         return self.get('project', [])
+
 
 class GetAndTouchOptions(GetOptions):
     pass

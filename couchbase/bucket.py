@@ -27,25 +27,25 @@ class ViewErrorMode(Enum):
 class ViewOptions(OptionBlockTimeOut):
     @overload
     def __init__(self,
-                 timeout,               # type: timedelta
-                 scan_consistency,      # type: ViewScanConsistency
-                 skip,                  # type: int
-                 limit,                 # type: int
-                 startkey,              # type: Any
-                 endkey,                # type: Any
-                 startkey_docid,        # type: str
-                 endkey_docid,          # type: str
-                 inclusive_end,         # type: bool
-                 group,                 # type: bool
-                 group_level,           # type: int
-                 key,                   # type: Any
-                 keys,                  # type: Any
-                 order,                 # type: ViewOrdering
-                 reduce,                # type: bool
-                 on_error,              # type: ViewErrorMode
-                 debug,                 # type: bool
-                 raw,                   # type: Tuple(str,str)
-                 namespace              # type: DesignDocumentNamespace
+                 timeout=None,               # type: timedelta
+                 scan_consistency=None,      # type: ViewScanConsistency
+                 skip=None,                  # type: int
+                 limit=None,                 # type: int
+                 startkey=None,              # type: Any
+                 endkey=None,                # type: Any
+                 startkey_docid=None,        # type: str
+                 endkey_docid=None,          # type: str
+                 inclusive_end=None,         # type: bool
+                 group=None,                 # type: bool
+                 group_level=None,           # type: int
+                 key=None,                   # type: Any
+                 keys=None,                  # type: Any
+                 order=None,                 # type: ViewOrdering
+                 reduce=None,                # type: bool
+                 on_error=None,              # type: ViewErrorMode
+                 debug=None,                 # type: bool
+                 raw=None,                   # type: Tuple(str,str)
+                 namespace=None              # type: DesignDocumentNamespace
                  ):
         pass
 
@@ -73,9 +73,9 @@ class ViewOptions(OptionBlockTimeOut):
 class PingOptions(OptionBlockTimeOut):
     @overload
     def __init__(self,
-                 timeout,       # type: timedelta
-                 report_id,     # type: str
-                 service_types  # type: Iterable[diagnostics.ServiceType]
+                 timeout=None,       # type: timedelta
+                 report_id=None,     # type: str
+                 service_types=None  # type: Iterable[diagnostics.ServiceType]
                 ):
         """
         Create options used for ping command.

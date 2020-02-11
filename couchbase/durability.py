@@ -65,8 +65,8 @@ class ServerDurability(DurabilityType):
 class ClientDurableOptionBlock(OptionBlockTimeOut):
     @overload
     def __init__(self,
-                 timeout,       # type: timedelta
-                 durability     # type: ClientDurability
+                 timeout=None,       # type: timedelta
+                 durability=None     # type: ClientDurability
                 ):
         pass
     def __init__(self,
@@ -77,8 +77,8 @@ class ClientDurableOptionBlock(OptionBlockTimeOut):
 class ServerDurableOptionBlock(OptionBlockTimeOut):
     @overload
     def __init__(self,
-                 timeout,       # type: timedelta
-                 durability     # type: ServerDurability
+                 timeout=None,       # type: timedelta
+                 durability=None     # type: ServerDurability
                 ):
         pass
     def __init__(self,
@@ -89,8 +89,8 @@ class ServerDurableOptionBlock(OptionBlockTimeOut):
 class DurabilityOptionBlock(OptionBlockTimeOut):
     @overload
     def __init__(self,
-                 timeout,       # type: timedelta
-                 durability     # type: DurabilityType
+                 timeout=None,       # type: timedelta
+                 durability=None     # type: DurabilityType
                  ):
         pass
     def __init__(self,

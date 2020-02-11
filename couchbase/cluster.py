@@ -73,14 +73,14 @@ class DiagnosticsOptions(OptionBlock):
 class AnalyticsOptions(OptionBlockTimeOut):
   @overload
   def __init__(self,
-               timeout,                # type: timedelta
-               read_only,              # type: bool
-               scan_consistency,       # type: QueryScanConsistency
-               client_context_id,      # type: str
-               priority,               # type: bool
-               positional_parameters,  # type: Iterable[str]
-               named_parameters,       # type: dict[str, str]
-               raw,                    # type: dict[str,Any]
+               timeout=None,                # type: timedelta
+               read_only=None,              # type: bool
+               scan_consistency=None,       # type: QueryScanConsistency
+               client_context_id=None,      # type: str
+               priority=None,               # type: bool
+               positional_parameters=None,  # type: Iterable[str]
+               named_parameters=None,       # type: Dict[str, str]
+               raw=None,                         # type: Dict[str,Any]
                ):
 
     pass
@@ -156,111 +156,115 @@ class QueryProfile(object):
   def as_string(self):
     return getattr(self, '_value', self.OFF)
 
+
 class QueryOptions(OptionBlockTimeOut):
-  VALID_OPTS=['timeout', 'read_only', 'scan_consistency','adhoc', 'client_context_id', 'consistent_with',
-              'max_parallelism', 'positional_parameters', 'named_parameters', 'pipeline_batch', 'pipeline_cap',
-              'profile', 'raw', 'scan_wait', 'scan_cap', 'metrics']
-  @overload
-  def __init__(self,
-               timeout,                # type: timedelta
-               read_only,              # type: bool
-               scan_consistency,       # type: QueryScanConsistency
-               adhoc,                  # type: bool
-               client_context_id,      # type: str
-               consistent_with,        # type: MutationState
-               max_parallelism,        # type: int
-               positional_parameters,  # type: Iterable[str]
-               named_parameters,       # type: dict[str, str]
-               pipeline_batch,         # type: int
-               pipeline_cap,           # type: int
-               profile,                # type: QueryProfile
-               raw,                    # type: dict[str,Any]
-               scan_wait,              # type: timedelta
-               scan_cap,               # type: int
-               metrics=False           # type: bool
-               ):
+    VALID_OPTS = ['timeout', 'read_only', 'scan_consistency', 'adhoc', 'client_context_id', 'consistent_with',
+                  'max_parallelism', 'positional_parameters', 'named_parameters', 'pipeline_batch', 'pipeline_cap',
+                  'profile', 'raw', 'scan_wait', 'scan_cap', 'metrics']
 
-    pass
+    @overload
+    def __init__(self,
+                 timeout=None,                # type: timedelta
+                 read_only=None,              # type: bool
+                 scan_consistency=None,       # type: QueryScanConsistency
+                 adhoc=None,                  # type: bool
+                 client_context_id=None,      # type: str
+                 consistent_with=None,        # type: MutationState
+                 max_parallelism=None,        # type: int
+                 positional_parameters=None,  # type: Iterable[str]
+                 named_parameters=None,       # type: Dict[str, str]
+                 pipeline_batch=None,         # type: int
+                 pipeline_cap=None,           # type: int
+                 profile=None,                # type: QueryProfile
+                 raw=None,                    # type: Dict[str, Any]
+                 scan_wait=None,              # type: timedelta
+                 scan_cap=None,               # type: int
+                 metrics=False                # type: bool
+                 ):
+        pass
 
-  def __init__(self,
-               **kwargs
-               ):
-    super(QueryOptions, self).__init__(**kwargs)
+    def __init__(self,
+                 **kwargs
+                 ):
+        super(QueryOptions, self).__init__(**kwargs)
 
-  def to_n1ql_query(self, statement, *options, **kwargs):
-    # lets make a copy of the options, and update with kwargs...
-    args = self.copy()
-    args.update(kwargs)
+    def to_n1ql_query(self, statement, *options, **kwargs):
+        # lets make a copy of the options, and update with kwargs...
+        args = self.copy()
+        args.update(kwargs)
 
-    # now lets get positional parameters.  Actual positional
-    # params OVERRIDE positional_parameters
-    positional_parameters = args.pop('positional_parameters', [])
-    if options and len(options) > 0:
-      positional_parameters = options
+        # now lets get positional parameters.  Actual positional
+        # params OVERRIDE positional_parameters
+        positional_parameters = args.pop('positional_parameters', [])
+        if options and len(options) > 0:
+            positional_parameters = options
 
-    # now the named parameters.  NOTE: all the kwargs that are
-    # not VALID_OPTS must be named parameters, and the kwargs
-    # OVERRIDE the list of named_parameters
-    new_keys = list(filter(lambda x: x not in self.VALID_OPTS, args.keys()))
-    named_parameters = args.pop('named_parameters',{})
-    for k in new_keys:
-      named_parameters[k] = args[k]
+        # now the named parameters.  NOTE: all the kwargs that are
+        # not VALID_OPTS must be named parameters, and the kwargs
+        # OVERRIDE the list of named_parameters
+        new_keys = list(filter(lambda x: x not in self.VALID_OPTS, args.keys()))
+        named_parameters = args.pop('named_parameters', {})
+        for k in new_keys:
+            named_parameters[k] = args[k]
 
-    query = N1QLQuery(statement, *positional_parameters, **named_parameters)
-    # now lets try to setup the options.  TODO: rework this after beta.3
-    # but for now we will use the existing N1QLQuery.  Could be we can
-    # add to it, etc...
+        query = N1QLQuery(statement, *positional_parameters, **named_parameters)
+        # now lets try to setup the options.  TODO: rework this after beta.3
+        # but for now we will use the existing N1QLQuery.  Could be we can
+        # add to it, etc...
 
-    # default to false on metrics
-    query.metrics = args.get('metrics', False)
+        # default to false on metrics
+        query.metrics = args.get('metrics', False)
 
-    # TODO: there is surely a cleaner way...
-    for k in self.VALID_OPTS:
-      v = args.get(k, None)
-      if (v):
-        if k == 'scan_consistency':
-          query.consistency = v.as_string()
-        if k == 'consistent_with':
-          query.consistent_with = v
-        if k == 'adhoc':
-          query.adhoc = v
-        if k == 'timeout':
-          query.timeout = v
-        if k == 'scan_cap':
-          query.scan_cap = v
-        if k == 'pipeline_batch':
-          query.pipeline_batch = v
-        if k == 'pipeline_cap':
-          query.pipeline_cap = v
-        if k == 'read_only':
-          query.readonly = v
-        if k == 'profile':
-          query.profile = v.as_string()
-    return query
+        # TODO: there is surely a cleaner way...
+        for k in self.VALID_OPTS:
+            v = args.get(k, None)
+            if v:
+                if k == 'scan_consistency':
+                    query.consistency = v.as_string()
+                if k == 'consistent_with':
+                    query.consistent_with = v
+                if k == 'adhoc':
+                    query.adhoc = v
+                if k == 'timeout':
+                    query.timeout = v
+                if k == 'scan_cap':
+                    query.scan_cap = v
+                if k == 'pipeline_batch':
+                    query.pipeline_batch = v
+                if k == 'pipeline_cap':
+                    query.pipeline_cap = v
+                if k == 'read_only':
+                    query.readonly = v
+                if k == 'profile':
+                    query.profile = v.as_string()
+        return query
 
-  # this will change the options for export.
-  # NOT USED CURRENTLY
-  def as_dict(self):
-    for key, val in self.items():
-      if key == 'positional_parameters':
-        self.pop(key, None)
-        self['args'] = val
-      if key == 'named_parameters':
-        self.pop(key, None)
-        for k, v in val.items():
-          self["${}".format(k)]=v
-      if key == 'scan_consistency':
-        self[key] = value.as_string()
-      if key == 'consistent_with':
-        self[key] = value.encode()
-      if key == 'profile':
-        self[key] = val.as_string()
-      if key == 'scan_wait':
-        # scan_wait should be in ms
-        self[key] = val.total_seconds() * 1000
-    if self.get('consistent_with', None):
-      self['scan_consistency'] = 'at_plus'
-    return self
+        # this will change the options for export.
+        # NOT USED CURRENTLY
+
+
+    def as_dict(self):
+        for key, val in self.items():
+            if key == 'positional_parameters':
+                self.pop(key, None)
+                self['args'] = val
+            if key == 'named_parameters':
+                self.pop(key, None)
+                for k, v in val.items():
+                    self["${}".format(k)] = v
+            if key == 'scan_consistency':
+                self[key] = val.as_string()
+            if key == 'consistent_with':
+                self[key] = val.encode()
+            if key == 'profile':
+                self[key] = val.as_string()
+            if key == 'scan_wait':
+                # scan_wait should be in ms
+                self[key] = val.total_seconds() * 1000
+        if self.get('consistent_with', None):
+            self['scan_consistency'] = 'at_plus'
+        return self
+
 
 class Cluster(object):
     clusterbucket = None  # type: CoreClient

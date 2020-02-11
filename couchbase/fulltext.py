@@ -20,16 +20,16 @@ class HighlightStyle(Enum):
 class SearchOptions(OptionBlockTimeOut):
     @overload
     def __init__(self,
-                 timeout,           # type: timedelta
-                 limit,             # type: int
-                 skip,              # type: int
-                 explain,           # type: bool
-                 fields,            # type: list[str]
-                 highlight_style,   # type: HighlightStyle
-                 highlight_fields,  # type: list[str]
-                 scan_consistency,  # type: cluster.QueryScanConsistency
-                 consistent_with,   # type: couchbase_core.MutationState
-                 facets             # type: Dict[str, couchbase_core.fulltext.Facet]
+                 timeout=None,           # type: timedelta
+                 limit=None,             # type: int
+                 skip=None,              # type: int
+                 explain=None,           # type: bool
+                 fields=None,            # type: List[str]
+                 highlight_style=None,   # type: HighlightStyle
+                 highlight_fields=None,  # type: List[str]
+                 scan_consistency=None,  # type: cluster.QueryScanConsistency
+                 consistent_with=None,   # type: couchbase_core.MutationState
+                 facets=None             # type: Dict[str, couchbase_core.fulltext.Facet]
                  ):
         pass
 

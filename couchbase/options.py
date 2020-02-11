@@ -18,7 +18,7 @@ OptionBlockBase = dict
 class OptionBlock(OptionBlockBase):
     def __init__(self, *args, **kwargs):
         # type: (*Any, **Any) -> None
-        super(OptionBlock, self).__init__(**kwargs)
+        super(OptionBlock, self).__init__(**{k: v for k, v in kwargs.items() if v is not None})
         self._args = args
 
 
