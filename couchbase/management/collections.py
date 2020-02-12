@@ -7,6 +7,7 @@ from couchbase_core import mk_formstr
 from couchbase_core.exceptions import ErrorMapper, NotSupportedWrapper, HTTPError
 from couchbase.exceptions import ScopeNotFoundException, ScopeAlreadyExistsException, CollectionNotFoundException, CollectionAlreadyExistsException
 
+
 class CollectionsErrorHandler(ErrorMapper):
     @staticmethod
     def mapping():
@@ -15,6 +16,7 @@ class CollectionsErrorHandler(ErrorMapper):
                             'Scope with this name is not found': ScopeNotFoundException,
                             'Collection with this name is not found': CollectionNotFoundException,
                             'Collection with this name already exists': CollectionAlreadyExistsException}}
+
 
 class CollectionManager(GenericManager):
     def __init__(self,  # type: CollectionManager
@@ -31,22 +33,13 @@ class CollectionManager(GenericManager):
                   ):
         # type: (...) -> ScopeSpec
         """
-        Get Scope
         Gets a scope. This will fetch a manifest and then pull the scope out of it.
-        Signature
-        ScopeSpec GetScope(string scope_name,  [options])
-        Parameters
-        Required:
-        scope_name: string - name of the scope.
-        Optional:
-        GetScopeOptions and/or
-        keyword options (currently just timeout).
-        Returns
-        Throws
-        ScopeNotFoundException
-        Any exceptions raised by the underlying platform
-        Uri
-        GET /pools/default/buckets/<bucket>/collections
+
+        :param str scope_name: name of the scope.
+        :param GetScopeOptions options:
+        :param GetScopeOptions kwargs:
+        :return: a ScopeSpec containing information about the specified scope.
+        :raises: ScopeNotFoundException
         """
         try:
           return next(s for s in self.get_all_scopes(*options, **kwargs) if s.name == scope_name)
@@ -60,34 +53,27 @@ class CollectionManager(GenericManager):
                        **kwargs         # type: Any
                        ):
         # type: (...) -> Iterable[ScopeSpec]
-        """Get All Scopes
+        """
         Gets all scopes. This will fetch a manifest and then pull the scopes out of it.
-        Signature
-        iterable<ScopeSpec> GetAllScopes([options])
-        Parameters
-        Required:
-        Optional:
-        GetAllScopesOptions and/or
-        keyword options (currently just timeout).
-        Returns
-        Throws
-        Any exceptions raised by the underlying platform
-        Uri
-        GET /pools/default/buckets/<bucket>/collections"""
+
+        :param GetAllScopesOptions options: (currently just timeout).
+        :param kwargs: keyword version of options
+        :return: An Iterable[ScopeSpec] containing all scopes in the associated bucket.
+        """
         kwargs.update({
-          "path": "/pools/default/buckets/{}/collections".format(self.bucket_name),
-          "method": "GET"
-          })
+            "path":   "/pools/default/buckets/{}/collections".format(self.bucket_name),
+            "method": "GET"
+        })
         response = self._admin_bucket.http_request(**forward_args(kwargs, *options))
         # now lets turn the response into a list of ScopeSpec...
         # the response looks like:
         # {'uid': '0', 'scopes': [{'name': '_default', 'uid': '0', 'collections': [{'name': '_default', 'uid': '0'}]}]}
         retval = list()
         for s in response.value['scopes']:
-          scope = ScopeSpec(s['name'], list())
-          for c in s['collections']:
-            scope.collections.append(CollectionSpec(c['name'], scope.name))
-          retval.append(scope)
+            scope = ScopeSpec(s['name'], list())
+            for c in s['collections']:
+                scope.collections.append(CollectionSpec(c['name'], scope.name))
+            retval.append(scope)
         return retval
 
     @CollectionsErrorHandler.mgmt_exc_wrap
@@ -97,24 +83,15 @@ class CollectionManager(GenericManager):
                           **kwargs        # type: Any
                           ):
         """
-        Create Collection
         Creates a new collection.
-        Signature
-        void CreateCollection(CollectionSpec collection, [options])
-        Parameters
-        Required:
-        collection: CollectionSpec - specification of the collection.
-        Optional:
-        CreateCollectionOptions and/or
-        keyword options (currently just timeout).
-        Returns
-        Throws
-        InvalidArgumentsException
-        CollectionAlreadyExistsException
-        ScopeNotFoundException
-        Any exceptions raised by the underlying platform
-        Uri
-        POST http://localhost:8091/pools/default/buckets/<bucket>/collections/<scope_name> -d name=<collection_name>
+
+        :param CollectionSpec collection: specification of the collection.
+        :param CreateCollectionOptions options:  options (currently just timeout).
+        :param kwargs: keyword version of 'options'
+        :return:
+        :raises: InvalidArgumentsException
+        :raises: CollectionAlreadyExistsException
+        :raises: ScopeNotFoundException
         """
         path = "pools/default/buckets/{}/collections/{}".format(self.bucket_name, collection.scope_name)
 
@@ -135,22 +112,14 @@ class CollectionManager(GenericManager):
                         *options,       # type: DropCollectionOptions
                         **kwargs        # type: Any
                         ):
-        """Drop Collection
+        # type: (...) -> None
+        """
         Removes a collection.
-        Signature
-        void DropCollection(CollectionSpec collection, [options])
-        Parameters
-        Required:
-        collection: CollectionSpec - namspece of the collection.
-        Optional:
-        DropCollectionOptions and/or
-        keyword options (currently just timeout).
-        Returns
-        Throws
-        CollectionNotFoundException
-        Any exceptions raised by the underlying platform
-        Uri
-        DELETE http://localhost:8091/pools/default/buckets/<bucket>/collections/<scope_name>/<collection_name>
+
+        :param CollectionSpec collection: namspece of the collection.
+        :param DropCollectionOptions options: (currently just timeout).
+        :param kwargs: keyword version of `options`
+        :raises: CollectionNotFoundException
         """
         kwargs.update({ 'path': "pools/default/buckets/{}/collections/{}/{}".format(self.bucket_name, collection.scope_name, collection.name),
                         'method': 'DELETE'})
@@ -162,19 +131,16 @@ class CollectionManager(GenericManager):
                      *options,        # type: CreateScopeOptions
                      **kwargs         # type: Any
                      ):
-        """Create Scope
+        # type: (...) -> None
+        """
         Creates a new scope.
-        Signature
-        Void CreateScope(string scope_name, [options])
-        Parameters
-        Required:
-        scope_name: String - name of the scope.
-        Optional:
-        CreateScopeOptions and/or
-        keyword options (currently just timeout).
-        Returns
-        Throws
-        InvalidArgumentsException
+
+        :param str scope_name: name of the scope.
+        :param CreateScopeOptions options: options (currently just timeout).
+        :param kwargs: keyword version of `options`
+        :return:
+
+        :raises: InvalidArgumentsException
         Any exceptions raised by the underlying platform
         Uri
         POST http://localhost:8091/pools/default/buckets/<bucket>/collections -d name=<scope_name>
@@ -198,34 +164,27 @@ class CollectionManager(GenericManager):
                    **kwargs         # type: Any
                    ):
         """
-        Drop Scope
         Removes a scope.
-        Signature
-        void DropScope(string scope_name, [options])
-        Parameters
-        Required:
-        collectionName: string - name of the collection.
-        Optional:
-        DropScopeOptions and/or
-        keyword options (currently just timeout).
-        Returns
-        Throws
-        ScopeNotFoundException
-        Any exceptions raised by the underlying platform
-        Uri
-        DELETE http://localhost:8091/pools/default/buckets/<bucket>/collections/<scope_name>
+
+        :param str scope_name: name of the scope
+        :param DropScopeOptions options: (currently just timeout)
+        :param kwargs: keyword version of `options`
+
+        :raises: ScopeNotFoundException
         """
         path = "pools/default/buckets/{}/collections/{}".format(self.bucket_name, scope_name)
         kwargs.update({ 'path': path,
                         'method': 'DELETE'})
         self._admin_bucket.http_request(**forward_args(kwargs, *options))
 
+
 class CollectionSpec(object):
     def __init__(self,
                  collection_name,  # type: str
-                 scope_name = '_default'  # type: str
+                 scope_name='_default'  # type: str
                  ):
-        self._name, self._scope_name=collection_name,scope_name
+        self._name, self._scope_name = collection_name, scope_name
+
     @property
     def name(self):
         # type: (...) -> str
@@ -239,10 +198,10 @@ class CollectionSpec(object):
 
 class ScopeSpec(object):
     def __init__(self,
-                 name, # type : str
-                 collections, # type: Iterable[CollectionSpec]
+                 name,  # type : str
+                 collections,  # type: Iterable[CollectionSpec]
                  ):
-      self._name, self._collections = name, collections
+        self._name, self._collections = name, collections
 
     @property
     def name(self):
@@ -255,22 +214,25 @@ class ScopeSpec(object):
         return self._collections
 
 
-
 class GetAllScopesOptions(OptionBlockTimeOut):
     pass
+
 
 class GetScopeOptions(GetAllScopesOptions):
     pass
 
+
 class CreateCollectionOptions(OptionBlockTimeOut):
     pass
+
 
 class DropCollectionOptions(OptionBlockTimeOut):
     pass
 
+
 class CreateScopeOptions(OptionBlockTimeOut):
     pass
 
+
 class DropScopeOptions(OptionBlockTimeOut):
     pass
-
