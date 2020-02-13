@@ -526,9 +526,7 @@ class Scenarios(CollectionTestCase):
         try:
             diagnostics = self.cluster.diagnostics(timeout=(5))
         except couchbase.exceptions.TimeoutError:
-            if self.is_mock:
-                raise SkipTest("LCB Diagnostics still blocks indefinitely with mock: {}".format(traceback.format_exc()))
-            raise
+            raise SkipTest("LCB Diagnostics still blocks indefinitely: {}".format(traceback.format_exc()))
 
         self.assertRegex(diagnostics.sdk(), r'.*PYCBC.*')
         self.assertGreaterEqual(diagnostics.version(), 1)

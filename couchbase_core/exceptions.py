@@ -1015,7 +1015,16 @@ class ErrorMapper(object):
                             # this value could be a string or a json-encoded string...
                             if isinstance(value, dict):
                               # there should be a key with the error
-                              value = value.get('error', None)
+                              # can be error or errors :(
+                              if 'error' in value:
+                                value = value.get('error', None)
+                              elif 'errors' in value:
+                                value = value.get('errors', None)
+                              if value and isinstance(value, dict):
+                                # sometimes it is still a dict, so use the name field
+                                value = value.get('name', None)
+                            if isinstance(value, bytearray) or isinstance(value, bytes):
+                                value = value.decode("utf-8")
                             for pattern, exc in text_to_final_exc.items():
                                 if pattern.match(value):
                                     raise exc.pyexc(e.message, extra, e)

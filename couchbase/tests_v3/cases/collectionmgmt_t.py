@@ -114,9 +114,12 @@ class CollectionManagerTestCase(CollectionTestCase):
   def testGetScopeNoScope(self):
     self.assertRaises(ScopeNotFoundException, self.cm.get_scope, 'somerandomname')
 
+  # TODO: get rid of sleep hack!!
   def testDropCollection(self):
     self.cm.create_collection(CollectionSpec('other-collection'))
+    sleep(5)
     self.assertTrue([c for c in self.cm.get_all_scopes()[0].collections if c.name == 'other-collection'])
+    sleep(5)
     self.cm.drop_collection(CollectionSpec('other-collection'))
     self.assertFalse([c for c in self.cm.get_all_scopes()[0].collections if c.name == 'other-collection'])
 
@@ -126,10 +129,13 @@ class CollectionManagerTestCase(CollectionTestCase):
   def testDropCollectionScopeNotFound(self):
     self.assertRaises(ScopeNotFoundException, self.cm.drop_collection, CollectionSpec('collectionname', 'scopename'))
 
+  # TODO: get rid of sleep hack!!
   def testDropScope(self):
     self.cm.create_scope('other-scope')
+    sleep(5)
     self.assertTrue([s for s in self.cm.get_all_scopes() if s.name == 'other-scope'])
     self.cm.drop_scope('other-scope')
+    sleep(5)
     self.assertFalse([s for s in self.cm.get_all_scopes() if s.name == 'other-scope'])
 
   def testDropScopeNotFound(self):

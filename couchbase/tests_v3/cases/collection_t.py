@@ -36,6 +36,8 @@ class CollectionTests(CollectionTestCase):
     def setUp(self):
         super(CollectionTests, self).setUp()
         self.cb.upsert(self.KEY, self.CONTENT)
+        # make sure it is available
+        self.try_n_times(10, 1, self.cb.get, self.KEY)
         # be sure NOKEY isn't in there
         try:
             self.cb.remove(self.NOKEY)
@@ -84,6 +86,10 @@ class CollectionTests(CollectionTestCase):
 
     def test_lookup_in_timeout(self):
         self.coll.upsert("id", {'someArray': ['wibble', 'gronk']})
+        # wait till it is there
+        self.try_n_times(10, 1, self.coll.get, "id")
+
+        # ok, it is there...
         self.coll.get("id", GetOptions(project=["someArray"], timeout=timedelta(seconds=1.0)))
         self.assertRaisesRegex(InvalidArgumentsException, "Expected timedelta", self.coll.get, "id",
                                GetOptions(project=["someArray"], timeout=456))
@@ -98,6 +104,9 @@ class CollectionTests(CollectionTestCase):
 
         try:
             self.coll.upsert('imakey100', self.CONTENT)
+            # wait till it it there...
+            self.try_n_times(10, 1, self.coll.get, "imakey100")
+            # ok it is there...
             result = self.coll.get_any_replica('imakey100')
             self.assertDictEqual(self.CONTENT, result.content_as[dict])
         except DocumentUnretrievableException as e:
@@ -110,11 +119,14 @@ class CollectionTests(CollectionTestCase):
             raise SkipTest('need replicas to test get_all_replicas')
         try:
             self.coll.upsert('imakey100', self.CONTENT)
+            # wait till it it there...
+            self.try_n_times(10, 1, self.coll.get, "imakey100")
+            # ok it is there...
             result = self.coll.get_all_replicas('imakey100')
             for r in result:
                 self.assertDictEqual(self.CONTENT, r.content_as[dict])
         except DocumentUnretrievableException as e:
-        # probably, you have replicas enabled, but on single node
+            # probably, you have replicas enabled, but on single node
             print("Perhaps your test server configured the default bucket to have replicas, but no other servers are up?")
             raise
 
@@ -129,6 +141,9 @@ class CollectionTests(CollectionTestCase):
 
         try:
             self.coll.upsert('imakey100', self.CONTENT)
+            # wait till it it there...
+            self.try_n_times(10, 1, self.coll.get, "imakey100")
+            # ok it is there...
             result = self.coll.get_all_replicas('imakey100')
             # TODO: this isn't implemented yet - waiting on CCBC-1169
             # when is does work, we just need to make sure one of the
@@ -137,7 +152,7 @@ class CollectionTests(CollectionTestCase):
                 with self.assertRaises(NotImplementedError):
                     r.is_replica()
         except DocumentUnretrievableException as e:
-        # probably, you have replicas enabled, but on single node
+            # probably, you have replicas enabled, but on single node
             print("Perhaps your test server configured the default bucket to have replicas, but no other servers are up?")
             raise
 
