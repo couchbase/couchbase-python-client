@@ -3131,11 +3131,9 @@ lcb_STATUS pycbc_report_err(int res, const char *generic_errmsg, const char* FIL
         char ERRBUF[PYCBC_REPORT_BUF_LEN] = {0};
         snprintf(ERRBUF,
                  PYCBC_REPORT_BUF_LEN,
-                 "%s - not supported in libcouchbase version: %s, "
-                 "PYCBC_LCB_API 0x%06X",
+                 "%s - not supported in libcouchbase version: %s",
                  generic_errmsg,
-                 lcb_get_version(NULL),
-                 PYCBC_LCB_API);
+                 lcb_get_version(NULL));
         PYCBC_EXC_WRAP_EX_FILE_LINE(PYCBC_EXC_LCBERR, res, ERRBUF, NULL, NULL, NULL, FILE, LINE)
     } else {
         PYCBC_EXC_WRAP_EX_FILE_LINE(PYCBC_EXC_LCBERR,

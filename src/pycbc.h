@@ -72,11 +72,7 @@ affect:
  but we use 0x02FF0x for V3 alphas (e.g. 0x02FF04 for 3.0.0 Alpha 4).
  */
 
-#if PYCBC_LCB_API > 0x02FF00
 #include "lcb_v4_wrapper.h"
-#else
-#include "lcb_v4_backport.h"
-#endif
 
 // TODO: fix in libcouchbase
 #ifdef _WIN32
