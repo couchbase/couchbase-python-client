@@ -36,28 +36,6 @@ class QueryMetrics(object):
 CallableOnOptionBlock = Callable[[OptionBlockDeriv, Any], Any]
 
 
-def options_to_func(orig,  # type: U
-                    verb  # type: CallableOnOptionBlock
-                    ):
-    class invocation:
-        # type: (...) -> Callable[[T,Tuple[OptionBlockDeriv,...],Any],Any]
-        def __init__(self,  # type: T
-                       *options,  # type: OptionBlockDeriv
-                       **kwargs  # type: Any
-                       ):
-            # type: (...) -> None
-            self.orig=orig
-            self.options=options
-            self.kwargs=kwargs
-
-        def __call__(self, *args, **kwargs):
-            # type: (...) -> Callable[[T,Tuple[OptionBlockDeriv,...],Any],Any]
-            def invocator(self, *options, **kwargs):
-                return verb(self, forward_args(kwargs, *options))
-            return invocator
-
-    return invocation(orig)
-
 class DiagnosticsOptions(OptionBlock):
     def __init__(self,
                  report_id = None # type: str
@@ -71,42 +49,42 @@ class DiagnosticsOptions(OptionBlock):
 
 
 class AnalyticsOptions(OptionBlockTimeOut):
-  @overload
-  def __init__(self,
-               timeout=None,                # type: timedelta
-               read_only=None,              # type: bool
-               scan_consistency=None,       # type: QueryScanConsistency
-               client_context_id=None,      # type: str
-               priority=None,               # type: bool
-               positional_parameters=None,  # type: Iterable[str]
-               named_parameters=None,       # type: Dict[str, str]
-               raw=None,                         # type: Dict[str,Any]
-               ):
+    @overload
+    def __init__(self,
+                 timeout=None,  # type: timedelta
+                 read_only=None,  # type: bool
+                 scan_consistency=None,  # type: QueryScanConsistency
+                 client_context_id=None,  # type: str
+                 priority=None,  # type: bool
+                 positional_parameters=None,  # type: Iterable[str]
+                 named_parameters=None,  # type: Dict[str, str]
+                 raw=None,  # type: Dict[str,Any]
+                 ):
 
-    pass
+        pass
 
-  def __init__(self,
-               **kwargs
-               ):
-    super(QueryOptions, self).__init__(**kwargs)
-    # lets modify the underlying dict to conform to the
-    # expected format for AnalyticsOptions...
-    for key, val in self.items():
-      if key == 'positional_parameters':
-        self.pop(key, None)
-        self['args'] = val
-      if key == 'named_parameters':
-        self.pop(key, None)
-        for k, v in val.items():
-          self["${}".format(k)]=v
-      if key == 'scan_consistency':
-        self[key] = value.as_string()
-      if key == 'consistent_with':
-        self[key] = value.encode()
-      if key == 'priority':
-        self[key] = -1 if val else 0
-    if self.get('consistent_with', None):
-      self['scan_consistency'] = 'at_plus'
+    def __init__(self,
+                 **kwargs
+                 ):
+        super(AnalyticsOptions, self).__init__(**kwargs)
+        # lets modify the underlying dict to conform to the
+        # expected format for AnalyticsOptions...
+        for key, val in self.items():
+            if key == 'positional_parameters':
+                self.pop(key, None)
+                self['args'] = val
+            if key == 'named_parameters':
+                self.pop(key, None)
+                for k, v in val.items():
+                    self["${}".format(k)] = v
+            if key == 'scan_consistency':
+                self[key] = val.as_string()
+            if key == 'consistent_with':
+                self[key] = val.encode()
+            if key == 'priority':
+                self[key] = -1 if val else 0
+        if self.get('consistent_with', None):
+            self['scan_consistency'] = 'at_plus'
 
 
 class QueryScanConsistency(object):
