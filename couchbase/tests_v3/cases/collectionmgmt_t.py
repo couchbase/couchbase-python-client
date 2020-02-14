@@ -20,7 +20,6 @@ from couchbase.exceptions import KeyNotFoundException
 from couchbase_core.exceptions import NotSupportedError
 from couchbase.exceptions import ScopeNotFoundException, ScopeAlreadyExistsException, CollectionAlreadyExistsException, CollectionNotFoundException
 from couchbase.management.buckets import CreateBucketSettings
-import time
 
 class CollectionManagerTestCase(CollectionTestCase):
   def setUp(self, *args, **kwargs):
@@ -42,23 +41,13 @@ class CollectionManagerTestCase(CollectionTestCase):
       # we are just insuring it isn't there already
       pass
     self.bm.create_bucket(CreateBucketSettings(name='other-bucket', bucket_type='couchbase', ram_quota_mb=100))
-    # HACK: we need to loop a bit, until the bucket exists.
-    for x in range(10):
-      try:
-        time.sleep(10)
-        self.other_bucket = self.cluster.bucket('other-bucket')
-        # ok if we got here, lets stop looping
-        break
-      except:
-        # if we have looped 10 times, fail
-        self.assertTrue(x<9)
-        pass
+    self.try_n_times(10, 1, self.bm.get_bucket, 'other-bucket')
+    self.other_bucket = self.cluster.bucket('other-bucket')
     self.cm = self.other_bucket.collections()
 
   def tearDown(self):
     self.bm.drop_bucket('other-bucket')
-    # HACK: I'm not 100% sure this is necessary
-    time.sleep(10)
+    self.try_n_times_till_exception(10, 1, self.bm.get_bucket, 'other-bucket')
     super(CollectionManagerTestCase, self).tearDown()
 
   def testCreateCollection(self):
@@ -70,17 +59,15 @@ class CollectionManagerTestCase(CollectionTestCase):
 
   def testCreateCollectionAlreadyExists(self):
     self.cm.create_collection(CollectionSpec('other-collection'))
+    self.try_n_times(10, 1, self.other_bucket.collection, 'other-collection')
     self.assertIsNotNone([c for c in self.cm.get_all_scopes()[0].collections if c.name == 'other-collection'])
     # now, it will fail if we try to create it again...
     self.assertRaises(CollectionAlreadyExistsException, self.cm.create_collection, CollectionSpec('other-collection'))
 
   def testCollectionGoesInCorrectBucket(self):
     self.cm.create_collection(CollectionSpec('other-collection'))
-    # HACK! it seems you can get temp fail when upserting if you immediately
-    # upsert after creating a new collection.  Oddly, opening the collection
-    # seems to work even when we get the temp fail on the subsequent upsert
-    # <sigh>
-    time.sleep(5)
+    self.try_n_times(10, 1, self.other_bucket.collection, 'other-collection')
+
     # make sure it actually is in the other-bucket
     self.assertIsNotNone([c for c in self.cm.get_all_scopes()[0].collections if c.name == 'other-collection'])
     # also be sure this isn't in the default bucket
@@ -114,14 +101,15 @@ class CollectionManagerTestCase(CollectionTestCase):
   def testGetScopeNoScope(self):
     self.assertRaises(ScopeNotFoundException, self.cm.get_scope, 'somerandomname')
 
-  # TODO: get rid of sleep hack!!
   def testDropCollection(self):
     self.cm.create_collection(CollectionSpec('other-collection'))
-    sleep(5)
+    self.try_n_times(10, 1, self.other_bucket.collection, 'other-collection')
     self.assertTrue([c for c in self.cm.get_all_scopes()[0].collections if c.name == 'other-collection'])
-    sleep(5)
     self.cm.drop_collection(CollectionSpec('other-collection'))
-    self.assertFalse([c for c in self.cm.get_all_scopes()[0].collections if c.name == 'other-collection'])
+    # there is no get_collection, so...
+    def get_collection(name):
+        c = [c for c in self.cm.get_all_scopes()[0].collections if c.name == name][0]
+    self.try_n_times_till_exception(10, 1, get_collection, 'other-collection')
 
   def testDropCollectionNotFound(self):
     self.assertRaises(CollectionNotFoundException, self.cm.drop_collection, CollectionSpec('somerandomname'))
@@ -129,13 +117,12 @@ class CollectionManagerTestCase(CollectionTestCase):
   def testDropCollectionScopeNotFound(self):
     self.assertRaises(ScopeNotFoundException, self.cm.drop_collection, CollectionSpec('collectionname', 'scopename'))
 
-  # TODO: get rid of sleep hack!!
   def testDropScope(self):
     self.cm.create_scope('other-scope')
-    sleep(5)
+    self.try_n_times(10, 1, self.cm.get_scope, 'other-scope')
     self.assertTrue([s for s in self.cm.get_all_scopes() if s.name == 'other-scope'])
     self.cm.drop_scope('other-scope')
-    sleep(5)
+    self.try_n_times_till_exception(10, 1, self.cm.get_scope, 'other-scope')
     self.assertFalse([s for s in self.cm.get_all_scopes() if s.name == 'other-scope'])
 
   def testDropScopeNotFound(self):

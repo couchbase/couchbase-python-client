@@ -788,6 +788,16 @@ class ClusterTestCase(CouchbaseTestCase):
     def assertCas(self, item):
         self.validator.assertCas(item)
 
+    def try_n_times_till_exception(self, num_times, seconds_between, func, *args):
+        for _ in range(num_times):
+            try:
+                ret = func(*args)
+                time.sleep(seconds_between)
+            except:
+                return
+        self.fail("successful {} after {} times waiting {} seconds between calls".format(func, num_times, seconds_between))
+
+
     def try_n_times(self, num_times, seconds_between, func, *args):
       for _ in range(num_times):
         try:

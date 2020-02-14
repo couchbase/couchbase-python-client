@@ -24,6 +24,7 @@ class BucketManagementTests(CollectionTestCase):
     def test_bucket_create(self):
         try:
             self.bm.create_bucket(CreateBucketSettings(name="fred", bucket_type="couchbase", ram_quota_mb=100))
+            self.try_n_times(10, 1, self.bm.get_bucket, "fred")
         finally:
             self.bm.drop_bucket('fred')
 
@@ -35,7 +36,7 @@ class BucketManagementTests(CollectionTestCase):
     def test_bucket_drop_fail(self):
       settings = CreateBucketSettings(name='fred', bucket_type='couchbase', ram_quota_mb=100)
       self.bm.create_bucket(settings)
-      self.bm.drop_bucket('fred')
+      self.try_n_times(10, 1, self.bm.drop_bucket, 'fred')
       self.assertRaises(BucketDoesNotExistException, self.bm.drop_bucket, 'fred')
 
     def test_bucket_list(self):
@@ -43,6 +44,7 @@ class BucketManagementTests(CollectionTestCase):
         try:
             for bucket, kwargs in buckets_to_add.items():
                 self.bm.create_bucket(CreateBucketSettings(name=bucket, ram_quota_mb=100, **kwargs))
+                self.try_n_times(10, 1, self.bm.get_bucket, bucket)
 
             self.assertEqual(set(), {"fred", "jane", "sally"}.difference(
                 set(map(lambda x: x.name, self.bm.get_all_buckets()))))
