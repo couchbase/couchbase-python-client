@@ -17,6 +17,7 @@ class HighlightStyle(Enum):
     Ansi = 'ansi'
     Html = 'html'
 
+
 class SearchOptions(OptionBlockTimeOut):
     @overload
     def __init__(self,

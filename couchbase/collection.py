@@ -64,7 +64,7 @@ class ReplaceOptions(DurabilityOptionBlock):
 
     def __init__(self,
                  **kwargs
-                ):
+                 ):
         super(ReplaceOptions, self).__init__(**kwargs)
 
 
@@ -106,14 +106,18 @@ class PrependOptions(OptionBlockTimeOut):
 class UnlockOptions(OptionBlockTimeOut):
     pass
 
+
 class CounterOptions(ServerDurableOptionBlock):
     pass
+
 
 class CollectionOptions(OptionBlock):
     pass
 
+
 class ExistsOptions(OptionBlockTimeOut):
     pass
+
 
 class GetOptions(OptionBlockTimeOut):
     @overload
@@ -144,20 +148,26 @@ class GetOptions(OptionBlockTimeOut):
 class GetAndTouchOptions(GetOptions):
     pass
 
+
 class GetAndLockOptions(GetOptions):
     pass
 
+
 class GetAnyReplicaOptions(GetOptions):
-  pass
+    pass
+
 
 class GetAllReplicasOptions(GetOptions):
-  pass
+    pass
+
 
 class InsertOptions(DurabilityOptionBlock):
     pass
 
+
 class UpsertOptions(DurabilityOptionBlock):
     pass
+
 
 T = TypeVar('T', bound='CBCollection')
 R = TypeVar("R")
@@ -175,8 +185,10 @@ CoreBucketOpRead = TypeVar("CoreBucketOpRead", Callable[[Any], CoreResult], Call
 class BinaryCollection(object):
     pass
 
+
 class TouchOptions(OptionBlockTimeOut):
     pass
+
 
 class LookupInOptions(OptionBlockTimeOut):
     pass
@@ -622,7 +634,6 @@ class CBCollection(CoreClient):
         :raise: Any exceptions raised by the underlying platform.
         """
         return ExistsResult(super(CBCollection,self).exists(key), **forward_args(kwargs, *options))
-
 
     @_wrap_in_mutation_result
     def upsert(self,
@@ -1098,6 +1109,7 @@ class Scope(object):
 
 
 Collection = CBCollection
+
 
 class AsyncCBCollection(AsyncClientFactory.gen_async_client(CBCollection)):
     def __init__(self, *args, **kwargs):

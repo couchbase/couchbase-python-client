@@ -241,8 +241,6 @@ class QueryOptions(OptionBlockTimeOut):
 
         # this will change the options for export.
         # NOT USED CURRENTLY
-
-
     def as_dict(self):
         for key, val in self.items():
             if key == 'positional_parameters':

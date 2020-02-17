@@ -1,9 +1,6 @@
 from typing import *
-import couchbase.options
 from .options import Cardinal, OptionBlock, OptionBlockTimeOut
 from couchbase_core.durability import Durability
-from couchbase_core._pyport import TypedDict, with_metaclass
-from couchbase_core import ABCMeta
 from datetime import timedelta
 
 try:
@@ -45,7 +42,7 @@ class ClientDurability(DurabilityType):
         from the cache of at least these many nodes
         (excluding the master)
         """
-        super(ClientDurability,self).__init__(ClientDurability.Storage(replicate_to=replicate_to, persist_to=persist_to))
+        super(ClientDurability, self).__init__(ClientDurability.Storage(replicate_to=replicate_to, persist_to=persist_to))
 
 
 class ServerDurability(DurabilityType):
@@ -60,31 +57,35 @@ class ServerDurability(DurabilityType):
 
         :param Durability level: durability level
         """
-        super(ServerDurability,self).__init__(ServerDurability.Storage(level=level))
+        super(ServerDurability, self).__init__(ServerDurability.Storage(level=level))
+
 
 class ClientDurableOptionBlock(OptionBlockTimeOut):
     @overload
     def __init__(self,
                  timeout=None,       # type: timedelta
                  durability=None     # type: ClientDurability
-                ):
+                 ):
         pass
     def __init__(self,
                  **kwargs
-                ):
+                 ):
         super(ClientDurableOptionBlock, self).__init__(**kwargs)
+
 
 class ServerDurableOptionBlock(OptionBlockTimeOut):
     @overload
     def __init__(self,
                  timeout=None,       # type: timedelta
                  durability=None     # type: ServerDurability
-                ):
+                 ):
         pass
+
     def __init__(self,
                  **kwargs
-                ):
+                 ):
         super(ServerDurableOptionBlock, self).__init__(**kwargs)
+
 
 class DurabilityOptionBlock(OptionBlockTimeOut):
     @overload
@@ -93,6 +94,7 @@ class DurabilityOptionBlock(OptionBlockTimeOut):
                  durability=None     # type: DurabilityType
                  ):
         pass
+
     def __init__(self,
                  **kwargs
                  ):

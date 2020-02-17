@@ -57,6 +57,7 @@ class Value(object):
     def __int__(self):
         return self.value
 
+
 class Cardinal(IntEnum):
     ONE = 1
     TWO = 2
