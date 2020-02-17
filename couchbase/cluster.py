@@ -1,6 +1,8 @@
 import asyncio
 from typing import *
 
+from couchbase_core.mutation_state import MutationState
+
 from couchbase.management.queries import QueryIndexManager
 from couchbase.management.search import SearchIndexManager
 from couchbase_core.exceptions import CouchbaseError
@@ -219,6 +221,8 @@ class QueryOptions(OptionBlockTimeOut):
 
         # this will change the options for export.
         # NOT USED CURRENTLY
+
+
     def as_dict(self):
         for key, val in self.items():
             if key == 'positional_parameters':
@@ -265,12 +269,13 @@ class Cluster(object):
         :param ClusterOptions options: options for the cluster.
         :param Any kwargs: Override corresponding value in options.
         """
-        self.connstr=connection_string
-        cluster_opts=forward_args(kwargs, *options)
-        authenticator=cluster_opts.pop('authenticator',None)
+        self.connstr = connection_string
+        cluster_opts = forward_args(kwargs, *options)  # type: Dict[str,Any]
+        authenticator = cluster_opts.pop('authenticator', None)
         if not authenticator:
             raise ArgumentError("Authenticator is mandatory")
-        cluster_opts.update(bucket_class=lambda connstr, bname=None, **kwargs: Bucket(connstr,name=bname,admin=self.admin,**kwargs))
+        cluster_opts.update(
+            bucket_class=lambda connstr, bname=None, **kwargs: Bucket(connstr, name=bname, admin=self.admin))
         self._cluster = CoreCluster(connection_string, **cluster_opts)  # type: CoreCluster
         self._authenticate(authenticator)
 
@@ -297,8 +302,8 @@ class Cluster(object):
         credentials = authenticator.get_credentials()
         self._clusteropts = credentials.get('options', {})
         self._clusteropts['bucket'] = "default"
-        self._clusterclient=None
-        auth=credentials.get('options')
+        self._clusterclient = None
+        auth = credentials.get('options')
         self.admin = Admin(auth.get('username'), auth.get('password'), connstr=str(self.connstr))
 
     # TODO: There should be no reason for these kwargs.  However, our tests against the mock

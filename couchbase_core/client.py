@@ -43,8 +43,9 @@ def _dsop(create_type=None, wrap_missing_path=True):
 
     return real_decorator
 
-ViewInstance = TypeVar('T', bound = View)
-ViewSubType = TypeVar('U', bound = Type[ViewInstance])
+
+ViewInstance = TypeVar('ViewInstance', bound=View)
+ViewSubType = TypeVar('ViewSubType', bound=Type[ViewInstance])
 
 
 class Client(_Base):

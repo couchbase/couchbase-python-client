@@ -300,7 +300,6 @@ class Cluster(object):
         def _warning(self, clash_param_dict, auth_type):
             warnings.warn(self._get_generic_complaint(clash_param_dict, auth_type))
 
-
     def n1ql_query(self, query, *args, **kwargs):
         """
         Issue a "cluster-level" query. This requires that at least one

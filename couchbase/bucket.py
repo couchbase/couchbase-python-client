@@ -70,19 +70,20 @@ class ViewOptions(OptionBlockTimeOut):
            kwargs['use_devmode'] = (val == DesignDocumentNamespace.DEVELOPMENT)
         super(ViewOptions, self).__init__(**kwargs)
 
+
 class PingOptions(OptionBlockTimeOut):
     @overload
     def __init__(self,
                  timeout=None,       # type: timedelta
                  report_id=None,     # type: str
-                 service_types=None  # type: Iterable[diagnostics.ServiceType]
-                ):
+                 service_types=None  # type: Iterable[ServiceType]
+                 ):
         """
         Create options used for ping command.
 
         :param timedelta timeout: Currently not implemented, coming soon.
         :param str report_id: Add an id to the request, which you can track in logging, etc...
-        :param Itertable[diagnostics.ServiceType] service_types: Restrict the ping to the services passed in here.
+        :param Iterable[ServiceType] service_types: Restrict the ping to the services passed in here.
         """
         pass
 
