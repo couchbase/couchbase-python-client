@@ -878,7 +878,7 @@ class Client(_Base):
         resultdict = self._ping(*options, **kwargs )
         return json.loads(resultdict['services_json'])
 
-    def diagnostics(self):
+    def diagnostics(self, *options, **kwargs):
         """Request diagnostics report about network connections
 
         Generates diagnostics for each node in the cluster.
@@ -906,7 +906,7 @@ class Client(_Base):
                   'version': diagnostics API version
               }
         """
-        return json.loads(self._diagnostics()['health_json'])
+        return json.loads(self._diagnostics(*options, **kwargs)['health_json'])
 
     def analytics_query(self, query, *args, **kwargs):
         """

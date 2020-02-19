@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import setuptools
 import logging
 import os
 import couchbase_version

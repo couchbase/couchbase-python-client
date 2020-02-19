@@ -1,13 +1,13 @@
 # Backward compatibility
-enum34; python_version < '3.5'
+enum34 ; python_version<"3.5"
 
 # Typing support
-typing; python_version<'3.7'
-typing-extensions; python_version<'3.8'
+typing; python_version<"3.7"
+typing-extensions; python_version<"3.8"
 mypy_extensions
 
 # Prevent installation of Python < 3 package on Windows.
-pip>=20.0; sys_platform == 'win32' and python_version <= '2.7'
+pip>=20.0; sys_platform=="win32" and python_version<="2.7"
 
 # General dependencies
 pyrsistent>=0.15.2

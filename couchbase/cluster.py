@@ -1,3 +1,4 @@
+import asyncio
 from typing import *
 
 from couchbase.management.queries import QueryIndexManager
@@ -56,6 +57,17 @@ def options_to_func(orig,  # type: U
             return invocator
 
     return invocation(orig)
+
+class DiagnosticsOptions(OptionBlock):
+    def __init__(self,
+                 report_id = None # type: str
+                 ):
+        pass
+
+    def __init__(self,
+                 **kwargs
+                 ):
+        super(DiagnosticsOptions, self).__init__(**kwargs)
 
 
 class AnalyticsOptions(OptionBlockTimeOut):
@@ -363,6 +375,33 @@ class Cluster(object):
         except Exception as e:
             raise_from(failtype(params=CouchbaseError.ParamType(message="Cluster operation failed", inner_cause=e)), e)
 
+    async def _operate_on_entire_cluster(self,
+                                   verb,
+                                   failtype,
+                                   *args,
+                                   **kwargs):
+        # if you don't have a cluster client yet, then you don't have any other buckets open either, so
+        # this is the same as operate_on_cluster
+        if not self._clusterclient:
+            return self._operate_on_cluster(verb, failtype, *args, **kwargs)
+
+        async def coroutine(client, verb, *args, **kwargs):
+            return verb(client, *args, **kwargs)
+        # ok, lets loop over all the buckets, and the clusterclient.  And lets do it async so it isn't miserably
+        # slow.  So we will create a list of tasks and execute them together...
+        tasks = [asyncio.ensure_future(coroutine(self._clusterclient, verb, *args, **kwargs))]
+        for name, c in self._cluster._buckets.items():
+            client = c()
+            if client:
+                tasks.append(coroutine(client._bucket, verb, *args, **kwargs))
+        done, pending = await asyncio.wait(tasks)
+        results = []
+        for d in done:
+            results.append(d.result())
+        return results
+
+
+
     def analytics_query(self,       # type: Cluster
                         statement,  # type: str,
                         *options,   # type: AnalyticsOptions
@@ -403,34 +442,21 @@ class Cluster(object):
     _root_diag_data = {'id', 'version', 'sdk'}
 
     def diagnostics(self,
-                    reportId=None,  # type: str
-                    timeout=None
+                    *options,   # type: DiagnosticsOptions
+                    **kwargs
                     ):
         # type: (...) -> DiagnosticsResult
         """
         Creates a diagnostics report that can be used to determine the healthfulness of the Cluster.
-        :param reportId - an optional string name for the generated report.
-        :return:A DiagnosticsResult object with the results of the query or error message if the query failed on the server.
+        :param DiagnosticsOptions options:  Options for the diagnostics
+        :return: A DiagnosticsResult object with the results of the query or error message if the query failed on the server.
 
         """
 
-        pool = ThreadPool(processes=1)
-        diag_results_async_result = pool.apply_async(self._operate_on_cluster,
-                                                     (CoreClient.diagnostics, DiagnosticsException))
-        try:
-            diag_results = diag_results_async_result.get(timeout)
-        except multiprocessing.TimeoutError as e:
-            raise couchbase.exceptions.TimeoutError(params=dict(inner_cause=e))
-
-        final_results = {'services': {}}
-
-        for k, v in diag_results.items():
-            if k in Cluster._root_diag_data:
-                final_results[k] = v
-            else:
-                for item in v:
-                    final_results['services'][k] = EndPointDiagnostics(k, item)
-        return DiagnosticsResult(final_results)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(self._operate_on_entire_cluster(CoreClient.diagnostics, DiagnosticsException, **forward_args(kwargs, *options)))
+        return DiagnosticsResult(result)
 
     def users(self):
         # type: (...) -> UserManager

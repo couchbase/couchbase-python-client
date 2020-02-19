@@ -566,10 +566,21 @@ TRACED_FUNCTION_WRAPPER(_diagnostics,LCBTRACE_OP_REQUEST_ENCODING,Bucket)
     Py_ssize_t ncmds = 0;
     lcb_STATUS err = LCB_ERR_GENERIC;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
+    char* report_id = NULL;
+    static char *kwlist[] = {  "report_id",  NULL };
+
+    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "|s", kwlist, &report_id);
+    if (!rv) {
+        PYCBC_DEBUG_LOG("couldn't parse the options to diagnostics!");
+        goto GT_ERR;
+    }
+
     CMDSCOPE_NG(DIAG, diag)
     {
         lcb_cmddiag_prettify(cmd, 1);
-        lcb_cmddiag_report_id(cmd, "PYCBC", strlen("PYCBC"));
+        if (report_id) {
+            lcb_cmddiag_report_id(cmd, report_id, strlen(report_id));
+        }
         rv = pycbc_common_vars_init(&cv, self, PYCBC_ARGOPT_MULTI, ncmds, 0);
 
         if (rv < 0) {

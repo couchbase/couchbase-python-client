@@ -521,23 +521,6 @@ class Scenarios(CollectionTestCase):
                           FT.TermQuery("category"),
                           facets={'fred': None})
 
-    def test_diagnostics(self  # type: Scenarios
-                         ):
-        try:
-            diagnostics = self.cluster.diagnostics(timeout=(5))
-        except couchbase.exceptions.TimeoutError:
-            raise SkipTest("LCB Diagnostics still blocks indefinitely: {}".format(traceback.format_exc()))
-
-        self.assertRegex(diagnostics.sdk(), r'.*PYCBC.*')
-        self.assertGreaterEqual(diagnostics.version(), 1)
-        self.assertIsNotNone(diagnostics.id())
-        config = diagnostics.services().get('config')
-        self.assertEqual(config.type(), ServiceType.Config)
-        for key, value in diagnostics.services().items():
-            self.assertIn(type(value.type()), (ServiceType, str))
-            self.assertIn(type(value.id()), ANY_STR)
-            self.assertIn(type(value.local()), ANY_STR)
-
     @staticmethod
     def get_multi_result_as_dict(result):
         return {k: v.content for k, v in result.items()}

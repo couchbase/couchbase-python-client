@@ -3,6 +3,22 @@ from typing import Optional, Mapping, Union, Any
 from enum import Enum
 from couchbase_core import JSON
 from datetime import timedelta
+from couchbase.exceptions import InvalidArgumentsException
+import json
+import copy
+
+
+class EndpointState(Enum):
+    Disconnected = "disconnected"
+    Connecting = "connecting"
+    Connected = "connected"
+    Disconnecting = "disconnecting"
+
+
+class ClusterState(Enum):
+    Online = "online"
+    Degraded = "degraded"
+    Offline = "offline"
 
 
 class ServiceType(Enum):
@@ -12,72 +28,137 @@ class ServiceType(Enum):
     Search = "fts"
     Analytics = "cbas"
     Config = "config"
+    Management = "mgmt"
 
 
 class EndPointDiagnostics(object):
-    def __init__(self,  # type: EndPointDiagnostics
-                 service_type,  # type: Union[ServiceType,str]
-                 raw_endpoint  # type: JSON
+    def __init__(self,          # type: EndPointDiagnostics
+                 service_type,  # type: ServiceType
+                 raw_endpoint   # type: JSON
                  ):
         self._raw_endpoint = raw_endpoint
-        if isinstance(service_type, ServiceType):
-            self._service_type = service_type
-        else:
-            try:
-                self._service_type = ServiceType(service_type)
-            except:
-                self._service_type = service_type
+        self._raw_endpoint['type'] = service_type.value
 
+    @property
     def type(self):
-        # type: (...) -> Union[ServiceType,str]
-        return self._service_type
+        # type: (...) -> ServiceType
+        return ServiceType(self._raw_endpoint.get('type'))
 
+    @property
     def id(self):
         # type: (...) -> str
         return self._raw_endpoint.get('id')
 
+    @property
     def local(self):
         # type: (...) -> str
         return self._raw_endpoint.get('local')
 
+    @property
     def remote(self):
         # type: (...) -> str
         return self._raw_endpoint.get('remote')
 
+    @property
     def last_activity(self):
-        # type: (...) -> int
-        return self._raw_endpoint.get('last_activity_us')
+        # type: (...) -> timedelta
+        return timedelta(microseconds=self._raw_endpoint.get('last_activity_us'))
 
-    def latency(self):
-        # type: (...) -> Optional[int]
-        return self._raw_endpoint.get('latency')
-
-    def scope(self):
+    @property
+    def namespace(self):
         # type: (...) -> str
         return self._raw_endpoint.get('scope')
+
+    @property
+    def state(self):
+        # type: (...) -> EndpointState
+        return EndpointState(self._raw_endpoint.get('status'))
+
+    def as_dict(self):
+        # type: (...) -> dict
+        return self._raw_endpoint
+
+    def as_json(self):
+        # type: (...) -> str
+        return json.dumps(self.as_dict())
 
 
 class DiagnosticsResult(object):
     def __init__(self,  # type: DiagnosticsResult
-                 source_diagnostics  # type: Mapping[str,Any]
+                 source_diagnostics  # type: Union[Mapping[str,Any], list[Mapping[str,Any]]]
                  ):
-        self._src_diagnostics = source_diagnostics
+        self._id = self._version = self._sdk = self._endpoints = None
+        # we could have an array of dicts, or just a single dict
+        if isinstance(source_diagnostics, dict):
+            source_diagnostics = [source_diagnostics]
+        if not isinstance(source_diagnostics, list):
+            raise InvalidArgumentsException("DiagnosticsResult expects a dict or list(dict)")
+        for d in source_diagnostics:
+            self.append_endpoints(d)
 
+    def as_json(self):
+        # type: (...) -> str
+        return_val = copy.deepcopy(self.__dict__)
+        for k, val in return_val['_endpoints'].items():
+            json_vals=[]
+            for v in val:
+                json_vals.append(v.as_dict())
+            return_val['_endpoints'][k] = json_vals
+        return_val['_endpoints'] = {k.value: v for k, v in return_val['_endpoints'].items()}
+        return json.dumps(return_val)
+
+    def append_endpoints(self, source_diagnostics):
+        # type: (...) -> None
+        # now the remaining keys are the endpoints...
+        self._id = source_diagnostics.pop('id', None)
+        self._version = source_diagnostics.pop('version', None)
+        self._sdk = source_diagnostics.pop('sdk', None)
+        if not self._endpoints:
+            self._endpoints = dict()
+        for k, v in source_diagnostics.items():
+            # construct an endpointpingreport for each
+            k = ServiceType(k)
+            endpoints = self._endpoints.get(k, list())
+            for value in v:
+                endpoints.append(EndPointDiagnostics(k, value))
+            self._endpoints[k] = endpoints
+
+    @property
     def id(self):
         # type: (...) -> str
-        return self._src_diagnostics.get('id')
+        return self._id
 
+    @property
     def version(self):
         # type: (...) -> int
-        return self._src_diagnostics.get('version')
+        return self._version
 
+    @property
     def sdk(self):
         # type: (...) -> str
-        return self._src_diagnostics.get('sdk')
+        return self._sdk
 
-    def services(self):
-        # type: (...) -> Mapping[str, EndPointDiagnostics]
-        return self._src_diagnostics.get('services', {})
+    @property
+    def endpoints(self):
+        # type: (...) -> Mapping[ServiceType, list[EndPointDiagnostics]]
+        return self._endpoints
+
+    @property
+    def state(self):
+        # type: (...)-> ClusterState
+        num_found = 0
+        num_connected = 0
+        for k, v in self._endpoints.items():
+            for endpoint in v:
+                num_found += 1
+                if endpoint.state == EndpointState.Connected:
+                    num_connected += 1
+
+        if num_found == num_connected:
+            return ClusterState.Online
+        if num_connected > 0 :
+            return ClusterState.Degraded
+        return ClusterState.Offline
 
 
 class EndpointPingReport(object):
@@ -90,25 +171,33 @@ class EndpointPingReport(object):
 
     @property
     def service_type(self):
+        # type: (...) -> ServiceType
         return self._src_ping.get('service_type', None)
 
     @property
     def id(self):
+        # type: (...) -> str
         return self._src_ping.get('id', None)
 
     @property
     def local(self):
+        # type: (...) -> str
         return self._src_ping.get('local', None)
 
     @property
     def remote(self):
+        # type: (...) -> str
         return self._src_ping.get('remote', None)
 
     @property
     def namespace(self):
+        # type: (...) -> str
         # TODO: check if LCB will update this to namespace (like java)
         return self._src_ping.get('scope', None)
 
     @property
     def latency(self):
+        # type: (...) -> timedelta
         return timedelta(microseconds=self._src_ping.get('latency_us', None))
+
+
