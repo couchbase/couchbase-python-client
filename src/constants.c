@@ -67,7 +67,8 @@
     X(ERR_SUBDOC_PATH_INVALID)      \
     X(ERR_QUERY)                    \
     X(ERR_NO_MATCHING_SERVER)       \
-    X(ERR_INDEX_NOT_FOUND)
+    X(ERR_INDEX_NOT_FOUND)          \
+    X(ERR_INDEX_EXISTS)
 
 #define XHTTP(X) \
     X(HTTP_METHOD_GET) \

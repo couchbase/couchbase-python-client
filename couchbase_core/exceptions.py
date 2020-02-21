@@ -591,6 +591,14 @@ class BucketNotFoundError(CouchbaseError):
     """The requested bucket does not exist"""
 
 
+class QueryIndexNotFoundError(CouchbaseError):
+    """The requested index does not exist"""
+
+
+class QueryIndexAlreadyExistsError(CouchbaseError):
+    """The requested index already exists"""
+
+
 class ClientNoMemoryError(CouchbaseError):
     """The client ran out of memory"""
 
@@ -825,7 +833,6 @@ _LCB_ERRNO_MAP = dict(list({
     C.LCB_ERR_AUTHENTICATION_FAILURE:       AuthError,
     C.LCB_ERR_INVALID_DELTA:     DeltaBadvalError,
     C.LCB_ERR_VALUE_TOO_LARGE:            TooBigError,
-    C.LCB_ERR_TEMPORARY_FAILURE:            BusyError,
     C.LCB_ERR_NO_MEMORY:           NoMemoryError,
     C.LCB_ERR_TEMPORARY_FAILURE:         TemporaryFailError,
     C.LCB_ERR_DOCUMENT_EXISTS:      KeyExistsError,
@@ -842,7 +849,7 @@ _LCB_ERRNO_MAP = dict(list({
     C.LCB_ERR_CONNECT_ERROR:    ConnectError,
     C.LCB_ERR_BUCKET_NOT_FOUND:    BucketNotFoundError,
     C.LCB_ERR_QUERY: QueryException,
-    C.LCB_ERR_INDEX_NOT_FOUND: QueryException,
+    C.LCB_ERR_INDEX_NOT_FOUND: QueryIndexNotFoundError,
     #C.LCB_EBADHANDLE:       BadHandleError,
     C.LCB_ERR_INVALID_HOST_FORMAT: InvalidError,
     C.LCB_ERR_INVALID_CHAR:     InvalidError,
@@ -860,7 +867,8 @@ _LCB_ERRNO_MAP = dict(list({
     C.LCB_ERR_SUBDOC_PATH_MISMATCH: SubdocPathMismatchError,
     C.LCB_ERR_SUBDOC_VALUE_INVALID: SubdocCantInsertValueError,
     C.LCB_ERR_SUBDOC_DELTA_INVALID: SubdocBadDeltaError,
-    C.LCB_ERR_SUBDOC_NUMBER_TOO_BIG: SubdocNumberTooBigError
+    C.LCB_ERR_SUBDOC_NUMBER_TOO_BIG: SubdocNumberTooBigError,
+    C.LCB_ERR_INDEX_EXISTS: QueryIndexAlreadyExistsError
 }.items()) + list(_PYCBC_CRYPTO_ERR_MAP.items()) + list(_LCB_SYNCREP_MAP.items()))
 
 

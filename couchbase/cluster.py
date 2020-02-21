@@ -506,5 +506,7 @@ class Cluster(object):
         """
         return self._cluster.cluster_manager()
 
+    def _is_dev_preview(self):
+        return self.admin.http_request(path="/pools").value.get("isDeveloperPreview", False)
 
 ClusterOptions = Cluster.ClusterOptions

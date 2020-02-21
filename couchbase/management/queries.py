@@ -1,30 +1,21 @@
 from couchbase.exceptions import KeyNotFoundException, KeyExistsException
 from couchbase_core._ixmgmt import N1QL_PRIMARY_INDEX, IxmgmtRequest, N1qlIndex
 from couchbase_core.bucketmanager import BucketManager
-from couchbase.options import (OptionBlockTimeOut, forward_args, timedelta)
+from couchbase.options import OptionBlock, OptionBlockTimeOut, forward_args, timedelta
 from typing import *
 from couchbase.management.generic import GenericManager
 import attr
 from attr.validators import instance_of as io, deep_mapping as dm
 from couchbase_core._pyport import Protocol
-
-from couchbase_core.exceptions import HTTPError, ErrorMapper, AnyPattern
-
-
-class QueryIndexNotFoundException(KeyNotFoundException):
-    pass
-
-
-class IndexAlreadyExistsException(KeyExistsException):
-    pass
+from couchbase_core.exceptions import HTTPError, ErrorMapper, AnyPattern, QueryIndexAlreadyExistsError, QueryIndexNotFoundError
 
 
 class QueryErrorMapper(ErrorMapper):
     @staticmethod
     def mapping():
         # type: (...) -> Dict[CBErrorType,Dict[Any, CBErrorType]]
-        return {KeyNotFoundException: {AnyPattern(): QueryIndexNotFoundException},
-                KeyExistsException: {AnyPattern(): IndexAlreadyExistsException}}
+        return {KeyNotFoundException: {AnyPattern(): QueryIndexNotFoundError},
+                KeyExistsException: {AnyPattern(): QueryIndexAlreadyExistsError}}
 
 
 @QueryErrorMapper.wrap
@@ -37,23 +28,9 @@ class QueryIndexManager(GenericManager):
         """
         super(QueryIndexManager,self).__init__(parent_cluster)
 
-    @overload
-    def get_all_indexes(self,  # type: QueryIndexManager
-                        bucket_name,  # type: str
-                        timeout=None,  # type: timedelta
-                        ):
-        pass
-
-    @overload
-    def get_all_indexes(self,  # type: QueryIndexManager
-                        bucket_name,  # type: str
-                        options,  # type: GetAllQueryIndexOptions
-                        ):
-        pass
-
-    def get_all_indexes(self,  # type: QueryIndexManager
-                        bucket_name,  # type: str
-                        *options,  # type: GetAllQueryIndexOptions
+    def get_all_indexes(self,           # type: QueryIndexManager
+                        bucket_name,    # type: str
+                        *options,       # type: GetAllQueryIndexOptions
                         **kwargs
                         ):
         # type: (...) -> List[QueryIndex]
@@ -61,10 +38,9 @@ class QueryIndexManager(GenericManager):
         Fetches all indexes from the server.
 
         :param str bucket_name: the name of the bucket.
-        :param timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
+        :param GetAllQueryIndexOptions options: Options to use for getting all indexes.
+        :param Any kwargs: Override corresponding value in options.
         :return: A list of QueryIndex objects.
-
-
         :raises: InvalidArgumentsException
         """
         # N1QL
@@ -73,7 +49,7 @@ class QueryIndexManager(GenericManager):
         # ORDER BY is_primary DESC, name ASC
         info = N1qlIndex()
         info.keyspace = bucket_name
-        response = IxmgmtRequest(self._admin_bucket, 'list', info).execute()
+        response = IxmgmtRequest(self._admin_bucket, 'list', info, **forward_args(kwargs, *options)).execute()
         return list(map(QueryIndex.from_n1qlindex, response))
 
     def _mk_index_def(self, bucket_name, ix, primary=False):
@@ -148,138 +124,96 @@ class QueryIndexManager(GenericManager):
         # Now actually create the indexes
         return IxmgmtRequest(self._admin_bucket, 'create', info, **options).execute()
 
-    @overload
-    def create_index(self,  # type: QueryIndexManager
-                     bucket_name,  # type: str
-                     index_name,  # type: str
-                     fields,  # type: Iterable[str]
-                     options  # type: CreateQueryIndexOptions
-                     ):
-        pass
-
-    @overload
-    def create_index(self,  # type: QueryIndexManager
-                     bucket_name,  # type: str
-                     index_name,  # type: str
-                     fields,  # type: Iterable[str]
-                     ignore_if_exists=None,  # type: bool
-                     num_replicas=0,  # type: int
-                     deferred=False,  # type: bool
-                     timeout=None,  # type: timedelta
-                     condition=None  # type: str
-                     ):
-        pass
-
-    def create_index(self,  # type: QueryIndexManager
-                     bucket_name,  # type: str
-                     index_name,  # type: str
-                     fields,  # type: Iterable[str]
-                     *options,  # type: CreateQueryIndexOptions
+    def create_index(self,          # type: QueryIndexManager
+                     bucket_name,   # type: str
+                     index_name,    # type: str
+                     fields,        # type: Iterable[str]
+                     *options,      # type: CreateQueryIndexOptions
                      **kwargs
                      ):
+        # type: (...) -> None
         """
         Creates a new index.
 
-        :param: str bucket_name: name of the bucket.
+        :param str bucket_name: name of the bucket.
         :param str index_name: the name of the index.
-        :param Iterable[str] fields: the fields to create the index over.
-        :param bool ignore_if_exists: Don't error/throw if the index already exists.
-        :param int num_replicas: The number of replicas that this index should have. Uses the WITH keyword and num_replica.
-        :param bool deferred: Whether the index should be created as a deferred index.
-        :param timedelta timeout:  the time allowed for the operation to be terminated. This is controlled by the client.
-        :param condition: condition on which to filter
-        :raises: IndexAlreadyExistsException
+        :param Iterable[str] fields: Fields over which to create the index.
+        :param CreateQueryIndexOptions options: Options to use when creating index.
+        :param Any kwargs: Override corresponding value in options.
+        :raises: QueryIndexAlreadyExistsError
         :raises: InvalidArgumentsException
         """
         # CREATE INDEX index_name ON bucket_name WITH { "num_replica": 2 }
         #         https://docs.couchbase.com/server/current/n1ql/n1ql-language-reference/createindex.html
         #
-        self._create_index(bucket_name, fields, index_name, **kwargs)
+        self._create_index(bucket_name, fields, index_name, *options, **kwargs)
 
     def _create_index(self, bucket_name, fields, index_name, *options, **kwargs):
         final_args = {
             k.replace('deferred', 'defer').replace('condition', 'cond').replace('ignore_if_exists', 'ignore_exists'): v
             for k, v in forward_args(kwargs, *options).items()}
-        self._n1ql_index_create(bucket_name, index_name, fields=fields, **final_args)
+        try:
+            self._n1ql_index_create(bucket_name, index_name, fields=fields, **final_args)
+        except QueryIndexAlreadyExistsError:
+            if not final_args.get('ignore_exists', False):
+                raise
 
-    @overload
-    def create_primary_index(self,  # type: QueryIndexManager
-                             bucket_name,  # type: str
-                             index_name="",  # type: str
-                             deferred=False,  # type: bool
-                             ignore_if_exists=False,  # type: bool
-                             num_replicas=None,  # type: int
-                             timeout=None  # type: timedelta
-                             ):
-        pass
 
     def create_primary_index(self,  # type: QueryIndexManager
                              bucket_name,  # type: str
                              *options,  # type: CreatePrimaryQueryIndexOptions
                              **kwargs
-        ):
+                             ):
         """
         Creates a new primary index.
 
         :param str bucket_name:  name of the bucket.
         :param str index_name: name of the index.
-        :param book deferred: Whether the index should be created as a deferred index.
-        :param bool ignore_if_exists:  Don't error/throw if the index already exists.
-        :param int num_replicas: The number of replicas that this index should have. Uses the WITH keyword and num_replica.
-        :param: timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
-
-        :raises: QueryIndexAlreadyExistsException
+        :param CreatePrimaryQueryIndexOptions options: Options to use when creating primary index
+        :param Any kwargs: Override corresponding values in options.
+        :raises: QueryIndexAlreadyExistsError
         :raises: InvalidArgumentsException
         """
         # CREATE INDEX index_name ON bucket_name WITH { "num_replica": 2 }
         #         https://docs.couchbase.com/server/current/n1ql/n1ql-language-reference/createindex.html
         #
-        self._create_index(bucket_name, "", [], primary=True, *options, **kwargs)
+        kwargs['primary'] = True
+        index_name = ""
+        if options and options[0] :
+            index_name = options[0].pop("index_name", "")
+        fields = []
+        self._create_index(bucket_name, fields, index_name, *options, **kwargs)
 
     def _drop_index(self, bucket_name, index_name, *options, **kwargs):
         info = BucketManager._mk_index_def(bucket_name, index_name, primary=kwargs.pop('primary',False))
         final_args = {k.replace('ignore_if_not_exists','ignore_missing'):v for k,v in  forward_args(kwargs, *options).items()}
-        IxmgmtRequest(self._admin_bucket, 'drop', info, **final_args).execute()
+        try:
+            IxmgmtRequest(self._admin_bucket, 'drop', info, **final_args).execute()
+        except QueryIndexNotFoundError:
+            if not final_args.get("ignore_missing", False):
+                raise
 
-    @overload
-    def drop_index(self,  # type: QueryIndexManager
-                   bucket_name,  # type: str
-                   index_name,  # type: str
-                   ignore_if_not_exists=False,  # type: bool
-                   timeout=None  # type: timedelta
-                   ):
-        pass
-
-    def drop_index(self,  # type: QueryIndexManager
-                   bucket_name,  # type: str
-                   index_name,  # type: str
-                   *options,  # type: DropQueryIndexOptions
+    def drop_index(self,            # type: QueryIndexManager
+                   bucket_name,     # type: str
+                   index_name,      # type: str
+                   *options,        # type: DropQueryIndexOptions
                    **kwargs):
         """
         Drops an index.
 
         :param str bucket_name: name of the bucket.
         :param str index_name: name of the index.
-        :param bool ignore_if_not_exists: Don't error/throw if the index does not exist.
-        :param timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
-
+        :param DropQueryIndexOptions options: Options for dropping index.
+        :param Any kwargs: Override corresponding value in options.
         :raises: QueryIndexNotFoundException
         :raises: InvalidArgumentsException
         """
-        self._drop_index(bucket_name, index_name, *options, **kwargs)
+        final_args = forward_args(kwargs, *options)
+        self._drop_index(bucket_name, index_name, **final_args)
 
-    @overload
-    def drop_primary_index(self,  # type: QueryIndexManager
-                           bucket_name,  # type: str
-                           index_name="",  # type: str
-                           ignore_if_not_exists=False,  # type: str
-                           timeout=None  # type: timedelta
-                           ):
-        pass
-
-    def drop_primary_index(self,  # type: QueryIndexManager
-                           bucket_name,  # type: str
-                           *options,  # type: DropPrimaryQueryIndexOptions
+    def drop_primary_index(self,            # type: QueryIndexManager
+                           bucket_name,     # type: str
+                           *options,        # type: DropPrimaryQueryIndexOptions
                            **kwargs):
         """
         Drops a primary index.
@@ -292,57 +226,45 @@ class QueryIndexManager(GenericManager):
         :raises: QueryIndexNotFoundException
         :raises: InvalidArgumentsException
         """
-        self._drop_index(bucket_name, "", primary=True, **kwargs)
+        final_args=forward_args(kwargs, *options)
+        final_args['primary'] = True
+        index_name = final_args.pop("index_name", "")
+        self._drop_index(bucket_name, index_name, **final_args)
 
-    @overload
-    def watch_indexes(self,  # type: QueryIndexManager
+    def watch_indexes(self,         # type: QueryIndexManager
                       bucket_name,  # type: str
                       index_names,  # type: Iterable[str]
-                      timeout=None,  # type: timedelta
-                      ):
-        pass
-
-    def watch_indexes(self,  # type: QueryIndexManager
-                      bucket_name,  # type: str
-                      index_names,  # type: Iterable[str]
-                      *options,  # type: WatchQueryIndexOptions
+                      *options,     # type: WatchQueryIndexOptions
                       **kwargs):
         """
         Watch polls indexes until they are online.
 
         :param str bucket_name: name of the bucket.
         :param Iterable[str] index_names: name(s) of the index(es).
-        :param timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
-        :param: bool watch_primary: whether or not to watch the primary index.
-
+        :param WatchQueryIndexOptions options: Options for request to watch indexes.
+        :param Any kwargs: Override corresponding valud in options.
         :raises: QueryIndexNotFoundException
         :raises: InvalidArgumentsException
         """
         final_args=forward_args(kwargs, *options)
         BucketManager(self._admin_bucket).n1ql_index_watch(index_names, **final_args)
 
-    @overload
-    def build_deferred_indexes(self,  # type: QueryIndexManager
-                               bucket_name,  # type: str
-                               timeout=None  # type: timedelta
-                               ):
-        pass
-
-    def build_deferred_indexes(self,  # type: QueryIndexManager
-                               bucket_name,  # type: str
-                               *options,  # type: BuildQueryIndexOptions
+    def build_deferred_indexes(self,            # type: QueryIndexManager
+                               bucket_name,     # type: str
+                               *options,        # type: BuildDeferredQueryIndexOptions
                                **kwargs
                                ):
         """
         Build Deferred builds all indexes which are currently in deferred state.
 
-        :param bucket_name: name of the bucket.
-        :param timeout: the time allowed for the operation to be terminated. This is controlled by the client.
-
+        :param str bucket_name: name of the bucket.
+        :param BuildDeferredQueryIndexOptions options: Options for building deferred indexes.
+        :param Any kwargs: Override corresponding value in options.
         :raise: InvalidArgumentsException
 
         """
-        return BucketManager._n1ql_index_build_deferred(bucket_name, self._admin_bucket, **kwargs)
+        final_args=forward_args(kwargs, *options)
+        return BucketManager._n1ql_index_build_deferred(bucket_name, self._admin_bucket, **final_args)
 
 
 class IndexType(object):
@@ -372,24 +294,71 @@ class GetAllQueryIndexOptions(OptionBlockTimeOut):
 
 
 class CreateQueryIndexOptions(OptionBlockTimeOut):
-    pass
+    @overload
+    def __init__(self,
+                 timeout=None,           # type: timedelta
+                 ignore_if_exists=None,  # type: bool
+                 num_replicas=None,      # type: int
+                 deferred=None,          # type: bool
+                 ):
+        pass
+
+    def __init__(self, **kwargs):
+        if 'ignore_if_exists' not in kwargs:
+            kwargs['ignore_if_exists'] = False
+        super(CreateQueryIndexOptions, self).__init__()
 
 
-class CreatePrimaryQueryIndexOptions(OptionBlockTimeOut):
-    pass
+class CreatePrimaryQueryIndexOptions(CreateQueryIndexOptions):
+    @overload
+    def __init__(self,
+                 index_name=None,        # type: str
+                 timeout=None,           # type: timedelta
+                 ignore_if_exists=None,  # type: bool
+                 num_replicas=None,      # type: int
+                 deferred=None,          # type: bool
+                 ):
+        pass
+
+    def __init__(self, **kwargs):
+        super(CreatePrimaryQueryIndexOptions, self).__init__()
 
 
 class DropQueryIndexOptions(OptionBlockTimeOut):
-    pass
+    @overload
+    def __init__(self,
+                 ignore_if_not_exists=None,  # type: bool
+                 timeout=None                # type: timedelta
+                 ):
+        pass
+
+    def __init__(self, **kwargs):
+        super(DropQueryIndexOptions, self).__init__(**kwargs)
 
 
 class DropPrimaryQueryIndexOptions(OptionBlockTimeOut):
-    pass
+    @overload
+    def __init__(self,
+                 index_name=None,            # str
+                 ignore_if_not_exists=None,  # type: bool
+                 timeout=None                # type: timedelta
+                 ):
+        pass
+
+    def __init__(self, **kwargs):
+        super(DropPrimaryQueryIndexOptions, self).__init__(**kwargs)
 
 
-class WatchQueryIndexOptions(OptionBlockTimeOut):
-    pass
+class WatchQueryIndexOptions(OptionBlock):
+    @overload
+    def __init__(self,
+                 watch_primary=None  # type: bool
+                 ):
+        pass
+
+    def __init__(self, **kwargs):
+        super(WatchQueryIndexOptions, self).__init__(**kwargs)
 
 
-class BuildQueryIndexOptions(OptionBlockTimeOut):
+class BuildDeferredQueryIndexOptions(OptionBlockTimeOut):
     pass

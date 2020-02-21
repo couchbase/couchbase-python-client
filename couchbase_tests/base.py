@@ -797,18 +797,18 @@ class ClusterTestCase(CouchbaseTestCase):
                 return
         self.fail("successful {} after {} times waiting {} seconds between calls".format(func, num_times, seconds_between))
 
-
     def try_n_times(self, num_times, seconds_between, func, *args):
-      for _ in range(num_times):
-        try:
-          ret = func(*args)
-          return ret
-        except:
-          time.sleep(seconds_between)
-      self.fail("unsuccessful {} after {} times, waiting {} seconds between calls".format(func, num_times, seconds_between))
+        for _ in range(num_times):
+            try:
+                ret = func(*args)
+                return ret
+            except:
+                time.sleep(seconds_between)
+        self.fail("unsuccessful {} after {} times, waiting {} seconds between calls".format(func, num_times, seconds_between))
 
     def factory(self, *args, **kwargs):
         return V3Bucket(*args, username="default", **kwargs).default_collection()
+
     def setUp(self, **kwargs):
         super(ClusterTestCase, self).setUp()
         connargs = self.cluster_info.make_connargs()
@@ -829,12 +829,13 @@ ParamClusterTestCase = parameterized_class(('cluster_factory',), [(Cluster,), (C
 
 
 def skip_if_no_collections(func):
-  @wraps(func)
-  def wrap(self, *args, **kwargs):
-    if not self.supports_collections():
-      raise SkipTest('collections not supported (server < 6.5?)')
-    func(self, *args, **kwargs)
-  return wrap
+    @wraps(func)
+    def wrap(self, *args, **kwargs):
+        if not self.supports_collections():
+            raise SkipTest('collections not supported (server < 6.5?)')
+        func(self, *args, **kwargs)
+        return wrap
+
 
 class CollectionTestCase(ClusterTestCase):
     coll = None  # type: CBCollection
@@ -850,7 +851,6 @@ class CollectionTestCase(ClusterTestCase):
             return True
         except NotSupportedError:
             return False
-
 
     def setUp(self, default_collections=None, real_collections=None):
         default_collections = default_collections or {None: {None: "coll"}}
