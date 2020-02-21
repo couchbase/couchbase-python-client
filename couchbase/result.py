@@ -135,6 +135,7 @@ class Result(ResultProtocol):
         # type: () -> int
         return self._error
 
+    @property
     def success(self):
         # type: () -> bool
         return not self.error
@@ -224,6 +225,7 @@ class MutateInResult(MutationResult):
         """ Original key of the operation """
         return self._content.key
 
+
 class PingResult(object):
     @internal
     def __init__(self,
@@ -238,7 +240,7 @@ class PingResult(object):
             k = ServiceType(k)
             self._endpoints[k] = list()
             for value in v :
-                self._endpoints[k] = EndpointPingReport(k, value)
+                self._endpoints[k].append(EndpointPingReport(k, value))
 
     @property
     def endpoints(self):
@@ -255,19 +257,21 @@ class PingResult(object):
 
     @property
     def version(self):
-        return self._version;
+        return self._version
+
 
 class ExistsResult(Result):
-  @internal
-  def __init__(self,
-               original # type: CoreResult
-              ):
-      super(ExistsResult, self).__init__(original.cas, original.rc)
-      self._exists = (original.cas != 0)
+    @internal
+    def __init__(self,
+                 original # type: CoreResult
+                 ):
+        super(ExistsResult, self).__init__(original.cas, original.rc)
+        self._exists = (original.cas != 0)
 
-  @property
-  def exists(self):
-      return self._exists
+    @property
+    def exists(self):
+        return self._exists
+
 
 class GetResult(Result):
     @internal
@@ -310,10 +314,11 @@ class GetResult(Result):
 
 T = TypeVar('T', bound=Tuple[ResultProtocol, ...])
 
+
 class GetReplicaResult(GetResult):
-  @property
-  def is_replica(self):
-    raise NotImplementedError("To be implemented in final sdk3 release")
+    @property
+    def is_replica(self):
+        raise NotImplementedError("To be implemented in final sdk3 release")
 
 
 class AsyncWrapper(object):

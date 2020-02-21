@@ -527,7 +527,7 @@ class Scenarios(CollectionTestCase):
 
     @staticmethod
     def get_multi_mutationresult_as_dict(result):
-        return {k: v.success() for k, v in result.items()}
+        return {k: v.success for k, v in result.items()}
 
     def test_multi(self):
         test_dict = {"Fred": "Wilma", "Barney": "Betty"}

@@ -228,9 +228,9 @@ class CBCollection(CoreClient):
 
     @classmethod
     def cast(cls,
-             parent,  # type: Scope
-             name,  # type Optional[str]
-             *options  # type: CollectionOptions
+             parent,    # type: Scope
+             name,      # type: Optional[str]
+             *options   # type: CollectionOptions
              ):
         # type: (...) -> CBCollection
         coll_args = copy.deepcopy(parent.bucket._bucket_args)
@@ -304,9 +304,9 @@ class CBCollection(CoreClient):
 
     @get_result_wrapper
     def get_and_touch(self,
-                      id,       # type: str
-                      expiry,   # type: int
-                      *options, # type: GetAndTouchOptions
+                      key,          # type: str
+                      expiry,       # type: int
+                      *options,     # type: GetAndTouchOptions
                       **kwargs
                       ):
         # type: (...) -> GetResult
@@ -314,27 +314,27 @@ class CBCollection(CoreClient):
         if 'durability' in set(kwargs.keys()).union(options[0][0].keys()):
             raise couchbase.exceptions.ReplicaNotAvailableException()
 
-        return self._get_generic(id, kwargs, options)
+        return self._get_generic(key, kwargs, options)
 
     @get_result_wrapper
     def get_and_lock(self,
-                     id,        # type: str
+                     key,        # type: str
                      expiry,    # type: int
                      *options,  # type: GetAndLockOptions
                      **kwargs
                      ):
         # type: (...) -> GetResult
-        final_options=forward_args(kwargs, *options)
-        x = _Base.get(self, id, expiry, **final_options)
-        _Base.lock(self, id, options)
+        final_options = forward_args(kwargs, *options)
+        x = _Base.get(self, key, expiry, **final_options)
+        _Base.lock(self, key, options)
         return ResultPrecursor(x, options)
 
     @get_replica_result_wrapper
     def get_any_replica(self,
-                         id,        # type: str
-                         *options,  # type: GetFromReplicaOptions
-                         **kwargs
-                         ):
+                        key,        # type: str
+                        *options,   # type: GetFromReplicaOptions
+                        **kwargs
+                        ):
         # type: (...) -> GetReplicaResult
         """Obtain an object stored in Couchbase by given key, from a replica.
 
@@ -349,11 +349,11 @@ class CBCollection(CoreClient):
 
         """
         final_options = forward_args(kwargs, *options)
-        return super(CBCollection, self).rget(id, **final_options)
+        return super(CBCollection, self).rget(key, **final_options)
 
     @get_replica_result_wrapper
     def get_all_replicas(self,
-                         id,         # type: str
+                         key,        # type: str
                          *options,   # type: GetAllReplicasOptions
                          **kwargs    # type: Any
                          ):
@@ -369,11 +369,11 @@ class CBCollection(CoreClient):
               :exc:`.DocumentUnretrievableError` if no replicas exist
       :return: A list(:class:`couchbase.result.GetReplicaResult`) object
       """
-      return super(CBCollection, self).rgetall(id, **forward_args(kwargs, *options))
+      return super(CBCollection, self).rgetall(key, **forward_args(kwargs, *options))
 
-    def get_multi(self,  # type: CBCollection
-                  keys,  # type: Iterable[str]
-                  *options,  # type: GetOptions
+    def get_multi(self,         # type: CBCollection
+                  keys,         # type: Iterable[str]
+                  *options,     # type: GetOptions
                   **kwargs
                   ):
         # type: (...) -> Dict[str,GetResult]
@@ -381,7 +381,7 @@ class CBCollection(CoreClient):
         Get multiple keys from the collection
 
         :param keys: list of keys to get
-        :type Iterable[str]
+        :type Iterable[str] keys: list of keys to get
         :return: a dictionary of :class:`~.GetResult` objects by key
         :rtype: dict
         """
@@ -488,7 +488,7 @@ class CBCollection(CoreClient):
     counter_multi = _wrap_multi_mutation_result(CoreClient.counter_multi)
 
     def touch(self,
-              id,  # type: str
+              key,  # type: str
               *options,  # type: TouchOptions
               **kwargs):
         # type: (...) -> MutationResult
@@ -515,21 +515,22 @@ class CBCollection(CoreClient):
         .. seealso:: :meth:`get` - which can be used to get *and* update the
             expiry
         """
-        return _Base.touch(self, id, **forward_args(kwargs, *options))
+        return _Base.touch(self, key, **forward_args(kwargs, *options))
 
     @_wrap_in_mutation_result
     def unlock(self,
-               id,  # type: str
-               *options  # type: UnlockOptions
+               key,          # type: str
+               *options,    # type: UnlockOptions
+               **kwargs
                ):
         # type: (...) -> MutationResult
         """Unlock a Locked Key in Couchbase.
 
         This unlocks an item previously locked by :meth:`lock`
 
-        :param key: The key to unlock
-        :param cas: The cas returned from :meth:`lock`'s
-            :class:`.MutationResult` object.
+        :param str key: The key to unlock
+        :param UnlockOptions options: Options for the unlock operation.
+        :param Any kwargs: Override corresponding value in options.
 
         See :meth:`lock` for an example.
 
@@ -539,7 +540,7 @@ class CBCollection(CoreClient):
 
         .. seealso:: :meth:`lock`
         """
-        return _Base.unlock(self, id, **forward_args({}, *options))
+        return _Base.unlock(self, key, **forward_args(kwargs, *options))
 
     def lock(self,  # type: CBCollection
              key,  # type: str
@@ -549,16 +550,8 @@ class CBCollection(CoreClient):
         """Lock and retrieve a key-value entry in Couchbase.
 
         :param key: A string which is the key to lock.
-
-        :param ttl: a TTL for which the lock should be valid.
-            While the lock is active, attempts to access the key (via
-            other :meth:`lock`, :meth:`upsert` or other mutation calls)
-            will fail with an :exc:`.KeyExistsError`. Note that the
-            value for this option is limited by the maximum allowable
-            lock time determined by the server (currently, this is 30
-            seconds). If passed a higher value, the server will silently
-            lower this to its maximum limit.
-
+        :param LockOptions options: Options for the lock operation.
+        :param Any kwargs: Override corresponding value in options.
 
         This function otherwise functions similarly to :meth:`get`;
         specifically, it will return the value upon success. Note the
@@ -616,24 +609,24 @@ class CBCollection(CoreClient):
         return _Base.lock(self, key, **final_options)
 
     def exists(self,      # type: CBCollection
-               id,        # type: str
+               key,       # type: str
                *options,  # type: ExistsOptions
                **kwargs   # type: Any
                 ):
         # type: (...) -> ExistsResult
         """Check to see if a key exists in this collection.
 
-        :param str id: the id of the document.
-        :param ExistsOptions *options: options for checking if a key exists.
+        :param str key: the id of the document.
+        :param ExistsOptions options: options for checking if a key exists.
         :return: An ExistsResult object with a boolean value indicating the presence of the document.
         :raise: Any exceptions raised by the underlying platform.
         """
-        return ExistsResult(super(CBCollection,self).exists(id), **forward_args(kwargs, *options))
+        return ExistsResult(super(CBCollection,self).exists(key), **forward_args(kwargs, *options))
 
 
     @_wrap_in_mutation_result
     def upsert(self,
-               id,          # type: str
+               key,         # type: str
                value,       # type: Any
                *options,    # type: UpsertOptions
                **kwargs     # type: Any
@@ -647,7 +640,7 @@ class CBCollection(CoreClient):
             UTF-8. If a custom `transcoder` class is used (see
             :meth:`~__init__`), then the key object is passed directly
             to the transcoder, which may serialize it how it wishes.
-        :type key: string or bytes
+        :type id: string or bytes
 
         :param value: The value to set for the key.
             This should be a native Python value which will be transparently
@@ -658,27 +651,8 @@ class CBCollection(CoreClient):
             parameter), and/or a custom transcoder then value for this
             argument may need to conform to different criteria.
 
-        :param int cas: The _CAS_ value to use. If supplied, the value
-            will only be stored if it already exists with the supplied
-            CAS
-
-        :param expiry: If specified, the key will expire after this
-            many seconds
-
-        :param int format: If specified, indicates the `format` to use
-            when encoding the value. If none is specified, it will use
-            the `default_format` For more info see
-            :attr:`~.default_format`
-
-        :param int persist_to:
-            Perform durability checking on this many nodes nodes for
-            persistence to disk. See :meth:`endure` for more information
-
-        :param int replicate_to: Perform durability checking on this
-            many replicas for presence in memory. See :meth:`endure` for
-            more information.
-
-        :param Durability durability_level: Durability level
+        :param UpsertOptions options: Options for the upsert operation.
+        :param Any kwargs: Override corresponding value in options.
 
         :raise: :exc:`.ArgumentError` if an argument is supplied that is
             not applicable in this context. For example setting the CAS
@@ -720,28 +694,14 @@ class CBCollection(CoreClient):
         """
 
         final_options = forward_args(kwargs, *options)
-        return ResultPrecursor(self.bucket.upsert(id, value, **final_options), final_options)
-
-    def insert(self,
-               id,  # type: str
-               value,  # type: Any
-               *options  # type: InsertOptions
-               ):
-        # type: (...) -> MutationResult
-        pass
-
-    @overload
-    def insert(self,
-               id,  # type: str
-               value,  # type: Any
-               expiry=None,  # type: timedelta
-               format=None,  # type: str
-               durability=None  # type: DurabilityType
-               ):
-        pass
+        return ResultPrecursor(self.bucket.upsert(key, value, **final_options), final_options)
 
     @_wrap_in_mutation_result
-    def insert(self, key, value, *options, **kwargs):
+    def insert(self,
+               key,         # type: str
+               value,       # type: Any
+               *options,    # type InsertOptions
+               **kwargs):
         # type: (...) -> ResultPrecursor
         """Store an object in Couchbase unless it already exists.
 
@@ -753,6 +713,10 @@ class CBCollection(CoreClient):
         because `insert` will only succeed if a key does not already
         exist on the server (and thus can have no CAS)
 
+        :param str key: Key of document to insert
+        :param Any value: The document itself.
+        :param InsertOptions options: Options for the insert request.
+        :param Any kwargs: Override corresponding value in the options.
         :raise: :exc:`.KeyExistsError` if the key already exists
 
         .. seealso:: :meth:`upsert`
@@ -761,34 +725,12 @@ class CBCollection(CoreClient):
         final_options = forward_args(kwargs, *options)
         return ResultPrecursor(_Base.insert(self, key, value, **final_options), final_options)
 
-    @overload
-    def replace(self,
-                id,  # type: str
-                value,  # type: Any
-                cas=0,  # type: int
-                expiry=None,  # type: timedelta
-                format=None,  # type: bool
-                durability=None  # type: DurabilityType
-                ):
-        # type: (...) -> MutationResult
-        pass
-
-    @overload
-    def replace(self,
-                id,  # type: str
-                value,  # type: Any
-                options,  # type: ReplaceOptions
-                **kwargs  # type: Any
-                ):
-        # type: (...) -> MutationResult
-        pass
-
     @_wrap_in_mutation_result
     def replace(self,
-                id,  # type: str
-                value,  # type: Any
-                *options,
-                **kwargs
+                key,        # type: str
+                value,      # type: Any
+                *options,   # type: ReplaceOptions
+                **kwargs    # type: Any
                 ):
         # type: (...) -> MutationResult
         """Store an object in Couchbase only if it already exists.
@@ -796,17 +738,22 @@ class CBCollection(CoreClient):
            Follows the same conventions as :meth:`upsert`, but the value is
            stored only if a previous value already exists.
 
+           :param str key: Key of document to replace
+           :param Any value: The document itself.
+           :param ReplaceOptions options: Options for the replace request.
+           :param Any kwargs: Override corresponding value in the options.
+
            :raise: :exc:`.NotFoundError` if the key does not exist
 
            .. seealso:: :meth:`upsert`
         """
 
         final_options = forward_args(kwargs, *options)
-        return ResultPrecursor(_Base.replace(self, id, value, **final_options), final_options)
+        return ResultPrecursor(_Base.replace(self, key, value, **final_options), final_options)
 
     @_wrap_in_mutation_result
     def remove(self,        # type: CBCollection
-               id,          # type: str
+               key,         # type: str
                *options,    # type: RemoveOptions
                **kwargs
                ):
@@ -837,21 +784,22 @@ class CBCollection(CoreClient):
             cb.remove("key", cas=rv.cas)
         """
         final_options = forward_args(kwargs, *options)
-        return ResultPrecursor(self.bucket.remove(id, **final_options), final_options)
+        return ResultPrecursor(self.bucket.remove(key, **final_options), final_options)
 
-    def lookup_in(self,  # type: CBCollection
-                  id,  # type: str
-                  spec,  # type: LookupInSpec
-                  *options,  # type: LookupInOptions
-                  **kwargs  # type: Any
+    def lookup_in(self,         # type: CBCollection
+                  key,          # type: str
+                  spec,         # type: LookupInSpec
+                  *options,     # type: LookupInOptions
+                  **kwargs      # type: Any
                   ):
         # type: (...) -> LookupInResult
 
         """Atomically retrieve one or more paths from a document.
 
-        :param str id: The key of the document to lookup
+        :param str key: The key of the document to lookup
         :param LookupInSpec spec: An iterable sequence of Specs (see :mod:`.couchbase_core.subdocument`)
-        :param timedelta timeout: Timeout for operation
+        :param LookupInOptions options: Options for the lookup_in operation.
+        :param Any kwargs: Override corresponding value in options.
 
         :return: A :class:`.couchbase.LookupInResult` object.
             This object contains the results and any errors of the
@@ -871,31 +819,10 @@ class CBCollection(CoreClient):
 
         """
         final_options = forward_args(kwargs, *options)
-        return LookupInResult(self.bucket.lookup_in(id, spec, **final_options))
-
-    @overload
-    def mutate_in(self,
-                  id,  # type: str
-                  spec,  # type: MutateInSpec
-                  *options  # type: MutateInOptions
-                  ):
-        # type: (...) -> MutateInResult
-        pass
-
-    @overload
-    def mutate_in(self,
-                  id,  # type: str
-                  spec,  # type: MutateInSpec
-                  create_doc=False,  # type: bool
-                  insert_doc=False,  # type: bool
-                  upsert_doc=False,  # type: bool
-                  durability_level=Durability.NONE  # type: Durability
-                  ):
-        # type: (...) -> MutateInResult
-        pass
+        return LookupInResult(self.bucket.lookup_in(key, spec, **final_options))
 
     def mutate_in(self,  # type: CBCollection
-                  id,  # type: str
+                  key,  # type: str
                   spec,  # type: MutateInSpec
                   *options,  # type: MutateInOptions
                   **kwargs  # type: Any
@@ -905,13 +832,8 @@ class CBCollection(CoreClient):
 
         :param key: The key of the document to modify
         :param MutateInSpec spec: An iterable of specs (See :mod:`.couchbase.mutate_in.MutateInSpecItemBase`)
-        :param bool create_doc:
-            Whether the document should be create if it doesn't exist
-        :param bool insert_doc: If the document should be created anew, and the
-            operations performed *only* if it does not exist.
-        :param bool upsert_doc: If the document should be created anew if it
-            does not exist. If it does exist the commands are still executed.
-        :param kwargs: CAS, etc.
+        :param MutateInOptions options: Options for the mutate_in operation.
+        :param kwargs: Override corresponding value in options.
         :return: A :class:`~.couchbase.MutationResult` object.
 
         Here's an example of adding a new tag to a "user" document
@@ -932,42 +854,23 @@ class CBCollection(CoreClient):
         .. seealso:: :mod:`.couchbase_core.subdocument`
         """
         final_options = forward_args(kwargs, *options)
-        return MutateInResult(self.bucket.mutate_in(id, spec, **final_options), **final_options)
+        return MutateInResult(self.bucket.mutate_in(key, spec, **final_options), **final_options)
 
     def binary(self):
         # type: (...) -> BinaryCollection
         pass
 
-    @overload
-    def append(self,
-               id,  # type: str
-               value,  # type: str
-               *options  # type: AppendOptions
-               ):
-        # type: (...) -> MutationResult
-        pass
-
-    @overload
-    def append(self,
-               id,  # type: str
-               value,  # type: str
-               cas=0,  # type: int
-               format=None,  # type: int
-               durability=None  # type: DurabilityType
-               ):
-        pass
-
     @_wrap_in_mutation_result
     def append(self,
-               id,  # type: str
+               key,  # type: str
                value,  # type: str
                *options,  # type: Any
                **kwargs  # type: Any
                ):
         # type: (...) -> ResultPrecursor
         """Append a string to an existing value in Couchbase.
-
-        :param string value: The data to append to the existing value.
+        :param str key: Key for the value to append
+        :param str value: The data to append to the existing value.
 
         Other parameters follow the same conventions as :meth:`upsert`.
 
@@ -989,31 +892,11 @@ class CBCollection(CoreClient):
 
         :raise: :exc:`.NotStoredError` if the key does not exist
         """
-        x = _Base.append(self, id, value, forward_args(kwargs, *options))
+        x = _Base.append(self, key, value, forward_args(kwargs, *options))
         return ResultPrecursor(x, options)
 
-    @overload
     def prepend(self,
-                id,  # type: str
-                value,  # type: Any
-                cas=0,  # type: int
-                format=None,  # type: int
-                durability=None  # type: DurabilityType
-                ):
-        # type: (...) -> MutationResult
-        pass
-
-    @overload
-    def prepend(self,
-                id,  # type: str
-                value,  # type: str
-                *options  # type: PrependOptions
-                ):
-        # type: (...) -> MutationResult
-        pass
-
-    def prepend(self,
-                id,  # type: str
+                key,  # type: str
                 value,  # type: str
                 *options,  # type: PrependOptions
                 **kwargs  # type: Any
@@ -1023,33 +906,12 @@ class CBCollection(CoreClient):
 
         .. seealso:: :meth:`append`
         """
-        x = _Base.prepend(self, id, value, **forward_args(kwargs, *options))
+        x = _Base.prepend(self, key, value, **forward_args(kwargs, *options))
         return ResultPrecursor(x, options)
-
-    @overload
-    def increment(self,
-                  id,  # type: str
-                  delta,  # type: DeltaValue
-                  initial=None,  # type: SignedInt64
-                  expiry=None,  # type: timedelta
-                  durability_level=Durability.NONE  # type: Durability
-                  ):
-        # type: (...) -> ResultPrecursor
-        pass
-
-    @overload
-    def increment(self,
-                  id,  # type: str
-                  delta,  # type: DeltaValue
-                  *options,  # type: CounterOptions
-                  **kwargs
-                  ):
-        # type: (...) -> ResultPrecursor
-        pass
 
     @_wrap_in_mutation_result
     def increment(self,
-                  id,  # type: str
+                  key,  # type: str
                   delta,  # type: DeltaValue
                   *options,  # type: CounterOptions
                   **kwargs
@@ -1068,15 +930,8 @@ class CBCollection(CoreClient):
 
         :param string key: A key whose counter value is to be modified
         :param DeltaValue delta: an amount by which the key should be incremented.
-        :param couchbase.options.SignedInt64 initial: The initial value for the key, if it does not
-           exist. If the key does not exist, this value is used, and
-           `delta` is ignored. If this parameter is `None` then no
-           initial value is used
-        :param SignedInt64 initial: :class:`couchbase.options.SignedInt64` or `None`
-        :param timedelta expiry: The lifetime for the key, after which it will
-           expire
-        :param Durability durability_level: Sync replication durability level.
-
+        :param CounterOptions options: Options for the increment operation.
+        :param Any kwargs: Overrides corresponding value in the options
         :raise: :exc:`.NotFoundError` if the key does not exist on the
            bucket (and `initial` was `None`)
         :raise: :exc:`.DeltaBadvalError` if the key exists, but the
@@ -1100,35 +955,14 @@ class CBCollection(CoreClient):
 
         """
         final_opts = self._check_delta_initial(kwargs, *options)
-        x = _Base.counter(self, id, delta=int(DeltaValue.verified(delta)), **final_opts)
+        x = _Base.counter(self, key, delta=int(DeltaValue.verified(delta)), **final_opts)
         return ResultPrecursor(x, final_opts)
-
-    @overload
-    def decrement(self,
-                  id,  # type: str
-                  delta,  # type: DeltaValue
-                  initial=None,  # type: SignedInt64
-                  expiry=None,  # type: timedelta
-                  durability_level=Durability.NONE  # type: Durability
-                  ):
-        # type: (...) -> ResultPrecursor
-        pass
-
-    @overload
-    def decrement(self,
-                  id,  # type: str
-                  delta,  # type: DeltaValue
-                  *options,  # type: CounterOptions
-                  **kwargs
-                  ):
-        # type: (...) -> ResultPrecursor
-        pass
 
     @_wrap_in_mutation_result
     def decrement(self,
-                  id,  # type: str
-                  delta,  # type: DeltaValue
-                  *options,  # type: CounterOptions
+                  key,          # type: str
+                  delta,        # type: DeltaValue
+                  *options,     # type: CounterOptions
                   **kwargs
                   ):
         # type: (...) -> ResultPrecursor
@@ -1145,15 +979,8 @@ class CBCollection(CoreClient):
 
         :param string key: A key whose counter value is to be modified
         :param DeltaValue delta: an amount by which the key should be decremented.
-        :param couchbase.options.SignedInt64 initial: The initial value for the key, if it does not
-           exist. If the key does not exist, this value is used, and
-           `delta` is ignored. If this parameter is `None` then no
-           initial value is used
-        :param SignedInt64 initial: :class:`couchbase.options.SignedInt64` or `None`
-        :param timedelta expiry: The lifetime for the key, after which it will
-           expire
-        :param Durability durability_level: Sync replication durability level.
-
+        :param CounterOptions options: Options for the decrement operation.
+        :param Any kwargs: Overrides corresponding value in the options
         :raise: :exc:`.NotFoundError` if the key does not exist on the
            bucket (and `initial` was `None`)
         :raise: :exc:`.DeltaBadvalError` if the key exists, but the
@@ -1178,7 +1005,7 @@ class CBCollection(CoreClient):
         """
 
         final_opts = self._check_delta_initial(kwargs, *options)
-        x = super(CBCollection,self).counter(id, delta=-int(DeltaValue.verified(delta)), **final_opts)
+        x = super(CBCollection, self).counter(key, delta=-int(DeltaValue.verified(delta)), **final_opts)
         return ResultPrecursor(x, final_opts)
 
     @staticmethod

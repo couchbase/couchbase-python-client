@@ -37,19 +37,20 @@ class BucketSimpleTest(CollectionTestCase):
         self.assertIsNotNone(result.id)
         self.assertIsNotNone(result.version)
         endpoints = result.endpoints
-        for k, v in result.endpoints.items():
-            self.assertIsNotNone(v)
-            self.assertIsNotNone(v.id)
-            self.assertIsNotNone(v.latency)
-            self.assertIsNotNone(v.remote)
-            self.assertIsNotNone(v.local)
-            self.assertEqual(k, v.service_type)
-            # Should really include ServiceType.View but lcb only
-            # puts the scope in for KV.  TODO: file ticket or discuss
-            if k in [ServiceType.KeyValue]:
-                self.assertEqual(self.bucket.name, v.namespace)
-            else:
-                self.assertIsNone(v.namespace)
+        for k, vals in result.endpoints.items():
+            for v in vals:
+                self.assertIsNotNone(v)
+                self.assertIsNotNone(v.id)
+                self.assertIsNotNone(v.latency)
+                self.assertIsNotNone(v.remote)
+                self.assertIsNotNone(v.local)
+                self.assertEqual(k, v.service_type)
+                # Should really include ServiceType.View but lcb only
+                # puts the scope in for KV.  TODO: file ticket or discuss
+                if k in [ServiceType.KeyValue]:
+                    self.assertEqual(self.bucket.name, v.namespace)
+                else:
+                    self.assertIsNone(v.namespace)
 
     def test_ping_report_id(self):
         report_id = "11111"
