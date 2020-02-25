@@ -1,13 +1,5 @@
-from flaky import flaky
-
-from couchbase.options import timedelta
-from couchbase.management.queries import QueryIndex
-from couchbase.management.views import DesignDocumentNamespace, DesignDocument, DesignDocumentNotFoundException
-from typing import *
-from couchbase.bucket import ViewOptions
-from time import sleep
 #
-# Copyright 2013, Couchbase, Inc.
+# Copyright 2020, Couchbase, Inc.
 # All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License")
@@ -23,86 +15,91 @@ from time import sleep
 # limitations under the License.
 #
 
-from nose.plugins.attrib import attr
-
-from couchbase_tests.base import DDocTestCase, ClusterTestCase
+from couchbase.management.views import DesignDocumentNamespace, View, DesignDocument, DesignDocumentNotFoundException, \
+    GetDesignDocumentOptions, GetAllDesignDocumentsOptions, PublishDesignDocumentOptions
+from couchbase_tests.base import ClusterTestCase
 from couchbase.exceptions import HTTPError
-from couchbase_tests.base import FlakyCounter
+from datetime import timedelta
 
 
-DNAME = "tmp"
-VNAME = "a_view"
-
-DESIGN_JSON = {
-    'language' : 'javascript',
-    'views' : {
-        VNAME : {
-            'map' : "function(doc) { emit(null,null); }"
-        }
-    }
-}
-
-DOCUMENT_FROM_JSON = DesignDocument.from_json(name=DNAME, **DESIGN_JSON)
-
-
-@attr('slow')
 class DesignDocManagementTest(ClusterTestCase):
+    DOCNAME = 'tmp'
+    VIEW = View(map="function(doc){emit(null, null);}")
+    DOC = DesignDocument(name=DOCNAME, views={"myview": VIEW})
+
     def setUp(self):
         super(DesignDocManagementTest, self).setUp()
         self.skipIfMock()
-        self.mgr = self.bucket.views()
+        self.mgr = self.bucket.view_indexes()
 
+        # insist that it exists in the development namespace
+        self.mgr.upsert_design_document(self.DOC, DesignDocumentNamespace.DEVELOPMENT)
+        # and be sure to drop it from the production namespace
         try:
-            self.mgr.drop_design_document(DNAME, DesignDocumentNamespace.PRODUCTION, syncwait=5)
+            self.mgr.drop_design_document(self.DOCNAME, DesignDocumentNamespace.PRODUCTION)
         except HTTPError:
             pass
-
-        try:
-            self.mgr.drop_design_document(DNAME, DesignDocumentNamespace.DEVELOPMENT, syncwait=5)
-        except HTTPError:
-            pass
+        # now wait till we are sure the design doc is there
+        self.try_n_times(10, 3, self.mgr.get_design_document, self.DOCNAME,
+                         DesignDocumentNamespace.DEVELOPMENT)
+        # and that it isn't in production
+        self.try_n_times_till_exception(10, 3, self.mgr.get_design_document,
+                                        self.DOCNAME, DesignDocumentNamespace.PRODUCTION)
         self.cb = self.bucket
 
     def tearDown(self):
         del self.mgr
         super(DesignDocManagementTest, self).tearDown()
 
-    @FlakyCounter(5,1)
-    def test_design_management(self):
-        self.mgr.upsert_design_document(DOCUMENT_FROM_JSON, DesignDocumentNamespace.DEVELOPMENT, syncwait=500)
-        sleep(5)
+    def test_get_design_document_fail(self):
+        self.assertRaises(DesignDocumentNotFoundException,
+                          self.mgr.get_design_document,
+                          self.DOCNAME,
+                          DesignDocumentNamespace.PRODUCTION,
+                          GetDesignDocumentOptions(timeout=timedelta(seconds=5)))
 
-        rv = self.bucket.view_query(DNAME, VNAME,
-                                    ViewOptions(namespace=DesignDocumentNamespace.DEVELOPMENT,limit=10))
-        print(list(rv))
-        self.assertTrue(rv.success)
-        self.mgr.publish_design_document(DNAME, timeout=timedelta(seconds=10), syncwait=5)
+    def test_get_design_document(self):
+        ddoc = self.mgr.get_design_document(self.DOCNAME, DesignDocumentNamespace.DEVELOPMENT,
+                                            timeout=timedelta(seconds=5))
+        self.assertIsNotNone(ddoc)
+        self.assertEqual(ddoc.name, self.DOCNAME)
 
-        rv = self.bucket.view_query(DNAME, VNAME,
-                           limit=10)
-        print(list(rv))
-        self.assertTrue(rv.success)
+    def test_get_all_design_documents(self):
+        # should start out in _some_ state.  Since we don't know for sure, but we
+        # do know it does have self.DOCNAME in it in development ONLY, lets assert on that and that
+        # it succeeds, meaning we didn't get an exception.
+        result = self.mgr.get_all_design_documents(DesignDocumentNamespace.DEVELOPMENT,
+                                                   GetAllDesignDocumentsOptions(timeout=timedelta(seconds=10)))
+        names = [doc.name for doc in result if doc.name == self.DOCNAME]
+        self.assertTrue(names.count(self.DOCNAME) > 0)
 
-        self.assertRaises(HTTPError, lambda: next(iter(self.cb.view_query(
-            DNAME, VNAME,
-            use_devmode=True))))
+    def test_get_all_design_documents_excludes_namespaces(self):
+        # we know the self.DOCNAME is _only_ in development, so...
+        result = self.mgr.get_all_design_documents(DesignDocumentNamespace.PRODUCTION)
+        names = [doc.name for doc in result if doc.name == self.DOCNAME]
+        self.assertEqual(0, names.count(self.DOCNAME))
 
-        self.mgr.drop_design_document(DNAME, DesignDocumentNamespace.PRODUCTION, syncwait=5)
+    def test_upsert_design_doc(self):
+        # we started with this already in here, so this isn't really necessary...`
+        self.mgr.upsert_design_document(self.DOC, DesignDocumentNamespace.DEVELOPMENT)
+        self.try_n_times(10, 3, self.mgr.get_design_document, self.DOCNAME, DesignDocumentNamespace.DEVELOPMENT)
 
-        self.assertRaises(HTTPError, lambda: next(iter(self.cb.view_query(
-            DNAME, VNAME,
-            use_devmode=False))))
+    def test_drop_design_doc(self):
+        self.mgr.drop_design_document(self.DOCNAME, DesignDocumentNamespace.DEVELOPMENT)
+        self.try_n_times_till_exception(10, 3, self.mgr.get_design_document, self.DOCNAME,
+                                        DesignDocumentNamespace.DEVELOPMENT,
+                                        GetDesignDocumentOptions(timeout=timedelta(seconds=10)))
 
-    @FlakyCounter(50,1)
-    def test_design_headers(self):
-        rv = self.mgr.upsert_design_document(DOCUMENT_FROM_JSON, DesignDocumentNamespace.DEVELOPMENT,
-                                             syncwait=5)
+    def test_drop_design_doc_fail(self):
+        self.assertRaises(DesignDocumentNotFoundException, self.mgr.drop_design_document,
+                          self.DOCNAME, DesignDocumentNamespace.PRODUCTION)
 
-        rv = self.mgr.get_design_document(DNAME, DesignDocumentNamespace.DEVELOPMENT)
-        self.assertTrue(rv.language)
-        print(rv.language)
-
-    @FlakyCounter(50,1)
-    def test_exceptions(self):
-        self.assertRaises(DesignDocumentNotFoundException,self.mgr.drop_design_document, DNAME, DesignDocumentNamespace.DEVELOPMENT)
-        self.mgr.upsert_design_document(DOCUMENT_FROM_JSON, DesignDocumentNamespace.DEVELOPMENT, syncwait=20)
+    def test_publish_design_doc(self):
+        # starts off not in prod
+        self.assertRaises(DesignDocumentNotFoundException, self.mgr.get_design_document,
+                          self.DOCNAME, DesignDocumentNamespace.PRODUCTION)
+        self.mgr.publish_design_document(self.DOCNAME, PublishDesignDocumentOptions(timeout=timedelta(seconds=10)))
+        # should be in prod now
+        self.try_n_times(10, 3, self.mgr.get_design_document, self.DOCNAME, DesignDocumentNamespace.PRODUCTION)
+        # and still in dev
+        self.try_n_times(10, 3, self.mgr.get_design_document, self.DOCNAME, DesignDocumentNamespace.DEVELOPMENT)

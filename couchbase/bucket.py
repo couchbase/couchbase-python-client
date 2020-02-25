@@ -267,10 +267,10 @@ class Bucket(object):
         res = cb.view_query(design_doc, view_name, **forward_args(kwargs, *view_options))
         return ViewResult(res)
 
-    def views(self  # type: Bucket
-              ):
-        # type: (...)->ViewIndexManager
-        return ViewIndexManager(self._bucket, self._name)
+    def view_indexes(self  # type: Bucket
+                     ):
+        # type: (...) -> ViewIndexManager
+        return ViewIndexManager(self._bucket, self._admin, self._name)
 
     def ping(self,
              *options,   # type: PingOptions
