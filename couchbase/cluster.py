@@ -275,7 +275,7 @@ class Cluster(object):
         if not authenticator:
             raise ArgumentError("Authenticator is mandatory")
         cluster_opts.update(
-            bucket_class=lambda connstr, bname=None, **kwargs: Bucket(connstr, name=bname, admin=self.admin))
+            bucket_class=lambda connstr, bname=None, **kwargs: Bucket(connstr, name=bname, admin=self.admin, **kwargs))
         self._cluster = CoreCluster(connection_string, **cluster_opts)  # type: CoreCluster
         self._authenticate(authenticator)
 
