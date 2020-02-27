@@ -204,7 +204,7 @@ def _wrap_multi_mutation_result(wrapped  # type: CoreBucketOp
     def wrapper(target, keys, *options, **kwargs
                 ):
         return get_multi_mutation_result(target, wrapped, keys, *options, **kwargs)
-    return wrapper
+    return volatile(wrapper)
 
 
 class CBCollection(CoreClient):
@@ -383,6 +383,7 @@ class CBCollection(CoreClient):
       """
       return super(CBCollection, self).rgetall(key, **forward_args(kwargs, *options))
 
+    @volatile
     def get_multi(self,         # type: CBCollection
                   keys,         # type: Iterable[str]
                   *options,     # type: GetOptions
@@ -409,6 +410,7 @@ class CBCollection(CoreClient):
                      ):
         pass
 
+    @volatile
     def upsert_multi(self,  # type: CBCollection
                      keys,  # type: Dict[str,JSON]
                      *options,  # type: GetOptions
@@ -457,6 +459,7 @@ class CBCollection(CoreClient):
         """
         return get_multi_mutation_result(self, CoreClient.upsert_multi, keys, *options, **kwargs)
 
+    @volatile
     def insert_multi(self,  # type: CBCollection
                      keys,  # type: Dict[str,JSON]
                      *options,  # type: GetOptions
@@ -474,6 +477,7 @@ class CBCollection(CoreClient):
         """
         return get_multi_mutation_result(self, CoreClient.insert_multi, keys, *options, **kwargs)
 
+    @volatile
     def remove_multi(self,  # type: CBCollection
                      keys,  # type: Iterable[str]
                      *options,  # type: GetOptions
