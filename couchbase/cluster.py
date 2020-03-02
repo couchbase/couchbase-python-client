@@ -5,13 +5,14 @@ from couchbase_core.mutation_state import MutationState
 
 from couchbase.management.queries import QueryIndexManager
 from couchbase.management.search import SearchIndexManager
+from couchbase.management.analytics import AnalyticsIndexManager
+from couchbase.analytics import AnalyticsOptions
 from couchbase_core.exceptions import CouchbaseError
 from .management.users import UserManager
 from .management.buckets import BucketManager
 from couchbase.management.admin import Admin
 from couchbase.diagnostics import DiagnosticsResult, EndPointDiagnostics
 from couchbase.fulltext import SearchResult, SearchOptions
-from couchbase_core.fulltext import Query, Facet
 from .analytics import AnalyticsResult
 from .n1ql import QueryResult
 from couchbase_core.n1ql import N1QLQuery
@@ -19,10 +20,6 @@ from .options import OptionBlock, OptionBlockTimeOut, forward_args, OptionBlockD
 from .bucket import Bucket, CoreClient
 from couchbase_core.cluster import Cluster as CoreCluster, Authenticator as CoreAuthenticator
 from .exceptions import InvalidArgumentsException, SearchException, DiagnosticsException, QueryException, ArgumentError, AnalyticsException
-from couchbase_core import abstractmethod
-import multiprocessing
-from multiprocessing.pool import ThreadPool
-import couchbase.exceptions
 import couchbase_core._libcouchbase as _LCB
 from couchbase_core._pyport import raise_from
 from couchbase.options import OptionBlockTimeOut
@@ -50,43 +47,6 @@ class DiagnosticsOptions(OptionBlock):
         super(DiagnosticsOptions, self).__init__(**kwargs)
 
 
-class AnalyticsOptions(OptionBlockTimeOut):
-    @overload
-    def __init__(self,
-                 timeout=None,  # type: timedelta
-                 read_only=None,  # type: bool
-                 scan_consistency=None,  # type: QueryScanConsistency
-                 client_context_id=None,  # type: str
-                 priority=None,  # type: bool
-                 positional_parameters=None,  # type: Iterable[str]
-                 named_parameters=None,  # type: Dict[str, str]
-                 raw=None,  # type: Dict[str,Any]
-                 ):
-
-        pass
-
-    def __init__(self,
-                 **kwargs
-                 ):
-        super(AnalyticsOptions, self).__init__(**kwargs)
-        # lets modify the underlying dict to conform to the
-        # expected format for AnalyticsOptions...
-        for key, val in self.items():
-            if key == 'positional_parameters':
-                self.pop(key, None)
-                self['args'] = val
-            if key == 'named_parameters':
-                self.pop(key, None)
-                for k, v in val.items():
-                    self["${}".format(k)] = v
-            if key == 'scan_consistency':
-                self[key] = val.as_string()
-            if key == 'consistent_with':
-                self[key] = val.encode()
-            if key == 'priority':
-                self[key] = -1 if val else 0
-        if self.get('consistent_with', None):
-            self['scan_consistency'] = 'at_plus'
 
 
 class QueryScanConsistency(object):
@@ -385,8 +345,6 @@ class Cluster(object):
             results.append(d.result())
         return results
 
-
-
     def analytics_query(self,       # type: Cluster
                         statement,  # type: str,
                         *options,   # type: AnalyticsOptions
@@ -401,7 +359,16 @@ class Cluster(object):
         Throws Any exceptions raised by the underlying platform - HTTP_TIMEOUT for example.
         :except ServiceNotFoundException - service does not exist or cannot be located.
         """
-        return AnalyticsResult(self._operate_on_cluster(CoreClient.analytics_query, AnalyticsException, statement, **forward_args(kwargs,*options)))
+        # following the query implementation, but this seems worth revisiting soon
+        opt = AnalyticsOptions()
+        opts = list(options)
+        for o in opts:
+            if isinstance(o, AnalyticsOptions):
+                opt = o
+                opts.remove(o)
+        return AnalyticsResult(self._operate_on_cluster(CoreClient.analytics_query,
+                                                        AnalyticsException,
+                                                        opt.to_analytics_query(statement, *opts, **kwargs)))
 
     def search_query(self,
                      index,     # type: str
@@ -452,8 +419,12 @@ class Cluster(object):
         return QueryIndexManager(self.admin)
 
     def search_indexes(self):
-      # type: (...) -> SearchIndexManager
-      return SearchIndexManager(self.admin)
+        # type: (...) -> SearchIndexManager
+        return SearchIndexManager(self.admin)
+
+    def analytics_indexes(self):
+        # type: (...) -> AnalyticsIndexManager
+        return AnalyticsIndexManager(self)
 
     def buckets(self):
         # type: (...) -> BucketManager

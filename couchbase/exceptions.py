@@ -281,7 +281,11 @@ V3Mapping=dict(list({
            C.LCB_ERR_SUBDOC_DELTA_INVALID: couchbase_core.exceptions.SubdocBadDeltaError,
            C.LCB_ERR_INDEX_NOT_FOUND: couchbase_core.exceptions.QueryIndexNotFoundError,
            C.LCB_ERR_INDEX_EXISTS: couchbase_core.exceptions.QueryIndexAlreadyExistsError,
-           C.LCB_ERR_SUBDOC_NUMBER_TOO_BIG: couchbase_core.exceptions.SubdocNumberTooBigError
+           C.LCB_ERR_SUBDOC_NUMBER_TOO_BIG: couchbase_core.exceptions.SubdocNumberTooBigError,
+           C.LCB_ERR_DATAVERSE_EXISTS: couchbase_core.exceptions.DataverseAlreadyExistsException,
+           C.LCB_ERR_DATAVERSE_NOT_FOUND: couchbase_core.exceptions.DataverseNotFoundException,
+           C.LCB_ERR_DATASET_NOT_FOUND: couchbase_core.exceptions.DatasetNotFoundException,
+           C.LCB_ERR_DATASET_EXISTS: couchbase_core.exceptions.DatasetAlreadyExistsException
 }.items()) + list(_PYCBC_CRYPTO_ERR_MAP.items()) + list(_LCB_SYNCREP_MAP.items()))
 
 

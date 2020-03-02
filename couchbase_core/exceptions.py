@@ -770,6 +770,25 @@ class NotImplementedInV3(CouchbaseError):
     """Not available on PYCBC>=3.0.0-alpha1"""
     pass
 
+
+class DataverseAlreadyExistsException(AnalyticsException):
+    """Raised when attempting to create dataverse when it already exists"""
+    pass
+
+
+class DataverseNotFoundException(AnalyticsException):
+    """Raised when attempting to drop a dataverse which does not exist"""
+    pass
+
+
+class DatasetNotFoundException(AnalyticsException):
+    """Raised when attempting to drop a dataset which does not exist."""
+    pass
+
+
+class DatasetAlreadyExistsException(AnalyticsException):
+    """Raised when attempting to create a dataset which already exists"""
+
 _PYCBC_CRYPTO_ERR_MAP ={
     C.PYCBC_CRYPTO_PROVIDER_NOT_FOUND: CryptoProviderNotFoundException,
     C.PYCBC_CRYPTO_PROVIDER_ALIAS_NULL: CryptoProviderAliasNullException,
@@ -868,7 +887,11 @@ _LCB_ERRNO_MAP = dict(list({
     C.LCB_ERR_SUBDOC_VALUE_INVALID: SubdocCantInsertValueError,
     C.LCB_ERR_SUBDOC_DELTA_INVALID: SubdocBadDeltaError,
     C.LCB_ERR_SUBDOC_NUMBER_TOO_BIG: SubdocNumberTooBigError,
-    C.LCB_ERR_INDEX_EXISTS: QueryIndexAlreadyExistsError
+    C.LCB_ERR_INDEX_EXISTS: QueryIndexAlreadyExistsError,
+    C.LCB_ERR_DATAVERSE_EXISTS: DataverseAlreadyExistsException,
+    C.LCB_ERR_DATAVERSE_NOT_FOUND: DataverseNotFoundException,
+    C.LCB_ERR_DATASET_NOT_FOUND: DatasetNotFoundException,
+    C.LCB_ERR_DATASET_EXISTS: DatasetAlreadyExistsException
 }.items()) + list(_PYCBC_CRYPTO_ERR_MAP.items()) + list(_LCB_SYNCREP_MAP.items()))
 
 
