@@ -180,8 +180,14 @@ class AuthenticationException(couchbase_core.exceptions.AuthError):
 class AccessDeniedException(CouchbaseError):
     pass
 
+
 class DiagnosticsException(CouchbaseError):
     pass
+
+
+class AlreadyShutdownException(CouchbaseError):
+    pass
+
 
 # previous exceptions
 

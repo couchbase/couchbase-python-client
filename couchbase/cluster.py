@@ -24,6 +24,7 @@ import couchbase_core._libcouchbase as _LCB
 from couchbase_core._pyport import raise_from
 from couchbase.options import OptionBlockTimeOut
 from datetime import timedelta
+from couchbase.exceptions import AlreadyShutdownException
 
 T = TypeVar('T')
 
@@ -50,25 +51,26 @@ class DiagnosticsOptions(OptionBlock):
 
 
 class QueryScanConsistency(object):
-  REQUEST_PLUS="request_plus"
-  NOT_BOUNDED="not_bounded"
+    REQUEST_PLUS="request_plus"
+    NOT_BOUNDED="not_bounded"
 
-  def __init__(self, val):
-    if val == self.REQUEST_PLUS or val == self.NOT_BOUNDED:
-      self._value = val
-    else:
-      raise InvalidArgumentsException("QueryScanConsistency can only be {} or {}".format(self.REQUEST_PLUS, self.NOT_BOUNDED))
+    def __init__(self, val):
+        if val == self.REQUEST_PLUS or val == self.NOT_BOUNDED:
+            self._value = val
+        else:
+            raise InvalidArgumentsException("QueryScanConsistency can only be {} or {}".format(self.REQUEST_PLUS, self.NOT_BOUNDED))
 
-  @classmethod
-  def request_plus(cls):
-    return cls(cls.REQUEST_PLUS)
+    @classmethod
+    def request_plus(cls):
+        return cls(cls.REQUEST_PLUS)
 
-  @classmethod
-  def not_bounded(cls):
-    return cls(cls.NOT_BOUNDED)
+    @classmethod
+    def not_bounded(cls):
+        return cls(cls.NOT_BOUNDED)
 
-  def as_string(self):
-    return getattr(self, '_value', self.NOT_BOUNDED)
+    def as_string(self):
+        return getattr(self, '_value', self.NOT_BOUNDED)
+
 
 class QueryProfile(object):
   OFF='off'
@@ -235,7 +237,7 @@ class Cluster(object):
         if not authenticator:
             raise ArgumentError("Authenticator is mandatory")
         cluster_opts.update(
-            bucket_class=lambda connstr, bname=None, **kwargs: Bucket(connstr, name=bname, admin=self.admin, **kwargs))
+            bucket_class=lambda connstr, bname=None, **kwargs: Bucket(connstr, name=bname, admin=self._admin, **kwargs))
         self._cluster = CoreCluster(connection_string, **cluster_opts)  # type: CoreCluster
         self._authenticate(authenticator)
 
@@ -253,6 +255,10 @@ class Cluster(object):
         """
         return Cluster(connection_string, *options, **kwargs)
 
+    def _check_for_shutdown(self):
+        if not self._cluster or not self._admin:
+            raise AlreadyShutdownException("This cluster has already been shutdown")
+
     def _authenticate(self,
                       authenticator=None,  # type: CoreAuthenticator
                       username=None,  # type: str
@@ -264,7 +270,7 @@ class Cluster(object):
         self._clusteropts['bucket'] = "default"
         self._clusterclient = None
         auth = credentials.get('options')
-        self.admin = Admin(auth.get('username'), auth.get('password'), connstr=str(self.connstr))
+        self._admin = Admin(auth.get('username'), auth.get('password'), connstr=str(self.connstr))
 
     # TODO: There should be no reason for these kwargs.  However, our tests against the mock
     # will all fail with auth errors without it...  So keeping it just for now, but lets fix it
@@ -274,6 +280,7 @@ class Cluster(object):
                **kwargs # type: Any
                ):
         # type: (...) -> Bucket
+        self._check_for_shutdown()
         kwargs['bname'] = name
         return self._cluster.open_bucket(name, **kwargs)
 
@@ -299,6 +306,7 @@ class Cluster(object):
         # we could have multiple positional parameters passed in, one of which may or may not be
         # a QueryOptions.  Note if multiple QueryOptions are passed in for some strange reason,
         # all but the last are ignored.
+        self._check_for_shutdown()
         opt = QueryOptions()
         opts = list(options)
         for o in opts:
@@ -360,6 +368,7 @@ class Cluster(object):
         :except ServiceNotFoundException - service does not exist or cannot be located.
         """
         # following the query implementation, but this seems worth revisiting soon
+        self._check_for_shutdown()
         opt = AnalyticsOptions()
         opts = list(options)
         for o in opts:
@@ -389,6 +398,7 @@ class Cluster(object):
         :except    ServiceNotFoundException - service does not exist or cannot be located.
 
         """
+        self._check_for_shutdown()
         return SearchResult(self._operate_on_cluster(CoreClient.search, SearchException, index, query, **forward_args(kwargs, *options)))
 
     _root_diag_data = {'id', 'version', 'sdk'}
@@ -405,6 +415,7 @@ class Cluster(object):
 
         """
 
+        self._check_for_shutdown()
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         result = loop.run_until_complete(self._operate_on_entire_cluster(CoreClient.diagnostics, DiagnosticsException, **forward_args(kwargs, *options)))
@@ -412,37 +423,44 @@ class Cluster(object):
 
     def users(self):
         # type: (...) -> UserManager
-        return UserManager(self.admin)
+        self._check_for_shutdown()
+        return UserManager(self._admin)
 
     def query_indexes(self):
         # type: (...) -> QueryIndexManager
-        return QueryIndexManager(self.admin)
+        self._check_for_shutdown()
+        return QueryIndexManager(self._admin)
 
     def search_indexes(self):
         # type: (...) -> SearchIndexManager
+        self._check_for_shutdown()
         return SearchIndexManager(self.admin)
 
     def analytics_indexes(self):
         # type: (...) -> AnalyticsIndexManager
+        self._check_for_shutdown()
         return AnalyticsIndexManager(self)
 
     def buckets(self):
         # type: (...) -> BucketManager
-        return BucketManager(self.admin)
+        self._check_for_shutdown()
+        return BucketManager(self._admin)
 
-    def disconnect(self,
-                   timeout=None     # type: timedelta
-                   ):
+    def disconnect(self):
         # type: (...) -> None
         """
-        Closes and cleans up any resources used by the Cluster and any objects it owns. Note the name is platform idiomatic.
+        Closes and cleans up any resources used by the Cluster and any objects it owns.
 
-        :param options - TBD
         :return: None
         :except Any exceptions raised by the underlying platform
 
         """
-        raise NotImplementedError("To be implemented in full SDK3 release")
+        # in this context, if we invoke the _cluster's destructor, that will do same for
+        # all the buckets we've opened, unless they are stored elswhere and are actively
+        # being used.
+        self._cluster = None
+        self._admin = None
+        self._clusterclient = None
 
     def manager(self):
         # type: (...) -> ClusterManager
@@ -460,9 +478,11 @@ class Cluster(object):
 
         :return:
         """
+
         return self._cluster.cluster_manager()
 
     def _is_dev_preview(self):
-        return self.admin.http_request(path="/pools").value.get("isDeveloperPreview", False)
+        return self._admin.http_request(path="/pools").value.get("isDeveloperPreview", False)
+
 
 ClusterOptions = Cluster.ClusterOptions
