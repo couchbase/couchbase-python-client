@@ -17,13 +17,15 @@
 #
 from couchbase_tests.base import skip_if_no_collections, CollectionTestCase
 from couchbase.collection import GetOptions, LookupInOptions, UpsertOptions, ReplaceOptions
-from couchbase.exceptions import NotFoundError, InvalidArgumentsException, DocumentUnretrievableException, KeyExistsException, KeyNotFoundException
+from couchbase.exceptions import NotFoundError, InvalidArgumentsException, DocumentUnretrievableException, \
+    KeyExistsException, KeyNotFoundException, TempFailException
 import unittest
 from datetime import timedelta
 import couchbase.subdocument as SD
 from unittest import SkipTest
 from couchbase.diagnostics import ServiceType
 import uuid
+
 
 class CollectionTests(CollectionTestCase):
     """
@@ -197,3 +199,37 @@ class CollectionTests(CollectionTestCase):
         for r in result:
             with self.assertRaises(NotImplementedError):
                 r.is_replica()
+
+    def test_touch(self):
+        self.cb.touch(self.KEY, timedelta(seconds=3))
+        self.try_n_times_till_exception(10, 3, self.cb.get, self.KEY)
+        self.assertRaises(KeyNotFoundException, self.cb.get, self.KEY)
+
+    def test_get_and_touch(self):
+        self.cb.get_and_touch(self.KEY, timedelta(seconds=3))
+        self.try_n_times_till_exception(10, 3, self.cb.get, self.KEY)
+        self.assertRaises(KeyNotFoundException, self.cb.get, self.KEY)
+
+    def test_get_and_lock(self):
+        self.cb.get_and_lock(self.KEY, timedelta(seconds=3))
+        self.try_n_times(10, 1, self.cb.upsert, self.KEY, self.CONTENT)
+        self.cb.get(self.KEY)
+
+    def test_get_and_lock_upsert_with_cas(self):
+        result = self.cb.get_and_lock(self.KEY, timedelta(seconds=15))
+        cas = result.cas
+        self.assertRaises(KeyExistsException, self.cb.upsert, self.KEY, self.CONTENT)
+        self.cb.replace(self.KEY, self.CONTENT, ReplaceOptions(cas=cas))
+
+    def test_unlock(self):
+        cas = self.cb.get_and_lock(self.KEY, timedelta(seconds=15)).cas
+        self.cb.unlock(self.KEY, cas)
+        self.cb.upsert(self.KEY, self.CONTENT)
+
+    def test_unlock_wrong_cas(self):
+        cas = self.cb.get_and_lock(self.KEY, timedelta(seconds=15)).cas
+        self.assertRaises(TempFailException, self.cb.unlock, self.KEY, 100)
+        self.cb.unlock(self.KEY, cas)
+
+
+

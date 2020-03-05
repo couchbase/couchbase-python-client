@@ -58,7 +58,7 @@ class ReplaceOptions(DurabilityOptionBlock):
     def __init__(self,
                  timeout=None,       # type: timedelta
                  durability=None,    # type: DurabilityType
-                 cas=0            # type: int
+                 cas=0               # type: int
                  ):
         pass
 
@@ -322,24 +322,37 @@ class CBCollection(CoreClient):
                       **kwargs
                       ):
         # type: (...) -> GetResult
-        kwargs_final = forward_args(kwargs, *options)
-        if 'durability' in set(kwargs.keys()).union(options[0][0].keys()):
-            raise couchbase.exceptions.ReplicaNotAvailableException()
-
+        """
+        Get the document with the specified key, and update the expiry.
+        :param str key: Key of document to get and touch.
+        :param timedelta expiry: New expiry for document.  Set to timedelta(seconds=0) to never expire.
+        :param GetAndTouchOptions options: Options for request.
+        :param kwargs: Override corresponding value in options.
+        :return: A :class:`couchbase.result.GetResult` object representing the document for this key.
+        """
+        # we place the expiry in the kwargs...
+        kwargs['expiry'] = expiry
         return self._get_generic(key, kwargs, options)
 
     @get_result_wrapper
     def get_and_lock(self,
-                     key,        # type: str
-                     expiry,    # type: int
+                     key,       # type: str
+                     expiry,    # type: timedelta
                      *options,  # type: GetAndLockOptions
                      **kwargs
                      ):
         # type: (...) -> GetResult
+        """
+        Get a document with the specified key, locking it from mutation.
+        :param str key: Key of document to lock
+        :param timedelta expiry: Time at which the lock expires.  Note you can always unlock it, and the server unlocks
+                it after 15 seconds.
+        :param GetAndLockOptions options: Options for the get and lock operation.
+        :param Any kwargs: Override corresponding value in options.
+        :return: A :class:`couchbase.result.GetResult` object representing the document for this key.
+        """
         final_options = forward_args(kwargs, *options)
-        x = _Base.get(self, key, expiry, **final_options)
-        _Base.lock(self, key, options)
-        return ResultPrecursor(x, options)
+        return ResultPrecursor(_Base.lock(self, key, int(expiry.total_seconds()), **final_options), final_options)
 
     @get_replica_result_wrapper
     def get_any_replica(self,
@@ -504,38 +517,36 @@ class CBCollection(CoreClient):
     counter_multi = _wrap_multi_mutation_result(CoreClient.counter_multi)
 
     def touch(self,
-              key,  # type: str
-              *options,  # type: TouchOptions
+              key,          # type: str
+              expiry,       # type: timedelta
+              *options,     # type: TouchOptions
               **kwargs):
         # type: (...) -> MutationResult
         """Update a key's expiry time
 
         :param string key: The key whose expiry time should be
             modified
-        :param int timeout: The new expiry time. If the expiry time
-            is `0` then the key never expires (and any existing
+        :param timedelta expiry: The new expiry time. If the expiry time
+            is timedelta(seconds=0), then the key never expires (and any existing
             expiry is removed)
-        :param Durability durability_level: Sync replication durability level.
-
+        :param TouchOptions options: Options for touch command.
+        :param Any kwargs: Override corresponding value in options.
         :return: :class:`.MutationResult`
-
-        Update the expiry time of a key ::
-
-            cb.upsert("key", expiry=timedelta(seconds=100))
-            # expires in 100 seconds
-            cb.touch("key", expiry=timedelta(seconds=0))
-            # key should never expire now
-
         :raise: The same things that :meth:`get` does
 
-        .. seealso:: :meth:`get` - which can be used to get *and* update the
+        .. seealso:: :meth:`get_and_touch` - which can be used to get *and* update the
             expiry
         """
+        # lets just pop the expiry into the kwargs.  If one was present, we override it
+        kwargs['expiry'] = expiry
+        args = forward_args(kwargs, *options)
+        print(args)
         return _Base.touch(self, key, **forward_args(kwargs, *options))
 
     @_wrap_in_mutation_result
     def unlock(self,
-               key,          # type: str
+               key,         # type: str
+               cas,         # type: int
                *options,    # type: UnlockOptions
                **kwargs
                ):
@@ -545,84 +556,21 @@ class CBCollection(CoreClient):
         This unlocks an item previously locked by :meth:`lock`
 
         :param str key: The key to unlock
+        :param int cas: The cas, which you got when you used get_and_lock.
         :param UnlockOptions options: Options for the unlock operation.
         :param Any kwargs: Override corresponding value in options.
 
         See :meth:`lock` for an example.
 
-        :raise: :exc:`.TemporaryFailError` if the CAS supplied does not
+        :raise: :exc:`.TempFailException` if the CAS supplied does not
             match the CAS on the server (possibly because it was
             unlocked by previous call).
 
         .. seealso:: :meth:`lock`
         """
+        # pop the cas into the kwargs
+        kwargs['cas'] = cas
         return _Base.unlock(self, key, **forward_args(kwargs, *options))
-
-    def lock(self,  # type: CBCollection
-             key,  # type: str
-             *options,  # type: LockOptions
-             **kwargs  # type: Any
-             ):
-        """Lock and retrieve a key-value entry in Couchbase.
-
-        :param key: A string which is the key to lock.
-        :param LockOptions options: Options for the lock operation.
-        :param Any kwargs: Override corresponding value in options.
-
-        This function otherwise functions similarly to :meth:`get`;
-        specifically, it will return the value upon success. Note the
-        :attr:`~.MutationResult.cas` value from the :class:`.MutationResult` object.
-        This will be needed to :meth:`unlock` the key.
-
-        Note the lock will also be implicitly released if modified by
-        one of the :meth:`upsert` family of functions when the valid CAS
-        is supplied
-
-        :raise: :exc:`.TemporaryFailError` if the key is already locked.
-        :raise: See :meth:`get` for possible exceptions
-
-        Lock a key ::
-
-            rv = cb.lock("locked_key", ttl=5)
-            # This key is now locked for the next 5 seconds.
-            # attempts to access this key will fail until the lock
-            # is released.
-
-            # do important stuff...
-
-            cb.unlock("locked_key", rv.cas)
-
-        Lock a key, implicitly unlocking with :meth:`upsert` with CAS ::
-
-            rv = self.cb.lock("locked_key", ttl=5)
-            new_value = rv.value.upper()
-            cb.upsert("locked_key", new_value, rv.cas)
-
-
-        Poll and Lock ::
-
-            rv = None
-            begin_time = time.time()
-            while time.time() - begin_time < 15:
-                try:
-                    rv = cb.lock("key", ttl=10)
-                    break
-                except TemporaryFailError:
-                    print("Key is currently locked.. waiting")
-                    time.sleep(1)
-
-            if not rv:
-                raise Exception("Waited too long..")
-
-            # Do stuff..
-
-            cb.unlock("key", rv.cas)
-
-
-        .. seealso:: :meth:`get`, :meth:`unlock`
-        """
-        final_options = forward_args(kwargs, *options)
-        return _Base.lock(self, key, **final_options)
 
     def exists(self,      # type: CBCollection
                key,       # type: str
