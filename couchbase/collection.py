@@ -637,7 +637,7 @@ class CBCollection(CoreClient):
         :return: An ExistsResult object with a boolean value indicating the presence of the document.
         :raise: Any exceptions raised by the underlying platform.
         """
-        return ExistsResult(super(CBCollection,self).exists(key), **forward_args(kwargs, *options))
+        return ExistsResult(self.bucket.exists(key, **forward_args(kwargs, *options)))
 
     @_wrap_in_mutation_result
     def upsert(self,

@@ -23,8 +23,7 @@ from datetime import timedelta
 import couchbase.subdocument as SD
 from unittest import SkipTest
 from couchbase.diagnostics import ServiceType
-import time
-
+import uuid
 
 class CollectionTests(CollectionTestCase):
     """
@@ -49,14 +48,25 @@ class CollectionTests(CollectionTestCase):
         # make sure NOKEY is gone
         self.try_n_times_till_exception(10, 1, self.cb.get, self.NOKEY)
 
-
-    @unittest.skip("exists currently broken")
     def test_exists(self):
+        if self.is_mock:
+            raise SkipTest("mock does not support exists")
         self.assertTrue(self.cb.exists(self.KEY).exists)
 
-    @unittest.skip("exists currently broken")
     def test_exists_when_it_does_not_exist(self):
-        self.assertFalse(self.cb.exists(self.NOKEY).exists)
+        if self.is_mock:
+            raise SkipTest("mock does not support exists")
+        key = str(uuid.uuid4())
+        self.assertRaises(KeyNotFoundException, self.cb.get, key)
+        self.assertFalse(self.cb.exists(key).exists)
+
+    @unittest.skip("this verifies CCBC-1187 - skip till fixed")
+    def test_exists_with_recently_removed_key(self):
+        if self.is_mock:
+            raise SkipTest("mock does not support exists")
+        self.cb.remove(self.KEY)
+        self.assertRaises(KeyNotFoundException, self.cb.get, self.KEY)
+        self.assertFalse(self.cb.exists(self.KEY).exists)
 
     def test_upsert(self):
         self.cb.upsert(self.NOKEY, {"some":"thing"}, UpsertOptions(timeout=timedelta(seconds=3)))

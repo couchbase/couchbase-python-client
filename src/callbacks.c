@@ -1124,6 +1124,46 @@ pycbc_strn_base_const pycbc_strn_base_const_from_psz(const char *buf)
     return (pycbc_strn_base_const){.buffer = buf,
                                    .length = buf ? strlen(buf) : 0};
 }
+
+static void exists_callback(lcb_t instance,
+                            int cbtype,
+                            const lcb_RESPBASE * resp_base) {
+
+    int rv;
+    int optflags = RESTYPE_OPERATION;
+    pycbc_Bucket *conn = NULL;
+    pycbc_OperationResult *res = NULL;
+    pycbc_MultiResult *mres = NULL;
+    response_handler handler = {.cbtype = cbtype};
+    rv = get_common_objects(
+            resp_base, &conn, (pycbc_Result **)&res, optflags, &mres, &handler);
+    PYCBC_DEBUG_LOG_CONTEXT(PYCBC_RES_CONTEXT(res), "Exists callback continues")
+
+    if (rv == 0) {
+        res->rc = handler.rc;
+        MAYBE_PUSH_OPERR(mres, (pycbc_Result *)res, handler.rc, 0);
+    }
+    if (handler.cas) {
+        res->cas = handler.cas;
+    }
+    {
+        int exists = lcb_respexists_is_found((const lcb_RESPEXISTS*)resp_base);
+        PYCBC_DEBUG_LOG("is_found returns %d", exists);
+        /* we just use the existance of the cas as an indication, in python.  Note a deleted
+         * doc will return a cas too - hence the explicit is_found call */
+        if (handler.cas && exists) {
+            res->cas = handler.cas;
+        } else {
+            res->cas = 0;
+        }
+    }
+
+    operation_completed_with_err_info(
+            conn, mres, cbtype, resp_base, (pycbc_Result *)res);
+    CB_THR_BEGIN(conn);
+    (void)instance;
+}
+
 static void ping_callback(lcb_t instance,
                           int cbtype,
                           const lcb_RESPBASE *resp_base)
@@ -1341,7 +1381,7 @@ pycbc_callbacks_init(lcb_t instance)
     // LCB_CALLBACK_STATS, stats_callback);
     lcb_install_callback(instance, LCB_CALLBACK_PING, ping_callback);
     lcb_install_callback(instance, LCB_CALLBACK_DIAG, diag_callback);
-    lcb_install_callback(instance, LCB_CALLBACK_EXISTS, keyop_simple_callback);
+    lcb_install_callback(instance, LCB_CALLBACK_EXISTS, exists_callback);
 #ifdef PYCBC_EXTRA_CALLBACK_WRAPPERS
 #define X(NAME) lcb_install_callback3(instance, NAME, NAME##_cb);
     PYCBC_FOR_EACH_GEN_CALLBACK(X)
