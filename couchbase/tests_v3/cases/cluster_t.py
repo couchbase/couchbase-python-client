@@ -20,8 +20,9 @@ from couchbase_core.cluster import ClassicAuthenticator
 from couchbase.cluster import  DiagnosticsOptions, Cluster, ClusterOptions
 from couchbase.diagnostics import ServiceType, EndpointState, ClusterState
 from couchbase.exceptions import AlreadyShutdownException
-
+from datetime import timedelta
 from unittest import SkipTest
+import couchbase_core._libcouchbase as _LCB
 
 
 class ClusterTests(CollectionTestCase):
@@ -80,3 +81,56 @@ class ClusterTests(CollectionTestCase):
         # disconnect cluster
         cluster.disconnect()
         self.assertRaises(AlreadyShutdownException, cluster.query, "SELECT * FROM `beer-sample` LIMIT 1")
+
+    def test_n1ql_default_timeout(self):
+        self.cluster.n1ql_timeout = timedelta(seconds=50)
+        self.assertEqual(timedelta(seconds=50), self.cluster.n1ql_timeout)
+
+    def test_tracing_orphaned_queue_flush_interval(self):
+        self.cluster.tracing_orphaned_queue_flush_interval = timedelta(seconds=1)
+        self.assertEqual(timedelta(seconds=1), self.cluster.tracing_orphaned_queue_flush_interval)
+
+    def test_tracing_orphaned_queue_size(self):
+        self.cluster.tracing_orphaned_queue_size = 10
+        self.assertEqual(10, self.cluster.tracing_orphaned_queue_size)
+
+    def test_tracing_threshold_queue_flush_interval(self):
+        self.cluster.tracing_threshold_queue_flush_interval = timedelta(seconds=10)
+        self.assertEqual(timedelta(seconds=10), self.cluster.tracing_threshold_queue_flush_interval)
+
+    def test_tracing_threshold_queue_size(self):
+        self.cluster.tracing_threshold_queue_size = 100
+        self.assertEqual(100, self.cluster.tracing_threshold_queue_size)
+
+    def test_tracing_threshold_n1ql(self):
+        self.cluster.tracing_threshold_n1ql = timedelta(seconds=1)
+        self.assertEqual(timedelta(seconds=1), self.cluster.tracing_threshold_n1ql)
+
+    def test_tracing_threshold_fts(self):
+        self.cluster.tracing_threshold_fts = timedelta(seconds=1)
+        self.assertEqual(timedelta(seconds=1), self.cluster.tracing_threshold_fts)
+
+    def test_tracing_threshold_analytics(self):
+        self.cluster.tracing_threshold_analytics = timedelta(seconds=1)
+        self.assertEqual(timedelta(seconds=1), self.cluster.tracing_threshold_analytics)
+
+    def test_compression(self):
+        self.cluster.compression = _LCB.COMPRESS_NONE
+        self.assertEqual(_LCB.COMPRESS_NONE, self.cluster.compression)
+
+    def test_compression_min_size(self):
+        self.cluster.compression_min_size = 5000
+        self.assertEqual(5000, self.cluster.compression_min_size)
+
+    def test_compression_min_ratio(self):
+        self.cluster.compression_min_ratio = 0.5
+        self.assertEqual(0.5, self.cluster.compression_min_ratio)
+
+    def test_redaction(self):
+        self.cluster.redaction = True
+        self.assertTrue(self.cluster.redaction)
+
+    def test_is_ssl(self):
+        # well, our tests are not ssl, so...
+        self.assertFalse(self.cluster.is_ssl)
+

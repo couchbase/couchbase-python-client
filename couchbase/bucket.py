@@ -3,6 +3,7 @@ from couchbase.management.admin import Admin
 from couchbase.management.views import DesignDocumentNamespace
 from couchbase_core.supportability import uncommitted, volatile
 from couchbase_core.client import Client as CoreClient
+import couchbase_core._libcouchbase as _LCB
 from .collection import CBCollection, CollectionOptions
 from .options import OptionBlockTimeOut
 from .result import *
@@ -11,18 +12,22 @@ from datetime import timedelta
 from enum import Enum
 import logging
 
+
 class ViewScanConsistency(Enum):
     NOT_BOUNDED = 'ok'
     REQUEST_PLUS = 'false'
     UPDATE_AFTER = 'update_after'
 
+
 class ViewOrdering(Enum):
     DESCENDING  = 'true'
     ASCENDING = 'false'
 
+
 class ViewErrorMode(Enum):
     CONTINUE = 'continue'
     STOP = 'stop'
+
 
 class ViewOptions(OptionBlockTimeOut):
     @overload
@@ -286,3 +291,164 @@ class Bucket(object):
         :raise: CouchbaseError for various communication issues.
         """
         return PingResult(self._bucket.ping(**forward_args(kwargs, *options)))
+
+    @property
+    def kv_timeout(self):
+        #(...) -> timedelta
+        """
+        The default timeout for all kv operations on this bucket.
+        ::
+            # Set the default kv timeout to 10 seconds:
+            bucket.kv_timeout = timedelta(seconds=10)
+
+            # Get the current default:
+            timeout = bucket.kv_timeout
+        """
+        return timedelta(seconds=self._bucket._get_timeout_common(_LCB.LCB_CNTL_OP_TIMEOUT))
+
+    @kv_timeout.setter
+    def kv_timeout(self,
+                   timeout  # type: timedelta
+                   ):
+        self._bucket._set_timeout_common(_LCB.LCB_CNTL_OP_TIMEOUT, timeout.total_seconds())
+
+    @property
+    def view_timeout(self):
+        # (...) -> timedelta
+        """
+        The default timeout for all view operations on this bucket.
+        ::
+            # Set the default view timeout to 10 seconds:
+            cb.view_timeout = timedelta(seconds=10)
+
+            # Get the default view timeout:
+            timeout = cb.view_timeout
+        """
+        # lets use the private function in the private _bucket for now.  Soon
+        # that _bucket will be gone and we will have migrated this all into here.
+        return timedelta(seconds=self._bucket._get_timeout_common(_LCB.LCB_CNTL_VIEW_TIMEOUT))
+
+    @view_timeout.setter
+    def view_timeout(self,
+                     timeout  # type: timedelta
+                     ):
+        # (...) -> None
+        self._bucket._set_timeout_common(_LCB.LCB_CNTL_VIEW_TIMEOUT, timeout.total_seconds())
+
+    @property
+    def tracing_orphaned_queue_flush_interval(self):
+        """
+        The tracing orphaned queue flush interval, as a `timedelta`
+
+        ::
+            # Set tracing orphaned queue flush interval to 0.5 seconds
+            cb.tracing_orphaned_queue_flush_interval = timedelta(seconds=0.5)
+
+        """
+
+        return timedelta(seconds=self._bucket._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL,
+                                                    value_type="timeout"))
+
+    @tracing_orphaned_queue_flush_interval.setter
+    def tracing_orphaned_queue_flush_interval(self,
+                                              val   # type: timedelta
+                                              ):
+        self._bucket._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL,
+                           value=val.total_seconds(),
+                           value_type="timeout")
+
+    @property
+    def tracing_orphaned_queue_size(self):
+        """
+        The tracing orphaned queue size.
+
+        ::
+            # Set tracing orphaned queue size to 100 entries
+            cb.tracing_orphaned_queue_size = 100
+
+        """
+
+        return self._bucket._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_SIZE, value_type="uint32_t")
+
+    @tracing_orphaned_queue_size.setter
+    def tracing_orphaned_queue_size(self,
+                                    val     # type: int
+                                    ):
+        self._bucket._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_SIZE, value=val, value_type="uint32_t")
+
+    @property
+    def tracing_threshold_queue_flush_interval(self):
+        """
+        The tracing threshold queue flush interval, as a `timedelta`
+
+        ::
+            # Set tracing threshold queue flush interval to 0.5 seconds
+            cb.tracing_threshold_queue_flush_interval = timedelta(seconds=0.5)
+
+        """
+
+        return timedelta(seconds=self._bucket._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_FLUSH_INTERVAL,
+                                                    value_type="timeout"))
+
+    @tracing_threshold_queue_flush_interval.setter
+    def tracing_threshold_queue_flush_interval(self,
+                                               val  # type: timedelta
+                                               ):
+        self._bucket._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_FLUSH_INTERVAL,
+                           value=val.total_seconds(),
+                           value_type="timeout")
+
+    @property
+    def tracing_threshold_queue_size(self):
+        """
+        The tracing threshold queue size.
+
+        ::
+            # Set tracing threshold queue size to 100 entries
+            cb.tracing_threshold_queue_size = 100
+
+        """
+
+        return self._bucket._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_SIZE, value_type="uint32_t")
+
+    @tracing_threshold_queue_size.setter
+    def tracing_threshold_queue_size(self, val):
+        self._bucket._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_SIZE, value=val, value_type="uint32_t")
+
+    @property
+    def tracing_threshold_kv(self):
+        """
+        The tracing threshold for KV, as a `timedelta`.
+
+        ::
+            # Set tracing threshold for KV to 0.5 seconds
+            cb.tracing_threshold_kv = timedelta(seconds=0.5)
+
+        """
+
+        return timedelta(seconds=self._bucket._cntl(op=_LCB.TRACING_THRESHOLD_KV, value_type="timeout"))
+
+    @tracing_threshold_kv.setter
+    def tracing_threshold_kv(self,
+                             val    # type: timedelta
+                             ):
+        self._bucket._cntl(op=_LCB.TRACING_THRESHOLD_KV, value=val.total_seconds(), value_type="timeout")
+
+    @property
+    def tracing_threshold_view(self):
+        """
+        The tracing threshold for View, as `timedelta`.
+
+        ::
+            # Set tracing threshold for View to 0.5 seconds
+            cb.tracing_threshold_view = timedelta(seconds=0.5)
+
+        """
+        return timedelta(seconds=self._bucket._cntl(op=_LCB.TRACING_THRESHOLD_VIEW, value_type="timeout"))
+
+    @tracing_threshold_view.setter
+    def tracing_threshold_view(self,
+                               val      # type: timedelta
+                               ):
+        self._bucket._cntl(op=_LCB.TRACING_THRESHOLD_VIEW, value=val.total_seconds(), value_type="timeout")
+

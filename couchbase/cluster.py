@@ -316,17 +316,33 @@ class Cluster(object):
 
         return QueryResult(self._operate_on_cluster(CoreClient.query, QueryException, opt.to_n1ql_query(statement, *opts, **kwargs)))
 
+    def _get_clusterclient(self):
+        if not self._clusterclient:
+            self._clusterclient = CoreClient(str(self.connstr), _conntype=_LCB.LCB_TYPE_CLUSTER, **self._clusteropts)
+        return self._clusterclient
+
     def _operate_on_cluster(self,
                             verb,
                             failtype,  # type: Type[CouchbaseError]
                             *args,
                             **kwargs):
-        if not self._clusterclient:
-            self._clusterclient = CoreClient(str(self.connstr), _conntype=_LCB.LCB_TYPE_CLUSTER, **self._clusteropts)
+
         try:
-            return verb(self._clusterclient, *args, **kwargs)
+            return verb(self._get_clusterclient(), *args, **kwargs)
         except Exception as e:
             raise_from(failtype(params=CouchbaseError.ParamType(message="Cluster operation failed", inner_cause=e)), e)
+
+    # for now this just calls functions.  We can return stuff if we need it, later.
+    def _sync_operate_on_entire_cluster(self,
+                                        verb,
+                                        *args,
+                                        **kwargs):
+        clients = [v() for k, v in self._cluster._buckets.items()]
+        clients = [v._bucket for v in clients if v]
+        clients.append(self._get_clusterclient())
+        for c in clients:
+            verb(c, *args, **kwargs)
+
 
     async def _operate_on_entire_cluster(self,
                                    verb,
@@ -434,7 +450,7 @@ class Cluster(object):
     def search_indexes(self):
         # type: (...) -> SearchIndexManager
         self._check_for_shutdown()
-        return SearchIndexManager(self.admin)
+        return SearchIndexManager(self._admin)
 
     def analytics_indexes(self):
         # type: (...) -> AnalyticsIndexManager
@@ -462,27 +478,282 @@ class Cluster(object):
         self._admin = None
         self._clusterclient = None
 
-    def manager(self):
-        # type: (...) -> ClusterManager
-        """
-
-        Manager
-        Returns a ClusterManager object for managing resources at the Cluster level.
-
-        Caveats and notes:
-        It is acceptable for a Cluster object to have a static Connect method which takes a Configuration for ease of use.
-        To facilitate testing/mocking, it's acceptable for this structure to derive from an interface at the implementers discretion.
-        The "Get" and "Set" prefixes are considered platform idiomatic and can be adjusted to various platform idioms.
-        The Configuration is passed in via the ctor; overloads for connection strings and various other platform specific configuration are also passed this way.
-        If a language does not support ctor overloading, then an equivalent method can be used on the object.
-
-        :return:
-        """
-
-        return self._cluster.cluster_manager()
-
     def _is_dev_preview(self):
+        self._check_for_shutdown()
         return self._admin.http_request(path="/pools").value.get("isDeveloperPreview", False)
 
+    @property
+    def n1ql_timeout(self):
+        # type: (...) -> timedelta
+        """
+        The timeout for N1QL query operations. This affects the
+        :meth:`n1ql_query` method.
+
+        Timeouts may also be adjusted on a per-query basis by setting the
+        :attr:`timeout` property in the options to the n1ql_query method.
+        The effective timeout is either the per-query timeout or the global timeout,
+        whichever is lower.
+        """
+        self._check_for_shutdown()
+        return timedelta(seconds=self._get_clusterclient()._get_timeout_common(_LCB.LCB_CNTL_QUERY_TIMEOUT))
+
+    @n1ql_timeout.setter
+    def n1ql_timeout(self,
+                     value  # type: timedelta
+                     ):
+        # type: (...) -> None
+        self._check_for_shutdown()
+        self._get_clusterclient()._set_timeout_common(_LCB.LCB_CNTL_QUERY_TIMEOUT, value.total_seconds())
+
+    @property
+    def tracing_threshold_n1ql(self):
+        """
+        The tracing threshold for N1QL, as `timedelta`
+
+        ::
+            # Set tracing threshold for N1QL to 0.5 seconds
+            cb.tracing_threshold_n1ql = timedelta(seconds=0.5)
+
+        """
+
+        return timedelta(seconds=self._get_clusterclient()._cntl(op=_LCB.TRACING_THRESHOLD_QUERY, value_type="timeout"))
+
+    @tracing_threshold_n1ql.setter
+    def tracing_threshold_n1ql(self,
+                               val  # type: timedelta
+                               ):
+        self._get_clusterclient()._cntl(op=_LCB.TRACING_THRESHOLD_QUERY, value=val.total_seconds(), value_type="timeout")
+
+
+    @property
+    def tracing_threshold_fts(self):
+        """
+        The tracing threshold for FTS, as `timedelta`.
+        ::
+            # Set tracing threshold for FTS to 0.5 seconds
+            cluster.tracing_threshold_fts = timedelta(seconds=0.5)
+
+        """
+
+        return timedelta(seconds=self._get_clusterclient()._cntl(op=_LCB.TRACING_THRESHOLD_SEARCH,
+                                                                 value_type="timeout"))
+
+    @tracing_threshold_fts.setter
+    def tracing_threshold_fts(self,
+                              val   # type: timedelta
+                              ):
+        self._get_clusterclient()._cntl(op=_LCB.TRACING_THRESHOLD_SEARCH,
+                                        value=val.total_seconds(),
+                                        value_type="timeout")
+
+    @property
+    def tracing_threshold_analytics(self):
+        """
+        The tracing threshold for analytics, as `timedelta`.
+
+        ::
+            # Set tracing threshold for analytics to 0.5 seconds
+            cluster.tracing_threshold_analytics = timedelta(seconds=0.5)
+
+        """
+
+        return timedelta(seconds=self._get_clusterclient()._cntl(op=_LCB.TRACING_THRESHOLD_ANALYTICS,
+                                                                 value_type="timeout"))
+
+    @tracing_threshold_analytics.setter
+    def tracing_threshold_analytics(self,
+                                    val     # type: timedelta
+                                    ):
+        self._get_clusterclient()._cntl(op=_LCB.TRACING_THRESHOLD_ANALYTICS,
+                                        value=val.total_seconds(),
+                                        value_type="timeout")
+    @property
+    def tracing_orphaned_queue_flush_interval(self):
+        """
+        The tracing orphaned queue flush interval, as a `timedelta`
+
+        ::
+            # Set tracing orphaned queue flush interval to 0.5 seconds
+            cluster.tracing_orphaned_queue_flush_interval = timedelta(seconds=0.5)
+
+        """
+
+        return timedelta(seconds=self._get_clusterclient()._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL,
+                                                    value_type="timeout"))
+
+    @tracing_orphaned_queue_flush_interval.setter
+    def tracing_orphaned_queue_flush_interval(self,
+                                              val   # type: timedelta
+                                              ):
+        self._sync_operate_on_entire_cluster(CoreClient._cntl,
+                                             op=_LCB.TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL,
+                                             value=val.total_seconds(),
+                                             value_type="timeout")
+
+    @property
+    def tracing_orphaned_queue_size(self):
+        """
+        The tracing orphaned queue size.
+
+        ::
+            # Set tracing orphaned queue size to 100 entries
+            cluster.tracing_orphaned_queue_size = 100
+
+        """
+
+        return self._get_clusterclient()._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_SIZE, value_type="uint32_t")
+
+    @tracing_orphaned_queue_size.setter
+    def tracing_orphaned_queue_size(self,
+                                    val     # type: int
+                                    ):
+        self._sync_operate_on_entire_cluster(CoreClient._cntl,
+                                             op=_LCB.TRACING_ORPHANED_QUEUE_SIZE,
+                                             value=val,
+                                             value_type="uint32_t")
+
+    @property
+    def tracing_threshold_queue_flush_interval(self):
+        """
+        The tracing threshold queue flush interval, as a `timedelta`
+
+        ::
+            # Set tracing threshold queue flush interval to 0.5 seconds
+            cluster.tracing_threshold_queue_flush_interval = timedelta(seconds=0.5)
+
+        """
+
+        return timedelta(seconds=self._get_clusterclient()._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_FLUSH_INTERVAL,
+                                                    value_type="timeout"))
+
+    @tracing_threshold_queue_flush_interval.setter
+    def tracing_threshold_queue_flush_interval(self,
+                                               val  # type: timedelta
+                                               ):
+        self._sync_operate_on_entire_cluster(CoreClient._cntl,
+                                             op=_LCB.TRACING_THRESHOLD_QUEUE_FLUSH_INTERVAL,
+                                             value=val.total_seconds(),
+                                             value_type="timeout")
+
+    @property
+    def tracing_threshold_queue_size(self):
+        """
+        The tracing threshold queue size.
+
+        ::
+            # Set tracing threshold queue size to 100 entries
+            cluster.tracing_threshold_queue_size = 100
+
+        """
+
+        return self._get_clusterclient()._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_SIZE, value_type="uint32_t")
+
+    @tracing_threshold_queue_size.setter
+    def tracing_threshold_queue_size(self, val):
+        self._sync_operate_on_entire_cluster(CoreClient._cntl,
+                                             op=_LCB.TRACING_THRESHOLD_QUEUE_SIZE,
+                                             value=val,
+                                             value_type="uint32_t")
+
+    @property
+    def redaction(self):
+        return bool(self._get_clusterclient()._cntl(_LCB.LCB_CNTL_LOG_REDACTION,  value_type='int'))
+
+    @redaction.setter
+    def redaction(self,
+                  val   # type: bool
+                  ):
+        val = 1 if val else 0
+        self._sync_operate_on_entire_cluster(CoreClient._cntl,
+                                             _LCB.LCB_CNTL_LOG_REDACTION,
+                                             value=val,
+                                             value_type='int')
+
+    @property
+    def compression(self):
+        """
+        The compression mode to be used when talking to the server.
+
+        This can be any of the values in :module:`couchbase_core._libcouchbase`
+        prefixed with `COMPRESS_`:
+
+        .. data:: COMPRESS_NONE
+
+        Do not perform compression in any direction.
+
+        .. data:: COMPRESS_IN
+
+        Decompress incoming data, if the data has been compressed at the server.
+
+        .. data:: COMPRESS_OUT
+
+        Compress outgoing data.
+
+        .. data:: COMPRESS_INOUT
+
+        Both `COMPRESS_IN` and `COMPRESS_OUT`.
+
+        .. data:: COMPRESS_FORCE
+
+        Setting this flag will force the client to assume that all servers
+        support compression despite a HELLO not having been initially negotiated.
+        """
+
+        return self._get_clusterclient()._cntl(_LCB.LCB_CNTL_COMPRESSION_OPTS, value_type='int')
+
+    @compression.setter
+    def compression(self, value):
+        self._sync_operate_on_entire_cluster(CoreClient._cntl,
+                                             _LCB.LCB_CNTL_COMPRESSION_OPTS,
+                                             value=value,
+                                             value_type='int')
+
+    @property
+    def compression_min_size(self):
+        """
+        Minimum size (in bytes) of the document payload to be compressed when compression enabled.
+
+        :type: int
+        """
+        return self._get_clusterclient()._cntl(_LCB.LCB_CNTL_COMPRESSION_MIN_SIZE, value_type='uint32_t')
+
+    @compression_min_size.setter
+    def compression_min_size(self,
+                             value  # type: int
+                             ):
+        self._sync_operate_on_entire_cluster(CoreClient._cntl,
+                                             _LCB.LCB_CNTL_COMPRESSION_MIN_SIZE,
+                                             value_type='uint32_t',
+                                             value=value)
+
+    @property
+    def compression_min_ratio(self):
+        """
+        Minimum compression ratio (compressed / original) of the compressed payload to allow sending it to cluster.
+
+        :type: float
+        """
+        return self._get_clusterclient()._cntl(_LCB.LCB_CNTL_COMPRESSION_MIN_RATIO, value_type='float')
+
+    @compression_min_ratio.setter
+    def compression_min_ratio(self, value):
+        self._sync_operate_on_entire_cluster(CoreClient._cntl,
+                                             _LCB.LCB_CNTL_COMPRESSION_MIN_RATIO,
+                                             value_type='float',
+                                             value=value)
+
+    @property
+    def is_ssl(self):
+        """
+        Read-only boolean property indicating whether SSL is used for
+        this connection.
+
+        If this property is true, then all communication between this
+        object and the Couchbase cluster is encrypted using SSL.
+
+        See :meth:`__init__` for more information on connection options.
+        """
+        mode = self._get_clusterclient()._cntl(op=_LCB.LCB_CNTL_SSL_MODE, value_type='int')
+        return mode & _LCB.LCB_SSL_ENABLED != 0
 
 ClusterOptions = Cluster.ClusterOptions
