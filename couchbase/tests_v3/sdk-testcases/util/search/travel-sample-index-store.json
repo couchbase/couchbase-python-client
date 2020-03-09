@@ -1,0 +1,43 @@
+{
+  "name": "travel-sample-index-stored",
+  "type": "fulltext-index",
+  "params": {
+    "doc_config": {
+      "mode": "type_field",
+      "type_field": "type"
+    },
+    "mapping": {
+      "analysis": {
+        "analyzers": {
+          "letterAnalyzer": {
+            "tokenizer": "letter",
+            "type": "custom"
+          }
+        }
+      },
+      "default_analyzer": "standard",
+      "default_datetime_parser": "dateTimeOptional",
+      "default_field": "_all",
+      "default_mapping": {
+        "dynamic": true,
+        "enabled": true
+      },
+      "default_type": "_default",
+      "index_dynamic": true,
+      "store_dynamic": true,
+      "type_field": "type"
+    },
+    "store": {
+      "kvStoreName": "mossStore"
+    }
+  },
+  "sourceType": "couchbase",
+  "sourceName": "travel-sample",
+  "sourceUUID": "",
+  "sourceParams": {},
+  "planParams": {
+    "maxPartitionsPerPIndex": 171,
+    "numReplicas": 0
+  },
+  "uuid": ""
+}

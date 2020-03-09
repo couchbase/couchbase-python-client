@@ -19,7 +19,7 @@ from typing import NamedTuple
 from twisted.internet import defer
 from twisted.trial._synctest import SkipTest
 
-import couchbase_core.fulltext as SEARCH
+import couchbase.search as SEARCH
 from couchbase_core.asynchronous.n1ql import AsyncN1QLRequest
 from couchbase_tests.base import ConnectionTestCase, AnalyticsTestCaseBase
 from txcouchbase.cluster import BatchedQueryResult, BatchedSearchResult, BatchedAnalyticsResult

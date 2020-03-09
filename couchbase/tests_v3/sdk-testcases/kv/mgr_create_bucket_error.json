@@ -1,0 +1,30 @@
+{
+  "metadata": {
+    "http_status": 400,
+    "description": "This is a response from the server for a create request when the bucket already exists.",
+    "server_version": "6.5"
+  },
+  "data": {
+    "errors": {
+      "name": "Bucket with given name already exists"
+    },
+    "summaries": {
+      "ramSummary": {
+        "total": 536870912,
+        "otherBuckets": 536870912,
+        "nodesCount": 1,
+        "perNodeMegs": 256,
+        "thisAlloc": 268435456,
+        "thisUsed": 0,
+        "free": -268435456
+      },
+      "hddSummary": {
+        "total": 19828572160,
+        "otherData": 3316066374,
+        "otherBuckets": 54790893,
+        "thisUsed": 0,
+        "free": 16457714893
+      }
+    }
+  }
+}

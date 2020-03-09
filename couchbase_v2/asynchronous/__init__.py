@@ -22,10 +22,6 @@ import couchbase_core.asynchronous.events as events
 
 sys.modules[__name__ + '.events'] = events
 
-import couchbase_core.asynchronous.fulltext as fulltext
-
-sys.modules[__name__ + '.fulltext'] = fulltext
-
 import couchbase_core.asynchronous.n1ql as n1ql
 
 sys.modules[__name__ + '.n1ql'] = n1ql

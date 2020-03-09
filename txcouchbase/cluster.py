@@ -28,7 +28,7 @@ from couchbase.asynchronous import AsyncViewResultBase, AsyncQueryResultBase, As
 from couchbase.cluster import Cluster as V3SyncCluster, AsyncCluster as V3AsyncCluster
 from couchbase.collection import AsyncCBCollection as BaseAsyncCBCollection
 from couchbase_core.asynchronous.events import EventQueue
-from couchbase_core.asynchronous.fulltext import AsyncSearchRequest
+from couchbase.asynchronous.search import AsyncSearchRequest
 from couchbase_core.asynchronous.n1ql import AsyncN1QLRequest
 from couchbase_core.asynchronous.view import AsyncViewBase
 from couchbase_core.client import Client as CoreClient

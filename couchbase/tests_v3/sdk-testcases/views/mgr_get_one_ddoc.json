@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "http_status": 200,
+    "description": "This case is representative of when a get ddoc request is made.",
+    "reproduction": "Request a design doc",
+    "server_version": "6.5"
+  },
+  "data": {
+    "views": {
+      "test": {
+        "map": "function (doc, meta) {\nemit(meta.id, null);\n}",
+        "reduce": "_count"
+      }
+    }
+  }
+}

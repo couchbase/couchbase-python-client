@@ -1,0 +1,51 @@
+{
+  "metadata": {
+    "http_status": 200,
+    "description": "This case is representative of when a get all request is made.",
+    "reproduction": "Request all design docs",
+    "server_version": "6.5"
+  },
+  "data": {
+    "rows": [
+      {
+        "doc": {
+          "meta": {
+            "id": "_design/dev_test",
+            "rev": "11-6612c791"
+          },
+          "json": {
+            "views": {
+              "test": {
+                "map": "function (doc, meta) {\n emit(meta.id, null);\n}",
+                "reduce": "_count"
+              }
+            }
+          }
+        },
+        "controllers": {
+          "compact": "/pools/default/buckets/default/ddocs/_design%2Fdev_test/controller/compactView",
+          "setUpdateMinChanges": "/pools/default/buckets/default/ddocs/_design%2Fdev_test/controller/setUpdateMinChanges"
+        }
+      },
+      {
+        "doc": {
+          "meta": {
+            "id": "_design/dev_th",
+            "rev": "1-5075875c"
+          },
+          "json": {
+            "views": {
+              "th": {
+                "map": "function (doc, meta) {\n  emit(meta.id, null);\n}"
+              }
+            }
+          }
+        },
+        "controllers": {
+          "compact": "/pools/default/buckets/default/ddocs/_design%2Fdev_th/controller/compactView",
+          "setUpdateMinChanges": "/pools/default/buckets/default/ddocs/_design%2Fdev_th/controller/setUpdateMinChanges"
+        }
+      }
+    ]
+  }
+}

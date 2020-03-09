@@ -13,5 +13,5 @@ pip>=20.0; sys_platform=="win32" and python_version<="2.7"
 pyrsistent>=0.15.2
 boltons>=19.1.0
 attrs>=19.1.0
-
+cattrs>=1.0.0
 wrapt>=1.11.2

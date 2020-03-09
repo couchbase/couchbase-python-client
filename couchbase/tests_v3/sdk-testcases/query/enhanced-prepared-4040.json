@@ -1,0 +1,27 @@
+{
+  "metadata": {
+    "http_status": 404,
+    "description": "This case is representative of a response an enhanced prepared statement request which has an unknown plan.",
+    "reproduction": "Send a enhanced prepared statement request to the server where the uuid in the prepared field is unknown to the server.",
+    "expectation": "When enhanced prepared statements are in use then retry",
+    "server_version": "6.5"
+  },
+  "data": {
+    "requestID": "9605e383-3da3-440e-a4e1-47d4b673401f",
+    "clientContextID": "d4c97655-2e89-41ed-a46c-9f4e2a1eae5a",
+    "errors": [
+      {
+        "code": 4040,
+        "msg": "No such prepared statement: 32f2405d-5715-5915-b2b2-d2c557da49"
+      }
+    ],
+    "status": "fatal",
+    "metrics": {
+      "elapsedTime": "1.167435ms",
+      "executionTime": "1.117429ms",
+      "resultCount": 0,
+      "resultSize": 0,
+      "errorCount": 1
+    }
+  }
+}

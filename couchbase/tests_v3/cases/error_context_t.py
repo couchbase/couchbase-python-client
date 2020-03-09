@@ -19,7 +19,7 @@
 from couchbase_tests.base import CollectionTestCase
 from couchbase.exceptions import KVErrorContext, QueryErrorContext, SearchErrorContext, AnalyticsErrorContext, \
     ViewErrorContext, HTTPErrorContext, CouchbaseException, NotSupportedException
-from couchbase_core.fulltext import TermQuery
+from couchbase.search import TermQuery
 from unittest import SkipTest
 
 

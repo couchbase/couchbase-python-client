@@ -1,0 +1,29 @@
+{
+  "metadata": {
+    "http_status": 200,
+    "description": "This case is representative of a response with an analytics query timeout.",
+    "reproduction": "Create a travel-sample analytics dataset and send a query with a short (e.g.500ms) timeout.",
+    "server_version": "6.0"
+  },
+  "data": {
+    "requestID": "74ed0ec2-8699-417d-b807-599520b70b4c",
+    "signature": {
+      "*": "*"
+    },
+    "errors": [
+      {
+        "code": 21002,
+        "msg": "Request timed out and will be cancelled"
+      }
+    ],
+    "status": "timeout",
+    "metrics": {
+      "elapsedTime": "24.187696ms",
+      "executionTime": "19.366336ms",
+      "resultCount": 0,
+      "resultSize": 0,
+      "processedObjects": 0,
+      "errorCount": 1
+    }
+  }
+}

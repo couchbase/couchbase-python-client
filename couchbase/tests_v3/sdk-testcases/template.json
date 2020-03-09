@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "description": "Anything under metadata is currently optional.  Add a brief description of the test here.  The actual server response goes under the 'data' field below.",
+    "http_status": 200,
+    "reproduction": "Specify how it was created here.",
+    "server_version": "6.5"
+  },
+  "data": {
+  }
+}
+

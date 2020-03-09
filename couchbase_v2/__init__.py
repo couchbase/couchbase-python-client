@@ -35,9 +35,6 @@ sys.modules[__name__ + '.crypto'] = crypto
 import couchbase_core.items as items
 sys.modules[__name__ + '.items'] = items
 
-import couchbase_core.fulltext as fulltext
-sys.modules[__name__ + '.fulltext'] = fulltext
-
 import couchbase_core.experimental as experimental
 sys.modules[__name__ + '.experimental'] = experimental
 

@@ -2,7 +2,7 @@ from couchbase import ViewResult, QueryResult, AnalyticsResult, SearchResult
 from couchbase_core.asynchronous.analytics import AsyncAnalyticsRequest
 from couchbase_core.asynchronous.n1ql import AsyncN1QLRequest
 from couchbase_core.asynchronous.view import AsyncViewBase
-from couchbase_core.asynchronous.fulltext import AsyncSearchRequest
+from couchbase.asynchronous.search import AsyncSearchRequest
 from couchbase_core.asynchronous.rowsbase import AsyncRowsBase
 
 

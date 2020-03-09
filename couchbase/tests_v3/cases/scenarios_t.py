@@ -15,17 +15,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import traceback
-from datetime import timedelta
+import datetime
 from typing import *
 from unittest import SkipTest
 
-from couchbase.fulltext import SearchResult, MetaData
 from couchbase_core import recursive_reload
-from couchbase_core._pyport import ANY_STR
-import datetime
-from couchbase import Cluster, ClusterOptions, UpsertOptions
-from couchbase_core.cluster import PasswordAuthenticator
 
 try:
     from abc import ABC
@@ -33,38 +27,32 @@ except:
     from abc import ABCMeta
 
 import logging
-import time
 
 from couchbase_core.transcodable import Transcodable
 
 import couchbase_core.connstr
 import couchbase.exceptions
 
-from couchbase import JSONDocument, DeltaValue, SignedInt64, MutateInResult
-from couchbase_core.durability import Durability
-from couchbase import ReplicateTo, PersistTo, copy, \
+from couchbase import JSONDocument, MutateInResult
+from couchbase import copy, \
     timedelta, ReplicaNotConfiguredException, DocumentConcurrentlyModifiedException, \
     DocumentMutationLostException, ReplicaNotAvailableException, MutateSpec, CASMismatchException, \
     MutateInOptions
 from couchbase import GetOptions, RemoveOptions, ReplaceOptions
-from couchbase import Bucket, raise_from
+from couchbase import raise_from
 
-from couchbase_tests.base import ClusterTestCase, CollectionTestCase
+from couchbase_tests.base import CollectionTestCase
 import couchbase.subdocument as SD
 import couchbase.management
 import couchbase_core._bootstrap
 import couchbase_core._libcouchbase as _LCB
 import couchbase_core.tests.analytics_harness
-from couchbase.diagnostics import ServiceType
-import couchbase_core.fulltext as FT
 from couchbase.exceptions import DocumentNotFoundException, DocumentExistsException, NotSupportedException
 from couchbase.durability import ClientDurability, ServerDurability, DurabilityOptionBlock, Durability, \
     PersistTo, ReplicateTo
 
 
 class Scenarios(CollectionTestCase):
-
-
     def test_scenario_A(self):
         # 1) fetch a full document that is a json document
         self.coll.upsert("id",{"kettle":"fish"})
@@ -443,41 +431,6 @@ class Scenarios(CollectionTestCase):
           count += 1
         self.assertEquals(1, count)
 
-    def test_cluster_search(self  # type: ClusterTestCase
-                            ):
-        if self.is_mock:
-            raise SkipTest("F.T.S. not supported by mock")
-        most_common_term_max = 10
-        initial=time.time()
-        x = self.cluster.search_query("beer-search", FT.TermQuery("category"),
-                                      facets={'fred': FT.TermFacet('category', most_common_term_max)})
-        first_entry = x.hits()[0]
-        self.assertEqual("brasserie_de_brunehaut-mont_st_aubert", first_entry.get('id'))
-        min_hits = 6
-        metadata = x.metadata()
-        duration=time.time()-initial
-        self.assertIsInstance(metadata, MetaData)
-        self.assertIsInstance(metadata.error_count(), int)
-        self.assertIsInstance(metadata.max_score(), float)
-        self.assertIsInstance(metadata.success_count(), int)
-        took=metadata.took()
-        self.assertIsInstance(took, timedelta)
-        # TODO: lets revisit why we chose this 0.1.  I often find the difference is greater,
-        # running the tests locally.  Commenting out for now...
-        #self.assertAlmostEqual(took.total_seconds(), duration, delta=0.1)
-        self.assertGreater(took.total_seconds(), 0)
-        self.assertIsInstance(metadata.total_hits(), int)
-        self.assertGreaterEqual(metadata.success_count(), min_hits)
-        self.assertGreaterEqual(metadata.total_hits(), min_hits)
-        self.assertGreaterEqual(len(x.hits()), min_hits)
-        fred_facet = x.facets()['fred']
-        self.assertIsInstance(fred_facet, SearchResult.Facet)
-        self.assertEqual(len(fred_facet['terms']), most_common_term_max)
-
-        self.assertRaises(couchbase.exceptions.SearchException, self.cluster.search_query, "beer-search",
-                          FT.TermQuery("category"),
-                          facets={'fred': None})
-
     @staticmethod
     def get_multi_result_as_dict(result):
         return {k: v.content for k, v in result.items()}
@@ -491,11 +444,11 @@ class Scenarios(CollectionTestCase):
         if durability == Durability.NONE:
             return ClientDurability(PersistTo.NONE, ReplicateTo.NONE)
         if durability == Durability.MAJORITY:
-            return ClientDurability(replicate_to=ReplicateTo(int((num_replicas+1)/2)), persist_to=0)
+            return ClientDurability(replicate_to=ReplicateTo(int((num_replicas+1)/2)), persist_to=PersistTo.NONE)
         if durability == Durability.MAJORITY_AND_PERSIST_TO_ACTIVE:
             return ClientDurability(replicate_to=ReplicateTo(int((num_replicas+1)/2)), persist_to=PersistTo.ONE)
         if durability == Durability.PERSIST_TO_MAJORITY:
-            return ClientDurability(persist_to=PersistTo(int((num_replicas+1)/2 + 1)), replicate_to=0)
+            return ClientDurability(persist_to=PersistTo(int((num_replicas+1)/2 + 1)), replicate_to=ReplicateTo.NONE)
 
     def test_multi(self):
         test_dict = {"Fred": "Wilma", "Barney": "Betty"}

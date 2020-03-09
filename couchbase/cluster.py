@@ -1,7 +1,9 @@
 import asyncio
-
+from typing import *
 from couchbase.management.admin import Admin
 
+
+import couchbase.search as SEARCH
 from couchbase_core.mutation_state import MutationState
 from couchbase_core.asynchronous import AsyncClientFactory
 from couchbase.management.queries import QueryIndexManager
@@ -10,8 +12,9 @@ from couchbase.management.analytics import AnalyticsIndexManager
 from couchbase.analytics import AnalyticsOptions
 from .management.users import UserManager
 from .management.buckets import BucketManager
-from couchbase.diagnostics import DiagnosticsResult
-from couchbase.fulltext import SearchResult, SearchOptions
+from couchbase.management.admin import Admin
+from couchbase.diagnostics import DiagnosticsResult, EndPointDiagnostics
+from couchbase.search import SearchResult, SearchOptions
 from .analytics import AnalyticsResult
 from .n1ql import QueryResult
 from couchbase_core.n1ql import N1QLQuery
@@ -403,7 +406,7 @@ class Cluster(CoreClient):
 
     def search_query(self,
                      index,     # type: str
-                     query,     # type: couchbase_core.Query
+                     query,     # type: search.SearchQuery
                      *options,  # type: SearchOptions
                      **kwargs
                      ):
@@ -411,19 +414,28 @@ class Cluster(CoreClient):
         """
         Executes a Search or F.T.S. query against the remote cluster and returns a SearchResult implementation with the results of the query.
 
+        .. code-block:: python
+
+            it = cb.search('name', ft.MatchQuery('nosql'), SearchOptions(limit=10))
+            for hit in it:
+                print(hit)
+
         :param str index: Name of the index to use for this query.
-        :param couchbase_core.Query query: the fluent search API to construct a query for F.T.S.
+        :param couchbas.search.SearchQuery: the fluent search API to construct a query for F.T.S.
         :param QueryOptions options: the options to pass to the cluster with the query.
         :param Any kwargs: Overrides corresponding value in options.
-        :return: An SearchResult object with the results of the query or error message if the query failed on the server.
+        :return: A SearchResult object with the results of the query or error message if the query failed on the server.
         Any exceptions raised by the underlying platform - HTTP_TIMEOUT for example.
         :except    ServiceNotFoundException - service does not exist or cannot be located.
 
         """
         self._check_for_shutdown()
-        final_args=forward_args(kwargs, *options)
-        final_args['itercls']=final_args.get('itercls',SearchResult)
-        return self._operate_on_cluster(CoreClient.search, SearchException, index, query, **final_args )
+
+        def do_search(dest):
+            search_params = SearchOptions.gen_search_params_cls(index, query, *options, **kwargs)
+            return search_params.itercls(search_params.body, dest, **search_params.iterargs)
+
+        return self._operate_on_cluster(do_search, SearchException)
 
     _root_diag_data = {'id', 'version', 'sdk'}
 

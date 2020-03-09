@@ -1,0 +1,12 @@
+{
+  "metadata": {
+    "http_status": 404,
+    "description": "This case is representative of when a request is made for a design document that does not exist.",
+    "reproduction": "Request a design document that does not exist",
+    "server_version": "6.5"
+  },
+  "data": {
+    "error": "not_found",
+    "reason": "missing"
+  }
+}

@@ -3,19 +3,19 @@ import warnings
 from boltons.funcutils import wraps
 
 
-def deprecate_module_attribute(mod, deprecated=[]):
+def deprecate_module_attribute(mod, deprecated=tuple()):
     return warn_on_attribute_access(mod, deprecated, "deprecated")
 
 
 class Level(object):
-    @classmethod
-    def wrap(cls, function):
+    def __new__(cls, function, *args, **kwargs):
         """
-        Mark a function as uncommitted
+        Mark a function as {}
 
         :param function: input function
         :return: marked function
-        """
+        """.format(cls.__name__)
+
         message = cls.__doc__+"\n"
 
         func_name = getattr(function, '__qualname__', function.__name__)
@@ -40,7 +40,7 @@ class Uncommitted(Level):
     """
 
 
-uncommitted = Uncommitted.wrap
+uncommitted = Uncommitted
 
 
 class Volatile(Level):
@@ -51,7 +51,7 @@ class Volatile(Level):
     """
 
 
-volatile = Volatile.wrap
+volatile = Volatile
 
 
 class Internal(Level):
@@ -66,7 +66,7 @@ class Internal(Level):
         return function
 
 
-internal = Internal.wrap
+internal = Internal
 
 
 class Committed(Level):
@@ -75,7 +75,7 @@ class Committed(Level):
     """
 
 
-committed = Committed.wrap
+committed = Committed
 
 
 def warn_on_attribute_access(obj, applicable, status):

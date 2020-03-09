@@ -1,0 +1,26 @@
+{
+  "metadata": {
+    "http_status": 500,
+    "description": "This case is representative of a response a prepared statement request which has an illegal plan.",
+    "reproduction": "Send a prepared statement request to the server where the encoded_plan field is illegal.",
+    "expectation": "When enhanced prepared statements are not in use then retry",
+    "server_version": "6.0"
+  },
+  "data": {
+    "requestID": "34fd1715-db11-410e-a058-1f91cc886dfb",
+    "errors": [
+      {
+        "code": 4070,
+        "msg": "Unable to decode prepared statement - cause: illegal base64 data at input byte 29"
+      }
+    ],
+    "status": "fatal",
+    "metrics": {
+      "elapsedTime": "58.631633ms",
+      "executionTime": "41.518µs",
+      "resultCount": 0,
+      "resultSize": 0,
+      "errorCount": 1
+    }
+  }
+}

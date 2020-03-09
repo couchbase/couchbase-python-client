@@ -23,7 +23,7 @@ Contents:
    api/views
    api/analytics
    api/n1ql
-   api/fulltext
+   api/search
    api/results
    api/exceptions
    api/transcoder

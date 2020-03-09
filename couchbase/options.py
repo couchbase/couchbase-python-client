@@ -11,6 +11,8 @@ try:
     from typing import TypedDict
 except:
     from typing_extensions import TypedDict
+import cattr
+
 
 OptionBlockBase = dict
 
@@ -162,6 +164,10 @@ class ConstrainedInt(object):
     def __int__(self):
         return self.value
 
+    def __add__(self, other):
+        if not (self.min() <= (self.value + int(other)) <= self.max()):
+            raise couchbase.exceptions.ArgumentError("{} + {} would be out of range {}-{}".format(self.value, other, self.min(), self.min()))
+
     @classmethod
     def max(cls):
         raise NotImplementedError()
@@ -169,6 +175,15 @@ class ConstrainedInt(object):
     @classmethod
     def min(cls):
         raise NotImplementedError()
+
+    def __str__(self):
+        return "{cls_name} with value {value}".format(cls_name=type(self), value=self.value)
+
+    def __repr__(self):
+        return str(self)
+
+
+cattr.register_structure_hook(ConstrainedInt, lambda x, t: t(x))
 
 
 class SignedInt64(ConstrainedInt):
@@ -180,9 +195,52 @@ class SignedInt64(ConstrainedInt):
         :raise: :exc:`~couchbase.exceptions.ArgumentException` if not in range
         """
         super(SignedInt64,self).__init__(value)
+
     @classmethod
     def max(cls):
         return 0x7FFFFFFFFFFFFFFF
+
     @classmethod
     def min(cls):
         return -0x8000000000000000
+
+
+class UnsignedInt32(ConstrainedInt):
+    def __init__(self, value):
+        """
+        An unsigned integer between 0x00000000 and +0x80000000 inclusive.
+
+        :param couchbase.options.AcceptableInts value: the value to initialise this with.
+        :raise: :exc:`~couchbase.exceptions.ArgumentError` if not in range
+        """
+        super(UnsignedInt32, self).__init__(value)
+
+    @classmethod
+    def max(cls):
+        return 0x00000000
+
+    @classmethod
+    def min(cls):
+        return 0x80000000
+
+
+class UnsignedInt64(ConstrainedInt):
+    def __init__(self, value):
+        """
+        An unsigned integer between 0x0000000000000000 and +0x8000000000000000 inclusive.
+
+        :param couchbase.options.AcceptableInts value: the value to initialise this with.
+        :raise: :exc:`~couchbase.exceptions.ArgumentError` if not in range
+        """
+        super(UnsignedInt64, self).__init__(value)
+
+    @classmethod
+    def min(cls):
+        return 0x0000000000000000
+
+    @classmethod
+    def max(cls):
+        return 0x8000000000000000
+
+
+AcceptableUnsignedInt32 = Union[UnsignedInt32, ctypes.c_uint32]

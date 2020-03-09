@@ -19,8 +19,8 @@
 This file contains the F.T.S. implementation for Async
 """
 
-from couchbase_core.fulltext import SearchRequest
-from .rowsbase import AsyncRowsBase
+from couchbase.search import SearchRequest
+from couchbase_core.asynchronous.rowsbase import AsyncRowsBase
 
 
 class AsyncSearchRequest(AsyncRowsBase, SearchRequest):
