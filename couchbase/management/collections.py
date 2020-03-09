@@ -47,7 +47,7 @@ class CollectionManager(GenericManager):
           raise ScopeNotFoundException("no scope with name {}".format(scope_name))
 
 
-    @NotSupportedWrapper.a_404_means_not_supported
+    @NotSupportedWrapper.a_400_or_404_means_not_supported
     def get_all_scopes(self,            # type: CollectionManager
                        *options,        # type: GetAllScopesOptions
                        **kwargs         # type: Any

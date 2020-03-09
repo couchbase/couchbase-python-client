@@ -824,6 +824,19 @@ class ClusterTestCase(CouchbaseTestCase):
         self.bucket = self.cluster.bucket(bucket_name, **connargs)
         self.bucket_name = bucket_name
 
+    # NOTE: this really is only something you can trust in homogeneous clusters, but then again
+    # this is a test suite.
+    def get_cluster_version(self):
+        pools = self.cluster._admin.http_request(path='/pools').value
+        return pools['implementationVersion'].split('-')[0]
+
+    def get_bucket_info(self):
+        return self.cluster._admin.bucket_info(self.bucket_name).value
+
+    def supports_sync_durability(self):
+        info = self.get_bucket_info()
+        return "durableWritd" in info['bucketCapabilities']
+
 
 ParamClusterTestCase = parameterized_class(('cluster_factory',), [(Cluster,), (Cluster.connect,)])(ClusterTestCase)
 

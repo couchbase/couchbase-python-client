@@ -102,13 +102,13 @@ class CollectionManagerTestCase(CollectionTestCase):
     self.assertRaises(ScopeNotFoundException, self.cm.get_scope, 'somerandomname')
 
   def testDropCollection(self):
+    def get_collection(name):
+        return [c for c in self.cm.get_all_scopes()[0].collections if c.name == name][0]
+
     self.cm.create_collection(CollectionSpec('other-collection'))
     self.try_n_times(10, 1, self.other_bucket.collection, 'other-collection')
-    self.assertTrue([c for c in self.cm.get_all_scopes()[0].collections if c.name == 'other-collection'])
     self.cm.drop_collection(CollectionSpec('other-collection'))
     # there is no get_collection, so...
-    def get_collection(name):
-        c = [c for c in self.cm.get_all_scopes()[0].collections if c.name == name][0]
     self.try_n_times_till_exception(10, 1, get_collection, 'other-collection')
 
   def testDropCollectionNotFound(self):

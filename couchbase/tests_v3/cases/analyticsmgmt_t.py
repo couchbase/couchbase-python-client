@@ -30,6 +30,9 @@ class AnalyticsIndexManagerTests(CollectionTestCase):
         if self.is_mock:
             raise SkipTest("mock doesn't mock management apis")
 
+        if int(self.get_cluster_version().split('.')[0]) < 6:
+            raise SkipTest("no analytics in {}".format(self.get_cluster_version()))
+
         self.mgr = self.cluster.analytics_indexes()
         self.dataverse_name = "test_dataverse"
         self.dataset_name = "test_breweries"

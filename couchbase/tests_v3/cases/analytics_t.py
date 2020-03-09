@@ -26,11 +26,18 @@ class AnalyticsTestCase(CollectionTestCase):
         super(AnalyticsTestCase, self).setUp()
         if self.is_mock:
             raise SkipTest("analytics not mocked")
+        if int(self.get_cluster_version().split('.')[0]) < 6:
+            raise SkipTest("no analytics in {}".format(self.get_cluster_version()))
         self.mgr = self.cluster.analytics_indexes()
         self.dataset_name = 'test_beer_dataset'
         # create a dataset to query
         self.mgr.create_dataset(self.dataset_name, 'beer-sample', CreateDatasetOptions(ignore_if_exists=True))
+        def has_dataset(name):
+            datasets = self.mgr.get_all_datasets()
+            return [d for d in datasets if d.dataset_name == name][0]
+        self.try_n_times(10, 3, has_dataset, self.dataset_name)
         # connect it...
+
         self.mgr.connect_link()
 
     def tearDown(self):

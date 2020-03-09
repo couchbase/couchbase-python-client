@@ -132,6 +132,8 @@ class Scenarios(CollectionTestCase):
                       dur_name):
         durability=Durability[dur_name]
         count = 0
+        if not self.supports_sync_durability() and dur_name != Durability.NONE.value:
+            raise SkipTest("durableWrite not supported in {}".format(self.get_cluster_version()))
 
         somecontents = {'some': {'path': 'keith'}}
         key="{}_{}".format("somekey_{}", count)
@@ -532,6 +534,9 @@ class Scenarios(CollectionTestCase):
 
     def test_multi(self):
         test_dict = {"Fred": "Wilma", "Barney": "Betty"}
+        # TODO: rewrite these tests to test one thing at a time, if possible
+        if not self.supports_sync_durability():
+            raise SkipTest("durableWrite not supported in {}".format(self.get_cluster_version()))
         for dur_level in [Durability.NONE] if self.is_mock else Durability:
             try:
                 self.coll.remove_multi(test_dict.keys())
@@ -585,14 +590,3 @@ class Scenarios(CollectionTestCase):
         self.coll.map_add("Fred", "Gail", "Porter")
         self.assertEqual("Porter", self.coll.map_get("Fred", "Gail"))
 
-class AnalyticsTest(couchbase_core.tests.analytics_harness.CBASTestSpecific, ClusterTestCase):
-    def setUp(self):
-        self.factory=Bucket
-        ClusterTestCase.setUp(self)
-        couchbase_core.tests.analytics_harness.CBASTestSpecific.setUp(self)
-
-    def get_fixture(self):
-        return self.cluster
-
-    def do_analytics_query(self, query, **kwargs):
-        return self.cluster.analytics_query(query, **kwargs)

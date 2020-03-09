@@ -30,8 +30,8 @@ class ClusterTests(CollectionTestCase):
         super(ClusterTests, self).setUp()
 
     def test_diagnostics(self):
-        if self.is_mock:
-            raise SkipTest("diagnostics hangs forever with mock")
+        if self.is_mock or not self.supports_collections():
+            raise SkipTest("diagnostics hangs forever with mock and < 6.5")
         result = self.cluster.diagnostics(DiagnosticsOptions(report_id="imareportid"))
         self.assertIn("imareportid", result.id)
         self.assertIsNotNone(result.sdk)
@@ -48,8 +48,8 @@ class ClusterTests(CollectionTestCase):
         self.assertEqual(config[0].type, ServiceType.Config)
 
     def test_diagnostics_with_active_bucket(self):
-        if self.is_mock:
-            raise SkipTest("diagnostics hangs forever with mock")
+        if self.is_mock or not self.supports_collections():
+            raise SkipTest("diagnostics hangs forever with mock and < 6.5")
         query_result = self.cluster.query('SELECT * FROM `beer-sample` LIMIT 1')
         self.assertTrue(len(query_result.rows()) > 0)
         result = self.cluster.diagnostics(DiagnosticsOptions(report_id="imareportid"))

@@ -17,7 +17,7 @@
 from couchbase_tests.base import CollectionTestCase, SkipTest
 from couchbase.management.collections import CollectionManager
 from couchbase.bucket import PingOptions
-from couchbase.diagnostics import ServiceType
+from couchbase.diagnostics import ServiceType, PingState
 from datetime import timedelta
 
 
@@ -38,20 +38,21 @@ class BucketSimpleTest(CollectionTestCase):
         self.assertIsNotNone(result.id)
         self.assertIsNotNone(result.version)
         endpoints = result.endpoints
-        for k, vals in result.endpoints.items():
+        for k, vals in endpoints.items():
             for v in vals:
-                self.assertIsNotNone(v)
-                self.assertIsNotNone(v.id)
-                self.assertIsNotNone(v.latency)
-                self.assertIsNotNone(v.remote)
-                self.assertIsNotNone(v.local)
-                self.assertEqual(k, v.service_type)
-                # Should really include ServiceType.View but lcb only
-                # puts the scope in for KV.  TODO: file ticket or discuss
-                if k in [ServiceType.KeyValue]:
-                    self.assertEqual(self.bucket.name, v.namespace)
-                else:
-                    self.assertIsNone(v.namespace)
+                if v.state == PingState.OK:
+                    self.assertIsNotNone(v)
+                    self.assertIsNotNone(v.id)
+                    self.assertIsNotNone(v.latency)
+                    self.assertIsNotNone(v.remote)
+                    self.assertIsNotNone(v.local)
+                    self.assertEqual(k, v.service_type)
+                    # Should really include ServiceType.View but lcb only
+                    # puts the scope in for KV.  TODO: file ticket or discuss
+                    if k in [ServiceType.KeyValue]:
+                        self.assertEqual(self.bucket.name, v.namespace)
+                    else:
+                        self.assertIsNone(v.namespace)
 
     def test_ping_report_id(self):
         report_id = "11111"

@@ -11,6 +11,7 @@ from couchbase_core.result import AsyncResult
 from couchbase_core._pyport import Protocol
 from couchbase_core.views.iterator import View as CoreView
 from couchbase.diagnostics import EndpointPingReport, ServiceType
+from enum import Enum
 
 Proxy_T = TypeVar('Proxy_T')
 
@@ -239,8 +240,9 @@ class PingResult(object):
             # construct an EndpointPingReport for each
             k = ServiceType(k)
             self._endpoints[k] = list()
-            for value in v :
-                self._endpoints[k].append(EndpointPingReport(k, value))
+            for value in v:
+                if value:
+                    self._endpoints[k].append(EndpointPingReport(k, value))
 
     @property
     def endpoints(self):

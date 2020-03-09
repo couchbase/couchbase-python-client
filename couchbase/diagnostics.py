@@ -31,6 +31,11 @@ class ServiceType(Enum):
     Management = "mgmt"
 
 
+class PingState(Enum):
+    OK = 'ok'
+    TIMEOUT = 'timeout'
+
+
 class EndPointDiagnostics(object):
     def __init__(self,          # type: EndPointDiagnostics
                  service_type,  # type: ServiceType
@@ -161,6 +166,7 @@ class DiagnosticsResult(object):
         return ClusterState.Offline
 
 
+
 class EndpointPingReport(object):
     def __init__(self,
                  service_type,  # type: ServiceType
@@ -199,5 +205,10 @@ class EndpointPingReport(object):
     def latency(self):
         # type: (...) -> timedelta
         return timedelta(microseconds=self._src_ping.get('latency_us', None))
+
+    @property
+    def state(self):
+        # type: (...) -> PingState
+        return PingState(self._src_ping.get('status', None))
 
 

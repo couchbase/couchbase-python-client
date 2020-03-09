@@ -42,6 +42,7 @@ class QueryTests(CollectionTestCase):
         for row in result.rows():
             self.assertIsNotNone(row)
             count += 1
+        print(result.parent.errors)
         self.assertEquals(count, expected_count)
 
     def test_simple_query(self):

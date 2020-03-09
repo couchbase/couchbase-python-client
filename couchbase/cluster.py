@@ -340,8 +340,10 @@ class Cluster(object):
         clients = [v() for k, v in self._cluster._buckets.items()]
         clients = [v._bucket for v in clients if v]
         clients.append(self._get_clusterclient())
+        results = []
         for c in clients:
-            verb(c, *args, **kwargs)
+            results.append(verb(c, *args, **kwargs))
+        return results
 
 
     async def _operate_on_entire_cluster(self,
@@ -430,11 +432,8 @@ class Cluster(object):
         :return: A DiagnosticsResult object with the results of the query or error message if the query failed on the server.
 
         """
-
         self._check_for_shutdown()
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(self._operate_on_entire_cluster(CoreClient.diagnostics, DiagnosticsException, **forward_args(kwargs, *options)))
+        result = self._sync_operate_on_entire_cluster(CoreClient.diagnostics, **forward_args(kwargs, *options))
         return DiagnosticsResult(result)
 
     def users(self):

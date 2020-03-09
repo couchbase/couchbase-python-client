@@ -1012,6 +1012,23 @@ class NotSupportedWrapper(object):
                 raise
         return wrapped
 
+    @classmethod
+    def a_400_or_404_means_not_supported(cls, func):
+        # some functions 404 if < 6.5, but 400 if 6.5 with
+        # developer preview off.  <Sigh>
+        def wrapped(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except HTTPError as e:
+                extra = getattr(e, 'objextra', None)
+                status = getattr(extra, 'http_status', None)
+                if status == 404 or status == 400:
+                    raise NotSupportedError('Server does not support this api call')
+                raise
+
+        return wrapped
+
+
 class DictMatcher(object):
     def __init__(self, **kwargs):
         self._pattern=tuple(kwargs.items())
