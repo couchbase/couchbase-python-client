@@ -1,6 +1,5 @@
 import asyncio
 from typing import *
-
 from couchbase_core.mutation_state import MutationState
 
 from couchbase.management.queries import QueryIndexManager
@@ -222,12 +221,14 @@ class Cluster(object):
     def __init__(self,
                  connection_string,  # type: str
                  *options,           # type: ClusterOptions
+                 bucket_factory=Bucket,  # type: Any
                  **kwargs            # type: Any
                  ):
         """
         Create a Cluster object.
         An Authenticator must be provided, either as the authenticator named parameter, or within the options argument.
         :param str connection_string: the connection string for the cluster.
+        :param Callable bucket_factory: factory for producing couchbase.bucket.Bucket derivatives
         :param ClusterOptions options: options for the cluster.
         :param Any kwargs: Override corresponding value in options.
         """
@@ -236,8 +237,11 @@ class Cluster(object):
         authenticator = cluster_opts.pop('authenticator', None)
         if not authenticator:
             raise ArgumentError("Authenticator is mandatory")
+
+        def corecluster_bucket_factory(connstr, bname=None, **kwargs):
+            return bucket_factory(connstr, name=bname, admin=self._admin, **kwargs)
         cluster_opts.update(
-            bucket_class=lambda connstr, bname=None, **kwargs: Bucket(connstr, name=bname, admin=self._admin, **kwargs))
+            bucket_factory=corecluster_bucket_factory)
         self._cluster = CoreCluster(connection_string, **cluster_opts)  # type: CoreCluster
         self._authenticate(authenticator)
 
@@ -338,7 +342,7 @@ class Cluster(object):
                                         *args,
                                         **kwargs):
         clients = [v() for k, v in self._cluster._buckets.items()]
-        clients = [v._bucket for v in clients if v]
+        clients = [v for v in clients if v]
         clients.append(self._get_clusterclient())
         results = []
         for c in clients:
@@ -364,7 +368,7 @@ class Cluster(object):
         for name, c in self._cluster._buckets.items():
             client = c()
             if client:
-                tasks.append(coroutine(client._bucket, verb, *args, **kwargs))
+                tasks.append(coroutine(client, verb, *args, **kwargs))
         done, pending = await asyncio.wait(tasks)
         results = []
         for d in done:

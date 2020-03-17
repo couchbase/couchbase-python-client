@@ -14,3 +14,4 @@ pyrsistent>=0.15.2
 boltons>=19.1.0
 attrs>=19.1.0
 
+wrapt>=1.11.2

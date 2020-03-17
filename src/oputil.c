@@ -175,8 +175,8 @@ pycbc_common_vars_finalize(struct pycbc_common_vars *cv, pycbc_Bucket *conn)
 }
 
 TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,,
-int,
-pycbc_common_vars_wait, struct pycbc_common_vars *cv, pycbc_Bucket *self)
+                int,
+                pycbc_common_vars_wait, struct pycbc_common_vars *cv, pycbc_Bucket *self)
 {
     Py_ssize_t nsched = cv->is_seqcmd ? 1 : cv->ncmds;
 
@@ -538,45 +538,10 @@ int pycbc_wrap_bucket_callback(pycbc_oputil_keyhandler_raw_Bucket *original,
                                void *arg,
                                pycbc_stack_context_handle context)
 {
-    return (*original)((pycbc_Bucket *)self,
-                       cv,
-                       optype,
-                       key,
-                       value,
-                       options,
-                       item,
-                       arg,
-                       context);
+    return (*original)(
+            self->bucket, cv, optype, key, value, options, item, arg, context);
 }
 
-int pycbc_oputil_iter_multi_Bucket(pycbc_Bucket *self,
-                                   pycbc_seqtype_t seqtype,
-                                   PyObject *collection,
-                                   struct pycbc_common_vars *cv,
-                                   int optype,
-                                   pycbc_oputil_keyhandler_Bucket handler,
-                                   void *arg,
-                                   pycbc_stack_context_handle context)
-{
-    pycbc_oputil_keyhandler_Collection wrapper;
-    int rv = LCB_SUCCESS;
-    PYCBC_COLLECTION_INIT(self, pycbc_DummyKeywords);
-    wrapper.category = handler.category;
-    wrapper.name = handler.name;
-    wrapper.original = &handler.cb;
-    wrapper.cb = pycbc_wrap_bucket_callback;
-
-    rv = pycbc_oputil_iter_multi_Collection(pcb_collection,
-                                            seqtype,
-                                            collection,
-                                            cv,
-                                            optype,
-                                            wrapper,
-                                            arg,
-                                            context);
-    pycbc_Collection_free_if_stack_allocated(pcb_collection);
-    return rv;
-}
 int pycbc_oputil_iter_multi_Collection(
         pycbc_Collection_t *collectionself,
         pycbc_seqtype_t seqtype,
@@ -628,7 +593,7 @@ int pycbc_oputil_iter_multi_Collection(
                                              NULL,
                                              1,
                                              cv,
-                                             collectionself,
+                                             collectionself->bucket,
                                              handler.original,
                                              collectionself,
                                              cv,
@@ -715,8 +680,8 @@ pycbc_oputil_conn_unlock(pycbc_Bucket *self)
     PyThread_release_lock(self->lock);
 }
 
-TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,,void,
-pycbc_oputil_wait_common,pycbc_Bucket *self)
+TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,, void,
+                pycbc_oputil_wait_common, pycbc_Bucket *self)
 {
     /**
      * If we have a 'lockmode' specified, check to see that nothing else is
@@ -778,7 +743,7 @@ int pycbc_handle_durability_args(pycbc_Bucket *self,
 
 int
 pycbc_encode_sd_keypath(pycbc_Bucket *conn, PyObject *src,
-                      pycbc_pybuffer *keybuf, pycbc_pybuffer *pathbuf)
+                        pycbc_pybuffer *keybuf, pycbc_pybuffer *pathbuf)
 {
     PyObject *kobj, *pthobj;
     int rv;
@@ -908,7 +873,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                 lcb_STATUS *err,
                 pycbc__SDResult *newitm)
 {
-    pycbc_Bucket *self = (pycbc_Bucket *)collection;
+    pycbc_Bucket *self = collection->bucket;
     (void)self;
     if (rv == 0) {
         PYCBC_TRACECMD_PURE(subdoc, cmd, context);
@@ -947,7 +912,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                 PyObject *spectuple,
                 lcb_CMDSUBDOC *cmd)
 {
-    pycbc_Bucket *self = (pycbc_Bucket *)collection;
+    pycbc_Bucket *self = collection->bucket;
     int rv = 0;
     lcb_STATUS err = LCB_SUCCESS;
     size_t nspecs = 0;

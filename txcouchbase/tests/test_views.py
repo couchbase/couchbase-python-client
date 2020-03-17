@@ -15,7 +15,7 @@
 #
 from twisted.internet import defer
 
-from txcouchbase.bucket import BatchedView
+from txcouchbase.bucket import BatchedView, TxBucket, BatchedViewResult
 from couchbase_core.exceptions import HTTPError
 from couchbase_core.asynchronous.view import AsyncViewBase
 
@@ -45,19 +45,23 @@ class RowsHandler(AsyncViewBase):
 
 
 class TxViewsTests(gen_base(ViewTestCase)):
+    @property
+    def factory(self):
+        return self.gen_bucket
+
     def make_connection(self, **kwargs):
         return super(TxViewsTests, self).make_connection(bucket='beer-sample')
 
     def testEmptyView(self):
         cb = self.make_connection()
-        return cb.queryAll('beer', 'brewery_beers', limit=0)
+        return cb.view_query('beer', 'brewery_beers', limit=0)
 
     def testLimitView(self):
         cb = self.make_connection()
-        d = cb.queryAll('beer', 'brewery_beers', limit=10)
+        d = cb.view_query('beer', 'brewery_beers', limit=10)
 
         def _verify(o):
-            self.assertIsInstance(o, BatchedView)
+            self.assertIsInstance(o, BatchedViewResult)
             rows = list(o)
             self.assertEqual(len(rows), 10)
 
@@ -65,14 +69,14 @@ class TxViewsTests(gen_base(ViewTestCase)):
 
     def testBadView(self):
         cb = self.make_connection()
-        d = cb.queryAll('blah', 'blah_blah')
+        d = cb.view_query('blah', 'blah_blah')
         self.assertFailure(d, HTTPError)
         return d
 
     def testIncrementalRows(self):
         d = defer.Deferred()
         cb = self.make_connection()
-        o = cb.queryEx(RowsHandler, 'beer', 'brewery_beers')
+        o = cb.view_query_ex(RowsHandler, 'beer', 'brewery_beers')
         self.assertIsInstance(o, RowsHandler)
 
         def verify(unused):

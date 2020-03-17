@@ -299,17 +299,6 @@ pycbc_oputil_keyhandler_Collection pycbc_oputil_keyhandler_build_Collection(
             PYCBC_OPUTIL_KEYHANDLER_BUILD(UNIT, HANDLER),                   \
             CONTEXT,                                                        \
             __VA_ARGS__)
-#define PYCBC_OPUTIL_ITER_MULTI(                                      \
-        SELF, SEQTYPE, COLLECTION, CV, OPTYPE, HANDLER, CONTEXT, ...) \
-    PYCBC_OPUTIL_ITER_MULTI_BASE(Bucket,                              \
-                                 SELF,                                \
-                                 SEQTYPE,                             \
-                                 COLLECTION,                          \
-                                 CV,                                  \
-                                 OPTYPE,                              \
-                                 HANDLER,                             \
-                                 CONTEXT,                             \
-                                 __VA_ARGS__)
 
 #define PYCBC_OPUTIL_ITER_MULTI_COLLECTION(                           \
         SELF, SEQTYPE, COLLECTION, CV, OPTYPE, HANDLER, CONTEXT, ...) \
@@ -333,14 +322,6 @@ pycbc_oputil_keyhandler_Collection pycbc_oputil_keyhandler_build_Collection(
  * @param handler the actual handler to call for each key-value-item pair
  * @param arg an opaque pointer passed to the handler
  */
-int pycbc_oputil_iter_multi_Bucket(pycbc_Bucket *self,
-                                   pycbc_seqtype_t seqtype,
-                                   PyObject *collection,
-                                   struct pycbc_common_vars *cv,
-                                   int optype,
-                                   pycbc_oputil_keyhandler_Bucket handler,
-                                   void *arg,
-                                   pycbc_stack_context_handle context);
 
 #define pycbc_oputil_iter_multi(...) pycbc_oputil_iter_multi(__VA_ARGS__)
 int pycbc_oputil_iter_multi_Collection(
@@ -369,16 +350,16 @@ void pycbc_common_vars_finalize(struct pycbc_common_vars *cv, pycbc_Bucket *self
  * @return 0 on success, -1 on failure.
  */
 TRACED_FUNCTION_DECL(,
-int,
-pycbc_common_vars_wait, struct pycbc_common_vars *cv, pycbc_Bucket *self);
+        int,
+        pycbc_common_vars_wait, struct pycbc_common_vars *cv, pycbc_Bucket *self);
 
 
 /**
  * Wrapper around lcb_wait(). This ensures threading contexts are properly
  * initialized.
  */
-TRACED_FUNCTION_DECL(,void,
-pycbc_oputil_wait_common, pycbc_Bucket *self);
+TRACED_FUNCTION_DECL(, void,
+                       pycbc_oputil_wait_common, pycbc_Bucket *self);
 
 
 /**

@@ -47,7 +47,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                 void *arg)
 
 {
-    pycbc_Bucket *self = (pycbc_Bucket *)collection;
+    pycbc_Bucket *self = collection->bucket;
     int rv;
     unsigned int lock = 0;
     struct getcmd_vars_st *gv = (struct getcmd_vars_st *)arg;
@@ -249,7 +249,7 @@ handle_replica_options(int *optype, struct getcmd_vars_st *gv, PyObject *replica
 
 static PyObject*
 get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
-    int argopts, pycbc_stack_context_handle context)
+           int argopts, pycbc_stack_context_handle context)
 {
     Py_ssize_t ncmds = 0;
     pycbc_seqtype_t seqtype;
@@ -266,7 +266,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
     static char *kwlist[] = {
             "keys", "ttl", "quiet", "replica", "no_format", "durability_level", "timeout", NULL};
 #undef X
-    PYCBC_COLLECTION_INIT(self, kwargs)
+    pycbc_Collection_t collection = pycbc_Collection_as_value(self, kwargs);
     int rv = PyArg_ParseTupleAndKeywords(args,
                                          kwargs,
                                          "O|OOOOIO",
@@ -353,7 +353,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
         // temporary wrapping code until everything is migrated to collections
 
         if (argopts & PYCBC_ARGOPT_MULTI) {
-            rv = PYCBC_OPUTIL_ITER_MULTI_COLLECTION(pcb_collection,
+            rv = PYCBC_OPUTIL_ITER_MULTI_COLLECTION(&collection,
                                                     seqtype,
                                                     kobj,
                                                     &cv,
@@ -370,7 +370,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
                                          &context,
                                          self,
                                          NULL,
-                                         pcb_collection,
+                                         &collection,
                                          &cv,
                                          optype,
                                          kobj,
@@ -423,7 +423,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
 GT_DONE:
     pycbc_common_vars_finalize(&cv, self);
 GT_FINALLY:
-    pycbc_Collection_free_if_stack_allocated(pcb_collection);
+    pycbc_Collection_free_unmanaged_contents(&collection);
     return cv.ret;
 }
 #define PYCBC_COMMON_ARGS_TIMEOUT(CLASS) CLASS##_OBJECT(timeout)
@@ -443,7 +443,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                 pycbc_Item *itm,
                 void *arg)
 {
-    pycbc_Bucket *self = (pycbc_Bucket *)collection;
+    pycbc_Bucket *self = collection->bucket;
     pycbc_pybuffer keybuf = {NULL};
     int rv = 0;
     if (itm) {
@@ -472,8 +472,8 @@ GT_DONE:
 }
 
 TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
-static, PyObject *,
-sdlookup_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopts)
+                static, PyObject *,
+                sdlookup_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopts)
 {
     Py_ssize_t ncmds;
     PyObject *kobj = NULL;
@@ -483,7 +483,7 @@ sdlookup_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argop
     static char *kwlist[] = {
             "ks", "quiet", PYCBC_COMMON_ARGS_TIMEOUT(KEYWORDS) NULL};
     pycbc_common_args_timeout_t opts = {0};
-    PYCBC_COLLECTION_INIT(self, kwargs)
+    pycbc_Collection_t collection = pycbc_Collection_as_value(self, kwargs);
     if (!PyArg_ParseTupleAndKeywords(args,
                                      kwargs,
                                      "O|O" PYCBC_COMMON_ARGS_TIMEOUT(ARGSPEC),
@@ -505,7 +505,7 @@ sdlookup_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argop
     if (pycbc_get_duration(opts.timeout, &cv.timeout, 1)) {
         goto GT_FAIL;
     }
-    if (PYCBC_OPUTIL_ITER_MULTI_COLLECTION(pcb_collection,
+    if (PYCBC_OPUTIL_ITER_MULTI_COLLECTION(&collection,
                                            seqtype,
                                            kobj,
                                            &cv,
@@ -526,7 +526,7 @@ sdlookup_common, pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argop
     GT_DONE:
     pycbc_common_vars_finalize(&cv, self);
     GT_FINAL:
-        pycbc_Collection_free_if_stack_allocated(pcb_collection);
+        pycbc_Collection_free_unmanaged_contents(&collection);
         return cv.ret;
     GT_FAIL:
         cv.ret = NULL;

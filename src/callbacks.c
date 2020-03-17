@@ -562,8 +562,8 @@ invoke_endure_test_notification(pycbc_Bucket *self, pycbc_Result *resp)
 }
 static void
 dur_chain2(pycbc_Bucket *conn,
-    pycbc_MultiResult *mres,
-    pycbc_OperationResult *res, int cbtype, const lcb_RESPBASE *resp)
+           pycbc_MultiResult *mres,
+           pycbc_OperationResult *res, int cbtype, const lcb_RESPBASE *resp)
 {
     int is_delete = cbtype == LCB_CALLBACK_REMOVE;
     PYCBC_DEBUG_LOG_CONTEXT(res ? res->tracing_context : NULL,

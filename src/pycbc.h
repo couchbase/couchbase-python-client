@@ -516,6 +516,7 @@ lcb_STATUS pycbc_logging_monad_verb(const char *FILE,
                                 CMDNAME,                           \
                                 __VA_ARGS__)
 
+
 typedef struct {
 #define PYCBC_BUCKET_BASE                                                    \
     PyObject_HEAD /** LCB instance */                                        \
@@ -601,9 +602,8 @@ typedef struct {
 typedef struct pycbc_Collection pycbc_Collection_t;
 
 struct pycbc_Collection {
-    PYCBC_BUCKET_BASE
+    PyObject_HEAD pycbc_Bucket *bucket;
     pycbc_Collection_coords collection;
-    int stack_allocated;
 };
 
 /**
@@ -626,19 +626,10 @@ typedef struct {
 } pycbc_coll_context;
 
 int pycbc_collection_init_from_fn_args(pycbc_Collection_t *self,
+                                       pycbc_Bucket *bucket,
                                        PyObject *kwargs);
 pycbc_Collection_t pycbc_Collection_as_value(pycbc_Bucket *self,
                                              PyObject *kwargs);
-
-pycbc_Collection_t *pycbc_Collection_ptr(pycbc_Bucket *self,
-                                         pycbc_Collection_t *in_place,
-                                         PyObject *kwargs);
-#define PYCBC_COLLECTION_INIT(SELF, KWARGS) \
-    pycbc_Collection_t cb_collection = {0}; \
-    pycbc_Collection_t *pcb_collection =    \
-            pycbc_Collection_ptr(self, &cb_collection, KWARGS);
-void pycbc_Collection_free_if_stack_allocated(
-        const pycbc_Collection_t *collection);
 void pycbc_Collection_free_unmanaged_contents(
         const pycbc_Collection_t *collection);
 #define PYCBC_COLLECTION_XARGS(X) X("collection", &collection, "O")
@@ -708,7 +699,7 @@ lcb_STATUS pycbc_log_coll(const char *TYPE,
 
 #define COLLECTION_ARG pycbc_Collection_t *
 #define NOCOLLECTION_ARG lcb_INSTANCE *
-#define COLLECTION_GETINSTANCE subject->instance
+#define COLLECTION_GETINSTANCE subject->bucket->instance
 #define NOCOLLECTION_GETINSTANCE subject
 #define COLLECTION_SET_COLL(UC, LC, CMD, SUBJECT) \
     PYCBC_CMD_COLLECTION(LC, CMD, SUBJECT)
@@ -720,6 +711,7 @@ void *pycbc_capsule_value_or_null(PyObject *capsule, const char *capsule_name);
 typedef struct pycbc_Tracer {
     PyObject_HEAD
     lcbtrace_TRACER *tracer;
+    int is_lcb_tracer;
 } pycbc_Tracer_t;
 
 typedef struct {
@@ -1590,7 +1582,7 @@ PyObject *pycbc_lcb_errstr(lcb_t instance, lcb_STATUS err);
 PyObject *pycbc_print_constants(PyObject *mod, PyObject *args);
 
 int pycbc_ResultType_init(PyObject **ptr);
-int pycbc_ClientType_init(PyObject **ptr);
+int pycbc_BucketType_init(PyObject **ptr);
 int pycbc_MultiResultType_init(PyObject **ptr);
 int pycbc_ValueResultType_init(PyObject **ptr);
 int pycbc_OperationResultType_init(PyObject **ptr);

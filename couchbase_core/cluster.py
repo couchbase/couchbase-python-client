@@ -53,16 +53,15 @@ class Cluster(object):
     # list of all authentication types, keep up to date, used to identify connstr/kwargs auth styles
 
     def __init__(self, connection_string='couchbase://localhost',
-                 bucket_class=Client):
+                 bucket_factory=Client):
         """
         Creates a new Cluster object
         :param connection_string: Base connection string. It is an error to
             specify a bucket in the string.
-        :param bucket_class: :class:`couchbase_core.client.Client` implementation to
-            use.
+        :param Callable bucket_factory: factory that open_bucket will use to instantiate buckets
         """
         self.connstr = ConnectionString.parse(str(connection_string))
-        self.bucket_class = bucket_class
+        self.bucket_factory = bucket_factory
         self.authenticator = None
         self._buckets = {}
         if self.connstr.bucket:
@@ -94,7 +93,7 @@ class Cluster(object):
         Open a new connection to a Couchbase bucket
         :param bucket_name: The name of the bucket to open
         :param kwargs: Additional arguments to provide to the constructor
-        :return: An instance of the `bucket_class` object provided to
+        :return: The output of the `bucket_factory` object provided to
             :meth:`__init__`
         """
         if self.authenticator:
@@ -142,7 +141,7 @@ class Cluster(object):
             kwargs['password'] = auth_credentials.get('password', None)
         connstr.scheme = auth_credentials_full.get('scheme', connstr.scheme)
         kwargs['bucket']=bucket_name
-        rv = self.bucket_class(str(connstr), **kwargs)
+        rv = self.bucket_factory(str(connstr), **kwargs)
         self._buckets[bucket_name] = weakref.ref(rv)
         if isinstance(self.authenticator, ClassicAuthenticator):
             for bucket, passwd in self.authenticator.buckets.items():

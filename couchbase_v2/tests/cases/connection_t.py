@@ -90,7 +90,7 @@ class ConnectionTest(CouchbaseTestCase):
         # apparently libcouchbase does not report this failure.
 
     def test_invalid_hostname(self):
-        self.assertRaises(ArgumentError, self.factory,
+        self.assertRaises(InvalidError, self.factory,
                           str('couchbase://12345:qwer###/default'))
 
     def test_multi_hosts(self):

@@ -20,6 +20,7 @@
 #include "iops.h"
 #include "structmember.h"
 #include <libcouchbase/logger.h>
+#include "frameobject.h"
 /**
  * This file contains boilerplate for the module itself
  */
@@ -326,7 +327,7 @@ init_libcouchbase(void)
 #define PYCBC_CRYPTO_TYPES_ADAPTER(NAME, DOC, ...) \
     X(NAME, pycbc_##NAME##Type_init)
 #    define X_PYTYPES_NOTRACING(X)                         \
-        X(Client, pycbc_ClientType_init)                   \
+        X(Bucket, pycbc_BucketType_init)                   \
         /** Remember to keep base classes in order */      \
         X(Result, pycbc_ResultType_init)                   \
         X(OperationResult, pycbc_OperationResultType_init) \
@@ -345,10 +346,10 @@ init_libcouchbase(void)
         X(_SDResult, pycbc_SDResultType_init)              \
         PYCBC_CRYPTO_TYPES(PYCBC_CRYPTO_TYPES_ADAPTER)
 
-#    define X_PYTYPES_NOCOLLECTIONS(X)     \
+#define X_PYTYPES_NOCOLLECTIONS(X)     \
         X_PYTYPES_NOTRACING(X)         \
         X(Tracer, pycbc_TracerType_init)
-#    define PYCBC_COLLECTIONS_PROPER
+
 #    ifdef PYCBC_COLLECTIONS_PROPER
 #        define X_PYTYPES(X)           \
             X_PYTYPES_NOCOLLECTIONS(X) \
@@ -805,9 +806,27 @@ void pycbc_exception_log(const char *file,
                 file,
                 func,
                 line,
-                "***** EXCEPTION:[%R], [%R] *****",
+                "***** EXCEPTION:[%R], [%R] *****, traceback:",
                 type,
                 value);
+        if (traceback && PyTraceBack_Check(traceback))
+        {
+            PyTracebackObject* traceRoot = (PyTracebackObject*)traceback;
+            PyTracebackObject* pTrace = traceRoot;
+
+            while (pTrace != NULL)
+            {
+                PyFrameObject* frame = pTrace->tb_frame;
+                PyCodeObject* code = frame->f_code;
+
+                int lineNr = PyFrame_GetLineNumber(frame);
+                const char *sCodeName = PyUnicode_AsUTF8(code->co_name);
+                const char *sFileName = PyUnicode_AsUTF8(code->co_filename);
+
+                PYCBC_DEBUG_PYFORMAT_FILE_FUNC_AND_LINE(file, func, line, "    at %s (%s:%d); ", sCodeName, sFileName, lineNr);
+                pTrace = pTrace->tb_next;
+            }
+        }
         if (clear)
         {
             Py_XDECREF(type);
@@ -2823,21 +2842,8 @@ pycbc_Collection_t pycbc_Collection_as_value(pycbc_Bucket *self,
                                              PyObject *kwargs)
 {
     pycbc_Collection_t unit = {0};
-    pycbc_collection_init_from_fn_args(&unit, kwargs);
-    unit.stack_allocated = 1;
+    pycbc_collection_init_from_fn_args(&unit, self, kwargs);
     return unit;
-}
-
-pycbc_Collection_t *pycbc_Collection_ptr(pycbc_Bucket *self,
-                                         pycbc_Collection_t *in_place,
-                                         PyObject *kwargs)
-{
-    if (PyObject_IsInstance((PyObject *)self,
-                            (PyObject *)&pycbc_CollectionType)) {
-        return (pycbc_Collection_t *)self;
-    }
-    *in_place = pycbc_Collection_as_value(self, kwargs);
-    return in_place;
 }
 pycbc_tracer_payload_t *pycbc_Tracer_propagate_span(
         pycbc_Tracer_t *tracer, pycbc_tracer_payload_t *payload)
@@ -2961,6 +2967,11 @@ void pycbc_tracer_destructor(lcbtrace_TRACER *tracer)
             Py_XDECREF(state->parent);
             Py_XDECREF(state->id_map);
             Py_XDECREF(state->start_span_method);
+            if (state->child)
+            {
+                lcbtrace_destroy(state->child);
+            }
+
             PYCBC_FREE(state);
             tracer->cookie = NULL;
         }
@@ -3015,6 +3026,10 @@ static PyObject *Tracer_parent(pycbc_Tracer_t *self, void *unused)
     pycbc_tracer_state *tracer_state =
             (self && self->tracer) ? (pycbc_tracer_state *)self->tracer->cookie
                                    : NULL;
+    if (self->is_lcb_tracer)
+    {
+        Py_RETURN_NONE;
+    }
     pycbc_assert(tracer_state);
     {
         PyObject *result = pycbc_none_or_value(tracer_state->parent);
@@ -3034,7 +3049,14 @@ static int Tracer__init__(pycbc_Tracer_t *self,
     lcbtrace_TRACER *child_tracer =
             (lcbtrace_TRACER *)pycbc_capsule_value_or_null(
                     threshold_tracer_capsule, "threshold_tracer");
-    self->tracer = pycbc_tracer_new(parent, child_tracer);
+    if (parent){
+        self->tracer = pycbc_tracer_new(parent, child_tracer);
+        self->is_lcb_tracer=0;
+    }
+    else{
+        self->tracer = pycbc_tracer_new(NULL, child_tracer);
+        self->is_lcb_tracer=1;
+    }
 
     PYCBC_EXCEPTION_LOG_NOCLEAR;
     return rv;

@@ -8,6 +8,8 @@ from couchbase_core.iops.base import (
     PYCBC_EVACTION_WATCH, PYCBC_EVACTION_UNWATCH
 )
 
+import selectors
+
 
 class AsyncioTimer(TimerEvent):
     def __init__(self):
@@ -25,9 +27,47 @@ class AsyncioTimer(TimerEvent):
 
 
 class IOPS(object):
+    required_methods = {'add_reader', 'remove_reader', 'add_writer', 'remove_writer'}
+    _working_loop=None
+
+    @staticmethod
+    def _get_working_loop():
+        if IOPS._working_loop:
+            return IOPS._working_loop
+        evloop = asyncio.get_event_loop()
+        if IOPS._is_working_loop(evloop):
+            IOPS._working_loop = evloop
+        else:
+            selector = selectors.SelectSelector()
+            IOPS._working_loop=asyncio.SelectorEventLoop(selector)
+        return IOPS._working_loop
+
+    @staticmethod
+    def _set_working_loop(evloop):
+        if IOPS._working_loop:
+            return
+        IOPS._working_loop = evloop
+
+    @staticmethod
+    def _is_working_loop(evloop):
+        if not evloop:
+            return False
+        for meth in IOPS.required_methods:
+            abs_meth, actual_meth = (getattr(asyncio.AbstractEventLoop, meth), getattr(evloop.__class__, meth))
+            if abs_meth == actual_meth:
+                return False
+        return True
+
+    @staticmethod
+    def get_event_loop(evloop):
+        if IOPS._is_working_loop(evloop):
+            IOPS._set_working_loop(evloop)
+            return evloop
+        return IOPS._get_working_loop()
+
     def __init__(self, evloop = None):
         if evloop is None:
-            evloop = asyncio.get_event_loop()
+            evloop = IOPS.get_event_loop()
         self.loop = evloop
 
     def update_event(self, event, action, flags):
@@ -61,3 +101,4 @@ class IOPS(object):
         pass
     def timer_event_factory(self):
         return AsyncioTimer()
+

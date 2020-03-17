@@ -349,6 +349,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
 
     static pycbc_query_handler handlers[] = {pycbc_handle_query,
                                              pycbc_handle_analytics};
+    Py_INCREF(vres);
     rc = (handlers[is_analytics])(
             self, params, nparams, host, is_prepared, is_xbucket, mres, vres, context);
     if (rc != LCB_SUCCESS) {

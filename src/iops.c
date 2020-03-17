@@ -69,7 +69,6 @@ static void event_fire_common(pycbc_Event *ev, short which)
 {
     lcb_socket_t fd = 0;
     PyObject *parent;
-
     if (ev->state == PYCBC_EVSTATE_FREED) {
         return;
     }
@@ -80,7 +79,9 @@ static void event_fire_common(pycbc_Event *ev, short which)
     Py_INCREF(ev);
     parent = ev->parent;
     Py_XINCREF(parent);
+    PYCBC_DEBUG_LOG("Calling handler with which %d", which)
     ev->cb.handler(fd, which, ev->cb.data);
+    PYCBC_DEBUG_LOG("Called handler with which %d", which)
     Py_XDECREF(parent);
     Py_DECREF(ev);
 }
@@ -348,8 +349,10 @@ do_safecall(PyObject *callable, PyObject *args)
         PyErr_Fetch(&exctype, &excval, &exctb);
         PyErr_Clear();
     }
-
+    PYCBC_EXCEPTION_LOG_NOCLEAR;
+    PYCBC_DEBUG_PYFORMAT("Calling %S with %S", pycbc_none_or_value(callable), pycbc_none_or_value(args))
     result = PyObject_CallObject(callable, args);
+    PYCBC_DEBUG_PYFORMAT("Called %S with %S, result was %S", pycbc_none_or_value(callable), pycbc_none_or_value(args), result?result:Py_None)
     if (!has_error) {
         /* No special handling here... */
         return result;
@@ -374,6 +377,7 @@ do_safecall(PyObject *callable, PyObject *args)
         Py_XDECREF(exctype);
         Py_XDECREF(excval);
         Py_XDECREF(exctb);
+        PYCBC_EXCEPTION_LOG_NOCLEAR;
     } else {
         PyErr_Restore(exctype, excval, exctb);
     }
@@ -410,8 +414,16 @@ modify_event_python(pycbc_IOPSWrapper *pio, pycbc_Event *ev,
         meth = pio->modtimer;
     }
     PyTuple_SET_ITEM(argtuple, 2, o_arg);
+    PYCBC_EXCEPTION_LOG_NOCLEAR;
 
+#ifdef PYCBC_IOPS_DEBUG
+    PYCBC_DEBUG_PYFORMAT("Calling %R with %R",meth,argtuple)
+#endif
     result = do_safecall(meth, argtuple);
+    PYCBC_EXCEPTION_LOG_NOCLEAR;
+#ifdef PYCBC_IOPS_DEBUG
+    PYCBC_DEBUG_PYFORMAT("Called %R with %R",meth,argtuple)
+#endif
     Py_DECREF(argtuple);
     Py_XDECREF(result);
 
@@ -491,9 +503,10 @@ destroy_event_common(lcb_io_opt_t io, void *arg)
     pycbc_Event *ev = arg;
     lcb_U32 dummy = 0;
     pycbc_assert(ev->state != PYCBC_EVSTATE_ACTIVE);
-
+    PYCBC_DEBUG_LOG("Calling destroy event for %p", arg)
     modify_event_python(PYCBC_IOW_FROM_IOPS(io), ev, PYCBC_EVACTION_CLEANUP,
                         0, &dummy);
+    PYCBC_DEBUG_LOG("Called destroy event for %p", arg)
 
     ev->state = PYCBC_EVSTATE_FREED;
     Py_DECREF(ev);

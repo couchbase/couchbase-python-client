@@ -302,12 +302,12 @@ typedef enum {
 #define PYCBC_CMD_SET_TRACESPAN(TYPE, CMD, SPAN) \
     lcb_cmd##TYPE##_parent_span((CMD), (SPAN));
 #define GENERIC_SPAN_OPERAND(SCOPE, INSTANCE, CMD, HANDLE, CONTEXT) \
-    lcb_cmd##SCOPE##_parent_span(CMD, (CONTEXT)->span)
+    if (CONTEXT){lcb_cmd##SCOPE##_parent_span(CMD, (CONTEXT)->span);};
 #define GENERIC_NULL_OPERAND(SCOPE, INSTANCE, CMD, HANDLE, CONTEXT, COMMAND, ...) \
     lcb_##SCOPE(INSTANCE, __VA_ARGS__);
 #define UNSCOPED_OPERAND(SCOPE, INSTANCE, CMD, HANDLE, CONTEXT, COMMAND, ...) lcb_##SCOPE(INSTANCE, __VA_ARGS__)
 
-#define VIEW_SPAN_OPERAND(SCOPE, INSTANCE, CMD, HANDLE, CONTEXT) lcb_cmdview_parent_span(CMD, (CONTEXT)->span)
+#define VIEW_SPAN_OPERAND(SCOPE, INSTANCE, CMD, HANDLE, CONTEXT) if (CONTEXT){lcb_cmdview_parent_span(CMD, (CONTEXT)->span);}
 
 #define PYCBC_LOG_KEY(CMD, key)
 

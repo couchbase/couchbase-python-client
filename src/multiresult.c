@@ -408,7 +408,9 @@ void pycbc_asyncresult_invoke(pycbc_AsyncResult *ares,
     }
 
     if (!cbmeth) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_INTERNAL, 0, "No callbacks provided");
+        PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_INTERNAL, 0, "No callbacks provided", (PyObject*)ares)
+        PYCBC_DEBUG_PYFORMAT("Ares at %p is type %R, values %S", ares, Py_TYPE(ares), ares)
+        PYCBC_EXCEPTION_LOG_NOCLEAR
     } else {
         PyObject *res =  PyObject_CallObject(cbmeth, argtuple);
         if (res) {

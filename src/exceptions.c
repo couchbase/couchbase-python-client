@@ -149,8 +149,13 @@ pycbc_exc_message(int mode, lcb_STATUS err, const char *msg)
 
     args = PyTuple_New(1);
     PyTuple_SET_ITEM(args, 0, pycbc_SimpleStringZ(msg));
-
+    PYCBC_EXCEPTION_LOG_NOCLEAR
+    PYCBC_DEBUG_PYFORMAT("Got excls %R, args %R",pycbc_none_or_value(excls),pycbc_none_or_value(args))
     instance = PyObject_CallObject(excls, args);
+    if (!instance)
+    {
+        PYCBC_DEBUG_LOG("NULL instance returned")
+    }
     Py_DECREF(args);
 
     pycbc_assert(instance);

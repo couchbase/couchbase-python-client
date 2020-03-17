@@ -17,10 +17,6 @@
 from couchbase_tests.base import SkipTest
 import sys
 
-vi = sys.version_info
-if vi[0] == 3:
-    from unittest.case import SkipTest
-    raise SkipTest("Twisted support unavailable on Python3")
 
 try:
     from twisted.trial.unittest import TestCase

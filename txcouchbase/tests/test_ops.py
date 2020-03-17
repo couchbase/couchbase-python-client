@@ -17,50 +17,55 @@ from couchbase_tests.base import ConnectionTestCase
 
 from txcouchbase.tests.base import gen_base
 from couchbase_core.exceptions import NotFoundError
-from couchbase_core.result import (
-    OperationResult, ValueResult)
+
+from couchbase.result import GetResult, MutationResult, MultiMutationResult
+
+Base = gen_base(ConnectionTestCase)
 
 
-class OperationTestCase(gen_base(ConnectionTestCase)):
-    def testSimpleSet(self):
+class OperationTestCase(Base):
+    def test_simple_set(self):
         cb = self.make_connection()
         key = self.gen_key("test_simple_set")
-        d = cb.set(key, "simple_Value")
+        d = cb.upsert(key, "simple_Value")
         def t(ret):
-            self.assertIsInstance(ret, OperationResult)
-            self.assertEqual(ret.key, key)
+            self.assertIsInstance(ret, MutationResult)
+            #self.assertEqual(ret.id, key) - seemingly MutationResults don't have IDs - recheck
             del ret
 
         d.addCallback(t)
         del cb
         return d
 
-    def testSimpleGet(self):
+    def test_simple_get(self):
         cb = self.make_connection()
         key = self.gen_key("test_simple_get")
         value = "simple_value"
 
-        cb.set(key, value)
+        cb.upsert(key, value)
         d_get = cb.get(key)
-        def t(ret):
-            self.assertIsInstance(ret, ValueResult)
-            self.assertEqual(ret.key, key)
-            self.assertEqual(ret.value, value)
+
+        def t(ret  # type: GetResult
+              ):
+            self.assertIsInstance(ret, GetResult)
+            self.assertEqual(ret.id, key)
+            self.assertEqual(ret.content, value)
 
         d_get.addCallback(t)
         return d_get
 
-    def testMultiSet(self):
+    def test_multi_set(self):
         cb = self.make_connection()
         kvs = self.gen_kv_dict(prefix="test_multi_set")
-        d_set = cb.setMulti(kvs)
+        d_set = cb.upsert_multi(kvs)
 
-        def t(ret):
+        def t(ret  # type: MultiMutationResult
+              ):
             self.assertEqual(len(ret), len(kvs))
             self.assertEqual(ret.keys(), kvs.keys())
-            self.assertTrue(ret.all_ok)
+            #self.assertTrue(ret.all_ok)  # to be defined by SDK3 multi-ops RFC
             for k in kvs:
-                self.assertEqual(ret[k].key, k)
+                #self.assertEqual(ret[k].id, k)  # MutationResult has no key or id
                 self.assertTrue(ret[k].success)
 
             del ret
@@ -68,11 +73,11 @@ class OperationTestCase(gen_base(ConnectionTestCase)):
         d_set.addCallback(t)
         return d_set
 
-    def testSingleError(self):
+    def test_single_error(self):
         cb = self.make_connection()
         key = self.gen_key("test_single_error")
 
-        d_del = cb.delete(key, quiet=True)
+        d_del = cb.remove(key, quiet=True)
 
         d = cb.get(key, quiet=False)
         def t(err):
@@ -83,13 +88,14 @@ class OperationTestCase(gen_base(ConnectionTestCase)):
         d.addErrback(t)
         return d
 
-    def testMultiErrors(self):
+    def test_multi_errors(self  # type: Base
+                        ):
         cb = self.make_connection()
         kv = self.gen_kv_dict(prefix = "test_multi_errors")
-        cb.setMulti(kv)
+        cb.upsert_multi(kv)
 
-        rmkey = kv.keys()[0]
-        cb.delete(rmkey)
+        rmkey = list(kv.keys())[0]
+        cb.remove(rmkey)
 
         d = cb.getMulti(kv.keys())
 

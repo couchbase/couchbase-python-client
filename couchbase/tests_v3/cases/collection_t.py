@@ -158,7 +158,7 @@ class CollectionTests(CollectionTestCase):
         self.assertEqual(['wibble', 'gronk'],sdresult_2.content_as[list](0))
 
     def _check_replicas(self, all_up=True):
-        num_replicas = self.bucket._bucket.configured_replica_count
+        num_replicas = self.bucket.configured_replica_count
         if num_replicas < 1:
             raise SkipTest('need replicas to test get_all_replicas')
             # TODO: this is far to difficult - having to use the test framework to get the bucket

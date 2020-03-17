@@ -227,6 +227,7 @@ decode_common(PyObject **vp, const char *buf, size_t nbuf, lcb_uint32_t flags)
 
         pycbc_assert(first_arg);
         args = PyTuple_Pack(1, first_arg);
+        PYCBC_EXCEPTION_LOG_NOCLEAR
         decoded = PyObject_CallObject(converter, args);
 
         Py_DECREF(args);
@@ -541,10 +542,10 @@ pycbc_tc_encode_value(pycbc_Bucket *conn, PyObject *srcbuf, PyObject *srcflags,
 
 int
 pycbc_tc_decode_value(pycbc_Bucket *conn,
-                       const void *value,
-                       size_t nvalue,
-                       lcb_uint32_t flags,
-                       PyObject **pobj)
+                      const void *value,
+                      size_t nvalue,
+                      lcb_uint32_t flags,
+                      PyObject **pobj)
 {
     PyObject *result = NULL;
     PyObject *pint = NULL;

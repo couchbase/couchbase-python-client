@@ -26,11 +26,17 @@ from couchbase_core.asynchronous.view import AsyncViewBase
 from couchbase_core.exceptions import ArgumentError
 from couchbase_core._pyport import with_metaclass
 from couchbase_core.client import Client as CoreClient
+from typing import *
+
+
+T = TypeVar('T', bound=CoreClient)
 
 
 class AsyncClientFactory(type):
     @staticmethod
-    def gen_async_client(syncbase):
+    def gen_async_client(syncbase  # type: Type[T]
+                         ):
+        # type: (...) -> Type[T]
         class AsyncClientSpecialised(syncbase):
             """
             This class contains the low-level async implementation of the
@@ -173,7 +179,10 @@ class AsyncClientFactory(type):
                     raise ArgumentError.pyexc("itercls must be defined "
                                               "and must be derived from AsyncViewBase")
 
-                return super(AsyncClientSpecialised, self).view_query(*args, **kwargs)
+                try:
+                    return super(AsyncClientSpecialised, self).view_query(*args, **kwargs)
+                except Exception as e:
+                    raise
 
             def endure(self, key, *args, **kwargs):
                 res = super(AsyncClientSpecialised, self).endure_multi([key], *args, **kwargs)

@@ -1,6 +1,6 @@
 import json
 
-from couchbase_core._libcouchbase import Collection as _Base, FMT_JSON
+from couchbase_core._libcouchbase import Bucket as _Base
 
 import couchbase_core.exceptions as E
 from couchbase_core.analytics import AnalyticsQuery
@@ -51,8 +51,8 @@ ViewSubType = TypeVar('ViewSubType', bound=Type[ViewInstance])
 class Client(_Base):
     _MEMCACHED_NOMULTI = ('stats', 'lookup_in', 'mutate_in')
     _MEMCACHED_OPERATIONS = ('upsert', 'get', 'insert', 'append', 'prepend',
-                             'replace', 'remove', 'counter', 'touch',
-                             'lock', 'unlock', 'stats',
+                             'replace', 'remove', 'touch',
+                             'unlock', 'stats',
                              'lookup_in', 'mutate_in')
 
     def __init__(self, *args, **kwargs):
@@ -1040,6 +1040,9 @@ class Client(_Base):
 
     @classmethod
     def _gen_memd_wrappers(cls, factory):
+        return Client._gen_memd_wrappers_retarget(cls, factory)
+    @staticmethod
+    def _gen_memd_wrappers_retarget(cls, factory):
         """Generates wrappers for all the memcached operations.
         :param factory: A function to be called to return the wrapped
             method. It will be called with two arguments; the first is

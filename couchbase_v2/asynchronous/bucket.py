@@ -39,9 +39,10 @@ class AsyncBucket(CoreAsyncBucketFactory.gen_async_client(Bucket)):
           object. This should be a subclass of
           :class:`~couchbase_v2.asynchronous.view.AsyncViewBase`.
         """
-        if not issubclass(kwargs.get('itercls', None), AsyncViewBase):
-            raise ArgumentError.pyexc("itercls must be defined "
-                                      "and must be derived from AsyncViewBase")
+        itercls=kwargs.get('itercls', None)
+        if not issubclass(itercls, AsyncViewBase):
+            raise ArgumentError.pyexc("itercls was {} must be defined "
+                                      "and must be derived from AsyncViewBase".format(itercls))
 
         return super(AsyncBucket, self).query(*args, **kwargs)
 

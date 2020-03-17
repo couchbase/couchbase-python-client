@@ -21,6 +21,9 @@ from couchbase_core.asynchronous.n1ql import AsyncN1QLRequest
 
 from couchbase_tests.base import MockTestCase
 from txcouchbase.tests.base import gen_base
+import logging
+from txcouchbase.bucket import TxBucket
+
 
 class RowsHandler(AsyncN1QLRequest):
     def __init__(self, *args, **kwargs):
@@ -43,11 +46,18 @@ class RowsHandler(AsyncN1QLRequest):
         self.deferred.errback(ex)
 
 
-class TxN1QLTests(gen_base(MockTestCase)):
+Base = gen_base(MockTestCase)
+
+
+class TxN1QLTests(Base):
+    @property
+    def factory(self):
+        return self.gen_bucket
+
     def testIncremental(self):
         cb = self.make_connection()
         d = defer.Deferred()
-        o = cb.n1qlQueryEx(RowsHandler, 'SELECT mockrow')
+        o = cb.query_ex(RowsHandler, 'SELECT mockrow')
         self.assertIsInstance(o, RowsHandler)
 
         def verify(*args):
@@ -60,18 +70,24 @@ class TxN1QLTests(gen_base(MockTestCase)):
 
     def testBatched(self):
         cb = self.make_connection()
-        d = cb.n1qlQueryAll('SELECT mockrow')
+        d = cb.query('SELECT mockrow')
 
         def verify(o):
+            logging.error("Called back")
+
             self.assertIsInstance(o, BatchedN1QLRequest)
             rows = [r for r in o]
             self.assertEqual(1, len(rows))
+            logging.error("End of callback")
 
-        return d.addCallback(verify)
+
+        result= d.addCallback(verify)
+        logging.error("ready to return")
+        return result
 
     def testEmpty(self):
         cb = self.make_connection()
-        d = cb.n1qlQueryAll('SELECT emptyrow')
+        d = cb.query('SELECT emptyrow')
 
         def verify(o):
             self.assertIsInstance(o, BatchedN1QLRequest)

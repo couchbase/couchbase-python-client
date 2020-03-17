@@ -1,5 +1,5 @@
 from twisted.internet import error as TxErrors
-
+from functools import wraps
 import couchbase_core._libcouchbase as LCB
 from couchbase_core._libcouchbase import (
     Event, TimerEvent, IOEvent,
@@ -9,6 +9,29 @@ from couchbase_core._libcouchbase import (
     PYCBC_EVACTION_UNWATCH,
     PYCBC_EVACTION_CLEANUP
 )
+
+import os
+
+THESEUS_LOGFILE = os.getenv("PYCBC_THESEUS_LOGFILE")
+if THESEUS_LOGFILE:
+    from theseus._tracer import Tracer
+    t = Tracer()
+    t.install()
+
+    theseus_log = open(THESEUS_LOGFILE, 'w')
+    import twisted.internet.base
+
+    twisted.internet.base.DelayedCall.debug = True
+
+
+def update_theseus(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        t.write_data(theseus_log)
+        theseus_log.flush()
+        return func(*args,**kwargs)
+    return wrapper if THESEUS_LOGFILE else func
+
 
 class TxIOEvent(IOEvent):
     """
@@ -48,7 +71,7 @@ class TxTimer(TimerEvent):
         self.lcb_active = False
         self._txev = None
 
-
+    @update_theseus
     def _timer_wrap(self):
         if not self.lcb_active:
             return
@@ -56,7 +79,7 @@ class TxTimer(TimerEvent):
         self.lcb_active = False
         self.ready(0)
 
-
+    @update_theseus
     def schedule(self, usecs, reactor):
         nsecs = usecs / 1000000.0
         if not self._txev or not self._txev.active():
@@ -93,6 +116,7 @@ class v0Iops(object):
         self.is_sync = is_sync
         self._stop = False
 
+    @update_theseus
     def update_event(self, event, action, flags):
         """
         Called by libcouchbase to add/remove event watchers
@@ -114,6 +138,7 @@ class v0Iops(object):
             if flags & LCB_WRITE_EVENT == 0:
                 self.reactor.removeWriter(event)
 
+    @update_theseus
     def update_timer(self, timer, action, usecs):
         """
         Called by libcouchbase to add/remove timers

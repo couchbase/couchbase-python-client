@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
+from couchbase.collection import CBCollection
 from couchbase_tests.base import ConnectionTestCase, CollectionTestCase
 import couchbase_v2.exceptions as E
 
@@ -23,11 +23,12 @@ class DatastructureTest(CollectionTestCase):
 
 
 
-    def test_map(self):
+    def test_map(self  # type: DatastructureTest
+                 ):
         key = self.gen_key('dsmap')
         self.cb.remove(key, quiet=True)
 
-        cb = self.cb
+        cb = self.cb  # type: CBCollection
         self.assertRaises(E.NotFoundError, cb.map_add, key, 'key1', 'val1')
         rv = cb.map_add(key, 'key1', 'val1', create=True)
         self.assertSuccess(rv)

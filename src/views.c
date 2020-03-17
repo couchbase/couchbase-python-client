@@ -216,6 +216,7 @@ static void row_callback(lcb_t instance, int cbtype, const lcb_RESPVIEW *resp)
     if (lcb_respview_is_final(resp)) {
         pycbc_httpresult_complete(
                 &vres->base, mres, lcb_respview_status(resp), htcode, hdrs);
+        PYCBC_DECREF(mres);
     } else {
         PYCBC_CONN_THR_BEGIN(bucket);
     }
@@ -325,7 +326,7 @@ TRACED_FUNCTION_WRAPPER(_view_request, LCBTRACE_OP_REQUEST_ENCODING, Bucket)
 
         vres->rows = PyList_New(0);
         vres->base.format = PYCBC_FMT_JSON;
-
+        PYCBC_INCREF(mres);
         PYCBC_TRACECMD_SCOPED_GENERIC(rc,
                                       view,
                                       query,

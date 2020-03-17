@@ -89,7 +89,7 @@ pycbc_observeinfo_new(pycbc_Bucket *parent)
 
 static int
 handle_single_observe(pycbc_Bucket *self, PyObject *curkey, int master_only,
-    struct pycbc_common_vars *cv, pycbc_stack_context_handle context)
+                      struct pycbc_common_vars *cv, pycbc_stack_context_handle context)
 {
     int rv;
     pycbc_pybuffer keybuf = { NULL };

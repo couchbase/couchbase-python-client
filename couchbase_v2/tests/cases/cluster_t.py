@@ -21,7 +21,7 @@ from couchbase_v2.cluster import Cluster, ClassicAuthenticator,PasswordAuthentic
 import gc
 import os
 import warnings
-from couchbase_core.exceptions import CouchbaseNetworkError, CouchbaseFatalError, CouchbaseInputError, ArgumentError
+from couchbase_core.exceptions import CouchbaseNetworkError, CouchbaseFatalError, CouchbaseInputError, CouchbaseError
 
 
 CERT_PATH = os.getenv("PYCBC_CERT_PATH")
@@ -60,11 +60,10 @@ class ClusterTest(CouchbaseTestCase):
         cb = cluster.open_bucket(bucket_name)
         row = cluster.n1ql_query('select mockrow').get_single_result()
 
-        # With G3CP/cluster-wide operations, should still work once the bucket has been GC'd
+        # V2 Cluster code doesn't use GCCP so Query won't work after this.
         del cb
         gc.collect()
 
-        cluster.n1ql_query('select mockrow')
 
     def test_no_mixed_auth(self):
         cluster, bucket_name = self._create_cluster()
@@ -179,7 +178,7 @@ class ClusterTest(CouchbaseTestCase):
                 self.assertRegex(str(e),r'.*(SSL subsystem).*')
             except CouchbaseInputError as f:
                 self.assertRegex(str(e),r'.*(not supported).*')
-            except ArgumentError as f:
+            except CouchbaseError as f:
                 self.assertRegex(str(e),r'.*(LCB_ERR_SSL_ERROR|LCB_ERR_SDK_FEATURE_UNAVAILABLE).*')
 
             warnings.warn("Got exception {} but acceptable error for Mock with  SSL+cert_path tests".format(str(e)))

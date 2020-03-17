@@ -39,7 +39,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                 pycbc_Item *item,
                 void *arg)
 {
-    pycbc_Bucket *self = (pycbc_Bucket *)collection;
+    pycbc_Bucket *self = collection->bucket;
     int rv = 0;
     lcb_STATUS err;
     struct arithmetic_common_vars my_params;
@@ -133,7 +133,7 @@ PyObject *arithmetic_common(pycbc_Collection_t *cb_collection,
                             int argopts,
                             pycbc_stack_context_handle context)
 {
-    pycbc_Bucket *self = (pycbc_Bucket *)cb_collection;
+    pycbc_Bucket *self = cb_collection->bucket;
     int rv;
     Py_ssize_t ncmds;
     struct arithmetic_common_vars global_params = { 0 };
@@ -226,10 +226,10 @@ PyObject *arithmetic_common_bucket(pycbc_Bucket *self,
                                    int argopts,
                                    pycbc_stack_context_handle context)
 {
-    PYCBC_COLLECTION_INIT(self, kwargs)
+    pycbc_Collection_t cb_collection = pycbc_Collection_as_value(self, kwargs);
     PyObject *result = arithmetic_common(
-            pcb_collection, args, kwargs, optype, argopts, context);
-    pycbc_Collection_free_if_stack_allocated(pcb_collection);
+            &cb_collection, args, kwargs, optype, argopts, context);
+    pycbc_Collection_free_unmanaged_contents(&cb_collection);
     return result;
 }
 
