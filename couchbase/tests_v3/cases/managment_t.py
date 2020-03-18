@@ -87,8 +87,11 @@ class BucketManagementTests(CollectionTestCase):
         self.bm.update_bucket(
                               BucketSettings(name=dummy_bucket, max_ttl=500))
         self.bm._admin_bucket.wait_ready(dummy_bucket, 10)
-        dummy=self.bm.get_bucket('dummy')
-        self.assertEqual(500,dummy.max_ttl)
+
+        def get_bucket_ttl_equal(name, ttl):
+            if not ttl == self.bm.get_bucket(name).max_ttl:
+                raise Exception("not equal")
+        self.try_n_times(10, 3, get_bucket_ttl_equal, 'dummy', 500)
         # Remove the bucket
         self.bm.drop_bucket('dummy')
         self.assertRaises(CouchbaseError, self.factory, connstr)
