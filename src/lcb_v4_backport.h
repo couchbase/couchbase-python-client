@@ -816,10 +816,7 @@ lcb_STATUS lcb_cmdremove_durability(lcb_CMDREMOVE *cmd,
     X(LCB_ERROR_TYPE_VIEW)      \
     X(LCB_ERROR_TYPE_SDK);
 
-typedef lcb_durability_opts_t pycbc_dur_opts;
-
 typedef lcb_MULTICMD_CTX pycbc_MULTICMD_CTX;
-typedef lcb_dur_opts_t pycbc_dur_opts;
 typedef lcb_CMDENDURE pycbc_CMDENDURE;
 
 #define PYCBC_OBSERVE_FROM_LCB(X) PYCBC_OBSERVE_##X

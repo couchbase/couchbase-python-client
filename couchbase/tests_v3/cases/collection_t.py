@@ -15,10 +15,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from couchbase_tests.base import skip_if_no_collections, CollectionTestCase
-from couchbase.collection import GetOptions, LookupInOptions, UpsertOptions, ReplaceOptions
-from couchbase.exceptions import NotFoundError, InvalidArgumentsException, DocumentUnretrievableException, \
-    KeyExistsException, KeyNotFoundException, TempFailException
+from couchbase_tests.base import CollectionTestCase
+from couchbase.collection import GetOptions, LookupInOptions, UpsertOptions, ReplaceOptions, InsertOptions, \
+    RemoveOptions
+from couchbase.durability import ServerDurability, ClientDurability, Durability, PersistTo, ReplicateTo
+from couchbase.exceptions import NotFoundError, InvalidArgumentsException,  KeyExistsException, KeyNotFoundException, \
+    TempFailException
 import unittest
 from datetime import timedelta
 import couchbase.subdocument as SD
@@ -50,11 +52,13 @@ class CollectionTests(CollectionTestCase):
         # make sure NOKEY is gone
         self.try_n_times_till_exception(10, 1, self.cb.get, self.NOKEY)
 
+    @unittest.skip("exists will segfault occasionally, see PYCBC-834")
     def test_exists(self):
         if self.is_mock:
             raise SkipTest("mock does not support exists")
         self.assertTrue(self.cb.exists(self.KEY).exists)
 
+    @unittest.skip("exists will segfault occasionally, see PYCBC-834")
     def test_exists_when_it_does_not_exist(self):
         if self.is_mock:
             raise SkipTest("mock does not support exists")
@@ -226,6 +230,67 @@ class CollectionTests(CollectionTestCase):
         cas = self.cb.get_and_lock(self.KEY, timedelta(seconds=15)).cas
         self.assertRaises(TempFailException, self.cb.unlock, self.KEY, 100)
         self.cb.unlock(self.KEY, cas)
+
+    def test_client_durable_upsert(self):
+        num_replicas = self.bucket._bucket.configured_replica_count
+        durability = ClientDurability(persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+        self.cb.upsert(self.NOKEY, self.CONTENT, UpsertOptions(durability=durability))
+        result = self.cb.get(self.NOKEY)
+        self.assertEqual(self.CONTENT, result.content_as[dict])
+
+    def test_server_durable_upsert(self):
+        if not self.supports_sync_durability():
+            raise SkipTest("ServerDurability not supported")
+        durability = ServerDurability(level=Durability.PERSIST_TO_MAJORITY)
+        self.cb.upsert(self.NOKEY, self.CONTENT, UpsertOptions(durability=durability))
+        result = self.cb.get(self.NOKEY)
+        self.assertEqual(self.CONTENT, result.content_as[dict])
+
+    def test_client_durable_insert(self):
+        num_replicas = self.bucket._bucket.configured_replica_count
+        durability = ClientDurability(persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+        self.cb.insert(self.NOKEY, self.CONTENT, InsertOptions(durability=durability))
+        result = self.cb.get(self.NOKEY)
+        self.assertEqual(self.CONTENT, result.content_as[dict])
+
+    def test_server_durable_insert(self):
+        if not self.supports_sync_durability():
+            raise SkipTest("ServerDurability not supported")
+        durability = ServerDurability(level=Durability.PERSIST_TO_MAJORITY)
+        self.cb.insert(self.NOKEY, self.CONTENT, InsertOptions(durability=durability))
+        result = self.cb.get(self.NOKEY)
+        self.assertEqual(self.CONTENT, result.content_as[dict])
+
+    def test_client_durable_replace(self):
+        num_replicas = self.bucket._bucket.configured_replica_count
+        content = {"new":"content"}
+        durability = ClientDurability(persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+        self.cb.replace(self.KEY, content, ReplaceOptions(durability=durability))
+        result = self.cb.get(self.KEY)
+        self.assertEqual(content, result.content_as[dict])
+
+    def test_server_durable_replace(self):
+        content = {"new":"content"}
+        if not self.supports_sync_durability():
+            raise SkipTest("ServerDurability not supported")
+        durability = ServerDurability(level=Durability.PERSIST_TO_MAJORITY)
+        self.cb.replace(self.KEY, content, ReplaceOptions(durability=durability))
+        result = self.cb.get(self.KEY)
+        self.assertEqual(content, result.content_as[dict])
+
+    @unittest.skip("Client Durable remove not yet supported (CCBC-1199)")
+    def test_client_durable_remove(self):
+        num_replicas = self.bucket._bucket.configured_replica_count
+        durability = ClientDurability(persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+        self.cb.remove(self.KEY, RemoveOptions(durability=durability))
+        self.assertRaises(KeyNotFoundException, self.cb.get, self.KEY)
+
+    def test_server_durable_remove(self):
+        if not self.supports_sync_durability():
+            raise SkipTest("ServerDurability not supported")
+        durability = ServerDurability(level=Durability.PERSIST_TO_MAJORITY)
+        self.cb.remove(self.KEY, RemoveOptions(durability=durability))
+        self.assertRaises(KeyNotFoundException, self.cb.get, self.KEY)
 
 
 

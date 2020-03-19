@@ -59,7 +59,8 @@ import couchbase_core.tests.analytics_harness
 from couchbase.diagnostics import ServiceType
 import couchbase_core.fulltext as FT
 from couchbase.exceptions import KeyNotFoundException, KeyExistsException, NotSupportedError
-from couchbase.durability import ClientDurability, ServerDurability, DurabilityOptionBlock
+from couchbase.durability import ClientDurability, ServerDurability, DurabilityOptionBlock, Durability, \
+    PersistTo, ReplicateTo
 
 
 class Scenarios(CollectionTestCase):
@@ -131,9 +132,13 @@ class Scenarios(CollectionTestCase):
     def test_mutatein(self,  # type: Scenarios
                       dur_name):
         durability=Durability[dur_name]
+        dur_option = DurabilityOptionBlock(durability=ServerDurability(level=durability))
         count = 0
-        if not self.supports_sync_durability() and dur_name != Durability.NONE.value:
-            raise SkipTest("durableWrite not supported in {}".format(self.get_cluster_version()))
+        replica_count = self.bucket._bucket.configured_replica_count
+        if dur_name != Durability.NONE and (replica_count == 0 or self.is_mock):
+            raise SkipTest("cluster will not support {}".format(dur_name))
+        if not self.supports_sync_durability():
+            dur_option = self.sdk3_to_sdk2_durability(dur_name, replica_count)
 
         somecontents = {'some': {'path': 'keith'}}
         key="{}_{}".format("somekey_{}", count)
@@ -149,7 +154,7 @@ class Scenarios(CollectionTestCase):
             self.coll.mutate_in(key, (
                 SD.replace('some.path', replacement_value),
                 SD.insert('some.other.path', inserted_value, create_parents=True),
-            ), durability_level=durability)
+            ), dur_option)
 
 
             somecontents['some']['path'] = replacement_value
@@ -183,7 +188,7 @@ class Scenarios(CollectionTestCase):
                                                                                                             PersistTo.ONE))),
                                                      ReplicateTo.TWO, ReplicateTo.TWO, datetime.datetime.now() + timedelta(seconds=30))
         except NotSupportedError as f:
-            raise SkipTest("Skipping as not supported: {}".format(str(f)))
+            raise SkipTest("Using a ClientDurability should work, but it doesn't: {}".format(str(f)))
 
 
     def retry_idempotent_remove_client_side(self,
@@ -532,38 +537,45 @@ class Scenarios(CollectionTestCase):
     def get_multi_mutationresult_as_dict(result):
         return {k: v.success for k, v in result.items()}
 
+    @staticmethod
+    def sdk3_to_sdk2_durability(durability, num_replicas):
+        if durability == Durability.NONE:
+            return ClientDurability(PersistTo.NONE, ReplicateTo.NONE)
+        if durability == Durability.MAJORITY:
+            return ClientDurability(replicate_to=ReplicateTo(int((num_replicas+1)/2)), persist_to=0)
+        if durability == Durability.MAJORITY_AND_PERSIST_TO_ACTIVE:
+            return ClientDurability(replicate_to=ReplicateTo(int((num_replicas+1)/2)), persist_to=PersistTo.ONE)
+        if durability == Durability.PERSIST_TO_MAJORITY:
+            return ClientDurability(persist_to=PersistTo(int((num_replicas+1)/2 + 1)), replicate_to=0)
+
     def test_multi(self):
         test_dict = {"Fred": "Wilma", "Barney": "Betty"}
         # TODO: rewrite these tests to test one thing at a time, if possible
-        if not self.supports_sync_durability():
-            raise SkipTest("durableWrite not supported in {}".format(self.get_cluster_version()))
-        for dur_level in [Durability.NONE] if self.is_mock else Durability:
-            try:
-                self.coll.remove_multi(test_dict.keys())
-            except:
-                pass
-            dur_options = DurabilityOptionBlock(durability=ServerDurability(dur_level))
-            self.assertRaises(KeyNotFoundException, self.coll.get, "Fred")
-            self.assertRaises(KeyNotFoundException, self.coll.get, "Barney")
-            self.coll.upsert_multi(test_dict)
-            result = self.coll.get_multi(test_dict.keys())
-            self.assertEqual(Scenarios.get_multi_result_as_dict(result), test_dict)
-            self.coll.remove_multi(test_dict.keys(), **dur_options)
-            self.assertRaises(KeyNotFoundException, self.coll.get_multi, test_dict.keys())
-            self.coll.insert_multi(test_dict, **dur_options)
-            self.assertRaises(KeyExistsException, self.coll.insert_multi, test_dict)
-            result = self.coll.get_multi(test_dict.keys())
-            self.assertEqual(Scenarios.get_multi_result_as_dict(result), test_dict)
-            self.assertEqual(self.coll.get("Fred").content, "Wilma")
-            self.assertEqual(self.coll.get("Barney").content, "Betty")
-            self.coll.remove_multi(test_dict.keys(), **dur_options)
-            self.assertRaises(KeyNotFoundException, self.coll.get_multi, test_dict.keys())
-            self.coll.insert_multi(test_dict)
-            test_dict_2 = {"Fred": "Cassandra", "Barney": "Raquel"}
-            result = self.coll.replace_multi(test_dict_2)
-            expected_result = {k: True for k, v in test_dict_2.items()}
-            self.assertEqual(Scenarios.get_multi_mutationresult_as_dict(result), expected_result)
-            self.assertEqual(Scenarios.get_multi_result_as_dict(self.coll.get_multi(test_dict_2.keys())),test_dict_2)
+        try:
+            self.coll.remove_multi(test_dict.keys())
+        except:
+            pass
+        self.assertRaises(KeyNotFoundException, self.coll.get, "Fred")
+        self.assertRaises(KeyNotFoundException, self.coll.get, "Barney")
+        self.coll.upsert_multi(test_dict)
+        result = self.coll.get_multi(test_dict.keys())
+        self.assertEqual(Scenarios.get_multi_result_as_dict(result), test_dict)
+        self.coll.remove_multi(test_dict.keys())
+        self.assertRaises(KeyNotFoundException, self.coll.get_multi, test_dict.keys())
+        self.coll.insert_multi(test_dict)
+        self.assertRaises(KeyExistsException, self.coll.insert_multi, test_dict)
+        result = self.coll.get_multi(test_dict.keys())
+        self.assertEqual(Scenarios.get_multi_result_as_dict(result), test_dict)
+        self.assertEqual(self.coll.get("Fred").content, "Wilma")
+        self.assertEqual(self.coll.get("Barney").content, "Betty")
+        self.coll.remove_multi(test_dict.keys())
+        self.assertRaises(KeyNotFoundException, self.coll.get_multi, test_dict.keys())
+        self.coll.insert_multi(test_dict)
+        test_dict_2 = {"Fred": "Cassandra", "Barney": "Raquel"}
+        result = self.coll.replace_multi(test_dict_2)
+        expected_result = {k: True for k, v in test_dict_2.items()}
+        self.assertEqual(Scenarios.get_multi_mutationresult_as_dict(result), expected_result)
+        self.assertEqual(Scenarios.get_multi_result_as_dict(self.coll.get_multi(test_dict_2.keys())), test_dict_2)
 
     def test_PYCBC_607(self  # type: Scenarios
                        ):

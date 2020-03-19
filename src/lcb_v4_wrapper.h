@@ -419,7 +419,6 @@ typedef lcb_DURABILITY_LEVEL pycbc_DURABILITY_LEVEL;
     lcb_cmd##TYPE##_collection(CMD, SCOPE, NSCOPE, COLLECTION, NCOLLECTION)
 
 typedef void pycbc_MULTICMD_CTX;
-typedef void pycbc_dur_opts;
 typedef void pycbc_CMDENDURE;
 
 #include "lcb_dur_wrappers.h"

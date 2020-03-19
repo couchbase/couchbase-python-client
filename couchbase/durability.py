@@ -29,8 +29,8 @@ class ClientDurability(DurabilityType):
     Storage = TypedDict('Storage', {'replicate_to': ReplicateTo, 'persist_to': PersistTo}, total=True)
 
     def __init__(self,  # type: T
-                 replicate_to,  # type: ReplicateTo
-                 persist_to  # type: PersistTo
+                 replicate_to=0,  # type: ReplicateTo
+                 persist_to=0  # type: PersistTo
                  ):
         # type: (...) -> None
         """

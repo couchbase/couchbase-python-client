@@ -15,6 +15,7 @@ from .durability import ReplicateTo, PersistTo, ClientDurability, ServerDurabili
     ServerDurableOptionBlock, DurabilityOptionBlock
 from couchbase_core._libcouchbase import Collection as _Base
 import couchbase.exceptions
+from couchbase_core.exceptions import NotSupportedError
 from couchbase_core.client import Client as CoreClient
 import copy
 
@@ -506,6 +507,12 @@ class CBCollection(CoreClient):
 
         .. seealso:: :meth:`upsert_multi` - for other optional arguments
         """
+        # See CCBC-1199 - LCB support for client durability not there for remove
+        # for now, we raise NotSupported so nobody is surprised.
+        persist_to = kwargs.get('persist_to', 0)
+        replicate_to = kwargs.get('replicate_to', 0)
+        if persist_to > 0 or replicate_to > 0:
+            raise NotSupportedError("Client durability not supported yet for remove")
         return get_multi_mutation_result(self, CoreClient.remove_multi, keys, *options, **kwargs)
 
     replace_multi = _wrap_multi_mutation_result(CoreClient.replace_multi)
@@ -747,6 +754,12 @@ class CBCollection(CoreClient):
             cb.remove("key", cas=rv.cas)
         """
         final_options = forward_args(kwargs, *options)
+        # See CCBC-1199 - LCB support for client durability not there for remove
+        # for now, we raise NotSupported so nobody is surprised.
+        persist_to = final_options.get('persist_to', 0)
+        replicate_to = final_options.get('replicate_to', 0)
+        if persist_to > 0 or replicate_to > 0:
+            raise NotSupportedError("Client durability not supported yet for remove")
         return ResultPrecursor(self.bucket.remove(key, **final_options), final_options)
 
     def lookup_in(self,         # type: CBCollection

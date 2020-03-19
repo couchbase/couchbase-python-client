@@ -565,7 +565,6 @@ dur_chain2(pycbc_Bucket *conn,
     pycbc_MultiResult *mres,
     pycbc_OperationResult *res, int cbtype, const lcb_RESPBASE *resp)
 {
-    lcb_STATUS err=LCB_SUCCESS;
     int is_delete = cbtype == LCB_CALLBACK_REMOVE;
     PYCBC_DEBUG_LOG_CONTEXT(res ? res->tracing_context : NULL,
                             "durability chain callback")
@@ -575,8 +574,8 @@ dur_chain2(pycbc_Bucket *conn,
     if(res->rc == LCB_SUCCESS) {
 #ifdef PYCBC_MUTATION_TOKENS_ENABLED
 
-        const lcb_MUTATION_TOKEN *mutinfo = lcb_resp_get_mutation_token(cbtype,
-        resp); Py_XDECREF(res->mutinfo);
+        const lcb_MUTATION_TOKEN *mutinfo = lcb_resp_get_mutation_token(cbtype,resp);
+        Py_XDECREF(res->mutinfo);
 
         if (mutinfo && lcb_mutation_token_is_valid(mutinfo)) {
             // Create the mutation token tuple: (vb,uuid,seqno)
@@ -617,48 +616,24 @@ dur_chain2(pycbc_Bucket *conn,
         invoke_endure_test_notification(conn, (pycbc_Result *)res);
     }
 
-    lcb_sched_enter(conn->instance);
-    {
-        pycbc_MULTICMD_CTX *mctx = NULL;
-        pycbc_dur_opts *dopts = NULL;
-        /** Setup global options */
-
-        err = pycbc_set_dur_opts(
-                dopts, &mres->dur, is_delete, conn->dur_timeout);
-        mctx = pycbc_endure_ctxnew(conn->instance, &dopts, &err);
-        if (mctx == NULL) {
-            goto GT_DONE;
-        }
-        {
-            pycbc_CMDENDURE *cmd = NULL;
-            (void)cmd;
-            err = pycbc_cmdendure_key(
-                    &cmd, handler.key.buffer, handler.key.length);
-            err = err ? err : pycbc_cmdendure_addcmd(mctx, (lcb_CMDBASE *)&cmd);
-            err = err ? err : pycbc_create_cmdendure(&cmd);
-            err = err ? err : pycbc_cmdendure_cas(cmd, handler.cas);
-        }
-        if (err != LCB_SUCCESS) {
-            goto GT_DONE;
-        }
-        err = pycbc_mctx_done(mctx, mres);
-        if (err == LCB_SUCCESS) {
-            mctx = NULL;
-            lcb_sched_leave(conn->instance);
-        }
-
-    GT_DONE:
-        if (mctx) {
-            err = err ? err : pycbc_mctx_fail(mctx);
+    if (lcb_respstore_observe_attached((const lcb_RESPSTORE*)resp)) {
+        uint16_t npersisted, nreplicated;
+        lcb_respstore_observe_num_persisted((const lcb_RESPSTORE*)resp, &npersisted);
+        lcb_respstore_observe_num_replicated((const lcb_RESPSTORE*)resp, &nreplicated);
+        if (res->rc == LCB_SUCCESS) {
+            PYCBC_DEBUG_LOG("Stored. Persisted(%u). Replicated(%u)", npersisted, nreplicated);
+        } else {
+            int store_ok;
+            lcb_respstore_observe_stored((const lcb_RESPSTORE*)resp, &store_ok);
+            if (store_ok) {
+                PYCBC_DEBUG_LOG("Store OK, but durability failed. Persisted(%u). Replicated(%u)", npersisted, nreplicated);
+            } else {
+                PYCBC_DEBUG_LOG("%s", "Store failed");
+            }
         }
     }
-    if (err != LCB_SUCCESS) {
-        res->rc = err;
-        MAYBE_PUSH_OPERR(mres, (pycbc_Result *)res, err, 0);
-        operation_completed_with_err_info(
-                conn, mres, cbtype, resp, (pycbc_Result *)res);
-    }
 
+    operation_completed_with_err_info(conn, mres, cbtype, resp, (pycbc_Result *)res);
     CB_THR_BEGIN(conn);
 }
 

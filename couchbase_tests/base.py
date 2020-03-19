@@ -835,7 +835,7 @@ class ClusterTestCase(CouchbaseTestCase):
 
     def supports_sync_durability(self):
         info = self.get_bucket_info()
-        return "durableWritd" in info['bucketCapabilities']
+        return "durableWrite" in info['bucketCapabilities']
 
 
 ParamClusterTestCase = parameterized_class(('cluster_factory',), [(Cluster,), (Cluster.connect,)])(ClusterTestCase)

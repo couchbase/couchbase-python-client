@@ -22,12 +22,4 @@ typedef struct {
     pycbc_DURABILITY_LEVEL durability_level;
 } pycbc_dur_params;
 
-lcb_STATUS pycbc_set_dur_opts(pycbc_dur_opts *dopts,
-                              pycbc_dur_params *dur,
-                              int is_delete,
-                              int timeout);
-pycbc_MULTICMD_CTX *pycbc_endure_ctxnew(lcb_INSTANCE *instance,
-                                        pycbc_dur_opts *dopts,
-                                        lcb_STATUS *err);
-
 #endif // COUCHBASE_PYTHON_CLIENT_LCB_COMMON_WRAPPERS_H

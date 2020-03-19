@@ -152,24 +152,3 @@ lcb_STATUS pycbc_cmdview_spatial(lcb_CMDVIEW *pCmdview, int is_spatial)
     return LCB_ERR_UNSUPPORTED_OPERATION;
 }
 
-lcb_STATUS pycbc_set_dur_opts(pycbc_dur_opts *dopts,
-                              pycbc_dur_params *dur,
-                              int is_delete,
-                              int timeout)
-{
-    (void)dopts;
-    (void)dur;
-    (void)is_delete;
-    (void)timeout;
-    return LCB_ERR_UNSUPPORTED_OPERATION;
-}
-
-pycbc_MULTICMD_CTX *pycbc_endure_ctxnew(lcb_INSTANCE *instance,
-                                        pycbc_dur_opts *dopts,
-                                        lcb_STATUS *err)
-{
-    (void)instance;
-    (void)dopts;
-    *err = LCB_ERR_UNSUPPORTED_OPERATION;
-    return NULL;
-}
