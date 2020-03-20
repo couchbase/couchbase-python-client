@@ -6,12 +6,10 @@ from couchbase_core._libcouchbase import Result as CoreResult
 from couchbase_core.result import MultiResult, SubdocResult
 from typing import *
 from boltons.funcutils import wraps
-from couchbase_core import abstractmethod, IterableWrapper
+from couchbase_core import iterable_wrapper
 from couchbase_core.result import AsyncResult
-from couchbase_core._pyport import Protocol
 from couchbase_core.views.iterator import View as CoreView, View
 from couchbase.diagnostics import EndpointPingReport, ServiceType
-from enum import Enum
 
 Proxy_T = TypeVar('Proxy_T')
 
@@ -481,11 +479,11 @@ def _wrap_in_mutation_result(func  # type: Callable[[Any,...],CoreResult]
     return mutated
 
 
-class ViewResult(IterableWrapper, CoreView):
+class ViewResult(iterable_wrapper(CoreView)):
     def __init__(self, *args, **kwargs  # type: CoreView
                 ):
-        CoreView.__init__(self,*args, **kwargs)
-        IterableWrapper.__init__(self, self)
+        super(ViewResult, self).__init__(*args, **kwargs)
+
     @property
     def error(self):
         return self.errors

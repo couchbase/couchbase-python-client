@@ -26,10 +26,19 @@ from typing import *
 from txcouchbase.bucket import TxCluster
 from couchbase_core.cluster import ClassicAuthenticator
 from couchbase_core.connstr import ConnectionString
+import twisted.python.util
+import sys
+import os
+
 
 T = TypeVar('T', bound=ConnectionTestCase)
 Factory = Callable[[Any], Client]
 twisted.internet.base.DelayedCall.debug = True
+
+
+if os.getenv("PYCBC_DEBUG_SPEWER"):
+    # enable very detailed call logging
+    sys.settrace(twisted.python.util.spewer)
 
 
 def gen_base(basecls,  # type: Type[T]
@@ -44,7 +53,9 @@ def gen_base(basecls,  # type: Type[T]
                 obj.registerDeferred('_dtor', d)
             except Exception as e:
                 raise
-            self.addCleanup(lambda x: d, None)
+            def cleanup(*args, **kwargs):
+                return d, None
+            self.addCleanup(cleanup)
 
             # Add another callback (invoked _outside_ of C) to ensure
             # the instance's destroy function is properly triggered
@@ -73,9 +84,13 @@ def gen_base(basecls,  # type: Type[T]
             # it seems the mock requires ClassicAuthenticator to work (hence its use in the ClusterTestCase)
             # TODO: resolve this
             auth_type = ClassicAuthenticator if self.is_mock else PasswordAuthenticator
-            return TxCluster(connection_string=str(connstr_nobucket),
-                             authenticator=auth_type(self.cluster_info.admin_username,
+            return self.cluster_class(connection_string=str(connstr_nobucket),
+                                        authenticator=auth_type(self.cluster_info.admin_username,
                                                      self.cluster_info.admin_password))
+
+        @property
+        def cluster_class(self):
+            return TxCluster
 
         def _get_connstr_and_bucket_name(self,
                                          args,  # type: List[Any]

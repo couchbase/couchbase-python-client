@@ -88,10 +88,8 @@ packages = {
     'gcouchbase',
     'txcouchbase',
     'acouchbase',
-}.union({
-            'acouchbase.tests',
-            'acouchbase.py34only'
-        } if sys.version_info >= (3, 4) else set())
+    'acouchbase.tests',
+}
 
 setup(
     name = 'couchbase',

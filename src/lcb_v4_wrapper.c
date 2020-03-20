@@ -138,13 +138,6 @@ lcb_STATUS pycbc_cmdquery_multiauth(lcb_CMDQUERY *cmd, int enable)
     return LCB_ERR_UNSUPPORTED_OPERATION;
 }
 
-lcb_STATUS pycbc_cmdanalytics_host(lcb_CMDANALYTICS* CMD, const char* host)
-{
-    (void)CMD;
-    (void)host;
-    return LCB_ERR_UNSUPPORTED_OPERATION;
-}
-
 lcb_STATUS pycbc_cmdview_spatial(lcb_CMDVIEW *pCmdview, int is_spatial)
 {
     (void)pCmdview;

@@ -1048,6 +1048,9 @@
         },
         "query": {
             "kwargs": {},
+            "args": [
+                "Kona Brewing"
+            ],
             "options": {
                 "pretty": true
             },

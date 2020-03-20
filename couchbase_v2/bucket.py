@@ -902,7 +902,7 @@ class Bucket(CoreClient):
     n1ql_query = CoreClient.query
     query = CoreClient.view_query
 
-    def _analytics_query(self, query, _, *args, **kwargs):
+    def _analytics_query(self, query, *args, **kwargs):
         # we used to take the CBAS host as the second parameter, but
         # LCB now retrieves the hostname from the cluster
         return super(Bucket,self).analytics_query(query, *args, **kwargs)

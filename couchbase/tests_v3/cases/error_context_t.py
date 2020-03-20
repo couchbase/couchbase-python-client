@@ -68,8 +68,8 @@ class ErrorContextTests(CollectionTestCase):
             for x in self.cb.view_query("notadesigndoc", "notaview"):
                 pass
             self.fail("expected an exception")
-        except RecursionError:
-            raise SkipTest("skip until recursion error is fixed")
+        except NotSupportedError:
+            raise SkipTest("Views not supported in this cluster")
         except CouchbaseError as e:
             self.assertIsInstance(e.context, ViewErrorContext)
 

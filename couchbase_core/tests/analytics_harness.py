@@ -109,7 +109,7 @@ class CBASTestBase(RealServerTestCase):
         return self.do_analytics_query(query)
 
     def do_analytics_query(self, query):
-        return self.get_fixture().analytics_query(query, self.cluster_info.analytics_host)
+        return self.get_fixture().analytics_query(query)
 
     def perform_query(self, statement, *args, **kwargs):
         return self.perform_query_with_options(statement, {}, *args, **kwargs)
@@ -290,7 +290,6 @@ class DeferredAnalyticsTest(CBASTestQueriesBase):
         x = couchbase_core.analytics.DeferredAnalyticsQuery(
             "SELECT VALUE bw FROM breweries bw WHERE bw.name = 'Kona Brewing'")
         creator = lambda query, timeout: couchbase_core.analytics.DeferredAnalyticsRequest(query,
-                                                                                           self.cluster_info.analytics_host,
                                                                                            self.get_fixture(),
                                                                                            timeout=timeout)
         self._check_finish_time_in_bounds(x, creator, 500)
@@ -363,16 +362,16 @@ def data_converter(document):
 class AnalyticsIngestTest(CBASTestBase):
     def test_ingest_basic(self):
         x = AnalyticsIngester(TestIdGenerator(), data_converter, BucketOperators.UPSERT)
-        x(self.get_fixture(), 'SELECT * FROM Metadata.`Dataverse`', self.cluster_info.host)
+        x(self.get_fixture(), 'SELECT * FROM Metadata.`Dataverse`')
         result = self.get_fixture().get("DataverseResult_1")
         self.assertIsNotNone(result)
 
     def test_ingest_defaults(self):
         x = AnalyticsIngester()
-        x(self.get_fixture(), 'SELECT * FROM Metadata.`Dataverse`', self.cluster_info.host)
+        x(self.get_fixture(), 'SELECT * FROM Metadata.`Dataverse`')
         result = self.get_fixture().get("DataverseResult_1")
         self.assertIsNotNone(result)
 
     def test_ingest_ignore_errors(self):
         x = AnalyticsIngester(TestIdGenerator(), lambda json: 1 / 0, BucketOperators.UPSERT)
-        x(self.get_fixture(), 'SELECT * FROM Metadata.`Dataverse`', self.cluster_info.host, ignore_ingest_error=True)
+        x(self.get_fixture(), 'SELECT * FROM Metadata.`Dataverse`', ignore_ingest_error=True)

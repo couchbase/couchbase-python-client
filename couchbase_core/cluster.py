@@ -87,8 +87,11 @@ class Cluster(object):
 
         self.authenticator = authenticator
 
-    def open_bucket(self, bucket_name, **kwargs):
-        # type: (str, str) -> Client
+    def open_bucket(self,
+                    bucket_name,  # type: str
+                    **kwargs      # type: Any
+                    ):
+        # type: (...) -> Bucket
         """
         Open a new connection to a Couchbase bucket
         :param bucket_name: The name of the bucket to open

@@ -97,6 +97,9 @@ class AnalyticsQuery(N.N1QLQuery):
             else:
                 self._set_named_args(**kwargs)
 
+    def gen_iter(self, parent, itercls=None, **kwargs):
+        return (itercls or AnalyticsRequest)(self, parent, **kwargs)
+
 
 class DeferredAnalyticsQuery(AnalyticsQuery):
     def __init__(self, querystr, *args, **kwargs):
@@ -128,9 +131,12 @@ class DeferredAnalyticsQuery(AnalyticsQuery):
     def timeout(self, value):
         self._timeout = value
 
+    def gen_iter(self, parent, itercls=None, **kwargs):
+        return (itercls or DeferredAnalyticsRequest)(self, parent, **kwargs)
+
 
 class AnalyticsRequest(N.N1QLRequest):
-    def __init__(self, params, host, parent):
+    def __init__(self, params, parent):
         """
         Object representing the execution of the request on the
         server.
@@ -142,23 +148,25 @@ class AnalyticsRequest(N.N1QLRequest):
             method (or one of its async derivatives).
 
         :param params: An :class:`AnalyticsQuery` object.
-        :param host: the host to send the request to.
         :param parent: The parent :class:`~.couchbase_core.client.Client` object
 
         To actually receive results of the query, iterate over this
         object.
         """
-        self._host = host
         super(AnalyticsRequest, self).__init__(params, parent)
 
     def _submit_query(self):
-        return self._parent._cbas_query(self._params.encoded,
-                                        self._host)
+        return self._parent._cbas_query(self._params.encoded)
 
 
 class DeferredAnalyticsRequest(AnalyticsRequest):
-    def __init__(self, params, host, parent, timeout = None, interval = None):
-        # type: (DeferredAnalyticsQuery, str, couchbase_core.client.Client, Optional[float], Optional[float]) -> None
+    def __init__(self,   # type: DeferredAnalyticsRequest
+                 params,  # type: DeferredAnalyticsQuery
+                 parent,   # type: couchbase_core.client.Client
+                 timeout = None,  # type: float
+                 interval = None   # type: float
+                 ):
+        # type: (...) -> None
         """
         Object representing the execution of a deferred request on the
         server.
@@ -172,7 +180,6 @@ class DeferredAnalyticsRequest(AnalyticsRequest):
             method (or one of its async derivatives).
 
         :param params: An :class:`DeferredAnalyticsQuery` object.
-        :param host: the host to send the request to.
         :param parent: The parent :class:`~.couchbase_core.client.Client` object.
         :param timeout: Timeout in seconds.
         :param interval: Interval in seconds for deferred polling.
@@ -180,19 +187,19 @@ class DeferredAnalyticsRequest(AnalyticsRequest):
         To actually receive results of the query, iterate over this
         object.
         """
-        handle_req = AnalyticsRequest(params, host, parent)
+        handle_req = AnalyticsRequest(params, parent)
 
         handle = handle_req.meta.get('handle')
 
         if not handle:
-            raise CouchbaseInternalError("{} does not support deferred queries".format(host))
+            raise CouchbaseInternalError("Endpoint does not support deferred queries")
 
         self.parent = parent
         self._final_response = None
         self.finish_time = time.time() + (timeout if timeout else params._timeout)
         self.handle_host=urlparse.urlparse(handle)
         self.interval = interval or 10
-        super(DeferredAnalyticsRequest,self).__init__(params,host,parent)
+        super(DeferredAnalyticsRequest,self).__init__(params,parent)
 
     def _submit_query(self):
         return {None:self.final_response()}
@@ -279,12 +286,5 @@ class DeferredAnalyticsRequest(AnalyticsRequest):
     @property
     def raw(self):
         return self.final_response()
-
-
-def gen_request(query, *args, **kwargs):
-    if isinstance(query, DeferredAnalyticsQuery):
-        return DeferredAnalyticsRequest(query,*args,**kwargs)
-    elif isinstance(query,AnalyticsQuery):
-        return AnalyticsRequest(query,*args,**kwargs)
 
 

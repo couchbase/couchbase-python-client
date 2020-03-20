@@ -2,7 +2,7 @@ from .n1ql import *
 from couchbase_core.n1ql import N1QLRequest
 from couchbase.options import OptionBlockTimeOut
 from enum import Enum
-from couchbase_core.analytics import AnalyticsQuery
+from couchbase_core.analytics import AnalyticsQuery, AnalyticsRequest
 
 
 class AnalyticsIndex(dict):
@@ -54,7 +54,7 @@ class AnalyticsDataset(dict):
         return self.get('BucketName', None)
 
 
-class AnalyticsResult(QueryResult):
+class AnalyticsResult(iterable_wrapper(AnalyticsRequest)):
     def client_context_id(self):
         return super(AnalyticsResult, self).client_context_id()
 
@@ -68,10 +68,9 @@ class AnalyticsResult(QueryResult):
         return super(AnalyticsResult, self).request_id()
 
     def __init__(self,
-                 parent  # type: N1QLRequest
+                 *args, **kwargs  # type: N1QLRequest
                  ):
-        super(AnalyticsResult, self).__init__(parent)
-        self._params=parent._params
+        super(AnalyticsResult, self).__init__(*args, **kwargs)
 
 
 class AnalyticsOptions(OptionBlockTimeOut):

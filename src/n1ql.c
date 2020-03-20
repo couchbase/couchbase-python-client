@@ -283,10 +283,6 @@ static void query_row_callback(lcb_t instance,
     if (PREPARED) {                 \
         lcb_cmdquery_adhoc(cmd, 1); \
     }
-#define PYCBC_HOST(CMD, HOST)               \
-    if (HOST) {                             \
-        pycbc_cmdanalytics_host(CMD, HOST); \
-    }
 #define PYCBC_QUERY_MULTIAUTH(CMD, IS_XBUCKET)                      \
     {                                                               \
         lcb_STATUS ma_status =                                      \
@@ -298,11 +294,10 @@ static void query_row_callback(lcb_t instance,
         }                                                           \
     }
 
-#define PYCBC_HANDLE_QUERY(UC, LC, ADHOC, HOST, MULTIAUTH)      \
+#define PYCBC_HANDLE_QUERY(UC, LC, ADHOC, MULTIAUTH)      \
     lcb_STATUS pycbc_handle_##LC(const pycbc_Bucket *self,      \
                                  const char *params,            \
                                  unsigned int nparams,          \
-                                 const char *host,              \
                                  int is_prepared,               \
                                  int is_xbucket,                \
                                  pycbc_MultiResult *mres,       \
@@ -316,7 +311,6 @@ static void query_row_callback(lcb_t instance,
                 lcb_cmd##LC##_query(cmd, params, nparams);      \
                 lcb_cmd##LC##_handle(cmd, &vres->base.u.LC);    \
                 ADHOC(cmd, is_prepared)                         \
-                HOST(cmd, host)                                 \
                 MULTIAUTH(CMD, is_xbucket)                      \
                 PYCBC_TRACECMD_SCOPED_NULL(rc,                  \
                                            LC,                  \
@@ -335,7 +329,6 @@ static void query_row_callback(lcb_t instance,
 typedef lcb_STATUS (*pycbc_query_handler)(const pycbc_Bucket *self,
                                           const char *params,
                                           unsigned int nparams,
-                                          const char *host,
                                           int is_prepared,
                                           int is_xbucket,
                                           pycbc_MultiResult *mres,
@@ -343,15 +336,14 @@ typedef lcb_STATUS (*pycbc_query_handler)(const pycbc_Bucket *self,
                                           pycbc_stack_context_handle);
 #undef PYCBC_QUERY_GEN
 #ifdef PYCBC_QUERY_GEN
-PYCBC_HANDLE_QUERY(ANALYTICS, analytics, PYCBC_DUMMY, PYCBC_HOST, PYCBC_DUMMY);
+PYCBC_HANDLE_QUERY(ANALYTICS, analytics, PYCBC_DUMMY, PYCBC_DUMMY);
 PYCBC_HANDLE_QUERY(
-        QUERY, query, PYCBC_ADHOC, PYCBC_DUMMY, PYCBC_QUERY_MULTIAUTH);
+        QUERY, query, PYCBC_ADHOC, PYCBC_QUERY_MULTIAUTH);
 
 #else
 lcb_STATUS pycbc_handle_analytics(const pycbc_Bucket *self,
                                   const char *params,
                                   unsigned int nparams,
-                                  const char *host,
                                   int is_prepared,
                                   int is_xbucket,
                                   pycbc_MultiResult *mres,
@@ -367,9 +359,6 @@ lcb_STATUS pycbc_handle_analytics(const pycbc_Bucket *self,
             lcb_cmdanalytics_callback(cmd, analytics_row_callback);
             lcb_cmdanalytics_payload(cmd, params, nparams);
             lcb_cmdanalytics_handle(cmd, &(vres->base.u.analytics));
-            if (host) {
-                pycbc_cmdanalytics_host(cmd, host);
-            }
             PYCBC_TRACECMD_SCOPED_NULL(rc,
                                        analytics,
                                        self->instance,
@@ -388,14 +377,12 @@ GT_DONE:
 lcb_STATUS pycbc_handle_query(const pycbc_Bucket *self,
                               const char *params,
                               unsigned int nparams,
-                              const char *host,
                               int is_prepared,
                               int is_xbucket,
                               pycbc_MultiResult *mres,
                               pycbc_ViewResult *vres,
                               pycbc_stack_context_handle context)
 {
-    (void)host;
     lcb_STATUS rc = LCB_SUCCESS;
     {
         CMDSCOPE_NG(QUERY, query)
@@ -437,7 +424,6 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                 pycbc_Bucket *self,
                 const char *params,
                 unsigned nparams,
-                const char *host,
                 int is_prepared,
                 int is_xbucket,
                 int is_analytics)
@@ -467,7 +453,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                                              pycbc_handle_analytics};
     Py_INCREF(vres);
     rc = (handlers[is_analytics])(
-            self, params, nparams, host, is_prepared, is_xbucket, mres, vres, context);
+            self, params, nparams, is_prepared, is_xbucket, mres, vres, context);
     if (rc != LCB_SUCCESS) {
         PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, rc, "Couldn't schedule n1ql query");
         goto GT_DONE;
@@ -504,7 +490,6 @@ pycbc_Bucket__n1ql_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
                               self,
                               params,
                               nparams,
-                              NULL,
                               prepared,
                               cross_bucket,
                               0);
@@ -515,24 +500,16 @@ PyObject *pycbc_Bucket__cbas_query(pycbc_Bucket *self,
                                    PyObject *args,
                                    PyObject *kwargs)
 {
-    PyObject *pyhost = Py_None;
     const char *params = NULL;
     pycbc_strlen_t nparams = 0;
-    static char *kwlist[] = {"params", "host", NULL};
+    static char *kwlist[] = {"params", NULL};
     PyObject *result = NULL;
     if (!PyArg_ParseTupleAndKeywords(
-                args, kwargs, "s#O", kwlist, &params, &nparams, &pyhost)) {
+                args, kwargs, "s#", kwlist, &params, &nparams)) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;
     }
     {
-        const char *host = NULL;
-        if (PyObject_IsTrue(pyhost)) {
-            host = pycbc_cstr(pyhost);
-            if (!host) {
-                PYCBC_EXCTHROW_ARGS();
-            }
-        }
         PYCBC_TRACE_WRAP_TOPLEVEL(result,
                                   LCBTRACE_OP_REQUEST_ENCODING,
                                   query_common,
@@ -540,7 +517,6 @@ PyObject *pycbc_Bucket__cbas_query(pycbc_Bucket *self,
                                   self,
                                   params,
                                   nparams,
-                                  host,
                                   0,
                                   0,
                                   1);

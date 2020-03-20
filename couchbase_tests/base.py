@@ -19,6 +19,8 @@ import sys
 import types
 import platform
 import warnings
+
+from couchbase.management.analytics import CreateDatasetOptions
 from collections import defaultdict
 from functools import wraps
 from parameterized import parameterized_class
@@ -54,6 +56,7 @@ from utilspie.collectionsutils import frozendict
 from couchbase.management.collections import CollectionSpec
 from couchbase.bucket import Bucket as V3Bucket
 from flaky import flaky
+from deepdiff import DeepDiff
 
 
 class FlakyCounter(object):
@@ -123,8 +126,14 @@ class ResourcedTestCase(ResourcedTestCaseReal):
         super(ResourcedTestCase,self).__init__(*args,**kwargs)
         self.maxDiff = None
 
-    def assertSanitizedEqual(self, actual, expected, ignored={}):
-        from deepdiff import DeepDiff
+    def deepDiffComparator(self, expected, actual):
+        self.assertEqual({}, DeepDiff(expected, actual, ignore_order=True, significant_digits=5,
+                                      ignore_numeric_type_changes=True, ignore_type_subclasses=True,
+                                      ignore_string_type_changes=True))
+
+    def assertSanitizedEqual(self, actual, expected, ignored=None, comparator=None):
+        comparator = comparator or self.assertEqual
+        ignored = ignored or {}
         actual_json_sanitized = sanitize_json(actual, ignored)
         expected_json_sanitized = sanitize_json(expected, ignored)
         logging.warning(("\n"
@@ -132,7 +141,7 @@ class ResourcedTestCase(ResourcedTestCaseReal):
                        "{}\n"
                        "sanitized actual:{} and\n"
                        "sanitized expected:{}").format(actual, expected, actual_json_sanitized, expected_json_sanitized))
-        self.assertEqual({},DeepDiff(expected_json_sanitized,actual_json_sanitized,ignore_order=True, significant_digits=5,ignore_numeric_type_changes=True,ignore_type_subclasses=True, ignore_string_type_changes=True))
+        comparator(expected_json_sanitized, actual_json_sanitized)
 
     def assertLogs(self, *args, **kwargs):
         try:
@@ -203,11 +212,11 @@ class ClusterInformation(object):
         bucket = self.bucket_name
         if 'bucket' in overrides:
             bucket = overrides.pop('bucket')
-
+        host = overrides.pop('host', self.host)
         if self.protocol.startswith('couchbase'):
-            protocol_format = '{0}/{1}'.format(self.host, bucket)
+            protocol_format = '{0}/{1}'.format(host, bucket)
         elif self.protocol.startswith('http'):
-            protocol_format = '{0}:{1}/{2}'.format(self.host, self.port, bucket)
+            protocol_format = '{0}:{1}/{2}'.format(host, self.port, bucket)
         else:
             raise CouchbaseError('Unrecognised protocol')
         connstr = self.protocol + '://' + protocol_format
@@ -763,6 +772,7 @@ class ClusterTestCase(CouchbaseTestCase):
     def __init__(self, *args, **kwargs):
         super(ClusterTestCase, self).__init__(*args, **kwargs)
         self.validator = ClusterTestCase.ItemValidator(self)
+        self.dataset_name = 'test_beer_dataset'
 
     @property
     def cluster_factory(self  # type: ClusterTestCase
@@ -806,16 +816,30 @@ class ClusterTestCase(CouchbaseTestCase):
                 return
         self.fail("successful {} after {} times waiting {} seconds between calls".format(func, num_times, seconds_between))
 
-    def try_n_times(self, num_times, seconds_between, func, *args, **kwargs):
+    @staticmethod
+    def _passthru(result, *args, **kwargs):
+        return result
+
+    def _fail(self, message):
+        self.fail(message)
+
+    def _success(self):
+        return True
+
+    def checkResult(self, result, callback):
+        return callback(result)
+
+    def try_n_times(self, num_times, seconds_between, func, *args, on_success=None, **kwargs):
+        on_success = on_success or self._passthru
         for _ in range(num_times):
             try:
                 ret = func(*args, **kwargs)
-                return ret
+                return on_success(ret)
             except Exception as e:
                 # helpful to have this print statement when tests fail
                 print("got exception {}, sleeping...".format(e))
                 time.sleep(seconds_between)
-        self.fail("unsuccessful {} after {} times, waiting {} seconds between calls".format(func, num_times, seconds_between))
+        return self._fail("unsuccessful {} after {} times, waiting {} seconds between calls".format(func, num_times, seconds_between))
 
     def factory(self, *args, **kwargs):
         return V3Bucket(*args, username="default", **kwargs).default_collection()
@@ -831,8 +855,8 @@ class ClusterTestCase(CouchbaseTestCase):
         # this for hitting the mock, it seems
         from couchbase_core.cluster import PasswordAuthenticator
         auth_type = ClassicAuthenticator if self.is_mock else PasswordAuthenticator
-        self.cluster = self.cluster_factory(connstr_abstract, ClusterOptions(
-            auth_type(self.cluster_info.admin_username, self.cluster_info.admin_password)))
+        self.cluster = self.cluster_factory(connection_string=connstr_abstract, authenticator=
+            auth_type(self.cluster_info.admin_username, self.cluster_info.admin_password))
         self.bucket = self.cluster.bucket(bucket_name)
         self.bucket_name = bucket_name
 
@@ -849,8 +873,6 @@ class ClusterTestCase(CouchbaseTestCase):
         info = self.get_bucket_info()
         return "durableWrite" in info['bucketCapabilities']
 
-
-ParamClusterTestCase = parameterized_class(('cluster_factory',), [(Cluster,), (Cluster.connect,)])(ClusterTestCase)
 
 
 def skip_if_no_collections(func):
@@ -929,3 +951,25 @@ class DDocTestCase(RealServerTestCase):
 
 class ViewTestCase(ConnectionTestCase):
     pass
+
+
+class AnalyticsTestCaseBase(CollectionTestCase):
+    def setUp(self, *args, **kwargs):
+        super(AnalyticsTestCaseBase, self).setUp(*args, **kwargs)
+        if self.is_mock:
+            raise SkipTest("analytics not mocked")
+        if int(self.get_cluster_version().split('.')[0]) < 6:
+            raise SkipTest("no analytics in {}".format(self.get_cluster_version()))
+        self.mgr = self.cluster.analytics_indexes()
+        # create a dataset to query
+        self.mgr.create_dataset(self.dataset_name, 'beer-sample', CreateDatasetOptions(ignore_if_exists=True))
+
+        def has_dataset(name, *args, **kwargs):
+            datasets = self.mgr.get_all_datasets()
+            return [d for d in datasets if d.dataset_name == name][0]
+
+        def on_dataset(*args, **kwargs):
+            # connect it...
+            return self.mgr.connect_link()
+
+        self.try_n_times(10, 3, has_dataset, self.dataset_name, on_success=on_dataset)

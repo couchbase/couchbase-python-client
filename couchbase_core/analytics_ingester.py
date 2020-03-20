@@ -69,7 +69,7 @@ class AnalyticsIngester:
         self.data_converter = data_converter
         self.operation = operation
 
-    def __call__(self, bucket, query, host, ignore_ingest_error=False, *args, **kwargs):
+    def __call__(self, bucket, query, host=None, ignore_ingest_error=False, *args, **kwargs):
         # type: (Client, Query, str, bool, *Any, **Any) -> None
         """
         Run an analytics query, pass the results through the data converter, and the results of that

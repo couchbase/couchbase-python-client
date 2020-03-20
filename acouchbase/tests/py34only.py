@@ -23,7 +23,7 @@ class CouchbaseBeerKVTest(CouchbaseBeerTest):
     @asyncio.coroutine
     def test_get_data(self):
         beer_bucket = self.cb
-        yield from (beer_bucket.connect() or asyncio.sleep(0.01))
+        yield from (beer_bucket.on_connect() or asyncio.sleep(0.01))
 
         data = yield from beer_bucket.get('21st_amendment_brewery_cafe')
         self.assertEqual("21st Amendment Brewery Cafe", self.details.get_value(data)["name"])
@@ -37,7 +37,7 @@ class CouchbaseBeerViewTest(CouchbaseBeerTest):
     def test_query(self):
         beer_bucket = self.cb
 
-        yield from (beer_bucket.connect() or asyncio.sleep(0.01))
+        yield from (beer_bucket.on_connect() or asyncio.sleep(0.01))
         viewiter = beer_bucket.view_query("beer", "brewery_beers", limit=10)
         yield from viewiter.future
 
@@ -55,7 +55,7 @@ class CouchbaseDefaultTestKV(AioTestCase):
         expected = str(uuid.uuid4())
 
         default_bucket = self.cb
-        yield from (default_bucket.connect() or asyncio.sleep(0.01))
+        yield from (default_bucket.on_connect() or asyncio.sleep(0.01))
 
         yield from default_bucket.upsert('hello', {"key": expected})
 
@@ -72,7 +72,7 @@ class CouchbaseDefaultTestN1QL(AioTestCase):
     def test_n1ql(self):
 
         default_bucket = self.cb
-        yield from (default_bucket.connect() or asyncio.sleep(0.01))
+        yield from (default_bucket.on_connect() or asyncio.sleep(0.01))
 
         q = N1QLQuery("SELECT mockrow")
         it = default_bucket.query(q)

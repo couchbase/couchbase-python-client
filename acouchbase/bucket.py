@@ -45,17 +45,25 @@ class AsyncBucketFactory(type):
                 self._cft = cft
                 self._conncb = ftresult
 
+            @property
+            def view_itercls(self):
+                return AView
+
             def view_query(self, *args, **kwargs):
                 if "itercls" not in kwargs:
-                    kwargs["itercls"] = AView
+                    kwargs["itercls"] = self.view_itercls
                 return view_query(self, *args, **kwargs)
+
+            @property
+            def query_itercls(self):
+                return AN1QLRequest
 
             def query(self, *args, **kwargs):
                 if "itercls" not in kwargs:
-                    kwargs["itercls"] = AN1QLRequest
+                    kwargs["itercls"] = self.query_itercls
                 return n1ql_query(self, *args, **kwargs)
 
-            def connect(self):
+            def on_connect(self):
                 if not self.connected:
                     self._connect()
                     return self._cft

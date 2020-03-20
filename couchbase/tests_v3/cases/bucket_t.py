@@ -30,7 +30,7 @@ class BucketSimpleTest(CollectionTestCase):
         super(BucketSimpleTest, self).tearDown()
 
     def test_name(self):
-        self.assertEqual(self.bucket.name, 'default')
+        self.assertEqual('default', self.bucket.name)
 
     def test_ping(self):
         result = self.bucket.ping()

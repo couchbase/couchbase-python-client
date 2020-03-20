@@ -1,6 +1,6 @@
 from typing import *
 from .options import OptionBlockTimeOut, timedelta
-from couchbase_core import abstractmethod, IterableWrapper, JSON
+from couchbase_core import abstractmethod, JSON, iterable_wrapper
 from enum import Enum
 from couchbase_core.fulltext import SearchRequest
 from datetime import timedelta
@@ -28,7 +28,7 @@ class SearchOptions(OptionBlockTimeOut):
                  fields=None,            # type: List[str]
                  highlight_style=None,   # type: HighlightStyle
                  highlight_fields=None,  # type: List[str]
-                 scan_consistency=None,  # type: cluster.QueryScanConsistency
+                 scan_consistency=None,  # type: couchbase.cluster.QueryScanConsistency
                  consistent_with=None,   # type: couchbase_core.MutationState
                  facets=None             # type: Dict[str, couchbase_core.fulltext.Facet]
                  ):
@@ -77,21 +77,27 @@ class MetaData(object):
         return self._raw_data.get('max_score')
 
 
-class SearchResult(IterableWrapper):
+class SearchResult(iterable_wrapper(SearchRequest)):
     Facet = object
 
     def __init__(self,
-                 raw_result  # type: SearchRequest
+                 *args, **kwargs  # type: SearchRequest
                  ):
-        IterableWrapper.__init__(self, raw_result)
+
+        super(SearchResult, self).__init__(*args, **kwargs)
 
     def hits(self):
         # type: (...) -> Iterable[JSON]
-        return list(x for x in self)
+        return list(x for x in super(SearchResult,self).__iter__())
 
     def facets(self):
         # type: (...) -> Dict[str, SearchResult.Facet]
-        return self.parent.facets
+        return super(SearchResult, self).facets
 
     def metadata(self):  # type: (...) -> MetaData
-        return MetaData(IterableWrapper.metadata(self))
+        return MetaData(super(SearchResult, self).meta)
+
+    @classmethod
+    def mk_kwargs(cls, kwargs):
+        return SearchRequest.mk_kwargs(kwargs)
+

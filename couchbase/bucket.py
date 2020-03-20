@@ -191,7 +191,7 @@ class Bucket(CoreClientDatastructureWrap):
 
 
         """
-        self._name = name
+        self._name = name or kwargs.get('bucket', None)
         self._connstr = connection_string
         self._bucket_args = forward_args(kwargs, *options)
         self._bucket_args['bucket'] = name
@@ -291,7 +291,7 @@ class Bucket(CoreClientDatastructureWrap):
 
     @property
     def kv_timeout(self):
-        #(...) -> timedelta
+        # type: (...) -> timedelta
         """
         The default timeout for all kv operations on this bucket.
         ::
@@ -311,7 +311,7 @@ class Bucket(CoreClientDatastructureWrap):
 
     @property
     def view_timeout(self):
-        # (...) -> timedelta
+        # type: (...) -> timedelta
         """
         The default timeout for all view operations on this bucket.
         ::

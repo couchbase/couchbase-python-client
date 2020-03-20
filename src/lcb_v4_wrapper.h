@@ -346,8 +346,6 @@ void pycbc_cmdsubdoc_flags_from_scv(unsigned int flags, lcb_CMDSUBDOC *cmd);
 
 lcb_STATUS pycbc_cmdquery_multiauth(lcb_CMDQUERY *cmd, int enable);
 
-lcb_STATUS pycbc_cmdanalytics_host(lcb_CMDANALYTICS* CMD, const char* host);
-
 #define LCB_PING_GET_TYPE_S(X, Y) \
 case LCB_PING_SERVICE_##X:        \
     return #Y;

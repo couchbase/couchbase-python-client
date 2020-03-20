@@ -13,9 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from couchbase.exceptions import UnknownHostError
 from twisted.internet import defer
+
 from couchbase_core.exceptions import (
-    BucketNotFoundError,
     ObjectDestroyedError)
 
 from couchbase_tests.base import ConnectionTestCase
@@ -26,32 +27,29 @@ from nose.tools import timed
 import sys
 from unittest import SkipTest
 
-
-Base = gen_base(ConnectionTestCase)  # type: ConnectionTestCase
-
-# TODO: once TxCluster is fully async, retarget to TxCluster and rename to BasicClusterTest
+Base = gen_base(ConnectionTestCase)
 
 
-class BasicConnectionTest(Base):
+class BasicClusterTest(Base):
     def __init__(self, *args, **kwargs):
-        super(BasicConnectionTest,self).__init__(*args,**kwargs)
+        super(BasicClusterTest, self).__init__(*args, **kwargs)
 
     @property
     def factory(self):
-        return self.gen_bucket
+        return self.gen_cluster
 
     def testConnectionSuccess(self):
         cb = self.make_connection()
-        d = cb.connect()
+        d = cb.on_connect()
         d.addCallback(lambda x: self.assertTrue(cb.connected))
         return d
 
     def testConnectionFailure(self  # type: Base
                               ):
-        cb = self.make_connection(bucket='blahblah')
-        d = cb.connect()
+        cb = self.make_connection(host="qweqwe")
+        d = cb.on_connect()
         d.addCallback(lambda x: x, cb)
-        return self.assertFailure(d, BucketNotFoundError)
+        return self.assertFailure(d, UnknownHostError)
 
     @timed(10)
     def testBadEvent(self):
@@ -72,7 +70,7 @@ class BasicConnectionTest(Base):
         cs = ConnectionString.parse(self.make_connargs()['connection_string'])
         cs.hosts = [ info.host + ':' + '10', info.host + ':' + str(info.port) ]
         cb = self.make_connection(connection_string=cs.encode())
-        d = cb.connect()
+        d = cb.on_connect()
         d.addCallback(lambda x: self.assertTrue(cb.connected))
         return d
 
@@ -80,12 +78,12 @@ class BasicConnectionTest(Base):
         info = self.cluster_info
         s = self.make_connargs()['connection_string']
         cb = TxBucket(connection_string=s,password=self.cluster_info.bucket_password)
-        d = cb.connect().addCallback(lambda x: self.assertTrue(cb.connected))
+        d = cb.on_connect().addCallback(lambda x: self.assertTrue(cb.connected))
         self.register_cleanup(cb)
         return d
 
     def testConnectionDestroyed(self):
         cb = self.make_connection()
-        d = cb.connect()
+        d = cb.on_connect()
         self.assertFailure(d, ObjectDestroyedError)
         return d
