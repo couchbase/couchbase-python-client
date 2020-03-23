@@ -6,7 +6,7 @@ from couchbase_core import mk_formstr
 
 from couchbase_core.exceptions import ErrorMapper, NotSupportedWrapper, HTTPError
 from couchbase.exceptions import ScopeNotFoundException, ScopeAlreadyExistsException, CollectionNotFoundException, CollectionAlreadyExistsException
-
+from datetime import timedelta
 
 class CollectionsErrorHandler(ErrorMapper):
     @staticmethod
@@ -98,6 +98,8 @@ class CollectionManager(GenericManager):
         params = {
             'name': collection.name
         }
+        if collection.max_ttl:
+            params['maxTTL'] = int(collection.max_ttl.total_seconds())
 
         form = mk_formstr(params)
         kwargs.update({'path': path,
@@ -180,10 +182,12 @@ class CollectionManager(GenericManager):
 
 class CollectionSpec(object):
     def __init__(self,
-                 collection_name,  # type: str
-                 scope_name='_default'  # type: str
+                 collection_name,           # type: str
+                 scope_name='_default',     # type: str
+                 max_ttl=None               # type: timedelta
                  ):
         self._name, self._scope_name = collection_name, scope_name
+        self._max_ttl = max_ttl
 
     @property
     def name(self):
@@ -194,6 +198,11 @@ class CollectionSpec(object):
     def scope_name(self):
         # type: (...) -> str
         return self._scope_name
+
+    @property
+    def max_ttl(self):
+        # type: (...) -> timedelta
+        return self._max_ttl
 
 
 class ScopeSpec(object):
