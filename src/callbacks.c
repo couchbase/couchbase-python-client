@@ -176,16 +176,104 @@ void pycbc_enhanced_err_register_entry(PyObject **dict,
     pycbc_dict_add_text_kv(*dict, key, value);
 }
 
+void pycbc_convert_kv_error_context(const lcb_KEY_VALUE_ERROR_CONTEXT* ctx,
+                                    pycbc_enhanced_err_info** err_info,
+                                    const char* extended_context,
+                                    const char* extended_ref) {
+    PyObject* err_context = NULL;
+    if (!*err_info) {
+        *err_info = PyDict_New();
+        err_context = PyDict_New();
+        PyDict_SetItemString(*err_info, "error_context", err_context);
+    }
+    if (ctx) {
+        uint16_t status_code;
+        uint32_t opaque;
+        uint64_t cas;
+        const char* val;
+        size_t len;
+
+        lcb_errctx_kv_status_code(ctx, &status_code);
+        lcb_errctx_kv_cas(ctx, &cas);
+        lcb_errctx_kv_opaque(ctx, &opaque);
+        pycbc_set_kv_ull_str(err_context, "status_code", (lcb_uint64_t)status_code);
+        pycbc_set_kv_ull_str(err_context, "opaque", (lcb_uint64_t)opaque);
+        pycbc_set_kv_ull_str(err_context, "cas", cas);
+        lcb_errctx_kv_key(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "key", val, len);
+        lcb_errctx_kv_bucket(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "bucket", val, len);
+        lcb_errctx_kv_collection(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "collection", val, len);
+        lcb_errctx_kv_scope(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "scope", val, len);
+        lcb_errctx_kv_context(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "context", val, len);
+        lcb_errctx_kv_ref(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "ref", val, len);
+        lcb_errctx_kv_endpoint(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "endpoint", val, len);
+        pycbc_dict_add_text_kv(err_context, "type", "KVErrorContext");
+    }
+    if (extended_context) {
+        pycbc_dict_add_text_kv(err_context, "extended_context", extended_context);
+    }
+    if (extended_ref) {
+        pycbc_dict_add_text_kv(err_context, "extended_ref", extended_ref);
+    }
+    Py_DECREF(err_context);
+}
+
+pycbc_enhanced_err_info* get_operation_err_info(const lcb_RESPBASE* respbase,
+                                                int cbtype) {
+
+    /* get the extended error context and ref, if any */
+    const char *extended_ref = lcb_resp_get_error_ref(cbtype, respbase);
+    const char *extended_context = lcb_resp_get_error_context(cbtype, respbase);
+    /* To get the error_context, we need to cast to appropriate resp type
+       and call appropriate respXXX_error_context function
+    */
+    pycbc_enhanced_err_info* info = NULL;
+    const lcb_KEY_VALUE_ERROR_CONTEXT* ctx = NULL;
+    lcb_STATUS rc;
+    switch(cbtype) {
+        case LCB_CALLBACK_GET:
+            rc = lcb_respget_error_context((const lcb_RESPGET*)respbase, &ctx);
+            break;
+        case LCB_CALLBACK_STORE:
+            rc = lcb_respstore_error_context((const lcb_RESPSTORE*)respbase, &ctx);
+            break;
+        case LCB_CALLBACK_UNLOCK:
+            rc = lcb_respunlock_error_context((const lcb_RESPUNLOCK*)respbase, &ctx);
+            break;
+        case LCB_CALLBACK_TOUCH:
+            rc = lcb_resptouch_error_context((const lcb_RESPTOUCH*)respbase, &ctx);
+            break;
+        case LCB_CALLBACK_GETREPLICA:
+            rc = lcb_respgetreplica_error_context((const lcb_RESPGETREPLICA*)respbase, &ctx);
+            break;
+        case LCB_CALLBACK_COUNTER:
+            rc = lcb_respcounter_error_context((const lcb_RESPCOUNTER*)respbase, &ctx);
+            break;
+        case LCB_CALLBACK_SDLOOKUP:
+        case LCB_CALLBACK_SDMUTATE:
+            rc = lcb_respsubdoc_error_context((const lcb_RESPSUBDOC*)respbase, &ctx);
+            break;
+    }
+    if (LCB_SUCCESS == rc) {
+        if (ctx) {
+            pycbc_convert_kv_error_context(ctx, &info, extended_context, extended_ref);
+        }
+    }
+    return info;
+}
+
 static pycbc_enhanced_err_info *pycbc_enhanced_err_info_store(
         const lcb_RESPBASE *respbase, int cbtype, pycbc_debug_info *info)
 {
-    pycbc_enhanced_err_info *err_info = NULL;
-    const char *ref = lcb_resp_get_error_ref(cbtype, respbase);
-    const char *context = lcb_resp_get_error_context(cbtype, respbase);
-    pycbc_enhanced_err_register_entry(&err_info, "ref", ref);
-    pycbc_enhanced_err_register_entry(&err_info, "context", context);
+    pycbc_enhanced_err_info *err_info = get_operation_err_info(respbase, cbtype);
     if (info) {
-        char LINEBUF[100] = {0};
+         char LINEBUF[100] = {0};
 
         pycbc_enhanced_err_register_entry(&err_info, "FILE", info->FILE);
         pycbc_enhanced_err_register_entry(&err_info, "FUNC", info->FUNC);

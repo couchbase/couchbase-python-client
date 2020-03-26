@@ -24,6 +24,11 @@ void pycbc_dict_add_text_kv_strn(PyObject *dict,
                                  pycbc_strn_base_const strn_key,
                                  pycbc_strn_base_const strn_value);
 
+void pycbc_dict_add_text_kv_strn2(PyObject* dict,
+                                  const char* key,
+                                  const char* val,
+                                  size_t val_len);
+
 void pycbc_dict_add_text_kv(PyObject *dict, const char *key, const char *value);
 
 pycbc_strn_unmanaged pycbc_strn_from_managed(PyObject *source);

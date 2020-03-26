@@ -3111,6 +3111,16 @@ int pycbc_TracerType_init(PyObject **ptr) {
     return PyType_Ready(p);
 }
 
+void pycbc_dict_add_text_kv_strn2(PyObject* dict,
+                                  const char* key,
+                                  const char* val,
+                                  size_t val_len) {
+    pycbc_dict_add_text_kv_strn(dict,
+            (pycbc_strn_base_const){.buffer = key, .length = strlen(key)},
+            (pycbc_strn_base_const){.buffer = val, .length = val_len}
+            );
+}
+
 void pycbc_dict_add_text_kv_strn(PyObject *dict,
                                  pycbc_strn_base_const strn_key,
                                  pycbc_strn_base_const strn_value)

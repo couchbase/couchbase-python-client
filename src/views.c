@@ -182,6 +182,61 @@ static int parse_row_json(pycbc_Bucket *bucket,
     Py_DECREF(dd);
     return rv;
 }
+
+void convert_view_error_context(const lcb_VIEW_ERROR_CONTEXT* ctx,
+                                pycbc_MultiResult* mres,
+                                const char* extended_context,
+                                const char* extended_ref) {
+
+    pycbc_enhanced_err_info* err_info = PyDict_New();
+    PyObject* err_context = PyDict_New();
+    PyDict_SetItemString(err_info, "error_context", err_context);
+    if (ctx) {
+        uint32_t uint32_val;
+        const char* val;
+        size_t len;
+
+        lcb_errctx_view_http_response_code(ctx, &uint32_val);
+        pycbc_set_kv_ull_str(err_context, "http_response_code", (lcb_uint64_t)uint32_val);
+        lcb_errctx_view_first_error_code(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "first_error_code", val, len);
+        lcb_errctx_view_first_error_message(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "first_error_message", val, len);
+        lcb_errctx_view_design_document(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "design_document", val, len);
+        lcb_errctx_view_view(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "view", val, len);
+        lcb_errctx_view_query_params(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "query_params", val, len);
+        lcb_errctx_view_http_response_body(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "http_response_body", val, len);
+        lcb_errctx_view_endpoint(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "endpoint", val, len);
+        pycbc_dict_add_text_kv(err_context, "type", "ViewErrorContext");
+    }
+    if (extended_context) {
+        pycbc_dict_add_text_kv(err_context, "extended_context", extended_context);
+    }
+    if (extended_ref) {
+        pycbc_dict_add_text_kv(err_context, "extended_ref", extended_ref);
+    }
+    mres->err_info = err_info;
+    Py_INCREF(err_info);
+    Py_DECREF(err_context);
+}
+
+void pycbc_add_view_error_context(const lcb_RESPVIEW* resp,
+                                  pycbc_MultiResult* mres) {
+    /* get the extended error context and ref, if any */
+    const char* extended_ref = lcb_resp_get_error_ref(LCB_CALLBACK_VIEWQUERY, (lcb_RESPBASE*)resp);
+    const char* extended_context = lcb_resp_get_error_context(LCB_CALLBACK_VIEWQUERY, (lcb_RESPBASE*)resp);
+    const lcb_VIEW_ERROR_CONTEXT* ctx;
+    if (LCB_SUCCESS == lcb_respview_error_context(resp, &ctx)) {
+        if (ctx) {
+            convert_view_error_context(ctx, mres, extended_context, extended_ref);
+        }
+    }
+}
 static void row_callback(lcb_t instance, int cbtype, const lcb_RESPVIEW *resp)
 {
     pycbc_MultiResult *mres;
@@ -214,6 +269,7 @@ static void row_callback(lcb_t instance, int cbtype, const lcb_RESPVIEW *resp)
     pycbc_viewresult_step(vres, mres, bucket, lcb_respview_is_final(resp));
 
     if (lcb_respview_is_final(resp)) {
+        pycbc_add_view_error_context(resp, mres);
         pycbc_httpresult_complete(
                 &vres->base, mres, lcb_respview_status(resp), htcode, hdrs);
         PYCBC_DECREF(mres);

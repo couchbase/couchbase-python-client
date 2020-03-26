@@ -44,6 +44,16 @@ HttpResult_success(pycbc_HttpResult *self, void *unused)
     return ret;
 }
 
+static PyObject*
+HttpResult_context(pycbc_HttpResult* self, void* unused) {
+    (void)unused;
+    if (!self->context) {
+        Py_RETURN_NONE;
+    }
+    Py_INCREF(self->context);
+    return self->headers;
+}
+
 static PyObject *
 HttpResult_headers(pycbc_HttpResult *self, void *unused)
 {
@@ -135,6 +145,9 @@ static PyGetSetDef HttpResult_TABLE_getset[] = {
 
         { "headers", (getter)HttpResult_headers, NULL,
                 PyDoc_STR("Headers dict for the request. ")
+        },
+        { "context", (getter)HttpResult_context, NULL,
+                PyDoc_STR("Error context dict for the request. ")
         },
 
         { NULL }

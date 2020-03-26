@@ -118,6 +118,59 @@ static void decode_data(pycbc_MultiResult *mres, pycbc_HttpResult *htres)
 
 #define HTTP_IS_OK(st) (st > 199 && st < 300)
 
+void pycbc_convert_http_error_context(const lcb_HTTP_ERROR_CONTEXT* ctx,
+                                      pycbc_enhanced_err_info** err_info,
+                                      const char* extended_context,
+                                      const char* extended_ref) {
+    *err_info = PyDict_New();
+    if (ctx && *err_info) {
+        uint32_t response_code;
+        const char* val;
+        size_t len;
+
+        PyObject* err_context = PyDict_New();
+        PyDict_SetItemString(*err_info, "error_context", err_context);
+
+        lcb_errctx_http_response_code(ctx, &response_code);
+        pycbc_set_kv_ull_str(err_context, "response_code", (lcb_uint64_t)response_code);
+        lcb_errctx_http_path(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "path", val, len);
+        lcb_errctx_http_response_body(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "response_body", val, len);
+        lcb_errctx_http_endpoint(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "endpoint", val, len);
+        pycbc_dict_add_text_kv(err_context, "type", "HTTPErrorContext");
+
+        if (extended_context) {
+            pycbc_dict_add_text_kv(err_context, "extended_context", extended_context);
+        }
+        if (extended_ref) {
+            pycbc_dict_add_text_kv(err_context, "extended_ref", extended_ref);
+        }
+        Py_DECREF(err_context);
+    }
+}
+
+void pycbc_add_error_context(const lcb_RESPHTTP* resp,
+                             pycbc_MultiResult* mres,
+                             pycbc_HttpResult* htres,
+                             int cbtype) {
+
+    /* get the extended error context and ref, if any */
+    const char *extended_ref = lcb_resp_get_error_ref(cbtype, (const lcb_RESPBASE*)resp);
+    const char *extended_context = lcb_resp_get_error_context(cbtype, (const lcb_RESPBASE*)resp);
+    const lcb_HTTP_ERROR_CONTEXT* ctx;
+    pycbc_enhanced_err_info* err_info = NULL;
+    if (LCB_SUCCESS == lcb_resphttp_error_context(resp, &ctx)) {
+        pycbc_convert_http_error_context(ctx, &err_info, extended_context, extended_ref);
+    }
+    /* now stick it in the multiresult.  This will be passed along when an exception is raised */
+    if (mres) {
+        mres->err_info = err_info;
+        Py_XINCREF(err_info);
+    }
+}
+
 void pycbc_httpresult_complete(pycbc_HttpResult *htres,
                                pycbc_MultiResult *mres,
                                lcb_STATUS err,
@@ -147,13 +200,16 @@ void pycbc_httpresult_complete(pycbc_HttpResult *htres,
     }
 
     if (should_raise) {
+        if (mres->err_info) {
+            Py_INCREF(mres->err_info);
+        }
         PYCBC_EXC_WRAP_EX(err ? PYCBC_EXC_LCBERR : PYCBC_EXC_HTTP,
                           err,
                           "HTTP Request failed. Examine 'objextra' for "
                           "full result",
                           htres->key,
                           (PyObject *)htres,
-                          NULL);
+                          mres->err_info ? mres->err_info : NULL);
         pycbc_multiresult_adderr(mres);
     }
 
@@ -198,10 +254,10 @@ static void complete_callback(lcb_t instance,
         lcb_resphttp_body(resp, &body.buffer, &body.length);
 
         pycbc_httpresult_add_data_strn(mres, htres, body);
+        pycbc_add_error_context(resp, mres, htres, cbtype);
         pycbc_httpresult_complete(
                 htres, mres, lcb_resphttp_status(resp), http_status, headers);
     }
-
     /* CONN_THR_BEGIN called by httpresult_complete() */
     (void)instance;
     (void)cbtype;

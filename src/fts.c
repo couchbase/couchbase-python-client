@@ -1,6 +1,59 @@
 #include "oputil.h"
 #include "pycbc_http.h"
 
+void convert_search_error_context(const lcb_SEARCH_ERROR_CONTEXT* ctx,
+                                  pycbc_MultiResult* mres,
+                                  const char* extended_context,
+                                  const char* extended_ref) {
+
+    pycbc_enhanced_err_info* err_info = PyDict_New();
+    PyObject* err_context = PyDict_New();
+    PyDict_SetItemString(err_info, "error_context", err_context);
+    if (ctx) {
+        uint32_t uint32_val;
+        const char* val;
+        size_t len;
+
+        lcb_errctx_search_http_response_code(ctx, &uint32_val);
+        pycbc_set_kv_ull_str(err_context, "http_response_code", (lcb_uint64_t)uint32_val);
+        lcb_errctx_search_error_message(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "error_message", val, len);
+        lcb_errctx_search_index_name(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "index_name", val, len);
+        lcb_errctx_search_query(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "query", val, len);
+        lcb_errctx_search_params(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "params", val, len);
+        lcb_errctx_search_http_response_body(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "http_response_body", val, len);
+        lcb_errctx_search_endpoint(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "endpoint", val, len);
+        pycbc_dict_add_text_kv(err_context, "type", "SearchErrorContext");
+    }
+    if (extended_context) {
+        pycbc_dict_add_text_kv(err_context, "extended_context", extended_context);
+    }
+    if (extended_ref) {
+        pycbc_dict_add_text_kv(err_context, "extended_ref", extended_ref);
+    }
+    mres->err_info = err_info;
+    Py_INCREF(err_info);
+    Py_DECREF(err_context);
+}
+
+void pycbc_add_fts_error_context(const lcb_RESPSEARCH* resp,
+                                 pycbc_MultiResult* mres) {
+    /* get the extended error context and ref, if any */
+    const char* extended_ref = lcb_resp_get_error_ref(LCB_CALLBACK_SEARCH, (lcb_RESPBASE*)resp);
+    const char* extended_context = lcb_resp_get_error_context(LCB_CALLBACK_SEARCH, (lcb_RESPBASE*)resp);
+    const lcb_SEARCH_ERROR_CONTEXT* ctx;
+    if (LCB_SUCCESS == lcb_respsearch_error_context(resp, &ctx)) {
+        if (ctx) {
+            convert_search_error_context(ctx, mres, extended_context, extended_ref);
+        }
+    }
+}
+
 static void fts_row_callback(lcb_t instance,
                              int ign,
                              const lcb_RESPSEARCH *resp)
@@ -36,6 +89,7 @@ static void fts_row_callback(lcb_t instance,
     }
     pycbc_viewresult_step(vres, mres, bucket, lcb_respsearch_is_final(resp));
     if (lcb_respsearch_is_final(resp)) {
+        pycbc_add_fts_error_context(resp, mres);
         pycbc_httpresult_complete(
                 &vres->base, mres, lcb_respsearch_status(resp), htcode, hdrs);
     } else {

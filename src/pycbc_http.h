@@ -24,6 +24,7 @@ typedef struct {
     pycbc_Result_HEAD PyObject *http_data;
     PyObject *headers;
     pycbc_Bucket *parent;
+    PyObject* context;
     union {
         pycbc_HTTP_HANDLE htreq;
         pycbc_VIEW_HANDLE vh;

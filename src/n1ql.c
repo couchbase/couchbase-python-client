@@ -49,6 +49,120 @@ void pycbc_add_row_or_data(pycbc_MultiResult *mres,
     }
 }
 
+/* note that the analytics and query error contexts are identical -- could
+   make a clever macro solution to DRY this up, but then I'd never be able to
+   understand it again.  So, no. Maybe later.
+   */
+void convert_analytics_error_context(const lcb_ANALYTICS_ERROR_CONTEXT* ctx,
+                                     pycbc_MultiResult *mres,
+                                     const char* extended_context,
+                                     const char* extended_ref) {
+
+    pycbc_enhanced_err_info* err_info = PyDict_New();
+    PyObject* err_context = PyDict_New();
+    PyDict_SetItemString(err_info, "error_context", err_context);
+    if (ctx) {
+        uint32_t uint32_val;
+        const char* val;
+        size_t len;
+
+        lcb_errctx_analytics_first_error_code(ctx, &uint32_val);
+        pycbc_set_kv_ull_str(err_context, "first_error_code", (lcb_uint64_t)uint32_val);
+        lcb_errctx_analytics_http_response_code(ctx, &uint32_val);
+        pycbc_set_kv_ull_str(err_context, "http_response_code", (lcb_uint64_t)uint32_val);
+        lcb_errctx_analytics_first_error_message(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "first_error_message", val, len);
+        lcb_errctx_analytics_statement(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "statement", val, len);
+        lcb_errctx_analytics_client_context_id(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "client_context_id", val, len);
+        lcb_errctx_analytics_query_params(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "query_params", val, len);
+        lcb_errctx_analytics_http_response_body(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "http_response_body", val, len);
+        lcb_errctx_analytics_endpoint(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "endpoint", val, len);
+        pycbc_dict_add_text_kv(err_context, "type", "AnalyticsErrorContext");
+    }
+    if (extended_context) {
+        pycbc_dict_add_text_kv(err_context, "extended_context", extended_context);
+    }
+    if (extended_ref) {
+        pycbc_dict_add_text_kv(err_context, "extended_ref", extended_ref);
+    }
+    mres->err_info = err_info;
+    Py_INCREF(err_info);
+    Py_DECREF(err_context);
+}
+void convert_query_error_context(const lcb_QUERY_ERROR_CONTEXT* ctx,
+                                 pycbc_MultiResult *mres,
+                                 const char* extended_context,
+                                 const char* extended_ref) {
+    pycbc_enhanced_err_info* err_info = PyDict_New();
+    PyObject* err_context = PyDict_New();
+    PyDict_SetItemString(err_info, "error_context", err_context);
+    if (ctx) {
+        uint32_t uint32_val;
+        const char* val;
+        size_t len;
+
+        lcb_errctx_query_first_error_code(ctx, &uint32_val);
+        pycbc_set_kv_ull_str(err_context, "first_error_code", (lcb_uint64_t)uint32_val);
+        lcb_errctx_query_http_response_code(ctx, &uint32_val);
+        pycbc_set_kv_ull_str(err_context, "http_response_code", (lcb_uint64_t)uint32_val);
+        lcb_errctx_query_first_error_message(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "first_error_message", val, len);
+        lcb_errctx_query_statement(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "statement", val, len);
+        lcb_errctx_query_client_context_id(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "client_context_id", val, len);
+        lcb_errctx_query_query_params(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "query_params", val, len);
+        lcb_errctx_query_http_response_body(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "http_response_body", val, len);
+        lcb_errctx_query_endpoint(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "endpoint", val, len);
+        pycbc_dict_add_text_kv(err_context, "type", "QueryErrorContext");
+    }
+    if (extended_context) {
+        pycbc_dict_add_text_kv(err_context, "extended_context", extended_context);
+    }
+    if (extended_ref) {
+        pycbc_dict_add_text_kv(err_context, "extended_ref", extended_ref);
+    }
+    mres->err_info = err_info;
+    Py_INCREF(err_info);
+    Py_DECREF(err_context);
+}
+
+/* Same here -- this is practically identical to the query one below, but no
+   fancy macros here, yet.
+*/
+void pycbc_add_analytics_error_context(const lcb_RESPANALYTICS* resp,
+                                       pycbc_MultiResult* mres) {
+    /* get the extended error context and ref, if any */
+    const char *extended_ref = lcb_resp_get_error_ref(LCB_CALLBACK_ANALYTICS, (lcb_RESPBASE*)resp);
+    const char *extended_context = lcb_resp_get_error_context(LCB_CALLBACK_ANALYTICS, (lcb_RESPBASE*)resp);
+    const lcb_ANALYTICS_ERROR_CONTEXT* ctx;
+    if (LCB_SUCCESS == lcb_respanalytics_error_context(resp, &ctx)) {
+        if (ctx) {
+            convert_analytics_error_context(ctx, mres, extended_context, extended_ref);
+        }
+    }
+}
+
+void pycbc_add_query_error_context(const lcb_RESPQUERY* resp,
+                                   pycbc_MultiResult* mres) {
+    /* get the extended error context and ref, if any */
+    const char *extended_ref = lcb_resp_get_error_ref(LCB_CALLBACK_QUERY, (lcb_RESPBASE*)resp);
+    const char *extended_context = lcb_resp_get_error_context(LCB_CALLBACK_QUERY, (lcb_RESPBASE*)resp);
+    const lcb_QUERY_ERROR_CONTEXT* ctx;
+    if (LCB_SUCCESS == lcb_respquery_error_context(resp, &ctx)) {
+        if (ctx) {
+            convert_query_error_context(ctx, mres, extended_context, extended_ref);
+        }
+    }
+}
 #define PYCBC_QUERY_CALLBACK(UC, LC)                                      \
     static void LC##_row_callback(                                        \
             lcb_t instance, int ign, const lcb_RESP##UC *respbase)        \
@@ -114,6 +228,7 @@ static void analytics_row_callback(lcb_t instance, int ign, const lcb_RESPANALYT
     }
     if (lcb_respanalytics_is_final(resp)) {
         if (vres) {
+            pycbc_add_analytics_error_context(resp, mres);
             pycbc_httpresult_complete(&vres->base,
                                       mres,
                                       lcb_respanalytics_status(resp),
@@ -151,6 +266,7 @@ static void query_row_callback(lcb_t instance,
     }
     if (lcb_respquery_is_final(resp)) {
         if (vres) {
+            pycbc_add_query_error_context(resp, mres);
             pycbc_httpresult_complete(&vres->base,
                                       mres,
                                       lcb_respquery_status(resp),

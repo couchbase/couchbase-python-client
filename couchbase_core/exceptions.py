@@ -20,15 +20,230 @@ from string import Template
 import json
 
 from couchbase_core import CompatibilityEnum
-
+from couchbase_core.supportability import uncommitted, volatile
 from typing import *
 import inspect
 import re
+import sys
 from boltons.funcutils import wraps
 try:
     from typing import TypedDict
 except:
     from typing_extensions import TypedDict
+
+
+class ErrorContext(dict):
+    @staticmethod
+    def from_dict(**kwargs):
+        # type: (...) -> ErrorContext
+        klass = kwargs.get('type', "ErrorContext")
+        cl = getattr(sys.modules[__name__], klass)
+        return cl(**kwargs)
+
+    @property
+    @uncommitted
+    def endpoint(self):
+        # type: (...) -> str
+        return self.get('endpoint', None)
+
+    @property
+    @uncommitted
+    def extended_context(self):
+        # type: (...) -> str
+        self.get('extended_context', None)
+
+    @property
+    @uncommitted
+    def extended_ref(self):
+        # type: (...) -> str
+        self.get('extended_ref', None)
+
+
+class HTTPErrorContextBase(ErrorContext):
+    @property
+    @uncommitted
+    def http_response_code(self):
+        # type: (...) -> int
+        return self.get('response_code', None)
+
+    @property
+    @uncommitted
+    def http_response_body(self):
+        # type: (...) -> str
+        return self.get('response_body', None)
+
+
+class ViewErrorContext(HTTPErrorContextBase):
+
+    @property
+    @uncommitted
+    def first_error_message(self):
+        # type: (...) -> str
+        return self.get('first_error_message', None)
+
+    @property
+    @uncommitted
+    def first_error_code(self):
+        # type: (...) -> str
+        return self.get('first_error_code', None)
+
+    @property
+    @uncommitted
+    def design_document(self):
+        # type: (...) -> str
+        return self.get('design_document', None)
+
+    @property
+    @uncommitted
+    def view(self):
+        # type: (...) -> str
+        return self.get('view', None)
+
+    @property
+    @uncommitted
+    def query_params(self):
+        # type: (...) -> str
+        return self.get('query_params', None)
+
+
+class SearchErrorContext(HTTPErrorContextBase):
+
+    @property
+    @uncommitted
+    def error_message(self):
+        # type: (...) -> str
+        return self.get('error_message', None)
+
+    @property
+    @uncommitted
+    def index_name(self):
+        # type: (...) -> str
+        return self.get('index_name', None)
+
+    @property
+    @uncommitted
+    def query(self):
+        # type: (...) -> str
+        return self.get('query', None)
+
+    @property
+    @uncommitted
+    def params(self):
+        # type: (...) -> str
+        return self.get('params', None)
+
+
+class QueryErrorContext(HTTPErrorContextBase):
+
+    @property
+    @uncommitted
+    def first_error_code(self):
+        # type: (...) -> int
+        return self.get('first_error_code', None)
+
+    @property
+    @uncommitted
+    def first_error_message(self):
+        # type: (...) -> str
+        return self.get('first_error_message', None)
+
+    @property
+    @uncommitted
+    def statement(self):
+        # type: (...) -> str
+        return self.get('statement', None)
+
+    @property
+    @uncommitted
+    def client_context_id(self):
+        # type: (...) -> str
+        return self.get('client_context_id', None)
+
+    @property
+    @uncommitted
+    def query_params(self):
+        # type: (...) -> str
+        return self.get('query_params', None)
+
+
+class AnalyticsErrorContext(QueryErrorContext):
+    pass
+
+
+class HTTPErrorContext(ErrorContext):
+    @property
+    @uncommitted
+    def response_code(self):
+        # type: (...) -> int
+        return self.get('response_code', None)
+
+    @property
+    @uncommitted
+    def path(self):
+        # type: (...) -> str
+        return self.get('path', None)
+
+    @property
+    @uncommitted
+    def response_body(self):
+        # type: (...) -> str
+        return self.get('response_body', None)
+
+
+class KVErrorContext(ErrorContext):
+    @property
+    @uncommitted
+    def status_code(self):
+        # type: (...) -> int
+        return self.get('status_code', None)
+
+    @property
+    @uncommitted
+    def cas(self):
+        # type: (...) -> int
+        return self.get('cas', None)
+
+    @property
+    @uncommitted
+    def opaque(self):
+        # type: (...) -> int
+        return self.get('opaque', None)
+
+    @property
+    @uncommitted
+    def key(self):
+        # type: (...) -> str
+        return self.get('key', None)
+
+    @property
+    @uncommitted
+    def bucket(self):
+        # type: (...) -> str
+        return self.get('bucket', None)
+
+    @property
+    @uncommitted
+    def scope(self):
+        # type: (...) -> str
+        return self.get('scope', '_default')
+
+    @property
+    @uncommitted
+    def collection(self):
+        # type: (...) -> str
+        return self.get('collection', '_default')
+
+    @property
+    @uncommitted
+    def context(self):
+        # type: (...) -> str
+        return self.get('context', None)
+
+    @property
+    @uncommitted
+    def ref(self):
+        # type: (...) -> str
+        return self.get('ref', None)
 
 
 class CouchbaseError(Exception):
@@ -132,8 +347,7 @@ class CouchbaseError(Exception):
                            'key': str,
                            'objextra': Any,
                            'message': str,
-                           'context': Any,
-                           'ref': Any})
+                           'context': Any})
 
     def __init__(self,  # type: CouchbaseError
                  params=None  # type: Union[CouchbaseError.ParamType,str]
@@ -152,14 +366,19 @@ class CouchbaseError(Exception):
         self.key = params.get('key', None)
         self.objextra = params.get('objextra', None)
         self.message = params.get('message', None)
-        self.context = params.get('context',None)
-        self.ref = params.get('ref',None)
+        self.context = ErrorContext.from_dict(**params.get('error_context', dict()))
+
 
     @classmethod
     def pyexc(cls, message=None, obj=None, inner=None):
+        context = dict()
+        if inner and isinstance(inner, CouchbaseError):
+            context = inner.context
+
         return cls({'message': message,
                     'objextra': obj,
-                    'inner_cause': inner})
+                    'inner_cause': inner,
+                    'error_context': context})
 
     @property
     def categories(self):
@@ -275,9 +494,6 @@ class CouchbaseError(Exception):
 
         if self.context:
             details.append("Context={0}".format(self.context))
-
-        if self.ref:
-            details.append("Ref={0}".format(self.ref))
 
         success, fail = self.split_results()
         if len(fail)>0:
