@@ -45,12 +45,12 @@ class BinaryCollectionTests(CollectionTestCase):
     def test_append_string_nokey(self):
         self.coll.remove(self.UTF8_KEY)
         self.try_n_times_till_exception(10, 1, self.coll.get, self.UTF8_KEY)
-        self.assertRaises(NotStoredError, self.coll.append, self.UTF8_KEY, "foo")
+        self.assertRaises(NotStoredError, self.coll.binary().append, self.UTF8_KEY, "foo")
 
     def test_prepend_string_nokey(self):
         self.coll.remove(self.UTF8_KEY)
         self.try_n_times_till_exception(10, 1, self.coll.get, self.UTF8_KEY)
-        self.assertRaises(NotStoredError, self.coll.prepend, self.UTF8_KEY, "foo")
+        self.assertRaises(NotStoredError, self.coll.binary().prepend, self.UTF8_KEY, "foo")
 
     def test_append_string(self):
         result = self.coll.binary().append(self.UTF8_KEY, "foo")
@@ -66,7 +66,7 @@ class BinaryCollectionTests(CollectionTestCase):
 
     def test_append_string_not_empty(self):
         self.coll.upsert(self.UTF8_KEY, "XXXX", format=FMT_UTF8)
-        self.assertIsNotNone(self.coll.append(self.UTF8_KEY, "foo", format=FMT_UTF8).cas)
+        self.assertIsNotNone(self.coll.binary().append(self.UTF8_KEY, "foo", format=FMT_UTF8).cas)
         self.assertEqual("XXXXfoo", self.coll.get(self.UTF8_KEY).content_as[str])
 
     def test_prepend_string_not_empty(self):
@@ -86,12 +86,12 @@ class BinaryCollectionTests(CollectionTestCase):
 
     def test_prepend_bytes_not_empty(self):
         self.coll.upsert(self.BYTES_KEY, b'XXX', format=FMT_BYTES)
-        self.assertIsNotNone(self.coll.prepend(self.BYTES_KEY, b'foo', format=FMT_BYTES).cas)
+        self.assertIsNotNone(self.coll.binary().prepend(self.BYTES_KEY, b'foo', format=FMT_BYTES).cas)
         self.assertEqual(b'fooXXX', self.coll.get(self.BYTES_KEY).content_as[bytes])
 
     def test_append_bytes_not_empty(self):
         self.coll.upsert(self.BYTES_KEY, b'XXX', format=FMT_BYTES)
-        self.assertIsNotNone(self.coll.append(self.BYTES_KEY, b'foo', format=FMT_BYTES).cas)
+        self.assertIsNotNone(self.coll.binary().append(self.BYTES_KEY, b'foo', format=FMT_BYTES).cas)
         self.assertEqual(b'XXXfoo', self.coll.get(self.BYTES_KEY).content_as[bytes])
 
     def test_counter_increment_default_no_key(self):

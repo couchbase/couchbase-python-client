@@ -1,7 +1,9 @@
+import logging
+
 from couchbase_core.supportability import volatile
 from couchbase_core import JSON
 
-from boltons.funcutils import wraps
+from functools import wraps
 from mypy_extensions import VarArg, KwArg, Arg
 
 from .subdocument import LookupInSpec, MutateInSpec, MutateInOptions, \
@@ -12,8 +14,10 @@ from .result import GetResult, GetReplicaResult, ExistsResult, get_result_wrappe
 from .options import forward_args, OptionBlockTimeOut, OptionBlockDeriv, ConstrainedInt, SignedInt64
 from .options import OptionBlock, AcceptableInts
 import couchbase.exceptions
-from couchbase_core.exceptions import NotSupportedError
+from couchbase_core.exceptions import NotSupportedError, NotFoundError, SubdocPathNotFoundError, QueueEmpty, \
+    SubdocPathExistsError, KeyExistsError
 from couchbase_core.client import Client as CoreClient
+from couchbase_core._libcouchbase import Bucket as _Base
 import copy
 
 from typing import *
@@ -29,6 +33,8 @@ except:
 import os
 from couchbase_core import abstractmethod, ABCMeta, with_metaclass
 import wrapt
+
+import couchbase_core.subdocument as SD
 
 
 class DeltaValue(ConstrainedInt):
@@ -237,18 +243,12 @@ def _inject_scope_and_collection(func  # type: RawCollectionMethodSpecial
                 **kwargs  # type:  Any
                 ):
         # type: (...)->Any
-        # NOTE: BinaryCollection, for instance, contains a collection and has an interface
-        # which uses this annotation.  So -- anything this depends on must be supported by
-        # that interface.  If we add/remove something that depends on self from here, we need
-        # to do same in BinaryCollection (and any other object that does likewise).
-        if self.true_collections:
-            if self._self_name and not self._self_scope:
-                raise couchbase.exceptions.CollectionMissingException
-            if self._self_scope and self._self_name:
-                kwargs['scope'] = self._self_scope.name
-                kwargs['collection'] = self._self_name
-
+        self._inject_scope_collection_kwargs(kwargs)
         return func(self, *args, **kwargs)
+
+    if getattr(func, 'coll_injected', False):
+        return func
+    wrapped.coll_injected = True
 
     return wrapped
 
@@ -291,9 +291,58 @@ def _wrap_multi_mutation_result(wrapped  # type: CoreBucketOp
     return _inject_scope_and_collection(wrapper)
 
 
+def _wrap_collections_class(cls):
+    for name in cls._MEMCACHED_OPERATIONS:
+        meth = getattr(cls, name)
+        if not name.startswith('_'):
+            setattr(cls, name, _inject_scope_and_collection(meth))
+
+
+def _dsop(create_type=None, wrap_missing_path=True):
+    import functools
+
+    def real_decorator(fn):
+        @functools.wraps(fn)
+        def newfn(self, key, *args, **kwargs):
+            try:
+                return fn(self, key, *args, **kwargs)
+            except NotFoundError:
+                if kwargs.get('create'):
+                    try:
+                        self.insert(key, create_type())
+                    except KeyExistsError:
+                        pass
+                    return fn(self, key, *args, **kwargs)
+                else:
+                    raise
+            except SubdocPathNotFoundError:
+                if wrap_missing_path:
+                    raise IndexError(args[0])
+
+        return newfn
+
+    return real_decorator
+
+
 class CBCollectionBase(with_metaclass(ABCMeta)):
+    def __new__(cls, *args, **kwargs):
+        _wrap_collections_class(cls)
+        return super(CBCollectionBase,cls).__new__(cls, *args,**kwargs)
+
+    def _inject_scope_collection_kwargs(self, kwargs):
+        # NOTE: BinaryCollection, for instance, contains a collection and has an interface
+        # which uses this annotation.  So -- anything this depends on must be supported by
+        # that interface.  If we add/remove something that depends on self from here, we need
+        # to do same in BinaryCollection (and any other object that does likewise).
+        if self.true_collections:
+            if self._self_name and not self._self_scope:
+                raise couchbase.exceptions.CollectionMissingException
+            if self._self_scope and self._self_name:
+                kwargs['scope'] = self._self_scope.name
+                kwargs['collection'] = self._self_name
+
     def __init__(self,  # type: CBCollectionBase
-                 name = None,  # type: str
+             name = None,  # type: str
                  parent_scope = None,  # type: Scope
                  *options,
                  **kwargs
@@ -325,8 +374,6 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
     def __repr__(self):
         return "CBCollectionBase of {}".format(repr(self.bucket))
 
-    _MEMCACHED_NOMULTI=CoreClient._MEMCACHED_NOMULTI
-    _MEMCACHED_OPERATIONS=CoreClient._MEMCACHED_OPERATIONS
 
     @classmethod
     def _gen_memd_wrappers(cls, factory):
@@ -336,8 +383,19 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
     def true_collections(self):
         return self._self_true_collections
 
-    def _wrap_dsop(self, sdres, has_value=False, **kwargs):
-        return getattr(CoreClient._wrap_dsop(self.bucket,sdres, has_value), 'value')
+    def _get_content(self, result):
+        return getattr(result, '_original', result)
+
+    def _wrap_dsop(self,
+                   sdres,  # type: SubdocResult
+                   has_value=False, **kwargs):
+        from couchbase_core.items import Item
+        sdres=self._get_content(sdres)
+        it = Item(sdres.key)
+        it.cas = sdres.cas
+        if has_value:
+            it.value = sdres[0]
+        return getattr(it, 'value', it)
 
     @classmethod
     def _cast(cls,
@@ -511,7 +569,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :return: a dictionary of :class:`~.GetResult` objects by key
         :rtype: dict
         """
-        return get_multi_get_result(self.bucket, CoreClient.get_multi, keys, *options, **kwargs)
+        return get_multi_get_result(self.bucket, _Base.get_multi, keys, *options, **kwargs)
 
     @overload
     def upsert_multi(self,  # type: CBCollectionBase
@@ -589,7 +647,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
 
         .. seealso:: :meth:`upsert_multi` - for other optional arguments
         """
-        return get_multi_mutation_result(self.bucket, CoreClient.insert_multi, keys, *options, **kwargs)
+        return get_multi_mutation_result(self.bucket, _Base.insert_multi, keys, *options, **kwargs)
 
     @_inject_scope_and_collection
     @volatile
@@ -616,14 +674,15 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
             raise NotSupportedError("Client durability not supported yet for remove")
         return get_multi_mutation_result(self.bucket, CoreClient.remove_multi, keys, *options, **kwargs)
 
-    replace_multi = _wrap_multi_mutation_result(CoreClient.replace_multi)
-    touch_multi = _wrap_multi_mutation_result(CoreClient.touch_multi)
-    lock_multi = _wrap_multi_mutation_result(CoreClient.lock_multi)
-    unlock_multi = _wrap_multi_mutation_result(CoreClient.unlock_multi)
-    append_multi = _wrap_multi_mutation_result(CoreClient.unlock_multi)
-    prepend_multi = _wrap_multi_mutation_result(CoreClient.prepend_multi)
-    counter_multi = _wrap_multi_mutation_result(CoreClient.counter_multi)
+    replace_multi = _wrap_multi_mutation_result(_Base.replace_multi)
+    touch_multi = _wrap_multi_mutation_result(_Base.touch_multi)
+    lock_multi = _wrap_multi_mutation_result(_Base.lock_multi)
+    unlock_multi = _wrap_multi_mutation_result(_Base.unlock_multi)
+    append_multi = _wrap_multi_mutation_result(_Base.append_multi)
+    prepend_multi = _wrap_multi_mutation_result(_Base.prepend_multi)
+    counter_multi = _wrap_multi_mutation_result(_Base.counter_multi)
 
+    @_inject_scope_and_collection
     def touch(self,
               key,          # type: str
               expiry,       # type: timedelta
@@ -649,7 +708,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         kwargs['expiry'] = expiry
         return CoreClient.touch(self.bucket, key, **forward_args(kwargs, *options))
 
-    @_wrap_in_mutation_result
+    @_mutate_result_and_inject
     def unlock(self,
                key,         # type: str
                cas,         # type: int
@@ -678,6 +737,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         kwargs['cas'] = cas
         return CoreClient.unlock(self.bucket, key, **forward_args(kwargs, *options))
 
+    @_inject_scope_and_collection
     def exists(self,      # type: CBCollection
                key,       # type: str
                *options,  # type: ExistsOptions
@@ -765,7 +825,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         final_options = forward_args(kwargs, *options)
         return ResultPrecursor(CoreClient.upsert(self.bucket, key, value, **final_options), final_options)
 
-    @_wrap_in_mutation_result
+    @_mutate_result_and_inject
     def insert(self,
                key,         # type: str
                value,       # type: Any
@@ -938,8 +998,363 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         return BinaryCollection(self)
 
 
+    @_dsop(create_type=dict)
+    def map_add(self, key, mapkey, value, create=False, **kwargs):
+        """
+        Set a value for a key in a map.
+
+        .. warning::
+
+            The functionality of the various `map_*`, `list_*`, `queue_*`
+            and `set_*` functions are considered experimental and are included
+            in the library to demonstrate new functionality.
+            They may change in the future or be removed entirely!
+
+            These functions are all wrappers around the :meth:`mutate_in` or
+            :meth:`lookup_in` methods.
+
+        :param key: The document ID of the map
+        :param mapkey: The key in the map to set
+        :param value: The value to use (anything serializable to JSON)
+        :param create: Whether the map should be created if it does not exist
+        :param kwargs: Additional arguments passed to :meth:`mutate_in`
+        :return: A :class:`~.OperationResult`
+        :raise: :cb_exc:`NotFoundError` if the document does not exist.
+            and `create` was not specified
+
+        .. Initialize a map and add a value
+
+            cb.upsert('a_map', {})
+            cb.map_add('a_map', 'some_key', 'some_value')
+            cb.map_get('a_map', 'some_key').value  # => 'some_value'
+            cb.get('a_map').value  # => {'some_key': 'some_value'}
+
+        """
+        op = SD.upsert(mapkey, value)
+        sdres = self.mutate_in(key, (op,), **kwargs)
+        return self._wrap_dsop(sdres, **kwargs)
+
+    @_dsop()
+    def map_get(self, key, mapkey, **kwargs):
+        """
+        Retrieve a value from a map.
+
+        :param str key: The document ID
+        :param str mapkey: Key within the map to retrieve
+        :return: :class:`~.ValueResult`
+        :raise: :exc:`IndexError` if the mapkey does not exist
+        :raise: :cb_exc:`NotFoundError` if the document does not exist.
+
+        .. seealso:: :meth:`map_add` for an example
+        """
+        op = SD.get(mapkey)
+        sdres = self.lookup_in(key, (op,), **kwargs)
+        return self._wrap_dsop(sdres, True)
+
+    @_dsop()
+    def map_remove(self, key, mapkey, **kwargs):
+        """
+        Remove an item from a map.
+
+        :param str key: The document ID
+        :param str mapkey: The key in the map
+        :param kwargs: See :meth:`mutate_in` for options
+        :raise: :exc:`IndexError` if the mapkey does not exist
+        :raise: :cb_exc:`NotFoundError` if the document does not exist.
+
+        .. Remove a map key-value pair:
+
+            cb.map_remove('a_map', 'some_key')
+
+        .. seealso:: :meth:`map_add`
+        """
+        op = SD.remove(mapkey)
+        sdres = self.mutate_in(key, (op,), **kwargs)
+        return self._wrap_dsop(sdres, **kwargs)
+    @_dsop()
+    def map_size(self, key, **kwargs):
+        """
+        Get the number of items in the map.
+
+        :param str key: The document ID of the map
+        :return int: The number of items in the map
+        :raise: :cb_exc:`NotFoundError` if the document does not exist.
+
+        .. seealso:: :meth:`map_add`
+        """
+
+        return self._get_content(self.lookup_in(key, (SD.get_count(''),), **kwargs))[0]
+
+    @_dsop(create_type=list)
+    def list_append(self, key, value, create=False, **kwargs):
+        """
+        Add an item to the end of a list.
+
+        :param str key: The document ID of the list
+        :param value: The value to append
+        :param create: Whether the list should be created if it does not
+               exist. Note that this option only works on servers >= 4.6
+        :param kwargs: Additional arguments to :meth:`mutate_in`
+        :return: :class:`~.OperationResult`.
+        :raise: :cb_exc:`NotFoundError` if the document does not exist.
+            and `create` was not specified.
+
+        example::
+
+            cb.list_append('a_list', 'hello')
+            cb.list_append('a_list', 'world')
+
+        .. seealso:: :meth:`map_add`
+        """
+        op = SD.array_append('', value)
+        sdres = self.mutate_in(key, (op,), **kwargs)
+        return self._wrap_dsop(sdres, **kwargs)
+
+    @_dsop(create_type=list)
+    def list_prepend(self, key, value, create=False, **kwargs):
+        """
+        Add an item to the beginning of a list.
+
+        :param str key: Document ID
+        :param value: Value to prepend
+        :param bool create:
+            Whether the list should be created if it does not exist
+        :param kwargs: Additional arguments to :meth:`mutate_in`.
+        :return: :class:`OperationResult`.
+        :raise: :cb_exc:`NotFoundError` if the document does not exist.
+            and `create` was not specified.
+
+        This function is identical to :meth:`list_append`, except for prepending
+        rather than appending the item
+
+        .. seealso:: :meth:`list_append`, :meth:`map_add`
+        """
+        op = SD.array_prepend('', value)
+        sdres = self.mutate_in(key, (op,), **kwargs)
+        return self._wrap_dsop(sdres, **kwargs)
+
+    @_dsop()
+    def list_set(self, key, index, value, **kwargs):
+        """
+        Sets an item within a list at a given position.
+
+        :param key: The key of the document
+        :param index: The position to replace
+        :param value: The value to be inserted
+        :param kwargs: Additional arguments to :meth:`mutate_in`
+        :return: :class:`OperationResult`
+        :raise: :cb_exc:`NotFoundError` if the list does not exist
+        :raise: :exc:`IndexError` if the index is out of bounds
+
+        example::
+
+            cb.upsert('a_list', ['hello', 'world'])
+            cb.list_set('a_list', 1, 'good')
+            cb.get('a_list').value # => ['hello', 'good']
+
+        .. seealso:: :meth:`map_add`, :meth:`list_append`
+        """
+        op = SD.replace('[{0}]'.format(index), value)
+        sdres = self.mutate_in(key, (op,), **kwargs)
+        return self._wrap_dsop(sdres, **kwargs)
+
+    @_dsop(create_type=list)
+    def set_add(self, key, value, create=False, **kwargs):
+        """
+        Add an item to a set if the item does not yet exist.
+
+        :param key: The document ID
+        :param value: Value to add
+        :param create: Create the set if it does not exist
+        :param kwargs: Arguments to :meth:`mutate_in`
+        :return: A :class:`~.OperationResult` if the item was added,
+        :raise: :cb_exc:`NotFoundError` if the document does not exist
+            and `create` was not specified.
+
+        .. seealso:: :meth:`map_add`
+        """
+        op = SD.array_addunique('', value)
+        try:
+            sdres = self.mutate_in(key, (op,), **kwargs)
+            return self._wrap_dsop(sdres, **kwargs)
+        except SubdocPathExistsError:
+            pass
+
+    @_dsop()
+    def set_remove(self, key, value, **kwargs):
+        """
+        Remove an item from a set.
+
+        :param key: The docuent ID
+        :param value: Value to remove
+        :param kwargs: Arguments to :meth:`mutate_in`
+        :return: A :class:`OperationResult` if the item was removed, false
+                 otherwise
+        :raise: :cb_exc:`NotFoundError` if the set does not exist.
+
+        .. seealso:: :meth:`set_add`, :meth:`map_add`
+        """
+        while True:
+            rv = self.bucket.get(key, **kwargs)
+            try:
+                ix = rv.value.index(value)
+                kwargs['cas'] = rv.cas
+                return self.list_remove(key, ix, **kwargs)
+            except KeyExistsError:
+                pass
+            except ValueError:
+                return
+
+    def set_size(self, key, **kwargs):
+        """
+        Get the length of a set.
+
+        :param key: The document ID of the set
+        :return: The length of the set
+        :raise: :cb_exc:`NotFoundError` if the set does not exist.
+
+        """
+        return self.list_size(key, **kwargs)
+
+    def set_contains(self, key, value, **kwargs):
+        """
+        Determine if an item exists in a set
+        :param key: The document ID of the set
+        :param value: The value to check for
+        :return: True if `value` exists in the set
+        :raise: :cb_exc:`NotFoundError` if the document does not exist
+        """
+        rv = self.bucket.get(key, **kwargs)
+        return value in rv.value
+
+    @_dsop()
+    def list_get(self, key, index, **kwargs):
+        """
+        Get a specific element within a list.
+
+        :param key: The document ID
+        :param index: The index to retrieve
+        :return: :class:`ValueResult` for the element
+        :raise: :exc:`IndexError` if the index does not exist
+        :raise: :cb_exc:`NotFoundError` if the list does not exist
+        """
+        return self.map_get(key, '[{0}]'.format(index), **kwargs)
+
+    @_dsop()
+    def list_remove(self, key, index, **kwargs):
+        """
+        Remove the element at a specific index from a list.
+
+        :param key: The document ID of the list
+        :param index: The index to remove
+        :param kwargs: Arguments to :meth:`mutate_in`
+        :return: :class:`OperationResult`
+        :raise: :exc:`IndexError` if the index does not exist
+        :raise: :cb_exc:`NotFoundError` if the list does not exist
+        """
+        return self.map_remove(key, '[{0}]'.format(index), **kwargs)
+
+    @_dsop()
+    def list_size(self, key, **kwargs):
+        """
+        Retrieve the number of elements in the list.
+
+        :param key: The document ID of the list
+        :return: The number of elements within the list
+        :raise: :cb_exc:`NotFoundError` if the list does not exist
+        """
+        return self.map_size(key, **kwargs)
+
+    @_dsop(create_type=list)
+    def queue_push(self, key, value, create=False, **kwargs):
+        """
+        Add an item to the end of a queue.
+
+        :param key: The document ID of the queue
+        :param value: The item to add to the queue
+        :param create: Whether the queue should be created if it does not exist
+        :param kwargs: Arguments to pass to :meth:`mutate_in`
+        :return: :class:`OperationResult`
+        :raise: :cb_exc:`NotFoundError` if the queue does not exist and
+            `create` was not specified.
+
+        example::
+
+            # Ensure it's removed first
+
+            cb.remove('a_queue')
+            cb.queue_push('a_queue', 'job9999', create=True)
+            cb.queue_pop('a_queue').value  # => job9999
+        """
+        return self.list_prepend(key, value, **kwargs)
+
+    @_dsop()
+    def queue_pop(self, key, **kwargs):
+        """
+        Remove and return the first item queue.
+
+        :param key: The document ID
+        :param kwargs: Arguments passed to :meth:`mutate_in`
+        :return: A :class:`ValueResult`
+        :raise: :cb_exc:`QueueEmpty` if there are no items in the queue.
+        :raise: :cb_exc:`NotFoundError` if the queue does not exist.
+        """
+        while True:
+            try:
+                itm = self.list_get(key, -1, **kwargs)
+            except IndexError:
+                raise QueueEmpty
+
+            kwargs.update({k:v for k,v in getattr(itm,'__dict__',{}).items() if k in {'cas'}})
+            try:
+                self.list_remove(key, -1, **kwargs)
+                return itm
+            except KeyExistsError:
+                pass
+            except IndexError:
+                raise QueueEmpty
+
+    @_dsop()
+    def queue_size(self, key):
+        """
+        Get the length of the queue.
+
+        :param key: The document ID of the queue
+        :return: The length of the queue
+        :raise: :cb_exc:`NotFoundError` if the queue does not exist.
+        """
+        return self.list_size(key)
+
+
+    dsops = (map_get,
+             map_add,
+             map_remove,
+             queue_push,
+             list_size,
+             map_size,
+             queue_pop,
+
+             list_set,
+             list_remove,
+             list_prepend,
+             list_get,
+             queue_size,
+
+             list_append,
+             set_add,
+             set_contains,
+             set_remove,
+             set_size)
+
+    dsop_strs=tuple(map(lambda x: x.__name__, dsops))
+    _MEMCACHED_NOMULTI = CoreClient._MEMCACHED_NOMULTI + dsop_strs
+    _MEMCACHED_OPERATIONS = CoreClient._MEMCACHED_OPERATIONS + dsop_strs
+
+
 class BinaryCollection(object):
-    def __init__(self, collection):
+    def __init__(self,
+                 collection  # type: CBCollectionBase
+                 ):
         self._collection = collection
         # The following are needed for the @_mutate_result_and_inject annotation.
         # If that implementation is changed, we must maintain that here.  That could be
@@ -947,7 +1362,10 @@ class BinaryCollection(object):
         self._self_name = self._collection._self_name
         self._self_scope = self._collection._self_scope
         self.true_collections = self._collection.true_collections
+        self._inject_scope_collection_kwargs = collection._inject_scope_collection_kwargs
 
+    _MEMCACHED_OPERATIONS = ('append', 'prepend', 'increment', 'decrement')
+    _MEMCACHED_NOMULTI = _MEMCACHED_OPERATIONS
 
     @_mutate_result_and_inject
     def append(self,
@@ -1048,7 +1466,6 @@ class BinaryCollection(object):
 
         """
         final_opts = self._check_delta_initial(kwargs, *options)
-
         x = CoreClient.counter(self._collection.bucket, key, **final_opts)
         return ResultPrecursor(x, final_opts)
 
@@ -1212,7 +1629,7 @@ class CBCollectionShared(CBCollectionBase, wrapt.ObjectProxy):
         """
         assert issubclass(type(parent_scope.bucket), CoreClientDatastructureWrap)
         wrapt.ObjectProxy.__init__(self, parent_scope.bucket)
-        CBCollectionBase.__init__(self, parent_scope=parent_scope, *options, **kwargs)
+        CBCollectionBase.__init__(self, name=name,  parent_scope=parent_scope, *options, **kwargs)
 
     @property
     def bucket(self  # type: CBCollectionShared

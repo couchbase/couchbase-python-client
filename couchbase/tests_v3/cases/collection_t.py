@@ -27,6 +27,10 @@ import couchbase.subdocument as SD
 from unittest import SkipTest
 from couchbase.diagnostics import ServiceType
 import uuid
+import copy
+import logging
+from couchbase.management.collections import CollectionSpec
+import uuid
 
 
 class CollectionTests(CollectionTestCase):
@@ -47,7 +51,7 @@ class CollectionTests(CollectionTestCase):
         # be sure NOKEY isn't in there
         try:
             self.cb.remove(self.NOKEY)
-        except:
+        except KeyNotFoundException as e:
             pass
         # make sure NOKEY is gone
         self.try_n_times_till_exception(10, 1, self.cb.get, self.NOKEY)
@@ -292,5 +296,72 @@ class CollectionTests(CollectionTestCase):
         self.cb.remove(self.KEY, RemoveOptions(durability=durability))
         self.assertRaises(KeyNotFoundException, self.cb.get, self.KEY)
 
+    def test_collection_access(self,  # type: CollectionTests
+                               ):
+        if not self.supports_collections():
+            raise SkipTest()
 
+        value = uuid.uuid4().int
+        value_1 = str(value)
+        value_2 = str(value + 1)
+        value_3 = str(value + 2)
+        value_4 = str(value + 3)
+        test_dict = {
+            "scope_1": {
+                "collection_1": {"key_1": value_1},
+                "collection_2": {"key_1": value_2},
+            },
+            "scope_2": {
+                "collection_1": {"key_1": value_3},
+                "collection_2": {"key_1": value_4},
+            }
+        }
 
+        bucket = self.cluster.bucket(self.cluster_info.bucket_name)
+        cm = bucket.collections()
+        def upsert_values(coll, scope_name, coll_name, result_key_dict, key, value):
+            return coll.upsert(key, value)
+        from collections import defaultdict
+        def recurse():
+            return defaultdict(recurse)
+        resultdict=recurse()
+        def check_values(coll, scope_name, coll_name, result_key_dict, key, value):
+            result_key_dict[key]=coll.get(key).content
+            return True
+        for action in [upsert_values, check_values]:
+            self._traverse_scope_tree(bucket, cm, resultdict, test_dict, action)
+
+        self.assertSanitizedEqual(test_dict, resultdict)
+
+    def _traverse_scope_tree(self, bucket, cm, result_dict, test_dict, coll_verb):
+        for scope_name, coll_dict in test_dict.items():
+            result_coll_dict = result_dict[scope_name]
+            logging.error("Creating scope {}".format(scope_name))
+            try:
+                cm.create_scope(scope_name)
+            except:
+                pass
+            scope = bucket.scope(scope_name)
+            for coll_name, key_dict in coll_dict.items():
+                result_key_dict = result_coll_dict[coll_name]
+                logging.error(
+                        "Creating collection {} in scope {}".format(coll_name, scope_name)
+                )
+                try:
+                    cm.create_collection(
+                            CollectionSpec(scope_name=scope_name, collection_name=coll_name)
+                    )
+                except:
+                    pass
+                coll = scope.collection(coll_name)
+                for key, value in key_dict.items():
+                    result=coll_verb(coll, scope_name, coll_name, result_key_dict, key, value)
+                    logging.error(
+                            "Called {} on {} to {} in {} and got {}".format(
+                                    coll_verb,
+                                    key,
+                                    value,
+                                    dict(scope_name=scope_name, coll_name=coll_name),
+                                    result,
+                            )
+                    )

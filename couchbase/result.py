@@ -130,7 +130,7 @@ class LookupInResult(Result):
         LookupInResult is the return type for lookup_in operations.
         """
         super(LookupInResult, self).__init__(content.cas, content.rc)
-        self._content = content  # type: CoreResult
+        self._original = content  # type: CoreResult
         self.dict = kwargs
 
     @property
@@ -145,12 +145,12 @@ class LookupInResult(Result):
 
         :return: returns as ContentProxySubdoc
         """
-        return ContentProxySubdoc(self._content)
+        return ContentProxySubdoc(self._original)
 
     def exists(self,
                index  # type: int
                ):
-        return len(canonical_sdresult(self._content))>index
+        return len(canonical_sdresult(self._original)) > index
 
 
 class MutationResult(Result):

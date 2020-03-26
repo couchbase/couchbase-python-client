@@ -1290,7 +1290,12 @@ class ErrorMapper(object):
                             if isinstance(value, bytearray) or isinstance(value, bytes):
                                 value = value.decode("utf-8")
                             for pattern, exc in text_to_final_exc.items():
-                                if pattern.match(value):
+                                matches=False
+                                try:
+                                    matches=pattern.match(value)
+                                except Exception as f:
+                                    pass
+                                if matches:
                                     raise exc.pyexc(e.message, extra, e)
                 raise
 

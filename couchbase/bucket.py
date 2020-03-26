@@ -245,7 +245,9 @@ class Bucket(CoreClientDatastructureWrap):
         """
         return Scope(self).collection(collection_name)
 
-    def collections(self):
+    def collections(self  # type: Bucket
+                    ):
+        # type: (...) -> CollectionManager
         return CollectionManager(self._admin, self._name)
 
     def view_query(self,

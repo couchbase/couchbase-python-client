@@ -119,7 +119,7 @@ class DefaultForwarder(Forwarder):
                 'expiry': {'ttl': timedelta_as_timestamp},
                 'self': {},
                 'options': {},
-                'durability': {'durability_level': lambda durability: durability.get('level', None),
+                'durability': {'durability_level': lambda durability: getattr(durability.get('level', None),'value', None),
                                "replicate_to": lambda client_dur: client_dur.get('replicate_to', None),
                                "persist_to": lambda client_dur: client_dur.get('persist_to', None)}}
 

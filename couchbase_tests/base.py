@@ -762,8 +762,13 @@ class SkipUnsupported(SkipTest):
 class ClusterTestCase(CouchbaseTestCase):
     def __init__(self, *args, **kwargs):
         super(ClusterTestCase, self).__init__(*args, **kwargs)
-        self.cluster_factory = getattr(self, 'cluster_factory', Cluster.connect)
         self.validator = ClusterTestCase.ItemValidator(self)
+
+    @property
+    def cluster_factory(self  # type: ClusterTestCase
+                        ):
+        # type: (...) -> Type[Cluster]
+        return Cluster.connect
 
     class ItemValidator(object):
         def __init__(self, parent):
@@ -824,10 +829,11 @@ class ClusterTestCase(CouchbaseTestCase):
         connstr_abstract.set_option('enable_collections', 'true')
         # FIXME: we should not be using classic here!  But, somewhere in the tests, we need
         # this for hitting the mock, it seems
+        from couchbase_core.cluster import PasswordAuthenticator
+        auth_type = ClassicAuthenticator if self.is_mock else PasswordAuthenticator
         self.cluster = self.cluster_factory(connstr_abstract, ClusterOptions(
-            ClassicAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)))
-        # TODO: why do we need the connargs?  '
-        self.bucket = self.cluster.bucket(bucket_name, **connargs)
+            auth_type(self.cluster_info.admin_username, self.cluster_info.admin_password)))
+        self.bucket = self.cluster.bucket(bucket_name)
         self.bucket_name = bucket_name
 
     # NOTE: this really is only something you can trust in homogeneous clusters, but then again

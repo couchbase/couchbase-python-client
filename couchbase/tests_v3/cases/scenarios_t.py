@@ -503,7 +503,7 @@ class Scenarios(CollectionTestCase):
         # TODO: rewrite these tests to test one thing at a time, if possible
         try:
             self.coll.remove_multi(test_dict.keys())
-        except:
+        except KeyNotFoundException:
             pass
         self.assertRaises(KeyNotFoundException, self.coll.get, "Fred")
         self.assertRaises(KeyNotFoundException, self.coll.get, "Barney")
