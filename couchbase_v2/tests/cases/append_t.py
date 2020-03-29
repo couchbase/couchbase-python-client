@@ -26,45 +26,6 @@ from couchbase_tests.base import ConnectionTestCase
 
 class AppendTest(ConnectionTestCase):
 
-    def test_append_prepend(self):
-        key = self.gen_key("appendprepend")
-        vbase = "middle"
-        self.cb.upsert(key, vbase, format=FMT_UTF8)
-        self.cb.prepend(key, "begin ")
-        self.cb.append(key, " end")
-        self.assertEqual(self.cb.get(key).value,
-                          "begin middle end")
-
-
-    def test_append_binary(self):
-        kname = self.gen_key("binary_append")
-        initial = b'\x10'
-        self.cb.upsert(kname, initial, format=FMT_BYTES)
-        self.cb.append(kname, b'\x20', format=FMT_BYTES)
-        self.cb.prepend(kname, b'\x00', format=FMT_BYTES)
-
-        res = self.cb.get(kname)
-        self.assertEqual(res.value, b'\x00\x10\x20')
-
-    def test_append_nostr(self):
-        key = self.gen_key("append_nostr")
-        self.cb.upsert(key, "value")
-        rv = self.cb.append(key, "a_string")
-        self.assertTrue(rv.cas)
-
-        self.assertRaises(ValueFormatError,
-                          self.cb.append, "key", { "some" : "object" })
-
-    def test_append_enoent(self):
-        key = self.gen_key("append_enoent")
-        self.cb.remove(key, quiet=True)
-        try:
-            self.cb.append(key, "value")
-            self.assertTrue(False, "Exception not thrown")
-        except CouchbaseError as e:
-            self.assertTrue(isinstance(e, NotStoredError)
-                            or isinstance(e, NotFoundError))
-
     def test_append_multi(self):
         kv = self.gen_kv_dict(amount=4, prefix="append_multi")
 

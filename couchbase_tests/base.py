@@ -795,7 +795,9 @@ class ClusterTestCase(CouchbaseTestCase):
             try:
                 ret = func(*args, **kwargs)
                 time.sleep(seconds_between)
-            except:
+            except Exception as e:
+                # helpful to have this print statement when tests fail
+                print("got exception {}, returning".format(e))
                 return
         self.fail("successful {} after {} times waiting {} seconds between calls".format(func, num_times, seconds_between))
 
@@ -804,7 +806,9 @@ class ClusterTestCase(CouchbaseTestCase):
             try:
                 ret = func(*args, **kwargs)
                 return ret
-            except:
+            except Exception as e:
+                # helpful to have this print statement when tests fail
+                print("got exception {}, sleeping...".format(e))
                 time.sleep(seconds_between)
         self.fail("unsuccessful {} after {} times, waiting {} seconds between calls".format(func, num_times, seconds_between))
 

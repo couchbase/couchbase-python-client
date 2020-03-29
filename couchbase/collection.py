@@ -20,6 +20,7 @@ from typing import *
 from couchbase.durability import Durability, DurabilityType, ServerDurableOptionBlock, DurabilityOptionBlock
 from couchbase_core.asynchronous.bucket import AsyncClientFactory
 from datetime import timedelta
+from couchbase_core._libcouchbase import FMT_UTF8, FMT_JSON
 
 try:
     from typing import TypedDict
@@ -69,10 +70,6 @@ class ReplaceOptions(DurabilityOptionBlock):
         super(ReplaceOptions, self).__init__(**kwargs)
 
 
-class AppendOptions(OptionBlockTimeOut):
-    pass
-
-
 class RemoveOptions(DurabilityOptionBlock):
     @overload
     def __init__(self,
@@ -100,15 +97,47 @@ class RemoveOptions(DurabilityOptionBlock):
         super(RemoveOptions, self).__init__(**kwargs)
 
 
-class PrependOptions(OptionBlockTimeOut):
+class PrependOptions(DurabilityOptionBlock):
+    @overload
+    def __init__(self,
+                 durability=None,   # type: DurabilityType,
+                 cas=None,          # type: int
+                 timeout=None       # type: timedelta
+                 ):
+        pass
+
+    def __init__(self, **kwargs):
+        super(PrependOptions, self).__init__(**kwargs)
+
+
+class AppendOptions(PrependOptions):
+    pass
+
+
+class IncrementOptions(DurabilityOptionBlock):
+    @overload
+    def __init__(self,
+                 durability=None,   # type: DurabilityType,
+                 cas=None,          # type: int
+                 timeout=None,      # type: timedelta
+                 expiry=None,       # type: timedelta
+                 initial=None,      # type: SignedInt64
+                 delta=None         # type: DeltaValue
+                 ):
+        pass
+
+    def __init__(self, **kwargs):
+        # enforce some defaults
+        args = {"delta": DeltaValue(1), "initial": SignedInt64(0)}
+        args.update(kwargs)
+        super(IncrementOptions, self).__init__(**args)
+
+
+class DecrementOptions(IncrementOptions):
     pass
 
 
 class UnlockOptions(OptionBlockTimeOut):
-    pass
-
-
-class CounterOptions(ServerDurableOptionBlock):
     pass
 
 
@@ -208,6 +237,10 @@ def _inject_scope_and_collection(func  # type: RawCollectionMethodSpecial
                 **kwargs  # type:  Any
                 ):
         # type: (...)->Any
+        # NOTE: BinaryCollection, for instance, contains a collection and has an interface
+        # which uses this annotation.  So -- anything this depends on must be supported by
+        # that interface.  If we add/remove something that depends on self from here, we need
+        # to do same in BinaryCollection (and any other object that does likewise).
         if self.true_collections:
             if self._self_name and not self._self_scope:
                 raise couchbase.exceptions.CollectionMissingException
@@ -235,9 +268,6 @@ def _wrap_get_result(func  # type: CoreBucketOpRead
         return _inject_scope_and_collection(get_result_wrapper(func))(self,*args,**kwargs)
 
     return wrapped
-
-class BinaryCollection(object):
-    pass
 
 
 class TouchOptions(OptionBlockTimeOut):
@@ -905,14 +935,26 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
 
     def binary(self):
         # type: (...) -> BinaryCollection
-        pass
+        return BinaryCollection(self)
+
+
+class BinaryCollection(object):
+    def __init__(self, collection):
+        self._collection = collection
+        # The following are needed for the @_mutate_result_and_inject annotation.
+        # If that implementation is changed, we must maintain that here.  That could be
+        # improved, later.
+        self._self_name = self._collection._self_name
+        self._self_scope = self._collection._self_scope
+        self.true_collections = self._collection.true_collections
+
 
     @_mutate_result_and_inject
     def append(self,
-               key,  # type: str
-               value,  # type: str
-               *options,  # type: Any
-               **kwargs  # type: Any
+               key,         # type: str
+               value,       # type: Union[str|bytes]
+               *options,    # type: AppendOptions
+               **kwargs     # type: Any
                ):
         # type: (...) -> ResultPrecursor
         """Append a string to an existing value in Couchbase.
@@ -939,9 +981,12 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
 
         :raise: :exc:`.NotStoredError` if the key does not exist
         """
-        x = CoreClient.append(self.bucket, key, value, forward_args(kwargs, *options))
+        final_options = { "format": FMT_UTF8 }
+        final_options.update(forward_args(kwargs, *options))
+        x = CoreClient.append(self._collection.bucket, key, value, **final_options)
         return ResultPrecursor(x, options)
 
+    @_mutate_result_and_inject
     def prepend(self,
                 key,  # type: str
                 value,  # type: str
@@ -953,14 +998,15 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
 
         .. seealso:: :meth:`append`
         """
-        x = CoreClient.prepend(self.bucket, key, value, **forward_args(kwargs, *options))
+        final_options = { "format": FMT_UTF8 }
+        final_options.update(forward_args(kwargs, *options))
+        x = CoreClient.prepend(self._collection.bucket, key, value, **final_options)
         return ResultPrecursor(x, options)
 
     @_mutate_result_and_inject
     def increment(self,
                   key,  # type: str
-                  delta,  # type: DeltaValue
-                  *options,  # type: CounterOptions
+                  *options,  # type: IncrementOptions
                   **kwargs
                   ):
         # type: (...) -> ResultPrecursor
@@ -980,36 +1026,36 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :param CounterOptions options: Options for the increment operation.
         :param Any kwargs: Overrides corresponding value in the options
         :raise: :exc:`.NotFoundError` if the key does not exist on the
-           bucket (and `initial` was `None`)
+            bucket (and `initial` was `None`)
         :raise: :exc:`.DeltaBadvalError` if the key exists, but the
-           existing value is not numeric
+            existing value is not numeric
         :return: A :class:`couchbase.result.MutationResult` object.
 
         Simple increment::
 
-           rv = cb.increment("key")
-           cb.get("key").content_as[int]
-           # 42
+            rv = cb.increment("key")
+            cb.get("key").content_as[int]
+            # 42
 
         Increment by 10::
 
-           rv = cb.increment("key", DeltaValue(10))
+            rv = cb.increment("key", DeltaValue(10))
 
 
         Increment by 20, set initial value to 5 if it does not exist::
 
-           rv = cb.increment("key", DeltaValue(20), initial=SignedInt64(5))
+            rv = cb.increment("key", DeltaValue(20), initial=SignedInt64(5))
 
         """
         final_opts = self._check_delta_initial(kwargs, *options)
-        x = CoreClient.counter(self.bucket, key, delta=int(DeltaValue.verified(delta)), **final_opts)
+
+        x = CoreClient.counter(self._collection.bucket, key, **final_opts)
         return ResultPrecursor(x, final_opts)
 
     @_mutate_result_and_inject
     def decrement(self,
                   key,          # type: str
-                  delta,        # type: DeltaValue
-                  *options,     # type: CounterOptions
+                  *options,     # type: IncrementOptions
                   **kwargs
                   ):
         # type: (...) -> ResultPrecursor
@@ -1029,30 +1075,31 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :param CounterOptions options: Options for the decrement operation.
         :param Any kwargs: Overrides corresponding value in the options
         :raise: :exc:`.NotFoundError` if the key does not exist on the
-           bucket (and `initial` was `None`)
+            bucket (and `initial` was `None`)
         :raise: :exc:`.DeltaBadvalError` if the key exists, but the
-           existing value is not numeric
+            existing value is not numeric
         :return: A :class:`couchbase.result.MutationResult` object.
 
         Simple decrement::
 
-           rv = cb.decrement("key")
-           cb.get("key").content_as[int]
-           # 42
+            rv = cb.decrement("key")
+            cb.get("key").content_as[int]
+            # 42
 
         Decrement by 10::
 
-           rv = cb.decrement("key", DeltaValue(10))
+            rv = cb.decrement("key", DeltaValue(10))
 
 
         Decrement by 20, set initial value to 5 if it does not exist::
 
-           rv = cb.decrement("key", DeltaValue(20), initial=SignedInt64(5))
+            rv = cb.decrement("key", DeltaValue(20), initial=SignedInt64(5))
 
         """
 
         final_opts = self._check_delta_initial(kwargs, *options)
-        x = CoreClient.counter(self.bucket, key, delta=-int(DeltaValue.verified(delta)), **final_opts)
+        final_opts['delta'] = -final_opts.get('delta', DeltaValue(1))
+        x = CoreClient.counter(self._collection.bucket, key, **final_opts)
         return ResultPrecursor(x, final_opts)
 
     @staticmethod
@@ -1166,6 +1213,7 @@ class CBCollectionShared(CBCollectionBase, wrapt.ObjectProxy):
         assert issubclass(type(parent_scope.bucket), CoreClientDatastructureWrap)
         wrapt.ObjectProxy.__init__(self, parent_scope.bucket)
         CBCollectionBase.__init__(self, parent_scope=parent_scope, *options, **kwargs)
+
     @property
     def bucket(self  # type: CBCollectionShared
                ):
