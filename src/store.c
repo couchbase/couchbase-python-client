@@ -124,7 +124,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                 void *arg)
 {
     pycbc_Bucket *self = collection->bucket;
-    int rv;
+    int rv=0;
     const struct storecmd_vars *scv = (const struct storecmd_vars *) arg;
     pycbc_pybuffer keybuf = {NULL};
     if (itm) {
@@ -301,9 +301,9 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     PyObject *ttl_O = NULL;
     PyObject *timeout_O =NULL;
     PyObject *dict = NULL;
-    PyObject *key;
-    PyObject *value;
-    pycbc_seqtype_t seqtype;
+    PyObject *key = NULL;
+    PyObject *value = NULL;
+    pycbc_seqtype_t seqtype = PYCBC_SEQTYPE_GENERIC;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
     struct storecmd_vars scv = { 0 };
     char persist_to = 0, replicate_to = 0;

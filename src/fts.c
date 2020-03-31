@@ -105,7 +105,7 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     PyObject *ret = NULL;
     pycbc_MultiResult *mres;
     pycbc_ViewResult *vres;
-    lcb_STATUS rc;
+    lcb_STATUS rc = LCB_SUCCESS;
     pycbc_pybuffer buf = { 0 };
     PyObject *params_o = NULL;
     pycbc_stack_context_handle context = PYCBC_TRACE_GET_STACK_CONTEXT_TOPLEVEL(

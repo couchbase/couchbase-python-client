@@ -252,7 +252,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
            int argopts, pycbc_stack_context_handle context)
 {
     Py_ssize_t ncmds = 0;
-    pycbc_seqtype_t seqtype;
+    pycbc_seqtype_t seqtype = PYCBC_SEQTYPE_GENERIC;
     PyObject *kobj = NULL;
     PyObject *is_quiet = NULL;
     PyObject *ttl_O = NULL;

@@ -225,7 +225,7 @@ void pycbc_convert_kv_error_context(const lcb_KEY_VALUE_ERROR_CONTEXT* ctx,
 }
 
 pycbc_enhanced_err_info* get_operation_err_info(const lcb_RESPBASE* respbase,
-                                                int cbtype) {
+                                                lcb_CALLBACK_TYPE cbtype) {
 
     /* get the extended error context and ref, if any */
     const char *extended_ref = lcb_resp_get_error_ref(cbtype, respbase);
@@ -259,12 +259,40 @@ pycbc_enhanced_err_info* get_operation_err_info(const lcb_RESPBASE* respbase,
         case LCB_CALLBACK_SDMUTATE:
             rc = lcb_respsubdoc_error_context((const lcb_RESPSUBDOC*)respbase, &ctx);
             break;
+        case LCB_CALLBACK_DEFAULT:
+            rc = LCB_ERR_SDK_INTERNAL;
+            break;
+        case LCB_CALLBACK_REMOVE:
+            rc = lcb_respremove_error_context((const lcb_RESPREMOVE*)respbase, &ctx);
+            break;
+        case LCB_CALLBACK_EXISTS:
+            rc = lcb_respexists_error_context((const lcb_RESPEXISTS*)respbase, &ctx);
+            break;
+
+        case LCB_CALLBACK_HTTP:  // handled in pycbc_add_error_context in pycbc_http.c
+        case LCB_CALLBACK_STATS:
+        case LCB_CALLBACK_VERSIONS:
+        case LCB_CALLBACK_VERBOSITY:
+        case LCB_CALLBACK_OBSERVE:
+        case LCB_CALLBACK_ENDURE:
+        case LCB_CALLBACK_CBFLUSH:
+        case LCB_CALLBACK_OBSEQNO:
+        case LCB_CALLBACK_STOREDUR:
+        case LCB_CALLBACK_NOOP:
+        case LCB_CALLBACK_PING:
+        case LCB_CALLBACK_DIAG:
+        case LCB_CALLBACK_COLLECTIONS_GET_MANIFEST:
+        case LCB_CALLBACK_GETCID:
+        case LCB_CALLBACK__MAX:
+        default:
+            goto SKIP;
     }
     if (LCB_SUCCESS == rc) {
         if (ctx) {
             pycbc_convert_kv_error_context(ctx, &info, extended_context, extended_ref);
         }
     }
+    SKIP:
     return info;
 }
 
@@ -316,7 +344,7 @@ static void operation_completed_with_err_info(pycbc_Bucket *self,
  */
 
 typedef struct {
-    int cbtype;
+    lcb_CALLBACK_TYPE cbtype;
     pycbc_strn_base_const key;
     pycbc_MultiResult *mres;
     lcb_STATUS rc;
@@ -478,6 +506,31 @@ int pycbc_extract_respdata(const lcb_RESPBASE *resp,
                            (uint64_t *)&(handler->cas));
         break;
 #endif
+        // none of these appear to be necessary for our purposes, this is just to satisfy the compiler
+        case LCB_CALLBACK_DEFAULT:
+            break;
+        case LCB_CALLBACK_VERSIONS:
+            break;
+        case LCB_CALLBACK_VERBOSITY:
+            break;
+        case LCB_CALLBACK_OBSERVE:
+            break;
+        case LCB_CALLBACK_ENDURE:
+            break;
+        case LCB_CALLBACK_CBFLUSH:
+            break;
+        case LCB_CALLBACK_OBSEQNO:
+            break;
+        case LCB_CALLBACK_STOREDUR:
+            break;
+        case LCB_CALLBACK_NOOP:
+            break;
+        case LCB_CALLBACK_COLLECTIONS_GET_MANIFEST:
+            break;
+        case LCB_CALLBACK_GETCID:
+            break;
+        case LCB_CALLBACK__MAX:
+            break;
     }
     return result;
 }

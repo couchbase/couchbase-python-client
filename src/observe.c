@@ -128,7 +128,7 @@ observe_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int argopts
     int ii;
     Py_ssize_t ncmds;
     PyObject *kobj = NULL;
-    pycbc_seqtype_t seqtype;
+    pycbc_seqtype_t seqtype = PYCBC_SEQTYPE_GENERIC;
     int master_only = 0;
     PyObject *master_only_O = NULL;
     lcb_STATUS err = LCB_SUCCESS;

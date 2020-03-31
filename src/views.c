@@ -119,7 +119,7 @@ static int parse_row_json(pycbc_Bucket *bucket,
                           const lcb_RESPVIEW *resp)
 {
     PyObject *dd = PyDict_New();
-    PyObject *docid;
+    PyObject *docid = NULL;
     int is_ok, rv = 0;
 
     const char *doc_id = NULL;

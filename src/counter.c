@@ -41,7 +41,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
 {
     pycbc_Bucket *self = collection->bucket;
     int rv = 0;
-    lcb_STATUS err;
+    lcb_STATUS err = LCB_SUCCESS;
     struct arithmetic_common_vars my_params;
     static const char *kwlist[] = {"delta", "initial", "ttl", "durability_level", NULL};
     pycbc_pybuffer keybuf = { 0 };
@@ -137,7 +137,7 @@ PyObject *arithmetic_common(pycbc_Collection_t *cb_collection,
     int rv;
     Py_ssize_t ncmds;
     struct arithmetic_common_vars global_params = { 0 };
-    pycbc_seqtype_t seqtype;
+    pycbc_seqtype_t seqtype = PYCBC_SEQTYPE_GENERIC;
     PyObject *all_initial_O = NULL;
     PyObject *all_ttl_O = NULL;
     PyObject *sequence;
