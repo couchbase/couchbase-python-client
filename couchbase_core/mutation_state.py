@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from couchbase_core.exceptions import CouchbaseError
+from couchbase.exceptions import CouchbaseException
 from couchbase_core import _from_json, _to_json
 
-class MissingTokenError(CouchbaseError):
+class MissingTokenException(CouchbaseException):
     pass
 
 
@@ -122,17 +122,17 @@ class MutationState(object):
             contain a convertible state.
         :return: `True` if the result was valid and added, `False` if not
             added (and `quiet` was specified
-        :raise: :exc:`~.MissingTokenError` if `result` does not contain
+        :raise: :exc:`~.MissingTokenException` if `result` does not contain
             a valid token
         """
         if not rvs:
-            raise MissingTokenError.pyexc(message='No results passed')
+            raise MissingTokenException.pyexc(message='No results passed')
         for rv in rvs:
             mi = rv._mutinfo
             if not mi:
                 if kwargs.get('quiet'):
                     return False
-                raise MissingTokenError.pyexc(
+                raise MissingTokenException.pyexc(
                     message='Result does not contain token')
             self._add_scanvec(mi)
         return True
@@ -152,7 +152,7 @@ class MutationState(object):
             option suppresses throwing exceptions.
         :return: `True` if at least one mutation was added, `False` if none
             were added (and `quiet` was specified)
-        :raise: :exc:`~.MissingTokenError` if no mutations were added and
+        :raise: :exc:`~.MissingTokenException` if no mutations were added and
             `quiet` was not specified
         """
         added = False
@@ -160,7 +160,7 @@ class MutationState(object):
             added = True
             self._add_scanvec(mt)
         if not added and not quiet:
-            raise MissingTokenError('Bucket object contains no tokens!')
+            raise MissingTokenException('Bucket object contains no tokens!')
         return added
 
     def __repr__(self):

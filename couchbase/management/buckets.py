@@ -3,16 +3,15 @@ from ..options import OptionBlockTimeOut, forward_args
 from couchbase.management.generic import GenericManager
 from typing import *
 from couchbase_core import abstractmethod, mk_formstr
-from couchbase_core.exceptions import HTTPError, ErrorMapper
-from couchbase.exceptions import BucketAlreadyExistsException, BucketDoesNotExistException
+from couchbase.exceptions import HTTPException, ErrorMapper, BucketAlreadyExistsException, BucketDoesNotExistException
 
 
 class BucketManagerErrorHandler(ErrorMapper):
     @staticmethod
     def mapping():
         # type (...)->Mapping[str, CBErrorType]
-        return {HTTPError: {'Bucket with given name (already|still) exists': BucketAlreadyExistsException,
-                            'Requested resource not found': BucketDoesNotExistException}}
+        return {HTTPException: {'Bucket with given name (already|still) exists': BucketAlreadyExistsException,
+                                'Requested resource not found': BucketDoesNotExistException}}
 
 @BucketManagerErrorHandler.wrap
 class BucketManager(GenericManager):

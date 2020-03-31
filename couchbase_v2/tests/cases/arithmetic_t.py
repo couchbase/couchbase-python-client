@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-from couchbase_v2.exceptions import (NotFoundError, DeltaBadvalError)
+from couchbase_v2.exceptions import (DocumentNotFoundException, DeltaBadvalException)
 from couchbase_tests.base import ConnectionTestCase
 
 
@@ -44,12 +44,12 @@ class ArithmeticTest(ConnectionTestCase):
     def test_incr_notfound(self):
         key = self.gen_key("incr_notfound")
         self.cb.remove(key, quiet=True)
-        self.assertRaises(NotFoundError, self.cb.counter, key)
+        self.assertRaises(DocumentNotFoundException, self.cb.counter, key)
 
     def test_incr_badval(self):
         key = self.gen_key("incr_badval")
         self.cb.upsert(key, "THIS IS SPARTA")
-        self.assertRaises(DeltaBadvalError, self.cb.counter, key)
+        self.assertRaises(DeltaBadvalException, self.cb.counter, key)
 
     def test_incr_multi(self):
         keys = self.gen_key_list(amount=5, prefix="incr_multi")
@@ -77,7 +77,7 @@ class ArithmeticTest(ConnectionTestCase):
 
         self.cb.remove(keys[0])
 
-        self.assertRaises(NotFoundError, self.cb.counter_multi, keys)
+        self.assertRaises(DocumentNotFoundException, self.cb.counter_multi, keys)
 
     def test_incr_extended(self):
         key = self.gen_key("incr_extended")

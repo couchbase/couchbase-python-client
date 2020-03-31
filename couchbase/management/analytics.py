@@ -20,7 +20,7 @@ from couchbase.options import OptionBlockTimeOut
 from typing import *
 from couchbase.analytics import AnalyticsOptions, AnalyticsResult, AnalyticsDataset, AnalyticsIndex
 import couchbase_core._libcouchbase as _LCB
-from couchbase.exceptions import CouchbaseError, NotSupportedError
+from couchbase.exceptions import CouchbaseException, NotSupportedException
 
 
 class BaseAnalyticsIndexManagerOptions(OptionBlockTimeOut):
@@ -239,9 +239,9 @@ class AnalyticsIndexManager(object):
         :param CreateDataverseOptions options: Options for dataverse creation.
         :param Any kwargs: Override corresponding value in options.
         :return: None
-        :raises DataverseAlreadyExistsError
+        :raises DataverseAlreadyExistsException
         :raises InvalidArgumentsException
-        :raises CouchbaseError
+        :raises CouchbaseException
         """
         if not options:
             options = CreateDataverseOptions()
@@ -463,11 +463,11 @@ class AnalyticsIndexManager(object):
                                                      method=_LCB.LCB_HTTP_METHOD_GET,
                                                      path="analytics/node/agg/stats/remaining"
                                                      ).value
-        except CouchbaseError as e:
+        except CouchbaseException as e:
             extra = getattr(e, 'objextra', None)
             if extra:
                 if int(getattr(extra, 'http_status', None)) == 404:
-                    raise NotSupportedError("get pending mutations not supported")
+                    raise NotSupportedException("get pending mutations not supported")
             raise e
 
 

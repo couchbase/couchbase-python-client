@@ -18,7 +18,7 @@
 from nose.plugins.attrib import attr
 
 from couchbase_tests.base import DDocTestCase
-from couchbase_v2.exceptions import HTTPError
+from couchbase_v2.exceptions import HTTPException
 
 DNAME = "tmp"
 VNAME = "a_view"
@@ -41,12 +41,12 @@ class DesignDocManagementTest(DDocTestCase):
 
         try:
             self.mgr.design_delete(DNAME, use_devmode=False, syncwait=5)
-        except HTTPError:
+        except HTTPException:
             pass
 
         try:
             self.mgr.design_delete(DNAME, use_devmode=True, syncwait=5)
-        except HTTPError:
+        except HTTPException:
             pass
 
     def tearDown(self):
@@ -71,7 +71,7 @@ class DesignDocManagementTest(DDocTestCase):
                            params = { 'limit':10 })
         self.assertTrue(rv.success)
 
-        self.assertRaises(HTTPError,
+        self.assertRaises(HTTPException,
                           self.cb._view,
                           DNAME, VNAME,
                           use_devmode=True)
@@ -79,7 +79,7 @@ class DesignDocManagementTest(DDocTestCase):
         rv = self.mgr.design_delete(DNAME, use_devmode=False, syncwait=5)
         self.assertTrue(rv.success)
 
-        self.assertRaises(HTTPError,
+        self.assertRaises(HTTPException,
                           self.cb._view,
                           DNAME, VNAME,
                           use_devmode=False)

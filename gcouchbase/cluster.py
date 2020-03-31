@@ -4,7 +4,7 @@ from gevent.hub import get_hub, getcurrent, Waiter
 from couchbase_v2.asynchronous.bucket import AsyncBucket
 from couchbase_core.asynchronous.view import AsyncViewBase
 from couchbase_core.asynchronous.n1ql import AsyncN1QLRequest
-from couchbase_core.views.iterator import AlreadyQueriedError
+from couchbase_core.views.iterator import AlreadyQueriedException
 try:
     from gcouchbase.iops_gevent0x import IOPS
 except ImportError:
@@ -47,7 +47,7 @@ class GRowsHandler(object):
 
     def __iter__(self):
         if not self._do_iter:
-            raise AlreadyQueriedError.pyexc("Already queried")
+            raise AlreadyQueriedException.pyexc("Already queried")
 
         while self._do_iter and not self.__done_called:
             self.__waiter.get()

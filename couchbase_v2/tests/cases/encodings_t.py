@@ -18,7 +18,7 @@
 from couchbase_v2 import (
     FMT_BYTES, FMT_JSON, FMT_PICKLE, FMT_UTF8,
     FMT_LEGACY_MASK)
-from couchbase_v2.exceptions import ValueFormatError, CouchbaseError
+from couchbase_v2.exceptions import ValueFormatException, CouchbaseException
 from couchbase_tests.base import ConnectionTestCase
 from couchbase_core.transcoder import TranscoderPP, LegacyTranscoderPP
 
@@ -85,7 +85,7 @@ class EncodingTest(ConnectionTestCase):
         self.assertEqual(rv.value, b'"some json"blobs')
 
         self.cb.data_passthrough = False
-        self.assertRaises(ValueFormatError, self.cb.get, "malformed")
+        self.assertRaises(ValueFormatException, self.cb.get, "malformed")
 
     def test_zerolength(self):
         rv = self.cb.upsert("key", b"", format=FMT_BYTES)
@@ -93,14 +93,14 @@ class EncodingTest(ConnectionTestCase):
         rv = self.cb.get("key")
         self.assertEqual(rv.value, b"")
 
-        self.assertRaises(CouchbaseError, self.cb.upsert, "", "value")
+        self.assertRaises(CouchbaseException, self.cb.upsert, "", "value")
 
     def test_blob_keys_py2(self):
         if bytes == str:
             rv = self.cb.upsert(b"\0", "value")
             rv = self.cb.get(b"\0")
         else:
-            self.assertRaises(ValueFormatError, self.cb.upsert, b"\0", "value")
+            self.assertRaises(ValueFormatException, self.cb.upsert, b"\0", "value")
 
     def test_compat_interop(self):
         # Check that we can interact with older versions, and vice versa:

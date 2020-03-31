@@ -16,11 +16,11 @@ from datetime import timedelta
 
 from couchbase.bucket import Bucket
 from couchbase.management.queries import QueryIndex
-from couchbase_core.exceptions import QueryIndexNotFoundError, QueryIndexAlreadyExistsError
+from couchbase.exceptions import CouchbaseException, DocumentExistsException, \
+    QueryIndexNotFoundException, QueryIndexAlreadyExistsException
 from couchbase_tests.base import SkipTest, CollectionTestCase
 from nose.plugins.attrib import attr
 from typing import *
-from couchbase.exceptions import KeyExistsException, CouchbaseError
 
 
 @attr("index")
@@ -59,7 +59,7 @@ class IndexManagementTestCase(CollectionTestCase):
         self.mgr.drop_primary_index(bucket_name)
         # Ensure we get an error when executing the query
         self.assertRaises(
-            CouchbaseError, lambda x: x.rows(), self.cluster.query(qstr))
+            CouchbaseException, lambda x: x.rows(), self.cluster.query(qstr))
 
     def test_create_named_primary(self):
         bucket_name = self.cluster_info.bucket_name
@@ -71,26 +71,26 @@ class IndexManagementTestCase(CollectionTestCase):
         # All OK
         self.mgr.drop_index(bucket_name, ixname)
         self.assertRaises(
-            CouchbaseError, lambda x: x.rows(), self.cluster.query(qstr))
+            CouchbaseException, lambda x: x.rows(), self.cluster.query(qstr))
 
     def test_create_primary_ignore_if_exists(self):
         bucket_name = self.cluster_info.bucket_name
         self.mgr.create_primary_index(bucket_name)
         self.mgr.create_primary_index(bucket_name, ignore_if_exists=True)
 
-        self.assertRaises(QueryIndexAlreadyExistsError, self.mgr.create_primary_index, bucket_name)
+        self.assertRaises(QueryIndexAlreadyExistsException, self.mgr.create_primary_index, bucket_name)
 
     def test_drop_primary_ignore_if_not_exists(self):
         bucket_name = self.cluster_info.bucket_name
         self.mgr.drop_primary_index(bucket_name, ignore_if_not_exists=True)
-        self.assertRaises(QueryIndexNotFoundError, self.mgr.drop_primary_index, bucket_name)
+        self.assertRaises(QueryIndexNotFoundException, self.mgr.drop_primary_index, bucket_name)
 
     def test_create_named_primary_ignore_if_exists(self):
         ixname = 'namedPrimary'
         bucket_name = self.cluster_info.bucket_name
         self.mgr.create_index(bucket_name, ixname, [], primary=True)
         self.mgr.create_index(bucket_name, ixname, [], primary=True, ignore_if_exists=True)
-        self.assertRaises(QueryIndexAlreadyExistsError, self.mgr.create_index, bucket_name,
+        self.assertRaises(QueryIndexAlreadyExistsException, self.mgr.create_index, bucket_name,
                           ixname, [], primary=True)
 
     def test_drop_named_primary_ignore_if_exists(self):
@@ -99,7 +99,7 @@ class IndexManagementTestCase(CollectionTestCase):
         self.mgr.create_index(bucket_name, ixname, [], primary=True)
         self.mgr.drop_index(bucket_name, ixname)
         self.mgr.drop_index(bucket_name, ixname, ignore_missing=True)
-        self.assertRaises(QueryIndexNotFoundError, self.mgr.drop_index, bucket_name, ixname)
+        self.assertRaises(QueryIndexNotFoundException, self.mgr.drop_index, bucket_name, ixname)
 
     def test_create_secondary_indexes(self):
         ixname = 'ix2'
@@ -123,7 +123,7 @@ class IndexManagementTestCase(CollectionTestCase):
         # Drop the index
         self.mgr.drop_index(bucket_name, ixname)
         # Issue the query again
-        self.assertRaises(CouchbaseError,
+        self.assertRaises(CouchbaseException,
                           lambda x: x.rows(), self.cluster.query(qq))
 
     def test_create_index_no_fields(self):
@@ -136,7 +136,7 @@ class IndexManagementTestCase(CollectionTestCase):
         bucket_name=self.cluster_info.bucket_name
         self.mgr.create_index(bucket_name, ixname, fields=['hello'])
         self.mgr.create_index(bucket_name, ixname, fields=['hello'], ignore_if_exists=True)
-        self.assertRaises(QueryIndexAlreadyExistsError, self.mgr.create_index,
+        self.assertRaises(QueryIndexAlreadyExistsException, self.mgr.create_index,
                           bucket_name, ixname, fields=['hello'])
 
     def test_drop_secondary_indexes_ignore_if_not_exists(self):
@@ -147,7 +147,7 @@ class IndexManagementTestCase(CollectionTestCase):
         # Drop it
         self.mgr.drop_index(bucket_name, ixname)
         self.mgr.drop_index(bucket_name, ixname, ignore_if_not_exists=True)
-        self.assertRaises(QueryIndexNotFoundError, self.mgr.drop_index, bucket_name, ixname)
+        self.assertRaises(QueryIndexNotFoundException, self.mgr.drop_index, bucket_name, ixname)
 
     def test_list_indexes(self):
         # start with no indexes
@@ -180,4 +180,4 @@ class IndexManagementTestCase(CollectionTestCase):
         self.assertEqual(6, len(pending))
         self.mgr.watch_indexes(self.cluster_info.bucket_name, pending)  # Should be OK
         self.mgr.watch_indexes(self.cluster_info.bucket_name, pending)  # Should be OK again
-        self.assertRaises(QueryIndexNotFoundError, self.mgr.watch_indexes, self.cluster_info.bucket_name, ['nonexist'])
+        self.assertRaises(QueryIndexNotFoundException, self.mgr.watch_indexes, self.cluster_info.bucket_name, ['nonexist'])

@@ -26,7 +26,7 @@ class DatastructureTest(CollectionTestCase):
         self.cb.remove(key, quiet=True)
 
         cb = self.cb  # type: CBCollection
-        self.assertRaises(E.NotFoundError, cb.map_add, key, 'key1', 'val1')
+        self.assertRaises(E.DocumentNotFoundException, cb.map_add, key, 'key1', 'val1')
         rv = cb.map_add(key, 'key1', 'val1', create=True)
         self.assertSuccess(rv)
         self.assertCas(rv)
@@ -47,7 +47,7 @@ class DatastructureTest(CollectionTestCase):
 
         cb = self.cb
 
-        self.assertRaises(E.NotFoundError, cb.list_append, key, 'hello')
+        self.assertRaises(E.DocumentNotFoundException, cb.list_append, key, 'hello')
         rv = self.cb.list_append(key, 'hello', create=True)
         self.assertSuccess(rv)
         self.assertCas(rv)
@@ -78,7 +78,7 @@ class DatastructureTest(CollectionTestCase):
         self.cb.remove(key, quiet=True)
         cb = self.cb
 
-        self.assertRaises(E.NotFoundError, cb.set_add, key, 123)
+        self.assertRaises(E.DocumentNotFoundException, cb.set_add, key, 123)
         rv = cb.set_add(key, 123, create=True)
         self.assertSuccess(rv)
         rv = cb.set_add(key, 123)
@@ -98,7 +98,7 @@ class DatastructureTest(CollectionTestCase):
         self.cb.remove(key, quiet=True)
 
         cb = self.cb
-        self.assertRaises(E.NotFoundError, cb.queue_push, key, 1)
+        self.assertRaises(E.DocumentNotFoundException, cb.queue_push, key, 1)
         rv = cb.queue_push(key, 1, create=True)
         self.assertSuccess(rv)
         cb.queue_push(key, 2)

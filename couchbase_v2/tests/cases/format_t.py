@@ -19,7 +19,7 @@ import json
 import pickle
 
 from couchbase_tests.base import ConnectionTestCase, SkipTest
-from couchbase_v2.exceptions import ValueFormatError
+from couchbase_v2.exceptions import ValueFormatException
 from couchbase_core import FMT_AUTO, FMT_JSON, FMT_BYTES, FMT_UTF8, FMT_PICKLE
 
 class FormatTest(ConnectionTestCase):
@@ -61,7 +61,7 @@ class FormatTest(ConnectionTestCase):
         rv1 = self.cb.upsert(key, {'some': 'value1'}, format=FMT_JSON)
         self.assertTrue(rv1.cas > 0)
 
-        self.assertRaises(ValueFormatError, self.cb.upsert,
+        self.assertRaises(ValueFormatException, self.cb.upsert,
                           key, object(), format=FMT_JSON)
 
         rv3 = self.cb.upsert(key, {'some': 'value3'},
@@ -70,10 +70,10 @@ class FormatTest(ConnectionTestCase):
         rv4 = self.cb.upsert(key, object(), format=FMT_PICKLE)
         self.assertTrue(rv4.cas > 0)
 
-        self.assertRaises(ValueFormatError, self.cb.upsert,
+        self.assertRaises(ValueFormatException, self.cb.upsert,
                           key, {'some': 'value5'},
                           format=FMT_BYTES)
-        self.assertRaises(ValueFormatError, self.cb.upsert,
+        self.assertRaises(ValueFormatException, self.cb.upsert,
                           key, { 'some' : 'value5.1'},
                           format=FMT_UTF8)
 
@@ -129,9 +129,9 @@ class FormatTest(ConnectionTestCase):
 
 
         self.cb.upsert('key_format6', {'some': 'value6'}, format=FMT_JSON)
-        self.assertRaises(ValueFormatError, self.cb.get, 'key_format6',
+        self.assertRaises(ValueFormatException, self.cb.get, 'key_format6',
                           format=FMT_PICKLE)
 
         self.cb.upsert('key_format7', {'some': 'value7'}, format=FMT_PICKLE)
-        self.assertRaises(ValueFormatError, self.cb.get, 'key_format7',
+        self.assertRaises(ValueFormatException, self.cb.get, 'key_format7',
                           format=FMT_JSON)

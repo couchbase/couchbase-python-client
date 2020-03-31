@@ -20,9 +20,9 @@ import os
 
 from nose.plugins.attrib import attr
 
-from couchbase_core.exceptions import (AuthError, BucketNotFoundError, CouchbaseNetworkError,
-                                       NotFoundError, InvalidError,
-                                       TimeoutError, ArgumentError)
+from couchbase.exceptions import (AuthException, BucketNotFoundException, CouchbaseNetworkException,
+                                  DocumentNotFoundException, InvalidException,
+                                  TimeoutException, ArgumentException)
 from couchbase_tests.base import CouchbaseTestCase, SkipTest, ConnectionTestCase
 from couchbase_core.connstr import ConnectionString
 
@@ -34,10 +34,10 @@ class ConnectionTest(CouchbaseTestCase):
         cs = ConnectionString.parse(connargs['connection_string'])
         cs.hosts = [ 'example.com' ]
         connargs['connection_string'] = cs.encode()
-        self.assertRaises(TimeoutError, self.factory, **connargs)
+        self.assertRaises(TimeoutException, self.factory, **connargs)
 
         cs.hosts = [ self.cluster_info.host + ':' + str(34567)]
-        self.assertRaises(TimeoutError, self.factory, **connargs)
+        self.assertRaises(TimeoutException, self.factory, **connargs)
 
     def test_bucket(self):
         cb = self.factory(**self.make_connargs())
@@ -46,12 +46,12 @@ class ConnectionTest(CouchbaseTestCase):
     def test_bucket_not_found(self):
         connargs = self.make_connargs(bucket='this_bucket_does_not_exist')
         self.assertRaises(
-            (BucketNotFoundError, AuthError), self.factory, **connargs)
+            (BucketNotFoundException, AuthException), self.factory, **connargs)
 
     def test_quiet(self):
         connparams = self.make_connargs()
         cb = self.factory(**connparams)
-        self.assertRaises(NotFoundError, cb.get, 'missing_key')
+        self.assertRaises(DocumentNotFoundException, cb.get, 'missing_key')
 
         cb = self.factory(quiet=True, **connparams)
         cb.remove('missing_key', quiet=True)
@@ -59,7 +59,7 @@ class ConnectionTest(CouchbaseTestCase):
         self.assertFalse(val1.success)
 
         cb = self.factory(quiet=False, **connparams)
-        self.assertRaises(NotFoundError, cb.get, 'missing_key')
+        self.assertRaises(DocumentNotFoundException, cb.get, 'missing_key')
 
 
     def test_configcache(self):
@@ -90,7 +90,7 @@ class ConnectionTest(CouchbaseTestCase):
         # apparently libcouchbase does not report this failure.
 
     def test_invalid_hostname(self):
-        self.assertRaises(InvalidError, self.factory,
+        self.assertRaises(InvalidException, self.factory,
                           str('couchbase://12345:qwer###/default'))
 
     def test_multi_hosts(self):

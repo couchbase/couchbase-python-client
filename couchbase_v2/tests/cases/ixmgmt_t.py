@@ -55,7 +55,7 @@ class IndexManagementTestCase(RealServerTestCase):
         mgr.n1ql_index_drop_primary()
         # Ensure we get an error when executing the query
         self.assertRaises(
-            E.CouchbaseError, lambda x: x.execute(), cb.n1ql_query(qstr))
+            E.CouchbaseException, lambda x: x.execute(), cb.n1ql_query(qstr))
 
         ixname = 'namedPrimary'
         # Try to create a _named_ primary index
@@ -64,27 +64,27 @@ class IndexManagementTestCase(RealServerTestCase):
         # All OK
         mgr.n1ql_index_drop(ixname)
         self.assertRaises(
-            E.CouchbaseError, lambda x: x.execute(), cb.n1ql_query(qstr))
+            E.CouchbaseException, lambda x: x.execute(), cb.n1ql_query(qstr))
 
         # Create the primary index the first time
         mgr.n1ql_index_create_primary()
         mgr.n1ql_index_create_primary(ignore_exists=True)
-        self.assertRaises(E.KeyExistsError, mgr.n1ql_index_create_primary)
+        self.assertRaises(E.KeyExistsException, mgr.n1ql_index_create_primary)
 
         # Drop the indexes
         mgr.n1ql_index_drop_primary()
         mgr.n1ql_index_drop_primary(ignore_missing=True)
-        self.assertRaises(E.NotFoundError, mgr.n1ql_index_drop_primary)
+        self.assertRaises(E.DocumentNotFoundException, mgr.n1ql_index_drop_primary)
 
         # Test with _named_ primaries
         mgr.n1ql_index_create(ixname, primary=True)
         mgr.n1ql_index_create(ixname, primary=True, ignore_exists=True)
-        self.assertRaises(E.KeyExistsError, mgr.n1ql_index_create,
+        self.assertRaises(E.KeyExistsException, mgr.n1ql_index_create,
                           ixname, primary=True)
 
         mgr.n1ql_index_drop(ixname)
         mgr.n1ql_index_drop(ixname, ignore_missing=True)
-        self.assertRaises(E.NotFoundError, mgr.n1ql_index_drop, ixname)
+        self.assertRaises(E.DocumentNotFoundException, mgr.n1ql_index_drop, ixname)
 
     def test_alt_indexes(self):
         cb = self.cb  # type: Bucket
@@ -99,20 +99,20 @@ class IndexManagementTestCase(RealServerTestCase):
         # Drop the index
         mgr.n1ql_index_drop(ixname)
         # Issue the query again
-        self.assertRaises(E.CouchbaseError,
+        self.assertRaises(E.CouchbaseException,
                           lambda x: x.execute(), cb.n1ql_query(qq))
 
         self.assertRaises((ValueError, TypeError),
                           mgr.n1ql_index_create, 'withoutFields')
         mgr.n1ql_index_create(ixname, fields=['hello'])
         mgr.n1ql_index_create(ixname, fields=['hello'], ignore_exists=True)
-        self.assertRaises(E.KeyExistsError, mgr.n1ql_index_create,
+        self.assertRaises(E.KeyExistsException, mgr.n1ql_index_create,
                           ixname, fields=['hello'])
 
         # Drop it
         mgr.n1ql_index_drop(ixname)
         mgr.n1ql_index_drop(ixname, ignore_missing=True)
-        self.assertRaises(E.NotFoundError, mgr.n1ql_index_drop, ixname)
+        self.assertRaises(E.DocumentNotFoundException, mgr.n1ql_index_drop, ixname)
 
         # Create an index with a condition
         ixname = 'ix_with_condition'
@@ -156,4 +156,4 @@ class IndexManagementTestCase(RealServerTestCase):
         self.assertEqual(6, len(pending))
         mgr.n1ql_index_watch(pending)  # Should be OK
         mgr.n1ql_index_watch(pending)  # Should be OK again
-        self.assertRaises(E.NotFoundError, mgr.n1ql_index_watch, ['nonexist'])
+        self.assertRaises(E.DocumentNotFoundException, mgr.n1ql_index_watch, ['nonexist'])

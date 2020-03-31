@@ -17,11 +17,11 @@
 
 from couchbase_tests.base import CouchbaseTestCase
 from couchbase_core.connstr import ConnectionString
-from couchbase_v2.cluster import Cluster, ClassicAuthenticator,PasswordAuthenticator, NoBucketError, MixedAuthError, CertAuthenticator
+from couchbase_v2.cluster import Cluster, ClassicAuthenticator,PasswordAuthenticator, NoBucketException, MixedAuthException, CertAuthenticator
 import gc
 import os
 import warnings
-from couchbase_core.exceptions import CouchbaseNetworkError, CouchbaseFatalError, CouchbaseInputError, CouchbaseError
+from couchbase.exceptions import CouchbaseNetworkException, CouchbaseFatalException, CouchbaseInputException, CouchbaseException
 
 
 CERT_PATH = os.getenv("PYCBC_CERT_PATH")
@@ -54,7 +54,7 @@ class ClusterTest(CouchbaseTestCase):
         cluster, bucket_name = self._create_cluster()
 
         # Should fail if no bucket is active yet
-        self.assertRaises(NoBucketError, cluster.n1ql_query, "select mockrow")
+        self.assertRaises(NoBucketException, cluster.n1ql_query, "select mockrow")
 
         # Open a bucket
         cb = cluster.open_bucket(bucket_name)
@@ -72,7 +72,7 @@ class ClusterTest(CouchbaseTestCase):
 
         cluster.authenticate(auther)
         cb1 = cluster.open_bucket(bucket_name)
-        self.assertRaises(MixedAuthError, cluster.open_bucket, bucket_name,
+        self.assertRaises(MixedAuthException, cluster.open_bucket, bucket_name,
                           password=self.cluster_info.bucket_password)
 
         cluster2, bucket_name = self._create_cluster()
@@ -81,32 +81,32 @@ class ClusterTest(CouchbaseTestCase):
 
     def test_PYCBC_488(self):
         cluster = Cluster('couchbases://10.142.175.101?certpath=/Users/daschl/tmp/ks/chain.pem&keypath=/Users/daschl/tmp/ks/pkey.key')
-        with self.assertRaises(MixedAuthError) as maerr:
+        with self.assertRaises(MixedAuthException) as maerr:
             cluster.open_bucket("pixels",
                                  password=self.cluster_info.bucket_password)
         exception = maerr.exception
-        self.assertIsInstance(exception, MixedAuthError)
+        self.assertIsInstance(exception, MixedAuthException)
         self.assertRegex(exception.message, r'.*CertAuthenticator.*password.*')
 
     def test_PYCBC_489(self):
         from couchbase_v2.cluster import Cluster
-        with self.assertRaises(MixedAuthError) as maerr:
+        with self.assertRaises(MixedAuthException) as maerr:
             cluster = Cluster('couchbases://10.142.175.101?certpath=/Users/daschl/tmp/ks/chain.pem&keypath=/Users/daschl/tmp/ks/pkey.key')
             cb = cluster.open_bucket('pixels', password = 'foo')
             cb.upsert('u:king_arthur', {'name': 'Arthur', 'email': 'kingarthur@couchbase.com', 'interests': ['Holy Grail', 'African Swallows']})
         exception = maerr.exception
-        self.assertIsInstance(exception, MixedAuthError)
+        self.assertIsInstance(exception, MixedAuthException)
         self.assertRegex(exception.message, r'.*CertAuthenticator-style.*password.*')
 
     def test_no_mixed_cert_auth(self):
         cluster3, bucket_name = self._create_cluster()
         auther_cert = CertAuthenticator(cert_path="dummy",key_path="dummy2")
         cluster3.authenticate(auther_cert)
-        with self.assertRaises(MixedAuthError) as maerr:
+        with self.assertRaises(MixedAuthException) as maerr:
             cluster3.open_bucket(bucket_name,
                           password=self.cluster_info.bucket_password)
         exception = maerr.exception
-        self.assertIsInstance(exception, MixedAuthError)
+        self.assertIsInstance(exception, MixedAuthException)
 
         self.assertRegex(exception.message, r'.*CertAuthenticator.*password.*')
 
@@ -172,13 +172,13 @@ class ClusterTest(CouchbaseTestCase):
                 raise
             try:
                 raise e
-            except CouchbaseNetworkError as f:
+            except CouchbaseNetworkException as f:
                 self.assertRegex(str(e),r'.*(refused the connection).*')
-            except CouchbaseFatalError as f:
+            except CouchbaseFatalException as f:
                 self.assertRegex(str(e),r'.*(SSL subsystem).*')
-            except CouchbaseInputError as f:
+            except CouchbaseInputException as f:
                 self.assertRegex(str(e),r'.*(not supported).*')
-            except CouchbaseError as f:
+            except CouchbaseException as f:
                 self.assertRegex(str(e),r'.*(LCB_ERR_SSL_ERROR|LCB_ERR_SDK_FEATURE_UNAVAILABLE).*')
 
             warnings.warn("Got exception {} but acceptable error for Mock with  SSL+cert_path tests".format(str(e)))

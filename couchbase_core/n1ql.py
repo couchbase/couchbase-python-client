@@ -18,14 +18,14 @@ import json
 
 from couchbase_core._pyport import basestring
 from couchbase_core.supportability import deprecate_module_attribute
-from couchbase_core.views.iterator import AlreadyQueriedError
-from couchbase_core.exceptions import CouchbaseError
+from couchbase_core.views.iterator import AlreadyQueriedException
+from couchbase.exceptions import CouchbaseException
 import sys
 
 # Not used internally, but by other modules
 
 
-class N1QLError(CouchbaseError):
+class N1QLException(CouchbaseException):
     @property
     def n1ql_errcode(self):
         return self.objextra['code']
@@ -475,7 +475,7 @@ class N1QLRequest(object):
             return
         if 'errors' in value:
             for err in value['errors']:
-                raise N1QLError.pyexc('N1QL Execution failed', err)
+                raise N1QLException.pyexc('N1QL Execution failed', err)
 
     def _process_payload(self, rows):
         if rows:
@@ -522,7 +522,7 @@ class N1QLRequest(object):
             while len(self.buffered_remainder)>0:
                 yield self.buffered_remainder.pop(0)
         elif not self._do_iter:
-            raise AlreadyQueriedError()
+            raise AlreadyQueriedException()
 
         self._start()
         while self._do_iter:

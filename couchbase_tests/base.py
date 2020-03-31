@@ -28,7 +28,7 @@ from testfixtures import LogCapture
 
 from testresources import ResourcedTestCase as ResourcedTestCaseReal, TestResourceManager
 
-from couchbase.exceptions import CollectionAlreadyExistsException, ScopeAlreadyExistsException, NotSupportedError
+from couchbase.exceptions import CollectionAlreadyExistsException, ScopeAlreadyExistsException, NotSupportedException
 import couchbase_core
 from couchbase import Cluster, ClusterOptions, CBCollection, JSONDocument, CoreClient
 from couchbase.cluster import ClassicAuthenticator
@@ -174,7 +174,7 @@ except ImportError:
     # Python <3.0 fallback
     from fallback import configparser
 
-from couchbase_v2.exceptions import CouchbaseError
+from couchbase_v2.exceptions import CouchbaseException
 from couchbase.management.admin import Admin
 from couchbase_core.mockserver import CouchbaseMock, BucketSpec, MockControlClient
 from couchbase_core.result import (
@@ -218,7 +218,7 @@ class ClusterInformation(object):
         elif self.protocol.startswith('http'):
             protocol_format = '{0}:{1}/{2}'.format(host, self.port, bucket)
         else:
-            raise CouchbaseError('Unrecognised protocol')
+            raise CouchbaseException('Unrecognised protocol')
         connstr = self.protocol + '://' + protocol_format
         final_options = ClusterInformation.filter_opts(self.__dict__)
         override_options = ClusterInformation.filter_opts(overrides)
@@ -455,7 +455,7 @@ class CouchbaseTestCase(ResourcedTestCase):
         self._key_counter = 0
 
         if not hasattr(self, 'factory'):
-            from couchbase_v2.views.iterator import View
+            from couchbase_core.views.iterator import View
             from couchbase_core.result import (
                 MultiResult, Result, OperationResult, ValueResult,
                 ObserveInfo)
@@ -902,7 +902,7 @@ class CollectionTestCase(ClusterTestCase):
         try:
             cm.get_all_scopes()
             return True
-        except NotSupportedError:
+        except NotSupportedException:
             return False
 
     def setUp(self, default_collections=None, real_collections=None):

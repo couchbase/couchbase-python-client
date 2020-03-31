@@ -17,8 +17,8 @@
 #
 
 from couchbase_tests.base import CollectionTestCase
-from couchbase_core.exceptions import KVErrorContext, QueryErrorContext, SearchErrorContext, AnalyticsErrorContext, \
-    ViewErrorContext, HTTPErrorContext, CouchbaseError, NotSupportedError
+from couchbase.exceptions import KVErrorContext, QueryErrorContext, SearchErrorContext, AnalyticsErrorContext, \
+    ViewErrorContext, HTTPErrorContext, CouchbaseException, NotSupportedException
 from couchbase_core.fulltext import TermQuery
 from unittest import SkipTest
 
@@ -32,25 +32,25 @@ class ErrorContextTests(CollectionTestCase):
         try:
             self.cb.insert("foo", {"some":"other content"})
             self.fail("expected an exception")
-        except CouchbaseError as e:
+        except CouchbaseException as e:
             self.assertIsInstance(e.context, KVErrorContext)
 
     def test_query_error(self):
         try:
             self.cluster.query("I'm not n1ql").rows()
             self.fail("expected an exception")
-        except NotSupportedError:
+        except NotSupportedException:
             raise SkipTest("query not supported in this cluster")
-        except CouchbaseError as e:
+        except CouchbaseException as e:
             self.assertIsInstance(e.context, QueryErrorContext)
 
     def test_analytics_error(self):
         try:
-            self.cluster.analytics_query("I'm also not n1ql").rows()
+            self.cluster.analytics_query("notanindex", "I'm also not n1ql").rows()
             self.fail("expected an exception")
-        except NotSupportedError:
+        except NotSupportedException:
             raise SkipTest("analytics not supported in this cluster")
-        except CouchbaseError as e:
+        except CouchbaseException as e:
             self.assertIsInstance(e.context, AnalyticsErrorContext)
 
     def test_search_error(self):
@@ -58,9 +58,9 @@ class ErrorContextTests(CollectionTestCase):
             for x in self.cluster.search_query("not_an_index", TermQuery("whatever")):
                 pass
             self.fail("expected an exception")
-        except NotSupportedError:
+        except NotSupportedException:
             raise SkipTest("search not supported in this cluster")
-        except CouchbaseError as e:
+        except CouchbaseException as e:
             self.assertIsInstance(e.context, SearchErrorContext)
 
     def test_view_error(self):
@@ -68,9 +68,9 @@ class ErrorContextTests(CollectionTestCase):
             for x in self.cb.view_query("notadesigndoc", "notaview"):
                 pass
             self.fail("expected an exception")
-        except NotSupportedError:
+        except NotSupportedException:
             raise SkipTest("Views not supported in this cluster")
-        except CouchbaseError as e:
+        except CouchbaseException as e:
             self.assertIsInstance(e.context, ViewErrorContext)
 
     def test_http_error(self):
@@ -79,5 +79,5 @@ class ErrorContextTests(CollectionTestCase):
         try:
             self.cluster.buckets().get_bucket("imnotabucket")
             self.fail("expected an exception")
-        except CouchbaseError as e:
+        except CouchbaseException as e:
             self.assertIsInstance(e.context, HTTPErrorContext)

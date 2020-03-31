@@ -119,7 +119,7 @@ def upsert(path, value, create_parents=False, **kwargs):
 
             cb.mutate_in("docid", SD.upsert("foo.bar.baz", "newValue"))
 
-        would fail with :cb_exc:`SubdocPathNotFoundError` because `foo.bar`
+        would fail with :cb_exc:`PathNotFoundException` because `foo.bar`
         does not exist. However when using the `create_parents` option, the
         server creates the new `foo.bar` dictionary and then inserts the
         `baz` value.

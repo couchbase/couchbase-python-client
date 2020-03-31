@@ -1,7 +1,7 @@
 from couchbase_tests.base import ConnectionTestCase
 from couchbase_core._libcouchbase import FMT_UTF8
 import couchbase_core.subdocument as SD
-import couchbase_core.exceptions as E
+import couchbase.exceptions as E
 import traceback
 import logging
 
@@ -13,9 +13,9 @@ class SubdocTest(ConnectionTestCase):
         k = self.gen_key('sd_precheck')
         try:
             cb.retrieve_in(k, 'pth')
-        except (E.NotSupportedError, E.UnknownCommandError):
+        except (E.NotSupportedException, E.UnknownCommandException):
             self.skipTest('Subdoc not supported on this server version')
-        except E.CouchbaseError:
+        except E.CouchbaseException:
             pass
 
     def test_lookup_in(self):
@@ -35,11 +35,11 @@ class SubdocTest(ConnectionTestCase):
 
         # Try when path is not found
         rv = cb.retrieve_in(key, 'path2')
-        self.assertRaises(E.SubdocPathNotFoundError, rv.__getitem__, 0)
-        self.assertRaises(E.SubdocPathNotFoundError, rv.__getitem__, 'path2')
+        self.assertRaises(E.PathNotFoundException, rv.__getitem__, 0)
+        self.assertRaises(E.PathNotFoundException, rv.__getitem__, 'path2')
 
         # Try when there is a mismatch
-        self.assertRaises(E.SubdocPathMismatchError,
+        self.assertRaises(E.SubdocPathMismatchException,
                           cb.retrieve_in, key, 'path1[0]')
 
         # Try existence
@@ -49,7 +49,7 @@ class SubdocTest(ConnectionTestCase):
 
         # Not found
         result = cb.lookup_in(key, SD.exists('p'))
-        self.assertEqual(E.SubdocPathNotFoundError.CODE, result.get(0)[0])
+        self.assertEqual(E.PathNotFoundException.CODE, result.get(0)[0])
 
         # Ensure that we complain about a missing path
         self.assertRaises((IndexError, KeyError), result.get, 33)
@@ -63,15 +63,15 @@ class SubdocTest(ConnectionTestCase):
         # Insert a non-JSON document
         bkey = self.gen_key('sdget_nonjson')
         cb.upsert(bkey, 'value', format=FMT_UTF8)
-        self.assertRaises(E.DocumentNotJsonError,
+        self.assertRaises(E.DocumentNotJsonException,
                           cb.lookup_in, bkey, SD.exists('path'))
 
         # Empty paths fail for get_in
-        #self.assertRaises(E.SubdocEmptyPathError,
+        #self.assertRaises(E.SubdocEmptyPathException,
         #                  cb.retrieve_in, key, '')
 
         # Try on non-existing document. Should fail
-        self.assertRaises(E.NotFoundError,
+        self.assertRaises(E.DocumentNotFoundException,
                           cb.retrieve_in, 'non-exist', 'path')
 
     def test_mutate_in(self):
@@ -84,7 +84,7 @@ class SubdocTest(ConnectionTestCase):
         self.assertEqual(['hello'], result[0])
 
         # Create deep path without create_parents
-        self.assertRaises(E.SubdocPathNotFoundError,
+        self.assertRaises(E.PathNotFoundException,
                           cb.mutate_in, key,
                           SD.upsert('path.with.missing.parents', 'value'))
 
@@ -96,7 +96,7 @@ class SubdocTest(ConnectionTestCase):
 
         # Test CAS operations
         self.assertTrue(result.cas)
-        self.assertRaises(E.KeyExistsError, cb.mutate_in,
+        self.assertRaises(E.DocumentExistsException, cb.mutate_in,
                           key, SD.upsert('newDict', None), cas=result.cas+1)
 
         # Try it again, using the CAS
@@ -104,7 +104,7 @@ class SubdocTest(ConnectionTestCase):
         self.assertNotEqual(result.cas, result2.cas)
 
         # Test insert, should fail
-        self.assertRaises(E.SubdocPathExistsError, cb.mutate_in,
+        self.assertRaises(E.PathExistsException, cb.mutate_in,
                           key, SD.insert('newDict', {}))
 
         # Test insert on new path, should succeed
@@ -116,7 +116,7 @@ class SubdocTest(ConnectionTestCase):
         self.assertEqual('World', cb.retrieve_in(key, 'newDict')[0]['Hello'])
 
         # Test replace with missing value, should fail
-        self.assertRaises(E.SubdocPathNotFoundError,
+        self.assertRaises(E.PathNotFoundException,
                           cb.mutate_in, key, SD.replace('nonexist', {}))
 
         # Test with empty string (should be OK)
@@ -129,15 +129,15 @@ class SubdocTest(ConnectionTestCase):
 
         # Test with empty path. Should throw some kind of error?
         self.assertRaises(
-            (E.SubdocPathInvalidError),
+            (E.SubdocPathInvalidException),
             cb.mutate_in, key, SD.upsert('', {}))
 
         cb.mutate_in(key, SD.upsert('array', [1, 2, 3]))
-        self.assertRaises(E.SubdocPathMismatchError, cb.mutate_in, key,
+        self.assertRaises(E.SubdocPathMismatchException, cb.mutate_in, key,
                           SD.upsert('array.newKey', 'newVal'))
-        self.assertRaises(E.SubdocPathInvalidError, cb.mutate_in, key,
+        self.assertRaises(E.SubdocPathInvalidException, cb.mutate_in, key,
                           SD.upsert('array[0]', 'newVal'))
-        self.assertRaises(E.SubdocPathNotFoundError, cb.mutate_in, key,
+        self.assertRaises(E.PathNotFoundException, cb.mutate_in, key,
                           SD.upsert('array[3].bleh', 'newVal'))
 
     def test_counter_in(self):
@@ -150,16 +150,16 @@ class SubdocTest(ConnectionTestCase):
         self.assertFalse(rv.cas == 0)
         self.assertEqual(100, rv[0])
 
-        self.assertRaises(E.SubdocBadDeltaError, cb.mutate_in, key,
+        self.assertRaises(E.SubdocBadDeltaException, cb.mutate_in, key,
                           SD.counter('not_a_counter', 'blah'))
 
         # Do an upsert
         cb.mutate_in(key, SD.upsert('not_a_counter', 'blah'))
 
-        self.assertRaises(E.SubdocPathMismatchError, cb.mutate_in, key,
+        self.assertRaises(E.SubdocPathMismatchException, cb.mutate_in, key,
                           SD.counter('not_a_counter', 25))
 
-        self.assertRaises(E.SubdocPathNotFoundError, cb.mutate_in, key,
+        self.assertRaises(E.PathNotFoundException, cb.mutate_in, key,
                           SD.counter('path.to.newcounter', 99))
         rv = cb.mutate_in(key,
                           SD.counter('path.to.newcounter', 99, create_parents=True))
@@ -208,9 +208,9 @@ class SubdocTest(ConnectionTestCase):
         self.assertTrue(1 in rvs)
         self.assertTrue('field2' in rvs)
 
-        self.assertEqual((E.SubdocPathNotFoundError.CODE, None),
+        self.assertEqual((E.PathNotFoundException.CODE, None),
                          rvs.get('field3'))
-        self.assertEqual((E.SubdocPathNotFoundError.CODE, None),
+        self.assertEqual((E.PathNotFoundException.CODE, None),
                          rvs.get(2))
         self.assertFalse(rvs.exists('field3'))
         self.assertFalse(rvs.exists(2))
@@ -218,16 +218,16 @@ class SubdocTest(ConnectionTestCase):
         def _getix(rv_, ix):
             return rv_[ix]
 
-        self.assertRaises(E.SubdocPathNotFoundError, _getix, rvs, 2)
-        self.assertRaises(E.SubdocPathNotFoundError, _getix, rvs, 'field3')
+        self.assertRaises(E.PathNotFoundException, _getix, rvs, 2)
+        self.assertRaises(E.PathNotFoundException, _getix, rvs, 'field3')
         self.assertFalse(rvs.exists('field3'))
 
         # See what happens when we mix operations
-        self.assertRaises(E.CouchbaseError, cb.lookup_in, key,
+        self.assertRaises(E.CouchbaseException, cb.lookup_in, key,
                           SD.get('field1'), SD.insert('a', 'b'))
 
         # Empty path (invalid)
-        self.assertRaises(E.CouchbaseError, cb.lookup_in, SD.get(''))
+        self.assertRaises(E.CouchbaseException, cb.lookup_in, SD.get(''))
 
     def test_multi_value(self):
         cb = self.cb
@@ -259,14 +259,14 @@ class SubdocTest(ConnectionTestCase):
         self.assertTrue(vals.success)
         it = iter(vals)
         self.assertEqual(1, next(it))
-        self.assertRaises(E.SubdocPathNotFoundError, next, it)
+        self.assertRaises(E.PathNotFoundException, next, it)
 
     def test_access_ok(self):
         cb = self.cb
         key = self.gen_key('non-exist')
         try:
             cb.lookup_in(key, SD.get('pth1'), quiet=True)
-        except E.NotFoundError as e:
+        except E.DocumentNotFoundException as e:
             rv = e.all_results[key]
             self.assertFalse(rv.access_ok)
 
@@ -292,7 +292,7 @@ class SubdocTest(ConnectionTestCase):
 
         # Check 'insert_doc'
 
-        self.assertRaises(E.KeyExistsError, cb.mutate_in,key, SD.upsert('new.path', 'newval'), insert_doc=True)
+        self.assertRaises(E.DocumentExistsException, cb.mutate_in, key, SD.upsert('new.path', 'newval'), insert_doc=True)
         cb.remove(key)
 
         cb.mutate_in(key, SD.upsert('new.path', 'newval'), insert_doc=True)

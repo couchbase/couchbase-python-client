@@ -15,7 +15,7 @@
 #
 
 from couchbase_v2.bucket import Bucket
-from couchbase_core.exceptions import KeyExistsError
+from couchbase.exceptions import DocumentExistsException
 
 
 # Connect to the default bucket on local host
@@ -38,7 +38,7 @@ try:
     # An exception will be raised if the CAS doesn't match
     wrong_cas = cas + 123
     cb.upsert('first', {'hello': 'world', 'additional': True}, cas=wrong_cas)
-except KeyExistsError:
+except DocumentExistsException:
     # Get the correct current CAS value
     rv = cb.get('first')
     item, flags, correct_cas = rv.value, rv.flags, rv.cas

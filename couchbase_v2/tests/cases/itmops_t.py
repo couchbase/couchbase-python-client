@@ -18,7 +18,7 @@
 from couchbase_tests.base import ConnectionTestCase
 from couchbase_core.items import Item, ItemSequence, ItemOptionDict
 from couchbase_v2.exceptions import (
-    NotFoundError, ValueFormatError, ArgumentError, KeyExistsError)
+    DocumentNotFoundException, ValueFormatException, ArgumentException, KeyExistsException)
 from couchbase_core.user_constants import FMT_BYTES, FMT_UTF8
 
 class ItemTest(ConnectionTestCase):
@@ -67,7 +67,7 @@ class ItemTest(ConnectionTestCase):
         # Now, delete it
         self.cb.remove_multi(itcoll)
 
-        self.assertRaises(NotFoundError,
+        self.assertRaises(DocumentNotFoundException,
                           self.cb.get_multi, itcoll)
 
     def test_item_format(self):
@@ -76,7 +76,7 @@ class ItemTest(ConnectionTestCase):
         it = Item(k, {})
         itcoll = ItemOptionDict()
         itcoll.dict[it] = { "format" : FMT_BYTES }
-        self.assertRaises(ValueFormatError, self.cb.upsert_multi, itcoll)
+        self.assertRaises(ValueFormatException, self.cb.upsert_multi, itcoll)
 
     def test_items_append(self):
         k = self.gen_key("itm_append")
@@ -98,10 +98,10 @@ class ItemTest(ConnectionTestCase):
         self.assertEqual(rv.value, "BEGIN_MIDDLE_END")
 
         # Try without a 'fragment' specifier
-        self.assertRaises(ArgumentError,
+        self.assertRaises(ArgumentException,
                           self.cb.append_items, ItemSequence([it]))
         itcoll.add(it)
-        self.assertRaises(ArgumentError,
+        self.assertRaises(ArgumentException,
                           self.cb.append_items, itcoll)
 
     def test_items_ignorecas(self):
@@ -118,7 +118,7 @@ class ItemTest(ConnectionTestCase):
         self.assertFalse(rv.cas == it.cas)
 
         # Should raise an error without ignore_cas
-        self.assertRaises(KeyExistsError, self.cb.upsert_multi, itcoll)
+        self.assertRaises(KeyExistsException, self.cb.upsert_multi, itcoll)
         self.assertTrue(it.cas)
 
         itcoll.add(it, ignore_cas=True)
@@ -141,7 +141,7 @@ class ItemTest(ConnectionTestCase):
         it = MyItem()
         it.key = k
         it.value = "hi!"
-        self.assertRaises(ArgumentError,
+        self.assertRaises(ArgumentException,
                           self.cb.upsert_multi,
                           ItemSequence([it]))
 
@@ -159,9 +159,9 @@ class ItemTest(ConnectionTestCase):
     def test_invalid_item(self):
         itcoll = ItemOptionDict()
         itcoll.add(None)
-        self.assertRaises(ArgumentError, self.cb.upsert_multi, itcoll)
+        self.assertRaises(ArgumentException, self.cb.upsert_multi, itcoll)
 
-        self.assertRaises(ArgumentError,
+        self.assertRaises(ArgumentException,
                           self.cb.upsert_multi, ItemSequence([None]))
 
     def test_create_and_add(self):
@@ -196,4 +196,4 @@ class ItemTest(ConnectionTestCase):
     def test_pycbc366(self):
         itcoll = ItemOptionDict()
         itcoll.create_and_add('foo', replica=True)
-        self.assertRaises(ArgumentError, self.cb.get_multi, itcoll)
+        self.assertRaises(ArgumentException, self.cb.get_multi, itcoll)

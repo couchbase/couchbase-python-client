@@ -1,5 +1,5 @@
 from .fixtures import asynct, AioTestCase
-from couchbase_core.exceptions import CouchbaseError
+from couchbase.exceptions import CouchbaseException
 from unittest import SkipTest
 
 
@@ -8,7 +8,7 @@ class CouchbasePy35Test(AioTestCase):
     def setUp(self):
         try:
             super(CouchbasePy35Test,self).setUp(bucket='beer-sample', type="Bucket")
-        except CouchbaseError as e:
+        except CouchbaseException as e:
             raise SkipTest("Need 'beer-sample' bucket for this")
 
     @asynct

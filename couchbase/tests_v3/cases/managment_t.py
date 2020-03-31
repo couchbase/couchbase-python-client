@@ -2,7 +2,7 @@ import os
 from unittest import SkipTest
 
 from couchbase import CBCollection
-from couchbase.exceptions import CouchbaseError, BucketDoesNotExistException, BucketAlreadyExistsException
+from couchbase.exceptions import CouchbaseException, BucketDoesNotExistException, BucketAlreadyExistsException
 from couchbase_core.connstr import ConnectionString
 from couchbase.management.buckets import CreateBucketSettings, BucketSettings
 from couchbase_tests.base import CollectionTestCase
@@ -60,7 +60,7 @@ class BucketManagementTests(CollectionTestCase):
         try:
             # Remove the bucket, if it exists
             self.bm.drop_bucket('dummy')
-        except CouchbaseError:
+        except CouchbaseException:
             pass
 
         # Need to explicitly enable admin tests..
@@ -80,7 +80,7 @@ class BucketManagementTests(CollectionTestCase):
         args['bucket'] = dummy_bucket
         self.factory(connstr, **args)
         # OK, it exists
-        self.assertRaises(CouchbaseError, self.factory, connstr)
+        self.assertRaises(CouchbaseException, self.factory, connstr)
 
         # Change the password
 
@@ -94,4 +94,4 @@ class BucketManagementTests(CollectionTestCase):
         self.try_n_times(10, 3, get_bucket_ttl_equal, 'dummy', 500)
         # Remove the bucket
         self.bm.drop_bucket('dummy')
-        self.assertRaises(CouchbaseError, self.factory, connstr)
+        self.assertRaises(CouchbaseException, self.factory, connstr)

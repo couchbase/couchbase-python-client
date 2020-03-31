@@ -17,7 +17,7 @@
 
 from couchbase_tests.base import ViewTestCase
 from couchbase_core.user_constants import FMT_JSON
-from couchbase_v2.exceptions import HTTPError, NotSupportedError
+from couchbase_v2.exceptions import HTTPException, NotSupportedException
 from couchbase_v2.bucket import Bucket
 
 from couchbase_core.auth_domain import AuthDomain
@@ -128,7 +128,7 @@ class ViewTest(ViewTestCase):
             self.assertTrue(row['key'] in jkey_pure)
 
     def test_missing_view(self):
-        self.assertRaises(HTTPError,
+        self.assertRaises(HTTPException,
                           self.cb._view,
                           "nonexist", "designdoc")
 
@@ -151,7 +151,7 @@ class ViewTest(ViewTestCase):
             admin.bucket_create(name=bucket_name,
                                      bucket_type='ephemeral',
                                      ram_quota=100)
-        except HTTPError:
+        except HTTPException:
             raise SkipTest("Unable to provision ephemeral bucket")
         try:
             admin.user_upsert(AuthDomain.Local, userid, password, roles)
@@ -159,7 +159,7 @@ class ViewTest(ViewTestCase):
             conn_str = "couchbase://{0}/{1}".format(self.cluster_info.host, bucket_name)
             bucket = Bucket(connection_string=conn_str,username=userid,password=password)
             self.assertIsNotNone(bucket)
-            self.assertRaisesRegex(NotSupportedError, "Ephemeral", lambda: bucket.query("beer", "brewery_beers", streaming=True, limit=100))
+            self.assertRaisesRegex(NotSupportedException, "Ephemeral", lambda: bucket.query("beer", "brewery_beers", streaming=True, limit=100))
         finally:
             admin.bucket_delete(bucket_name)
             admin.user_remove(AuthDomain.Local, userid)

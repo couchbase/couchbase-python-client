@@ -16,7 +16,7 @@
 from twisted.internet import defer
 
 from txcouchbase.cluster import BatchedView, TxBucket, BatchedViewResult
-from couchbase_core.exceptions import HTTPError
+from couchbase.exceptions import HTTPException
 from couchbase_core.asynchronous.view import AsyncViewBase
 
 from couchbase_tests.base import ViewTestCase
@@ -70,7 +70,7 @@ class TxViewsTests(gen_base(ViewTestCase)):
     def testBadView(self):
         cb = self.make_connection()
         d = cb.view_query('blah', 'blah_blah')
-        self.assertFailure(d, HTTPError)
+        self.assertFailure(d, HTTPException)
         return d
 
     def testIncrementalRows(self):

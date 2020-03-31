@@ -18,8 +18,8 @@
 from couchbase_tests.base import CollectionTestCase, SkipTest
 from couchbase.management.analytics import CreateDataverseOptions, DropDataverseOptions, CreateDatasetOptions, \
     CreateAnalyticsIndexOptions, DropAnalyticsIndexOptions, DropDatasetOptions, ConnectLinkOptions
-from couchbase_core.exceptions import CouchbaseError, DataverseAlreadyExistsException, DataverseNotFoundException, \
-    DatasetAlreadyExistsException, DatasetNotFoundException, NotSupportedError
+from couchbase.exceptions import CouchbaseException, DataverseAlreadyExistsException, DataverseNotFoundException, \
+    DatasetAlreadyExistsException, DatasetNotFoundException, NotSupportedException
 from couchbase.analytics import AnalyticsDataType
 import time
 
@@ -163,6 +163,6 @@ class AnalyticsIndexManagerTests(CollectionTestCase):
             result = self.mgr.get_pending_mutations()
             print(result)
             self.assertTrue("test_dataverse" in result.keys())
-        except NotSupportedError:
+        except NotSupportedException:
             raise SkipTest("get pending mutations not supported on this cluster")
 

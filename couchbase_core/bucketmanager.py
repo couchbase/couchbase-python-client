@@ -20,10 +20,10 @@ import time
 from datetime import timedelta, datetime
 
 import couchbase_core._libcouchbase as _LCB
-import couchbase_core.exceptions as exceptions
+import couchbase.exceptions as exceptions
 from couchbase_core import syncwait_or_deadline_time
 from couchbase_core.client import Client
-from couchbase_core.exceptions import CouchbaseError, ArgumentError
+from couchbase.exceptions import CouchbaseException, ArgumentException
 from couchbase_core.views.params import Query, SpatialQuery, STALE_OK
 from couchbase_core._pyport import single_dict_key
 from couchbase_core._ixmgmt import IxmgmtRequest, N1qlIndex, N1QL_PRIMARY_INDEX
@@ -105,7 +105,7 @@ class BucketManager(object):
             return True
 
         if timeout < 0:
-            raise ArgumentError.pyexc("Interval must not be negative")
+            raise ArgumentException.pyexc("Interval must not be negative")
 
         t_end = time.time() + timeout
         old_rev = None
@@ -125,15 +125,15 @@ class BucketManager(object):
                         continue
                     return True
 
-                except CouchbaseError:
+                except CouchbaseException:
                     continue
 
-            except CouchbaseError:
+            except CouchbaseException:
                 if mode == 'del':
                     # Deleted, whopee!
                     return True
 
-        raise exceptions.TimeoutError.pyexc(
+        raise exceptions.TimeoutException.pyexc(
             "Wait time for design action completion exceeded")
 
     def design_create(self, name, ddoc, use_devmode=True, syncwait=0):
@@ -162,7 +162,7 @@ class BucketManager(object):
             ensures the client polls during this interval to ensure the
             operation has completed.
 
-        :raise: :exc:`couchbase_core.exceptions.TimeoutError` if ``syncwait`` was
+        :raise: :exc:`couchbase.exceptions.TimeoutException` if ``syncwait`` was
             specified and the operation could not be verified within the
             interval specified.
 
@@ -187,7 +187,7 @@ class BucketManager(object):
         if syncwait:
             try:
                 existing = self.design_get(name, use_devmode=False)
-            except CouchbaseError:
+            except CouchbaseException:
                 pass
 
         ret = client._http_request(
@@ -210,7 +210,7 @@ class BucketManager(object):
         :return: A :class:`~couchbase_core.result.HttpResult` containing
             a dict representing the format of the design document
 
-        :raise: :exc:`couchbase_core.exceptions.HTTPError` if the design does not
+        :raise: :exc:`couchbase.exceptions.HTTPException` if the design does not
             exist.
 
         .. seealso:: :meth:`design_create`, :meth:`design_list`
@@ -245,7 +245,7 @@ class BucketManager(object):
 
         :return: An :class:`~couchbase_core.result.HttpResult` object.
 
-        :raise: :exc:`couchbase_core.exceptions.HTTPError` if the design does not
+        :raise: :exc:`couchbase.exceptions.HTTPException` if the design does not
             exist
 
         .. seealso:: :meth:`design_create`, :meth:`design_delete`,
@@ -277,9 +277,9 @@ class BucketManager(object):
 
         :return: An :class:`HttpResult` object.
 
-        :raise: :exc:`couchbase_core.exceptions.HTTPError` if the design does not
+        :raise: :exc:`couchbase.exceptions.HTTPException` if the design does not
             exist
-        :raise: :exc:`couchbase_core.exceptions.TimeoutError` if ``syncwait`` was
+        :raise: :exc:`couchbase.exceptions.TimeoutException` if ``syncwait`` was
             specified and the operation could not be verified within the
             specified interval.
 
@@ -291,7 +291,7 @@ class BucketManager(object):
         if syncwait:
             try:
                 existing = self.design_get(name, use_devmode=False)
-            except CouchbaseError:
+            except CouchbaseException:
                 pass
 
         ret = self._http_request(type=_LCB.LCB_HTTP_TYPE_VIEW,
@@ -395,7 +395,7 @@ class BucketManager(object):
             must be empty.
         :param str condition: Specify a condition for indexing. Using
             a condition reduces an index size
-        :raise: :exc:`~.KeyExistsError` if the index already exists
+        :raise: :exc:`~.DocumentExistsException` if the index already exists
 
         .. seealso:: :meth:`n1ql_index_create_primary`
         """
@@ -454,7 +454,7 @@ class BucketManager(object):
         :param bool primary: if this index is a primary index
         :param bool ignore_missing: Do not raise an exception if the index
             does not exist
-        :raise: :exc:`~.NotFoundError` if the index does not exist and
+        :raise: :exc:`~.QueryIndexNotFoundException` if the index does not exist and
             `ignore_missing` was not specified
         """
         info = BucketManager._mk_index_def(self._bucketname, ix, primary)
@@ -536,9 +536,9 @@ class BucketManager(object):
         :param bool watch_primary: Whether to also watch the primary index.
             This parameter should only be used when manually constructing a
             list of string indexes
-        :raise: :exc:`~.TimeoutError` if the timeout was reached before all
+        :raise: :exc:`~.TimeoutException` if the timeout was reached before all
             indexes were built
-        :raise: :exc:`~.NotFoundError` if one of the indexes passed no longer
+        :raise: :exc:`~.QueryIndexNotFoundException` if one of the indexes passed no longer
             exists.
         """
         kwargs = {

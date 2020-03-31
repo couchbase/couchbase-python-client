@@ -17,7 +17,7 @@
 from couchbase_tests.base import CollectionTestCase, SkipTest
 from couchbase_core._libcouchbase import FMT_UTF8, FMT_BYTES
 from couchbase.collection import IncrementOptions, DecrementOptions, DeltaValue, SignedInt64
-from couchbase.exceptions import ArgumentError, NotStoredError
+from couchbase.exceptions import ArgumentException, NotStoredException
 
 class BinaryCollectionTests(CollectionTestCase):
     def setUp(self):
@@ -45,12 +45,12 @@ class BinaryCollectionTests(CollectionTestCase):
     def test_append_string_nokey(self):
         self.coll.remove(self.UTF8_KEY)
         self.try_n_times_till_exception(10, 1, self.coll.get, self.UTF8_KEY)
-        self.assertRaises(NotStoredError, self.coll.binary().append, self.UTF8_KEY, "foo")
+        self.assertRaises(NotStoredException, self.coll.binary().append, self.UTF8_KEY, "foo")
 
     def test_prepend_string_nokey(self):
         self.coll.remove(self.UTF8_KEY)
         self.try_n_times_till_exception(10, 1, self.coll.get, self.UTF8_KEY)
-        self.assertRaises(NotStoredError, self.coll.binary().prepend, self.UTF8_KEY, "foo")
+        self.assertRaises(NotStoredException, self.coll.binary().prepend, self.UTF8_KEY, "foo")
 
     def test_append_string(self):
         result = self.coll.binary().append(self.UTF8_KEY, "foo")
@@ -125,13 +125,13 @@ class BinaryCollectionTests(CollectionTestCase):
         self.assertEqual(97, self.coll.get(self.COUNTER_KEY).content_as[int])
 
     def test_unsigned_int(self):
-        self.assertRaises(ArgumentError, DeltaValue, -1)
-        self.assertRaises(ArgumentError, DeltaValue, 0x7FFFFFFFFFFFFFFF + 1)
+        self.assertRaises(ArgumentException, DeltaValue, -1)
+        self.assertRaises(ArgumentException, DeltaValue, 0x7FFFFFFFFFFFFFFF + 1)
         self.assertEqual(5, DeltaValue(5).value)
 
     def test_signed_int_64(self):
-        self.assertRaises(ArgumentError, SignedInt64, -0x7FFFFFFFFFFFFFFF-2)
-        self.assertRaises(ArgumentError, SignedInt64, 0x7FFFFFFFFFFFFFFF + 1)
+        self.assertRaises(ArgumentException, SignedInt64, -0x7FFFFFFFFFFFFFFF - 2)
+        self.assertRaises(ArgumentException, SignedInt64, 0x7FFFFFFFFFFFFFFF + 1)
         x = SignedInt64(0x7FFFFFFFFFFFFFFF)
         self.assertEqual(0x7FFFFFFFFFFFFFFF, x.value)
         x = SignedInt64(-0x7FFFFFFFFFFFFFFF-1)

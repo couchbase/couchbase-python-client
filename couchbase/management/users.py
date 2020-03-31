@@ -7,17 +7,16 @@ from couchbase_core import mk_formstr, JSONMapping, Mapped
 from couchbase_core.auth_domain import AuthDomain
 from couchbase_core._pyport import ulp, with_metaclass, Protocol
 from couchbase_core import ABCMeta
-from couchbase_core.exceptions import HTTPError
 from typing import *
 from couchbase.options import OptionBlockTimeOut
-from couchbase_core.exceptions import ErrorMapper, NotSupportedWrapper
+from couchbase.exceptions import HTTPException, ErrorMapper, NotSupportedWrapper
 
 
-class GroupNotFoundException(HTTPError):
+class GroupNotFoundException(HTTPException):
     """ The RBAC Group was not found"""
 
 
-class UserNotFoundException(HTTPError):
+class UserNotFoundException(HTTPException):
     """ The RBAC User was not found"""
 
 
@@ -25,7 +24,7 @@ class UserErrorHandler(ErrorMapper):
     @staticmethod
     def mapping():
         # type (...)->Mapping[str, CBErrorType]
-        return {HTTPError: {'Unknown group': GroupNotFoundException,
+        return {HTTPException: {'Unknown group': GroupNotFoundException,
                             'Unknown user': UserNotFoundException}}
 
 

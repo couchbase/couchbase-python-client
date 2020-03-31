@@ -15,9 +15,9 @@
 
 from couchbase.management.collections import CollectionSpec
 from couchbase_tests.base import SkipTest, CollectionTestCase
-from couchbase.exceptions import ScopeNotFoundException, ScopeAlreadyExistsException, CollectionAlreadyExistsException, CollectionNotFoundException
+from couchbase.exceptions import NotSupportedException, ScopeNotFoundException, ScopeAlreadyExistsException, \
+    CollectionAlreadyExistsException, CollectionNotFoundException
 from couchbase.management.buckets import CreateBucketSettings
-from couchbase_core.exceptions import NotSupportedError
 from datetime import timedelta
 import time
 
@@ -29,7 +29,7 @@ class CollectionManagerTestCase(CollectionTestCase):
         # SkipTest if collections not supported
         try:
           self.bucket.collections().get_all_scopes()
-        except NotSupportedError:
+        except NotSupportedException:
           raise SkipTest('cluster does not support collections')
 
         # Need this so we use RBAC.
@@ -46,7 +46,7 @@ class CollectionManagerTestCase(CollectionTestCase):
         self.try_n_times_till_exception(10, 1, self.bm.get_bucket, 'other-bucket')
 
         # now re-create it fresh (maybe we could just flush, but we may test settings which would not be flushed)
-        self.bm.create_bucket(CreateBucketSettings(name='other-bucket', bucket_type='couchbase', ram_quota_mb=100))
+        self.try_n_times(10, 1, self.bm.create_bucket, CreateBucketSettings(name='other-bucket', bucket_type='couchbase', ram_quota_mb=100))
         self.try_n_times(10, 1, self.bm.get_bucket, 'other-bucket')
         # TODO: we need to wait till the bucket is ready - getting the bucket settings apparently isn't sufficient
         time.sleep(5)

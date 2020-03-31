@@ -20,7 +20,7 @@ from enum import Enum
 from couchbase.options import forward_args
 from couchbase_core._pyport import *
 from couchbase_core.client import Client
-from couchbase_core.exceptions import HTTPError, ErrorMapper, DictMatcher
+from couchbase.exceptions import HTTPException, ErrorMapper, DictMatcher
 from couchbase.options import OptionBlockTimeOut
 import couchbase_core._libcouchbase as _LCB
 import json
@@ -43,7 +43,7 @@ class DesignDocumentNamespace(Enum):
 
 
 
-class DesignDocumentNotFoundException(HTTPError):
+class DesignDocumentNotFoundException(HTTPException):
     pass
 
 
@@ -51,7 +51,7 @@ class ViewErrorHandler(ErrorMapper):
     @staticmethod
     def mapping():
         # type (...) -> Mapping[CBErrorType, Mapping[Any,CBErrorType]]
-        return { HTTPError: {'not_found': DesignDocumentNotFoundException}}
+        return {HTTPException: {'not_found': DesignDocumentNotFoundException}}
 
 
 class GetDesignDocumentOptions(OptionBlockTimeOut):

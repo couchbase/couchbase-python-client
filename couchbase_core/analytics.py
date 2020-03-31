@@ -17,10 +17,9 @@
 from couchbase_core._libcouchbase import FMT_JSON
 
 import couchbase_core.n1ql as N
-import couchbase_core.exceptions
 import couchbase_core._libcouchbase as LCB
 import time
-from couchbase_core.exceptions import CouchbaseInternalError
+from couchbase.exceptions import CouchbaseInternalException
 try:
     import urlparse
 except:
@@ -76,7 +75,7 @@ class AnalyticsQuery(N.N1QLQuery):
             AnalyticsQuery('SELECT VALUE bw FROM breweries bw WHERE bw.name IN ?',
                       "[\\"Kona Brewing\\",\\"21st Amendment Brewery Cafe\\"]")
         Since the placeholders are serialized to JSON internally anyway.
-        
+
         """
         querystr = querystr.rstrip()
         if not querystr.endswith(';'):
@@ -86,14 +85,14 @@ class AnalyticsQuery(N.N1QLQuery):
     def update(self, *args, **kwargs):
         if args:
             if 'args' in self._body:
-                raise couchbase_core.exceptions.ArgumentError(
+                raise couchbase.exceptions.ArgumentException(
                     "Cannot append positional args to existing query positional args")
             else:
                 self._add_pos_args(args)
         if kwargs:
             overlapping_keys = set(kwargs.keys()) & set(self._body.keys())
             if overlapping_keys:
-                raise couchbase_core.exceptions.ArgumentError("Cannot overwrite named args in query")
+                raise couchbase.exceptions.ArgumentException("Cannot overwrite named args in query")
             else:
                 self._set_named_args(**kwargs)
 
@@ -192,7 +191,7 @@ class DeferredAnalyticsRequest(AnalyticsRequest):
         handle = handle_req.meta.get('handle')
 
         if not handle:
-            raise CouchbaseInternalError("Endpoint does not support deferred queries")
+            raise CouchbaseInternalException("Endpoint does not support deferred queries")
 
         self.parent = parent
         self._final_response = None
@@ -219,10 +218,10 @@ class DeferredAnalyticsRequest(AnalyticsRequest):
             if result=='success':
                 return True
             if result=='failed':
-                raise couchbase_core.exceptions.InternalError("Failed exception")
+                raise couchbase.exceptions.InternalException("Failed exception")
             time.sleep(self.interval)
 
-        raise couchbase_core.exceptions.TimeoutError("Deferred query timed out")
+        raise couchbase.exceptions.TimeoutException("Deferred query timed out")
 
     class MRESWrapper:
         def __init__(self, response):
@@ -255,15 +254,15 @@ class DeferredAnalyticsRequest(AnalyticsRequest):
         except Exception as e:
             pass
         if status == 'failed':
-            raise couchbase_core.exceptions.InternalError("Deferred Query Failed")
+            raise couchbase.exceptions.InternalException("Deferred Query Failed")
         if status == 'success':
             response_handle = response_value.get('handle')
             if not response_handle:
-                raise couchbase_core.exceptions.InternalError("Got success but no handle from deferred query response")
+                raise couchbase.exceptions.InternalException("Got success but no handle from deferred query response")
             try:
                 parsed_response_handle = urlparse.urlparse(response_handle)
             except Exception as e:
-                raise couchbase_core.exceptions.InternalError("Got invalid url: {}".format(e))
+                raise couchbase.exceptions.InternalException("Got invalid url: {}".format(e))
             final_response = self.parent._http_request(type=LCB.LCB_HTTP_TYPE_CBAS,
                                                        method=LCB.LCB_HTTP_METHOD_GET,
                                                        path=parsed_response_handle.path,

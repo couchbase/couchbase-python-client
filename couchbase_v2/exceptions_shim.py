@@ -1,1 +1,1 @@
-from couchbase_core.exceptions import *
+from couchbase.exceptions import *

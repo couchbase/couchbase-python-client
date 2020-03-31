@@ -19,21 +19,21 @@ import weakref
 
 from .client import Client
 from .connstr import ConnectionString
-from .exceptions import CouchbaseError
+from  couchbase.exceptions import CouchbaseException
 import itertools
 from collections import defaultdict
 import warnings
 from typing import *
 
 
-class MixedAuthError(CouchbaseError):
+class MixedAuthException(CouchbaseException):
     """
     Cannot use old and new style auth together in the same cluster
     """
     pass
 
 
-class NoBucketError(CouchbaseError):
+class NoBucketException(CouchbaseException):
     """
     Operation requires at least a single bucket to be open
     """
@@ -133,7 +133,7 @@ class _Cluster(object):
 
         if 'password' in kwargs:
             if isinstance(self.authenticator, PasswordAuthenticator):
-                raise MixedAuthError("Cannot override "
+                raise MixedAuthException("Cannot override "
                                      "PasswordAuthenticators password")
         else:
             kwargs['password'] = auth_credentials.get('password', None)
@@ -191,13 +191,13 @@ class _Cluster(object):
 
         def assert_no_critical_complaints(self):
             if self.critical_complaints:
-                raise MixedAuthError(str(self.critical_complaints))
+                raise MixedAuthException(str(self.critical_complaints))
 
         def check_no_unwanted_keys(self):
             """
             Check for definitely unwanted keys in any of the options
             for the active authentication type in use and
-            throw a MixedAuthError if found.
+            throw a MixedAuthException if found.
             """
             unwanted_keys = self.auth_type.unwanted_keys() if self.auth_type else set()
 
@@ -206,7 +206,7 @@ class _Cluster(object):
 
         def check_clash_free_params(self):
             """
-            Check for clashes with the authenticator in use, and thrown a MixedAuthError if found.
+            Check for clashes with the authenticator in use, and thrown a MixedAuthException if found.
             """
             auth_clashes = self.clash_dict.get('auth_credential')
             if auth_clashes:
@@ -323,7 +323,7 @@ class _Cluster(object):
         for k in to_purge:
             del self._buckets[k]
 
-        raise NoBucketError('Must have at least one active bucket for query')
+        raise NoBucketException('Must have at least one active bucket for query')
 
 
 def _recursive_creds_merge(base, overlay):

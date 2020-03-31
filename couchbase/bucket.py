@@ -150,7 +150,7 @@ class Bucket(CoreClientDatastructureWrap):
         :param boolean quiet: the flag controlling whether to raise an
             exception when the client executes operations on
             non-existent keys. If it is `False` it will raise
-            :exc:`.NotFoundError` exceptions. When
+            :exc:`.DocumentNotFoundException` exceptions. When
             set to `True` the operations will return `None` silently.
 
         :param boolean unlock_gil: If set (which is the default), the
@@ -178,13 +178,13 @@ class Bucket(CoreClientDatastructureWrap):
             to propagate any tracing information. Requires
             tracing to be enabled.
 
-        :raise: :exc:`.BucketNotFoundError` or :exc:`.AuthError` if
+        :raise: :exc:`.BucketNotFoundException` or :exc:`.AuthenticationException` if
             there is no such bucket to connect to, or if invalid
             credentials were supplied.
-        :raise: :exc:`.CouchbaseNetworkError` if the socket wasn't
+        :raise: :exc:`.CouchbaseNetworkException` if the socket wasn't
             accessible (doesn't accept connections or doesn't respond
             in
-        :raise: :exc:`.InvalidError` if the connection string
+        :raise: :exc:`.InvalidException` if the connection string
             was malformed.
 
         :return: instance of :class:`~couchbase.bucket.Bucket`
@@ -285,7 +285,7 @@ class Bucket(CoreClientDatastructureWrap):
         :param (PingOptions) options: Options for sending the ping request.
         :param kwargs: Overrides corresponding value in options.
         :return: PingResult representing the state of all the pinged services.
-        :raise: CouchbaseError for various communication issues.
+        :raise: CouchbaseException for various communication issues.
         """
         return PingResult(super(Bucket,self).ping(**forward_args(kwargs, *options)))
 

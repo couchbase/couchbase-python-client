@@ -15,9 +15,9 @@
 # limitations under the License.
 #
 
-from couchbase_v2.exceptions import ArgumentError
+from couchbase_v2.exceptions import ArgumentException
 
-from couchbase_core.exceptions import  NotSupportedError
+from couchbase.exceptions import  NotSupportedException
 from couchbase_tests.base import ConnectionTestCase
 
 class EmptyKeyTest(ConnectionTestCase):
@@ -40,6 +40,6 @@ class EmptyKeyTest(ConnectionTestCase):
 
         for fn, args in fnargs:
             try:
-                self.assertRaises(ArgumentError, fn, *args)
-            except NotSupportedError:
+                self.assertRaises(ArgumentException, fn, *args)
+            except NotSupportedException:
                 pass

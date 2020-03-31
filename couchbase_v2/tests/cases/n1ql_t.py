@@ -17,8 +17,8 @@
 
 from __future__ import print_function
 
-from couchbase.exceptions import QueryException
-from couchbase_core.exceptions import HTTPError, CouchbaseQueryError
+from couchbase.exceptions import QueryException, CouchbaseException
+from couchbase.exceptions import HTTPException
 
 from couchbase_tests.base import MockTestCase
 from couchbase_v2.n1ql import N1QLQuery
@@ -54,10 +54,9 @@ class N1QLTest(MockTestCase):
     def test_httperror_str(self):
         q = self.cb.n1ql_query('CREATE INDEX abc#123 ON abc (col_1)')
 
-        with self.assertRaises(QueryException) as c:
+        with self.assertRaises(CouchbaseException) as c:
             q.execute()
 
-        self.assertIn(hex(C.LCB_ERR_QUERY_INDEX), str(c.exception))
         ok, failed = c.exception.split_results()
         self.assertTrue(':nokey:' in k for k in failed.keys())
 

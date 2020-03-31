@@ -2,17 +2,19 @@ from ..options import OptionBlockTimeOut, forward_args
 from couchbase.management.admin import Admin, METHMAP
 from typing import *
 from .generic import GenericManager
-from couchbase_core.exceptions import ErrorMapper, HTTPError, NotSupportedError, NotSupportedWrapper
-from couchbase.exceptions import InvalidArgumentsException, SearchIndexNotFoundException
+from couchbase.exceptions import ErrorMapper, HTTPException, NotSupportedException, \
+    InvalidArgumentsException, SearchIndexNotFoundException
 import couchbase_core._libcouchbase as LCB
 import json
+
 
 class SearchIndexErrorHandler(ErrorMapper):
   @staticmethod
   def mapping():
       # type (...)->Mapping[str, CBErrorType]
-      return {HTTPError: {'.*index not found': SearchIndexNotFoundException,
-                          'Page not found': NotSupportedError }}
+      return {HTTPException: {'.*index not found': SearchIndexNotFoundException,
+                          'Page not found': NotSupportedException}}
+
 
 @SearchIndexErrorHandler.wrap
 class SearchIndexManager(GenericManager):
@@ -57,7 +59,7 @@ class SearchIndexManager(GenericManager):
             if the index was not found.
           :exc:`~.InvalidArgumentsException`
             if the arguments were not understood
-          :exc:`~.CouchbaseError`
+          :exc:`~.CouchbaseException`
             for various server errors
         Uri
         GET http://localhost:8094/api/index/<name>"""
@@ -82,7 +84,7 @@ class SearchIndexManager(GenericManager):
     :param Any kwargs: override corresponding value in options
     :return: A list of :class: `~.SearchIndex` objects
     :raise:
-      :exc: `~.CouchbaseError`
+      :exc: `~.CouchbaseException`
         for various server errors
     Uri
     GET http://localhost:8094/api/index
@@ -107,7 +109,7 @@ class SearchIndexManager(GenericManager):
     :raise:
       :exc: `~.InvalidArgumentsException`
         if the arguments were invalid
-      :exc: `~.CouchbaseError`
+      :exc: `~.CouchbaseException`
         for various server errors
     Uri
     PUT http://localhost:8094/api/index/<index_name>"""
@@ -138,7 +140,7 @@ class SearchIndexManager(GenericManager):
     :raise:
       :exc: `~.InvalidArgumentsException`
         if the arguments were invalid
-      :exc: `~.CouchbaseError`
+      :exc: `~.CouchbaseException`
         for various server errors
 
     Uri
@@ -167,7 +169,7 @@ class SearchIndexManager(GenericManager):
     :raise:
       :exc: `~.InvalidArgumentsException`
         if the arguments were invalid
-      :exc: `~.CouchbaseError`
+      :exc: `~.CouchbaseException`
         for various server errors
     Uri
     GET http://localhost:8094/api/index/{index_name}/count
@@ -193,7 +195,7 @@ class SearchIndexManager(GenericManager):
     :raise:
       :exc: `~.InvalidArgumentsException`
         if the arguments were invalid
-      :exc: `~.CouchbaseError`
+      :exc: `~.CouchbaseException`
         for various server errors
     Uri
     POST http://localhost:8094/api/index/{index_name}/ingestControl/pause
@@ -221,7 +223,7 @@ class SearchIndexManager(GenericManager):
     :raise:
       :exc: `~.InvalidArgumentsException`
         if the arguments were invalid
-      :exc: `~.CouchbaseError`
+      :exc: `~.CouchbaseException`
         for various server errors
     Uri
     POST http://localhost:8094/api/index/{index_name}/ingestControl/resume
@@ -251,7 +253,7 @@ class SearchIndexManager(GenericManager):
         if the index doesn't exist
       :exc: `~.InvalidArgumentsException`
         if the arguments were invalid
-      :exc: `~.CouchbaseError`
+      :exc: `~.CouchbaseException`
         for various server errors
     Uri
     POST http://localhost:8094/api/index/{index_name}/queryControl/allow
@@ -280,7 +282,7 @@ class SearchIndexManager(GenericManager):
         if the index doesn't exist
       :exc: `~.InvalidArgumentsException`
         if the arguments were invalid
-      :exc: `~.CouchbaseError`
+      :exc: `~.CouchbaseException`
         for various server errors
     Uri
     POST http://localhost:8094/api/index/{index_name}/queryControl/allow
@@ -309,7 +311,7 @@ class SearchIndexManager(GenericManager):
         if the index doesn't exist
       :exc: `~.InvalidArgumentsException`
         if the arguments were invalid
-      :exc: `~.CouchbaseError`
+      :exc: `~.CouchbaseException`
         for various server errors
     Uri
     POST http://localhost:8094/api/index/{index_name}/planFreezeControl/freeze
@@ -338,7 +340,7 @@ class SearchIndexManager(GenericManager):
         if the index doesn't exist
       :exc: `~.InvalidArgumentsException`
         if the arguments were invalid
-      :exc: `~.CouchbaseError`
+      :exc: `~.CouchbaseException`
         for various server errors
     Uri
     POST http://localhost:8094/api/index/{index_name}/planFreezeControl/unfreeze
@@ -369,7 +371,7 @@ class SearchIndexManager(GenericManager):
         if the index doesn't exist
       :exc: `~.InvalidArgumentsException`
         if the arguments were invalid
-      :exc: `~.CouchbaseError`
+      :exc: `~.CouchbaseException`
         for various server errors
     Uri
     POST http://localhost:8094/api/index/{index_name}/analyzeDoc

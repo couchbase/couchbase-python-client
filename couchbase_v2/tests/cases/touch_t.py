@@ -43,7 +43,7 @@ class TouchTest(ConnectionTestCase):
         self.sleep(2)
         rv = self.cb.get(key, quiet=True)
         self.assertFalse(rv.success)
-        self.assertTrue(E.NotFoundError._can_derive(rv.rc))
+        self.assertTrue(E.DocumentNotFoundException._can_derive(rv.rc))
 
     @flaky(20,1)
     def test_trivial_multi_touch(self):

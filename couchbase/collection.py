@@ -14,8 +14,8 @@ from .result import GetResult, GetReplicaResult, ExistsResult, get_result_wrappe
 from .options import forward_args, OptionBlockTimeOut, OptionBlockDeriv, ConstrainedInt, SignedInt64
 from .options import OptionBlock, AcceptableInts
 import couchbase.exceptions
-from couchbase_core.exceptions import NotSupportedError, NotFoundError, SubdocPathNotFoundError, QueueEmpty, \
-    SubdocPathExistsError, KeyExistsError
+from couchbase.exceptions import NotSupportedException, DocumentNotFoundException, PathNotFoundException, QueueEmpty, \
+    PathExistsException, DocumentExistsException
 from couchbase_core.client import Client as CoreClient
 from couchbase_core._libcouchbase import Bucket as _Base
 import copy
@@ -48,7 +48,7 @@ class DeltaValue(ConstrainedInt):
 
         :param couchbase.options.AcceptableInts value: the value to initialise this with.
 
-        :raise: :exc:`~couchbase.exceptions.ArgumentError` if not in range
+        :raise: :exc:`~couchbase.exceptions.ArgumentException` if not in range
         """
         super(DeltaValue,self).__init__(value)
 
@@ -306,16 +306,16 @@ def _dsop(create_type=None, wrap_missing_path=True):
         def newfn(self, key, *args, **kwargs):
             try:
                 return fn(self, key, *args, **kwargs)
-            except NotFoundError:
+            except DocumentNotFoundException:
                 if kwargs.get('create'):
                     try:
                         self.insert(key, create_type())
-                    except KeyExistsError:
+                    except DocumentExistsException:
                         pass
                     return fn(self, key, *args, **kwargs)
                 else:
                     raise
-            except SubdocPathNotFoundError:
+            except PathNotFoundException:
                 if wrap_missing_path:
                     raise IndexError(args[0])
 
@@ -336,7 +336,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         # to do same in BinaryCollection (and any other object that does likewise).
         if self.true_collections:
             if self._self_name and not self._self_scope:
-                raise couchbase.exceptions.CollectionMissingException
+                raise couchbase.exceptions.CollectionNotFoundException
             if self._self_scope and self._self_name:
                 kwargs['scope'] = self._self_scope.name
                 kwargs['collection'] = self._self_name
@@ -421,7 +421,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
             if len(project) <= CBCollectionBase.MAX_GET_OPS:
                 spec = gen_projection_spec(project)
             else:
-                raise couchbase.exceptions.ArgumentError(
+                raise couchbase.exceptions.ArgumentException(
                     "Project only accepts {} operations or less".format(CBCollectionBase.MAX_GET_OPS))
         if not project and not opts.get('with_expiry', False):
             x = CoreClient.get(self.bucket, key, **opts)
@@ -450,7 +450,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :param: GetOptions options: The options to use for this get request.
         :param: Any kwargs: Override corresponding value in options.
 
-        :raise: :exc:`.NotFoundError` if the key does not exist
+        :raise: :exc:`.DocumentNotFoundException` if the key does not exist
         :return: A :class:`couchbase.result.GetResult` object
 
         Simple get::
@@ -523,8 +523,8 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :param: GetFromReplicaOptions options: The options to use for this get request.
         :param: Any kwargs: Override corresponding value in options.
 
-        :raise: :exc:`.NotFoundError` if the key does not exist
-                :exc:`.DocumentUnretrievableError` if no replicas exist
+        :raise: :exc:`.DocumentNotFoundException` if the key does not exist
+                :exc:`.DocumentUnretrievableException` if no replicas exist
         :return: A :class:`couchbase.result.GetReplicaResult` object
 
         """
@@ -546,8 +546,8 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
       :param: GetFromReplicaOptions options: The options to use for this get request.
       :param: Any kwargs: Override corresponding value in options.
 
-      :raise: :exc:`.NotFoundError` if the key does not exist
-              :exc:`.DocumentUnretrievableError` if no replicas exist
+      :raise: :exc:`.DocumentNotFoundException` if the key does not exist
+              :exc:`.DocumentUnretrievableException` if no replicas exist
       :return: A list(:class:`couchbase.result.GetReplicaResult`) object
       """
       return CoreClient.rgetall(self.bucket, key, **forward_args(kwargs, *options))
@@ -671,7 +671,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         persist_to = kwargs.get('persist_to', 0)
         replicate_to = kwargs.get('replicate_to', 0)
         if persist_to > 0 or replicate_to > 0:
-            raise NotSupportedError("Client durability not supported yet for remove")
+            raise NotSupportedException("Client durability not supported yet for remove")
         return get_multi_mutation_result(self.bucket, CoreClient.remove_multi, keys, *options, **kwargs)
 
     replace_multi = _wrap_multi_mutation_result(_Base.replace_multi)
@@ -727,7 +727,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
 
         See :meth:`lock` for an example.
 
-        :raise: :exc:`.TempFailException` if the CAS supplied does not
+        :raise: :exc:`.TemporaryFailException` if the CAS supplied does not
             match the CAS on the server (possibly because it was
             unlocked by previous call).
 
@@ -783,13 +783,13 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :param UpsertOptions options: Options for the upsert operation.
         :param Any kwargs: Override corresponding value in options.
 
-        :raise: :exc:`.ArgumentError` if an argument is supplied that is
+        :raise: :exc:`.ArgumentException` if an argument is supplied that is
             not applicable in this context. For example setting the CAS
             as a string.
-        :raise: :exc`.CouchbaseNetworkError`
-        :raise: :exc:`.KeyExistsError` if the key already exists on the
+        :raise: :exc`.CouchbaseNetworkException`
+        :raise: :exc:`.DocumentExistsException` if the key already exists on the
             server with a different CAS value.
-        :raise: :exc:`.ValueFormatError` if the value cannot be
+        :raise: :exc:`.ValueFormatException` if the value cannot be
             serialized with chosen encoder, e.g. if you try to store a
             dictionary in plain mode.
         :return: :class:`~.Result`.
@@ -846,7 +846,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :param Any value: The document itself.
         :param InsertOptions options: Options for the insert request.
         :param Any kwargs: Override corresponding value in the options.
-        :raise: :exc:`.KeyExistsError` if the key already exists
+        :raise: :exc:`.DocumentExistsException` if the key already exists
 
         .. seealso:: :meth:`upsert`
         """
@@ -872,7 +872,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
            :param ReplaceOptions options: Options for the replace request.
            :param Any kwargs: Override corresponding value in the options.
 
-           :raise: :exc:`.NotFoundError` if the key does not exist
+           :raise: :exc:`.DocumentNotFoundException` if the key does not exist
 
            .. seealso:: :meth:`upsert`
         """
@@ -894,8 +894,8 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
             :meth:`upsert`
         :param RemoveOptions options: Options for removing key.
         :param Any kwargs: Override corresponding value in options
-        :raise: :exc:`.NotFoundError` if the key does not exist.
-        :raise: :exc:`.KeyExistsError` if a CAS was specified, but
+        :raise: :exc:`.DocumentNotFoundException` if the key does not exist.
+        :raise: :exc:`.DocumentExistsException` if a CAS was specified, but
             the CAS on the server had changed
         :return: A :class:`~.MutationResult` object.
 
@@ -918,7 +918,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         persist_to = final_options.get('persist_to', 0)
         replicate_to = final_options.get('replicate_to', 0)
         if persist_to > 0 or replicate_to > 0:
-            raise NotSupportedError("Client durability not supported yet for remove")
+            raise NotSupportedException("Client durability not supported yet for remove")
         return ResultPrecursor(CoreClient.remove(self.bucket, key, **final_options), final_options)
 
     @_inject_scope_and_collection
@@ -1019,7 +1019,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :param create: Whether the map should be created if it does not exist
         :param kwargs: Additional arguments passed to :meth:`mutate_in`
         :return: A :class:`~.OperationResult`
-        :raise: :cb_exc:`NotFoundError` if the document does not exist.
+        :raise: :cb_exc:`Document.DocumentNotFoundException` if the document does not exist.
             and `create` was not specified
 
         .. Initialize a map and add a value
@@ -1043,7 +1043,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :param str mapkey: Key within the map to retrieve
         :return: :class:`~.ValueResult`
         :raise: :exc:`IndexError` if the mapkey does not exist
-        :raise: :cb_exc:`NotFoundError` if the document does not exist.
+        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
 
         .. seealso:: :meth:`map_add` for an example
         """
@@ -1060,7 +1060,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :param str mapkey: The key in the map
         :param kwargs: See :meth:`mutate_in` for options
         :raise: :exc:`IndexError` if the mapkey does not exist
-        :raise: :cb_exc:`NotFoundError` if the document does not exist.
+        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
 
         .. Remove a map key-value pair:
 
@@ -1078,7 +1078,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
 
         :param str key: The document ID of the map
         :return int: The number of items in the map
-        :raise: :cb_exc:`NotFoundError` if the document does not exist.
+        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
 
         .. seealso:: :meth:`map_add`
         """
@@ -1096,7 +1096,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
                exist. Note that this option only works on servers >= 4.6
         :param kwargs: Additional arguments to :meth:`mutate_in`
         :return: :class:`~.OperationResult`.
-        :raise: :cb_exc:`NotFoundError` if the document does not exist.
+        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
             and `create` was not specified.
 
         example::
@@ -1121,7 +1121,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
             Whether the list should be created if it does not exist
         :param kwargs: Additional arguments to :meth:`mutate_in`.
         :return: :class:`OperationResult`.
-        :raise: :cb_exc:`NotFoundError` if the document does not exist.
+        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
             and `create` was not specified.
 
         This function is identical to :meth:`list_append`, except for prepending
@@ -1143,7 +1143,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :param value: The value to be inserted
         :param kwargs: Additional arguments to :meth:`mutate_in`
         :return: :class:`OperationResult`
-        :raise: :cb_exc:`NotFoundError` if the list does not exist
+        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
         :raise: :exc:`IndexError` if the index is out of bounds
 
         example::
@@ -1168,7 +1168,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :param create: Create the set if it does not exist
         :param kwargs: Arguments to :meth:`mutate_in`
         :return: A :class:`~.OperationResult` if the item was added,
-        :raise: :cb_exc:`NotFoundError` if the document does not exist
+        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist
             and `create` was not specified.
 
         .. seealso:: :meth:`map_add`
@@ -1177,7 +1177,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         try:
             sdres = self.mutate_in(key, (op,), **kwargs)
             return self._wrap_dsop(sdres, **kwargs)
-        except SubdocPathExistsError:
+        except PathExistsException:
             pass
 
     @_dsop()
@@ -1190,7 +1190,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :param kwargs: Arguments to :meth:`mutate_in`
         :return: A :class:`OperationResult` if the item was removed, false
                  otherwise
-        :raise: :cb_exc:`NotFoundError` if the set does not exist.
+        :raise: :cb_exc:`DocumentNotFoundException` if the set does not exist.
 
         .. seealso:: :meth:`set_add`, :meth:`map_add`
         """
@@ -1200,7 +1200,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
                 ix = rv.value.index(value)
                 kwargs['cas'] = rv.cas
                 return self.list_remove(key, ix, **kwargs)
-            except KeyExistsError:
+            except DocumentExistsException:
                 pass
             except ValueError:
                 return
@@ -1211,7 +1211,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
 
         :param key: The document ID of the set
         :return: The length of the set
-        :raise: :cb_exc:`NotFoundError` if the set does not exist.
+        :raise: :cb_exc:`DocumentNotFoundException` if the set does not exist.
 
         """
         return self.list_size(key, **kwargs)
@@ -1222,7 +1222,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :param key: The document ID of the set
         :param value: The value to check for
         :return: True if `value` exists in the set
-        :raise: :cb_exc:`NotFoundError` if the document does not exist
+        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist
         """
         rv = self.bucket.get(key, **kwargs)
         return value in rv.value
@@ -1236,7 +1236,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :param index: The index to retrieve
         :return: :class:`ValueResult` for the element
         :raise: :exc:`IndexError` if the index does not exist
-        :raise: :cb_exc:`NotFoundError` if the list does not exist
+        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
         """
         return self.map_get(key, '[{0}]'.format(index), **kwargs)
 
@@ -1250,7 +1250,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :param kwargs: Arguments to :meth:`mutate_in`
         :return: :class:`OperationResult`
         :raise: :exc:`IndexError` if the index does not exist
-        :raise: :cb_exc:`NotFoundError` if the list does not exist
+        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
         """
         return self.map_remove(key, '[{0}]'.format(index), **kwargs)
 
@@ -1261,7 +1261,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
 
         :param key: The document ID of the list
         :return: The number of elements within the list
-        :raise: :cb_exc:`NotFoundError` if the list does not exist
+        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
         """
         return self.map_size(key, **kwargs)
 
@@ -1275,7 +1275,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :param create: Whether the queue should be created if it does not exist
         :param kwargs: Arguments to pass to :meth:`mutate_in`
         :return: :class:`OperationResult`
-        :raise: :cb_exc:`NotFoundError` if the queue does not exist and
+        :raise: :cb_exc:`DocumentNotFoundException` if the queue does not exist and
             `create` was not specified.
 
         example::
@@ -1297,7 +1297,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :param kwargs: Arguments passed to :meth:`mutate_in`
         :return: A :class:`ValueResult`
         :raise: :cb_exc:`QueueEmpty` if there are no items in the queue.
-        :raise: :cb_exc:`NotFoundError` if the queue does not exist.
+        :raise: :cb_exc:`DocumentNotFoundException` if the queue does not exist.
         """
         while True:
             try:
@@ -1309,7 +1309,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
             try:
                 self.list_remove(key, -1, **kwargs)
                 return itm
-            except KeyExistsError:
+            except DocumentExistsException:
                 pass
             except IndexError:
                 raise QueueEmpty
@@ -1321,7 +1321,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
 
         :param key: The document ID of the queue
         :return: The length of the queue
-        :raise: :cb_exc:`NotFoundError` if the queue does not exist.
+        :raise: :cb_exc:`DocumentNotFoundException` if the queue does not exist.
         """
         return self.list_size(key)
 
@@ -1397,7 +1397,7 @@ class BinaryCollection(object):
         be thrown when retrieving the value using :meth:`get` (you may
         still use the :attr:`data_passthrough` to overcome this).
 
-        :raise: :exc:`.NotStoredError` if the key does not exist
+        :raise: :exc:`.NotStoredException` if the key does not exist
         """
         final_options = { "format": FMT_UTF8 }
         final_options.update(forward_args(kwargs, *options))
@@ -1443,9 +1443,9 @@ class BinaryCollection(object):
         :param DeltaValue delta: an amount by which the key should be incremented.
         :param CounterOptions options: Options for the increment operation.
         :param Any kwargs: Overrides corresponding value in the options
-        :raise: :exc:`.NotFoundError` if the key does not exist on the
+        :raise: :exc:`.DocumentNotFoundException` if the key does not exist on the
             bucket (and `initial` was `None`)
-        :raise: :exc:`.DeltaBadvalError` if the key exists, but the
+        :raise: :exc:`.DeltaBadvalException` if the key exists, but the
             existing value is not numeric
         :return: A :class:`couchbase.result.MutationResult` object.
 
@@ -1491,9 +1491,9 @@ class BinaryCollection(object):
         :param DeltaValue delta: an amount by which the key should be decremented.
         :param CounterOptions options: Options for the decrement operation.
         :param Any kwargs: Overrides corresponding value in the options
-        :raise: :exc:`.NotFoundError` if the key does not exist on the
+        :raise: :exc:`.DocumentNotFoundException` if the key does not exist on the
             bucket (and `initial` was `None`)
-        :raise: :exc:`.DeltaBadvalError` if the key exists, but the
+        :raise: :exc:`.DeltaBadvalException` if the key exists, but the
             existing value is not numeric
         :return: A :class:`couchbase.result.MutationResult` object.
 
@@ -1556,7 +1556,7 @@ class Scope(object):
 
         :return:    A string value that is the name of the collection.
         :except     ScopeNotFoundException
-        :except     AuthorizationException
+        :except     AuthenticationException
         """
         return self._name
 
@@ -1573,7 +1573,7 @@ class Scope(object):
         :return: A :class:`.Collection` for a collection with the given name.
 
         :raise: CollectionNotFoundException
-        :raise: AuthorizationException
+        :raise: AuthenticationException
         """
         return self._gen_collection(None, *options)
 
@@ -1597,7 +1597,7 @@ class Scope(object):
         :return: A :class:`.Collection` for a collection with the given name.
 
         :raise: CollectionNotFoundException
-        :raise: AuthorizationException
+        :raise: AuthenticationException
 
         """
         return self._gen_collection(collection_name, *options)

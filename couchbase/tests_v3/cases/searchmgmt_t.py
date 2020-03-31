@@ -16,6 +16,8 @@ from couchbase_tests.base import CollectionTestCase, SkipTest, skip_if_no_collec
 from couchbase.exceptions import InvalidArgumentsException, SearchIndexNotFoundException
 from couchbase.management.search import SearchIndex
 import uuid
+import time
+
 
 class SearchIndexManagerTestCase(CollectionTestCase):
   def setUp(self):
@@ -76,6 +78,7 @@ class SearchIndexManagerTestCase(CollectionTestCase):
 
   def test_drop_index(self):
     self.indexmgr.drop_index(self.indexname)
+    self.try_n_times_till_exception(10, 3, self.indexmgr.get_index, self.indexname)
     self.assertRaises(SearchIndexNotFoundException, self.indexmgr.get_index, self.indexname)
 
   def test_get_all_indexes(self):

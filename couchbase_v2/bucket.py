@@ -100,7 +100,7 @@ class Bucket(CoreClient):
         argument errors are thrown immediately.
 
         :return: a :class:`Pipeline` object
-        :raise: :exc:`.PipelineError` if a pipeline is already created
+        :raise: :exc:`.PipelineException` if a pipeline is already created
         :raise: Other operation-specific errors.
 
         Scheduling multiple operations, without checking results::
@@ -186,13 +186,13 @@ class Bucket(CoreClient):
             many replicas for presence in memory. See :meth:`endure` for
             more information.
 
-        :raise: :exc:`.ArgumentError` if an argument is supplied that is
+        :raise: :exc:`.ArgumentException` if an argument is supplied that is
             not applicable in this context. For example setting the CAS
             as a string.
-        :raise: :exc`.CouchbaseNetworkError`
-        :raise: :exc:`.KeyExistsError` if the key already exists on the
+        :raise: :exc`.CouchbaseNetworkException`
+        :raise: :exc:`.DocumentExistsException` if the key already exists on the
             server with a different CAS value.
-        :raise: :exc:`.ValueFormatError` if the value cannot be
+        :raise: :exc:`.ValueFormatException` if the value cannot be
             serialized with chosen encoder, e.g. if you try to store a
             dictionary in plain mode.
         :return: :class:`~.Result`.
@@ -242,7 +242,7 @@ class Bucket(CoreClient):
         because `insert` will only succeed if a key does not already
         exist on the server (and thus can have no CAS)
 
-        :raise: :exc:`.KeyExistsError` if the key already exists
+        :raise: :exc:`.DocumentExistsException` if the key already exists
 
         .. seealso:: :meth:`upsert`, :meth:`insert_multi`
         """
@@ -259,7 +259,7 @@ class Bucket(CoreClient):
         Follows the same conventions as :meth:`upsert`, but the value is
         stored only if a previous value already exists.
 
-        :raise: :exc:`.NotFoundError` if the key does not exist
+        :raise: :exc:`.DocumentNotFoundException` if the key does not exist
 
         .. seealso:: :meth:`upsert`, :meth:`replace_multi`
         """
@@ -299,7 +299,7 @@ class Bucket(CoreClient):
         be thrown when retrieving the value using :meth:`get` (you may
         still use the :attr:`data_passthrough` to overcome this).
 
-        :raise: :exc:`.NotStoredError` if the key does not exist
+        :raise: :exc:`.NotStoredException` if the key does not exist
 
         .. seealso:: :meth:`upsert`, :meth:`append_multi`
         """
@@ -357,7 +357,7 @@ class Bucket(CoreClient):
 
                 try:
                     res = c.get("key", quiet=True) # suppress not-found errors
-                catch CouchbaseError:
+                catch CouchbaseException:
                     res = c.get("key", replica=True, quiet=True)
 
         :param bool no_format: If set to ``True``, then the value will
@@ -366,9 +366,9 @@ class Bucket(CoreClient):
             item-local equivalent of using the :attr:`data_passthrough`
             option
 
-        :raise: :exc:`.NotFoundError` if the key does not exist
-        :raise: :exc:`.CouchbaseNetworkError`
-        :raise: :exc:`.ValueFormatError` if the value cannot be
+        :raise: :exc:`.DocumentNotFoundException` if the key does not exist
+        :raise: :exc:`.CouchbaseNetworkException`
+        :raise: :exc:`.ValueFormatException` if the value cannot be
             deserialized with chosen decoder, e.g. if you try to
             retreive an object stored with an unrecognized format
         :return: A :class:`~.Result` object
@@ -430,7 +430,7 @@ class Bucket(CoreClient):
         :param ttl: a TTL for which the lock should be valid.
             While the lock is active, attempts to access the key (via
             other :meth:`lock`, :meth:`upsert` or other mutation calls)
-            will fail with an :exc:`.KeyExistsError`. Note that the
+            will fail with an :exc:`.DocumentExistsException`. Note that the
             value for this option is limited by the maximum allowable
             lock time determined by the server (currently, this is 30
             seconds). If passed a higher value, the server will silently
@@ -446,7 +446,7 @@ class Bucket(CoreClient):
         one of the :meth:`upsert` family of functions when the valid CAS
         is supplied
 
-        :raise: :exc:`.TemporaryFailError` if the key is already locked.
+        :raise: :exc:`.TemporaryFailException` if the key is already locked.
         :raise: See :meth:`get` for possible exceptions
 
         Lock a key ::
@@ -475,7 +475,7 @@ class Bucket(CoreClient):
                 try:
                     rv = cb.lock("key", ttl=10)
                     break
-                except TemporaryFailError:
+                except TemporaryFailException:
                     print("Key is currently locked.. waiting")
                     time.sleep(1)
 
@@ -502,7 +502,7 @@ class Bucket(CoreClient):
 
         See :meth:`lock` for an example.
 
-        :raise: :exc:`.TemporaryFailError` if the CAS supplied does not
+        :raise: :exc:`.TemporaryFailException` if the CAS supplied does not
             match the CAS on the server (possibly because it was
             unlocked by previous call).
 
@@ -532,8 +532,8 @@ class Bucket(CoreClient):
         :param int replicate_to: If set, wait for the item to be removed
             from the cache of at least these many nodes
             (excluding the master)
-        :raise: :exc:`.NotFoundError` if the key does not exist.
-        :raise: :exc:`.KeyExistsError` if a CAS was specified, but
+        :raise: :exc:`.DocumentNotFoundException` if the key does not exist.
+        :raise: :exc:`.DocumentExistsException` if a CAS was specified, but
             the CAS on the server had changed
         :return: A :class:`~.Result` object.
 
@@ -592,9 +592,9 @@ class Bucket(CoreClient):
         :type initial: int or `None`
         :param int ttl: The lifetime for the key, after which it will
             expire
-        :raise: :exc:`.NotFoundError` if the key does not exist on the
+        :raise: :exc:`.DocumentNotFoundException` if the key does not exist on the
             bucket (and `initial` was `None`)
-        :raise: :exc:`.DeltaBadvalError` if the key exists, but the
+        :raise: :exc:`.DeltaBadvalException` if the key exists, but the
             existing value is not numeric
         :return: A :class:`.Result` object. The current value of the
             counter may be obtained by inspecting the return value's
@@ -739,7 +739,7 @@ class Bucket(CoreClient):
 
         :param keys: One or several stats to query
         :type keys: string or list of string
-        :raise: :exc:`.CouchbaseNetworkError`
+        :raise: :exc:`.CouchbaseNetworkException`
         :return: `dict` where keys are stat keys and values are
             host-value pairs
 
@@ -1031,14 +1031,14 @@ class Bucket(CoreClient):
         json_encoded = json.dumps(document)
         encrypted_string = _Base.encrypt_fields(self, json_encoded, fieldspec, prefix)
         if not encrypted_string:
-            raise couchbase_core.exceptions.CouchbaseError("Encryption failed")
+            raise couchbase.exceptions.CouchbaseException("Encryption failed")
         return json.loads(encrypted_string)
 
     def decrypt_fields_real(self, document, *args):
         json_decoded = json.dumps(document)
         decrypted_string = _Base.decrypt_fields(self, json_decoded, *args)
         if not decrypted_string:
-            raise couchbase_core.exceptions.CouchbaseError("Decryption failed")
+            raise couchbase.exceptions.CouchbaseException("Decryption failed")
         return json.loads(decrypted_string)
 
     if _LCB.PYCBC_CRYPTO_VERSION<1:

@@ -18,13 +18,13 @@ import os
 from unittest import SkipTest
 
 from couchbase_v2.exceptions import (
-    NotFoundError)
+    DocumentNotFoundException)
 
 from couchbase_tests.base import TracedCase, ConnectionTestCase
 import logging
 import couchbase_core._libcouchbase
 import couchbase_core._logutil
-from couchbase_v2.exceptions import TimeoutError
+from couchbase_v2.exceptions import TimeoutException
 from time import sleep
 import re
 import couchbase_core
@@ -147,7 +147,7 @@ class TimeoutTest(TracedCase):
         for x in range(0, i):
             try:
                 bucket.get("key")
-            except TimeoutError as e:
+            except TimeoutException as e:
                 logging.error("Got exception [{}]".format(str(e)))
                 to_ops += 1
             if self.handler.count >= mincount:
@@ -158,7 +158,7 @@ class TimeoutTest(TracedCase):
             sleep(1)
             try:
                 bucket.get("key")
-            except TimeoutError as e:
+            except TimeoutException as e:
                 logging.error("Got exception [{}]".format(str(e)))
                 to_ops += 1
         logging.info('timedout ops ' + str(to_ops))
@@ -307,13 +307,13 @@ class TracingTest(TracedCase):
             self.assertTrue(k in rvs)
             self.assertFalse(rvs[k].success)
             self.assertTrue(rvs[k].value is None)
-            self.assertTrue(NotFoundError._can_derive(rvs[k].rc))
+            self.assertTrue(DocumentNotFoundException._can_derive(rvs[k].rc))
         self.verify_tracing_output(kv_existing, rvs, True)
         # Try this again, but without quiet
         cb_exc = None
         try:
             self.cb.get_multi(list(kv_existing.keys()) + list(kv_missing.keys()))
-        except NotFoundError as e:
+        except DocumentNotFoundException as e:
             cb_exc = e
 
         self.assertTrue(cb_exc)

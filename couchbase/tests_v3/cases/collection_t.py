@@ -19,15 +19,13 @@ from couchbase_tests.base import CollectionTestCase
 from couchbase.collection import GetOptions, LookupInOptions, UpsertOptions, ReplaceOptions, InsertOptions, \
     RemoveOptions
 from couchbase.durability import ServerDurability, ClientDurability, Durability, PersistTo, ReplicateTo
-from couchbase.exceptions import NotFoundError, InvalidArgumentsException,  KeyExistsException, KeyNotFoundException, \
-    TempFailException
+from couchbase.exceptions import InvalidArgumentsException,  DocumentExistsException, DocumentNotFoundException, \
+    TemporaryFailException
 import unittest
 from datetime import timedelta
 import couchbase.subdocument as SD
 from unittest import SkipTest
 from couchbase.diagnostics import ServiceType
-import uuid
-import copy
 import logging
 from couchbase.management.collections import CollectionSpec
 import uuid
@@ -51,7 +49,7 @@ class CollectionTests(CollectionTestCase):
         # be sure NOKEY isn't in there
         try:
             self.cb.remove(self.NOKEY)
-        except KeyNotFoundException as e:
+        except DocumentNotFoundException as e:
             pass
         # make sure NOKEY is gone
         self.try_n_times_till_exception(10, 1, self.cb.get, self.NOKEY)
@@ -67,7 +65,7 @@ class CollectionTests(CollectionTestCase):
         if self.is_mock:
             raise SkipTest("mock does not support exists")
         key = str(uuid.uuid4())
-        self.assertRaises(KeyNotFoundException, self.cb.get, key)
+        self.assertRaises(DocumentNotFoundException, self.cb.get, key)
         self.assertFalse(self.cb.exists(key).exists)
 
     @unittest.skip("this verifies CCBC-1187 - skip till fixed")
@@ -75,7 +73,7 @@ class CollectionTests(CollectionTestCase):
         if self.is_mock:
             raise SkipTest("mock does not support exists")
         self.cb.remove(self.KEY)
-        self.assertRaises(KeyNotFoundException, self.cb.get, self.KEY)
+        self.assertRaises(DocumentNotFoundException, self.cb.get, self.KEY)
         self.assertFalse(self.cb.exists(self.KEY).exists)
 
     def test_upsert(self):
@@ -91,7 +89,7 @@ class CollectionTests(CollectionTestCase):
         self.assertDictEqual({"some":"thing"}, result.content_as[dict])
 
     def test_insert_fail(self):
-        self.assertRaises(KeyExistsException, self.cb.insert, self.KEY, self.CONTENT)
+        self.assertRaises(DocumentExistsException, self.cb.insert, self.KEY, self.CONTENT)
 
     def test_replace(self):
         result = self.cb.replace(self.KEY, {"some":"other content"})
@@ -103,11 +101,11 @@ class CollectionTests(CollectionTestCase):
         self.assertTrue(result.success)
         # try same cas again, must fail.  TODO: this seems wrong - lets be sure there
         # isn't perhaps a more sensible exception out there.
-        self.assertRaises(KeyExistsException, self.cb.replace, self.KEY, self.CONTENT, ReplaceOptions(cas=old_cas))
+        self.assertRaises(DocumentExistsException, self.cb.replace, self.KEY, self.CONTENT, ReplaceOptions(cas=old_cas))
 
     def test_replace_fail(self):
-        self.assertRaises(KeyNotFoundException, self.cb.get, self.NOKEY)
-        self.assertRaises(KeyNotFoundException, self.cb.replace, self.NOKEY, self.CONTENT)
+        self.assertRaises(DocumentNotFoundException, self.cb.get, self.NOKEY)
+        self.assertRaises(DocumentNotFoundException, self.cb.replace, self.NOKEY, self.CONTENT)
 
     def test_remove(self):
         result = self.cb.remove(self.KEY)
@@ -115,7 +113,7 @@ class CollectionTests(CollectionTestCase):
         self.try_n_times_till_exception(10, 1, self.cb.get, self.KEY)
 
     def test_remove_fail(self):
-        self.assertRaises(KeyNotFoundException, self.cb.remove,self.NOKEY)
+        self.assertRaises(DocumentNotFoundException, self.cb.remove, self.NOKEY)
 
     def test_get(self):
         result = self.cb.get(self.KEY)
@@ -132,7 +130,7 @@ class CollectionTests(CollectionTestCase):
         self.assertDictEqual(self.CONTENT, result.content_as[dict])
 
     def test_get_fails(self):
-        self.assertRaises(NotFoundError, self.cb.get, self.NOKEY)
+        self.assertRaises(DocumentNotFoundException, self.cb.get, self.NOKEY)
 
     @unittest.skip("get does not properly do a subdoc lookup and get the xattr expiry yet")
     def test_get_with_expiry(self):
@@ -207,12 +205,12 @@ class CollectionTests(CollectionTestCase):
     def test_touch(self):
         self.cb.touch(self.KEY, timedelta(seconds=3))
         self.try_n_times_till_exception(10, 3, self.cb.get, self.KEY)
-        self.assertRaises(KeyNotFoundException, self.cb.get, self.KEY)
+        self.assertRaises(DocumentNotFoundException, self.cb.get, self.KEY)
 
     def test_get_and_touch(self):
         self.cb.get_and_touch(self.KEY, timedelta(seconds=3))
         self.try_n_times_till_exception(10, 3, self.cb.get, self.KEY)
-        self.assertRaises(KeyNotFoundException, self.cb.get, self.KEY)
+        self.assertRaises(DocumentNotFoundException, self.cb.get, self.KEY)
 
     def test_get_and_lock(self):
         self.cb.get_and_lock(self.KEY, timedelta(seconds=3))
@@ -222,7 +220,7 @@ class CollectionTests(CollectionTestCase):
     def test_get_and_lock_upsert_with_cas(self):
         result = self.cb.get_and_lock(self.KEY, timedelta(seconds=15))
         cas = result.cas
-        self.assertRaises(KeyExistsException, self.cb.upsert, self.KEY, self.CONTENT)
+        self.assertRaises(DocumentExistsException, self.cb.upsert, self.KEY, self.CONTENT)
         self.cb.replace(self.KEY, self.CONTENT, ReplaceOptions(cas=cas))
 
     def test_unlock(self):
@@ -232,7 +230,7 @@ class CollectionTests(CollectionTestCase):
 
     def test_unlock_wrong_cas(self):
         cas = self.cb.get_and_lock(self.KEY, timedelta(seconds=15)).cas
-        self.assertRaises(TempFailException, self.cb.unlock, self.KEY, 100)
+        self.assertRaises(TemporaryFailException, self.cb.unlock, self.KEY, 100)
         self.cb.unlock(self.KEY, cas)
 
     def test_client_durable_upsert(self):
@@ -287,14 +285,14 @@ class CollectionTests(CollectionTestCase):
         num_replicas = self.bucket._bucket.configured_replica_count
         durability = ClientDurability(persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
         self.cb.remove(self.KEY, RemoveOptions(durability=durability))
-        self.assertRaises(KeyNotFoundException, self.cb.get, self.KEY)
+        self.assertRaises(DocumentNotFoundException, self.cb.get, self.KEY)
 
     def test_server_durable_remove(self):
         if not self.supports_sync_durability():
             raise SkipTest("ServerDurability not supported")
         durability = ServerDurability(level=Durability.PERSIST_TO_MAJORITY)
         self.cb.remove(self.KEY, RemoveOptions(durability=durability))
-        self.assertRaises(KeyNotFoundException, self.cb.get, self.KEY)
+        self.assertRaises(DocumentNotFoundException, self.cb.get, self.KEY)
 
     def test_collection_access(self,  # type: CollectionTests
                                ):

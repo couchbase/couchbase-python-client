@@ -22,13 +22,13 @@ for example:
 
     try:
         cb.get("foo")
-    except NotFoundError:
+    except DocumentNotFoundException:
         print("Item does not exist")
-    except CouchbaseTransientError:
+    except CouchbaseTransientException:
         print("Transient error received. Handling and backing off")
 
-Where `NotFoundError` is a specific error detail code indicating the item has
-not been found, and `CouchbaseTransientError` is an error category indicating
+Where `DocumentNotFoundException` is a specific error detail code indicating the item has
+not been found, and `CouchbaseTransientException` is an error category indicating
 the specific cause is likely transient.
 
 As your application evolves you may wish to examine the specific error code
@@ -46,8 +46,8 @@ You may also employ a different use model, for example:
 
     try:
         cb.get("foo")
-    except CouchbaseError as e:
-        if e.is_data and isinstance(e, NotFoundError):
+    except CouchbaseException as e:
+        if e.is_data and isinstance(e, DocumentNotFoundException):
             # handle not found
             pass
         elif e.is_network:
@@ -66,7 +66,7 @@ This object is the base class for all exceptions thrown by Couchbase which
 are specific to the library. Other standard Python exceptions may still be
 thrown depending on the condition.
 
-.. autoexception:: CouchbaseError
+.. autoexception:: CouchbaseException
    :members:
 
 --------------------
@@ -75,12 +75,12 @@ Exception Categories
 
 These categories form the base exception classes
 
-.. autoexception:: CouchbaseInternalError
-.. autoexception:: CouchbaseNetworkError
-.. autoexception:: CouchbaseInputError
-.. autoexception:: CouchbaseFatalError
-.. autoexception:: CouchbaseDataError
-.. autoexception:: CouchbaseTransientError
+.. autoexception:: CouchbaseInternalException
+.. autoexception:: CouchbaseNetworkException
+.. autoexception:: CouchbaseInputException
+.. autoexception:: CouchbaseFatalException
+.. autoexception:: CouchbaseDataException
+.. autoexception:: CouchbaseTransientException
 
 
 
@@ -89,70 +89,70 @@ Exception Details
 -----------------
 
 The following codes are exception details. They all derive from
-:exc:`CouchbaseError`. Many of them will have multiple error categories and thus
+:exc:`CouchbaseException`. Many of them will have multiple error categories and thus
 be inherited from multiple exception categories.
 
-.. autoexception:: ArgumentError
+.. autoexception:: ArgumentException
    :show-inheritance:
-.. autoexception:: ValueFormatError
+.. autoexception:: ValueFormatException
    :show-inheritance:
-.. autoexception:: AuthError
+.. autoexception:: AuthException
    :show-inheritance:
-.. autoexception:: DeltaBadvalError
+.. autoexception:: DeltaBadvalException
    :show-inheritance:
-.. autoexception:: TooBigError
+.. autoexception:: TooBigException
    :show-inheritance:
-.. autoexception:: BusyError
+.. autoexception:: BusyException
    :show-inheritance:
-.. autoexception:: InternalError
+.. autoexception:: InternalException
    :show-inheritance:
-.. autoexception:: InvalidError
+.. autoexception:: InvalidException
    :show-inheritance:
-.. autoexception:: NoMemoryError
+.. autoexception:: NoMemoryException
    :show-inheritance:
-.. autoexception:: RangeError
+.. autoexception:: RangeException
    :show-inheritance:
-.. autoexception:: LibcouchbaseError
+.. autoexception:: LibcouchbaseException
    :show-inheritance:
-.. autoexception:: TemporaryFailError
+.. autoexception:: TemporaryFailException
    :show-inheritance:
-.. autoexception:: KeyExistsError
+.. autoexception:: DocumentExistsException
    :show-inheritance:
-.. autoexception:: NotFoundError
+.. autoexception:: NotFoundException
    :show-inheritance:
-.. autoexception:: DlopenFailedError
+.. autoexception:: DlopenFailedException
    :show-inheritance:
-.. autoexception:: DlsymFailedError
+.. autoexception:: DlsymFailedException
    :show-inheritance:
-.. autoexception:: NetworkError
+.. autoexception:: NetworkException
    :show-inheritance:
-.. autoexception:: NotMyVbucketError
+.. autoexception:: NotMyVbucketException
    :show-inheritance:
-.. autoexception:: NotStoredError
+.. autoexception:: NotStoredException
    :show-inheritance:
-.. autoexception:: NotSupportedError
+.. autoexception:: NotSupportedException
    :show-inheritance:
-.. autoexception:: UnknownCommandError
+.. autoexception:: UnknownCommandException
    :show-inheritance:
-.. autoexception:: UnknownHostError
+.. autoexception:: UnknownHostException
    :show-inheritance:
-.. autoexception:: ProtocolError
+.. autoexception:: ProtocolException
    :show-inheritance:
-.. autoexception:: TimeoutError
+.. autoexception:: TimeoutException
    :show-inheritance:
-.. autoexception:: ConnectError
+.. autoexception:: ConnectException
    :show-inheritance:
-.. autoexception:: BucketNotFoundError
+.. autoexception:: BucketNotFoundException
    :show-inheritance:
-.. autoexception:: ClientNoMemoryError
+.. autoexception:: ClientNoMemoryException
    :show-inheritance:
-.. autoexception:: ClientTemporaryFailError
+.. autoexception:: ClientTemporaryFailException
    :show-inheritance:
-.. autoexception:: BadHandleError
+.. autoexception:: BadHandleException
    :show-inheritance:
-.. autoexception:: HTTPError
+.. autoexception:: HTTPException
    :show-inheritance:
-.. autoexception:: SubdocPathNotFoundError
+.. autoexception:: PathNotFoundException
    :show-inheritance:
-.. autoexception:: SubdocPathExistsError
+.. autoexception:: PathExistsException
    :show-inheritance:

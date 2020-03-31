@@ -1,8 +1,8 @@
 import abc
 
 
-from couchbase_core.exceptions import CouchbaseError
-from couchbase_core.views.iterator import AlreadyQueriedError
+from couchbase.exceptions import CouchbaseException
+from couchbase_core.views.iterator import AlreadyQueriedException
 from couchbase_core import _to_json
 from couchbase_core._pyport import unicode
 
@@ -615,7 +615,7 @@ class DocIdQuery(_SingleQuery):
     def validate(self):
         super(DocIdQuery, self).validate()
         if not self.ids:
-            raise NoChildrenError('`ids` must contain at least one ID')
+            raise NoChildrenException('`ids` must contain at least one ID')
 
 
 @_with_fields('prefix_length', 'fuzziness', 'field', 'analyzer')
@@ -669,7 +669,7 @@ class PhraseQuery(_SingleQuery):
     def validate(self):
         super(PhraseQuery, self).validate()
         if not self.terms:
-            raise NoChildrenError('Missing terms')
+            raise NoChildrenException('Missing terms')
 
 
 @_with_fields('field')
@@ -895,7 +895,7 @@ class ConjunctionQuery(_CompoundQuery):
     def validate(self):
         super(ConjunctionQuery, self).validate()
         if not self.conjuncts:
-            raise NoChildrenError('No sub-queries')
+            raise NoChildrenException('No sub-queries')
 
 
 def _convert_gt0(value):
@@ -926,7 +926,7 @@ class DisjunctionQuery(_CompoundQuery):
     def validate(self):
         super(DisjunctionQuery, self).validate()
         if not self.disjuncts or len(self.disjuncts) < self.min:
-            raise NoChildrenError('No children specified, or min is too big')
+            raise NoChildrenException('No children specified, or min is too big')
 
 
 def _bprop_wrap(name, reqtype, doc):
@@ -1050,18 +1050,18 @@ class BooleanFieldQuery(_SingleQuery):
     bool = _genprop(bool, 'bool', doc='Boolean value to search for')
 
 
-class SearchError(CouchbaseError):
+class SearchException(CouchbaseException):
     """
     Error during server execution
     """
 
 
-class NoChildrenError(CouchbaseError):
+class NoChildrenException(CouchbaseException):
     """
     Compound query is missing children"
     """
     def __init__(self, msg='No child queries'):
-        super(NoChildrenError, self).__init__({'message': msg})
+        super(NoChildrenException, self).__init__({'message': msg})
 
 
 def make_search_body(index, query, params=None):
@@ -1210,7 +1210,7 @@ class SearchRequest(object):
             return
         if 'errors' in value:
             for err in value['errors']:
-                raise SearchError.pyexc('N1QL Execution failed', err)
+                raise SearchException.pyexc('N1QL Execution failed', err)
 
     def _process_payload(self, rows):
         if rows:
@@ -1227,7 +1227,7 @@ class SearchRequest(object):
 
     def __iter__(self):
         if not self._do_iter:
-            raise AlreadyQueriedError()
+            raise AlreadyQueriedException()
 
         self._start()
         while self._do_iter:

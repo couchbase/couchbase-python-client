@@ -20,8 +20,8 @@ import sys
 from couchbase.management.admin import Admin
 from couchbase_core.result import HttpResult
 from couchbase.exceptions import (
-    ArgumentError, AuthError, CouchbaseError,
-    NetworkError, HTTPError)
+    ArgumentException, AuthenticationException, CouchbaseException,
+    NetworkException, HTTPException)
 from couchbase_tests.base import CouchbaseTestCase, SkipTest
 from couchbase_core.auth_domain import AuthDomain
 
@@ -68,29 +68,29 @@ class AdminSimpleTest(CouchbaseTestCase):
         self.assertIsNotNone(admin)
 
     def test_bad_request(self):
-        self.assertRaises(HTTPError, self.admin.http_request, '/badpath')
+        self.assertRaises(HTTPException, self.admin.http_request, '/badpath')
 
         excraised = 0
         try:
             self.admin.http_request("/badpath")
-        except HTTPError as e:
+        except HTTPException as e:
             excraised = 1
             self.assertIsInstance(e.objextra, HttpResult)
 
         self.assertTrue(excraised)
 
     def test_bad_args(self):
-        self.assertRaises(ArgumentError,
+        self.assertRaises(ArgumentException,
                           self.admin.http_request,
                           None)
 
-        self.assertRaises(ArgumentError,
+        self.assertRaises(ArgumentException,
                           self.admin.http_request,
                           '/',
                           method='blahblah')
 
     def test_bad_auth(self):
-        self.assertRaises(AuthError, Admin,
+        self.assertRaises(AuthenticationException, Admin,
                           'baduser', 'badpass',
                           host=self.cluster_info.host,
                           port=self.cluster_info.port)
@@ -99,16 +99,16 @@ class AdminSimpleTest(CouchbaseTestCase):
         # admin connections don't really connect until an action is performed
         try:
             admin = Admin('username', 'password', host='127.0.0.1', port=1)
-            self.assertRaises(NetworkError, admin.bucket_info, 'default')
-        except NetworkError:
+            self.assertRaises(NetworkException, admin.bucket_info, 'default')
+        except NetworkException:
             pass
 
     def test_bad_handle(self):
-        self.assertRaises(CouchbaseError, self.admin.upsert, "foo", "bar")
-        self.assertRaises(CouchbaseError, self.admin.get, "foo")
-        self.assertRaises(CouchbaseError, self.admin.append, "foo", "bar")
-        self.assertRaises(CouchbaseError, self.admin.remove, "foo")
-        self.assertRaises(CouchbaseError, self.admin.unlock, "foo", 1)
+        self.assertRaises(CouchbaseException, self.admin.upsert, "foo", "bar")
+        self.assertRaises(CouchbaseException, self.admin.get, "foo")
+        self.assertRaises(CouchbaseException, self.admin.append, "foo", "bar")
+        self.assertRaises(CouchbaseException, self.admin.remove, "foo")
+        self.assertRaises(CouchbaseException, self.admin.unlock, "foo", 1)
         str(None)
 
     def test_create_ephemeral_bucket_and_use(self):

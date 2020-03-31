@@ -4,15 +4,16 @@ from typing import *
 from .generic import GenericManager
 from couchbase_core import mk_formstr
 
-from couchbase_core.exceptions import ErrorMapper, NotSupportedWrapper, HTTPError
-from couchbase.exceptions import ScopeNotFoundException, ScopeAlreadyExistsException, CollectionNotFoundException, CollectionAlreadyExistsException
+from couchbase.exceptions import ErrorMapper, NotSupportedWrapper, HTTPException, ScopeNotFoundException, \
+    ScopeAlreadyExistsException, CollectionNotFoundException, CollectionAlreadyExistsException
 from datetime import timedelta
+
 
 class CollectionsErrorHandler(ErrorMapper):
     @staticmethod
     def mapping():
         # type (...)->Mapping[str, CBErrorType]
-        return {HTTPError: {'Scope with this name already exists': ScopeAlreadyExistsException,
+        return {HTTPException: {'Scope with this name already exists': ScopeAlreadyExistsException,
                             'Scope with this name is not found': ScopeNotFoundException,
                             'Collection with this name is not found': CollectionNotFoundException,
                             'Collection with this name already exists': CollectionAlreadyExistsException}}

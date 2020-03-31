@@ -16,11 +16,6 @@
 #
 
 from couchbase_core import FMT_BYTES, FMT_UTF8
-
-from couchbase_v2.exceptions import (ValueFormatError,
-                                     NotFoundError,
-                                     NotStoredError, CouchbaseError)
-
 from couchbase_tests.base import ConnectionTestCase
 
 

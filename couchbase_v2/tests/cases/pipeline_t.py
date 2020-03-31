@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-from couchbase_v2.exceptions import PipelineError, NotFoundError, ArgumentError
+from couchbase_v2.exceptions import PipelineException, DocumentNotFoundException, ArgumentException
 from couchbase_tests.base import ConnectionTestCase
 from couchbase_core import FMT_UTF8
 
@@ -73,7 +73,7 @@ class PipelineTest(ConnectionTestCase):
             with self.cb.pipeline():
                 self.cb.get(k, quiet=False)
                 self.cb.upsert(k, v)
-        self.assertRaises(NotFoundError, run_pipeline)
+        self.assertRaises(DocumentNotFoundException, run_pipeline)
 
         rv = self.cb.upsert("foo", "bar")
         self.assertTrue(rv.success)
@@ -84,13 +84,13 @@ class PipelineTest(ConnectionTestCase):
                 with self.cb.pipeline():
                     pass
 
-        self.assertRaises(PipelineError, fun)
+        self.assertRaises(PipelineException, fun)
 
         def fun():
             with self.cb.pipeline():
                 list(self.cb.query("design", "view"))
 
-        self.assertRaises(PipelineError, fun)
+        self.assertRaises(PipelineException, fun)
 
     def test_pipeline_argerrors(self):
         k = self.gen_key("pipeline_argerrors")
@@ -104,7 +104,7 @@ class PipelineTest(ConnectionTestCase):
                 self.cb.get("foo", "bar")
                 self.cb.get(k)
 
-        self.assertRaises(ArgumentError, fun)
+        self.assertRaises(ArgumentException, fun)
         self.assertEqual(len(pipeline.results), 1)
         self.assertEqual(self.cb.get(k).value, "foo")
 

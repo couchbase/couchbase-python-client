@@ -16,7 +16,7 @@
 #
 import unittest
 
-from couchbase_v2.exceptions import (CouchbaseError)
+from couchbase_v2.exceptions import (CouchbaseException)
 from couchbase_tests.base import CouchbaseTestCase
 from couchbase_core.auth_domain import AuthDomain
 import sys
@@ -61,7 +61,7 @@ class EnhancedErrorTest(CouchbaseTestCase):
 
                 key = self.gen_key('create_doc')
                 connection.mutate_in(key, SD.upsert('new.path', 'newval'), upsert_doc=True)
-            except CouchbaseError as e:
+            except CouchbaseException as e:
                 print(str(e))
                 if userid=="writer":
                     raise e

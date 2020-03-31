@@ -2,11 +2,11 @@ import os
 from unittest import SkipTest
 from functools import wraps
 
-from couchbase import ArgumentError
+from couchbase import ArgumentException
 from couchbase.management.users import User, Role, Group, RawRole, GroupNotFoundException, UserNotFoundException
 from couchbase_core.auth_domain import AuthDomain
 from couchbase_tests.base import CollectionTestCase
-from couchbase_core.exceptions import  NotSupportedError
+from couchbase.exceptions import  NotSupportedException
 from typing import *
 import re
 from datetime import timedelta
@@ -28,7 +28,7 @@ class UserManagementTests(CollectionTestCase):
       try:
         self.um.get_all_groups()
         return True
-      except NotSupportedError:
+      except NotSupportedException:
         return False
 
     def setUp(self, *args, **kwargs):
@@ -72,11 +72,11 @@ class UserManagementTests(CollectionTestCase):
         roles = [Role.of(name='data_reader', bucket='default'), Role.of(name='data_writer', bucket='default')]
 
         # invalid domain generates argument error
-        self.assertRaises(ArgumentError, self.um.get_all_users, None)
-        self.assertRaises(ArgumentError, self.um.get_user, userid, None)
-        self.assertRaises(ArgumentError, self.um.upsert_user, User(username=userid, password=password, roles=roles),
+        self.assertRaises(ArgumentException, self.um.get_all_users, None)
+        self.assertRaises(ArgumentException, self.um.get_user, userid, None)
+        self.assertRaises(ArgumentException, self.um.upsert_user, User(username=userid, password=password, roles=roles),
                           domain=None)
-        self.assertRaises(ArgumentError, self.um.drop_user, userid, None)
+        self.assertRaises(ArgumentException, self.um.drop_user, userid, None)
 
     def test_external_nopassword(self):
 
@@ -85,15 +85,15 @@ class UserManagementTests(CollectionTestCase):
         roles = [Role.of(name='data_reader', bucket='default'), Role.of(name='data_writer', bucket='default')]
 
         # password with external generates argument error
-        self.assertRaises(ArgumentError, self.um.upsert_user, User(username=userid, password=password, roles=roles),
+        self.assertRaises(ArgumentException, self.um.upsert_user, User(username=userid, password=password, roles=roles),
                           domain=AuthDomain.External)
-        self.assertRaises(ArgumentError, self.um.upsert_user, User(username=userid, password=password, roles=None),
+        self.assertRaises(ArgumentException, self.um.upsert_user, User(username=userid, password=password, roles=None),
                           domain=AuthDomain.External)
-        self.assertRaises(ArgumentError, self.um.upsert_user, User(username=userid, password=password, roles=[]),
+        self.assertRaises(ArgumentException, self.um.upsert_user, User(username=userid, password=password, roles=[]),
                           domain=AuthDomain.External)
         try:
             self.um.upsert_user(User(username=userid, password=None, roles=roles), domain=AuthDomain.External)
-        except ArgumentError:
+        except ArgumentException:
             raise
         except:
             pass

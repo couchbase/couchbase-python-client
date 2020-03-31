@@ -25,7 +25,7 @@ import couchbase_core._libcouchbase as LCB
 from boltons.funcutils import wraps
 
 from couchbase_core import JSON, mk_formstr
-import couchbase_core.exceptions as E
+import couchbase.exceptions as E
 from couchbase_core._pyport import basestring
 from couchbase_core.auth_domain import AuthDomain
 from couchbase_core._libcouchbase import FMT_JSON
@@ -39,7 +39,7 @@ METHMAP = {
 }
 
 
-class NotReadyError(E.CouchbaseError):
+class NotReadyException(E.CouchbaseException):
     """
     Thrown when not all nodes could be ready (internal)
     """
@@ -72,10 +72,10 @@ class Admin(LCB.Bucket):
         :param int port: The management port for the node
 
         :raise:
-            :exc:`couchbase_core.exceptions.AuthError` if incorrect credentials
+            :exc:`couchbase.exceptions.AuthenticationException` if incorrect credentials
             were supplied
 
-            :exc:`couchbase_core.exceptions.ConnectError` if there was a problem
+            :exc:`couchbase.exceptions.ConnectException` if there was a problem
             establishing a connection to the provided host
 
         :return: an instance of :class:`Admin`
@@ -136,11 +136,11 @@ class Admin(LCB.Bucket):
           ``bytes``
 
         :raise:
-          :exc:`~.ArgumentError`
+          :exc:`~.ArgumentException`
             if the method supplied was incorrect.
-          :exc:`~.ConnectError`
+          :exc:`~.ConnectException`
             if there was a problem establishing a connection.
-          :exc:`~.HTTPError`
+          :exc:`~.HTTPException`
             if the server responded with a negative reply
 
         :return: a :class:`~.HttpResult` object.
@@ -149,7 +149,7 @@ class Admin(LCB.Bucket):
         """
         imeth = None
         if not method in METHMAP:
-            raise E.ArgumentError.pyexc("Unknown HTTP Method", method)
+            raise E.ArgumentException.pyexc("Unknown HTTP Method", method)
 
         imeth = METHMAP[method]
         return self._http_request(type=LCB.LCB_HTTP_TYPE_MANAGEMENT,
@@ -194,7 +194,7 @@ class Admin(LCB.Bucket):
             not recommended in production. This setting may be changed
             via :meth:`update_bucket`
         :return: A :class:`~.HttpResult`
-        :raise: :exc:`~.HTTPError` if the bucket could not be created.
+        :raise: :exc:`~.HTTPException` if the bucket could not be created.
         """
         final_opts = dict(**Admin.bc_defaults)
         final_opts.update(**{k: v for k, v in kwargs.items() if (v is not None)})
@@ -220,7 +220,7 @@ class Admin(LCB.Bucket):
 
         :param string name: The name of the bucket to remove
         :return: A :class:`~.HttpResult`
-        :raise: :exc:`~HTTPError` on error
+        :raise: :exc:`~HTTPException` on error
         """
         return self.http_request(path='/pools/default/buckets/' + name,
                                  method='DELETE')
@@ -267,7 +267,7 @@ class Admin(LCB.Bucket):
             intended primarily for use with :meth:`update_bucket`.
             Currently this returns the raw decoded JSON as emitted
             by the corresponding server-side API
-        :raise: :exc:`~.HTTPError` if the request failed
+        :raise: :exc:`~.HTTPException` if the request failed
         """
         return self.http_request(path='/pools/default/buckets/' + name)
 
@@ -279,8 +279,8 @@ class Admin(LCB.Bucket):
         :param seconds timeout: the maximum amount of time to wait
         :param seconds sleep_interval: the number of time to sleep
             between each probe
-        :raise: :exc:`.CouchbaseError` on internal HTTP error
-        :raise: :exc:`NotReadyError` if all nodes could not be
+        :raise: :exc:`.CouchbaseException` on internal HTTP error
+        :raise: :exc:`NotReadyException` if all nodes could not be
             ready in time
         """
         end = time() + timeout
@@ -289,9 +289,9 @@ class Admin(LCB.Bucket):
                 info = self.bucket_info(name).value
                 for node in info['nodes']:
                     if node['status'] != 'healthy':
-                        raise NotReadyError.pyexc('Not all nodes are healthy')
+                        raise NotReadyException.pyexc('Not all nodes are healthy')
                 return  # No error and all OK
-            except E.CouchbaseError:
+            except E.CouchbaseException:
                 if time() + sleep_interval > end:
                     raise
                 sleep(sleep_interval)
@@ -304,7 +304,7 @@ class Admin(LCB.Bucket):
         elif auth_domain == AuthDomain.External:
             domain = 'external'
         else:
-            raise E.ArgumentError.pyexc("Unknown Authentication Domain", auth_domain)
+            raise E.ArgumentException.pyexc("Unknown Authentication Domain", auth_domain)
 
         path = '/settings/rbac/users/{0}'.format(domain)
         if userid is not None:
@@ -330,7 +330,7 @@ class Admin(LCB.Bucket):
 
         :param AuthDomain domain: The authentication domain for the user.
         :param userid: The user ID.
-        :raise: :exc:`couchbase_core.exceptions.HTTPError` if the user does not exist.
+        :raise: :exc:`couchbase.exceptions.HTTPException` if the user does not exist.
         :return: :class:`~.HttpResult`. The user can be obtained from the
             returned object's `value` property.
         """
@@ -349,7 +349,7 @@ class Admin(LCB.Bucket):
         :param roles: A list of roles. A role can either be a simple string,
             or a list of `(role, bucket)` pairs.
         :param name: Human-readable name
-        :raise: :exc:`couchbase_core.exceptions.HTTPError` if the request fails.
+        :raise: :exc:`couchbase.exceptions.HTTPException` if the request fails.
         :return: :class:`~.HttpResult`
 
         Creating a new read-only admin user ::
@@ -369,10 +369,10 @@ class Admin(LCB.Bucket):
            take a few moments for the new user settings to take effect.
         """
         if not roles or not isinstance(roles, list):
-            raise E.ArgumentError("Roles must be a non-empty list")
+            raise E.ArgumentException("Roles must be a non-empty list")
 
         if password and domain == AuthDomain.External:
-            raise E.ArgumentError("External domains must not have passwords")
+            raise E.ArgumentException("External domains must not have passwords")
         role_string = self.gen_role_list(roles)
         params = {
             'roles': role_string,
@@ -427,7 +427,7 @@ class Admin(LCB.Bucket):
         Remove a user
         :param AuthDomain domain: The authentication domain for the user.
         :param userid: The user ID to remove
-        :raise: :exc:`couchbase_core.exceptions.HTTPError` if the user does not exist.
+        :raise: :exc:`couchbase.exceptions.HTTPException` if the user does not exist.
         :return: :class:`~.HttpResult`
         """
         path = self._get_management_path(domain, userid)

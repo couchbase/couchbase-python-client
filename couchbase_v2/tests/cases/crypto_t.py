@@ -60,7 +60,7 @@ class ROT13PythonCryptoProvider(PythonCryptoProvider):
 
     def encrypt_real(self, input, iv):
         if codecs.decode(input,'utf-8').endswith('\n'):
-            raise couchbase_v2.exceptions.InternalError("passing back string containing newline")
+            raise couchbase_v2.exceptions.InternalException("passing back string containing newline")
         logging.debug("encrypting with input={} iv={}".format(repr(input),repr(iv)))
         encoded = codecs.encode(codecs.decode(input,'utf-8'), 'rot_13')
         return encoded
@@ -104,7 +104,7 @@ class FieldEncryptionTests(ConnectionTestCase):
         keystore.set_key('key', 'my-secret')
         try:
             provider = AESCryptoProvider(keystore=keystore)
-        except couchbase_v2.exceptions.NotFoundError:
+        except couchbase_v2.exceptions.DocumentNotFoundException:
             raise SkipTest("C Crypto module not found, skipping")
 
         document = {'sensitive': 'secret'}
@@ -197,7 +197,7 @@ class FieldEncryptionTests(ConnectionTestCase):
         # register encryption provider with LCB
         try:
             self.cb.register_crypto_provider('rot13', provider)
-        except couchbase_v2.exceptions.NotSupportedError as e:
+        except couchbase_v2.exceptions.NotSupportedException as e:
             raise SkipTest(e)
         return document, fieldspec, provider
 
@@ -207,7 +207,7 @@ class FieldEncryptionTests(ConnectionTestCase):
             exceptions = list(type(couchbase_v2.exceptions.exc_from_rc(rc)) for rc in rcs)
             document, fieldspec, provider = self._setup_encryption()
             def dummy(*args,**kwargs):
-                raise couchbase_v2.exceptions.TemporaryFailError(params=dict(rc=_LCB.LCB_ERR_TEMPORARY_FAILURE))
+                raise couchbase_v2.exceptions.TemporaryFailException(params=dict(rc=_LCB.LCB_ERR_TEMPORARY_FAILURE))
             logging.error("corrupting method:{}".format(name))
             setattr(provider, name, dummy)
             valid_exception_raised = False

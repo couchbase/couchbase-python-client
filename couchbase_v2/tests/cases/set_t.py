@@ -21,7 +21,7 @@ from time import sleep
 from nose.plugins.attrib import attr
 
 from couchbase_core import FMT_JSON, FMT_PICKLE, FMT_UTF8
-from couchbase_v2.exceptions import (KeyExistsError, ArgumentError, NotFoundError)
+from couchbase_v2.exceptions import (KeyExistsException, ArgumentException, DocumentNotFoundException)
 from couchbase_tests.base import ConnectionTestCase
 import json
 
@@ -56,7 +56,7 @@ class UpsertTest(ConnectionTestCase):
         rv1 = self.cb.upsert(key, 'value1')
         self.assertTrue(rv1.cas > 0)
 
-        self.assertRaises(KeyExistsError, self.cb.upsert,
+        self.assertRaises(KeyExistsException, self.cb.upsert,
                           key, 'value2', cas=rv1.cas+1)
 
         rv2 = self.cb.upsert(key, 'value3', cas=rv1.cas)
@@ -76,7 +76,7 @@ class UpsertTest(ConnectionTestCase):
         self.assertEqual(rv.value, 'value_ttl')
         # Make sure the key expires
         sleep(3)
-        self.assertRaises(NotFoundError, self.cb.get, key)
+        self.assertRaises(DocumentNotFoundException, self.cb.get, key)
 
     def test_set_objects(self):
         key = self.gen_key('set_objects')
@@ -100,7 +100,7 @@ class UpsertTest(ConnectionTestCase):
             self.assertTrue(k in rvs)
             self.assertTrue(rvs[k].success)
 
-        self.assertRaises((ArgumentError,TypeError), self.cb.upsert_multi, kv,
+        self.assertRaises((ArgumentException,TypeError), self.cb.upsert_multi, kv,
                           cas = 123)
 
     def test_add(self):
@@ -109,7 +109,7 @@ class UpsertTest(ConnectionTestCase):
         rv = self.cb.insert(key, "value")
         self.assertTrue(rv.cas)
 
-        self.assertRaises(KeyExistsError,
+        self.assertRaises(KeyExistsException,
                           self.cb.insert, key, "value")
 
     def test_replace(self):
@@ -123,11 +123,11 @@ class UpsertTest(ConnectionTestCase):
         rv = self.cb.replace(key, "value", cas=rv.cas)
         self.assertTrue(rv.cas)
 
-        self.assertRaises(KeyExistsError,
+        self.assertRaises(KeyExistsException,
                           self.cb.replace, key, "value", cas=0xdeadbeef)
 
         self.cb.remove(key, quiet=True)
-        self.assertRaises(NotFoundError,
+        self.assertRaises(DocumentNotFoundException,
                           self.cb.replace, key, "value")
 
     def test_from_json_string(self):

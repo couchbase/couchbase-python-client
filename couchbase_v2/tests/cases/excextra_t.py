@@ -30,13 +30,13 @@ class ExceptionsTest(ConnectionTestCase):
 
         try:
             self.cb.get(key, quiet=False)
-        except E.CouchbaseError as e:
+        except E.CouchbaseException as e:
             exc = e
 
         self.assertTrue(exc)
-        self.assertIsInstance(exc, E.CouchbaseError)
+        self.assertIsInstance(exc, E.CouchbaseException)
         self.assertTrue(exc.message)
-        self.assertIsInstance(exc, E.NotFoundError)
+        self.assertIsInstance(exc, E.DocumentNotFoundException)
         self.assertEqual(exc.key, key)
         self.assertIsInstance(exc.all_results, self.cls_MultiResult)
         self.assertTrue(key in exc.all_results)
@@ -55,11 +55,11 @@ class ExceptionsTest(ConnectionTestCase):
         try:
             self.cb.get_multi(list(kv_missing.keys()) + list(kv_existing.keys()),
                         quiet=False)
-        except E.CouchbaseError as e:
+        except E.CouchbaseException as e:
             exc = e
 
         self.assertTrue(exc)
-        self.assertIsInstance(exc, E.NotFoundError)
+        self.assertIsInstance(exc, E.DocumentNotFoundException)
         self.assertEqual(len(exc.all_results),
                          len(kv_missing) + len(kv_existing))
 

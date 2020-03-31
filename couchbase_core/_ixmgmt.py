@@ -15,7 +15,7 @@
 #
 # This module is used internally by the BucketManager class. Do not use
 # this module directly.
-import couchbase_core.exceptions as E
+import couchbase.exceptions as E
 import couchbase_core._libcouchbase as C
 from couchbase_core import _to_json
 
@@ -145,10 +145,10 @@ class IxmgmtRequest(object):
         while not self.raw.done:
             try:
                 raw_rows = self.__raw.fetch(self._mres)
-            except E.CouchbaseError as ex:
-                if ex.CODE == E.KeyExistsError.CODE and self._ignore_exists:
+            except E.CouchbaseException as ex:
+                if ex.CODE == E.DocumentExistsException.CODE and self._ignore_exists:
                     break
-                elif ex.CODE == E.NotFoundError.CODE and self._ignore_missing:
+                elif ex.CODE == E.DocumentNotFoundException.CODE and self._ignore_missing:
                     break
                 else:
                     raise

@@ -222,7 +222,7 @@ int pycbc_oputil_check_sequence(PyObject *sequence,
  * below). This may not be the same as the sequence object itself (i.e. it
  * could be the iterator object).
  *
- * If an error is encountered, a CouchbaseError is set, and this function
+ * If an error is encountered, a CouchbaseException is set, and this function
  * returns NULL.
  */
 
@@ -244,7 +244,7 @@ PyObject *pycbc_oputil_iter_prepare(pycbc_seqtype_t seqtype,
  * new reference.
  * @param value the value for the current iteration. If the sequence is not
  * a dictionary, this is always NULL. This is populated with a new referenced
- * @return 0 on success, -1 on failure (with a CouchbaseError set)
+ * @return 0 on success, -1 on failure (with a CouchbaseException set)
  */
 int pycbc_oputil_sequence_next(pycbc_seqtype_t seqtype,
                                PyObject *seqobj,

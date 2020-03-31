@@ -17,10 +17,10 @@
 
 from couchbase_tests.base import ViewTestCase, SkipTest
 from couchbase_v2.views.iterator import (
-    View, ViewRow, RowProcessor, AlreadyQueriedError)
+    View, ViewRow, RowProcessor, AlreadyQueriedException)
 
 from couchbase_v2.views.params import Query, UNSPEC
-from couchbase_v2.exceptions import ArgumentError, CouchbaseError, HTTPError
+from couchbase_v2.exceptions import ArgumentException, CouchbaseException, HTTPException
 from couchbase_core._pyport import xrange
 from couchbase_core._bootstrap import MAX_URI_LENGTH
 
@@ -163,7 +163,7 @@ class ViewIteratorTest(ViewTestCase):
     def setUp(self):
         try:
             super(ViewIteratorTest, self).setUp(bucket='beer-sample')
-        except CouchbaseError:
+        except CouchbaseException:
             raise SkipTest("Need 'beer-sample' bucket for this")
         self.skipIfMock()
 
@@ -192,7 +192,7 @@ class ViewIteratorTest(ViewTestCase):
             self.assertTrue(doc.success)
 
         # Try with reduce
-        self.assertRaises(ArgumentError,
+        self.assertRaises(ArgumentException,
                           self.cb.query,
                           "beer", "by_location",
                           reduce=True,
@@ -201,7 +201,7 @@ class ViewIteratorTest(ViewTestCase):
     def test_bad_view(self):
         ret = self.cb.query("beer", "bad_view")
         self.assertIsInstance(ret, View)
-        self.assertRaises(HTTPError,
+        self.assertRaises(HTTPException,
                           tuple, ret)
 
     def test_streaming(self):
@@ -233,7 +233,7 @@ class ViewIteratorTest(ViewTestCase):
         del ret
 
     def test_mixed_query(self):
-        self.assertRaises(ArgumentError,
+        self.assertRaises(ArgumentException,
                           self.cb.query,
                           "d", "v",
                           query=Query(),
@@ -309,7 +309,7 @@ class ViewIteratorTest(ViewTestCase):
     def test_already_queried(self):
         ret = self.cb.query("beer", "brewery_beers", limit=5)
         list(ret)
-        self.assertRaises(AlreadyQueriedError, list, ret)
+        self.assertRaises(AlreadyQueriedException, list, ret)
 
     def test_no_rows(self):
         ret = self.cb.query("beer", "brewery_beers", limit=0)

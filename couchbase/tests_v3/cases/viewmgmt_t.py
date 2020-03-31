@@ -18,7 +18,7 @@
 from couchbase.management.views import DesignDocumentNamespace, View, DesignDocument, DesignDocumentNotFoundException, \
     GetDesignDocumentOptions, GetAllDesignDocumentsOptions, PublishDesignDocumentOptions
 from couchbase_tests.base import ClusterTestCase
-from couchbase.exceptions import HTTPError
+from couchbase.exceptions import HTTPException
 from datetime import timedelta
 
 
@@ -37,7 +37,7 @@ class DesignDocManagementTest(ClusterTestCase):
         # and be sure to drop it from the production namespace
         try:
             self.mgr.drop_design_document(self.DOCNAME, DesignDocumentNamespace.PRODUCTION)
-        except HTTPError:
+        except HTTPException:
             pass
         # now wait till we are sure the design doc is there
         self.try_n_times(10, 3, self.mgr.get_design_document, self.DOCNAME,

@@ -16,7 +16,7 @@
 from couchbase_tests.base import ConnectionTestCase
 
 from txcouchbase.tests.base import gen_base
-from couchbase_core.exceptions import NotFoundError
+from couchbase.exceptions import DocumentNotFoundException
 
 from couchbase.result import GetResult, MutationResult, MultiMutationResult
 
@@ -81,7 +81,7 @@ class OperationTestCase(Base):
 
         d = cb.get(key, quiet=False)
         def t(err):
-            self.assertIsInstance(err.value, NotFoundError)
+            self.assertIsInstance(err.value, DocumentNotFoundException)
             return True
 
         d.addCallback(lambda x: self.assertTrue(False))
@@ -100,7 +100,7 @@ class OperationTestCase(Base):
         d = cb.getMulti(kv.keys())
 
         def t(err):
-            self.assertIsInstance(err.value, NotFoundError)
+            self.assertIsInstance(err.value, DocumentNotFoundException)
             all_results = err.value.all_results
             for k, v in kv.items():
                 self.assertTrue(k in all_results)
@@ -112,7 +112,7 @@ class OperationTestCase(Base):
 
             res_fail = err.value.result
             self.assertFalse(res_fail.success)
-            self.assertTrue(NotFoundError._can_derive(res_fail.rc))
+            self.assertTrue(DocumentNotFoundException._can_derive(res_fail.rc))
 
         d.addErrback(t)
         return d

@@ -173,7 +173,7 @@ class SearchStringsTest(CouchbaseTestCase):
 
     def test_docid_query(self):
         qq = cbft.DocIdQuery([])
-        self.assertRaises(cbft.NoChildrenError, getattr, qq, 'encodable')
+        self.assertRaises(cbft.NoChildrenException, getattr, qq, 'encodable')
         qq.ids = ['foo', 'bar', 'baz']
         self.assertEqual({'ids': ['foo', 'bar', 'baz']}, qq.encodable)
 
@@ -226,18 +226,18 @@ class SearchStringsTest(CouchbaseTestCase):
     def test_disjunction_query(self):
         dq = cbft.DisjunctionQuery()
         self.assertEqual(1, dq.min)
-        self.assertRaises(cbft.NoChildrenError, getattr, dq, 'encodable')
+        self.assertRaises(cbft.NoChildrenException, getattr, dq, 'encodable')
 
         dq.disjuncts.append(cbft.PrefixQuery('somePrefix'))
         self.assertEqual({'min': 1, 'disjuncts': [{'prefix': 'somePrefix'}]},
                          dq.encodable)
         self.assertRaises(ValueError, setattr, dq, 'min', 0)
         dq.min = 2
-        self.assertRaises(cbft.NoChildrenError, getattr, dq, 'encodable')
+        self.assertRaises(cbft.NoChildrenException, getattr, dq, 'encodable')
 
     def test_conjunction_query(self):
         cq = cbft.ConjunctionQuery()
-        self.assertRaises(cbft.NoChildrenError, getattr, cq, 'encodable')
+        self.assertRaises(cbft.NoChildrenException, getattr, cq, 'encodable')
         cq.conjuncts.append(cbft.PrefixQuery('somePrefix'))
         self.assertEqual({'conjuncts': [{'prefix': 'somePrefix'}]},
                          cq.encodable)
@@ -251,7 +251,7 @@ class SearchStringsTest(CouchbaseTestCase):
         self.assertEqual({'terms': ['salty', 'beers']}, pq.encodable)
 
         pq = cbft.PhraseQuery()
-        self.assertRaises(cbft.NoChildrenError, getattr, pq, 'encodable')
+        self.assertRaises(cbft.NoChildrenException, getattr, pq, 'encodable')
         pq.terms.append('salty')
         self.assertEqual({'terms': ['salty']}, pq.encodable)
 

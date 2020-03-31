@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from couchbase.exceptions import UnknownHostError
+from couchbase.exceptions import UnknownHostException
 from twisted.internet import defer
 
-from couchbase_core.exceptions import (
-    ObjectDestroyedError)
+from couchbase.exceptions import (
+    ObjectDestroyedException)
 
 from couchbase_tests.base import ConnectionTestCase
 from couchbase_core.connstr import ConnectionString
@@ -49,7 +49,7 @@ class BasicClusterTest(Base):
         cb = self.make_connection(host="qweqwe")
         d = cb.on_connect()
         d.addCallback(lambda x: x, cb)
-        return self.assertFailure(d, UnknownHostError)
+        return self.assertFailure(d, UnknownHostException)
 
     @timed(10)
     def testBadEvent(self):
@@ -85,5 +85,5 @@ class BasicClusterTest(Base):
     def testConnectionDestroyed(self):
         cb = self.make_connection()
         d = cb.on_connect()
-        self.assertFailure(d, ObjectDestroyedError)
+        self.assertFailure(d, ObjectDestroyedException)
         return d

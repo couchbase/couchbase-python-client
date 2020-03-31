@@ -22,7 +22,7 @@ from nose.plugins.attrib import attr
 from couchbase_core import FMT_JSON
 
 from couchbase_v2.exceptions import (
-    NotFoundError)
+    DocumentNotFoundException)
 
 from couchbase_tests.base import ConnectionTestCase
 
@@ -44,7 +44,7 @@ class GetTest(ConnectionTestCase):
         self.assertFalse(rv.success)
 
         # Get with quiet=False
-        self.assertRaises(NotFoundError, self.cb.get, 'key_missing_1',
+        self.assertRaises(DocumentNotFoundException, self.cb.get, 'key_missing_1',
                           quiet=False)
 
     def test_multi_get(self):
@@ -83,7 +83,7 @@ class GetTest(ConnectionTestCase):
             self.assertTrue(k in rvs)
             self.assertFalse(rvs[k].success)
             self.assertTrue(rvs[k].value is None)
-            self.assertTrue(NotFoundError._can_derive(rvs[k].rc))
+            self.assertTrue(DocumentNotFoundException._can_derive(rvs[k].rc))
 
         for k, v in kv_existing.items():
             self.assertTrue(k in rvs)
@@ -95,7 +95,7 @@ class GetTest(ConnectionTestCase):
         cb_exc = None
         try:
             self.cb.get_multi(list(kv_existing.keys()) + list(kv_missing.keys()))
-        except NotFoundError as e:
+        except DocumentNotFoundException as e:
             cb_exc = e
 
         self.assertTrue(cb_exc)
@@ -167,7 +167,7 @@ class GetTest(ConnectionTestCase):
         sleep(2)
         rv = self.cb.get(key, quiet=True)
         self.assertFalse(rv.success)
-        self.assertTrue(NotFoundError._can_derive(rv.rc))
+        self.assertTrue(DocumentNotFoundException._can_derive(rv.rc))
 
     @attr('slow')
     def test_get_multi_ttl(self):
@@ -183,7 +183,7 @@ class GetTest(ConnectionTestCase):
         for k, v in rvs.items():
             self.assertFalse(v.success)
             self.assertTrue(k in kvs)
-            self.assertTrue(NotFoundError._can_derive(v.rc))
+            self.assertTrue(DocumentNotFoundException._can_derive(v.rc))
 
 if __name__ == '__main__':
     unittest.main()

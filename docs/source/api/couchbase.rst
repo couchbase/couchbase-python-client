@@ -158,7 +158,7 @@ Each format specifier has specific rules about what data types it accepts.
 
     Pass the value as a UTF-8 encoded string. This accepts `unicode` objects.
     It may also accept `str` objects if their content is encodable as UTF-8
-    (otherwise a :exc:`~couchbase.exceptions.ValueFormatError` is
+    (otherwise a :exc:`~couchbase.exceptions.ValueFormatException` is
     thrown).
 
     Values with `FMT_UTF8` are retrieved as `unicode` objects (for Python 3
@@ -597,7 +597,7 @@ Attributes
         It controlls whether to raise an exception when the client
         executes operations on non-existent keys (default: `False`).
         If it is `False` it will raise
-        :exc:`couchbase.exceptions.NotFoundError` exceptions. When
+        :exc:`couchbase.exceptions.NotFoundException` exceptions. When
         set to `True` the operations will not raise an exception, but
         still set an error inside the :class:`~couchbase.result.Result` object.
 

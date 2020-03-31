@@ -16,7 +16,7 @@
 #
 from unittest import SkipTest
 
-from couchbase_v2.exceptions import ArgumentError, TimeoutError
+from couchbase_v2.exceptions import ArgumentException, TimeoutException
 from couchbase_tests.base import MockTestCase
 import couchbase_core._libcouchbase as LCB
 class EndureTest(MockTestCase):
@@ -26,7 +26,7 @@ class EndureTest(MockTestCase):
             raise SkipTest("Endure op not supported in V4")
         super(EndureTest,self).setUp(**kwargs)
     def test_excessive(self):
-        self.assertRaises(ArgumentError,
+        self.assertRaises(ArgumentException,
                           self.cb.set,
                           "foo", "bar",
                           persist_to=99, replicate_to=99)
@@ -50,7 +50,7 @@ class EndureTest(MockTestCase):
                                           replica_count=self.mock.replicas)
 
             self.cb._dur_testhook = cb2
-            self.assertRaises(TimeoutError, self.cb.set, key, "value")
+            self.assertRaises(TimeoutException, self.cb.set, key, "value")
 
     def test_embedded_endure_delete(self):
         key = self.gen_key("embedded_endure_delete")
@@ -79,7 +79,7 @@ class EndureTest(MockTestCase):
                                    cas=cas, value="blah")
 
             self.cb._dur_testhook =  None
-            self.assertRaises(TimeoutError, self.cb.delete, key)
+            self.assertRaises(TimeoutException, self.cb.delete, key)
 
 
     def test_single_poll(self):
@@ -100,7 +100,7 @@ class EndureTest(MockTestCase):
                                   replica_count=self.mock.replicas)
 
         obsres = self.cb.observe(key)
-        self.assertRaises(TimeoutError,
+        self.assertRaises(TimeoutException,
                           self.cb.endure,
                           key, persist_to=1, replicate_to=0,
                           timeout=0.1)
@@ -109,7 +109,7 @@ class EndureTest(MockTestCase):
         rv = self.cb.endure(key, persist_to=1, replicate_to=0)
         self.assertTrue(rv.success)
 
-        self.assertRaises(TimeoutError,
+        self.assertRaises(TimeoutException,
                           self.cb.endure,
                           key, persist_to=2,
                           replicate_to=0,

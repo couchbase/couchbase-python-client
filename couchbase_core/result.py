@@ -24,7 +24,7 @@ from couchbase_core._libcouchbase import (
     AsyncResult)
 from couchbase_core._pyport import long, xrange, izip
 import couchbase_core._libcouchbase as C
-import couchbase_core.exceptions as E
+import couchbase.exceptions as E
 
 
 class SubdocResult(C._SDResult):
@@ -122,7 +122,7 @@ class SubdocResult(C._SDResult):
         :return: A tuple of `(error, value)`. If the entry does not exist
             then `(err, default)` is returned, where `err` is the actual error
             which occurred.
-            You can use :meth:`couchbase_core.exceptions.CouchbaseError.rc_to_exctype`
+            You can use :meth:`couchbase.exceptions.CouchbaseException.rc_to_exctype`
             to convert the error code to a proper exception class
         :raise: :exc:`IndexError` or :exc:`KeyError` if `path_or_index`
             is not an initially requested path. This is a programming error
@@ -145,7 +145,7 @@ class SubdocResult(C._SDResult):
         result = self._resolve(path_or_index)
         if not result[0]:
             return True
-        elif E.SubdocPathNotFoundError._can_derive(result[0]):
+        elif E.PathNotFoundException._can_derive(result[0]):
             return False
         else:
             raise E.exc_from_rc(result[0])

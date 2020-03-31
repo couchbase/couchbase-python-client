@@ -19,8 +19,8 @@ from time import sleep
 
 from nose.plugins.attrib import attr
 
-from couchbase_core.exceptions import (
-    TemporaryFailError, KeyExistsError, ArgumentError)
+from couchbase.exceptions import (
+    TemporaryFailException, DocumentExistsException, ArgumentException)
 
 from couchbase_tests.base import ConnectionTestCase
 
@@ -35,20 +35,20 @@ class LockTest(ConnectionTestCase):
 
         self.assertTrue(rv.success)
         self.assertEqual(rv.value, v)
-        self.assertRaises(KeyExistsError, self.cb.set, k, v)
+        self.assertRaises(DocumentExistsException, self.cb.upsert, k, v)
 
-        self.assertRaises(TemporaryFailError, self.cb.lock, k, ttl=5)
+        self.assertRaises(TemporaryFailException, self.cb.lock, k, ttl=5)
 
         # Test set-while-locked
-        self.assertRaises(KeyExistsError, self.cb.set, k, v)
+        self.assertRaises(DocumentExistsException, self.cb.upsert, k, v)
 
-        self.assertRaises(TemporaryFailError, self.cb.unlock, k, cas=0xdeadbeef)
+        self.assertRaises(TemporaryFailException, self.cb.unlock, k, cas=0xdeadbeef)
 
         rv = self.cb.unlock(k, rv.cas)
         self.assertTrue(rv.success)
 
         # Unlocked with key already unlocked
-        self.assertRaises(TemporaryFailError,
+        self.assertRaises(TemporaryFailException,
                           self.cb.unlock,
                           k,
                           1234)
@@ -94,16 +94,16 @@ class LockTest(ConnectionTestCase):
         self.assertTrue(rvs[key].success)
 
     def test_missing_expiry(self):
-        self.assertRaises(ArgumentError,
+        self.assertRaises(ArgumentException,
                           self.cb.lock, "foo")
-        self.assertRaises(ArgumentError, self.cb.lock_multi,
+        self.assertRaises(ArgumentException, self.cb.lock_multi,
                           ("foo", "bar"))
 
     def test_missing_cas(self):
-        self.assertRaises(ArgumentError,
+        self.assertRaises(ArgumentException,
                           self.cb.unlock_multi,
                           ("foo", "bar"))
-        self.assertRaises(ArgumentError,
+        self.assertRaises(ArgumentException,
                           self.cb.unlock_multi,
                           {"foo":0, "bar":0})
 

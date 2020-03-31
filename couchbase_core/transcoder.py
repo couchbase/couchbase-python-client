@@ -22,7 +22,7 @@ import pickle
 from couchbase_core._libcouchbase import (FMT_JSON, FMT_AUTO,
                        FMT_BYTES, FMT_UTF8, FMT_PICKLE,
                        FMT_LEGACY_MASK, FMT_COMMON_MASK)
-from .exceptions import ValueFormatError
+
 from couchbase_core._libcouchbase import Transcoder
 from couchbase_core._pyport import unicode
 

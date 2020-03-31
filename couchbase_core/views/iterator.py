@@ -19,13 +19,13 @@ from collections import namedtuple
 from copy import deepcopy
 from warnings import warn
 
-from ..exceptions import ArgumentError, CouchbaseError, ViewEngineError, NotSupportedError
+from couchbase.exceptions import ArgumentException, CouchbaseException, ViewEngineException, NotSupportedException
 from .params import ViewQuery, SpatialQuery, QueryBase
 from couchbase_core._pyport import basestring
 import couchbase_core._libcouchbase as C
 
 
-class AlreadyQueriedError(CouchbaseError):
+class AlreadyQueriedException(CouchbaseException):
     """Thrown when iterating over a View which was already iterated over"""
 
 
@@ -234,7 +234,7 @@ class View(object):
         """
 
         if parent.btype == C.LCB_BTYPE_EPHEMERAL:
-            raise NotSupportedError("Ephemeral bucket")
+            raise NotSupportedException("Ephemeral bucket")
         self._parent = parent
         self.design = design
         self.view = view
@@ -247,7 +247,7 @@ class View(object):
         self.__meta_received = False
 
         if query and params:
-            raise ArgumentError.pyexc(
+            raise ArgumentException.pyexc(
                 "Extra parameters are mutually exclusive with the "
                 "'query' argument. Use query.update() to add extra arguments")
 
@@ -266,7 +266,7 @@ class View(object):
             self._flags |= C.LCB_CMDVIEWQUERY_F_SPATIAL
 
         if include_docs and self._query.reduce:
-            raise ArgumentError.pyexc(
+            raise ArgumentException.pyexc(
                 "include_docs is only applicable for map-only views, but "
                 "'reduce', 'group', or 'group_level' was specified; or "
                 "this is a spatial query",
@@ -347,8 +347,8 @@ class View(object):
         self._errors += [errors]
 
         if self._query.on_error != 'continue':
-            raise ViewEngineError.pyexc("Error while executing view.",
-                                        self._errors)
+            raise ViewEngineException.pyexc("Error while executing view.",
+                                            self._errors)
         else:
             warn("Error encountered when executing view. Inspect 'errors' "
                  "for more information")
@@ -376,7 +376,7 @@ class View(object):
         Returns a row for each query.
         The type of the row depends on the :attr:`row_processor` being used.
 
-        :raise: :exc:`~couchbase_core.exceptions.ViewEngineError`
+        :raise: :exc:`~couchbase.exceptions.ViewEngineException`
 
             If an error was encountered while processing the view, and the
             :attr:`~couchbase_core.views.params.Query.on_error`
@@ -386,13 +386,13 @@ class View(object):
             screen (via ``warnings.warn`` and operation continues). To inspect
             the error, examine :attr:`errors`
 
-        :raise: :exc:`AlreadyQueriedError`
+        :raise: :exc:`AlreadyQueriedException`
 
             If this object was already iterated
             over and the last result was already returned.
         """
         if not self._do_iter:
-            raise AlreadyQueriedError.pyexc(
+            raise AlreadyQueriedException.pyexc(
                 "This object has already been executed. Create a new one to "
                 "query again")
 

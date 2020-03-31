@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-from couchbase_v2.exceptions import (KeyExistsError, NotFoundError)
+from couchbase_v2.exceptions import (KeyExistsException, DocumentNotFoundException)
 from couchbase_tests.base import ConnectionTestCase
 
 class DeleteTest(ConnectionTestCase):
@@ -34,12 +34,12 @@ class DeleteTest(ConnectionTestCase):
     def test_delete_notfound(self):
         # Delete a key that does not exist.
         # With 'quiet' ensure that it returns false. Without 'quiet', ensure that
-        # it raises a NotFoundError
+        # it raises a DocumentNotFoundException
 
         self.cb.remove("foo", quiet = True)
         rv = self.cb.remove("foo", quiet = True)
         self.assertFalse(rv.success)
-        self.assertRaises(NotFoundError, self.cb.remove, 'foo')
+        self.assertRaises(DocumentNotFoundException, self.cb.remove, 'foo')
 
     def test_delete_cas(self):
         # Delete with a CAS value. Ensure that it returns OK
@@ -55,7 +55,7 @@ class DeleteTest(ConnectionTestCase):
 
         key = self.gen_key("delete_badcas")
         self.cb.upsert(key, 'bar')
-        self.assertRaises(KeyExistsError,
+        self.assertRaises(KeyExistsException,
                 self.cb.remove, key, cas = 0xdeadbeef)
 
     def test_delete_multi(self):
@@ -116,7 +116,7 @@ class DeleteTest(ConnectionTestCase):
 
         # Set one to have a bad CAS
         cas_rvs[keys[0]] = 0xdeadbeef
-        self.assertRaises(KeyExistsError,
+        self.assertRaises(KeyExistsException,
                           self.cb.remove_multi, cas_rvs)
 
 if __name__ == '__main__':

@@ -135,7 +135,7 @@ class ConstrainedInt(object):
         A signed integer between cls.min() and cls.max() inclusive
 
         :param couchbase.options.AcceptableInts value: the value to initialise this with.
-        :raise: :exc:`~couchbase.exceptions.ArgumentError` if not in range
+        :raise: :exc:`~couchbase.exceptions.ArgumentException` if not in range
         """
         self.value = type(self).verified_value(value)
 
@@ -145,7 +145,7 @@ class ConstrainedInt(object):
         # type: (...) -> int
         value = getattr(item, 'value', item)
         if not isinstance(value, int) or not (cls.min()<=value<=cls.max()):
-            raise couchbase.exceptions.ArgumentError("Integer in range {} and {} inclusiverequired".format(cls.min(), cls.max()))
+            raise couchbase.exceptions.ArgumentException("Integer in range {} and {} inclusiverequired".format(cls.min(), cls.max()))
         return value
 
     @classmethod
@@ -154,7 +154,7 @@ class ConstrainedInt(object):
                  ):
         if isinstance(item, cls):
             return item
-        raise couchbase.exceptions.ArgumentError("Argument is not {}".format(cls))
+        raise couchbase.exceptions.ArgumentException("Argument is not {}".format(cls))
 
     def __neg__(self):
         return -self.value
@@ -177,7 +177,7 @@ class SignedInt64(ConstrainedInt):
         A signed integer between -0x8000000000000000 and +0x7FFFFFFFFFFFFFFF inclusive.
 
         :param couchbase.options.AcceptableInts value: the value to initialise this with.
-        :raise: :exc:`~couchbase.exceptions.ArgumentError` if not in range
+        :raise: :exc:`~couchbase.exceptions.ArgumentException` if not in range
         """
         super(SignedInt64,self).__init__(value)
     @classmethod

@@ -17,7 +17,7 @@
 
 from couchbase_core.asynchronous.bucket import AsyncClientFactory as CoreAsyncBucketFactory
 from couchbase_core.asynchronous.view import AsyncViewBase
-from couchbase_core.exceptions import ArgumentError
+from couchbase.exceptions import ArgumentException
 from couchbase_v2.bucket import Bucket
 from couchbase_core._pyport import with_metaclass
 
@@ -41,7 +41,7 @@ class AsyncBucket(CoreAsyncBucketFactory.gen_async_client(Bucket)):
         """
         itercls=kwargs.get('itercls', None)
         if not issubclass(itercls, AsyncViewBase):
-            raise ArgumentError.pyexc("itercls was {} must be defined "
+            raise ArgumentException.pyexc("itercls was {} must be defined "
                                       "and must be derived from AsyncViewBase".format(itercls))
 
         return super(AsyncBucket, self).query(*args, **kwargs)

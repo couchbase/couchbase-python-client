@@ -28,8 +28,8 @@ except ImportError:
 
 from couchbase_tests.base import ConnectionTestCaseBase
 from couchbase_core.user_constants import FMT_AUTO, FMT_JSON, FMT_PICKLE
-from couchbase_v2.exceptions import ClientTemporaryFailError
-from couchbase_v2.exceptions import CouchbaseError
+from couchbase_v2.exceptions import ClientTemporaryFailException
+from couchbase_v2.exceptions import CouchbaseException
 import re
 import couchbase_core._libcouchbase as _LCB
 from couchbase_core import couchbase_core
@@ -89,7 +89,7 @@ class MiscTest(ConnectionTestCaseBase):
         self.assertFalse(cb.closed)
         cb._close()
         self.assertTrue(cb.closed)
-        self.assertRaises(ClientTemporaryFailError, self.cb.get, "foo")
+        self.assertRaises(ClientTemporaryFailException, self.cb.get, "foo")
 
 
     def test_fmt_args(self):
@@ -114,8 +114,8 @@ class MiscTest(ConnectionTestCaseBase):
         # Doesn't crash? good enough
 
         # Try with something invalid
-        self.assertRaises(CouchbaseError, cb._cntl, 0xf000)
-        self.assertRaises(CouchbaseError, cb._cntl, 0x01, "string")
+        self.assertRaises(CouchbaseException, cb._cntl, 0xf000)
+        self.assertRaises(CouchbaseException, cb._cntl, 0x01, "string")
 
         # Try with something else now. Operation timeout
         rv = cb._cntl(0x00, value_type="timeout")
@@ -237,7 +237,7 @@ class MiscTest(ConnectionTestCaseBase):
                     cb = self.make_connection(compression=connstr)
                     if min_size:
                         if min_size < 32:
-                            self.assertRaises(CouchbaseInputError, set_comp)
+                            self.assertRaises(CouchbaseInputException, set_comp)
                         else:
                             set_comp()
 
@@ -277,5 +277,5 @@ class MiscTest(ConnectionTestCaseBase):
             def raiser():
                 raise exception
 
-            self.assertRaisesRegex(InternalSDKError, r'self->nremaining!=0, resetting to 0', raiser)
+            self.assertRaisesRegex(InternalSDKException, r'self->nremaining!=0, resetting to 0', raiser)
 

@@ -17,7 +17,7 @@
 import warnings
 
 from couchbase_tests.base import ConnectionTestCase
-from couchbase_v2.exceptions import NotFoundError, TemporaryFailError
+from couchbase_v2.exceptions import DocumentNotFoundException, TemporaryFailException
 import couchbase_core._libcouchbase as LCB
 
 class DupKeyTest(ConnectionTestCase):
@@ -48,13 +48,13 @@ class DupKeyTest(ConnectionTestCase):
                 print(m.__name__)
                 try:
                     m(("foo", "foo"))
-                except NotFoundError:
+                except DocumentNotFoundException:
                     pass
                 self._assertWarned(wlog)
 
             try:
                 self.cb.lock_multi(("foo", "foo"), ttl=5)
-            except NotFoundError:
+            except DocumentNotFoundException:
                 pass
             self._assertWarned(wlog)
 
@@ -63,6 +63,6 @@ class DupKeyTest(ConnectionTestCase):
 
             try:
                 self.cb.unlock_multi((rv, rv))
-            except (NotFoundError, TemporaryFailError):
+            except (DocumentNotFoundException, TemporaryFailException):
                 pass
             self._assertWarned(wlog)

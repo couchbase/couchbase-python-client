@@ -2,8 +2,9 @@ import json
 
 from couchbase_core._libcouchbase import Bucket as _Base
 
-import couchbase_core.exceptions as E
-from couchbase_core.exceptions import NotImplementedInV3
+import couchbase.exceptions as E
+from couchbase_core.analytics import AnalyticsQuery
+from couchbase.exceptions import NotImplementedInV3
 from couchbase_core.n1ql import N1QLQuery, N1QLRequest
 from couchbase_core.views.iterator import View
 from .views.params import make_options_string, make_dvpath
@@ -16,8 +17,6 @@ from typing import *
 from .durability import Durability
 from .result import Result
 from couchbase_core.analytics import AnalyticsQuery
-
-
 
 
 ViewInstance = TypeVar('ViewInstance', bound=View)
@@ -63,7 +62,7 @@ class Client(_Base):
         :param boolean quiet: the flag controlling whether to raise an
             exception when the client executes operations on
             non-existent keys. If it is `False` it will raise
-            :exc:`.NotFoundError` exceptions. When
+            :exc:`.DocumentNotFoundException` exceptions. When
             set to `True` the operations will return `None` silently.
 
         :param boolean unlock_gil: If set (which is the default), the
@@ -91,13 +90,13 @@ class Client(_Base):
             to propagate any tracing information. Requires
             tracing to be enabled.
 
-        :raise: :exc:`.BucketNotFoundError` or :exc:`.AuthError` if
+        :raise: :exc:`.BucketNotFoundException` or :exc:`.AuthenticationException` if
             there is no such bucket to connect to, or if invalid
             credentials were supplied.
-        :raise: :exc:`.CouchbaseNetworkError` if the socket wasn't
+        :raise: :exc:`.CouchbaseNetworkException` if the socket wasn't
             accessible (doesn't accept connections or doesn't respond
             in
-        :raise: :exc:`.InvalidError` if the connection string
+        :raise: :exc:`.InvalidException` if the connection string
             was malformed.
 
         :return: instance of :class:`~couchbase_core.client.Client`
@@ -149,7 +148,7 @@ class Client(_Base):
         try:
             from couchbase_core._version import __version__ as cb_version
             self._cntlstr('client_string', 'PYCBC/' + cb_version)
-        except E.NotSupportedError:
+        except E.NotSupportedException:
             pass
 
         for ctl, val in strcntls.items():
@@ -160,7 +159,7 @@ class Client(_Base):
 
         try:
             self._do_ctor_connect()
-        except E.CouchbaseError as e:
+        except E.CouchbaseException as e:
             if not _no_connect_exceptions:
                 raise
 
@@ -543,7 +542,7 @@ class Client(_Base):
         and node service summary lists as a value.
 
 
-        :raise: :exc:`.CouchbaseNetworkError`
+        :raise: :exc:`.CouchbaseNetworkException`
         :return: `dict` where keys are stat keys and values are
             host-value pairs
 
@@ -562,7 +561,7 @@ class Client(_Base):
         It returns a `dict` with details
 
 
-        :raise: :exc:`.CouchbaseNetworkError`
+        :raise: :exc:`.CouchbaseNetworkException`
         :return: `dict` where keys are stat keys and values are
             host-value pairs
 

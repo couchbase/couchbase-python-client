@@ -22,7 +22,7 @@ import json
 from copy import deepcopy
 
 from couchbase_core._pyport import long, ulp, basestring
-from ..exceptions import ArgumentError
+from couchbase.exceptions import ArgumentException
 
 # Some constants
 STALE_UPDATE_BEFORE = "false"
@@ -56,7 +56,7 @@ def _bool_param_handler(input):
 
     if isinstance(input, basestring):
         if input not in ("true", "false"):
-            raise ArgumentError.pyexc("String for boolean must be "
+            raise ArgumentException.pyexc("String for boolean must be "
                                       "'true' or 'false'", input)
         return input
 
@@ -68,7 +68,7 @@ def _bool_param_handler(input):
             return "false"
 
     except TypeError:
-        raise ArgumentError.pyexc("Boolean value must be boolean, "
+        raise ArgumentException.pyexc("Boolean value must be boolean, "
                                   "numeric, or a string of 'true' "
                                   "or 'false'", input)
 
@@ -76,12 +76,12 @@ def _bool_param_handler(input):
 def _num_param_handler(input):
     # Don't allow booleans:
     if isinstance(input, bool):
-        raise ArgumentError.pyexc("Cannot use booleans as numeric values",
-                                  input)
+        raise ArgumentException.pyexc("Cannot use booleans as numeric values",
+                                      input)
     try:
         return str(int(input))
     except Exception as e:
-        raise ArgumentError.pyexc("Expected a numeric argument", input, e)
+        raise ArgumentException.pyexc("Expected a numeric argument", input, e)
 
 
 def _string_param_common(input, do_quote=False):
@@ -94,15 +94,15 @@ def _string_param_common(input, do_quote=False):
         s = input
 
     elif isinstance(input, bool):
-        raise ArgumentError.pyexc("Can't use boolean as string", input)
+        raise ArgumentException.pyexc("Can't use boolean as string", input)
 
     elif isinstance(input, (int, long, float)):
         # Basic numeric types:
         s = str(input)
 
     else:
-        raise ArgumentError.pyexc("Expected simple numeric type or string ",
-                                  input)
+        raise ArgumentException.pyexc("Expected simple numeric type or string ",
+                                      input)
     if do_quote:
         s = ulp.quote(s)
 
@@ -129,7 +129,7 @@ def _stale_param_handler(input):
 
 def _onerror_param_handler(input):
     if input not in (ONERROR_CONTINUE, ONERROR_STOP):
-        raise ArgumentError.pyexc(
+        raise ArgumentException.pyexc(
             "on_error must be 'continue' or 'stop'", input)
 
     return input
@@ -140,13 +140,13 @@ def _jval_param_handler(input):
         ret = json.dumps(input)
         return _string_param_handler(ret)
     except Exception as e:
-        raise ArgumentError.pyexc("Couldn't convert value to JSON", input, e)
+        raise ArgumentException.pyexc("Couldn't convert value to JSON", input, e)
 
 
 def _jarry_param_handler(input):
     ret = _jval_param_handler(input)
     if not ret.startswith('['):
-        raise ArgumentError.pyexc(
+        raise ArgumentException.pyexc(
             "Value must be converted to JSON array", input)
 
     return ret
@@ -252,7 +252,7 @@ class QueryBase(object):
         handler = _HANDLER_MAP.get(param)
         if not handler:
             if not self.unrecognized_ok:
-                raise ArgumentError.pyexc(
+                raise ArgumentException.pyexc(
                     "Unrecognized parameter. To use unrecognized parameters, "
                     "set 'unrecognized_ok' to True")
 
@@ -286,14 +286,14 @@ class QueryBase(object):
         """
 
         if not isinstance(value, (list, tuple, _Unspec)):
-            raise ArgumentError.pyexc(
+            raise ArgumentException.pyexc(
                 "Range specification for {0} must be a list, tuple or UNSPEC"
                 .format(k_sugar))
 
         if self._user_options.get(k_start, UNSPEC) is not UNSPEC or (
                 self._user_options.get(k_end, UNSPEC) is not UNSPEC):
 
-            raise ArgumentError.pyexc(
+            raise ArgumentException.pyexc(
                 "Cannot specify {0} with either {1} or {2}"
                 .format(k_sugar, k_start, k_end))
 
@@ -304,9 +304,9 @@ class QueryBase(object):
             return
 
         if len(value) not in (1, 2):
-            raise ArgumentError.pyexc("Range specification "
+            raise ArgumentException.pyexc("Range specification "
                                       "must have one or two elements",
-                                      value)
+                                          value)
 
         value = value[::]
         if len(value) == 1:
@@ -342,7 +342,7 @@ class QueryBase(object):
             a list of acceptable options and their values.
 
 
-        :raise: :exc:`couchbase_core.exceptions.ArgumentError` if a view option
+        :raise: :exc:`couchbase.exceptions.ArgumentException` if a view option
             or a combination of view options were deemed invalid.
 
         """
@@ -391,7 +391,7 @@ class QueryBase(object):
         for k, v in params.items():
             if not hasattr(self, k):
                 if not self.unrecognized_ok:
-                    raise ArgumentError.pyexc("Unknown option", k)
+                    raise ArgumentException.pyexc("Unknown option", k)
                 self._set_common(k, v)
 
             else:
@@ -419,7 +419,7 @@ class QueryBase(object):
         constructor.
 
         :return: a new :class:`Query` object
-        :raise: :exc:`ArgumentError` if the input is none of the acceptable
+        :raise: :exc:`ArgumentException` if the input is none of the acceptable
             types mentioned above. Also raises any exceptions possibly thrown
             by the constructor.
 
@@ -442,7 +442,7 @@ class QueryBase(object):
             return ret
 
         else:
-            raise ArgumentError.pyexc("Params must be Query, dict, or string")
+            raise ArgumentException.pyexc("Params must be Query, dict, or string")
 
     @classmethod
     def from_string(cls, qstr):

@@ -57,7 +57,7 @@ import couchbase_core._libcouchbase as _LCB
 import couchbase_core.tests.analytics_harness
 from couchbase.diagnostics import ServiceType
 import couchbase_core.fulltext as FT
-from couchbase.exceptions import KeyNotFoundException, KeyExistsException, NotSupportedError
+from couchbase.exceptions import DocumentNotFoundException, DocumentExistsException, NotSupportedException
 from couchbase.durability import ClientDurability, ServerDurability, DurabilityOptionBlock, Durability, \
     PersistTo, ReplicateTo
 
@@ -159,12 +159,12 @@ class Scenarios(CollectionTestCase):
             somecontents['some']['path'] = replacement_value
             somecontents['some'].update({'other': {'path': inserted_value}})
             self.assertEqual(somecontents, self.coll.get(key).content)
-        except NotSupportedError as e:
+        except NotSupportedException as e:
             if not self.is_mock:
                 raise
             else:
                 logging.error("Assuming failure is due to mock not supporting durability")
-        except couchbase.TimeoutError as e:
+        except couchbase.TimeoutException as e:
             self.assertIn("Operational",e.message)
             raise SkipTest("Raised {}, skipped pending further verification".format(e.message))
 
@@ -186,7 +186,7 @@ class Scenarios(CollectionTestCase):
                                                                   RemoveOptions(durability=ClientDurability(replicateTo,
                                                                                                             PersistTo.ONE))),
                                                      ReplicateTo.TWO, ReplicateTo.TWO, datetime.datetime.now() + timedelta(seconds=30))
-        except NotSupportedError as f:
+        except NotSupportedException as f:
             raise SkipTest("Using a ClientDurability should work, but it doesn't: {}".format(str(f)))
 
 
@@ -215,14 +215,14 @@ class Scenarios(CollectionTestCase):
             try:
                 callback(replicate_to)
                 success = True
-            except couchbase.exceptions.KeyNotFoundException:
+            except couchbase.exceptions.DocumentNotFoundException:
                 print("Our work here is done")
                 break
 
             except ReplicaNotConfiguredException as e:
                 print("Not enough replicas configured, aborting")
                 if self.is_mock:
-                    raise_from(NotSupportedError("Not enough replicas configured, aborting"),e)
+                    raise_from(NotSupportedException("Not enough replicas configured, aborting"), e)
                 else:
                     raise
 
@@ -276,7 +276,7 @@ class Scenarios(CollectionTestCase):
                 logging.info("Our work here is done")
                 return
 
-            except couchbase.exceptions.KeyNotFoundException:
+            except couchbase.exceptions.DocumentNotFoundException:
                 logging.info("Our work here is done")
                 return
         # Depending on the durability requirements, may want to also log this to an external system for human review
@@ -502,23 +502,23 @@ class Scenarios(CollectionTestCase):
         # TODO: rewrite these tests to test one thing at a time, if possible
         try:
             self.coll.remove_multi(test_dict.keys())
-        except KeyNotFoundException:
+        except DocumentNotFoundException:
             pass
-        self.assertRaises(KeyNotFoundException, self.coll.get, "Fred")
-        self.assertRaises(KeyNotFoundException, self.coll.get, "Barney")
+        self.assertRaises(DocumentNotFoundException, self.coll.get, "Fred")
+        self.assertRaises(DocumentNotFoundException, self.coll.get, "Barney")
         self.coll.upsert_multi(test_dict)
         result = self.coll.get_multi(test_dict.keys())
         self.assertEqual(Scenarios.get_multi_result_as_dict(result), test_dict)
         self.coll.remove_multi(test_dict.keys())
-        self.assertRaises(KeyNotFoundException, self.coll.get_multi, test_dict.keys())
+        self.assertRaises(DocumentNotFoundException, self.coll.get_multi, test_dict.keys())
         self.coll.insert_multi(test_dict)
-        self.assertRaises(KeyExistsException, self.coll.insert_multi, test_dict)
+        self.assertRaises(DocumentExistsException, self.coll.insert_multi, test_dict)
         result = self.coll.get_multi(test_dict.keys())
         self.assertEqual(Scenarios.get_multi_result_as_dict(result), test_dict)
         self.assertEqual(self.coll.get("Fred").content, "Wilma")
         self.assertEqual(self.coll.get("Barney").content, "Betty")
         self.coll.remove_multi(test_dict.keys())
-        self.assertRaises(KeyNotFoundException, self.coll.get_multi, test_dict.keys())
+        self.assertRaises(DocumentNotFoundException, self.coll.get_multi, test_dict.keys())
         self.coll.insert_multi(test_dict)
         test_dict_2 = {"Fred": "Cassandra", "Barney": "Raquel"}
         result = self.coll.replace_multi(test_dict_2)

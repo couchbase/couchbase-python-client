@@ -21,7 +21,7 @@ from couchbase.tests.base import ConnectionTestCase
 from couchbase.connstr import ConnectionString
 from couchbase._pyport import long
 from couchbase.n1ql import MutationState
-from couchbase.exceptions import NotSupportedError
+from couchbase.exceptions import NotSupportedException
 import logging
 
 
@@ -57,7 +57,7 @@ class MutationTokensTest(ConnectionTestCase):
             self.assertIsInstance(vb, (int, long))
             self.assertIsInstance(uuid, (int, long))
             self.assertIsInstance(seq, (int, long))
-        except NotSupportedError as e:
+        except NotSupportedException as e:
             # as per CCBC-1051
             logging.info("Skipped VBucket mutation info test because not supported: {}".format(e))
 
@@ -68,7 +68,7 @@ class MutationTokensTest(ConnectionTestCase):
         self.assertFalse(rv._mutinfo)
         try:
             self.assertEqual(0, len(cb._mutinfo()))
-        except NotSupportedError as e:
+        except NotSupportedException as e:
             # as per CCBC-1051
             logging.info("Skipped VBucket mutation info test because not supported: {}".format(e))
 

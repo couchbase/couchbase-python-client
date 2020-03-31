@@ -27,7 +27,7 @@ def on_inited(app):
     fns = [
         ('cb_bmeth', '~couchbase_core.client.Client', 'meth'),
         ('cb_sdmeth', '~couchbase_core.subdocument', 'func'),
-        ('cb_exc', 'couchbase_core.exceptions', 'exc')
+        ('cb_exc', 'couchbase.exceptions', 'exc')
     ]
 
     for newname, target, pyrole_name in fns:

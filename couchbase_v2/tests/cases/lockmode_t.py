@@ -18,7 +18,7 @@ from threading import Thread
 import time
 
 
-from couchbase_v2.exceptions import ObjectThreadError
+from couchbase_v2.exceptions import ObjectThreadException
 from couchbase_tests.base import CouchbaseTestCase
 from couchbase_core import LOCKMODE_WAIT, LOCKMODE_EXC, LOCKMODE_NONE
 
@@ -35,9 +35,9 @@ class LockmodeTest(CouchbaseTestCase):
         cb = self.make_connection(lockmode=LOCKMODE_NONE)
         self.assertEqual(cb.lockmode, LOCKMODE_NONE)
 
-        self.assertRaises(ObjectThreadError,
+        self.assertRaises(ObjectThreadException,
                           cb._thr_lockop, 1)
-        self.assertRaises(ObjectThreadError,
+        self.assertRaises(ObjectThreadException,
                           cb._thr_lockop, 0)
         cb.upsert(key, "value")
 
@@ -56,7 +56,7 @@ class LockmodeTest(CouchbaseTestCase):
 
         cb = self.make_connection()
         cb._thr_lockop(0)
-        self.assertRaises(ObjectThreadError,
+        self.assertRaises(ObjectThreadException,
                           cb.upsert,
                           key, "bar")
         cb._thr_lockop(1)

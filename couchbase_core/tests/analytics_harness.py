@@ -44,6 +44,8 @@ class CBASTestBase(RealServerTestCase):
         CBASTestBase.datasets = {'beers': ['beer', '21A IPA'], 'breweries': ['brewery', 'Kona Brewing']}
 
     def setUp(self, **kwargs):
+        if not os.environ.get("PYCBC_USE_ANALYTICS"):
+            raise SkipTest("Skipping broken analytics tests")
         pycbc_min_analytics = version_to_tuple(os.environ.get("PYCBC_MIN_ANALYTICS"))
 
         # analytics tests seem to fail on 5.5.2, seemingly because dataset creation semantics have changed

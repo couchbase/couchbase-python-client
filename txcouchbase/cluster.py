@@ -32,7 +32,7 @@ from couchbase_core.asynchronous.fulltext import AsyncSearchRequest
 from couchbase_core.asynchronous.n1ql import AsyncN1QLRequest
 from couchbase_core.asynchronous.view import AsyncViewBase
 from couchbase_core.client import Client as CoreClient
-from couchbase_core.exceptions import CouchbaseError
+from couchbase.exceptions import CouchbaseException
 from txcouchbase.iops import v0Iops
 from couchbase.bucket import AsyncBucket as V3AsyncBucket
 
@@ -297,7 +297,7 @@ class TxRawClientFactory(object):
                 def _on_err(mres, ex_type, ex_val, ex_tb):
                     try:
                         raise ex_type(ex_val)
-                    except CouchbaseError:
+                    except CouchbaseException:
                         d.errback()
                 opres.set_callbacks(d.callback, _on_err)
                 return d

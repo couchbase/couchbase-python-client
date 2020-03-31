@@ -18,12 +18,12 @@ from couchbase_core.n1ql import N1QLQuery
 from .options import OptionBlock, forward_args, OptionBlockDeriv
 from .bucket import Bucket, CoreClient
 from couchbase_core.cluster import _Cluster as CoreCluster, Authenticator as CoreAuthenticator
-from .exceptions import InvalidArgumentsException, SearchException, QueryException, ArgumentError, AnalyticsException
+from .exceptions import CouchbaseException, AlreadyShutdownException, InvalidArgumentsException, \
+    SearchException, DiagnosticsException, QueryException, ArgumentException, AnalyticsException
 import couchbase_core._libcouchbase as _LCB
 from couchbase_core._pyport import raise_from
 from couchbase.options import OptionBlockTimeOut
 from datetime import timedelta
-from couchbase.exceptions import AlreadyShutdownException, CouchbaseError
 from couchbase_core.cluster import *
 
 
@@ -237,7 +237,7 @@ class Cluster(CoreClient):
         cluster_opts = forward_args(kwargs, *options)  # type: Dict[str,Any]
         self._authenticator = cluster_opts.pop('authenticator', None)  # type: Authenticator
         if not self._authenticator:
-            raise ArgumentError("Authenticator is mandatory")
+            raise ArgumentException("Authenticator is mandatory")
 
         self.__admin = None
         self._cluster = CoreCluster(connection_string, bucket_factory=bucket_factory)  # type: CoreCluster
@@ -326,14 +326,14 @@ class Cluster(CoreClient):
 
     def _operate_on_cluster(self,
                             verb,
-                            failtype,  # type: Type[CouchbaseError]
+                            failtype,  # type: Type[CouchbaseException]
                             *args,
                             **kwargs):
 
         try:
             return verb(self, *args, **kwargs)
         except Exception as e:
-            raise_from(failtype(params=CouchbaseError.ParamType(message="Cluster operation failed", inner_cause=e)), e)
+            raise_from(failtype(params=CouchbaseException.ParamType(message="Cluster operation failed", inner_cause=e)), e)
 
     # for now this just calls functions.  We can return stuff if we need it, later.
     def _sync_operate_on_entire_cluster(self,

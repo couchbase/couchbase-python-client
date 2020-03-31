@@ -37,7 +37,7 @@ class Player(Item):
 
         # In an actual application you'd probably want to use 'add',
         # but since this app might be run multiple times, you don't
-        # want to get KeyExistsError
+        # want to get DocumentExistsException
         cb.upsert_multi(ItemSequence([it]))
         return it
 

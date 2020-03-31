@@ -3,7 +3,7 @@ import asyncio
 from couchbase_core.experimental import enable; enable()
 from .fixtures import asynct, AioTestCase
 from couchbase_core.n1ql import N1QLQuery
-from couchbase_core.exceptions import CouchbaseError
+from couchbase.exceptions import CouchbaseException
 from unittest import SkipTest
 
 
@@ -11,7 +11,7 @@ class CouchbaseBeerTest(AioTestCase):
     def setUp(self, **kwargs):
         try:
             return super(CouchbaseBeerTest,self).setUp(bucket='beer-sample', **kwargs)
-        except CouchbaseError:
+        except CouchbaseException:
             raise SkipTest("Need 'beer-sample' bucket for this")
 
 

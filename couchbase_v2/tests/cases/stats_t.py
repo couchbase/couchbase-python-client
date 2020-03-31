@@ -17,7 +17,7 @@
 from unittest import SkipTest
 
 from couchbase_tests.base import ConnectionTestCase, RealServerTestCase
-from couchbase.exceptions import NotSupportedError
+from couchbase.exceptions import NotSupportedException
 
 # For Python 2/3 compatibility
 try:
@@ -31,7 +31,7 @@ class StatsTest(ConnectionTestCase):
     def test_trivial_stats_without_argument(self):
         try:
             stats = self.cb.stats()
-        except NotSupportedError as e:
+        except NotSupportedException as e:
             raise SkipTest(e.message)
         self.assertIsInstance(stats, dict)
         self.assertTrue('curr_connections' in stats)
@@ -44,7 +44,7 @@ class StatsTest(ConnectionTestCase):
     def test_stats_with_argument(self):
         try:
             stats = self.cb.stats('memory')
-        except NotSupportedError as e:
+        except NotSupportedException as e:
             raise SkipTest(e.message)
         self.assertIsInstance(stats, dict)
         self.assertTrue('mem_used' in stats)
@@ -58,7 +58,7 @@ class StatsTest(ConnectionTestCase):
 
         try:
             stats = self.cb.stats(['memory'] + list(second_entry.keys()))
-        except NotSupportedError as e:
+        except NotSupportedException as e:
             raise SkipTest(e.message)
         self.assertIsInstance(stats, dict)
         self.assertTrue('mem_used' in stats)

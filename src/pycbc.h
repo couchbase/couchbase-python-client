@@ -1708,7 +1708,7 @@ PyObject* pycbc_exc_message(int mode, lcb_STATUS err, const char *msg);
 PyObject* pycbc_exc_get_categories(PyObject *self, PyObject *arg);
 /**
  * Throws an exception. If an exception is pending, it is caught and wrapped,
- * delivered into the CouchbaseError's 'inner_cause' field
+ * delivered into the CouchbaseException's 'inner_cause' field
  *
  * @param e_mode one of the PYCBC_EXC_* constants
  * @param e_err the LCB error code (use 0 if none)

@@ -31,7 +31,7 @@ this file at all. You have been warned
 import json
 import pickle
 
-import couchbase_core.exceptions as E
+import couchbase.exceptions as E
 import couchbase_core._libcouchbase as C
 from couchbase_core.items import ItemCollection, ItemOptionDict, ItemSequence
 from couchbase_core.result import SubdocResult
@@ -153,7 +153,7 @@ _default_helpers=dict(result_reprfunc=_result__repr__,
                       json_decode=json.loads,
                       lcb_errno_map=E._LCB_ERRNO_MAP,
                       misc_errno_map=E._EXCTYPE_MAP,
-                      default_exception=E.CouchbaseError,
+                      default_exception=E.CouchbaseException,
                       obsinfo_reprfunc=_observeinfo__repr__,
                       itmcoll_base_type=ItemCollection,
                       itmopts_dict_type=ItemOptionDict,

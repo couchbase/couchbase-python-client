@@ -22,7 +22,7 @@ import ctypes
 import logging
 import os.path
 import abc
-import couchbase_core.exceptions as exceptions
+import couchbase.exceptions
 import couchbase_core._libcouchbase as _LCB
 
 
@@ -186,7 +186,7 @@ class CTypesCryptoProvider(CryptoProvider):
                 break
             except Exception as e:
                 logging.error(str(e))
-                raise exceptions.NotFoundError("Couldn't load provider shared library")
+                raise couchbase.exceptions.DocumentNotFoundException("Couldn't load provider shared library")
         if crypto_dll:
             logging.debug("Crypto provider DLL=[" + repr(crypto_dll))
             try:
@@ -199,10 +199,10 @@ class CTypesCryptoProvider(CryptoProvider):
                 logging.debug("Crypto provider=" + format(provider, '02x'))
             except Exception as e:
                 logging.debug("Problem executing Crypto provider: " + str(e))
-                raise exceptions.NotFoundError("Couldn't initialise crypto provider shared library")
+                raise couchbase.exceptions.DocumentNotFoundException("Couldn't initialise crypto provider shared library")
 
             super(CTypesCryptoProvider, self).__init__(provider=provider)
             if self.keystore:
                 setattr(self, 'load_key', self.key_loader)
         else:
-            raise exceptions.NotFoundError("Couldn't find provider shared library")
+            raise couchbase.exceptions.DocumentNotFoundException("Couldn't find provider shared library")

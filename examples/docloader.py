@@ -30,7 +30,7 @@ import requests
 from couchbase_core.user_constants import FMT_JSON, FMT_BYTES
 from couchbase_core.transcoder import Transcoder
 from couchbase_v2.bucket import Bucket
-from couchbase_v2.exceptions import CouchbaseNetworkError, CouchbaseTransientError
+from couchbase_v2.exceptions import CouchbaseNetworkException, CouchbaseTransientException
 
 
 class DocLoader(object):
@@ -100,7 +100,7 @@ class DocLoader(object):
                 cb.transcoder = AlwaysJsonTranscoder()
                 cb.stats()
                 cb.timeout = 7.5
-            except CouchbaseNetworkError as e:
+            except CouchbaseNetworkException as e:
                 self.logger.exception(
                     'Got error while connecting. Sleeping for a bit')
                 sleep(1)
@@ -145,7 +145,7 @@ class DocLoader(object):
 
         try:
             self._client.upsert_multi(kvs)
-        except CouchbaseTransientError as e:
+        except CouchbaseTransientException as e:
             self.logger.info('Items have failed. Placing into retry queue: %r', e)
             for k, v in e.all_results.items():
                 if not v.success:

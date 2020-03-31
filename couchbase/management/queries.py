@@ -1,4 +1,3 @@
-from couchbase.exceptions import KeyNotFoundException, KeyExistsException
 from couchbase_core._ixmgmt import N1QL_PRIMARY_INDEX, IxmgmtRequest, N1qlIndex
 from couchbase_core.bucketmanager import BucketManager
 from couchbase.options import OptionBlock, OptionBlockTimeOut, forward_args, timedelta
@@ -7,15 +6,16 @@ from couchbase.management.generic import GenericManager
 import attr
 from attr.validators import instance_of as io, deep_mapping as dm
 from couchbase_core._pyport import Protocol
-from couchbase_core.exceptions import HTTPError, ErrorMapper, AnyPattern, QueryIndexAlreadyExistsError, QueryIndexNotFoundError
+from couchbase.exceptions import HTTPException, ErrorMapper, AnyPattern, QueryIndexAlreadyExistsException, \
+    QueryIndexNotFoundException, DocumentNotFoundException, DocumentExistsException
 
 
 class QueryErrorMapper(ErrorMapper):
     @staticmethod
     def mapping():
         # type: (...) -> Dict[CBErrorType,Dict[Any, CBErrorType]]
-        return {KeyNotFoundException: {AnyPattern(): QueryIndexNotFoundError},
-                KeyExistsException: {AnyPattern(): QueryIndexAlreadyExistsError}}
+        return {DocumentNotFoundException: {AnyPattern(): QueryIndexNotFoundException},
+                DocumentExistsException: {AnyPattern(): QueryIndexAlreadyExistsException}}
 
 
 @QueryErrorMapper.wrap
@@ -87,7 +87,7 @@ class QueryIndexManager(GenericManager):
             must be empty.
         :param str condition: Specify a condition for indexing. Using
             a condition reduces an index size
-        :raise: :exc:`~.KeyExistsError` if the index already exists
+        :raise: :exc:`~.DocumentExistsException` if the index already exists
 
         .. seealso:: :meth:`n1ql_index_create_primary`
         """
@@ -140,7 +140,7 @@ class QueryIndexManager(GenericManager):
         :param Iterable[str] fields: Fields over which to create the index.
         :param CreateQueryIndexOptions options: Options to use when creating index.
         :param Any kwargs: Override corresponding value in options.
-        :raises: QueryIndexAlreadyExistsError
+        :raises: QueryIndexAlreadyExistsException
         :raises: InvalidArgumentsException
         """
         # CREATE INDEX index_name ON bucket_name WITH { "num_replica": 2 }
@@ -154,7 +154,7 @@ class QueryIndexManager(GenericManager):
             for k, v in forward_args(kwargs, *options).items()}
         try:
             self._n1ql_index_create(bucket_name, index_name, fields=fields, **final_args)
-        except QueryIndexAlreadyExistsError:
+        except QueryIndexAlreadyExistsException:
             if not final_args.get('ignore_exists', False):
                 raise
 
@@ -171,7 +171,7 @@ class QueryIndexManager(GenericManager):
         :param str index_name: name of the index.
         :param CreatePrimaryQueryIndexOptions options: Options to use when creating primary index
         :param Any kwargs: Override corresponding values in options.
-        :raises: QueryIndexAlreadyExistsError
+        :raises: QueryIndexAlreadyExistsException
         :raises: InvalidArgumentsException
         """
         # CREATE INDEX index_name ON bucket_name WITH { "num_replica": 2 }
@@ -189,7 +189,7 @@ class QueryIndexManager(GenericManager):
         final_args = {k.replace('ignore_if_not_exists','ignore_missing'):v for k,v in  forward_args(kwargs, *options).items()}
         try:
             IxmgmtRequest(self._admin_bucket, 'drop', info, **final_args).execute()
-        except QueryIndexNotFoundError:
+        except QueryIndexNotFoundException:
             if not final_args.get("ignore_missing", False):
                 raise
 
