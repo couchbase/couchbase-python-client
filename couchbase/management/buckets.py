@@ -11,7 +11,7 @@ class BucketManagerErrorHandler(ErrorMapper):
     @staticmethod
     def mapping():
         # type (...)->Mapping[str, CBErrorType]
-        return {HTTPError: {'Bucket with given name already exists': BucketAlreadyExistsException,
+        return {HTTPError: {'Bucket with given name (already|still) exists': BucketAlreadyExistsException,
                             'Requested resource not found': BucketDoesNotExistException}}
 
 @BucketManagerErrorHandler.wrap
