@@ -846,6 +846,11 @@ class ClusterTestCase(CouchbaseTestCase):
 
     def setUp(self, **kwargs):
         super(ClusterTestCase, self).setUp()
+        bucket_name = self.init_cluster_and_bucket()
+        self.bucket = self.cluster.bucket(bucket_name)
+        self.bucket_name = bucket_name
+
+    def init_cluster_and_bucket(self):
         connargs = self.cluster_info.make_connargs()
         connstr_abstract = ConnectionString.parse(connargs.pop('connection_string'))
         bucket_name = connstr_abstract.bucket
@@ -855,10 +860,11 @@ class ClusterTestCase(CouchbaseTestCase):
         # this for hitting the mock, it seems
         from couchbase_core.cluster import PasswordAuthenticator
         auth_type = ClassicAuthenticator if self.is_mock else PasswordAuthenticator
+        # hack because the Mock seems to want a bucket name for cluster connections, odd
+        mock_hack = {'bucket': bucket_name} if self.is_mock else {}
         self.cluster = self.cluster_factory(connection_string=connstr_abstract, authenticator=
-            auth_type(self.cluster_info.admin_username, self.cluster_info.admin_password))
-        self.bucket = self.cluster.bucket(bucket_name)
-        self.bucket_name = bucket_name
+        auth_type(self.cluster_info.admin_username, self.cluster_info.admin_password), **mock_hack)
+        return bucket_name
 
     # NOTE: this really is only something you can trust in homogeneous clusters, but then again
     # this is a test suite.

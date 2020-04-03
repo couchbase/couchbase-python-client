@@ -83,10 +83,12 @@ def gen_base(basecls,  # type: Type[T]
         def _instantiate_txcluster(self, connstr_nobucket, **kwargs):
             # it seems the mock requires ClassicAuthenticator to work (hence its use in the ClusterTestCase)
             # TODO: resolve this
+
             auth_type = ClassicAuthenticator if self.is_mock else PasswordAuthenticator
+            mock_hack = {'bucket':self.cluster_info.bucket_name} if self.is_mock else {}
             return self.cluster_class(connection_string=str(connstr_nobucket),
                                         authenticator=auth_type(self.cluster_info.admin_username,
-                                                     self.cluster_info.admin_password))
+                                                     self.cluster_info.admin_password), **mock_hack)
 
         @property
         def cluster_class(self):
@@ -106,9 +108,10 @@ def gen_base(basecls,  # type: Type[T]
             bucket_result = self.gen_bucket(*args, **kwargs)
             return bucket_result.default_collection()
 
-        def gen_bucket(self, *args, **kwargs):
+        def gen_bucket(self, *args, override_bucket=None, **kwargs):
             args = list(args)
             connstr_nobucket, bucket = self._get_connstr_and_bucket_name(args, kwargs)
+            bucket = override_bucket or bucket
             return self._instantiate_txcluster(connstr_nobucket, **kwargs).bucket(bucket)
 
         @property
