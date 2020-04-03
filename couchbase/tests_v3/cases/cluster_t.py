@@ -16,7 +16,7 @@
 # limitations under the License.
 #
 from couchbase_tests.base import CollectionTestCase
-from couchbase_core.cluster import ClassicAuthenticator
+from couchbase.cluster import ClassicAuthenticator
 from couchbase.cluster import  DiagnosticsOptions, Cluster, ClusterOptions
 from couchbase.diagnostics import ServiceType, EndpointState, ClusterState
 from couchbase.exceptions import AlreadyShutdownException

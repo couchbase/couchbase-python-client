@@ -22,7 +22,7 @@ from twisted.trial._synctest import SkipTest
 import couchbase_core.fulltext as SEARCH
 from couchbase_core.asynchronous.n1ql import AsyncN1QLRequest
 from couchbase_tests.base import ConnectionTestCase, AnalyticsTestCaseBase
-from txcouchbase.bucket import BatchedQueryResult, BatchedSearchResult, BatchedAnalyticsResult
+from txcouchbase.cluster import BatchedQueryResult, BatchedSearchResult, BatchedAnalyticsResult
 from txcouchbase.tests.base import gen_base
 
 

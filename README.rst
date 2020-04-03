@@ -127,11 +127,10 @@ are only working with password-less buckets.
 
 .. code-block:: pycon
 
-    >>> from couchbase.cluster import Cluster
-    >>> from couchbase_core.cluster import ClassicAuthenticator
-    >>> cluster = Cluster('couchbase://localhost')
-    >>> cluster.authenticate(ClassicAuthenticator(buckets={'bucket-name': 'password'}))
+    >>> from couchbase.cluster import Cluster, ClassicAuthenticator, ClusterOptions
+    >>> cluster = Cluster('couchbase://localhost', ClusterOptions(ClassicAuthenticator(buckets={'bucket-name': 'password'})))
     >>> bucket = cluster.bucket('bucket-name')
+    >>> collection = bucket.default_collection()
 
 ~~~~~~~~~~~~~~~~~~~~~~~
 Couchbase Server >= 5.0
@@ -141,10 +140,8 @@ application that allow fine-grained control. The authenticator is always require
 
 .. code-block:: pycon
 
-    >>> from couchbase.cluster import Cluster
-    >>> from couchbase_core.cluster import PasswordAuthenticator
-    >>> cluster = Cluster('couchbase://localhost')
-    >>> cluster.authenticate(PasswordAuthenticator('username', 'password'))
+    >>> from couchbase.cluster import Cluster, PasswordAuthenticator, ClusterOptions
+    >>> cluster = Cluster('couchbase://localhost', ClusterOptions(PasswordAuthenticator('username', 'password')))
     >>> bucket = cluster.bucket('bucket-name')
     >>> collection = bucket.default_collection()
 
@@ -162,7 +159,7 @@ You can also use views
 
 .. code-block:: pycon
 
-    >>> resultset = cluster.query("beer", "brewery_beers", limit=5)
+    >>> resultset = cluster.view_query("beer", "brewery_beers", limit=5)
     >>> resultset
     View<Design=beer, View=brewery_beers, Query=Query:'limit=5', Rows Fetched=0>
     >>> for row in resultset: print row.key
@@ -174,35 +171,28 @@ You can also use views
     [u'21st_amendment_brewery_cafe', u'21st_amendment_brewery_cafe-bitter_american']
 
 
-.. _PYCBC-590: https://issues.couchbase.com/browse/PYCBC-590
-
-.. warning::
-    The async APIs below are from SDK2 and currently only available
-    from the couchbase_v2 legacy support package. They will
-    be updated to support SDK3 shortly. See PYCBC-590_.*
-
 ~~~~~~~~~~~
 Twisted API
 ~~~~~~~~~~~
 
-*NOTE: this API is from SDK2 and is currently only supports SDK2-style
-access. It will be updated to support SDK3 shortly.*
-
 The Python client now has support for the Twisted async network framework.
-To use with Twisted, simply import ``txcouchbase.connection`` instead of
-``couchbase.bucket``
+To use with Twisted, simply import ``txcouchbase.cluster`` instead of
+``couchbase.cluster``
 
 .. code-block:: python
 
     from twisted.internet import reactor
-    from txcouchbase.bucket import Bucket
+    from txcouchbase.cluster import TxCluster
 
-    cb = Bucket('couchbase://localhost/default')
+    cluster = TxCluster('couchbase://localhost', ClusterOptions(PasswordAuthenticator('username', 'password')))
+    bucket = cluster.bucket("default")
+    cb = bucket.default_collection()
+
     def on_upsert(ret):
-        print "Set key. Result", ret
+        print("Set key. Result", ret)
 
     def on_get(ret):
-        print "Got key. Result", ret
+        print("Got key. Result", ret)
         reactor.stop()
 
     cb.upsert("key", "value").addCallback(on_upsert)
@@ -228,11 +218,11 @@ access. It will be updated to support SDK3 shortly.*
 
 .. code-block:: python
 
-    from gcouchbase.bucket import Bucket
+    from gcouchbase.cluster import Bucket
 
     conn = Bucket('couchbase://localhost/default')
-    print conn.upsert("foo", "bar")
-    print conn.get("foo")
+    print(conn.upsert("foo", "bar"))
+    print(conn.get("foo"))
 
 The API functions exactly like the normal Bucket API, except that the
 implementation is significantly different.
@@ -251,9 +241,7 @@ client:
 
     import asyncio
 
-    import couchbase.experimental
-    couchbase.experimental.enable()
-    from acouchbase.bucket import Bucket
+    from acouchbase.cluster import Bucket
 
 
     async def write_and_read(key, value):
@@ -265,7 +253,7 @@ client:
 
     loop = asyncio.get_event_loop()
     rv = loop.run_until_complete(write_and_read('foo', 'bar'))
-    print(rv.value)
+    print(rv.content)
 
 
 ~~~~~~~~~~~~~~

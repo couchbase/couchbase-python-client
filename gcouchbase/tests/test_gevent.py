@@ -6,7 +6,7 @@ try:
 except ImportError as e:
     raise SkipTest(e)
 
-from gcouchbase.bucket import Bucket, GView
+from gcouchbase.cluster import Bucket, GView
 from couchbase_tests.base import ConnectionTestCase
 
 

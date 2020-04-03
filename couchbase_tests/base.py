@@ -31,7 +31,7 @@ from testresources import ResourcedTestCase as ResourcedTestCaseReal, TestResour
 from couchbase.exceptions import CollectionAlreadyExistsException, ScopeAlreadyExistsException, NotSupportedError
 import couchbase_core
 from couchbase import Cluster, ClusterOptions, CBCollection, JSONDocument, CoreClient
-from couchbase_core.cluster import ClassicAuthenticator
+from couchbase.cluster import ClassicAuthenticator
 from couchbase_core.connstr import ConnectionString
 import couchbase_core._libcouchbase as _LCB
 
@@ -858,7 +858,7 @@ class ClusterTestCase(CouchbaseTestCase):
         connstr_abstract.set_option('enable_collections', 'true')
         # FIXME: we should not be using classic here!  But, somewhere in the tests, we need
         # this for hitting the mock, it seems
-        from couchbase_core.cluster import PasswordAuthenticator
+        from couchbase.cluster import PasswordAuthenticator
         auth_type = ClassicAuthenticator if self.is_mock else PasswordAuthenticator
         # hack because the Mock seems to want a bucket name for cluster connections, odd
         mock_hack = {'bucket': bucket_name} if self.is_mock else {}

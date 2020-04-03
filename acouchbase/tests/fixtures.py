@@ -2,15 +2,15 @@ from couchbase_tests.base import MockTestCase
 from functools import wraps
 from parameterized import parameterized_class
 from collections import namedtuple
-from acouchbase.bucket import Bucket
+from acouchbase.cluster import Bucket
 
 
 Details = namedtuple('Details', ['factories', 'get_value'])
 
 try:
-    from acouchbase.bucket import Bucket, get_event_loop
-    from acouchbase.bucket import V3CoreClient
-    from acouchbase.bucket import asyncio
+    from acouchbase.cluster import Bucket, get_event_loop
+    from acouchbase.cluster import V3CoreClient
+    from acouchbase.cluster import asyncio
 
     def asynct(f):
         @wraps(f)

@@ -12,10 +12,10 @@ to perform common API requests.
 
 
 To create an administrative handle, simply instantiate a new
-:class:`Admin` object. Note that unlike the :class:`~couchbase.client.Client`,
+:class:`Admin` object. Note that unlike the :class:`~couchbase_core.client.Client`,
 the :class:`Admin` constructor does not accept a connection string. This is
 deliberate, as the administrative API communicates with a single node, on
-a well defined port (whereas the :class:`~couchbase.client.Client` object communicates with
+a well defined port (whereas the :class:`~couchbase_core.client.Client` object communicates with
 one or more nodes using a variety of different protocols).
 
 

@@ -17,14 +17,15 @@ from .n1ql import QueryResult
 from couchbase_core.n1ql import N1QLQuery
 from .options import OptionBlock, forward_args, OptionBlockDeriv
 from .bucket import Bucket, CoreClient
-from couchbase_core.cluster import Cluster as CoreCluster, Authenticator as CoreAuthenticator
+from couchbase_core.cluster import _Cluster as CoreCluster, Authenticator as CoreAuthenticator
 from .exceptions import InvalidArgumentsException, SearchException, QueryException, ArgumentError, AnalyticsException
 import couchbase_core._libcouchbase as _LCB
 from couchbase_core._pyport import raise_from
 from couchbase.options import OptionBlockTimeOut
 from datetime import timedelta
-from couchbase.exceptions import AlreadyShutdownException
+from couchbase.exceptions import AlreadyShutdownException, CouchbaseError
 from couchbase_core.cluster import *
+
 
 T = TypeVar('T')
 

@@ -25,7 +25,7 @@ from time import time
 
 from couchbase_core.user_constants import FMT_BYTES
 from couchbase_core.experimental import enable; enable()
-from acouchbase.bucket import V2Bucket
+from acouchbase.cluster import V2Bucket
 
 ap = argparse.ArgumentParser()
 

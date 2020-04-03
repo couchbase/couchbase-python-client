@@ -14,7 +14,7 @@ class CouchbasePy35Test(AioTestCase):
     @asynct
     async def test_query_with_async_iterator(self):
         beer_bucket = self.cb
-        from acouchbase.bucket import asyncio
+        from acouchbase.cluster import asyncio
         await (beer_bucket.on_connect() or asyncio.sleep(0.01))
         viewiter = beer_bucket.view_query("beer", "brewery_beers", limit=10)
 

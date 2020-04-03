@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 import twisted.internet.base
-from couchbase_core.cluster import PasswordAuthenticator
+from couchbase.cluster import PasswordAuthenticator
 from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
@@ -23,8 +23,8 @@ from couchbase_tests.base import ConnectionTestCase
 
 from typing import *
 
-from txcouchbase.bucket import TxCluster
-from couchbase_core.cluster import ClassicAuthenticator
+from txcouchbase.cluster import TxCluster
+from couchbase.cluster import ClassicAuthenticator
 from couchbase_core.connstr import ConnectionString
 import twisted.python.util
 import sys

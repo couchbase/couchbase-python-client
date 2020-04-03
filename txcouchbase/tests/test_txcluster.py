@@ -22,7 +22,7 @@ from couchbase_core.exceptions import (
 from couchbase_tests.base import ConnectionTestCase
 from couchbase_core.connstr import ConnectionString
 from txcouchbase.tests.base import gen_base
-from txcouchbase.bucket import TxBucket
+from txcouchbase.cluster import TxBucket
 from nose.tools import timed
 import sys
 from unittest import SkipTest

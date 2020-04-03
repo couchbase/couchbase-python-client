@@ -1,4 +1,44 @@
 =================
+Cluster object
+=================
+
+.. module:: couchbase.cluster
+.. class:: Cluster
+
+    .. automethod:: __init__
+    .. automethod:: connect
+
+.. _argtypes:
+
+.. class:: Authenticator
+
+    .. automethod:: __init__
+
+.. _argtypes:
+
+.. class:: CertAuthenticator
+
+    .. automethod:: __init__
+
+.. _argtypes:
+
+.. class:: ClassicAuthenticator
+
+    .. automethod:: __init__
+
+.. _argtypes:
+
+.. class:: PasswordAuthenticator
+
+    .. automethod:: __init__
+
+.. _argtypes:
+
+
+
+
+
+=================
 Bucket object
 =================
 

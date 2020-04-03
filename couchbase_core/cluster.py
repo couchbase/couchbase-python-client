@@ -39,17 +39,12 @@ class NoBucketError(CouchbaseError):
     """
 
 
-class OverrideSet(set):
+class _OverrideSet(set):
     def __init__(self, *args, **kwargs):
-        super(OverrideSet, self).__init__(*args, **kwargs)
+        super(_OverrideSet, self).__init__(*args, **kwargs)
 
 
-class OverrideDict(dict):
-    def __init__(self, *args, **kwargs):
-        super(OverrideDict, self).__init__(*args, **kwargs)
-
-
-class Cluster(object):
+class _Cluster(object):
     # list of all authentication types, keep up to date, used to identify connstr/kwargs auth styles
 
     def __init__(self, connection_string='couchbase://localhost',
@@ -87,11 +82,11 @@ class Cluster(object):
 
         self.authenticator = authenticator
 
-    def open_bucket(self,
+    def open_bucket(self,         # type: _Cluster
                     bucket_name,  # type: str
                     **kwargs      # type: Any
                     ):
-        # type: (...) -> Bucket
+        # type: (...) -> Client
         """
         Open a new connection to a Couchbase bucket
         :param bucket_name: The name of the bucket to open
@@ -116,7 +111,7 @@ class Cluster(object):
         # Also sets its own 'auth_type' field to the type of authentication it
         # thinks is being specified
 
-        normalizer = Cluster.ParamNormaliser(self.authenticator, connstr, **kwargs)
+        normalizer = _Cluster._ParamNormaliser(self.authenticator, connstr, **kwargs)
 
         # we don't do anything with this information unless the Normaliser thinks
         # Cert Auth is involved as this is outside the remit of PYCBC-487/488/489
@@ -152,7 +147,7 @@ class Cluster(object):
                     rv.add_bucket_creds(bucket, passwd)
         return rv
 
-    class ParamNormaliser:
+    class _ParamNormaliser(object):
 
         _authentication_types = None
         _auth_unique_params = None
@@ -160,27 +155,27 @@ class Cluster(object):
         @staticmethod
         def auth_types():
             # cache this calculation
-            if not Cluster.ParamNormaliser._authentication_types:
-                Cluster.ParamNormaliser._authentication_types = {CertAuthenticator, ClassicAuthenticator,
-                                                                 PasswordAuthenticator}
-                Cluster.ParamNormaliser._auth_unique_params = {k.__name__: k.unique_keys() for k in
-                                                               Cluster.ParamNormaliser._authentication_types}
+            if not _Cluster._ParamNormaliser._authentication_types:
+                _Cluster._ParamNormaliser._authentication_types = {CertAuthenticator, ClassicAuthenticator,
+                                                                   PasswordAuthenticator}
+                _Cluster._ParamNormaliser._auth_unique_params = {k.__name__: k.unique_keys() for k in
+                                                                 _Cluster._ParamNormaliser._authentication_types}
 
         @property
         def authentication_types(self):
-            Cluster.ParamNormaliser.auth_types()
-            return Cluster.ParamNormaliser._authentication_types
+            _Cluster._ParamNormaliser.auth_types()
+            return _Cluster._ParamNormaliser._authentication_types
 
         @property
         def auth_unique_params(self):
-            Cluster.ParamNormaliser.auth_types()
-            return Cluster.ParamNormaliser._auth_unique_params
+            _Cluster._ParamNormaliser.auth_types()
+            return _Cluster._ParamNormaliser._auth_unique_params
 
         def __init__(self, authenticator, connstr, **kwargs):
 
             # build a dictionary of all potentially overlapping/conflicting parameter names
 
-            self.param_keys = dict(kwargs=OverrideSet(kwargs), connstr=set(connstr.options))
+            self.param_keys = dict(kwargs=_OverrideSet(kwargs), connstr=set(connstr.options))
             self.param_keys.update({'auth_credential': authenticator.unique_keys()} if authenticator else {})
             self.param_keys.update(self.auth_unique_params)
 
@@ -280,7 +275,7 @@ class Cluster(object):
             if len(clashes):
                 clash_dict = defaultdict(lambda: defaultdict(list))
                 for clash, intersection in clashes.items():
-                    clash_dict[isinstance(self.param_keys[clash], OverrideSet)][clash].append(intersection)
+                    clash_dict[isinstance(self.param_keys[clash], _OverrideSet)][clash].append(intersection)
 
                 action = {False: self._warning, True: self._exception}
                 for is_override, param_dict in clash_dict.items():
@@ -293,7 +288,7 @@ class Cluster(object):
 
         def _get_generic_complaint(self, clash_param_dict, auth_type):
             return "Invalid parameters used with {}-style authentication - {}".format(auth_type.__name__,
-                                                                                      Cluster.ParamNormaliser._gen_complaint(
+                                                                                      _Cluster._ParamNormaliser._gen_complaint(
                                                                                           clash_param_dict))
 
         def _exception(self, clash_param_dict, auth_type):

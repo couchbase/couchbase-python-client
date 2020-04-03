@@ -20,7 +20,7 @@ from time import sleep, time
 import gevent
 
 from couchbase_core import FMT_BYTES
-from gcouchbase.bucket import Bucket
+from gcouchbase.cluster import Bucket
 
 ap = argparse.ArgumentParser()
 

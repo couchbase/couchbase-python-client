@@ -1,6 +1,6 @@
 from couchbase_core.cluster import *
 from .bucket import Bucket
-from couchbase_core.cluster import Cluster as CoreCluster
+from couchbase_core.cluster import _Cluster as CoreCluster
 
 
 class Cluster(CoreCluster):
