@@ -247,6 +247,7 @@ class Cluster(CoreClient):
         self._clusteropts.update(cluster_opts)
         self._adminopts = dict(**self._clusteropts)
         self._clusteropts.update(async_items)
+        self._clusteropts['bucket'] = "default"
         super(Cluster, self).__init__(connection_string=str(self.connstr), _conntype=_LCB.LCB_TYPE_CLUSTER, **self._clusteropts)
 
     @staticmethod
