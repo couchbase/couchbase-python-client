@@ -292,7 +292,7 @@ include_directories(
         ${libcouchbase_src}/include
 )
 
-file(GLOB_RECURSE PY_SOURCES_FOLDERS acouchbase/*.py gcouchbase/*.py txcouchbase/*.py  couchbase/*.py couchbase_core/*.py couchbase_tests/*.py couchbase_v2/*.py)
+file(GLOB_RECURSE PY_SOURCES_FOLDERS acouchbase/*.py txcouchbase/*.py  couchbase/*.py couchbase_core/*.py couchbase_tests/*.py couchbase_v2/*.py)
 file(GLOB PY_SOURCES_FILES *.py)
 set(PY_SOURCES ${PY_SOURCES_FOLDERS} ${PY_SOURCES_FILES})
 message("Got PY_SOURCES ${PY_SOURCES}")

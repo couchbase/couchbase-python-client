@@ -47,7 +47,7 @@ class AsyncClientFactory(type):
 
                 Using this module directly may cause odd error messages or
                 application crashes. Use an existing subclass designated for
-                your I/O framework (`txcouchbase`, `gcouchbase`, `acouchbase`)
+                your I/O framework (`txcouchbase`, `acouchbase`)
                 or subclass this module (continue reading) if one does not
                 already exist.
 
@@ -106,10 +106,6 @@ class AsyncClientFactory(type):
             * :class:`acouchbase.bucket.Bucket` - this is the Python3/Tulip
               based implementation, and uses a hybrid callback/implicit
               yield functionality (by returning "future" objects).
-            * :class:`gcouchbase.bucket.Bucket` - this is the `gevent`
-              based implementation, and uses an implicit yield model; where
-              the bucket class will yield to the event loop and return
-              actual "result" objects
             * :class:`txcouchbase.bucket.RawBucket` - this is a thin wrapper
               around this class, which returns :class:`~.AsyncResult` objects:
               Since Twisted is callback-based, it is possible to return these

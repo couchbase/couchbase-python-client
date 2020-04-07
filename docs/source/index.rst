@@ -39,7 +39,6 @@ Asynchronous APIs
    :maxdepth: 2
 
    api/txcouchbase
-   api/gcouchbase
 
 Internal APIs
 =============

@@ -85,7 +85,6 @@ packages = {
     'couchbase_v2.tests',
     'couchbase_v2.tests.cases',
     'couchbase.management',
-    'gcouchbase',
     'txcouchbase',
     'acouchbase',
     'acouchbase.tests',

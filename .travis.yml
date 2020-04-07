@@ -30,7 +30,6 @@ script:
   - cp .tests.ini.travis tests.ini
   - nosetests -v couchbase_tests.test_sync
   - nosetests -v acouchbase
-  - nosetests -v gcouchbase.tests.test_api || echo "Gevent tests failed"
   - nosetests -v txcouchbase || echo "Twisted tests failed"
 
 notifications:

@@ -170,6 +170,9 @@ You can also use views
     [u'21st_amendment_brewery_cafe', u'21st_amendment_brewery_cafe-amendment_pale_ale']
     [u'21st_amendment_brewery_cafe', u'21st_amendment_brewery_cafe-bitter_american']
 
+.. warning::
+    The gcouchbase API has not yet been fully migrated to version 3,
+    so is omitted for this version.
 
 ~~~~~~~~~~~
 Twisted API
@@ -209,23 +212,7 @@ the synchronous API will block until it receives a result, the async API will
 return a `Deferred` which will be called later with the result or an appropriate
 error.
 
-~~~~~~~~~~
-GEvent API
-~~~~~~~~~~
 
-*NOTE: this API is from SDK2 and is currently only supports SDK2-style
-access. It will be updated to support SDK3 shortly.*
-
-.. code-block:: python
-
-    from gcouchbase.cluster import Bucket
-
-    conn = Bucket('couchbase://localhost/default')
-    print(conn.upsert("foo", "bar"))
-    print(conn.get("foo"))
-
-The API functions exactly like the normal Bucket API, except that the
-implementation is significantly different.
 
 ------------------------
 Asynchronous (Tulip) API
