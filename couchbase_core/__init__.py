@@ -291,7 +291,7 @@ class IterableWrapper(object):
             raise
 
     def rows(self):
-        return list(x for x in IterableWrapper.__iter__(self))
+        return list(self)
 
     def metadata(self):
         # type: (...) -> JSON
