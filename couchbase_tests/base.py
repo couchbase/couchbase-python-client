@@ -15,25 +15,24 @@
 
 from __future__ import absolute_import
 
+import platform
 import sys
 import types
-import platform
 import warnings
-
-from couchbase.management.analytics import CreateDatasetOptions
-from collections import defaultdict
+from abc import abstractmethod
 from functools import wraps
-from parameterized import parameterized_class
-from testfixtures import LogCapture
 
+from testfixtures import LogCapture
 from testresources import ResourcedTestCase as ResourcedTestCaseReal, TestResourceManager
 
-from couchbase.exceptions import CollectionAlreadyExistsException, ScopeAlreadyExistsException, NotSupportedException
 import couchbase_core
-from couchbase import Cluster, ClusterOptions, CBCollection, JSONDocument, CoreClient
+from collections import defaultdict
+from couchbase import Cluster, CBCollection, CoreClient
 from couchbase.cluster import ClassicAuthenticator
+from couchbase.cluster import PasswordAuthenticator
+from couchbase.exceptions import CollectionAlreadyExistsException, ScopeAlreadyExistsException, NotSupportedException
+from couchbase.management.analytics import CreateDatasetOptions
 from couchbase_core.connstr import ConnectionString
-import couchbase_core._libcouchbase as _LCB
 
 try:
     import unittest2 as unittest
@@ -768,6 +767,9 @@ class SkipUnsupported(SkipTest):
         super(SkipUnsupported, self).__init__(traceback.format_exc())
 
 
+QueryParams = NamedTuple('QueryParams', [('statement', str), ('rowcount', int)])
+
+
 class ClusterTestCase(CouchbaseTestCase):
     def __init__(self, *args, **kwargs):
         super(ClusterTestCase, self).__init__(*args, **kwargs)
@@ -869,22 +871,35 @@ class ClusterTestCase(CouchbaseTestCase):
         bucket_name = self.init_cluster_and_bucket()
         self.bucket = self.cluster.bucket(bucket_name)
         self.bucket_name = bucket_name
+        self.query_props = QueryParams('SELECT mockrow', 1) if self.is_mock else \
+            QueryParams("SELECT * FROM `beer-sample` LIMIT 2", 2)  # type: QueryParams
+        self.empty_query_props = QueryParams('SELECT emptyrow', 0) if self.is_mock else \
+            QueryParams("SELECT * FROM `beer-sample` LIMIT 0", 0)
+
+    def _get_connstr_and_bucket_name(self,
+                                     args,  # type: List[Any]
+                                     kwargs):
+        connstr = args.pop(0) if args else kwargs.pop('connection_string')
+        connstr_nobucket = ConnectionString.parse(connstr)
+        bucket = connstr_nobucket.bucket
+        connstr_nobucket.bucket = None
+        return connstr_nobucket, bucket
 
     def init_cluster_and_bucket(self):
         connargs = self.cluster_info.make_connargs()
-        connstr_abstract = ConnectionString.parse(connargs.pop('connection_string'))
-        bucket_name = connstr_abstract.bucket
-        connstr_abstract.bucket = None
-        connstr_abstract.set_option('enable_collections', 'true')
+        connstr_abstract, bucket_name = self._get_connstr_and_bucket_name([], connargs)
+        self.cluster = self._instantiate_cluster(connstr_abstract, self.cluster_factory)
+        return bucket_name
+
+    def _instantiate_cluster(self, connstr_nobucket, cluster_factory):
         # FIXME: we should not be using classic here!  But, somewhere in the tests, we need
         # this for hitting the mock, it seems
-        from couchbase.cluster import PasswordAuthenticator
         auth_type = ClassicAuthenticator if self.is_mock else PasswordAuthenticator
         # hack because the Mock seems to want a bucket name for cluster connections, odd
-        mock_hack = {'bucket': bucket_name} if self.is_mock else {}
-        self.cluster = self.cluster_factory(connection_string=connstr_abstract, authenticator=
-        auth_type(self.cluster_info.admin_username, self.cluster_info.admin_password), **mock_hack)
-        return bucket_name
+        mock_hack = {'bucket': self.cluster_info.bucket_name} if self.is_mock else {}
+        return cluster_factory(connection_string=str(connstr_nobucket),
+                                    authenticator=auth_type(self.cluster_info.admin_username,
+                                                 self.cluster_info.admin_password), **mock_hack)
 
     # NOTE: this really is only something you can trust in homogeneous clusters, but then again
     # this is a test suite.
@@ -971,6 +986,33 @@ class CollectionTestCase(ClusterTestCase):
             pass
 
 
+class AsyncClusterTestCase(ClusterTestCase):
+
+    def gen_cluster(self,  # type: AsyncClusterTestCase
+                    *args,
+                    **kwargs):
+        # type: (...) -> Cluster
+        args = list(args)
+        connstr_nobucket, bucket = self._get_connstr_and_bucket_name(args, kwargs)
+        return self._instantiate_cluster(connstr_nobucket, self.cluster_class)
+
+    def gen_bucket(self, *args, override_bucket=None, **kwargs):
+        args = list(args)
+        connstr_nobucket, bucket = self._get_connstr_and_bucket_name(args, kwargs)
+        bucket = override_bucket or bucket
+        return self._instantiate_cluster(connstr_nobucket, self.cluster_class).bucket(bucket)
+
+    def gen_collection(self,
+                       *args, **kwargs):
+        bucket_result = self.gen_bucket(*args, **kwargs)
+        return bucket_result.default_collection()
+
+    @property
+    @abstractmethod
+    def cluster_class(self):
+        # type: (...) -> Cluster
+        pass
+
 class DDocTestCase(RealServerTestCase):
     pass
 
@@ -999,3 +1041,4 @@ class AnalyticsTestCaseBase(CollectionTestCase):
             return self.mgr.connect_link()
 
         self.try_n_times(10, 3, has_dataset, self.dataset_name, on_success=on_dataset)
+

@@ -1,10 +1,6 @@
 import asyncio
 
-from couchbase import QueryResult, AnalyticsResult
-from couchbase_core.asynchronous.view import AsyncViewBase
-from couchbase.asynchronous import AsyncViewResult
-from couchbase_core.asynchronous.n1ql import AsyncN1QLRequest
-from couchbase_core.asynchronous.rowsbase import AsyncRowsBase
+from couchbase.asynchronous import AsyncQueryResult, AsyncSearchResult, AsyncViewResult, AsyncAnalyticsResult
 
 
 class AioBase:
@@ -62,39 +58,21 @@ class AioBase:
         self.__accum.put_nowait(None)
 
 
-class AView(AioBase, AsyncViewBase):
-
-    def __init__(self, *args, **kwargs):
-        AsyncViewBase.__init__(self, *args, **kwargs)
-        AioBase.__init__(self)
-
-
-class AN1QLRequest(AioBase, AsyncN1QLRequest):
-
-    def __init__(self, *args, **kwargs):
-        AsyncN1QLRequest.__init__(self, *args, **kwargs)
-        AioBase.__init__(self)
-
-
 class AViewResult(AioBase, AsyncViewResult):
     def __init__(self, *args, **kwargs):
-        AsyncViewBase.__init__(self, *args, **kwargs)
+        AsyncViewResult.__init__(self, *args, **kwargs)
         AioBase.__init__(self)
-
-
-class AsyncQueryResult(AsyncRowsBase, QueryResult):
-    def __init__(self, *args, **kwargs):
-        QueryResult.__init__(self, *args, **kwargs)
-
-
-class AsyncAnalyticsResult(AsyncRowsBase, AnalyticsResult):
-    def __init__(self, *args, **kwargs):
-        AnalyticsResult.__init__(self, *args, **kwargs)
 
 
 class AQueryResult(AioBase, AsyncQueryResult):
     def __init__(self, *args, **kwargs):
         AsyncQueryResult.__init__(self, *args, **kwargs)
+        AioBase.__init__(self)
+
+
+class ASearchResult(AioBase, AsyncSearchResult):
+    def __init__(self, *args, **kwargs):
+        AsyncSearchResult.__init__(self, *args, **kwargs)
         AioBase.__init__(self)
 
 

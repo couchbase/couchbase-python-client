@@ -15,12 +15,12 @@
 #
 from twisted.internet import defer
 
-from txcouchbase.cluster import BatchedView, TxBucket, BatchedViewResult
 from couchbase.exceptions import HTTPException
 from couchbase_core.asynchronous.view import AsyncViewBase
-
-from couchbase_tests.base import ViewTestCase
+from couchbase_tests.base import AsyncClusterTestCase
+from txcouchbase.cluster import BatchedViewResult
 from txcouchbase.tests.base import gen_base
+
 
 class RowsHandler(AsyncViewBase):
     def __init__(self, *args, **kwargs):
@@ -44,7 +44,7 @@ class RowsHandler(AsyncViewBase):
         self._d.errback(ex)
 
 
-class TxViewsTests(gen_base(ViewTestCase)):
+class TxViewsTests(gen_base(AsyncClusterTestCase)):
     @property
     def factory(self):
         return self.gen_bucket

@@ -1,10 +1,11 @@
 import asyncio
 
-from couchbase_core.experimental import enable; enable()
+from couchbase.asynchronous import AsyncSearchResult
+from couchbase.asynchronous import AsyncAnalyticsResult
 from .fixtures import asynct, AioTestCase
-from couchbase_core.n1ql import N1QLQuery
 from couchbase.exceptions import CouchbaseException
 from unittest import SkipTest
+import couchbase.search as SEARCH
 
 
 class CouchbaseBeerTest(AioTestCase):
@@ -22,11 +23,13 @@ class CouchbaseBeerKVTest(CouchbaseBeerTest):
     @asynct
     @asyncio.coroutine
     def test_get_data(self):
-        beer_bucket = self.cb
-        yield from (beer_bucket.on_connect() or asyncio.sleep(0.01))
+        connargs=self.make_connargs(bucket='beer-sample')
+        beer_default_collection = self.gen_collection(**connargs)
 
-        data = yield from beer_bucket.get('21st_amendment_brewery_cafe')
-        self.assertEqual("21st Amendment Brewery Cafe", self.details.get_value(data)["name"])
+        yield from (beer_default_collection.on_connect() or asyncio.sleep(0.01))
+
+        data = yield from beer_default_collection.get('21st_amendment_brewery_cafe')
+        self.assertEqual("21st Amendment Brewery Cafe", data.content["name"])
 
 
 class CouchbaseBeerViewTest(CouchbaseBeerTest):
@@ -35,7 +38,8 @@ class CouchbaseBeerViewTest(CouchbaseBeerTest):
     @asynct
     @asyncio.coroutine
     def test_query(self):
-        beer_bucket = self.cb
+
+        beer_bucket = self.gen_cluster(**self.make_connargs()).bucket('beer-sample')
 
         yield from (beer_bucket.on_connect() or asyncio.sleep(0.01))
         viewiter = beer_bucket.view_query("beer", "brewery_beers", limit=10)
@@ -54,30 +58,59 @@ class CouchbaseDefaultTestKV(AioTestCase):
 
         expected = str(uuid.uuid4())
 
-        default_bucket = self.cb
-        yield from (default_bucket.on_connect() or asyncio.sleep(0.01))
+        default_collection = self.gen_collection(**self.make_connargs())
+        yield from (default_collection.on_connect() or asyncio.sleep(0.01))
 
-        yield from default_bucket.upsert('hello', {"key": expected})
+        yield from default_collection.upsert('hello', {"key": expected})
 
-        obtained = yield from default_bucket.get('hello')
-        self.assertEqual({"key": expected}, self.details.get_value(obtained))
+        obtained = yield from default_collection.get('hello')
+        self.assertEqual({"key": expected}, obtained.content)
 
 
-class CouchbaseDefaultTestN1QL(AioTestCase):
+class AIOClusterTest(AioTestCase):
     def setUp(self, **kwargs):
-        super(CouchbaseDefaultTestN1QL, self).setUp(type='Bucket',**kwargs)
+        super(AIOClusterTest, self).setUp(**kwargs)
 
     @asynct
     @asyncio.coroutine
     def test_n1ql(self):
 
-        default_bucket = self.cb
-        yield from (default_bucket.on_connect() or asyncio.sleep(0.01))
+        cluster = self.gen_cluster(**self.make_connargs())
+        yield from (cluster.on_connect() or asyncio.sleep(0.01))
 
-        q = N1QLQuery("SELECT mockrow")
-        it = default_bucket.query(q)
+        it = cluster.query(self.query_props.statement)
         yield from it.future
 
         data = list(it)
-        self.assertEqual('value', data[0]['row'])
+        self.assertEqual(self.query_props.rowcount, len(data))
+
+    @asynct
+    @asyncio.coroutine
+    def test_search(self  # type: Base
+                    ):
+        if self.is_mock:
+            raise SkipTest("No search on mock")
+        cluster = self.gen_cluster(**self.make_connargs())
+        yield from (cluster.on_connect() or asyncio.sleep(0.01))
+        it = cluster.search_query("beer-search", SEARCH.TermQuery("category"),
+                                      facets={'fred': SEARCH.TermFacet('category', 10)})
+        yield from it.future
+        data = list(it)
+        self.assertIsInstance(it, AsyncSearchResult)
+        self.assertEqual(10, len(data))
+
+
+class AnalyticsTest(AioTestCase):
+    def testBatchedAnalytics(self  # type: Base
+                             ):
+        if self.is_mock:
+            raise SkipTest("No analytics on mock")
+        cluster = self.gen_cluster(**self.make_connargs())
+        yield from (cluster.on_connect() or asyncio.sleep(0.01))
+
+        it = cluster.analytics_query("SELECT * FROM `{}` LIMIT 1".format(self.dataset_name))
+        yield from it.future
+
+        self.assertIsInstance(it, AsyncAnalyticsResult)
+        self.assertEqual(1, len(it.rows()))
 

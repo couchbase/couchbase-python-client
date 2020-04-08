@@ -14,14 +14,13 @@
 # limitations under the License.
 #
 import logging
-from typing import NamedTuple
 
 from twisted.internet import defer
 from twisted.trial._synctest import SkipTest
 
 import couchbase.search as SEARCH
 from couchbase_core.asynchronous.n1ql import AsyncN1QLRequest
-from couchbase_tests.base import ConnectionTestCase, AnalyticsTestCaseBase
+from couchbase_tests.base import AnalyticsTestCaseBase, AsyncClusterTestCase
 from txcouchbase.cluster import BatchedQueryResult, BatchedSearchResult, BatchedAnalyticsResult
 from txcouchbase.tests.base import gen_base
 
@@ -47,19 +46,13 @@ class RowsHandler(AsyncN1QLRequest):
         self.deferred.errback(ex)
 
 
-Base = gen_base(ConnectionTestCase)
+Base = gen_base(AsyncClusterTestCase)
 
-
-QueryParams = NamedTuple('QueryParams', [('statement', str), ('rowcount', int)])
 
 
 class TxN1QLTests(Base):
     def setUp(self, *args, **kwargs):
         super(TxN1QLTests, self).setUp(*args, **kwargs)
-        self.query_props = QueryParams('SELECT mockrow', 1) if self.is_mock else \
-            QueryParams("SELECT * FROM `beer-sample` LIMIT 2", 2)  # type: QueryParams
-        self.empty_query_props = QueryParams('SELECT emptyrow', 0) if self.is_mock else \
-            QueryParams("SELECT * FROM `beer-sample` LIMIT 0", 0)
 
     @property
     def factory(self):
@@ -128,7 +121,11 @@ class TxN1QLTests(Base):
         return d
 
 
-class AnalyticsTest(gen_base(AnalyticsTestCaseBase)):
+class AnalyticsTestBase(AsyncClusterTestCase, AnalyticsTestCaseBase):
+    pass
+
+
+class AnalyticsTest(gen_base(AnalyticsTestBase)):
     @property
     def factory(self):
         return self.gen_cluster

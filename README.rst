@@ -228,11 +228,12 @@ client:
 
     import asyncio
 
-    from acouchbase.cluster import Bucket
+    from acouchbase.cluster import Cluster, ClusterOptions, PasswordAuthenticator
 
 
     async def write_and_read(key, value):
-        cb = Bucket('couchbase://10.0.0.31/default')
+        cluster = Cluster('couchbase://10.0.0.31/', ClusterOptions(PasswordAuthenticator("username","password")))
+        cb = cluster.bucket("default")
         cb_coll = cb.default_collection()
         await cb_coll.connect()
         await cb_coll.upsert(key, value)

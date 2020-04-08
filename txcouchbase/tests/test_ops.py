@@ -13,14 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from couchbase_tests.base import ConnectionTestCase
-
-from txcouchbase.tests.base import gen_base
 from couchbase.exceptions import DocumentNotFoundException
-
 from couchbase.result import GetResult, MutationResult, MultiMutationResult
+from couchbase_tests.base import AsyncClusterTestCase
+from txcouchbase.tests.base import gen_base
 
-Base = gen_base(ConnectionTestCase)
+Base = gen_base(AsyncClusterTestCase)
 
 
 class OperationTestCase(Base):

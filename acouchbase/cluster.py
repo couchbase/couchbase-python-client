@@ -6,7 +6,7 @@ except ImportError:
     import trollius as asyncio
 
 from acouchbase.asyncio_iops import IOPS
-from acouchbase.iterator import AView, AN1QLRequest
+from acouchbase.iterator import AQueryResult, ASearchResult, AAnalyticsResult, AViewResult
 from couchbase_core.experimental import enable; enable()
 from couchbase_core.experimental import enabled_or_raise; enabled_or_raise()
 from couchbase_core.asynchronous.bucket import AsyncClient as CoreAsyncClient
@@ -14,6 +14,7 @@ from couchbase.collection import AsyncCBCollection as BaseAsyncCBCollection
 from couchbase_core.client import Client as CoreClient
 from couchbase.bucket import AsyncBucket as V3AsyncBucket
 from typing import *
+from couchbase.cluster import AsyncCluster as V3AsyncCluster
 
 T = TypeVar('T', bound=CoreClient)
 
@@ -25,6 +26,7 @@ class AsyncBucketFactory(type):
         # type: (...) -> Type[T]
         n1ql_query = getattr(asyncbase, 'n1ql_query', getattr(asyncbase, 'query', None))
         view_query = getattr(asyncbase, 'view_query', getattr(asyncbase, 'query', None))
+        search_query = getattr(asyncbase, 'search_query', None)
 
         class Bucket(asyncbase):
             def __init__(self, connstr=None, *args, **kwargs):
@@ -47,7 +49,7 @@ class AsyncBucketFactory(type):
 
             @property
             def view_itercls(self):
-                return AView
+                return AViewResult
 
             def view_query(self, *args, **kwargs):
                 if "itercls" not in kwargs:
@@ -56,12 +58,29 @@ class AsyncBucketFactory(type):
 
             @property
             def query_itercls(self):
-                return AN1QLRequest
+                return AQueryResult
 
             def query(self, *args, **kwargs):
                 if "itercls" not in kwargs:
                     kwargs["itercls"] = self.query_itercls
                 return n1ql_query(self, *args, **kwargs)
+
+            @property
+            def search_itercls(self):
+                return ASearchResult
+
+            def search_query(self, *args, **kwargs):
+                if "itercls" not in kwargs:
+                    kwargs["itercls"] = self.search_itercls
+                return search_query(self, *args, **kwargs)
+
+            @property
+            def analytics_itercls(self):
+                return AAnalyticsResult
+
+            def analytics_query(self, *args, **kwargs):
+                return super(Bucket, self).analytics_query(*args, itercls=kwargs.pop('itercls', self.analytics_itercls),
+                                                           **kwargs)
 
             def on_connect(self):
                 if not self.connected:
@@ -109,9 +128,20 @@ class AsyncCBCollection(AsyncBucketFactory.gen_async_bucket(BaseAsyncCBCollectio
 Collection = AsyncCBCollection
 
 
-class Bucket(AsyncBucketFactory.gen_async_bucket(V3AsyncBucket)):
+class ABucket(AsyncBucketFactory.gen_async_bucket(V3AsyncBucket)):
     def __init__(self, *args, **kwargs):
-        super(Bucket,self).__init__(collection_factory=AsyncCBCollection, *args, **kwargs)
+        super(ABucket,self).__init__(collection_factory=AsyncCBCollection, *args, **kwargs)
+
+
+Bucket = ABucket
+
+
+class ACluster(AsyncBucketFactory.gen_async_bucket(V3AsyncCluster)):
+    def __init__(self, connection_string, *options, **kwargs):
+        super(ACluster, self).__init__(connection_string=connection_string, *options, bucket_factory=Bucket, **kwargs)
+
+
+Cluster = ACluster
 
 
 def get_event_loop(evloop=None  # type: AbstractEventLoop

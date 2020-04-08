@@ -13,21 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from couchbase.exceptions import UnknownHostException
+import sys
+from unittest import SkipTest
+
+from nose.tools import timed
 from twisted.internet import defer
 
 from couchbase.exceptions import (
     ObjectDestroyedException)
-
-from couchbase_tests.base import ConnectionTestCase
+from couchbase.exceptions import UnknownHostException
 from couchbase_core.connstr import ConnectionString
-from txcouchbase.tests.base import gen_base
+from couchbase_tests.base import AsyncClusterTestCase
 from txcouchbase.cluster import TxBucket
-from nose.tools import timed
-import sys
-from unittest import SkipTest
+from txcouchbase.tests.base import gen_base
 
-Base = gen_base(ConnectionTestCase)
+Base = gen_base(AsyncClusterTestCase)
 
 
 class BasicClusterTest(Base):
