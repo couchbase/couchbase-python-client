@@ -48,9 +48,11 @@ class CollectionManagerTestCase(CollectionTestCase):
         # now re-create it fresh (maybe we could just flush, but we may test settings which would not be flushed)
         self.try_n_times(10, 1, self.bm.create_bucket, CreateBucketSettings(name='other-bucket', bucket_type='couchbase', ram_quota_mb=100))
         self.try_n_times(10, 1, self.bm.get_bucket, 'other-bucket')
-        # TODO: we need to wait till the bucket is ready - getting the bucket settings apparently isn't sufficient
-        time.sleep(5)
-        self.other_bucket = self.cluster.bucket('other-bucket')
+        # we need to get the bucket, but sometimes this fails for a few seconds depending on what
+        # the cluster is doing.  So, try_n_times...
+        def get_bucket(name):
+            return self.cluster.bucket(name)
+        self.other_bucket = self.try_n_times(10, 3, get_bucket, 'other-bucket')
         self.cm = self.other_bucket.collections()
 
     def testCreateCollection(self):
@@ -62,7 +64,9 @@ class CollectionManagerTestCase(CollectionTestCase):
         # pop a doc in with no ttl, verify it goes away...
         coll = self.try_n_times(10, 1, self.other_bucket.collection, 'other-collection')
         key = self.gen_key('cmtest')
-        coll.upsert(key, {"some":"thing"})
+        # we _can_ get a temp fail here, as we just created the collection.  So we
+        # retry the upsert.
+        self.try_n_times(10, 1, coll.upsert, key, {"some":"thing"})
         self.try_n_times(10, 1, coll.get, key)
         self.try_n_times_till_exception(4, 1, coll.get, key)
 

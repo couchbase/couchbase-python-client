@@ -751,7 +751,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :return: An ExistsResult object with a boolean value indicating the presence of the document.
         :raise: Any exceptions raised by the underlying platform.
         """
-        return ExistsResult(CoreClient.exists(self.bucket, key), **forward_args(kwargs, *options))
+        return ExistsResult(CoreClient.exists(self.bucket, key, **forward_args(kwargs, *options)))
 
     @_mutate_result_and_inject
     def upsert(self,
@@ -1583,7 +1583,7 @@ class Scope(object):
                         ):
         # type: (...) -> CBCollectionBase
         return CBCollectionBase._cast(self, collection_name, *options)
-    @volatile
+
     def collection(self,
                         collection_name,  # type: str
                         *options  # type: CollectionOptions

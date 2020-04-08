@@ -1426,6 +1426,8 @@ class ErrorMapper(object):
                                     value = value.get('error', None)
                                 elif 'errors' in value:
                                     value = value.get('errors', None)
+                                elif '_' in value:
+                                    value = value.get('_', None)
                                 if value and isinstance(value, dict):
                                     # sometimes it is still a dict, so use the name field
                                     value = value.get('name', None)

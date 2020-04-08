@@ -30,8 +30,9 @@ class ClusterTests(CollectionTestCase):
         super(ClusterTests, self).setUp()
 
     def test_diagnostics(self):
-        if self.is_mock or not self.supports_collections():
-            raise SkipTest("diagnostics hangs forever with mock and < 6.5")
+        # basically, 6.5.x and not dev preview
+        if self.is_mock or not self.cluster._is_6_5_plus():
+            raise SkipTest("diagnostics hangs forever with mock and < 6.5, and sometimes DP")
         result = self.cluster.diagnostics(DiagnosticsOptions(report_id="imareportid"))
         self.assertIn("imareportid", result.id)
         self.assertIsNotNone(result.sdk)
@@ -48,8 +49,9 @@ class ClusterTests(CollectionTestCase):
         self.assertEqual(config[0].type, ServiceType.Config)
 
     def test_diagnostics_with_active_bucket(self):
-        if self.is_mock or not self.supports_collections():
-            raise SkipTest("diagnostics hangs forever with mock and < 6.5")
+        # basically, 6.5.x and not dev preview
+        if self.is_mock or not self.cluster._is_6_5_plus():
+            raise SkipTest("diagnostics hangs forever with mock and < 6.5, and sometimes DP")
         query_result = self.cluster.query('SELECT * FROM `beer-sample` LIMIT 1')
         self.assertTrue(len(query_result.rows()) > 0)
         result = self.cluster.diagnostics(DiagnosticsOptions(report_id="imareportid"))
@@ -75,12 +77,11 @@ class ClusterTests(CollectionTestCase):
             raise SkipTest("query not mocked")
         cluster = Cluster.connect(self.cluster.connstr, ClusterOptions(
             ClassicAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)))
-        # verify that diagnostics returns a result
-        result = cluster.query("SELECT * from `beer-sample` LIMIT 1")
-        self.assertIsNotNone(len(result.rows()) > 0)
+        # verify that we can get a bucket manager
+        self.assertIsNotNone(cluster.buckets())
         # disconnect cluster
         cluster.disconnect()
-        self.assertRaises(AlreadyShutdownException, cluster.query, "SELECT * FROM `beer-sample` LIMIT 1")
+        self.assertRaises(AlreadyShutdownException, cluster.buckets)
 
     def test_n1ql_default_timeout(self):
         self.cluster.n1ql_timeout = timedelta(seconds=50)

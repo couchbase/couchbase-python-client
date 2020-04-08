@@ -1,7 +1,7 @@
 from couchbase.management import CollectionManager, ViewIndexManager
 from couchbase.management.admin import Admin
 from couchbase.management.views import DesignDocumentNamespace
-from couchbase_core.supportability import uncommitted, volatile
+from couchbase_core.supportability import uncommitted
 from couchbase_core.client import Client as CoreClient
 import couchbase_core._libcouchbase as _LCB
 from .collection import CBCollection, CollectionOptions, CoreClientDatastructureWrap
@@ -12,7 +12,6 @@ from datetime import timedelta
 from enum import Enum
 import logging
 from couchbase_core.asynchronous import AsyncClientFactory
-
 
 
 class ViewScanConsistency(Enum):
@@ -208,7 +207,6 @@ class Bucket(CoreClientDatastructureWrap):
         # type: (...) -> str
         return self._name
 
-    @volatile
     def scope(self,
               scope_name  # type: str
               ):
@@ -232,7 +230,6 @@ class Bucket(CoreClientDatastructureWrap):
         """
         return Scope(self).default_collection()
 
-    @volatile
     def collection(self,
                    collection_name  # type: str
                    ):

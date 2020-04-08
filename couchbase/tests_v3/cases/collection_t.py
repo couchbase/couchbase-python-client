@@ -162,7 +162,7 @@ class CollectionTests(CollectionTestCase):
     def _check_replicas(self, all_up=True):
         num_replicas = self.bucket.configured_replica_count
         if num_replicas < 1:
-            raise SkipTest('need replicas to test get_all_replicas')
+            raise SkipTest('need replicas to test get_all/get_any_replicas')
             # TODO: this is far to difficult - having to use the test framework to get the bucket
         kv_results = self.bucket.ping().endpoints.get(ServiceType.KeyValue, None)
         num_expected = num_replicas+1 if all_up else 2 # 2 means at least one replica is up
@@ -177,20 +177,22 @@ class CollectionTests(CollectionTestCase):
         result = self.try_n_times(10, 3, self.coll.get_any_replica, 'imakey100')
         self.assertDictEqual(self.CONTENT, result.content_as[dict])
 
-    @unittest.skip("This sometimes will segfault - skip for now -- see PYCBC-833")
     def test_get_all_replicas(self):
         self._check_replicas()
-        self.coll.upsert('imakey100', self.CONTENT)
+        if self.supports_collections():
+            raise SkipTest("get_all_replicas fails if using collections it seems")
+        self.coll.upsert(self.KEY, self.CONTENT)
         # wait till it it there...
-        result = self.try_n_times(10, 3, self.coll.get_all_replicas, "imakey100")
+        result = self.try_n_times(10, 3, self.coll.get_all_replicas, self.KEY)
         if not hasattr(result, '__iter__'):
             result = [result]
         for r in result:
             self.assertDictEqual(self.CONTENT, r.content_as[dict])
 
-    @unittest.skip("get_all_replicas will sometimes segfault - see PYCBD-833")
     def test_get_all_replicas_returns_master(self):
         self._check_replicas()
+        if self.supports_collections():
+            raise SkipTest("get_all_replicas fails if using collections it seems")
         self.coll.upsert('imakey100', self.CONTENT)
         result = self.try_n_times(10, 3, self.coll.get_all_replicas, 'imakey100')
         if not hasattr(result, '__iter__'):

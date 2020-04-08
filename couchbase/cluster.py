@@ -18,8 +18,8 @@ from couchbase.search import SearchResult, SearchOptions
 from .analytics import AnalyticsResult
 from .n1ql import QueryResult
 from couchbase_core.n1ql import N1QLQuery
-from .options import OptionBlock, forward_args, OptionBlockDeriv
-from .bucket import Bucket, CoreClient
+from .options import OptionBlock, OptionBlockDeriv
+from .bucket import Bucket, CoreClient, PingOptions
 from couchbase_core.cluster import _Cluster as CoreCluster, Authenticator as CoreAuthenticator
 from .exceptions import CouchbaseException, AlreadyShutdownException, InvalidArgumentsException, \
     SearchException, DiagnosticsException, QueryException, ArgumentException, AnalyticsException
@@ -28,6 +28,8 @@ from couchbase_core._pyport import raise_from
 from couchbase.options import OptionBlockTimeOut
 from datetime import timedelta
 from couchbase_core.cluster import *
+from .result import *
+from random import choice
 
 
 T = TypeVar('T')
@@ -250,7 +252,7 @@ class Cluster(CoreClient):
         self._clusteropts.update(cluster_opts)
         self._adminopts = dict(**self._clusteropts)
         self._clusteropts.update(async_items)
-        self._clusteropts['bucket'] = "default"
+        #self._clusteropts['bucket'] = "default"
         super(Cluster, self).__init__(connection_string=str(self.connstr), _conntype=_LCB.LCB_TYPE_CLUSTER, **self._clusteropts)
 
     @staticmethod
@@ -294,6 +296,19 @@ class Cluster(CoreClient):
         kwargs['admin'] = self._admin
         return self._cluster.open_bucket(name, **kwargs)
 
+    # Temporary, helpful with working around CCBC-1204
+    def _is_6_5_plus(self):
+        self._check_for_shutdown()
+        response = self._admin.http_request(path="/pools").value
+        v = response.get("implementationVersion")
+        # lets just get first 3 characters -- the string should be X.Y.Z-XXXX-YYYY and we only care about
+        # major and minor version
+        try:
+            return float(v[:3]) >= 6.5
+        except ValueError:
+            # the mock says "CouchbaseMock..."
+            return True
+
     def query(self,
               statement,            # type: str
               *options,             # type: QueryOptions
@@ -325,7 +340,44 @@ class Cluster(CoreClient):
             opt = o
             opts.remove(o)
 
-        return self._operate_on_cluster(CoreClient.query, QueryException, opt.to_n1ql_query(statement, *opts, **kwargs), itercls=itercls)
+        # if not a 6.5 cluster, we need to query against a bucket.  We think once
+        # CCBC-1204 is addressed, we can just use the cluster's instance
+        return self._maybe_operate_on_an_open_bucket(CoreClient.query,
+                                                     QueryException,
+                                                     opt.to_n1ql_query(statement, *opts, **kwargs),
+                                                     itercls=itercls,
+                                                     err_msg="Query requires an open bucket")
+
+    # gets a random bucket from those the cluster has opened
+    def _get_an_open_bucket(self, err_msg):
+        clients = [v() for k, v in self._cluster._buckets.items()]
+        clients = [v for v in clients if v]
+        if clients:
+            return choice(clients)
+        raise NoBucketException(err_msg)
+
+    def _maybe_operate_on_an_open_bucket(self,
+                                         verb,
+                                         failtype,
+                                         *args,
+                                         **kwargs):
+        if self._is_6_5_plus() and not self._is_dev_preview():
+            kwargs.pop('err_msg', None)
+            return self._operate_on_cluster(verb, failtype, *args, **kwargs)
+        return self._operate_on_an_open_bucket(verb, failtype, *args, **kwargs)
+
+    def _operate_on_an_open_bucket(self,
+                                   verb,
+                                   failtype,
+                                   *args,
+                                   **kwargs):
+        try:
+            return verb(self._get_an_open_bucket(kwargs.pop('err_msg', 'Cluster has no open buckets')),
+                        *args,
+                        **kwargs)
+        except Exception as e:
+            raise_from(failtype(params=CouchbaseException.ParamType(message='Cluster operation on bucket failed',
+                                                                    inner_cause=e)), e)
 
     def _operate_on_cluster(self,
                             verb,
@@ -351,12 +403,11 @@ class Cluster(CoreClient):
             results.append(verb(c, *args, **kwargs))
         return results
 
-
     async def _operate_on_entire_cluster(self,
-                                   verb,
-                                   failtype,
-                                   *args,
-                                   **kwargs):
+                                         verb,
+                                         failtype,
+                                         *args,
+                                         **kwargs):
         # if you don't have a cluster client yet, then you don't have any other buckets open either, so
         # this is the same as operate_on_cluster
         if not self._cluster._buckets:
@@ -400,9 +451,12 @@ class Cluster(CoreClient):
             if isinstance(o, AnalyticsOptions):
                 opt = o
                 opts.remove(o)
-        return self._operate_on_cluster(CoreClient.analytics_query,
-                                                        AnalyticsException,
-                                                        opt.to_analytics_query(statement, *opts, **kwargs), itercls=itercls)
+
+        return self._maybe_operate_on_an_open_bucket(CoreClient.analytics_query,
+                                                     AnalyticsException,
+                                                     opt.to_analytics_query(statement, *opts, **kwargs),
+                                                     itercls=itercls,
+                                                     err_msg='Analytics queries require an open bucket')
 
     def search_query(self,
                      index,     # type: str
@@ -421,7 +475,7 @@ class Cluster(CoreClient):
                 print(hit)
 
         :param str index: Name of the index to use for this query.
-        :param couchbas.search.SearchQuery: the fluent search API to construct a query for F.T.S.
+        :param couchbase.search.SearchQuery query: the fluent search API to construct a query for F.T.S.
         :param QueryOptions options: the options to pass to the cluster with the query.
         :param Any kwargs: Overrides corresponding value in options.
         :return: A SearchResult object with the results of the query or error message if the query failed on the server.
@@ -435,7 +489,7 @@ class Cluster(CoreClient):
             search_params = SearchOptions.gen_search_params_cls(index, query, *options, **kwargs)
             return search_params.itercls(search_params.body, dest, **search_params.iterargs)
 
-        return self._operate_on_cluster(do_search, SearchException)
+        return self._maybe_operate_on_an_open_bucket(do_search, SearchException, err_msg="No buckets opened on cluster")
 
     _root_diag_data = {'id', 'version', 'sdk'}
 
@@ -453,6 +507,16 @@ class Cluster(CoreClient):
         self._check_for_shutdown()
         result = self._sync_operate_on_entire_cluster(CoreClient.diagnostics, **forward_args(kwargs, *options))
         return DiagnosticsResult(result)
+
+    def ping(self,
+             *options,  # type: PingOptions
+             **kwargs
+             ):
+        # type: (...) -> PingResult
+        bucket = self._get_an_open_bucket()
+        if bucket:
+            return PingResult(bucket.ping(*options, **kwargs))
+        raise NoBucketException("ping requires a bucket be opened first")
 
     def users(self):
         # type: (...) -> UserManager
@@ -494,6 +558,7 @@ class Cluster(CoreClient):
         self._cluster = None
         self.__admin = None
 
+    # Only useful for 6.5 DP testing
     def _is_dev_preview(self):
         self._check_for_shutdown()
         return self._admin.http_request(path="/pools").value.get("isDeveloperPreview", False)

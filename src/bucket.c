@@ -1136,6 +1136,8 @@ Bucket__init__(pycbc_Bucket *self,
         err = lcb_cntl(self->instance, LCB_CNTL_GET, LCB_CNTL_BUCKETNAME, &bucketstr);
         if (err == LCB_SUCCESS && bucketstr != NULL) {
             self->bucket = pycbc_SimpleStringZ(bucketstr);
+        } else {
+            self->bucket = pycbc_SimpleStringZ("");
         }
     }
 

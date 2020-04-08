@@ -164,6 +164,8 @@ class SearchTest(ClusterTestCase):
         x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search", search.TermQuery("category"),
                                                                           search.SearchOptions(facets={'fred': search.TermFacet('category',
                                                                                                                                 most_common_term_max)}))  # type: SearchResult
+        r = x.rows()
+        print(r)
         first_entry = x.rows()[0]
         self.assertEqual("brasserie_de_brunehaut-mont_st_aubert", first_entry.id)
         SearchResultTest._check_search_result(self, initial, 6, x)

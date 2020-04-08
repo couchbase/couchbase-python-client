@@ -15,18 +15,14 @@ class BucketManagementTests(CollectionTestCase):
         if not self.is_realserver:
             raise SkipTest('Real server must be used for admin tests')
 
-        # clean up test bucket just in case
-        try:
-          self.bm.drop_bucket('fred')
-        except:
-          pass
+        self.try_n_times_till_exception(10, 3, self.bm.drop_bucket, 'fred')
+
+        # be sure fred is not there anymore...
+        self.try_n_times_till_exception(10, 3, self.bm.get_bucket, 'fred')
 
     def test_bucket_create(self):
-        try:
-            self.bm.create_bucket(CreateBucketSettings(name="fred", bucket_type="couchbase", ram_quota_mb=100))
-            self.try_n_times(10, 1, self.bm.get_bucket, "fred")
-        finally:
-            self.bm.drop_bucket('fred')
+        self.bm.create_bucket(CreateBucketSettings(name="fred", bucket_type="couchbase", ram_quota_mb=100))
+        self.try_n_times(10, 1, self.bm.get_bucket, "fred")
 
     def test_bucket_create_fail(self):
       settings = CreateBucketSettings(name='fred', bucket_type='couchbase', ram_quota_mb=100)
@@ -52,8 +48,10 @@ class BucketManagementTests(CollectionTestCase):
             for bucket, kwargs in buckets_to_add.items():
                 try:
                     self.bm.drop_bucket(bucket)
-                except:
+                except BucketDoesNotExistException:
                     pass
+                # now be sure it is really gone
+                self.try_n_times_till_exception(10, 3, self.bm.get_bucket, bucket)
 
     def test_actions(self):
 
