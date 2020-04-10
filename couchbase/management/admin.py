@@ -29,6 +29,8 @@ import couchbase.exceptions as E
 from couchbase_core._pyport import basestring
 from couchbase_core.auth_domain import AuthDomain
 from couchbase_core._libcouchbase import FMT_JSON
+from couchbase_core.supportability import internal
+
 import re
 
 METHMAP = {
@@ -57,6 +59,7 @@ class Admin(LCB.Bucket):
     This object should **not** be used to perform Key/Value operations. The
     :class:`~couchbase_core.client.Client` is used for that.
     """
+    @internal
     def __init__(self, username, password, host='localhost', port=8091,
                  **kwargs):
 
@@ -97,6 +100,7 @@ class Admin(LCB.Bucket):
         super(Admin, self).__init__(**kwargs)
         self._connect()
 
+    @internal
     def http_request(self,
                      path,
                      method='GET',
@@ -164,6 +168,7 @@ class Admin(LCB.Bucket):
                   bucket_password='', replicas=0,
                   flush_enabled=False)
 
+    @internal
     def bucket_create(self, name, **kwargs):
         """
         Create a new bucket
@@ -214,6 +219,7 @@ class Admin(LCB.Bucket):
             content=mk_formstr(params),
             content_type='application/x-www-form-urlencoded')
 
+    @internal
     def bucket_remove(self, name):
         """
         Remove an existing bucket from the cluster
@@ -227,6 +233,7 @@ class Admin(LCB.Bucket):
 
     bucket_delete = bucket_remove
 
+    @internal
     class BucketInfo(object):
         """
         Information about a bucket
@@ -246,6 +253,7 @@ class Admin(LCB.Bucket):
         def __str__(self):
             return "Bucket named {}".format(self.name)
 
+    @internal
     def buckets_list(self):
         """
         Retrieve the list of buckets from the server
@@ -255,6 +263,7 @@ class Admin(LCB.Bucket):
         buckets_list = self.http_request(path='/pools/default/buckets', method='GET')
         return map(Admin.BucketInfo, buckets_list.value)
 
+    @internal
     def bucket_info(self, name):
         """
         Retrieve information about the bucket.
@@ -271,6 +280,7 @@ class Admin(LCB.Bucket):
         """
         return self.http_request(path='/pools/default/buckets/' + name)
 
+    @internal
     def wait_ready(self, name, timeout=5.0, sleep_interval=0.2):
         """
         Wait for a newly created bucket to be ready.
@@ -312,6 +322,7 @@ class Admin(LCB.Bucket):
 
         return path
 
+    @internal
     def users_get(self, domain):
         """
         Retrieve a list of users from the server.
@@ -323,7 +334,7 @@ class Admin(LCB.Bucket):
         path = self._get_management_path(domain)
         return self.http_request(path=path,
                                  method='GET')
-
+    @internal
     def user_get(self, domain, userid, **kwargs):
         """
         Retrieve a user from the server
@@ -338,7 +349,7 @@ class Admin(LCB.Bucket):
         return self.http_request(path=path,
                                  method='GET',
                                  **kwargs)
-
+    @internal
     def user_upsert(self, domain, userid, password=None, roles=None, name=None):
         """
         Upsert a user in the cluster
@@ -373,7 +384,7 @@ class Admin(LCB.Bucket):
 
         if password and domain == AuthDomain.External:
             raise E.ArgumentException("External domains must not have passwords")
-        role_string = self.gen_role_list(roles)
+        role_string = self._gen_role_list(roles)
         params = {
             'roles': role_string,
         }
@@ -391,15 +402,15 @@ class Admin(LCB.Bucket):
                                  content=form)
 
     @staticmethod
-    def gen_role_list(roles):
+    def _gen_role_list(roles):
         tmplist = []
         for role in roles:
-            tmplist.append(Admin.role_to_str(role))
+            tmplist.append(Admin._role_to_str(role))
         role_string = ','.join(tmplist)
         return role_string
 
     @staticmethod
-    def role_to_str(role):
+    def _role_to_str(role):
         name=None
         bucket=None
         try:
@@ -419,9 +430,10 @@ class Admin(LCB.Bucket):
     role_format = re.compile(r'^(?P<role>.*?)(|\[(?P<bucket>.*?)\])$')
 
     @staticmethod
-    def str_to_role(param):
+    def _str_to_role(param):
         return Admin.role_format.match(param).groupdict()
 
+    @internal
     def user_remove(self, domain, userid, **kwargs):
         """
         Remove a user
@@ -434,10 +446,3 @@ class Admin(LCB.Bucket):
         return self.http_request(path=path,
                                  method='DELETE',
                                  **kwargs)
-
-    # Add aliases to match RFC
-    # Python SDK so far has used object-verb where RFC uses verb-object
-    get_user = user_get
-    get_users = users_get
-    upsert_user = user_upsert
-    remove_user = user_remove

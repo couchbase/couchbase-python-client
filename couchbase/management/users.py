@@ -331,12 +331,12 @@ class Role(with_metaclass(ABCMeta, Mapped)):
         return iter([self.name, self.bucket])
 
     def __str__(self):
-        return Admin.role_to_str(self)
+        return Admin._role_to_str(self)
 
     @classmethod
     def decode(cls, param):
         if isinstance(param, str):
-            param = Admin.str_to_role(param)
+            param = Admin._str_to_role(param)
         if isinstance(param, dict):
             args = list(map(param.get, ('role', 'bucket')))
         else:
@@ -576,7 +576,7 @@ class Group(JSONMapping):
 
     @roles.setter
     def roles(self, value):
-        self._raw_json['roles']=list(map(Admin.role_to_str, value))
+        self._raw_json['roles']=list(map(Admin._role_to_str, value))
 
     @staticmethod
     def from_json(kwargs):
