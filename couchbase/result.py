@@ -1,15 +1,17 @@
-from couchbase_core.subdocument import Spec
-from couchbase_core.supportability import internal
-from .options import timedelta, forward_args
-from couchbase_core.transcodable import Transcodable
-from couchbase_core._libcouchbase import Result as CoreResult
-from couchbase_core.result import MultiResult, SubdocResult
 from typing import *
+
 from boltons.funcutils import wraps
+from couchbase_core._libcouchbase import Result as CoreResult
+
+from couchbase.diagnostics import EndpointPingReport, ServiceType
 from couchbase_core import iterable_wrapper
 from couchbase_core.result import AsyncResult
-from couchbase_core.views.iterator import View as CoreView, View
-from couchbase.diagnostics import EndpointPingReport, ServiceType
+from couchbase_core.result import MultiResult, SubdocResult
+from couchbase_core.subdocument import Spec
+from couchbase_core.supportability import internal
+from couchbase_core.transcodable import Transcodable
+from couchbase_core.views.iterator import View as CoreView
+from .options import timedelta, forward_args
 
 Proxy_T = TypeVar('Proxy_T')
 
@@ -84,17 +86,16 @@ class ContentProxySubdoc(object):
 class Result(object):
     @internal
     def __init__(self,
-                 cas,  # type: int
-                 error=None  # type: Optional[int]
+                 original  # type: CoreResult
                  ):
+        # type: (...) -> None
         """
         This is the base implementation for SDK3 results
 
         :param int cas: CAS value
         :param Optional[int] error: error code if applicable
         """
-        self._cas = cas
-        self._error = error
+        self._original = original
 
     @property
     def cas(self):
@@ -104,31 +105,37 @@ class Result(object):
 
         :return: the CAS value
         """
-        return self._cas
+        return self._original.cas
 
     @property
     def error(self):
         # type: () -> int
-        return self._error
+        return self._original.rc
 
     @property
     def success(self):
         # type: () -> bool
         return not self.error
 
+    TracingOutput = Dict[str, Any]
+
+    @property
+    def _tracing_output(self):
+        # type: () -> TracingOutput
+        return self._original.tracing_output
+
 
 class LookupInResult(Result):
     @internal
     def __init__(self,
-                 content,  # type: CoreResult
+                 original,  # type: CoreResult
                  **kwargs  # type: Any
                  ):
         # type: (...) -> None
         """
         LookupInResult is the return type for lookup_in operations.
         """
-        super(LookupInResult, self).__init__(content.cas, content.rc)
-        self._original = content  # type: CoreResult
+        super(LookupInResult, self).__init__(original)
         self.dict = kwargs
 
     @property
@@ -153,12 +160,12 @@ class LookupInResult(Result):
 
 class MutationResult(Result):
     def __init__(self,
-                core_result    # type: CoreResult
-                ):
-      super(MutationResult, self).__init__(core_result.cas, core_result.rc)
-      mutinfo = getattr(core_result, '_mutinfo', None)
-      muttoken = MutationToken(mutinfo) if mutinfo else None
-      self.mutationToken = muttoken
+                 original  # type: CoreResult
+                 ):
+        super(MutationResult, self).__init__(original)
+        mutinfo = getattr(original, '_mutinfo', None)
+        muttoken = MutationToken(mutinfo) if mutinfo else None
+        self.mutationToken = muttoken
 
     def mutation_token(self):
         # type: () -> MutationToken
@@ -242,12 +249,11 @@ class ExistsResult(Result):
     def __init__(self,
                  original # type: CoreResult
                  ):
-        super(ExistsResult, self).__init__(original.cas, original.rc)
-        self._exists = (original.cas != 0)
+        super(ExistsResult, self).__init__(original)
 
     @property
     def exists(self):
-        return self._exists
+        return self._original.cas != 0
 
 
 class GetResult(Result):
@@ -259,9 +265,8 @@ class GetResult(Result):
       """
       GetResult is the return type for full read operations.
       """
-      super(GetResult, self).__init__(original.cas, original.rc)
+      super(GetResult, self).__init__(original)
       self._id = original.key
-      self._original = original
       self._expiry = expiry
 
     def content_as_array(self):
@@ -410,17 +415,17 @@ def get_mutation_result(result  # type: CoreResult
     return factory_class(orig_result)
 
 
-class MultiMutationResult(dict):
-    def __init__(self, raw_result):
-        self.update({k: get_mutation_result(v) for k, v in raw_result.items()})
-
-
 class MultiResultBase(dict):
     def converter(self, value):
         pass
 
+    @property
+    def all_ok(self):
+        return self._raw_result.all_ok
+
     def __init__(self, raw_result):
-        super(MultiResultBase,self).__init__({k: self.converter(v) for k, v in raw_result.items()})
+        self._raw_result = raw_result
+        super(MultiResultBase, self).__init__({k: self.converter(v) for k, v in raw_result.items()})
 
 
 class MultiGetResult(MultiResultBase):
@@ -429,6 +434,14 @@ class MultiGetResult(MultiResultBase):
 
     def __init__(self, *args, **kwargs):
         super(MultiGetResult, self).__init__(*args, **kwargs)
+
+
+class MultiMutationResult(MultiResultBase):
+    def converter(self, raw_value):
+        return get_mutation_result(raw_value)
+
+    def __init__(self, *args, **kwargs):
+        super(MultiMutationResult, self).__init__(*args, **kwargs)
 
 
 class AsyncMultiMutationResult(AsyncWrapper.gen_wrapper(MultiMutationResult)):
@@ -449,20 +462,20 @@ class AsyncMultiGetResult(AsyncWrapper.gen_wrapper(MultiGetResult)):
 
 class MultiResultWrapper(object):
     def __init__(self, orig_result_type, async_result_type=None):
-        self.orig_result_type=orig_result_type
-        self.async_result_type=async_result_type or AsyncWrapper.gen_wrapper(orig_result_type)
+        self.orig_result_type = orig_result_type
+        self.async_result_type = async_result_type or AsyncWrapper.gen_wrapper(orig_result_type)
 
     def get_multi_result(self, target, wrapped, keys, *options, **kwargs):
         final_options = forward_args(kwargs, *options)
         raw_result = wrapped(target, keys, **final_options)
-        orig_result = getattr(raw_result,'orig_result',raw_result)
+        orig_result = getattr(raw_result, 'orig_result', raw_result)
         factory_class = self.async_result_type if issubclass(type(orig_result), AsyncResult) else self.orig_result_type
         result = factory_class(orig_result)
         return result
 
 
-get_multi_mutation_result=MultiResultWrapper(MultiMutationResult, AsyncMultiMutationResult).get_multi_result
-get_multi_get_result=MultiResultWrapper(MultiGetResult, AsyncMultiGetResult).get_multi_result
+get_multi_mutation_result = MultiResultWrapper(MultiMutationResult, AsyncMultiMutationResult).get_multi_result
+get_multi_get_result = MultiResultWrapper(MultiGetResult, AsyncMultiGetResult).get_multi_result
 
 
 def _wrap_in_mutation_result(func  # type: Callable[[Any,...],CoreResult]
@@ -480,7 +493,7 @@ def _wrap_in_mutation_result(func  # type: Callable[[Any,...],CoreResult]
 
 class ViewResult(iterable_wrapper(CoreView)):
     def __init__(self, *args, **kwargs  # type: CoreView
-                ):
+                 ):
         super(ViewResult, self).__init__(*args, **kwargs)
 
     @property
@@ -494,6 +507,3 @@ class ViewResult(iterable_wrapper(CoreView)):
     @property
     def cas(self):
         raise NotImplementedError()
-
-
-

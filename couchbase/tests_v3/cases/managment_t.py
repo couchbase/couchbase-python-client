@@ -72,11 +72,7 @@ class BucketManagementTests(CollectionTestCase):
             self.make_connargs()['connection_string'])
 
         dummy_bucket = 'dummy'
-        connstr = connstr.encode()
-        args=self.make_connargs()
-        args.pop('connection_string',None)
-        args['bucket'] = dummy_bucket
-        self.factory(connstr, **args)
+        self.cluster.bucket(dummy_bucket)
         # OK, it exists
         self.assertRaises(CouchbaseException, self.factory, connstr)
 

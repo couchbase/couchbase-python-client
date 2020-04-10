@@ -1,18 +1,16 @@
-from couchbase_tests.base import ConnectionTestCase
+from couchbase_tests.base import ConnectionTestCase, CollectionTestCase
 from couchbase_core._libcouchbase import FMT_UTF8
 import couchbase_core.subdocument as SD
 import couchbase.exceptions as E
-import traceback
-import logging
 
 
-class SubdocTest(ConnectionTestCase):
+class SubdocTest(CollectionTestCase):
     def setUp(self):
         super(SubdocTest, self).setUp()
         cb = self.cb
         k = self.gen_key('sd_precheck')
         try:
-            cb.retrieve_in(k, 'pth')
+            cb.lookup_in(k, 'pth')
         except (E.NotSupportedException, E.UnknownCommandException):
             self.skipTest('Subdoc not supported on this server version')
         except E.CouchbaseException:
@@ -26,7 +24,7 @@ class SubdocTest(ConnectionTestCase):
             'path1': 'value1'
         })
 
-        result = cb.retrieve_in(key, 'path1')
+        result = cb.get(key, project=['path1'])
         self.assertEqual((0, 'value1'), result.get(0))
         self.assertEqual((0, 'value1'), result.get('path1'))
         self.assertEqual('value1', result[0])
@@ -145,29 +143,29 @@ class SubdocTest(ConnectionTestCase):
         key = self.gen_key('sdcounter')
         cb.upsert(key, {})
 
-        rv = cb.mutate_in(key, SD.counter('counter', 100))
+        rv = cb.mutate_in(key, (SD.counter('counter', 100),))
         self.assertTrue(rv.success)
         self.assertFalse(rv.cas == 0)
-        self.assertEqual(100, rv[0])
+        self.assertEqual(100, rv.content_as[int](0))
 
         self.assertRaises(E.SubdocBadDeltaException, cb.mutate_in, key,
-                          SD.counter('not_a_counter', 'blah'))
+                          (SD.counter('not_a_counter', 'blah'),))
 
         # Do an upsert
-        cb.mutate_in(key, SD.upsert('not_a_counter', 'blah'))
+        cb.mutate_in(key, (SD.upsert('not_a_counter', 'blah'),))
 
         self.assertRaises(E.SubdocPathMismatchException, cb.mutate_in, key,
-                          SD.counter('not_a_counter', 25))
+                          (SD.counter('not_a_counter', 25),))
 
         self.assertRaises(E.PathNotFoundException, cb.mutate_in, key,
-                          SD.counter('path.to.newcounter', 99))
+                          (SD.counter('path.to.newcounter', 99),))
         rv = cb.mutate_in(key,
-                          SD.counter('path.to.newcounter', 99, create_parents=True))
-        self.assertEqual(99, rv[0])
+                          (SD.counter('path.to.newcounter', 99, create_parents=True),))
+        self.assertEqual(99, rv.content_as[int](0))
 
         # Increment first counter again
-        rv = cb.mutate_in(key, SD.counter('counter', -25))
-        self.assertEqual(75, rv[0])
+        rv = cb.mutate_in(key, (SD.counter('counter', -25),))
+        self.assertEqual(75, rv.content_as[int](0))
 
         self.assertRaises(ValueError, SD.counter, 'counter', 0)
 
@@ -234,14 +232,14 @@ class SubdocTest(ConnectionTestCase):
         key = self.gen_key('sdArray')
 
         cb.upsert(key, {'array': []})
-        cb.mutate_in(key, SD.array_append('array', True))
-        self.assertEqual([True], cb.retrieve_in(key, 'array')[0])
+        cb.mutate_in(key, (SD.array_append('array', True),))
+        self.assertEqual([True], cb.get(key, project=['array'])[0])
 
-        cb.mutate_in(key, SD.array_append('array', 1, 2, 3))
-        self.assertEqual([True, 1, 2, 3], cb.retrieve_in(key, 'array')[0])
+        cb.mutate_in(key, (SD.array_append('array', 1, 2, 3),))
+        self.assertEqual([True, 1, 2, 3], cb.get(key, project=['array'])[0])
 
-        cb.mutate_in(key, SD.array_prepend('array', [42]))
-        self.assertEqual([[42], True, 1, 2, 3], cb.retrieve_in(key, 'array')[0])
+        cb.mutate_in(key, (SD.array_prepend('array', [42]),))
+        self.assertEqual([[42], True, 1, 2, 3], cb.get(key, project=['array'])[0])
 
     def test_result_iter(self):
         cb = self.cb
@@ -265,35 +263,36 @@ class SubdocTest(ConnectionTestCase):
         cb = self.cb
         key = self.gen_key('non-exist')
         try:
-            cb.lookup_in(key, SD.get('pth1'), quiet=True)
+            cb.get(key, project=['pth1'], quiet=True)
         except E.DocumentNotFoundException as e:
             rv = e.all_results[key]
             self.assertFalse(rv.access_ok)
 
         cb.upsert(key, {'hello': 'world'})
-        rv = cb.lookup_in(key, SD.get('nonexist'))
-        self.assertTrue(rv.access_ok)
+        rv = cb.get(key, project=['nonexist'])
+        self.assertTrue(rv.success)
 
     def test_get_count(self):
         cb = self.cb
         key = self.gen_key('get_count')
 
         cb.upsert(key, [1, 2, 3])
-        self.assertEqual(3, cb.lookup_in(key, SD.get_count(''))[0])
+        self.assertEqual(3, cb.get(key, project=['']).content[''][2])
 
         cb.upsert(key, {'k1': 1, 'k2': 2, 'k3': 3})
-        self.assertEqual(3, cb.lookup_in(key, SD.get_count(''))[0])
+        self.assertEqual(3, cb.lookup_in(key, (SD.get_count(''),)).content_as[int](0))
 
     def test_create_doc(self):
         cb = self.cb
         key = self.gen_key('create_doc')
-        cb.mutate_in(key, SD.upsert('new.path', 'newval'), upsert_doc=True)
-        self.assertEqual('newval', cb.retrieve_in(key, 'new.path')[0])
+        cb.mutate_in(key, (SD.upsert('new.path', 'newval'),), upsert_doc=True)
+        result= cb.get(key, project=['new.path'])
+        self.assertEqual('newval',result.content['new.path'])
 
         # Check 'insert_doc'
 
-        self.assertRaises(E.DocumentExistsException, cb.mutate_in, key, SD.upsert('new.path', 'newval'), insert_doc=True)
+        self.assertRaises(E.DocumentExistsException, cb.mutate_in, key, (SD.upsert('new.path', 'newval'),), insert_doc=True)
         cb.remove(key)
 
-        cb.mutate_in(key, SD.upsert('new.path', 'newval'), insert_doc=True)
-        self.assertEqual('newval', cb.retrieve_in(key, 'new.path')[0])
+        cb.mutate_in(key, (SD.upsert('new.path', 'newval'),), insert_doc=True)
+        self.assertEqual('newval', cb.get(key, project=['new.path']).content['new.path'])

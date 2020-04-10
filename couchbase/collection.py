@@ -1,30 +1,28 @@
-import logging
-
-from couchbase_core.supportability import volatile
-from couchbase_core import JSON
-
+import copy
+from datetime import timedelta
 from functools import wraps
+from typing import *
+
+from couchbase_core._libcouchbase import Bucket as _Base
+from couchbase_core._libcouchbase import FMT_UTF8
 from mypy_extensions import VarArg, KwArg, Arg
 
-from .subdocument import LookupInSpec, MutateInSpec, MutateInOptions, \
-    gen_projection_spec
-from .result import GetResult, GetReplicaResult, ExistsResult, get_result_wrapper, CoreResult, ResultPrecursor, \
-    LookupInResult, MutateInResult, \
-    MutationResult, _wrap_in_mutation_result, get_replica_result_wrapper, get_multi_mutation_result, get_multi_get_result
-from .options import forward_args, OptionBlockTimeOut, OptionBlockDeriv, ConstrainedInt, SignedInt64
-from .options import OptionBlock, AcceptableInts
 import couchbase.exceptions
+from couchbase.durability import Durability, DurabilityType, DurabilityOptionBlock
 from couchbase.exceptions import NotSupportedException, DocumentNotFoundException, PathNotFoundException, QueueEmpty, \
     PathExistsException, DocumentExistsException
-from couchbase_core.client import Client as CoreClient
-from couchbase_core._libcouchbase import Bucket as _Base
-import copy
-
-from typing import *
-from couchbase.durability import Durability, DurabilityType, ServerDurableOptionBlock, DurabilityOptionBlock
+from couchbase_core import JSON
 from couchbase_core.asynchronous.bucket import AsyncClientFactory
-from datetime import timedelta
-from couchbase_core._libcouchbase import FMT_UTF8, FMT_JSON
+from couchbase_core.client import Client as CoreClient
+from couchbase_core.supportability import volatile
+from .options import OptionBlock, AcceptableInts
+from .options import forward_args, OptionBlockTimeOut, OptionBlockDeriv, ConstrainedInt, SignedInt64
+from .result import GetResult, GetReplicaResult, ExistsResult, get_result_wrapper, CoreResult, ResultPrecursor, \
+    LookupInResult, MutateInResult, \
+    MutationResult, _wrap_in_mutation_result, get_replica_result_wrapper, get_multi_mutation_result, \
+    get_multi_get_result
+from .subdocument import LookupInSpec, MutateInSpec, MutateInOptions, \
+    gen_projection_spec
 
 try:
     from typing import TypedDict
@@ -35,7 +33,6 @@ from couchbase_core import abstractmethod, ABCMeta, with_metaclass
 import wrapt
 
 import couchbase_core.subdocument as SD
-
 
 class DeltaValue(ConstrainedInt):
     def __init__(self,
@@ -680,7 +677,6 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
     unlock_multi = _wrap_multi_mutation_result(_Base.unlock_multi)
     append_multi = _wrap_multi_mutation_result(_Base.append_multi)
     prepend_multi = _wrap_multi_mutation_result(_Base.prepend_multi)
-    counter_multi = _wrap_multi_mutation_result(_Base.counter_multi)
 
     @_inject_scope_and_collection
     def touch(self,
@@ -827,9 +823,9 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
 
     @_mutate_result_and_inject
     def insert(self,
-               key,         # type: str
-               value,       # type: Any
-               *options,    # type InsertOptions
+               key,  # type: str
+               value,  # type: Any
+               *options,  # type InsertOptions
                **kwargs):
         # type: (...) -> ResultPrecursor
         """Store an object in Couchbase unless it already exists.
@@ -997,7 +993,6 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         # type: (...) -> BinaryCollection
         return BinaryCollection(self)
 
-
     @_dsop(create_type=dict)
     def map_add(self, key, mapkey, value, create=False, **kwargs):
         """
@@ -1071,6 +1066,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         op = SD.remove(mapkey)
         sdres = self.mutate_in(key, (op,), **kwargs)
         return self._wrap_dsop(sdres, **kwargs)
+
     @_dsop()
     def map_size(self, key, **kwargs):
         """
@@ -1305,7 +1301,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
             except IndexError:
                 raise QueueEmpty
 
-            kwargs.update({k:v for k,v in getattr(itm,'__dict__',{}).items() if k in {'cas'}})
+            kwargs.update({k: v for k, v in getattr(itm, '__dict__', {}).items() if k in {'cas'}})
             try:
                 self.list_remove(key, -1, **kwargs)
                 return itm
@@ -1324,7 +1320,6 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :raise: :cb_exc:`DocumentNotFoundException` if the queue does not exist.
         """
         return self.list_size(key)
-
 
     dsops = (map_get,
              map_add,
@@ -1346,7 +1341,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
              set_remove,
              set_size)
 
-    dsop_strs=tuple(map(lambda x: x.__name__, dsops))
+    dsop_strs = tuple(map(lambda x: x.__name__, dsops))
     _MEMCACHED_NOMULTI = CoreClient._MEMCACHED_NOMULTI + dsop_strs
     _MEMCACHED_OPERATIONS = CoreClient._MEMCACHED_OPERATIONS + dsop_strs
 
@@ -1399,7 +1394,7 @@ class BinaryCollection(object):
 
         :raise: :exc:`.NotStoredException` if the key does not exist
         """
-        final_options = { "format": FMT_UTF8 }
+        final_options = {"format": FMT_UTF8}
         final_options.update(forward_args(kwargs, *options))
         x = CoreClient.append(self._collection.bucket, key, value, **final_options)
         return ResultPrecursor(x, options)
@@ -1416,7 +1411,7 @@ class BinaryCollection(object):
 
         .. seealso:: :meth:`append`
         """
-        final_options = { "format": FMT_UTF8 }
+        final_options = {"format": FMT_UTF8}
         final_options.update(forward_args(kwargs, *options))
         x = CoreClient.prepend(self._collection.bucket, key, value, **final_options)
         return ResultPrecursor(x, options)
@@ -1519,6 +1514,21 @@ class BinaryCollection(object):
         x = CoreClient.counter(self._collection.bucket, key, **final_opts)
         return ResultPrecursor(x, final_opts)
 
+    @volatile
+    def increment_multi(self, keys, *options, **kwargs):
+        func = _wrap_multi_mutation_result(_Base.counter_multi)
+        final_opts = self._check_delta_initial(kwargs, *options)
+        return func(self._collection, keys, **final_opts)
+
+    @volatile
+    def decrement_multi(self, keys, *options, **kwargs):
+        func = _wrap_multi_mutation_result(_Base.counter_multi)
+        final_opts = self._check_delta_initial(kwargs, *options)
+        delta = final_opts.pop('delta')
+        if delta:
+            final_opts['delta'] = -delta
+        return func(self._collection, keys, **final_opts)
+
     @staticmethod
     def _check_delta_initial(kwargs, *options):
         final_opts = forward_args(kwargs, *options)
@@ -1526,6 +1536,10 @@ class BinaryCollection(object):
         initial = None if init_arg is None else int(SignedInt64.verified(init_arg))
         if initial is not None:
             final_opts['initial'] = initial
+        delta_arg = final_opts.get('delta')
+        delta = None if delta_arg is None else int(DeltaValue.verified(delta_arg))
+        if delta is not None:
+            final_opts['delta'] = delta
         return final_opts
 
 

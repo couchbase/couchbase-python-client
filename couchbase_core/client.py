@@ -15,7 +15,7 @@ from typing import *
 from .durability import Durability
 from .result import Result
 from couchbase_core.analytics import AnalyticsQuery
-
+from datetime import timedelta
 
 ViewInstance = TypeVar('ViewInstance', bound=View)
 ViewSubType = TypeVar('ViewSubType', bound=Type[ViewInstance])
@@ -176,12 +176,17 @@ class Client(_Base):
     def _get_timeout_common(self, op):
         return self._cntl(op, value_type='timeout')
 
-    def _set_timeout_common(self, op, value):
-        value = float(value)
-        if value <= 0:
-            raise ValueError('Timeout must be greater than 0')
+    def _set_timeout_common(self,
+                            op,  # type: Any
+                            timeout  # type: timedelta
+                            ):
+        if not isinstance(timeout, timedelta):
+            raise E.InvalidArgumentException("Expected timedelta for timeout but got {}".format(timeout))
+        timeout_as_float = float(timeout.total_seconds())
+        if timeout_as_float <= 0:
+            raise ValueError('Timeout must be non-negative')
 
-        self._cntl(op, value_type='timeout', value=value)
+        self._cntl(op, value_type='timeout', value=timeout_as_float)
 
     def mkmeth(oldname, newname, _dst):
         def _tmpmeth(self, *args, **kwargs):
@@ -998,3 +1003,59 @@ class Client(_Base):
                         continue
                     raise
         return d
+
+    def add_bucket_creds(self, bucket, password):
+        if not bucket or not password:
+            raise ValueError('Bucket and password must be nonempty')
+        return _Base._add_creds(self, bucket, password)
+
+    def register_crypto_provider(self, name, provider):
+        """
+        Registers the crypto provider used to encrypt and decrypt document fields.
+        :param name: The name of the provider.
+        :param provider: The provider implementation. // reference LCB type?
+        """
+        _Base.register_crypto_provider(self, name, provider)
+
+    def unregister_crypto_provider(self, name):
+        """
+        Unregisters the crypto provider used to encrypt and decrypt document fields.
+        :param name: The name of the provider.
+        """
+        _Base.unregister_crypto_provider(self, name)
+
+    def encrypt_fields(self, document, fieldspec, prefix):
+        """
+        Encrypt a document using the registered encryption providers.
+        :param document: The document body.
+        :param fieldspec: A list of field specifications, each of which is
+        a dictionary as follows:
+            {
+                'alg' : registered algorithm name,
+                'kid' : key id to use to encrypt with,
+                'name' : field name
+            }
+        :param prefix: Prefix for encrypted field names. Default is None.
+        :return: Encrypted document.
+        """
+        json_encoded = json.dumps(document)
+        encrypted_string = _Base.encrypt_fields(self, json_encoded, fieldspec, prefix)
+        if not encrypted_string:
+            raise E.CouchbaseException("Encryption failed")
+        return json.loads(encrypted_string)
+
+    def decrypt_fields_real(self, document, *args):
+        json_decoded = json.dumps(document)
+        decrypted_string = _Base.decrypt_fields(self, json_decoded, *args)
+        if not decrypted_string:
+            raise E.CouchbaseException("Decryption failed")
+        return json.loads(decrypted_string)
+
+    def decrypt_fields(self, document, prefix):
+        """
+        Decrypts a document using the registered encryption providers.
+        :param document: The document body.
+        :param prefix: Prefix for encrypted field names. Default is None.
+        :return:
+        """
+        return self.decrypt_fields_real(document, prefix)

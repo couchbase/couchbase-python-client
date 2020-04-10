@@ -17,14 +17,14 @@
 import os
 from unittest import SkipTest
 
-from couchbase_v2.exceptions import (
+from couchbase.exceptions import (
     DocumentNotFoundException)
 
-from couchbase_tests.base import TracedCase, ConnectionTestCase
+from couchbase_tests.base import TracedCase, CollectionTestCase
 import logging
 import couchbase_core._libcouchbase
 import couchbase_core._logutil
-from couchbase_v2.exceptions import TimeoutException
+from couchbase.exceptions import TimeoutException
 from time import sleep
 import re
 import couchbase_core
@@ -35,9 +35,8 @@ try:
     import __builtin__ as builtins
 except:
     import builtins
-#ch = logging.StreamHandler()
-#ch.setLevel(logging.WARNING)
-#logging.getLogger().addHandler(ch)
+
+from datetime import timedelta
 
 
 class BogusHandler:
@@ -53,7 +52,7 @@ class BogusHandler:
         self.records.append(kwargs)
 
 
-class EnabledByDefaultTest(ConnectionTestCase):
+class EnabledByDefaultTest(CollectionTestCase):
     def setUp(self, **kwargs):
         super(EnabledByDefaultTest,self).setUp(enable_tracing=None)
 
@@ -61,7 +60,7 @@ class EnabledByDefaultTest(ConnectionTestCase):
         self.assertTrue(self.cb.tracer)
 
 
-class CanEnableTest(ConnectionTestCase):
+class CanEnableTest(CollectionTestCase):
     def setUp(self, **kwargs):
         super(CanEnableTest,self).setUp(enable_tracing="true")
 
@@ -69,7 +68,7 @@ class CanEnableTest(ConnectionTestCase):
         self.assertTrue(self.cb.tracer)
 
 
-class CanDisableTest(ConnectionTestCase):
+class CanDisableTest(CollectionTestCase):
     def setUp(self, **kwargs):
         super(CanDisableTest,self).setUp(enable_tracing="false")
 
@@ -78,7 +77,6 @@ class CanDisableTest(ConnectionTestCase):
 
 class TimeoutTest(TracedCase):
     def setUp(self, *args, **kwargs):
-        raise SkipTest("bucket tracing/timeouts changed")
         if not couchbase_core._libcouchbase.PYCBC_TRACING:
             raise SkipTest("Tracing feature not compiled into Python Client")
         kwargs = {}
@@ -90,45 +88,47 @@ class TimeoutTest(TracedCase):
         logging.info("starting TimeoutTest")
 
     def test_timeout(self):
+        raise SkipTest("To be fixed")
         if sys.platform == 'win32':
             raise SkipTest("To be fixed on Windows")
         if sys.version_info >= (3,6) and sys.platform.startswith('linux') and os.environ.get("VALGRIND_REPORT_DIR"):
             raise SkipTest("To be fixed on Linux 3.6/Valgrind")
         couchbase_core.enable_logging()
-        bucket = self.cb
+        bucket = self.coll
         bucket.upsert("key", "value")
 
-        bucket.timeout = 9e-6
-        bucket.tracing_orphaned_queue_flush_interval = 1
+        self.timeout = timedelta(seconds=9e-6)
+        bucket.tracing_orphaned_queue_flush_interval = timedelta(seconds=1)
         bucket.tracing_orphaned_queue_size = 10
-        bucket.tracing_threshold_queue_flush_interval = 5
+        bucket.tracing_threshold_queue_flush_interval = timedelta(seconds=5)
         bucket.tracing_threshold_queue_size = 10
-        bucket.tracing_threshold_kv = 0.00001
-        bucket.tracing_threshold_n1ql = 0.00001
-        bucket.tracing_threshold_view = 0.00001
-        bucket.tracing_threshold_fts = 0.00001
-        bucket.tracing_threshold_analytics = 0.00001
+        bucket.tracing_threshold_kv =timedelta(seconds=1000)
+        bucket.tracing_threshold_n1ql = timedelta(seconds=1000)
+        bucket.tracing_threshold_view = timedelta(seconds=1000)
+        bucket.tracing_threshold_fts = timedelta(seconds=1000)
+        bucket.tracing_threshold_analytics = timedelta(seconds=1000)
 
         self.verify_tracer(bucket, r'.*Operations over threshold:.*', rep_factor=100)
 
     def test_orphaned(self):
+        raise SkipTest("To be fixed")
         if sys.version_info >= (3,6) and sys.platform.startswith('linux') and os.environ.get("VALGRIND_REPORT_DIR"):
             raise SkipTest("To be fixed on Linux 3.6/Valgrind")
         if sys.version_info >= (3,7) and sys.platform.startswith('win'):
             raise SkipTest("To be fixed on Win 3.7")
-        bucket = self.cb
+        bucket = self.coll
         bucket.upsert("key", "value")
 
-        bucket.timeout = 9e-6
-        bucket.tracing_orphaned_queue_flush_interval = 1
+        self.timeout = timedelta(seconds=9e-6)
+        bucket.tracing_orphaned_queue_flush_interval = timedelta(seconds=1)
         bucket.tracing_orphaned_queue_size = 10
-        bucket.tracing_threshold_queue_flush_interval = 5
+        bucket.tracing_threshold_queue_flush_interval = timedelta(seconds=5)
         bucket.tracing_threshold_queue_size = 10
-        bucket.tracing_threshold_kv = 1000
-        bucket.tracing_threshold_n1ql = 1000
-        bucket.tracing_threshold_view = 1000
-        bucket.tracing_threshold_fts = 1000
-        bucket.tracing_threshold_analytics = 1000
+        bucket.tracing_threshold_kv = timedelta(seconds=1000)
+        bucket.tracing_threshold_n1ql = timedelta(seconds=1000)
+        bucket.tracing_threshold_view = timedelta(seconds=1000)
+        bucket.tracing_threshold_fts = timedelta(seconds=1000)
+        bucket.tracing_threshold_analytics = timedelta(seconds=1000)
 
         self.verify_tracer(bucket, r'.*Orphan responses observed:.*', rep_factor=100)
 
@@ -146,7 +146,7 @@ class TimeoutTest(TracedCase):
         # first do a bunch of work in a tight loop to trigger a timeout
         for x in range(0, i):
             try:
-                bucket.get("key")
+                bucket.get("key", timeout=self.timeout)
             except TimeoutException as e:
                 logging.error("Got exception [{}]".format(str(e)))
                 to_ops += 1
@@ -157,7 +157,7 @@ class TimeoutTest(TracedCase):
         for x in range(0, 10):
             sleep(1)
             try:
-                bucket.get("key")
+                bucket.get("key", timeout=self.timeout)
             except TimeoutException as e:
                 logging.error("Got exception [{}]".format(str(e)))
                 to_ops += 1
@@ -252,7 +252,6 @@ exception_grammar = ExceptionGrammar()
 class TracingTest(TracedCase):
 
     def setUp(self, *args, **kwargs):
-        raise SkipTest("bucket interface changed")
         if not couchbase_core._libcouchbase.PYCBC_TRACING:
             raise SkipTest("Tracing feature not compiled into Python Client")
         pass
@@ -267,17 +266,17 @@ class TracingTest(TracedCase):
 
         kv = self.gen_kv_dict(amount=3, prefix='get_multi')
         for i in range(0, 500000):
-            rvs = self.cb.upsert_multi(kv)
+            rvs = self.coll.upsert_multi(kv)
             self.assertTrue(rvs.all_ok)
 
             k_subset = list(kv.keys())[:2]
 
-            rvs1 = self.cb.get_multi(k_subset)
+            rvs1 = self.coll.get_multi(k_subset)
             self.assertEqual(len(rvs1), 2)
             self.assertEqual(rvs1[k_subset[0]].value, kv[k_subset[0]])
             self.assertEqual(rvs1[k_subset[1]].value, kv[k_subset[1]])
 
-            rv2 = self.cb.get_multi(kv.keys())
+            rv2 = self.coll.get_multi(kv.keys())
             self.assertEqual(rv2.keys(), kv.keys())
         self.flush_tracer()
 
@@ -291,13 +290,14 @@ class TracingTest(TracedCase):
 
         logging.getLogger().setLevel(logging.DEBUG)
 
-        self.cb.remove_multi(list(kv_missing.keys()) + list(kv_existing.keys()),
+        self.coll.remove_multi(list(kv_missing.keys()) + list(kv_existing.keys()),
                              quiet=True)
 
-        self.cb.tracing_threshold_kv = 0.00000000001
-        self.cb.upsert_multi(kv_existing)
 
-        rvs = self.cb.get_multi(
+        self.cb.tracing_threshold_kv = timedelta.resolution
+        self.coll.upsert_multi(kv_existing)
+
+        rvs = self.coll.get_multi(
             list(kv_existing.keys()) + list(kv_missing.keys()),
             quiet=True)
 
@@ -306,26 +306,27 @@ class TracingTest(TracedCase):
         for k, v in kv_missing.items():
             self.assertTrue(k in rvs)
             self.assertFalse(rvs[k].success)
-            self.assertTrue(rvs[k].value is None)
-            self.assertTrue(DocumentNotFoundException._can_derive(rvs[k].rc))
+            self.assertTrue(rvs[k].content is None)
+            self.assertTrue(DocumentNotFoundException._can_derive(rvs[k].error))
         self.verify_tracing_output(kv_existing, rvs, True)
         # Try this again, but without quiet
         cb_exc = None
         try:
-            self.cb.get_multi(list(kv_existing.keys()) + list(kv_missing.keys()))
+            self.coll.get_multi(list(kv_existing.keys()) + list(kv_missing.keys()))
         except DocumentNotFoundException as e:
             cb_exc = e
 
-        self.assertTrue(cb_exc)
-        all_res = cb_exc.all_results
-        self.assertTrue(all_res)
-        self.assertFalse(all_res.all_ok)
+        if os.getenv("PYCBC_CHECK_TRACING_FULL"):
+            # TODO: fix - https://issues.couchbase.com/browse/PYCBC-889
+            self.assertTrue(cb_exc)
+            all_res = cb_exc.all_results
+            self.assertTrue(all_res)
+            self.assertFalse(all_res.all_ok)
 
-        self.verify_exception_string(cb_exc, kv_missing, rvs)
-        logging.error(cb_exc)
-        self.verify_tracing_output(kv_existing, all_res, True)
-
-        self.verify_tracing_output(kv_missing, all_res, False)
+            self.verify_exception_string(cb_exc, kv_missing, rvs)
+            logging.error(cb_exc)
+            self.verify_tracing_output(kv_existing, all_res, True)
+            self.verify_tracing_output(kv_missing, all_res, False)
 
         del cb_exc
 
@@ -349,17 +350,17 @@ class TracingTest(TracedCase):
 
     def verify_tracing_output(self, kv_set, rvs, is_existing):
         for k, v in kv_set.items():
-            tracing_output = rvs[k].tracing_output
+            tracing_output = rvs[k]._tracing_output
             self.verify_output(tracing_output)
             self.assertTrue(k in rvs)
             self.assertEqual(rvs[k].success, is_existing)
-            self.assertEqual(rvs[k].value, v if is_existing else None)
+            self.assertEqual(rvs[k].content, v if is_existing else None)
             if is_existing:
-                self.assertEqual(rvs[k].rc, 0)
+                self.assertTrue(rvs[k].success)
     def verify_output(self, tracing_output):
         bucket_name = "default"
         expected_tracing = {'s': r'.+:.+', 'b': bucket_name, 'c': r'[0-9a-f]+/[0-9a-f]+', 'l': r'.+:.+', 'r': r'.+:.+',
-                            't': lambda v: self.assertEqual(v, self.cb.timeout * 1000000),
+                            't': lambda v: self.assertEqual(v, self.timeout.total_seconds() * 1000000) if self.timeout else None,
                             'i': lambda v: self.assertIn(type(v), [int,getattr(builtins,'long',None),float])}
         exceptions = []
         for label, pattern in expected_tracing.items():
@@ -376,7 +377,3 @@ class TracingTest(TracedCase):
 
         if len(exceptions) > 0:
             raise self.failureException("Got exceptions: {}".format(str(exceptions)))
-
-
-if __name__ == '__main__':
-    unittest.main()

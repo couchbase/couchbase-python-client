@@ -25,17 +25,18 @@ from couchbase_v2.n1ql import N1QLQuery
 import json
 import couchbase_core._libcouchbase as C
 
+
 class N1QLTest(MockTestCase):
     def test_onerow(self):
-        row = self.cb.n1ql_query('SELECT mockrow').get_single_result()
+        row = self.cb.query('SELECT mockrow').get_single_result()
         self.assertEqual('value', row['row'])
 
     def test_emptyrow(self):
-        rv = self.cb.n1ql_query('SELECT emptyrow').get_single_result()
+        rv = self.cb.query('SELECT emptyrow').get_single_result()
         self.assertEqual(None, rv)
 
     def test_meta(self):
-        q = self.cb.n1ql_query('SELECT mockrow',meta_lookahead=False)
+        q = self.cb.query('SELECT mockrow',meta_lookahead=False)
         self.assertRaises(RuntimeError, getattr, q, 'meta')
         q.execute()
         self.assertIsInstance(q.meta, dict)
@@ -48,11 +49,11 @@ class N1QLTest(MockTestCase):
         self.assertTrue(json.loads(q.encoded)['metrics'])
 
     def test_meta_lookahead(self):
-        q = self.cb.n1ql_query('SELECT mockrow',meta_lookahead=True)
+        q = self.cb.query('SELECT mockrow',meta_lookahead=True)
         self.assertIsInstance(q.meta, dict)
 
     def test_httperror_str(self):
-        q = self.cb.n1ql_query('CREATE INDEX abc#123 ON abc (col_1)')
+        q = self.cb.query('CREATE INDEX abc#123 ON abc (col_1)')
 
         with self.assertRaises(CouchbaseException) as c:
             q.execute()

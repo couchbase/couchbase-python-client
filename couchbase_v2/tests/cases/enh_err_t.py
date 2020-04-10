@@ -60,7 +60,7 @@ class EnhancedErrorTest(CouchbaseTestCase):
                 connection = self.make_connection(username=userid,password=password)
 
                 key = self.gen_key('create_doc')
-                connection.mutate_in(key, SD.upsert('new.path', 'newval'), upsert_doc=True)
+                connection.mutate_in(key, (SD.upsert('new.path', 'newval'),), upsert_doc=True)
             except CouchbaseException as e:
                 print(str(e))
                 if userid=="writer":

@@ -15,11 +15,11 @@
 # limitations under the License.
 #
 
-from couchbase_core import FMT_BYTES, FMT_UTF8
-from couchbase_tests.base import ConnectionTestCase
+from couchbase_core._libcouchbase import FMT_UTF8
+from couchbase_tests.base import CollectionTestCase
 
 
-class AppendTest(ConnectionTestCase):
+class AppendTest(CollectionTestCase):
 
     def test_append_multi(self):
         kv = self.gen_kv_dict(amount=4, prefix="append_multi")
@@ -34,4 +34,4 @@ class AppendTest(ConnectionTestCase):
 
         for k, v in rvs.items():
             basekey = kv[k]
-            self.assertEqual(v.value, basekey * 3)
+            self.assertEqual(v.content, basekey * 3)

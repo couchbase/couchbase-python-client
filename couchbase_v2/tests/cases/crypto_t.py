@@ -16,11 +16,10 @@
 #
 from unittest import SkipTest
 
-from couchbase._bootstrap import describe_lcb_api
-from couchbase.tests.base import ConnectionTestCase
+from couchbase_tests.base import ConnectionTestCase
 import codecs
-import couchbase_v2.exceptions
-from couchbase_v2.exceptions import CryptoProviderKeySizeException
+import couchbase.exceptions
+from couchbase.exceptions import CryptoProviderKeySizeException
 from couchbase_core.crypto import CTypesCryptoProvider, InMemoryKeyStore, PythonCryptoProvider
 import os
 import logging
@@ -60,7 +59,7 @@ class ROT13PythonCryptoProvider(PythonCryptoProvider):
 
     def encrypt_real(self, input, iv):
         if codecs.decode(input,'utf-8').endswith('\n'):
-            raise couchbase_v2.exceptions.InternalException("passing back string containing newline")
+            raise couchbase.exceptions.InternalException("passing back string containing newline")
         logging.debug("encrypting with input={} iv={}".format(repr(input),repr(iv)))
         encoded = codecs.encode(codecs.decode(input,'utf-8'), 'rot_13')
         return encoded
@@ -197,17 +196,17 @@ class FieldEncryptionTests(ConnectionTestCase):
         # register encryption provider with LCB
         try:
             self.cb.register_crypto_provider('rot13', provider)
-        except couchbase_v2.exceptions.NotSupportedException as e:
+        except couchbase.exceptions.NotSupportedException as e:
             raise SkipTest(e)
         return document, fieldspec, provider
 
     def test_encryption_exceptions(self):
         # encrypt document
         for name, rcs in  _LCB.CRYPTO_EXCEPTIONS.items():
-            exceptions = list(type(couchbase_v2.exceptions.exc_from_rc(rc)) for rc in rcs)
+            exceptions = list(type(couchbase.exceptions.exc_from_rc(rc)) for rc in rcs)
             document, fieldspec, provider = self._setup_encryption()
             def dummy(*args,**kwargs):
-                raise couchbase_v2.exceptions.TemporaryFailException(params=dict(rc=_LCB.LCB_ERR_TEMPORARY_FAILURE))
+                raise couchbase.exceptions.TemporaryFailException(params=dict(rc=_LCB.LCB_ERR_TEMPORARY_FAILURE))
             logging.error("corrupting method:{}".format(name))
             setattr(provider, name, dummy)
             valid_exception_raised = False

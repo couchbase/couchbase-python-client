@@ -17,11 +17,11 @@
 
 from couchbase_tests.base import CouchbaseTestCase
 from couchbase_core.connstr import ConnectionString
-from couchbase_v2.cluster import Cluster, ClassicAuthenticator,PasswordAuthenticator, NoBucketException, MixedAuthException, CertAuthenticator
+from couchbase_core.cluster import _Cluster as Cluster, ClassicAuthenticator,PasswordAuthenticator, MixedAuthException, CertAuthenticator
 import gc
 import os
 import warnings
-from couchbase.exceptions import CouchbaseNetworkException, CouchbaseFatalException, CouchbaseInputException, CouchbaseException
+from couchbase.exceptions import NetworkException, CouchbaseFatalException, CouchbaseInputException, CouchbaseException
 
 
 CERT_PATH = os.getenv("PYCBC_CERT_PATH")
@@ -38,7 +38,7 @@ class ClusterTest(CouchbaseTestCase):
         password = connargs.get('password', '')
 
         # Can I open a new bucket via open_bucket?
-        cluster = Cluster(connstr, bucket_class=self.factory)
+        cluster = Cluster(connstr, bucket_factory=self.factory)
         cluster.authenticate(ClassicAuthenticator(buckets={bucket: password},cluster_password=self.cluster_info.admin_password, cluster_username=self.cluster_info.admin_username))
         return cluster, bucket
 
@@ -47,23 +47,6 @@ class ClusterTest(CouchbaseTestCase):
         cb = cluster.open_bucket(bucket_name)
         key = self.gen_key('cluster_test')
         cb.upsert(key, 'cluster test')
-
-    def test_query(self):
-        self.skipUnlessMock()
-
-        cluster, bucket_name = self._create_cluster()
-
-        # Should fail if no bucket is active yet
-        self.assertRaises(NoBucketException, cluster.n1ql_query, "select mockrow")
-
-        # Open a bucket
-        cb = cluster.open_bucket(bucket_name)
-        row = cluster.n1ql_query('select mockrow').get_single_result()
-
-        # V2 Cluster code doesn't use GCCP so Query won't work after this.
-        del cb
-        gc.collect()
-
 
     def test_no_mixed_auth(self):
         cluster, bucket_name = self._create_cluster()
@@ -120,7 +103,7 @@ class ClusterTest(CouchbaseTestCase):
         keys_to_skip = authenticator.get_credentials(bucket)['options'].keys()
         for entry in keys_to_skip:
             connstr.clear_option(entry)
-        cluster = Cluster(connstr, bucket_class=self.factory)
+        cluster = Cluster(connstr, bucket_factory=self.factory)
         cluster.authenticate(ClassicAuthenticator(buckets={bucket: password}))
         return cluster, bucket
 

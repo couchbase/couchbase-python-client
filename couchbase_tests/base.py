@@ -25,6 +25,7 @@ import traceback
 import types
 import warnings
 from abc import abstractmethod
+from datetime import timedelta
 from functools import wraps
 
 from deepdiff import DeepDiff
@@ -468,8 +469,7 @@ class CouchbaseTestCase(ResourcedTestCase):
             from couchbase_core.result import (
                 MultiResult, Result, OperationResult, ValueResult,
                 ObserveInfo)
-            from couchbase_v2.bucket import Bucket as V2Bucket
-            self.factory = V2Bucket
+            self.factory = V3Bucket
             self.viewfactory = View
             self.cls_Result = Result
             self.cls_MultiResult = MultiResult
@@ -679,74 +679,7 @@ except Exception as e:
         return basic_tracer()
 
 
-class TracedCase(ConnectionTestCaseBase):
-    _tracer = None
-
-    def init_tracer(self, service, **kwargs):
-        if not TracedCase._tracer:
-            if self.using_jaeger:
-                TracedCase._tracer = jaeger_tracer(service, **kwargs)
-                self.using_jaeger = True
-        if not TracedCase._tracer:
-            TracedCase._tracer = basic_tracer()
-            self.using_jaeger = False
-        return TracedCase._tracer
-
-    @property
-    def tracer(self):
-        return TracedCase._tracer
-
-    def setUp(self, trace_all=True, flushcount=0, enable_logging=False, use_parent_tracer=False, *args, **kwargs):
-        self.enable_logging = enable_logging or os.environ.get("PYCBC_ENABLE_LOGGING")
-        self.use_parent_tracer = use_parent_tracer
-        self.using_jaeger = (os.environ.get("PYCBC_USE_JAEGER") == "TRUE")
-        self.flushdict = {k: v for k, v in zip(map(str, range(1, 100)), map(str, range(1, 100)))}
-        self.trace_all = os.environ.get("PYCBC_TRACE_ALL") or trace_all
-        self.flushcount = flushcount
-        if self.using_jaeger and self.flushcount > 5:
-            raise SkipTest("too slow when using jaeger")
-        enable_logging |= bool(self.trace_all)
-        if enable_logging:
-            couchbase_core.enable_logging()
-        if self.use_parent_tracer:
-            kwargs['init_tracer'] = self.init_tracer
-        kwargs['enable_tracing'] = "true"
-        super(TracedCase, self).setUp(**kwargs)
-        if self.trace_all:
-            self.cb.tracing_orphaned_queue_flush_interval = 0.0001
-            self.cb.tracing_orphaned_queue_size = 10
-            self.cb.tracing_threshold_queue_flush_interval = 0.00001
-            self.cb.tracing_threshold_queue_size = 10
-            self.cb.tracing_threshold_kv = 0.00001
-            self.cb.tracing_threshold_n1ql = 0.00001
-            self.cb.tracing_threshold_view = 0.00001
-            self.cb.tracing_threshold_fts = 0.00001
-            self.cb.tracing_threshold_analytics = 0.00001
-
-    def flush_tracer(self):
-        try:
-            for entry in range(1, self.flushcount):
-                self.cb.upsert_multi(self.flushdict)
-        except Exception as e:
-            logging.warning(str(e))
-
-    def tearDown(self):
-        if self.trace_all and not self.using_jaeger:
-            self.flush_tracer()
-        super(TracedCase, self).tearDown()
-        couchbase_core.disable_logging()
-        if self.tracer and getattr(self.tracer, "close", None):
-            try:
-                time.sleep(
-                    2)  # yield to IOLoop to flush the spans - https://github.com/jaegertracing/jaeger-client-python/issues/50
-                self.tracer.close()  # flush any buffered spans
-            except:
-                pass
-
-
 ConnectionTestCase = ConnectionTestCaseBase
-if os.environ.get("PYCBC_TRACE_ALL") and PYCBC_TRACING:
-    ConnectionTestCase = TracedCase
 
 
 class RealServerTestCase(ConnectionTestCase):
@@ -887,7 +820,7 @@ class ClusterTestCase(CouchbaseTestCase):
 
     def setUp(self, **kwargs):
         super(ClusterTestCase, self).setUp()
-        bucket_name = self.init_cluster_and_bucket()
+        bucket_name = self.init_cluster_and_bucket(**kwargs)
         self.bucket = self.cluster.bucket(bucket_name)
         self.bucket_name = bucket_name
         self.query_props = QueryParams('SELECT mockrow', 1) if self.is_mock else \
@@ -904,8 +837,8 @@ class ClusterTestCase(CouchbaseTestCase):
         connstr_nobucket.bucket = None
         return connstr_nobucket, bucket
 
-    def init_cluster_and_bucket(self):
-        connargs = self.cluster_info.make_connargs()
+    def init_cluster_and_bucket(self, **kwargs):
+        connargs = self.cluster_info.make_connargs(**kwargs)
         connstr_abstract, bucket_name = self._get_connstr_and_bucket_name([], connargs)
         self.cluster = self._instantiate_cluster(connstr_abstract, self.cluster_factory)
         return bucket_name
@@ -959,12 +892,12 @@ class CollectionTestCase(ClusterTestCase):
         except NotSupportedException:
             return False
 
-    def setUp(self, default_collections=None, real_collections=None):
+    def setUp(self, default_collections=None, real_collections=None, **kwargs):
         default_collections = default_collections or {None: {None: "coll"}}
         real_collections = real_collections or {"bedrock": {"flintstones": 'coll'}}
         # prepare:
         # 1) Connect to a Cluster
-        super(CollectionTestCase, self).setUp()
+        super(CollectionTestCase, self).setUp(**kwargs)
         cm = self.bucket.collections()
         # check for collection support.  Return use default_collection otherwise
         if self.supports_collections():
@@ -1038,6 +971,72 @@ class DDocTestCase(RealServerTestCase):
 
 class ViewTestCase(ConnectionTestCase):
     pass
+
+
+class TracedCase(CollectionTestCase):
+    _tracer = None
+
+    def init_tracer(self, service, **kwargs):
+        if not TracedCase._tracer:
+            if self.using_jaeger:
+                TracedCase._tracer = jaeger_tracer(service, **kwargs)
+                self.using_jaeger = True
+        if not TracedCase._tracer:
+            TracedCase._tracer = basic_tracer()
+            self.using_jaeger = False
+        return TracedCase._tracer
+
+    @property
+    def tracer(self):
+        return TracedCase._tracer
+
+    def setUp(self, trace_all=True, flushcount=0, enable_logging=False, use_parent_tracer=False, *args, **kwargs):
+        self.timeout = None
+        # self.enable_logging = enable_logging or os.environ.get("PYCBC_ENABLE_LOGGING")
+        self.use_parent_tracer = use_parent_tracer
+        self.using_jaeger = (os.environ.get("PYCBC_USE_JAEGER") == "TRUE")
+        self.flushdict = {k: v for k, v in zip(map(str, range(1, 100)), map(str, range(1, 100)))}
+        self.trace_all = os.environ.get("PYCBC_TRACE_ALL") or trace_all
+        self.flushcount = flushcount
+        if self.using_jaeger and self.flushcount > 5:
+            raise SkipTest("too slow when using jaeger")
+        enable_logging |= bool(self.trace_all)
+        if enable_logging:
+            couchbase_core.enable_logging()
+        if self.use_parent_tracer:
+            kwargs['init_tracer'] = self.init_tracer
+        kwargs['enable_tracing'] = "true"
+        super(TracedCase, self).setUp(**kwargs)
+        if self.trace_all:
+            self.cb.tracing_orphaned_queue_flush_interval = timedelta(seconds=0.0001)
+            self.cb.tracing_orphaned_queue_size = 10
+            self.cb.tracing_threshold_queue_flush_interval = timedelta(seconds=0.00001)
+            self.cb.tracing_threshold_queue_size = 10
+            self.cb.tracing_threshold_kv = timedelta(seconds=0.00001)
+            self.cb.tracing_threshold_n1ql = timedelta(seconds=0.00001)
+            self.cb.tracing_threshold_view = timedelta(seconds=0.00001)
+            self.cb.tracing_threshold_fts = timedelta(seconds=0.00001)
+            self.cb.tracing_threshold_analytics = timedelta(seconds=0.00001)
+
+    def flush_tracer(self):
+        try:
+            for entry in range(1, self.flushcount):
+                self.cb.upsert_multi(self.flushdict)
+        except Exception as e:
+            logging.warning(str(e))
+
+    def tearDown(self):
+        if self.trace_all and not self.using_jaeger:
+            self.flush_tracer()
+        super(TracedCase, self).tearDown()
+        couchbase_core.disable_logging()
+        if self.tracer and getattr(self.tracer, "close", None):
+            try:
+                # yield to IOLoop to flush the spans - https://github.com/jaegertracing/jaeger-client-python/issues/50
+                time.sleep(2)
+                self.tracer.close()  # flush any buffered spans
+            except:
+                pass
 
 
 class AnalyticsTestCaseBase(CollectionTestCase):

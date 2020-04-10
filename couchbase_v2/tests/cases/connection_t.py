@@ -20,14 +20,15 @@ import tempfile
 
 from nose.plugins.attrib import attr
 
+from couchbase.cluster import PasswordAuthenticator, ClusterOptions
+from couchbase.bucket import Bucket
 from couchbase.exceptions import (AuthenticationException, BucketNotFoundException, DocumentNotFoundException,
-                                  InvalidException,
-                                  TimeoutException)
+                                  TimeoutException, InvalidArgumentException)
 from couchbase_core.connstr import ConnectionString
-from couchbase_tests.base import CouchbaseTestCase, SkipTest, ConnectionTestCase
+from couchbase_tests.base import SkipTest, ConnectionTestCase, ClusterTestCase
 
 
-class ConnectionTest(CouchbaseTestCase):
+class ConnectionTest(ClusterTestCase):
     @attr('slow')
     def test_server_not_found(self):
         connargs = self.make_connargs()
@@ -40,8 +41,8 @@ class ConnectionTest(CouchbaseTestCase):
         self.assertRaises(TimeoutException, self.factory, **connargs)
 
     def test_bucket(self):
-        cb = self.factory(**self.make_connargs())
-        self.assertIsInstance(cb, self.factory)
+        cb = self.cluster.bucket(self.bucket_name)
+        self.assertIsInstance(cb, Bucket)
 
     def test_bucket_not_found(self):
         connargs = self.make_connargs(bucket='this_bucket_does_not_exist')
@@ -75,7 +76,7 @@ class ConnectionTest(CouchbaseTestCase):
             cb2 = self.factory(**self.make_connargs(config_cache=cachefile.name))
 
             self.assertTrue(cb2.upsert("foo", "bar").success)
-            self.assertEqual("bar", cb.get("foo").value)
+            self.assertEqual("bar", cb.get("foo").content)
 
             sb = os.stat(cachefile.name)
 
@@ -90,13 +91,12 @@ class ConnectionTest(CouchbaseTestCase):
         # apparently libcouchbase does not report this failure.
 
     def test_invalid_hostname(self):
-        self.assertRaises(InvalidException, self.factory,
+        self.assertRaises(InvalidArgumentException, self.factory,
                           str('couchbase://12345:qwer###/default'))
 
     def test_multi_hosts(self):
         passwd = self.cluster_info.bucket_password
-        cs = ConnectionString(bucket=self.cluster_info.bucket_name,
-                              hosts=[self.cluster_info.host])
+        cs = ConnectionString(bucket=None, hosts=[self.cluster_info.host])
 
         if not self.mock:
             cb = self.factory(str(cs), password=passwd)
@@ -104,17 +104,21 @@ class ConnectionTest(CouchbaseTestCase):
 
         cs.hosts = [ self.cluster_info.host + ':' + str(self.cluster_info.port) ]
         cs.scheme = 'http'
-        cb = self.factory(str(cs), username=self.cluster_info.bucket_username, password=self.cluster_info.bucket_password)
+        cluster = self.cluster_factory(str(cs), ClusterOptions(PasswordAuthenticator(username=self.cluster_info.bucket_username, password=self.cluster_info.bucket_password)))
+        cb = cluster.bucket(self.cluster_info.bucket_name)
         self.assertTrue(cb.upsert("foo", "bar").success)
 
         cs.hosts.insert(0, 'localhost:1')
-        cb = self.factory(str(cs), username=self.cluster_info.bucket_username, password=self.cluster_info.bucket_password)
+        cluster = self.cluster_factory(str(cs), username=self.cluster_info.bucket_username, password=self.cluster_info.bucket_password)
+        cb = cluster.bucket(self.cluster_info.bucket_name)
+
         self.assertTrue(cb.upsert("foo", "bar").success)
 
     def test_enable_error_map(self):
         # enabled via connection string param, invalid params cause error
-        conn_str = 'http://{0}:{1}?enable_errmap=true'.format(self.cluster_info.host, self.cluster_info.port)
-        cb = self.factory(conn_str,username=self.cluster_info.bucket_username,password=self.cluster_info.bucket_password)
+        conn_str = '{}://{}:{}?enable_errmap=true'.format(self.cluster_info.protocol, self.cluster_info.host, self.cluster_info.port)
+        cluster=self.cluster_factory(connection_string=conn_str, authenticator=PasswordAuthenticator(self.cluster_info.bucket_username, self.cluster_info.bucket_password))
+        cb =cluster.bucket(self.cluster_info.bucket_name)
         self.assertTrue(cb.upsert("foo", "bar").success)
 
 

@@ -23,10 +23,10 @@ from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
 from couchbase_core.client import Client
-from couchbase_tests.base import ConnectionTestCase
+from couchbase_tests.base import ClusterTestCase
 from txcouchbase.cluster import TxCluster
 
-T = TypeVar('T', bound=ConnectionTestCase)
+T = TypeVar('T', bound=ClusterTestCase)
 Factory = Callable[[Any], Client]
 twisted.internet.base.DelayedCall.debug = True
 

@@ -1,4 +1,6 @@
-0#
+from unittest import SkipTest
+
+#
 # Copyright 2013, Couchbase, Inc.
 # All Rights Reserved
 #

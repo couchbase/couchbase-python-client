@@ -18,24 +18,24 @@
 from couchbase_v2.exceptions import InvalidArgumentException
 
 from couchbase.exceptions import  NotSupportedException
-from couchbase_tests.base import ConnectionTestCase
+from couchbase_tests.base import CollectionTestCase
 
-class EmptyKeyTest(ConnectionTestCase):
+class EmptyKeyTest(CollectionTestCase):
 
     def test_empty_key(self):
         fnargs = (
-            (self.cb.set, ["", "value"]),
-            (self.cb.get, [""]),
-            (self.cb.lock, ["", {'ttl': 5}]),
-            (self.cb.counter, [""]),
-            (self.cb.unlock, ["", 1234]),
-            (self.cb.delete, [""]),
-            (self.cb.observe, [""]),
-            (self.cb.set_multi, [{"": "value"}]),
-            (self.cb.counter_multi, [("", "")]),
-            (self.cb.delete_multi, [("", "")]),
-            (self.cb.unlock_multi, [{"": 1234}]),
-            (self.cb.observe_multi, [("")])
+            (self.coll.upsert, ["", "value"]),
+            (self.coll.get, [""]),
+            (self.coll.lock, ["", {'ttl': 5}]),
+            (self.coll.counter, [""]),
+            (self.coll.unlock, ["", 1234]),
+            (self.coll.remove, [""]),
+            (self.coll.observe, [""]),
+            (self.coll.upsert_multi, [{"": "value"}]),
+            (self.coll.counter_multi, [("", "")]),
+            (self.coll.remove_multi, [("", "")]),
+            (self.coll.unlock_multi, [{"": 1234}]),
+            (self.coll.observe_multi, [("")])
         )
 
         for fn, args in fnargs:

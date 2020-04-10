@@ -297,34 +297,6 @@ class _Cluster(object):
         def _warning(self, clash_param_dict, auth_type):
             warnings.warn(self._get_generic_complaint(clash_param_dict, auth_type))
 
-    def n1ql_query(self, query, *args, **kwargs):
-        """
-        Issue a "cluster-level" query. This requires that at least one
-        connection to a bucket is active.
-        :param query: The query string or object
-        :param args: Additional arguments to :cb_bmeth:`n1ql_query`
-
-        .. seealso:: :cb_bmeth:`n1ql_query`
-        """
-        from couchbase_core.n1ql import N1QLQuery
-        if not isinstance(query, N1QLQuery):
-            query = N1QLQuery(query)
-
-        query.cross_bucket = True
-
-        to_purge = []
-        for k, v in self._buckets.items():
-            bucket = v()
-            if bucket:
-                return bucket.n1ql_query(query, *args, **kwargs)
-            else:
-                to_purge.append(k)
-
-        for k in to_purge:
-            del self._buckets[k]
-
-        raise NoBucketException('Must have at least one active bucket for query')
-
 
 def _recursive_creds_merge(base, overlay):
     for k, v in overlay.items():

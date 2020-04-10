@@ -18,50 +18,23 @@
 #include "lcb_v4_wrapper.h"
 #include <libcouchbase/crypto.h>
 
-// TODO: these crypto functions are now accessible but seem to return an error, so disabled for now
-
 lcb_STATUS pycbc_crypto_register(lcb_INSTANCE* instance, const char *name, lcbcrypto_PROVIDER *provider){
-#ifdef PYCBC_CRYPTO_ENABLED
     lcbcrypto_register(instance,name,provider);
     return LCB_SUCCESS;
-#else
-    (void)instance;
-    (void)name;
-    (void)provider;
-    return LCB_ERR_UNSUPPORTED_OPERATION;
-#endif
 }
 
 lcb_STATUS pycbc_crypto_unregister(lcb_INSTANCE* instance, const char *name){
-#ifdef PYCBC_CRYPTO_ENABLED
     lcbcrypto_unregister(instance,name);
     return LCB_SUCCESS;
-#else
-    (void)instance;
-    (void)name;
-    return LCB_ERR_UNSUPPORTED_OPERATION;
-#endif
 }
 
 lcb_STATUS pycbc_encrypt_fields(lcb_INSTANCE* instance, lcbcrypto_CMDENCRYPT* cmd)
 {
-#ifdef PYCBC_CRYPTO_ENABLED
     return lcbcrypto_encrypt_fields(instance,cmd);
-#else
-    (void)instance;
-    (void)cmd;
-    return LCB_ERR_UNSUPPORTED_OPERATION;
-#endif
 }
 
 lcb_STATUS pycbc_decrypt_fields(lcb_INSTANCE* instance, lcbcrypto_CMDDECRYPT* cmd) {
-#ifdef PYCBC_CRYPTO_ENABLED
     return lcbcrypto_decrypt_fields(instance,cmd);
-#else
-    (void)instance;
-    (void)cmd;
-    return LCB_ERR_UNSUPPORTED_OPERATION;
-#endif
 }
 
 
