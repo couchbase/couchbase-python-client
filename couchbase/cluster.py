@@ -280,7 +280,7 @@ class Cluster(CoreClient):
     def _admin(self):
         self._check_for_shutdown()
         if not self.__admin:
-            self.__admin = Admin(connstr=str(self.connstr), **self._adminopts)
+            self.__admin = Admin(connection_string=str(self.connstr), **self._adminopts)
         return self.__admin
 
     # TODO: There should be no reason for these kwargs.  However, our tests against the mock
