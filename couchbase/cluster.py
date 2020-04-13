@@ -287,14 +287,11 @@ class Cluster(CoreClient):
     # will all fail with auth errors without it...  So keeping it just for now, but lets fix it
     # and remove this for 3.0.0
     def bucket(self,
-               name,    # type: str
-               **kwargs # type: Any
+               name    # type: str
                ):
         # type: (...) -> Bucket
         self._check_for_shutdown()
-        kwargs['bucket'] = name
-        kwargs['admin'] = self._admin
-        return self._cluster.open_bucket(name, **kwargs)
+        return self._cluster.open_bucket(name, admin=self._admin)
 
     # Temporary, helpful with working around CCBC-1204
     def _is_6_5_plus(self):
