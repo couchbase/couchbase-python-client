@@ -13,19 +13,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+
+from typing import *
+
+from twisted.trial.unittest import TestCase
+
 from couchbase.exceptions import DocumentNotFoundException
 from couchbase.result import GetResult, MutationResult, MultiMutationResult
 from couchbase_tests.base import AsyncClusterTestCase
 from txcouchbase.tests.base import gen_base
+from txcouchbase.tests.base import skip_PYCBC_894
 
-Base = gen_base(AsyncClusterTestCase)
+Base = gen_base(AsyncClusterTestCase)  # type: Type[TestCase]
 
 
 class OperationTestCase(Base):
+    @skip_PYCBC_894
     def test_simple_set(self):
         cb = self.make_connection()
         key = self.gen_key("test_simple_set")
         d = cb.upsert(key, "simple_Value")
+
         def t(ret):
             self.assertIsInstance(ret, MutationResult)
             #self.assertEqual(ret.id, key) - seemingly MutationResults don't have IDs - recheck
@@ -35,7 +43,9 @@ class OperationTestCase(Base):
         del cb
         return d
 
+    @skip_PYCBC_894
     def test_simple_get(self):
+
         cb = self.make_connection()
         key = self.gen_key("test_simple_get")
         value = "simple_value"
@@ -52,6 +62,7 @@ class OperationTestCase(Base):
         d_get.addCallback(t)
         return d_get
 
+    @skip_PYCBC_894
     def test_multi_set(self):
         cb = self.make_connection()
         kvs = self.gen_kv_dict(prefix="test_multi_set")
@@ -71,6 +82,7 @@ class OperationTestCase(Base):
         d_set.addCallback(t)
         return d_set
 
+    @skip_PYCBC_894
     def test_single_error(self):
         cb = self.make_connection()
         key = self.gen_key("test_single_error")
@@ -86,16 +98,14 @@ class OperationTestCase(Base):
         d.addErrback(t)
         return d
 
+    @skip_PYCBC_894
     def test_multi_errors(self  # type: Base
                         ):
-        cb = self.make_connection()
+        orig_cb = self.make_connection()
         kv = self.gen_kv_dict(prefix = "test_multi_errors")
-        cb.upsert_multi(kv)
 
+        cb = orig_cb.upsert_multi(kv)
         rmkey = list(kv.keys())[0]
-        cb.remove(rmkey)
-
-        d = cb.getMulti(kv.keys())
 
         def t(err):
             self.assertIsInstance(err.value, DocumentNotFoundException)
@@ -112,5 +122,31 @@ class OperationTestCase(Base):
             self.assertFalse(res_fail.success)
             self.assertTrue(DocumentNotFoundException._can_derive(res_fail.rc))
 
-        d.addErrback(t)
-        return d
+        def respond(target):
+            d = orig_cb.remove(rmkey)
+
+            def and_then(*args, **kwargs):
+                at = orig_cb.get_multi(kv.keys())
+                at.addErrback(t)
+
+                class Checker(object):
+                    def __init__(self, parent):
+                        self.count = 1
+                        self._parent = parent
+
+                    def __call__(self, *args, **kwargs):
+                        try:
+                            self._parent.assertTrue(success)
+                        except Exception as e:
+                            if not self.count:
+                                raise
+                            self.count -= 1
+
+                at.addCallback(Checker(self))
+                return at
+
+            d.addCallback(and_then)
+            return d
+
+        cb.addCallback(respond)
+        return cb

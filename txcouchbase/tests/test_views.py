@@ -19,7 +19,7 @@ from couchbase.exceptions import HTTPException
 from couchbase_core.asynchronous.view import AsyncViewBase
 from couchbase_tests.base import AsyncClusterTestCase
 from txcouchbase.cluster import BatchedViewResult
-from txcouchbase.tests.base import gen_base
+from txcouchbase.tests.base import gen_base, skip_PYCBC_894
 
 
 class RowsHandler(AsyncViewBase):
@@ -52,10 +52,12 @@ class TxViewsTests(gen_base(AsyncClusterTestCase)):
     def make_connection(self, **kwargs):
         return super(TxViewsTests, self).make_connection(bucket='beer-sample')
 
+    @skip_PYCBC_894
     def testEmptyView(self):
         cb = self.make_connection()
         return cb.view_query('beer', 'brewery_beers', limit=0)
 
+    @skip_PYCBC_894
     def testLimitView(self):
         cb = self.make_connection()
         d = cb.view_query('beer', 'brewery_beers', limit=10)
@@ -67,12 +69,14 @@ class TxViewsTests(gen_base(AsyncClusterTestCase)):
 
         return d.addCallback(_verify)
 
+    @skip_PYCBC_894
     def testBadView(self):
         cb = self.make_connection()
         d = cb.view_query('blah', 'blah_blah')
         self.assertFailure(d, HTTPException)
         return d
 
+    @skip_PYCBC_894
     def testIncrementalRows(self):
         d = defer.Deferred()
         cb = self.make_connection()

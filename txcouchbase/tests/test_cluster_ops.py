@@ -22,7 +22,7 @@ import couchbase.search as SEARCH
 from couchbase_core.asynchronous.n1ql import AsyncN1QLRequest
 from couchbase_tests.base import AnalyticsTestCaseBase, AsyncClusterTestCase
 from txcouchbase.cluster import BatchedQueryResult, BatchedSearchResult, BatchedAnalyticsResult
-from txcouchbase.tests.base import gen_base
+from txcouchbase.tests.base import gen_base, skip_PYCBC_894
 
 
 class RowsHandler(AsyncN1QLRequest):
@@ -58,6 +58,7 @@ class TxN1QLTests(Base):
     def factory(self):
         return self.gen_cluster
 
+    @skip_PYCBC_894
     def testIncremental(self):
         cb = self.make_connection()
         d = defer.Deferred()
@@ -72,6 +73,7 @@ class TxN1QLTests(Base):
         d.addCallback(verify)
         return d
 
+    @skip_PYCBC_894
     def testBatched(self  # type: Base
                     ):
         cb = self.make_connection()
@@ -109,6 +111,7 @@ class TxN1QLTests(Base):
         logging.error("ready to return")
         return result
 
+    @skip_PYCBC_894
     def testEmpty(self):
         cb = self.make_connection()
         d = cb.query(self.empty_query_props.statement)

@@ -3,7 +3,7 @@ import asyncio
 from couchbase.asynchronous import AsyncSearchResult
 from couchbase.asynchronous import AsyncAnalyticsResult
 from .fixtures import asynct, AioTestCase
-from couchbase.exceptions import CouchbaseException
+from couchbase.exceptions import CouchbaseException, SearchException, NotSupportedException
 from unittest import SkipTest
 import couchbase.search as SEARCH
 
@@ -88,23 +88,23 @@ class AIOClusterTest(AioTestCase):
     @asyncio.coroutine
     def test_search(self  # type: Base
                     ):
-        if self.is_mock:
-            raise SkipTest("No search on mock")
         cluster = self.gen_cluster(**self.make_connargs())
         yield from (cluster.on_connect() or asyncio.sleep(0.01))
-        it = cluster.search_query("beer-search", SEARCH.TermQuery("category"),
+        try:
+            it = cluster.search_query("beer-search", SEARCH.TermQuery("category"),
                                       facets={'fred': SEARCH.TermFacet('category', 10)})
-        yield from it.future
-        data = list(it)
-        self.assertIsInstance(it, AsyncSearchResult)
-        self.assertEqual(10, len(data))
+            yield from it.future
+            data = list(it)
+            self.assertIsInstance(it, AsyncSearchResult)
+            self.assertEqual(10, len(data))
+        except SearchException as e:
+            if isinstance(e.inner_cause, NotSupportedException) and self.is_mock:
+                raise SkipTest("Not supported")
 
 
 class AnalyticsTest(AioTestCase):
     def testBatchedAnalytics(self  # type: Base
                              ):
-        if self.is_mock:
-            raise SkipTest("No analytics on mock")
         cluster = self.gen_cluster(**self.make_connargs())
         yield from (cluster.on_connect() or asyncio.sleep(0.01))
 

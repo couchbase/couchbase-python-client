@@ -97,6 +97,8 @@ loglevel = os.environ.get("PYCBC_DEBUG_LOG_LEVEL")
 if loglevel:
     ch = logging.StreamHandler()
     ch.setLevel(logging.getLevelName(loglevel))
+    formatter = logging.Formatter('%(asctime)s : %(message)s : %(levelname)s -%(name)s',datefmt='%d%m%Y %I:%M:%S %p')
+    ch.setFormatter(formatter)
     logging.getLogger().addHandler(ch)
 
 

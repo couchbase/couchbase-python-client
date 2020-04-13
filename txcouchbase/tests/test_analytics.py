@@ -21,8 +21,11 @@ class TxAnalyticsTest(gen_base(couchbase.tests_v3.cases.analytics_t.AnalyticsTes
         self.cluster = self.make_connection()
 
     def tearDown(self):
-        self._factory = SyncCluster
-        self.cluster = self.make_connection()
+        try:
+            self._factory = SyncCluster
+            self.cluster = self.make_connection()
+        except Exception as e:
+            pass
         super(TxAnalyticsTest, self).tearDown()
 
     @staticmethod
