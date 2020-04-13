@@ -30,36 +30,41 @@ class ClusterTests(CollectionTestCase):
         super(ClusterTests, self).setUp()
 
     def test_diagnostics(self):
-        # basically, 6.5.x and not dev preview
-        if self.is_mock or not self.cluster._is_6_5_plus():
-            raise SkipTest("diagnostics hangs forever with mock and < 6.5, and sometimes DP")
         result = self.cluster.diagnostics(DiagnosticsOptions(report_id="imareportid"))
         self.assertIn("imareportid", result.id)
         self.assertIsNotNone(result.sdk)
         self.assertIsNotNone(result.version)
         self.assertEquals(result.state, ClusterState.Online)
-        # no matter what there should be a config service type in there...
-        config = result.endpoints[ServiceType.Config]
-        self.assertTrue(len(config) > 0)
-        self.assertIsNotNone(config[0].id)
-        self.assertIsNotNone(config[0].local)
-        self.assertIsNotNone(config[0].remote)
-        self.assertIsNotNone(config[0].last_activity)
-        self.assertEqual(config[0].state, EndpointState.Connected)
-        self.assertEqual(config[0].type, ServiceType.Config)
+        if not self.is_mock:
+            # no matter what there should be a config service type in there,
+            # as long as we are not the mock.
+            config = result.endpoints[ServiceType.Config]
+            self.assertTrue(len(config) > 0)
+            self.assertIsNotNone(config[0].id)
+            self.assertIsNotNone(config[0].local)
+            self.assertIsNotNone(config[0].remote)
+            self.assertIsNotNone(config[0].last_activity)
+            self.assertEqual(config[0].state, EndpointState.Connected)
+            self.assertEqual(config[0].type, ServiceType.Config)
 
     def test_diagnostics_with_active_bucket(self):
-        # basically, 6.5.x and not dev preview
-        if self.is_mock or not self.cluster._is_6_5_plus():
-            raise SkipTest("diagnostics hangs forever with mock and < 6.5, and sometimes DP")
         query_result = self.cluster.query('SELECT * FROM `beer-sample` LIMIT 1')
-        self.assertTrue(len(query_result.rows()) > 0)
+        if self.is_mock:
+            try:
+                query_result.rows()
+            except:
+                pass
+        else:
+            self.assertTrue(len(query_result.rows()) > 0)
         result = self.cluster.diagnostics(DiagnosticsOptions(report_id="imareportid"))
+        print(result.as_json())
         self.assertIn("imareportid", result.id)
 
-        # no matter what there should be a config service type in there...
-        config = result.endpoints[ServiceType.Config]
-        self.assertTrue(len(config) > 0)
+        if not self.is_mock:
+            # no matter what there should be a config service type in there,
+            # as long as we are not the mock.
+            config = result.endpoints[ServiceType.Config]
+            self.assertTrue(len(config) > 0)
 
         # but now, we have hit Query, so...
         q = result.endpoints[ServiceType.Query]

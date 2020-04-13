@@ -699,7 +699,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,, void,
 
     PYCBC_CONN_THR_BEGIN(self);
     PYCBC_DEBUG_LOG_CONTEXT(context, "Beginning wait")
-    lcb_wait(self->instance, LCB_WAIT_NOCHECK);
+    lcb_wait(self->instance, LCB_WAIT_DEFAULT);
     PYCBC_DEBUG_LOG_CONTEXT(context, "Finished wait")
     PYCBC_CONN_THR_END(self);
 }
