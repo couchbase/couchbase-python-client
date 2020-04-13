@@ -12,7 +12,6 @@ from couchbase_core._pyport import unicode
 from couchbase_core.supportability import internal
 from .options import OptionBlockTimeOut, UnsignedInt32, UnsignedInt64, forward_args
 import abc
-import cattr
 import couchbase_core.mutation_state as MutationState
 
 
@@ -1285,9 +1284,6 @@ class SearchRowFields(Dict[str, Any]):
         super(SearchRowFields, self).__init__(*args, **kwargs)
 
 
-cattr.register_structure_hook(SearchRowFields, lambda x, t: t(x))
-
-
 class SearchRowLocations(object):
     def __init__(self, **orig_data):
         self._real_data = orig_data
@@ -1336,9 +1332,6 @@ class SearchRowLocations(object):
         # type: (...) -> list[str]
         """ list the terms for a given field """
         return list(self._real_data[field].keys())
-
-
-cattr.register_structure_hook(SearchRowLocations, lambda x, t: t(**x))
 
 
 @attr.s
@@ -1435,14 +1428,16 @@ class SearchResultBase(object):
         super(SearchResultBase, self).__init__(*args, row_factory=(row_factory or self._row_factory), **kwargs)
 
     @staticmethod
-    def _row_factory(orig_value  # type: JSON
-                    ):
+    def _row_factory(orig_value  # type: Dict[str, Any]
+                     ):
         # type: (...) -> SearchRow
-        return cattr.structure(orig_value, SearchRow)
+        return SearchRow(orig_value.pop('index'), orig_value.pop('id'), orig_value.pop('score'),
+                         locations=SearchRowLocations(**orig_value.pop('locations', {})),
+                         **{k: orig_value[k] for k in (attr.fields(SearchRow) & orig_value.keys())})
 
     def facets(self):
         # type: (...) -> Dict[str, SearchFacetResult]
-        return {k: cattr.structure(dict(name=k, **v), SearchFacetResult) for k, v in
+        return {k: SearchFacetResult(k, v.pop('field'), v.pop('total'), v.pop('missing'), v.pop('other')) for k, v in
                 super(SearchResultBase, self).facets.items()}
 
     def metadata(self):  # type: (...) -> SearchMetaData

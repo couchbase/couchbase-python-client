@@ -11,7 +11,6 @@ try:
     from typing import TypedDict
 except:
     from typing_extensions import TypedDict
-import cattr
 
 
 OptionBlockBase = dict
@@ -181,9 +180,6 @@ class ConstrainedInt(object):
 
     def __repr__(self):
         return str(self)
-
-
-cattr.register_structure_hook(ConstrainedInt, lambda x, t: t(x))
 
 
 class SignedInt64(ConstrainedInt):
