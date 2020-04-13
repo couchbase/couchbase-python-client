@@ -20,7 +20,7 @@ from time import sleep
 from nose.plugins.attrib import attr
 
 from couchbase.exceptions import (
-    TemporaryFailException, DocumentExistsException, ArgumentException)
+    TemporaryFailException, DocumentExistsException, InvalidArgumentException)
 
 from couchbase_tests.base import ConnectionTestCase
 
@@ -94,16 +94,16 @@ class LockTest(ConnectionTestCase):
         self.assertTrue(rvs[key].success)
 
     def test_missing_expiry(self):
-        self.assertRaises(ArgumentException,
+        self.assertRaises(InvalidArgumentException,
                           self.cb.lock, "foo")
-        self.assertRaises(ArgumentException, self.cb.lock_multi,
+        self.assertRaises(InvalidArgumentException, self.cb.lock_multi,
                           ("foo", "bar"))
 
     def test_missing_cas(self):
-        self.assertRaises(ArgumentException,
+        self.assertRaises(InvalidArgumentException,
                           self.cb.unlock_multi,
                           ("foo", "bar"))
-        self.assertRaises(ArgumentException,
+        self.assertRaises(InvalidArgumentException,
                           self.cb.unlock_multi,
                           {"foo":0, "bar":0})
 

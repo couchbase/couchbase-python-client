@@ -172,7 +172,7 @@ class ClusterTest(CouchbaseTestCase):
                 raise
             try:
                 raise e
-            except CouchbaseNetworkException as f:
+            except NetworkException as f:
                 self.assertRegex(str(e),r'.*(refused the connection).*')
             except CouchbaseFatalException as f:
                 self.assertRegex(str(e),r'.*(SSL subsystem).*')

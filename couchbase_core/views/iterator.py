@@ -19,7 +19,7 @@ from collections import namedtuple
 from copy import deepcopy
 from warnings import warn
 
-from couchbase.exceptions import ArgumentException, CouchbaseException, ViewEngineException, NotSupportedException
+from couchbase.exceptions import InvalidArgumentException, CouchbaseException, ViewEngineException, NotSupportedException
 from .params import ViewQuery, SpatialQuery, QueryBase
 from couchbase_core._pyport import basestring
 import couchbase_core._libcouchbase as C
@@ -247,7 +247,7 @@ class View(object):
         self.__meta_received = False
 
         if query and params:
-            raise ArgumentException.pyexc(
+            raise InvalidArgumentException.pyexc(
                 "Extra parameters are mutually exclusive with the "
                 "'query' argument. Use query.update() to add extra arguments")
 
@@ -266,7 +266,7 @@ class View(object):
             self._flags |= C.LCB_CMDVIEWQUERY_F_SPATIAL
 
         if include_docs and self._query.reduce:
-            raise ArgumentException.pyexc(
+            raise InvalidArgumentException.pyexc(
                 "include_docs is only applicable for map-only views, but "
                 "'reduce', 'group', or 'group_level' was specified; or "
                 "this is a spatial query",

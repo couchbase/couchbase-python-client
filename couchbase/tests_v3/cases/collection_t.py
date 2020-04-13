@@ -19,7 +19,7 @@ from couchbase_tests.base import CollectionTestCase
 from couchbase.collection import GetOptions, LookupInOptions, UpsertOptions, ReplaceOptions, InsertOptions, \
     RemoveOptions
 from couchbase.durability import ServerDurability, ClientDurability, Durability, PersistTo, ReplicateTo
-from couchbase.exceptions import InvalidArgumentsException,  DocumentExistsException, DocumentNotFoundException, \
+from couchbase.exceptions import InvalidArgumentException,  DocumentExistsException, DocumentNotFoundException, \
     TemporaryFailException
 import unittest
 from datetime import timedelta
@@ -160,7 +160,7 @@ class CollectionTests(CollectionTestCase):
 
         # ok, it is there...
         self.coll.get("id", GetOptions(project=["someArray"], timeout=timedelta(seconds=1.0)))
-        self.assertRaisesRegex(InvalidArgumentsException, "Expected timedelta", self.coll.get, "id",
+        self.assertRaisesRegex(InvalidArgumentException, "Expected timedelta", self.coll.get, "id",
                                GetOptions(project=["someArray"], timeout=456))
         sdresult_2 = self.coll.lookup_in("id", (SD.get("someArray"),), LookupInOptions(timeout=timedelta(microseconds=1)))
         self.assertEqual(['wibble', 'gronk'],sdresult_2.content_as[list](0))

@@ -582,8 +582,6 @@ class ReplicaNotAvailableException(CouchbaseException):
     pass
 
 
-class InvalidArgumentsException(CouchbaseException):
-  pass
 
 
 # TODO: make types to match.  This is just to get it to compile and run...
@@ -855,11 +853,11 @@ class CouchbaseDurabilityException(InternalSDKException):
     pass
 
 
-class ArgumentException(CouchbaseException):
-    """Invalid argument
-
-    A given argument is invalid or must be set
+class InvalidArgumentException(CouchbaseException):
     """
+    Raised when It is unambiguously determined that the error was caused because of invalid arguments from the user
+    Usually only thrown directly when doing request arg validation.
+    Also commonly used as a parent class for many service-specific exceptions (see below)"""
 
 
 class ValueFormatException(CouchbaseException):
@@ -1245,27 +1243,27 @@ _LCB_ERRNO_MAP = dict(list({
                         C.LCB_ERR_NETWORK:                       NetworkException,
                         C.LCB_ERR_NOT_MY_VBUCKET:                NotMyVbucketException,
                         C.LCB_ERR_NOT_STORED:                    NotStoredException,
-                        C.LCB_ERR_UNSUPPORTED_OPERATION:         NotSupportedException,
-                        C.LCB_ERR_UNKNOWN_HOST:                  UnknownHostException,
-                        C.LCB_ERR_PROTOCOL_ERROR:                ProtocolException,
-                        C.LCB_ERR_TIMEOUT:                       TimeoutException,
-                        C.LCB_ERR_CONNECT_ERROR:                 ConnectException,
-                        C.LCB_ERR_BUCKET_NOT_FOUND:              BucketNotFoundException,
-                        C.LCB_ERR_QUERY:                         QueryException,
-                        C.LCB_ERR_NO_MATCHING_SERVER:            DocumentUnretrievableException,
-                        C.LCB_ERR_INVALID_HOST_FORMAT:           InvalidException,
-                        C.LCB_ERR_INVALID_CHAR:                  InvalidException,
-                        C.LCB_ERR_INVALID_ARGUMENT:              InvalidException,
-                        C.LCB_ERR_DURABILITY_TOO_MANY:           ArgumentException,
-                        C.LCB_ERR_DUPLICATE_COMMANDS:            ArgumentException,
-                        C.LCB_ERR_NO_CONFIGURATION:              ClientTemporaryFailException,
-                        C.LCB_ERR_HTTP:                          HTTPException,
-                        C.LCB_ERR_SUBDOC_PATH_NOT_FOUND:         PathNotFoundException,
-                        C.LCB_ERR_SUBDOC_PATH_EXISTS:            PathExistsException,
-                        C.LCB_ERR_SUBDOC_PATH_INVALID:           SubdocPathInvalidException,
-                        C.LCB_ERR_SUBDOC_PATH_TOO_DEEP:          DocumentTooDeepException,
-                        C.LCB_ERR_SUBDOC_DOCUMENT_NOT_JSON:      DocumentNotJsonException,
-                        C.LCB_ERR_SUBDOC_VALUE_TOO_DEEP:         SubdocValueTooDeepException,
+                        C.LCB_ERR_UNSUPPORTED_OPERATION:    NotSupportedException,
+                        C.LCB_ERR_UNKNOWN_HOST:             UnknownHostException,
+                        C.LCB_ERR_PROTOCOL_ERROR:           ProtocolException,
+                        C.LCB_ERR_TIMEOUT:                  TimeoutException,
+                        C.LCB_ERR_CONNECT_ERROR:            ConnectException,
+                        C.LCB_ERR_BUCKET_NOT_FOUND:         BucketNotFoundException,
+                        C.LCB_ERR_QUERY:                    QueryException,
+                        C.LCB_ERR_NO_MATCHING_SERVER:       DocumentUnretrievableException,
+                        C.LCB_ERR_INVALID_HOST_FORMAT:      InvalidException,
+                        C.LCB_ERR_INVALID_CHAR:             InvalidException,
+                        C.LCB_ERR_INVALID_ARGUMENT:         InvalidArgumentException,
+                        C.LCB_ERR_DURABILITY_TOO_MANY:      DurabilityImpossibleException,
+                        C.LCB_ERR_DUPLICATE_COMMANDS:       InvalidArgumentException,
+                        C.LCB_ERR_NO_CONFIGURATION:         ClientTemporaryFailException,
+                        C.LCB_ERR_HTTP:                     HTTPException,
+                        C.LCB_ERR_SUBDOC_PATH_NOT_FOUND:    PathNotFoundException,
+                        C.LCB_ERR_SUBDOC_PATH_EXISTS:       PathExistsException,
+                        C.LCB_ERR_SUBDOC_PATH_INVALID:      SubdocPathInvalidException,
+                        C.LCB_ERR_SUBDOC_PATH_TOO_DEEP:     DocumentTooDeepException,
+                        C.LCB_ERR_SUBDOC_DOCUMENT_NOT_JSON: DocumentNotJsonException,
+                        C.LCB_ERR_SUBDOC_VALUE_TOO_DEEP:    SubdocValueTooDeepException,
                         C.LCB_ERR_SUBDOC_PATH_MISMATCH:          SubdocPathMismatchException,
                         C.LCB_ERR_SUBDOC_VALUE_INVALID:          SubdocCantInsertValueException,
                         C.LCB_ERR_SUBDOC_DELTA_INVALID:          SubdocBadDeltaException,
@@ -1283,7 +1281,7 @@ def _set_default_codes():
     for k, v in _LCB_ERRNO_MAP.items():
         v.CODE = k
 
-    ArgumentException.CODE = 0
+    InvalidArgumentException.CODE = 0
 
 
 _set_default_codes()
@@ -1468,7 +1466,7 @@ class ErrorMapper(object):
 
 
 _EXCTYPE_MAP = {
-    C.PYCBC_EXC_ARGUMENTS:  ArgumentException,
+    C.PYCBC_EXC_ARGUMENTS:  InvalidArgumentException,
     C.PYCBC_EXC_ENCODING:   ValueFormatException,
     C.PYCBC_EXC_INTERNAL:   InternalSDKException,
     C.PYCBC_EXC_HTTP:       HTTPException,

@@ -23,7 +23,7 @@ import couchbase_core._libcouchbase as _LCB
 import couchbase.exceptions as exceptions
 from couchbase_core import syncwait_or_deadline_time
 from couchbase_core.client import Client
-from couchbase.exceptions import CouchbaseException, ArgumentException
+from couchbase.exceptions import CouchbaseException, InvalidArgumentException
 from couchbase_core.views.params import Query, SpatialQuery, STALE_OK
 from couchbase_core._pyport import single_dict_key
 from couchbase_core._ixmgmt import IxmgmtRequest, N1qlIndex, N1QL_PRIMARY_INDEX
@@ -105,7 +105,7 @@ class BucketManager(object):
             return True
 
         if timeout < 0:
-            raise ArgumentException.pyexc("Interval must not be negative")
+            raise InvalidArgumentException.pyexc("Interval must not be negative")
 
         t_end = time.time() + timeout
         old_rev = None

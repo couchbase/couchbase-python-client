@@ -20,7 +20,7 @@ from couchbase_v2.views.iterator import (
     View, ViewRow, RowProcessor, AlreadyQueriedException)
 
 from couchbase_v2.views.params import Query, UNSPEC
-from couchbase_v2.exceptions import ArgumentException, CouchbaseException, HTTPException
+from couchbase_v2.exceptions import InvalidArgumentException, CouchbaseException, HTTPException
 from couchbase_core._pyport import xrange
 from couchbase_core._bootstrap import MAX_URI_LENGTH
 
@@ -192,7 +192,7 @@ class ViewIteratorTest(ViewTestCase):
             self.assertTrue(doc.success)
 
         # Try with reduce
-        self.assertRaises(ArgumentException,
+        self.assertRaises(InvalidArgumentException,
                           self.cb.query,
                           "beer", "by_location",
                           reduce=True,
@@ -233,7 +233,7 @@ class ViewIteratorTest(ViewTestCase):
         del ret
 
     def test_mixed_query(self):
-        self.assertRaises(ArgumentException,
+        self.assertRaises(InvalidArgumentException,
                           self.cb.query,
                           "d", "v",
                           query=Query(),

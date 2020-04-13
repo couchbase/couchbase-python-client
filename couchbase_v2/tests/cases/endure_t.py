@@ -16,7 +16,7 @@
 #
 from unittest import SkipTest
 
-from couchbase_v2.exceptions import ArgumentException, TimeoutException
+from couchbase_v2.exceptions import InvalidArgumentException, TimeoutException
 from couchbase_tests.base import MockTestCase
 import couchbase_core._libcouchbase as LCB
 class EndureTest(MockTestCase):
@@ -26,7 +26,7 @@ class EndureTest(MockTestCase):
             raise SkipTest("Endure op not supported in V4")
         super(EndureTest,self).setUp(**kwargs)
     def test_excessive(self):
-        self.assertRaises(ArgumentException,
+        self.assertRaises(InvalidArgumentException,
                           self.cb.set,
                           "foo", "bar",
                           persist_to=99, replicate_to=99)

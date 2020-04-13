@@ -3,7 +3,7 @@ from couchbase.management.admin import Admin, METHMAP
 from typing import *
 from .generic import GenericManager
 from couchbase.exceptions import ErrorMapper, HTTPException, NotSupportedException, \
-    InvalidArgumentsException, SearchIndexNotFoundException
+    InvalidArgumentException, SearchIndexNotFoundException
 import couchbase_core._libcouchbase as LCB
 import json
 
@@ -28,7 +28,7 @@ class SearchIndexManager(GenericManager):
         imeth = None
         method = kwargs.get('method', 'GET')
         if not method in METHMAP:
-            raise InvalidArgumentsException("Unknown HTTP Method", method)
+            raise InvalidArgumentException("Unknown HTTP Method", method)
 
         imeth = METHMAP[method]
         return self._admin_bucket._http_request(
@@ -64,7 +64,7 @@ class SearchIndexManager(GenericManager):
         Uri
         GET http://localhost:8094/api/index/<name>"""
         if not index_name:
-            raise InvalidArgumentsException("expected index_name to not be empty")
+            raise InvalidArgumentException("expected index_name to not be empty")
 
         return SearchIndex.from_server(
             **self._http_request(
@@ -114,10 +114,10 @@ class SearchIndexManager(GenericManager):
         Uri
         PUT http://localhost:8094/api/index/<index_name>"""
         if not index:
-            raise InvalidArgumentsException("expected index to not be None")
+            raise InvalidArgumentException("expected index to not be None")
         else:
             if not index.is_valid():
-                raise InvalidArgumentsException("Index must have name, source set")
+                raise InvalidArgumentException("Index must have name, source set")
         try:
             self._http_request(
                 path="api/index/{}".format(index.name),
@@ -150,7 +150,7 @@ class SearchIndexManager(GenericManager):
         DELETE http://localhost:8094/api/index/{index_name}
         """
         if not index_name:
-            raise InvalidArgumentsException("expected an index_name")
+            raise InvalidArgumentException("expected an index_name")
 
         self._http_request(
             path="api/index/{}".format(index_name),
@@ -178,7 +178,7 @@ class SearchIndexManager(GenericManager):
         GET http://localhost:8094/api/index/{index_name}/count
         """
         if not index_name:
-            raise InvalidArgumentsException("expected an index_name")
+            raise InvalidArgumentException("expected an index_name")
 
         return self._http_request(
             path="api/index/{}/count".format(index_name),
@@ -205,7 +205,7 @@ class SearchIndexManager(GenericManager):
         """
 
         if not index_name:
-            raise InvalidArgumentsException("expected an index_name")
+            raise InvalidArgumentException("expected an index_name")
 
         self._http_request(
             path="api/index/{}/ingestControl/pause".format(index_name),
@@ -233,7 +233,7 @@ class SearchIndexManager(GenericManager):
         """
 
         if not index_name:
-            raise InvalidArgumentsException("expected an index_name")
+            raise InvalidArgumentException("expected an index_name")
 
         self._http_request(
             path="api/index/{}/ingestControl/resume".format(index_name),
@@ -262,7 +262,7 @@ class SearchIndexManager(GenericManager):
         POST http://localhost:8094/api/index/{index_name}/queryControl/allow
         """
         if not index_name:
-            raise InvalidArgumentsException("expected an index_name")
+            raise InvalidArgumentException("expected an index_name")
 
         self._http_request(
             path='api/index/{}/queryControl/allow'.format(index_name),
@@ -291,7 +291,7 @@ class SearchIndexManager(GenericManager):
         POST http://localhost:8094/api/index/{index_name}/queryControl/allow
         """
         if not index_name:
-            raise InvalidArgumentsException("expected an index_name")
+            raise InvalidArgumentException("expected an index_name")
 
         self._http_request(
             path='api/index/{}/queryControl/allow'.format(index_name),
@@ -320,7 +320,7 @@ class SearchIndexManager(GenericManager):
         POST http://localhost:8094/api/index/{index_name}/planFreezeControl/freeze
         """
         if not index_name:
-            raise InvalidArgumentsException("expected an index_name")
+            raise InvalidArgumentException("expected an index_name")
 
         self._http_request(
             path='api/index/{}/planFreezeControl/freeze'.format(index_name),
@@ -349,7 +349,7 @@ class SearchIndexManager(GenericManager):
         POST http://localhost:8094/api/index/{index_name}/planFreezeControl/unfreeze
         """
         if not index_name:
-            raise InvalidArgumentsException("expected an index_name")
+            raise InvalidArgumentException("expected an index_name")
 
         self._http_request(
             path='api/index/{}/planFreezeControl/unfreeze'.format(index_name),
@@ -380,13 +380,13 @@ class SearchIndexManager(GenericManager):
         POST http://localhost:8094/api/index/{index_name}/analyzeDoc
         """
         if not index_name:
-            raise InvalidArgumentsException("expected an index_name")
+            raise InvalidArgumentException("expected an index_name")
         if not document:
-            raise InvalidArgumentsException("expected a document to analyze")
+            raise InvalidArgumentException("expected a document to analyze")
         try:
             jsonDoc = json.dumps(document)
         except:
-            raise InvalidArgumentsException("cannot convert doc to json to analyze")
+            raise InvalidArgumentException("cannot convert doc to json to analyze")
         return self._http_request(
             path="api/index/{}/analyzeDoc".format(index_name),
             method='POST',

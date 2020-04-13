@@ -16,7 +16,7 @@
 #
 
 from couchbase_tests.base import ConnectionTestCase
-from couchbase_v2.exceptions import ArgumentException, ValueFormatException
+from couchbase_v2.exceptions import InvalidArgumentException, ValueFormatException
 from couchbase_core.user_constants import FMT_UTF8
 
 class ItertypeTest(ConnectionTestCase):
@@ -39,11 +39,11 @@ class ItertypeTest(ConnectionTestCase):
                    self.cb.delete_multi,
                    self.cb.get_multi):
             self.assertRaises(
-                (ArgumentException, ValueFormatException),
+                (InvalidArgumentException, ValueFormatException),
                 fn, badlist)
 
         self.assertRaises(
-            (ArgumentException, ValueFormatException),
+            (InvalidArgumentException, ValueFormatException),
             self.cb.set_multi,
             { None: "value" })
 
@@ -79,6 +79,6 @@ class ItertypeTest(ConnectionTestCase):
         self.cb.remove_multi(IterTemp(gen_ints = False))
 
         # Try with a mismatched len-iter
-        self.assertRaises(ArgumentException,
+        self.assertRaises(InvalidArgumentException,
                           self.cb.get_multi,
                           IterTemp(gen_ints=False, badlen=True))

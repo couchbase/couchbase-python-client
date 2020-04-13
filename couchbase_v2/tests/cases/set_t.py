@@ -21,7 +21,7 @@ from time import sleep
 from nose.plugins.attrib import attr
 
 from couchbase_core import FMT_JSON, FMT_PICKLE, FMT_UTF8
-from couchbase_v2.exceptions import (KeyExistsException, ArgumentException, DocumentNotFoundException)
+from couchbase_v2.exceptions import (KeyExistsException, InvalidArgumentException, DocumentNotFoundException)
 from couchbase_tests.base import ConnectionTestCase
 import json
 
@@ -100,7 +100,7 @@ class UpsertTest(ConnectionTestCase):
             self.assertTrue(k in rvs)
             self.assertTrue(rvs[k].success)
 
-        self.assertRaises((ArgumentException,TypeError), self.cb.upsert_multi, kv,
+        self.assertRaises((InvalidArgumentException,TypeError), self.cb.upsert_multi, kv,
                           cas = 123)
 
     def test_add(self):

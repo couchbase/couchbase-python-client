@@ -24,7 +24,7 @@ from couchbase_v2.views.params import (make_options_string,
                                        UNSPEC,
                                        _HANDLER_MAP)
 
-from couchbase_v2.exceptions import ArgumentException
+from couchbase_v2.exceptions import InvalidArgumentException
 from couchbase_tests.base import CouchbaseTestCase
 
 class ViewStringTest(CouchbaseTestCase):
@@ -59,16 +59,16 @@ class ViewStringTest(CouchbaseTestCase):
 
 
     def test_bad_stale(self):
-        self.assertRaises(ArgumentException,
+        self.assertRaises(InvalidArgumentException,
                           self._assert_vopteq,
                           'stale=blahblah', 'stale', 'blahblha')
-        self.assertRaises(ArgumentException,
+        self.assertRaises(InvalidArgumentException,
                           self._assert_vopteq,
                           'stale=None', 'stale', None)
 
 
     def test_unrecognized_params(self):
-        self.assertRaises(ArgumentException,
+        self.assertRaises(InvalidArgumentException,
                           self._assert_vopteq,
                           'frobble=gobble', 'frobble', 'gobble')
 
@@ -90,11 +90,11 @@ class ViewStringTest(CouchbaseTestCase):
                                 p,
                                 "true")
 
-            self.assertRaises(ArgumentException,
+            self.assertRaises(InvalidArgumentException,
                               self._assert_vopteq,
                               p+'=gobble', p, 'gobble')
 
-            self.assertRaises(ArgumentException,
+            self.assertRaises(InvalidArgumentException,
                               self._assert_vopteq,
                               p+'=None', p, None)
 
@@ -113,11 +113,11 @@ class ViewStringTest(CouchbaseTestCase):
                                 p,
                                 "42")
 
-            self.assertRaises(ArgumentException,
+            self.assertRaises(InvalidArgumentException,
                               self._assert_vopteq,
                               p+'=true', p, True)
 
-            self.assertRaises(ArgumentException,
+            self.assertRaises(InvalidArgumentException,
                               self._assert_vopteq,
                               p+'=blah', p, 'blah')
 
@@ -149,7 +149,7 @@ class ViewStringTest(CouchbaseTestCase):
                 print("Expected", expected)
                 self._assert_vopteq(expected, p, v)
 
-            self.assertRaises(ArgumentException,
+            self.assertRaises(InvalidArgumentException,
                               self._assert_vopteq,
                               "blah", p, object())
 
@@ -174,7 +174,7 @@ class ViewStringTest(CouchbaseTestCase):
                 self._assert_vopteq(expected, p, v)
 
             for v in badvalues:
-                self.assertRaises(ArgumentException,
+                self.assertRaises(InvalidArgumentException,
                                   self._assert_vopteq,
                                   "blah", p, v)
 
@@ -193,7 +193,7 @@ class ViewStringTest(CouchbaseTestCase):
 
 
         # Ensure we still can't use unrecognized params
-        self.assertRaises(ArgumentException,
+        self.assertRaises(InvalidArgumentException,
                           make_options_string,
                           {'foo':'bar'},
                           passthrough=True)
@@ -202,7 +202,7 @@ class ViewStringTest(CouchbaseTestCase):
         # ensure we still can't use "stupid" params
         badvals = (object(), None, True, False)
         for bv in badvals:
-            self.assertRaises(ArgumentException,
+            self.assertRaises(InvalidArgumentException,
                               make_options_string,
                               {'stale':bv},
                               passthrough=True)
@@ -221,7 +221,7 @@ class ViewStringTest(CouchbaseTestCase):
 
         badvals = (object(), True, False, None)
         for bv in badvals:
-            self.assertRaises(ArgumentException,
+            self.assertRaises(InvalidArgumentException,
                               make_options_string,
                               {'foo':bv},
                               unrecognized_ok=True)
@@ -241,7 +241,7 @@ class ViewStringTest(CouchbaseTestCase):
                 self._assert_vopteq(expected, p, v)
 
             for v in badvals:
-                self.assertRaises(ArgumentException,
+                self.assertRaises(InvalidArgumentException,
                                   make_options_string,
                                   {p:v})
 
@@ -270,10 +270,10 @@ class ViewStringTest(CouchbaseTestCase):
             self._assert_vopteq('', p, [UNSPEC,UNSPEC])
             self._assert_vopteq('', p, [UNSPEC])
 
-            self.assertRaises(ArgumentException,
+            self.assertRaises(InvalidArgumentException,
                   self._assert_vopteq,
                   "blah", p, [object()])
 
-            self.assertRaises(ArgumentException,
+            self.assertRaises(InvalidArgumentException,
                               self._assert_vopteq,
                               "blah", p, None)

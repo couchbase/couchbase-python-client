@@ -20,7 +20,7 @@ import sys
 from couchbase.management.admin import Admin
 from couchbase_core.result import HttpResult
 from couchbase.exceptions import (
-    ArgumentException, AuthenticationException, CouchbaseException,
+    InvalidArgumentException, AuthenticationException, CouchbaseException,
     NetworkException, HTTPException)
 from couchbase_tests.base import CouchbaseTestCase, SkipTest
 from couchbase_core.auth_domain import AuthDomain
@@ -80,11 +80,11 @@ class AdminSimpleTest(CouchbaseTestCase):
         self.assertTrue(excraised)
 
     def test_bad_args(self):
-        self.assertRaises(ArgumentException,
+        self.assertRaises(InvalidArgumentException,
                           self.admin.http_request,
                           None)
 
-        self.assertRaises(ArgumentException,
+        self.assertRaises(InvalidArgumentException,
                           self.admin.http_request,
                           '/',
                           method='blahblah')

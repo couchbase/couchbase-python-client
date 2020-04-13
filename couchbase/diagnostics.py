@@ -3,7 +3,7 @@ from typing import Optional, Mapping, Union, Any
 from enum import Enum
 from couchbase_core import JSON
 from datetime import timedelta
-from couchbase.exceptions import InvalidArgumentsException
+from couchbase.exceptions import InvalidArgumentException
 import json
 import copy
 
@@ -97,7 +97,7 @@ class DiagnosticsResult(object):
         if isinstance(source_diagnostics, dict):
             source_diagnostics = [source_diagnostics]
         if not isinstance(source_diagnostics, list):
-            raise InvalidArgumentsException("DiagnosticsResult expects a dict or list(dict)")
+            raise InvalidArgumentException("DiagnosticsResult expects a dict or list(dict)")
         for d in source_diagnostics:
             self.append_endpoints(d)
 

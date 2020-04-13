@@ -2,7 +2,7 @@ import os
 from unittest import SkipTest
 from functools import wraps
 
-from couchbase.exceptions import ArgumentException
+from couchbase.exceptions import InvalidArgumentException
 from couchbase.management.users import User, Role, Group, RawRole, GroupNotFoundException, UserNotFoundException
 from couchbase_core.auth_domain import AuthDomain
 from couchbase_tests.base import CollectionTestCase
@@ -72,11 +72,11 @@ class UserManagementTests(CollectionTestCase):
         roles = [Role.of(name='data_reader', bucket='default'), Role.of(name='data_writer', bucket='default')]
 
         # invalid domain generates argument error
-        self.assertRaises(ArgumentException, self.um.get_all_users, None)
-        self.assertRaises(ArgumentException, self.um.get_user, userid, None)
-        self.assertRaises(ArgumentException, self.um.upsert_user, User(username=userid, password=password, roles=roles),
+        self.assertRaises(InvalidArgumentException, self.um.get_all_users, None)
+        self.assertRaises(InvalidArgumentException, self.um.get_user, userid, None)
+        self.assertRaises(InvalidArgumentException, self.um.upsert_user, User(username=userid, password=password, roles=roles),
                           domain=None)
-        self.assertRaises(ArgumentException, self.um.drop_user, userid, None)
+        self.assertRaises(InvalidArgumentException, self.um.drop_user, userid, None)
 
     def test_external_nopassword(self):
 
@@ -85,15 +85,15 @@ class UserManagementTests(CollectionTestCase):
         roles = [Role.of(name='data_reader', bucket='default'), Role.of(name='data_writer', bucket='default')]
 
         # password with external generates argument error
-        self.assertRaises(ArgumentException, self.um.upsert_user, User(username=userid, password=password, roles=roles),
+        self.assertRaises(InvalidArgumentException, self.um.upsert_user, User(username=userid, password=password, roles=roles),
                           domain=AuthDomain.External)
-        self.assertRaises(ArgumentException, self.um.upsert_user, User(username=userid, password=password, roles=None),
+        self.assertRaises(InvalidArgumentException, self.um.upsert_user, User(username=userid, password=password, roles=None),
                           domain=AuthDomain.External)
-        self.assertRaises(ArgumentException, self.um.upsert_user, User(username=userid, password=password, roles=[]),
+        self.assertRaises(InvalidArgumentException, self.um.upsert_user, User(username=userid, password=password, roles=[]),
                           domain=AuthDomain.External)
         try:
             self.um.upsert_user(User(username=userid, password=None, roles=roles), domain=AuthDomain.External)
-        except ArgumentException:
+        except InvalidArgumentException:
             raise
         except:
             pass

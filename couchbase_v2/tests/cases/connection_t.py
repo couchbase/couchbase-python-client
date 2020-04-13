@@ -15,16 +15,16 @@
 # limitations under the License.
 #
 
-import tempfile
 import os
+import tempfile
 
 from nose.plugins.attrib import attr
 
-from couchbase.exceptions import (AuthException, BucketNotFoundException, CouchbaseNetworkException,
-                                  DocumentNotFoundException, InvalidException,
-                                  TimeoutException, ArgumentException)
-from couchbase_tests.base import CouchbaseTestCase, SkipTest, ConnectionTestCase
+from couchbase.exceptions import (AuthenticationException, BucketNotFoundException, DocumentNotFoundException,
+                                  InvalidException,
+                                  TimeoutException)
 from couchbase_core.connstr import ConnectionString
+from couchbase_tests.base import CouchbaseTestCase, SkipTest, ConnectionTestCase
 
 
 class ConnectionTest(CouchbaseTestCase):
@@ -46,7 +46,7 @@ class ConnectionTest(CouchbaseTestCase):
     def test_bucket_not_found(self):
         connargs = self.make_connargs(bucket='this_bucket_does_not_exist')
         self.assertRaises(
-            (BucketNotFoundException, AuthException), self.factory, **connargs)
+            (BucketNotFoundException, AuthenticationException), self.factory, **connargs)
 
     def test_quiet(self):
         connparams = self.make_connargs()

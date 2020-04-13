@@ -23,7 +23,7 @@ from couchbase_core._libcouchbase import (
 
 from couchbase_core.result import AsyncResult
 from couchbase_core.asynchronous.view import AsyncViewBase
-from couchbase.exceptions import ArgumentException
+from couchbase.exceptions import InvalidArgumentException
 from couchbase_core._pyport import with_metaclass
 from couchbase_core.client import Client as CoreClient
 from typing import *
@@ -172,7 +172,7 @@ class AsyncClientFactory(type):
                   :class:`~couchbase.asynchronous.view.AsyncViewBase`.
                 """
                 if not issubclass(kwargs.get('itercls', None), AsyncViewBase):
-                    raise ArgumentException.pyexc("itercls must be defined "
+                    raise InvalidArgumentException.pyexc("itercls must be defined "
                                               "and must be derived from AsyncViewBase")
 
                 try:

@@ -140,7 +140,7 @@ class Admin(LCB.Bucket):
           ``bytes``
 
         :raise:
-          :exc:`~.ArgumentException`
+          :exc:`~.InvalidArgumentException`
             if the method supplied was incorrect.
           :exc:`~.ConnectException`
             if there was a problem establishing a connection.
@@ -153,7 +153,7 @@ class Admin(LCB.Bucket):
         """
         imeth = None
         if not method in METHMAP:
-            raise E.ArgumentException.pyexc("Unknown HTTP Method", method)
+            raise E.InvalidArgumentException.pyexc("Unknown HTTP Method", method)
 
         imeth = METHMAP[method]
         return self._http_request(type=LCB.LCB_HTTP_TYPE_MANAGEMENT,
@@ -314,7 +314,7 @@ class Admin(LCB.Bucket):
         elif auth_domain == AuthDomain.External:
             domain = 'external'
         else:
-            raise E.ArgumentException.pyexc("Unknown Authentication Domain", auth_domain)
+            raise E.InvalidArgumentException.pyexc("Unknown Authentication Domain", auth_domain)
 
         path = '/settings/rbac/users/{0}'.format(domain)
         if userid is not None:
@@ -380,10 +380,10 @@ class Admin(LCB.Bucket):
            take a few moments for the new user settings to take effect.
         """
         if not roles or not isinstance(roles, list):
-            raise E.ArgumentException("Roles must be a non-empty list")
+            raise E.InvalidArgumentException("Roles must be a non-empty list")
 
         if password and domain == AuthDomain.External:
-            raise E.ArgumentException("External domains must not have passwords")
+            raise E.InvalidArgumentException("External domains must not have passwords")
         role_string = self._gen_role_list(roles)
         params = {
             'roles': role_string,

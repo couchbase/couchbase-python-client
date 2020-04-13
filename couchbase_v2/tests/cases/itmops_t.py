@@ -18,7 +18,7 @@
 from couchbase_tests.base import ConnectionTestCase
 from couchbase_core.items import Item, ItemSequence, ItemOptionDict
 from couchbase_v2.exceptions import (
-    DocumentNotFoundException, ValueFormatException, ArgumentException, KeyExistsException)
+    DocumentNotFoundException, ValueFormatException, InvalidArgumentException, KeyExistsException)
 from couchbase_core.user_constants import FMT_BYTES, FMT_UTF8
 
 class ItemTest(ConnectionTestCase):
@@ -98,10 +98,10 @@ class ItemTest(ConnectionTestCase):
         self.assertEqual(rv.value, "BEGIN_MIDDLE_END")
 
         # Try without a 'fragment' specifier
-        self.assertRaises(ArgumentException,
+        self.assertRaises(InvalidArgumentException,
                           self.cb.append_items, ItemSequence([it]))
         itcoll.add(it)
-        self.assertRaises(ArgumentException,
+        self.assertRaises(InvalidArgumentException,
                           self.cb.append_items, itcoll)
 
     def test_items_ignorecas(self):
@@ -141,7 +141,7 @@ class ItemTest(ConnectionTestCase):
         it = MyItem()
         it.key = k
         it.value = "hi!"
-        self.assertRaises(ArgumentException,
+        self.assertRaises(InvalidArgumentException,
                           self.cb.upsert_multi,
                           ItemSequence([it]))
 
@@ -159,9 +159,9 @@ class ItemTest(ConnectionTestCase):
     def test_invalid_item(self):
         itcoll = ItemOptionDict()
         itcoll.add(None)
-        self.assertRaises(ArgumentException, self.cb.upsert_multi, itcoll)
+        self.assertRaises(InvalidArgumentException, self.cb.upsert_multi, itcoll)
 
-        self.assertRaises(ArgumentException,
+        self.assertRaises(InvalidArgumentException,
                           self.cb.upsert_multi, ItemSequence([None]))
 
     def test_create_and_add(self):
@@ -196,4 +196,4 @@ class ItemTest(ConnectionTestCase):
     def test_pycbc366(self):
         itcoll = ItemOptionDict()
         itcoll.create_and_add('foo', replica=True)
-        self.assertRaises(ArgumentException, self.cb.get_multi, itcoll)
+        self.assertRaises(InvalidArgumentException, self.cb.get_multi, itcoll)

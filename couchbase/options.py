@@ -101,7 +101,7 @@ def timedelta_as_timestamp(duration  # type: timedelta
                         ):
     # type: (...)->int
     if not isinstance(duration,timedelta):
-        raise couchbase.exceptions.InvalidArgumentsException("Expected timedelta instead of {}".format(duration))
+        raise couchbase.exceptions.InvalidArgumentException("Expected timedelta instead of {}".format(duration))
     return int(duration.total_seconds() if duration else 0)
 
 
@@ -109,7 +109,7 @@ def timedelta_as_microseconds(duration  # type: timedelta
                            ):
     # type: (...)->int
     if not isinstance(duration,timedelta):
-        raise couchbase.exceptions.InvalidArgumentsException("Expected timedelta instead of {}".format(duration))
+        raise couchbase.exceptions.InvalidArgumentException("Expected timedelta instead of {}".format(duration))
     return int(duration.total_seconds()*1e6 if duration else 0)
 
 
@@ -136,7 +136,7 @@ class ConstrainedInt(object):
         A signed integer between cls.min() and cls.max() inclusive
 
         :param couchbase.options.AcceptableInts value: the value to initialise this with.
-        :raise: :exc:`~couchbase.exceptions.ArgumentException` if not in range
+        :raise: :exc:`~couchbase.exceptions.InvalidArgumentException` if not in range
         """
         self.value = type(self).verified_value(value)
 
@@ -146,7 +146,7 @@ class ConstrainedInt(object):
         # type: (...) -> int
         value = getattr(item, 'value', item)
         if not isinstance(value, int) or not (cls.min()<=value<=cls.max()):
-            raise couchbase.exceptions.ArgumentException("Integer in range {} and {} inclusiverequired".format(cls.min(), cls.max()))
+            raise couchbase.exceptions.InvalidArgumentException("Integer in range {} and {} inclusiverequired".format(cls.min(), cls.max()))
         return value
 
     @classmethod
@@ -155,7 +155,7 @@ class ConstrainedInt(object):
                  ):
         if isinstance(item, cls):
             return item
-        raise couchbase.exceptions.ArgumentException("Argument is not {}".format(cls))
+        raise couchbase.exceptions.InvalidArgumentException("Argument is not {}".format(cls))
 
     def __neg__(self):
         return -self.value
@@ -197,7 +197,7 @@ class SignedInt64(ConstrainedInt):
         A signed integer between -0x8000000000000000 and +0x7FFFFFFFFFFFFFFF inclusive.
 
         :param couchbase.options.AcceptableInts value: the value to initialise this with.
-        :raise: :exc:`~couchbase.exceptions.ArgumentException` if not in range
+        :raise: :exc:`~couchbase.exceptions.InvalidArgumentException` if not in range
         """
         super(SignedInt64,self).__init__(value)
 

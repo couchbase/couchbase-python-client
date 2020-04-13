@@ -1,7 +1,8 @@
-from couchbase_core import FMT_JSON, FMT_PICKLE, FMT_UTF8, FMT_BYTES
-from couchbase_v2.exceptions import (ValueFormatException,
-                                     ArgumentException)
-from couchbase_tests.base import ConnectionTestCase
+from couchbase_core._libcouchbase import FMT_JSON, FMT_PICKLE, FMT_UTF8, FMT_BYTES
+from couchbase.exceptions import (ValueFormatException,
+                                     InvalidArgumentException)
+from couchbase_tests.base import ConnectionTestCase, CollectionTestCase
+
 
 #
 # Copyright 2013, Couchbase, Inc.
@@ -20,13 +21,14 @@ from couchbase_tests.base import ConnectionTestCase
 # limitations under the License.
 #
 
-class BadArgsTest(ConnectionTestCase):
+class BadArgsTest(CollectionTestCase):
 
     def test_bad_single(self):
 
         for k in (
             (),
             ("key",),
+
             {"key":"value"},
             [],
             set(),
@@ -43,11 +45,11 @@ class BadArgsTest(ConnectionTestCase):
 
             self.assertRaises(ValueFormatException, self.cb.get, k)
             self.assertRaises(ValueFormatException, self.cb.counter, k)
-            self.assertRaises(ValueFormatException, self.cb.delete, k)
-            self.assertRaises(ValueFormatException, self.cb.set, k, "value")
-            self.assertRaises(ValueFormatException, self.cb.set, "key", k,
+            self.assertRaises(ValueFormatException, self.cb.remove, k)
+            self.assertRaises(ValueFormatException, self.cb.upsert, k, "value")
+            self.assertRaises(ValueFormatException, self.cb.upsert, "key", k,
                               format=FMT_UTF8)
-            self.assertRaises(ValueFormatException, self.cb.set, "key", k,
+            self.assertRaises(ValueFormatException, self.cb.upsert, "key", k,
                               format=FMT_BYTES)
             self.assertRaises(ValueFormatException, self.cb.append, "key", k)
 
@@ -64,10 +66,10 @@ class BadArgsTest(ConnectionTestCase):
             object()):
             print("Testing with keys (%r)" % (k,))
 
-            self.assertRaises(ArgumentException, self.cb.get_multi, k)
-            self.assertRaises(ArgumentException, self.cb.set_multi, k)
-            self.assertRaises(ArgumentException, self.cb.counter_multi, k)
-            self.assertRaises(ArgumentException, self.cb.delete_multi, k)
+            self.assertRaises(InvalidArgumentException, self.cb.get_multi, k)
+            self.assertRaises(InvalidArgumentException, self.cb.upsert_multi, k)
+            self.assertRaises(InvalidArgumentException, self.cb.counter_multi, k)
+            self.assertRaises(InvalidArgumentException, self.cb.remove_multi, k)
 
     def test_bad_timeout(self):
         def _set_timeout(x):
@@ -92,13 +94,13 @@ class BadArgsTest(ConnectionTestCase):
         _set_quiet(False)
 
     def test_badargs_get(self):
-        self.assertRaises(ArgumentException, self.cb.get_multi,
+        self.assertRaises(InvalidArgumentException, self.cb.get_multi,
                           {"key" : "string"})
-        self.assertRaises(ArgumentException, self.cb.get_multi,
+        self.assertRaises(InvalidArgumentException, self.cb.get_multi,
                           { "key" : object()} )
-        self.assertRaises(ArgumentException, self.cb.get, "string", ttl="string")
-        self.assertRaises(ArgumentException, self.cb.lock, "string", ttl="string")
-        self.assertRaises(ArgumentException, self.cb.get, "string", ttl=object())
+        self.assertRaises(InvalidArgumentException, self.cb.get, "string", ttl="string")
+        self.assertRaises(InvalidArgumentException, self.cb.lock, "string", ttl="string")
+        self.assertRaises(InvalidArgumentException, self.cb.get, "string", ttl=object())
 
     def test_bad_default_format(self):
         def _set_fmt(x):
@@ -110,15 +112,15 @@ class BadArgsTest(ConnectionTestCase):
         _set_fmt(FMT_UTF8)
         _set_fmt(FMT_PICKLE)
 
-        self.assertRaises(ArgumentException, _set_fmt, "a format")
-        self.assertRaises(ArgumentException, _set_fmt, None)
-        self.assertRaises(ArgumentException, _set_fmt, False)
-        self.assertRaises(ArgumentException, _set_fmt, True)
-        self.assertRaises(ArgumentException, _set_fmt, object())
+        self.assertRaises(InvalidArgumentException, _set_fmt, "a format")
+        self.assertRaises(InvalidArgumentException, _set_fmt, None)
+        self.assertRaises(InvalidArgumentException, _set_fmt, False)
+        self.assertRaises(InvalidArgumentException, _set_fmt, True)
+        self.assertRaises(InvalidArgumentException, _set_fmt, object())
 
         # TODO: Stricter format handling
 
-        #self.assertRaises(ArgumentException, self.cb.set,
+        #self.assertRaises(InvalidArgumentException, self.cb.set,
         #                  "foo", "bar", format=-1)
 
     def test_negative_ttl(self):
@@ -130,22 +132,22 @@ class BadArgsTest(ConnectionTestCase):
                         2**100):
 
             print(bad_ttl)
-            self.assertRaises(ArgumentException, self.cb.get, "key", ttl=bad_ttl)
-            self.assertRaises(ArgumentException, self.cb.set, "key", "value",
+            self.assertRaises(InvalidArgumentException, self.cb.get, "key", ttl=bad_ttl)
+            self.assertRaises(InvalidArgumentException, self.cb.upsert, "key", "value",
                               ttl=bad_ttl)
-            self.assertRaises(ArgumentException, self.cb.touch, "key", ttl=bad_ttl)
-            self.assertRaises(ArgumentException, self.cb.counter, "key", ttl=bad_ttl)
-            self.assertRaises(ArgumentException, self.cb.lock, "key", ttl=bad_ttl)
+            self.assertRaises(InvalidArgumentException, self.cb.touch, "key", expiry=bad_ttl)
+            self.assertRaises(InvalidArgumentException, self.cb.counter, "key", ttl=bad_ttl)
+            self.assertRaises(InvalidArgumentException, self.cb.lock, "key", ttl=bad_ttl)
 
-            self.assertRaises(ArgumentException, self.cb.get_multi,
+            self.assertRaises(InvalidArgumentException, self.cb.get_multi,
                               ["key"], ttl=bad_ttl)
-            self.assertRaises(ArgumentException, self.cb.get_multi,
+            self.assertRaises(InvalidArgumentException, self.cb.get_multi,
                               { "key" : { 'ttl' : bad_ttl } })
-            self.assertRaises(ArgumentException, self.cb.get_multi,
+            self.assertRaises(InvalidArgumentException, self.cb.get_multi,
                               { "key" : bad_ttl } )
-            self.assertRaises(ArgumentException, self.cb.counter_multi,
+            self.assertRaises(InvalidArgumentException, self.cb.counter_multi,
                               "key", ttl=bad_ttl)
-            self.assertRaises(ArgumentException, self.cb.lock_multi,
+            self.assertRaises(InvalidArgumentException, self.cb.lock_multi,
                               "key", ttl=bad_ttl)
 
 

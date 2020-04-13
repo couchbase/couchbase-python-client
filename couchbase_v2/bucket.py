@@ -186,7 +186,7 @@ class Bucket(CoreClient):
             many replicas for presence in memory. See :meth:`endure` for
             more information.
 
-        :raise: :exc:`.ArgumentException` if an argument is supplied that is
+        :raise: :exc:`.InvalidArgumentException` if an argument is supplied that is
             not applicable in this context. For example setting the CAS
             as a string.
         :raise: :exc`.CouchbaseNetworkException`

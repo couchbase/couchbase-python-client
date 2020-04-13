@@ -21,7 +21,7 @@ from couchbase_core.client import Client
 from couchbase_core.analytics import AnalyticsQuery
 from couchbase_core import JSON
 import uuid
-from couchbase.exceptions import ArgumentException
+from couchbase.exceptions import InvalidArgumentException
 
 IdGenerator = Callable[[JSON], str]
 DataConverter = Callable[[JSON], Any]
@@ -60,10 +60,10 @@ class AnalyticsIngester:
             value and applies the key and value to the bucket (e.g. upsert/insert/replace)
         """
         if not isinstance(operation, BucketOperator):
-            raise ArgumentException("Operation is not a BucketOperator")
+            raise InvalidArgumentException("Operation is not a BucketOperator")
 
         if operation == BucketOperators.REPLACE and not id_generator:
-            raise ArgumentException("Replace cannot use default ID generator.")
+            raise InvalidArgumentException("Replace cannot use default ID generator.")
 
         self.id_generator = id_generator or (lambda x: str(uuid.uuid4()))
         self.data_converter = data_converter

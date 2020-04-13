@@ -48,7 +48,7 @@ class DeltaValue(ConstrainedInt):
 
         :param couchbase.options.AcceptableInts value: the value to initialise this with.
 
-        :raise: :exc:`~couchbase.exceptions.ArgumentException` if not in range
+        :raise: :exc:`~couchbase.exceptions.InvalidArgumentException` if not in range
         """
         super(DeltaValue,self).__init__(value)
 
@@ -421,7 +421,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
             if len(project) <= CBCollectionBase.MAX_GET_OPS:
                 spec = gen_projection_spec(project)
             else:
-                raise couchbase.exceptions.ArgumentException(
+                raise couchbase.exceptions.InvalidArgumentException(
                     "Project only accepts {} operations or less".format(CBCollectionBase.MAX_GET_OPS))
         if not project and not opts.get('with_expiry', False):
             x = CoreClient.get(self.bucket, key, **opts)
@@ -783,7 +783,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :param UpsertOptions options: Options for the upsert operation.
         :param Any kwargs: Override corresponding value in options.
 
-        :raise: :exc:`.ArgumentException` if an argument is supplied that is
+        :raise: :exc:`.InvalidArgumentException` if an argument is supplied that is
             not applicable in this context. For example setting the CAS
             as a string.
         :raise: :exc`.CouchbaseNetworkException`

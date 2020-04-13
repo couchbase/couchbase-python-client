@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from couchbase_tests.base import CollectionTestCase, SkipTest, skip_if_no_collections
-from couchbase.exceptions import InvalidArgumentsException, SearchIndexNotFoundException
+from couchbase.exceptions import InvalidArgumentException, SearchIndexNotFoundException
 from couchbase.management.search import SearchIndex
 import uuid
 import time
@@ -96,7 +96,7 @@ class SearchIndexManagerTestCase(CollectionTestCase):
         self.assertIsNotNone(self.indexmgr.get_index(self.indexname))
 
     def test_get_index_fail_no_index_name(self):
-        self.assertRaises(InvalidArgumentsException, self.indexmgr.get_index, None)
+        self.assertRaises(InvalidArgumentException, self.indexmgr.get_index, None)
 
     def test_get_index_fail(self):
         self.assertRaises(SearchIndexNotFoundException, self.indexmgr.get_index, 'foo')

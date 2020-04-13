@@ -85,14 +85,14 @@ class AnalyticsQuery(N.N1QLQuery):
     def update(self, *args, **kwargs):
         if args:
             if 'args' in self._body:
-                raise couchbase.exceptions.ArgumentException(
+                raise couchbase.exceptions.InvalidArgumentException(
                     "Cannot append positional args to existing query positional args")
             else:
                 self._add_pos_args(args)
         if kwargs:
             overlapping_keys = set(kwargs.keys()) & set(self._body.keys())
             if overlapping_keys:
-                raise couchbase.exceptions.ArgumentException("Cannot overwrite named args in query")
+                raise couchbase.exceptions.InvalidArgumentException("Cannot overwrite named args in query")
             else:
                 self._set_named_args(**kwargs)
 

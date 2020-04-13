@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-from couchbase_v2.exceptions import PipelineException, DocumentNotFoundException, ArgumentException
+from couchbase_v2.exceptions import PipelineException, DocumentNotFoundException, InvalidArgumentException
 from couchbase_tests.base import ConnectionTestCase
 from couchbase_core import FMT_UTF8
 
@@ -104,7 +104,7 @@ class PipelineTest(ConnectionTestCase):
                 self.cb.get("foo", "bar")
                 self.cb.get(k)
 
-        self.assertRaises(ArgumentException, fun)
+        self.assertRaises(InvalidArgumentException, fun)
         self.assertEqual(len(pipeline.results), 1)
         self.assertEqual(self.cb.get(k).value, "foo")
 
