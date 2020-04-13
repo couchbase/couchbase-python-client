@@ -16,7 +16,7 @@
 
 #ifndef COUCHBASE_PYTHON_CLIENT_PYTHON_WRAPPERS_H
 #define COUCHBASE_PYTHON_CLIENT_PYTHON_WRAPPERS_H
-
+#define PY_SSIZE_T_CLEAN
 #include "Python.h"
 #include "util_wrappers.h"
 
