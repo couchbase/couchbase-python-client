@@ -14,12 +14,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from couchbase_tests.base import CollectionTestCase
-from couchbase.cluster import QueryOptions, QueryProfile, DiagnosticsOptions, QueryResult
-from couchbase.diagnostics import ServiceType, EndpointState, ClusterState
-
+import datetime
 from unittest import SkipTest
+
+from couchbase.n1ql import UnsignedInt64
+from couchbase.cluster import QueryOptions, QueryProfile, QueryResult
+from couchbase.n1ql import QueryMetaData, QueryStatus, QueryWarning
+from couchbase_tests.base import CollectionTestCase
 
 
 class QueryTests(CollectionTestCase):
@@ -45,13 +46,12 @@ class QueryTests(CollectionTestCase):
             self.assertIsNotNone(row)
             count += 1
         print(result.errors)
-        self.assertEquals(count, expected_count)
+        self.assertEqual(count, expected_count)
 
     def test_simple_query(self):
         result = self.cluster.query("SELECT * FROM `beer-sample` LIMIT 2")
         self.assertRows(result, 2)
-        self.assertIsNone(result.metrics())
-        self.assertIsNone(result.profile())
+        self.assertIsNone(result.metadata().profile())
 
     def test_simple_query_with_positional_params(self):
         result = self.cluster.query("SELECT * FROM `beer-sample` WHERE brewery_id LIKE $1 LIMIT 1", '21st_amendment%')
@@ -90,14 +90,50 @@ class QueryTests(CollectionTestCase):
     def test_query_with_profile(self):
         result = self.cluster.query("SELECT * FROM `beer-sample` LIMIT 1", QueryOptions(profile=QueryProfile.timings()))
         self.assertRows(result, 1)
-        self.assertIsNone(result.metrics())
-        self.assertIsNotNone(result.profile())
+        self.assertIsNotNone(result.metadata().profile())
 
     def test_query_with_metrics(self):
+        initial = datetime.datetime.now()
         result = self.cluster.query("SELECT * FROM `beer-sample` LIMIT 1", QueryOptions(metrics=True))
         self.assertRows(result, 1)
-        self.assertIsNotNone(result.metrics())
-        self.assertIsNone(result.profile())
+        taken = datetime.datetime.now() - initial
+        metadata = result.metadata()  # type: QueryMetaData
+        metrics = metadata.metrics()
+        self.assertIsInstance(metrics.elapsed_time(), datetime.timedelta)
+        self.assertLess(metrics.elapsed_time(), taken)
+        self.assertGreater(metrics.elapsed_time(), datetime.timedelta(milliseconds=0))
+        self.assertLess(metrics.elapsed_time(), taken)
+        self.assertGreater(metrics.execution_time(), datetime.timedelta(milliseconds=0))
+
+        expected_counts = {metrics.mutation_count: 0,
+                           metrics.result_count: 1,
+                           metrics.sort_count: 0,
+                           metrics.warning_count: 0}
+        for method, expected in expected_counts.items():
+            count_result = method()
+            fail_msg = "{} failed".format(method)
+            self.assertIsInstance(count_result, UnsignedInt64, msg=fail_msg)
+            self.assertEqual(UnsignedInt64(expected), count_result, msg=fail_msg)
+        self.assertGreater(metrics.result_size(), UnsignedInt64(500))
+
+        self.assertEqual(UnsignedInt64(0), metrics.error_count())
+        self.assertIsNone(metadata.profile())
+
+    def test_query_metadata(self):
+        result = self.cluster.query("SELECT * FROM `beer-sample` LIMIT 2")
+        self.assertRows(result, 2)
+        metadata = result.metadata()  # type: QueryMetaData
+        for id_meth in (metadata.client_context_id,metadata.request_id):
+            id_res = id_meth()
+            fail_msg = "{} failed".format(id_meth)
+            self.assertIsInstance(id_res, str, msg=fail_msg)
+        self.assertEqual(QueryStatus.SUCCESS, metadata.status())
+        self.assertIsInstance(metadata.signature(), (str, dict))
+        self.assertIsInstance(metadata.warnings(), (list))
+        for warning in metadata.warnings():
+            self.assertIsInstance(warning, QueryWarning)
+            self.assertIsInstance(warning.message, str)
+            self.assertIsInstance(warning.code, int)
 
     def test_mixed_positional_parameters(self):
         # we assume that positional overrides one in the Options

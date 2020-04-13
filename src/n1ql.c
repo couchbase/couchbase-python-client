@@ -333,6 +333,7 @@ typedef lcb_STATUS (*pycbc_query_handler)(const pycbc_Bucket *self,
                                           int is_xbucket,
                                           pycbc_MultiResult *mres,
                                           pycbc_ViewResult *vres,
+                                          lcb_uint32_t timeout,
                                           pycbc_stack_context_handle);
 #undef PYCBC_QUERY_GEN
 #ifdef PYCBC_QUERY_GEN
@@ -348,6 +349,7 @@ lcb_STATUS pycbc_handle_analytics(const pycbc_Bucket *self,
                                   int is_xbucket,
                                   pycbc_MultiResult *mres,
                                   pycbc_ViewResult *vres,
+                                  lcb_uint32_t timeout,
                                   pycbc_stack_context_handle context)
 {
     (void)is_prepared;
@@ -359,6 +361,10 @@ lcb_STATUS pycbc_handle_analytics(const pycbc_Bucket *self,
             lcb_cmdanalytics_callback(cmd, analytics_row_callback);
             lcb_cmdanalytics_payload(cmd, params, nparams);
             lcb_cmdanalytics_handle(cmd, &(vres->base.u.analytics));
+            if (timeout) {
+                lcb_cmdanalytics_timeout(cmd, timeout);
+            }
+
             PYCBC_TRACECMD_SCOPED_NULL(rc,
                                        analytics,
                                        self->instance,
@@ -381,6 +387,7 @@ lcb_STATUS pycbc_handle_query(const pycbc_Bucket *self,
                               int is_xbucket,
                               pycbc_MultiResult *mres,
                               pycbc_ViewResult *vres,
+                              lcb_uint32_t timeout,
                               pycbc_stack_context_handle context)
 {
     lcb_STATUS rc = LCB_SUCCESS;
@@ -390,6 +397,9 @@ lcb_STATUS pycbc_handle_query(const pycbc_Bucket *self,
             lcb_cmdquery_callback(cmd, query_row_callback);
             lcb_cmdquery_payload(cmd, params, nparams);
             lcb_cmdquery_handle(cmd, &(vres->base.u.query));
+            if (timeout) {
+                lcb_cmdquery_timeout(cmd, timeout);
+            }
             if (is_prepared) {
                 lcb_cmdquery_adhoc(cmd, 1);
             }
@@ -426,15 +436,19 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                 unsigned nparams,
                 int is_prepared,
                 int is_xbucket,
-                int is_analytics)
+                int is_analytics,
+                PyObject* timeout_O)
 {
     PyObject *ret = NULL;
-    pycbc_MultiResult *mres;
-    pycbc_ViewResult *vres;
+    pycbc_MultiResult *mres = NULL;
+    pycbc_ViewResult *vres = NULL;
     lcb_STATUS rc = LCB_SUCCESS;
+    unsigned long timeout = 0;
+
     if (-1 == pycbc_oputil_conn_lock(self)) {
         return NULL;
     }
+
     if (self->pipeline_queue) {
         PYCBC_EXC_WRAP(PYCBC_EXC_PIPELINE,
                        0,
@@ -449,11 +463,16 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     vres->base.format = PYCBC_FMT_JSON;
     vres->base.htype = is_analytics ? PYCBC_HTTP_HANALYTICS : PYCBC_HTTP_HQUERY;
 
+    if (pycbc_get_duration(timeout_O, &timeout, 1))
+    {
+        goto GT_DONE;
+    }
+
     static pycbc_query_handler handlers[] = {pycbc_handle_query,
                                              pycbc_handle_analytics};
     Py_INCREF(vres);
     rc = (handlers[is_analytics])(
-            self, params, nparams, is_prepared, is_xbucket, mres, vres, context);
+            self, params, nparams, is_prepared, is_xbucket, mres, vres, timeout, context);
     if (rc != LCB_SUCCESS) {
         PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, rc, "Couldn't schedule n1ql query");
         goto GT_DONE;
@@ -475,10 +494,11 @@ pycbc_Bucket__n1ql_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     pycbc_strlen_t nparams = 0;
     int prepared = 0, cross_bucket = 0;
     PyObject *result = NULL;
-    static char *kwlist[] = { "params", "prepare", "cross_bucket", NULL };
+    PyObject* timeout_O = NULL;
+    static char *kwlist[] = { "params", "prepare", "cross_bucket", "timeout", NULL };
     if (!PyArg_ParseTupleAndKeywords(
-        args, kwargs, "s#|ii", kwlist, &params,
-        &nparams, &prepared, &cross_bucket)) {
+        args, kwargs, "s#|iiO", kwlist, &params,
+        &nparams, &prepared, &cross_bucket, &timeout_O)) {
 
         PYCBC_EXCTHROW_ARGS();
         return NULL;
@@ -492,7 +512,8 @@ pycbc_Bucket__n1ql_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
                               nparams,
                               prepared,
                               cross_bucket,
-                              0);
+                              0,
+                              timeout_O);
     return result;
 }
 
@@ -502,10 +523,11 @@ PyObject *pycbc_Bucket__cbas_query(pycbc_Bucket *self,
 {
     const char *params = NULL;
     pycbc_strlen_t nparams = 0;
-    static char *kwlist[] = {"params", NULL};
+    static char *kwlist[] = {"params", "timeout", NULL};
     PyObject *result = NULL;
+    PyObject* timeout_O = NULL;
     if (!PyArg_ParseTupleAndKeywords(
-                args, kwargs, "s#", kwlist, &params, &nparams)) {
+                args, kwargs, "s#|O", kwlist, &params, &nparams, &timeout_O)) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;
     }
@@ -519,7 +541,8 @@ PyObject *pycbc_Bucket__cbas_query(pycbc_Bucket *self,
                                   nparams,
                                   0,
                                   0,
-                                  1);
+                                  1,
+                                  timeout_O);
     }
     return result;
 }

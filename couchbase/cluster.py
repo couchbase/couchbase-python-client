@@ -35,10 +35,6 @@ from random import choice
 T = TypeVar('T')
 
 
-class QueryMetrics(object):
-    pass
-
-
 CallableOnOptionBlock = Callable[[OptionBlockDeriv, Any], Any]
 
 
@@ -174,7 +170,7 @@ class QueryOptions(OptionBlockTimeOut):
                 if k == 'adhoc':
                     query.adhoc = v
                 if k == 'timeout':
-                    query.timeout = v
+                    query.timeout = v.total_seconds()
                 if k == 'scan_cap':
                     query.scan_cap = v
                 if k == 'pipeline_batch':
