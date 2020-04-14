@@ -358,7 +358,7 @@ class Cluster(CoreClient):
                                          failtype,
                                          *args,
                                          **kwargs):
-        if self._is_6_5_plus() and not self._is_dev_preview():
+        if self._is_6_5_plus():
             kwargs.pop('err_msg', None)
             return self._operate_on_cluster(verb, failtype, *args, **kwargs)
         return self._operate_on_an_open_bucket(verb, failtype, *args, **kwargs)
