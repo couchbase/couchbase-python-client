@@ -255,8 +255,8 @@ class Cluster(CoreClient):
         #self._clusteropts['bucket'] = "default"
         super(Cluster, self).__init__(connection_string=str(self.connstr), _conntype=_LCB.LCB_TYPE_CLUSTER, **self._clusteropts)
 
-    @staticmethod
-    def connect(connection_string,  # type: str
+    @classmethod
+    def connect(cls, connection_string,  # type: str
                 *options,  # type: ClusterOptions
                 **kwargs
                 ):
@@ -267,7 +267,7 @@ class Cluster(CoreClient):
         :param ClusterOptions options: options for the cluster.
         :param Any kwargs: Override corresponding value in options.
         """
-        return Cluster(connection_string, *options, **kwargs)
+        return cls(connection_string, *options, **kwargs)
 
     def _do_ctor_connect(self, *args, **kwargs):
         super(Cluster,self)._do_ctor_connect(*args,**kwargs)
@@ -835,6 +835,10 @@ class Cluster(CoreClient):
         return mode & _LCB.LCB_SSL_ENABLED != 0
 
 
-AsyncCluster = AsyncClientFactory.gen_async_client(Cluster)
+class AsyncCluster(AsyncClientFactory.gen_async_client(Cluster)):
+    @classmethod
+    def connect(cls, connection_string=None, *args, **kwargs):
+        return cls(connection_string=connection_string, *args, **kwargs)
+
 
 ClusterOptions = Cluster.ClusterOptions

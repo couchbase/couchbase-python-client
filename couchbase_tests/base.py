@@ -796,7 +796,7 @@ class ClusterTestCase(CouchbaseTestCase):
     def cluster_factory(self  # type: ClusterTestCase
                         ):
         # type: (...) -> Type[Cluster]
-        return Cluster.connect
+        return Cluster
 
     class ItemValidator(object):
         def __init__(self, parent):
@@ -916,7 +916,7 @@ class ClusterTestCase(CouchbaseTestCase):
         auth_type = ClassicAuthenticator if self.is_mock else PasswordAuthenticator
         # hack because the Mock seems to want a bucket name for cluster connections, odd
         mock_hack = {'bucket': self.cluster_info.bucket_name} if self.is_mock else {}
-        return cluster_factory(connection_string=str(connstr_nobucket),
+        return cluster_factory.connect(connection_string=str(connstr_nobucket),
                                authenticator=auth_type(self.cluster_info.admin_username,
                                                        self.cluster_info.admin_password), **mock_hack)
 
