@@ -15,65 +15,84 @@
 
 from __future__ import absolute_import
 
+import gc
+import logging
+import os
 import platform
 import sys
+import time
+import traceback
 import types
 import warnings
 from abc import abstractmethod
 from functools import wraps
 
+from deepdiff import DeepDiff
+from flaky import flaky
 from testfixtures import LogCapture
 from testresources import ResourcedTestCase as ResourcedTestCaseReal, TestResourceManager
+from utilspie.collectionsutils import frozendict
 
 import couchbase_core
 from collections import defaultdict
-from couchbase import Cluster, CBCollection, CoreClient
-from couchbase.cluster import ClassicAuthenticator
+from couchbase.bucket import Bucket as V3Bucket
+from couchbase.cluster import Cluster, ClassicAuthenticator
 from couchbase.cluster import PasswordAuthenticator
+from couchbase.collection import CBCollection
 from couchbase.exceptions import CollectionAlreadyExistsException, ScopeAlreadyExistsException, NotSupportedException
 from couchbase.management.analytics import CreateDatasetOptions
+from couchbase.management.collections import CollectionSpec
+from couchbase_core.client import Client as CoreClient
 from couchbase_core.connstr import ConnectionString
+
+try:
+    from unittest2.case import SkipTest
+except ImportError:
+    from nose.exc import SkipTest
+
+try:
+    from configparser import ConfigParser
+except ImportError:
+    # Python <3.0 fallback
+    from fallback import configparser
+
+from couchbase.management.admin import Admin
+from couchbase_core.mockserver import CouchbaseMock, BucketSpec, MockControlClient
+
+from couchbase_core._pyport import basestring
+from couchbase_core._version import __version__ as cb_version
 
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest
-import logging
-import gc
-import os
-import time
 from basictracer import BasicTracer, SpanRecorder
-import couchbase_core._libcouchbase
-import traceback
+from couchbase_core._libcouchbase import PYCBC_TRACING
 
 from typing import *
-from couchbase_v2.bucket import Bucket as V2Bucket
+
 if os.environ.get("PYCBC_TRACE_GC") in ['FULL', 'STATS_LEAK_ONLY']:
     gc.set_debug(gc.DEBUG_STATS | gc.DEBUG_LEAK)
-
-from utilspie.collectionsutils import frozendict
-from couchbase.management.collections import CollectionSpec
-from couchbase.bucket import Bucket as V3Bucket
-from flaky import flaky
-from deepdiff import DeepDiff
 
 
 class FlakyCounter(object):
     def __init__(self, max_runs, min_passes, **kwargs):
-        self.count=0
-        self.kwargs=kwargs
-        self.kwargs['rerun_filter']=self.flaky_count
-        self.kwargs['max_runs']=max_runs
-        self.kwargs['min_passes']=min_passes
+        self.count = 0
+        self.kwargs = kwargs
+        self.kwargs['rerun_filter'] = self.flaky_count
+        self.kwargs['max_runs'] = max_runs
+        self.kwargs['min_passes'] = min_passes
 
     def __call__(self, func):
         return flaky(**self.kwargs)(func)
+
     def flaky_count(self, err, name, test, plugin):
-        self.count+=1
-        print("trying test {}: {}/{}".format(name,self.count,self.kwargs['max_runs']))
+        self.count += 1
+        print("trying test {}: {}/{}".format(name, self.count, self.kwargs['max_runs']))
         return True
 
-loglevel=os.environ.get("PYCBC_DEBUG_LOG_LEVEL")
+
+loglevel = os.environ.get("PYCBC_DEBUG_LOG_LEVEL")
 if loglevel:
     ch = logging.StreamHandler()
     ch.setLevel(logging.getLevelName(loglevel))
@@ -90,27 +109,26 @@ PYCBC_SERVER_VERSION = version_to_tuple(os.environ.get("PYCBC_SERVER_VERSION"))
 def sanitize_json(input, ignored_parts):
     # types (Any,Dict) -> Any
     if isinstance(input, list):
-        to_be_sorted=list(sanitize_json(x, ignored_parts) for x in input)
-        return tuple(sorted(to_be_sorted, key=lambda x: x.__hash__() ))
-    elif isinstance(input,basestring):
-        return input.replace("'",'"')
-    elif isinstance(input,float):
-        return round(input,5)
-    elif isinstance(input,dict):
-        result ={}
+        to_be_sorted = list(sanitize_json(x, ignored_parts) for x in input)
+        return tuple(sorted(to_be_sorted, key=lambda x: x.__hash__()))
+    elif isinstance(input, basestring):
+        return input.replace("'", '"')
+    elif isinstance(input, float):
+        return round(input, 5)
+    elif isinstance(input, dict):
+        result = {}
         for key, value in input.items():
             sub_ignored_parts = None
             if isinstance(ignored_parts, dict):
-                sub_ignored_parts=ignored_parts.get(key)
-            elif isinstance(ignored_parts,str) and ignored_parts == key:
+                sub_ignored_parts = ignored_parts.get(key)
+            elif isinstance(ignored_parts, str) and ignored_parts == key:
                 continue
-            result[key]=sanitize_json(value, sub_ignored_parts or {})
+            result[key] = sanitize_json(value, sub_ignored_parts or {})
         input = frozendict(**result)
     return input
 
 
 class ResourcedTestCase(ResourcedTestCaseReal):
-
     class CaptureContext(LogCapture):
         def __init__(self, *args, **kwargs):
             self.records = []
@@ -121,8 +139,8 @@ class ResourcedTestCase(ResourcedTestCaseReal):
         def output(self):
             return map(str, self.records)
 
-    def __init__(self,*args,**kwargs):
-        super(ResourcedTestCase,self).__init__(*args,**kwargs)
+    def __init__(self, *args, **kwargs):
+        super(ResourcedTestCase, self).__init__(*args, **kwargs)
         self.maxDiff = None
 
     def deepDiffComparator(self, expected, actual):
@@ -136,15 +154,16 @@ class ResourcedTestCase(ResourcedTestCaseReal):
         actual_json_sanitized = sanitize_json(actual, ignored)
         expected_json_sanitized = sanitize_json(expected, ignored)
         logging.warning(("\n"
-                       "comparing {} and\n"
-                       "{}\n"
-                       "sanitized actual:{} and\n"
-                       "sanitized expected:{}").format(actual, expected, actual_json_sanitized, expected_json_sanitized))
+                         "comparing {} and\n"
+                         "{}\n"
+                         "sanitized actual:{} and\n"
+                         "sanitized expected:{}").format(actual, expected, actual_json_sanitized,
+                                                         expected_json_sanitized))
         comparator(expected_json_sanitized, actual_json_sanitized)
 
     def assertLogs(self, *args, **kwargs):
         try:
-            return super(ResourcedTestCase,self).assertLogs(*args, **kwargs)
+            return super(ResourcedTestCase, self).assertLogs(*args, **kwargs)
         except Exception as e:
             logging.warn(e)
 
@@ -155,35 +174,17 @@ class ResourcedTestCase(ResourcedTestCaseReal):
             command()
         except:
             if not hasattr(self, "exceptions"):
-                self.exceptions=[]
+                self.exceptions = []
             self.exceptions.append(traceback.format_exc())
 
     def check_exceptions(self):
         exceptions = getattr(self, "exceptions", [])
         self.assertListEqual([], exceptions)
 
-try:
-    from unittest2.case import SkipTest
-except ImportError:
-    from nose.exc import SkipTest
 
-try:
-    from configparser import ConfigParser
-except ImportError:
-    # Python <3.0 fallback
-    from fallback import configparser
-
-from couchbase_v2.exceptions import CouchbaseException
-from couchbase.management.admin import Admin
-from couchbase_core.mockserver import CouchbaseMock, BucketSpec, MockControlClient
-from couchbase_core.result import (
-    ValueResult, OperationResult, ObserveInfo, Result)
-from couchbase_core._libcouchbase import MultiResult
-from couchbase_core._pyport import basestring
-from couchbase_core._version import __version__ as cb_version
 PYCBC_CB_VERSION = 'PYCBC/' + cb_version
 
-CONFIG_FILE = 'tests.ini' # in cwd
+CONFIG_FILE = 'tests.ini'  # in cwd
 
 ClientType = TypeVar('ClientType', bound=CoreClient)
 
@@ -205,7 +206,9 @@ class ClusterInformation(object):
     @staticmethod
     def filter_opts(options):
         return {key: value for key, value in
-                options.items() if key in ["certpath", "keypath", "ipv6", "config_cache", "compression", "log_redaction", "enable_tracing", "network"]}
+                options.items() if
+                key in ["certpath", "keypath", "ipv6", "config_cache", "compression", "log_redaction", "enable_tracing",
+                        "network"]}
 
     def make_connargs(self, **overrides):
         bucket = self.bucket_name
@@ -226,18 +229,18 @@ class ClusterInformation(object):
             if v:
                 final_options[k] = v
 
-        conn_options = '&'.join((key + "=" + value) for key, value in filter(lambda tpl: tpl[1],final_options.items()))
+        conn_options = '&'.join((key + "=" + value) for key, value in filter(lambda tpl: tpl[1], final_options.items()))
         connstr += ("?" + conn_options) if conn_options else ""
         if 'init_tracer' in overrides.keys():
-            overrides['tracer']=overrides.pop("init_tracer")(PYCBC_CB_VERSION
-                                                             , **self.tracingparms)
+            overrides['tracer'] = overrides.pop("init_tracer")(PYCBC_CB_VERSION
+                                                               , **self.tracingparms)
         ret = {
             'password': self.bucket_password,
             'connection_string': connstr
         }
 
         if self.bucket_username:
-            ret['password']=self.bucket_username
+            ret['password'] = self.bucket_username
         ret.update(overrides)
         return ret
 
@@ -275,10 +278,10 @@ class ConnectionConfiguration(object):
         info.protocol = config.get('realserver', 'protocol', fallback="http")
         info.enable_tracing = config.get('realserver', 'tracing', fallback=None)
         info.tracingparms['port'] = config.get('realserver', 'tracing_port', fallback=None)
-        info.analytics_host = config.get('analytics','host',fallback=info.host)
-        info.analytics_port = config.get('analytics','host',fallback=info.port)
-        info.network = config.get('realserver','network',fallback=None)
-        logging.info("info is "+str(info.__dict__))
+        info.analytics_host = config.get('analytics', 'host', fallback=info.host)
+        info.analytics_port = config.get('analytics', 'host', fallback=info.port)
+        info.network = config.get('realserver', 'network', fallback=None)
+        logging.info("info is " + str(info.__dict__))
         self.enable_tracing = info.enable_tracing
         if config.getboolean('realserver', 'enabled'):
             self.realserver_info = info
@@ -286,7 +289,7 @@ class ConnectionConfiguration(object):
             self.realserver_info = None
 
         if (config.has_option("mock", "enabled") and
-                              config.getboolean('mock', 'enabled')):
+                config.getboolean('mock', 'enabled')):
 
             self.mock_enabled = True
             self.mockpath = config.get("mock", "path")
@@ -364,6 +367,7 @@ class ApiImplementationMixin(object):
     This represents the interface which should be installed by an implementation
     of the API during load-time
     """
+
     @property
     def factory(self):
         """
@@ -385,6 +389,10 @@ class ApiImplementationMixin(object):
         destruction time
         """
         raise NotImplementedError()
+
+    from couchbase_core.result import (
+        ValueResult, OperationResult, ObserveInfo, Result)
+    from couchbase_core._libcouchbase import MultiResult
 
     cls_MultiResult = MultiResult
     cls_ValueResult = ValueResult
@@ -445,10 +453,12 @@ class CouchbaseTestCase(ResourcedTestCase):
         if not hasattr(self, 'assertIsInstance'):
             def tmp(self, a, *bases):
                 self.assertTrue(isinstance(a, bases))
+
             self.assertIsInstance = types.MethodType(tmp, self)
         if not hasattr(self, 'assertIsNone'):
             def tmp(self, a):
                 self.assertTrue(a is None)
+
             self.assertIsNone = types.MethodType(tmp, self)
 
         self._key_counter = 0
@@ -458,6 +468,7 @@ class CouchbaseTestCase(ResourcedTestCase):
             from couchbase_core.result import (
                 MultiResult, Result, OperationResult, ValueResult,
                 ObserveInfo)
+            from couchbase_v2.bucket import Bucket as V2Bucket
             self.factory = V2Bucket
             self.viewfactory = View
             self.cls_Result = Result
@@ -469,7 +480,6 @@ class CouchbaseTestCase(ResourcedTestCase):
             return
 
         self.should_check_refcount = False
-
 
     def skipLcbMin(self, vstr):
         """
@@ -490,7 +500,7 @@ class CouchbaseTestCase(ResourcedTestCase):
             components = []
             # Get the display
             for x in range(0, 3):
-                comp = (vernum & 0xff << (x*8)) >> x*8
+                comp = (vernum & 0xff << (x * 8)) >> x * 8
                 comp = "{0:x}".format(comp)
                 components = [comp] + components
             vstr = ".".join(components)
@@ -507,6 +517,7 @@ class CouchbaseTestCase(ResourcedTestCase):
     def skipUnlessMock(self):
         if not self.is_mock:
             raise SkipTest("Not to be run against non-mock")
+
     def make_connargs(self, **overrides):
         return self.cluster_info.make_connargs(**overrides)
 
@@ -525,7 +536,7 @@ class CouchbaseTestCase(ResourcedTestCase):
         return ret
 
     def gen_key_list(self, amount=5, prefix=None):
-        ret = [ self.gen_key(prefix) for x in range(amount) ]
+        ret = [self.gen_key(prefix) for x in range(amount)]
         return ret
 
     def gen_kv_dict(self, amount=5, prefix=None):
@@ -537,28 +548,30 @@ class CouchbaseTestCase(ResourcedTestCase):
 
     def assertRegex(self, *args, **kwargs):
         try:
-            return super(CouchbaseTestCase,self).assertRegex(*args,**kwargs)
+            return super(CouchbaseTestCase, self).assertRegex(*args, **kwargs)
         except NameError:
             pass
         except AttributeError:
             pass
 
-        return super(CouchbaseTestCase,self).assertRegexpMatches(*args,**kwargs)
+        return super(CouchbaseTestCase, self).assertRegexpMatches(*args, **kwargs)
 
     def assertRaisesRegex(self, *args, **kwargs):
         try:
-            return super(CouchbaseTestCase,self).assertRaisesRegex(*args,**kwargs)
+            return super(CouchbaseTestCase, self).assertRaisesRegex(*args, **kwargs)
         except NameError:
             pass
         except AttributeError:
             pass
 
-        super(CouchbaseTestCase,self).assertRaisesRegexp(*args,**kwargs)
+        super(CouchbaseTestCase, self).assertRaisesRegexp(*args, **kwargs)
+
 
 class ConnectionTestCaseBase(CouchbaseTestCase):
     def __init__(self, *args, **kwargs):
-        self.cb =None
-        super(ConnectionTestCaseBase,self).__init__(*args,**kwargs)
+        self.cb = None
+        super(ConnectionTestCaseBase, self).__init__(*args, **kwargs)
+
     def checkCbRefcount(self):
         if not self.should_check_refcount:
             return
@@ -566,9 +579,9 @@ class ConnectionTestCaseBase(CouchbaseTestCase):
         import gc
         if platform.python_implementation() == 'PyPy':
             return
-        if os.environ.get("PYCBC_TRACE_GC") in ['FULL','GRAPH_ONLY']:
+        if os.environ.get("PYCBC_TRACE_GC") in ['FULL', 'GRAPH_ONLY']:
             import objgraph
-            graphdir=os.path.join(os.getcwd(),"ref_graphs")
+            graphdir = os.path.join(os.getcwd(), "ref_graphs")
             try:
                 os.makedirs(graphdir)
             except:
@@ -576,7 +589,7 @@ class ConnectionTestCaseBase(CouchbaseTestCase):
 
             for attrib_name in ["cb.tracer.parent", "cb"]:
                 try:
-                    logging.info("evaluating "+attrib_name)
+                    logging.info("evaluating " + attrib_name)
                     attrib = eval("self." + attrib_name)
                     options = dict(refcounts=True, max_depth=3, too_many=10, shortnames=False)
                     objgraph.show_refs(attrib,
@@ -600,7 +613,7 @@ class ConnectionTestCaseBase(CouchbaseTestCase):
             else:
                 break
         # commented out for now as GC seems to be unstable
-        #self.assertEqual(oldrc, 2)
+        # self.assertEqual(oldrc, 2)
 
     def setUp(self, **kwargs):
         # type: (**Any) -> None
@@ -608,13 +621,13 @@ class ConnectionTestCaseBase(CouchbaseTestCase):
         self.cb = self.make_connection(**kwargs)
 
     def sleep(self, duration):
-        expected_end=time.time()+duration
+        expected_end = time.time() + duration
         while True:
-            remaining_time=expected_end-time.time()
-            if remaining_time<=0:
+            remaining_time = expected_end - time.time()
+            if remaining_time <= 0:
                 break
             try:
-                self.cb.get("dummy",ttl=remaining_time)
+                self.cb.get("dummy", ttl=remaining_time)
             except:
                 pass
 
@@ -632,7 +645,7 @@ class ConnectionTestCaseBase(CouchbaseTestCase):
 class LogRecorder(SpanRecorder):
     def record_span(self, span):
         if os.environ.get("PYCBC_LOG_RECORDED_SPANS"):
-            logging.info("recording span: "+str(span.__dict__))
+            logging.info("recording span: " + str(span.__dict__))
 
 
 def basic_tracer():
@@ -643,6 +656,7 @@ try:
     from opentracing_pyzipkin.tracer import Tracer
     import requests
 
+
     def http_transport(encoded_span):
         # The collector expects a thrift-encoded list of spans.
         import logging
@@ -652,14 +666,15 @@ try:
             headers={'Content-Type': 'application/x-thrift'}
         )
 
-    def jaeger_tracer(service, port = 9414, **kwargs ):
+
+    def jaeger_tracer(service, port=9414, **kwargs):
         port = 9411
-        tracer= Tracer(PYCBC_CB_VERSION, 100, http_transport, port )
+        tracer = Tracer(PYCBC_CB_VERSION, 100, http_transport, port)
         logging.error(tracer)
         return tracer
 
 except Exception as e:
-    def jaeger_tracer(service, port = None):
+    def jaeger_tracer(service, port=None):
         logging.error("No Jaeger import available")
         return basic_tracer()
 
@@ -670,7 +685,7 @@ class TracedCase(ConnectionTestCaseBase):
     def init_tracer(self, service, **kwargs):
         if not TracedCase._tracer:
             if self.using_jaeger:
-                TracedCase._tracer =  jaeger_tracer(service,**kwargs)
+                TracedCase._tracer = jaeger_tracer(service, **kwargs)
                 self.using_jaeger = True
         if not TracedCase._tracer:
             TracedCase._tracer = basic_tracer()
@@ -681,32 +696,32 @@ class TracedCase(ConnectionTestCaseBase):
     def tracer(self):
         return TracedCase._tracer
 
-    def setUp(self, trace_all = True, flushcount = 0, enable_logging = False, use_parent_tracer = False, *args, **kwargs):
+    def setUp(self, trace_all=True, flushcount=0, enable_logging=False, use_parent_tracer=False, *args, **kwargs):
         self.enable_logging = enable_logging or os.environ.get("PYCBC_ENABLE_LOGGING")
         self.use_parent_tracer = use_parent_tracer
-        self.using_jaeger =(os.environ.get("PYCBC_USE_JAEGER") == "TRUE")
+        self.using_jaeger = (os.environ.get("PYCBC_USE_JAEGER") == "TRUE")
         self.flushdict = {k: v for k, v in zip(map(str, range(1, 100)), map(str, range(1, 100)))}
         self.trace_all = os.environ.get("PYCBC_TRACE_ALL") or trace_all
         self.flushcount = flushcount
-        if self.using_jaeger and self.flushcount>5:
+        if self.using_jaeger and self.flushcount > 5:
             raise SkipTest("too slow when using jaeger")
         enable_logging |= bool(self.trace_all)
         if enable_logging:
             couchbase_core.enable_logging()
         if self.use_parent_tracer:
-            kwargs['init_tracer'] =self.init_tracer
-        kwargs['enable_tracing']="true"
+            kwargs['init_tracer'] = self.init_tracer
+        kwargs['enable_tracing'] = "true"
         super(TracedCase, self).setUp(**kwargs)
         if self.trace_all:
             self.cb.tracing_orphaned_queue_flush_interval = 0.0001
-            self.cb.tracing_orphaned_queue_size =10
+            self.cb.tracing_orphaned_queue_size = 10
             self.cb.tracing_threshold_queue_flush_interval = 0.00001
             self.cb.tracing_threshold_queue_size = 10
             self.cb.tracing_threshold_kv = 0.00001
-            self.cb.tracing_threshold_n1ql= 0.00001
-            self.cb.tracing_threshold_view =0.00001
-            self.cb.tracing_threshold_fts =0.00001
-            self.cb.tracing_threshold_analytics =0.00001
+            self.cb.tracing_threshold_n1ql = 0.00001
+            self.cb.tracing_threshold_view = 0.00001
+            self.cb.tracing_threshold_fts = 0.00001
+            self.cb.tracing_threshold_analytics = 0.00001
 
     def flush_tracer(self):
         try:
@@ -718,18 +733,19 @@ class TracedCase(ConnectionTestCaseBase):
     def tearDown(self):
         if self.trace_all and not self.using_jaeger:
             self.flush_tracer()
-        super(TracedCase,self).tearDown()
+        super(TracedCase, self).tearDown()
         couchbase_core.disable_logging()
-        if self.tracer and getattr(self.tracer,"close", None):
+        if self.tracer and getattr(self.tracer, "close", None):
             try:
-                time.sleep(2)   # yield to IOLoop to flush the spans - https://github.com/jaegertracing/jaeger-client-python/issues/50
+                time.sleep(
+                    2)  # yield to IOLoop to flush the spans - https://github.com/jaegertracing/jaeger-client-python/issues/50
                 self.tracer.close()  # flush any buffered spans
             except:
                 pass
 
 
 ConnectionTestCase = ConnectionTestCaseBase
-if os.environ.get("PYCBC_TRACE_ALL") and couchbase_core._libcouchbase.PYCBC_TRACING:
+if os.environ.get("PYCBC_TRACE_ALL") and PYCBC_TRACING:
     ConnectionTestCase = TracedCase
 
 
@@ -816,7 +832,8 @@ class ClusterTestCase(CouchbaseTestCase):
                 # helpful to have this print statement when tests fail
                 print("Got exception, returning: {}".format(traceback.print_exc()))
                 return
-        self.fail("successful {} after {} times waiting {} seconds between calls".format(func, num_times, seconds_between))
+        self.fail(
+            "successful {} after {} times waiting {} seconds between calls".format(func, num_times, seconds_between))
 
     @staticmethod
     def _passthrough(result, *_, **__):
@@ -847,7 +864,8 @@ class ClusterTestCase(CouchbaseTestCase):
                 # helpful to have this print statement when tests fail
                 print("Got exception, sleeping: {}".format(traceback.print_exc()))
                 time.sleep(seconds_between)
-        return self._fail("unsuccessful {} after {} times, waiting {} seconds between calls".format(func, num_times, seconds_between))
+        return self._fail(
+            "unsuccessful {} after {} times, waiting {} seconds between calls".format(func, num_times, seconds_between))
 
     Triable = TypeVar('Triable', bound=Callable)
 
@@ -861,6 +879,7 @@ class ClusterTestCase(CouchbaseTestCase):
         def wrapper(*args, **kwargs):
             success_func = kwargs.pop('on_success', on_success) or self._passthrough
             return self.try_n_times(num_times, seconds_between, func, *args, on_success=success_func, **kwargs)
+
         return wrapper
 
     def factory(self, *args, **kwargs):
@@ -898,8 +917,8 @@ class ClusterTestCase(CouchbaseTestCase):
         # hack because the Mock seems to want a bucket name for cluster connections, odd
         mock_hack = {'bucket': self.cluster_info.bucket_name} if self.is_mock else {}
         return cluster_factory(connection_string=str(connstr_nobucket),
-                                    authenticator=auth_type(self.cluster_info.admin_username,
-                                                 self.cluster_info.admin_password), **mock_hack)
+                               authenticator=auth_type(self.cluster_info.admin_username,
+                                                       self.cluster_info.admin_password), **mock_hack)
 
     # NOTE: this really is only something you can trust in homogeneous clusters, but then again
     # this is a test suite.
@@ -915,7 +934,6 @@ class ClusterTestCase(CouchbaseTestCase):
         return "durableWrite" in info['bucketCapabilities']
 
 
-
 def skip_if_no_collections(func):
     @wraps(func)
     def wrap(self, *args, **kwargs):
@@ -929,6 +947,7 @@ class CollectionTestCase(ClusterTestCase):
     coll = None  # type: CBCollection
     initialised = defaultdict(lambda: {})
     cb = None  # type: CBCollection
+
     def __init__(self, *args, **kwargs):
         super(CollectionTestCase, self).__init__(*args, **kwargs)
 
@@ -975,7 +994,6 @@ class CollectionTestCase(ClusterTestCase):
             except CollectionAlreadyExistsException as e:
                 warnings.warn(e.message)
 
-
     @staticmethod
     def _upsert_scope(cm, scope_name):
         try:
@@ -1013,6 +1031,7 @@ class AsyncClusterTestCase(ClusterTestCase):
         # type: (...) -> Cluster
         pass
 
+
 class DDocTestCase(RealServerTestCase):
     pass
 
@@ -1041,4 +1060,3 @@ class AnalyticsTestCaseBase(CollectionTestCase):
             return self.mgr.connect_link()
 
         self.try_n_times(10, 3, has_dataset, self.dataset_name, on_success=on_dataset)
-
