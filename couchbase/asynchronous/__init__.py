@@ -1,12 +1,12 @@
-from couchbase import ViewResult, QueryResult, AnalyticsResult, SearchResult
-from couchbase_core.asynchronous.analytics import AsyncAnalyticsRequest
-from couchbase_core.asynchronous.n1ql import AsyncN1QLRequest
+from couchbase.result import ViewResult
+from couchbase.n1ql import QueryResult
+from couchbase.analytics import AnalyticsResult
+from couchbase.search import SearchResult
 from couchbase_core.asynchronous.view import AsyncViewBase
 from couchbase.asynchronous.search import AsyncSearchRequest
 from couchbase_core.asynchronous.rowsbase import AsyncRowsBase
 
 
-from couchbase import ViewResult
 
 
 class AsyncViewResult(AsyncViewBase, ViewResult):

@@ -3,7 +3,7 @@ from twisted.internet.task import deferLater
 from twisted.trial._synctest import SkipTest
 
 import couchbase.tests_v3.cases.analytics_t
-from couchbase import Cluster as SyncCluster
+from couchbase.cluster import Cluster as SyncCluster
 from txcouchbase.cluster import TxCluster, BatchedAnalyticsResult
 from txcouchbase.tests.base import gen_base
 import os
