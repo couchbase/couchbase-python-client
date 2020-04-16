@@ -80,7 +80,8 @@ class ViewOptions(OptionBlockTimeOut):
 class PingOptions(OptionBlockTimeOut):
     @overload
     def __init__(self,
-                 timeout=None,       # type: timedelta
+                 # CCBC-1175  - no timeout yet.
+                 # timeout=None,       # type: timedelta
                  report_id=None,     # type: str
                  service_types=None  # type: Iterable[ServiceType]
                  ):
