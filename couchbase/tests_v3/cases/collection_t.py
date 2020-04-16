@@ -134,16 +134,24 @@ class CollectionTests(CollectionTestCase):
 
     @unittest.skip("get does not properly do a subdoc lookup and get the xattr expiry yet")
     def test_get_with_expiry(self):
-        result = self.cb.get(self.KEY, GetOptions(with_expiry=True))
+        # need to upsert with some expiry first!!!! PYCBC-886
+        result = self.coll.get(self.KEY, GetOptions(with_expiry=True))
         self.assertIsNotNone(result.expiry)
 
-    @unittest.skip("get does not properly do a subdoc lookup so project will not work yet")
     def test_project(self):
-        result = self.cb.get(self.KEY, GetOptions(project=["some"]))
-        self.ssertIsNotNone(result.cas)
+        content = {"a": "aaa", "b": "bbb", "c": "ccc"}
+        cas = self.coll.upsert(self.KEY, content).cas
+
+        def cas_matches(c, cas):
+            if cas != c.get(self.KEY).cas:
+                raise Exception("nope")
+
+        self.try_n_times(10, 3, cas_matches, self.coll, cas)
+        result = self.coll.get(self.KEY, GetOptions(project=["a"]))
+        self.assertEqual({"a": "aaa"}, result.content_as[dict])
+        self.assertIsNotNone(result.cas)
         self.assertEqual(result.id, self.KEY)
         self.assertIsNone(result.expiry)
-        self.assertDictEqual(self.CONTENT, result.content_as[dict])
 
     def test_lookup_in_timeout(self):
         self.coll.upsert("id", {'someArray': ['wibble', 'gronk']})
