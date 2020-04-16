@@ -2,7 +2,7 @@ import os
 from unittest import SkipTest
 from functools import wraps
 
-from couchbase import ArgumentException
+from couchbase.exceptions import ArgumentException
 from couchbase.management.users import User, Role, Group, RawRole, GroupNotFoundException, UserNotFoundException
 from couchbase_core.auth_domain import AuthDomain
 from couchbase_tests.base import CollectionTestCase

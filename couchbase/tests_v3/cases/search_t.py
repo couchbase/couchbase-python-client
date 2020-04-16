@@ -33,7 +33,8 @@ import datetime
 
 import couchbase.exceptions
 
-from couchbase import timedelta, iterable_wrapper
+from datetime import timedelta
+from couchbase_core import iterable_wrapper
 
 from couchbase_tests.base import ClusterTestCase
 import couchbase.management

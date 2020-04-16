@@ -1,7 +1,7 @@
 import os
 from unittest import SkipTest
 
-from couchbase import CBCollection
+from couchbase.collection import CBCollection
 from couchbase.exceptions import CouchbaseException, BucketDoesNotExistException, BucketAlreadyExistsException
 from couchbase_core.connstr import ConnectionString
 from couchbase.management.buckets import CreateBucketSettings, BucketSettings
