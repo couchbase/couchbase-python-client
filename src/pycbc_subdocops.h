@@ -30,6 +30,7 @@
     CTR(COUNTER, counter, EXP_TYPE)                     \
     X(REMOVE, remove, EXP_TYPE)                         \
     X(GET_COUNT, get_count, EXP_TYPE)                   \
-    PYCBC_X_SD_OPS_FULLDOC(X, NP, VAL, MVAL, CTR, EXP_TYPE)
+    X(FULLDOC_GET, get, EXP_TYPE)
+
 
 #endif //COUCHBASE_PYTHON_CLIENT_PYCBC_SUBDOCOPS_COMMON_H

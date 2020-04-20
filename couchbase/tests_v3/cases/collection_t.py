@@ -16,19 +16,19 @@
 # limitations under the License.
 #
 from couchbase_tests.base import CollectionTestCase
-from couchbase.collection import GetOptions, LookupInOptions, UpsertOptions, ReplaceOptions, InsertOptions, \
+from couchbase.collection import GetOptions, UpsertOptions, ReplaceOptions, InsertOptions, \
     RemoveOptions
 from couchbase.durability import ServerDurability, ClientDurability, Durability, PersistTo, ReplicateTo
 from couchbase.exceptions import InvalidArgumentException,  DocumentExistsException, DocumentNotFoundException, \
-    TemporaryFailException
+    TemporaryFailException, PathNotFoundException
 import unittest
 from datetime import timedelta
-import couchbase.subdocument as SD
 from unittest import SkipTest
 from couchbase.diagnostics import ServiceType
 import logging
 from couchbase.management.collections import CollectionSpec
 import uuid
+from datetime import datetime
 
 
 class CollectionTests(CollectionTestCase):
@@ -132,11 +132,26 @@ class CollectionTests(CollectionTestCase):
     def test_get_fails(self):
         self.assertRaises(DocumentNotFoundException, self.cb.get, self.NOKEY)
 
-    @unittest.skip("get does not properly do a subdoc lookup and get the xattr expiry yet")
+    def test_expiry_really_expires(self):
+        result = self.coll.upsert(self.KEY, self.CONTENT, UpsertOptions(expiry=timedelta(seconds=3)))
+        self.assertTrue(result.success)
+        self.try_n_times_till_exception(10, 2, self.coll.get, self.KEY)
+
     def test_get_with_expiry(self):
-        # need to upsert with some expiry first!!!! PYCBC-886
-        result = self.coll.get(self.KEY, GetOptions(with_expiry=True))
+        if self.is_mock:
+            raise SkipTest("mock will not return the expiry in the xaddrs")
+        cas = self.coll.upsert(self.KEY, self.CONTENT, UpsertOptions(expiry=timedelta(seconds=100))).cas
+
+        def cas_matches(c, cas):
+            r = c.get(self.KEY, GetOptions(with_expiry=True))
+            if r.cas == cas:
+                return r
+            raise Exception("nope")
+        result = self.try_n_times(10, 3, cas_matches, self.coll, cas)
         self.assertIsNotNone(result.expiry)
+        self.assertDictEqual(self.CONTENT, result.content_as[dict])
+        expires_in = (result.expiry - datetime.now()).total_seconds()
+        self.assertTrue(100 >= expires_in > 0)
 
     def test_project(self):
         content = {"a": "aaa", "b": "bbb", "c": "ccc"}
@@ -153,19 +168,23 @@ class CollectionTests(CollectionTestCase):
         self.assertEqual(result.id, self.KEY)
         self.assertIsNone(result.expiry)
 
-    def test_lookup_in_timeout(self):
-        self.coll.upsert("id", {'someArray': ['wibble', 'gronk']})
-        # wait till it is there
-        self.try_n_times(10, 1, self.coll.get, "id")
+    def test_project_bad_path(self):
+        result = self.coll.get(self.KEY, GetOptions(project=["some", "qzx"]))
+        self.assertTrue(result.success)
+        with self.assertRaisesRegex(PathNotFoundException, 'qzx'):
+            result.content_as[dict]
 
-        # ok, it is there...
-        self.coll.get("id", GetOptions(project=["someArray"], timeout=timedelta(seconds=1.0)))
-        self.assertRaisesRegex(InvalidArgumentException, "Expected timedelta", self.coll.get, "id",
-                               GetOptions(project=["someArray"], timeout=456))
-        sdresult_2 = self.coll.lookup_in("id", (SD.get("someArray"),), LookupInOptions(timeout=timedelta(microseconds=1)))
-        self.assertEqual(['wibble', 'gronk'],sdresult_2.content_as[list](0))
-        sdresult_2 = self.coll.lookup_in("id", (SD.get("someArray"),), LookupInOptions(timeout=timedelta(seconds=1)), timeout=timedelta(microseconds=1))
-        self.assertEqual(['wibble', 'gronk'],sdresult_2.content_as[list](0))
+    def test_project_bad_project_string(self):
+        with self.assertRaises(InvalidArgumentException):
+            self.coll.get(self.KEY, GetOptions(project="something"))
+
+    def test_project_bad_project_too_long(self):
+        project = []
+        for _ in range(17):
+            project.append("something")
+
+        with self.assertRaisesRegex(InvalidArgumentException, "16 operations or less"):
+            self.coll.get(self.KEY, GetOptions(project=project))
 
     def _check_replicas(self, all_up=True):
         num_replicas = self.bucket.configured_replica_count

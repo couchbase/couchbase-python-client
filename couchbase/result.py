@@ -16,9 +16,14 @@ from .options import timedelta, forward_args
 Proxy_T = TypeVar('Proxy_T')
 
 
-def canonical_sdresult(content):
+# full means we are doing a subdoc lookup_in, and want to only
+# get the results of the get_full().  Special case for a get where
+# with_expiry=True.  Also this is a hack.
+def canonical_sdresult(content, full=False):
     sdresult = content  # type: SubdocResult
     result = {}
+    if full:
+        return content.get_full
     cursor = iter(sdresult)
     for index in range(0, sdresult.result_count):
         spec = sdresult._specs[index]  # type: Spec
@@ -26,11 +31,14 @@ def canonical_sdresult(content):
     return result
 
 
-def extract_value(content, decode_canonical):
+# full means we are doing a subdoc lookup_in, and want to only
+# get the results of the get_full().  Special case for a get where
+# with_expiry=True.  Also this is a hack.
+def extract_value(content, decode_canonical, full=False):
     if isinstance(content, MultiResult):
         return {k: decode_canonical(content[k].value) for k, v, in content}
     elif isinstance(content, SubdocResult):
-        return decode_canonical(canonical_sdresult(content))
+        return decode_canonical(canonical_sdresult(content, full))
     return decode_canonical(content.value)
 
 
@@ -43,12 +51,14 @@ class ContentProxy(object):
     """
     Used to provide access to Result content via Result.content_as[type]
     """
+
     @internal
-    def __init__(self, content):
+    def __init__(self, content, full=False):
         self.content = content
+        self.full = full
 
     def __getitem__(self,
-                    item  # type: Type[Proxy_T]
+                    item       # type: Type[Proxy_T]
                     ):
         # type: (...) -> Union[Proxy_T, Mapping[str,Proxy_T]]
         """
@@ -56,16 +66,17 @@ class ContentProxy(object):
         :param item: the type to attempt to cast the result to
         :return: the content cast to the given type, if possible
         """
-        return extract_value(self.content, get_decoder(item))
+        return extract_value(self.content, get_decoder(item), self.full)
 
 
 class ContentProxySubdoc(object):
     """
     Used to provide access to Result content via Result.content_as[type]
     """
+
     @internal
     def __init__(self, content):
-        self.content=content
+        self.content = content
 
     def index_proxy(self, item, index):
         return get_decoder(item)(self.content[index])
@@ -157,6 +168,10 @@ class LookupInResult(Result):
                ):
         return len(canonical_sdresult(self._original)) > index
 
+    @property
+    def expiry(self):
+        return self._original.expiry
+
 
 class MutationResult(Result):
     def __init__(self,
@@ -182,7 +197,7 @@ class MutateInResult(MutationResult):
         """
         MutateInResult is the return type for mutate_in operations.
         """
-        super(MutateInResult,self).__init__(content)
+        super(MutateInResult, self).__init__(content)
         self._content = content  # type: CoreResult
         self.dict = options
 
@@ -212,8 +227,8 @@ class MutateInResult(MutationResult):
 class PingResult(object):
     @internal
     def __init__(self,
-                 original   # Mapping[str, Any]
-                ):
+                 original  # Mapping[str, Any]
+                 ):
         self._id = original.get("id", None)
         self._sdk = original.get("sdk", None)
         self._version = original.get("version", None)
@@ -247,7 +262,7 @@ class PingResult(object):
 class ExistsResult(Result):
     @internal
     def __init__(self,
-                 original # type: CoreResult
+                 original  # type: CoreResult
                  ):
         super(ExistsResult, self).__init__(original)
 
@@ -259,15 +274,19 @@ class ExistsResult(Result):
 class GetResult(Result):
     @internal
     def __init__(self,
-                 original,     # type: CoreResult,
-                 expiry = None # type: timedelta
-                ):
-      """
-      GetResult is the return type for full read operations.
-      """
-      super(GetResult, self).__init__(original)
-      self._id = original.key
-      self._expiry = expiry
+                 original
+                 ):
+        """
+        GetResult is the return type for full read operations.
+        """
+        super(GetResult, self).__init__(original)
+        self._id = original.key
+        self._original = original
+        self._full = False
+        self._expiry = None
+        if isinstance(original, SubdocResult):
+            self._expiry = original.expiry
+            self._full = bool(original.get_full)
 
     def content_as_array(self):
         # type: (...) -> List
@@ -280,18 +299,18 @@ class GetResult(Result):
 
     @property
     def expiry(self):
-        # type: () -> timedelta
+        # type: () -> datetime
         return self._expiry
 
     @property
     def content_as(self):
         # type: (...) -> ContentProxy
-        return ContentProxy(self._original)
+        return ContentProxy(self._original, self._full)
 
     @property
     def content(self):
         # type: () -> Any
-        return extract_value(self._original, lambda x: x)
+        return extract_value(self._original, lambda x: x, self._full)
 
 
 class GetReplicaResult(GetResult):
@@ -338,6 +357,7 @@ class AsyncGetReplicaResult(AsyncWrapper.gen_wrapper(GetReplicaResult)):
                  ):
         super(AsyncGetReplicaResult, self).__init__(sdk2_result)
 
+
 class AsyncMutationResult(AsyncWrapper.gen_wrapper(MutationResult)):
     def __init__(self,
                  core_result  # type: CoreResult
@@ -349,9 +369,11 @@ class AsyncMutationResult(AsyncWrapper.gen_wrapper(MutationResult)):
 # TODO: eliminate the options shortly.  They serve no purpose
 ResultPrecursor = NamedTuple('ResultPrecursor', [('orig_result', CoreResult), ('orig_options', Mapping[str, Any])])
 
+
 def get_wrapped_get_result(x):
     factory_class = AsyncGetResult if issubclass(type(x), AsyncResult) else GetResult
     return factory_class(x)
+
 
 def get_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
                        ):
@@ -361,16 +383,16 @@ def get_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
         x, options = func(*args, **kwargs)
         return get_wrapped_get_result(x)
 
-
     wrapped.__name__ = func.__name__
     wrapped.__doc__ = func.__name__
     return wrapped
 
+
 def get_replica_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
-                       ):
+                               ):
     # type: (...) -> Callable[[Any], GetResult]
     def factory_class(x):
-        factory=AsyncGetReplicaResult if issubclass(type(x), AsyncResult) else GetReplicaResult
+        factory = AsyncGetReplicaResult if issubclass(type(x), AsyncResult) else GetReplicaResult
         return factory(x)
 
     @wraps(func)
@@ -388,7 +410,7 @@ def get_replica_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
 class MutationToken(object):
     def __init__(self, token):
         token = token or (None, None, None)
-        (self.vbucketId, self.vbucketUUID, self.sequenceNumber)=token
+        (self.vbucketId, self.vbucketUUID, self.sequenceNumber) = token
 
     def partition_id(self):
         # type: (...) -> int
@@ -410,7 +432,7 @@ class MutationToken(object):
 def get_mutation_result(result  # type: CoreResult
                         ):
     # type (...)->MutationResult
-    orig_result = getattr(result,'orig_result',result)
+    orig_result = getattr(result, 'orig_result', result)
     factory_class = AsyncMutationResult if issubclass(type(orig_result), AsyncResult) else MutationResult
     return factory_class(orig_result)
 

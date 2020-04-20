@@ -91,7 +91,8 @@ class DurabilityOptionBlock(OptionBlockTimeOut):
     @overload
     def __init__(self,
                  timeout=None,       # type: timedelta
-                 durability=None     # type: DurabilityType
+                 durability=None,    # type: DurabilityType
+                 expiry=None,        # type: timedelta
                  ):
         pass
 
@@ -100,3 +101,6 @@ class DurabilityOptionBlock(OptionBlockTimeOut):
                  ):
         super(DurabilityOptionBlock, self).__init__(**kwargs)
 
+    @property
+    def expiry(self):
+        return self.get('expiry', None)

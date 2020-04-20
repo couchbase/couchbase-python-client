@@ -25,7 +25,8 @@ from couchbase_core._libcouchbase import (
 from couchbase_core._pyport import long, xrange, izip
 import couchbase_core._libcouchbase as C
 import couchbase.exceptions as E
-
+from datetime import datetime
+import couchbase_core.priv_constants as _P
 
 class SubdocResult(C._SDResult):
     """
@@ -152,6 +153,26 @@ class SubdocResult(C._SDResult):
 
     def __contains__(self, item):
         return self.exists(item)
+
+    @property
+    def expiry(self):
+        # if expiry is there, it has to be the very first result...
+        try:
+            ret = self.get('$document.exptime', 0)[1]
+            if ret > 0:
+                return datetime.fromtimestamp(ret)
+            return None
+        except KeyError:
+            return None
+
+    @property
+    def get_full(self):
+        # look at specs and get the correct index, as other
+        # operations could also have blank path
+        for idx, s in enumerate(self._specs):
+            if s[0] == _P.SDCMD_GET_FULLDOC:
+                return self._results[idx][1]
+        return None
 
     @property
     def access_ok(self):
