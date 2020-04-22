@@ -73,7 +73,7 @@ def upsert(path,                    # type: str,
 def replace(path,       # type: str
             value       # type: JSON
             ):
-    # type: (...)->Spec
+    # type: (...) -> Spec
     """
     Replace value at a path with the value given.
 
@@ -88,7 +88,7 @@ def insert(path,            # type: str
            value,           # type: JSON
            create_parents=False     # type: bool
            ):
-    # type: (...)->Spec
+    # type: (...) -> Spec
     """
     Insert a value at a given path in a document.
 
@@ -103,7 +103,7 @@ def insert(path,            # type: str
 
 def remove(path,    # type: str
            ):
-    # type: (...)->Spec
+    # type: (...) -> Spec
     """
     Remove a path from a document.
 
@@ -168,7 +168,7 @@ def array_addunique(path,                   # type: str
                     value,                  # type Union[str|int|float|bool]
                     create_parents=False    # type:bool
                     ):
-    # type: (...)->Spec
+    # type: (...) -> Spec
     """
     Add a value to an existing array, if it doesn't currently exist in the array.  Note the
     position is unspecified -- it is up to the server to place it where it wants.
@@ -185,7 +185,7 @@ def counter(path,                   # type: str
             delta,                  # type: int
             create_parents=False    # type: bool
             ):
-    # type: (...)->Spec
+    # type: (...) -> Spec
     """
     Increment or decrement a counter in a document.
 

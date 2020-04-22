@@ -1,5 +1,10 @@
 import logging
 import warnings
+import pathlib
+import traceback
+
+
+curdir = pathlib.Path(__file__).parent
 
 lcb_min_version_baseline = (2, 9, 0)
 
@@ -15,7 +20,7 @@ def get_lcb_min_version():
 
         parser = docutils.parsers.rst.Parser()
 
-        with open("README.rst") as README:
+        with open(curdir.joinpath("README.rst")) as README:
             settings = docutils.frontend.OptionParser().get_default_values()
             settings.update(
                 dict(tab_width=4, report_level=1, pep_references=False, rfc_references=False, syntax_highlight=False),
@@ -28,5 +33,5 @@ def get_lcb_min_version():
             result = max(result, readme_min_version)
             logging.info("min version is {}".format(result))
     except Exception as e:
-        warnings.warn("problem: {}".format(e))
+        warnings.warn("problem: {}".format(traceback.format_exc()))
     return result

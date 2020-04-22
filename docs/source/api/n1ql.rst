@@ -2,31 +2,36 @@
 N1QL Queries
 ############
 
-.. currentmodule:: couchbase_core.n1ql
+.. currentmodule:: couchbase.cluster
 
-.. class:: N1QLQuery
+.. class:: QueryOptions
 
     .. automethod:: __init__
-    .. automethod:: set_option
-    .. automethod:: consistent_with
-    .. autoattribute:: consistency
-    .. autoattribute:: encoded
-    .. autoattribute:: adhoc
-    .. autoattribute:: timeout
-    .. autoattribute:: cross_bucket
 
-.. autodata:: NOT_BOUNDED
-.. autodata:: REQUEST_PLUS
-.. autodata:: UNBOUNDED
+.. class:: QueryScanConsistency
+    .. autodata:: NOT_BOUNDED
+    .. autodata:: REQUEST_PLUS
 
-.. currentmodule:: couchbase_core.mutation_state
+.. currentmodule:: couchbase.mutation_state
 .. autoclass:: MutationState
 
-.. currentmodule:: couchbase_core.n1ql
-.. class:: N1QLRequest
+.. currentmodule:: couchbase.n1ql
+.. class:: QueryResult
 
     .. automethod:: __init__
-    .. automethod:: __iter__
-    .. automethod:: execute
-    .. autoattribute:: meta
-    .. automethod:: get_single_result
+
+.. class:: QueryMetrics
+
+    .. automethod:: __init__
+
+.. class:: QueryWarning
+
+    .. automethod:: __init__
+
+.. class:: QueryStatus
+
+    .. automethod:: __init__
+
+.. class:: QueryMetaData
+
+    .. automethod:: __init__

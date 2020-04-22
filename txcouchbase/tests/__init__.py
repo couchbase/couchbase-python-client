@@ -16,7 +16,7 @@
 
 from couchbase_tests.base import SkipTest
 import sys
-
+import couchbase
 
 try:
     from twisted.trial.unittest import TestCase

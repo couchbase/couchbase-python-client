@@ -27,7 +27,7 @@ except:
 from typing import *
 
 
-class AnalyticsQuery(N.N1QLQuery):
+class AnalyticsQuery(N._N1QLQuery):
     def __init__(self, querystr, *args, **kwargs):
         """
         Create an Analytics Query object. This may be passed as the

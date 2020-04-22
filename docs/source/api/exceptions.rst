@@ -76,7 +76,7 @@ Exception Categories
 These categories form the base exception classes
 
 .. autoexception:: CouchbaseInternalException
-.. autoexception:: CouchbaseNetworkException
+.. autoexception:: NetworkException
 .. autoexception:: CouchbaseInputException
 .. autoexception:: CouchbaseFatalException
 .. autoexception:: CouchbaseDataException
@@ -92,11 +92,11 @@ The following codes are exception details. They all derive from
 :exc:`CouchbaseException`. Many of them will have multiple error categories and thus
 be inherited from multiple exception categories.
 
-.. autoexception:: ArgumentException
+.. autoexception:: InvalidArgumentException
    :show-inheritance:
 .. autoexception:: ValueFormatException
    :show-inheritance:
-.. autoexception:: AuthException
+.. autoexception:: AuthenticationException
    :show-inheritance:
 .. autoexception:: DeltaBadvalException
    :show-inheritance:
@@ -118,7 +118,7 @@ be inherited from multiple exception categories.
    :show-inheritance:
 .. autoexception:: DocumentExistsException
    :show-inheritance:
-.. autoexception:: NotFoundException
+.. autoexception:: DocumentNotFoundException
    :show-inheritance:
 .. autoexception:: DlopenFailedException
    :show-inheritance:

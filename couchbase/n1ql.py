@@ -21,8 +21,8 @@ from typing import *
 
 from couchbase.options import UnsignedInt64
 from couchbase_core import iterable_wrapper, JSON
-from couchbase_core.n1ql import N1QLRequest
 from couchbase.exceptions import QueryException
+from couchbase_core.n1ql import N1QLRequest
 
 
 class QueryStatus(enum.Enum):

@@ -38,20 +38,20 @@ STATEMENT_PLUS = 'statement_plus'
 
 NOT_BOUNDED = 'not_bounded'
 """
-For use with :attr:`~.N1QLQuery.consistency`, will allow cached
+For use with :attr:`~._N1QLQuery.consistency`, will allow cached
 values to be returned. This will improve performance but may not
 reflect the latest data in the server.
 """
 REQUEST_PLUS = 'request_plus'
 """
-For use with :attr:`~.N1QLQuery.consistency`, will ensure that query
+For use with :attr:`~._N1QLQuery.consistency`, will ensure that query
 results always reflect the latest data in the server
 """
 UNBOUNDED = 'none'
 """
 .. deprecated:: 2.3.3
    Use :attr:`couchbase_core.n1ql.NOT_BOUNDED` instead. This had no effect in its advertised
-   usage as a value for :attr:`~.N1QLQuery.consistency` before.
+   usage as a value for :attr:`~._N1QLQuery.consistency` before.
 """
 
 CONSISTENCY_UNBOUNDED = NOT_BOUNDED
@@ -60,7 +60,7 @@ CONSISTENCY_NONE = UNBOUNDED
 """
 .. deprecated:: 2.3.3
    Use :attr:`couchbase_core.n1ql.CONSISTENCY_UNBOUNDED` instead. This had no effect in its advertised
-   usage as a value for :attr:`~.N1QLQuery.consistency` before. By default
+   usage as a value for :attr:`~._N1QLQuery.consistency` before. By default
    'Not Bounded' mode is used so the effect was functionally equivalent, but
    this is not guaranteed in future.
 """
@@ -70,7 +70,7 @@ PROFILE_PHASES = 'phases'
 PROFILE_TIMINGS = 'timings'
 VALID_PROFILES = [PROFILE_OFF, PROFILE_TIMINGS, PROFILE_PHASES]
 
-class N1QLQuery(object):
+class _N1QLQuery(object):
     def __init__(self, query, *args, **kwargs):
         """
         Create an N1QL Query object. This may be passed as the
@@ -87,7 +87,7 @@ class N1QLQuery(object):
 
         Use positional parameters::
 
-            q = N1QLQuery('SELECT * FROM `travel-sample` '
+            q = _N1QLQuery('SELECT * FROM `travel-sample` '
                           'WHERE type=$1 AND id=$2',
                           'airline', 0)
 
@@ -96,7 +96,7 @@ class N1QLQuery(object):
 
         Use named parameters::
 
-            q = N1QLQuery('SELECT * FROM `travel-sample` '
+            q = _N1QLQuery('SELECT * FROM `travel-sample` '
                           'WHERE type=$type AND id=$id',
                            type='airline', id=0)
             for row in cb.n1ql_query(q):
@@ -111,12 +111,12 @@ class N1QLQuery(object):
 
         Correct::
 
-            N1QLQuery('SELECT * FROM products WHERE tags IN $1',
+            _N1QLQuery('SELECT * FROM products WHERE tags IN $1',
                       ['sale', 'clearance'])
 
         Incorrect::
 
-            N1QLQuery('SELECT * FROM products WHERE tags IN $1',
+            _N1QLQuery('SELECT * FROM products WHERE tags IN $1',
                       "[\\"sale\\",\\"clearance\\"]")
 
         Since the placeholders are serialized to JSON internally anyway.
@@ -388,7 +388,7 @@ class N1QLRequest(object):
             yourself, rather use the :meth:`~.Client.n1ql_query`
             method (or one of its async derivatives).
 
-        :param params: An :class:`N1QLQuery` object.
+        :param params: An :class:`_N1QLQuery` object.
         :param parent: The parent :class:`~.couchbase_core.client.Client` object
         :param row_factory: Callable which accepts the raw dictionary
             of each row, and can wrap them in a customized class.
@@ -398,7 +398,7 @@ class N1QLRequest(object):
         object.
         """
         if isinstance(params, basestring):
-            params = N1QLQuery(params)
+            params = _N1QLQuery(params)
 
         self._params = params
         self._parent = parent

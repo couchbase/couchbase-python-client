@@ -2,41 +2,36 @@
 Analytics Queries
 #################
 
-.. currentmodule:: couchbase_core.analytics
+.. currentmodule:: couchbase.analytics
 
 .. class:: AnalyticsQuery
 
     .. automethod:: __init__
-    .. automethod:: set_option
-    .. automethod:: consistent_with
-    .. autoattribute:: encoded
 
-.. class:: AnalyticsRequest
+.. class:: AnalyticsResult
 
     .. automethod:: __init__
+
+.. not defined by SDK3 Analytics RFC
+
+.. .. class:: DeferredAnalyticsQuery
+
+   .. .. automethod:: __init__
+    .. automethod:: set_option
+    .. autoattribute:: encoded
+
+.. .. class:: DeferredAnalyticsRequest
+
+    .. .. automethod:: __init__
     .. automethod:: __iter__
     .. automethod:: execute
     .. autoattribute:: meta
     .. automethod:: get_single_result
 
-.. class:: DeferredAnalyticsQuery
+.. .. currentmodule:: couchbase.analytics_ingester
 
-    .. automethod:: __init__
-    .. automethod:: set_option
-    .. autoattribute:: encoded
+.. .. class:: AnalyticsIngester
 
-.. class:: DeferredAnalyticsRequest
-
-    .. automethod:: __init__
-    .. automethod:: __iter__
-    .. automethod:: execute
-    .. autoattribute:: meta
-    .. automethod:: get_single_result
-
-.. currentmodule:: couchbase_core.analytics_ingester
-
-.. class:: AnalyticsIngester
-
-    .. automethod:: __init__
+    .. .. automethod:: __init__
     .. automethod:: __call__
 

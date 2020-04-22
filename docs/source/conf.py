@@ -31,7 +31,7 @@ try:
 
     libcouchbase_version=lcb_version.get_lcb_min_version()
 except:
-    libcouchbase_version=(2,9,0)
+    libcouchbase_version=(3,0,0)
 # -- General configuration -----------------------------------------------------
 rst_epilog = """
 .. |libcouchbase_version| replace:: {}""".format('.'.join(map(str,libcouchbase_version)))

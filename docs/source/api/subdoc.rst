@@ -1,4 +1,4 @@
-.. module:: couchbase_core.subdocument
+.. module:: couchbase.subdocument
 
 ================
 Sub-Document API
@@ -20,8 +20,8 @@ specifying the path, options, and value of the command, so for example:
 .. code-block:: python
 
     cb.mutate_in(key,
-                 SD.upsert('path1', 'value1'),
-                 SD.insert('path2', 'value2', create_parents=True))
+                 (SD.upsert('path1', 'value1'),
+                 SD.insert('path2', 'value2', create_parents=True)))
 
 really becomes
 
@@ -42,7 +42,7 @@ via
 
 .. code-block:: python
 
-    import couchbase.subdoc as SD
+    import couchbase.subdocument as SD
 
 -----------------
 Lookup Operations
@@ -66,6 +66,7 @@ Mutation Operations
 .. autofunction:: array_addunique
 .. autofunction:: remove
 .. autofunction:: counter
+.. autofunction:: exists
 
 
 -------------

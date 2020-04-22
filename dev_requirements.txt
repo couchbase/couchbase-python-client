@@ -17,7 +17,7 @@ parameterized==0.7.0
 utilspie>=0.1.0
 python-vagrant>=0.5.15
 pytest
-sphinx-autodoc-typehints>=1.9.0; python_version>="3.8"
+sphinx-autodoc-typehints>=1.9.0; python_version>="3.7"
 git+https://github.com/couchbaselabs/mypy.git@stub-merge; python_version>"3.10"
 beautifulsoup4==4.7.1
 jira>=2.0.0

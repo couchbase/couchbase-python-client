@@ -115,10 +115,12 @@ class BatchedQueryResult(BatchedRowMixin, AsyncQueryResultBase):
         AsyncQueryResultBase.__init__(self, *args, **kwargs)
         BatchedRowMixin.__init__(self, *args, **kwargs)
 
+
 class BatchedAnalyticsRequest(BatchedRowMixin, AsyncAnalyticsRequest):
     def __init__(self, *args, **kwargs):
         AsyncAnalyticsRequest.__init__(self, *args, **kwargs)
         BatchedRowMixin.__init__(self, *args, **kwargs)
+
 
 class BatchedAnalyticsResult(BatchedRowMixin, AsyncAnalyticsResultBase):
     def __init__(self, *args, **kwargs):

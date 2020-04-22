@@ -4,7 +4,7 @@ from couchbase_core._libcouchbase import Bucket as _Base
 
 import couchbase.exceptions as E
 from couchbase.exceptions import NotImplementedInV3
-from couchbase_core.n1ql import N1QLQuery, N1QLRequest
+from couchbase_core.n1ql import _N1QLQuery, N1QLRequest
 from couchbase_core.views.iterator import View
 from .views.params import make_options_string, make_dvpath
 import couchbase_core._libcouchbase as _LCB
@@ -446,20 +446,20 @@ class Client(_Base):
         """
         Execute a N1QL query.
 
-        This method is mainly a wrapper around the :class:`~.N1QLQuery`
+        This method is mainly a wrapper around the :class:`~._N1QLQuery`
         and :class:`~.N1QLRequest` objects, which contain the inputs
         and outputs of the query.
 
-        Using an explicit :class:`~.N1QLQuery`::
+        Using an explicit :class:`~._N1QLQuery`::
 
-            query = N1QLQuery(
+            query = _N1QLQuery(
                 'SELECT airportname FROM `travel-sample` WHERE city=$1', "Reno")
             # Use this option for often-repeated queries
             query.adhoc = False
             for row in cb.n1ql_query(query):
                 print 'Name: {0}'.format(row['airportname'])
 
-        Using an implicit :class:`~.N1QLQuery`::
+        Using an implicit :class:`~._N1QLQuery`::
 
             for row in cb.n1ql_query(
                 'SELECT airportname, FROM `travel-sample` WHERE city="Reno"'):
@@ -470,14 +470,14 @@ class Client(_Base):
         otherwise defaulting to :class:`~.N1QLRequest`.
 
         :param query: The query to execute. This may either be a
-            :class:`.N1QLQuery` object, or a string (which will be
+            :class:`._N1QLQuery` object, or a string (which will be
             implicitly converted to one).
         :param kwargs: Arguments for :class:`.N1QLRequest`.
         :return: An iterator which yields rows. Each row is a dictionary
             representing a single result
         """
-        if not isinstance(query, N1QLQuery):
-            query = N1QLQuery(query)
+        if not isinstance(query, _N1QLQuery):
+            query = _N1QLQuery(query)
 
         return query.gen_iter(self, **kwargs)
 

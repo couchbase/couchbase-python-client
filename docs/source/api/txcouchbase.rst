@@ -16,24 +16,25 @@ library which may be found at http://www.twistedmatrix.com. This documentation
 contains the API reference for how to use the ``txcouchbase`` module with
 Twisted.
 
-.. currentmodule:: txcouchbase.bucket
+.. currentmodule:: txcouchbase.cluster
 
 For the most part, the ``txcouchbase`` API functions like its synchronous
-counterpart, :class:`~couchbase_v2.bucket.Bucket`, except for its
+counterpart, :class:`~couchbase`, except for its
 asynchronous nature. Where the synchronous API returns a
-:class:`~couchbase_core.result.Result` object, the ``txcouchbase`` API returns
+:class:`~couchbase.result.Result` object, the ``txcouchbase`` API returns
 a :class:`Deferred` which will have its callback invoked with a result.
 
 As such, we will omit the mentions of the normal key value operations, which
 function identially to their synchronous conterparts documented in the
-:class:`~couchbase_v2.bucket.Bucket` class.
+:class:`~couchbase.cluster.Cluster` :class:`~couchbase.bucket.Bucket`,
+and :class:`~couchbase.collection.Collection` classes.
 
-The :class:`Bucket` interface for Twisted is subclassed from the lower-level
-:class:`RawBucket` which returns :class:`~couchbase_core.result.AsyncResult`
+The :class:`TxDeferredClient` interface for Twisted is subclassed from the lower-level
+:class:`TxRawClient` which returns :class:`~couchbase_core.result.AsyncResult`
 objects rather than `Deferred` objects. This is largely due to performance
 reasons (Deferreds result in a 3x performance slowdown).
 
-.. class:: RawBucket
+.. class:: TxRawClientFactory.gen_raw.<locals>.TxRawClient
 
     .. automethod:: __init__
     .. automethod:: registerDeferred
@@ -41,15 +42,33 @@ reasons (Deferreds result in a 3x performance slowdown).
     .. automethod:: defer
     .. autoattribute:: connected
 
-.. class:: Bucket
+.. class:: TxClientFactory.gen_client.<locals>.TxDeferredClient
 
     .. automethod:: __init__
-    .. automethod:: queryAll
-    .. automethod:: queryEx
-    .. automethod:: n1qlQueryAll
-    .. automethod:: n1qlQueryEx
+    .. automethod:: query
+    .. automethod:: query_ex
+    .. automethod:: view_query
+    .. automethod:: view_query_ex
+    .. automethod:: analytics_query
+    .. automethod:: search_query
 
-.. class:: BatchedView
+
+.. class:: BatchedViewResult
+
+    .. automethod:: __iter__
+    .. automethod:: __init__
+
+.. class:: BatchedQueryResult
+
+    .. automethod:: __iter__
+    .. automethod:: __init__
+
+.. class:: BatchedAnalyticsResult
+
+    .. automethod:: __iter__
+    .. automethod:: __init__
+
+.. class:: BatchedSearchResult
 
     .. automethod:: __iter__
     .. automethod:: __init__

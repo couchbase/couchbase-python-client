@@ -188,11 +188,8 @@ For *keys*, the acceptable inputs are those for :const:`FMT_UTF8`
 Single-Key Data Methods
 =======================
 
-These methods all return a :class:`~couchbase_core.result.Result` object containing
+These methods all return a :class:`~couchbase.result.Result` object containing
 information about the operation (such as status and value).
-
-.. currentmodule:: couchbase.collection
-
 
 Storing Data
 ------------
@@ -224,7 +221,7 @@ Modifying Data
 These methods modify existing values in Couchbase
 
 .. currentmodule:: couchbase.collection
-.. class:: Collection
+.. class:: BinaryCollection
 
 
     .. automethod:: append
@@ -244,7 +241,7 @@ or duration.
 
     .. automethod:: remove
 
-    .. automethod:: lock
+    .. automethod:: get_and_lock
 
     .. automethod:: unlock
 
@@ -290,7 +287,7 @@ using the :meth:`couchbase.collection.Collection.get` method
 
     .. automethod:: __init__
 
-.. class:: Collection
+.. class:: BinaryCollection
 
     .. automethod:: increment
     .. automethod:: decrement
@@ -300,7 +297,7 @@ Multi-Key Data Methods
 ======================
 
 These methods tend to be more efficient than their single-key
-equivalents. They return a :class:`couchbase.result.MultiResult` object (which is
+equivalents. They return a :class:`couchbase.result.MultiResultBase` object (which is
 a dict subclass) which contains class:`couchbase.result.Result` objects as the
 values for its keys
 
@@ -323,12 +320,14 @@ values for its keys
 
     .. automethod:: remove_multi
 
-    .. automethod:: append_multi
+.. class:: BinaryCollection
+    .. not implemented yet
+    .. .. automethod:: append_multi
+    .. .. automethod:: prepend_multi
 
-    .. automethod:: prepend_multi
+    .. automethod:: increment_multi
 
-    .. automethod:: counter_multi
-
+    .. automethod:: decrement_multi
 
 Batch Operation Pipeline
 ========================
@@ -380,18 +379,13 @@ Full-Text Search Methods
 Design Document Management
 ==========================
 
-.. warning::
-    The APIs below are from SDK2 and currently only available
-    from the couchbase_v2 legacy support package. We plan
-    to update these to support SDK3 shortly.
-
-.. currentmodule:: couchbase_core.bucketmanager
+.. currentmodule:: couchbase.management.views
 
 
 To perform design document management operations, you must first get
-an instance of the :class:`BucketManager`. You can do this by invoking
-the :meth:`~couchbase_v2.bucket.Bucket.bucket_manager` method on the
-:class:`~couchbase_v2.bucket.Bucket` object.
+an instance of the :class:`ViewIndexManager`. You can do this by invoking
+the :meth:`~couchbase.bucket.Bucket.views` method on the
+:class:`~couchbase.bucket.Bucket` object.
 
 .. note::
     Design document management functions are async. This means that any
@@ -418,36 +412,26 @@ the :meth:`~couchbase_v2.bucket.Bucket.bucket_manager` method on the
     prefixes the design name with ``dev_`` if not already prefixed.
 
 
-.. class:: BucketManager
+.. class:: ViewIndexManager
 
-
-    .. automethod:: design_create
-    .. automethod:: design_get
-    .. automethod:: design_publish
-    .. automethod:: design_delete
-    .. automethod:: design_list
+    .. automethod:: __init__
 
 N1QL Index Management
 =====================
 
-.. warning::
-    The APIs below are from SDK2 and currently only available
-    from the couchbase_v2 legacy support package. We plan
-    to update these to support SDK3 shortly.
+.. currentmodule:: couchbase.management.queries
 
-.. currentmodule:: couchbase_core.bucketmanager
-
-Before issuing any N1QL query using :cb_bmeth:`n1ql_query`, the bucket being
+Before issuing any N1QL query using :cb_bmeth:`query`, the bucket being
 queried must have an index defined for the query. The simplest index is the
 primary index.
 
 To create a primary index, use::
 
-    mgr.n1ql_index_create_primary(ignore_exists=True)
+    mgr.create_primary_index('bucket_name', CreatePrimaryQueryIndexOptions(ignore_if_exists=True))
 
 You can create additional indexes using::
 
-    mgr.n1ql_create_index('idx_foo', fields=['foo'])
+    mgr.create_index('bucket_name', 'idx_foo', fields=['foo'])
 
 .. class:: BucketManager
 
@@ -468,18 +452,13 @@ You can create additional indexes using::
 Flushing (clearing) the Bucket
 ==============================
 
-.. warning::
-    The APIs below are from SDK2 and currently only available
-    from the couchbase_v2 legacy support package. We plan
-    to update these to support SDK3 shortly.
-
 For some stages of development and/or deployment, it might be useful
 to be able to clear the bucket of its contents.
 
-.. currentmodule:: couchbase_core.client
-.. class:: Client
+.. currentmodule:: couchbase.management.buckets
+.. class:: BucketManager
 
-    .. automethod:: flush
+    .. automethod:: flush_bucket
 
 
 Informational Methods
@@ -493,10 +472,8 @@ Informational Methods
 These methods do not operate on keys directly, but offer various
 information about things
 
-.. currentmodule:: couchbase_v2.bucket
-.. class:: Bucket
-
-    .. automethod:: stats
+.. currentmodule:: couchbase_core.client
+.. class:: Client
 
     .. automethod:: lcb_version
 
@@ -525,19 +502,13 @@ however there are some special methods for this interface
 Durability Constraints
 ======================
 
-.. warning::
-    The APIs below are from SDK2 and currently only available
-    from the couchbase_v2 legacy support package. We plan
-    to update these to support SDK3 shortly.
-
 Durability constraints ensure safer protection against data loss.
 
-.. currentmodule:: couchbase_v2.bucket
-.. class:: Bucket
+.. currentmodule:: couchbase.durability
+.. class:: DurabilityOptionBlock
 
-    .. automethod:: endure
-    .. automethod:: endure_multi
-    .. automethod:: durability
+    .. automethod:: __init__
+    .. autoattribute:: expiry
 
 Attributes
 ==========
@@ -547,8 +518,8 @@ Attributes
     from the couchbase_v2 legacy support package. We plan
     to update these to support SDK3 shortly.
 
-.. currentmodule:: couchbase.collection
-.. class:: Collection
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
 
     .. autoattribute:: quiet
 
@@ -607,13 +578,8 @@ Attributes
 Private APIs
 ============
 
-.. warning::
-    The APIs below are from SDK2 and currently only available
-    from the couchbase_v2 legacy support package. We plan
-    to update these to support SDK3 shortly.
-
-.. currentmodule:: couchbase_v2.bucket
-.. class:: Bucket
+.. currentmodule:: couchbase_core.client
+.. class:: Client
 
    The following APIs are not supported because using them is inherently
    dangerous. They are provided as workarounds for specific problems which
@@ -634,11 +600,11 @@ Private APIs
 Additional Connection Options
 =============================
 
-.. currentmodule:: couchbase_core.client
+.. currentmodule:: couchbase.Cluster
 
 This section is intended to document some of the less common connection
 options and formats of the connection string
-(see :meth:`couchbase_core.client.Client.__init__`).
+(see :meth:`couchbase.cluster.Cluster.__init__`).
 
 
 Using Custom Ports

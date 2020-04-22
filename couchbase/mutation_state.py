@@ -28,12 +28,12 @@ class MutationState(object):
         The API and implementation of this class are subject to change.
 
     This class acts as a container for one or more mutations. It may
-    then be used with the :meth:`~.N1QLQuery.consistent_with` method to
+    then be used with the :meth:`~._N1QLQuery.consistent_with` method to
     indicate that a given query should be bounded by the contained
     mutations.
 
     Using `consistent_with` is similar to setting
-    :attr:`~.N1QLQuery.consistency` to :data:`REQUEST_PLUS`,
+    :attr:`~._N1QLQuery.consistency` to :data:`REQUEST_PLUS`,
     but is more optimal as the query will use cached data, *except*
     when the given mutation(s) are concerned. This option is useful
     for use patterns when an application has just performed a mutation,
@@ -56,7 +56,7 @@ class MutationState(object):
             'bar': {'type': 'user', 'value': 'a bar value'}
         })
 
-        nq = N1QLQuery('SELECT type, value FROM default WHERE type="user"')
+        nq = _N1QLQuery('SELECT type, value FROM default WHERE type="user"')
         ms = MutationToken()
         ms.add_result(rv
         nq.consistent_with_ops(*rvs.values())

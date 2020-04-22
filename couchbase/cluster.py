@@ -2,7 +2,7 @@ import asyncio
 from typing import *
 
 
-from couchbase_core.mutation_state import MutationState
+from couchbase.mutation_state import MutationState
 from couchbase_core.asynchronous import AsyncClientFactory
 from couchbase.management.queries import QueryIndexManager
 from couchbase.management.search import SearchIndexManager
@@ -15,7 +15,7 @@ from couchbase.diagnostics import DiagnosticsResult
 from couchbase.search import SearchResult, SearchOptions
 from .analytics import AnalyticsResult
 from .n1ql import QueryResult
-from couchbase_core.n1ql import N1QLQuery
+from couchbase_core.n1ql import _N1QLQuery
 from .options import OptionBlock, OptionBlockDeriv
 from .bucket import Bucket, CoreClient, PingOptions
 from couchbase_core.cluster import _Cluster as CoreCluster, Authenticator as CoreAuthenticator
@@ -148,9 +148,9 @@ class QueryOptions(OptionBlockTimeOut):
         for k in new_keys:
             named_parameters[k] = args[k]
 
-        query = N1QLQuery(statement, *positional_parameters, **named_parameters)
+        query = _N1QLQuery(statement, *positional_parameters, **named_parameters)
         # now lets try to setup the options.  TODO: rework this after beta.3
-        # but for now we will use the existing N1QLQuery.  Could be we can
+        # but for now we will use the existing _N1QLQuery.  Could be we can
         # add to it, etc...
 
         # default to false on metrics

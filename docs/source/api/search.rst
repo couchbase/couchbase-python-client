@@ -2,7 +2,7 @@
 Full Text Queries
 #################
 
-.. module:: couchbase_core.fulltext
+.. module:: couchbase.search
 
 Full-text queries search the cluster for documents matching certain terms or
 strings of texts. Unlike N1QL queries which are designed to be structured, i.e.
@@ -118,10 +118,10 @@ Debugging Queries
 Parameters
 ----------
 
-Query parameters may be passed as the ``params`` keyword argument to
+Query parameters may be passed as the ``options`` keyword argument to
 :cb_bmeth:`search`.
 
-.. autoclass:: Params
+.. autoclass:: SearchOptions
     :members:
 
 ------

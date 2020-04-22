@@ -27,10 +27,12 @@ from distutils.command.install_headers import install_headers as install_headers
 from shutil import copyfile, copymode
 
 from setuptools.command.build_ext import build_ext
+import pathlib
+curdir = pathlib.Path(__file__).parent
 
 
 def get_json_build_cfg():
-    with open("cbuild_cfg.json") as JSONFILE:
+    with open(curdir.joinpath("cbuild_cfg.json")) as JSONFILE:
         return json.load(JSONFILE)
 
 

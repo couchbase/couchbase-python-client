@@ -12,10 +12,6 @@ Result Objects
    :show-inheritance:
    :members:
 
-.. autoclass:: ResultProtocol
-   :show-inheritance:
-   :members:
-
 .. autoclass:: Result
    :show-inheritance:
    :members:
@@ -45,10 +41,6 @@ Result Objects
    :members:
 
 .. autoclass:: MutationToken
-   :show-inheritance:
-   :members:
-
-.. autoclass:: ViewResultProtocol
    :show-inheritance:
    :members:
 
