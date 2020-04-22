@@ -1,9 +1,8 @@
 import asyncio
 from typing import *
 
-
+from couchbase_core.asynchronous.client import AsyncClientMixin
 from couchbase.mutation_state import MutationState
-from couchbase_core.asynchronous import AsyncClientFactory
 from couchbase.management.queries import QueryIndexManager
 from couchbase.management.search import SearchIndexManager
 from couchbase.management.analytics import AnalyticsIndexManager
@@ -47,8 +46,6 @@ class DiagnosticsOptions(OptionBlock):
         super(DiagnosticsOptions, self).__init__(**kwargs)
 
 
-
-
 class QueryScanConsistency(object):
     REQUEST_PLUS="request_plus"
     NOT_BOUNDED="not_bounded"
@@ -72,30 +69,31 @@ class QueryScanConsistency(object):
 
 
 class QueryProfile(object):
-  OFF='off'
-  PHASES='phases'
-  TIMINGS='timings'
+    OFF = 'off'
+    PHASES = 'phases'
+    TIMINGS = 'timings'
 
-  @classmethod
-  def off(cls):
-    return cls(cls.OFF)
+    @classmethod
+    def off(cls):
+        return cls(cls.OFF)
 
-  @classmethod
-  def phases(cls):
-    return cls(cls.PHASES)
+    @classmethod
+    def phases(cls):
+        return cls(cls.PHASES)
 
-  @classmethod
-  def timings(cls):
-    return cls(cls.TIMINGS)
+    @classmethod
+    def timings(cls):
+        return cls(cls.TIMINGS)
 
-  def __init__(self, val):
-    if val == self.OFF or val == self.PHASES or val==self.TIMINGS:
-      self._value = val
-    else:
-      raise InvalidArgumentException("QueryProfile can only be {}, {}, {}".format(self.OFF, self.TIMINGS, self.PHASES))
+    def __init__(self, val):
+        if val == self.OFF or val == self.PHASES or val == self.TIMINGS:
+            self._value = val
+        else:
+            raise InvalidArgumentException(
+                "QueryProfile can only be {}, {}, {}".format(self.OFF, self.TIMINGS, self.PHASES))
 
-  def as_string(self):
-    return getattr(self, '_value', self.OFF)
+    def as_string(self):
+        return getattr(self, '_value', self.OFF)
 
 
 class QueryOptions(OptionBlockTimeOut):
@@ -823,7 +821,7 @@ class Cluster(CoreClient):
         return mode & _LCB.LCB_SSL_ENABLED != 0
 
 
-class AsyncCluster(AsyncClientFactory.gen_async_client(Cluster)):
+class AsyncCluster(AsyncClientMixin, Cluster):
     @classmethod
     def connect(cls, connection_string=None, *args, **kwargs):
         return cls(connection_string=connection_string, *args, **kwargs)

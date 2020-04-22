@@ -135,8 +135,6 @@ class AnalyticsTest(gen_base(AnalyticsTestBase)):
 
     def testBatchedAnalytics(self  # type: Base
                              ):
-        if self.is_mock:
-            raise SkipTest("No analytics on mock")
         cb = self.make_connection()
         d = cb.analytics_query("SELECT * FROM `{}` LIMIT 1".format(self.dataset_name))
 

@@ -33,6 +33,7 @@ from couchbase_core.asynchronous.n1ql import AsyncN1QLRequest
 from couchbase_core.asynchronous.view import AsyncViewBase
 from couchbase_core.client import Client as CoreClient
 from couchbase.exceptions import CouchbaseException
+from couchbase_core.supportability import internal
 from txcouchbase.iops import v0Iops
 from couchbase.bucket import AsyncBucket as V3AsyncBucket
 
@@ -168,428 +169,420 @@ class ConnectionEventQueue(TxEventQueue):
 T = TypeVar('T', bound=CoreClient)
 
 
+class TxRawClientMixin(object):
+    @internal
+    def __init__(self, connstr=None, **kwargs):
+        """
+        Client mixin for Twisted. This inherits from an 'AsyncClient' class,
+        but also adds some twisted-specific logic for hooking on a connection.
+        """
+        if connstr and 'connstr' not in kwargs:
+            kwargs['connstr'] = connstr
+        iops = v0Iops(reactor)
+        super(TxRawClientMixin, self).__init__(iops=iops, **kwargs)
+
+        self._evq = {
+            'connect': ConnectionEventQueue(),
+            '_dtor': TxEventQueue()
+        }
+
+        self._conncb = self._evq['connect']
+        self._dtorcb = self._evq['_dtor']
+
+    def registerDeferred(self, event, d):
+        """
+        Register a defer to be fired at the firing of a specific event.
+
+        :param string event: Currently supported values are `connect`. Another
+          value may be `_dtor` which will register an event to fire when this
+          object has been completely destroyed.
+
+        :param event: The defered to fire when the event succeeds or failes
+        :type event: :class:`Deferred`
+
+        If this event has already fired, the deferred will be triggered
+        asynchronously.
+
+        Example::
+
+          def on_connect(*args):
+              print("I'm connected")
+          def on_connect_err(*args):
+              print("Connection failed")
+
+          d = Deferred()
+          cb.registerDeferred('connect', d)
+          d.addCallback(on_connect)
+          d.addErrback(on_connect_err)
+
+        :raise: :exc:`ValueError` if the event name is unrecognized
+        """
+        try:
+            self._evq[event].schedule(d)
+        except KeyError:
+            raise ValueError("No such event type", event)
+
+    def on_connect(self):
+        """
+        Short-hand for the following idiom::
+
+            d = Deferred()
+            cb.registerDeferred('connect', d)
+            return d
+
+        :return: A :class:`Deferred`
+        """
+        d = Deferred()
+        self.registerDeferred('connect', d)
+        return d
+
+    def defer(self, opres):
+        """
+        Converts a raw :class:`couchbase_core.results.AsyncResult` object
+        into a :class:`Deferred`.
+
+        This is shorthand for the following "non-idiom"::
+
+          d = Deferred()
+          opres = cb.upsert("foo", "bar")
+          opres.callback = d.callback
+
+          def d_err(res, ex_type, ex_val, ex_tb):
+              d.errback(opres, ex_type, ex_val, ex_tb)
+
+          opres.errback = d_err
+          return d
+
+        :param opres: The operation to wrap
+        :type opres: :class:`couchbase_core.results.AsyncResult`
+
+        :return: a :class:`Deferred` object.
+
+        Example::
+
+          opres = cb.upsert("foo", "bar")
+          d = cb.defer(opres)
+          def on_ok(res):
+              print("Result OK. Cas: {0}".format(res.cas))
+          d.addCallback(opres)
+
+
+        """
+        d = Deferred()
+
+        def _on_err(mres, ex_type, ex_val, ex_tb):
+            try:
+                raise ex_type(ex_val)
+            except CouchbaseException:
+                d.errback()
+
+        opres.set_callbacks(d.callback, _on_err)
+        return d
+
+    def view_query_ex(self, viewcls, *args, **kwargs):
+        """
+        Query a view, with the ``viewcls`` instance receiving events
+        of the query as they arrive.
+
+        :param type viewcls: A class (derived from :class:`AsyncViewBase`)
+          to instantiate
+
+        Other arguments are passed to the standard `query` method.
+
+        This functions exactly like the :meth:`~couchbase.asynchronous.AsyncClient.query`
+        method, except it automatically schedules operations if the connection
+        has not yet been negotiated.
+        """
+
+        kwargs['itercls'] = viewcls
+        o = super(TxRawClientMixin, self).view_query(*args, **kwargs)
+        if not self.connected:
+            self.on_connect().addCallback(lambda x: o.start())
+        else:
+            o.start()
+
+        return o
+
+    def view_query(self, *args, **kwargs):
+        """
+        Returns a :class:`Deferred` object which will have its callback invoked
+        with a :class:`BatchedView` when the results are complete.
+
+        Parameters follow conventions of
+        :meth:`~couchbase_v2.bucket.Bucket.query`.
+
+        Example::
+
+          d = cb.queryAll("beer", "brewery_beers")
+          def on_all_rows(rows):
+              for row in rows:
+                 print("Got row {0}".format(row))
+
+          d.addCallback(on_all_rows)
+
+        """
+
+        if not self.connected:
+            cb = lambda x: self.view_query(*args, **kwargs)
+            return self.on_connect().addCallback(cb)
+
+        kwargs['itercls'] = BatchedViewResult
+        o = super(TxRawClientMixin, self).view_query(*args, **kwargs)
+        try:
+            o.start()
+        except Exception as e:
+            raise
+        return o._getDeferred()
+
+    def query_ex(self, cls, *args, **kwargs):
+        """
+        Execute a N1QL statement providing a custom handler for rows.
+
+        This method allows you to define your own subclass (of
+        :class:`~AsyncN1QLRequest`) which can handle rows as they are
+        received from the network.
+
+        :param cls: The subclass (not instance) to use
+        :param args: Positional arguments for the class constructor
+        :param kwargs: Keyword arguments for the class constructor
+
+        .. seealso:: :meth:`queryEx`, around which this method wraps
+        """
+        kwargs['itercls'] = cls
+        o = super(TxRawClientMixin,self).query(*args, **kwargs)
+        if not self.connected:
+            self.on_connect().addCallback(lambda x: o.start())
+        else:
+            o.start()
+        return o
+
+    def query(self, *args, **kwargs):
+        """
+        Execute a N1QL query, retrieving all rows.
+
+        This method returns a :class:`Deferred` object which is executed
+        with a :class:`~.N1QLRequest` object. The object may be iterated
+        over to yield the rows in the result set.
+
+        This method is similar to :meth:`~couchbase_v2.bucket.Bucket.n1ql_query`
+        in its arguments.
+
+        Example::
+
+            def handler(req):
+                for row in req:
+                    # ... handle row
+
+            d = cb.n1qlQueryAll('SELECT * from `travel-sample` WHERE city=$1`,
+                            'Reno')
+            d.addCallback(handler)
+
+        :return: A :class:`Deferred`
+
+        .. seealso:: :meth:`~couchbase_v2.bucket.Bucket.n1ql_query`
+        """
+        return self.deferred_verb(BatchedQueryResult, super(TxRawClientMixin,self).query, self.query, *args, **kwargs)
+
+    def deferred_verb(self, itercls, raw_verb, cooked_verb, *args, **kwargs):
+        if not self.connected:
+            cb = lambda x: cooked_verb(*args, **kwargs)
+            return self.on_connect().addCallback(cb)
+        kwargs['itercls'] = itercls
+        o = raw_verb(*args, **kwargs)
+        o.start()
+        return o._getDeferred()
+
+    def analytics_query(self, *args, **kwargs):
+        return self.deferred_verb(BatchedAnalyticsResult, super(TxRawClientMixin, self).analytics_query, self.analytics_query, *args,
+                                  **kwargs)
+
+    def search(self, cls, *args, **kwargs):
+        """
+        Experimental Method
+
+        Execute a Search query providing a custom handler for rows.
+
+        This method allows you to define your own subclass (of
+        :class:`~AsyncSearchRequest`) which can handle rows as they are
+        received from the network.
+
+        :param cls: The subclass (not instance) to use
+        :param args: Positional arguments for the class constructor
+        :param kwargs: Keyword arguments for the class constructor
+
+        .. seealso:: :meth:`search`, around which this method wraps
+        """
+        kwargs['itercls'] = cls
+        o = super(TxRawClientMixin, self).search_query(*args, **kwargs)
+        if not self.connected:
+            self.on_connect().addCallback(lambda x: o.start())
+        else:
+            o.start()
+        return o
+
+    def search_query(self, *args, **kwargs):
+        """
+        Experimental Method
+
+        Execute a Search query, retrieving all rows.
+
+        This method returns a :class:`Deferred` object which is executed
+        with a :class:`~.SearchRequest` object. The object may be iterated
+        over to yield the rows in the result set.
+
+        This method is similar to :meth:`~couchbase_v2.bucket.Bucket.search`
+        in its arguments.
+
+        Example::
+
+            def handler(req):
+                for row in req:
+                    # ... handle row
+
+            d = cb.search('name', ft.MatchQuery('nosql'), limit=10)
+            d.addCallback(handler)
+
+        :return: A :class:`Deferred`
+
+        .. seealso:: :meth:`~couchbase_v2.bucket.Bucket.search`
+        """
+
+        if not self.connected:
+            cb = lambda x: self.search_query(*args, **kwargs)
+            return self.on_connect().addCallback(cb)
+
+        kwargs['itercls'] = BatchedSearchResult
+        o = super(TxRawClientMixin, self).search_query(*args, **kwargs)
+        o.start()
+        return o._getDeferred()
+
+
 class TxRawClientFactory(object):
     @staticmethod
     def gen_raw(async_base  # type: Type[T]
                 ):
         # type: (...) -> Type[T]
-        class TxRawClient(async_base):
-            def __init__(self, connstr=None, **kwargs):
-                """
-                Bucket subclass for Twisted. This inherits from the 'AsyncBucket' class,
-                but also adds some twisted-specific logic for hooking on a connection.
-                """
-                if connstr and 'connstr' not in kwargs:
-                    kwargs['connstr'] = connstr
-                iops = v0Iops(reactor)
-                super(TxRawClient, self).__init__(iops=iops, **kwargs)
-
-                self._evq = {
-                    'connect': ConnectionEventQueue(),
-                    '_dtor': TxEventQueue()
-                }
-
-                self._conncb = self._evq['connect']
-                self._dtorcb = self._evq['_dtor']
-
-            def _do_n1ql_query(self,  # type: TxRawClient
-                               *args,  # type: Any
-                               **kwargs  # type: Any
-                               ):
-                # type: (...) -> Any
-                super_obj = super(async_base, self)
-                meth = getattr(super_obj, 'n1ql_query', getattr(super_obj, 'query', None))
-                return meth(*args, **kwargs)
-
-            def _do_analytics_query(self,  # type: TxRawClient
-                               *args,  # type: Any
-                               **kwargs  # type: Any
-                               ):
-                # type: (...) -> Any
-                super_obj = super(async_base, self)
-                meth = getattr(super_obj, 'analytics_query')
-                return meth(*args, **kwargs)
-
-            def _do_view_query(self, *args, **kwargs):
-                #super_obj = super(async_base, self)
-                #0meth = getattr(super_obj, 'view_query', getattr(super_obj, 'query', None))
-                return super(async_base,self).view_query(*args, **kwargs)
-
-            def registerDeferred(self, event, d):
-                """
-                Register a defer to be fired at the firing of a specific event.
-
-                :param string event: Currently supported values are `connect`. Another
-                  value may be `_dtor` which will register an event to fire when this
-                  object has been completely destroyed.
-
-                :param event: The defered to fire when the event succeeds or failes
-                :type event: :class:`Deferred`
-
-                If this event has already fired, the deferred will be triggered
-                asynchronously.
-
-                Example::
-
-                  def on_connect(*args):
-                      print("I'm connected")
-                  def on_connect_err(*args):
-                      print("Connection failed")
-
-                  d = Deferred()
-                  cb.registerDeferred('connect', d)
-                  d.addCallback(on_connect)
-                  d.addErrback(on_connect_err)
-
-                :raise: :exc:`ValueError` if the event name is unrecognized
-                """
-                try:
-                    self._evq[event].schedule(d)
-                except KeyError:
-                    raise ValueError("No such event type", event)
-
-            def on_connect(self):
-                """
-                Short-hand for the following idiom::
-
-                    d = Deferred()
-                    cb.registerDeferred('connect', d)
-                    return d
-
-                :return: A :class:`Deferred`
-                """
-                d = Deferred()
-                self.registerDeferred('connect', d)
-                return d
-
-            def defer(self, opres):
-                """
-                Converts a raw :class:`couchbase_core.results.AsyncResult` object
-                into a :class:`Deferred`.
-
-                This is shorthand for the following "non-idiom"::
-
-                  d = Deferred()
-                  opres = cb.upsert("foo", "bar")
-                  opres.callback = d.callback
-
-                  def d_err(res, ex_type, ex_val, ex_tb):
-                      d.errback(opres, ex_type, ex_val, ex_tb)
-
-                  opres.errback = d_err
-                  return d
-
-                :param opres: The operation to wrap
-                :type opres: :class:`couchbase_core.results.AsyncResult`
-
-                :return: a :class:`Deferred` object.
-
-                Example::
-
-                  opres = cb.upsert("foo", "bar")
-                  d = cb.defer(opres)
-                  def on_ok(res):
-                      print("Result OK. Cas: {0}".format(res.cas))
-                  d.addCallback(opres)
-
-
-                """
-                d = Deferred()
-
-                def _on_err(mres, ex_type, ex_val, ex_tb):
-                    try:
-                        raise ex_type(ex_val)
-                    except CouchbaseException:
-                        d.errback()
-                opres.set_callbacks(d.callback, _on_err)
-                return d
-
-            def view_query_ex(self, viewcls, *args, **kwargs):
-                """
-                Query a view, with the ``viewcls`` instance receiving events
-                of the query as they arrive.
-
-                :param type viewcls: A class (derived from :class:`AsyncViewBase`)
-                  to instantiate
-
-                Other arguments are passed to the standard `query` method.
-
-                This functions exactly like the :meth:`~couchbase_v2.asynchronous.AsyncBucket.query`
-                method, except it automatically schedules operations if the connection
-                has not yet been negotiated.
-                """
-
-                kwargs['itercls'] = viewcls
-                o = self._do_view_query(*args, **kwargs)
-                if not self.connected:
-                    self.on_connect().addCallback(lambda x: o.start())
-                else:
-                    o.start()
-
-                return o
-
-            def view_query(self, *args, **kwargs):
-                """
-                Returns a :class:`Deferred` object which will have its callback invoked
-                with a :class:`BatchedView` when the results are complete.
-
-                Parameters follow conventions of
-                :meth:`~couchbase_v2.bucket.Bucket.query`.
-
-                Example::
-
-                  d = cb.queryAll("beer", "brewery_beers")
-                  def on_all_rows(rows):
-                      for row in rows:
-                         print("Got row {0}".format(row))
-
-                  d.addCallback(on_all_rows)
-
-                """
-
-                if not self.connected:
-                    cb = lambda x: self.view_query(*args, **kwargs)
-                    return self.on_connect().addCallback(cb)
-
-                kwargs['itercls'] = BatchedViewResult
-                o = self._do_view_query(*args, **kwargs)
-                try:
-                    o.start()
-                except Exception as e:
-                    raise
-                return o._getDeferred()
-
-            def query_ex(self, cls, *args, **kwargs):
-                """
-                Execute a N1QL statement providing a custom handler for rows.
-
-                This method allows you to define your own subclass (of
-                :class:`~AsyncN1QLRequest`) which can handle rows as they are
-                received from the network.
-
-                :param cls: The subclass (not instance) to use
-                :param args: Positional arguments for the class constructor
-                :param kwargs: Keyword arguments for the class constructor
-
-                .. seealso:: :meth:`queryEx`, around which this method wraps
-                """
-                kwargs['itercls'] = cls
-                o = self._do_n1ql_query(*args, **kwargs)
-                if not self.connected:
-                    self.on_connect().addCallback(lambda x: o.start())
-                else:
-                    o.start()
-                return o
-
-            def query(self, *args, **kwargs):
-                """
-                Execute a N1QL query, retrieving all rows.
-
-                This method returns a :class:`Deferred` object which is executed
-                with a :class:`~.N1QLRequest` object. The object may be iterated
-                over to yield the rows in the result set.
-
-                This method is similar to :meth:`~couchbase_v2.bucket.Bucket.n1ql_query`
-                in its arguments.
-
-                Example::
-
-                    def handler(req):
-                        for row in req:
-                            # ... handle row
-
-                    d = cb.n1qlQueryAll('SELECT * from `travel-sample` WHERE city=$1`,
-                                    'Reno')
-                    d.addCallback(handler)
-
-                :return: A :class:`Deferred`
-
-                .. seealso:: :meth:`~couchbase_v2.bucket.Bucket.n1ql_query`
-                """
-                return self.deferred_verb(BatchedQueryResult, self._do_n1ql_query, self.query, *args, **kwargs)
-
-            def deferred_verb(self, itercls, raw_verb, cooked_verb, *args, **kwargs):
-                if not self.connected:
-                    cb = lambda x: cooked_verb(*args, **kwargs)
-                    return self.on_connect().addCallback(cb)
-                kwargs['itercls'] = itercls
-                o = raw_verb(*args, **kwargs)
-                o.start()
-                return o._getDeferred()
-
-            def analytics_query(self, *args, **kwargs):
-                return self.deferred_verb(BatchedAnalyticsResult, self._do_analytics_query, self.analytics_query, *args, **kwargs)
-
-            def search(self, cls, *args, **kwargs):
-                """
-                Experimental Method
-
-                Execute a Search query providing a custom handler for rows.
-
-                This method allows you to define your own subclass (of
-                :class:`~AsyncSearchRequest`) which can handle rows as they are
-                received from the network.
-
-                :param cls: The subclass (not instance) to use
-                :param args: Positional arguments for the class constructor
-                :param kwargs: Keyword arguments for the class constructor
-
-                .. seealso:: :meth:`search`, around which this method wraps
-                """
-                kwargs['itercls'] = cls
-                o = super(TxRawClient, self).search_query(*args, **kwargs)
-                if not self.connected:
-                    self.on_connect().addCallback(lambda x: o.start())
-                else:
-                    o.start()
-                return o
-
-            def search_query(self, *args, **kwargs):
-                """
-                Experimental Method
-
-                Execute a Search query, retrieving all rows.
-
-                This method returns a :class:`Deferred` object which is executed
-                with a :class:`~.SearchRequest` object. The object may be iterated
-                over to yield the rows in the result set.
-
-                This method is similar to :meth:`~couchbase_v2.bucket.Bucket.search`
-                in its arguments.
-
-                Example::
-
-                    def handler(req):
-                        for row in req:
-                            # ... handle row
-
-                    d = cb.search('name', ft.MatchQuery('nosql'), limit=10)
-                    d.addCallback(handler)
-
-                :return: A :class:`Deferred`
-
-                .. seealso:: :meth:`~couchbase_v2.bucket.Bucket.search`
-                """
-
-                if not self.connected:
-                    cb = lambda x: self.search_query(*args, **kwargs)
-                    return self.on_connect().addCallback(cb)
-
-                kwargs['itercls'] = BatchedSearchResult
-                o = super(TxRawClient, self).search_query(*args, **kwargs)
-                o.start()
-                return o._getDeferred()
-
-        return TxRawClient
-
-
-RawCollection = TxRawClientFactory.gen_raw(BaseAsyncCBCollection)
-
-
-class TxClientFactory(object):
+        class TxRawClientSpecific(TxRawClientMixin, async_base):
+            pass
+        return TxRawClientSpecific
+
+
+class TxDeferredClientMixin(TxRawClientMixin):
+    def __new__(cls, *args, **kwargs):
+        if not hasattr(cls, "TxDeferred_Wrapped"):
+            for k, v in cls._gen_memd_wrappers(TxDeferredClientMixin._meth_factory).items():
+                setattr(cls, k, v)
+            cls.TxDeferred_Wrapped = True
+        return super(TxDeferredClientMixin, cls).__new__(cls, *args, **kwargs)
+
+    @internal
+    def __init__(self, *args, **kwargs):
+        """
+        This mixin inherits from :class:`TxRawClientMixin`.
+        In addition to the connection methods, this class' data access methods
+        return :class:`Deferreds` instead of :class:`Result` objects.
+
+        Operations such as :meth:`get` or :meth:`set` will invoke the
+        :attr:`Deferred.callback` with the result object when the result is
+        complete, or they will invoke the :attr:`Deferred.errback` with an
+        exception (or :class:`Failure`) in case of an error. The rules of the
+        :attr:`~couchbase_v2.connection.Connection.quiet` attribute for raising
+        exceptions apply to the invocation of the ``errback``. This means that
+        in the case where the synchronous client would raise an exception,
+        the Deferred API will have its ``errback`` invoked. Otherwise, the
+        result's :attr:`~couchbase_v2.result.Result.success` field should be
+        inspected.
+
+
+        Likewise multi operations will be invoked with a
+        :class:`~couchbase.result.MultiResultBase` compatible object.
+
+        Some examples:
+
+        Using single items::
+
+          d_set = cb.upsert("foo", "bar")
+          d_get = cb.get("foo")
+
+          def on_err_common(*args):
+              print("Got an error: {0}".format(args)),
+          def on_set_ok(res):
+              print("Successfuly set key with CAS {0}".format(res.cas))
+          def on_get_ok(res):
+              print("Successfuly got key with value {0}".format(res.value))
+
+          d_set.addCallback(on_set_ok).addErrback(on_err_common)
+          d_get.addCallback(on_get_ok).addErrback(on_get_common)
+
+          # Note that it is safe to do this as operations performed on the
+          # same key are *always* performed in the order they were scheduled.
+
+        Using multiple items::
+
+          d_get = cb.get_multi(("Foo", "bar", "baz"))
+          def on_mres(mres):
+              for k, v in mres.items():
+                  print("Got result for key {0}: {1}".format(k, v.value))
+          d_get.addCallback(on_mres)
+
+        """
+        super(TxDeferredClientMixin, self).__init__(*args, **kwargs)
+
+    def _connectSchedule(self, f, meth, *args, **kwargs):
+        qop = Deferred()
+        qop.addCallback(lambda x: f(meth, *args, **kwargs))
+        self._evq['connect'].schedule(qop)
+        return qop
+
+    def _wrap(self,  # type: TxDeferredClient
+              meth, *args, **kwargs):
+        """
+        Calls a given method with the appropriate arguments, or defers such
+        a call until the instance has been connected
+        """
+        if not self.connected:
+            return self._connectSchedule(self._wrap, meth, *args, **kwargs)
+
+        opres = meth(self, *args, **kwargs)
+        return self.defer(opres)
+
+
+    ### Generate the methods
     @staticmethod
-    def gen_client(raw_class,  # type: Type[T]
-                   **injected_kwargs  # type: Any
-                   ):
-        # type: (...) -> Type[T]
-        class TxDeferredClient(raw_class):
-            def __init__(self, *args, **kwargs):
-                """
-                This class inherits from :class:`RawBucket`.
-                In addition to the connection methods, this class' data access methods
-                return :class:`Deferreds` instead of :class:`AsyncResult` objects.
-
-                Operations such as :meth:`get` or :meth:`set` will invoke the
-                :attr:`Deferred.callback` with the result object when the result is
-                complete, or they will invoke the :attr:`Deferred.errback` with an
-                exception (or :class:`Failure`) in case of an error. The rules of the
-                :attr:`~couchbase_v2.connection.Connection.quiet` attribute for raising
-                exceptions apply to the invocation of the ``errback``. This means that
-                in the case where the synchronous client would raise an exception,
-                the Deferred API will have its ``errback`` invoked. Otherwise, the
-                result's :attr:`~couchbase_v2.result.Result.success` field should be
-                inspected.
+    def _meth_factory(meth, _):
+        def ret(self, *args, **kwargs):
+            return self._wrap(meth, *args, **kwargs)
+        return ret
 
 
-                Likewise multi operations will be invoked with a
-                :class:`~couchbase_v2.result.MultiResult` compatible object.
-
-                Some examples:
-
-                Using single items::
-
-                  d_set = cb.upsert("foo", "bar")
-                  d_get = cb.get("foo")
-
-                  def on_err_common(*args):
-                      print("Got an error: {0}".format(args)),
-                  def on_set_ok(res):
-                      print("Successfuly set key with CAS {0}".format(res.cas))
-                  def on_get_ok(res):
-                      print("Successfuly got key with value {0}".format(res.value))
-
-                  d_set.addCallback(on_set_ok).addErrback(on_err_common)
-                  d_get.addCallback(on_get_ok).addErrback(on_get_common)
-
-                  # Note that it is safe to do this as operations performed on the
-                  # same key are *always* performed in the order they were scheduled.
-
-                Using multiple items::
-
-                  d_get = cb.get_multi(("Foo", "bar", "baz"))
-                  def on_mres(mres):
-                      for k, v in mres.items():
-                          print("Got result for key {0}: {1}".format(k, v.value))
-                  d_get.addCallback(on_mres)
-
-                """
-                kwargs.update(injected_kwargs)
-                super(TxDeferredClient, self).__init__(*args, **kwargs)
-
-            def _connectSchedule(self, f, meth, *args, **kwargs):
-                qop = Deferred()
-                qop.addCallback(lambda x: f(meth, *args, **kwargs))
-                self._evq['connect'].schedule(qop)
-                return qop
-
-            def _wrap(self,  # type: TxDeferredClient
-                      meth, *args, **kwargs):
-                """
-                Calls a given method with the appropriate arguments, or defers such
-                a call until the instance has been connected
-                """
-                if not self.connected:
-                    return self._connectSchedule(self._wrap, meth, *args, **kwargs)
-
-                opres = meth(self, *args, **kwargs)
-                return self.defer(opres)
+class TxRawCollection(TxRawClientMixin, BaseAsyncCBCollection):
+    pass
 
 
-            ### Generate the methods
-            def _meth_factory(meth, name):
-                def ret(self, *args, **kwargs):
-                    return self._wrap(meth, *args, **kwargs)
-                return ret
-
-            locals().update(raw_class._gen_memd_wrappers(_meth_factory))
-            for x in raw_class._MEMCACHED_OPERATIONS:
-                if locals().get(x+'_multi', None):
-                    locals().update({x+"Multi": locals()[x+"_multi"]})
-        return TxDeferredClient
+class TxCollection(TxDeferredClientMixin, BaseAsyncCBCollection):
+    pass
 
 
-TxCollection = TxClientFactory.gen_client(RawCollection)
+class TxRawBucket(TxRawClientMixin, V3AsyncBucket):
+    @internal
+    def __init__(self, *args, **kwargs):
+        super(TxRawBucket, self).__init__(collection_factory=TxRawCollection, *args, **kwargs)
 
-RawTxBucket = TxRawClientFactory.gen_raw(V3AsyncBucket)
 
-
-class TxBucket(TxClientFactory.gen_client(RawTxBucket)):
+class TxBucket(TxDeferredClientMixin, V3AsyncBucket):
+    @internal
     def __init__(self, *args, **kwargs):
         super(TxBucket,self).__init__(collection_factory=TxCollection, *args, **kwargs)
 
 
-RawTxCluster=TxRawClientFactory.gen_raw(V3AsyncCluster)
-TxCluster = TxClientFactory.gen_client(RawTxCluster, bucket_factory=TxBucket)
+class TxRawCluster(TxRawClientMixin, V3AsyncCluster):
+    def __init__(self, *args, **kwargs):
+        super(TxRawCluster, self).__init__(*args, bucket_factory=TxRawBucket, **kwargs)
+
+
+class TxCluster(TxDeferredClientMixin, V3AsyncCluster):
+    def __init__(self, *args, **kwargs):
+        super(TxCluster, self).__init__(*args, bucket_factory=TxBucket, **kwargs)
 
 
 class TxSyncCluster(V3SyncCluster):

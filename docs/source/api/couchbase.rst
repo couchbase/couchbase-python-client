@@ -513,13 +513,12 @@ Durability constraints ensure safer protection against data loss.
 Attributes
 ==========
 
-.. warning::
-    The APIs below are from SDK2 and currently only available
-    from the couchbase_v2 legacy support package. We plan
-    to update these to support SDK3 shortly.
-
 .. currentmodule:: couchbase.bucket
 .. class:: Bucket
+
+    .. autoattribute:: kv_timeout
+
+    .. autoattribute:: view_timeout
 
     .. autoattribute:: quiet
 
@@ -529,23 +528,7 @@ Attributes
 
     .. autoattribute:: unlock_gil
 
-    .. autoattribute:: timeout
-
-    .. autoattribute:: views_timeout
-
-    .. autoattribute:: n1ql_timeout
-
-    .. autoattribute:: bucket
-
-    .. autoattribute:: server_nodes
-
-    .. autoattribute:: is_ssl
-
-    .. autoattribute:: compression
-
-    .. autoattribute:: compression_min_size
-
-    .. autoattribute:: compression_min_ratio
+    .. autoattribute:: name
 
     .. attribute:: default_format
 
@@ -573,6 +556,21 @@ Attributes
         still set an error inside the :class:`~couchbase.result.Result` object.
 
     .. autoattribute:: lockmode
+
+.. currentmodule:: couchbase.cluster
+.. class:: Cluster
+
+    .. autoattribute:: n1ql_timeout
+
+    .. autoattribute:: server_nodes
+
+    .. autoattribute:: is_ssl
+
+    .. autoattribute:: compression
+
+    .. autoattribute:: compression_min_size
+
+    .. autoattribute:: compression_min_ratio
 
 
 Private APIs

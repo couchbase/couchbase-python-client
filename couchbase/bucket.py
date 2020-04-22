@@ -10,7 +10,7 @@ from .collection import Scope
 from datetime import timedelta
 from enum import Enum
 import logging
-from couchbase_core.asynchronous import AsyncClientFactory
+from couchbase_core.asynchronous.client import AsyncClientMixin
 
 
 class ViewScanConsistency(Enum):
@@ -443,4 +443,5 @@ class Bucket(CoreClientDatastructureWrap):
         self._set_timeout_common(_LCB.TRACING_THRESHOLD_VIEW, val)
 
 
-AsyncBucket=AsyncClientFactory.gen_async_client(Bucket)
+class AsyncBucket(AsyncClientMixin, Bucket):
+    pass

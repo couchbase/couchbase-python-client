@@ -12,7 +12,7 @@ from couchbase.durability import Durability, DurabilityType, DurabilityOptionBlo
 from couchbase.exceptions import NotSupportedException, DocumentNotFoundException, PathNotFoundException, QueueEmpty, \
     PathExistsException, DocumentExistsException
 from couchbase_core import JSON
-from couchbase_core.asynchronous.bucket import AsyncClientFactory
+from couchbase_core.asynchronous.client import AsyncClientMixin
 from couchbase_core.client import Client as CoreClient
 from couchbase_core.supportability import volatile
 from .options import OptionBlock, AcceptableInts
@@ -1647,7 +1647,8 @@ class CBCollection(CBCollectionBase, wrapt.ObjectProxy):
         return self._self_scope.bucket
 
 
+class AsyncCBCollection(AsyncClientMixin, CBCollection):
+    pass
+
+
 Collection = CBCollection
-
-
-AsyncCBCollection = AsyncClientFactory.gen_async_client(CBCollection)
