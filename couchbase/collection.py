@@ -1611,8 +1611,14 @@ class CoreClientDatastructureWrap(CoreClient):
         return getattr(CoreClient._wrap_dsop(self,sdres, has_value), 'value')
 
 
-class CBCollectionShared(CBCollectionBase, wrapt.ObjectProxy):
-    def __init__(self,  # type: CBCollectionShared
+class CBCollection(CBCollectionBase, wrapt.ObjectProxy):
+    def __copy__(self):
+        raise NotImplementedError()
+
+    def __deepcopy__(self, memo):
+        raise NotImplementedError()
+
+    def __init__(self,  # type: CBCollection
                  name = None,  # type: str
                  parent_scope = None,  # type: Scope
                  *options,
@@ -1635,48 +1641,12 @@ class CBCollectionShared(CBCollectionBase, wrapt.ObjectProxy):
         CBCollectionBase.__init__(self, name=name,  parent_scope=parent_scope, *options, **kwargs)
 
     @property
-    def bucket(self  # type: CBCollectionShared
+    def bucket(self  # type: CBCollection
                ):
         # type: (...) -> CoreClient
         return self._self_scope.bucket
 
 
-class CBCollectionNonShared(CBCollectionBase, CoreClient):
-    def __init__(self,  # type: CBCollectionNonShared
-                 *options,
-                 name = None,  # type: str
-                 parent_scope = None,  # type: Scope
-                 **kwargs
-                 ):
-        # type: (...) -> None
-        """
-        Couchbase collection. Should only be invoked by internal API, e.g.
-        by :meth:`couchbase.collection.scope.Scope.collection` or
-        :meth:`couchbase.bucket.Bucket.default_collection`.
-
-        Args as for CoreClient, plus:
-
-        :param couchbase.collections.Scope parent: parent scope
-        :param str name: name of collection
-        :param CollectionOptions options: miscellaneous options
-        """
-        options = list(options)
-        connstr = kwargs.pop('connection_string', kwargs.pop('connstr', None))
-        connstr = connstr or options.pop(0)
-        final_args = [connstr] + options
-        CoreClient.__init__(self, *final_args, **kwargs)
-        CBCollectionBase.__init__(self, *options, name=name, parent_scope=parent_scope, **kwargs)
-    @property
-    def bucket_class(self):
-        return CoreClient
-    @property
-    def bucket(self  # type: CBCollectionNonShared
-               ):
-        # type: (...) -> CoreClient
-        return self
-
-
-CBCollection = CBCollectionShared if (os.getenv("PYCBC_COLL_SHARED", "").upper() != "OFF") else CBCollectionNonShared
 Collection = CBCollection
 
 
