@@ -15,14 +15,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import unittest
+
 from couchbase_tests.base import CollectionTestCase
-from couchbase.cluster import ClassicAuthenticator
-from couchbase.cluster import  DiagnosticsOptions, Cluster, ClusterOptions
+from couchbase.cluster import ClassicAuthenticator, PasswordAuthenticator, ClusterOptions, ClusterTimeoutOptions,\
+    ClusterTracingOptions, Compression, DiagnosticsOptions, Cluster
 from couchbase.diagnostics import ServiceType, EndpointState, ClusterState
 from couchbase.exceptions import AlreadyShutdownException
 from datetime import timedelta
 from unittest import SkipTest
-import couchbase_core._libcouchbase as _LCB
 
 
 class ClusterTests(CollectionTestCase):
@@ -88,53 +89,151 @@ class ClusterTests(CollectionTestCase):
         cluster.disconnect()
         self.assertRaises(AlreadyShutdownException, cluster.buckets)
 
-    def test_n1ql_default_timeout(self):
-        self.cluster.n1ql_timeout = timedelta(seconds=50)
-        self.assertEqual(timedelta(seconds=50), self.cluster.n1ql_timeout)
+    def _authenticator(self):
+        if self.is_mock:
+            return ClassicAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)
+        return PasswordAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)
+
+    def _create_cluster_opts(self, **kwargs):
+        return ClusterOptions(self._authenticator(), **kwargs)
+
+    def _mock_hack(self):
+        if self.is_mock:
+            return {'bucket': self.bucket_name}
+        return {}
+
+    def test_can_override_timeout_options(self):
+        timeout = timedelta(seconds=100)
+        timeout2 = timedelta(seconds=50)
+        opts = self._create_cluster_opts(timeout_options=ClusterTimeoutOptions(kv_timeout=timeout))
+        args = self._mock_hack()
+        args.update({'timeout_options': ClusterTimeoutOptions(kv_timeout=timeout2)})
+        cluster = Cluster.connect(self.cluster.connstr, opts, **args)
+        b = cluster.bucket(self.bucket_name)
+        self.assertEqual(timeout2, b.kv_timeout)
+
+    def test_can_override_tracing_options(self):
+        timeout = timedelta(seconds=50)
+        timeout2 = timedelta(seconds=100)
+        opts = self._create_cluster_opts(
+            tracing_options=ClusterTracingOptions(tracing_orphaned_queue_flush_interval=timeout))
+        args = self._mock_hack()
+        args.update({'tracing_options': ClusterTracingOptions(tracing_orphaned_queue_flush_interval=timeout2)})
+        cluster = Cluster.connect(self.cluster.connstr, opts, **args)
+        self.assertEqual(timeout2, cluster.tracing_orphaned_queue_flush_interval)
+        b = cluster.bucket(self.bucket_name)
+        self.assertEqual(timeout2, b.tracing_orphaned_queue_flush_interval)
+
+    def test_can_override_cluster_options(self):
+        compression = Compression.FORCE
+        compression2 = Compression.IN
+        opts = self._create_cluster_opts(compression=compression)
+        args = self._mock_hack()
+        args.update({'compression': compression2})
+        cluster = Cluster.connect(self.cluster.connstr, opts, **args)
+        self.assertEqual(compression2, cluster.compression)
+
+    def test_kv_default_timeout(self):
+        timeout = timedelta(seconds=50)
+        opts = self._create_cluster_opts(timeout_options=ClusterTimeoutOptions(kv_timeout=timeout))
+        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        b = cluster.bucket(self.bucket_name)
+        self.assertEqual(timeout, b.kv_timeout)
+
+    def test_views_default_timeout(self):
+        timeout = timedelta(seconds=50)
+        opts = self._create_cluster_opts(timeout_options=ClusterTimeoutOptions(views_timeout=timeout))
+        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        b = cluster.bucket(self.bucket_name)
+        self.assertEqual(timeout, b.views_timeout)
+
+    def test_query_default_timeout(self):
+        timeout = timedelta(seconds=50)
+        opts = self._create_cluster_opts(timeout_options=ClusterTimeoutOptions(query_timeout=timeout))
+        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        self.assertEqual(timeout, cluster.query_timeout)
 
     def test_tracing_orphaned_queue_flush_interval(self):
-        self.cluster.tracing_orphaned_queue_flush_interval = timedelta(seconds=1)
-        self.assertEqual(timedelta(seconds=1), self.cluster.tracing_orphaned_queue_flush_interval)
+        timeout = timedelta(seconds=50)
+        opts = self._create_cluster_opts(
+            tracing_options=ClusterTracingOptions(tracing_orphaned_queue_flush_interval=timeout))
+        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        self.assertEqual(timeout, cluster.tracing_orphaned_queue_flush_interval)
+        b = cluster.bucket(self.bucket_name)
+        self.assertEqual(timeout, b.tracing_orphaned_queue_flush_interval)
 
     def test_tracing_orphaned_queue_size(self):
-        self.cluster.tracing_orphaned_queue_size = 10
-        self.assertEqual(10, self.cluster.tracing_orphaned_queue_size)
+        size = 10
+        opt = ClusterTracingOptions(tracing_orphaned_queue_size=size)
+        opts = self._create_cluster_opts(tracing_options=opt)
+        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        self.assertEqual(10, cluster.tracing_orphaned_queue_size)
+        b = cluster.bucket(self.bucket_name)
+        self.assertEqual(size, b.tracing_orphaned_queue_size)
 
     def test_tracing_threshold_queue_flush_interval(self):
-        self.cluster.tracing_threshold_queue_flush_interval = timedelta(seconds=10)
-        self.assertEqual(timedelta(seconds=10), self.cluster.tracing_threshold_queue_flush_interval)
+        timeout = timedelta(seconds=10)
+        opt = ClusterTracingOptions(tracing_threshold_queue_flush_interval=timeout)
+        opts = self._create_cluster_opts(tracing_options=opt)
+        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        self.assertEqual(timeout, cluster.tracing_threshold_queue_flush_interval)
+        b = cluster.bucket(self.bucket_name)
+        self.assertEqual(timeout, b.tracing_threshold_queue_flush_interval)
 
     def test_tracing_threshold_queue_size(self):
-        self.cluster.tracing_threshold_queue_size = 100
-        self.assertEqual(100, self.cluster.tracing_threshold_queue_size)
+        size = 100
+        opt = ClusterTracingOptions(tracing_threshold_queue_size=size)
+        opts = self._create_cluster_opts(tracing_options=opt)
+        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        self.assertEqual(size, cluster.tracing_threshold_queue_size)
+        b = cluster.bucket(self.bucket_name)
+        self.assertEqual(size, b.tracing_threshold_queue_size)
 
-    def test_tracing_threshold_n1ql(self):
-        self.cluster.tracing_threshold_n1ql = timedelta(seconds=1)
-        self.assertEqual(timedelta(seconds=1), self.cluster.tracing_threshold_n1ql)
+    @unittest.skip("waiting on CCBC-1222")
+    def test_tracing_threshold_query(self):
+        timeout = timedelta(seconds=0.3)
+        opt = ClusterTracingOptions(tracing_threshold_query=timeout)
+        opts = self._create_cluster_opts(tracing_options=opt)
+        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        self.assertEqual(timeout, cluster.tracing_threshold_n1ql)
 
-    def test_tracing_threshold_fts(self):
-        self.cluster.tracing_threshold_fts = timedelta(seconds=1)
-        self.assertEqual(timedelta(seconds=1), self.cluster.tracing_threshold_fts)
+    @unittest.skip("waiting on CCBC-1222")
+    def test_tracing_threshold_search(self):
+        timeout = timedelta(seconds=0.3)
+        opt = ClusterTracingOptions(tracing_threshold_search=timeout)
+        opts = self._create_cluster_opts(tracing_options=opt)
+        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        self.assertEqual(timeout, cluster.tracing_threshold_search)
 
     def test_tracing_threshold_analytics(self):
-        self.cluster.tracing_threshold_analytics = timedelta(seconds=1)
-        self.assertEqual(timedelta(seconds=1), self.cluster.tracing_threshold_analytics)
+        timeout = timedelta(seconds=0.3)
+        opt = ClusterTracingOptions(tracing_threshold_analytics=timeout)
+        opts = self._create_cluster_opts(tracing_options=opt)
+        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        self.assertEqual(timeout, cluster.tracing_threshold_analytics)
 
     def test_compression(self):
-        self.cluster.compression = _LCB.COMPRESS_NONE
-        self.assertEqual(_LCB.COMPRESS_NONE, self.cluster.compression)
+        compression = Compression.FORCE
+        opts = self._create_cluster_opts(compression=compression)
+        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        self.assertEqual(compression, cluster.compression)
 
     def test_compression_min_size(self):
-        self.cluster.compression_min_size = 5000
-        self.assertEqual(5000, self.cluster.compression_min_size)
+        size = 5000
+        opts = self._create_cluster_opts(compression_min_size=size)
+        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        self.assertEqual(size, cluster.compression_min_size)
 
     def test_compression_min_ratio(self):
-        self.cluster.compression_min_ratio = 0.5
-        self.assertEqual(0.5, self.cluster.compression_min_ratio)
+        ratio = 0.5
+        opts = self._create_cluster_opts(compression_min_ratio=ratio)
+        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        self.assertEqual(ratio, cluster.compression_min_ratio)
 
     def test_redaction(self):
-        self.cluster.redaction = True
-        self.assertTrue(self.cluster.redaction)
+        opts = self._create_cluster_opts(log_redaction=True)
+        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        self.assertTrue(cluster.redaction)
 
     def test_is_ssl(self):
         # well, our tests are not ssl, so...

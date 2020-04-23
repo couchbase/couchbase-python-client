@@ -26,7 +26,7 @@ from couchbase.options import OptionBlockTimeOut
 from couchbase_core.cluster import *
 from .result import *
 from random import choice
-
+from enum import Enum
 
 T = TypeVar('T')
 
@@ -181,7 +181,6 @@ class QueryOptions(OptionBlockTimeOut):
         # this will change the options for export.
         # NOT USED CURRENTLY
 
-
     def as_dict(self):
         for key, val in self.items():
             if key == 'positional_parameters':
@@ -205,20 +204,176 @@ class QueryOptions(OptionBlockTimeOut):
         return self
 
 
-class Cluster(CoreClient):
-    class ClusterOptions(OptionBlock):
-        def __init__(self,
-                     authenticator,  # type: CoreAuthenticator
-                     **kwargs
-                     ):
-            super(ClusterOptions, self).__init__()
-            self['authenticator'] = authenticator
+class ClusterTimeoutOptions(dict):
+    KEY_MAP = {'kv_timeout': 'operation_timeout',
+               'query_timeout': 'query_timeout',
+               'views_timeout': 'views_timeout'}
+    @overload
+    def __init__(self,
+                 query_timeout=None,                  # type: timedelta
+                 kv_timeout=None,                    # type: timedelta
+                 views_timeout=None                  # type: timedelta
+                 ):
+        pass
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def as_dict(self):
+        opts = {}
+        for k, v in self.items():
+            if v is None or k not in self.KEY_MAP.keys():
+                continue
+            elif k in self.KEY_MAP:
+                opts[self.KEY_MAP[k]] = v.total_seconds()
+            else:
+                opts[k] = v
+        return opts
+
+
+class Compression(Enum):
+    @classmethod
+    def from_int(cls, val):
+        if val == 0:
+            return cls.NONE
+        elif val == 1:
+            return cls.IN
+        elif val == 2:
+            return cls.OUT
+        elif val == 3:
+            return cls.INOUT
+        elif val == 7:
+            # note that the lcb flag is a 4, but when you set "force" in the connection
+            # string, it sets it as INOUT|FORCE.
+            return cls.FORCE
+        else:
+            raise InvalidArgumentException("cannot convert {} to a Compression".format(val))
+
+    NONE='off'
+    IN='inflate_only'
+    OUT='deflate_only'
+    INOUT='on'
+    FORCE='force'
+
+
+class ClusterTracingOptions(dict):
+    INT_KEYS = ['tracing_threshold_queue_size',
+                'tracing_orphaned_queue_size']
+    KEYS = ['tracing_threshold_kv', 'tracing_threshold_view', 'tracing_threshold_query', 'tracing_threshold_search',
+            'tracing_threshold_analytics', 'tracing_threshold_queue_size', 'tracing_threshold_queue_flush_interval',
+            'tracing_orphaned_queue_size', 'tracing_orphaned_queue_flush_interval']
+    @overload
+    def __init__(self,
+                 tracing_threshold_kv=None,                      # type: timedelta
+                 tracing_threshold_view=None,                    # type: timedelta
+                 tracing_threshold_query=None,                   # type: timedelta
+                 tracing_threshold_search=None,                  # type: timedelta
+                 tracing_threshold_analytics=None,               # type: timedelta
+                 tracing_threshold_queue_size=None,              # type: int
+                 tracing_threshold_queue_flush_interval=None,    # type: timedelta
+                 tracing_orphaned_queue_size=None,               # type: int
+                 tracing_orphaned_queue_flush_interval=None,     # type: timedelta
+                 ):
+        pass
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def as_dict(self):
+        opts = {}
+        for k, v in self.items():
+            if v is None or k not in self.KEYS:
+                continue
+            elif isinstance(v, timedelta):
+                opts[k] = v.total_seconds()
+            else:
+                opts[k] = v
+        return opts
+
+
+class ClusterOptions(dict):
+    KEYS = ['timeout_options', 'tracing_options', 'log_redaction', 'compression', 'compression_min_size',
+            'compression_min_ratio']
+
+    @overload
+    def __init__(self,
+                 authenticator,                      # type: CoreAuthenticator
+                 timeout_options=None,               # type: ClusterTimeoutOptions
+                 tracing_options=None,               # type: ClusterTracingOptions
+                 log_redaction=None,                 # type: bool
+                 compression=None,                   # type: Compression
+                 compression_min_size=None,          # type: int
+                 compression_min_ratio=None,         # type: float
+                 ):
+        pass
 
     def __init__(self,
-                 connection_string,  # type: str
-                 *options,           # type: ClusterOptions
-                 bucket_factory=Bucket,  # type: Any
-                 **kwargs            # type: Any
+                 authenticator,     # type: CoreAuthenticator
+                 **kwargs):
+        super(ClusterOptions, self).__init__(**kwargs)
+        self['authenticator'] = authenticator
+
+    def update_connection_string(self, connstr, **kwargs):
+
+        opts = self.as_dict(**kwargs)
+        if len(opts) == 0:
+            return connstr
+        conn = ConnectionString.parse(connstr)
+        for k, v in opts.items():
+            conn.set_option(k, v)
+        return conn.encode()
+
+    def split_args(self, **kwargs):
+        # return a tuple with args we recognize and those we don't, which
+        # should be kwargs in connect
+        ours = {}
+        theirs = {}
+        for k, v in kwargs.items():
+            if k in self.KEYS:
+                ours[k] = v
+            else:
+                theirs[k] = v
+        return (ours, theirs,)
+
+
+    def as_dict(self, **kwargs):
+        # the kwargs override or add to existing args.  So you could do something like:
+        # opts.as_dict(tracing_options=TracingOptions(tracing_threshold_kv=timedelta(seconds=1)),
+        #                                             compression=Compression.NONE)
+        # and expect those values to override the corresponding ones in the output.
+        #
+
+        # first, get the nested dicts and update if necessary
+        for k in ['timeout_options', 'tracing_options']:
+            obj = self.get(k, {}).update(kwargs.pop(k, {}))
+            if obj:
+                self.update({k:obj})
+        # now, update the top-level ones
+        self.update(kwargs)
+
+        # now convert final product
+        opts = {}
+        for k, v in self.items():
+            if v is None or k not in self.KEYS:
+                continue
+            elif k in ['timeout_options', 'tracing_options']:
+                opts.update(v.as_dict())
+            elif k in ['compression_min_size', 'log_redaction']:
+                opts[k] = str(int(v))
+            elif k == 'compression':
+                opts[k] = v.value
+            else:
+                opts[k] = v
+        return opts
+
+
+class Cluster(CoreClient):
+
+    def __init__(self,
+                 connection_string,         # type: str
+                 options=None,              # type: ClusterOptions
+                 bucket_factory=Bucket,     # type: Any
+                 **kwargs                   # type: Any
                  ):
         """
         Create a Cluster object.
@@ -228,27 +383,33 @@ class Cluster(CoreClient):
         :param ClusterOptions options: options for the cluster.
         :param Any kwargs: Override corresponding value in options.
         """
-        self.connstr = connection_string
-        async_items = {k: kwargs.pop(k) for k in list(kwargs.keys()) if k in {'_iops', '_flags'}}
-        cluster_opts = forward_args(kwargs, *options)  # type: Dict[str,Any]
-        self._authenticator = cluster_opts.pop('authenticator', None)  # type: Authenticator
+        self._authenticator = kwargs.pop('authenticator', None)
+        cluster_opts = options or ClusterOptions(self._authenticator)
         if not self._authenticator:
-            raise InvalidArgumentException("Authenticator is mandatory")
-
+            self._authenticator = cluster_opts.pop('authenticator', None)
+            if not self._authenticator:
+                raise InvalidArgumentException("Authenticator is mandatory")
+        async_items = {k: kwargs.pop(k) for k in list(kwargs.keys()) if k in {'_iops', '_flags'}}
+        # fixup any overrides to the ClusterOptions here as well
+        args, kwargs = cluster_opts.split_args(**kwargs)
+        self.connstr = cluster_opts.update_connection_string(connection_string, **args)
         self.__admin = None
-        self._cluster = CoreCluster(connection_string, bucket_factory=bucket_factory)  # type: CoreCluster
+        self._cluster = CoreCluster(self.connstr, bucket_factory=bucket_factory)  # type: CoreCluster
         self._cluster.authenticate(self._authenticator)
         credentials = self._authenticator.get_credentials()
         self._clusteropts = dict(**credentials.get('options', {}))
-        self._clusteropts.update(cluster_opts)
         self._adminopts = dict(**self._clusteropts)
         self._clusteropts.update(async_items)
-        #self._clusteropts['bucket'] = "default"
+        # TODO: eliminate the 'mock hack' and ClassicAuthenticator, then you can remove this as well.
+        self._clusteropts.update(kwargs)
+        self._connstr_opts = cluster_opts
+        self.connstr = cluster_opts.update_connection_string(self.connstr)
         super(Cluster, self).__init__(connection_string=str(self.connstr), _conntype=_LCB.LCB_TYPE_CLUSTER, **self._clusteropts)
 
     @classmethod
-    def connect(cls, connection_string,  # type: str
-                *options,  # type: ClusterOptions
+    def connect(cls,
+                connection_string,  # type: str
+                options=None,       # type: ClusterOptions
                 **kwargs
                 ):
         """
@@ -258,7 +419,7 @@ class Cluster(CoreClient):
         :param ClusterOptions options: options for the cluster.
         :param Any kwargs: Override corresponding value in options.
         """
-        return cls(connection_string, *options, **kwargs)
+        return cls(connection_string, options, **kwargs)
 
     def _do_ctor_connect(self, *args, **kwargs):
         super(Cluster,self)._do_ctor_connect(*args,**kwargs)
@@ -274,9 +435,6 @@ class Cluster(CoreClient):
             self.__admin = Admin(connection_string=str(self.connstr), **self._adminopts)
         return self.__admin
 
-    # TODO: There should be no reason for these kwargs.  However, our tests against the mock
-    # will all fail with auth errors without it...  So keeping it just for now, but lets fix it
-    # and remove this for 3.0.0
     def bucket(self,
                name    # type: str
                ):
@@ -552,7 +710,7 @@ class Cluster(CoreClient):
         return self._admin.http_request(path="/pools").value.get("isDeveloperPreview", False)
 
     @property
-    def n1ql_timeout(self):
+    def query_timeout(self):
         # type: (...) -> timedelta
         """
         The timeout for N1QL query operations. This affects the
@@ -566,16 +724,8 @@ class Cluster(CoreClient):
         self._check_for_shutdown()
         return timedelta(seconds=self._get_timeout_common(_LCB.LCB_CNTL_QUERY_TIMEOUT))
 
-    @n1ql_timeout.setter
-    def n1ql_timeout(self,
-                     timeout  # type: timedelta
-                     ):
-        # type: (...) -> None
-        self._check_for_shutdown()
-        self._set_timeout_common(_LCB.LCB_CNTL_QUERY_TIMEOUT, timeout)
-
     @property
-    def tracing_threshold_n1ql(self):
+    def tracing_threshold_query(self):
         """
         The tracing threshold for N1QL, as `timedelta`
 
@@ -587,15 +737,8 @@ class Cluster(CoreClient):
 
         return timedelta(seconds=self._cntl(op=_LCB.TRACING_THRESHOLD_QUERY, value_type="timeout"))
 
-    @tracing_threshold_n1ql.setter
-    def tracing_threshold_n1ql(self,
-                               val  # type: timedelta
-                               ):
-        self._set_timeout_common(_LCB.TRACING_THRESHOLD_QUERY, val)
-
-
     @property
-    def tracing_threshold_fts(self):
+    def tracing_threshold_search(self):
         """
         The tracing threshold for FTS, as `timedelta`.
         ::
@@ -606,12 +749,6 @@ class Cluster(CoreClient):
 
         return timedelta(seconds=self._cntl(op=_LCB.TRACING_THRESHOLD_SEARCH,
                                                                  value_type="timeout"))
-
-    @tracing_threshold_fts.setter
-    def tracing_threshold_fts(self,
-                              val   # type: timedelta
-                              ):
-        self._set_timeout_common(_LCB.TRACING_THRESHOLD_SEARCH, val)
 
     @property
     def tracing_threshold_analytics(self):
@@ -627,12 +764,6 @@ class Cluster(CoreClient):
         return timedelta(seconds=self._cntl(op=_LCB.TRACING_THRESHOLD_ANALYTICS,
                                             value_type="timeout"))
 
-    @tracing_threshold_analytics.setter
-    def tracing_threshold_analytics(self,
-                                    val     # type: timedelta
-                                    ):
-        self._set_timeout_common(_LCB.TRACING_THRESHOLD_ANALYTICS, val)
-
     @property
     def tracing_orphaned_queue_flush_interval(self):
         """
@@ -647,14 +778,6 @@ class Cluster(CoreClient):
         return timedelta(seconds=self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL,
                                                     value_type="timeout"))
 
-    @tracing_orphaned_queue_flush_interval.setter
-    def tracing_orphaned_queue_flush_interval(self,
-                                              val   # type: timedelta
-                                              ):
-        self._sync_operate_on_entire_cluster(CoreClient._set_timeout_common,
-                                             _LCB.TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL,
-                                             val)
-
     @property
     def tracing_orphaned_queue_size(self):
         """
@@ -667,15 +790,6 @@ class Cluster(CoreClient):
         """
 
         return self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_SIZE, value_type="uint32_t")
-
-    @tracing_orphaned_queue_size.setter
-    def tracing_orphaned_queue_size(self,
-                                    val     # type: int
-                                    ):
-        self._sync_operate_on_entire_cluster(CoreClient._cntl,
-                                             op=_LCB.TRACING_ORPHANED_QUEUE_SIZE,
-                                             value=val,
-                                             value_type="uint32_t")
 
     @property
     def tracing_threshold_queue_flush_interval(self):
@@ -691,14 +805,6 @@ class Cluster(CoreClient):
         return timedelta(seconds=self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_FLUSH_INTERVAL,
                                             value_type="timeout"))
 
-    @tracing_threshold_queue_flush_interval.setter
-    def tracing_threshold_queue_flush_interval(self,
-                                               val  # type: timedelta
-                                               ):
-        self._sync_operate_on_entire_cluster(CoreClient._set_timeout_common,
-                                             _LCB.TRACING_THRESHOLD_QUEUE_FLUSH_INTERVAL,
-                                             val)
-
     @property
     def tracing_threshold_queue_size(self):
         """
@@ -712,26 +818,9 @@ class Cluster(CoreClient):
 
         return self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_SIZE, value_type="uint32_t")
 
-    @tracing_threshold_queue_size.setter
-    def tracing_threshold_queue_size(self, val):
-        self._sync_operate_on_entire_cluster(CoreClient._cntl,
-                                             op=_LCB.TRACING_THRESHOLD_QUEUE_SIZE,
-                                             value=val,
-                                             value_type="uint32_t")
-
     @property
     def redaction(self):
         return bool(self._cntl(_LCB.LCB_CNTL_LOG_REDACTION, value_type='int'))
-
-    @redaction.setter
-    def redaction(self,
-                  val   # type: bool
-                  ):
-        val = 1 if val else 0
-        self._sync_operate_on_entire_cluster(CoreClient._cntl,
-                                             _LCB.LCB_CNTL_LOG_REDACTION,
-                                             value=val,
-                                             value_type='int')
 
     @property
     def compression(self):
@@ -763,14 +852,9 @@ class Cluster(CoreClient):
         support compression despite a HELLO not having been initially negotiated.
         """
 
-        return self._cntl(_LCB.LCB_CNTL_COMPRESSION_OPTS, value_type='int')
-
-    @compression.setter
-    def compression(self, value):
-        self._sync_operate_on_entire_cluster(CoreClient._cntl,
-                                             _LCB.LCB_CNTL_COMPRESSION_OPTS,
-                                             value=value,
-                                             value_type='int')
+        return Compression.from_int(
+            self._cntl(_LCB.LCB_CNTL_COMPRESSION_OPTS, value_type='int')
+        )
 
     @property
     def compression_min_size(self):
@@ -781,15 +865,6 @@ class Cluster(CoreClient):
         """
         return self._cntl(_LCB.LCB_CNTL_COMPRESSION_MIN_SIZE, value_type='uint32_t')
 
-    @compression_min_size.setter
-    def compression_min_size(self,
-                             value  # type: int
-                             ):
-        self._sync_operate_on_entire_cluster(CoreClient._cntl,
-                                             _LCB.LCB_CNTL_COMPRESSION_MIN_SIZE,
-                                             value_type='uint32_t',
-                                             value=value)
-
     @property
     def compression_min_ratio(self):
         """
@@ -798,13 +873,6 @@ class Cluster(CoreClient):
         :type: float
         """
         return self._cntl(_LCB.LCB_CNTL_COMPRESSION_MIN_RATIO, value_type='float')
-
-    @compression_min_ratio.setter
-    def compression_min_ratio(self, value):
-        self._sync_operate_on_entire_cluster(CoreClient._cntl,
-                                             _LCB.LCB_CNTL_COMPRESSION_MIN_RATIO,
-                                             value_type='float',
-                                             value=value)
 
     @property
     def is_ssl(self):
@@ -826,5 +894,3 @@ class AsyncCluster(AsyncClientMixin, Cluster):
     def connect(cls, connection_string=None, *args, **kwargs):
         return cls(connection_string=connection_string, *args, **kwargs)
 
-
-ClusterOptions = Cluster.ClusterOptions

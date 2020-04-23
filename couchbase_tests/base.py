@@ -37,10 +37,12 @@ from utilspie.collectionsutils import frozendict
 import couchbase_core
 from collections import defaultdict
 from couchbase.bucket import Bucket as V3Bucket
-from couchbase.cluster import Cluster, ClassicAuthenticator
+from couchbase.cluster import Cluster, ClassicAuthenticator, ClusterOptions, ClusterTracingOptions, \
+    ClusterTimeoutOptions
 from couchbase.cluster import PasswordAuthenticator
 from couchbase.collection import CBCollection
-from couchbase.exceptions import CollectionAlreadyExistsException, ScopeAlreadyExistsException, NotSupportedException
+from couchbase.exceptions import CollectionAlreadyExistsException, ScopeAlreadyExistsException, NotSupportedException, \
+    CouchbaseException
 from couchbase.management.analytics import CreateDatasetOptions
 from couchbase.management.collections import CollectionSpec
 from couchbase_core.client import Client as CoreClient
@@ -840,20 +842,25 @@ class ClusterTestCase(CouchbaseTestCase):
         return connstr_nobucket, bucket
 
     def init_cluster_and_bucket(self, **kwargs):
+        # put the ClusterOptions in later
+        opts = kwargs.pop('cluster_options', None)
         connargs = self.cluster_info.make_connargs(**kwargs)
         connstr_abstract, bucket_name = self._get_connstr_and_bucket_name([], connargs)
-        self.cluster = self._instantiate_cluster(connstr_abstract, self.cluster_factory)
+        self.cluster = self._instantiate_cluster(connstr_abstract, self.cluster_factory, opts)
         return bucket_name
 
-    def _instantiate_cluster(self, connstr_nobucket, cluster_factory):
+    def _instantiate_cluster(self, connstr_nobucket, cluster_factory, opts=None):
         # FIXME: we should not be using classic here!  But, somewhere in the tests, we need
         # this for hitting the mock, it seems
         auth_type = ClassicAuthenticator if self.is_mock else PasswordAuthenticator
         # hack because the Mock seems to want a bucket name for cluster connections, odd
         mock_hack = {'bucket': self.cluster_info.bucket_name} if self.is_mock else {}
-        return cluster_factory.connect(connection_string=str(connstr_nobucket),
-                               authenticator=auth_type(self.cluster_info.admin_username,
-                                                       self.cluster_info.admin_password), **mock_hack)
+        auth = auth_type(self.cluster_info.admin_username, self.cluster_info.admin_password)
+        if not opts:
+            opts = ClusterOptions(auth)
+        else:
+            opts['authenticator'] = auth
+        return cluster_factory.connect(connection_string=str(connstr_nobucket), options=opts, **mock_hack)
 
     # NOTE: this really is only something you can trust in homogeneous clusters, but then again
     # this is a test suite.
@@ -1008,17 +1015,24 @@ class TracedCase(CollectionTestCase):
         if self.use_parent_tracer:
             kwargs['init_tracer'] = self.init_tracer
         kwargs['enable_tracing'] = "true"
-        super(TracedCase, self).setUp(**kwargs)
         if self.trace_all:
-            self.cb.tracing_orphaned_queue_flush_interval = timedelta(seconds=0.0001)
-            self.cb.tracing_orphaned_queue_size = 10
-            self.cb.tracing_threshold_queue_flush_interval = timedelta(seconds=0.00001)
-            self.cb.tracing_threshold_queue_size = 10
-            self.cb.tracing_threshold_kv = timedelta(seconds=0.00001)
-            self.cb.tracing_threshold_n1ql = timedelta(seconds=0.00001)
-            self.cb.tracing_threshold_view = timedelta(seconds=0.00001)
-            self.cb.tracing_threshold_fts = timedelta(seconds=0.00001)
-            self.cb.tracing_threshold_analytics = timedelta(seconds=0.00001)
+            tracing_options = ClusterTracingOptions(
+                tracing_orphaned_queue_flush_interval=timedelta(milliseconds=1),
+                tracing_orphaned_queue_size=9,
+                tracing_threshold_queue_flush_interval=timedelta(milliseconds=1),
+                tracing_threshold_queue_size=9,
+                tracing_threshold_kv=timedelta(milliseconds=1),
+                #tracing_threshold_query=timedelta(milliseconds=1),
+                tracing_threshold_view=timedelta(milliseconds=1),
+                tracing_threshold_search=timedelta(milliseconds=1),
+                tracing_threshold_analytics=timedelta(milliseconds=1)
+            )
+            dummy_auth = PasswordAuthenticator("default", "password")
+            # the dummy_auth isn't really used, the base class decides between classic
+            # and password dependng on mock or not.
+            opts = ClusterOptions(authenticator=dummy_auth, tracing_options=tracing_options)
+            kwargs["cluster_options"] = opts
+        super(TracedCase, self).setUp(**kwargs)
 
     def flush_tracer(self):
         try:

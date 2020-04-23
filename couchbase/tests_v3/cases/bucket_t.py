@@ -86,35 +86,3 @@ class BucketSimpleTest(CollectionTestCase):
 
     def test_view_query(self):
         raise SkipTest('cannot test view_query until a ViewManager has been created')
-
-    def test_view_query_timeout(self):
-        self.bucket.view_timeout = timedelta(seconds=50)
-        self.assertEqual(timedelta(seconds=50), self.bucket.view_timeout)
-
-    def test_kv_timeout(self):
-        self.bucket.kv_timeout = timedelta(seconds=50)
-        self.assertEqual(timedelta(seconds=50), self.bucket.kv_timeout)
-
-    def test_tracing_orphaned_queue_flush_interval(self):
-        self.bucket.tracing_orphaned_queue_flush_interval = timedelta(seconds=1)
-        self.assertEqual(timedelta(seconds=1), self.bucket.tracing_orphaned_queue_flush_interval)
-
-    def test_tracing_orphaned_queue_size(self):
-        self.bucket.tracing_orphaned_queue_size = 10
-        self.assertEqual(10, self.bucket.tracing_orphaned_queue_size)
-
-    def test_tracing_threshold_queue_flush_interval(self):
-        self.bucket.tracing_threshold_queue_flush_interval = timedelta(seconds=10)
-        self.assertEqual(timedelta(seconds=10), self.bucket.tracing_threshold_queue_flush_interval)
-
-    def test_tracing_threshold_queue_size(self):
-        self.bucket.tracing_threshold_queue_size = 100
-        self.assertEqual(100, self.bucket.tracing_threshold_queue_size)
-
-    def test_tracing_threshold_kv(self):
-        self.bucket.tracing_threshold_kv = timedelta(seconds=1)
-        self.assertEqual(timedelta(seconds=1), self.bucket.tracing_threshold_kv)
-
-    def test_tracing_threshold_view(self):
-        self.bucket.tracing_threshold_view = timedelta(seconds=1)
-        self.assertEqual(timedelta(seconds=1), self.bucket.tracing_threshold_view)

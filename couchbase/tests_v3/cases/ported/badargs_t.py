@@ -71,19 +71,6 @@ class BadArgsTest(CollectionTestCase):
             self.assertRaises(InvalidArgumentException, self.cb.counter_multi, k)
             self.assertRaises(InvalidArgumentException, self.cb.remove_multi, k)
 
-    def test_bad_timeout(self):
-        def _set_timeout(x):
-            self.cb.kv_timeout = x
-
-        self.assertRaisesRegex(InvalidArgumentException, "timedelta", _set_timeout, 0)
-        self.assertRaisesRegex(InvalidArgumentException, "timedelta", _set_timeout, -1)
-        self.assertRaisesRegex(InvalidArgumentException, "timedelta", _set_timeout, None)
-        self.assertRaisesRegex(InvalidArgumentException, "timedelta", _set_timeout, "a string")
-
-        self.cb.timeout = 0.1
-        self.cb.timeout = 1
-        self.cb.timeout = 2.5
-
     def test_bad_quiet(self):
         def _set_quiet(x):
             self.cb.quiet = x

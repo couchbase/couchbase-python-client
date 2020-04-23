@@ -293,8 +293,6 @@ class TracingTest(TracedCase):
         self.coll.remove_multi(list(kv_missing.keys()) + list(kv_existing.keys()),
                              quiet=True)
 
-
-        self.cb.tracing_threshold_kv = timedelta.resolution
         self.coll.upsert_multi(kv_existing)
 
         rvs = self.coll.get_multi(

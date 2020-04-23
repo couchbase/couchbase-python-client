@@ -300,14 +300,8 @@ class Bucket(CoreClientDatastructureWrap):
         """
         return timedelta(seconds=self._get_timeout_common(_LCB.LCB_CNTL_OP_TIMEOUT))
 
-    @kv_timeout.setter
-    def kv_timeout(self,
-                   timeout  # type: timedelta
-                   ):
-        self._set_timeout_common(_LCB.LCB_CNTL_OP_TIMEOUT, timeout)
-
     @property
-    def view_timeout(self):
+    def views_timeout(self):
         # type: (...) -> timedelta
         """
         The default timeout for all view operations on this bucket.
@@ -321,13 +315,6 @@ class Bucket(CoreClientDatastructureWrap):
         # lets use the private function in the private _bucket for now.  Soon
         # that _bucket will be gone and we will have migrated this all into here.
         return timedelta(seconds=self._get_timeout_common(_LCB.LCB_CNTL_VIEW_TIMEOUT))
-
-    @view_timeout.setter
-    def view_timeout(self,
-                     timeout  # type: timedelta
-                     ):
-        # (...) -> None
-        self._set_timeout_common(_LCB.LCB_CNTL_VIEW_TIMEOUT, timeout)
 
     @property
     def tracing_orphaned_queue_flush_interval(self):
@@ -343,12 +330,6 @@ class Bucket(CoreClientDatastructureWrap):
         return timedelta(seconds=self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL,
                                                     value_type="timeout"))
 
-    @tracing_orphaned_queue_flush_interval.setter
-    def tracing_orphaned_queue_flush_interval(self,
-                                              val   # type: timedelta
-                                              ):
-        self._set_timeout_common(_LCB.TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL, val)
-
     @property
     def tracing_orphaned_queue_size(self):
         """
@@ -361,12 +342,6 @@ class Bucket(CoreClientDatastructureWrap):
         """
 
         return self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_SIZE, value_type="uint32_t")
-
-    @tracing_orphaned_queue_size.setter
-    def tracing_orphaned_queue_size(self,
-                                    val     # type: int
-                                    ):
-        self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_SIZE, value=val, value_type="uint32_t")
 
     @property
     def tracing_threshold_queue_flush_interval(self):
@@ -382,12 +357,6 @@ class Bucket(CoreClientDatastructureWrap):
         return timedelta(seconds=self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_FLUSH_INTERVAL,
                                                     value_type="timeout"))
 
-    @tracing_threshold_queue_flush_interval.setter
-    def tracing_threshold_queue_flush_interval(self,
-                                               val  # type: timedelta
-                                               ):
-        self._set_timeout_common(_LCB.TRACING_THRESHOLD_QUEUE_FLUSH_INTERVAL, val)
-
     @property
     def tracing_threshold_queue_size(self):
         """
@@ -400,10 +369,6 @@ class Bucket(CoreClientDatastructureWrap):
         """
 
         return self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_SIZE, value_type="uint32_t")
-
-    @tracing_threshold_queue_size.setter
-    def tracing_threshold_queue_size(self, val):
-        self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_SIZE, value=val, value_type="uint32_t")
 
     @property
     def tracing_threshold_kv(self):
@@ -418,12 +383,6 @@ class Bucket(CoreClientDatastructureWrap):
 
         return timedelta(seconds=self._cntl(op=_LCB.TRACING_THRESHOLD_KV, value_type="timeout"))
 
-    @tracing_threshold_kv.setter
-    def tracing_threshold_kv(self,
-                             val    # type: timedelta
-                             ):
-        self._set_timeout_common(_LCB.TRACING_THRESHOLD_KV, val)
-
     @property
     def tracing_threshold_view(self):
         """
@@ -435,12 +394,6 @@ class Bucket(CoreClientDatastructureWrap):
 
         """
         return timedelta(seconds=self._cntl(op=_LCB.TRACING_THRESHOLD_VIEW, value_type="timeout"))
-
-    @tracing_threshold_view.setter
-    def tracing_threshold_view(self,
-                               val      # type: timedelta
-                               ):
-        self._set_timeout_common(_LCB.TRACING_THRESHOLD_VIEW, val)
 
 
 class AsyncBucket(AsyncClientMixin, Bucket):
