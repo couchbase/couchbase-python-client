@@ -195,7 +195,7 @@ class ClusterTests(CollectionTestCase):
         opt = ClusterTracingOptions(tracing_threshold_query=timeout)
         opts = self._create_cluster_opts(tracing_options=opt)
         cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
-        self.assertEqual(timeout, cluster.tracing_threshold_n1ql)
+        self.assertEqual(timeout, cluster.tracing_threshold_query)
 
     @unittest.skip("waiting on CCBC-1222")
     def test_tracing_threshold_search(self):

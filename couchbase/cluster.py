@@ -335,7 +335,6 @@ class ClusterOptions(dict):
                 theirs[k] = v
         return (ours, theirs,)
 
-
     def as_dict(self, **kwargs):
         # the kwargs override or add to existing args.  So you could do something like:
         # opts.as_dict(tracing_options=TracingOptions(tracing_threshold_kv=timedelta(seconds=1)),
@@ -727,11 +726,11 @@ class Cluster(CoreClient):
     @property
     def tracing_threshold_query(self):
         """
-        The tracing threshold for N1QL, as `timedelta`
+        The tracing threshold for query response times, as `timedelta`
 
         ::
-            # Set tracing threshold for N1QL to 0.5 seconds
-            cb.tracing_threshold_n1ql = timedelta(seconds=0.5)
+            # Set tracing threshold for query response times  to 0.5 seconds
+            cb.tracing_threshold_query = timedelta(seconds=0.5)
 
         """
 
@@ -740,15 +739,15 @@ class Cluster(CoreClient):
     @property
     def tracing_threshold_search(self):
         """
-        The tracing threshold for FTS, as `timedelta`.
+        The tracing threshold for search response times, as `timedelta`.
         ::
-            # Set tracing threshold for FTS to 0.5 seconds
-            cluster.tracing_threshold_fts = timedelta(seconds=0.5)
+            # Set tracing threshold for search response times to 0.5 seconds
+            cluster.tracing_threshold_search = timedelta(seconds=0.5)
 
         """
 
         return timedelta(seconds=self._cntl(op=_LCB.TRACING_THRESHOLD_SEARCH,
-                                                                 value_type="timeout"))
+                                            value_type="timeout"))
 
     @property
     def tracing_threshold_analytics(self):
@@ -756,7 +755,7 @@ class Cluster(CoreClient):
         The tracing threshold for analytics, as `timedelta`.
 
         ::
-            # Set tracing threshold for analytics to 0.5 seconds
+            # Set tracing threshold for analytics response times to 0.5 seconds
             cluster.tracing_threshold_analytics = timedelta(seconds=0.5)
 
         """
