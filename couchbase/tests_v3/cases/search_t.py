@@ -21,7 +21,7 @@ from unittest import SkipTest
 import couchbase.search as search
 from couchbase.management.search import SearchIndex
 from couchbase.search import SearchResult, SearchOptions
-from couchbase_core.mutation_state import MutationState
+from couchbase.mutation_state import MutationState
 from couchbase_tests.base import CouchbaseTestCase
 
 try:

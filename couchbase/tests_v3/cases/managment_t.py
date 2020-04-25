@@ -1,6 +1,8 @@
 import os
 from unittest import SkipTest
 
+from flaky import flaky
+
 from couchbase.collection import CBCollection
 from couchbase.exceptions import CouchbaseException, BucketDoesNotExistException, BucketAlreadyExistsException
 from couchbase_core.connstr import ConnectionString
@@ -9,6 +11,7 @@ from couchbase_tests.base import CollectionTestCase
 
 
 class BucketManagementTests(CollectionTestCase):
+    @flaky(10, 1)
     def setUp(self, *args, **kwargs):
         super(BucketManagementTests, self).setUp(*args, **kwargs)
         self.bm = self.cluster.buckets()
@@ -20,21 +23,25 @@ class BucketManagementTests(CollectionTestCase):
         # be sure fred is not there anymore...
         self.try_n_times_till_exception(10, 3, self.bm.get_bucket, 'fred')
 
+    @flaky(10, 1)
     def test_bucket_create(self):
         self.bm.create_bucket(CreateBucketSettings(name="fred", bucket_type="couchbase", ram_quota_mb=100))
         self.try_n_times(10, 1, self.bm.get_bucket, "fred")
 
+    @flaky(10, 1)
     def test_bucket_create_fail(self):
       settings = CreateBucketSettings(name='fred', bucket_type='couchbase', ram_quota_mb=100)
       self.bm.create_bucket(settings)
       self.assertRaises(BucketAlreadyExistsException, self.bm.create_bucket, settings)
 
+    @flaky(10, 1)
     def test_bucket_drop_fail(self):
       settings = CreateBucketSettings(name='fred', bucket_type='couchbase', ram_quota_mb=100)
       self.bm.create_bucket(settings)
       self.try_n_times(10, 1, self.bm.drop_bucket, 'fred')
       self.assertRaises(BucketDoesNotExistException, self.bm.drop_bucket, 'fred')
 
+    @flaky(10, 1)
     def test_bucket_list(self):
         buckets_to_add = {'fred': {}, 'jane': {}, 'sally': {}}
         try:
@@ -53,6 +60,7 @@ class BucketManagementTests(CollectionTestCase):
                 # now be sure it is really gone
                 self.try_n_times_till_exception(10, 3, self.bm.get_bucket, bucket)
 
+    @flaky(10, 1)
     def test_actions(self):
 
         try:
