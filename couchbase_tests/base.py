@@ -860,7 +860,10 @@ class ClusterTestCase(CouchbaseTestCase):
             opts = ClusterOptions(auth)
         else:
             opts['authenticator'] = auth
-        return cluster_factory.connect(connection_string=str(connstr_nobucket), options=opts, **mock_hack)
+
+        return self.try_n_times(10, 3, cluster_factory.connect,
+                                connection_string=str(connstr_nobucket),
+                                options=opts, **mock_hack)
 
     # NOTE: this really is only something you can trust in homogeneous clusters, but then again
     # this is a test suite.

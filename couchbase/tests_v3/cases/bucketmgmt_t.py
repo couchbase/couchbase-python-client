@@ -3,9 +3,7 @@ from unittest import SkipTest
 
 from flaky import flaky
 
-from couchbase.collection import CBCollection
-from couchbase.exceptions import CouchbaseException, BucketDoesNotExistException, BucketAlreadyExistsException
-from couchbase_core.connstr import ConnectionString
+from couchbase.exceptions import BucketDoesNotExistException, BucketAlreadyExistsException
 from couchbase.management.buckets import CreateBucketSettings, BucketSettings
 from couchbase_tests.base import CollectionTestCase
 
@@ -61,39 +59,24 @@ class BucketManagementTests(CollectionTestCase):
                 self.try_n_times_till_exception(10, 3, self.bm.get_bucket, bucket)
 
     @flaky(10, 1)
-    def test_actions(self):
-
-        try:
-            # Remove the bucket, if it exists
-            self.bm.drop_bucket('dummy')
-        except CouchbaseException:
-            pass
-
-        # Need to explicitly enable admin tests..
+    def test_cluster_sees_bucket(self):
         # Create the bucket
-        self.bm.create_bucket(CreateBucketSettings(name='dummy',
-                                                   ram_quota_mb=100, bucket_password='letmein'))
-        self.bm._admin_bucket.wait_ready('dummy', timeout=15.0)
+        self.bm.create_bucket(CreateBucketSettings(name='fred', ram_quota_mb=100))
+        # cluster should be able to return it (though, not right away)
+        self.try_n_times(10, 3, self.cluster.bucket, 'fred')
 
-        # All should be OK, ensure we can connect:
-        connstr = ConnectionString.parse(
-            self.make_connargs()['connection_string'])
+    @flaky(10, 1)
+    def test_change_ttl(self):
+        # Create the bucket
+        self.bm.create_bucket(CreateBucketSettings(name='fred', ram_quota_mb=100))
+        self.bm._admin_bucket.wait_ready('fred', timeout=15.0)
+        self.try_n_times(10, 3, self.bm.get_bucket, 'fred')
 
-        dummy_bucket = 'dummy'
-        self.cluster.bucket(dummy_bucket)
-        # OK, it exists
-        self.assertRaises(CouchbaseException, self.factory, connstr)
-
-        # Change the password
-
-        self.bm.update_bucket(
-                              BucketSettings(name=dummy_bucket, max_ttl=500))
-        self.bm._admin_bucket.wait_ready(dummy_bucket, 10)
+        # change bucket TTL
+        self.try_n_times(10, 3, self.bm.update_bucket, BucketSettings(name='fred', max_ttl=500))
+        self.bm._admin_bucket.wait_ready('fred', 10)
 
         def get_bucket_ttl_equal(name, ttl):
             if not ttl == self.bm.get_bucket(name).max_ttl:
                 raise Exception("not equal")
-        self.try_n_times(10, 3, get_bucket_ttl_equal, 'dummy', 500)
-        # Remove the bucket
-        self.bm.drop_bucket('dummy')
-        self.assertRaises(CouchbaseException, self.factory, connstr)
+        self.try_n_times(10, 3, get_bucket_ttl_equal, 'fred', 500)

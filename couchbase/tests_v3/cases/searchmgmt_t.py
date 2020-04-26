@@ -60,12 +60,12 @@ class SearchIndexManagerTestCase(CollectionTestCase):
     def test_ingestion_control(self):
         # can't easily test this, but lets at least call them and insure we get no
         # exceptions
-        self.assertIsNone(self.indexmgr.pause_ingest(self.indexname))
-        self.assertIsNone(self.indexmgr.resume_ingest(self.indexname))
+        self.assertIsNone(self.try_n_times(10, 3, self.indexmgr.pause_ingest, self.indexname))
+        self.assertIsNone(self.try_n_times(10, 3, self.indexmgr.resume_ingest, self.indexname))
 
     def test_query_control(self):
-        self.assertIsNone(self.indexmgr.disallow_querying(self.indexname))
-        self.assertIsNone(self.indexmgr.allow_querying(self.indexname))
+        self.assertIsNone(self.try_n_times(10, 3, self.indexmgr.disallow_querying, self.indexname))
+        self.assertIsNone(self.try_n_times(10, 3, self.indexmgr.allow_querying, self.indexname))
 
     def test_plan_freeze_control(self):
         self.assertIsNone(self.indexmgr.freeze_plan(self.indexname))
@@ -86,14 +86,15 @@ class SearchIndexManagerTestCase(CollectionTestCase):
 
     def test_get_all_indexes(self):
         # we know of one, lets make sure it is in the list
-        indexes = self.indexmgr.get_all_indexes()
+        indexes = self.try_n_times(10, 3, self.indexmgr.get_all_indexes)
         for idx in indexes:
             if idx.name == self.indexname:
                 return;
         self.fail('did not find {} as expected'.format(self.indexname))
 
     def test_get_index(self):
-        self.assertIsNotNone(self.indexmgr.get_index(self.indexname))
+        index = self.try_n_times(10, 3, self.indexmgr.get_index, self.indexname)
+        self.assertIsNotNone(index)
 
     def test_get_index_fail_no_index_name(self):
         self.assertRaises(InvalidArgumentException, self.indexmgr.get_index, None)
@@ -102,7 +103,7 @@ class SearchIndexManagerTestCase(CollectionTestCase):
         self.assertRaises(SearchIndexNotFoundException, self.indexmgr.get_index, 'foo')
 
     def test_upsert_index(self):
-        index = self.indexmgr.get_index(self.indexname)
+        index = self.try_n_times(10, 3, self.indexmgr.get_index, self.indexname)
         self.assertIsNone(
             self.indexmgr.upsert_index(SearchIndex(uuid=index.uuid, name=self.indexname, source_name='default')))
 
