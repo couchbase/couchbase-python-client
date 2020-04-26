@@ -17,6 +17,8 @@
 import os
 from unittest import SkipTest
 
+from flaky import flaky
+
 from couchbase.exceptions import (
     DocumentNotFoundException)
 
@@ -282,6 +284,7 @@ class TracingTest(TracedCase):
 
         self.assertTrue(handler.count>0, "no {} found in logs".format(error_message_expected))
 
+    @flaky(10,1)
     def test_tracing_result_context(self):
         super(TracingTest, self).setUp(trace_all=True, enable_logging=True, use_parent_tracer=False, flushcount=0)
 

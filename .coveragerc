@@ -2,4 +2,8 @@
 omit =
     */site-packages/*
     */distutils/*
-    tests/*
+    */*test*/**
+    */.eggs/*
+    */couchbase_v2/**
+    .
+
