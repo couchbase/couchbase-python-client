@@ -518,7 +518,7 @@ Attributes
 
     .. autoattribute:: kv_timeout
 
-    .. autoattribute:: view_timeout
+    .. autoattribute:: views_timeout
 
     .. autoattribute:: quiet
 
@@ -560,7 +560,7 @@ Attributes
 .. currentmodule:: couchbase.cluster
 .. class:: Cluster
 
-    .. autoattribute:: n1ql_timeout
+    .. autoattribute:: query_timeout
 
     .. autoattribute:: server_nodes
 
