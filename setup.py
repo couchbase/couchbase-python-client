@@ -16,7 +16,6 @@ except ImportError:
     from distutils.core import setup, Extension
 
 import os
-import platform
 import itertools
 import pathlib
 curdir = pathlib.Path(__file__).parent
@@ -32,7 +31,7 @@ except:
 if not os.path.exists("build"):
     os.mkdir("build")
 
-with open(curdir.joinpath("build/lcb_min_version.h"), "w+") as LCB_MIN_VERSION:
+with open(str(curdir.joinpath("build/lcb_min_version.h")), "w+") as LCB_MIN_VERSION:
     LCB_MIN_VERSION.write('\n'.join(
         ["#define LCB_MIN_VERSION 0x{}".format(''.join(map(lambda x: "{0:02d}".format(x), lcb_min_version))),
          '#define LCB_MIN_VERSION_TEXT "{}"'.format('.'.join(map(str, lcb_min_version))),
@@ -49,7 +48,7 @@ pkgversion = couchbase_version.get_version()
 def handle_build_type_and_gen_deps():
     cmake_build = build_type in ['CMAKE', 'CMAKE_HYBRID']
     print("Build type: {}, cmake:{}".format(build_type, cmake_build))
-    general_requires = open(curdir.joinpath('requirements.txt')).readlines()
+    general_requires = open(str(curdir.joinpath('requirements.txt'))).readlines()
     extoptions, pkgdata=get_ext_options()
 
     if cmake_build:
@@ -79,10 +78,9 @@ packages = {
     couchbase_core+'.views',
     couchbase_core+'.iops',
     couchbase_core+'.asynchronous',
+    'couchbase.asynchronous',
     'couchbase.management',
-    'txcouchbase',
-    'acouchbase',
-    'acouchbase.tests'
+    'txcouchbase'
 }
 
 setup(
@@ -93,7 +91,7 @@ setup(
     author_email="PythonPackage@couchbase.com",
     license="Apache License 2.0",
     description="Python Client for Couchbase",
-    long_description=open(curdir.joinpath("README.rst"), "r").read(),
+    long_description=open(str(curdir.joinpath("README.rst")), "r").read(),
     long_description_content_type='text/x-rst',
     keywords=["couchbase", "nosql", "pycouchbase", "libcouchbase"],
     classifiers=[

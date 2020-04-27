@@ -20,7 +20,7 @@ def get_lcb_min_version():
 
         parser = docutils.parsers.rst.Parser()
 
-        with open(curdir.joinpath("README.rst")) as README:
+        with open(str(curdir.joinpath("README.rst"))) as README:
             settings = docutils.frontend.OptionParser().get_default_values()
             settings.update(
                 dict(tab_width=4, report_level=1, pep_references=False, rfc_references=False, syntax_highlight=False),

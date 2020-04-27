@@ -32,7 +32,7 @@ curdir = pathlib.Path(__file__).parent
 
 
 def get_json_build_cfg():
-    with open(curdir.joinpath("cbuild_cfg.json")) as JSONFILE:
+    with open(str(curdir.joinpath("cbuild_cfg.json"))) as JSONFILE:
         return json.load(JSONFILE)
 
 
