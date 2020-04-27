@@ -142,23 +142,23 @@ class CollectionTests(CollectionTestCase):
             raise SkipTest("mock will not return the expiry in the xaddrs")
         cas = self.coll.upsert(self.KEY, self.CONTENT, UpsertOptions(expiry=timedelta(seconds=100))).cas
 
-        def cas_matches(c, cas):
+        def cas_matches(c, new_cas):
             r = c.get(self.KEY, GetOptions(with_expiry=True))
-            if r.cas == cas:
+            if r.cas == new_cas:
                 return r
             raise Exception("nope")
         result = self.try_n_times(10, 3, cas_matches, self.coll, cas)
         self.assertIsNotNone(result.expiry)
         self.assertDictEqual(self.CONTENT, result.content_as[dict])
         expires_in = (result.expiry - datetime.now()).total_seconds()
-        self.assertTrue(100 >= expires_in > 0)
+        self.assertTrue(100 >= expires_in > 0, msg="Expected expires_in {} to be between 100 and 0")
 
     def test_project(self):
         content = {"a": "aaa", "b": "bbb", "c": "ccc"}
         cas = self.coll.upsert(self.KEY, content).cas
 
-        def cas_matches(c, cas):
-            if cas != c.get(self.KEY).cas:
+        def cas_matches(c, new_cas):
+            if new_cas != c.get(self.KEY).cas:
                 raise Exception("nope")
 
         self.try_n_times(10, 3, cas_matches, self.coll, cas)

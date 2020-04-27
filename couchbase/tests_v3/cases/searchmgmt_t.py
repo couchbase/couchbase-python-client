@@ -12,13 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from flaky import flaky
+
 from couchbase_tests.base import CollectionTestCase, SkipTest, skip_if_no_collections
 from couchbase.exceptions import InvalidArgumentException, SearchIndexNotFoundException
 from couchbase.management.search import SearchIndex
 import uuid
-import time
 
 
+@flaky(10,3)
 class SearchIndexManagerTestCase(CollectionTestCase):
     def setUp(self):
         super(SearchIndexManagerTestCase, self).setUp()
@@ -68,8 +70,8 @@ class SearchIndexManagerTestCase(CollectionTestCase):
         self.assertIsNone(self.try_n_times(10, 3, self.indexmgr.allow_querying, self.indexname))
 
     def test_plan_freeze_control(self):
-        self.assertIsNone(self.indexmgr.freeze_plan(self.indexname))
-        self.assertIsNone(self.indexmgr.unfreeze_plan(self.indexname))
+        self.assertIsNone(self.try_n_times(10, 3, self.indexmgr.freeze_plan, self.indexname))
+        self.assertIsNone(self.try_n_times(10, 3, self.indexmgr.unfreeze_plan, self.indexname))
 
     def test_get_indexed_document_count(self):
         # just be sure we get something back.  NOTE: immediately after creation,

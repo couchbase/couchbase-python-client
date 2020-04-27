@@ -8,8 +8,8 @@ from couchbase.management.buckets import CreateBucketSettings, BucketSettings
 from couchbase_tests.base import CollectionTestCase
 
 
+@flaky(10, 10)
 class BucketManagementTests(CollectionTestCase):
-    @flaky(10, 1)
     def setUp(self, *args, **kwargs):
         super(BucketManagementTests, self).setUp(*args, **kwargs)
         self.bm = self.cluster.buckets()
@@ -21,25 +21,21 @@ class BucketManagementTests(CollectionTestCase):
         # be sure fred is not there anymore...
         self.try_n_times_till_exception(10, 3, self.bm.get_bucket, 'fred')
 
-    @flaky(10, 1)
     def test_bucket_create(self):
         self.bm.create_bucket(CreateBucketSettings(name="fred", bucket_type="couchbase", ram_quota_mb=100))
         self.try_n_times(10, 1, self.bm.get_bucket, "fred")
 
-    @flaky(10, 1)
     def test_bucket_create_fail(self):
-      settings = CreateBucketSettings(name='fred', bucket_type='couchbase', ram_quota_mb=100)
-      self.bm.create_bucket(settings)
-      self.assertRaises(BucketAlreadyExistsException, self.bm.create_bucket, settings)
+        settings = CreateBucketSettings(name='fred', bucket_type='couchbase', ram_quota_mb=100)
+        self.bm.create_bucket(settings)
+        self.assertRaises(BucketAlreadyExistsException, self.bm.create_bucket, settings)
 
-    @flaky(10, 1)
     def test_bucket_drop_fail(self):
-      settings = CreateBucketSettings(name='fred', bucket_type='couchbase', ram_quota_mb=100)
-      self.bm.create_bucket(settings)
-      self.try_n_times(10, 1, self.bm.drop_bucket, 'fred')
-      self.assertRaises(BucketDoesNotExistException, self.bm.drop_bucket, 'fred')
+        settings = CreateBucketSettings(name='fred', bucket_type='couchbase', ram_quota_mb=100)
+        self.bm.create_bucket(settings)
+        self.try_n_times(10, 1, self.bm.drop_bucket, 'fred')
+        self.assertRaises(BucketDoesNotExistException, self.bm.drop_bucket, 'fred')
 
-    @flaky(10, 1)
     def test_bucket_list(self):
         buckets_to_add = {'fred': {}, 'jane': {}, 'sally': {}}
         try:
@@ -58,14 +54,12 @@ class BucketManagementTests(CollectionTestCase):
                 # now be sure it is really gone
                 self.try_n_times_till_exception(10, 3, self.bm.get_bucket, bucket)
 
-    @flaky(10, 1)
     def test_cluster_sees_bucket(self):
         # Create the bucket
         self.bm.create_bucket(CreateBucketSettings(name='fred', ram_quota_mb=100))
         # cluster should be able to return it (though, not right away)
         self.try_n_times(10, 3, self.cluster.bucket, 'fred')
 
-    @flaky(10, 1)
     def test_change_ttl(self):
         # Create the bucket
         self.bm.create_bucket(CreateBucketSettings(name='fred', ram_quota_mb=100))
@@ -79,4 +73,5 @@ class BucketManagementTests(CollectionTestCase):
         def get_bucket_ttl_equal(name, ttl):
             if not ttl == self.bm.get_bucket(name).max_ttl:
                 raise Exception("not equal")
+
         self.try_n_times(10, 3, get_bucket_ttl_equal, 'fred', 500)
