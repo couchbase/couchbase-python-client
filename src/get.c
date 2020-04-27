@@ -365,7 +365,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
 #ifndef PYCBC_UNIT_GEN
             rv = PYCBC_TRACE_WRAP_NOTERV(handle_single_key,
                                          kwargs,
-                                         1,
+                                         0,
                                          &cv,
                                          &context,
                                          self,

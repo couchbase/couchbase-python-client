@@ -591,7 +591,7 @@ int pycbc_oputil_iter_multi_Collection(
                                              (handler).name,
                                              (handler).category,
                                              NULL,
-                                             1,
+                                             0,
                                              cv,
                                              collectionself->bucket,
                                              handler.original,

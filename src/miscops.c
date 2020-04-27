@@ -211,7 +211,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, p
     } else {
         rv = PYCBC_TRACE_WRAP_NOTERV(handle_single_keyop,
                                      kwargs,
-                                     1,
+                                     0,
                                      &cv,
                                      &context,
                                      self,
