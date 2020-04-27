@@ -27,6 +27,7 @@ from couchbase_core.cluster import *
 from .result import *
 from random import choice
 from enum import Enum
+from copy import deepcopy
 
 T = TypeVar('T')
 
@@ -383,7 +384,8 @@ class Cluster(CoreClient):
         :param Any kwargs: Override corresponding value in options.
         """
         self._authenticator = kwargs.pop('authenticator', None)
-        cluster_opts = options or ClusterOptions(self._authenticator)
+        # copy options if they exist, as we mutate it
+        cluster_opts = deepcopy(options) or ClusterOptions(self._authenticator)
         if not self._authenticator:
             self._authenticator = cluster_opts.pop('authenticator', None)
             if not self._authenticator:
