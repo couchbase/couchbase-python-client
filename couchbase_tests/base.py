@@ -35,6 +35,7 @@ from testresources import ResourcedTestCase as ResourcedTestCaseReal, TestResour
 from utilspie.collectionsutils import frozendict
 
 import couchbase_core
+from couchbase.cluster import AsyncCluster
 from collections import defaultdict
 from couchbase.bucket import Bucket as V3Bucket
 from couchbase.cluster import Cluster, ClassicAuthenticator, ClusterOptions, ClusterTracingOptions, \
@@ -799,7 +800,7 @@ class ClusterTestCase(CouchbaseTestCase):
                 return on_success(ret)
             except Exception as e:
                 # helpful to have this print statement when tests fail
-                print("Got exception, sleeping: {}".format(e))
+                logging.info("Got exception, sleeping: {}".format(traceback.format_exc()))
                 time.sleep(seconds_between)
         return self._fail(
             "unsuccessful {} after {} times, waiting {} seconds between calls".format(func, num_times, seconds_between))
@@ -849,7 +850,14 @@ class ClusterTestCase(CouchbaseTestCase):
         self.cluster = self._instantiate_cluster(connstr_abstract, self.cluster_factory, opts)
         return bucket_name
 
-    def _instantiate_cluster(self, connstr_nobucket, cluster_factory, opts=None):
+    T = TypeVar('T', bound=Cluster)
+
+    def _instantiate_cluster(self,
+                             connstr_nobucket,  # type: str
+                             cluster_class,  # type: Type[ClusterTestCase.T]
+                             opts=None  # type: Any
+                             ):
+        # type: (...) -> ClusterTestCase.T
         # FIXME: we should not be using classic here!  But, somewhere in the tests, we need
         # this for hitting the mock, it seems
         auth_type = ClassicAuthenticator if self.is_mock else PasswordAuthenticator
@@ -860,7 +868,8 @@ class ClusterTestCase(CouchbaseTestCase):
             opts = ClusterOptions(auth)
         else:
             opts['authenticator'] = auth
-        return self.try_n_times(10, 3, cluster_factory.connect,
+
+        return self.try_n_times(10, 3, cluster_class.connect,
                                 connection_string=str(connstr_nobucket),
                                 options=opts, **mock_hack)
 
@@ -948,12 +957,15 @@ class CollectionTestCase(ClusterTestCase):
             pass
 
 
+AsyncClusterType = TypeVar('AsyncClusterType', bound=AsyncCluster)
+
+
 class AsyncClusterTestCase(ClusterTestCase):
 
     def gen_cluster(self,  # type: AsyncClusterTestCase
                     *args,
                     **kwargs):
-        # type: (...) -> Cluster
+        # type: (...) -> AsyncClusterType
         args = list(args)
         connstr_nobucket, bucket = self._get_connstr_and_bucket_name(args, kwargs)
         return self._instantiate_cluster(connstr_nobucket, self.cluster_class)
@@ -971,8 +983,9 @@ class AsyncClusterTestCase(ClusterTestCase):
 
     @property
     @abstractmethod
-    def cluster_class(self):
-        # type: (...) -> Cluster
+    def cluster_class(self  # type: AsyncClusterTestCase
+                      ):
+        # type: (...) -> Type[.AsyncClusterType]
         pass
 
 

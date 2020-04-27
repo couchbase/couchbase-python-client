@@ -65,41 +65,6 @@ class AIOClientMixin(object):
         self._cft = cft
         self._conncb = ftresult
 
-    @property
-    def view_itercls(self):
-        return AViewResult
-
-    def view_query(self, *args, **kwargs):
-        if "itercls" not in kwargs:
-            kwargs["itercls"] = self.view_itercls
-        return super(AIOClientMixin, self).view_query(*args, **kwargs)
-
-    @property
-    def query_itercls(self):
-        return AQueryResult
-
-    def query(self, *args, **kwargs):
-        if "itercls" not in kwargs:
-            kwargs["itercls"] = self.query_itercls
-        return super(AIOClientMixin, self).query(*args, **kwargs)
-
-    @property
-    def search_itercls(self):
-        return ASearchResult
-
-    def search_query(self, *args, **kwargs):
-        if "itercls" not in kwargs:
-            kwargs["itercls"] = self.search_itercls
-        return super(AIOClientMixin, self).search_query(*args, **kwargs)
-
-    @property
-    def analytics_itercls(self):
-        return AAnalyticsResult
-
-    def analytics_query(self, *args, **kwargs):
-        return super(AIOClientMixin, self).analytics_query(*args, itercls=kwargs.pop('itercls', self.analytics_itercls),
-                                                   **kwargs)
-
     def on_connect(self):
         if not self.connected:
             self._connect()
@@ -121,6 +86,11 @@ class ABucket(AIOClientMixin, V3AsyncBucket):
     def __init__(self, *args, **kwargs):
         super(ABucket,self).__init__(collection_factory=AsyncCBCollection, *args, **kwargs)
 
+    def view_query(self, *args, **kwargs):
+        if "itercls" not in kwargs:
+            kwargs["itercls"] = AViewResult
+        return super(ABucket, self).view_query(*args, **kwargs)
+
 
 Bucket = ABucket
 
@@ -128,6 +98,20 @@ Bucket = ABucket
 class ACluster(AIOClientMixin, V3AsyncCluster):
     def __init__(self, connection_string, *options, **kwargs):
         super(ACluster, self).__init__(connection_string=connection_string, *options, bucket_factory=Bucket, **kwargs)
+
+    def query(self, *args, **kwargs):
+        if "itercls" not in kwargs:
+            kwargs["itercls"] = AQueryResult
+        return super(ACluster, self).query(*args, **kwargs)
+
+    def search_query(self, *args, **kwargs):
+        if "itercls" not in kwargs:
+            kwargs["itercls"] = ASearchResult
+        return super(ACluster, self).search_query(*args, **kwargs)
+
+    def analytics_query(self, *args, **kwargs):
+        return super(ACluster, self).analytics_query(*args, itercls=kwargs.pop('itercls', AAnalyticsResult),
+                                                           **kwargs)
 
 
 Cluster = ACluster
