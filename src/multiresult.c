@@ -320,20 +320,20 @@ int pycbc_multiresult_maybe_raise2(pycbc_MultiResult *self,
         PyObject_SetAttrString(value, "result", (PyObject*)res);
     }
 
-    if (PyObject_IsInstance(value, pycbc_helpers.default_exception)) {
-        PyObject_SetAttrString(value, "all_results", (PyObject*)self);
-        Py_XDECREF(self->exceptions);
-    }
-    PyErr_Restore(type, value, traceback);
-
     /**
      * This is needed since the exception object will later contain
      * a reference to ourselves. If we don't free the original exception,
      * then we'll be stuck with a circular reference
      */
+    if (PyObject_IsInstance(value, pycbc_helpers.default_exception)) {
+        PyObject_SetAttrString(value, "all_results", (PyObject*)self);
+        Py_XDECREF(self->exceptions);
+    }
     Py_XDECREF(self->errop);
     self->exceptions = NULL;
     self->errop = NULL;
+
+    PyErr_Restore(type, value, traceback);
 
     return 1;
 }
