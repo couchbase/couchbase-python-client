@@ -14,6 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+
+from couchbase.result import ViewResult, ViewRow
+from couchbase.bucket import Bucket
+
 from couchbase_tests.base import CollectionTestCase, SkipTest
 from couchbase.management.collections import CollectionManager
 from couchbase.bucket import PingOptions
@@ -84,5 +88,24 @@ class BucketSimpleTest(CollectionTestCase):
     def test_collections(self):
         self.assertIsInstance(self.bucket.collections(), CollectionManager)
 
-    def test_view_query(self):
-        raise SkipTest('cannot test view_query until a ViewManager has been created')
+    def test_view_query(self  # type: BucketSimpleTest
+                        ):
+        self.skipUnlessMock()
+        beer_bucket = self.cluster.bucket('beer-sample')  # type: Bucket
+        EXPECTED_ROW_COUNT=10
+        view_result = beer_bucket.view_query("beer", "brewery_beers", limit=EXPECTED_ROW_COUNT)  # type: ViewResult
+
+        count = 0
+        for _ in view_result:
+            x = _  # type: ViewRow
+            if x.id:
+                self.assertIsInstance(x.id, str)
+            self.assertIsNotNone(x.key)
+            count += 1
+
+        self.assertEqual(count, EXPECTED_ROW_COUNT)
+
+        metadata = view_result.metadata()
+
+        self.assertEqual(EXPECTED_ROW_COUNT, metadata.total_rows())
+        self.assertEqual(7303, metadata.debug()['total_rows'])

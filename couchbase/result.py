@@ -1,17 +1,18 @@
 from typing import *
 
+import attr
 from boltons.funcutils import wraps
 from couchbase_core._libcouchbase import Result as CoreResult
 
 from couchbase.diagnostics import EndpointPingReport, ServiceType
-from couchbase_core import iterable_wrapper
+from couchbase_core import iterable_wrapper, IterableWrapper, JSON
 from couchbase_core.result import AsyncResult as CoreAsyncResult
 from couchbase_core.result import MultiResult, SubdocResult
 from couchbase_core.subdocument import Spec
 from couchbase_core.supportability import internal
 from couchbase_core.transcodable import Transcodable
-from couchbase_core.views.iterator import View as CoreView
-from .options import timedelta, forward_args
+from couchbase_core.views.iterator import View as CoreView, RowProcessor, get_row_doc
+from .options import timedelta, forward_args, UnsignedInt64
 
 Proxy_T = TypeVar('Proxy_T')
 
@@ -447,6 +448,7 @@ class MutationToken(object):
         # type: (...) -> str
         raise NotImplementedError()
 
+
 def get_mutation_result(result  # type: CoreResult
                         ):
     # type (...)->MutationResult
@@ -531,19 +533,37 @@ def _wrap_in_mutation_result(func  # type: Callable[[Any,...],CoreResult]
     return mutated
 
 
-class ViewResult(iterable_wrapper(CoreView)):
-    def __init__(self, *args, **kwargs  # type: CoreView
+@attr.s
+class ViewRow(object):
+    key = attr.ib()
+    value = attr.ib(default=object)
+    id = attr.ib(default=str)
+    document = attr.ib(default=object)
+
+
+class ViewMetaData(object):
+    def __init__(self,
+                 parent  # type: CoreView
                  ):
-        super(ViewResult, self).__init__(*args, **kwargs)
+        self._parent = parent
 
-    @property
-    def error(self):
-        return self.errors
+    def total_rows(self  # type: ViewMetaData
+                   ):
+        # type: (...) -> UnsignedInt64
+        return self._parent.rows_returned
 
-    @property
-    def success(self):
-        return not self.errors
+    def debug(self  # type: ViewMetaData
+              ):
+        # type: (...) -> JSON
+        return self._parent.debug
 
-    @property
-    def cas(self):
-        raise NotImplementedError()
+
+class ViewResult(iterable_wrapper(CoreView)):
+    def __init__(self, *args, row_factory=ViewRow, **kwargs  # type: CoreView
+                 ):
+        super(ViewResult, self).__init__(*args, row_factory=row_factory, **kwargs)
+
+    def metadata(self  # type: ViewResult
+                 ):
+        # type: (...) -> ViewMetaData
+        return ViewMetaData(self)
