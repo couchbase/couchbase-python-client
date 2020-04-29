@@ -698,7 +698,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
                key,         # type: str
                cas,         # type: int
                *options,    # type: UnlockOptions
-               **kwargs
+               **kwargs     # type: Any
                ):
         # type: (...) -> MutationResult
         """Unlock a Locked Key in Couchbase.
@@ -710,7 +710,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
         :param UnlockOptions options: Options for the unlock operation.
         :param Any kwargs: Override corresponding value in options.
 
-        See :meth:`lock` for an example.
+        See :meth:`get_and_lock` for an example.
 
         :raise: :exc:`.TemporaryFailException` if the CAS supplied does not
             match the CAS on the server (possibly because it was
@@ -727,7 +727,7 @@ class CBCollectionBase(with_metaclass(ABCMeta)):
                key,       # type: str
                *options,  # type: ExistsOptions
                **kwargs   # type: Any
-                ):
+               ):
         # type: (...) -> ExistsResult
         """Check to see if a key exists in this collection.
 

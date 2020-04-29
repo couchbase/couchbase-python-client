@@ -1,5 +1,5 @@
 from typing import *
-from couchbase_core import subdocument as SD
+from couchbase_core import JSON, subdocument as SD
 import couchbase_core.priv_constants as _P
 from .options import OptionBlockTimeOut
 from couchbase_core.subdocument import  Spec
@@ -131,9 +131,9 @@ def array_append(path,                  # type: str
 
 
 def array_prepend(path,             # type: str
-                  *values,          # type: JSON,
+                  *values,          # type: JSON
                   **kwargs          # type: Any
-                 ):
+                  ):
     # type: (...) -> Spec
     """
     Append values to the beginning of an array in a document.

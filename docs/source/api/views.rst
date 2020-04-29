@@ -6,9 +6,9 @@ Querying Views
 ``View`` Object
 ===============
 
-.. module:: couchbase_core.views.iterator
+.. module:: couchbase.result
 
-.. class:: View
+.. class:: ViewResult
 
     .. automethod:: __init__
 
@@ -65,6 +65,8 @@ Attributes
 ^^^^^^^^^^^^^^
 Row Processing
 ^^^^^^^^^^^^^^
+
+.. module:: couchbase_core.views.iterator
 
 .. class:: RowProcessor
 

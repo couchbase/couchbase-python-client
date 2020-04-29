@@ -39,6 +39,7 @@ Asynchronous APIs
    :maxdepth: 2
 
    api/txcouchbase
+   api/acouchbase
 
 Internal APIs
 =============

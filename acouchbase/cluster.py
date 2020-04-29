@@ -70,6 +70,8 @@ class AIOClientMixin(object):
             self._connect()
             return self._cft
 
+    connected = CoreClient.connected
+
 
 class AsyncCBCollection(AIOClientMixin, BaseAsyncCBCollection):
     def __init__(self,
