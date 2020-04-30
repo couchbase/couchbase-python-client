@@ -475,7 +475,6 @@ class CouchbaseTestCase(ResourcedTestCase):
                 MultiResult, Result, OperationResult, ValueResult,
                 ObserveInfo)
             self.factory = V3Bucket
-            self.viewfactory = View
             self.cls_Result = Result
             self.cls_MultiResult = MultiResult
             self.cls_OperationResult = OperationResult

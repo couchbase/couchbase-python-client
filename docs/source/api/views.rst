@@ -3,16 +3,33 @@ Querying Views
 ##############
 
 ===============
-``View`` Object
+``ViewResult`` Object
 ===============
 
 .. module:: couchbase.result
 
 .. class:: ViewResult
 
-    .. automethod:: __init__
-
     .. automethod:: __iter__
+
+    .. automethod:: metadata
+
+    .. automethod:: rows
+
+.. class:: ViewRow
+
+    .. autoattribute:: key
+    .. autoattribute:: value
+    .. autoattribute:: id
+    .. autoattribute:: document
+
+
+.. class:: ViewMetaData
+    .. automethod:: total_rows
+
+    .. automethod:: debug
+
+
 
 ^^^^^^^^^^
 Attributes

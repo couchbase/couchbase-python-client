@@ -11,7 +11,7 @@ from .management.users import UserManager
 from .management.buckets import BucketManager
 from couchbase.management.admin import Admin
 from couchbase.diagnostics import DiagnosticsResult
-from couchbase.search import SearchResult, SearchOptions, Query
+from couchbase.search import SearchResult, SearchOptions, SearchQuery
 from .analytics import AnalyticsResult
 from .n1ql import QueryResult
 from couchbase_core.n1ql import _N1QLQuery
@@ -492,7 +492,7 @@ class Cluster(CoreClient):
 
     def query(self,
               statement,            # type: str
-              *options,             # type: QueryOptions
+              *options,             # type: Union[QueryOptions,Any]
               **kwargs              # type: Any
               ):
         # type: (...) -> QueryResult
@@ -500,12 +500,11 @@ class Cluster(CoreClient):
         Perform a N1QL query.
 
         :param statement: the N1QL query statement to execute
-        :param options: the optional parameters that the Query service takes.
-        :param options: A QueryOptions object, all others assumed to be the positional parameters in the query.
+        :param options: A QueryOptions object or the positional parameters in the query.
         :param kwargs: Override the corresponding value in the Options.  If they don't match
           any value in the options, assumed to be named parameters for the query.
 
-        :return: An :class:`~.n1ql.QueryResult` object with the results of the query or error message
+        :return: The results of the query or error message
             if the query failed on the server.
 
         :raise: :exc:`~.exceptions.QueryException` - for errors involving the query itself.  Also any exceptions
@@ -647,13 +646,13 @@ class Cluster(CoreClient):
 
     def search_query(self,
                      index,     # type: str
-                     query,     # type: Query
+                     query,     # type: SearchQuery
                      *options,  # type: SearchOptions
                      **kwargs
                      ):
         # type: (...) -> SearchResult
         """
-        Executes a Search or F.T.S. query against the remote cluster and returns a SearchResult implementation with the
+        Executes a Search or FTS query against the remote cluster and returns a SearchResult implementation with the
         results of the query.
 
         .. code-block:: python
@@ -665,7 +664,7 @@ class Cluster(CoreClient):
                 print(hit)
 
         :param str index: Name of the index to use for this query.
-        :param query: the fluent search API to construct a query for F.T.S.
+        :param query: the fluent search API to construct a query for FTS.
         :param options: the options to pass to the cluster with the query.
         :param kwargs: Overrides corresponding value in options.
         :return: A :class:`~.search.SearchResult` object with the results of the query or error message if the query

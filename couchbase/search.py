@@ -467,7 +467,7 @@ class _Params(object):
         self._ms = ms
 
 
-class Query(object):
+class SearchQuery(object):
     """
     Base query object. You probably want to use one of the subclasses.
 
@@ -505,7 +505,9 @@ class Query(object):
         pass
 
 
-class RawQuery(Query):
+
+
+class RawQuery(SearchQuery):
     """
     This class is used to wrap a raw query payload. It should be used
     for custom query parameters, or in cases where any of the other
@@ -516,7 +518,7 @@ class RawQuery(Query):
         self._json_ = obj
 
 
-class _SingleQuery(Query):
+class _SingleQuery(SearchQuery):
     __metaclass__ = abc.ABCMeta
 
     @property
@@ -717,7 +719,7 @@ RegexpQuery = RegexQuery
 
 
 @_with_fields('field')
-class GeoDistanceQuery(Query):
+class GeoDistanceQuery(SearchQuery):
     def __init__(self, distance, location, **kwargs):
         """
         Search for items within a given radius
@@ -734,7 +736,7 @@ class GeoDistanceQuery(Query):
 
 
 @_with_fields('field')
-class GeoBoundingBoxQuery(Query):
+class GeoBoundingBoxQuery(SearchQuery):
     def __init__(self, top_left, bottom_right, **kwargs):
         super(GeoBoundingBoxQuery, self).__init__()
         kwargs['top_left'] = top_left
@@ -749,7 +751,7 @@ class GeoBoundingBoxQuery(Query):
         doc='Tuple of `(lon, lat`) for the bottom right corner of bounding box')
 
 
-class _RangeQuery(Query):
+class _RangeQuery(SearchQuery):
     __metaclass__ = abc.ABCMeta
 
     @property
@@ -873,7 +875,7 @@ class TermRangeQuery(_RangeQuery):
     _MINMAX = 'start', 'end'
 
 
-class _CompoundQuery(Query):
+class _CompoundQuery(SearchQuery):
     __metaclass__ = abc.ABCMeta
 
     @property
@@ -971,7 +973,7 @@ def _bprop_wrap(name, reqtype, doc):
                 del self._subqueries[name]
         elif isinstance(value, reqtype):
             self._subqueries[name] = value
-        elif isinstance(value, Query):
+        elif isinstance(value, SearchQuery):
             self._subqueries[name] = reqtype(value)
         else:
             try:
@@ -981,7 +983,7 @@ def _bprop_wrap(name, reqtype, doc):
 
             l = []
             for q in it:
-                if not isinstance(q, Query):
+                if not isinstance(q, SearchQuery):
                     raise TypeError('Item is not a query!', q)
                 l.append(q)
             self._subqueries[name] = reqtype(*l)
@@ -992,7 +994,7 @@ def _bprop_wrap(name, reqtype, doc):
     return property(fget, fset, fdel, doc)
 
 
-class BooleanQuery(Query):
+class BooleanQuery(SearchQuery):
     def __init__(self, must=None, should=None, must_not=None):
         super(BooleanQuery, self).__init__()
         self._subqueries = {}
@@ -1048,7 +1050,7 @@ class BooleanQuery(Query):
             raise ValueError('No sub-queries specified', self)
 
 
-class MatchAllQuery(Query):
+class MatchAllQuery(SearchQuery):
     """
     Special query which matches all documents
     """
@@ -1058,7 +1060,7 @@ class MatchAllQuery(Query):
         _assign_kwargs(self, kwargs)
 
 
-class MatchNoneQuery(Query):
+class MatchNoneQuery(SearchQuery):
     """
     Special query which matches no documents
     """
@@ -1099,7 +1101,7 @@ def _make_search_body(index, query, params=None):
     """
     dd = {}
 
-    if not isinstance(query, Query):
+    if not isinstance(query, SearchQuery):
         query = QueryStringQuery(query)
 
     dd['query'] = query.encodable
