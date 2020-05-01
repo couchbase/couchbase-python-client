@@ -18,8 +18,9 @@
 import unittest
 
 from couchbase_tests.base import CollectionTestCase
-from couchbase.cluster import ClassicAuthenticator, PasswordAuthenticator, ClusterOptions, ClusterTimeoutOptions,\
+from couchbase.cluster import ClusterOptions, ClusterTimeoutOptions,\
     ClusterTracingOptions, Compression, DiagnosticsOptions, Cluster
+from couchbase.auth import PasswordAuthenticator, ClassicAuthenticator
 from couchbase.diagnostics import ServiceType, EndpointState, ClusterState
 from couchbase.exceptions import AlreadyShutdownException
 from datetime import timedelta

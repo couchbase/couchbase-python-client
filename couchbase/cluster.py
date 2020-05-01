@@ -1,5 +1,4 @@
 import asyncio
-from typing import *
 
 from couchbase_core.asynchronous.client import AsyncClientMixin
 from couchbase.mutation_state import MutationState
@@ -7,19 +6,20 @@ from couchbase.management.queries import QueryIndexManager
 from couchbase.management.search import SearchIndexManager
 from couchbase.management.analytics import AnalyticsIndexManager
 from couchbase.analytics import AnalyticsOptions
+from .auth import NoBucketException, Authenticator
 from .management.users import UserManager
 from .management.buckets import BucketManager
 from couchbase.management.admin import Admin
 from couchbase.diagnostics import DiagnosticsResult
-from couchbase.search import SearchResult, SearchOptions
+from couchbase.search import SearchResult, SearchOptions, Query
 from .analytics import AnalyticsResult
 from .n1ql import QueryResult
 from couchbase_core.n1ql import _N1QLQuery
 from .options import OptionBlock, OptionBlockDeriv
 from .bucket import Bucket, CoreClient, PingOptions
-from couchbase_core.cluster import _Cluster as CoreCluster, Authenticator as CoreAuthenticator
+from couchbase_core.cluster import _Cluster as CoreCluster
 from .exceptions import AlreadyShutdownException, InvalidArgumentException, \
-    SearchException, QueryException, AnalyticsException
+    SearchException, QueryException, AnalyticsException, CouchbaseException
 import couchbase_core._libcouchbase as _LCB
 from couchbase_core._pyport import raise_from
 from couchbase.options import OptionBlockTimeOut
@@ -233,6 +233,24 @@ class ClusterTimeoutOptions(dict):
 
 
 class Compression(Enum):
+    """
+    Can be one of:
+        NONE:
+            The client will not compress or decompress the data.
+        IN:
+            The data coming back from the server will be decompressed, if it was compressed.
+        OUT:
+            The data coming into server will be compressed.
+        INOUT:
+            The data will be compressed on way in, decompressed on way out of server.
+        FORCE:
+            By default the library will send a HELLO command to the server to determine whether compression
+            is supported or not.  Because commands may be
+            pipelined prior to the scheduing of the HELLO command it is possible that the first few commands may not be
+            compressed when schedule due to the library not yet having negotiated settings with the server. Setting this flag
+            will force the client to assume that all servers support compression despite a HELLO not having been intially
+            negotiated.
+    """
     @classmethod
     def from_int(cls, val):
         if val == 0:
@@ -298,7 +316,7 @@ class ClusterOptions(dict):
 
     @overload
     def __init__(self,
-                 authenticator,                      # type: CoreAuthenticator
+                 authenticator,                      # type: Authenticator
                  timeout_options=None,               # type: ClusterTimeoutOptions
                  tracing_options=None,               # type: ClusterTracingOptions
                  log_redaction=None,                 # type: bool
@@ -309,8 +327,21 @@ class ClusterOptions(dict):
         pass
 
     def __init__(self,
-                 authenticator,     # type: CoreAuthenticator
+                 authenticator,     # type: Authenticator
                  **kwargs):
+        """
+        Options to set when creating a cluster.  Note the authenticator is mandatory, all the
+        others are optional.
+
+        :param Authenticator authenticator: :class:`~.Authenticator` to use - see :class:`~.PasswordAuthenticator` and
+            :class:`~.CertAuthenticator`.
+        :param ClusterTimeoutOptions timeout_options: A :class:`~.ClusterTimeoutOptions` object, with various optional timeouts.
+        :param ClusterTracingOptions tracing_options: A :class:`~.ClusterTracingOptions` object, with various options for tracing.
+        :param bool log_redaction: Turn log redaction on/off.
+        :param Compression compression: A :class:`~.Compression` value for this cluster.
+        :param int compression_min_size: Min size of the data before compression kicks in.
+        :param float compression_min_ratio: A `float` representing the minimum compression ratio to use when compressing.
+        """
         super(ClusterOptions, self).__init__(**kwargs)
         self['authenticator'] = authenticator
 
@@ -369,20 +400,13 @@ class ClusterOptions(dict):
 
 class Cluster(CoreClient):
 
+    @internal
     def __init__(self,
                  connection_string,         # type: str
                  options=None,              # type: ClusterOptions
                  bucket_factory=Bucket,     # type: Any
                  **kwargs                   # type: Any
                  ):
-        """
-        Create a Cluster object.
-        An Authenticator must be provided, either as the authenticator named parameter, or within the options argument.
-        :param str connection_string: the connection string for the cluster.
-        :param Callable bucket_factory: factory for producing couchbase.bucket.Bucket derivatives
-        :param ClusterOptions options: options for the cluster.
-        :param Any kwargs: Override corresponding value in options.
-        """
         self._authenticator = kwargs.pop('authenticator', None)
         # copy options if they exist, as we mutate it
         cluster_opts = deepcopy(options) or ClusterOptions(self._authenticator)
@@ -413,11 +437,13 @@ class Cluster(CoreClient):
                 options=None,       # type: ClusterOptions
                 **kwargs
                 ):
+        # type: (...) -> Cluster
         """
         Create a Cluster object.
         An Authenticator must be provided, either as the authenticator named parameter, or within the options argument.
-        :param str connection_string: the connection string for the cluster.
-        :param ClusterOptions options: options for the cluster.
+
+        :param connection_string: the connection string for the cluster.
+        :param options: options for the cluster.
         :param Any kwargs: Override corresponding value in options.
         """
         return cls(connection_string, options, **kwargs)
@@ -430,6 +456,7 @@ class Cluster(CoreClient):
             raise AlreadyShutdownException("This cluster has already been shutdown")
 
     @property
+    @internal
     def _admin(self):
         self._check_for_shutdown()
         if not self.__admin:
@@ -440,6 +467,13 @@ class Cluster(CoreClient):
                name    # type: str
                ):
         # type: (...) -> Bucket
+        """
+        Open a bucket on this cluster.  This doesn't create a bucket, merely opens an existing bucket.
+
+        :param name: Name of bucket to open.
+        :return: The :class:~.bucket.Bucket` you requested.
+        :raise: :exc:`~.exceptions.BucketDoesNotExistException` if the bucket has not been created on this cluster.
+        """
         self._check_for_shutdown()
         return self._cluster.open_bucket(name, admin=self._admin)
 
@@ -465,14 +499,17 @@ class Cluster(CoreClient):
         """
         Perform a N1QL query.
 
-        :param str statement: the N1QL query statement to execute
-        :param QueryOptions options: the optional parameters that the Query service takes.
-        :param Any options: if present, assumed to be the positional parameters in the query.
-        :param Any kwargs: Override the corresponding value in the Options.  If they don't match
+        :param statement: the N1QL query statement to execute
+        :param options: the optional parameters that the Query service takes.
+        :param options: A QueryOptions object, all others assumed to be the positional parameters in the query.
+        :param kwargs: Override the corresponding value in the Options.  If they don't match
           any value in the options, assumed to be named parameters for the query.
 
-        :return: An :class:`QueryResult` object with the results of the query or error message
+        :return: An :class:`~.n1ql.QueryResult` object with the results of the query or error message
             if the query failed on the server.
+
+        :raise: :exc:`~.exceptions.QueryException` - for errors involving the query itself.  Also any exceptions
+            raised by underlying system - :class:`~.exceptions.TimeoutException` for instance.
 
         """
         # we could have multiple positional parameters passed in, one of which may or may not be
@@ -582,12 +619,15 @@ class Cluster(CoreClient):
                         ):
         # type: (...) -> AnalyticsResult
         """
-        Executes an Analytics query against the remote cluster and returns a AnalyticsResult with the results of the query.
+        Executes an Analytics query against the remote cluster and returns a AnalyticsResult with the results
+        of the query.
+
         :param statement: the analytics statement to execute
         :param options: the optional parameters that the Analytics service takes based on the Analytics RFC.
         :return: An AnalyticsResult object with the results of the query or error message if the query failed on the server.
-        Throws Any exceptions raised by the underlying platform - HTTP_TIMEOUT for example.
-        :except ServiceNotFoundException - service does not exist or cannot be located.
+        :raise: :exc:`~.exceptions.AnalyticsException` errors associated with the analytics query itself.
+            Also, any exceptions raised by the underlying platform - :class:`~.exceptions.TimeoutException`
+            for example.
         """
         # following the query implementation, but this seems worth revisiting soon
         self._check_for_shutdown()
@@ -607,27 +647,32 @@ class Cluster(CoreClient):
 
     def search_query(self,
                      index,     # type: str
-                     query,     # type: search.SearchQuery
+                     query,     # type: Query
                      *options,  # type: SearchOptions
                      **kwargs
                      ):
         # type: (...) -> SearchResult
         """
-        Executes a Search or F.T.S. query against the remote cluster and returns a SearchResult implementation with the results of the query.
+        Executes a Search or F.T.S. query against the remote cluster and returns a SearchResult implementation with the
+        results of the query.
 
         .. code-block:: python
 
-            it = cb.search('name', ft.MatchQuery('nosql'), SearchOptions(limit=10))
+            from couchbase.search import MatchQuery, SearchOptions
+
+            it = cb.search('name', MatchQuery('nosql'), SearchOptions(limit=10))
             for hit in it:
                 print(hit)
 
         :param str index: Name of the index to use for this query.
-        :param couchbase.search.SearchQuery query: the fluent search API to construct a query for F.T.S.
-        :param QueryOptions options: the options to pass to the cluster with the query.
-        :param Any kwargs: Overrides corresponding value in options.
-        :return: A SearchResult object with the results of the query or error message if the query failed on the server.
-        Any exceptions raised by the underlying platform - HTTP_TIMEOUT for example.
-        :except    ServiceNotFoundException - service does not exist or cannot be located.
+        :param query: the fluent search API to construct a query for F.T.S.
+        :param options: the options to pass to the cluster with the query.
+        :param kwargs: Overrides corresponding value in options.
+        :return: A :class:`~.search.SearchResult` object with the results of the query or error message if the query
+            failed on the server.
+        :raise: :exc:`~.exceptions.SearchException` Errors related to the query itself.
+            Also, any exceptions raised by the underlying platform - :class:`~.exceptions.TimeoutException`
+            for example.
 
         """
         self._check_for_shutdown()
@@ -647,8 +692,8 @@ class Cluster(CoreClient):
         # type: (...) -> DiagnosticsResult
         """
         Creates a diagnostics report that can be used to determine the healthfulness of the Cluster.
-        :param DiagnosticsOptions options:  Options for the diagnostics
-        :return: A DiagnosticsResult object with the results of the query or error message if the query failed on the server.
+        :param options:  Options for the diagnostics
+        :return: A :class:`~.diagnostics.DiagnosticsResult` object with the results of the query or error message if the query failed on the server.
 
         """
         self._check_for_shutdown()
@@ -660,6 +705,15 @@ class Cluster(CoreClient):
              **kwargs
              ):
         # type: (...) -> PingResult
+        """
+        Actively contacts each of the  services and returns their pinged status.
+
+        :param options: Options for sending the ping request.
+        :param kwargs: Overrides corresponding value in options.
+        :return: A :class:`~.result.PingResult` representing the state of all the pinged services.
+        :raise: :class:`~.exceptions.CouchbaseException` for various communication issues.
+        """
+
         bucket = self._get_an_open_bucket()
         if bucket:
             return PingResult(bucket.ping(*options, **kwargs))
@@ -667,26 +721,55 @@ class Cluster(CoreClient):
 
     def users(self):
         # type: (...) -> UserManager
+        """
+        Get the UserManager.
+
+        :return: A :class:`~.management.UserManager` with which you can create or update cluster users and roles.
+        """
         self._check_for_shutdown()
         return UserManager(self._admin)
 
     def query_indexes(self):
         # type: (...) -> QueryIndexManager
+        """
+        Get the QueryIndexManager.
+
+        :return:  A :class:`~.management.QueryIndexManager` with which you can create or modify query indexes on
+            the cluster.
+        """
         self._check_for_shutdown()
         return QueryIndexManager(self._admin)
 
     def search_indexes(self):
         # type: (...) -> SearchIndexManager
+        """
+        Get the SearchIndexManager.
+
+        :return:  A :class:`~.management.SearchIndexManager` with which you can create or modify search (FTS) indexes
+            on the cluster.
+        """
+
         self._check_for_shutdown()
         return SearchIndexManager(self._admin)
 
     def analytics_indexes(self):
         # type: (...) -> AnalyticsIndexManager
+        """
+        Get the AnalyticsIndexManager.
+
+        :return:  A :class:`~.management.AnalyticsIndexManager` with which you can create or modify analytics datasets,
+            dataverses, etc.. on the cluster.
+        """
         self._check_for_shutdown()
         return AnalyticsIndexManager(self)
 
     def buckets(self):
         # type: (...) -> BucketManager
+        """
+        Get the BucketManager.
+
+        :return: A :class:`~.management.BucketManager` with which you can create or modify buckets on the cluster.
+        """
         self._check_for_shutdown()
         return BucketManager(self._admin)
 
@@ -696,7 +779,7 @@ class Cluster(CoreClient):
         Closes and cleans up any resources used by the Cluster and any objects it owns.
 
         :return: None
-        :except Any exceptions raised by the underlying platform
+        :raise: Any exceptions raised by the underlying platform.
 
         """
         # in this context, if we invoke the _cluster's destructor, that will do same for
@@ -714,8 +797,10 @@ class Cluster(CoreClient):
     def query_timeout(self):
         # type: (...) -> timedelta
         """
-        The timeout for N1QL query operations. This affects the
-        :meth:`n1ql_query` method.
+        The timeout for N1QL query operations, as a `timedelta`. This affects the
+        :meth:`query` method.  This can be set in :meth:`connect` by
+        passing in a :class:`ClusterOptions` with the query_timeout set
+        to the desired time.
 
         Timeouts may also be adjusted on a per-query basis by setting the
         :attr:`timeout` property in the options to the n1ql_query method.
@@ -727,25 +812,20 @@ class Cluster(CoreClient):
 
     @property
     def tracing_threshold_query(self):
+        # type: (...) -> timedelta
         """
-        The tracing threshold for query response times, as `timedelta`
-
-        ::
-            # Set tracing threshold for query response times  to 0.5 seconds
-            cb.tracing_threshold_query = timedelta(seconds=0.5)
-
+        The tracing threshold for query response times, as `timedelta`.  This can be set in the :meth:`connect`
+        by passing in a :class:`~.ClusterOptions` with the desired tracing_threshold_query set in it.
         """
 
         return timedelta(seconds=self._cntl(op=_LCB.TRACING_THRESHOLD_QUERY, value_type="timeout"))
 
     @property
     def tracing_threshold_search(self):
+        # type: (...) -> timedelta
         """
-        The tracing threshold for search response times, as `timedelta`.
-        ::
-            # Set tracing threshold for search response times to 0.5 seconds
-            cluster.tracing_threshold_search = timedelta(seconds=0.5)
-
+        The tracing threshold for search response times, as `timedelta`.  This can be set in the :meth:`connect`
+        by passing in a :class:`~.ClusterOptions` with the desired tracing_threshold_search set in it.
         """
 
         return timedelta(seconds=self._cntl(op=_LCB.TRACING_THRESHOLD_SEARCH,
@@ -753,13 +833,10 @@ class Cluster(CoreClient):
 
     @property
     def tracing_threshold_analytics(self):
+        # type: (...) -> timedelta
         """
-        The tracing threshold for analytics, as `timedelta`.
-
-        ::
-            # Set tracing threshold for analytics response times to 0.5 seconds
-            cluster.tracing_threshold_analytics = timedelta(seconds=0.5)
-
+        The tracing threshold for analytics, as `timedelta`.  This can be set in the :meth:`connect`
+        by passing in a :class:`~.ClusterOptions` with the desired tracing_threshold_analytics set in it.
         """
 
         return timedelta(seconds=self._cntl(op=_LCB.TRACING_THRESHOLD_ANALYTICS,
@@ -767,13 +844,10 @@ class Cluster(CoreClient):
 
     @property
     def tracing_orphaned_queue_flush_interval(self):
+        # type: (...) -> timedelta
         """
-        The tracing orphaned queue flush interval, as a `timedelta`
-
-        ::
-            # Set tracing orphaned queue flush interval to 0.5 seconds
-            cluster.tracing_orphaned_queue_flush_interval = timedelta(seconds=0.5)
-
+        Returns the interval that the orphaned responses are logged, as a `timedelta`. This can be set in the
+        :meth:`connect` by passing in a :class:`~.ClusterOptions` with the desired interval set in it.
         """
 
         return timedelta(seconds=self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL,
@@ -781,26 +855,20 @@ class Cluster(CoreClient):
 
     @property
     def tracing_orphaned_queue_size(self):
+        # type: (...) -> int
         """
-        The tracing orphaned queue size.
-
-        ::
-            # Set tracing orphaned queue size to 100 entries
-            cluster.tracing_orphaned_queue_size = 100
-
+        Returns the tracing orphaned queue size. This can be set in the :meth:`connect` by passing in a
+        :class:`~.ClusterOptions` with the size set in it.
         """
 
         return self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_SIZE, value_type="uint32_t")
 
     @property
     def tracing_threshold_queue_flush_interval(self):
+        # type: (...) -> timedelta
         """
-        The tracing threshold queue flush interval, as a `timedelta`
-
-        ::
-            # Set tracing threshold queue flush interval to 0.5 seconds
-            cluster.tracing_threshold_queue_flush_interval = timedelta(seconds=0.5)
-
+        The tracing threshold queue flush interval, as a `timedelta`.  This can be set in the :meth:`connect` by
+        passing in a :class:`~.ClusterOptions` with the desired interval set in it.
         """
 
         return timedelta(seconds=self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_FLUSH_INTERVAL,
@@ -808,49 +876,29 @@ class Cluster(CoreClient):
 
     @property
     def tracing_threshold_queue_size(self):
+        # type: (...) -> int
         """
-        The tracing threshold queue size.
-
-        ::
-            # Set tracing threshold queue size to 100 entries
-            cluster.tracing_threshold_queue_size = 100
-
+        The tracing threshold queue size. This can be set in the :meth:`connect` by
+        passing in a :class:`~.ClusterOptions` with the desired size set in it.
         """
 
         return self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_SIZE, value_type="uint32_t")
 
     @property
     def redaction(self):
+        # type: (...) -> bool
+        """
+        Returns whether or not the logs will redact sensitive information.
+        """
         return bool(self._cntl(_LCB.LCB_CNTL_LOG_REDACTION, value_type='int'))
 
     @property
     def compression(self):
+        # type: (...) -> Compression
         """
-        The compression mode to be used when talking to the server.
-
-        This can be any of the values in :module:`couchbase_core._libcouchbase`
-        prefixed with `COMPRESS_`:
-
-        .. data:: COMPRESS_NONE
-
-        Do not perform compression in any direction.
-
-        .. data:: COMPRESS_IN
-
-        Decompress incoming data, if the data has been compressed at the server.
-
-        .. data:: COMPRESS_OUT
-
-        Compress outgoing data.
-
-        .. data:: COMPRESS_INOUT
-
-        Both `COMPRESS_IN` and `COMPRESS_OUT`.
-
-        .. data:: COMPRESS_FORCE
-
-        Setting this flag will force the client to assume that all servers
-        support compression despite a HELLO not having been initially negotiated.
+        Returns the compression mode to be used when talking to the server. See :class:`Compression` for
+        details.  This can be set in the :meth:`connect` by passing in a :class:`~.ClusterOptions`
+        with the desired compression set in it.
         """
 
         return Compression.from_int(
@@ -859,24 +907,26 @@ class Cluster(CoreClient):
 
     @property
     def compression_min_size(self):
+        # type: (...) -> int
         """
-        Minimum size (in bytes) of the document payload to be compressed when compression enabled.
-
-        :type: int
+        Minimum size (in bytes) of the document payload to be compressed when compression enabled. This can be set
+        in the :meth:`connect` by passing in a :class:`~.ClusterOptions` with the desired compression set in it.
         """
         return self._cntl(_LCB.LCB_CNTL_COMPRESSION_MIN_SIZE, value_type='uint32_t')
 
     @property
     def compression_min_ratio(self):
+        # type: (...) -> float
         """
         Minimum compression ratio (compressed / original) of the compressed payload to allow sending it to cluster.
-
-        :type: float
+        This can be set in the :meth:`connect` by passing in a :class:`~.ClusterOptions` with the desired
+        ratio set in it.
         """
         return self._cntl(_LCB.LCB_CNTL_COMPRESSION_MIN_RATIO, value_type='float')
 
     @property
     def is_ssl(self):
+        # type: (...) -> bool
         """
         Read-only boolean property indicating whether SSL is used for
         this connection.

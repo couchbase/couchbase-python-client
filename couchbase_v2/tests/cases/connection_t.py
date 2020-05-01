@@ -20,7 +20,8 @@ import tempfile
 
 from nose.plugins.attrib import attr
 
-from couchbase.cluster import PasswordAuthenticator, ClusterOptions
+from couchbase.cluster import ClusterOptions
+from couchbase.auth import PasswordAuthenticator
 from couchbase.bucket import Bucket
 from couchbase.exceptions import (AuthenticationException, BucketNotFoundException, DocumentNotFoundException,
                                   TimeoutException, InvalidArgumentException)

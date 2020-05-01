@@ -119,19 +119,6 @@ Using
 Authentication is handled differently depending on what version of Couchbase Server
 you are using:
 
-~~~~~~~~~~~~~~~~~~~~~~
-Couchbase Server < 5.0
-~~~~~~~~~~~~~~~~~~~~~~
-Each bucket can optionally have a password. You may omit the authenticator if you
-are only working with password-less buckets.
-
-.. code-block:: pycon
-
-    >>> from couchbase.cluster import Cluster, ClassicAuthenticator, ClusterOptions
-    >>> cluster = Cluster('couchbase://localhost', ClusterOptions(ClassicAuthenticator(buckets={'bucket-name': 'password'})))
-    >>> bucket = cluster.bucket('bucket-name')
-    >>> collection = bucket.default_collection()
-
 ~~~~~~~~~~~~~~~~~~~~~~~
 Couchbase Server >= 5.0
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -141,6 +128,7 @@ application that allow fine-grained control. The authenticator is always require
 .. code-block:: pycon
 
     >>> from couchbase.cluster import Cluster, PasswordAuthenticator, ClusterOptions
+    >>> from couchbase.auth import PasswordAuthenticator
     >>> cluster = Cluster('couchbase://localhost', ClusterOptions(PasswordAuthenticator('username', 'password')))
     >>> bucket = cluster.bucket('bucket-name')
     >>> collection = bucket.default_collection()

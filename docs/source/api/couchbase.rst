@@ -5,24 +5,14 @@ Cluster object
 .. module:: couchbase.cluster
 .. class:: Cluster
 
-    .. automethod:: __init__
     .. automethod:: connect
 
-.. _argtypes:
-
-.. class:: Authenticator
+.. class:: ClusterOptions
 
     .. automethod:: __init__
 
-.. _argtypes:
-
+.. module::couchbase.auth
 .. class:: CertAuthenticator
-
-    .. automethod:: __init__
-
-.. _argtypes:
-
-.. class:: ClassicAuthenticator
 
     .. automethod:: __init__
 
@@ -31,10 +21,6 @@ Cluster object
 .. class:: PasswordAuthenticator
 
     .. automethod:: __init__
-
-.. _argtypes:
-
-
 
 
 
@@ -45,15 +31,16 @@ Bucket object
 .. module:: couchbase.bucket
 .. class:: Bucket
 
-    .. automethod:: __init__
     .. automethod:: scope
     .. automethod:: default_collection
     .. automethod:: collection
 
-.. _argtypes:
+To open a bucket, you want to use the Cluster.
 
+.. module:: couchbase.cluster
+.. class:: Cluster
 
-
+    .. automethod:: bucket
 
 
 =================
@@ -353,10 +340,10 @@ manager to schedule multiple operations of different types
 MapReduce/View Methods
 ======================
 
-.. currentmodule:: couchbase.cluster
-.. class:: Cluster
+.. currentmodule:: couchbase.bucket
+.. class:: Bucket
 
-    .. automethod:: query
+    .. automethod:: view_query
 
 N1QL Query Methods
 ==================
@@ -374,6 +361,13 @@ Full-Text Search Methods
 .. class:: Cluster
 
     .. automethod:: search_query
+
+Analytics Query Methods
+=======================
+.. currentmodule:: couchbase.cluster
+.. class:: Cluster
+
+    .. automethod:: analytics_query
 
 
 Design Document Management
@@ -433,20 +427,20 @@ You can create additional indexes using::
 
     mgr.create_index('bucket_name', 'idx_foo', fields=['foo'])
 
-.. class:: BucketManager
+.. class:: QueryIndexManager
 
-    .. automethod:: n1ql_index_create
-    .. automethod:: n1ql_index_create_primary
-    .. automethod:: n1ql_index_drop
-    .. automethod:: n1ql_index_drop_primary
-    .. automethod:: n1ql_index_build_deferred
-    .. automethod:: n1ql_index_watch
-    .. automethod:: n1ql_index_list
+    .. automethod:: get_all_indexes
+    .. automethod:: create_primary_index
+    .. automethod:: create_index
+    .. automethod:: drop_primary_index
+    .. automethod:: drop_index
+    .. automethod:: watch_indexes
+    .. automethod:: build_deferred_indexes
 
-.. currentmodule:: couchbase_v2.bucket
+.. currentmodule:: couchbase.bucket.
 .. class:: Bucket
 
-    .. automethod:: bucket_manager
+    .. automethod:: buckets
 
 
 Flushing (clearing) the Bucket

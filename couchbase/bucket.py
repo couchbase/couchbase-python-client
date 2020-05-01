@@ -3,7 +3,7 @@ from couchbase.management.admin import Admin
 from couchbase.management.views import DesignDocumentNamespace
 from couchbase_core.client import Client as CoreClient
 import couchbase_core._libcouchbase as _LCB
-from .collection import CBCollection, CollectionOptions, CoreClientDatastructureWrap
+from .collection import CBCollection, CoreClientDatastructureWrap
 from .options import OptionBlockTimeOut
 from .result import *
 from .collection import Scope
@@ -105,11 +105,12 @@ class PingOptions(OptionBlockTimeOut):
 
 
 class Bucket(CoreClientDatastructureWrap):
+    @internal
     def __init__(self,
-                 connection_string = None,  # type: str
-                 name=None,  # type: str
-                 collection_factory=CBCollection,  # type: Type[CBCollection]
-                 admin=None,  # type: Admin
+                 connection_string=None,            # type: str
+                 name=None,                         # type: str
+                 collection_factory=CBCollection,   # type: Type[CBCollection]
+                 admin=None,                        # type: Admin
                  *options,
                  **kwargs
                  ):
@@ -117,8 +118,6 @@ class Bucket(CoreClientDatastructureWrap):
         """
         Connect to a bucket.
         Typically invoked by :meth:`couchbase.cluster.Cluster.open_bucket`
-
-        :param str name: name of bucket.
 
         :param str connection_string:
             The connection string to use for connecting to the bucket.
@@ -141,6 +140,8 @@ class Bucket(CoreClientDatastructureWrap):
             certificate could not be trusted.
 
             See :ref:`connopts` for additional connection options.
+
+        :param str name: name of bucket.
 
         :param string username: username to connect to bucket with
 
@@ -202,9 +203,16 @@ class Bucket(CoreClientDatastructureWrap):
     @property
     def _bucket(self):
         return self
+
     @property
     def name(self):
         # type: (...) -> str
+        """
+        Get the name of this bucket.
+
+        :return: Name of this bucket.
+        :rtype: str
+        """
         return self._name
 
     def scope(self,
@@ -214,14 +222,12 @@ class Bucket(CoreClientDatastructureWrap):
         """
         Open the named scope.
 
-        :param scope_name:
+        :param scope_name: Name of scope to open on this bucket.
         :return: the named scope
-        :rtype: Scope
         """
         return Scope(self, scope_name)
 
-    def default_collection(self,
-                           ):
+    def default_collection(self):
         # type: (...) -> CBCollection
         """
         Open the default collection.
@@ -245,6 +251,11 @@ class Bucket(CoreClientDatastructureWrap):
     def collections(self  # type: Bucket
                     ):
         # type: (...) -> CollectionManager
+        """
+        Get the CollectionManager.
+
+        :return: the :class:`.management.CollectionManager` for this bucket.
+        """
         return CollectionManager(self._admin, self._name)
 
     def view_query(self,
@@ -256,10 +267,12 @@ class Bucket(CoreClientDatastructureWrap):
         # type: (...) -> ViewResult
         """
         Run a View Query
+
         :param str design_doc: design document
         :param str view_name: view name
         :param ViewOptions view_options: Options to use when querying a view index.
-        :return: ViewResult containing the view results
+        :param kwargs: Override corresponding option in options.
+        :return: A :class:`ViewResult` containing the view results
         """
         final_kwargs={'itercls':ViewResult}
         final_kwargs.update(kwargs)
@@ -269,6 +282,11 @@ class Bucket(CoreClientDatastructureWrap):
     def view_indexes(self  # type: Bucket
                      ):
         # type: (...) -> ViewIndexManager
+        """
+        Get the ViewIndexManager for this bucket.
+
+        :return: The :class:`.management.ViewIndexManager` for this bucket.
+        """
         return ViewIndexManager(self, self._admin, self._name)
 
     def ping(self,
@@ -279,9 +297,9 @@ class Bucket(CoreClientDatastructureWrap):
         """
         Actively contacts each of the  services and returns their pinged status.
 
-        :param (PingOptions) options: Options for sending the ping request.
+        :param options: Options for sending the ping request.
         :param kwargs: Overrides corresponding value in options.
-        :return: PingResult representing the state of all the pinged services.
+        :return: A :class:`PingResult` representing the state of all the pinged services.
         :raise: CouchbaseException for various communication issues.
         """
         return PingResult(super(Bucket,self).ping(**forward_args(kwargs, *options)))

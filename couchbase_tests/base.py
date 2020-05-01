@@ -38,9 +38,9 @@ import couchbase_core
 from couchbase.cluster import AsyncCluster
 from collections import defaultdict
 from couchbase.bucket import Bucket as V3Bucket
-from couchbase.cluster import Cluster, ClassicAuthenticator, ClusterOptions, ClusterTracingOptions, \
+from couchbase.cluster import Cluster, ClusterOptions, ClusterTracingOptions, \
     ClusterTimeoutOptions
-from couchbase.cluster import PasswordAuthenticator
+from couchbase.auth import PasswordAuthenticator, ClassicAuthenticator
 from couchbase.collection import CBCollection
 from couchbase.exceptions import CollectionAlreadyExistsException, ScopeAlreadyExistsException, NotSupportedException, \
     CouchbaseException
