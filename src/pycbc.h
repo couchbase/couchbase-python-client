@@ -90,10 +90,6 @@ affect:
 
 #include <libcouchbase/crypto.h>
 #include "../build/lcb_min_version.h"
-#if LCB_VERSION < LCB_MIN_VERSION
-#pragma message "Couchbase Python SDK requires libcouchbase " LCB_MIN_VERSION_TEXT " or greater"
-#error "Please upgrade libcouchbase accordingly"
-#endif
 
 #include <pythread.h>
 #include "mresdict.h"
