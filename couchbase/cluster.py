@@ -28,6 +28,8 @@ from .result import *
 from random import choice
 from enum import Enum
 from copy import deepcopy
+from datetime import timedelta
+
 
 T = TypeVar('T')
 

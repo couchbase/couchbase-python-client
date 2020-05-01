@@ -853,12 +853,13 @@ class ClusterTestCase(CouchbaseTestCase):
 
     def _instantiate_cluster(self,
                              connstr_nobucket,  # type: str
-                             cluster_class,  # type: Type[ClusterTestCase.T]
+                             cluster_class=None,  # type: Type[ClusterTestCase.T]
                              opts=None  # type: Any
                              ):
         # type: (...) -> ClusterTestCase.T
         # FIXME: we should not be using classic here!  But, somewhere in the tests, we need
         # this for hitting the mock, it seems
+        cluster_class = cluster_class or self.cluster_factory
         auth_type = ClassicAuthenticator if self.is_mock else PasswordAuthenticator
         # hack because the Mock seems to want a bucket name for cluster connections, odd
         mock_hack = {'bucket': self.cluster_info.bucket_name} if self.is_mock else {}

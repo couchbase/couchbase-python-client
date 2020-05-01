@@ -12,7 +12,6 @@ try:
 except:
     from typing_extensions import TypedDict
 
-
 OptionBlockBase = dict
 
 
