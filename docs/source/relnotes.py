@@ -33,13 +33,16 @@ except:
 with open(os.path.join(outputdir, "relnotes.adoc"), "w+") as outputfile:
     section_type = None
     result = defaultdict(lambda: [])
-    mapping = {"Enhancements": r'(Task|Improvement).*',
-               "Fixes": r'(Bugs).*'}
+    mapping = {"Task": "Enhancements",
+               "Improvement": "Enhancements",
+               "New Feature": "Enhancements",
+               "Bug": "Fixes"}
     version = re.match(r'^(.*)Version ([0-9]+\.[0-9]+\.[0-9]+).*$', content.title.text).group(2)
     print("got version {}".format(version))
     for entry in content.body.find_all():
         if re.match(r'h[0-9]+', entry.name):
-            section_type = mapping.get(entry.text.strip(), "Enhancements")
+            print("Got section :{}".format(entry.text))
+            section_type = mapping.get(entry.text.strip(), None)
             if re.match("Edit/Copy Release Notes", entry.text):
                 break
         else:

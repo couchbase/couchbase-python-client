@@ -16,7 +16,7 @@ Querying Views
 
     .. automethod:: rows
 
-.. class:: ViewRow
+.. autoclass:: ViewRow
 
     .. autoattribute:: key
     .. autoattribute:: value

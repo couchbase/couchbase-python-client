@@ -456,7 +456,7 @@ class CBCollection(wrapt.ObjectProxy):
         return self._get_generic(key, kwargs, options)
 
     @_get_result_and_inject
-    def get_and_touch(self,
+    def get_and_touch(self,         # type: CBCollection
                       key,          # type: str
                       expiry,       # type: timedelta
                       *options,     # type: GetAndTouchOptions
@@ -465,6 +465,7 @@ class CBCollection(wrapt.ObjectProxy):
         # type: (...) -> GetResult
         """
         Get the document with the specified key, and update the expiry.
+
         :param key: Key of document to get and touch.
         :param expiry: New expiry for document.  Set to timedelta(seconds=0) to never expire.
         :param options: Options for request.
@@ -661,7 +662,7 @@ class CBCollection(wrapt.ObjectProxy):
     prepend_multi = _wrap_multi_mutation_result(_Base.prepend_multi)
 
     @_inject_scope_and_collection
-    def touch(self,
+    def touch(self,         # type: CBCollection
               key,          # type: str
               expiry,       # type: timedelta
               *options,     # type: TouchOptions
@@ -731,7 +732,7 @@ class CBCollection(wrapt.ObjectProxy):
         return ExistsResult(CoreClient.exists(self.bucket, key, **forward_args(kwargs, *options)))
 
     @_mutate_result_and_inject
-    def upsert(self,
+    def upsert(self,        # type: CBCollection
                key,         # type: str
                value,       # type: Any
                *options,    # type: UpsertOptions

@@ -43,7 +43,7 @@ term; :class:`TermQuery` to match a field exactly, :class:`PrefixQuery` for
 type-ahead queries, or a compound query type such as :class:`ConjunctionQuery`
 for more complex queries.
 
-.. autoclass:: Query
+.. autoclass:: SearchQuery
     :members:
 
 =============
