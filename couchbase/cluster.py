@@ -38,65 +38,55 @@ CallableOnOptionBlock = Callable[[OptionBlockDeriv, Any], Any]
 
 
 class DiagnosticsOptions(OptionBlock):
+
+    @overload
     def __init__(self,
-                 report_id = None # type: str
+                 report_id=None # type: str
                  ):
         pass
 
     def __init__(self,
                  **kwargs
                  ):
+        """
+
+        :param str report_id: An id that is appended on to the :class:`~.DiagnosticsResult`.  Helps with
+            disambiguating reports when you have several running.
+        """
         super(DiagnosticsOptions, self).__init__(**kwargs)
 
 
 class QueryScanConsistency(object):
-    REQUEST_PLUS="request_plus"
-    NOT_BOUNDED="not_bounded"
+    """
+    QueryScanConsistency
 
-    def __init__(self, val):
-        if val == self.REQUEST_PLUS or val == self.NOT_BOUNDED:
-            self._value = val
-        else:
-            raise InvalidArgumentException("QueryScanConsistency can only be {} or {}".format(self.REQUEST_PLUS, self.NOT_BOUNDED))
+    This can be:
 
-    @classmethod
-    def request_plus(cls):
-        return cls(cls.REQUEST_PLUS)
-
-    @classmethod
-    def not_bounded(cls):
-        return cls(cls.NOT_BOUNDED)
-
-    def as_string(self):
-        return getattr(self, '_value', self.NOT_BOUNDED)
+    NOT_BOUNDED
+        Which means we just return what is currently in the indexes, or
+    REQUEST_PLUS
+        which means we 'read our own writes'.  Slower, since the query has to wait for the indexes to catch up.
+    """
+    REQUEST_PLUS = "request_plus"
+    NOT_BOUNDED = "not_bounded"
 
 
-class QueryProfile(object):
+class QueryProfile(Enum):
+    """
+    QueryProfile
+
+    You can chose to set this to:
+
+    OFF
+        No query profiling data will be collected.
+    PHASES
+        Profile will have details on phases.
+    TIMINGS
+        Profile will have phases, and details on the query plan execution as well.
+    """
     OFF = 'off'
     PHASES = 'phases'
     TIMINGS = 'timings'
-
-    @classmethod
-    def off(cls):
-        return cls(cls.OFF)
-
-    @classmethod
-    def phases(cls):
-        return cls(cls.PHASES)
-
-    @classmethod
-    def timings(cls):
-        return cls(cls.TIMINGS)
-
-    def __init__(self, val):
-        if val == self.OFF or val == self.PHASES or val == self.TIMINGS:
-            self._value = val
-        else:
-            raise InvalidArgumentException(
-                "QueryProfile can only be {}, {}, {}".format(self.OFF, self.TIMINGS, self.PHASES))
-
-    def as_string(self):
-        return getattr(self, '_value', self.OFF)
 
 
 class QueryOptions(OptionBlockTimeOut):
@@ -113,12 +103,12 @@ class QueryOptions(OptionBlockTimeOut):
                  client_context_id=None,      # type: str
                  consistent_with=None,        # type: MutationState
                  max_parallelism=None,        # type: int
-                 positional_parameters=None,  # type: Iterable[str]
-                 named_parameters=None,       # type: Dict[str, str]
+                 positional_parameters=None,  # type: Iterable[JSON]
+                 named_parameters=None,       # type: dict[str, JSON]
                  pipeline_batch=None,         # type: int
                  pipeline_cap=None,           # type: int
                  profile=None,                # type: QueryProfile
-                 raw=None,                    # type: Dict[str, Any]
+                 raw=None,                    # type: dict[str, JSON]
                  scan_wait=None,              # type: timedelta
                  scan_cap=None,               # type: int
                  metrics=False                # type: bool
@@ -128,6 +118,47 @@ class QueryOptions(OptionBlockTimeOut):
     def __init__(self,
                  **kwargs
                  ):
+        """
+        QueryOptions
+        Various options for queries
+
+        :param timedelta timeout:
+            Uses this timeout value, rather than the default for the cluster. See :meth:`~Cluster.query_timeout`.
+        :param bool read_only:
+            Hint to the server that this is a read-only query.
+        :param QueryScanConsistency scan_consistency:
+            Specify the level of consistency for the query.  Overrides any setting in consistent_with.  Can be either
+            :meth:`~.QueryScanConsistency.NOT_BOUNDED`, which means return what is in the index now, or
+            :meth:`~.QueryScanConsistency.REQUEST_PLUS`, which means you can read your own writes.  Slower, but when
+            you need it you have it.
+        :param bool adhoc:
+            Specifies if the prepared statement logic should be executed internally.
+        :param str client_context_id:
+            Specifies a context ID string which is mirrored back from the query engine on response.
+        :param MutationState consistent_with:
+            Specifies custom scan consistency through “at_plus” with mutation state token vectors.
+        :param int max_parallelism:
+            The maximum number of logical cores to use in parallel for this query.
+        :param Iterable[JSON] positional_parameters:
+            Specifies the parameters used in the query, when positional notation ($1, $2, etc...) is used.
+        :param dict[str,JSON] named_parameters:
+            Specifies the parameters used in the query, when named parameter notation ($foo, $bar, etc...) is used.
+        :param int pipeline_batch:
+            Specifies pipeline batching characteristics.
+        :param int pipeline_cap:
+            Specifies pipeline cap characteristics.
+        :param QueryProfile profile:
+            Specifies the profiling level to use.
+        :param dict[str,JSON] raw:
+            This is a way to to specify the query payload to support unknown commands and be future-compatible.
+        :param timedelta scan_wait:
+            Specifies maximum amount of time to wait for a scan.
+        :param int scan_cap:
+            Specifies the scan cap characteristics.
+        :param bool metrics:
+            Specifies whether or not to include metrics with the :class:`~.QueryResult`.
+
+        """
         super(QueryOptions, self).__init__(**kwargs)
 
     def to_n1ql_query(self, statement, *options, **kwargs):
@@ -162,7 +193,7 @@ class QueryOptions(OptionBlockTimeOut):
             v = args.get(k, None)
             if v:
                 if k == 'scan_consistency':
-                    query.consistency = v.as_string()
+                    query.consistency = v.value
                 if k == 'consistent_with':
                     query.consistent_with = v
                 if k == 'adhoc':
@@ -178,7 +209,7 @@ class QueryOptions(OptionBlockTimeOut):
                 if k == 'read_only':
                     query.readonly = v
                 if k == 'profile':
-                    query.profile = v.as_string()
+                    query.profile = v.value
         return query
 
         # this will change the options for export.
@@ -220,6 +251,14 @@ class ClusterTimeoutOptions(dict):
         pass
 
     def __init__(self, **kwargs):
+        """
+        ClusterTimeoutOptions
+        These will be the default timeouts for queries, kv operations or views for the entire cluster
+
+        :param timedelta query_timeout: Timeout for query operations.
+        :param timedelta kv_timeout: Timeout for KV operations.
+        :param timedelta views_timeout: Timeout for View operations.
+        """
         super().__init__(**kwargs)
 
     def as_dict(self):
@@ -298,6 +337,20 @@ class ClusterTracingOptions(dict):
         pass
 
     def __init__(self, **kwargs):
+        """
+        ClusterTracingOptions
+        These parameters control when/how our request tracing will log slow requests or orphaned responses.
+
+        :param timedelta tracing_threshold_kv:  Any KV request taking longer than this will be traced.
+        :param timedelta tracing_threshold_view: Any View request taking longer than this will be traced.
+        :param timedelta tracing_threshold_query: Any Query request taking longer than this will be traced.
+        :param timedelta tracing_threshold_search: Any Search request taking longer than this will be traced.
+        :param timedelta tracing_threshold_analytics: Any Analytics request taking longer than this will be traced
+        :param int tracing_threshold_queue_size: Limits the number of requests traced.
+        :param timedelta tracing_threshold_queue_flush_interval: Interval between flushes of the threshold queues.
+        :param int tracing_orphaned_queue_size: Limits the number of orphaned requests traced.
+        :param timedelta tracing_orphaned_queue_flush_interval:  Interval between flushes of the orphaned queue.
+        """
         super().__init__(**kwargs)
 
     def as_dict(self):

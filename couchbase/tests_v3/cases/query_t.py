@@ -88,7 +88,7 @@ class QueryTests(CollectionTestCase):
         self.assertRows(result, 1)
 
     def test_query_with_profile(self):
-        result = self.cluster.query("SELECT * FROM `beer-sample` LIMIT 1", QueryOptions(profile=QueryProfile.timings()))
+        result = self.cluster.query("SELECT * FROM `beer-sample` LIMIT 1", QueryOptions(profile=QueryProfile.TIMINGS))
         self.assertRows(result, 1)
         self.assertIsNotNone(result.metadata().profile())
 

@@ -1404,6 +1404,16 @@ class SearchMetrics(object):
 
 
 class HighlightStyle(Enum):
+    """
+    HighlightStyle
+
+    Can be either:
+
+    Ansi
+        Need Example
+    Html
+        Need Example
+    """
     Ansi = 'ansi'
     Html = 'html'
 
@@ -1479,6 +1489,36 @@ class SearchOptions(OptionBlockTimeOut):
     def __init__(self,
                  **kwargs   # type: Any
                  ):
+        """
+        Search Options
+
+        These options apply to a Full Text Search query.
+
+        :param timedelta timeout:  Timeout to use for this query.  If not set, the default cluster-wide timeout is used
+            :meth:`~.Cluster.search_timeout`
+        :param int limit:
+            Limit the results returned.
+        :param int skip:
+            Skip the first N results.
+        :param bool explain:
+            Include an explaination of the search result scores.
+        :param Iterable[str] fields:
+            List of fields to return, if they exist on the document.
+        :param HighlightStyle highlight_style:
+            Style to render the highlights.  See :class:`~.HighlighStyle` for details.
+        :param Iterable[str] highlight_fields:
+            Fields to highlight.  If this is not specified, all fields returned are highlighted.
+        :param QueryScanConsistency scan_consistency:
+            Scan Consistency to use for this query.  See :class:`~.QueryScanConsistency` for details.
+        :param MutationState consistent_with:
+            Specify a consistency using :class:`~.MutationState`.
+        :param Iterable[str,Facet] facets:
+            Specify a set of :class:`~.Facet` objects that aggregate the result data.
+        :param dict[str,JSON] raw:
+            A way to support unknown commands, and be future-compatible.
+        :param Iterable[Sort] sort:
+            List of various :class:`~.Sort` objects to sort the results.
+        """
         # convert highlight_style to str if it is present...
         style = kwargs.get('highlight_style', None)
         if style:
