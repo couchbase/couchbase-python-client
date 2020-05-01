@@ -63,12 +63,10 @@ class BucketManagementTests(CollectionTestCase):
     def test_change_ttl(self):
         # Create the bucket
         self.bm.create_bucket(CreateBucketSettings(name='fred', ram_quota_mb=100))
-        self.bm._admin_bucket.wait_ready('fred', timeout=15.0)
         self.try_n_times(10, 3, self.bm.get_bucket, 'fred')
 
         # change bucket TTL
         self.try_n_times(10, 3, self.bm.update_bucket, BucketSettings(name='fred', max_ttl=500))
-        self.bm._admin_bucket.wait_ready('fred', 10)
 
         def get_bucket_ttl_equal(name, ttl):
             if not ttl == self.bm.get_bucket(name).max_ttl:
