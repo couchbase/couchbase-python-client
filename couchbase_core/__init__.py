@@ -26,16 +26,12 @@ except:
     import abstractmethod
 
 from copy import deepcopy
-import logging
-import traceback
-
 
 # Pythons > (2.7||3.2) silence deprecation warnings by default.
 # Many folks are not happy about this, as it avoids letting them
 # know about potential upcoming breaking changes in their code.
 # Here we add a warning filter for any deprecation warning thrown
 # by Couchbase
-from enum import Enum
 
 warnings.filterwarnings(action='default',
                         category=DeprecationWarning,
@@ -146,29 +142,6 @@ def _from_json(*args):
     :return: Python object converted from JSON
     """
     return _LCB._get_helper('json_decode')(*args)
-
-
-def enable_logging():
-    """
-    Enables integration with Python's `logging` module.
-
-    This function enables the C library's logging to be propagated to
-    the Python standard `logging` module.
-
-    Calling this function affects any :class:`~couchbase_core.client.Client` objects created
-    afterwards (but not before). Note that currently this will also
-    override any ``LCB_LOGLEVEL`` directive inside the environment as
-    well.
-
-    The "root" couchbase_core logger is ``couchbase``.
-    """
-    import couchbase_core._logutil
-    couchbase_core._logutil.configure(True)
-
-
-def disable_logging():
-    import couchbase_core._logutil
-    couchbase_core._logutil.configure(False)
 
 
 _enum_counts = defaultdict(lambda: 0)

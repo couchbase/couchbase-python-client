@@ -1,3 +1,5 @@
+from enum import IntEnum
+
 from couchbase.exceptions import CouchbaseException
 from typing import *
 
@@ -229,3 +231,13 @@ class CertAuthenticator(Authenticator):
 
     def get_credentials(self, bucket=None):
         return self.get_auto_credentials(bucket)
+
+
+class AuthDomain(IntEnum):
+    """
+    The Authentication domain for a user.
+    Local: Users managed by Couchbase Server.
+    External: Users managed by an external resource, eg LDAP.
+    """
+    Local = 0
+    External = 1

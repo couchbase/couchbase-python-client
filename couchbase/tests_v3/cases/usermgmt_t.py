@@ -4,7 +4,7 @@ from functools import wraps
 
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.management.users import User, Role, Group, RawRole, GroupNotFoundException, UserNotFoundException
-from couchbase_core.auth_domain import AuthDomain
+from couchbase.auth import AuthDomain
 from couchbase_tests.base import CollectionTestCase
 from couchbase.exceptions import  NotSupportedException
 from typing import *

@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import couchbase
 import couchbase_v2
 
 try:
@@ -162,9 +163,9 @@ class MiscTest(ConnectionTestCaseBase):
         lcb.lcb_logging(logfn)
         self.assertEqual(logfn, lcb.lcb_logging())
 
-        couchbase_core.enable_logging()
+        couchbase.enable_logging()
         self.assertTrue(lcb.lcb_logging())
-        couchbase_core.disable_logging()
+        couchbase.disable_logging()
         self.assertFalse(lcb.lcb_logging())
 
     def test_redaction(self):
@@ -172,7 +173,7 @@ class MiscTest(ConnectionTestCaseBase):
         all_tags = r'|'.join(re.escape(v) for k, v in _LCB.__dict__.items() if
                              re.match(r'.*LCB_LOG_(SD|MD|UD)_[OC]TAG.*', k))
 
-        couchbase_core.enable_logging()
+        couchbase.enable_logging()
         try:
             contains_no_tags = r'^(.(?!<' + all_tags + r'))*$'
             contains_tags = r'^.*(' + all_tags + r').*$'
@@ -209,7 +210,7 @@ class MiscTest(ConnectionTestCaseBase):
                                                                                                          **val))
                     self.assertRegex(''.join(cm.output), opposite_val['pattern'])
         finally:
-            couchbase_core.disable_logging()
+            couchbase.disable_logging()
 
     def test_compat_timeout(self):
         cb = self.make_connection(timeout=7.5)

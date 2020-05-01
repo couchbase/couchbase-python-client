@@ -34,6 +34,7 @@ from testfixtures import LogCapture
 from testresources import ResourcedTestCase as ResourcedTestCaseReal, TestResourceManager
 from utilspie.collectionsutils import frozendict
 
+import couchbase
 import couchbase_core
 from couchbase.cluster import AsyncCluster
 from collections import defaultdict
@@ -1026,7 +1027,7 @@ class TracedCase(CollectionTestCase):
             raise SkipTest("too slow when using jaeger")
         enable_logging |= bool(self.trace_all)
         if enable_logging:
-            couchbase_core.enable_logging()
+            couchbase.enable_logging()
         if self.use_parent_tracer:
             kwargs['init_tracer'] = self.init_tracer
         kwargs['enable_tracing'] = "true"
@@ -1060,7 +1061,7 @@ class TracedCase(CollectionTestCase):
         if self.trace_all and not self.using_jaeger:
             self.flush_tracer()
         super(TracedCase, self).tearDown()
-        couchbase_core.disable_logging()
+        couchbase.disable_logging()
         if self.tracer and getattr(self.tracer, "close", None):
             try:
                 # yield to IOLoop to flush the spans - https://github.com/jaegertracing/jaeger-client-python/issues/50

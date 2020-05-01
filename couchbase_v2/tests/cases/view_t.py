@@ -20,7 +20,7 @@ from couchbase_core.user_constants import FMT_JSON
 from couchbase_v2.exceptions import HTTPException, NotSupportedException
 from couchbase_v2.bucket import Bucket
 
-from couchbase_core.auth_domain import AuthDomain
+from couchbase.auth import AuthDomain
 from nose import SkipTest
 from nose.plugins.attrib import attr
 

@@ -27,7 +27,7 @@ from boltons.funcutils import wraps
 from couchbase_core import JSON, mk_formstr
 import couchbase.exceptions as E
 from couchbase_core._pyport import basestring
-from couchbase_core.auth_domain import AuthDomain
+from couchbase.auth import AuthDomain
 from couchbase_core._libcouchbase import FMT_JSON
 from couchbase_core.supportability import internal
 

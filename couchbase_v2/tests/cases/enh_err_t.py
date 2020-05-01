@@ -18,7 +18,7 @@ import unittest
 
 from couchbase_v2.exceptions import (CouchbaseException)
 from couchbase_tests.base import CouchbaseTestCase
-from couchbase_core.auth_domain import AuthDomain
+from couchbase.auth import AuthDomain
 import sys
 import time
 from nose import SkipTest

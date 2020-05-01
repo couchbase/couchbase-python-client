@@ -23,7 +23,7 @@ from couchbase.exceptions import (
     InvalidArgumentException, AuthenticationException, CouchbaseException,
     NetworkException, HTTPException)
 from couchbase_tests.base import CouchbaseTestCase, SkipTest
-from couchbase_core.auth_domain import AuthDomain
+from couchbase.auth import AuthDomain
 
 import time
 

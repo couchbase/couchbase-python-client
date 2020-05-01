@@ -4,7 +4,7 @@ from couchbase.management.admin import Admin
 from couchbase.options import timedelta, forward_args
 from couchbase.management.generic import GenericManager
 from couchbase_core import mk_formstr, JSONMapping, Mapped
-from couchbase_core.auth_domain import AuthDomain
+from couchbase.auth import AuthDomain
 from couchbase_core._pyport import ulp, with_metaclass, Protocol
 from couchbase_core import ABCMeta
 from typing import *

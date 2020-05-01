@@ -19,6 +19,7 @@ from unittest import SkipTest
 
 from flaky import flaky
 
+import couchbase
 from couchbase.exceptions import (
     DocumentNotFoundException)
 
@@ -82,7 +83,7 @@ class TimeoutTest(TracedCase):
         if not couchbase_core._libcouchbase.PYCBC_TRACING:
             raise SkipTest("Tracing feature not compiled into Python Client")
         kwargs = {}
-        couchbase_core.enable_logging()
+        couchbase.enable_logging()
         kwargs['enable_tracing'] = "true"
         #super(TimeoutTest, self).setUp(**kwargs)
         super(TimeoutTest, self).setUp(trace_all=True, enable_logging=True, use_parent_tracer=False, flushcount=0)
@@ -95,7 +96,7 @@ class TimeoutTest(TracedCase):
             raise SkipTest("To be fixed on Windows")
         if sys.version_info >= (3,6) and sys.platform.startswith('linux') and os.environ.get("VALGRIND_REPORT_DIR"):
             raise SkipTest("To be fixed on Linux 3.6/Valgrind")
-        couchbase_core.enable_logging()
+        couchbase.enable_logging()
         bucket = self.coll
         bucket.upsert("key", "value")
 
@@ -168,7 +169,7 @@ class TimeoutTest(TracedCase):
 
     def tearDown(self):
         super(TimeoutTest, self).tearDown()
-        couchbase_core.disable_logging()
+        couchbase.disable_logging()
 
 
 class ExceptionGrammar:
