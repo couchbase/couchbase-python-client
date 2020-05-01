@@ -99,11 +99,11 @@ class Scenarios(CollectionTestCase):
         3) replace the fragment in the original document
 
         """
-        self.coll.upsert("id",{'someArray':['wibble','gronk']})
-        subdoc = self.coll.get("id", GetOptions(project = ["someArray"]))
+        self.coll.upsert("id", {'someArray': ['wibble', 'gronk']})
+        subdoc = self.coll.get("id", GetOptions(project=["someArray"]))
         result = None
         if subdoc:
-            arr = subdoc.content_as_array()
+            arr = subdoc.content_as[list]
             arr.append("foo")
 
             result = self.coll.mutate_in("id", [SD.upsert("someArray", arr)],

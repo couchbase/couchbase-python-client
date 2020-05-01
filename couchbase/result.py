@@ -173,6 +173,9 @@ class LookupInResult(Result):
     def expiry(self):
         return self._original.expiry
 
+    def __len__(self):
+        return len(canonical_sdresult(self._original))
+
 
 class MutationResult(Result):
     def __init__(self,
@@ -288,10 +291,6 @@ class GetResult(Result):
         if isinstance(original, SubdocResult):
             self._expiry = original.expiry
             self._full = bool(original.get_full)
-
-    def content_as_array(self):
-        # type: (...) -> List
-        return list(self.content)
 
     @property
     def id(self):
