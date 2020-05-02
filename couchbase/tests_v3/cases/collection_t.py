@@ -198,16 +198,12 @@ class CollectionTests(CollectionTestCase):
 
     def test_get_any_replica(self):
         self._check_replicas(False)
-        if self.supports_collections():
-            raise SkipTest("get_any_replica fails if using collections it seems")
         self.coll.upsert('imakey100', self.CONTENT)
         result = self.try_n_times(10, 3, self.coll.get_any_replica, 'imakey100')
         self.assertDictEqual(self.CONTENT, result.content_as[dict])
 
     def test_get_all_replicas(self):
         self._check_replicas()
-        if self.supports_collections():
-            raise SkipTest("get_all_replicas fails if using collections it seems")
         self.coll.upsert(self.KEY, self.CONTENT)
         # wait till it it there...
         result = self.try_n_times(10, 3, self.coll.get_all_replicas, self.KEY)
@@ -218,8 +214,6 @@ class CollectionTests(CollectionTestCase):
 
     def test_get_all_replicas_returns_master(self):
         self._check_replicas()
-        if self.supports_collections():
-            raise SkipTest("get_all_replicas fails if using collections it seems")
         self.coll.upsert('imakey100', self.CONTENT)
         result = self.try_n_times(10, 3, self.coll.get_all_replicas, 'imakey100')
         if not hasattr(result, '__iter__'):

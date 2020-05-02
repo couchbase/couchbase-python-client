@@ -45,8 +45,6 @@ typedef lcb_ANALYTICS_HANDLE *pycbc_ANALYTICS_HANDLE;
  * parts. Note this is incompatible with `F_INCLUDE_DOCS`*/
 #    define LCB_CMDVIEWQUERY_F_NOROWPARSE (1 << 17)
 
-#define pycbc_rget(INSTANCE, COOKIE, CMD) \
-    pycbc_verb_postfix(, getreplica, (INSTANCE), (COOKIE), (CMD))
 #define pycbc_verb(VERB, INSTANCE, COOKIE, CMD) pycbc_verb_postfix(, VERB, INSTANCE, COOKIE, CMD)
 #define LCB_STORE_WRAPPER(b) handler(module, "LCB_" #b, LCB_STORE_##b);
 

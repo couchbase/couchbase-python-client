@@ -836,6 +836,13 @@ value_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
     }
     PYCBC_DEBUG_LOG_CONTEXT(PYCBC_RES_CONTEXT(res), "Value callback continues")
 
+    /* for only getreplica, we need to check is_final.  And we need to do that before
+     * the GT_DONE.  So, though this isn't super clean, lets do it here.
+     */
+    if (cbtype == LCB_CALLBACK_GETREPLICA) {
+        const lcb_RESPGETREPLICA *gresp = (const lcb_RESPGETREPLICA *)resp;
+        is_final = lcb_respgetreplica_is_final(gresp);
+    }
     if (handler.rc == LCB_SUCCESS) {
         res->cas = handler.cas;
     } else {
@@ -850,7 +857,6 @@ value_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
         const lcb_RESPGETREPLICA *gresp = (const lcb_RESPGETREPLICA *)resp;
         lcb_U32 eflags;
         lcb_respgetreplica_flags(gresp, &res->flags);
-        is_final = lcb_respgetreplica_is_final(gresp);
         if (mres->mropts & PYCBC_MRES_F_FORCEBYTES) {
             eflags = PYCBC_FMT_BYTES;
         } else {

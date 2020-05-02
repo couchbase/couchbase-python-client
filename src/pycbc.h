@@ -60,14 +60,6 @@ affect:
  wrapped using CMDSCOPE_NG etc, as defined in pycbc.h
 
 2. 'shared' attributes of structures.
- The backport of the V4 API (see lcb_v4_backport.h) to
- LCB API V3 replicates these interface changes as far as possible, so one
- unified set of code can be used with both LCB API V3 and LCB API V4.
-
- There are some mutually exclusive features between LCB API V3 and LCB API V4
- (e.g. standalone ENDURE/OBSERVE commands)
- that are currently implemented via conditional compilation.
-
  PYCBC_LCB_API represents LCB_API version,
  but we use 0x02FF0x for V3 alphas (e.g. 0x02FF04 for 3.0.0 Alpha 4).
  */
@@ -691,7 +683,8 @@ lcb_STATUS pycbc_log_coll(const char *TYPE,
     X(HTTP, http, NOCOLLECTION, IMPL_TYPE)                    \
     X(PING, ping, NOCOLLECTION, IMPL_TYPE)                    \
     X(EXISTS, exists, COLLECTION, IMPL_TYPE)                  \
-    X(SUBDOC, subdoc, COLLECTION, IMPL_TYPE)
+    X(SUBDOC, subdoc, COLLECTION, IMPL_TYPE)                  \
+    X(GETREPLICA, getreplica, COLLECTION, IMPL_TYPE)
 
 #define COLLECTION_ARG pycbc_Collection_t *
 #define NOCOLLECTION_ARG lcb_INSTANCE *

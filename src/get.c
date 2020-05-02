@@ -170,7 +170,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
             CMDSCOPE_NG_PARAMS(GETREPLICA, getreplica, gv->u.replica.strategy)
             {
                 COMMON_OPTS(PYCBC_getreplica_ATTR, rget, getreplica);
-                err = pycbc_rget(self->instance, cv->mres, cmd);
+                err = pycbc_getreplica(collection, cv->mres, cmd);
             }
         } break;
         default:
