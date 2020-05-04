@@ -181,10 +181,13 @@ else:
 cmake_build=os.environ.get("PYCBC_CMAKE_BUILD")
 
 # Dummy dependency to prevent installation of Python < 3 package on Windows.
-
+try:
+    pipversion = pip.__version__
+except:
+    pipversion = "0.0.0"
 pip_not_on_win_python_lt_3 = (
     ['pip>=9.0; (sys_platform != "win32" and python_version >= "2.7") or (python_version >= "3.0")']
-    if pip.__version__ >= "9.0.0"
+    if pipversion >= "9.0.0"
     else [])
 
 conan_and_cmake_deps = (['conan', 'cmake>=3.0.2'] if
