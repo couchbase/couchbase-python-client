@@ -16,6 +16,7 @@
 #
 import time
 
+from flaky import flaky
 from nose.plugins.attrib import attr
 
 from couchbase.tests.base import ConnectionTestCase
@@ -28,6 +29,7 @@ class TouchTest(ConnectionTestCase):
         super(TouchTest, self).setUp()
         self.cb = self.make_connection()
 
+    @flaky(10, 1)
     def test_trivial_touch(self):
         key = self.gen_key("trivial_touch")
         self.cb.upsert(key, "value", ttl=1)
@@ -44,6 +46,7 @@ class TouchTest(ConnectionTestCase):
         self.assertFalse(rv.success)
         self.assertTrue(E.NotFoundError._can_derive(rv.rc))
 
+    @flaky(10, 1)
     def test_trivial_multi_touch(self):
         kv = self.gen_kv_dict(prefix="trivial_multi_touch")
         self.cb.upsert_multi(kv, ttl=1)
@@ -61,6 +64,7 @@ class TouchTest(ConnectionTestCase):
         rvs = self.cb.get_multi(kv.keys(), quiet=True)
         self.assertFalse(rvs.all_ok)
 
+    @flaky(10, 1)
     def test_dict_touch_multi(self):
         k_missing = self.gen_key("dict_touch_multi_missing")
         k_existing = self.gen_key("dict_touch_multi_existing")

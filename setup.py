@@ -189,9 +189,11 @@ pip_not_on_win_python_lt_3 = (
 
 conan_and_cmake_deps = (['conan', 'cmake>=3.0.2'] if
                         cmake_build and sys.platform.startswith('darwin') else [])
-
-gen_reqs = ['typing; python_version<"3.7"',
-            'enum34; python_version<"3.5"']
+gen_reqs = []
+if sys.version_info < (3, 7):
+    gen_reqs += ['typing']
+if sys.version_info < (3, 5):
+    gen_reqs += ['enum34']
 
 setup(
     name = 'couchbase',
