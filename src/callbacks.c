@@ -1055,72 +1055,7 @@ keyop_simple_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
     (void)instance;
 
 }
-/* comment out until lcb_RESPSTATS exists again
-static void
-stats_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp_base)
-{
-    pycbc_MultiResult *mres;
-    PyObject *value;
-    PyObject *skey, *knodes;
-    PyObject *mrdict;
-    pycbc_Bucket *parent;
-    pycbc_Result *res = NULL;
-    const lcb_RESPSTATS *resp = (const lcb_RESPSTATS *)resp_base;
-    int do_return = 0;
 
-    mres = (pycbc_MultiResult*)resp->cookie;
-    parent = mres->parent;
-    CB_THR_END(parent);
-
-    if (resp->rc != LCB_SUCCESS) {
-        do_return = 1;
-        if (mres->errop == NULL) {
-            res = (pycbc_Result *)pycbc_result_new(parent);
-            res->rc = resp->rc;
-            res->key = Py_None; Py_INCREF(res->key);
-            MAYBE_PUSH_OPERR(mres, res, resp->rc, 0);
-        }
-    }
-    if (resp->rflags & LCB_RESP_F_FINAL) {
-        // Note this can happen in both success and error cases!
-        do_return = 1;
-        operation_completed_with_err_info(parent, mres, cbtype, resp_base, res);
-    }
-    if (do_return) {
-        CB_THR_BEGIN(parent);
-        return;
-    }
-
-    skey = pycbc_SimpleStringN(resp->key, resp->nkey);
-
-    mrdict = pycbc_multiresult_dict(mres);
-    knodes = PyDict_GetItem(mrdict, skey);
-
-    value = pycbc_SimpleStringN(resp->value, resp->nvalue);
-    {
-        PyObject *intval = pycbc_maybe_convert_to_int(value);
-        if (intval) {
-            Py_DECREF(value);
-            value = intval;
-
-        } else {
-            PyErr_Clear();
-        }
-    }
-
-    if (!knodes) {
-        knodes = PyDict_New();
-        PyDict_SetItem(mrdict, skey, knodes);
-    }
-
-    PyDict_SetItemString(knodes, resp->server, value);
-    Py_DECREF(skey);
-    Py_DECREF(value);
-
-    CB_THR_BEGIN(parent);
-    (void)instance;
-}
-*/
 static void
 observe_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp_base)
 {
@@ -1257,31 +1192,31 @@ static void exists_callback(lcb_t instance,
     pycbc_OperationResult *res = NULL;
     pycbc_MultiResult *mres = NULL;
     response_handler handler = {.cbtype = cbtype};
+
     rv = get_common_objects(
             resp_base, &conn, (pycbc_Result **)&res, optflags, &mres, &handler);
+    if (rv < 0) {
+        goto DONE;
+    }
+
     PYCBC_DEBUG_LOG_CONTEXT(PYCBC_RES_CONTEXT(res), "Exists callback continues")
 
-    if (rv == 0) {
-        res->rc = handler.rc;
+    if (handler.rc != LCB_SUCCESS) {
         MAYBE_PUSH_OPERR(mres, (pycbc_Result *)res, handler.rc, 0);
+        goto DONE;
     }
-    if (handler.cas) {
+    int exists = lcb_respexists_is_found((const lcb_RESPEXISTS*)resp_base);
+    PYCBC_DEBUG_LOG("is_found returns %d", exists);
+    /* we just use the existance of the cas as an indication, in python.  Note a deleted
+     * doc will return a cas too - hence the explicit is_found call */
+    if (handler.cas && exists) {
         res->cas = handler.cas;
-    }
-    {
-        int exists = lcb_respexists_is_found((const lcb_RESPEXISTS*)resp_base);
-        PYCBC_DEBUG_LOG("is_found returns %d", exists);
-        /* we just use the existance of the cas as an indication, in python.  Note a deleted
-         * doc will return a cas too - hence the explicit is_found call */
-        if (handler.cas && exists) {
-            res->cas = handler.cas;
-        } else {
-            res->cas = 0;
-        }
+    } else {
+        res->cas = 0;
     }
 
-    operation_completed_with_err_info(
-            conn, mres, cbtype, resp_base, (pycbc_Result *)res);
+    DONE:
+    operation_completed_with_err_info(conn, mres, cbtype, resp_base, (pycbc_Result *)res);
     CB_THR_BEGIN(conn);
     (void)instance;
 }

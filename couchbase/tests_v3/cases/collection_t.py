@@ -54,13 +54,11 @@ class CollectionTests(CollectionTestCase):
         # make sure NOKEY is gone
         self.try_n_times_till_exception(10, 1, self.cb.get, self.NOKEY)
 
-    @unittest.skip("exists will segfault occasionally, see PYCBC-834")
     def test_exists(self):
         if self.is_mock:
             raise SkipTest("mock does not support exists")
         self.assertTrue(self.cb.exists(self.KEY).exists)
 
-    @unittest.skip("exists will segfault occasionally, see PYCBC-834")
     def test_exists_when_it_does_not_exist(self):
         if self.is_mock:
             raise SkipTest("mock does not support exists")
@@ -68,7 +66,6 @@ class CollectionTests(CollectionTestCase):
         self.assertRaises(DocumentNotFoundException, self.cb.get, key)
         self.assertFalse(self.cb.exists(key).exists)
 
-    @unittest.skip("this verifies CCBC-1187 - skip till fixed")
     def test_exists_with_recently_removed_key(self):
         if self.is_mock:
             raise SkipTest("mock does not support exists")

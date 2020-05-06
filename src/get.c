@@ -147,7 +147,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
         } break;
 
         case PYCBC_CMD_EXISTS: {
-            CMDSCOPE_NG_V4(EXISTS, exists)
+            CMDSCOPE_NG(EXISTS, exists)
             {
                 PYCBC_CMD_SET_KEY_SCOPE(exists, cmd, keybuf);
                 PYCBC_TRACECMD_TYPED(exists, cmd, context, cv->mres, curkey, self);
