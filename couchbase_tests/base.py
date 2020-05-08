@@ -258,9 +258,9 @@ class ClusterInformation(object):
         connargs = self.make_connargs(**kwargs)
         return conncls(**connargs)
 
-    def make_admin_connection(self):
+    def make_admin_connection(self, **kwargs):
         return Admin(self.admin_username, self.admin_password,
-                     self.host, self.port, ipv6=self.ipv6)
+                     self.host, self.port, ipv6=self.ipv6, **kwargs)
 
 
 class ConnectionConfiguration(object):
@@ -530,7 +530,8 @@ class CouchbaseTestCase(ResourcedTestCase):
         return self.cluster_info.make_connection(self.factory, **kwargs)
 
     def make_admin_connection(self):
-        return self.cluster_info.make_admin_connection()
+        mock_hack = {'bucket': self.cluster_info.bucket_name} if self.is_mock else {}
+        return self.cluster_info.make_admin_connection(**mock_hack)
 
     def gen_key(self, prefix=None):
         if not prefix:

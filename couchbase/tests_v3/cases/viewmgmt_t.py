@@ -48,7 +48,6 @@ class DesignDocManagementTest(ClusterTestCase):
         self.cb = self.bucket
 
     def tearDown(self):
-        del self.mgr
         super(DesignDocManagementTest, self).tearDown()
 
     def test_get_design_document_fail(self):

@@ -22,7 +22,8 @@ from couchbase.cluster import ClusterOptions, ClusterTimeoutOptions,\
     ClusterTracingOptions, Compression, DiagnosticsOptions, Cluster
 from couchbase.auth import PasswordAuthenticator, ClassicAuthenticator
 from couchbase.diagnostics import ServiceType, EndpointState, ClusterState
-from couchbase.exceptions import AlreadyShutdownException
+from couchbase.exceptions import AlreadyShutdownException, BucketNotFoundException
+from couchbase.auth import NoBucketException
 from datetime import timedelta
 from unittest import SkipTest
 
@@ -83,7 +84,9 @@ class ClusterTests(CollectionTestCase):
         if self.is_mock:
             raise SkipTest("query not mocked")
         cluster = Cluster.connect(self.cluster.connstr, ClusterOptions(
-            ClassicAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)))
+            PasswordAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)))
+        # Temporarily, lets open a bucket to insure the admin object was created
+        b = cluster.bucket(self.bucket_name)
         # verify that we can get a bucket manager
         self.assertIsNotNone(cluster.buckets())
         # disconnect cluster
@@ -240,3 +243,22 @@ class ClusterTests(CollectionTestCase):
         # well, our tests are not ssl, so...
         self.assertFalse(self.cluster.is_ssl)
 
+    @unittest.skip("Skip until the admin stuff is worked out")
+    def test_cluster_may_need_open_bucket_before_admin_calls(self):
+        # NOTE: some admin calls -- like listing query indexes, seem to require
+        # that the admin was given a bucket.  That can only happen if we have already
+        # opened a bucket, which is what usually happens in the tests.  This does not, and
+        # checks for the exception when appropriate.
+        if self.is_mock:
+            raise SkipTest("mock doesn't support the admin call we are making")
+        cluster = Cluster.connect(self.cluster.connstr, self._create_cluster_opts(), **self._mock_hack())
+        if cluster._is_6_5_plus():
+            self.assertIsNotNone(cluster.query_indexes().get_all_indexes(self.bucket_name))
+        else:
+            self.assertRaises(NoBucketException, cluster.query_indexes().list_all_indexes, self.bucket_name)
+
+    def can_do_admin_calls_after_unsuccessful_bucket_openings(self):
+        cluster = Cluster.connect(self.cluster.connstr, self._create_cluster_opts(), **self._mock_hack())
+        self.assertRaises(BucketNotFoundException, cluster.bucket, "flkkjkjk")
+        self.assertIsNotNone(cluster.bucket(self.bucket_name))
+        self.assertIsNotNone(cluster.query_indexes().list_all_indexes(self.bucket_name))

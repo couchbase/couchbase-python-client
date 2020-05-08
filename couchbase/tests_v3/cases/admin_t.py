@@ -51,8 +51,15 @@ class AdminSimpleTest(CouchbaseTestCase):
         self.assertTrue(htres.success)
 
     def test_connection_string_param(self):
+        # if using mock, we need a bucket in the connstr.  Note the admin
+        # constructor just adds a bucket (if given) when it constructs the
+        # connection string.  If you give it one, you need to put it in yourself.
+        # But, only for the mock
+        if self.is_mock:
+            conn_str = 'http://{0}:{1}/{2}'.format(self.cluster_info.host, self.cluster_info.port, 'default')
+        else:
+            conn_str = 'http://{0}:{1}'.format(self.cluster_info.host, self.cluster_info.port)
 
-        conn_str = 'http://{0}:{1}'.format(self.cluster_info.host, self.cluster_info.port)
         admin = Admin('Administrator',
                       'password',
                       connection_string=conn_str)
@@ -90,10 +97,12 @@ class AdminSimpleTest(CouchbaseTestCase):
                           method='blahblah')
 
     def test_bad_auth(self):
+        mock_hack = {'bucket': 'default'} if self.is_mock else  {}
         self.assertRaises(AuthenticationException, Admin,
                           'baduser', 'badpass',
                           host=self.cluster_info.host,
-                          port=self.cluster_info.port)
+                          port=self.cluster_info.port,
+                          **mock_hack)
 
     def test_bad_host(self):
         # admin connections don't really connect until an action is performed
