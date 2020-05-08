@@ -9,7 +9,7 @@ testresources>=0.2.7
 jsonschema==2.6.0
 configparser==3.5.0
 testfixtures==5.4.0
-basictracer==2.2.0
+basictracer>=2.2.0
 zipkin==0.1.0
 pyparsing==2.2.0
 configparser2

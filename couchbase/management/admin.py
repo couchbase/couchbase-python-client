@@ -24,6 +24,7 @@ from time import time, sleep
 import couchbase_core._libcouchbase as LCB
 from boltons.funcutils import wraps
 
+from couchbase_core.connstr import ConnectionString
 from couchbase_core import JSON, mk_formstr
 import couchbase.exceptions as E
 from couchbase_core._pyport import basestring
@@ -84,20 +85,20 @@ class Admin(LCB.Bucket):
         :return: an instance of :class:`Admin`
         """
         connection_string = kwargs.pop('connection_string', None)
-        bucket = kwargs.get('bucket', None)
+
         if not connection_string:
-            connection_string = "http://{0}:{1}".format(host, port)
-            if bucket:
-                connection_string += "/{0}".format(bucket)
-            connection_string += "?ipv6=" + kwargs.pop('ipv6', 'disabled')
+            connection_string = ConnectionString(hosts=["{0}:{1}".format(host, port)],
+                                                 scheme=kwargs.get('scheme', 'http'), bucket=kwargs.get('bucket', None))
+            ipv6 = kwargs.pop('ipv6', None)
+            if ipv6:
+                connection_string.set_option('ipv6', ipv6)
 
         kwargs.update({
             'username': username,
             'password': password,
-            'connection_string': connection_string,
+            'connection_string': str(connection_string),
             '_conntype': LCB.LCB_TYPE_CLUSTER
         })
-        print(kwargs)
         super(Admin, self).__init__(**kwargs)
         self._connect()
 

@@ -23,7 +23,7 @@ from couchbase.bucket import Bucket
 from couchbase.exceptions import (AuthenticationException, BucketNotFoundException, DocumentNotFoundException,
                                   TimeoutException, InvalidArgumentException)
 from couchbase_core.connstr import ConnectionString
-from couchbase_tests.base import SkipTest, ConnectionTestCase, ClusterTestCase
+from couchbase_tests.base import SkipTest, ConnectionTestCase, ClusterTestCase, CollectionTestCase
 
 
 class ConnectionTest(ClusterTestCase):
@@ -120,7 +120,7 @@ class ConnectionTest(ClusterTestCase):
         self.assertTrue(cb.upsert("foo", "bar").success)
 
 
-class AlternateNamesTest(ConnectionTestCase):
+class AlternateNamesTest(CollectionTestCase):
     def setUp(self):
         super(AlternateNamesTest, self).setUp()
         self.args = dict()
@@ -143,5 +143,5 @@ class AlternateNamesTest(ConnectionTestCase):
     def check_all_services(self):
         import uuid
         unique_str = str(uuid.uuid4())
-        self.cb.upsert("network", unique_str)
-        self.assertEqual(self.cb.get("network").value, unique_str)
+        self.coll.upsert("network", unique_str)
+        self.assertEqual(self.cb.get("network").content, unique_str)

@@ -41,7 +41,7 @@ from collections import defaultdict
 from couchbase.bucket import Bucket as V3Bucket
 from couchbase.cluster import Cluster, ClusterOptions, ClusterTracingOptions, \
     ClusterTimeoutOptions
-from couchbase.auth import PasswordAuthenticator, ClassicAuthenticator
+from couchbase.auth import PasswordAuthenticator, ClassicAuthenticator, Authenticator
 from couchbase.collection import CBCollection
 from couchbase.exceptions import CollectionAlreadyExistsException, ScopeAlreadyExistsException, NotSupportedException, \
     CouchbaseException
@@ -195,6 +195,8 @@ CONFIG_FILE = 'tests.ini'  # in cwd
 
 ClientType = TypeVar('ClientType', bound=CoreClient)
 
+MockHackArgs = NamedTuple('MockHackArgs', [('auth', Authenticator), ('kwargs', Mapping[str,Any])])
+
 
 class ClusterInformation(object):
     def __init__(self):
@@ -258,9 +260,20 @@ class ClusterInformation(object):
         connargs = self.make_connargs(**kwargs)
         return conncls(**connargs)
 
-    def make_admin_connection(self, **kwargs):
+    def mock_hack_options(self,  # type: ClusterInformation
+                          is_mock  # type: bool
+                          ):
+        # type: (...) -> MockHackArgs
+        # FIXME: hack because the Mock seems to want a bucket name for cluster connections
+        # We should not be using classic here!  But, somewhere in the tests, we need
+        # this for hitting the mock, it seems
+
+        return MockHackArgs(ClassicAuthenticator,{'bucket': self.bucket_name}) if is_mock else MockHackArgs(PasswordAuthenticator, {})
+
+    def make_admin_connection(self, is_mock):
+
         return Admin(self.admin_username, self.admin_password,
-                     self.host, self.port, ipv6=self.ipv6, **kwargs)
+                     self.host, self.port, ipv6=self.ipv6, **self.mock_hack_options(is_mock).kwargs)
 
 
 class ConnectionConfiguration(object):
@@ -420,8 +433,9 @@ class CouchbaseTestCase(ResourcedTestCase):
     config = GLOBAL_CONFIG
 
     @property
-    def cluster_info(self):
-        # type: (Any) -> ClusterInformation
+    def cluster_info(self  # type: CouchbaseTestCase
+                     ):
+        # type: (...) -> ClusterInformation
         for v in [self._realserver_info, self._mock_info]:
             if v:
                 return v
@@ -530,8 +544,7 @@ class CouchbaseTestCase(ResourcedTestCase):
         return self.cluster_info.make_connection(self.factory, **kwargs)
 
     def make_admin_connection(self):
-        mock_hack = {'bucket': self.cluster_info.bucket_name} if self.is_mock else {}
-        return self.cluster_info.make_admin_connection(**mock_hack)
+        return self.cluster_info.make_admin_connection(self.is_mock)
 
     def gen_key(self, prefix=None):
         if not prefix:
@@ -859,21 +872,16 @@ class ClusterTestCase(CouchbaseTestCase):
                              opts=None  # type: Any
                              ):
         # type: (...) -> ClusterTestCase.T
-        # FIXME: we should not be using classic here!  But, somewhere in the tests, we need
-        # this for hitting the mock, it seems
         cluster_class = cluster_class or self.cluster_factory
-        auth_type = ClassicAuthenticator if self.is_mock else PasswordAuthenticator
-        # hack because the Mock seems to want a bucket name for cluster connections, odd
-        mock_hack = {'bucket': self.cluster_info.bucket_name} if self.is_mock else {}
-        auth = auth_type(self.cluster_info.admin_username, self.cluster_info.admin_password)
+        mock_hack = self.cluster_info.mock_hack_options(self.is_mock)
+        auth = mock_hack.auth(self.cluster_info.admin_username, self.cluster_info.admin_password)
         if not opts:
             opts = ClusterOptions(auth)
         else:
             opts['authenticator'] = auth
-
         return self.try_n_times(10, 3, cluster_class.connect,
                                 connection_string=str(connstr_nobucket),
-                                options=opts, **mock_hack)
+                                options=opts, **mock_hack.kwargs)
 
     # NOTE: this really is only something you can trust in homogeneous clusters, but then again
     # this is a test suite.

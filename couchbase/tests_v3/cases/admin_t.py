@@ -97,12 +97,10 @@ class AdminSimpleTest(CouchbaseTestCase):
                           method='blahblah')
 
     def test_bad_auth(self):
-        mock_hack = {'bucket': 'default'} if self.is_mock else  {}
         self.assertRaises(AuthenticationException, Admin,
                           'baduser', 'badpass',
                           host=self.cluster_info.host,
-                          port=self.cluster_info.port,
-                          **mock_hack)
+                          port=self.cluster_info.port, **self.cluster_info.mock_hack_options(self.is_mock).kwargs)
 
     def test_bad_host(self):
         # admin connections don't really connect until an action is performed
