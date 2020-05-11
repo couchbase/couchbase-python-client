@@ -109,7 +109,8 @@ pygments_style = 'sphinx'
 # A list of ignored prefixes for module index sorting.
 #modindex_common_prefix = []
 
-
+import logging
+logging.getLogger().setLevel(logging.INFO)
 # -- Options for HTML output ---------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
@@ -239,6 +240,7 @@ man_pages = [
     ('index', 'couchbasepythonclientlibrary', 'Couchbase Python Client Library Documentation',
      ['Couchbase, Inc.'], 1)
 ]
+intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}
 
 # If true, show URL addresses after external links.
 #man_show_urls = False

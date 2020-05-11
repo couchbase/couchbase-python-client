@@ -1,4 +1,5 @@
 import copy
+from functools import wraps
 from typing import *
 
 import couchbase.exceptions
@@ -15,28 +16,59 @@ except:
 OptionBlockBase = dict
 
 
+T = TypeVar('T', bound=OptionBlockBase)
+
+
 class OptionBlock(OptionBlockBase):
-    def __init__(self, *args, **kwargs):
-        # type: (*Any, **Any) -> None
-        super(OptionBlock, self).__init__(**{k: v for k, v in kwargs.items() if v is not None})
-        self._args = args
-
-
-T = TypeVar('T', bound=OptionBlock)
-
-
-class OptionBlockTimeOut(OptionBlock):
-    @overload
     def __init__(self,
-                 timeout=None  # type: timedelta
-                 ):
-        pass
-
-    def __init__(self,
+                 *args,  # type: Any
                  **kwargs  # type: Any
                  ):
         # type: (...) -> None
-        super(OptionBlockTimeOut, self).__init__(**kwargs)
+        """
+        This is a wrapper for a set of options for a Couchbase command. It can be passed
+        into the command in the 'options' parameter and overriden by parameters of the
+        same name via the following **kwargs.
+
+        :param args:
+        :param kwargs: parameters to pass in to the OptionBlock
+        """
+        super(OptionBlock, self).__init__(**{k: v for k, v in kwargs.items() if v is not None})
+        self._args = args
+
+    @classmethod
+    def _wrap_docs(cls,  # type: Type[T]
+                   **doc_params  # type: Any
+                   ):
+        # type: (...) -> Type[T]
+        class DocWrapper(cls):
+            @wraps(cls.__init__)
+            def __init__(self,  # type: DocWrapper
+                         *args,  # type: Any
+                         **kwargs  # type: Any
+                         ):
+                # type: (...) -> None
+                try:
+                    super(DocWrapper, self).__init__(self, *args, **kwargs)
+                except Exception as e:
+                    raise
+
+            __init__.__doc__ = cls.__init__.__doc__.format(**doc_params)
+        return DocWrapper
+
+
+class OptionBlockTimeOut(OptionBlock):
+    def __init__(self,  # type: OptionBlockTimeOut
+                 timeout=None,  # type: timedelta
+                 **kwargs  # type: Any
+                 ):
+        # type: (...) -> None
+        """
+        An OptionBlock with a timeout
+
+        :param timeout: Timeout for an operation
+        """
+        super(OptionBlockTimeOut, self).__init__(timeout=timeout, **kwargs)
 
     def timeout(self,  # type: T
                 duration  # type: timedelta
@@ -44,18 +76,6 @@ class OptionBlockTimeOut(OptionBlock):
         # type: (...) -> T
         self['timeout'] = duration
         return self
-
-
-class Value(object):
-    def __init__(self,
-                 value,  # type: Union[str,bytes,SupportsInt]
-                 **kwargs  # type: Any
-                 ):
-        self.value = value
-        self.kwargs = kwargs
-
-    def __int__(self):
-        return self.value
 
 
 class Cardinal(IntEnum):
@@ -70,7 +90,7 @@ OptionBlockDeriv = TypeVar('OptionBlockDeriv', bound=OptionBlock)
 
 class Forwarder(with_metaclass(ABCMeta)):
     def forward_args(self, arg_vars,  # type: Optional[Dict[str,Any]]
-                     *options  # type: Tuple[OptionBlockDeriv,...]
+                     *options  # type: OptionBlockDeriv
                      ):
         # type: (...) -> OptionBlockDeriv[str,Any]
         arg_vars = copy.copy(arg_vars) if arg_vars else {}
@@ -97,7 +117,7 @@ class Forwarder(with_metaclass(ABCMeta)):
 
 
 def timedelta_as_timestamp(duration  # type: timedelta
-                        ):
+                           ):
     # type: (...)->int
     if not isinstance(duration,timedelta):
         raise couchbase.exceptions.InvalidArgumentException("Expected timedelta instead of {}".format(duration))
@@ -181,7 +201,7 @@ class ConstrainedInt(object):
         return str(self)
 
     def __eq__(self, other):
-        return self.value == other.value
+        return type(self) == type(other) and self.value == other.value
 
     def __gt__(self, other):
         return self.value > other.value

@@ -23,7 +23,7 @@ import re
 from couchbase_core import CompatibilityEnum
 from string import Template
 from collections import defaultdict
-from boltons.funcutils import wraps
+from functools import wraps
 try:
     from typing import TypedDict
 except ImportError:

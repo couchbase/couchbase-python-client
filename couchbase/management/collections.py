@@ -1,4 +1,4 @@
-from ..options import OptionBlockTimeOut, forward_args
+from couchbase.options import OptionBlockTimeOut, forward_args
 from couchbase.management.admin import Admin
 from typing import *
 from .generic import GenericManager
@@ -37,8 +37,8 @@ class CollectionManager(GenericManager):
         Gets a scope. This will fetch a manifest and then pull the scope out of it.
 
         :param str scope_name: name of the scope.
-        :param GetScopeOptions options:
-        :param GetScopeOptions kwargs:
+        :param GetScopeOptions options: scope options
+        :param GetScopeOptions kwargs: overrides for scope options
         :return: a ScopeSpec containing information about the specified scope.
         :raises: ScopeNotFoundException
         """

@@ -18,11 +18,9 @@
 The contents of this module do not have a stable API and are subject to
 change
 """
-from json import JSONEncoder
 from time import time, sleep
 
 import couchbase_core._libcouchbase as LCB
-from boltons.funcutils import wraps
 
 from couchbase_core.connstr import ConnectionString
 from couchbase_core import JSON, mk_formstr

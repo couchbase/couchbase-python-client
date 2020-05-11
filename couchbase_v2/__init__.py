@@ -50,7 +50,7 @@ sys.modules[__name__ + '.subdocument'] = subdocument
 import couchbase_core.user_constants as user_constants
 sys.modules[__name__ + '.user_constants'] = user_constants
 
-import couchbase_core.auth_domain as auth_domain
+import couchbase.auth as auth_domain
 sys.modules[__name__ + '.auth_domain'] = auth_domain
 
 import couchbase_core.analytics_ingester as analytics_ingester

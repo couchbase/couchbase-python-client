@@ -91,6 +91,141 @@ and never like ::
 
 
 
+Option Blocks
+=============
+.. currentmodule:: couchbase.options
+
+.. class:: OptionBlock
+
+   .. automethod:: __init__
+
+
+.. class:: OptionBlockTimeOut
+
+   .. automethod:: __init__
+
+.. currentmodule:: couchbase.collection
+
+.. class:: AppendOptions
+
+   .. automethod:: __init__
+
+
+.. class:: DecrementOptions
+
+   .. automethod:: __init__
+
+
+.. class:: ExistsOptions
+
+   .. automethod:: __init__
+
+
+.. class:: GetAllReplicasOptions
+
+   .. automethod:: __init__
+
+
+.. class:: GetAndLockOptions
+
+   .. automethod:: __init__
+
+
+.. class:: GetAndTouchOptions
+
+   .. automethod:: __init__
+
+
+.. class:: GetAnyReplicaOptions
+
+   .. automethod:: __init__
+
+
+.. class:: GetOptions
+
+   .. automethod:: __init__
+
+
+.. class:: IncrementOptions
+
+   .. automethod:: __init__
+
+
+.. class:: InsertOptions
+
+   .. automethod:: __init__
+
+
+.. class:: LookupInOptions
+
+   .. automethod:: __init__
+
+
+.. class:: PrependOptions
+
+   .. automethod:: __init__
+
+
+.. class:: RemoveOptions
+
+   .. automethod:: __init__
+
+
+.. class:: ReplaceOptions
+
+   .. automethod:: __init__
+
+
+.. class:: TouchOptions
+
+ .. automethod:: __init__
+
+
+.. class:: UnlockOptions
+
+   .. automethod:: __init__
+
+
+.. class:: UpsertOptions
+
+   .. automethod:: __init__
+
+
+Integer Types
+=============
+.. currentmodule:: couchbase.options
+
+.. autoclass:: ConstrainedInt
+   :show-inheritance:
+   :members:
+
+
+.. autoclass:: SignedInt64
+   :show-inheritance:
+   :members:
+
+
+.. autoclass:: UnsignedInt32
+   :show-inheritance:
+   :members:
+
+
+.. autoclass:: UnsignedInt64
+   :show-inheritance:
+   :members:
+
+
+.. autoclass:: Cardinal
+   :show-inheritance:
+   :members:
+
+
+.. autoclass:: Value
+   :show-inheritance:
+   :members:
+
+
+
 Key and Value Format
 ====================
 
@@ -310,9 +445,6 @@ values for its keys
     .. automethod:: remove_multi
 
 .. class:: BinaryCollection
-    .. not implemented yet
-    .. .. automethod:: append_multi
-    .. .. automethod:: prepend_multi
 
     .. automethod:: increment_multi
 
@@ -501,10 +633,36 @@ Durability Constraints
 Durability constraints ensure safer protection against data loss.
 
 .. currentmodule:: couchbase.durability
+
 .. class:: DurabilityOptionBlock
 
     .. automethod:: __init__
-    .. autoattribute:: expiry
+
+.. class:: ClientDurability
+
+    .. automethod:: __init__
+
+
+.. class:: ClientDurableOptionBlock
+
+    .. automethod:: __init__
+
+
+.. class:: ServerDurableOptionBlock
+
+    .. automethod:: __init__
+
+
+.. class:: DurabilityType
+
+    .. automethod:: __init__
+
+
+.. class:: ServerDurability
+
+    .. automethod:: __init__
+
+
 
 Attributes
 ==========

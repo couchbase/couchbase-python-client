@@ -695,7 +695,7 @@ try:
         logging.error(tracer)
         return tracer
 
-except Exception as e:
+except Exception as f:
     def jaeger_tracer(service, port=None):
         logging.error("No Jaeger import available")
         return basic_tracer()
@@ -778,15 +778,27 @@ class ClusterTestCase(CouchbaseTestCase):
     def assertCas(self, item):
         self.validator.assertCas(item)
 
-    def try_n_times_till_exception(self, num_times, seconds_between, func, *args, **kwargs):
+    def try_n_times_till_exception(self,  # type: ClusterTestCase
+                                   num_times,  # type: int
+                                   seconds_between,  # type: SupportsFloat
+                                   func,  # type: Callable
+                                   *args,  # type: Any
+                                   expected_exceptions=(Exception,),  # type: Tuple[Type[Exception],...]
+                                   **kwargs  # type: Any
+                                   ):
+        # type: (...) -> Any
         for _ in range(num_times):
             try:
-                ret = func(*args, **kwargs)
-                time.sleep(seconds_between)
-            except Exception as e:
+                func(*args, **kwargs)
+                time.sleep(float(seconds_between))
+            except expected_exceptions as e:
                 # helpful to have this print statement when tests fail
-                print("Got exception, returning: {}".format(e))
+                logging.info("Got one of expected exceptions {}, returning: {}".format(expected_exceptions, e))
                 return
+            except Exception as e:
+                logging.info("Got unexpected exception, raising: {}".format(e))
+                raise
+
         self.fail(
             "successful {} after {} times waiting {} seconds between calls".format(func, num_times, seconds_between))
 
@@ -803,19 +815,22 @@ class ClusterTestCase(CouchbaseTestCase):
     def checkResult(self, result, callback):
         return callback(result)
 
-    def try_n_times(self,
-                    num_times,
-                    seconds_between,
-                    func,
-                    *args,
-                    on_success=None,
-                    **kwargs):
+    def try_n_times(self,  # type: ClusterTestCase
+                    num_times,  # type: int
+                    seconds_between,  # type: SupportsFloat
+                    func,  # type: Callable
+                    *args,  # type: Any
+                    on_success=None,  # type: Callable
+                    expected_exceptions=(Exception,),  # type: Tuple[Type[Exception], ...]
+                    **kwargs  # type: Any
+                    ):
+        # type: (...) -> Any
         on_success = on_success or self._passthrough
         for _ in range(num_times):
             try:
                 ret = func(*args, **kwargs)
                 return on_success(ret)
-            except Exception as e:
+            except expected_exceptions as e:
                 # helpful to have this print statement when tests fail
                 logging.info("Got exception, sleeping: {}".format(traceback.format_exc()))
                 time.sleep(seconds_between)

@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-from collections import namedtuple
+from typing import NamedTuple, Any
 from copy import deepcopy
 from warnings import warn
 
@@ -29,13 +29,13 @@ class AlreadyQueriedException(CouchbaseException):
     """Thrown when iterating over a View which was already iterated over"""
 
 
-ViewRow = namedtuple('ViewRow', ['key', 'value', 'docid', 'doc'])
+ViewRow = NamedTuple('ViewRow', [('key', str), ('value', Any), ('docid', str), ('doc',Any)])
 """
 Default class for a single row.
 """
 
-SpatialRow = namedtuple('SpatialRow',
-                        ['key', 'value', 'geometry', 'docid', 'doc'])
+SpatialRow = NamedTuple('SpatialRow',
+                        [('key', str), ('value', Any), ('geometry', Any), ('docid', Any), ('doc', Any)])
 """
 Default class for a spatial row
 """

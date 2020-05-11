@@ -1,4 +1,5 @@
-from couchbase.management import CollectionManager, ViewIndexManager
+from couchbase.management.collections import CollectionManager
+from couchbase.management.views import ViewIndexManager
 from couchbase.management.admin import Admin
 from couchbase.management.views import DesignDocumentNamespace
 from couchbase_core.client import Client as CoreClient

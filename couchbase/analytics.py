@@ -90,7 +90,17 @@ class AnalyticsOptions(OptionBlockTimeOut):
                  named_parameters=None,  # type: Dict[str, str]
                  raw=None,  # type: Dict[str,Any]
                  ):
+        """
 
+        :param timeout:
+        :param read_only:
+        :param scan_consistency:
+        :param client_context_id:
+        :param priority:
+        :param positional_parameters:
+        :param named_parameters:
+        :param raw:
+        """
         pass
 
     def __init__(self,
@@ -98,7 +108,6 @@ class AnalyticsOptions(OptionBlockTimeOut):
                  ):
         super(AnalyticsOptions, self).__init__(**kwargs)
 
-    # TODO: the priority is not making it into the queries yet -- see PYCBC-827
     def to_analytics_query(self, statement, *options, **kwargs):
         # lets make a copy of the options, and update with kwargs...
         args = self.copy()

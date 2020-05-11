@@ -1,7 +1,9 @@
 from typing import *
 
 import attr
-from boltons.funcutils import wraps
+import datetime
+
+from functools import wraps
 from couchbase_core._libcouchbase import Result as CoreResult
 
 from couchbase.diagnostics import EndpointPingReport, ServiceType
@@ -231,7 +233,7 @@ class MutateInResult(MutationResult):
 class PingResult(object):
     @internal
     def __init__(self,
-                 original  # Mapping[str, Any]
+                 original  # type: Mapping[str, Any]
                  ):
         self._id = original.get("id", None)
         self._sdk = original.get("sdk", None)
@@ -293,23 +295,27 @@ class GetResult(Result):
             self._full = bool(original.get_full)
 
     @property
-    def id(self):
-        # type: () -> str
+    def id(self  # type: GetResult
+           ):
+        # type: (...) -> str
         return self._id
 
     @property
-    def expiry(self):
-        # type: () -> datetime
+    def expiry(self  # type: GetResult
+               ):
+        # type: (...) -> datetime.datetime
         return self._expiry
 
     @property
-    def content_as(self):
+    def content_as(self  # type: GetResult
+                   ):
         # type: (...) -> ContentProxy
         return ContentProxy(self._original, self._full)
 
     @property
-    def content(self):
-        # type: () -> Any
+    def content(self  # type: GetResult
+                ):
+        # type: (...) -> Any
         return extract_value(self._original, lambda x: x, self._full)
 
 
@@ -417,7 +423,7 @@ def get_replica_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
     @wraps(func)
     def wrapped(*args, **kwargs):
         x = list(map(factory_class, func(*args, **kwargs)))
-        if (len(x) > 1):
+        if len(x) > 1:
             return x
         return x[0]
 

@@ -1,2 +1,2 @@
-from .collections import CollectionManager
-from .views import ViewIndexManager
+from couchbase.management.collections import CollectionManager
+from couchbase.management.views import ViewIndexManager

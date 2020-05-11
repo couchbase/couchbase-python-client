@@ -15,7 +15,7 @@ from couchbase_core import JSON
 from couchbase_core.asynchronous.client import AsyncClientMixin
 from couchbase_core.client import Client as CoreClient
 from couchbase_core.supportability import volatile, internal
-from .options import AcceptableInts
+from .options import AcceptableInts, OptionBlock
 from .options import forward_args, OptionBlockTimeOut, OptionBlockDeriv, ConstrainedInt, SignedInt64
 from .result import GetResult, GetReplicaResult, ExistsResult, get_result_wrapper, CoreResult, ResultPrecursor, \
     LookupInResult, MutateInResult, \
@@ -44,7 +44,7 @@ class DeltaValue(ConstrainedInt):
         A non-negative integer between 0 and +0x7FFFFFFFFFFFFFFF inclusive.
         Used as an argument for :meth:`Collection.increment` and :meth:`Collection.decrement`
 
-        :param couchbase.options.AcceptableInts value: the value to initialise this with.
+        :param value: the value to initialise this with.
 
         :raise: :exc:`~couchbase.exceptions.InvalidArgumentException` if not in range
         """
@@ -60,18 +60,18 @@ class DeltaValue(ConstrainedInt):
 
 
 class ReplaceOptions(DurabilityOptionBlock):
-    @overload
     def __init__(self,
                  timeout=None,       # type: timedelta
                  durability=None,    # type: DurabilityType
                  cas=0               # type: int
                  ):
-        pass
+        """
 
-    def __init__(self,
-                 **kwargs
-                 ):
-        super(ReplaceOptions, self).__init__(**kwargs)
+        :param timeout:
+        :param durability:
+        :param cas:
+        """
+        super(ReplaceOptions, self).__init__(timeout=timeout, durability=durability, cas=cas)
 
 
 class RemoveOptions(DurabilityOptionBlock):
@@ -83,9 +83,9 @@ class RemoveOptions(DurabilityOptionBlock):
         """
         Remove Options
 
-        :param DurabilityType durability: durability type
+        :param durability: durability type
 
-        :param int cas: The CAS to use for the removal operation.
+        :param cas: The CAS to use for the removal operation.
         If specified, the key will only be removed from the server
         if it has the same CAS as specified. This is useful to
         remove a key only if its value has not been changed from the
@@ -101,43 +101,58 @@ class RemoveOptions(DurabilityOptionBlock):
         super(RemoveOptions, self).__init__(**kwargs)
 
 
-class PrependOptions(DurabilityOptionBlock):
-    @overload
-    def __init__(self,
+class ExtensionOptions(DurabilityOptionBlock):
+    def __init__(self,  # type: ExtensionOptions
                  durability=None,   # type: DurabilityType,
                  cas=None,          # type: int
                  timeout=None       # type: timedelta
                  ):
-        pass
+        """
+        Options for {extending} an item
 
-    def __init__(self, **kwargs):
-        super(PrependOptions, self).__init__(**kwargs)
+        :param cas: CAS value
+        :param timeout: Timeout for operation
+        :param durability: Durability settings
+        """
+        super(ExtensionOptions, self).__init__(cas=cas, timeout=timeout, durability=durability)
 
 
-class AppendOptions(PrependOptions):
+class PrependOptions(ExtensionOptions._wrap_docs(extending='prepending')):
     pass
 
 
-class IncrementOptions(DurabilityOptionBlock):
-    @overload
-    def __init__(self,
-                 durability=None,   # type: DurabilityType,
+class AppendOptions(ExtensionOptions._wrap_docs(extending='appending')):
+    pass
+
+
+class CounterOptions(DurabilityOptionBlock):
+    def __init__(self,  # type: CounterOptions
+                 durability=None,   # type: DurabilityType
                  cas=None,          # type: int
                  timeout=None,      # type: timedelta
                  expiry=None,       # type: timedelta
-                 initial=None,      # type: SignedInt64
-                 delta=None         # type: DeltaValue
+                 initial=SignedInt64(0),      # type: SignedInt64
+                 delta=DeltaValue(1)         # type: DeltaValue
                  ):
-        pass
+        # type: (...) -> None
+        """
+        Settings for {counter_type} operations
 
-    def __init__(self, **kwargs):
-        # enforce some defaults
-        args = {"delta": DeltaValue(1), "initial": SignedInt64(0)}
-        args.update(kwargs)
-        super(IncrementOptions, self).__init__(**args)
+        :param durability: Durability settings
+        :param cas: the CAS value
+        :param timeout: Timeout for the operation
+        :param expiry: Expiration time
+        :param initial: Initial value
+        :param delta: Variation
+        """
+        super(CounterOptions, self).__init__(durability=durability, cas=cas, timeout=timeout, expiry=expiry, delta=delta, initial=initial)
 
 
-class DecrementOptions(IncrementOptions):
+class IncrementOptions(CounterOptions._wrap_docs(counter_type='increment')):
+    pass
+
+
+class DecrementOptions(CounterOptions._wrap_docs(counter_type='decrement')):
     pass
 
 
@@ -205,6 +220,7 @@ R = TypeVar("R")
 RawCollectionMethodDefault = Callable[
     [Arg('CBCollection', 'self'), Arg(str, 'key'), VarArg(OptionBlockDeriv), KwArg(Any)], R]
 RawCollectionMethodInt = Callable[
+
     [Arg('CBCollection', 'self'), Arg(str, 'key'), int, VarArg(OptionBlockDeriv), KwArg(Any)], R]
 RawCollectionMethod = Union[RawCollectionMethodDefault, RawCollectionMethodInt]
 RawCollectionMethodSpecial = TypeVar('RawCollectionMethodSpecial', bound=RawCollectionMethod)
@@ -439,7 +455,7 @@ class CBCollection(wrapt.ObjectProxy):
         # type: (...) -> GetResult
         """Obtain an object stored in Couchbase by given key.
 
-        :param string key: The key to fetch. The type of key is the same
+        :param key: The key to fetch. The type of key is the same
             as mentioned in :meth:`upsert`
         :param: GetOptions options: The options to use for this get request.
         :param: Any kwargs: Override corresponding value in options.
@@ -492,11 +508,12 @@ class CBCollection(wrapt.ObjectProxy):
         # type: (...) -> GetResult
         """
         Get a document with the specified key, locking it from mutation.
-        :param str key: Key of document to lock
-        :param timedelta expiry: Time at which the lock expires.  Note you can always unlock it, and the server unlocks
+
+        :param key: Key of document to lock
+        :param expiry: Time at which the lock expires.  Note you can always unlock it, and the server unlocks
                 it after 15 seconds.
-        :param GetAndLockOptions options: Options for the get and lock operation.
-        :param Any kwargs: Override corresponding value in options.
+        :param options: Options for the get and lock operation.
+        :param kwargs: Override corresponding value in options.
         """
         final_options = forward_args(kwargs, *options)
         return ResultPrecursor(CoreClient.lock(self.bucket, key, int(expiry.total_seconds()), **final_options),
@@ -512,7 +529,7 @@ class CBCollection(wrapt.ObjectProxy):
         # type: (...) -> GetReplicaResult
         """Obtain an object stored in Couchbase by given key, from a replica.
 
-        :param string key: The key to fetch. The type of key is the same
+        :param key: The key to fetch. The type of key is the same
             as mentioned in :meth:`upsert`
         :param: GetFromReplicaOptions options: The options to use for this get request.
         :param: Any kwargs: Override corresponding value in options.
@@ -581,7 +598,7 @@ class CBCollection(wrapt.ObjectProxy):
         """
         Write multiple items to the cluster. Multi version of :meth:`upsert`
 
-        :param dict keys: A dictionary of keys to set. The keys are the
+        :param keys: A dictionary of keys to set. The keys are the
             keys as they should be on the server, and the values are the
             values for the keys to be stored.
 
@@ -591,20 +608,20 @@ class CBCollection(wrapt.ObjectProxy):
             If not specified, the operation will fail if the CAS value
             on the server does not match the one specified in the
             `Item`'s `cas` field.
-        :param int ttl: If specified, sets the expiry value
+        :param ttl: If specified, sets the expiry value
             for all keys
-        :param int format: If specified, this is the conversion format
+        :param format: If specified, this is the conversion format
             which will be used for _all_ the keys.
-        :param int persist_to: Durability constraint for persistence.
+        :param persist_to: Durability constraint for persistence.
             Note that it is more efficient to use :meth:`endure_multi`
             on the returned :class:`~couchbase_v2.result.MultiResult` than
             using these parameters for a high volume of keys. Using
             these parameters however does save on latency as the
             constraint checking for each item is performed as soon as it
             is successfully stored.
-        :param int replicate_to: Durability constraints for replication.
+        :param replicate_to: Durability constraints for replication.
             See notes on the `persist_to` parameter for usage.
-        :param Durability durability_level: Sync replication durability level.
+        :param durability_level: Sync replication durability level.
             You should either use this or the old-style durability params above,
             but not both.
         :returns: a dictionary of :class:`~.MutationResult` objects by key
@@ -629,7 +646,7 @@ class CBCollection(wrapt.ObjectProxy):
         """
         Insert multiple items into the collection.
 
-        :param dict keys: dictionary of items to insert, by key
+        :param keys: dictionary of items to insert, by key
         :return: a dictionary of :class:`~.MutationResult` objects by key
 
         .. seealso:: :meth:`upsert_multi` - for other optional arguments
@@ -647,7 +664,7 @@ class CBCollection(wrapt.ObjectProxy):
         """
         Remove multiple items from the collection.
 
-        :param list keys: list of items to remove, by key
+        :param keys: list of items to remove, by key
         :return: a dictionary of :class:`~.MutationResult` objects by key
 
         .. seealso:: :meth:`upsert_multi` - for other optional arguments
@@ -676,13 +693,13 @@ class CBCollection(wrapt.ObjectProxy):
         # type: (...) -> MutationResult
         """Update a key's expiry time
 
-        :param string key: The key whose expiry time should be
+        :param key: The key whose expiry time should be
             modified
-        :param timedelta expiry: The new expiry time. If the expiry time
+        :param expiry: The new expiry time. If the expiry time
             is timedelta(seconds=0), then the key never expires (and any existing
             expiry is removed)
-        :param TouchOptions options: Options for touch command.
-        :param Any kwargs: Override corresponding value in options.
+        :param options: Options for touch command.
+        :param kwargs: Override corresponding value in options.
         :raise: The same things that :meth:`get` does
 
         .. seealso:: :meth:`get_and_touch` - which can be used to get *and* update the
@@ -704,10 +721,10 @@ class CBCollection(wrapt.ObjectProxy):
 
         This unlocks an item previously locked by :meth:`lock`
 
-        :param str key: The key to unlock
-        :param int cas: The cas, which you got when you used get_and_lock.
-        :param UnlockOptions options: Options for the unlock operation.
-        :param Any kwargs: Override corresponding value in options.
+        :param key: The key to unlock
+        :param cas: The cas, which you got when you used get_and_lock.
+        :param options: Options for the unlock operation.
+        :param kwargs: Override corresponding value in options.
 
         See :meth:`get_and_lock` for an example.
 
@@ -730,8 +747,8 @@ class CBCollection(wrapt.ObjectProxy):
         # type: (...) -> ExistsResult
         """Check to see if a key exists in this collection.
 
-        :param str key: the id of the document.
-        :param ExistsOptions options: options for checking if a key exists.
+        :param key: the id of the document.
+        :param options: options for checking if a key exists.
         :return: An object with a boolean value indicating the presence of the document.
         :raise: Any exceptions raised by the underlying platform.
         """
@@ -763,8 +780,8 @@ class CBCollection(wrapt.ObjectProxy):
             parameter), and/or a custom transcoder then value for this
             argument may need to conform to different criteria.
 
-        :param UpsertOptions options: Options for the upsert operation.
-        :param Any kwargs: Override corresponding value in options.
+        :param options: Options for the upsert operation.
+        :param kwargs: Override corresponding value in options.
 
         :raise: :exc:`.InvalidArgumentException` if an argument is supplied that is
             not applicable in this context. For example setting the CAS
@@ -877,11 +894,11 @@ class CBCollection(wrapt.ObjectProxy):
         # type: (...) -> MutationResult
         """Remove the key-value entry for a given key in Couchbase.
 
-        :param str key: A string which is the key to remove. The format and
+        :param key: A string which is the key to remove. The format and
             type of the key follows the same conventions as in
             :meth:`upsert`
-        :param RemoveOptions options: Options for removing key.
-        :param Any kwargs: Override corresponding value in options
+        :param options: Options for removing key.
+        :param kwargs: Override corresponding value in options
         :raise: :exc:`.DocumentNotFoundException` if the key does not exist.
         :raise: :exc:`.DocumentExistsException` if a CAS was specified, but
             the CAS on the server had changed
@@ -919,10 +936,10 @@ class CBCollection(wrapt.ObjectProxy):
 
         """Atomically retrieve one or more paths from a document.
 
-        :param str key: The key of the document to lookup
-        :param LookupInSpec spec: An iterable sequence of Specs (see :mod:`.couchbase_core.subdocument`)
-        :param LookupInOptions options: Options for the lookup_in operation.
-        :param Any kwargs: Override corresponding value in options.
+        :param key: The key of the document to lookup
+        :param spec: An iterable sequence of Specs (see :mod:`.couchbase_core.subdocument`)
+        :param options: Options for the lookup_in operation.
+        :param kwargs: Override corresponding value in options.
 
         :return: A :class:`.couchbase.LookupInResult` object.
             This object contains the results and any errors of the
@@ -1016,8 +1033,8 @@ class CBCollection(wrapt.ObjectProxy):
         """
         Retrieve a value from a map.
 
-        :param str key: The document ID
-        :param str mapkey: Key within the map to retrieve
+        :param key: The document ID
+        :param mapkey: Key within the map to retrieve
         :return: :class:`~.ValueResult`
         :raise: :exc:`IndexError` if the mapkey does not exist
         :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
@@ -1033,9 +1050,9 @@ class CBCollection(wrapt.ObjectProxy):
         """
         Remove an item from a map.
 
-        :param str key: The document ID
-        :param str mapkey: The key in the map
-        :param kwargs: See :meth:`mutate_in` for options
+        :param key: The document ID
+        :param mapkey: The key in the map
+        :param See:meth:`mutate_in` for options
         :raise: :exc:`IndexError` if the mapkey does not exist
         :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
 
@@ -1054,7 +1071,7 @@ class CBCollection(wrapt.ObjectProxy):
         """
         Get the number of items in the map.
 
-        :param str key: The document ID of the map
+        :param key: The document ID of the map
         :return int: The number of items in the map
         :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
 
@@ -1068,7 +1085,7 @@ class CBCollection(wrapt.ObjectProxy):
         """
         Add an item to the end of a list.
 
-        :param str key: The document ID of the list
+        :param key: The document ID of the list
         :param value: The value to append
         :param create: Whether the list should be created if it does not
                exist. Note that this option only works on servers >= 4.6
@@ -1093,9 +1110,9 @@ class CBCollection(wrapt.ObjectProxy):
         """
         Add an item to the beginning of a list.
 
-        :param str key: Document ID
+        :param key: Document ID
         :param value: Value to prepend
-        :param bool create:
+        :param create:
             Whether the list should be created if it does not exist
         :param kwargs: Additional arguments to :meth:`mutate_in`.
         :return: :class:`OperationResult`.

@@ -1,6 +1,6 @@
 import warnings
 
-from boltons.funcutils import wraps
+from functools import wraps
 
 
 def deprecate_module_attribute(mod, deprecated=tuple()):

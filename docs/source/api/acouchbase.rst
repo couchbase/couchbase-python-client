@@ -4,8 +4,8 @@
 
 .. module:: acouchbase
 
-The asyncio interface is for use with the Async IO Python event and networking
-library which may be found at http://www.twistedmatrix.com. This documentation
+The asyncio interface is for use with the Async IO Python standard library
+that ships with Python 3.4 and greater. This documentation
 contains the API reference for how to use the ``acouchbase`` module with
 asyncio.
 
