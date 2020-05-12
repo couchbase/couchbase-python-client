@@ -286,12 +286,6 @@ def _wrap_multi_mutation_result(wrapped  # type: CoreBucketOp
     return _inject_scope_and_collection(wrapper)
 
 
-def _wrap_collections_class(cls):
-    for name in cls._MEMCACHED_OPERATIONS:
-        meth = getattr(cls, name)
-        if not name.startswith('_'):
-            setattr(cls, name, _inject_scope_and_collection(meth))
-
 
 def _dsop(create_type=None, wrap_missing_path=True):
     import functools
@@ -320,9 +314,20 @@ def _dsop(create_type=None, wrap_missing_path=True):
 
 
 class CBCollection(wrapt.ObjectProxy):
-    def __new__(cls, *args, **kwargs):
-        _wrap_collections_class(cls)
-        return super(CBCollection, cls).__new__(cls, *args, **kwargs)
+    def __reduce_ex__(self, protocol):
+        raise NotImplementedError()
+
+    def __reduce__(self):
+        raise NotImplementedError()
+
+    @classmethod
+    def _wrap_collections_class(cls):
+        if not hasattr(cls, 'coll_wrapped'):
+            for name in cls._MEMCACHED_OPERATIONS:
+                meth = getattr(cls, name)
+                if not name.startswith('_'):
+                    setattr(cls, name, _inject_scope_and_collection(meth))
+            cls.coll_wrapped = True
 
     def _inject_scope_collection_kwargs(self, kwargs):
         # NOTE: BinaryCollection, for instance, contains a collection and has an interface
@@ -352,6 +357,7 @@ class CBCollection(wrapt.ObjectProxy):
         :param options: miscellaneous options
         """
         assert issubclass(type(parent_scope.bucket), CoreClientDatastructureWrap)
+        self._wrap_collections_class()
         wrapt.ObjectProxy.__init__(self, parent_scope.bucket)
         self._self_scope = parent_scope  # type: Scope
         self._self_name = name  # type: Optional[str]
