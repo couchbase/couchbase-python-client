@@ -1,5 +1,5 @@
 # Backward compatibility
-enum34 ; python_version<"3.5"
+enum34==1.1.8 ; python_version<"3.5"
 
 # Typing support
 typing; python_version<"3.7"
