@@ -22,7 +22,7 @@ from .exceptions import AlreadyShutdownException, InvalidArgumentException, \
     SearchException, QueryException, AnalyticsException, CouchbaseException
 import couchbase_core._libcouchbase as _LCB
 from couchbase_core._pyport import raise_from
-from couchbase.options import OptionBlockTimeOut
+from couchbase.options import OptionBlockTimeOut, LockMode
 from couchbase_core.cluster import *
 from .result import *
 from random import choice
@@ -388,6 +388,7 @@ class ClusterOptions(dict):
                  compression=None,                   # type: Compression
                  compression_min_size=None,          # type: int
                  compression_min_ratio=None,         # type: float
+                 lockmode=None                       # type: LockMode
                  ):
         pass
 

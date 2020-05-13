@@ -12,6 +12,8 @@ try:
     from typing import TypedDict
 except:
     from typing_extensions import TypedDict
+from enum import IntEnum
+from couchbase_core._libcouchbase import LOCKMODE_EXC, LOCKMODE_NONE, LOCKMODE_WAIT
 
 OptionBlockBase = dict
 
@@ -268,3 +270,9 @@ class UnsignedInt64(ConstrainedInt):
 
 
 AcceptableUnsignedInt32 = Union[UnsignedInt32, ctypes.c_uint32]
+
+
+class LockMode(IntEnum):
+    WAIT = LOCKMODE_WAIT
+    EXC = LOCKMODE_EXC
+    NONE = LOCKMODE_NONE

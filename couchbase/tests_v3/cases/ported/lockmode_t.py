@@ -19,21 +19,21 @@ import time
 
 
 from couchbase_v2.exceptions import ObjectThreadException
-from couchbase_tests.base import CouchbaseTestCase
-from couchbase_core import LOCKMODE_WAIT, LOCKMODE_EXC, LOCKMODE_NONE
+from couchbase_tests.base import CouchbaseTestCase, CollectionTestCase
+from couchbase.options import LockMode
 
-class LockmodeTest(CouchbaseTestCase):
+class LockmodeTest(CollectionTestCase):
     def test_lockmode_defaults(self):
         # default is LOCKMODE_EXC
         key = self.gen_key("lockmode_defaults")
         cb = self.make_connection()
-        self.assertEqual(cb.lockmode, LOCKMODE_EXC)
+        self.assertEqual(cb.lockmode, LockMode.EXC)
         cb._thr_lockop(0)
         cb._thr_lockop(1)
         cb.upsert(key, "value")
 
-        cb = self.make_connection(lockmode=LOCKMODE_NONE)
-        self.assertEqual(cb.lockmode, LOCKMODE_NONE)
+        cb = self.make_connection(lockmode=LockMode.NONE)
+        self.assertEqual(cb.lockmode, LockMode.NONE)
 
         self.assertRaises(ObjectThreadException,
                           cb._thr_lockop, 1)
@@ -41,14 +41,14 @@ class LockmodeTest(CouchbaseTestCase):
                           cb._thr_lockop, 0)
         cb.upsert(key, "value")
 
-        cb = self.make_connection(lockmode=LOCKMODE_WAIT)
-        self.assertEqual(cb.lockmode, LOCKMODE_WAIT)
+        cb = self.make_connection(lockmode=LockMode.WAIT)
+        self.assertEqual(cb.lockmode, LockMode.WAIT)
         cb._thr_lockop(0)
         cb._thr_lockop(1)
         cb.upsert(key, "value")
 
-        cb = self.make_connection(lockmode=LOCKMODE_WAIT, unlock_gil=False)
-        self.assertEqual(cb.lockmode, LOCKMODE_NONE)
+        cb = self.make_connection(lockmode=LockMode.WAIT, unlock_gil=False)
+        self.assertEqual(cb.lockmode, LockMode.NONE)
         cb.upsert(key, "value")
 
     def test_lockmode_exc(self):
@@ -63,11 +63,11 @@ class LockmodeTest(CouchbaseTestCase):
 
         # Ensure the old value is not buffered
         cb.upsert(key, "baz")
-        self.assertEqual(cb.get(key).value, "baz")
+        self.assertEqual(cb.get(key).content, "baz")
 
     def test_lockmode_wait(self):
         key = self.gen_key("lockmode_wait")
-        cb = self.make_connection(lockmode=LOCKMODE_WAIT, unlock_gil=True)
+        cb = self.make_connection(lockmode=LockMode.WAIT, unlock_gil=True)
 
         d = {
             'ended' : 0

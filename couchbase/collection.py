@@ -8,15 +8,16 @@ from couchbase_core._libcouchbase import FMT_UTF8
 from mypy_extensions import VarArg, KwArg, Arg
 
 import couchbase.exceptions
-from couchbase.durability import Durability, DurabilityType, DurabilityOptionBlock
+from couchbase.durability import DurabilityType, DurabilityOptionBlock
 from couchbase.exceptions import NotSupportedException, DocumentNotFoundException, PathNotFoundException, QueueEmpty, \
     PathExistsException, DocumentExistsException
 from couchbase_core import JSON
 from couchbase_core.asynchronous.client import AsyncClientMixin
 from couchbase_core.client import Client as CoreClient
 from couchbase_core.supportability import volatile, internal
-from .options import AcceptableInts, OptionBlock
+from .options import AcceptableInts
 from .options import forward_args, OptionBlockTimeOut, OptionBlockDeriv, ConstrainedInt, SignedInt64
+import couchbase.options
 from .result import GetResult, GetReplicaResult, ExistsResult, get_result_wrapper, CoreResult, ResultPrecursor, \
     LookupInResult, MutateInResult, \
     MutationResult, _wrap_in_mutation_result, get_replica_result_wrapper, get_multi_mutation_result, \
@@ -1610,6 +1611,10 @@ class Scope(object):
 class CoreClientDatastructureWrap(CoreClient):
     def _wrap_dsop(self, sdres, has_value=False, **kwargs):
         return getattr(CoreClient._wrap_dsop(self, sdres, has_value), 'value')
+
+    @property
+    def lockmode(self):
+        return couchbase.options.LockMode(super(CoreClientDatastructureWrap, self).lockmode)
 
 
 class AsyncCBCollection(AsyncClientMixin, CBCollection):
