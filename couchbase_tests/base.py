@@ -15,6 +15,7 @@
 
 from __future__ import absolute_import
 
+import re
 import gc
 import logging
 import os
@@ -78,6 +79,8 @@ from typing import *
 
 if os.environ.get("PYCBC_TRACE_GC") in ['FULL', 'STATS_LEAK_ONLY']:
     gc.set_debug(gc.DEBUG_STATS | gc.DEBUG_LEAK)
+
+SLOWCONNECT_PATTERN = re.compile(r'.*centos.*')
 
 
 class FlakyCounter(object):
@@ -868,7 +871,7 @@ class ClusterTestCase(CouchbaseTestCase):
 
     def _instantiate_cluster(self,
                              connstr_nobucket,  # type: str
-                             cluster_class=None,  # type: Type[ClusterTestCase.T]
+                             cluster_class=None,  # type: Type[Cluster]
                              opts=None  # type: Any
                              ):
         # type: (...) -> ClusterTestCase.T
@@ -879,6 +882,10 @@ class ClusterTestCase(CouchbaseTestCase):
             opts = ClusterOptions(auth)
         else:
             opts['authenticator'] = auth
+        if SLOWCONNECT_PATTERN.match(platform.platform()):
+            default_timeout_options = ClusterTimeoutOptions(config_total_timeout=timedelta(seconds=30))
+            default_timeout_options.update(opts.get('timeout_options', {}))
+            opts['timeout_options'] = default_timeout_options
         return self.try_n_times(10, 3, cluster_class.connect,
                                 connection_string=str(connstr_nobucket),
                                 options=opts, **mock_hack.kwargs)

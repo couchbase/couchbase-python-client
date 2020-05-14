@@ -252,9 +252,10 @@ class ClusterTimeoutOptions(dict):
     @overload
     def __init__(self,
                  query_timeout=None,                  # type: timedelta
-                 kv_timeout=None,                    # type: timedelta
-                 views_timeout=None                  # type: timedelta
-                 ):
+                 kv_timeout=None,                     # type: timedelta
+                 views_timeout=None,                  # type: timedelta
+                 config_total_timeout=None            # type: timedelta
+        ):
         pass
 
     def __init__(self, **kwargs):
@@ -265,6 +266,7 @@ class ClusterTimeoutOptions(dict):
         :param timedelta query_timeout: Timeout for query operations.
         :param timedelta kv_timeout: Timeout for KV operations.
         :param timedelta views_timeout: Timeout for View operations.
+        :param timedelta config_total_timeout: Timeout for complete bootstrap configuration
         """
         super().__init__(**kwargs)
 
