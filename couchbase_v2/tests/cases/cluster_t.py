@@ -14,12 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from unittest import SkipTest
 
 from couchbase_tests.base import CouchbaseTestCase
 from couchbase_core.connstr import ConnectionString
 from couchbase_core.cluster import _Cluster as Cluster
 from couchbase.auth import MixedAuthException, PasswordAuthenticator, ClassicAuthenticator, CertAuthenticator
-import gc
+
 import os
 import warnings
 from couchbase.exceptions import NetworkException, CouchbaseFatalException, CouchbaseInputException, CouchbaseException
@@ -118,11 +119,12 @@ class ClusterTest(CouchbaseTestCase):
         cluster3.authenticate(auther_cert)
         try:
             cluster3.open_bucket(bucket_name)
-        except Exception as e:
+        except CouchbaseException as e:
+            self.assertRegex(str(e), r'.*LCB_ERR_SSL_ERROR.*')
             if self.is_realserver and certpath and keypath:
                 raise e
             else:
-                pass
+                raise SkipTest("SSL error but expected so skipping")
 
     def test_pathless_connstr(self):
         # Not strictly a cluster test, but relevant

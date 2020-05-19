@@ -77,7 +77,7 @@ class Authenticator(object):
         return {}
 
     def _base_options(self, bucket, overlay):
-        base_dict = {'options': {'cert_path': self._cert_path} if self._cert_path else {}}
+        base_dict = {'options': {'certpath': self._cert_path} if self._cert_path else {}}
         return _recursive_creds_merge(base_dict, overlay)
 
     def get_cred_bucket(self, bucket, **overlay):

@@ -568,9 +568,10 @@ class CouchbaseTestCase(ResourcedTestCase):
             ret[k] = "Value_For_" + k
         return ret
 
-    def assertRegex(self, *args, **kwargs):
+    # noinspection PyCompatibility
+    def assertRegex(self, text, expected_regex, *args, **kwargs):
         try:
-            return super(CouchbaseTestCase, self).assertRegex(*args, **kwargs)
+            return super(CouchbaseTestCase, self).assertRegex(text, expected_regex, *args, **kwargs)
         except NameError:
             pass
         except AttributeError:
@@ -578,9 +579,10 @@ class CouchbaseTestCase(ResourcedTestCase):
 
         return super(CouchbaseTestCase, self).assertRegexpMatches(*args, **kwargs)
 
-    def assertRaisesRegex(self, *args, **kwargs):
+    # noinspection PyCompatibility
+    def assertRaisesRegex(self, expected_exception, expected_regex, *args, **kwargs):
         try:
-            return super(CouchbaseTestCase, self).assertRaisesRegex(*args, **kwargs)
+            return super(CouchbaseTestCase, self).assertRaisesRegex(expected_exception, expected_regex, *args, **kwargs)
         except NameError:
             pass
         except AttributeError:
