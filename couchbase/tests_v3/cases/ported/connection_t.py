@@ -23,7 +23,7 @@ from couchbase.bucket import Bucket
 from couchbase.exceptions import (AuthenticationException, BucketNotFoundException, DocumentNotFoundException,
                                   TimeoutException, InvalidArgumentException)
 from couchbase_core.connstr import ConnectionString
-from couchbase_tests.base import SkipTest, ConnectionTestCase, ClusterTestCase, CollectionTestCase
+from couchbase_tests.base import SkipTest, ClusterTestCase, CollectionTestCase
 
 
 class ConnectionTest(ClusterTestCase):

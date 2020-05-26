@@ -1017,7 +1017,7 @@ class AsyncClusterTestCase(ClusterTestCase):
     @abstractmethod
     def cluster_class(self  # type: AsyncClusterTestCase
                       ):
-        # type: (...) -> Type[.AsyncClusterType]
+        # type: (...) -> Type[AsyncClusterType]
         pass
 
 

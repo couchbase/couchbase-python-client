@@ -43,7 +43,6 @@ class UserManagementTests(CollectionTestCase):
         if self.config.mock_enabled:
             raise SkipTest('Real server must be used for admin tests')
 
-        print(self.cluster_info)
         super(UserManagementTests, self).setUp(*args, **kwargs)
         self.um = self.cluster.users()
         if self.supports_groups():

@@ -248,7 +248,8 @@ class QueryOptions(OptionBlockTimeOut):
 class ClusterTimeoutOptions(dict):
     KEY_MAP = {'kv_timeout': 'operation_timeout',
                'query_timeout': 'query_timeout',
-               'views_timeout': 'views_timeout'}
+               'views_timeout': 'views_timeout',
+               'config_total_timeout': 'config_total_timeout'}
     @overload
     def __init__(self,
                  query_timeout=None,                  # type: timedelta

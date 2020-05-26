@@ -20,8 +20,8 @@ from nose.tools import timed
 from twisted.internet import defer
 
 from couchbase.exceptions import (
-    ObjectDestroyedException)
-from couchbase.exceptions import UnknownHostException
+    ObjectDestroyedException, DocumentUnretrievableException)
+from couchbase.exceptions import UnknownHostException, TimeoutException
 from couchbase_core.connstr import ConnectionString
 from couchbase_tests.base import AsyncClusterTestCase
 from txcouchbase.cluster import TxBucket
@@ -49,7 +49,7 @@ class BasicClusterTest(Base):
         cb = self.make_connection(host="qweqwe")
         d = cb.on_connect()
         d.addCallback(lambda x: x, cb)
-        return self.assertFailure(d, UnknownHostException)
+        return self.assertFailure(d, UnknownHostException, TimeoutException, DocumentUnretrievableException)
 
     @timed(10)
     def testBadEvent(self):
