@@ -21,7 +21,7 @@ analytics_dir = os.path.join(os.path.dirname(__file__), "analytics")
 response_dir = analytics_dir
 
 
-class CBASTestBase(RealServerTestCase):
+class AnalyticsTestBase(RealServerTestCase):
     initialised = False
     lastcb = None
     datasets = {}
@@ -31,17 +31,17 @@ class CBASTestBase(RealServerTestCase):
 
     @classmethod
     def tearDownClass(cls):
-        if CBASTestBase.lastcb:
-            CBASTestBase.lastcb.cleanUp()
-            CBASTestBase.lastcb.tearDown()
-            del CBASTestBase.lastcb
-        super(CBASTestBase, cls).tearDownClass()
+        if AnalyticsTestBase.lastcb:
+            AnalyticsTestBase.lastcb.cleanUp()
+            AnalyticsTestBase.lastcb.tearDown()
+            del AnalyticsTestBase.lastcb
+        super(AnalyticsTestBase, cls).tearDownClass()
 
     @classmethod
     def setUpClass(cls):
-        CBASTestBase.lastcb = None
-        CBASTestBase.initialised = False
-        CBASTestBase.datasets = {'beers': ['beer', '21A IPA'], 'breweries': ['brewery', 'Kona Brewing']}
+        AnalyticsTestBase.lastcb = None
+        AnalyticsTestBase.initialised = False
+        AnalyticsTestBase.datasets = {'beers': ['beer', '21A IPA'], 'breweries': ['brewery', 'Kona Brewing']}
 
     def setUp(self, **kwargs):
         if not os.environ.get("PYCBC_USE_ANALYTICS"):
@@ -60,9 +60,9 @@ class CBASTestBase(RealServerTestCase):
         logging.error("Testing against server version {}".format(PYCBC_SERVER_VERSION))
         self.override_quiet = old_analytics
 
-        super(CBASTestBase, self).setUp(**kwargs)
-        if not CBASTestBase.lastcb:
-            CBASTestBase.lastcb = copy.copy(self)
+        super(AnalyticsTestBase, self).setUp(**kwargs)
+        if not AnalyticsTestBase.lastcb:
+            AnalyticsTestBase.lastcb = copy.copy(self)
 
     def init_if_not_setup(self, is_setup_test=False):
         if is_setup_test:
@@ -72,29 +72,29 @@ class CBASTestBase(RealServerTestCase):
 
     def initialise(self):
         if not self.is_mock:
-            if not CBASTestBase.initialised:
+            if not AnalyticsTestBase.initialised:
                 logging.error("initialising dataset")
                 self.cleanUp()
-                for dataset, source in CBASTestBase.datasets.items():
+                for dataset, source in AnalyticsTestBase.datasets.items():
                     self.perform_query(
                         "CREATE DATASET {} ON `beer-sample` WHERE `type` = '{}';".format(dataset, source[0]),
                         quiet=True)
 
                 self.perform_query("CONNECT LINK Local;", quiet=True)
-                for dataset, source in CBASTestBase.datasets.items():
+                for dataset, source in AnalyticsTestBase.datasets.items():
                     self.poll_for_response(dataset, source[1])
                 time.sleep(10)
 
-        CBASTestBase.initialised = True
+        AnalyticsTestBase.initialised = True
 
     def cleanUp(self):
         if not self.is_mock:
             logging.error("cleaning up")
             self.perform_query("DISCONNECT LINK Local;", quiet=True)
-            for dataset, source in CBASTestBase.datasets.items():
+            for dataset, source in AnalyticsTestBase.datasets.items():
                 self.perform_query("DROP DATASET {} IF EXISTS;".format(dataset), quiet=True)
             time.sleep(10)
-        CBASTestBase.initialised = False
+        AnalyticsTestBase.initialised = False
 
     def poll_for_response(self, dataset, marker):
         if not self.is_mock:
@@ -155,7 +155,7 @@ class CBASTestBase(RealServerTestCase):
         return query._params
 
 
-gen_reference = os.getenv("PYCBC_GEN_CBAS_REF")
+gen_reference = os.getenv("PYCBC_GEN_ANALYTICS_REF")
 with open(os.path.join(response_dir, "queries.json")) as resp_file:
     cbas_response = json.load(resp_file)
 
@@ -173,7 +173,7 @@ def get_expected_query(expected_query):
     return expected_query_copy
 
 
-class CBASTestQueriesBase(CBASTestBase):
+class AnalyticsTestQueriesBase(AnalyticsTestBase):
     def gen_query_params(self, query_file, responsedict):
         logging.info("test={}".format(query_file))
         entry = copy.deepcopy(responsedict[query_file])
@@ -196,7 +196,7 @@ class CBASTestQueriesBase(CBASTestBase):
         self.assertSanitizedEqual(result, expected, {u'meta': 'cas', 'Dataverse': 'Timestamp'})
 
 
-class CBASTestQueries(CBASTestQueriesBase):
+class AnalyticsTestQueries(AnalyticsTestQueriesBase):
     @classmethod
     def tearDownClass(cls):
         if gen_reference:
@@ -219,7 +219,7 @@ class CBASTestQueries(CBASTestQueriesBase):
             self._check_response(encoded, query_file, result, cbas_response)
 
 
-class DeferredAnalyticsTest(CBASTestQueriesBase):
+class DeferredAnalyticsTest(AnalyticsTestQueriesBase):
     _responses = None
 
     def __init__(self, *args, **kwargs):
@@ -308,7 +308,7 @@ class DeferredAnalyticsTest(CBASTestQueriesBase):
             pass
 
 
-class CBASTestSpecific(CBASTestBase):
+class AnalyticsTestSpecific(AnalyticsTestBase):
     def test_importworks(self):
         self.init_if_not_setup()
         try:
@@ -361,7 +361,7 @@ def data_converter(document):
     return {'results': document}
 
 
-class AnalyticsIngestTest(CBASTestBase):
+class AnalyticsIngestTest(AnalyticsTestBase):
     def test_ingest_basic(self):
         x = AnalyticsIngester(TestIdGenerator(), data_converter, BucketOperators.UPSERT)
         x(self.get_fixture(), 'SELECT * FROM Metadata.`Dataverse`')

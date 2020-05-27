@@ -246,7 +246,7 @@ class DeferredAnalyticsRequest(AnalyticsRequest):
         status = "pending"
         response_value = {}
         try:
-            response = self.parent._http_request(type=LCB.LCB_HTTP_TYPE_CBAS, method=LCB.LCB_HTTP_METHOD_GET,
+            response = self.parent._http_request(type=LCB.LCB_HTTP_TYPE_ANALYTICS, method=LCB.LCB_HTTP_METHOD_GET,
                                                  path=self.handle_host.path, response_format=FMT_JSON,
                                                  host=self._to_host_URI(self.handle_host))
             response_value = response.value
@@ -263,7 +263,7 @@ class DeferredAnalyticsRequest(AnalyticsRequest):
                 parsed_response_handle = urlparse.urlparse(response_handle)
             except Exception as e:
                 raise couchbase.exceptions.InternalException("Got invalid url: {}".format(e))
-            final_response = self.parent._http_request(type=LCB.LCB_HTTP_TYPE_CBAS,
+            final_response = self.parent._http_request(type=LCB.LCB_HTTP_TYPE_ANALYTICS,
                                                        method=LCB.LCB_HTTP_METHOD_GET,
                                                        path=parsed_response_handle.path,
                                                        host=self._to_host_URI(parsed_response_handle),
