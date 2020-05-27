@@ -306,7 +306,7 @@ class CreateQueryIndexOptions(OptionBlockTimeOut):
     def __init__(self, **kwargs):
         if 'ignore_if_exists' not in kwargs:
             kwargs['ignore_if_exists'] = False
-        super(CreateQueryIndexOptions, self).__init__()
+        super(CreateQueryIndexOptions, self).__init__(**kwargs)
 
 
 class CreatePrimaryQueryIndexOptions(CreateQueryIndexOptions):
@@ -321,7 +321,7 @@ class CreatePrimaryQueryIndexOptions(CreateQueryIndexOptions):
         pass
 
     def __init__(self, **kwargs):
-        super(CreatePrimaryQueryIndexOptions, self).__init__()
+        super(CreatePrimaryQueryIndexOptions, self).__init__(**kwargs)
 
 
 class DropQueryIndexOptions(OptionBlockTimeOut):
