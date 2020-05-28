@@ -63,7 +63,7 @@ class DiagnosticsOptions(OptionBlock):
         super(DiagnosticsOptions, self).__init__(**kwargs)
 
 
-class QueryScanConsistency(object):
+class QueryScanConsistency(Enum):
     """
     QueryScanConsistency
 
