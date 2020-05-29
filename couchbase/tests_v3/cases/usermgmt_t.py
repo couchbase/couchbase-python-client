@@ -15,37 +15,43 @@ from datetime import timedelta
 
 UG_WORKING = os.getenv("PYCBC_UPSERT_GROUP_WORKING")
 
+
 def skip_if_no_groups(func):
-  @wraps(func)
-  def wrap(self, *args, **kwargs):
-    if not self.supports_groups():
-      raise SkipTest('groups not supported (server < 6.5?)')
-    func(self, *args, **kwargs)
-  return wrap
+    @wraps(func)
+    def wrap(self, *args, **kwargs):
+        if not self.supports_groups():
+            raise SkipTest('groups not supported (server < 6.5?)')
+        func(self, *args, **kwargs)
+
+    return wrap
+
 
 class UserManagementTests(CollectionTestCase):
 
     def supports_groups(self):
-      # get_all_groups will raise NotSupported when we are hiting < 6.5
-      try:
-        self.um.get_all_groups()
-        return True
-      except NotSupportedException:
-        return False
+        # mock doesnt support it
+        if self.is_mock:
+            return False
+        # get_all_groups will raise NotSupported when we are hiting < 6.5
+        try:
+            self.um.get_all_groups()
+            return True
+        except NotSupportedException:
+            return False
 
     def setUp(self, *args, **kwargs):
-        super(UserManagementTests, self).setUp(*args, **kwargs)
-        self.um = self.cluster.users()
-        if not self.is_realserver:
+        if self.config.mock_enabled:
             raise SkipTest('Real server must be used for admin tests')
 
+        print(self.cluster_info)
+        super(UserManagementTests, self).setUp(*args, **kwargs)
+        self.um = self.cluster.users()
         if self.supports_groups():
-          self.um.upsert_group(Group('qweqwe', roles={Role.of(name='admin')}))
-
+            self.um.upsert_group(Group('qweqwe', roles={Role.of(name='admin')}))
 
     def tearDown(self):
-      if self.supports_groups():
-        self.um.drop_group('qweqwe')
+        if self.supports_groups():
+            self.um.drop_group('qweqwe')
 
     def test_create_list_get_remove_internal_user(self):
 

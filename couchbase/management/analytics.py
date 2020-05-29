@@ -459,7 +459,7 @@ class AnalyticsIndexManager(object):
             options = GetPendingMutationsOptions()
 
         try:
-            return self._cluster._admin._http_request(type=_LCB.LCB_HTTP_TYPE_CBAS,
+            return self._cluster._admin._http_request(type=_LCB.LCB_HTTP_TYPE_ANALYTICS,
                                                      method=_LCB.LCB_HTTP_METHOD_GET,
                                                      path="analytics/node/agg/stats/remaining"
                                                      ).value
