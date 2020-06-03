@@ -7,7 +7,7 @@ sphinx>=2.1.0,<3.0; python_version>="3.0"
 sphinx==1.8.5; python_version<"3.0"
 testresources>=0.2.7
 jsonschema==2.6.0
-configparser==3.5.0
+configparser>=3.5.0
 testfixtures==5.4.0
 basictracer>=2.2.0
 zipkin==0.1.0
