@@ -50,6 +50,7 @@ from couchbase.management.analytics import CreateDatasetOptions
 from couchbase.management.collections import CollectionSpec
 from couchbase_core.client import Client as CoreClient
 from couchbase_core.connstr import ConnectionString
+from couchbase.diagnostics import ServiceType, PingState
 
 try:
     from unittest2.case import SkipTest
@@ -862,6 +863,7 @@ class ClusterTestCase(CouchbaseTestCase):
         bucket_name = self.init_cluster_and_bucket(**kwargs)
         self.bucket = self.cluster.bucket(bucket_name)
         self.bucket_name = bucket_name
+        self.try_n_times(20, 3, self.is_ready)
         self.query_props = QueryParams('SELECT mockrow', 1) if self.is_mock else \
             QueryParams("SELECT * FROM `beer-sample` LIMIT 2", 2)  # type: QueryParams
         self.empty_query_props = QueryParams('SELECT emptyrow', 0) if self.is_mock else \
@@ -875,6 +877,28 @@ class ClusterTestCase(CouchbaseTestCase):
         bucket = connstr_nobucket.bucket
         connstr_nobucket.bucket = None
         return connstr_nobucket, bucket
+
+    # for now, we assume _all_ services should be present, and wait for that...
+    # NOTE: we have to call this after opening a bucket, as cluster ping still
+    # requires this for now.  There is an LCB issue on this.
+    def is_ready(self):
+        if self.is_mock:
+            return True
+        # NOTE: ping is broken -- returns the Analytics in the Query.  So, for now, we
+        # are _probably_ ok if we just make sure the 4 services are up.  Could be more
+        # tricky if needed...
+        service_types = [ServiceType.KeyValue, ServiceType.Search, ServiceType.Query,
+                         #ServiceType.Analytics,
+                         ServiceType.View]
+        resp = self.bucket.ping()
+        # first make sure all are there:
+        if all(k in resp.endpoints.keys() for k in service_types):
+            print("all services are present ({})".format(service_types))
+            for service in service_types:
+                if not any(x for x in resp.endpoints[service] if x.state == PingState.OK):
+                    raise Exception("{} isn't ready yet".format(service))
+            return True
+        raise Exception("not all services present in {}".format(resp))
 
     def init_cluster_and_bucket(self, **kwargs):
         # put the ClusterOptions in later
@@ -938,13 +962,17 @@ class CollectionTestCase(ClusterTestCase):
     def __init__(self, *args, **kwargs):
         super(CollectionTestCase, self).__init__(*args, **kwargs)
 
+    # soon we should have a Cluster function that does this (DP _or_ 7.0, etc...)
     def supports_collections(self):
-        cm = self.bucket.collections()
         try:
-            cm.get_all_scopes()
-            return True
-        except NotSupportedException:
+            v = float(self.get_cluster_version()[0:3])
+            if v >= 7.0:
+                return True
+        except ValueError:
+            # lets assume it is the mock
             return False
+        # if < 7, check for DP
+        return self.cluster._is_dev_preview()
 
     def setUp(self, default_collections=None, real_collections=None, **kwargs):
         default_collections = default_collections or {None: {None: "coll"}}

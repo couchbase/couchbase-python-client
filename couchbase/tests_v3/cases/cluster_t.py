@@ -22,8 +22,7 @@ from couchbase.cluster import ClusterOptions, ClusterTimeoutOptions,\
     ClusterTracingOptions, Compression, DiagnosticsOptions, Cluster
 from couchbase.auth import PasswordAuthenticator, ClassicAuthenticator
 from couchbase.diagnostics import ServiceType, EndpointState, ClusterState
-from couchbase.exceptions import AlreadyShutdownException, BucketNotFoundException
-from couchbase.auth import NoBucketException
+from couchbase.exceptions import AlreadyShutdownException, BucketNotFoundException, NotSupportedException
 from datetime import timedelta
 from unittest import SkipTest
 
@@ -41,14 +40,16 @@ class ClusterTests(CollectionTestCase):
         if not self.is_mock:
             # no matter what there should be a config service type in there,
             # as long as we are not the mock.
-            config = result.endpoints[ServiceType.Config]
-            self.assertTrue(len(config) > 0)
-            self.assertIsNotNone(config[0].id)
-            self.assertIsNotNone(config[0].local)
-            self.assertIsNotNone(config[0].remote)
-            self.assertIsNotNone(config[0].last_activity)
-            self.assertEqual(config[0].state, EndpointState.Connected)
-            self.assertEqual(config[0].type, ServiceType.Config)
+            # no matter what there should be a config service type in there,
+            # as long as we are not the mock.
+            mgmt = result.endpoints[ServiceType.Management]
+            self.assertTrue(len(mgmt) > 0)
+            self.assertIsNotNone(mgmt[0].id)
+            self.assertIsNotNone(mgmt[0].local)
+            self.assertIsNotNone(mgmt[0].remote)
+            self.assertIsNotNone(mgmt[0].last_activity)
+            self.assertEqual(mgmt[0].state, EndpointState.Connected)
+            self.assertEqual(mgmt[0].type, ServiceType.Management)
 
     def test_diagnostics_with_active_bucket(self):
         query_result = self.cluster.query('SELECT * FROM `beer-sample` LIMIT 1')
@@ -63,11 +64,13 @@ class ClusterTests(CollectionTestCase):
         print(result.as_json())
         self.assertIn("imareportid", result.id)
 
+        # we now open a bucket, and ping the services, in setUp's base classes.  So
+        # there should always be a management endpoint...
         if not self.is_mock:
             # no matter what there should be a config service type in there,
             # as long as we are not the mock.
-            config = result.endpoints[ServiceType.Config]
-            self.assertTrue(len(config) > 0)
+            mgmt = result.endpoints[ServiceType.Management]
+            self.assertTrue(len(mgmt) > 0)
 
         # but now, we have hit Query, so...
         q = result.endpoints[ServiceType.Query]
@@ -243,7 +246,6 @@ class ClusterTests(CollectionTestCase):
         # well, our tests are not ssl, so...
         self.assertFalse(self.cluster.is_ssl)
 
-    @unittest.skip("Skip until the admin stuff is worked out")
     def test_cluster_may_need_open_bucket_before_admin_calls(self):
         # NOTE: some admin calls -- like listing query indexes, seem to require
         # that the admin was given a bucket.  That can only happen if we have already
@@ -255,10 +257,16 @@ class ClusterTests(CollectionTestCase):
         if cluster._is_6_5_plus():
             self.assertIsNotNone(cluster.query_indexes().get_all_indexes(self.bucket_name))
         else:
-            self.assertRaises(NoBucketException, cluster.query_indexes().list_all_indexes, self.bucket_name)
+            # since we called cluster._is_6_5_plus(), that creates an admin under the hood to do
+            # the http call.  Thus, we won't get the NoBucketException in this case, we get an
+            # NotSupportedException instead.  Normally, one would use the public api and not hit that,
+            # getting the NoBucketException instead.
+            self.assertRaises(NotSupportedException, cluster.query_indexes().get_all_indexes, self.bucket_name)
 
-    def can_do_admin_calls_after_unsuccessful_bucket_openings(self):
+    def test_can_do_admin_calls_after_unsuccessful_bucket_openings(self):
+        if self.is_mock:
+            raise SkipTest("mock doesn't support admin calls")
         cluster = Cluster.connect(self.cluster.connstr, self._create_cluster_opts(), **self._mock_hack())
         self.assertRaises(BucketNotFoundException, cluster.bucket, "flkkjkjk")
         self.assertIsNotNone(cluster.bucket(self.bucket_name))
-        self.assertIsNotNone(cluster.query_indexes().list_all_indexes(self.bucket_name))
+        self.assertIsNotNone(cluster.query_indexes().get_all_indexes(self.bucket_name))

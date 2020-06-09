@@ -36,13 +36,6 @@ T = TypeVar('T')
 
 CallableOnOptionBlock = Callable[[OptionBlockDeriv, Any], Any]
 
-METHMAP = {
-    'GET': _LCB.LCB_HTTP_METHOD_GET,
-    'PUT': _LCB.LCB_HTTP_METHOD_PUT,
-    'POST': _LCB.LCB_HTTP_METHOD_POST,
-    'DELETE': _LCB.LCB_HTTP_METHOD_DELETE
-}
-
 
 class DiagnosticsOptions(OptionBlock):
 
@@ -784,7 +777,7 @@ class Cluster(CoreClient):
         :raise: :class:`~.exceptions.CouchbaseException` for various communication issues.
         """
 
-        bucket = self._get_an_open_bucket()
+        bucket = self._get_an_open_bucket("Ping requires an open bucket")
         if bucket:
             return PingResult(bucket.ping(*options, **kwargs))
         raise NoBucketException("ping requires a bucket be opened first")

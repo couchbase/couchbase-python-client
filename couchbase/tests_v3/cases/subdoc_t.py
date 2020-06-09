@@ -103,11 +103,11 @@ class SubdocTests(CollectionTestCase):
 
         cas = self.coll.mutate_in(self.KEY,
                                   (SD.upsert("c", "ccc"), SD.replace("b", "XXX"),),
-                                  MutateInOptions(expiry=timedelta(seconds=100))).cas
+                                  MutateInOptions(expiry=timedelta(seconds=1000))).cas
         self.try_n_times(10, 3, self._cas_matches, self.KEY, cas)
         result = self.coll.get(self.KEY, GetOptions(with_expiry=True))
         expires_in = (result.expiry - datetime.now()).total_seconds()
-        self.assertTrue(0 < expires_in < 100)
+        self.assertTrue(0 < expires_in < 1000)
 
     # refactor!  Also, this seems like it should timeout.  I suspect a bug here.  I don't really
     # believe there is any way this could not timeout on the first lookup_in

@@ -45,6 +45,10 @@ class AnalyticsIndexManagerTests(CollectionTestCase):
                                                      condition='`type` = "brewery"',
                                                      ignore_if_exists=True)
                                 )
+        try:
+            self.mgr.disconnect_link()
+        except:
+            pass
 
     def tearDown(self):
         super(AnalyticsIndexManagerTests, self).tearDown()
@@ -52,6 +56,10 @@ class AnalyticsIndexManagerTests(CollectionTestCase):
         try:
             self.cluster.analytics_query("USE `{}`; DISCONNECT LINK Local;".format(self.dataverse_name)).metadata()
         except DataverseNotFoundException:
+            pass
+        try:
+            self.mgr.disconnect_link()
+        except:
             pass
         self.try_n_times(10, 3,
                          self.mgr.drop_dataverse, self.dataverse_name,
@@ -78,6 +86,7 @@ class AnalyticsIndexManagerTests(CollectionTestCase):
 
     def test_drop_dataverse(self):
         self.mgr.drop_dataverse(self.dataverse_name)
+        self.mgr.connect_link()
         statement = 'SELECT * FROM Metadata.`Dataverse` WHERE DataverseName="{}";'.format(self.dataverse_name)
         result = self.cluster.analytics_query(statement)
         self.assertEqual(0, len(result.rows()))
