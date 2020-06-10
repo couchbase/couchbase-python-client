@@ -6,12 +6,15 @@ set(LCBCXX_ROOT libcouchbase-cxx-prefix/src/libcouchbase-cxx)
 set(LCB_ROOT ${THIRDPARTY_LCB_ROOT}/src/libcouchbase_src)
 set(PYCBC_CMAKE_CPYTHON_WRAPPER 1)
 cmake_policy(SET CMP0054 NEW)
+include(cmake/json-cmake/JSONParser.cmake)
+include(FindPythonInterp)
+include(FindPythonLibs)
+include(ExternalProject)
+
 if(HYBRID_BUILD)
     set(PYCBC_C_MOD_NAME "_dummy")
     set(PYCBC_C_MOD_SUFFIX ".so")
 else()
-    include(FindPythonInterp)
-    include(FindPythonLibs)
 
     if (PYTHON_LIBDIR)
         set(PYTHON_LIBDIR_HINT HINTS ${PYTHON_LIBDIR})
@@ -59,26 +62,99 @@ set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -fPIC -fno-strict-aliasing -Wall -Wstrict-
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-common -dynamic -DNDEBUG -g -fwrapv -Wswitch")
 endif()
 
-if ("$PYCBC_USE_CONAN")
-    # Download automatically, you can also just copy the conan.cmake file
-    include(${CMAKE_BINARY_DIR}/conan.cmake)
-    if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
-        message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
-        file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/master/conan.cmake"
-                "${CMAKE_BINARY_DIR}/conan.cmake")
+function(get_conan)
+    if(NOT CONAN_INCLUDED)
+        # Download automatically, you can also just copy the conan.cmake file
+        if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+            message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+            file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/master/conan.cmake"
+                    "${CMAKE_BINARY_DIR}/conan.cmake")
+        endif()
+        include(${CMAKE_BINARY_DIR}/conan.cmake)
+        conan_add_remote(NAME bintray
+        URL https://api.bintray.com/conan/conan-community/conan )
+        set(CONAN_INCLUDED TRUE)
     endif()
-    conan_cmake_run(REQUIRES OpenSSL/1.0.2n@conan/stable
-            BASIC_SETUP
-            BUILD missing)
+endfunction()
+
+if("${CMAKE_SIZEOF_VOID_P}" EQUAL "8")
+    MESSAGE("++ 64 bit architecture")
+    set(PKGARCH "amd64")
+else()
+    MESSAGE("++ 32 bit architecture")
+    set(PKGARCH "win32")
 endif()
 
-include(ExternalProject)
+if (NOT (OPENSSL_ROOT_DIR AND EXISTS ${OPENSSL_ROOT_DIR}))
+    set(OPENSSL_ROOT_DIR ${CMAKE_CURRENT_BINARY_DIR}/OpenSSL-prefix/src/OpenSSL/${PKGARCH})
+endif()
+
+function(get_ssl)
+    execute_process(
+        COMMAND     ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/gen_config.py --temp_build_dir ${CMAKE_CURRENT_BINARY_DIR}
+    )
+    set (OPENSSLCFG_FILE ${CMAKE_CURRENT_BINARY_DIR}/openssl_version.json)
+    file(READ ${OPENSSLCFG_FILE} OPENSSLCFG)
+    sbeParseJson(openssl_cfg OPENSSLCFG)
+    message("Need to find OpenSSL ${openssl_cfg.major} from\n${OPENSSLCFG}")
+
+    if (OPENSSL_ROOT_DIR AND EXISTS ${OPENSSL_ROOT_DIR})
+        message("Found relevant OpenSSL ${OPENSSL_ROOT_DIR}")
+        ExternalProject_Add(OpenSSL
+                SOURCE_DIR ${OpenSSL_DIR}
+                CONFIGURE_COMMAND ""
+                BUILD_COMMAND ""
+                INSTALL_COMMAND ""
+                TEST_COMMAND ""
+                )
+    endif()
+    if (PYCBC_SSL_FETCH MATCHES ".*(CONAN|ALL).*")
+        get_conan()
+        conan_cmake_run(REQUIRES openssl/${openssl_cfg.major}
+                BASIC_SETUP
+                BUILD missing
+                INSTALL_FOLDER ${openssl_cfg.ssl_root_dir}
+                OPTIONS Pkg:shared=True)
+
+        include(${CMAKE_CURRENT_BINARY_DIR}/openssl/conanbuildinfo.cmake)
+        conan_basic_setup()
+        file(GLOB OPENSSL_FILES ${CONAN_OPENSSL_ROOT}/*)
+        file(COPY ${OPENSSL_FILES}
+                DESTINATION ${OPENSSL_ROOT_DIR})
+        set(OPENSSL_LIB CONAN_PKG::openssl)
+    endif()
+    if (WIN32)
+        # on Windows, we can download from cpython-bin-deps
+        message("Can't find relevant OpenSSL, downloading instead")
+
+        if (PYCBC_SSL_FETCH MATCHES ".*(ALL|GITHUB).*")
+            ExternalProject_Add(OpenSSL
+                URL "https://github.com/python/cpython-bin-deps/archive/openssl-bin-${openssl_cfg.major}.zip"
+                    CONFIGURE_COMMAND ""
+                    BUILD_COMMAND ""
+                    INSTALL_COMMAND ""
+                    TEST_COMMAND ""
+
+                    )
+            ExternalProject_Get_Property(OpenSSL source_dir)
+            set(GITHUB_OPENSSL_ROOT_DIR ${source_dir}/${PKGARCH})
+            message("Downloaded from Github zip: Set OPENSSL_ROOT_DIR to ${OPENSSL_ROOT_DIR}")
+            file(GLOB OPENSSL_FILES ${GITHUB_OPENSSL_ROOT_DIR}/*)
+            file(COPY ${OPENSSL_FILES}
+                    DESTINATION ${OPENSSL_ROOT_DIR})
+            message("Copied files from ${GITHUB_OPENSSL_ROOT_DIR} OPENSSL_ROOT_DIR ${OPENSSL_ROOT_DIR}: [${OPENSSL_FILES}]")
+        endif()
+    endif()
+endfunction()
+message("Got OpenSSL_DIR ${OpenSSL_DIR}")
+message("Got OPENSSL_ROOT_DIR ${OPENSSL_ROOT_DIR}")
+
+
 
 
 set(CMAKE_MACOSX_RPATH 1)
 
 set(BUILD_CFG_FILE cbuild_cfg.json)
-include(cmake/json-cmake/JSONParser.cmake)
 file(READ ${BUILD_CFG_FILE} BUILDCFG)
 sbeParseJson(build_cfg BUILDCFG)
 message("environment LCB_TAG: $ENV{LCB_TAG}")
@@ -135,6 +211,24 @@ endif()
 
 set(LCB_SRC TRUE)
 if (LCB_SRC)
+    if (NOT (OPENSSL_ROOT_DIR AND EXISTS ${OPENSSL_ROOT_DIR}))
+        find_package(
+                OpenSSL
+                PATHS ${OPENSSL_ROOT_DIR}
+        )
+        if (OpenSSL_DIR)
+            set(OPENSSL_ROOT_DIR OpenSSL_DIR)
+        elseif(PYCBC_SSL_FETCH)
+            get_ssl()
+        endif()
+    endif()
+    if (OPENSSL_ROOT_DIR)
+        message("Found OPENSSL_ROOT_DIR ${OPENSSL_ROOT_DIR}")
+        set (LCB_SSL_OPTS -DOPENSSL_ROOT_DIR=${OPENSSL_ROOT_DIR})
+    else()
+        message("Found no existent OPENSSL_ROOT_DIR: ${OPENSSL_ROOT_DIR}")
+    endif()
+
     SET(LCB_BUILD_DIR "${CMAKE_BINARY_DIR}/Release/lcb_build")
     SET(LCB_DBGBUILD_DIR "${CMAKE_BINARY_DIR}/Release/lcb_dbgbuild")
     if (CMAKE_BUILD_TYPE MATCHES DEBUG)
@@ -152,7 +246,7 @@ if (LCB_SRC)
         else()
             set(WIN_PLATFORM "Visual Studio 14 2015")
         endif()
-        set(LCB_CMAKE_ARGS ${LCB_CMAKE_ARGS} -DLCB_NO_SSL=1 -DLCB_NO_MOCK=1)
+        set(LCB_CMAKE_ARGS ${LCB_CMAKE_ARGS} -DLCB_NO_MOCK=1 ${LCB_SSL_OPTS})
         SET(LIBCOUCHBASE_LIBRARY_FILE "${LCB_BUILD_DIR}/lib/Release/${LIBCOUCHBASE_LIBRARY_NAME}")
         SET(LIBCOUCHBASE_DBG_LIBRARY_FILE "${LCB_BUILD_DIR}/lib/Debug/${LIBCOUCHBASE_DBG_LIBRARY_NAME}")
         ExternalProject_Add(libcouchbase_src
@@ -338,6 +432,8 @@ endif()
 
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 target_link_libraries(couchbase_python_client ${Boost_LIBRARIES}   ${LIBCOUCHBASE_FINAL_PATH}  ${PYTHON_LIBRARIES} -Wl,-rpath,${LIBCOUCHBASE_FINAL_DIRPATH})
+link_libraries(libcouchbase_src
+        ${OPENSSL_LIB})
 set_target_properties(
         couchbase_python_client
         PROPERTIES COMPILE_FLAGS "${CMAKE_C_FLAGS}"

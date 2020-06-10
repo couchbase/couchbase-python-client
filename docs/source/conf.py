@@ -27,11 +27,11 @@ sys.path.insert(0, os.path.abspath('../../build/lib.%s-%s' % (get_platform(), sy
 
 import couchbase_version
 try:
-    import lcb_version
+    import gen_config
 
-    libcouchbase_version=lcb_version.get_lcb_min_version()
+    libcouchbase_version = gen_config.get_lcb_min_version()
 except:
-    libcouchbase_version=(3,0,0)
+    libcouchbase_version = (3, 0, 0)
 # -- General configuration -----------------------------------------------------
 rst_epilog = """
 .. |libcouchbase_version| replace:: {}""".format('.'.join(map(str,libcouchbase_version)))

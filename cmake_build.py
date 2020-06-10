@@ -28,6 +28,7 @@ from setuptools import Extension
 from setuptools.command.build_ext import build_ext
 
 import cbuild_config
+from gen_config import win_cmake_path
 from cbuild_config import couchbase_core, build_type
 
 
@@ -72,7 +73,7 @@ class CMakeBuild(cbuild_config.CBuildCommon):
 
     @staticmethod
     def requires():
-        return "" if CMakeBuild.check_for_cmake() else ["cmake"]
+        return ["PyGithub","conan"] +([] if CMakeBuild.check_for_cmake() else ["cmake"])
 
     def prep_build(self, ext):
         if not CMakeBuild.hasbuilt:
@@ -136,16 +137,34 @@ class CMakeBuild(cbuild_config.CBuildCommon):
             if platform.system() == "Windows":
                 cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'.format(
                     cfg.upper(),
-                    extdir), '-DLCB_NO_MOCK=1', '-DLCB_NO_SSL=1']
+                    extdir), '-DLCB_NO_MOCK=1']
                 if sys.maxsize > 2 ** 32:
                     cmake_args += ['-A', 'x64']
                 build_args += ['--', '/m']
             else:
                 cmake_args += ['-DCMAKE_BUILD_TYPE=' + cfg.upper()]
                 build_args += ['--', '-j2']
-
             env = os.environ.copy()
-            cmake_args += ['-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON']
+            python_executable = win_cmake_path(sys.executable)
+            try:
+                import conans.conan
+                env['PATH'] = env['PATH']+";{}".format(os.path.dirname(conans.conan.__file__))
+                env['PYTHONPATH'] = ';'.join(sys.path)
+            except Exception as e:
+                import logging
+                import traceback
+                logging.warning("Cannot find conan : {}".format(traceback.format_exc()))
+            cmake_args += [
+                           '-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON',
+                           '-DPYTHON_EXECUTABLE={}'.format(python_executable)]
+            PYCBC_SSL_FETCH = env.get('PYCBC_SSL_FETCH')
+            if PYCBC_SSL_FETCH:
+                cmake_args += ['-DPYCBC_SSL_FETCH={}'.format(PYCBC_SSL_FETCH)]
+            PYCBC_CMAKE_DEBUG = env.get('PYCBC_CMAKE_DEBUG')
+            if PYCBC_CMAKE_DEBUG:
+                cmake_args += [
+                '--trace-source=CMakeLists.txt',
+                '--trace-expand']
             cxx_compile_args=filter(re.compile(r'^(?!-std\s*=\s*c(11|99)).*').match, ext.extra_compile_args)
             env['CXXFLAGS'] = '{} {} -DVERSION_INFO=\\"{}\\"'.format(
                 env.get('CXXFLAGS', ''), ' '.join(cxx_compile_args),
@@ -179,35 +198,9 @@ class CMakeBuild(cbuild_config.CBuildCommon):
 
 
 def gen_cmake_build(extoptions, pkgdata):
-    from cmake_build import CMakeExtension, CMakeBuild
-
-    class LazyCommandClass(dict):
-        """
-        Lazy command class that defers operations requiring given cmdclass until
-        they've actually been downloaded and installed by setup_requires.
-        """
-        def __init__(self, cmdclass_real):
-            self.cmdclass_real=cmdclass_real
-
-        def __contains__(self, key):
-            return (
-                    key == 'build_ext'
-                    or super(LazyCommandClass, self).__contains__(key)
-            )
-
-        def __setitem__(self, key, value):
-            if key == 'build_ext':
-                raise AssertionError("build_ext overridden!")
-            super(LazyCommandClass, self).__setitem__(key, value)
-
-        def __getitem__(self, key):
-            if key != 'build_ext':
-                return super(LazyCommandClass, self).__getitem__(key)
-            return self.cmdclass_real
-
     CMakeBuild.hybrid = build_type in ['CMAKE_HYBRID']
     CMakeBuild.setup_build_info(extoptions, pkgdata)
     e_mods = [CMakeExtension(str(couchbase_core+'._libcouchbase'), '', **extoptions)]
-    return e_mods, CMakeBuild.requires(), LazyCommandClass(CMakeBuild)
+    return e_mods, CMakeBuild.requires(), cbuild_config.LazyCommandClass(CMakeBuild)
 
 
