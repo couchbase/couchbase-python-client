@@ -19,7 +19,7 @@ from .options import OptionBlock, OptionBlockDeriv
 from .bucket import Bucket, CoreClient, PingOptions
 from couchbase_core.cluster import _Cluster as CoreCluster
 from .exceptions import AlreadyShutdownException, InvalidArgumentException, \
-    SearchException, QueryException, AnalyticsException, CouchbaseException
+    SearchException, QueryException, AnalyticsException, CouchbaseException, NetworkException
 import couchbase_core._libcouchbase as _LCB
 from couchbase_core._pyport import raise_from
 from couchbase.options import OptionBlockTimeOut, LockMode
@@ -467,6 +467,7 @@ class Cluster(CoreClient):
                  **kwargs                   # type: Any
                  ):
         self._authenticator = kwargs.pop('authenticator', None)
+        self.__is_6_5 = None
         # copy options if they exist, as we mutate it
         cluster_opts = deepcopy(options) or ClusterOptions(self._authenticator)
         if not self._authenticator:
@@ -541,18 +542,30 @@ class Cluster(CoreClient):
             self._adminopts['bucket'] = name
         return self._cluster.open_bucket(name, admin=self._admin)
 
-    # Temporary, helpful with working around CCBC-1204
+    # Temporary, helpful with working around CCBC-1204.  We should be able to get rid of this
+    # logic when this issue is fixed.
     def _is_6_5_plus(self):
         self._check_for_shutdown()
-        response = self._admin.http_request(path="/pools").value
-        v = response.get("implementationVersion")
-        # lets just get first 3 characters -- the string should be X.Y.Z-XXXX-YYYY and we only care about
-        # major and minor version
+
+        # lets just check once.  Below, we will only set this if we are sure about the value.
+        if self.__is_6_5 is not None:
+            return self.__is_6_5
+
         try:
-            return float(v[:3]) >= 6.5
-        except ValueError:
-            # the mock says "CouchbaseMock..."
+            response = self._admin.http_request(path="/pools").value
+            v = response.get("implementationVersion")
+            # lets just get first 3 characters -- the string should be X.Y.Z-XXXX-YYYY and we only care about
+            # major and minor version
+            self.__is_6_5 = (float(v[:3]) >= 6.5)
+        except NetworkException as e:
+            # the cloud doesn't let us query this endpoint, and so lets assume this is a cloud instance.  However
+            # lets not actually set the __is_6_5 flag as this also could be a transient error.  That means cloud
+            # instances check every time, but this is only temporary.
             return True
+        except ValueError:
+            # this comes from the conversion to float -- the mock says "CouchbaseMock..."
+            self.__is_6_5 = True
+        return self.__is_6_5
 
     def query(self,
               statement,            # type: str
