@@ -11,7 +11,7 @@ import couchbase.exceptions
 from couchbase.durability import DurabilityType, DurabilityOptionBlock
 from couchbase.exceptions import NotSupportedException, DocumentNotFoundException, PathNotFoundException, QueueEmpty, \
     PathExistsException, DocumentExistsException
-from couchbase_core import JSON
+from couchbase_core import JSON, operation_mode
 from couchbase_core.asynchronous.client import AsyncClientMixin
 from couchbase_core.client import Client as CoreClient
 from couchbase_core.supportability import volatile, internal
@@ -231,7 +231,7 @@ def _get_result_and_inject(func  # type: RawCollectionMethod
                            ):
     # type: (...) ->RawCollectionMethod
     result = _inject_scope_and_collection(get_result_wrapper(func))
-    result.__doc__ = func.__doc__
+    operation_mode.operate_on_doc(result, lambda x: func.__doc__)
     result.__name__ = func.__name__
     return result
 
@@ -240,7 +240,7 @@ def _mutate_result_and_inject(func  # type: RawCollectionMethod
                               ):
     # type: (...) ->RawCollectionMethod
     result = _inject_scope_and_collection(_wrap_in_mutation_result(func))
-    result.__doc__ = func.__doc__
+    operation_mode.operate_on_doc(result, lambda x: func.__doc__)
     result.__name__ = func.__name__
     return result
 

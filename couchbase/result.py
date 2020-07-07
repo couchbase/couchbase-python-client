@@ -7,7 +7,7 @@ from functools import wraps
 from couchbase_core._libcouchbase import Result as CoreResult
 
 from couchbase.diagnostics import EndpointPingReport, ServiceType
-from couchbase_core import iterable_wrapper, JSON
+from couchbase_core import iterable_wrapper, JSON, operation_mode
 from couchbase_core.result import AsyncResult as CoreAsyncResult
 from couchbase_core.result import MultiResult, SubdocResult
 from couchbase_core.subdocument import Spec
@@ -409,7 +409,7 @@ def get_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
         return get_wrapped_get_result(x)
 
     wrapped.__name__ = func.__name__
-    wrapped.__doc__ = func.__name__
+    operation_mode.operate_on_doc(wrapped, lambda x: func.__doc__)
     return wrapped
 
 
@@ -428,7 +428,7 @@ def get_replica_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
         return x[0]
 
     wrapped.__name__ = func.__name__
-    wrapped.__doc__ = func.__name__
+    operation_mode.operate_on_doc(wrapped, lambda x: func.__doc__)
     return wrapped
 
 
@@ -534,7 +534,7 @@ def _wrap_in_mutation_result(func  # type: Callable[[Any,...],CoreResult]
         return get_mutation_result(result)
 
     mutated.__name__ = func.__name__
-    mutated.__doc__ = func.__doc__
+    operation_mode.operate_on_doc(mutated, lambda x: func.__doc__)
     return mutated
 
 

@@ -311,3 +311,26 @@ def mk_formstr(d):
 def syncwait_or_deadline_time(syncwait, timeout):
     deadline = (datetime.now() + timedelta(microseconds=timeout)) if timeout else None
     return lambda: syncwait if syncwait else (deadline - datetime.now()).total_seconds()
+
+
+class OperationMode(object):
+    def operate_on_doc(self,
+                       item,  # type: object
+                       action  # type: Callable[str,str]
+                       ):
+        pass
+
+
+class OptimisedMode(OperationMode):
+    pass
+
+
+class DebugMode(OperationMode):
+    def operate_on_doc(self,
+                       item,  # type: object
+                       action  # type: Callable[str,str]
+                       ):
+        item.__doc__=action(item.__doc__)
+
+
+operation_mode = DebugMode() if __debug__ else OptimisedMode()

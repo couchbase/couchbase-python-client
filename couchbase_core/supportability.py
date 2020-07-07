@@ -2,12 +2,16 @@ import warnings
 
 from functools import wraps
 
+from couchbase_core import operation_mode
+
 
 def deprecate_module_attribute(mod, deprecated=tuple()):
     return warn_on_attribute_access(mod, deprecated, "deprecated")
 
 
 class Level(object):
+    desc = None  # type: str
+
     def __new__(cls, function, *args, **kwargs):
         """
         Mark a function as {}
@@ -16,12 +20,15 @@ class Level(object):
         :return: marked function
         """.format(cls.__name__)
 
-        message = cls.__doc__+"\n"
+        message = cls.desc+"\n"
 
         func_name = getattr(function, '__qualname__', function.__name__)
 
         result = cls.get_final_fn(function, message, func_name)
-        result.__doc__ = (function.__doc__+"\n\n" if function.__doc__ else "") + "    :warning: " + message % "This"
+        operation_mode.operate_on_doc(result,
+                                      lambda x:
+                                      (function.__doc__+"\n\n" if function.__doc__ else "") + \
+                                      "    :warning: " + message % "This")
         return result
 
     @classmethod
@@ -35,6 +42,7 @@ class Level(object):
 
 
 class Uncommitted(Level):
+    desc = \
     """
     %s is an uncommitted API call that is unlikely to change, but may still change as final consensus on its behavior has not yet been reached.
     """
@@ -44,6 +52,7 @@ uncommitted = Uncommitted
 
 
 class Volatile(Level):
+    desc = \
     """
     %s is a volatile API call that is still in flux and may likely be changed.
 
@@ -55,6 +64,7 @@ volatile = Volatile
 
 
 class Internal(Level):
+    desc = \
     """
     %s is an internal API call.
 
@@ -70,6 +80,7 @@ internal = Internal
 
 
 class Committed(Level):
+    desc = \
     """
     %s is guaranteed to be supported and remain stable between SDK versions.
     """

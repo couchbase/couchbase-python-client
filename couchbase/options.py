@@ -4,7 +4,7 @@ from typing import *
 
 import couchbase.exceptions
 import ctypes
-from couchbase_core import abstractmethod, ABCMeta
+from couchbase_core import abstractmethod, ABCMeta, operation_mode
 from couchbase_core._pyport import with_metaclass
 from datetime import timedelta
 from enum import IntEnum
@@ -55,7 +55,7 @@ class OptionBlock(OptionBlockBase):
                 except Exception as e:
                     raise
 
-            __init__.__doc__ = cls.__init__.__doc__.format(**doc_params)
+            operation_mode.operate_on_doc(__init__, lambda x: cls.__init__.__doc__.format(**doc_params))
         return DocWrapper
 
 
