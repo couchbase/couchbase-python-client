@@ -149,7 +149,8 @@ class CMakeBuild(cbuild_config.CBuildCommon):
             try:
                 import conans.conan
                 env['PATH'] = env['PATH']+";{}".format(os.path.dirname(conans.conan.__file__))
-                env['PYTHONPATH'] = ';'.join(sys.path)
+                pathsep = ';' if platform.system().lower().startswith('win') else ':'
+                env['PYTHONPATH'] = pathsep.join(sys.path)
             except Exception as e:
                 import logging
                 import traceback
