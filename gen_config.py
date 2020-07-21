@@ -229,8 +229,8 @@ def get_openssl():
 def gen_config(temp_build_dir=None, ssl_relative_path=None, couchbase_core='couchbase_core'):
     build_dir = curdir.joinpath('build')
 
-    if not os.path.exists(build_dir):
-        os.mkdir(build_dir)
+    if not os.path.exists(str(build_dir)):
+        os.mkdir(str(build_dir))
     with open(str(build_dir.joinpath("lcb_min_version.h")), "w+") as LCB_MIN_VERSION:
         LCB_MIN_VERSION.write('\n'.join(
             ["#define LCB_MIN_VERSION 0x{}".format(''.join(map(lambda x: "{0:02d}".format(x), lcb_min_version))),

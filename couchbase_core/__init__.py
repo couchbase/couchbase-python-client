@@ -37,6 +37,11 @@ warnings.filterwarnings(action='default',
                         category=DeprecationWarning,
                         module=r"^couchbase($|\..*)")
 
+try:
+    import ssl
+except:
+    warnings.warn("Couldn't import SSL, TLS functionality may not be available")
+
 import couchbase_core._libcouchbase as _LCB
 
 from typing import *
@@ -49,12 +54,7 @@ try:
 except ImportError:
     __version__ = "0.0.0-could-not-find-git"
 
-try:
-    from importlib import reload  # Python 3.4+
-except ImportError:
-    # Needed for Python 3.0-3.3; harmless in Python 2.7 where imp.reload is just an
-    # alias for the builtin reload.
-    from imp import reload
+from importlib import reload
 
 from types import ModuleType
 import os, sys

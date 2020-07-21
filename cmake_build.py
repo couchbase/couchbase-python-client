@@ -30,6 +30,11 @@ from setuptools.command.build_ext import build_ext
 import cbuild_config
 from gen_config import win_cmake_path
 from cbuild_config import couchbase_core, build_type
+import logging
+import traceback
+
+
+PYCBC_SSL_FETCH = os.getenv('PYCBC_SSL_FETCH', '')
 
 
 class CMakeExtension(Extension):
@@ -73,7 +78,12 @@ class CMakeBuild(cbuild_config.CBuildCommon):
 
     @staticmethod
     def requires():
-        return ["PyGithub","conan"] +([] if CMakeBuild.check_for_cmake() else ["cmake"])
+        base_req = []
+        if re.match(r'.*(CONAN|ALL).*', PYCBC_SSL_FETCH):
+            base_req.append('conan')
+        if re.match(r'.*(GITHUB_API|ALL).*', PYCBC_SSL_FETCH):
+            base_req.append('PyGithub')
+        return base_req + ([] if CMakeBuild.check_for_cmake() else ["cmake"])
 
     def prep_build(self, ext):
         if not CMakeBuild.hasbuilt:
@@ -146,19 +156,22 @@ class CMakeBuild(cbuild_config.CBuildCommon):
                 build_args += ['--', '-j2']
             env = os.environ.copy()
             python_executable = win_cmake_path(sys.executable)
-            try:
-                import conans.conan
-                env['PATH'] = env['PATH']+";{}".format(os.path.dirname(conans.conan.__file__))
+            pass_path = False
+            if re.match(r'.*(CONAN|ALL).*',PYCBC_SSL_FETCH):
+                try:
+                    import conans.conan
+                    env['PATH'] = env['PATH']+";{}".format(os.path.dirname(conans.conan.__file__))
+                    pass_path = True
+                except:
+                    logging.warning("Cannot find conan : {}".format(traceback.format_exc()))
+            if re.match(r'.*(GITHUB|ALL).*', PYCBC_SSL_FETCH):
+                pass_path = True
+            if pass_path:
                 pathsep = ';' if platform.system().lower().startswith('win') else ':'
                 env['PYTHONPATH'] = pathsep.join(sys.path)
-            except Exception as e:
-                import logging
-                import traceback
-                logging.warning("Cannot find conan : {}".format(traceback.format_exc()))
             cmake_args += [
                            '-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON',
                            '-DPYTHON_EXECUTABLE={}'.format(python_executable)]
-            PYCBC_SSL_FETCH = env.get('PYCBC_SSL_FETCH')
             if PYCBC_SSL_FETCH:
                 cmake_args += ['-DPYCBC_SSL_FETCH={}'.format(PYCBC_SSL_FETCH)]
             PYCBC_CMAKE_DEBUG = env.get('PYCBC_CMAKE_DEBUG')

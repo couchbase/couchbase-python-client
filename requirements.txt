@@ -1,8 +1,5 @@
-# Backward compatibility
-enum34==1.1.8 ; python_version<"3.5"
-
 # Typing support
-typing; python_version<"3.7"
+typing; python_version<"3.5"
 typing-extensions; python_version<"3.8"
 mypy_extensions
 
