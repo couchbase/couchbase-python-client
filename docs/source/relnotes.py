@@ -25,7 +25,7 @@ soup = BeautifulSoup(relnotes_raw.text, 'html.parser')
 content = soup.find("section", class_="aui-page-panel-content")
 outputdir = os.path.join("build")
 
-date = datetime.date.today().strftime("%B {day} %Y").format(day=datetime.date.today().day)
+date = datetime.date.today().strftime("{day} %B %Y").format(day=datetime.date.today().day)
 try:
     os.makedirs(outputdir)
 except:
@@ -56,7 +56,7 @@ with open(os.path.join(outputdir, "relnotes.adoc"), "w+") as outputfile:
                 result[section_type] += output
 
     output = """
-== Python SDK {version} Release Notes ({date})
+== Version {version} ({date})
 
 [source,bash]
 ----
