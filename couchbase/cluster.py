@@ -90,9 +90,9 @@ class QueryProfile(Enum):
 
 
 class QueryOptions(OptionBlockTimeOut):
-    VALID_OPTS = ['timeout', 'read_only', 'scan_consistency', 'adhoc', 'client_context_id', 'consistent_with',
+    VALID_OPTS = {'timeout', 'read_only', 'scan_consistency', 'adhoc', 'client_context_id', 'consistent_with',
                   'max_parallelism', 'positional_parameters', 'named_parameters', 'pipeline_batch', 'pipeline_cap',
-                  'profile', 'raw', 'scan_wait', 'scan_cap', 'metrics']
+                  'profile', 'raw', 'scan_wait', 'scan_cap', 'metrics'}
 
     @overload
     def __init__(self,
@@ -189,27 +189,25 @@ class QueryOptions(OptionBlockTimeOut):
         query.metrics = args.get('metrics', False)
 
         # TODO: there is surely a cleaner way...
-        for k in self.VALID_OPTS:
-            v = args.get(k, None)
-            if v:
-                if k == 'scan_consistency':
-                    query.consistency = v.value
-                if k == 'consistent_with':
-                    query.consistent_with = v
-                if k == 'adhoc':
-                    query.adhoc = v
-                if k == 'timeout':
-                    query.timeout = v.total_seconds()
-                if k == 'scan_cap':
-                    query.scan_cap = v
-                if k == 'pipeline_batch':
-                    query.pipeline_batch = v
-                if k == 'pipeline_cap':
-                    query.pipeline_cap = v
-                if k == 'read_only':
-                    query.readonly = v
-                if k == 'profile':
-                    query.profile = v.value
+        for k, v in ((k, args[k]) for k in (args.keys() & self.VALID_OPTS)):
+            if k == 'scan_consistency':
+                query.consistency = v.value
+            if k == 'consistent_with':
+                query.consistent_with = v
+            if k == 'adhoc':
+                query.adhoc = v
+            if k == 'timeout':
+                query.timeout = v.total_seconds()
+            if k == 'scan_cap':
+                query.scan_cap = v
+            if k == 'pipeline_batch':
+                query.pipeline_batch = v
+            if k == 'pipeline_cap':
+                query.pipeline_cap = v
+            if k == 'read_only':
+                query.readonly = v
+            if k == 'profile':
+                query.profile = v.value
         return query
 
         # this will change the options for export.

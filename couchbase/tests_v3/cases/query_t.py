@@ -52,6 +52,13 @@ class QueryTests(CollectionTestCase):
         result = self.cluster.query("SELECT * FROM `beer-sample` LIMIT 2")
         self.assertRows(result, 2)
         self.assertIsNone(result.metadata().profile())
+        self.assertTrue(result._params._adhoc)
+
+    def test_simple_query_prepared(self):
+        result = self.cluster.query("SELECT * FROM `beer-sample` LIMIT 2", QueryOptions(adhoc=False, metrics=True))  # type: QueryResult
+        self.assertRows(result, 2)
+        self.assertIsNone(result.metadata().profile())
+        self.assertFalse(result._params._adhoc)
 
     def test_simple_query_with_positional_params(self):
         result = self.cluster.query("SELECT * FROM `beer-sample` WHERE brewery_id LIKE $1 LIMIT 1", '21st_amendment%')
