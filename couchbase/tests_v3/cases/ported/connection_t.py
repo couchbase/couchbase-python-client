@@ -112,13 +112,6 @@ class ConnectionTest(ClusterTestCase):
 
         self.assertTrue(cb.upsert("foo", "bar").success)
 
-    def test_enable_error_map(self):
-        # enabled via connection string param, invalid params cause error
-        conn_str = '{}://{}:{}?enable_errmap=true'.format(self.cluster_info.protocol, self.cluster_info.host, self.cluster_info.port)
-        cluster = self._instantiate_cluster(conn_str)
-        cb =cluster.bucket(self.cluster_info.bucket_name)
-        self.assertTrue(cb.upsert("foo", "bar").success)
-
 
 class AlternateNamesTest(CollectionTestCase):
     def setUp(self):
