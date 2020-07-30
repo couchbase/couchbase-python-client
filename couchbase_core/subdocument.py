@@ -98,7 +98,7 @@ def exists(path, **kwargs):
     return _gen_3spec(LCB_SDCMD_EXISTS, path, **kwargs)
 
 
-def upsert(path, value, create_parents=False, **kwargs):
+def upsert(path, value, create_parents=False, xattr=False, **kwargs):
     """
     Create or replace a dictionary path.
 
@@ -127,10 +127,10 @@ def upsert(path, value, create_parents=False, **kwargs):
 
     """
     return _gen_4spec(LCB_SDCMD_DICT_UPSERT, path, value,
-                      create_path=create_parents, **kwargs)
+                      create_path=create_parents, xattr=xattr, **kwargs)
 
 
-def replace(path, value, **kwargs):
+def replace(path, value, xattr=False, **kwargs):
     """
     Replace an existing path. This works on any valid path if the path already
     exists. Valid only in :cb_bmeth:`mutate_in`
@@ -139,10 +139,10 @@ def replace(path, value, **kwargs):
     :param value: The new value
     """
     return _gen_4spec(LCB_SDCMD_REPLACE, path, value,
-                      create_path=False, **kwargs)
+                      create_path=False, xattr=xattr, **kwargs)
 
 
-def insert(path, value, create_parents=False, **kwargs):
+def insert(path, value, create_parents=False, xattr=False, **kwargs):
     """
     Create a new path in the document. The final path element points to a
     dictionary key that should be created. Valid only in :cb_bmeth:`mutate_in`
@@ -152,7 +152,7 @@ def insert(path, value, create_parents=False, **kwargs):
     :param create_parents: Whether intermediate parents should be created
     """
     return _gen_4spec(LCB_SDCMD_DICT_ADD, path, value,
-                      create_path=create_parents, **kwargs)
+                      create_path=create_parents, xattr=xattr, **kwargs)
 
 
 def array_append(path, *values, **kwargs):

@@ -55,7 +55,8 @@ def get(path,  # type: str
 
 def upsert(path,                    # type: str,
            value,                   # type: JSON
-           create_parents=False     # type: bool
+           create_parents=False,    # type: bool
+           xattr=False              # type: False
            ):
     # type: (...) -> Spec
     """
@@ -64,14 +65,16 @@ def upsert(path,                    # type: str,
     :param str path:  Path at which to upsert the value.
     :param JSON value:  Value to upsert.
     :param create_parents: Whether or not to create parents if needed.
+    :param xattr: whether this is an xattr path
 
     :return: Spec
     """
-    return SD.upsert(path, value, create_parents)
+    return SD.upsert(path, value, create_parents, xattr=xattr)
 
 
 def replace(path,       # type: str
-            value       # type: JSON
+            value,       # type: JSON
+            xattr=False # type: bool
             ):
     # type: (...) -> Spec
     """
@@ -79,14 +82,16 @@ def replace(path,       # type: str
 
     :param str path:  Path at which to replace the value.
     :param value: Value you would like at the path given.
+    :param xattr: whether this is an xattr path
     :return: Spec
     """
-    return SD.replace(path, value)
+    return SD.replace(path, value, xattr=xattr)
 
 
-def insert(path,            # type: str
-           value,           # type: JSON
-           create_parents=False     # type: bool
+def insert(path,                     # type: str
+           value,                    # type: JSON
+           create_parents=False,     # type: bool
+           xattr=False               # type: False
            ):
     # type: (...) -> Spec
     """
@@ -96,25 +101,29 @@ def insert(path,            # type: str
     :param JSON value: Value to insert at this path.
     :param create_parents: Whether or not to create the parents in the path,
         if they don't already exist.
+    :param xattr: whether this is an xattr path
     :return: Spec
     """
-    return SD.insert(path, value, create_parents)
+    return SD.insert(path, value, create_parents, xattr=xattr)
 
 
-def remove(path,    # type: str
+def remove(path,        # type: str
+           xattr=False  # type: bool
            ):
     # type: (...) -> Spec
     """
     Remove a path from a document.
 
     :param str path: Path to remove from document.
+    :param xattr: whether this is an xattr path
     :return: Spec
     """
-    return SD.remove(path)
+    return SD.remove(path, xattr=xattr)
 
 
 def array_append(path,                  # type: str
                  *values,               # type: JSON
+                 xattr=False,           # type: bool
                  **kwargs               # type: Any
                  ):
     # type: (...) -> Spec
@@ -124,14 +133,16 @@ def array_append(path,                  # type: str
     :param str path: Path to an array in document.  Note this is the path *to*
         the array, not to the path to a specific element.
     :param JSON values: Value(s) to append to the array.
+    :param xattr: whether this is an xattr path
     :param Any kwargs: Specify create_parents=True to create the array.
     :return: Spec
     """
-    return SD.array_append(path, *values, **kwargs)
+    return SD.array_append(path, *values, xattr=xattr, **kwargs)
 
 
 def array_prepend(path,             # type: str
                   *values,          # type: JSON
+                  xattr=False,      # type: bool
                   **kwargs          # type: Any
                   ):
     # type: (...) -> Spec
@@ -141,13 +152,15 @@ def array_prepend(path,             # type: str
     :param str path: Path to an array in document.  Note this is the path *to*
         the array, not to the path to a specific element.
     :param JSON values: Value(s) to prepend to the array.
+    :param xattr: whether this is an xattr path
     :param Any kwargs: Specify create_parents=True to create the array.
     :return:
     """
-    return SD.array_prepend(path, *values, **kwargs)
+    return SD.array_prepend(path, *values, xattr=xattr, **kwargs)
 
 
 def array_insert(path,          # type: str
+                 xattr=False,   # type: bool
                  *values        # type: JSON
                 ):
     # type: (...) -> Spec
@@ -158,15 +171,17 @@ def array_insert(path,          # type: str
     :param str path: Path to the spot in the array where the values
         should be inserted.  Note in this case, the path is a path
         to a specific location in an array.
+    :param xattr: whether this is an xattr path
     :param values: Value(s) to insert.
     :return: Spec
     """
-    return SD.array_insert(path, *values)
+    return SD.array_insert(path, *values, xattr=xattr)
 
 
 def array_addunique(path,                   # type: str
                     value,                  # type Union[str|int|float|bool]
-                    create_parents=False    # type:bool
+                    xattr=False,            # type: bool
+                    create_parents=False    # type: bool
                     ):
     # type: (...) -> Spec
     """
@@ -175,14 +190,16 @@ def array_addunique(path,                   # type: str
     :param str path: Path to an array in a document. Note this is the path *to*
         the array, not to the path to a specific element.
     :param value: Value to add, if it does not already exist in the array.
+    :param xattr: whether this is an xattr path
     :param bool create_parents: If True, create the array if it does not already exist.
     :return: Spec
     """
-    return SD.array_addunique(path, value, create_parents)
+    return SD.array_addunique(path, value, xattr=xattr, create_parents=create_parents)
 
 
 def counter(path,                   # type: str
             delta,                  # type: int
+            xattr=False,            # type: bool
             create_parents=False    # type: bool
             ):
     # type: (...) -> Spec
@@ -191,15 +208,16 @@ def counter(path,                   # type: str
 
     :param str path: Path to the counter
     :param int delta: Amount to change the counter.   Cannot be 0, and must be and integer.
+    :param xattr: whether this is an xattr path
     :param bool create_parents: Create the counter if it doesn't exist.  Will be initialized
         to the value of delta.
     :return: Spec
     """
-    return SD.counter(path, delta, create_parents)
+    return SD.counter(path, delta, xattr=xattr, create_parents=create_parents)
 
 
 def count(path,  # type: str
-          xattr=False  # type; bool
+          xattr=False  # type: bool
           ):
     # type: (...) -> Spec
     """
@@ -209,7 +227,7 @@ def count(path,  # type: str
     :param bool xattr: operation is done on an Extended Attribute.
     :return: Spec
     """
-    return SD.get_count(path)
+    return SD.get_count(path, xattr=xattr)
 
 
 def get_full():
