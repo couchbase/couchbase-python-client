@@ -15,9 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from couchbase.durability import ClientDurability
 from couchbase_tests.base import CollectionTestCase
 from couchbase.collection import GetOptions, LookupInOptions
-from couchbase.exceptions import InvalidArgumentException, PathNotFoundException
+from couchbase.exceptions import InvalidArgumentException, PathNotFoundException, DurabilityImpossibleException
 from couchbase.collection import MutateInOptions
 from datetime import timedelta
 import couchbase.subdocument as SD
@@ -108,6 +109,13 @@ class SubdocTests(CollectionTestCase):
         result = self.coll.get(self.KEY, GetOptions(with_expiry=True))
         expires_in = (result.expiry - datetime.now()).total_seconds()
         self.assertTrue(0 < expires_in < 1000)
+
+    def test_mutate_in_durability(self):
+        if self.is_mock:
+            raise SkipTest("mock doesn't support getting xattrs (like $document.expiry)")
+        self.assertRaises(DurabilityImpossibleException, self.coll.mutate_in,self.KEY,
+                                  (SD.upsert("c", "ccc"), SD.replace("b", "XXX"),),
+                                  MutateInOptions(durability=ClientDurability(replicate_to=5)))
 
     # refactor!  Also, this seems like it should timeout.  I suspect a bug here.  I don't really
     # believe there is any way this could not timeout on the first lookup_in

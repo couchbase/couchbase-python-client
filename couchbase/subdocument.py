@@ -1,7 +1,7 @@
 from typing import *
 from couchbase_core import JSON, subdocument as SD
 import couchbase_core.priv_constants as _P
-from .options import OptionBlockTimeOut
+from couchbase.durability import DurabilityOptionBlock
 from couchbase_core.subdocument import  Spec
 from couchbase.exceptions import InvalidArgumentException
 
@@ -290,7 +290,7 @@ def gen_projection_spec(project, with_exp=False):
     return map(generate, project)
 
 
-class MutateInOptions(OptionBlockTimeOut):
+class MutateInOptions(DurabilityOptionBlock):
     def __init__(self, *args, **kwargs):
         super(MutateInOptions, self).__init__(*args, **kwargs)
 
