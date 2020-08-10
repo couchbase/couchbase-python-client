@@ -196,7 +196,9 @@ class ResourcedTestCase(ResourcedTestCaseReal):
 PYCBC_CB_VERSION = 'PYCBC/' + cb_version
 
 CONFIG_FILE = 'tests.ini'  # in cwd
-
+if not os.path.exists(CONFIG_FILE):
+    import pathlib
+    CONFIG_FILE=pathlib.Path(__file__).parent.parent.joinpath(CONFIG_FILE).__str__()
 ClientType = TypeVar('ClientType', bound=CoreClient)
 
 MockHackArgs = NamedTuple('MockHackArgs', [('auth', Authenticator), ('kwargs', Mapping[str,Any])])
