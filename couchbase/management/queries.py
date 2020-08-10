@@ -31,7 +31,7 @@ class QueryIndexManager(GenericManager):
     def get_all_indexes(self,           # type: QueryIndexManager
                         bucket_name,    # type: str
                         *options,       # type: GetAllQueryIndexOptions
-                        **kwargs
+                        **kwargs        # type: Any
                         ):
         # type: (...) -> List[QueryIndex]
         """
@@ -300,10 +300,21 @@ class CreateQueryIndexOptions(OptionBlockTimeOut):
                  ignore_if_exists=None,  # type: bool
                  num_replicas=None,      # type: int
                  deferred=None,          # type: bool
+                 condition=None,         # type: str
                  ):
         pass
 
     def __init__(self, **kwargs):
+        """
+        Query Index creation options
+
+        :param timeout: operation timeout in seconds
+        :param ignore_if_exists: don't throw an exception if index already exists
+        :param num_replicas: number of replicas
+        :param deferred: whether the index creation should be deferred
+        :param condition: 'where' condition for partial index creation
+
+        """
         if 'ignore_if_exists' not in kwargs:
             kwargs['ignore_if_exists'] = False
         super(CreateQueryIndexOptions, self).__init__(**kwargs)

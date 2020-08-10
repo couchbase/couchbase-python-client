@@ -14,14 +14,13 @@
 # limitations under the License.
 from datetime import timedelta
 
-from couchbase.bucket import Bucket
-from couchbase.management.queries import QueryIndex
-from couchbase.exceptions import CouchbaseException, DocumentExistsException, \
+from couchbase.management.queries import QueryIndex, CreateQueryIndexOptions, QueryIndexManager
+from couchbase.exceptions import CouchbaseException, \
     QueryIndexNotFoundException, QueryIndexAlreadyExistsException
 from couchbase_tests.base import SkipTest, CollectionTestCase
 from nose.plugins.attrib import attr
 from typing import *
-
+import time
 
 @attr("index")
 class IndexManagementTestCase(CollectionTestCase):
@@ -38,7 +37,7 @@ class IndexManagementTestCase(CollectionTestCase):
 
     def setUp(self, *args, **kwargs):
         super(IndexManagementTestCase, self).setUp()
-        self.mgr = self.cluster.query_indexes()
+        self.mgr = self.cluster.query_indexes()  # type: QueryIndexManager
         self.skipIfMock()
         if self.cluster._is_dev_preview():
             raise SkipTest("dev preview is on, that means index creation will fail")
@@ -110,6 +109,25 @@ class IndexManagementTestCase(CollectionTestCase):
         qq = 'select {1}, {2} from `{0}` where {1}=1 and {2}=2 limit 1'\
             .format(bucket_name, *fields)
         self.cluster.query(qq).rows()
+
+    def test_create_secondary_indexes_condition(self):
+        ixname = 'ix2'
+        fields = ('fld1', 'fld2')
+        bucket_name = self.cluster_info.bucket_name
+        self.mgr._admin_bucket.timeout = 10000
+
+        self.try_n_times_till_exception(10, 5, self.mgr.drop_index, bucket_name, ixname,
+                                        expected_exceptions=(QueryIndexNotFoundException,))
+        CONDITION = '((`fld1` = 1) and (`fld2` = 2))'
+        self.mgr.create_index(bucket_name, ixname, fields,
+                              CreateQueryIndexOptions(timeout=timedelta(days=1), condition=CONDITION))
+        def check_index():
+            result=next(
+                iter(x for x in self.mgr.get_all_indexes(bucket_name) if x.name==ixname), None)
+            self.assertIsNotNone(result)
+            return result
+        result=self.try_n_times(10, 5, check_index)
+        self.assertEqual(CONDITION,result.condition)
 
     def test_drop_secondary_indexes(self):
         ixname = 'ix2'
