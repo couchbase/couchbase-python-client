@@ -26,3 +26,5 @@ Twisted>=19.10.0
 deepdiff[murmur]
 coverage>=4.5.4,<5.0.0
 typed_ast; python_version<"3.8"
+distro
+pyutil

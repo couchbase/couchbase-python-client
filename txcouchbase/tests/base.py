@@ -21,6 +21,7 @@ from typing import *
 
 import twisted.internet.base
 import twisted.python.util
+from pyutil.testutil import PollMixin, TestMixin
 from twisted.internet import defer
 from twisted.trial._synctest import SkipTest
 from twisted.trial.unittest import TestCase
@@ -38,6 +39,7 @@ import re
 import inspect
 
 import couchbase.exceptions
+import distro
 
 
 candidate_pattern=re.compile(r'.*(twisted|tx|couchbase).*')
@@ -98,7 +100,7 @@ def logged_spewer(frame,  # type: FrameType
         pass
 
 
-class _TxTestCase(TestCase):
+class _TxTestCase(TestCase, TestMixin):
     def make_connection(self,  # type: _TxTestCase
                         **kwargs):
         # type: (...) -> Factory
@@ -130,6 +132,7 @@ class _TxTestCase(TestCase):
         return TxCluster
 
     def setUp(self):
+        TestMixin.setUp(self)
         self.setUpTrace(self)
         super(_TxTestCase, self).setUp()
         self.cb = None
@@ -137,6 +140,7 @@ class _TxTestCase(TestCase):
     def tearDown(self):
         try:
             super(_TxTestCase, self).tearDown()
+            self.clean_pending(required_to_quiesce=False)
         except Exception as e:
             raise
         finally:
@@ -189,15 +193,16 @@ def gen_base(basecls,  # type: Type[AsyncClusterTestCase]
             return factory or self.gen_collection
 
     return WrappedTest
-
+import time
 
 def skip_PYCBC_894(func):
+    os_name = distro.id().lower()
     def wrapped_func(self,  # type: TestCase
                      *args, **kwargs):
         try:
             return func(self, *args, **kwargs)
         except couchbase.exceptions.TimeoutException:
-            raise SkipTest("Fails on MacOS - to be fixed: https://issues.couchbase.com/browse/PYCBC-894")
-    if sys.platform in ['darwin'] and not os.environ.get("PYCBC_894", None):
+            raise SkipTest("Fails on this OS - to be fixed: https://issues.couchbase.com/browse/PYCBC-894")
+    if re.compile(r'.*(darwin|centos|amazon|osx|macos).*').match(os_name) and not os.environ.get("PYCBC_894", None):
         return wrapped_func
     return func
