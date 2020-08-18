@@ -276,3 +276,46 @@ class LockMode(IntEnum):
     WAIT = LOCKMODE_WAIT
     EXC = LOCKMODE_EXC
     NONE = LOCKMODE_NONE
+
+
+class QueryBaseOptions(OptionBlockTimeOut):
+    VALID_OPTS = dict()
+    TARGET_CLASS = None
+
+    def to_query_object(self, statement, *options, **kwargs):
+        # lets make a copy of the options, and update with kwargs...
+        args = self.copy()
+        args.update(kwargs)
+
+        # now lets get positional parameters.  Actual positional
+        # params OVERRIDE positional_parameters
+        positional_parameters = args.pop('positional_parameters', [])
+        if options and len(options) > 0:
+            positional_parameters = options
+
+        # now the named parameters.  NOTE: all the kwargs that are
+        # not VALID_OPTS must be named parameters, and the kwargs
+        # OVERRIDE the list of named_parameters
+        new_keys = list(filter(lambda x: x not in self.VALID_OPTS, args.keys()))
+        named_parameters = args.pop('named_parameters', {})
+        for k in new_keys:
+            named_parameters[k] = args[k]
+
+        query = self.TARGET_CLASS(statement, *positional_parameters, **named_parameters)
+        # now lets try to setup the options.
+        # but for now we will use the existing _N1QLQuery.  Could be we can
+        # add to it, etc...
+
+        # default to false on metrics
+        query.metrics = args.get('metrics', False)
+
+        for k, v in ((k, args[k]) for k in (args.keys() & self.VALID_OPTS)):
+            for target, transform in self.VALID_OPTS[k].items():
+                setattr(query, target, transform(v))
+        return query
+
+def identity(input):
+    return input
+
+def enum_value(input):
+    return input.value

@@ -15,14 +15,13 @@ from couchbase.search import SearchResult, SearchOptions, SearchQuery
 from .analytics import AnalyticsResult
 from .n1ql import QueryResult
 from couchbase_core.n1ql import _N1QLQuery
-from .options import OptionBlock, OptionBlockDeriv
+from .options import OptionBlock, OptionBlockDeriv, QueryBaseOptions, LockMode, identity, enum_value
 from .bucket import Bucket, CoreClient, PingOptions
 from couchbase_core.cluster import _Cluster as CoreCluster
 from .exceptions import AlreadyShutdownException, InvalidArgumentException, \
     SearchException, QueryException, AnalyticsException, CouchbaseException, NetworkException
 import couchbase_core._libcouchbase as _LCB
 from couchbase_core._pyport import raise_from
-from couchbase.options import OptionBlockTimeOut, LockMode
 from couchbase_core.cluster import *
 from .result import *
 from random import choice
@@ -89,10 +88,30 @@ class QueryProfile(Enum):
     TIMINGS = 'timings'
 
 
-class QueryOptions(OptionBlockTimeOut):
-    VALID_OPTS = {'timeout', 'read_only', 'scan_consistency', 'adhoc', 'client_context_id', 'consistent_with',
-                  'max_parallelism', 'positional_parameters', 'named_parameters', 'pipeline_batch', 'pipeline_cap',
-                  'profile', 'raw', 'scan_wait', 'scan_cap', 'metrics'}
+class NamedClass(type):
+    def __new__(cls, name, bases=tuple(), namespace=dict()):
+        super(NamedClass, cls).__new__(cls, name, bases=bases, namespace=namespace)
+
+
+class QueryOptions(QueryBaseOptions):
+    VALID_OPTS = {'timeout': {'timeout': timedelta.total_seconds},
+                  'read_only': {'readonly':identity},
+                  'scan_consistency': {'consistency': enum_value},
+                  'adhoc': {'adhoc': identity},
+                  'client_context_id': {},
+                  'consistent_with': {'consistent_with': identity},
+                  'max_parallelism': {},
+                  'positional_parameters': {},
+                  'named_parameters': {},
+                  'pipeline_batch': {'pipeline_batch': identity},
+                  'pipeline_cap': {'pipeline_cap': identity},
+                  'profile': {'profile': enum_value},
+                  'raw': {},
+                  'scan_wait': {},
+                  'scan_cap': {'scan_cap': identity},
+                  'metrics': {'metrics': identity}}
+
+    TARGET_CLASS = _N1QLQuery
 
     @overload
     def __init__(self,
@@ -160,80 +179,6 @@ class QueryOptions(OptionBlockTimeOut):
 
         """
         super(QueryOptions, self).__init__(**kwargs)
-
-    def to_n1ql_query(self, statement, *options, **kwargs):
-        # lets make a copy of the options, and update with kwargs...
-        args = self.copy()
-        args.update(kwargs)
-
-        # now lets get positional parameters.  Actual positional
-        # params OVERRIDE positional_parameters
-        positional_parameters = args.pop('positional_parameters', [])
-        if options and len(options) > 0:
-            positional_parameters = options
-
-        # now the named parameters.  NOTE: all the kwargs that are
-        # not VALID_OPTS must be named parameters, and the kwargs
-        # OVERRIDE the list of named_parameters
-        new_keys = list(filter(lambda x: x not in self.VALID_OPTS, args.keys()))
-        named_parameters = args.pop('named_parameters', {})
-        for k in new_keys:
-            named_parameters[k] = args[k]
-
-        query = _N1QLQuery(statement, *positional_parameters, **named_parameters)
-        # now lets try to setup the options.  TODO: rework this after beta.3
-        # but for now we will use the existing _N1QLQuery.  Could be we can
-        # add to it, etc...
-
-        # default to false on metrics
-        query.metrics = args.get('metrics', False)
-
-        # TODO: there is surely a cleaner way...
-        for k, v in ((k, args[k]) for k in (args.keys() & self.VALID_OPTS)):
-            if k == 'scan_consistency':
-                query.consistency = v.value
-            if k == 'consistent_with':
-                query.consistent_with = v
-            if k == 'adhoc':
-                query.adhoc = v
-            if k == 'timeout':
-                query.timeout = v.total_seconds()
-            if k == 'scan_cap':
-                query.scan_cap = v
-            if k == 'pipeline_batch':
-                query.pipeline_batch = v
-            if k == 'pipeline_cap':
-                query.pipeline_cap = v
-            if k == 'read_only':
-                query.readonly = v
-            if k == 'profile':
-                query.profile = v.value
-        return query
-
-        # this will change the options for export.
-        # NOT USED CURRENTLY
-
-    def as_dict(self):
-        for key, val in self.items():
-            if key == 'positional_parameters':
-                self.pop(key, None)
-                self['args'] = val
-            if key == 'named_parameters':
-                self.pop(key, None)
-                for k, v in val.items():
-                    self["${}".format(k)] = v
-            if key == 'scan_consistency':
-                self[key] = val.as_string()
-            if key == 'consistent_with':
-                self[key] = val.encode()
-            if key == 'profile':
-                self[key] = val.as_string()
-            if key == 'scan_wait':
-                # scan_wait should be in ms
-                self[key] = val.total_seconds() * 1000
-        if self.get('consistent_with', None):
-            self['scan_consistency'] = 'at_plus'
-        return self
 
 
 class ClusterTimeoutOptions(dict):
@@ -602,7 +547,7 @@ class Cluster(CoreClient):
         # CCBC-1204 is addressed, we can just use the cluster's instance
         return self._maybe_operate_on_an_open_bucket(CoreClient.query,
                                                      QueryException,
-                                                     opt.to_n1ql_query(statement, *opts, **kwargs),
+                                                     opt.to_query_object(statement, *opts, **kwargs),
                                                      itercls=itercls,
                                                      err_msg="Query requires an open bucket")
 
@@ -715,7 +660,7 @@ class Cluster(CoreClient):
 
         return self._maybe_operate_on_an_open_bucket(CoreClient.analytics_query,
                                                      AnalyticsException,
-                                                     opt.to_analytics_query(statement, *opts, **kwargs),
+                                                     opt.to_query_object(statement, *opts, **kwargs),
                                                      itercls=itercls,
                                                      err_msg='Analytics queries require an open bucket')
 
