@@ -147,7 +147,8 @@ class CMakeBuild(cbuild_config.CBuildCommon):
             if platform.system() == "Windows":
                 cmake_args += ['-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{}={}'.format(
                     cfg.upper(),
-                    extdir), '-DLCB_NO_MOCK=1']
+                    extdir), '-DLCB_NO_MOCK=1',
+                    '-DCMAKE_BUILD_PARALLEL_LEVEL=1']
                 if sys.maxsize > 2 ** 32:
                     cmake_args += ['-A', 'x64']
                 build_args += ['--', '/m']
