@@ -109,7 +109,8 @@ class QueryOptions(QueryBaseOptions):
                   'raw': {},
                   'scan_wait': {},
                   'scan_cap': {'scan_cap': identity},
-                  'metrics': {'metrics': identity}}
+                  'metrics': {'metrics': identity},
+                  'flex_index': {'flex_index': int}}
 
     TARGET_CLASS = _N1QLQuery
 
@@ -130,7 +131,8 @@ class QueryOptions(QueryBaseOptions):
                  raw=None,                    # type: dict[str, JSON]
                  scan_wait=None,              # type: timedelta
                  scan_cap=None,               # type: int
-                 metrics=False                # type: bool
+                 metrics=False,               # type: bool
+                 flex_index=False                # type: bool
                  ):
         pass
 
@@ -176,7 +178,8 @@ class QueryOptions(QueryBaseOptions):
             Specifies the scan cap characteristics.
         :param bool metrics:
             Specifies whether or not to include metrics with the :class:`~.QueryResult`.
-
+        :param bool flex_index
+            Specifies whether this query may make use of Search indexes
         """
         super(QueryOptions, self).__init__(**kwargs)
 
