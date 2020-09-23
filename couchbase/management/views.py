@@ -233,7 +233,7 @@ class View(object):
 
     def to_json(self):
         # type: (...) -> str
-        json.dumps(self.as_dict())
+        return json.dumps(self.as_dict())
 
     @classmethod
     def from_json(cls, json_view):

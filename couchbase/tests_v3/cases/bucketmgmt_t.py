@@ -1,10 +1,11 @@
 import os
+import datetime
 from unittest import SkipTest
 
 from flaky import flaky
 
 from couchbase.exceptions import BucketDoesNotExistException, BucketAlreadyExistsException
-from couchbase.management.buckets import CreateBucketSettings, BucketSettings
+from couchbase.management.buckets import CreateBucketSettings, BucketSettings, BucketType
 from couchbase_tests.base import CollectionTestCase
 
 
@@ -16,43 +17,45 @@ class BucketManagementTests(CollectionTestCase):
         if not self.is_realserver:
             raise SkipTest('Real server must be used for admin tests')
 
-        self.try_n_times_till_exception(10, 3, self.bm.drop_bucket, 'fred')
+        self.purge_buckets()
+    buckets_to_add = {'fred': {}, 'jane': {}, 'sally': {}}
 
-        # be sure fred is not there anymore...
-        self.try_n_times_till_exception(10, 3, self.bm.get_bucket, 'fred')
+    def tearDown(self):
+        self.purge_buckets()
+
+    def purge_buckets(self):
+        for bucket, kwargs in BucketManagementTests.buckets_to_add.items():
+            try:
+                self.bm.drop_bucket(bucket)
+            except BucketDoesNotExistException:
+                pass
+            except Exception as e:
+                raise
+                # now be sure it is really gone
+            self.try_n_times_till_exception(10, 3, self.bm.get_bucket, bucket)
 
     def test_bucket_create(self):
         self.bm.create_bucket(CreateBucketSettings(name="fred", bucket_type="couchbase", ram_quota_mb=100))
         self.try_n_times(10, 1, self.bm.get_bucket, "fred")
 
     def test_bucket_create_fail(self):
-        settings = CreateBucketSettings(name='fred', bucket_type='couchbase', ram_quota_mb=100)
+        settings = CreateBucketSettings(name='fred', bucket_type=BucketType.COUCHBASE, ram_quota_mb=100)
         self.bm.create_bucket(settings)
         self.assertRaises(BucketAlreadyExistsException, self.bm.create_bucket, settings)
 
     def test_bucket_drop_fail(self):
-        settings = CreateBucketSettings(name='fred', bucket_type='couchbase', ram_quota_mb=100)
+        settings = CreateBucketSettings(name='fred', bucket_type=BucketType.COUCHBASE, ram_quota_mb=100)
         self.bm.create_bucket(settings)
         self.try_n_times(10, 1, self.bm.drop_bucket, 'fred')
         self.assertRaises(BucketDoesNotExistException, self.bm.drop_bucket, 'fred')
 
     def test_bucket_list(self):
-        buckets_to_add = {'fred': {}, 'jane': {}, 'sally': {}}
-        try:
-            for bucket, kwargs in buckets_to_add.items():
-                self.bm.create_bucket(CreateBucketSettings(name=bucket, ram_quota_mb=100, **kwargs))
-                self.try_n_times(10, 1, self.bm.get_bucket, bucket)
+        for bucket, kwargs in BucketManagementTests.buckets_to_add.items():
+            self.bm.create_bucket(CreateBucketSettings(name=bucket, ram_quota_mb=100, **kwargs))
+            self.try_n_times(10, 1, self.bm.get_bucket, bucket)
 
-            self.assertEqual(set(), {"fred", "jane", "sally"}.difference(
-                set(map(lambda x: x.name, self.bm.get_all_buckets()))))
-        finally:
-            for bucket, kwargs in buckets_to_add.items():
-                try:
-                    self.bm.drop_bucket(bucket)
-                except BucketDoesNotExistException:
-                    pass
-                # now be sure it is really gone
-                self.try_n_times_till_exception(10, 3, self.bm.get_bucket, bucket)
+        self.assertEqual(set(), {"fred", "jane", "sally"}.difference(
+            set(map(lambda x: x.name, self.bm.get_all_buckets()))))
 
     def test_cluster_sees_bucket(self):
         # Create the bucket
@@ -66,10 +69,10 @@ class BucketManagementTests(CollectionTestCase):
         self.try_n_times(10, 3, self.bm.get_bucket, 'fred')
 
         # change bucket TTL
-        self.try_n_times(10, 3, self.bm.update_bucket, BucketSettings(name='fred', max_ttl=500))
+        self.try_n_times(10, 3, self.bm.update_bucket, BucketSettings(name='fred', max_ttl=datetime.timedelta(seconds=500)))
 
         def get_bucket_ttl_equal(name, ttl):
             if not ttl == self.bm.get_bucket(name).max_ttl:
                 raise Exception("not equal")
 
-        self.try_n_times(10, 3, get_bucket_ttl_equal, 'fred', 500)
+        self.try_n_times(10, 3, get_bucket_ttl_equal, 'fred', datetime.timedelta(seconds=500))

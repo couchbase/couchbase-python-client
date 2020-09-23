@@ -314,8 +314,6 @@ class QueryBaseOptions(OptionBlockTimeOut):
                 setattr(query, target, transform(v))
         return query
 
-def identity(input):
-    return input
 
 def enum_value(input):
     return input.value

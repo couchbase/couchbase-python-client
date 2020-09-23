@@ -52,6 +52,10 @@ from couchbase_core.client import Client as CoreClient
 from couchbase_core.connstr import ConnectionString
 from couchbase.diagnostics import ServiceType, PingState
 
+import pathlib
+
+BASEDIR = pathlib.Path(__file__).parent.parent
+
 try:
     from unittest2.case import SkipTest
 except ImportError:
@@ -318,7 +322,7 @@ class ConnectionConfiguration(object):
                 config.getboolean('mock', 'enabled')):
 
             self.mock_enabled = True
-            self.mockpath = config.get("mock", "path")
+            self.mockpath = str(BASEDIR.joinpath(config.get("mock", "path")))
             if config.has_option("mock", "url"):
                 self.mockurl = config.get("mock", "url")
             else:

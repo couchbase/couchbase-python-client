@@ -6,6 +6,7 @@ from couchbase.management.queries import QueryIndexManager
 from couchbase.management.search import SearchIndexManager
 from couchbase.management.analytics import AnalyticsIndexManager
 from couchbase.analytics import AnalyticsOptions
+from couchbase_core.mapper import identity
 from .auth import NoBucketException, Authenticator
 from .management.users import UserManager
 from .management.buckets import BucketManager
@@ -15,7 +16,7 @@ from couchbase.search import SearchResult, SearchOptions, SearchQuery
 from .analytics import AnalyticsResult
 from .n1ql import QueryResult
 from couchbase_core.n1ql import _N1QLQuery
-from .options import OptionBlock, OptionBlockDeriv, QueryBaseOptions, LockMode, identity, enum_value
+from .options import OptionBlock, OptionBlockDeriv, QueryBaseOptions, LockMode, enum_value
 from .bucket import Bucket, CoreClient, PingOptions
 from couchbase_core.cluster import _Cluster as CoreCluster
 from .exceptions import AlreadyShutdownException, InvalidArgumentException, \

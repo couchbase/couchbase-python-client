@@ -1,4 +1,5 @@
-from couchbase.options import QueryBaseOptions, identity, enum_value
+from couchbase.options import QueryBaseOptions, enum_value
+from couchbase_core.mapper import identity
 from .n1ql import *
 from couchbase_core.n1ql import N1QLRequest
 from enum import Enum
