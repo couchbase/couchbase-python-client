@@ -21,6 +21,8 @@ from couchbase_core.supportability import deprecate_module_attribute
 from couchbase_core.views.iterator import AlreadyQueriedException
 from couchbase.exceptions import CouchbaseException
 import sys
+from typing import *
+from couchbase_core import JSON
 
 # Not used internally, but by other modules
 
@@ -406,7 +408,7 @@ class N1QLRequest(object):
         self.errors = []
         self._mres = None
         self._do_iter = True
-        self.__raw = False
+        self.__raw = False  # type: Union[bool, List[JSON]]
         self.__meta_received = False
         self.buffered_remainder = []
         self.meta_lookahead = meta_lookahead
@@ -425,6 +427,7 @@ class N1QLRequest(object):
 
     @property
     def raw(self):
+        # type: (...) -> List[JSON]
         return self.__raw
 
     @property
@@ -517,7 +520,7 @@ class N1QLRequest(object):
             return r
 
     def __iter__(self):
-        # type: () -> JSON
+        # type: (...) -> JSON
         if self.buffered_remainder:
             while len(self.buffered_remainder)>0:
                 yield self.buffered_remainder.pop(0)
@@ -526,6 +529,12 @@ class N1QLRequest(object):
 
         self._start()
         while self._do_iter:
-            raw_rows = self.raw.fetch(self._mres)
+            raw_rows = self.fetch()
             for row in self._process_payload(raw_rows):
                 yield row
+
+    def fetch(self):
+        return self.raw.fetch(self._mres)
+
+    def __del__(self):
+        del self.__raw

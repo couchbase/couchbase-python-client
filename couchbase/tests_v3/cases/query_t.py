@@ -20,7 +20,10 @@ from unittest import SkipTest
 from couchbase.n1ql import UnsignedInt64
 from couchbase.cluster import QueryOptions, QueryProfile, QueryResult
 from couchbase.n1ql import QueryMetaData, QueryStatus, QueryWarning
-from couchbase_tests.base import CollectionTestCase
+from couchbase_tests.base import CollectionTestCase, BASEDIR, ClusterTestCase
+import objgraph
+from collections import Counter
+import gc
 
 
 class QueryTests(CollectionTestCase):
@@ -152,3 +155,66 @@ class QueryTests(CollectionTestCase):
         result = self.cluster.query("SELECT * FROM `beer-sample` WHERE brewery_id LIKE $brewery LIMIT 1",
                                     QueryOptions(named_parameters={'brewery':'xxffqqlx'}), brewery='21st_am%')
         self.assertRows(result, 1)
+
+
+class QueryLeakTest(CollectionTestCase):
+    def setUp(self, default_collections=None, real_collections=None, **kwargs):
+        super(QueryLeakTest, self).setUp()
+
+    def test_no_leak(self):
+        import tracemalloc
+        tracemalloc.start(25)
+        snapshot = tracemalloc.take_snapshot()
+        doc = {'field1': "value1"}
+        for i in range(100):
+            key = str(i)
+            self.bucket.default_collection().upsert(key, doc)
+
+        if self.is_realserver:
+            statement = "SELECT * FROM default:`default` USE KEYS[$1];".format(self.cluster_info.bucket_name,
+                                                                               self.coll._self_scope.name,
+                                                                               self.coll._self_name)
+        else:
+            statement = "'SELECT mockrow'"
+        counts = Counter({"builtins.dict": 1, "builtins.list": 2})
+
+        objgraph.growth(shortnames=False)
+
+        for i in range(5):
+            args = [str(i)] if self.is_realserver else []
+            print("PRE: key: {}".format(i))
+            result = self.cluster.query(statement, *args)
+            try:
+                stuff = list(result)
+                metadata = result.meta
+                del stuff
+                del result
+                del metadata
+                gc.collect()
+                print("POST: key: {}".format(i))
+            except:
+                pass
+            growth = objgraph.growth(shortnames=False)
+            print("growth is {}".format(growth))
+            if i > 0:
+                for entry in growth:
+                    key = entry[0]
+                    if key in ('builtins.dict', 'builtins.list'):
+                        self.assertLessEqual(entry[2], counts[key],
+                                                "{} count should not grow more than {}".format(key, counts[key]))
+            print("\n")
+            del growth
+            gc.collect()
+        snapshot2 = tracemalloc.take_snapshot()
+
+        top_stats = snapshot2.compare_to(snapshot, 'lineno')
+        import logging
+        logging.error("[ Top 10 differences ]")
+        for stat in top_stats[:10]:
+            logging.error(stat)
+        # pick the biggest memory block
+        top_stats = snapshot2.statistics('traceback')
+        stat = top_stats[0]
+        logging.error("%s memory blocks: %.1f KiB" % (stat.count, stat.size / 1024))
+        for line in stat.traceback.format():
+            logging.error(line)

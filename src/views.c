@@ -221,7 +221,6 @@ void convert_view_error_context(const lcb_VIEW_ERROR_CONTEXT* ctx,
         pycbc_dict_add_text_kv(err_context, "extended_ref", extended_ref);
     }
     mres->err_info = err_info;
-    Py_INCREF(err_info);
     Py_DECREF(err_context);
 }
 
@@ -496,6 +495,7 @@ ViewResult_dealloc(pycbc_ViewResult *vres)
 {
     PYCBC_DEBUG_LOG("Deallocing ViewResult %S at %p", vres, vres)
     Py_CLEAR(vres->rows);
+    PYCBC_XDECREF(vres->rows);
     Py_XDECREF(vres->context_capsule);
     Py_TYPE(vres)->tp_base->tp_dealloc((PyObject*)vres);
 }

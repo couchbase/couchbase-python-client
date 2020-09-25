@@ -55,14 +55,14 @@ class QueryMetrics(object):
     def __init__(self,
                  parent  # type: QueryResult
                  ):
-        self._parent = parent
+        self._parentquery = parent
 
     @property
     def _raw_metrics(self):
-        return self._parent.metrics
+        return self._parentquery.metrics
 
     def _as_timedelta(self, time_str):
-        return self._parent._duration_as_timedelta(self._raw_metrics.get(time_str))
+        return self._parentquery._duration_as_timedelta(self._raw_metrics.get(time_str))
 
     def elapsed_time(self):
         # type: (...) -> timedelta
@@ -101,35 +101,35 @@ class QueryMetaData(object):
     def __init__(self,
                  parent  # type: QueryResult
                  ):
-        self._parent = parent
+        self._parentquery_for_metadata = parent
 
     def request_id(self):
         # type: (...) -> str
-        return self._parent.meta.get('requestID')
+        return self._parentquery_for_metadata.meta.get('requestID')
 
     def client_context_id(self):
         # type: (...) -> str
-        return self._parent.meta.get('clientContextID')
+        return self._parentquery_for_metadata.meta.get('clientContextID')
 
     def signature(self):
         # type: (...) -> Optional[JSON]
-        return self._parent.meta.get('signature')
+        return self._parentquery_for_metadata.meta.get('signature')
 
     def status(self):
         # type: (...) -> QueryStatus
-        return QueryStatus[self._parent.meta.get('status').upper()]
+        return QueryStatus[self._parentquery_for_metadata.meta.get('status').upper()]
 
     def warnings(self):
         # type: (...) -> List[QueryWarning]
-        return list(map(QueryWarning, self._parent.meta.get('warnings', [])))
+        return list(map(QueryWarning, self._parentquery_for_metadata.meta.get('warnings', [])))
 
     def metrics(self):
         # type: (...) -> Optional[QueryMetrics]
-        return QueryMetrics(self._parent)
+        return QueryMetrics(self._parentquery_for_metadata)
 
     def profile(self):
         # type: (...) -> Optional[JSON]
-        return self._parent.profile
+        return self._parentquery_for_metadata.profile
 
 
 class QueryResult(iterable_wrapper(N1QLRequest)):
@@ -138,7 +138,6 @@ class QueryResult(iterable_wrapper(N1QLRequest)):
                  ):
         # type (...)->None
         super(QueryResult, self).__init__(params, parent, **kwargs)
-        self._parent = parent
 
     def metadata(self  # type: QueryResult
                  ):
