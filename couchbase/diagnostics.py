@@ -198,8 +198,8 @@ class EndpointPingReport(object):
     @property
     def namespace(self):
         # type: (...) -> str
-        # TODO: check if LCB will update this to namespace (like java)
-        return self._src_ping.get('scope', None)
+        # was 'scope', now 'namespace'
+        return self._src_ping.get('namespace', self._src_ping.get('scope', None))
 
     @property
     def latency(self):
