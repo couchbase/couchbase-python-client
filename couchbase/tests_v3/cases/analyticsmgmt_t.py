@@ -17,7 +17,7 @@
 #
 from couchbase_tests.base import CollectionTestCase, SkipTest
 from couchbase.management.analytics import CreateDataverseOptions, DropDataverseOptions, CreateDatasetOptions, \
-    CreateAnalyticsIndexOptions, DropAnalyticsIndexOptions, DropDatasetOptions, ConnectLinkOptions
+    CreateAnalyticsIndexOptions, DropAnalyticsIndexOptions, DropDatasetOptions, ConnectLinkOptions, DisconnectLinkOptions
 from couchbase.exceptions import CouchbaseException, DataverseAlreadyExistsException, DataverseNotFoundException, \
     DatasetAlreadyExistsException, DatasetNotFoundException, NotSupportedException
 from couchbase.analytics import AnalyticsDataType
@@ -46,7 +46,7 @@ class AnalyticsIndexManagerTests(CollectionTestCase):
                                                      ignore_if_exists=True)
                                 )
         try:
-            self.mgr.disconnect_link()
+            self.mgr.disconnect_link(DisconnectLinkOptions(dataverse_name=self.dataverse_name))
         except:
             pass
 
@@ -58,7 +58,7 @@ class AnalyticsIndexManagerTests(CollectionTestCase):
         except DataverseNotFoundException:
             pass
         try:
-            self.mgr.disconnect_link()
+            self.mgr.disconnect_link(DisconnectLinkOptions(dataverse_name=self.dataverse_name))
         except:
             pass
         self.try_n_times(10, 3,

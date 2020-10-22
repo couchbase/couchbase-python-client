@@ -13,10 +13,12 @@ class CollectionsErrorHandler(ErrorMapper):
     @staticmethod
     def mapping():
         # type (...)->Mapping[str, CBErrorType]
-        return {HTTPException: {'Scope with this name already exists': ScopeAlreadyExistsException,
-                            'Scope with this name is not found': ScopeNotFoundException,
-                            'Collection with this name is not found': CollectionNotFoundException,
-                            'Collection with this name already exists': CollectionAlreadyExistsException}}
+        return {HTTPException: {'.*Scope with.*name.*already exists': ScopeAlreadyExistsException,
+                                '.*Scope with.*name.*not found': ScopeNotFoundException,
+                                '.*Collection with.*name.*not found': CollectionNotFoundException,
+                                '.*Collection with.*name.*already exists': CollectionAlreadyExistsException,
+                                '.*collection_not_found.*': CollectionNotFoundException,
+                                '.*scope_not_found.*': ScopeNotFoundException}}
 
 
 class CollectionManager(GenericManager):

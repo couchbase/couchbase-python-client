@@ -149,7 +149,7 @@ class CollectionTests(CollectionTestCase):
         self.assertIsNotNone(result.expiry)
         self.assertDictEqual(self.CONTENT, result.content_as[dict])
         expires_in = (result.expiry - datetime.now()).total_seconds()
-        self.assertTrue(1000 >= expires_in > 0, msg="Expected expires_in {} to be between 100 and 0")
+        self.assertTrue(1001 >= expires_in > 0, msg="Expected expires_in {} to be between 1000 and 0".format(expires_in))
 
     def test_project(self):
         content = {"a": "aaa", "b": "bbb", "c": "ccc"}

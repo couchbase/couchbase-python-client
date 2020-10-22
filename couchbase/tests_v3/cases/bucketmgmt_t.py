@@ -8,7 +8,7 @@ from couchbase.management.buckets import CreateBucketSettings, BucketSettings
 from couchbase_tests.base import CollectionTestCase
 
 
-@flaky(10, 10)
+@flaky(10, 1)
 class BucketManagementTests(CollectionTestCase):
     def setUp(self, *args, **kwargs):
         super(BucketManagementTests, self).setUp(*args, **kwargs)
