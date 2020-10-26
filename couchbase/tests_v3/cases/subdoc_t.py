@@ -108,7 +108,7 @@ class SubdocTests(CollectionTestCase):
         self.try_n_times(10, 3, self._cas_matches, self.KEY, cas)
         result = self.coll.get(self.KEY, GetOptions(with_expiry=True))
         expires_in = (result.expiry - datetime.now()).total_seconds()
-        self.assertTrue(0 < expires_in < 1000)
+        self.assertTrue(0 < expires_in < 1001)
 
     def test_mutate_in_durability(self):
         if self.is_mock:
