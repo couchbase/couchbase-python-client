@@ -80,8 +80,7 @@ class ViewOptions(OptionBlockTimeOut):
 class PingOptions(OptionBlockTimeOut):
     @overload
     def __init__(self,
-                 # CCBC-1175  - no timeout yet.
-                 # timeout=None,       # type: timedelta
+                 timeout=None,       # type: timedelta
                  report_id=None,     # type: str
                  service_types=None  # type: Iterable[ServiceType]
                  ):
@@ -97,8 +96,6 @@ class PingOptions(OptionBlockTimeOut):
     def __init__(self,
                  **kwargs
                  ):
-        if 'timeout' in kwargs:
-            logging.warning("Ping has not implemented timeout yet - using defaults for now.")
         if 'service_types' in kwargs:
             kwargs['service_types'] = list(map(lambda x : x.value, kwargs['service_types']))
 

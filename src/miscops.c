@@ -497,9 +497,7 @@ TRACED_FUNCTION_WRAPPER(_ping,LCBTRACE_OP_REQUEST_ENCODING,Bucket)
             if (rv < 0) {
                 goto GT_ERR;
             }
-            /* there is no lcb_cmdping_timeout call in 3.0.0 - but we have
-               CCBC-1175 to track its eventual implementation.  When it is
-               in, we can call it here - that is tracked in PYCBC-797 */
+            lcb_cmdping_timeout(cmd, timeout);
         }
         if (report_id) {
             lcb_cmdping_report_id(cmd, report_id, strlen(report_id));

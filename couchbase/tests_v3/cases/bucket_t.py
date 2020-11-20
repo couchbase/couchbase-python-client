@@ -51,12 +51,25 @@ class BucketSimpleTest(CollectionTestCase):
                     self.assertIsNotNone(v.remote)
                     self.assertIsNotNone(v.local)
                     self.assertEqual(k, v.service_type)
+                    self.assertEqual(v.state, PingState.OK)
                     # Should really include ServiceType.View but lcb only
                     # puts the scope in for KV.  TODO: file ticket or discuss
                     if k in [ServiceType.KeyValue]:
                         self.assertEqual(self.bucket.name, v.namespace)
                     else:
                         self.assertIsNone(v.namespace)
+
+    def test_ping_timeout(self):
+        self.skipIfMock()
+        result = self.bucket.ping(PingOptions(timeout=timedelta(microseconds=1.0)))
+        self.assertIsNotNone(result)
+        for k, vals in result.endpoints.items():
+            for v in vals:
+                self.assertIsNotNone(v)
+                self.assertIsNotNone(v.latency)
+                self.assertIsNotNone(v.local)
+                self.assertEqual(k, v.service_type)
+                self.assertEqual(v.state, PingState.TIMEOUT)
 
     def test_ping_report_id(self):
         report_id = "11111"
@@ -90,7 +103,6 @@ class BucketSimpleTest(CollectionTestCase):
 
     def test_view_query(self  # type: BucketSimpleTest
                         ):
-        self.skipUnlessMock()
         beer_bucket = self.cluster.bucket('beer-sample')  # type: Bucket
         EXPECTED_ROW_COUNT=10
         view_result = beer_bucket.view_query("beer", "brewery_beers", limit=EXPECTED_ROW_COUNT)  # type: ViewResult
