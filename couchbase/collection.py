@@ -21,7 +21,7 @@ import couchbase.options
 from .result import GetResult, GetReplicaResult, ExistsResult, get_result_wrapper, CoreResult, ResultPrecursor, \
     LookupInResult, MutateInResult, \
     MutationResult, _wrap_in_mutation_result, get_replica_result_wrapper, get_multi_mutation_result, \
-    get_multi_get_result
+    get_multi_get_result, lookup_in_result_wrapper, mutate_in_result_wrapper
 from .subdocument import LookupInSpec, MutateInSpec, MutateInOptions, \
     gen_projection_spec
 
@@ -927,6 +927,7 @@ class CBCollection(wrapt.ObjectProxy):
         return ResultPrecursor(CoreClient.remove(self.bucket, key, **final_options), final_options)
 
     @_inject_scope_and_collection
+    @lookup_in_result_wrapper
     def lookup_in(self,         # type: CBCollection
                   key,          # type: str
                   spec,         # type: LookupInSpec
@@ -960,9 +961,10 @@ class CBCollection(wrapt.ObjectProxy):
 
         """
         final_options = forward_args(kwargs, *options)
-        return LookupInResult(CoreClient.lookup_in(self.bucket, key, spec, **final_options))
+        return ResultPrecursor(CoreClient.lookup_in(self.bucket, key, spec, **final_options), final_options)
 
     @_inject_scope_and_collection
+    @mutate_in_result_wrapper
     def mutate_in(self,  # type: CBCollection
                   key,  # type: str
                   spec,  # type: MutateInSpec
@@ -995,7 +997,7 @@ class CBCollection(wrapt.ObjectProxy):
         .. seealso:: :mod:`.couchbase_core.subdocument`
         """
         final_options = forward_args(kwargs, *options)
-        return MutateInResult(CoreClient.mutate_in(self.bucket, key, spec, **final_options), **final_options)
+        return ResultPrecursor(CoreClient.mutate_in(self.bucket, key, spec, **final_options), final_options)
 
     def binary(self):
         # type: (...) -> BinaryCollection

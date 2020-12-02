@@ -386,6 +386,22 @@ class AsyncMutationResult(AsyncWrapper.gen_wrapper(MutationResult)):
         super(AsyncMutationResult, self).__init__(core_result)
 
 
+class AsyncMutateInResult(AsyncWrapper.gen_wrapper(MutateInResult)):
+    def __init__(self,
+                 core_result  # type: CoreResult
+                 ):
+        # type (...)->None
+        super(AsyncMutateInResult, self).__init__(core_result)
+
+
+class AsyncLookupInResult(AsyncWrapper.gen_wrapper(LookupInResult)):
+    def __init__(self,
+                 core_result  # type: CoreResult
+                 ):
+        # type (...)->None
+        super(AsyncLookupInResult, self).__init__(core_result)
+
+
 # TODO: eliminate the options shortly.  They serve no purpose
 ResultPrecursor = NamedTuple('ResultPrecursor', [('orig_result', CoreResult), ('orig_options', Mapping[str, Any])])
 
@@ -398,6 +414,40 @@ def _is_async(orig_result  # type: CoreResult
 def get_wrapped_get_result(x):
     factory_class = AsyncGetResult if _is_async(x) else GetResult
     return factory_class(x)
+
+
+def mutate_in_result_wrapper(func # type: Callable[[Any], ResultPrecursor]
+                            ):
+    # type: (...) -> Callable[[Any], MutateInResult]
+    def factory_class(x):
+        factory = AsyncMutateInResult if _is_async(x) else MutateInResult
+        return factory(x)
+
+    @wraps(func)
+    def wrapped(*args, **kwargs):
+        x, opts = func(*args, **kwargs)
+        return factory_class(x)
+
+    wrapped.__name__ = func.__name__
+    operation_mode.operate_on_doc(wrapped, lambda x: func.__doc__)
+    return wrapped
+
+
+def lookup_in_result_wrapper(func  #type: Callable[[Any], ResultPrecursor]
+                             ):
+    # type:  (...) -> Callable[[Any], LookupInResult]
+    def factory_class(x):
+        factory = AsyncLookupInResult if _is_async(x) else LookupInResult
+        return factory(x)
+
+    @wraps(func)
+    def wrapped(*args, **kwargs):
+        x, opts = func(*args, **kwargs)
+        return factory_class(x)
+
+    wrapped.__name__ = func.__name__
+    operation_mode.operate_on_doc(wrapped, lambda x: func.__doc__)
+    return wrapped
 
 
 def get_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
