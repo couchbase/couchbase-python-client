@@ -264,9 +264,8 @@ class CollectionTests(CollectionTestCase):
 
     def test_unlock_wrong_cas(self):
         cas = self.cb.get_and_lock(self.KEY, timedelta(seconds=15)).cas
-        self.try_n_times_till_exception(20, 1, self.cb.unlock, self.KEY, 100,
-                                        expected_exceptions=(TemporaryFailException,))
-        self.try_n_times(10, 3, self.cb.unlock, self.KEY, cas, expected_exceptions=(TemporaryFailException,))
+        self.assertRaises(TemporaryFailException, self.cb.unlock, self.KEY, 100)
+        self.cb.unlock(self.KEY, cas)
 
     def test_client_durable_upsert(self):
         num_replicas = self.bucket._bucket.configured_replica_count

@@ -349,7 +349,9 @@ RawRoleAndDescription = NamedTuple('RawRoleAndDescription',
                                     ('display_name', str),
                                     ('description', str),
                                     ('ce', Any),
-                                    ('bucket_name', str)])
+                                    ('bucket_name', str),
+                                    ('scope_name', str),
+                                    ('collection_name', str)])
 
 
 class RoleAndDescription(with_metaclass(ABCMeta, Mapped)):
@@ -360,7 +362,7 @@ class RoleAndDescription(with_metaclass(ABCMeta, Mapped)):
 
     @staticmethod
     def defaults():
-        return {'ce': True, 'bucket_name':None}
+        return {'ce': True, 'bucket_name': None, 'scope_name': None, 'collection_name': None}
 
     @staticmethod
     def mappings():

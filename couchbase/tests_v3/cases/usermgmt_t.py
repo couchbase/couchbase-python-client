@@ -162,6 +162,12 @@ class UserManagementTests(CollectionTestCase):
                 return
         self.fail("No admin role found")
 
+    # see PYCBC-1030
+    def test_get_roles_all_valid(self):
+        roles = self.um.get_roles()
+        for r in roles:
+            self.assertIsNotNone(r)
+
     @skip_if_no_groups
     def test_missing_group(self):
         self.assertRaises(GroupNotFoundException, self.um.get_group, 'fred')
