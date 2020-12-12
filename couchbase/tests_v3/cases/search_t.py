@@ -20,7 +20,7 @@ from unittest import SkipTest
 
 import couchbase.search as search
 from couchbase.management.search import SearchIndex
-from couchbase.search import SearchResult, SearchOptions
+from couchbase.search import SearchResult, SearchOptions, SearchScanConsistency
 from couchbase.mutation_state import MutationState
 from couchbase_tests.base import CouchbaseTestCase
 
@@ -122,7 +122,8 @@ class SearchResultTest(CouchbaseTestCase):
         # running the tests locally.  Commenting out for now...
         self.assertGreater(took.total_seconds(), 0)
         self.assertIsInstance(metadata.metrics.total_partition_count, int)
-        self.assertGreaterEqual(metadata.metrics.success_partition_count, min_hits)
+        min_partition_count = min(metadata.metrics.total_partition_count, min_hits)
+        self.assertGreaterEqual(metadata.metrics.success_partition_count, min_partition_count)
         self.assertGreaterEqual(metadata.metrics.total_rows, min_hits)
 
     def test_parsing_locations(self):
@@ -149,9 +150,11 @@ class SearchTest(ClusterTestCase):
             SearchIndex(name="beer-search", idx_type="fulltext-index", source_type="couchbase", source_name="beer-sample"))
 
     def test_locations(self):
+        options = search.SearchOptions(fields=["*"], limit=10, sort=["-_score"],
+                                       scan_consistency=SearchScanConsistency.NOT_BOUNDED.value)
         initial = datetime.datetime.now()
         x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search", search.MatchQuery("Budweiser", prefix_length=0, fuzziness=0),
-                                                                          search.SearchOptions(fields=["*"],limit=10, sort=["-_score"])
+                                                                          options
                                                                           )  # type: SearchResult
         SearchResultTest._check_search_result(self, initial, 6, x)
 
@@ -308,6 +311,8 @@ class SearchStringsTest(CouchbaseTestCase):
             }
         }
         self.assertEqual(exp, p.as_encodable('ix'))
+        self.assertEqual({'ctl': {'consistency': 'not_bounded'}},
+                         SearchOptions(scan_consistency=search.SearchScanConsistency.NOT_BOUNDED.value).as_encodable('ix'))
 
     def test_facets(self):
         s = SearchOptions()

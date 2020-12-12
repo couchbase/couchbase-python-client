@@ -18,6 +18,18 @@ import couchbase.mutation_state as MutationState
 SearchQueryRow = JSON
 
 
+class SearchScanConsistency(Enum):
+    """
+    SearchScanConsistency
+
+    This can be:
+
+    NOT_BOUNDED
+        Which means we just return what is currently in the indexes.
+    """
+    NOT_BOUNDED = "not_bounded"
+
+
 def _genprop(converter, *apipaths, **kwargs):
     """
     This internal helper method returns a property (similar to the
@@ -1478,7 +1490,7 @@ class SearchOptions(OptionBlockTimeOut):
                  fields=None,            # type: List[str]
                  highlight_style=None,   # type: HighlightStyle
                  highlight_fields=None,  # type: List[str]
-                 scan_consistency=None,  # type: cluster.QueryScanConsistency
+                 scan_consistency=None,  # type: SearchScanConsistency
                  consistent_with=None,   # type: MutationState
                  facets=None,            # type: Dict[str, Facet]
                  raw=None,               # type: JSON
@@ -1508,8 +1520,8 @@ class SearchOptions(OptionBlockTimeOut):
             Style to render the highlights.  See :class:`~.HighlighStyle` for details.
         :param Iterable[str] highlight_fields:
             Fields to highlight.  If this is not specified, all fields returned are highlighted.
-        :param QueryScanConsistency scan_consistency:
-            Scan Consistency to use for this query.  See :class:`~.QueryScanConsistency` for details.
+        :param SearchScanConsistency scan_consistency:
+            Scan Consistency to use for this query.  See :class:`~.SearchScanConsistency` for details.
         :param MutationState consistent_with:
             Specify a consistency using :class:`~.MutationState`.
         :param Iterable[str,Facet] facets:
@@ -1547,6 +1559,9 @@ class SearchOptions(OptionBlockTimeOut):
     @classmethod
     def _gen_params_from_final_args(cls, final_args):
         consistent_with = final_args.pop('consistent_with', None)
+        consistency = final_args.pop('scan_consistency', None)
+        if consistency is not None:
+            final_args["consistency"] = consistency
         params = final_args.pop('params', _Params(**final_args))  # type: _Params
         if consistent_with:
             params.consistent_with(consistent_with)
