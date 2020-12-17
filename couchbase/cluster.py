@@ -317,7 +317,7 @@ class ClusterTracingOptions(dict):
 
 class ClusterOptions(dict):
     KEYS = ['timeout_options', 'tracing_options', 'log_redaction', 'compression', 'compression_min_size',
-            'compression_min_ratio']
+            'compression_min_ratio', 'certpath']
 
     @overload
     def __init__(self,
@@ -434,8 +434,13 @@ class Cluster(CoreClient):
         self._clusteropts.update(kwargs)
         self._adminopts = dict(**self._clusteropts)
         self._clusteropts.update(async_items)
-        self._connstr_opts = cluster_opts
-        self.connstr = cluster_opts.update_connection_string(self.connstr)
+        self.connstr = cluster_opts.update_connection_string(self.connstr, **self._clusteropts)
+
+        # PYCBC-949 remove certpath, it is not accepted by super(Cluster)
+        # (it has been copied into self.connstr)
+        self._clusteropts.pop('certpath', None)
+        self._adminopts.pop('certpath', None)
+
         super(Cluster, self).__init__(connection_string=str(self.connstr), _conntype=_LCB.LCB_TYPE_CLUSTER, **self._clusteropts)
 
     @classmethod
