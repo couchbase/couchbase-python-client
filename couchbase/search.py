@@ -337,6 +337,10 @@ def _location_conv(l):
     return [float(l[0]), float(l[1])]
 
 
+def _locations_conv(ll):
+    return [_location_conv(l) for l in ll]
+
+
 class SortGeoDistance(Sort):
     """
     Sorts matches based on their distance from a specific location
@@ -761,6 +765,18 @@ class GeoBoundingBoxQuery(SearchQuery):
     bottom_right = _genprop(
         _location_conv, 'bottom_right',
         doc='Tuple of `(lon, lat`) for the bottom right corner of bounding box')
+
+
+@_with_fields('field')
+class GeoPolygonQuery(SearchQuery):
+    def __init__(self, polygon_points, **kwargs):
+        super(GeoPolygonQuery, self).__init__()
+        kwargs['polygon_points'] = polygon_points
+        _assign_kwargs(self, kwargs)
+
+    polygon_points = _genprop(
+        _locations_conv, 'polygon_points',
+        doc='List of tuples `(lon, lat)` for the points of a polygon')
 
 
 class _RangeQuery(SearchQuery):
