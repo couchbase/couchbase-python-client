@@ -11,7 +11,7 @@ from couchbase_core import iterable_wrapper, JSON, operation_mode
 from couchbase_core.result import AsyncResult as CoreAsyncResult
 from couchbase_core.result import MultiResult, SubdocResult
 from couchbase_core.subdocument import Spec
-from couchbase_core.supportability import internal
+from couchbase_core.supportability import deprecated, internal
 from couchbase_core.transcodable import Transcodable
 from couchbase_core.views.iterator import View as CoreView
 from .options import forward_args, UnsignedInt64
@@ -301,10 +301,23 @@ class GetResult(Result):
         return self._id
 
     @property
+    @deprecated(instead="expiryTime")
     def expiry(self  # type: GetResult
                ):
         # type: (...) -> datetime.datetime
         return self._expiry
+
+    @property
+    def expiryTime(self  # type: GetResult
+               ):
+        # type: (...) -> float
+        instant = None
+        try:
+            instant = self._expiry.timestamp()
+        except AttributeError:
+            instant = self._expiry
+
+        return instant
 
     @property
     def content_as(self  # type: GetResult

@@ -31,6 +31,7 @@ from couchbase.management.collections import CollectionSpec
 import uuid
 from datetime import datetime
 from flaky import flaky
+import warnings
 
 class CollectionTests(CollectionTestCase):
     """
@@ -117,14 +118,14 @@ class CollectionTests(CollectionTestCase):
         result = self.cb.get(self.KEY)
         self.assertIsNotNone(result.cas)
         self.assertEqual(result.id, self.KEY)
-        self.assertIsNone(result.expiry)
+        self.assertIsNone(result.expiryTime)
         self.assertDictEqual(self.CONTENT, result.content_as[dict])
 
     def test_get_options(self):
         result = self.cb.get(self.KEY, GetOptions(timeout=timedelta(seconds=2), with_expiry=False))
         self.assertIsNotNone(result.cas)
         self.assertEqual(result.id, self.KEY)
-        self.assertIsNone(result.expiry)
+        self.assertIsNone(result.expiryTime)
         self.assertDictEqual(self.CONTENT, result.content_as[dict])
 
     def test_get_fails(self):
@@ -146,8 +147,31 @@ class CollectionTests(CollectionTestCase):
                 return r
             raise Exception("nope")
         result = self.try_n_times(10, 3, cas_matches, self.coll, cas)
-        self.assertIsNotNone(result.expiry)
+        self.assertIsNotNone(result.expiryTime)
         self.assertDictEqual(self.CONTENT, result.content_as[dict])
+        expires_in = result.expiryTime - datetime.now().timestamp()
+        self.assertTrue(1001 >= expires_in > 0, msg="Expected expires_in {} to be between 1000 and 0".format(expires_in))
+
+    def test_deprecated_expiry(self):
+        # PYCBC-999 Deprecate GetResult.expiry()
+        # expiry returned datetime, was replaced by expiryTime which returns
+        # an instant (aka unix timestamp)
+        if self.is_mock:
+            raise SkipTest("mock will not return the expiry in the xaddrs")
+        cas = self.coll.upsert(self.KEY, self.CONTENT, UpsertOptions(expiry=timedelta(seconds=1000))).cas
+
+        def cas_matches(c, new_cas):
+            r = c.get(self.KEY, GetOptions(with_expiry=True))
+            if r.cas == new_cas:
+                return r
+            raise Exception("nope")
+        result = self.try_n_times(10, 3, cas_matches, self.coll, cas)
+
+        warnings.resetwarnings()
+        with warnings.catch_warnings(record=True) as w:
+            self.assertIsNotNone(result.expiry)
+            self.assertEqual(len(w), 1)
+
         expires_in = (result.expiry - datetime.now()).total_seconds()
         self.assertTrue(1001 >= expires_in > 0, msg="Expected expires_in {} to be between 1000 and 0".format(expires_in))
 
@@ -164,7 +188,7 @@ class CollectionTests(CollectionTestCase):
         self.assertEqual({"a": "aaa"}, result.content_as[dict])
         self.assertIsNotNone(result.cas)
         self.assertEqual(result.id, self.KEY)
-        self.assertIsNone(result.expiry)
+        self.assertIsNone(result.expiryTime)
 
     def test_project_bad_path(self):
         result = self.coll.get(self.KEY, GetOptions(project=["some", "qzx"]))

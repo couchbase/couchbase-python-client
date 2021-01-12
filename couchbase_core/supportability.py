@@ -12,6 +12,8 @@ def deprecate_module_attribute(mod, deprecated=tuple()):
 class Level(object):
     desc = None  # type: str
 
+    msg_params = "msg_params"
+
     def __new__(cls, function, *args, **kwargs):
         """
         Mark a function as {}
@@ -21,6 +23,9 @@ class Level(object):
         """.format(cls.__name__)
 
         message = cls.desc+"\n"
+        msg_params = kwargs.get(cls.msg_params)
+        if msg_params:
+            message = message.format(**msg_params)
 
         func_name = getattr(function, '__qualname__', function.__name__)
 
@@ -39,6 +44,23 @@ class Level(object):
             return function(*args, **kwargs)
 
         return fn_wrapper
+
+
+class Deprecated(Level):
+    desc = \
+    """
+    %s is a deprecated API, use {instead} instead.
+    """
+    def __new__(cls, instead):
+        def decorator(function):
+            warn_on_attribute_access(cls, [function], "deprecated")
+
+            kwargs = {cls.msg_params: {"instead": instead}}
+            return Level.__new__(cls, function, **kwargs)
+
+        return decorator
+
+deprecated = Deprecated
 
 
 class Uncommitted(Level):
