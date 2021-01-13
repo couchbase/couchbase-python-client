@@ -30,7 +30,7 @@ import logging
 from couchbase.management.collections import CollectionSpec
 import uuid
 from datetime import datetime
-
+from flaky import flaky
 
 class CollectionTests(CollectionTestCase):
     """
@@ -262,6 +262,7 @@ class CollectionTests(CollectionTestCase):
         self.cb.unlock(self.KEY, cas)
         self.cb.upsert(self.KEY, self.CONTENT)
 
+    @flaky(10,1)
     def test_unlock_wrong_cas(self):
         cas = self.cb.get_and_lock(self.KEY, timedelta(seconds=15)).cas
         self.assertRaises(TemporaryFailException, self.cb.unlock, self.KEY, 100)
