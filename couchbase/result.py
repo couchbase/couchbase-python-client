@@ -310,10 +310,10 @@ class GetResult(Result):
     @property
     def expiryTime(self  # type: GetResult
                ):
-        # type: (...) -> float
+        # type: (...) -> datetime.datetime
         instant = None
         try:
-            instant = self._expiry.timestamp()
+            instant = self._expiry
         except AttributeError:
             instant = self._expiry
 

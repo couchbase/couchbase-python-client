@@ -140,17 +140,12 @@ class CollectionTests(CollectionTestCase):
     def test_get_with_expiry(self):
         if self.is_mock:
             raise SkipTest("mock will not return the expiry in the xaddrs")
-        cas = self.coll.upsert(self.KEY, self.CONTENT, UpsertOptions(expiry=timedelta(seconds=1000))).cas
+        self.coll.upsert(self.KEY, self.CONTENT, UpsertOptions(expiry=timedelta(seconds=1000)))
 
-        def cas_matches(c, new_cas):
-            r = c.get(self.KEY, GetOptions(with_expiry=True))
-            if r.cas == new_cas:
-                return r
-            raise Exception("nope")
-        result = self.try_n_times(10, 3, cas_matches, self.coll, cas)
+        result = self.coll.get(self.KEY, GetOptions(with_expiry=True))
         self.assertIsNotNone(result.expiryTime)
         self.assertDictEqual(self.CONTENT, result.content_as[dict])
-        expires_in = result.expiryTime - datetime.now().timestamp()
+        expires_in = (result.expiryTime - datetime.now()).total_seconds()
         self.assertTrue(1001 >= expires_in > 0, msg="Expected expires_in {} to be between 1000 and 0".format(expires_in))
 
     def test_deprecated_expiry(self):
@@ -159,15 +154,8 @@ class CollectionTests(CollectionTestCase):
         # an instant (aka unix timestamp)
         if self.is_mock:
             raise SkipTest("mock will not return the expiry in the xaddrs")
-        cas = self.coll.upsert(self.KEY, self.CONTENT, UpsertOptions(expiry=timedelta(seconds=1000))).cas
-
-        def cas_matches(c, new_cas):
-            r = c.get(self.KEY, GetOptions(with_expiry=True))
-            if r.cas == new_cas:
-                return r
-            raise Exception("nope")
-        result = self.try_n_times(10, 3, cas_matches, self.coll, cas)
-
+        self.coll.upsert(self.KEY, self.CONTENT, UpsertOptions(expiry=timedelta(seconds=1000)))
+        result = self.coll.get(self.KEY, GetOptions(with_expiry=True))
         warnings.resetwarnings()
         with warnings.catch_warnings(record=True) as w:
             self.assertIsNotNone(result.expiry)
@@ -480,7 +468,7 @@ class CollectionTests(CollectionTestCase):
                     self.assertEqual(len(warns), 1)
                     # ttl taken as expiry time
                     if verify_expiry and ttl > now:
-                        self.assertTrue(int(result.expiryTime) == ttl)
+                        self.assertTrue(int(result.expiryTime.timestamp()) == ttl)
                     else:
                         # doc expired immediately
                         self.assertTrue(result is DocumentNotFoundException)
@@ -490,4 +478,4 @@ class CollectionTests(CollectionTestCase):
                         # ttl >= 30 days (and <= 50 yrs) changed to a timestamp
                         # on the client; server interprets ttl < 30 as a true
                         # duration. Either way expiryTime is a timestamp.
-                        self.assertTrue(now+ttl <= int(result.expiryTime) <= then+ttl)
+                        self.assertTrue(now+ttl <= int(result.expiryTime.timestamp()) <= then+ttl)
