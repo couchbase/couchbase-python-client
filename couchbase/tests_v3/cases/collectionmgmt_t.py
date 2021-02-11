@@ -15,7 +15,7 @@
 
 from couchbase.management.collections import CollectionSpec
 from couchbase_tests.base import SkipTest, CollectionTestCase
-from couchbase.exceptions import NotSupportedException, ScopeNotFoundException, ScopeAlreadyExistsException, \
+from couchbase.exceptions import BucketDoesNotExistException, DocumentExistsException, DocumentNotFoundException, NotSupportedException, ScopeNotFoundException, ScopeAlreadyExistsException, \
     CollectionAlreadyExistsException, CollectionNotFoundException
 from couchbase.management.buckets import CreateBucketSettings
 from datetime import timedelta
@@ -23,6 +23,7 @@ import time
 
 
 class CollectionManagerTestCase(CollectionTestCase):
+    
     def setUp(self, *args, **kwargs):
         super(CollectionManagerTestCase, self).setUp()
 
@@ -43,7 +44,7 @@ class CollectionManagerTestCase(CollectionTestCase):
         except:
             # it maybe isn't there, that's fine
             pass
-        self.try_n_times_till_exception(10, 1, self.bm.get_bucket, 'other-bucket')
+        self.try_n_times_till_exception(10, 1, self.bm.get_bucket, 'other-bucket', expected_exceptions=(BucketDoesNotExistException,))
 
         # now re-create it fresh (maybe we could just flush, but we may test settings which would not be flushed)
         self.try_n_times(10, 1, self.bm.create_bucket, CreateBucketSettings(name='other-bucket', bucket_type='couchbase', ram_quota_mb=100))
@@ -55,12 +56,30 @@ class CollectionManagerTestCase(CollectionTestCase):
         self.other_bucket = self.try_n_times(10, 3, get_bucket, 'other-bucket')
         self.cm = self.other_bucket.collections()
 
+    def get_scope(self, bucket_name, scope_name):
+        bucket = self.try_n_times(10, 3, self.cluster.bucket, bucket_name)
+        if bucket:
+            cm = bucket.collections()
+            return next((s for s in cm.get_all_scopes() if s.name == scope_name), None)
+
+        return None
+
+    def get_collection(self, bucket_name, scope_name, coll_name):
+        scope = self.get_scope(bucket_name, scope_name)
+        if scope:
+            return next((c for c in scope.collections if c.name == coll_name), None)
+
+        return None
+
     def testCreateCollection(self):
-        self.cm.create_collection(CollectionSpec('other-collection'))
-        self.assertIsNotNone([c for c in self.cm.get_all_scopes()[0].collections if c.name == 'other-collection'])
+        collection = CollectionSpec('other-collection')
+        self.cm.create_collection(collection)
+        self.assertIsNotNone(self.get_collection(self.other_bucket.bucket,collection.scope_name, collection.name))
 
     def testCreateCollectionMaxTTL(self):
-        self.cm.create_collection(CollectionSpec('other-collection', max_ttl=timedelta(seconds=2)))
+        collection = CollectionSpec('other-collection', max_ttl=timedelta(seconds=2))
+        self.cm.create_collection(collection)
+        self.assertIsNotNone(self.get_collection(self.other_bucket.bucket, collection.scope_name, collection.name))
         # pop a doc in with no ttl, verify it goes away...
         coll = self.try_n_times(10, 1, self.other_bucket.collection, 'other-collection')
         key = self.gen_key('cmtest')
@@ -68,36 +87,34 @@ class CollectionManagerTestCase(CollectionTestCase):
         # retry the upsert.
         self.try_n_times(10, 1, coll.upsert, key, {"some":"thing"})
         self.try_n_times(10, 1, coll.get, key)
-        self.try_n_times_till_exception(4, 1, coll.get, key)
+        self.try_n_times_till_exception(4, 1, coll.get, key, expected_exceptions=(DocumentNotFoundException,))
 
     def testCreateCollectionBadScope(self):
         self.assertRaises(ScopeNotFoundException, self.cm.create_collection, CollectionSpec('imnotgonnawork', 'notarealscope'))
 
     def testCreateCollectionAlreadyExists(self):
-        self.cm.create_collection(CollectionSpec('other-collection'))
-        self.try_n_times(10, 1, self.other_bucket.collection, 'other-collection')
-        self.assertIsNotNone([c for c in self.cm.get_all_scopes()[0].collections if c.name == 'other-collection'])
+        collection = CollectionSpec('other-collection')
+        self.cm.create_collection(collection)
+        #verify the collection exists w/in other-bucket
+        self.assertIsNotNone(self.get_collection(self.other_bucket.bucket, collection.scope_name, collection.name))
         # now, it will fail if we try to create it again...
-        self.assertRaises(CollectionAlreadyExistsException, self.cm.create_collection, CollectionSpec('other-collection'))
+        self.assertRaises(CollectionAlreadyExistsException, self.cm.create_collection, collection)
 
     def testCollectionGoesInCorrectBucket(self):
-        self.cm.create_collection(CollectionSpec('other-collection'))
-        self.try_n_times(10, 1, self.other_bucket.collection, 'other-collection')
-
+        collection = CollectionSpec('other-collection')
+        self.cm.create_collection(collection)
         # make sure it actually is in the other-bucket
-        self.assertIsNotNone([c for c in self.cm.get_all_scopes()[0].collections if c.name == 'other-collection'])
+        self.assertIsNotNone(self.get_collection(self.other_bucket.bucket, collection.scope_name, collection.name))
         # also be sure this isn't in the default bucket
-        self.assertFalse([ c for c in self.bucket.collections().get_all_scopes()[0].collections if c.name == 'other-collection'])
+        self.assertIsNone(self.get_collection(self.bucket.bucket, collection.scope_name, collection.name))
 
     def testCreateScope(self):
         self.cm.create_scope('other-scope')
-        scopes = self.cm.get_all_scopes()
-        self.assertIsNotNone([s for s in scopes if s.name == 'other-scope'])
+        self.assertIsNotNone(self.get_scope(self.other_bucket.bucket, 'other-scope'))
 
     def testCreateScopeAlreadyExists(self):
         self.cm.create_scope('other-scope')
-        scopes = self.cm.get_all_scopes()
-        self.assertIsNotNone([s for s in scopes if s.name == 'other-scope'])
+        self.assertIsNotNone(self.get_scope(self.other_bucket.bucket, 'other-scope'))
         self.assertRaises(ScopeAlreadyExistsException, self.cm.create_scope, 'other-scope')
 
     def testGetAllScopes(self):
@@ -118,14 +135,13 @@ class CollectionManagerTestCase(CollectionTestCase):
         self.assertRaises(ScopeNotFoundException, self.cm.get_scope, 'somerandomname')
 
     def testDropCollection(self):
-        def get_collection(name):
-            return [c for c in self.cm.get_all_scopes()[0].collections if c.name == name][0]
-
-        self.cm.create_collection(CollectionSpec('other-collection'))
-        self.try_n_times(10, 1, self.other_bucket.collection, 'other-collection')
-        self.cm.drop_collection(CollectionSpec('other-collection'))
-        # there is no get_collection, so...
-        self.try_n_times_till_exception(10, 1, get_collection, 'other-collection')
+        collection = CollectionSpec('other-collection')
+        self.cm.create_collection(collection)
+        #verify the collection exists w/in other-bucket
+        self.try_n_times_till_exception(4, 1, self.cm.create_collection, collection, expected_exceptions=(CollectionAlreadyExistsException,))
+        # attempt to drop it again will raise CollectionNotFoundException
+        self.cm.drop_collection(collection)
+        self.assertRaises(CollectionNotFoundException, self.cm.drop_collection, collection)
 
     def testDropCollectionNotFound(self):
         self.assertRaises(CollectionNotFoundException, self.cm.drop_collection, CollectionSpec('somerandomname'))
@@ -134,12 +150,11 @@ class CollectionManagerTestCase(CollectionTestCase):
         self.assertRaises(ScopeNotFoundException, self.cm.drop_collection, CollectionSpec('collectionname', 'scopename'))
 
     def testDropScope(self):
-        self.cm.create_scope('other-scope')
-        self.try_n_times(10, 1, self.cm.get_scope, 'other-scope')
-        self.assertTrue([s for s in self.cm.get_all_scopes() if s.name == 'other-scope'])
-        self.cm.drop_scope('other-scope')
-        self.try_n_times_till_exception(10, 1, self.cm.get_scope, 'other-scope')
-        self.assertFalse([s for s in self.cm.get_all_scopes() if s.name == 'other-scope'])
+        scope = 'other-scope'
+        self.cm.create_scope(scope)
+        self.assertIsNotNone(self.get_scope(self.other_bucket.bucket, scope))
+        self.cm.drop_scope(scope)
+        self.assertRaises(ScopeNotFoundException, self.cm.drop_scope, scope)
 
     def testDropScopeNotFound(self):
       self.assertRaises(ScopeNotFoundException, self.cm.drop_scope, 'somerandomscope')

@@ -23,14 +23,14 @@ p2
 p3_nose
 p2_nose
 BUILD*
-couchbase/_version.py
+couchbase*/_version.py
 ci/
 buildall.py
 *egg-info*
 _trial*
 *.dSYM
 .idea/
-CouchbaseMock.jar
+CouchbaseMock*.jar
 /.cproject
 /.eclipse-pmd
 /.project
@@ -39,4 +39,7 @@ CouchbaseMock.jar
 /make.sh
 html
 latex
+.eggs/
+.vscode/
+openssl_version.json
 

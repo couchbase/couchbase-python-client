@@ -3,6 +3,7 @@ from couchbase.management.admin import Admin
 from typing import *
 from .generic import GenericManager
 from couchbase_core import mk_formstr
+from couchbase_core.supportability import deprecated
 
 from couchbase.exceptions import ErrorMapper, NotSupportedWrapper, HTTPException, ScopeNotFoundException, \
     ScopeAlreadyExistsException, CollectionNotFoundException, CollectionAlreadyExistsException
@@ -27,8 +28,9 @@ class CollectionManager(GenericManager):
                  bucket_name  # type: str
                  ):
         super(CollectionManager, self).__init__(admin_bucket)
-        self.bucket_name = bucket_name
+        self.base_path = 'pools/default/buckets/{}/scopes'.format(bucket_name)
 
+    @deprecated(instead="get_all_scopes")
     def get_scope(self,           # type: CollectionManager
                   scope_name,     # type: str
                   *options,       # type: GetScopeOptions
@@ -63,10 +65,8 @@ class CollectionManager(GenericManager):
         :param kwargs: keyword version of options
         :return: An Iterable[ScopeSpec] containing all scopes in the associated bucket.
         """
-        kwargs.update({
-            "path":   "/pools/default/buckets/{}/collections".format(self.bucket_name),
-            "method": "GET"
-        })
+        kwargs.update({ 'path':   self.base_path,
+                        'method': 'GET' })
         response = self._admin_bucket.http_request(**forward_args(kwargs, *options))
         # now lets turn the response into a list of ScopeSpec...
         # the response looks like:
@@ -96,7 +96,6 @@ class CollectionManager(GenericManager):
         :raises: CollectionAlreadyExistsException
         :raises: ScopeNotFoundException
         """
-        path = "pools/default/buckets/{}/collections/{}".format(self.bucket_name, collection.scope_name)
 
         params = {
             'name': collection.name
@@ -105,7 +104,7 @@ class CollectionManager(GenericManager):
             params['maxTTL'] = int(collection.max_ttl.total_seconds())
 
         form = mk_formstr(params)
-        kwargs.update({'path': path,
+        kwargs.update({'path': '{}/{}/collections'.format(self.base_path, collection.scope_name),
                        'method': 'POST',
                        'content_type': 'application/x-www-form-urlencoded',
                        'content': form})
@@ -126,7 +125,7 @@ class CollectionManager(GenericManager):
         :param kwargs: keyword version of `options`
         :raises: CollectionNotFoundException
         """
-        kwargs.update({ 'path': "pools/default/buckets/{}/collections/{}/{}".format(self.bucket_name, collection.scope_name, collection.name),
+        kwargs.update({ 'path': '{}/{}/collections/{}'.format(self.base_path, collection.scope_name, collection.name),
                         'method': 'DELETE'})
         self._admin_bucket.http_request(**forward_args(kwargs, *options))
 
@@ -155,7 +154,7 @@ class CollectionManager(GenericManager):
         }
 
         form = mk_formstr(params)
-        kwargs.update({'path': "pools/default/buckets/{}/collections".format(self.bucket_name),
+        kwargs.update({'path': self.base_path,
                        'method': 'POST',
                        'content_type': 'application/x-www-form-urlencoded',
                        'content': form})
@@ -177,8 +176,8 @@ class CollectionManager(GenericManager):
 
         :raises: ScopeNotFoundException
         """
-        path = "pools/default/buckets/{}/collections/{}".format(self.bucket_name, scope_name)
-        kwargs.update({ 'path': path,
+
+        kwargs.update({ 'path': '{}/{}'.format(self.base_path, scope_name),
                         'method': 'DELETE'})
         self._admin_bucket.http_request(**forward_args(kwargs, *options))
 
