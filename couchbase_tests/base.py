@@ -336,7 +336,7 @@ class MockResourceManager(TestResourceManager):
     def __init__(self, config):
         super(MockResourceManager, self).__init__()
         self._config = config
-        self._info = None
+        self._info = self.create_mock()
         self._failed = False
 
     def _reset(self, *args, **kw):
@@ -352,6 +352,12 @@ class MockResourceManager(TestResourceManager):
         if self._failed:
             raise Exception('Not invoking failed mock!')
 
+        return self.create_mock()
+
+    def isDirty(self):
+        return False
+
+    def create_mock(self):
         bspec_dfl = BucketSpec('default', 'couchbase')
         mock = CouchbaseMock([bspec_dfl],
                              self._config.mockpath,
@@ -376,10 +382,6 @@ class MockResourceManager(TestResourceManager):
         info.enable_tracing = self._config.enable_tracing
         self._info = info
         return info
-
-    def isDirty(self):
-        return False
-
 
 class RealServerResourceManager(TestResourceManager):
     def __init__(self, config):
@@ -679,7 +681,6 @@ class ConnectionTestCaseBase(CouchbaseTestCase):
         # self.assertEqual(oldrc, 2)
 
     def setUp(self, **kwargs):
-        # type: (**Any) -> None
         super(ConnectionTestCaseBase, self).setUp()
         self.cb = self.make_connection(**kwargs)
 
@@ -781,8 +782,211 @@ class SkipUnsupported(SkipTest):
 
 QueryParams = NamedTuple('QueryParams', [('statement', str), ('rowcount', int)])
 
+def check_gc(execute_gc=False):
+    import gc
+    if execute_gc:
+        before = gc.get_count()
+        gc.collect()
+        print('Executed GC:  count before: {}, count after: {}'
+            .format(before, gc.get_count()))
+    else:
+        print('GC count: {}'.format(gc.get_count()))
+
+def check_fds():
+    # TODO:  add fd logic for windows
+    if sys.platform not in ['linux', 'darwin']:
+        return
+
+    from subprocess import Popen, PIPE, TimeoutExpired
+    python_pid = os.getpid()
+
+    # other commands useful for debugging
+    # args = ["lsof", "-iTCP", "-sTCP:LISTEN", "-n"]
+    # to do this though will take more hoops (or use shell=True ?)
+    # lsof -a -p python_pid | wc -l
+    args = ["lsof", "-a", "-p", str(python_pid)]
+
+    fds = Popen(args, stdout=PIPE, stderr=PIPE)
+
+    try:
+        output, _ = fds.communicate(timeout=3)
+        fd_output = output.decode().split('\n')
+        print('found {} fds'.format(len(fd_output)-1))
+
+    except TimeoutExpired:
+        fds.kill()
+        fds.communicate()
+        raise
+    
+
+class MockRestartException(Exception):
+    pass
+
+class CouchbaseClusterResourceException(Exception):
+    pass
+
+class CouchbaseClusterResource(object):
+
+    def __init__(self, test_resources):
+        """
+        Create a CouchbaseClusterResource object.
+        Responsible for handling cluster and bucket creation.
+
+        PYCBC-1097
+            Temporary fix to help improve the test suite
+
+        :param test_resources: list of tuples representing the CouchbaseTestCase resources
+        """
+        self.info = None
+        self.is_mock = False
+        self.cluster = None
+        self.bucket = None
+        self.bucket_name = None
+        self.cluster_version = None
+        self.set_test_resources(test_resources)
+
+    def set_test_resources(self, 
+                            test_resources # type: List[Tuple]
+                          ): 
+        # type: (...) -> None
+
+        #hack to grab info built in the resource's make() method
+        mock = test_resources[0][1]._info
+        real = test_resources[1][1]._config.realserver_info
+        if real:
+            self.info = real
+        else:
+            self.info = mock
+            self.is_mock = True
+
+    def setup_cluster(self, 
+                       **kwargs # type: Any
+                     ):
+        # type: (...) -> None
+        if self.is_mock:
+            #less patience with the mock
+            bucket_name = self.try_n_times(3, 
+                                3, self.init_cluster_and_bucket, **kwargs)
+        else:
+            bucket_name = self.try_n_times(10, 
+                                3, self.init_cluster_and_bucket, **kwargs)
+        self.bucket = self.cluster.bucket(bucket_name)
+        self.bucket_name = bucket_name
+        self.try_n_times(20, 3, self.is_ready)
+        self.set_cluster_version()
+
+    def init_cluster_and_bucket(self, 
+                                 **kwargs # type: Any
+                                ):
+        # type: (...) -> str
+        opts = kwargs.pop('cluster_options', None)
+        connargs = self.info.make_connargs(**kwargs)
+        connstr_abstract, bucket_name = self.get_connstr_and_bucket_name([], connargs)
+        self.cluster = self.instantiate_cluster(connstr_abstract, opts)
+        return bucket_name
+
+    def get_connstr_and_bucket_name(self,
+                                     args,  # type: List[Any]
+                                     kwargs # type: Any
+                                    ):
+        # type: (...) -> Tuple
+        connstr = args.pop(0) if args else kwargs.pop('connection_string')
+        connstr_nobucket = ConnectionString.parse(connstr)
+        bucket = connstr_nobucket.bucket
+        connstr_nobucket.bucket = None
+        return connstr_nobucket, bucket
+
+    def instantiate_cluster(self,
+                             connstr_nobucket,  # type: str
+                             opts=None  # type: Any
+                             ):
+        # type: (...) -> Cluster
+        mock_hack = self.info.mock_hack_options(self.is_mock)
+        auth = mock_hack.auth(self.info.admin_username, self.info.admin_password)
+        if not opts:
+            opts = ClusterOptions(auth)
+        else:
+            opts['authenticator'] = auth
+        if SLOWCONNECT_PATTERN.match(platform.platform()):
+            default_timeout_options = ClusterTimeoutOptions(config_total_timeout=timedelta(seconds=30))
+            default_timeout_options.update(opts.get('timeout_options', {}))
+            opts['timeout_options'] = default_timeout_options
+
+        return Cluster.connect(connection_string=str(connstr_nobucket),
+                                options=opts, **mock_hack.kwargs)
+
+    def disconnect_cluster(self) -> None:
+        self.cluster.disconnect()
+
+    def set_cluster_version(self) -> None:
+        pools = self.cluster._admin.http_request(path='/pools').value
+        self.cluster_version = pools['implementationVersion'].split('-')[0]
+
+    def is_ready(self) -> bool:
+        if self.is_mock:
+            return True
+        # NOTE: ping is broken -- returns the Analytics in the Query.  So, for now, we
+        # are _probably_ ok if we just make sure the 4 services are up.  Could be more
+        # tricky if needed...
+        service_types = [ServiceType.KeyValue, ServiceType.Search, ServiceType.Query,
+                         #ServiceType.Analytics,
+                         ServiceType.View]
+        resp = self.bucket.ping()
+        # first make sure all are there:
+        if all(k in resp.endpoints.keys() for k in service_types):
+            print("all services are present ({})".format(service_types))
+            for service in service_types:
+                if not any(x for x in resp.endpoints[service] if x.state == PingState.OK):
+                    raise Exception("{} isn't ready yet".format(service))
+            return True
+        raise Exception("not all services present in {}".format(resp))
+
+    def try_n_times(self,  # type: ClusterTestCase
+                    num_times,  # type: int
+                    seconds_between,  # type: SupportsFloat
+                    func,  # type: Callable
+                    *args,  # type: Any
+                    **kwargs  # type: Any
+                    ):
+        # type: (...) -> Any
+
+        for _ in range(num_times):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                # helpful to have this print statement when tests fail
+                logging.info("Got exception, sleeping: {}".format(traceback.format_exc()))
+                time.sleep(seconds_between)
+
+        if self.is_mock:
+
+            try:
+                self.restart_mock()
+                return func(*args, **kwargs)
+            except MockRestartException:
+                raise
+            except Exception:
+                pass
+            
+        raise CouchbaseClusterResourceException(
+            "unsuccessful {} after {} times, waiting {} seconds between calls".format(func, num_times, seconds_between))
+
+    def restart_mock(self) -> None:
+        try:
+            print('\nR.I.P. mock...')
+            self.info.mock.stop()
+            time.sleep(3)
+            self.info.mock.start()
+            self.info.port = self.info.mock.rest_port
+        except Exception as ex:
+            import traceback
+            traceback.print_exc()
+            raise MockRestartException('Error trying to restart mock')
+
 
 class ClusterTestCase(CouchbaseTestCase):
+    _cluster_resource = None
+
     def __init__(self, *args, **kwargs):
         super(ClusterTestCase, self).__init__(*args, **kwargs)
         self.validator = ClusterTestCase.ItemValidator(self)
@@ -898,14 +1102,51 @@ class ClusterTestCase(CouchbaseTestCase):
 
     def setUp(self, **kwargs):
         super(ClusterTestCase, self).setUp()
-        bucket_name = self.init_cluster_and_bucket(**kwargs)
-        self.bucket = self.cluster.bucket(bucket_name)
-        self.bucket_name = bucket_name
-        self.try_n_times(20, 3, self.is_ready)
+
+        # if kwargs are passed in, reset conneciton w/ specied options
+        if kwargs:
+            if type(self)._cluster_resource:
+                type(self)._cluster_resource.disconnect_cluster()
+                type(self)._cluster_resource = None
+
+            type(self)._cluster_resource = CouchbaseClusterResource(type(self).resources)
+            type(self)._cluster_resource.setup_cluster(**kwargs)
+        
+        if not type(self)._cluster_resource:
+            type(self)._cluster_resource = CouchbaseClusterResource(type(self).resources)
+            type(self)._cluster_resource.setup_cluster()
+
+        self.cluster = type(self)._cluster_resource.cluster
+        self.bucket = type(self)._cluster_resource.bucket
+        self.bucket_name = type(self)._cluster_resource.bucket_name
+        self.cluster_version = type(self)._cluster_resource.cluster_version
         self.query_props = QueryParams('SELECT mockrow', 1) if self.is_mock else \
             QueryParams("SELECT * FROM `beer-sample` LIMIT 2", 2)  # type: QueryParams
         self.empty_query_props = QueryParams('SELECT emptyrow', 0) if self.is_mock else \
             QueryParams("SELECT * FROM `beer-sample` LIMIT 0", 0)
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        #PYCBC-1097: this is a temporary hack to help stabilize builds
+        #   a larger refactor needs to be done
+        super(ClusterTestCase, cls).setUpClass()
+        if cls._cluster_resource:
+            return
+        
+        cls._cluster_resource = CouchbaseClusterResource(cls.resources)
+        cls._cluster_resource.setup_cluster()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        #PYCBC-1097: this is a temporary hack to help stabilize builds
+        #   a larger refactor needs to be done
+        if cls._cluster_resource:
+            cls._cluster_resource.disconnect_cluster()
+            cls._cluster_resource = None
+
+        # PYCBC-1097 - helper methods to track gc + fds
+        # check_gc(execute_gc=False)
+        # check_fds()
 
     def _get_connstr_and_bucket_name(self,
                                      args,  # type: List[Any]
@@ -915,36 +1156,6 @@ class ClusterTestCase(CouchbaseTestCase):
         bucket = connstr_nobucket.bucket
         connstr_nobucket.bucket = None
         return connstr_nobucket, bucket
-
-    # for now, we assume _all_ services should be present, and wait for that...
-    # NOTE: we have to call this after opening a bucket, as cluster ping still
-    # requires this for now.  There is an LCB issue on this.
-    def is_ready(self):
-        if self.is_mock:
-            return True
-        # NOTE: ping is broken -- returns the Analytics in the Query.  So, for now, we
-        # are _probably_ ok if we just make sure the 4 services are up.  Could be more
-        # tricky if needed...
-        service_types = [ServiceType.KeyValue, ServiceType.Search, ServiceType.Query,
-                         #ServiceType.Analytics,
-                         ServiceType.View]
-        resp = self.bucket.ping()
-        # first make sure all are there:
-        if all(k in resp.endpoints.keys() for k in service_types):
-            print("all services are present ({})".format(service_types))
-            for service in service_types:
-                if not any(x for x in resp.endpoints[service] if x.state == PingState.OK):
-                    raise Exception("{} isn't ready yet".format(service))
-            return True
-        raise Exception("not all services present in {}".format(resp))
-
-    def init_cluster_and_bucket(self, **kwargs):
-        # put the ClusterOptions in later
-        opts = kwargs.pop('cluster_options', None)
-        connargs = self.cluster_info.make_connargs(**kwargs)
-        connstr_abstract, bucket_name = self._get_connstr_and_bucket_name([], connargs)
-        self.cluster = self._instantiate_cluster(connstr_abstract, self.cluster_factory, opts)
-        return bucket_name
 
     T = TypeVar('T', bound=Cluster)
 
@@ -965,15 +1176,19 @@ class ClusterTestCase(CouchbaseTestCase):
             default_timeout_options = ClusterTimeoutOptions(config_total_timeout=timedelta(seconds=30))
             default_timeout_options.update(opts.get('timeout_options', {}))
             opts['timeout_options'] = default_timeout_options
-        return self.try_n_times(10, 3, cluster_class.connect,
+
+        if not self.is_mock:
+            return self.try_n_times(10, 3, cluster_class.connect,
                                 connection_string=str(connstr_nobucket),
                                 options=opts, **mock_hack.kwargs)
+
+        return cluster_class.connect(connection_string=str(connstr_nobucket),
+                                        options=opts, **mock_hack.kwargs)
 
     # NOTE: this really is only something you can trust in homogeneous clusters, but then again
     # this is a test suite.
     def get_cluster_version(self):
-        pools = self.cluster._admin.http_request(path='/pools').value
-        return pools['implementationVersion'].split('-')[0]
+        return self.cluster_version
 
     def get_bucket_info(self):
         return self.cluster._admin.bucket_info(self.bucket_name).value

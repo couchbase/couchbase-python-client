@@ -21,8 +21,10 @@ from couchbase_tests.base import CollectionTestCase
 from couchbase.cluster import ClusterOptions, ClusterTimeoutOptions,\
     ClusterTracingOptions, Compression, DiagnosticsOptions, Cluster
 from couchbase.auth import PasswordAuthenticator, ClassicAuthenticator
-from couchbase.diagnostics import ServiceType, EndpointState, ClusterState
+from couchbase.diagnostics import ServiceType, EndpointState, ClusterState, PingState
 from couchbase.exceptions import AlreadyShutdownException, BucketNotFoundException, NotSupportedException
+from couchbase.result import PingResult
+from couchbase.bucket import PingOptions
 from datetime import timedelta
 from unittest import SkipTest
 
@@ -30,6 +32,37 @@ from unittest import SkipTest
 class ClusterTests(CollectionTestCase):
     def setUp(self):
         super(ClusterTests, self).setUp()
+
+    def test_ping(self):
+        result = self.cluster.ping()
+        self.assertIsInstance(result, PingResult)
+
+        self.assertIsNotNone(result.sdk)
+        self.assertIsNotNone(result.id)
+        self.assertIsNotNone(result.version)
+        endpoints = result.endpoints
+        for k, vals in endpoints.items():
+            for v in vals:
+                if v.state == PingState.OK:
+                    self.assertIsNotNone(v)
+                    self.assertIsNotNone(v.id)
+                    self.assertIsNotNone(v.latency)
+                    self.assertIsNotNone(v.remote)
+                    self.assertIsNotNone(v.local)
+                    self.assertEqual(k, v.service_type)
+                    self.assertEqual(v.state, PingState.OK)
+
+    def test_ping_report_id(self):
+        report_id = "11111"
+        result = self.cluster.ping(PingOptions(report_id=report_id))
+        self.assertIn(report_id, result.id)
+
+    def test_ping_restrict_services(self):        
+        services = [ServiceType.KeyValue]
+        result = self.cluster.ping(PingOptions(service_types=services))
+        keys = list(result.endpoints.keys())
+        self.assertEqual(1, len(keys))
+        self.assertEqual(ServiceType.KeyValue, keys[0])
 
     def test_diagnostics(self):
         result = self.cluster.diagnostics(DiagnosticsOptions(report_id="imareportid"))

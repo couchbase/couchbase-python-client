@@ -742,10 +742,7 @@ class Cluster(CoreClient):
         :raise: :class:`~.exceptions.CouchbaseException` for various communication issues.
         """
 
-        bucket = self._get_an_open_bucket("Ping requires an open bucket")
-        if bucket:
-            return PingResult(bucket.ping(*options, **kwargs))
-        raise NoBucketException("ping requires a bucket be opened first")
+        return PingResult(CoreClient.ping(self, **forward_args(kwargs, *options)))
 
     def users(self):
         # type: (...) -> UserManager

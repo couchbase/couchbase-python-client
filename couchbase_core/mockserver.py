@@ -185,4 +185,29 @@ class CouchbaseMock(object):
         self._invoke()
 
     def stop(self):
-        self.po.kill()
+        '''
+            PYCBC - 1097
+            Allow for clean shutdown of mock in order to create another mock
+        '''
+        try:
+            self.listen.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        finally:
+            self.listen.close()
+
+        try:
+            self.harakiri_sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        finally:
+            self.harakiri_sock.close()
+
+        try:
+            self.po.terminate()
+            self.po.kill()
+            self.po.communicate()
+        except OSError:
+            pass
+
+
