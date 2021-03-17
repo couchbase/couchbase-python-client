@@ -5,6 +5,7 @@ from ..options import OptionBlockTimeOut, forward_args
 from couchbase.management.generic import GenericManager
 from typing import *
 from couchbase_core import abstractmethod, mk_formstr
+from couchbase_core.durability import Durability
 from couchbase.exceptions import HTTPException, ErrorMapper, BucketAlreadyExistsException, BucketDoesNotExistException
 import enum
 import datetime
@@ -226,7 +227,8 @@ class BucketSettings(dict):
                                     'conflict_resolution_type': -StringEnumLoose(ConflictResolutionType)},
                                 'evictionPolicy': {'eviction_policy': -StringEnumLoose(EvictionPolicyType)},
                                 'ejectionMethod': {'ejection_method': -StringEnumLoose(EjectionMethod)},
-                                'name': {'name': Identity(str)}})
+                                'name': {'name': Identity(str)},
+                                'durabilityMinLevel': {'minimum_durability_level': Identity(str)}})
 
     @overload
     def __init__(self,
@@ -249,6 +251,18 @@ class BucketSettings(dict):
         """
         if kwargs.get('bucket_type',None) == "couchbase":
             kwargs['bucket_type'] = BucketType.COUCHBASE
+
+        """
+            PYCBC-956
+            Bucket min durability setting is represented as string on the wire.
+            See Durability enum for string representations
+        """
+        durability = kwargs.pop('minimum_durability_level', None)
+        if durability:
+            if isinstance(durability, Durability):
+                kwargs['minimum_durability_level'] = durability.to_server_str()
+            else:
+                kwargs['minimum_durability_level'] = Durability.from_server_str(durability)
 
         super(BucketSettings, self).__init__(**self.mapping.sanitize_src(kwargs))
 

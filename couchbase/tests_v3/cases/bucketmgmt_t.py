@@ -7,6 +7,7 @@ from flaky import flaky
 from couchbase.exceptions import BucketDoesNotExistException, BucketAlreadyExistsException
 from couchbase.management.buckets import CreateBucketSettings, BucketSettings, BucketType
 from couchbase_tests.base import CollectionTestCase
+from couchbase_core.durability import Durability
 
 
 @flaky(10, 1)
@@ -36,7 +37,17 @@ class BucketManagementTests(CollectionTestCase):
 
     def test_bucket_create(self):
         self.bm.create_bucket(CreateBucketSettings(name="fred", bucket_type="couchbase", ram_quota_mb=100))
-        self.try_n_times(10, 1, self.bm.get_bucket, "fred")
+        bucket = self.try_n_times(10, 1, self.bm.get_bucket, "fred")
+        self.assertEqual(bucket['minimum_durability_level'], Durability.NONE)
+
+    def test_bucket_create_durability(self):
+        min_durability = Durability.MAJORITY_AND_PERSIST_TO_ACTIVE
+        self.bm.create_bucket(CreateBucketSettings(name="fred", 
+                                    bucket_type="couchbase", 
+                                    ram_quota_mb=100, 
+                                    minimum_durability_level=min_durability))
+        bucket = self.try_n_times(10, 1, self.bm.get_bucket, "fred")
+        self.assertEqual(bucket['minimum_durability_level'], min_durability)
 
     def test_bucket_create_fail(self):
         settings = CreateBucketSettings(name='fred', bucket_type=BucketType.COUCHBASE, ram_quota_mb=100)

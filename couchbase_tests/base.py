@@ -336,7 +336,10 @@ class MockResourceManager(TestResourceManager):
     def __init__(self, config):
         super(MockResourceManager, self).__init__()
         self._config = config
-        self._info = self.create_mock()
+        if config.mock_enabled:
+            self._info = self.create_mock()
+        else:
+            self._info = None
         self._failed = False
 
     def _reset(self, *args, **kw):
