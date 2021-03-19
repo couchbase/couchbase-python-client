@@ -19,6 +19,7 @@ from couchbase_tests.base import ViewTestCase
 from couchbase_core.user_constants import FMT_JSON
 from couchbase_v2.exceptions import HTTPException, NotSupportedException
 from couchbase_v2.bucket import Bucket
+from couchbase.management.users import Role
 
 from couchbase.auth import AuthDomain
 from nose import SkipTest
@@ -137,9 +138,9 @@ class ViewTest(ViewTestCase):
             raise SkipTest("Need real server")
         admin=self.make_admin_connection()
         bucket_name = 'ephemeral'
-        users=[('writer',('s3cr3t',[('data_reader', 'ephemeral'), ('data_writer', 'ephemeral')])),
-               ('reader',('s3cr3t',[('data_reader', 'ephemeral')])),
-               ('viewer',('s3cr3t',[('views_reader', 'ephemeral'), ('views_admin', 'ephemeral')]))]
+        users=[('writer',('s3cr3t',[Role(name='data_reader', bucket='ephemeral'), Role(name='data_writer', bucket='ephemeral')])),
+               ('reader',('s3cr3t',[Role(name='data_reader', bucket='ephemeral')])),
+               ('viewer',('s3cr3t',[Role(name='views_reader', bucket='ephemeral'), Role(name='views_admin', bucket='ephemeral')]))]
         user=users[2]
         (userid, password, roles) = user[0],user[1][0],user[1][1]
         # add user
@@ -154,7 +155,7 @@ class ViewTest(ViewTestCase):
         except HTTPException:
             raise SkipTest("Unable to provision ephemeral bucket")
         try:
-            admin.user_upsert(AuthDomain.Local, userid, password, roles)
+            admin.user_upsert(userid, AuthDomain.Local, password, roles)
             admin.wait_ready(bucket_name, timeout=10)
             conn_str = "couchbase://{0}/{1}".format(self.cluster_info.host, bucket_name)
             bucket = Bucket(connection_string=conn_str,username=userid,password=password)
@@ -162,4 +163,4 @@ class ViewTest(ViewTestCase):
             self.assertRaisesRegex(NotSupportedException, "Ephemeral", lambda: bucket.query("beer", "brewery_beers", streaming=True, limit=100))
         finally:
             admin.bucket_delete(bucket_name)
-            admin.user_remove(AuthDomain.Local, userid)
+            admin.user_remove(userid, AuthDomain.Local)

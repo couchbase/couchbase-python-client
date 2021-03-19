@@ -24,6 +24,7 @@ from couchbase.exceptions import (
     NetworkException, HTTPException)
 from couchbase_tests.base import CouchbaseTestCase, SkipTest
 from couchbase.auth import AuthDomain
+from couchbase.management.users import Role
 
 import time
 
@@ -43,7 +44,7 @@ class AdminSimpleTest(CouchbaseTestCase):
         del self.admin
 
     def test_http_request(self):
-        htres = self.admin.http_request('pools/')
+        htres = self.admin.http_request(path='pools/')
         self.assertIsInstance(htres, HttpResult)
         self.assertIsInstance(htres.value, dict)
         self.assertEqual(htres.http_status, 200)
@@ -119,8 +120,8 @@ class AdminSimpleTest(CouchbaseTestCase):
         str(None)
 
     def test_create_ephemeral_bucket_and_use(self):
-        if self.is_realserver:
-            raise SkipTest('Mock server must be used for admin tests')
+        # if not self.is_realserver:
+        #     raise SkipTest('Mock server must be used for admin tests')
         bucket_name = 'ephemeral'
         password = 'letmein'
 
@@ -153,9 +154,9 @@ class AdminSimpleTest(CouchbaseTestCase):
             if perm_generator:
                 roles = perm_generator(bucket_name)
             else:
-                roles = [('data_reader', bucket_name), ('data_writer', bucket_name)]
+                roles = [Role(name='data_reader', bucket=bucket_name), Role(name='data_writer', bucket=bucket_name)]
 
-            self.admin.user_upsert(AuthDomain.Local, bucket_name, password, roles)
+            self.admin.user_upsert(bucket_name, AuthDomain.Local, password, roles)
             # connect to bucket to ensure we can use it
             conn_str = "http://{0}:{1}/{2}".format(self.cluster_info.host, self.cluster_info.port,
                                                    bucket_name) + "?ipv6="+self.cluster_info.ipv6
@@ -165,6 +166,7 @@ class AdminSimpleTest(CouchbaseTestCase):
             action(bucket)
         finally:
             try:
+                self.admin.user_remove(bucket_name, AuthDomain.Local)
                 self.admin.bucket_delete(bucket_name)
             finally:
                 if self.is_realserver:

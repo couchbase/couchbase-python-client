@@ -82,6 +82,7 @@ class Admin(LCB.Bucket):
 
         :return: an instance of :class:`Admin`
         """
+        self.__is_6_5 = None
         connection_string = kwargs.pop('connection_string', None)
 
         if not connection_string:
@@ -99,6 +100,28 @@ class Admin(LCB.Bucket):
         })
         super(Admin, self).__init__(**kwargs)
         self._connect()
+
+    def _is_6_5_plus(self):
+
+        # lets just check once.  Below, we will only set this if we are sure about the value.
+        if self.__is_6_5 is not None:
+            return self.__is_6_5
+
+        try:
+            response = self.http_request(path="/pools").value
+            v = response.get("implementationVersion")
+            # lets just get first 3 characters -- the string should be X.Y.Z-XXXX-YYYY and we only care about
+            # major and minor version
+            self.__is_6_5 = (float(v[:3]) >= 6.5)
+        except E.NetworkException as e:
+            # the cloud doesn't let us query this endpoint, and so lets assume this is a cloud instance.  However
+            # lets not actually set the __is_6_5 flag as this also could be a transient error.  That means cloud
+            # instances check every time, but this is only temporary.
+            return True
+        except ValueError:
+            # this comes from the conversion to float -- the mock says "CouchbaseMock..."
+            self.__is_6_5 = True
+        return self.__is_6_5
 
     @internal
     def http_request(self,
@@ -309,10 +332,10 @@ class Admin(LCB.Bucket):
     @staticmethod
     def _get_management_path(auth_domain, userid=None):
 
-        if auth_domain == AuthDomain.Local:
-            domain = 'local'
-        elif auth_domain == AuthDomain.External:
-            domain = 'external'
+        if isinstance(auth_domain, str) and auth_domain in ["local", "external"]:
+            domain = auth_domain
+        elif isinstance(auth_domain, AuthDomain):
+            domain = AuthDomain.to_str(auth_domain)
         else:
             raise E.InvalidArgumentException.pyexc("Unknown Authentication Domain", auth_domain)
 
@@ -323,7 +346,25 @@ class Admin(LCB.Bucket):
         return path
 
     @internal
-    def users_get(self, domain):
+    def user_get(self, username, domain, timeout=None):
+        """
+        Retrieve a user from the server
+
+        :param username: The user ID.
+        :param AuthDomain domain: The authentication domain for the user.
+
+        :raise: :exc:`couchbase.exceptions.HTTPException` if the user does not exist.
+
+        :return: :class:`~.HttpResult`. The user can be obtained from the
+            returned object's `value` property.
+        """
+        path = self._get_management_path(domain, username)
+        return self.http_request(path=path,
+                                 method='GET',
+                                 timeout=timeout)
+
+    @internal
+    def users_get(self, domain, timeout=None):
         """
         Retrieve a list of users from the server.
 
@@ -333,43 +374,32 @@ class Admin(LCB.Bucket):
         """
         path = self._get_management_path(domain)
         return self.http_request(path=path,
-                                 method='GET')
-    @internal
-    def user_get(self, domain, userid, **kwargs):
-        """
-        Retrieve a user from the server
-
-        :param AuthDomain domain: The authentication domain for the user.
-        :param userid: The user ID.
-        :raise: :exc:`couchbase.exceptions.HTTPException` if the user does not exist.
-        :return: :class:`~.HttpResult`. The user can be obtained from the
-            returned object's `value` property.
-        """
-        path = self._get_management_path(domain, userid)
-        return self.http_request(path=path,
                                  method='GET',
-                                 **kwargs)
+                                 timeout=timeout)
+
     @internal
-    def user_upsert(self, domain, userid, password=None, roles=None, name=None):
+    def user_upsert(self, username, domain, password=None, roles=None, groups=None, name=None, timeout=None):
         """
         Upsert a user in the cluster
 
+        :param username: The new username or user to update
         :param AuthDomain domain: The authentication domain for the user.
-        :param userid: The user ID
         :param password: The user password
         :param roles: A list of roles. A role can either be a simple string,
             or a list of `(role, bucket)` pairs.
-        :param name: Human-readable name
+        :param name: role display name
+        :param timeout: time allowed for operation to be terminated.
+            This is controlled by the client.
         :raise: :exc:`couchbase.exceptions.HTTPException` if the request fails.
         :return: :class:`~.HttpResult`
 
         Creating a new read-only admin user ::
 
-            adm.upsert_user(AuthDomain.Local, 'mark', 's3cr3t', ['ro_admin'])
+            adm.user_upsert(AuthDomain.Local, 'mark', 's3cr3t', ['ro_admin'])
 
         An example of using more complex roles ::
 
-            adm.upsert_user(AuthDomain.Local, 'mark', 's3cr3t',
+            adm.user_upsert(AuthDomain.Local, 'mark', 's3cr3t',
                                               [('data_reader', '*'),
                                                ('data_writer', 'inbox')])
 
@@ -379,70 +409,156 @@ class Admin(LCB.Bucket):
            Due to the asynchronous nature of Couchbase management APIs, it may
            take a few moments for the new user settings to take effect.
         """
-        if not roles or not isinstance(roles, list):
+        if not groups and (not roles or not isinstance(roles, list)):
             raise E.InvalidArgumentException("Roles must be a non-empty list")
 
-        if password and domain == AuthDomain.External:
-            raise E.InvalidArgumentException("External domains must not have passwords")
-        role_string = self._gen_role_list(roles)
-        params = {
-            'roles': role_string,
-        }
+        if isinstance(domain, AuthDomain):
+            domain = AuthDomain.to_str(domain)
 
+        if password and domain == "external":
+            raise E.InvalidArgumentException("External domains must not have passwords")
+        
+        params = {}
+        if roles:
+            params['roles'] = ','.join(list(map(lambda r: r.to_server_str(), roles)))
+        # For backwards compatibility with Couchbase Server 6.0 and earlier,
+        # the "groups" parameter MUST be omitted if the group list is empty. 
+        # Couchbase Server 6.5 treats the absent parameter the same as an 
+        # explicit parameter with no value (removes any existing group associations, 
+        # which is what we want in this case).
+        if groups and self._is_6_5_plus():
+            params['groups'] = ','.join(groups)
         if password:
             params['password'] = password
         if name:
             params['name'] = name
 
         form = mk_formstr(params)
-        path = self._get_management_path(domain, userid)
+        path = self._get_management_path(domain, username)
         return self.http_request(path=path,
                                  method='PUT',
                                  content_type='application/x-www-form-urlencoded',
-                                 content=form)
-
-    @staticmethod
-    def _gen_role_list(roles):
-        tmplist = []
-        for role in roles:
-            tmplist.append(Admin._role_to_str(role))
-        role_string = ','.join(tmplist)
-        return role_string
-
-    @staticmethod
-    def _role_to_str(role):
-        name=None
-        bucket=None
-        try:
-            if isinstance(role, basestring):
-                name=role
-            elif isinstance(role, dict):
-                name, bucket = map(role.get, ('role','bucket'))
-            else:
-                name, bucket = role
-        except Exception as e:
-            pass
-        if name and bucket:
-            return '{0}[{1}]'.format(name,bucket)
-        else:
-            return name
-
-    role_format = re.compile(r'^(?P<role>.*?)(|\[(?P<bucket>.*?)\])$')
-
-    @staticmethod
-    def _str_to_role(param):
-        return Admin.role_format.match(param).groupdict()
+                                 content=form,
+                                 timeout=timeout)
 
     @internal
-    def user_remove(self, domain, userid, **kwargs):
+    def user_remove(self, username, domain, timeout=None):
         """
         Remove a user
+        
         :param AuthDomain domain: The authentication domain for the user.
-        :param userid: The user ID to remove
+        :param username: The user ID to remove
+
         :raise: :exc:`couchbase.exceptions.HTTPException` if the user does not exist.
+
         :return: :class:`~.HttpResult`
         """
-        path = self._get_management_path(domain, userid)
+        path = self._get_management_path(domain, username)
+        return self.http_request(path=path,
+                                 method='DELETE',
+                                 timeout=timeout)
+
+    @internal
+    def get_roles(self, timeout=None):
+        """
+        Retrieve roles from the server
+
+        :param timeout: time allowed for operation to be terminated.
+            This is controlled by the client.
+
+        :raise: :exc:`couchbase.exceptions.HTTPException` if the request fails.
+
+        :return: :class:`~.HttpResult`. The user can be obtained from the
+            returned object's `value` property.
+        """
+        return self.http_request(path="/settings/rbac/roles/",
+                                 method='GET',
+                                 timeout=timeout)
+    
+    @internal
+    def group_upsert(self, group_name, roles=None, description=None, ldap_group_reference=None, timeout=None):
+        """
+        Upsert a group in the cluster
+
+        :param group_name: The name of the group
+        :param roles: A list of roles
+        :param description: The description of the group
+        :param ldap_group_reference: The external LDAP group reference
+        :param timeout: time allowed for operation to be terminated.
+            This is controlled by the client.
+
+        :raise: :exc:`couchbase.exceptions.HTTPException` if the request fails.
+
+        :return: :class:`~.HttpResult`
+
+        .. warning::
+
+           Due to the asynchronous nature of Couchbase management APIs, it may
+           take a few moments for the new user settings to take effect.
+        """
+        params = {}
+        if roles:
+            params['roles'] = ','.join(list(map(lambda r: r.to_server_str(), roles)))
+
+        if description:
+            params['description'] = description
+
+        if ldap_group_reference:
+            params['ldap_group_ref'] = ldap_group_reference
+
+        path = "/settings/rbac/groups/{}".format(group_name)
+        form = mk_formstr(params)
+        return self.http_request(path=path,
+                                 method='PUT',
+                                 content_type='application/x-www-form-urlencoded',
+                                 content=form,
+                                 timeout=timeout)
+
+    @internal
+    def group_get(self, group_name, timeout=None):
+        """
+        Retrieve a group from the server
+
+        :param group_name: the name of the group to get
+        
+        :raise: :exc:`couchbase.exceptions.HTTPException` if the group does not exist.
+
+        :return: :class:`~.HttpResult`. The group can be obtained from the
+            returned object's `value` property.
+        """
+
+        path = '/settings/rbac/groups/{}'.format(group_name)
+        return self.http_request(path=path,
+                                 method='GET',
+                                 timeout=timeout)
+
+    @internal
+    def groups_get(self, timeout=None):
+        """
+        Retrieve a list of groups from the server.
+
+        :raise: :exc:`couchbase.exceptions.HTTPException` if the request fails.
+
+        :return: :class:`~.HttpResult`. The list of users can be obtained from
+            the returned object's `value` property.
+        """
+        
+        return self.http_request(path='/settings/rbac/groups/',
+                                 method='GET',
+                                 timeout=timeout)
+
+    @internal
+    def group_remove(self, group_name, **kwargs):
+        """
+        Remove a group
+        
+        :param group_name: the name of the group to get
+
+        :raise: :exc:`couchbase.exceptions.HTTPException` if the group does not exist.
+
+        :return: :class:`~.HttpResult`
+        """
+        path = '/settings/rbac/groups/{}'.format(group_name)
         return self.http_request(path=path,
                                  method='DELETE',
                                  **kwargs)

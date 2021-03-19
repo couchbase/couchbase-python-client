@@ -1014,6 +1014,8 @@ class BadHandleException(CouchbaseException):
 class HTTPException(CouchbaseException):
     """HTTP error"""
 
+class FeatureNotFoundException(HTTPException):
+    """Thrown when feature is not supported by server version."""
 
 class ObjectThreadException(CouchbaseException):
     """Thrown when access from multiple threads is detected"""

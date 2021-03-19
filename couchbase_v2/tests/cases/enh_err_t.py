@@ -19,6 +19,7 @@ import unittest
 from couchbase_v2.exceptions import (CouchbaseException)
 from couchbase_tests.base import CouchbaseTestCase
 from couchbase.auth import AuthDomain
+from couchbase.management.users import Role
 import sys
 import time
 from nose import SkipTest
@@ -47,14 +48,14 @@ class EnhancedErrorTest(CouchbaseTestCase):
 
     def test_enhanced_err_present_authorisation(self):
         import couchbase_core.subdocument as SD
-        users=[('writer',('s3cr3t',[('data_reader', 'default'), ('data_writer', 'default')])),
-              ('reader',('s3cr3t',[('data_reader', 'default')]))]
+        users=[('writer',('s3cr3t',[Role(name='data_reader', bucket='default'), Role(name='data_writer', bucket='default')])),
+              ('reader',('s3cr3t',[Role(name='data_reader', bucket='default')]))]
         #self.mockclient._do_request("SET_ENHANCED_ERRORS",{"enabled":True})
         for user in users:
             print(str(user))
             (userid, password, roles) = user[0],user[1][0],user[1][1]
             # add user
-            self.admin.user_upsert(AuthDomain.Local, userid, password, roles)
+            self.admin.user_upsert(userid, AuthDomain.Local, password, roles)
             time.sleep(1)
             try:
                 connection = self.make_connection(username=userid,password=password)
@@ -71,7 +72,7 @@ class EnhancedErrorTest(CouchbaseTestCase):
                     self.assertRegexpMatches(str(e),r".*Context=Authorization failure.*,.*Ref=.*","exception as string doesn't contain both fields")
             finally:
                 #remove user
-                self.admin.user_remove(AuthDomain.Local, userid)
+                self.admin.user_remove(userid, AuthDomain.Local)
 
 if __name__ == "__main__":
     unittest.main()

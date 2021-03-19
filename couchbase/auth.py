@@ -241,3 +241,17 @@ class AuthDomain(IntEnum):
     """
     Local = 0
     External = 1
+
+    @classmethod
+    def to_str(cls, value):
+        if value == cls.External:
+            return "external"
+        else:
+            return "local"
+
+    @classmethod
+    def from_str(cls, value):
+        if value == "external":
+            return cls.External
+        else:
+            return cls.Local
