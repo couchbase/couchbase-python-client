@@ -1473,7 +1473,7 @@ class SearchResultBase(object):
         # type: (...) -> SearchRow
         return SearchRow(orig_value.pop('index'), orig_value.pop('id'), orig_value.pop('score'),
                          locations=SearchRowLocations(**orig_value.pop('locations', {})),
-                         **{k: orig_value[k] for k in (attr.fields(SearchRow) & orig_value.keys())})
+                         **{k: orig_value[k] for k in ([f.name for f in attr.fields(SearchRow)] & orig_value.keys())})
 
     def facets(self):
         # type: (...) -> Dict[str, SearchFacetResult]

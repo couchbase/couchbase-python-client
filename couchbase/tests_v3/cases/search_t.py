@@ -41,6 +41,7 @@ import couchbase.management
 import json
 import os
 from couchbase.tests_v3.cases import sdk_testcases
+import time
 
 search_testcases = os.path.join(sdk_testcases, "search")
 
@@ -105,7 +106,7 @@ class SearchResultTest(CouchbaseTestCase):
             self.assertIsInstance(entry.id, str)
             self.assertIsInstance(entry.score, float)
             self.assertIsInstance(entry.index, str)
-            self.assertIsInstance(entry.fields, search.SearchRowFields)
+            self.assertIsInstance(entry.fields, dict)
             self.assertIsInstance(entry.locations, search.SearchRowLocations)
             print(entry)
             for location in entry.fields:
@@ -146,39 +147,58 @@ class SearchTest(ClusterTestCase):
         super(SearchTest, self).setUp(**kwargs)
         if self.is_mock:
             raise SkipTest("Search not available on Mock")
-        self.cluster.search_indexes().upsert_index(
-            SearchIndex(name="beer-search", idx_type="fulltext-index", source_type="couchbase", source_name="beer-sample"))
+        with open(os.path.join(search_testcases,"beer-search-index-params.json")) as params_file:
+            input=params_file.read()
+            params_json=json.loads(input)
+            sm = self.cluster.search_indexes()
+            try:
+                sm.get_index('beer-search-index')
+            except Exception:
+                sm.upsert_index(
+                    SearchIndex(name="beer-search-index", 
+                        idx_type="fulltext-index", 
+                        source_name="beer-sample", 
+                        source_type="couchbase",
+                        params=params_json)
+                )
+                #make sure the index loads...
+                self.try_n_times(10, 10, sm.get_indexed_documents_count, 'beer-search-index')
 
-    def test_locations(self):
+    def test_cluster_search(self):
         options = search.SearchOptions(fields=["*"], limit=10, sort=["-_score"],
                                        scan_consistency=SearchScanConsistency.NOT_BOUNDED.value)
         initial = datetime.datetime.now()
-        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search", search.MatchQuery("Budweiser", prefix_length=0, fuzziness=0),
-                                                                          options
-                                                                          )  # type: SearchResult
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index", 
+                                                search.TermQuery("north"), 
+                                                search.SearchOptions(limit=10))  # type: SearchResult
         SearchResultTest._check_search_result(self, initial, 6, x)
 
 
-    def test_cluster_search(self  # type: SearchTest
+    def test_cluster_search_fields(self  # type: SearchTest
                             ):
         if self.is_mock:
             raise SkipTest("F.T.S. not supported by mock")
-        most_common_term_max = 10
+        test_fields = ['category','name']
         initial = datetime.datetime.now()
-        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search", search.TermQuery("category"),
-                                                                          search.SearchOptions(facets={'fred': search.TermFacet('category',
-                                                                                                                                most_common_term_max)}))  # type: SearchResult
-        r = x.rows()
-        print(r)
-        first_entry = x.rows()[0]
-        self.assertEqual("brasserie_de_brunehaut-mont_st_aubert", first_entry.id)
-        SearchResultTest._check_search_result(self, initial, 6, x)
-        fred_facet = x.facets()['fred']
-        self.assertIsInstance(fred_facet, search.SearchFacetResult)
+        #verify fields works w/in kwargs
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index", 
+                                            search.TermQuery("north"), 
+                                            fields=test_fields)  # type: SearchResult
 
-        self.assertRaises(couchbase.exceptions.SearchException, self.cluster.search_query, "beer-search",
-                          search.TermQuery("category"),
-                          facets={'fred': None})
+        first_entry = x.rows()[0]
+        self.assertNotEqual(first_entry.fields, {})
+        res = list(map(lambda f: f in test_fields,first_entry.fields.keys()))
+        self.assertTrue(all(res))
+        SearchResultTest._check_search_result(self, initial, 6, x)
+
+        #verify fields works w/in SearchOptions
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index", 
+                                            search.TermQuery("north"), 
+                                            search.SearchOptions(fields=test_fields))  # type: SearchResult
+        first_entry = x.rows()[0]
+        self.assertNotEqual(first_entry.fields, {})
+        res = list(map(lambda f: f in test_fields,first_entry.fields.keys()))
+        self.assertTrue(all(res))
 
 
 class SearchStringsTest(CouchbaseTestCase):
