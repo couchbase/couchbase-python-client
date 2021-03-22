@@ -166,7 +166,8 @@ class DefaultForwarder(Forwarder):
                 'options': {},
                 'durability': {'durability_level': lambda durability: getattr(durability.get('level', None),'value', None),
                                "replicate_to": lambda client_dur: client_dur.get('replicate_to', None),
-                               "persist_to": lambda client_dur: client_dur.get('persist_to', None)}}
+                               "persist_to": lambda client_dur: client_dur.get('persist_to', None)},
+                'disable_scoring': {'disable_scoring': lambda dis_score: True if dis_score else None}}
 
 
 forward_args = DefaultForwarder().forward_args

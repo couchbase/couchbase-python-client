@@ -313,6 +313,47 @@ class SearchTest(ClusterTestCase):
                           search.TermQuery("north"),
                           facets={'abv': search.DateFacet('abv', 10)})
 
+    def test_cluster_search_disable_scoring(self # type: SearchTest
+                                ):
+        if self.is_mock:
+            raise SkipTest("F.T.S. not supported by mock")
+
+
+        #verify disable scoring works w/in SearchOptions
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index", 
+                                                search.TermQuery("north"), 
+                                                search.SearchOptions(limit=10, 
+                                                    disable_scoring=True) )  # type: SearchResult
+        rows = x.rows()
+        res = list(map(lambda r: r.score == 0, rows))
+        self.assertTrue(all(res))
+
+        # verify disable scoring works w/in kwargs
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index", 
+                                                search.TermQuery("north"), 
+                                                search.SearchOptions(limit=10),
+                                                disable_scoring=True)  # type: SearchResult
+        rows = x.rows()
+        res = list(map(lambda r: r.score == 0, rows))
+        self.assertTrue(all(res))
+        
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index", 
+                                                search.TermQuery("north"), 
+                                                search.SearchOptions(limit=10, 
+                                                    disable_scoring=False) )  # type: SearchResult
+
+        rows = x.rows()
+        res = list(map(lambda r: r.score != 0, rows))
+        self.assertTrue(all(res))
+
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index", 
+                                                search.TermQuery("north"), 
+                                                search.SearchOptions(limit=10))  # type: SearchResult
+
+        rows = x.rows()
+        res = list(map(lambda r: r.score != 0, rows))
+        self.assertTrue(all(res))
+
 
 class SearchStringsTest(CouchbaseTestCase):
     def test_fuzzy(self):

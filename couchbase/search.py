@@ -117,6 +117,11 @@ def _assign_kwargs(self, kwargs):
             raise AttributeError(k, 'Not valid for', self.__class__.__name__)
         setattr(self, k, kwargs[k])
 
+def _disable_scoring(value):
+    if value:
+        return 'none'
+    return None
+
 
 class Facet(object):
     """
@@ -457,6 +462,9 @@ class _Params(object):
         a :class:`Sort` class
         """
     )
+
+    disable_scoring = _genprop(
+        _disable_scoring, 'score', doc='Whether to disable scoring on the FTS search')
 
     consistency = _genprop(
         _consistency, 'ctl', 'consistency', doc="""
@@ -1579,6 +1587,8 @@ class SearchOptions(OptionBlockTimeOut):
             A way to support unknown commands, and be future-compatible.
         :param Iterable[Sort] sort:
             List of various :class:`~.Sort` objects to sort the results.
+        :param bool disable_scoring:
+            Disable scoring of the search results.
         """
         # convert highlight_style to str if it is present...
         style = kwargs.get('highlight_style', None)
@@ -1587,6 +1597,9 @@ class SearchOptions(OptionBlockTimeOut):
         sort = kwargs.get('sort', None)
         if sort:
             kwargs['sort'] = SortString(*sort)
+        disable_scoring = kwargs.pop('disable_scoring', None)
+        if disable_scoring:
+            kwargs['disable_scoring'] = True
         super(SearchOptions, self).__init__(**kwargs)
 
     @classmethod
