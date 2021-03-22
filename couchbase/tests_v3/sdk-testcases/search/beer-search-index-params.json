@@ -67,6 +67,36 @@
                                 "type": "text"
                             }
                         ]
+                    },
+                    "abv": {
+                        "enabled": true,
+                        "dynamic": false,
+                        "fields": [
+                            {
+                                "docvalues": true,
+                                "include_in_all": true,
+                                "include_term_vectors": true,
+                                "index": true,
+                                "name": "abv",
+                                "store": true,
+                                "type": "number"
+                            }
+                        ]
+                    },
+                    "updated": {
+                        "enabled": true,
+                        "dynamic": false,
+                        "fields": [
+                            {
+                                "docvalues": true,
+                                "include_in_all": true,
+                                "include_term_vectors": true,
+                                "index": true,
+                                "name": "updated",
+                                "store": true,
+                                "type": "datetime"
+                            }
+                        ]
                     }
                 }
             }

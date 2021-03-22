@@ -200,6 +200,119 @@ class SearchTest(ClusterTestCase):
         res = list(map(lambda f: f in test_fields,first_entry.fields.keys()))
         self.assertTrue(all(res))
 
+    def test_cluster_search_term_facets(self  # type: SearchTest
+                            ):
+        if self.is_mock:
+            raise SkipTest("F.T.S. not supported by mock")
+
+        facet_name = 'beers'
+        facet = search.TermFacet('category', 10)
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                            search.TermQuery("north"),
+                                            search.SearchOptions(facets={
+                                                            facet_name:facet
+                                                        }))  # type: SearchResult
+
+        x.rows()
+        result_facet = x.facets()[facet_name]
+        self.assertIsInstance(result_facet, search.SearchFacetResult)
+        self.assertEqual(facet_name, result_facet.name)
+        self.assertEqual(facet.field, result_facet.field)
+        self.assertGreaterEqual(facet.limit, len(result_facet.terms))
+
+        self.assertRaises(couchbase.exceptions.SearchException, self.cluster.search_query,
+                          "beer-search-index",
+                          search.TermQuery("north"),
+                          facets={'beers': None})
+
+    def test_cluster_search_numeric_facets(self  # type: SearchTest
+                            ):
+        if self.is_mock:
+            raise SkipTest("F.T.S. not supported by mock")
+
+        facet_name = 'abv'
+        facet = search.NumericFacet('abv')
+        facet.add_range('low', max=7)
+        facet.add_range('med', min=7, max=10)
+        facet.add_range('high', min=10)
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                            search.TermQuery("north"),
+                                            search.SearchOptions(facets={
+                                                            facet_name:facet
+                                                        }))  # type: SearchResult
+
+        x.rows()
+        result_facet = x.facets()[facet_name]
+        self.assertIsInstance(result_facet, search.SearchFacetResult)
+        self.assertEqual(facet_name, result_facet.name)
+        self.assertEqual(facet.field, result_facet.field)
+        # if a limit is not provided, only the top-level facet results are provided
+        self.assertEqual(0, len(result_facet.numeric_ranges))
+
+        # try again but verify the limit is applied (i.e. limit < len(numeric_ranges))
+        facet.limit = 2
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                    search.TermQuery("north"),
+                                    search.SearchOptions(facets={
+                                                    facet_name:facet
+                                                }))  # type: SearchResult
+
+        x.rows()
+        result_facet = x.facets()[facet_name]
+        self.assertIsInstance(result_facet, search.SearchFacetResult)
+        self.assertEqual(facet_name, result_facet.name)
+        self.assertEqual(facet.field, result_facet.field)
+        self.assertGreaterEqual(facet.limit, len(result_facet.numeric_ranges))
+        self.assertEqual(facet.limit, len(result_facet.numeric_ranges))
+        self.assertRaises(couchbase.exceptions.SearchException, self.cluster.search_query,
+                          "beer-search-index",
+                          search.TermQuery("north"),
+                          facets={'abv': search.NumericFacet('abv', 10)})
+
+    def test_cluster_search_date_facets(self  # type: SearchTest
+                            ):
+        if self.is_mock:
+            raise SkipTest("F.T.S. not supported by mock")
+
+        facet_name = 'updated'
+        facet = search.DateFacet('updated')
+        facet.add_range('early', end='2010-12-01T00:00:00Z')
+        facet.add_range('mid', start='2010-12-01T00:00:00Z', end='2011-01-01T00:00:00Z')
+        facet.add_range('late', start='2011-01-01T00:00:00Z')
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                            search.TermQuery("north"),
+                                            search.SearchOptions(facets={
+                                                            facet_name:facet
+                                                        }))  # type: SearchResult
+
+        x.rows()
+        result_facet = x.facets()[facet_name]
+        self.assertIsInstance(result_facet, search.SearchFacetResult)
+        self.assertEqual(facet_name, result_facet.name)
+        self.assertEqual(facet.field, result_facet.field)
+        # if a limit is not provided, only the top-level facet results are provided
+        self.assertEqual(0, len(result_facet.date_ranges))
+
+        # try again but verify the limit is applied (i.e. limit < len(date_ranges))
+        facet.limit = 2
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                    search.TermQuery("north"),
+                                    search.SearchOptions(facets={
+                                                    facet_name:facet
+                                                }))  # type: SearchResult
+
+        x.rows()
+        result_facet = x.facets()[facet_name]
+        self.assertIsInstance(result_facet, search.SearchFacetResult)
+        self.assertEqual(facet_name, result_facet.name)
+        self.assertEqual(facet.field, result_facet.field)
+        self.assertEqual(facet.limit, len(result_facet.date_ranges))
+
+        self.assertRaises(couchbase.exceptions.SearchException, self.cluster.search_query,
+                          "beer-search-index",
+                          search.TermQuery("north"),
+                          facets={'abv': search.DateFacet('abv', 10)})
+
 
 class SearchStringsTest(CouchbaseTestCase):
     def test_fuzzy(self):

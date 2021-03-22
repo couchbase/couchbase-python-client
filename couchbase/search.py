@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import *
 
@@ -122,8 +122,10 @@ class Facet(object):
     """
     Base facet class. Each facet must have a field which it aggregates
     """
-    def __init__(self, field):
+    def __init__(self, field, limit=0):
         self._json_ = {'field': field}
+        if limit:
+            self._json_['size'] = limit
 
     @property
     def encodable(self):
@@ -137,6 +139,9 @@ class Facet(object):
     """
     field = _genprop_str('field')
 
+    limit = _genprop(int, 'size',
+                    doc="Maximum number of facet results to return")
+
     def __repr__(self):
         return '{0.__class__.__name__}<{0._json_!r}>'.format(self)
 
@@ -146,12 +151,7 @@ class TermFacet(Facet):
     Facet aggregating the most frequent terms used.
     """
     def __init__(self, field, limit=0):
-        super(TermFacet, self).__init__(field)
-        if limit:
-            self.limit = limit
-
-    limit = _genprop(int, 'size',
-                     doc="Maximum number of terms/count pairs to return")
+        super(TermFacet, self).__init__(field, limit)
 
 
 def _mk_range_bucket(name, n1, n2, r1, r2):
@@ -187,8 +187,8 @@ class DateFacet(Facet):
     This facet must have at least one invocation of :meth:`add_range` before
     it is added to :attr:`~Params.facets`.
     """
-    def __init__(self, field):
-        super(DateFacet, self).__init__(field)
+    def __init__(self, field, limit=0):
+        super(DateFacet, self).__init__(field, limit)
         self._ranges = []
 
     def add_range(self, name, start=None, end=None):
@@ -214,8 +214,8 @@ class NumericFacet(Facet):
     This facet must have at least one invocation of :meth:`add_range`
     before it is added to :attr:`Params.facets`
     """
-    def __init__(self, field):
-        super(NumericFacet, self).__init__(field)
+    def __init__(self, field, limit=0):
+        super(NumericFacet, self).__init__(field, limit)
         self._ranges = []
 
     def add_range(self, name, min=None, max=None):
@@ -1375,6 +1375,24 @@ class SearchRow(object):
     fragments = attr.ib(factory=dict, type=Optional[Mapping[str, str]])
     fields = attr.ib(default=attr.Factory(SearchRowFields), type=SearchRowFields)
 
+@attr.s
+class SearchTermRange(object):
+    term = attr.ib(type=str)
+    count = attr.ib(type=UnsignedInt64)
+
+@attr.s
+class SearchNumericRange(object):
+    name = attr.ib(type=str)
+    count = attr.ib(type=UnsignedInt64)
+    min = attr.ib(type=float, default=None)
+    max = attr.ib(type=float, default=None)
+    
+@attr.s
+class SearchDateRange(object):
+    name = attr.ib(type=str)
+    count = attr.ib(type=UnsignedInt64)
+    start = attr.ib(type=datetime, default=None)
+    end = attr.ib(type=datetime, default=None)
 
 @attr.s
 class SearchFacetResult(object):
@@ -1385,6 +1403,9 @@ class SearchFacetResult(object):
     total = attr.attr(type=UnsignedInt64)
     missing = attr.attr(type=UnsignedInt64)
     other = attr.attr(type=UnsignedInt64)
+    terms = attr.attr(factory=list, type=SearchTermRange)
+    numeric_ranges = attr.attr(factory=list, type=SearchTermRange)
+    date_ranges = attr.attr(factory=list, type=SearchTermRange)
 
 
 """ If top-level "error" property exists, then SDK should build and throw CouchbaseException with its content."""
@@ -1477,8 +1498,20 @@ class SearchResultBase(object):
 
     def facets(self):
         # type: (...) -> Dict[str, SearchFacetResult]
-        return {k: SearchFacetResult(k, v.pop('field'), v.pop('total'), v.pop('missing'), v.pop('other')) for k, v in
-                super(SearchResultBase, self).facets.items()}
+        facet_results = {}
+        for k, v in super(SearchResultBase, self).facets.items():
+            facet_results[k] = SearchFacetResult(k, v.pop('field'), v.pop('total'), v.pop('missing'), v.pop('other'))
+            terms = v.pop('terms', None)
+            numeric_ranges = v.pop('numeric_ranges', None)
+            date_ranges = v.pop('date_ranges', None)
+            if terms:
+                facet_results[k].terms = list(map(lambda t: SearchTermRange(**t), terms))
+            if numeric_ranges:
+                facet_results[k].numeric_ranges = list(map(lambda nr: SearchNumericRange(**nr), numeric_ranges))
+            if date_ranges:
+                facet_results[k].date_ranges = list(map(lambda dr: SearchDateRange(**dr), date_ranges))
+
+        return facet_results
 
     def metadata(self):  # type: (...) -> SearchMetaData
         return SearchMetaData(**super(SearchResultBase, self).meta)
