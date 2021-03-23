@@ -27,7 +27,8 @@ class SearchScanConsistency(Enum):
     NOT_BOUNDED
         Which means we just return what is currently in the indexes.
     """
-    NOT_BOUNDED = "not_bounded"
+    NOT_BOUNDED = ""
+    AT_PLUS = "at_plus"
 
 
 def _genprop(converter, *apipaths, **kwargs):
@@ -103,7 +104,9 @@ def _consistency(value):
     """
     Validator for 'consistency' parameter
     """
-    if value and value.lower() not in ('', 'not_bounded'):
+    if isinstance(value, SearchScanConsistency):
+        value = value.value
+    if value and value.lower() not in ('', 'at_plus'):
         raise ValueError('Invalid value!')
     return value
 
@@ -422,6 +425,14 @@ class _Params(object):
                 'vectors': {
                     index_name: self._ms._to_fts_encodable()
                 }
+            }
+            self._json_.setdefault('ctl', {})['consistency'] = sv_val
+
+
+        if self.consistency is not None and isinstance(self.consistency, str):
+            # Encode according to scan vectors..
+            sv_val = {
+                'level': self.consistency
             }
             self._json_.setdefault('ctl', {})['consistency'] = sv_val
 

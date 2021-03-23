@@ -354,6 +354,69 @@ class SearchTest(ClusterTestCase):
         res = list(map(lambda r: r.score != 0, rows))
         self.assertTrue(all(res))
 
+    def test_cluster_search_highlight(self # type: SearchTest
+                                ):
+        if self.is_mock:
+            raise SkipTest("F.T.S. not supported by mock")
+
+        initial = datetime.datetime.now()
+        #verify locations/fragments works w/in SearchOptions
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index", 
+                                                search.TermQuery("north"), 
+                                                search.SearchOptions(highlight_style=search.HighlightStyle.Html, limit=10))  # type: SearchResult
+
+        rows = x.rows()
+        self.assertGreaterEqual(10, len(rows))
+        locations = rows[0].locations
+        fragments = rows[0].fragments
+        self.assertIsInstance(fragments, dict)
+        res = list(map(lambda l: isinstance(l, search.SearchRowLocation), locations.get_all()))
+        self.assertTrue(all(res))
+        self.assertIsInstance(locations, search.SearchRowLocations)
+        SearchResultTest._check_search_result(self, initial, 6, x)
+
+        initial = datetime.datetime.now()
+        #verify locations/fragments works w/in kwargs
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index", 
+                                                search.TermQuery("north"), 
+                                                search.SearchOptions(limit=10),
+                                                highlight_style='html')  # type: SearchResult
+
+        rows = x.rows()
+        self.assertGreaterEqual(10, len(rows))
+        locations = rows[0].locations
+        fragments = rows[0].fragments
+        self.assertIsInstance(fragments, dict)
+        res = list(map(lambda l: isinstance(l, search.SearchRowLocation), locations.get_all()))
+        self.assertTrue(all(res))
+        self.assertIsInstance(locations, search.SearchRowLocations)
+        SearchResultTest._check_search_result(self, initial, 6, x)
+
+    def test_cluster_search_scan_consistency(self # type: SearchTest
+                                ):
+        if self.is_mock:
+            raise SkipTest("F.T.S. not supported by mock")
+
+        initial = datetime.datetime.now()
+        #verify scan consistency works w/in SearchOptions
+        x = self.try_n_times_decorator(self.cluster.search_query, 2, 1)("beer-search-index", 
+                                                search.TermQuery("north"), 
+                                                search.SearchOptions(scan_consistency=search.SearchScanConsistency.NOT_BOUNDED))  # type: SearchResult
+
+        rows = x.rows()
+        self.assertGreaterEqual(10, len(rows))
+        SearchResultTest._check_search_result(self, initial, 6, x)
+
+        initial = datetime.datetime.now()
+        #verify scan consistency works w/in SearchOptions
+        x = self.try_n_times_decorator(self.cluster.search_query, 2, 1)("beer-search-index", 
+                                                search.TermQuery("north"), 
+                                                search.SearchOptions(scan_consistency=search.SearchScanConsistency.AT_PLUS))  # type: SearchResult
+
+        rows = x.rows()
+        self.assertGreaterEqual(10, len(rows))
+        SearchResultTest._check_search_result(self, initial, 6, x)
+
 
 class SearchStringsTest(CouchbaseTestCase):
     def test_fuzzy(self):
@@ -485,7 +548,7 @@ class SearchStringsTest(CouchbaseTestCase):
             }
         }
         self.assertEqual(exp, p.as_encodable('ix'))
-        self.assertEqual({'ctl': {'consistency': 'not_bounded'}},
+        self.assertEqual({'ctl': {'consistency': {'level':''}}},
                          SearchOptions(scan_consistency=search.SearchScanConsistency.NOT_BOUNDED.value).as_encodable('ix'))
 
     def test_facets(self):
