@@ -38,9 +38,12 @@ class BucketManagementTests(CollectionTestCase):
     def test_bucket_create(self):
         self.bm.create_bucket(CreateBucketSettings(name="fred", bucket_type="couchbase", ram_quota_mb=100))
         bucket = self.try_n_times(10, 1, self.bm.get_bucket, "fred")
-        self.assertEqual(bucket['minimum_durability_level'], Durability.NONE)
+        if float(self.cluster_version[0:3]) >= 6.6:
+            self.assertEqual(bucket['minimum_durability_level'], Durability.NONE)
 
     def test_bucket_create_durability(self):
+        if float(self.cluster_version[0:3]) < 6.6:
+            raise SkipTest("Bucket minimum durability not available on server version < 6.6")
         min_durability = Durability.MAJORITY_AND_PERSIST_TO_ACTIVE
         self.bm.create_bucket(CreateBucketSettings(name="fred", 
                                     bucket_type="couchbase", 
