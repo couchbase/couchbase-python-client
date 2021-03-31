@@ -36,7 +36,7 @@ class DesignDocumentNamespace(Enum):
 
     @classmethod
     def unprefix(cls, name):
-        for prefix in ('_design/', '_dev'):
+        for prefix in ('_design/', 'dev_'):
             name = name[name.startswith(prefix) and len(prefix):]
         return name
 
