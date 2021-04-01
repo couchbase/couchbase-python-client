@@ -815,13 +815,6 @@ class CBCollection(wrapt.ObjectProxy):
 
             cb.upsert('foo', "<xml></xml>", format=couchbase_core.FMT_UTF8)
 
-        Perform optimistic locking by specifying last known CAS version::
-
-            cb.upsert('foo', 'bar', UpsertOptions(cas=8835713818674332672))
-            # or
-            cb.upsert('foo', 'bar', cas=8835713818674332672)
-
-
         Simple set with durability::
 
             cb.upsert('key', 'value', durability_level=Durability.MAJORITY_AND_PERSIST_TO_ACTIVE)
