@@ -54,20 +54,23 @@ class SubdocTests(CollectionTestCase):
         result = self.coll.lookup_in(self.KEY, (SD.exists("b"),))
         self.assertEqual(result.cas, cas)
         self.assertTrue(result.exists(0))
+        # no content; only valid path, returns None so is False
+        self.assertFalse(result.content_as[bool](0))
 
     def test_lookup_in_simple_exists_bad_path(self):
         cas = self.coll.upsert(self.KEY, {"a": "aaa", "b": [1, 2, 3, 4]}).cas
         self.try_n_times(10, 3, self._cas_matches, self.KEY, cas)
         result = self.coll.lookup_in(self.KEY, (SD.exists("qzzxy"),))
         self.assertEqual(result.cas, cas)
-        self.assertRaisesRegex(PathNotFoundException, "qzzxy", result.exists, 0)
+        self.assertFalse(result.exists(0))
+        self.assertRaises(PathNotFoundException, result.content_as[bool], 0)
 
     def test_lookup_in_one_path_not_found(self):
         cas = self.coll.upsert(self.KEY, {"a": "aaa", "b": [1, 2, 3, 4]}).cas
         self.try_n_times(10, 3, self._cas_matches, self.KEY, cas)
         result = self.coll.lookup_in(self.KEY, (SD.exists("a"), SD.exists("qzzxy"),))
-        self.assertRaisesRegex(PathNotFoundException, "qzzxy", result.exists, 0)
-        self.assertRaisesRegex(PathNotFoundException, "qzzxy", result.exists, 1)
+        self.assertTrue(result.exists(0))
+        self.assertFalse(result.exists(1))
 
     def test_lookup_in_simple_get_longer_path(self):
         cas = self.coll.upsert(self.KEY, {"a": "aaa", "b": {"c": {"d": "yo!"}}}).cas
@@ -88,7 +91,7 @@ class SubdocTests(CollectionTestCase):
                                       SD.get("b.c")))
         self.assertTrue(result.success)
         self.assertIsNone(result.expiry)
-        self.assertEquals("aaa", result.content_as[str](1))
+        self.assertEqual("aaa", result.content_as[str](1))
         self.assertTrue(result.exists(2))
         self.assertDictEqual({"d": "yo!"}, result.content_as[dict](3))
 
@@ -107,7 +110,7 @@ class SubdocTests(CollectionTestCase):
                                   MutateInOptions(expiry=timedelta(seconds=1000))).cas
         self.try_n_times(10, 3, self._cas_matches, self.KEY, cas)
         result = self.coll.get(self.KEY, GetOptions(with_expiry=True))
-        expires_in = (result.expiry - datetime.now()).total_seconds()
+        expires_in = (result.expiryTime - datetime.now()).total_seconds()
         self.assertTrue(0 < expires_in < 1001)
 
     def test_mutate_in_durability(self):

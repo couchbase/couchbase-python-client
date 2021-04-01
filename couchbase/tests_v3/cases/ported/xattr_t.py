@@ -26,7 +26,8 @@ class XattrTest(CollectionTestCase):
 
             # Try using lookup_in
             rv = cb.lookup_in(k, (SD.get('my.attr'),))
-            self.assertRaises(PathNotFoundException, rv.exists, 0)
+            #self.assertRaises(PathNotFoundException, rv.exists, 0)
+            self.assertFalse(rv.exists(0))
 
             # Finally, use lookup_in with 'xattrs' attribute enabled
             rv = cb.lookup_in(k, (SD.get('my.attr', xattr=True),))

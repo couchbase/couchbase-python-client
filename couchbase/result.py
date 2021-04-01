@@ -15,6 +15,7 @@ from couchbase_core.supportability import deprecated, internal
 from couchbase_core.transcodable import Transcodable
 from couchbase_core.views.iterator import View as CoreView
 from .options import forward_args, UnsignedInt64
+import couchbase.exceptions as E
 
 Proxy_T = TypeVar('Proxy_T')
 
@@ -169,7 +170,16 @@ class LookupInResult(Result):
     def exists(self,
                index  # type: int
                ):
-        return len(canonical_sdresult(self._original)) > index
+        try:
+            err = self._original._results[index][0]
+            if err:
+                path = self._original._specs[index][1]
+                raise E.exc_from_rc(err, obj=path)
+            return True
+        except E.PathNotFoundException:
+            return False
+        except E.CouchbaseException:
+            raise
 
     @property
     def expiry(self):
