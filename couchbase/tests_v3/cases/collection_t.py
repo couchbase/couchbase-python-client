@@ -21,7 +21,7 @@ from couchbase.collection import GetOptions, UpsertOptions, ReplaceOptions, Inse
     RemoveOptions
 from couchbase.durability import ServerDurability, ClientDurability, Durability, PersistTo, ReplicateTo
 from couchbase.exceptions import InvalidArgumentException,  DocumentExistsException, DocumentNotFoundException, \
-    TemporaryFailException, PathNotFoundException
+    TemporaryFailException, PathNotFoundException, DocumentLockedException, CASMismatchException
 import unittest
 from datetime import timedelta
 from unittest import SkipTest
@@ -46,9 +46,8 @@ class CollectionTests(CollectionTestCase):
 
     def setUp(self):
         super(CollectionTests, self).setUp()
-        self.cb.upsert(self.KEY, self.CONTENT)
-        # make sure it is available
-        self.try_n_times(10, 1, self.cb.get, self.KEY)
+        # retry just in case doc is locked from previous test
+        self.try_n_times(10, 3, self.cb.upsert, self.KEY, self.CONTENT)
         # be sure NOKEY isn't in there
         try:
             self.cb.remove(self.NOKEY)
@@ -99,9 +98,8 @@ class CollectionTests(CollectionTestCase):
         old_cas = self.cb.get(self.KEY).cas
         result = self.cb.replace(self.KEY, self.CONTENT, ReplaceOptions(cas=old_cas))
         self.assertTrue(result.success)
-        # try same cas again, must fail.  TODO: this seems wrong - lets be sure there
-        # isn't perhaps a more sensible exception out there.
-        self.assertRaises(DocumentExistsException, self.cb.replace, self.KEY, self.CONTENT, ReplaceOptions(cas=old_cas))
+        # try same cas again, must fail.
+        self.assertRaises(CASMismatchException, self.cb.replace, self.KEY, self.CONTENT, ReplaceOptions(cas=old_cas))
 
     def test_replace_fail(self):
         self.assertRaises(DocumentNotFoundException, self.cb.get, self.NOKEY)
@@ -256,18 +254,20 @@ class CollectionTests(CollectionTestCase):
 
     def test_get_and_touch(self):
         self.cb.get_and_touch(self.KEY, timedelta(seconds=3))
-        self.try_n_times_till_exception(10, 3, self.cb.get, self.KEY)
-        self.assertRaises(DocumentNotFoundException, self.cb.get, self.KEY)
+        self.cb.get(self.KEY)
+        self.try_n_times_till_exception(10, 3, self.cb.get, self.KEY, DocumentNotFoundException)
 
     def test_get_and_lock(self):
         self.cb.get_and_lock(self.KEY, timedelta(seconds=3))
+        # upsert should definitely fail
+        self.assertRaises(DocumentLockedException, self.cb.upsert, self.KEY, self.CONTENT)
+        # but succeed eventually
         self.try_n_times(10, 1, self.cb.upsert, self.KEY, self.CONTENT)
-        self.cb.get(self.KEY)
 
     def test_get_and_lock_upsert_with_cas(self):
         result = self.cb.get_and_lock(self.KEY, timedelta(seconds=15))
         cas = result.cas
-        self.assertRaises(DocumentExistsException, self.cb.upsert, self.KEY, self.CONTENT)
+        self.assertRaises(DocumentLockedException, self.cb.upsert, self.KEY, self.CONTENT)
         self.cb.replace(self.KEY, self.CONTENT, ReplaceOptions(cas=cas))
 
     def test_unlock(self):
@@ -275,10 +275,10 @@ class CollectionTests(CollectionTestCase):
         self.cb.unlock(self.KEY, cas)
         self.cb.upsert(self.KEY, self.CONTENT)
 
-    @flaky(10,1)
     def test_unlock_wrong_cas(self):
         cas = self.cb.get_and_lock(self.KEY, timedelta(seconds=15)).cas
-        self.assertRaises(TemporaryFailException, self.cb.unlock, self.KEY, 100)
+        expectedException = TemporaryFailException if self.is_mock else DocumentLockedException
+        self.assertRaises(expectedException, self.cb.unlock, self.KEY, 100)
         self.cb.unlock(self.KEY, cas)
 
     def test_client_durable_upsert(self):

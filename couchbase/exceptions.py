@@ -406,6 +406,10 @@ class SearchIndexNotFoundException(SearchException):
   pass
 
 
+class DocumentLockedException(KeyValueException):
+  pass
+
+
 class DocumentNotFoundException(KeyValueException):
     pass
 
@@ -1242,6 +1246,8 @@ _LCB_ERRNO_MAP = dict(list({
                         C.LCB_ERR_TEMPORARY_FAILURE:             TemporaryFailException,
                         C.LCB_ERR_DOCUMENT_EXISTS:               DocumentExistsException,
                         C.LCB_ERR_DOCUMENT_NOT_FOUND:            DocumentNotFoundException,
+                        C.LCB_ERR_DOCUMENT_LOCKED:               DocumentLockedException,
+                        C.LCB_ERR_CAS_MISMATCH:                  CASMismatchException,
                         C.LCB_ERR_DLOPEN_FAILED:                 DlopenFailedException,
                         C.LCB_ERR_DLSYM_FAILED:                  DlsymFailedException,
                         C.LCB_ERR_NETWORK:                       NetworkException,

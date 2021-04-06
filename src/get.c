@@ -140,8 +140,14 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
         GT_GET : {
             CMDSCOPE_NG(GET, get)
             {
-                lcb_cmdget_locktime(cmd, lock);
-                COMMON_OPTS(PYCBC_get_ATTR, get, get);
+                lcb_cmdget_timeout(cmd, timeout);
+                if (lock) {
+                    lcb_cmdget_locktime(cmd, ttl);
+                } else {
+                    lcb_cmdget_expiry(cmd, ttl);
+                }
+                PYCBC_CMD_SET_KEY_SCOPE(get, cmd, keybuf);
+                PYCBC_TRACECMD_TYPED(get, cmd, context, cv->mres, curkey, self);
                 err = pycbc_get(collection, cv->mres, cmd);
             }
         } break;

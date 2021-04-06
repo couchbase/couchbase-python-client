@@ -301,6 +301,8 @@ if (LCB_SRC)
                 cmake <SOURCE_DIR> ${LCB_CMAKE_ARGS})
         SET(_parallelism 4)
 
+        INCLUDE(GNUInstallDirs)
+
         ExternalProject_Add(libcouchbase_src
                 URL "${LCB_REPO}/archive/${LCB_TAG}.zip"
                 CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory "${LCB_BUILD_DIR}"
@@ -317,7 +319,7 @@ if (LCB_SRC)
                 INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/install
                 INSTALL_COMMAND ${CMAKE_COMMAND} -E rename <INSTALL_DIR>/${RELEASE_TYPE}/include <INSTALL_DIR>/include
                 COMMAND ${CMAKE_COMMAND} -E make_directory <INSTALL_DIR>/lib
-                COMMAND ${CMAKE_COMMAND} -E rename <INSTALL_DIR>/${RELEASE_TYPE}/lib <INSTALL_DIR>/lib/${RELEASE_TYPE}
+                COMMAND ${CMAKE_COMMAND} -E rename <INSTALL_DIR>/${RELEASE_TYPE}/${CMAKE_INSTALL_LIBDIR} <INSTALL_DIR>/lib/${RELEASE_TYPE}
                 COMMAND ${CMAKE_COMMAND} -E remove_directory <INSTALL_DIR>/${RELEASE_TYPE}
                 )
         SET(LIBCOUCHBASE_LIBRARY_FILE "${LCB_BUILD_DIR}/lib/${LIBCOUCHBASE_LIBRARY_NAME}")

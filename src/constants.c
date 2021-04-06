@@ -37,6 +37,8 @@
     X(ERR_NO_CONFIGURATION)         \
     X(ERR_DOCUMENT_EXISTS)          \
     X(ERR_DOCUMENT_NOT_FOUND)       \
+    X(ERR_DOCUMENT_LOCKED)          \
+    X(ERR_CAS_MISMATCH)             \
     X(ERR_DLOPEN_FAILED)            \
     X(ERR_DLSYM_FAILED)             \
     X(ERR_NETWORK)                  \
