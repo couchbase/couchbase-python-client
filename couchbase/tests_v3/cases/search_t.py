@@ -108,7 +108,6 @@ class SearchResultTest(CouchbaseTestCase):
             self.assertIsInstance(entry.index, str)
             self.assertIsInstance(entry.fields, dict)
             self.assertIsInstance(entry.locations, search.SearchRowLocations)
-            print(entry)
             for location in entry.fields:
                 self.assertIsInstance(location, str)
         metadata = x.metadata()
@@ -162,7 +161,13 @@ class SearchTest(ClusterTestCase):
                         params=params_json)
                 )
                 #make sure the index loads...
-                self.try_n_times(10, 10, sm.get_indexed_documents_count, 'beer-search-index')
+                for _ in range(10):
+                    indexed_docs = self.try_n_times(10, 10, sm.get_indexed_documents_count, 'beer-search-index')
+                    if indexed_docs == 7303:
+                        print('All docs indexed!')
+                        break
+                    print('Found {} indexed docs, waiting a bit...'.format(indexed_docs))
+                    time.sleep(5)
 
     def test_cluster_search(self):
         options = search.SearchOptions(fields=["*"], limit=10, sort=["-_score"],
@@ -318,6 +323,8 @@ class SearchTest(ClusterTestCase):
         if self.is_mock:
             raise SkipTest("F.T.S. not supported by mock")
 
+        if float(self.cluster_version[0:3]) < 6.5:
+            raise SkipTest("Disable scoring not available on server version < 6.5")
 
         #verify disable scoring works w/in SearchOptions
         x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index", 
