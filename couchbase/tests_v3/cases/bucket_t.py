@@ -21,8 +21,10 @@ from couchbase.bucket import Bucket
 from couchbase_tests.base import CollectionTestCase, SkipTest
 from couchbase.management.collections import CollectionManager
 from couchbase.bucket import PingOptions
+from couchbase.result import PingResult
 from couchbase.diagnostics import ServiceType, PingState
 from datetime import timedelta
+import json
 
 
 class BucketSimpleTest(CollectionTestCase):
@@ -83,6 +85,24 @@ class BucketSimpleTest(CollectionTestCase):
         print(keys)
         self.assertEqual(1, len(keys))
         self.assertEqual(ServiceType.KeyValue, keys[0])
+
+    def test_ping_as_json(self):
+        result = self.bucket.ping()
+        self.assertIsInstance(result, PingResult)
+        result_str = result.as_json()
+        self.assertIsInstance(result_str, str)
+        result_json = json.loads(result_str)
+        self.assertIsNotNone(result_json['version'])
+        self.assertIsNotNone(result_json['id'])
+        self.assertIsNotNone(result_json['sdk'])
+        self.assertIsNotNone(result_json['services'])
+        for _, data in result_json['services'].items():
+            if len(data):
+                self.assertIsNotNone(data[0]['id'])
+                self.assertIsNotNone(data[0]['latency_us'])
+                self.assertIsNotNone(data[0]['remote'])
+                self.assertIsNotNone(data[0]['local'])
+                self.assertIsNotNone(data[0]['state'])
 
     def test_collection(self):
         if self.supports_collections():

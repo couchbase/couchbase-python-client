@@ -16,6 +16,7 @@
 # limitations under the License.
 #
 import unittest
+import json
 
 from couchbase_tests.base import CollectionTestCase
 from couchbase.cluster import ClusterOptions, ClusterTimeoutOptions,\
@@ -63,6 +64,27 @@ class ClusterTests(CollectionTestCase):
         keys = list(result.endpoints.keys())
         self.assertEqual(1, len(keys))
         self.assertEqual(ServiceType.KeyValue, keys[0])
+
+    def test_ping_as_json(self):
+        result = self.cluster.ping()
+        self.assertIsInstance(result, PingResult)
+        result_str = result.as_json()
+        self.assertIsInstance(result_str, str)
+        result_json = json.loads(result_str)
+        self.assertIsNotNone(result_json['version'])
+        self.assertIsNotNone(result_json['id'])
+        self.assertIsNotNone(result_json['sdk'])
+        self.assertIsNotNone(result_json['services'])
+        # TODO:  see why the mock doesn't like this
+        if not self.is_mock:
+            for _, data in result_json['services'].items():
+                if len(data):
+                    self.assertIsNotNone(data[0]['id'])
+                    self.assertIsNotNone(data[0]['latency_us'])
+                    self.assertIsNotNone(data[0]['remote'])
+                    self.assertIsNotNone(data[0]['local'])
+                    self.assertIsNotNone(data[0]['state'])
+
 
     def test_diagnostics(self):
         result = self.cluster.diagnostics(DiagnosticsOptions(report_id="imareportid"))
@@ -114,6 +136,27 @@ class ClusterTests(CollectionTestCase):
         self.assertIsNotNone(q[0].last_activity)
         self.assertEqual(q[0].state, EndpointState.Connected)
         self.assertEqual(q[0].type, ServiceType.Query)
+
+    def test_diagnostics_as_json(self):
+        result = self.cluster.diagnostics(DiagnosticsOptions(report_id="imareportid"))
+        self.assertIn("imareportid", result.id)
+        self.assertIsNotNone(result.sdk)
+        self.assertIsNotNone(result.version)
+        self.assertEquals(result.state, ClusterState.Online)
+        result_str = result.as_json()
+        self.assertIsInstance(result_str, str)
+        result_json = json.loads(result_str)
+        self.assertIsNotNone(result_json['version'])
+        self.assertIsNotNone(result_json['id'])
+        self.assertIsNotNone(result_json['sdk'])
+        self.assertIsNotNone(result_json['services'])
+        for _, data in result_json['services'].items():
+            if len(data):
+                self.assertIsNotNone(data[0]['id'])
+                self.assertIsNotNone(data[0]['last_activity_us'])
+                self.assertIsNotNone(data[0]['remote'])
+                self.assertIsNotNone(data[0]['local'])
+                self.assertIsNotNone(data[0]['state'])
 
     def test_disconnect(self):
         # for this test we need a new cluster...

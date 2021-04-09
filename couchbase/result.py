@@ -2,6 +2,8 @@ from typing import *
 
 import attr
 import datetime
+import copy
+import json
 
 from functools import wraps
 from couchbase_core._libcouchbase import Result as CoreResult
@@ -273,6 +275,26 @@ class PingResult(object):
     @property
     def version(self):
         return self._version
+
+    def as_json(self):
+        # type: (...) -> str
+        tmp = copy.deepcopy(self.__dict__)
+        for k, val in tmp['_endpoints'].items():
+            json_vals=[]
+            for v in val:
+                v_dict = v.as_dict()
+                v_dict.pop('service_type')
+                status = v_dict.pop('status')
+                v_dict['state'] = status
+                json_vals.append(v_dict)
+            tmp['_endpoints'][k] = json_vals
+        return_val = {
+            'version': self.version,
+            'id':self.id,
+            'sdk': self.sdk
+        }
+        return_val['services'] = {k.value: v for k, v in tmp['_endpoints'].items()}
+        return json.dumps(return_val)
 
 
 class ExistsResult(Result):

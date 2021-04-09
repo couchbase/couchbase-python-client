@@ -103,13 +103,22 @@ class DiagnosticsResult(object):
 
     def as_json(self):
         # type: (...) -> str
-        return_val = copy.deepcopy(self.__dict__)
-        for k, val in return_val['_endpoints'].items():
+        tmp = copy.deepcopy(self.__dict__)
+        for k, val in tmp['_endpoints'].items():
             json_vals=[]
             for v in val:
-                json_vals.append(v.as_dict())
-            return_val['_endpoints'][k] = json_vals
-        return_val['_endpoints'] = {k.value: v for k, v in return_val['_endpoints'].items()}
+                v_dict = v.as_dict()
+                v_dict.pop('type')
+                status = v_dict.pop('status')
+                v_dict['state'] = status
+                json_vals.append(v_dict)
+            tmp['_endpoints'][k] = json_vals
+        return_val = {
+            'version': self.version,
+            'id':self.id,
+            'sdk': self.sdk
+        }
+        return_val['services'] = {k.value: v for k, v in tmp['_endpoints'].items()}
         return json.dumps(return_val)
 
     def append_endpoints(self, source_diagnostics):
@@ -210,5 +219,9 @@ class EndpointPingReport(object):
     def state(self):
         # type: (...) -> PingState
         return PingState(self._src_ping.get('status', None))
+
+    def as_dict(self):
+        # type: (...) -> dict
+        return self._src_ping
 
 
