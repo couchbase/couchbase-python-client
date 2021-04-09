@@ -4,7 +4,7 @@ from unittest import SkipTest
 
 from flaky import flaky
 
-from couchbase.exceptions import BucketDoesNotExistException, BucketAlreadyExistsException
+from couchbase.exceptions import BucketDoesNotExistException, BucketAlreadyExistsException, BucketNotFlushableException
 from couchbase.management.buckets import CreateBucketSettings, BucketSettings, BucketType
 from couchbase_tests.base import CollectionTestCase
 from couchbase_core.durability import Durability
@@ -40,6 +40,16 @@ class BucketManagementTests(CollectionTestCase):
         bucket = self.try_n_times(10, 1, self.bm.get_bucket, "fred")
         if float(self.cluster_version[0:3]) >= 6.6:
             self.assertEqual(bucket['minimum_durability_level'], Durability.NONE)
+
+    def test_bucket_create_replica_index(self):
+        self.bm.create_bucket(CreateBucketSettings(name="fred", bucket_type="couchbase", ram_quota_mb=100, replica_index=True))
+        bucket = self.try_n_times(10, 1, self.bm.get_bucket, "fred")
+        self.assertTrue(bucket.replica_index)
+        self.try_n_times(10, 1, self.bm.drop_bucket, 'fred')
+        self.assertRaises(BucketDoesNotExistException, self.bm.drop_bucket, 'fred')
+        self.bm.create_bucket(CreateBucketSettings(name="fred", bucket_type="couchbase", ram_quota_mb=100, replica_index=False))
+        bucket = self.try_n_times(10, 1, self.bm.get_bucket, "fred")
+        self.assertFalse(bucket.replica_index)
 
     def test_bucket_create_durability(self):
         if float(self.cluster_version[0:3]) < 6.6:
@@ -90,3 +100,19 @@ class BucketManagementTests(CollectionTestCase):
                 raise Exception("not equal")
 
         self.try_n_times(10, 3, get_bucket_ttl_equal, 'fred', datetime.timedelta(seconds=500))
+
+    def test_bucket_flush(self):
+        # Create the bucket
+        self.bm.create_bucket(CreateBucketSettings(name='fred', ram_quota_mb=100, flush_enabled=True))
+        bucket = self.try_n_times(10, 3, self.bm.get_bucket, 'fred')
+        self.assertTrue(bucket.flush_enabled)
+        # flush the bucket
+        self.try_n_times(10, 3, self.bm.flush_bucket, bucket.name)
+
+        # disable bucket flush
+        self.bm.update_bucket(BucketSettings(name='fred', flush_enabled=False))
+        bucket = self.try_n_times(10, 3, self.bm.get_bucket, 'fred')
+        self.assertFalse(bucket.flush_enabled)
+
+        # verify appropriate Exception when flush attempted
+        self.assertRaises(BucketNotFlushableException, self.bm.flush_bucket, 'fred')

@@ -6,7 +6,9 @@ from couchbase.management.generic import GenericManager
 from typing import *
 from couchbase_core import abstractmethod, mk_formstr
 from couchbase_core.durability import Durability
-from couchbase.exceptions import HTTPException, ErrorMapper, BucketAlreadyExistsException, BucketDoesNotExistException
+from couchbase.exceptions import HTTPException, ErrorMapper, \
+    BucketAlreadyExistsException, BucketDoesNotExistException, \
+    BucketNotFlushableException
 import enum
 import datetime
 
@@ -16,7 +18,8 @@ class BucketManagerErrorHandler(ErrorMapper):
     def mapping():
         # type (...)->Mapping[str, CBErrorType]
         return {HTTPException: {'Bucket with given name (already|still) exists': BucketAlreadyExistsException,
-                                'Requested resource not found': BucketDoesNotExistException}}
+                                'Requested resource not found': BucketDoesNotExistException,
+                                'Flush is disabled for the bucket': BucketNotFlushableException}}
 
 
 @BucketManagerErrorHandler.wrap
@@ -46,10 +49,14 @@ class BucketManager(GenericManager):
         :raises: InvalidArgumentsException
         """
         # prune the missing settings...
-        params= settings.as_dict()#*options, **kwargs)
+        params = settings.as_dict()
 
         # insure flushEnabled is an int
         params['flushEnabled'] = int(params.get('flushEnabled', 0))
+
+        # ensure replicaIndex is an int, if specified
+        if 'replicaIndex' in params:
+            params['replicaIndex'] = 1 if params['replicaIndex'] else 0
 
         # send it
         return self._admin_bucket.http_request(

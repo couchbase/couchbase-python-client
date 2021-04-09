@@ -465,6 +465,8 @@ class BucketAlreadyExistsException(KeyValueException):
 class BucketDoesNotExistException(KeyValueException):
   pass
 
+class BucketNotFlushableException(KeyValueException):
+  pass
 
 class PartialViewResultException(ViewException):
     #? (returns rows that it did get)
