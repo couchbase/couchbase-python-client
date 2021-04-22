@@ -35,6 +35,8 @@ class ClusterTests(CollectionTestCase):
         super(ClusterTests, self).setUp()
 
     def test_ping(self):
+        if self.is_mock:
+            raise SkipTest("Mock -- skip cluster.ping() tests")
         result = self.cluster.ping()
         self.assertIsInstance(result, PingResult)
 
@@ -54,11 +56,15 @@ class ClusterTests(CollectionTestCase):
                     self.assertEqual(v.state, PingState.OK)
 
     def test_ping_report_id(self):
+        if self.is_mock:
+            raise SkipTest("Mock -- skip cluster.ping() tests")
         report_id = "11111"
         result = self.cluster.ping(PingOptions(report_id=report_id))
         self.assertIn(report_id, result.id)
 
-    def test_ping_restrict_services(self):        
+    def test_ping_restrict_services(self):
+        if self.is_mock:
+            raise SkipTest("Mock -- skip cluster.ping() tests")
         services = [ServiceType.KeyValue]
         result = self.cluster.ping(PingOptions(service_types=services))
         keys = list(result.endpoints.keys())
@@ -66,6 +72,8 @@ class ClusterTests(CollectionTestCase):
         self.assertEqual(ServiceType.KeyValue, keys[0])
 
     def test_ping_as_json(self):
+        if self.is_mock:
+            raise SkipTest("Mock -- skip cluster.ping() tests")
         result = self.cluster.ping()
         self.assertIsInstance(result, PingResult)
         result_str = result.as_json()
@@ -85,9 +93,9 @@ class ClusterTests(CollectionTestCase):
                     self.assertIsNotNone(data[0]['local'])
                     self.assertIsNotNone(data[0]['state'])
 
-
     def test_diagnostics(self):
-        result = self.cluster.diagnostics(DiagnosticsOptions(report_id="imareportid"))
+        result = self.cluster.diagnostics(
+            DiagnosticsOptions(report_id="imareportid"))
         self.assertIn("imareportid", result.id)
         self.assertIsNotNone(result.sdk)
         self.assertIsNotNone(result.version)
@@ -107,7 +115,8 @@ class ClusterTests(CollectionTestCase):
             self.assertEqual(mgmt[0].type, ServiceType.Management)
 
     def test_diagnostics_with_active_bucket(self):
-        query_result = self.cluster.query('SELECT * FROM `beer-sample` LIMIT 1')
+        query_result = self.cluster.query(
+            'SELECT * FROM `beer-sample` LIMIT 1')
         if self.is_mock:
             try:
                 query_result.rows()
@@ -115,7 +124,8 @@ class ClusterTests(CollectionTestCase):
                 pass
         else:
             self.assertTrue(len(query_result.rows()) > 0)
-        result = self.cluster.diagnostics(DiagnosticsOptions(report_id="imareportid"))
+        result = self.cluster.diagnostics(
+            DiagnosticsOptions(report_id="imareportid"))
         print(result.as_json())
         self.assertIn("imareportid", result.id)
 
@@ -138,7 +148,8 @@ class ClusterTests(CollectionTestCase):
         self.assertEqual(q[0].type, ServiceType.Query)
 
     def test_diagnostics_as_json(self):
-        result = self.cluster.diagnostics(DiagnosticsOptions(report_id="imareportid"))
+        result = self.cluster.diagnostics(
+            DiagnosticsOptions(report_id="imareportid"))
         self.assertIn("imareportid", result.id)
         self.assertIsNotNone(result.sdk)
         self.assertIsNotNone(result.version)
@@ -188,9 +199,11 @@ class ClusterTests(CollectionTestCase):
     def test_can_override_timeout_options(self):
         timeout = timedelta(seconds=100)
         timeout2 = timedelta(seconds=50)
-        opts = self._create_cluster_opts(timeout_options=ClusterTimeoutOptions(kv_timeout=timeout))
+        opts = self._create_cluster_opts(
+            timeout_options=ClusterTimeoutOptions(kv_timeout=timeout))
         args = self._mock_hack()
-        args.update({'timeout_options': ClusterTimeoutOptions(kv_timeout=timeout2)})
+        args.update(
+            {'timeout_options': ClusterTimeoutOptions(kv_timeout=timeout2)})
         cluster = Cluster.connect(self.cluster.connstr, opts, **args)
         b = cluster.bucket(self.bucket_name)
         self.assertEqual(timeout2, b.kv_timeout)
@@ -201,9 +214,11 @@ class ClusterTests(CollectionTestCase):
         opts = self._create_cluster_opts(
             tracing_options=ClusterTracingOptions(tracing_orphaned_queue_flush_interval=timeout))
         args = self._mock_hack()
-        args.update({'tracing_options': ClusterTracingOptions(tracing_orphaned_queue_flush_interval=timeout2)})
+        args.update({'tracing_options': ClusterTracingOptions(
+            tracing_orphaned_queue_flush_interval=timeout2)})
         cluster = Cluster.connect(self.cluster.connstr, opts, **args)
-        self.assertEqual(timeout2, cluster.tracing_orphaned_queue_flush_interval)
+        self.assertEqual(
+            timeout2, cluster.tracing_orphaned_queue_flush_interval)
         b = cluster.bucket(self.bucket_name)
         self.assertEqual(timeout2, b.tracing_orphaned_queue_flush_interval)
 
@@ -218,30 +233,38 @@ class ClusterTests(CollectionTestCase):
 
     def test_kv_default_timeout(self):
         timeout = timedelta(seconds=50)
-        opts = self._create_cluster_opts(timeout_options=ClusterTimeoutOptions(kv_timeout=timeout))
-        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        opts = self._create_cluster_opts(
+            timeout_options=ClusterTimeoutOptions(kv_timeout=timeout))
+        cluster = Cluster.connect(
+            self.cluster.connstr, opts, **self._mock_hack())
         b = cluster.bucket(self.bucket_name)
         self.assertEqual(timeout, b.kv_timeout)
 
     def test_views_default_timeout(self):
         timeout = timedelta(seconds=50)
-        opts = self._create_cluster_opts(timeout_options=ClusterTimeoutOptions(views_timeout=timeout))
-        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        opts = self._create_cluster_opts(
+            timeout_options=ClusterTimeoutOptions(views_timeout=timeout))
+        cluster = Cluster.connect(
+            self.cluster.connstr, opts, **self._mock_hack())
         b = cluster.bucket(self.bucket_name)
         self.assertEqual(timeout, b.views_timeout)
 
     def test_query_default_timeout(self):
         timeout = timedelta(seconds=50)
-        opts = self._create_cluster_opts(timeout_options=ClusterTimeoutOptions(query_timeout=timeout))
-        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        opts = self._create_cluster_opts(
+            timeout_options=ClusterTimeoutOptions(query_timeout=timeout))
+        cluster = Cluster.connect(
+            self.cluster.connstr, opts, **self._mock_hack())
         self.assertEqual(timeout, cluster.query_timeout)
 
     def test_tracing_orphaned_queue_flush_interval(self):
         timeout = timedelta(seconds=50)
         opts = self._create_cluster_opts(
             tracing_options=ClusterTracingOptions(tracing_orphaned_queue_flush_interval=timeout))
-        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
-        self.assertEqual(timeout, cluster.tracing_orphaned_queue_flush_interval)
+        cluster = Cluster.connect(
+            self.cluster.connstr, opts, **self._mock_hack())
+        self.assertEqual(
+            timeout, cluster.tracing_orphaned_queue_flush_interval)
         b = cluster.bucket(self.bucket_name)
         self.assertEqual(timeout, b.tracing_orphaned_queue_flush_interval)
 
@@ -249,17 +272,21 @@ class ClusterTests(CollectionTestCase):
         size = 10
         opt = ClusterTracingOptions(tracing_orphaned_queue_size=size)
         opts = self._create_cluster_opts(tracing_options=opt)
-        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        cluster = Cluster.connect(
+            self.cluster.connstr, opts, **self._mock_hack())
         self.assertEqual(10, cluster.tracing_orphaned_queue_size)
         b = cluster.bucket(self.bucket_name)
         self.assertEqual(size, b.tracing_orphaned_queue_size)
 
     def test_tracing_threshold_queue_flush_interval(self):
         timeout = timedelta(seconds=10)
-        opt = ClusterTracingOptions(tracing_threshold_queue_flush_interval=timeout)
+        opt = ClusterTracingOptions(
+            tracing_threshold_queue_flush_interval=timeout)
         opts = self._create_cluster_opts(tracing_options=opt)
-        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
-        self.assertEqual(timeout, cluster.tracing_threshold_queue_flush_interval)
+        cluster = Cluster.connect(
+            self.cluster.connstr, opts, **self._mock_hack())
+        self.assertEqual(
+            timeout, cluster.tracing_threshold_queue_flush_interval)
         b = cluster.bucket(self.bucket_name)
         self.assertEqual(timeout, b.tracing_threshold_queue_flush_interval)
 
@@ -267,7 +294,8 @@ class ClusterTests(CollectionTestCase):
         size = 100
         opt = ClusterTracingOptions(tracing_threshold_queue_size=size)
         opts = self._create_cluster_opts(tracing_options=opt)
-        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        cluster = Cluster.connect(
+            self.cluster.connstr, opts, **self._mock_hack())
         self.assertEqual(size, cluster.tracing_threshold_queue_size)
         b = cluster.bucket(self.bucket_name)
         self.assertEqual(size, b.tracing_threshold_queue_size)
@@ -277,7 +305,8 @@ class ClusterTests(CollectionTestCase):
         timeout = timedelta(seconds=0.3)
         opt = ClusterTracingOptions(tracing_threshold_query=timeout)
         opts = self._create_cluster_opts(tracing_options=opt)
-        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        cluster = Cluster.connect(
+            self.cluster.connstr, opts, **self._mock_hack())
         self.assertEqual(timeout, cluster.tracing_threshold_query)
 
     @unittest.skip("waiting on CCBC-1222")
@@ -285,37 +314,43 @@ class ClusterTests(CollectionTestCase):
         timeout = timedelta(seconds=0.3)
         opt = ClusterTracingOptions(tracing_threshold_search=timeout)
         opts = self._create_cluster_opts(tracing_options=opt)
-        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        cluster = Cluster.connect(
+            self.cluster.connstr, opts, **self._mock_hack())
         self.assertEqual(timeout, cluster.tracing_threshold_search)
 
     def test_tracing_threshold_analytics(self):
         timeout = timedelta(seconds=0.3)
         opt = ClusterTracingOptions(tracing_threshold_analytics=timeout)
         opts = self._create_cluster_opts(tracing_options=opt)
-        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        cluster = Cluster.connect(
+            self.cluster.connstr, opts, **self._mock_hack())
         self.assertEqual(timeout, cluster.tracing_threshold_analytics)
 
     def test_compression(self):
         compression = Compression.FORCE
         opts = self._create_cluster_opts(compression=compression)
-        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        cluster = Cluster.connect(
+            self.cluster.connstr, opts, **self._mock_hack())
         self.assertEqual(compression, cluster.compression)
 
     def test_compression_min_size(self):
         size = 5000
         opts = self._create_cluster_opts(compression_min_size=size)
-        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        cluster = Cluster.connect(
+            self.cluster.connstr, opts, **self._mock_hack())
         self.assertEqual(size, cluster.compression_min_size)
 
     def test_compression_min_ratio(self):
         ratio = 0.5
         opts = self._create_cluster_opts(compression_min_ratio=ratio)
-        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        cluster = Cluster.connect(
+            self.cluster.connstr, opts, **self._mock_hack())
         self.assertEqual(ratio, cluster.compression_min_ratio)
 
     def test_redaction(self):
         opts = self._create_cluster_opts(log_redaction=True)
-        cluster = Cluster.connect(self.cluster.connstr, opts, **self._mock_hack())
+        cluster = Cluster.connect(
+            self.cluster.connstr, opts, **self._mock_hack())
         self.assertTrue(cluster.redaction)
 
     def test_is_ssl(self):
@@ -329,20 +364,25 @@ class ClusterTests(CollectionTestCase):
         # checks for the exception when appropriate.
         if self.is_mock:
             raise SkipTest("mock doesn't support the admin call we are making")
-        cluster = Cluster.connect(self.cluster.connstr, self._create_cluster_opts(), **self._mock_hack())
+        cluster = Cluster.connect(
+            self.cluster.connstr, self._create_cluster_opts(), **self._mock_hack())
         if cluster._is_6_5_plus():
-            self.assertIsNotNone(cluster.query_indexes().get_all_indexes(self.bucket_name))
+            self.assertIsNotNone(
+                cluster.query_indexes().get_all_indexes(self.bucket_name))
         else:
             # since we called cluster._is_6_5_plus(), that creates an admin under the hood to do
             # the http call.  Thus, we won't get the NoBucketException in this case, we get an
             # NotSupportedException instead.  Normally, one would use the public api and not hit that,
             # getting the NoBucketException instead.
-            self.assertRaises(NotSupportedException, cluster.query_indexes().get_all_indexes, self.bucket_name)
+            self.assertRaises(NotSupportedException, cluster.query_indexes(
+            ).get_all_indexes, self.bucket_name)
 
     def test_can_do_admin_calls_after_unsuccessful_bucket_openings(self):
         if self.is_mock:
             raise SkipTest("mock doesn't support admin calls")
-        cluster = Cluster.connect(self.cluster.connstr, self._create_cluster_opts(), **self._mock_hack())
+        cluster = Cluster.connect(
+            self.cluster.connstr, self._create_cluster_opts(), **self._mock_hack())
         self.assertRaises(BucketNotFoundException, cluster.bucket, "flkkjkjk")
         self.assertIsNotNone(cluster.bucket(self.bucket_name))
-        self.assertIsNotNone(cluster.query_indexes().get_all_indexes(self.bucket_name))
+        self.assertIsNotNone(
+            cluster.query_indexes().get_all_indexes(self.bucket_name))
