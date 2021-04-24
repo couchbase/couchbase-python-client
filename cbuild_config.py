@@ -40,7 +40,8 @@ def get_json_build_cfg():
 
 
 BUILD_CFG = get_json_build_cfg()
-PYCBC_LCB_API = os.getenv("PYCBC_LCB_API", BUILD_CFG.get('comp_options', {}).get('PYCBC_LCB_API'))
+PYCBC_LCB_API = os.getenv("PYCBC_LCB_API", BUILD_CFG.get(
+    'comp_options', {}).get('PYCBC_LCB_API'))
 
 
 def get_all_sources():
@@ -48,19 +49,21 @@ def get_all_sources():
 
 
 def get_sources():
-    sources_ext={}
+    sources_ext = {}
     all_sources = get_all_sources()
     SOURCEMODS = list(filter(re.compile(r'^.*\.c$').match, all_sources))
-    SOURCEMODS_CPP = list(filter(re.compile(r'^.*\.(cpp|cxx|cc)$').match, all_sources))
+    SOURCEMODS_CPP = list(
+        filter(re.compile(r'^.*\.(cpp|cxx|cc)$').match, all_sources))
     sources_ext['sources'] = list(map(str, SOURCEMODS+SOURCEMODS_CPP))
     return sources_ext
 
 
-couchbase_core = BUILD_CFG.get("comp_options",{}).get("PYCBC_CORE","couchbase")
+couchbase_core = BUILD_CFG.get(
+    "comp_options", {}).get("PYCBC_CORE", "couchbase")
 
 
 def get_cbuild_options():
-    extoptions={}
+    extoptions = {}
     extoptions['extra_compile_args'] = []
     extoptions['extra_link_args'] = []
 
@@ -85,8 +88,10 @@ def get_cbuild_options():
 
     def comp_clang_san_option(flag):
         san_option = flag.replace(CLANG_SAN_PREFIX, "")
-        fsanitize_statements = ["-fsanitize={}".format(san_option), "-fno-omit-frame-pointer"]
-        extoptions['extra_link_args'] += fsanitize_statements + ['-Llibclang_rt.asan_osx_dynamic']
+        fsanitize_statements = [
+            "-fsanitize={}".format(san_option), "-fno-omit-frame-pointer"]
+        extoptions['extra_link_args'] += fsanitize_statements + \
+            ['-Llibclang_rt.asan_osx_dynamic']
         return fsanitize_statements
 
     def comp_option_pattern(prefix):
@@ -101,7 +106,8 @@ def get_cbuild_options():
                   "PYCBC_CRYPTO_VERSION": boolean_option, comp_option_pattern(COMP_OPTION_PREFIX): comp_option,
                   comp_option_pattern(COMP_OPTION_BOOL_PREFIX): comp_option_bool,
                   comp_option_pattern(CLANG_SAN_PREFIX): comp_clang_san_option}
-    debug_symbols = len(set(os.environ.keys()) & {"PYCBC_DEBUG", "PYCBC_DEBUG_SYMBOLS"}) > 0
+    debug_symbols = len(set(os.environ.keys()) & {
+                        "PYCBC_DEBUG", "PYCBC_DEBUG_SYMBOLS"}) > 0
     comp_arg_additions = list(itertools.chain.from_iterable(
         action(actual_flag) for flag, action in comp_flags.items() for actual_flag in os.environ.keys() if
         re.match(flag, actual_flag)))
@@ -115,20 +121,24 @@ def get_ext_options():
     extoptions, debug_symbols = get_cbuild_options()
     pkgdata = {}
     if sys.platform != 'win32':
-        extoptions['extra_compile_args'] += ['-Wno-strict-prototypes', '-fPIC','-std=c11']
+        extoptions['extra_compile_args'] += ['-Wno-strict-prototypes',
+                                             '-fPIC', '-std=c11']
         extoptions['libraries'] = ['couchbase']
         if debug_symbols:
             extoptions['extra_compile_args'] += ['-O0', '-g3']
             extoptions['extra_link_args'] += ['-O0', '-g3']
         if sys.platform == 'darwin':
-            extoptions['library_dirs'] = ['/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/10.0.0/lib/darwin/']
-            extoptions['extra_compile_args']+=['-Wsometimes-uninitialized','-Wconditional-uninitialized']
-        extoptions['extra_compile_args']+=['-Wuninitialized',
-                                           '-Wswitch','-Werror','-Wno-missing-braces']
+            extoptions['library_dirs'] = [
+                '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/10.0.0/lib/darwin/']
+            extoptions['extra_compile_args'] += ['-Wsometimes-uninitialized',
+                                                 '-Wconditional-uninitialized']
+        extoptions['extra_compile_args'] += ['-Wuninitialized',
+                                             '-Wswitch', '-Werror', '-Wno-missing-braces']
         print(pkgdata)
     else:
         if sys.version_info < (3, 0, 0):
-            raise RuntimeError("Windows on Python earlier than v3 unsupported.")
+            raise RuntimeError(
+                "Windows on Python earlier than v3 unsupported.")
 
         warnings.warn("I'm detecting you're running windows."
                       "You might want to modify "
@@ -156,7 +166,8 @@ def get_ext_options():
         extoptions['define_macros'] = [('_CRT_SECURE_NO_WARNINGS', 1)]
         pkgdata[couchbase_core] = ['libcouchbase.dll']
 
-    extoptions['extra_compile_args']+=['-DPYCBC_LCB_API={}'.format(PYCBC_LCB_API)]
+    extoptions['extra_compile_args'] += [
+        '-DPYCBC_LCB_API={}'.format(PYCBC_LCB_API)]
     extoptions.update(get_sources())
     return extoptions, pkgdata
 
@@ -164,8 +175,9 @@ def get_ext_options():
 class CBuildInfo:
     def __init__(self, cmake_base=None):
         self.setbase(cmake_base)
-        self.cfg="Release"
-        self.pkg_data_dir=os.path.join(couchbase_core)
+        self.cfg = "Release"
+        self.pkg_data_dir = os.path.join(couchbase_core)
+
     @property
     def base(self):
         print("self.base is {}".format(self._cmake_base))
@@ -173,7 +185,8 @@ class CBuildInfo:
         return self._cmake_base
 
     def setbase(self, path):
-        self._cmake_base=(path if isinstance(path,list) else list(os.path.split(path))) if path else None
+        self._cmake_base = (path if isinstance(path, list) else list(
+            os.path.split(path))) if path else None
         print("set base as {}".format(self._cmake_base))
 
     @base.setter
@@ -184,16 +197,16 @@ class CBuildInfo:
         plat = get_plat_code()
 
         print("Got platform {}".format(plat))
-        default = ['libcouchbase.so.6']
+        default = ['libcouchbase.so.7']
         return {'darwin': ['libcouchbase.2.dylib', 'libcouchbase.dylib'], 'linux': default,
-                'win': ['libcouchbase_d.dll','libcouchbase.dll']}.get(get_plat_code(), default)
+                'win': ['libcouchbase_d.dll', 'libcouchbase.dll']}.get(get_plat_code(), default)
 
     def lcb_build_base(self):
         print("self.base is {}".format(self.base))
         return self._cmake_base + ['install', 'lib']
 
     def lcb_pkgs_srcs(self):
-        return {'Debug':self.lcb_build_base() + ['Debug'],'Release':self.lcb_build_base() + ['Release']}
+        return {'Debug': self.lcb_build_base() + ['Debug'], 'Release': self.lcb_build_base() + ['Release']}
 
     def lcb_pkgs(self, cfg):
         return map(lambda x: self.lcb_pkgs_srcs()[cfg] + [x], self.entries())
@@ -201,17 +214,19 @@ class CBuildInfo:
     def lcb_pkgs_strlist(self):
         print("got pkgs {}".format(self.entries()))
         for x in self.entries():
-            print("yielding binary {} : {}".format(x, os.path.join(self.pkg_data_dir,x)))
+            print("yielding binary {} : {}".format(
+                x, os.path.join(self.pkg_data_dir, x)))
             yield os.path.join(self.pkg_data_dir, x)
 
     def get_rpaths(self, cfg):
-        result= [{'Darwin': '@loader_path', 'Linux': '$ORIGIN'}.get(platform.system(), "$ORIGIN"),
-                 os.path.join(*self.lcb_pkgs_srcs()[cfg])]
+        result = [{'Darwin': '@loader_path', 'Linux': '$ORIGIN'}.get(platform.system(), "$ORIGIN"),
+                  os.path.join(*self.lcb_pkgs_srcs()[cfg])]
         print("got rpaths {}".format(result))
         return result
 
     def get_lcb_dirs(self):
-        lcb_dbg_build = os.path.join(*(self.base + ["install", "lib", "Debug"]))
+        lcb_dbg_build = os.path.join(
+            *(self.base + ["install", "lib", "Debug"]))
         lcb_build = os.path.join(*(self.base + ["install", "lib", "Release"]))
         lib_dirs = [lcb_dbg_build, lcb_build]
         return lib_dirs
@@ -222,14 +237,15 @@ class LazyCommandClass(dict):
     Lazy command class that defers operations requiring given cmdclass until
     they've actually been downloaded and installed by setup_requires.
     """
+
     def __init__(self, cmdclass_real):
         super(LazyCommandClass, self).__init__()
-        self.cmdclass_real=cmdclass_real
+        self.cmdclass_real = cmdclass_real
 
     def __contains__(self, key):
         return (
-                key == 'build_ext'
-                or super(LazyCommandClass, self).__contains__(key)
+            key == 'build_ext'
+            or super(LazyCommandClass, self).__contains__(key)
         )
 
     def __setitem__(self, key, value):
@@ -248,9 +264,11 @@ class CBuildCommon(build_ext):
     def setup_build_info(cls, extoptions, pkgdata):
         cls.info = CBuildInfo()
         cls.info.pkgdata = pkgdata
-        cls.info.pkg_data_dir = os.path.join(os.path.abspath("."), couchbase_core)
+        cls.info.pkg_data_dir = os.path.join(
+            os.path.abspath("."), couchbase_core)
         pkgdata['couchbase'] = list(cls.info.lcb_pkgs_strlist())
-        extoptions['library_dirs'] = [cls.info.pkg_data_dir] + extoptions.get('library_dirs', [])
+        extoptions['library_dirs'] = [cls.info.pkg_data_dir] + \
+            extoptions.get('library_dirs', [])
 
     def build_extension(self, ext):
         self.init_info_and_rpaths(ext)
@@ -262,11 +280,14 @@ class CBuildCommon(build_ext):
         pass
 
     def init_info_and_rpaths(self, ext):
-        self.ssl_config = gen_config.gen_config(self.build_temp, couchbase_core=couchbase_core)
+        self.ssl_config = gen_config.gen_config(
+            self.build_temp, couchbase_core=couchbase_core)
         self.info.setbase(self.build_temp)
         self.info.cfg = self.cfg_type()
-        self.compiler.add_include_dir(os.path.join(*self.info.base+["install","include"]))
-        self.compiler.add_library_dir(os.path.join(*self.info.base+["install","lib",self.cfg_type()]))
+        self.compiler.add_include_dir(os.path.join(
+            *self.info.base+["install", "include"]))
+        self.compiler.add_library_dir(os.path.join(
+            *self.info.base+["install", "lib", self.cfg_type()]))
         if sys.platform == 'darwin':
             warnings.warn('Adding /usr/local to lib search path for OS X')
             self.compiler.add_library_dir('/usr/local/lib')
@@ -274,21 +295,24 @@ class CBuildCommon(build_ext):
         self.add_rpaths(ext)
 
     def add_rpaths(self, ext=None, extoptions=None):
-        rpaths=self.info.get_rpaths(self.cfg_type())
+        rpaths = self.info.get_rpaths(self.cfg_type())
         if platform.system() != 'Windows':
             if self.compiler:
                 try:
                     existing_rpaths = self.compiler.runtime_library_dirs
-                    self.compiler.set_runtime_library_dirs(rpaths + existing_rpaths)
+                    self.compiler.set_runtime_library_dirs(
+                        rpaths + existing_rpaths)
                 except:
                     pass
             for rpath in rpaths:
                 if self.compiler:
                     self.compiler.add_runtime_library_dir(rpath)
-                linker_arg='-Wl,-rpath,' + rpath
-                ext.runtime_library_dirs=(ext.runtime_library_dirs if ext.runtime_library_dirs else [])+[rpath]
-                ext.extra_link_args+=[linker_arg]
-                (extoptions['extra_link_args'] if extoptions else ext.extra_link_args if ext else []).insert(0,linker_arg)
+                linker_arg = '-Wl,-rpath,' + rpath
+                ext.runtime_library_dirs = (
+                    ext.runtime_library_dirs if ext.runtime_library_dirs else [])+[rpath]
+                ext.extra_link_args += [linker_arg]
+                (extoptions['extra_link_args'] if extoptions else ext.extra_link_args if ext else [
+                ]).insert(0, linker_arg)
 
     def cfg_type(self):
         return 'Debug' if self.debug else 'Release'
@@ -300,8 +324,10 @@ class CBuildCommon(build_ext):
             pass
         dest = os.path.join(dest_dir, name)
         failures = {}
-        lib_paths_prioritized = [(k, v) for k, v in lib_paths.items() if k == cfg]
-        lib_paths_prioritized += [(k, v) for k, v in lib_paths.items() if k != cfg]
+        lib_paths_prioritized = [(k, v)
+                                 for k, v in lib_paths.items() if k == cfg]
+        lib_paths_prioritized += [(k, v)
+                                  for k, v in lib_paths.items() if k != cfg]
         for rel_type, binary_path in lib_paths_prioritized:
             src = os.path.join(*(binary_path + [name]))
             try:
@@ -310,7 +336,8 @@ class CBuildCommon(build_ext):
                     copyfile(src, dest)
                     print("success")
             except Exception as e:
-                failures[rel_type] = "copying {} to {}, got {}".format(src, dest, repr(e))
+                failures[rel_type] = "copying {} to {}, got {}".format(
+                    src, dest, repr(e))
         if len(failures) == len(lib_paths):
             raise Exception("Failed to copy binary: {}".format(failures))
 
@@ -354,7 +381,7 @@ class CBuildCommon(build_ext):
                          BUILD_CFG.get('comp_options', {}).get('PYCBC_LCB_API', None))
 
     def get_lcb_api_flags(self):
-        pycbc_lcb_api=self.get_pycbc_lcb_api()
+        pycbc_lcb_api = self.get_pycbc_lcb_api()
         return ['-DPYCBC_LCB_API={}'.format(pycbc_lcb_api)] if pycbc_lcb_api else []
 
 
@@ -378,6 +405,4 @@ def get_plat_code():
 
 build_type = os.getenv("PYCBC_BUILD",
                        {"Windows": "CMAKE_HYBRID", "Darwin": "CMAKE_HYBRID", "Linux": "CMAKE_HYBRID"}.get(platform.system(),
-                                                                                                   "CMAKE_HYBRID"))
-
-
+                                                                                                          "CMAKE_HYBRID"))

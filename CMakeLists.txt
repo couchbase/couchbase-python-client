@@ -209,6 +209,7 @@ function(make_dir path)
     file(MAKE_DIRECTORY ${path})
 endfunction(make_dir)
 
+
 if (MAKE)
 else()
 set(MAKE make)
@@ -255,7 +256,8 @@ if (LCB_SRC)
         SET(LIBCOUCHBASE_LIBRARY_FILE "${LCB_BUILD_DIR}/lib/Release/${LIBCOUCHBASE_LIBRARY_NAME}")
         SET(LIBCOUCHBASE_DBG_LIBRARY_FILE "${LCB_BUILD_DIR}/lib/Debug/${LIBCOUCHBASE_DBG_LIBRARY_NAME}")
         ExternalProject_Add(libcouchbase_src
-            URL "${LCB_REPO}/archive/${LCB_TAG}.zip"
+            GIT_REPOSITORY "${LCB_REPO}"
+            GIT_TAG "${LCB_TAG}"
             CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory ${LCB_BUILD_DIR}
             COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}/install
 
@@ -304,7 +306,8 @@ if (LCB_SRC)
         INCLUDE(GNUInstallDirs)
 
         ExternalProject_Add(libcouchbase_src
-                URL "${LCB_REPO}/archive/${LCB_TAG}.zip"
+                GIT_REPOSITORY "${LCB_REPO}"
+                GIT_TAG "${LCB_TAG}"
                 CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory "${LCB_BUILD_DIR}"
                 make_dir ${LCB_SELECTED_BUILD_DIR}
 
