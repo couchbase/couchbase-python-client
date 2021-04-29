@@ -109,9 +109,9 @@ class ViewIndexManager(object):
         """
         args = forward_args(kwargs, *options)
         name = namespace.prefix(design_doc_name)
-        args['path'] = "_design/" + name
+        args['path'] = "couchBase/{bucketname}/_design/{name}".format(name=name, bucketname=self._bucketname)
 
-        response = self._http_request(False, **args)
+        response = self._http_request(True, **args)
         return DesignDocument.from_json(name, **response.value)
 
     def get_all_design_documents(self,          # type: ViewIndexManager
@@ -158,10 +158,10 @@ class ViewIndexManager(object):
         ddoc = json.dumps(design_doc_data.as_dict(namespace))
 
         args = forward_args(kwargs, *options)
-        args['path'] = "_design/{name}".format(name=name, bucketname=self._bucketname)
+        args['path'] = "couchBase/{bucketname}/_design/{name}".format(name=name, bucketname=self._bucketname)
         args['method'] = _LCB.LCB_HTTP_METHOD_PUT
         args['post_data'] = ddoc
-        self._http_request(False, **args)
+        self._http_request(True, **args)
 
     def drop_design_document(self,              # type: ViewIndexManager
                              design_doc_name,   # type: str
