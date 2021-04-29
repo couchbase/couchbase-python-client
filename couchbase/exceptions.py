@@ -152,8 +152,8 @@ class CouchbaseException(Exception):
         self.key = params.get('key', None)
         self.objextra = params.get('objextra', None)
         self.message = params.get('message', None)
-        self.context = ErrorContext.from_dict(**params.get('error_context', dict()))
-
+        self.context = ErrorContext.from_dict(
+            **params.get('error_context', dict()))
 
     @classmethod
     def pyexc(cls, message=None, obj=None, inner=None):
@@ -241,12 +241,13 @@ class CouchbaseException(Exception):
 
         ret_ok, ret_fail = {}, {}
         count = 0
-        nokey_prefix = ([""] + sorted(filter(bool, self.all_results.keys())))[-1]
+        nokey_prefix = (
+            [""] + sorted(filter(bool, self.all_results.keys())))[-1]
         for key, v in self.all_results.items():
             if not key:
                 key = nokey_prefix + ":nokey:" + str(count)
                 count += 1
-            success = getattr(v,'success', True)
+            success = getattr(v, 'success', True)
             if success:
                 ret_ok[key] = v
             else:
@@ -281,8 +282,9 @@ class CouchbaseException(Exception):
             details.append("Context={0}".format(self.context))
 
         success, fail = self.split_results()
-        if len(fail)>0:
-            summary = {key: value.tracing_output for key, value in fail.items() if hasattr(value,"tracing_output")}
+        if len(fail) > 0:
+            summary = {key: value.tracing_output for key,
+                       value in fail.items() if hasattr(value, "tracing_output")}
             details.append("Tracing Output={}".format(json.dumps(summary)))
 
         s = "<{0}>".format(", ".join(details))
@@ -304,6 +306,8 @@ BaseException
 All Service exceptions derived from the base CouchbaseException and have an internal exception which can be either a system error/exception raised by the platform or a generic or shared error/exception across all services.
 
 """
+
+
 class QueryException(CouchbaseException):
     """
     A server error occurred while executing a N1QL query. Assumes that that the service has returned a response.
@@ -315,6 +319,7 @@ class QueryException(CouchbaseException):
     """
     pass
 
+
 class SearchException(CouchbaseException):
     pass
 
@@ -325,9 +330,12 @@ class SearchException(CouchbaseException):
     Any additional information returned by the server, the node it executed on, payload, HTTP status
     """
 
+
 """Derived Exceptions
 TBD? May be nothing to extend...
 """
+
+
 class AnalyticsException(CouchbaseException):
     pass
     """A server error occurred while executing an Analytics query. Assumes that that the service has returned a response
@@ -336,10 +344,14 @@ class AnalyticsException(CouchbaseException):
     Properties
     The error(s) returned by response from the server, contextId, any additional information returned by the server, the node it executed on, payload, HTTP status.
     """
+
+
 """
 Derived Exceptions
 TBD? May be nothing to extend...
 """
+
+
 class ViewException(CouchbaseException):
     """A server error occurred while executing a View query.  Assumes that that the service has returned a response.
     Message
@@ -348,6 +360,7 @@ class ViewException(CouchbaseException):
     The error(s) returned by response from the server, contextId, any additional information returned by the server, the node it executed on, payload, HTTP status.
     """
     pass
+
 
 class KeyValueException(CouchbaseException):
     """
@@ -361,6 +374,7 @@ class KeyValueException(CouchbaseException):
     The opaque used in the request"""
     pass
 
+
 class SDKException(CouchbaseException):
     """
     An error occured within the SDK, while executing a command.
@@ -370,6 +384,7 @@ class SDKException(CouchbaseException):
     """
     pass
 
+
 class SharedException(CouchbaseException):
     """
     A server error occured, and it is of a sort that several services would all raise.
@@ -377,6 +392,7 @@ class SharedException(CouchbaseException):
     The error message returned by the server
     Properties
     """
+
 
 class BaseException(CouchbaseException):
     """
@@ -402,12 +418,18 @@ Etc.
 Expected to be handled specifically by the application to perform an additional action such as retrying to check if the key has become unlocked.
 """
 
+
 class SearchIndexNotFoundException(SearchException):
-  pass
+    pass
+
+
+class KeyspaceNotFoundException(QueryException):
+    """Keyspace not found (collection or bucket does not exist)"""
+    pass
 
 
 class DocumentLockedException(KeyValueException):
-  pass
+    pass
 
 
 class DocumentNotFoundException(KeyValueException):
@@ -427,7 +449,7 @@ class KeyLockedException(KeyValueException):
 
 
 class DocumentUnretrievableException(KeyValueException):
-  pass
+    pass
 
 
 class PathNotFoundException(KeyValueException):
@@ -447,34 +469,37 @@ class KeyDeletedException(KeyValueException):
 
 
 class CollectionAlreadyExistsException(KeyValueException):
-  pass
+    pass
 
 
 class CollectionNotFoundException(KeyValueException):
-  pass
+    pass
 
 
 class ScopeAlreadyExistsException(KeyValueException):
-  pass
+    pass
 
 
-class ScopeNotFoundException(KeyValueException):
-  pass
+class ScopeNotFoundException(SharedException):
+    pass
 
 
 class BucketAlreadyExistsException(KeyValueException):
-  pass
+    pass
 
 
 class BucketDoesNotExistException(KeyValueException):
-  pass
+    pass
+
 
 class BucketNotFlushableException(KeyValueException):
-  pass
+    pass
+
 
 class PartialViewResultException(ViewException):
-    #? (returns rows that it did get)
+    # ? (returns rows that it did get)
     pass
+
 
 """
 Generic/Shared Exceptions
@@ -586,8 +611,6 @@ class DocumentMutationLostException(CouchbaseException):
 
 class ReplicaNotAvailableException(CouchbaseException):
     pass
-
-
 
 
 # TODO: make types to match.  This is just to get it to compile and run...
@@ -935,6 +958,11 @@ class TemporaryFailException(SharedException):
     """
 
 
+class ParsingFailedException(SharedException):
+    """Parsing failure (from server)"""
+    pass
+
+
 class DlopenFailedException(CouchbaseException):
     """Failed to open shared object"""
 
@@ -1020,8 +1048,10 @@ class BadHandleException(CouchbaseException):
 class HTTPException(CouchbaseException):
     """HTTP error"""
 
+
 class FeatureNotFoundException(HTTPException):
     """Thrown when feature is not supported by server version."""
+
 
 class ObjectThreadException(CouchbaseException):
     """Thrown when access from multiple threads is detected"""
@@ -1088,14 +1118,16 @@ class CryptoConfigException(CryptoException):
     """Generic Crypto Config Error"""
 
     def __init__(self, params=None, message="Generic Cryptography Configuration Error for alias:$alias", **kwargs):
-        super(CryptoConfigException, self).__init__(params=params, message=message, **kwargs)
+        super(CryptoConfigException, self).__init__(
+            params=params, message=message, **kwargs)
 
 
 class CryptoExecutionException(CryptoException):
     """Generic Crypto Execution Error"""
 
     def __init__(self, params=None, message="Generic Cryptography Execution Error for alias:$alias", **kwargs):
-        super(CryptoExecutionException, self).__init__(params=params, message=message, **kwargs)
+        super(CryptoExecutionException, self).__init__(
+            params=params, message=message, **kwargs)
 
 
 class CryptoProviderNotFoundException(CryptoConfigException):
@@ -1116,44 +1148,56 @@ class CryptoProviderAliasNullException(CryptoConfigException):
 
 class CryptoProviderMissingPublicKeyException(CryptoConfigException):
     """The PublicKeyName field has not been set in the crypto provider configuration or is null or and empty string"""
-    def __init__(self, params = None):
-        super(CryptoProviderMissingPublicKeyException,self).__init__(params=params, message="Cryptographic providers require a non-null, empty public and key identifier (kid) be configured for the alias:$alias")
+
+    def __init__(self, params=None):
+        super(CryptoProviderMissingPublicKeyException, self).__init__(params=params,
+                                                                      message="Cryptographic providers require a non-null, empty public and key identifier (kid) be configured for the alias:$alias")
 
 
 class CryptoProviderMissingSigningKeyException(CryptoConfigException):
     """The SigningKeyName field has not been set in the crypto provider configuration or is null or and empty string. Required for symmetric algos."""
-    def __init__(self, params = None):
-        super(CryptoProviderMissingSigningKeyException,self).__init__(params=params, message="Symmetric key cryptographic providers require a non-null, empty signing key be configured for the alias:$alias")
+
+    def __init__(self, params=None):
+        super(CryptoProviderMissingSigningKeyException, self).__init__(params=params,
+                                                                       message="Symmetric key cryptographic providers require a non-null, empty signing key be configured for the alias:$alias")
 
 
 class CryptoProviderMissingPrivateKeyException(CryptoConfigException):
     """The PrivateKeyName field has not been set in the crypto provider configuration or is null or and empty string. Required for asymmetric algos."""
-    def __init__(self, params = None):
-        super(CryptoProviderMissingPrivateKeyException,self).__init__(params=params, message="Asymmetric key cryptographic providers require a non-null, empty private key be configured for the alias:$alias")
+
+    def __init__(self, params=None):
+        super(CryptoProviderMissingPrivateKeyException, self).__init__(params=params,
+                                                                       message="Asymmetric key cryptographic providers require a non-null, empty private key be configured for the alias:$alias")
 
 
 class CryptoProviderSigningFailedException(CryptoExecutionException):
     """Thrown if the authentication check fails on the decryption side."""
-    def __init__(self, params = None):
-        super(CryptoProviderSigningFailedException,self).__init__(params=params, message="The authentication failed while checking the signature of the message payload for the alias:$alias")
+
+    def __init__(self, params=None):
+        super(CryptoProviderSigningFailedException, self).__init__(params=params,
+                                                                   message="The authentication failed while checking the signature of the message payload for the alias:$alias")
 
 
 class CryptoProviderEncryptFailedException(CryptoExecutionException):
     """Thrown if an error occurs during encryption."""
-    def __init__(self, params = None):
-        super(CryptoProviderEncryptFailedException,self).__init__(params=params, message="The encryption of the field failed for the alias:$alias")
+
+    def __init__(self, params=None):
+        super(CryptoProviderEncryptFailedException, self).__init__(
+            params=params, message="The encryption of the field failed for the alias:$alias")
 
 
 class CryptoProviderDecryptFailedException(CryptoExecutionException):
     """Thrown if an error occurs during decryption."""
-    def __init__(self, params = None):
-        super(CryptoProviderDecryptFailedException,self).__init__(params=params, message="The decryption of the field failed for the alias:$alias")
+
+    def __init__(self, params=None):
+        super(CryptoProviderDecryptFailedException, self).__init__(
+            params=params, message="The decryption of the field failed for the alias:$alias")
 
 
 class CryptoProviderKeySizeException(CryptoException):
-    def __init__(self, params = None):
-        super(CryptoProviderKeySizeException,self).__init__(params=params, message=
-        "The key found does not match the size of the key that the algorithm expects for the alias: $alias. Expected key size was $expected_keysize and configured key size is $configured_keysize")
+    def __init__(self, params=None):
+        super(CryptoProviderKeySizeException, self).__init__(params=params,
+                                                             message="The key found does not match the size of the key that the algorithm expects for the alias: $alias. Expected key size was $expected_keysize and configured key size is $configured_keysize")
 
 
 class NotImplementedInV3(CouchbaseException):
@@ -1179,7 +1223,8 @@ class DatasetNotFoundException(AnalyticsException):
 class DatasetAlreadyExistsException(AnalyticsException):
     """Raised when attempting to create a dataset which already exists"""
 
-_PYCBC_CRYPTO_ERR_MAP ={
+
+_PYCBC_CRYPTO_ERR_MAP = {
     C.PYCBC_CRYPTO_PROVIDER_NOT_FOUND: CryptoProviderNotFoundException,
     C.PYCBC_CRYPTO_PROVIDER_ALIAS_NULL: CryptoProviderAliasNullException,
     C.PYCBC_CRYPTO_PROVIDER_MISSING_PUBLIC_KEY: CryptoProviderMissingPublicKeyException,
@@ -1204,6 +1249,7 @@ _LCB_ERRCAT_MAP = {
     C.LCB_ERROR_TYPE_VIEW: ViewException,
     C.LCB_ERROR_TYPE_SDK: SDKException
 }
+
 
 class DurabilityInvalidLevelException(CouchbaseDurabilityException):
     """Given durability level is invalid"""
@@ -1235,56 +1281,60 @@ class DurabilityErrorCode(CompatibilityEnum):
     SYNC_WRITE_AMBIGUOUS = DurabilitySyncWriteAmbiguousException
 
 
-_LCB_SYNCREP_MAP = {item.value:item.orig_value for item in DurabilityErrorCode}
+_LCB_SYNCREP_MAP = {
+    item.value: item.orig_value for item in DurabilityErrorCode}
 
 
 _LCB_ERRNO_MAP = dict(list({
-                        C.LCB_ERR_AUTHENTICATION_FAILURE:        AuthenticationException,
-                        C.LCB_ERR_INVALID_DELTA:                 DeltaBadvalException,
-                        C.LCB_ERR_VALUE_TOO_LARGE:               ValueTooBigException,
-                        C.LCB_ERR_NO_MEMORY:                     NoMemoryException,
-                        C.LCB_ERR_TEMPORARY_FAILURE:             TemporaryFailException,
-                        C.LCB_ERR_DOCUMENT_EXISTS:               DocumentExistsException,
-                        C.LCB_ERR_DOCUMENT_NOT_FOUND:            DocumentNotFoundException,
-                        C.LCB_ERR_DOCUMENT_LOCKED:               DocumentLockedException,
-                        C.LCB_ERR_CAS_MISMATCH:                  CASMismatchException,
-                        C.LCB_ERR_DLOPEN_FAILED:                 DlopenFailedException,
-                        C.LCB_ERR_DLSYM_FAILED:                  DlsymFailedException,
-                        C.LCB_ERR_NETWORK:                       NetworkException,
-                        C.LCB_ERR_NOT_MY_VBUCKET:                NotMyVbucketException,
-                        C.LCB_ERR_NOT_STORED:                    NotStoredException,
-                        C.LCB_ERR_UNSUPPORTED_OPERATION:    NotSupportedException,
-                        C.LCB_ERR_UNKNOWN_HOST:             UnknownHostException,
-                        C.LCB_ERR_PROTOCOL_ERROR:           ProtocolException,
-                        C.LCB_ERR_TIMEOUT:                  TimeoutException,
-                        C.LCB_ERR_CONNECT_ERROR:            ConnectException,
-                        C.LCB_ERR_BUCKET_NOT_FOUND:         BucketNotFoundException,
-                        C.LCB_ERR_QUERY:                    QueryException,
-                        C.LCB_ERR_NO_MATCHING_SERVER:       DocumentUnretrievableException,
-                        C.LCB_ERR_INVALID_HOST_FORMAT:      InvalidException,
-                        C.LCB_ERR_INVALID_CHAR:             InvalidException,
-                        C.LCB_ERR_INVALID_ARGUMENT:         InvalidArgumentException,
-                        C.LCB_ERR_DURABILITY_TOO_MANY:      DurabilityImpossibleException,
-                        C.LCB_ERR_DUPLICATE_COMMANDS:       InvalidArgumentException,
-                        C.LCB_ERR_NO_CONFIGURATION:         ClientTemporaryFailException,
-                        C.LCB_ERR_HTTP:                     HTTPException,
-                        C.LCB_ERR_SUBDOC_PATH_NOT_FOUND:    PathNotFoundException,
-                        C.LCB_ERR_SUBDOC_PATH_EXISTS:       PathExistsException,
-                        C.LCB_ERR_SUBDOC_PATH_INVALID:      SubdocPathInvalidException,
-                        C.LCB_ERR_SUBDOC_PATH_TOO_DEEP:     DocumentTooDeepException,
-                        C.LCB_ERR_SUBDOC_DOCUMENT_NOT_JSON: DocumentNotJsonException,
-                        C.LCB_ERR_SUBDOC_VALUE_TOO_DEEP:    SubdocValueTooDeepException,
-                        C.LCB_ERR_SUBDOC_PATH_MISMATCH:          SubdocPathMismatchException,
-                        C.LCB_ERR_SUBDOC_VALUE_INVALID:          SubdocCantInsertValueException,
-                        C.LCB_ERR_SUBDOC_DELTA_INVALID:          SubdocBadDeltaException,
-                        C.LCB_ERR_INDEX_NOT_FOUND:               QueryIndexNotFoundException,
-                        C.LCB_ERR_INDEX_EXISTS:                  QueryIndexAlreadyExistsException,
-                        C.LCB_ERR_SUBDOC_NUMBER_TOO_BIG:         SubdocNumberTooBigException,
-                        C.LCB_ERR_DATAVERSE_EXISTS:              DataverseAlreadyExistsException,
-                        C.LCB_ERR_DATAVERSE_NOT_FOUND:           DataverseNotFoundException,
-                        C.LCB_ERR_DATASET_NOT_FOUND:             DatasetNotFoundException,
-                        C.LCB_ERR_DATASET_EXISTS:                DatasetAlreadyExistsException
-                    }.items()) + list(_PYCBC_CRYPTO_ERR_MAP.items()) + list(_LCB_SYNCREP_MAP.items()))
+    C.LCB_ERR_AUTHENTICATION_FAILURE:        AuthenticationException,
+    C.LCB_ERR_INVALID_DELTA:                 DeltaBadvalException,
+    C.LCB_ERR_VALUE_TOO_LARGE:               ValueTooBigException,
+    C.LCB_ERR_NO_MEMORY:                     NoMemoryException,
+    C.LCB_ERR_TEMPORARY_FAILURE:             TemporaryFailException,
+    C.LCB_ERR_PARSING_FAILURE:               ParsingFailedException,
+    C.LCB_ERR_SCOPE_NOT_FOUND:               ScopeNotFoundException,
+    C.LCB_ERR_DOCUMENT_EXISTS:               DocumentExistsException,
+    C.LCB_ERR_DOCUMENT_NOT_FOUND:            DocumentNotFoundException,
+    C.LCB_ERR_DOCUMENT_LOCKED:               DocumentLockedException,
+    C.LCB_ERR_CAS_MISMATCH:                  CASMismatchException,
+    C.LCB_ERR_DLOPEN_FAILED:                 DlopenFailedException,
+    C.LCB_ERR_DLSYM_FAILED:                  DlsymFailedException,
+    C.LCB_ERR_NETWORK:                       NetworkException,
+    C.LCB_ERR_NOT_MY_VBUCKET:                NotMyVbucketException,
+    C.LCB_ERR_NOT_STORED:                    NotStoredException,
+    C.LCB_ERR_UNSUPPORTED_OPERATION:    NotSupportedException,
+    C.LCB_ERR_UNKNOWN_HOST:             UnknownHostException,
+    C.LCB_ERR_PROTOCOL_ERROR:           ProtocolException,
+    C.LCB_ERR_TIMEOUT:                  TimeoutException,
+    C.LCB_ERR_CONNECT_ERROR:            ConnectException,
+    C.LCB_ERR_BUCKET_NOT_FOUND:         BucketNotFoundException,
+    C.LCB_ERR_QUERY:                    QueryException,
+    C.LCB_ERR_KEYSPACE_NOT_FOUND:       KeyspaceNotFoundException,
+    C.LCB_ERR_NO_MATCHING_SERVER:       DocumentUnretrievableException,
+    C.LCB_ERR_INVALID_HOST_FORMAT:      InvalidException,
+    C.LCB_ERR_INVALID_CHAR:             InvalidException,
+    C.LCB_ERR_INVALID_ARGUMENT:         InvalidArgumentException,
+    C.LCB_ERR_DURABILITY_TOO_MANY:      DurabilityImpossibleException,
+    C.LCB_ERR_DUPLICATE_COMMANDS:       InvalidArgumentException,
+    C.LCB_ERR_NO_CONFIGURATION:         ClientTemporaryFailException,
+    C.LCB_ERR_HTTP:                     HTTPException,
+    C.LCB_ERR_SUBDOC_PATH_NOT_FOUND:    PathNotFoundException,
+    C.LCB_ERR_SUBDOC_PATH_EXISTS:       PathExistsException,
+    C.LCB_ERR_SUBDOC_PATH_INVALID:      SubdocPathInvalidException,
+    C.LCB_ERR_SUBDOC_PATH_TOO_DEEP:     DocumentTooDeepException,
+    C.LCB_ERR_SUBDOC_DOCUMENT_NOT_JSON: DocumentNotJsonException,
+    C.LCB_ERR_SUBDOC_VALUE_TOO_DEEP:    SubdocValueTooDeepException,
+    C.LCB_ERR_SUBDOC_PATH_MISMATCH:          SubdocPathMismatchException,
+    C.LCB_ERR_SUBDOC_VALUE_INVALID:          SubdocCantInsertValueException,
+    C.LCB_ERR_SUBDOC_DELTA_INVALID:          SubdocBadDeltaException,
+    C.LCB_ERR_INDEX_NOT_FOUND:               QueryIndexNotFoundException,
+    C.LCB_ERR_INDEX_EXISTS:                  QueryIndexAlreadyExistsException,
+    C.LCB_ERR_SUBDOC_NUMBER_TOO_BIG:         SubdocNumberTooBigException,
+    C.LCB_ERR_DATAVERSE_EXISTS:              DataverseAlreadyExistsException,
+    C.LCB_ERR_DATAVERSE_NOT_FOUND:           DataverseNotFoundException,
+    C.LCB_ERR_DATASET_NOT_FOUND:             DatasetNotFoundException,
+    C.LCB_ERR_DATASET_EXISTS:                DatasetAlreadyExistsException
+}.items()) + list(_PYCBC_CRYPTO_ERR_MAP.items()) + list(_LCB_SYNCREP_MAP.items()))
 
 
 def _set_default_codes():
@@ -1320,7 +1370,7 @@ def _mk_lcberr(rc, name=None, default=CouchbaseException, docstr="", extrabase=[
         name = "LCB_0x{0:0X} (generated, catch: {1})".format(
             rc, ", ".join(x.__name__ for x in bases))
 
-    d = { '__doc__' : docstr }
+    d = {'__doc__': docstr}
 
     if not bases:
         bases = [CouchbaseException]
@@ -1374,7 +1424,8 @@ class NotSupportedWrapper(object):
                 extra = getattr(e, 'objextra', None)
                 status = getattr(extra, 'http_status', None)
                 if status == 404:
-                    raise NotSupportedException('Server does not support this api call')
+                    raise NotSupportedException(
+                        'Server does not support this api call')
                 raise
         return wrapped
 
@@ -1389,7 +1440,8 @@ class NotSupportedWrapper(object):
                 extra = getattr(e, 'objextra', None)
                 status = getattr(extra, 'http_status', None)
                 if status == 404 or status == 400:
-                    raise NotSupportedException('Server does not support this api call')
+                    raise NotSupportedException(
+                        'Server does not support this api call')
                 raise
 
         return wrapped
@@ -1397,7 +1449,7 @@ class NotSupportedWrapper(object):
 
 class DictMatcher(object):
     def __init__(self, **kwargs):
-        self._pattern=tuple(kwargs.items())
+        self._pattern = tuple(kwargs.items())
 
     def match(self, dict):
         for k, v in self._pattern:
@@ -1456,9 +1508,9 @@ class ErrorMapper(object):
                             if isinstance(value, bytearray) or isinstance(value, bytes):
                                 value = value.decode("utf-8")
                             for pattern, exc in text_to_final_exc.items():
-                                matches=False
+                                matches = False
                                 try:
-                                    matches=pattern.match(value)
+                                    matches = pattern.match(value)
                                 except Exception as f:
                                     pass
                                 if matches:

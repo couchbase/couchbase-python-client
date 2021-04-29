@@ -525,7 +525,7 @@ class CBCollection(wrapt.ObjectProxy):
     @get_replica_result_wrapper
     def get_any_replica(self,
                         key,  # type: str
-                        *options,  # type: GetFromReplicaOptions
+                        *options,  # type: GetAnyReplicaOptions
                         **kwargs
                         ):
         # type: (...) -> GetReplicaResult
@@ -533,7 +533,7 @@ class CBCollection(wrapt.ObjectProxy):
 
         :param key: The key to fetch. The type of key is the same
             as mentioned in :meth:`upsert`
-        :param: GetFromReplicaOptions options: The options to use for this get request.
+        :param: GetAnyReplicaOptions options: The options to use for this get request.
         :param: Any kwargs: Override corresponding value in options.
 
         :raise: :exc:`.DocumentNotFoundException` if the key does not exist
@@ -1608,6 +1608,51 @@ class Scope(object):
         :raise: CollectionNotFoundException
         """
         return self._gen_collection(collection_name)
+
+    def query(self,
+              statement,            # type: str
+              *options,             # type: QueryOptions
+              **kwargs              # type: Any
+              ):
+        # type: (...) -> QueryResult
+        """
+        Perform a N1QL query.
+
+        The context for the query will be automatically supplied as
+        "bucket_name.scope_name" using the name of this scope and the
+        name of the bucket containing this scope.
+
+        :param statement: the N1QL query statement to execute
+        :param options: A QueryOptions object or the positional parameters in the query.
+        :param kwargs: Override the corresponding value in the Options.  If they don't match
+          any value in the options, assumed to be named parameters for the query.
+
+        :return: The results of the query or error message
+            if the query failed on the server.
+
+        :raise: :exc:`~.exceptions.QueryException` - for errors involving the query itself.  Also any exceptions
+            raised by underlying system - :class:`~.exceptions.TimeoutException` for instance.
+
+        """
+        # import here to avoid circular reference:
+        from couchbase.cluster import QueryOptions
+
+        itercls = kwargs.pop('itercls', QueryResult)
+        opt = QueryOptions()
+        opts = list(options)
+        for o in opts:
+            if isinstance(o, QueryOptions):
+                opt = o
+                opts.remove(o)
+
+        # set the query context as this bucket and scope if not provided
+        if not ('query_context' in opt or 'query_context' in kwargs):
+            opt['query_context'] = '{}.{}'.format(self.bucket.name, self.name)
+
+        return CoreClient.query(self.bucket,
+                                opt.to_query_object(
+                                    statement, *opts, **kwargs),
+                                itercls=itercls)
 
 
 class CoreClientDatastructureWrap(CoreClient):

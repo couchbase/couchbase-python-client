@@ -16,14 +16,17 @@
 # limitations under the License.
 import datetime
 from unittest import SkipTest
+import objgraph
+from collections import Counter
+import gc
 
 from couchbase.n1ql import UnsignedInt64
 from couchbase.cluster import QueryOptions, QueryProfile, QueryResult
 from couchbase.n1ql import QueryMetaData, QueryStatus, QueryWarning
-from couchbase_tests.base import CollectionTestCase, BASEDIR, ClusterTestCase
-import objgraph
-from collections import Counter
-import gc
+from couchbase_tests.base import CollectionTestCase
+from couchbase.exceptions import (KeyspaceNotFoundException, NotSupportedException,
+                                  ScopeNotFoundException)
+from couchbase.management.collections import CollectionSpec
 
 
 class QueryTests(CollectionTestCase):
@@ -58,13 +61,15 @@ class QueryTests(CollectionTestCase):
         self.assertTrue(result._params._adhoc)
 
     def test_simple_query_prepared(self):
-        result = self.cluster.query("SELECT * FROM `beer-sample` LIMIT 2", QueryOptions(adhoc=False, metrics=True))  # type: QueryResult
+        result = self.cluster.query("SELECT * FROM `beer-sample` LIMIT 2",
+                                    QueryOptions(adhoc=False, metrics=True))  # type: QueryResult
         self.assertRows(result, 2)
         self.assertIsNone(result.metadata().profile())
         self.assertFalse(result._params._adhoc)
 
     def test_simple_query_with_positional_params(self):
-        result = self.cluster.query("SELECT * FROM `beer-sample` WHERE brewery_id LIKE $1 LIMIT 1", '21st_amendment%')
+        result = self.cluster.query(
+            "SELECT * FROM `beer-sample` WHERE brewery_id LIKE $1 LIMIT 1", '21st_amendment%')
         self.assertRows(result, 1)
 
     def test_simple_query_with_named_params(self):
@@ -79,7 +84,7 @@ class QueryTests(CollectionTestCase):
 
     def test_simple_query_with_named_params_in_options(self):
         result = self.cluster.query("SELECT * FROM `beer-sample` WHERE brewery_id LIKE $brewery LIMIT 1",
-                                    QueryOptions(named_parameters={'brewery':'21st_amendment%'}))
+                                    QueryOptions(named_parameters={'brewery': '21st_amendment%'}))
         self.assertRows(result, 1)
 
     # NOTE: Ideally I'd notice a set of positional parameters in the query call, and assume they were the positional
@@ -94,26 +99,30 @@ class QueryTests(CollectionTestCase):
     # named parameter for the query.  However I worry about overlap being confusing, etc...
     def test_simple_query_without_options_with_kwargs_named_params(self):
         result = self.cluster.query("SELECT * FROM `beer-sample` WHERE brewery_id LIKE $brewery LIMIT 1",
-                                    named_parameters={'brewery':'21st_amendment%'})
+                                    named_parameters={'brewery': '21st_amendment%'})
         self.assertRows(result, 1)
 
     def test_query_with_profile(self):
-        result = self.cluster.query("SELECT * FROM `beer-sample` LIMIT 1", QueryOptions(profile=QueryProfile.TIMINGS))
+        result = self.cluster.query(
+            "SELECT * FROM `beer-sample` LIMIT 1", QueryOptions(profile=QueryProfile.TIMINGS))
         self.assertRows(result, 1)
         self.assertIsNotNone(result.metadata().profile())
 
     def test_query_with_metrics(self):
         initial = datetime.datetime.now()
-        result = self.cluster.query("SELECT * FROM `beer-sample` LIMIT 1", QueryOptions(metrics=True))
+        result = self.cluster.query(
+            "SELECT * FROM `beer-sample` LIMIT 1", QueryOptions(metrics=True))
         self.assertRows(result, 1)
         taken = datetime.datetime.now() - initial
         metadata = result.metadata()  # type: QueryMetaData
         metrics = metadata.metrics()
         self.assertIsInstance(metrics.elapsed_time(), datetime.timedelta)
         self.assertLess(metrics.elapsed_time(), taken)
-        self.assertGreater(metrics.elapsed_time(), datetime.timedelta(milliseconds=0))
+        self.assertGreater(metrics.elapsed_time(),
+                           datetime.timedelta(milliseconds=0))
         self.assertLess(metrics.elapsed_time(), taken)
-        self.assertGreater(metrics.execution_time(), datetime.timedelta(milliseconds=0))
+        self.assertGreater(metrics.execution_time(),
+                           datetime.timedelta(milliseconds=0))
 
         expected_counts = {metrics.mutation_count: 0,
                            metrics.result_count: 1,
@@ -123,7 +132,8 @@ class QueryTests(CollectionTestCase):
             count_result = method()
             fail_msg = "{} failed".format(method)
             self.assertIsInstance(count_result, UnsignedInt64, msg=fail_msg)
-            self.assertEqual(UnsignedInt64(expected), count_result, msg=fail_msg)
+            self.assertEqual(UnsignedInt64(expected),
+                             count_result, msg=fail_msg)
         self.assertGreater(metrics.result_size(), UnsignedInt64(500))
 
         self.assertEqual(UnsignedInt64(0), metrics.error_count())
@@ -133,7 +143,7 @@ class QueryTests(CollectionTestCase):
         result = self.cluster.query("SELECT * FROM `beer-sample` LIMIT 2")
         self.assertRows(result, 2)
         metadata = result.metadata()  # type: QueryMetaData
-        for id_meth in (metadata.client_context_id,metadata.request_id):
+        for id_meth in (metadata.client_context_id, metadata.request_id):
             id_res = id_meth()
             fail_msg = "{} failed".format(id_meth)
             self.assertIsInstance(id_res, str, msg=fail_msg)
@@ -153,7 +163,7 @@ class QueryTests(CollectionTestCase):
 
     def test_mixed_named_parameters(self):
         result = self.cluster.query("SELECT * FROM `beer-sample` WHERE brewery_id LIKE $brewery LIMIT 1",
-                                    QueryOptions(named_parameters={'brewery':'xxffqqlx'}), brewery='21st_am%')
+                                    QueryOptions(named_parameters={'brewery': 'xxffqqlx'}), brewery='21st_am%')
         self.assertRows(result, 1)
 
 
@@ -201,7 +211,7 @@ class QueryLeakTest(CollectionTestCase):
                     key = entry[0]
                     if key in ('builtins.dict', 'builtins.list'):
                         self.assertLessEqual(entry[2], counts[key],
-                                                "{} count should not grow more than {}".format(key, counts[key]))
+                                             "{} count should not grow more than {}".format(key, counts[key]))
             print("\n")
             del growth
             gc.collect()
@@ -215,6 +225,161 @@ class QueryLeakTest(CollectionTestCase):
         # pick the biggest memory block
         top_stats = snapshot2.statistics('traceback')
         stat = top_stats[0]
-        logging.error("%s memory blocks: %.1f KiB" % (stat.count, stat.size / 1024))
+        logging.error("%s memory blocks: %.1f KiB" %
+                      (stat.count, stat.size / 1024))
         for line in stat.traceback.format():
             logging.error(line)
+
+
+class QueryCollectionTests(CollectionTestCase):
+    def setUp(self):
+        super(QueryCollectionTests, self).setUp(bucket='beer-sample')
+
+        if not self.is_realserver:
+            raise SkipTest('mock does not mock queries')
+
+        # SkipTest if collections not supported
+        try:
+            self.bucket.collections().get_all_scopes()
+        except NotSupportedException:
+            raise SkipTest('cluster does not support collections')
+
+        self.cm = self.bucket.collections()
+        self.create_beer_sample_collections()
+
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super(QueryCollectionTests, cls).setUpClass(True)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        super(QueryCollectionTests, cls).tearDownClass()
+
+    def assertRows(self,
+                   result,  # type: QueryResult
+                   expected_count):
+        count = 0
+        self.assertIsNotNone(result)
+        for row in result.rows():
+            self.assertIsNotNone(row)
+            count += 1
+        self.assertEqual(count, expected_count)
+
+    def test_query_fully_qualified(self):
+        beers_fqdn = '`{}`.`{}`.beers'.format(
+            self.bucket_name, self.beer_sample_collections.scope)
+        result = self.cluster.query(
+            "SELECT * FROM {} LIMIT 2".format(beers_fqdn))
+        self.assertRows(result, 2)
+        self.assertIsNone(result.metadata().profile())
+        self.assertTrue(result._params._adhoc)
+
+    def test_cluster_query_context(self):
+        q_context = '{}.{}'.format(self.bucket_name, self.beer_sample_collections.scope)
+        # test with QueryOptions
+        q_opts = QueryOptions(query_context=q_context, adhoc=True)
+        result = self.cluster.query("SELECT * FROM beers LIMIT 2", q_opts)
+        self.assertRows(result, 2)
+
+        # test with kwargs
+        result = self.cluster.query(
+            "SELECT * FROM beers LIMIT 2", query_context=q_context)
+        self.assertRows(result, 2)
+
+    def test_bad_query_context(self):
+        # test w/ no context
+        result = self.cluster.query("SELECT * FROM beers LIMIT 2")
+        with self.assertRaises(KeyspaceNotFoundException):
+            result.rows()
+
+        # test w/ bad scope
+        q_context = '{}.{}'.format(self.bucket_name, 'fake-scope')
+        result = self.cluster.query(
+            "SELECT * FROM beers LIMIT 2", QueryOptions(query_context=q_context))
+        with self.assertRaises(ScopeNotFoundException):
+            result.rows()
+
+    def test_scope_query(self):
+        scope = self.bucket.scope(self.beer_sample_collections.scope)
+        result = scope.query("SELECT * FROM beers LIMIT 2")
+        self.assertRows(result, 2)
+        fully_qualified = '{}.{}.beers'.format(
+            self.bucket_name, self.beer_sample_collections.scope)
+        result = scope.query(
+            "SELECT * FROM {} LIMIT 2".format(fully_qualified))
+
+    def test_bad_scope_query(self):
+        scope = self.bucket.scope(self.beer_sample_collections.scope)
+        q_context = '{}.{}'.format(self.bucket_name, 'fake-scope')
+        result = scope.query("SELECT * FROM beers LIMIT 2",
+                             QueryOptions(query_context=q_context))
+        with self.assertRaises(ScopeNotFoundException):
+            result.rows()
+
+        q_context = '{}.{}'.format('fake-bucket', self.beer_sample_collections.scope)
+        result = scope.query("SELECT * FROM beers LIMIT 2",
+                             query_context=q_context)
+        with self.assertRaises(KeyspaceNotFoundException):
+            result.rows()
+
+    def test_scope_query_with_positional_params_in_options(self):
+        scope = self.bucket.scope(self.beer_sample_collections.scope)
+        result = scope.query("SELECT * FROM breweries WHERE META().id LIKE $1 LIMIT 1",
+                             QueryOptions(positional_parameters=['21st_amendment%']))
+        self.assertRows(result, 1)
+
+    def test_scope_query_with_named_params_in_options(self):
+        scope = self.bucket.scope(self.beer_sample_collections.scope)
+        result = scope.query("SELECT * FROM breweries WHERE META().id LIKE $brewery LIMIT 1",
+                             QueryOptions(named_parameters={'brewery': '21st_amendment%'}))
+        self.assertRows(result, 1)
+
+    def test_scope_query_with_metrics(self):
+        scope = self.bucket.scope(self.beer_sample_collections.scope)
+        initial = datetime.datetime.now()
+        result = scope.query(
+            "SELECT * FROM breweries LIMIT 1", QueryOptions(metrics=True))
+        self.assertRows(result, 1)
+        taken = datetime.datetime.now() - initial
+        metadata = result.metadata()  # type: QueryMetaData
+        metrics = metadata.metrics()
+        self.assertIsInstance(metrics.elapsed_time(), datetime.timedelta)
+        self.assertLess(metrics.elapsed_time(), taken)
+        self.assertGreater(metrics.elapsed_time(),
+                           datetime.timedelta(milliseconds=0))
+        self.assertLess(metrics.elapsed_time(), taken)
+        self.assertGreater(metrics.execution_time(),
+                           datetime.timedelta(milliseconds=0))
+
+        expected_counts = {metrics.mutation_count: 0,
+                           metrics.result_count: 1,
+                           metrics.sort_count: 0,
+                           metrics.warning_count: 0}
+        for method, expected in expected_counts.items():
+            count_result = method()
+            fail_msg = "{} failed".format(method)
+            self.assertIsInstance(count_result, UnsignedInt64, msg=fail_msg)
+            self.assertEqual(UnsignedInt64(expected),
+                             count_result, msg=fail_msg)
+        self.assertGreater(metrics.result_size(), UnsignedInt64(500))
+
+        self.assertEqual(UnsignedInt64(0), metrics.error_count())
+        self.assertIsNone(metadata.profile())
+
+    def test_scope_query_metadata(self):
+        scope = self.bucket.scope(self.beer_sample_collections.scope)
+        result = scope.query("SELECT * FROM beers LIMIT 2")
+        self.assertRows(result, 2)
+        metadata = result.metadata()  # type: QueryMetaData
+        for id_meth in (metadata.client_context_id, metadata.request_id):
+            id_res = id_meth()
+            fail_msg = "{} failed".format(id_meth)
+            self.assertIsInstance(id_res, str, msg=fail_msg)
+        self.assertEqual(QueryStatus.SUCCESS, metadata.status())
+        self.assertIsInstance(metadata.signature(), (str, dict))
+        self.assertIsInstance(metadata.warnings(), (list))
+        for warning in metadata.warnings():
+            self.assertIsInstance(warning, QueryWarning)
+            self.assertIsInstance(warning.message, str)
+            self.assertIsInstance(warning.code, int)

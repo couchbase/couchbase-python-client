@@ -72,6 +72,7 @@ PROFILE_PHASES = 'phases'
 PROFILE_TIMINGS = 'timings'
 VALID_PROFILES = [PROFILE_OFF, PROFILE_TIMINGS, PROFILE_PHASES]
 
+
 class _N1QLQuery(object):
     def __init__(self, query, *args, **kwargs):
         """
@@ -364,9 +365,25 @@ class _N1QLQuery(object):
         :return:
         """
         if value not in VALID_PROFILES:
-            raise TypeError('Profile option must be one of: ' + ', '.join(VALID_PROFILES))
+            raise TypeError('Profile option must be one of: ' +
+                            ', '.join(VALID_PROFILES))
 
         self._body['profile'] = value
+
+    @property
+    def query_context(self):
+        """
+        Get the N1QL query context.
+        """
+        return self._body.get('query_context')
+
+    @query_context.setter
+    def query_context(self, value):
+        """
+        Sets the N1QL query context. Used to set the target bucket
+        and/or scope.
+        """
+        self._body['query_context'] = value
 
     def __repr__(self):
         return ('<{cls} stmt={stmt} at {oid}>'.format(
@@ -379,7 +396,7 @@ class _N1QLQuery(object):
 
 
 class N1QLRequest(object):
-    def __init__(self, params, parent, row_factory=lambda x: x, meta_lookahead = True, **kwargs):
+    def __init__(self, params, parent, row_factory=lambda x: x, meta_lookahead=True, **kwargs):
         """
         Object representing the execution of the request on the
         server.
@@ -440,9 +457,9 @@ class N1QLRequest(object):
 
     @property
     def profile(self):
-      return self.meta_retrieve().get('profile', None)
+        return self.meta_retrieve().get('profile', None)
 
-    def meta_retrieve(self, meta_lookahead = None):
+    def meta_retrieve(self, meta_lookahead=None):
         """
         Get metadata from the query itself. This is guaranteed to only
         return a Python dictionary.
@@ -522,7 +539,7 @@ class N1QLRequest(object):
     def __iter__(self):
         # type: (...) -> JSON
         if self.buffered_remainder:
-            while len(self.buffered_remainder)>0:
+            while len(self.buffered_remainder) > 0:
                 yield self.buffered_remainder.pop(0)
         elif not self._do_iter:
             raise AlreadyQueriedException()

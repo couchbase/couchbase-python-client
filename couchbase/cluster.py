@@ -16,11 +16,13 @@ from couchbase.search import SearchResult, SearchOptions, SearchQuery
 from .analytics import AnalyticsResult
 from .n1ql import QueryResult
 from couchbase_core.n1ql import _N1QLQuery
-from .options import OptionBlock, OptionBlockDeriv, QueryBaseOptions, LockMode, enum_value
+from .options import (OptionBlock, OptionBlockDeriv, QueryBaseOptions,
+                      LockMode, enum_value)
 from .bucket import Bucket, CoreClient, PingOptions
 from couchbase_core.cluster import _Cluster as CoreCluster
-from .exceptions import AlreadyShutdownException, InvalidArgumentException, \
-    SearchException, QueryException, AnalyticsException, CouchbaseException, NetworkException
+from .exceptions import (AlreadyShutdownException, InvalidArgumentException,
+                         SearchException, QueryException, AnalyticsException, CouchbaseException,
+                         NetworkException)
 import couchbase_core._libcouchbase as _LCB
 from couchbase_core._pyport import raise_from
 from couchbase_core.cluster import *
@@ -41,7 +43,7 @@ class DiagnosticsOptions(OptionBlock):
 
     @overload
     def __init__(self,
-                 report_id=None # type: str
+                 report_id=None  # type: str
                  ):
         pass
 
@@ -91,12 +93,13 @@ class QueryProfile(Enum):
 
 class NamedClass(type):
     def __new__(cls, name, bases=tuple(), namespace=dict()):
-        super(NamedClass, cls).__new__(cls, name, bases=bases, namespace=namespace)
+        super(NamedClass, cls).__new__(
+            cls, name, bases=bases, namespace=namespace)
 
 
 class QueryOptions(QueryBaseOptions):
     VALID_OPTS = {'timeout': {'timeout': timedelta.total_seconds},
-                  'read_only': {'readonly':identity},
+                  'read_only': {'readonly': identity},
                   'scan_consistency': {'consistency': enum_value},
                   'adhoc': {'adhoc': identity},
                   'client_context_id': {},
@@ -107,6 +110,7 @@ class QueryOptions(QueryBaseOptions):
                   'pipeline_batch': {'pipeline_batch': identity},
                   'pipeline_cap': {'pipeline_cap': identity},
                   'profile': {'profile': enum_value},
+                  'query_context': {'query_context': identity},
                   'raw': {},
                   'scan_wait': {},
                   'scan_cap': {'scan_cap': identity},
@@ -129,6 +133,7 @@ class QueryOptions(QueryBaseOptions):
                  pipeline_batch=None,         # type: int
                  pipeline_cap=None,           # type: int
                  profile=None,                # type: QueryProfile
+                 query_context=None,          # type: str
                  raw=None,                    # type: dict[str, JSON]
                  scan_wait=None,              # type: timedelta
                  scan_cap=None,               # type: int
@@ -171,6 +176,8 @@ class QueryOptions(QueryBaseOptions):
             Specifies pipeline cap characteristics.
         :param QueryProfile profile:
             Specifies the profiling level to use.
+        :param str query_context:
+            Specifies the context for the query.
         :param dict[str,JSON] raw:
             This is a way to to specify the query payload to support unknown commands and be future-compatible.
         :param timedelta scan_wait:
@@ -190,13 +197,14 @@ class ClusterTimeoutOptions(dict):
                'query_timeout': 'query_timeout',
                'views_timeout': 'views_timeout',
                'config_total_timeout': 'config_total_timeout'}
+
     @overload
     def __init__(self,
                  query_timeout=None,                  # type: timedelta
                  kv_timeout=None,                     # type: timedelta
                  views_timeout=None,                  # type: timedelta
                  config_total_timeout=None            # type: timedelta
-        ):
+                 ):
         pass
 
     def __init__(self, **kwargs):
@@ -257,13 +265,14 @@ class Compression(Enum):
             # string, it sets it as INOUT|FORCE.
             return cls.FORCE
         else:
-            raise InvalidArgumentException("cannot convert {} to a Compression".format(val))
+            raise InvalidArgumentException(
+                "cannot convert {} to a Compression".format(val))
 
-    NONE='off'
-    IN='inflate_only'
-    OUT='deflate_only'
-    INOUT='on'
-    FORCE='force'
+    NONE = 'off'
+    IN = 'inflate_only'
+    OUT = 'deflate_only'
+    INOUT = 'on'
+    FORCE = 'force'
 
 
 class ClusterTracingOptions(dict):
@@ -272,6 +281,7 @@ class ClusterTracingOptions(dict):
     KEYS = ['tracing_threshold_kv', 'tracing_threshold_view', 'tracing_threshold_query', 'tracing_threshold_search',
             'tracing_threshold_analytics', 'tracing_threshold_queue_size', 'tracing_threshold_queue_flush_interval',
             'tracing_orphaned_queue_size', 'tracing_orphaned_queue_flush_interval']
+
     @overload
     def __init__(self,
                  tracing_threshold_kv=None,                      # type: timedelta
@@ -384,7 +394,7 @@ class ClusterOptions(dict):
         for k in ['timeout_options', 'tracing_options']:
             obj = self.get(k, {}).update(kwargs.pop(k, {}))
             if obj:
-                self.update({k:obj})
+                self.update({k: obj})
         # now, update the top-level ones
         self.update(kwargs)
 
@@ -421,12 +431,15 @@ class Cluster(CoreClient):
             self._authenticator = cluster_opts.pop('authenticator', None)
             if not self._authenticator:
                 raise InvalidArgumentException("Authenticator is mandatory")
-        async_items = {k: kwargs.pop(k) for k in list(kwargs.keys()) if k in {'_iops', '_flags'}}
+        async_items = {k: kwargs.pop(k) for k in list(
+            kwargs.keys()) if k in {'_iops', '_flags'}}
         # fixup any overrides to the ClusterOptions here as well
         args, kwargs = cluster_opts.split_args(**kwargs)
-        self.connstr = cluster_opts.update_connection_string(connection_string, **args)
+        self.connstr = cluster_opts.update_connection_string(
+            connection_string, **args)
         self.__admin = None
-        self._cluster = CoreCluster(self.connstr, bucket_factory=bucket_factory)  # type: CoreCluster
+        self._cluster = CoreCluster(
+            self.connstr, bucket_factory=bucket_factory)  # type: CoreCluster
         self._cluster.authenticate(self._authenticator)
         credentials = self._authenticator.get_credentials()
         self._clusteropts = dict(**credentials.get('options', {}))
@@ -434,14 +447,16 @@ class Cluster(CoreClient):
         self._clusteropts.update(kwargs)
         self._adminopts = dict(**self._clusteropts)
         self._clusteropts.update(async_items)
-        self.connstr = cluster_opts.update_connection_string(self.connstr, **self._clusteropts)
+        self.connstr = cluster_opts.update_connection_string(
+            self.connstr, **self._clusteropts)
 
         # PYCBC-949 remove certpath, it is not accepted by super(Cluster)
         # (it has been copied into self.connstr)
         self._clusteropts.pop('certpath', None)
         self._adminopts.pop('certpath', None)
 
-        super(Cluster, self).__init__(connection_string=str(self.connstr), _conntype=_LCB.LCB_TYPE_CLUSTER, **self._clusteropts)
+        super(Cluster, self).__init__(connection_string=str(self.connstr),
+                                      _conntype=_LCB.LCB_TYPE_CLUSTER, **self._clusteropts)
 
     @classmethod
     def connect(cls,
@@ -461,11 +476,12 @@ class Cluster(CoreClient):
         return cls(connection_string, options, **kwargs)
 
     def _do_ctor_connect(self, *args, **kwargs):
-        super(Cluster,self)._do_ctor_connect(*args,**kwargs)
+        super(Cluster, self)._do_ctor_connect(*args, **kwargs)
 
     def _check_for_shutdown(self):
         if not self._cluster:
-            raise AlreadyShutdownException("This cluster has already been shutdown")
+            raise AlreadyShutdownException(
+                "This cluster has already been shutdown")
 
     @property
     @internal
@@ -556,7 +572,8 @@ class Cluster(CoreClient):
         # CCBC-1204 is addressed, we can just use the cluster's instance
         return self._maybe_operate_on_an_open_bucket(CoreClient.query,
                                                      QueryException,
-                                                     opt.to_query_object(statement, *opts, **kwargs),
+                                                     opt.to_query_object(
+                                                         statement, *opts, **kwargs),
                                                      itercls=itercls,
                                                      err_msg="Query requires an open bucket")
 
@@ -600,7 +617,8 @@ class Cluster(CoreClient):
         try:
             return verb(self, *args, **kwargs)
         except Exception as e:
-            raise_from(failtype(params=CouchbaseException.ParamType(message="Cluster operation failed", inner_cause=e)), e)
+            raise_from(failtype(params=CouchbaseException.ParamType(
+                message="Cluster operation failed", inner_cause=e)), e)
 
     # for now this just calls functions.  We can return stuff if we need it, later.
     def _sync_operate_on_entire_cluster(self,
@@ -669,7 +687,8 @@ class Cluster(CoreClient):
 
         return self._maybe_operate_on_an_open_bucket(CoreClient.analytics_query,
                                                      AnalyticsException,
-                                                     opt.to_query_object(statement, *opts, **kwargs),
+                                                     opt.to_query_object(
+                                                         statement, *opts, **kwargs),
                                                      itercls=itercls,
                                                      err_msg='Analytics queries require an open bucket')
 
@@ -706,7 +725,8 @@ class Cluster(CoreClient):
         self._check_for_shutdown()
 
         def do_search(dest):
-            search_params = SearchOptions.gen_search_params_cls(index, query, *options, **kwargs)
+            search_params = SearchOptions.gen_search_params_cls(
+                index, query, *options, **kwargs)
             return search_params.itercls(search_params.body, dest, **search_params.iterargs)
 
         return self._maybe_operate_on_an_open_bucket(do_search, SearchException, err_msg="No buckets opened on cluster")
@@ -725,7 +745,8 @@ class Cluster(CoreClient):
 
         """
         self._check_for_shutdown()
-        result = self._sync_operate_on_entire_cluster(CoreClient.diagnostics, **forward_args(kwargs, *options))
+        result = self._sync_operate_on_entire_cluster(
+            CoreClient.diagnostics, **forward_args(kwargs, *options))
         return DiagnosticsResult(result)
 
     def ping(self,
@@ -876,7 +897,7 @@ class Cluster(CoreClient):
         """
 
         return timedelta(seconds=self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL,
-                                                    value_type="timeout"))
+                                            value_type="timeout"))
 
     @property
     def tracing_orphaned_queue_size(self):
@@ -969,4 +990,3 @@ class AsyncCluster(AsyncClientMixin, Cluster):
     @classmethod
     def connect(cls, connection_string=None, *args, **kwargs):
         return cls(connection_string=connection_string, *args, **kwargs)
-

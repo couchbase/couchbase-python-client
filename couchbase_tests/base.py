@@ -14,6 +14,13 @@
 # limitations under the License.
 
 from __future__ import absolute_import
+from typing import *
+from couchbase_core._libcouchbase import PYCBC_TRACING
+from basictracer import BasicTracer, SpanRecorder
+from couchbase_core._version import __version__ as cb_version
+from couchbase_core._pyport import basestring
+from couchbase_core.mockserver import CouchbaseMock, BucketSpec, MockControlClient
+from couchbase.management.admin import Admin
 
 import re
 import gc
@@ -38,7 +45,7 @@ from utilspie.collectionsutils import frozendict
 import couchbase
 import couchbase_core
 from couchbase.cluster import AsyncCluster
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from couchbase.bucket import Bucket as V3Bucket
 from couchbase.cluster import Cluster, ClusterOptions, ClusterTracingOptions, \
     ClusterTimeoutOptions
@@ -67,22 +74,12 @@ except ImportError:
     # Python <3.0 fallback
     from fallback import configparser
 
-from couchbase.management.admin import Admin
-from couchbase_core.mockserver import CouchbaseMock, BucketSpec, MockControlClient
-
-from couchbase_core._pyport import basestring
-from couchbase_core._version import __version__ as cb_version
 
 try:
     import unittest2 as unittest
 except ImportError:
     import unittest
-from basictracer import BasicTracer, SpanRecorder
-from couchbase_core._libcouchbase import PYCBC_TRACING
-import re
-import traceback
 
-from typing import *
 
 if os.environ.get("PYCBC_TRACE_GC") in ['FULL', 'STATS_LEAK_ONLY']:
     gc.set_debug(gc.DEBUG_STATS | gc.DEBUG_LEAK)
@@ -103,7 +100,8 @@ class FlakyCounter(object):
 
     def flaky_count(self, err, name, test, plugin):
         self.count += 1
-        print("trying test {}: {}/{}".format(name, self.count, self.kwargs['max_runs']))
+        print("trying test {}: {}/{}".format(name,
+              self.count, self.kwargs['max_runs']))
         return True
 
 
@@ -111,7 +109,8 @@ loglevel = os.environ.get("PYCBC_DEBUG_LOG_LEVEL")
 if loglevel:
     ch = logging.StreamHandler()
     ch.setLevel(logging.getLevelName(loglevel))
-    formatter = logging.Formatter('%(asctime)s : %(message)s : %(levelname)s -%(name)s',datefmt='%d%m%Y %I:%M:%S %p')
+    formatter = logging.Formatter(
+        '%(asctime)s : %(message)s : %(levelname)s -%(name)s', datefmt='%d%m%Y %I:%M:%S %p')
     ch.setFormatter(formatter)
     logging.getLogger().addHandler(ch)
 
@@ -150,7 +149,8 @@ class ResourcedTestCase(ResourcedTestCaseReal):
         def __init__(self, *args, **kwargs):
             self.records = []
             kwargs['attributes'] = (lambda r: self.records.append(r))
-            super(ResourcedTestCase.CaptureContext, self).__init__(*args, **kwargs)
+            super(ResourcedTestCase.CaptureContext,
+                  self).__init__(*args, **kwargs)
 
         @property
         def output(self):
@@ -206,7 +206,8 @@ if not os.path.exists(CONFIG_FILE):
     CONFIG_FILE = BASEDIR.joinpath(CONFIG_FILE).__str__()
 ClientType = TypeVar('ClientType', bound=CoreClient)
 
-MockHackArgs = NamedTuple('MockHackArgs', [('auth', Authenticator), ('kwargs', Mapping[str,Any])])
+MockHackArgs = NamedTuple(
+    'MockHackArgs', [('auth', Authenticator), ('kwargs', Mapping[str, Any])])
 
 
 class ClusterInformation(object):
@@ -249,11 +250,12 @@ class ClusterInformation(object):
             if v:
                 final_options[k] = v
 
-        conn_options = '&'.join((key + "=" + value) for key, value in filter(lambda tpl: tpl[1], final_options.items()))
+        conn_options = '&'.join((key + "=" + value) for key,
+                                value in filter(lambda tpl: tpl[1], final_options.items()))
         connstr += ("?" + conn_options) if conn_options else ""
         if 'init_tracer' in overrides.keys():
-            overrides['tracer'] = overrides.pop("init_tracer")(PYCBC_CB_VERSION
-                                                               , **self.tracingparms)
+            overrides['tracer'] = overrides.pop("init_tracer")(
+                PYCBC_CB_VERSION, **self.tracingparms)
         ret = {
             'password': self.bucket_password,
             'connection_string': connstr
@@ -279,7 +281,7 @@ class ClusterInformation(object):
         # We should not be using classic here!  But, somewhere in the tests, we need
         # this for hitting the mock, it seems
 
-        return MockHackArgs(ClassicAuthenticator,{'bucket': self.bucket_name}) if is_mock else MockHackArgs(PasswordAuthenticator, {})
+        return MockHackArgs(ClassicAuthenticator, {'bucket': self.bucket_name}) if is_mock else MockHackArgs(PasswordAuthenticator, {})
 
     def make_admin_connection(self, is_mock):
 
@@ -307,10 +309,14 @@ class ConnectionConfiguration(object):
         info.certpath = config.get('realserver', 'certpath', fallback=None)
         info.keypath = config.get('realserver', 'keypath', fallback=None)
         info.protocol = config.get('realserver', 'protocol', fallback="http")
-        info.enable_tracing = config.get('realserver', 'tracing', fallback=None)
-        info.tracingparms['port'] = config.get('realserver', 'tracing_port', fallback=None)
-        info.analytics_host = config.get('analytics', 'host', fallback=info.host)
-        info.analytics_port = config.get('analytics', 'host', fallback=info.port)
+        info.enable_tracing = config.get(
+            'realserver', 'tracing', fallback=None)
+        info.tracingparms['port'] = config.get(
+            'realserver', 'tracing_port', fallback=None)
+        info.analytics_host = config.get(
+            'analytics', 'host', fallback=info.host)
+        info.analytics_port = config.get(
+            'analytics', 'host', fallback=info.port)
         info.network = config.get('realserver', 'network', fallback=None)
         logging.info("info is " + str(info.__dict__))
         self.enable_tracing = info.enable_tracing
@@ -385,6 +391,7 @@ class MockResourceManager(TestResourceManager):
         info.enable_tracing = self._config.enable_tracing
         self._info = info
         return info
+
 
 class RealServerResourceManager(TestResourceManager):
     def __init__(self, config):
@@ -526,7 +533,8 @@ class CouchbaseTestCase(ResourcedTestCase):
             hexstr = "0x"
             for comp in components:
                 if len(comp) > 2:
-                    raise ValueError("Version component cannot be larger than 99")
+                    raise ValueError(
+                        "Version component cannot be larger than 99")
                 hexstr += "{0:02}".format(int(comp))
 
             vernum = int(hexstr, 16)
@@ -621,30 +629,33 @@ class CouchbaseTestCase(ResourcedTestCase):
                     fn(*args, **kwargs)
                 except expected_exc:
                     if re.match(plat_pat, os_id):
-                        raise SkipTest("{}: {}".format(message, traceback.format_exc()))
+                        raise SkipTest("{}: {}".format(
+                            message, traceback.format_exc()))
                     raise
             return wrapper
         return real_decorator
 
-
     def gen_obj_graph(self, attrib, attrib_name, graphdir):
         import objgraph
 
-        options = dict(refcounts=True, max_depth=3, too_many=10, shortnames=False)
+        options = dict(refcounts=True, max_depth=3,
+                       too_many=10, shortnames=False)
         import os
-        final_graph_dir=BASEDIR.joinpath(graphdir)
+        final_graph_dir = BASEDIR.joinpath(graphdir)
         os.makedirs(final_graph_dir, exist_ok=True)
         objgraph.show_refs(attrib,
                            filename=os.path.join(final_graph_dir, '{}_{}_refs.dot'.format(self._testMethodName,
-                                                                                   attrib_name)),
+                                                                                          attrib_name)),
                            **options)
         objgraph.show_backrefs(attrib,
                                filename=os.path.join(final_graph_dir,
                                                      '{}_{}_backrefs.dot'.format(self._testMethodName,
                                                                                  attrib_name)),
                                **options)
-        logging.info("got referrents {}".format(repr(gc.get_referents(attrib))))
+        logging.info("got referrents {}".format(
+            repr(gc.get_referents(attrib))))
         logging.info("got referrers {}".format(repr(gc.get_referrers(attrib))))
+
 
 class ConnectionTestCaseBase(CouchbaseTestCase):
     def __init__(self, *args, **kwargs):
@@ -723,7 +734,6 @@ try:
     from opentracing_pyzipkin.tracer import Tracer
     import requests
 
-
     def http_transport(encoded_span):
         # The collector expects a thrift-encoded list of spans.
         import logging
@@ -732,7 +742,6 @@ try:
             data=encoded_span,
             headers={'Content-Type': 'application/x-thrift'}
         )
-
 
     def jaeger_tracer(service, port=9414, **kwargs):
         port = 9411
@@ -783,7 +792,9 @@ class SkipUnsupported(SkipTest):
         super(SkipUnsupported, self).__init__(traceback.format_exc())
 
 
-QueryParams = NamedTuple('QueryParams', [('statement', str), ('rowcount', int)])
+QueryParams = NamedTuple(
+    'QueryParams', [('statement', str), ('rowcount', int)])
+
 
 def check_gc(execute_gc=False):
     import gc
@@ -791,9 +802,10 @@ def check_gc(execute_gc=False):
         before = gc.get_count()
         gc.collect()
         print('Executed GC:  count before: {}, count after: {}'
-            .format(before, gc.get_count()))
+              .format(before, gc.get_count()))
     else:
         print('GC count: {}'.format(gc.get_count()))
+
 
 def check_fds():
     # TODO:  add fd logic for windows
@@ -820,13 +832,15 @@ def check_fds():
         fds.kill()
         fds.communicate()
         raise
-    
+
 
 class MockRestartException(Exception):
     pass
 
+
 class CouchbaseClusterResourceException(Exception):
     pass
+
 
 class CouchbaseClusterResource(object):
 
@@ -848,12 +862,12 @@ class CouchbaseClusterResource(object):
         self.cluster_version = None
         self.set_test_resources(test_resources)
 
-    def set_test_resources(self, 
-                            test_resources # type: List[Tuple]
-                          ): 
+    def set_test_resources(self,
+                           test_resources  # type: List[Tuple]
+                           ):
         # type: (...) -> None
 
-        #hack to grab info built in the resource's make() method
+        # hack to grab info built in the resource's make() method
         mock = test_resources[0][1]._info
         real = test_resources[1][1]._config.realserver_info
         if real:
@@ -862,35 +876,36 @@ class CouchbaseClusterResource(object):
             self.info = mock
             self.is_mock = True
 
-    def setup_cluster(self, 
-                       **kwargs # type: Any
-                     ):
+    def setup_cluster(self,
+                      **kwargs  # type: Any
+                      ):
         # type: (...) -> None
         if self.is_mock:
-            #less patience with the mock
-            bucket_name = self.try_n_times(3, 
-                                3, self.init_cluster_and_bucket, **kwargs)
+            # less patience with the mock
+            bucket_name = self.try_n_times(3,
+                                           3, self.init_cluster_and_bucket, **kwargs)
         else:
-            bucket_name = self.try_n_times(10, 
-                                3, self.init_cluster_and_bucket, **kwargs)
+            bucket_name = self.try_n_times(10,
+                                           3, self.init_cluster_and_bucket, **kwargs)
         self.bucket = self.cluster.bucket(bucket_name)
         self.bucket_name = bucket_name
         self.try_n_times(20, 3, self.is_ready)
         self.set_cluster_version()
 
-    def init_cluster_and_bucket(self, 
-                                 **kwargs # type: Any
+    def init_cluster_and_bucket(self,
+                                **kwargs  # type: Any
                                 ):
         # type: (...) -> str
         opts = kwargs.pop('cluster_options', None)
         connargs = self.info.make_connargs(**kwargs)
-        connstr_abstract, bucket_name = self.get_connstr_and_bucket_name([], connargs)
+        connstr_abstract, bucket_name = self.get_connstr_and_bucket_name(
+            [], connargs)
         self.cluster = self.instantiate_cluster(connstr_abstract, opts)
         return bucket_name
 
     def get_connstr_and_bucket_name(self,
-                                     args,  # type: List[Any]
-                                     kwargs # type: Any
+                                    args,  # type: List[Any]
+                                    kwargs  # type: Any
                                     ):
         # type: (...) -> Tuple
         connstr = args.pop(0) if args else kwargs.pop('connection_string')
@@ -900,23 +915,25 @@ class CouchbaseClusterResource(object):
         return connstr_nobucket, bucket
 
     def instantiate_cluster(self,
-                             connstr_nobucket,  # type: str
-                             opts=None  # type: Any
-                             ):
+                            connstr_nobucket,  # type: str
+                            opts=None  # type: Any
+                            ):
         # type: (...) -> Cluster
         mock_hack = self.info.mock_hack_options(self.is_mock)
-        auth = mock_hack.auth(self.info.admin_username, self.info.admin_password)
+        auth = mock_hack.auth(self.info.admin_username,
+                              self.info.admin_password)
         if not opts:
             opts = ClusterOptions(auth)
         else:
             opts['authenticator'] = auth
         if SLOWCONNECT_PATTERN.match(platform.platform()):
-            default_timeout_options = ClusterTimeoutOptions(config_total_timeout=timedelta(seconds=30))
+            default_timeout_options = ClusterTimeoutOptions(
+                config_total_timeout=timedelta(seconds=30))
             default_timeout_options.update(opts.get('timeout_options', {}))
             opts['timeout_options'] = default_timeout_options
 
         return Cluster.connect(connection_string=str(connstr_nobucket),
-                                options=opts, **mock_hack.kwargs)
+                               options=opts, **mock_hack.kwargs)
 
     def disconnect_cluster(self) -> None:
         self.cluster.disconnect()
@@ -932,7 +949,7 @@ class CouchbaseClusterResource(object):
         # are _probably_ ok if we just make sure the 4 services are up.  Could be more
         # tricky if needed...
         service_types = [ServiceType.KeyValue, ServiceType.Search, ServiceType.Query,
-                         #ServiceType.Analytics,
+                         # ServiceType.Analytics,
                          ServiceType.View]
         resp = self.bucket.ping()
         # first make sure all are there:
@@ -958,7 +975,8 @@ class CouchbaseClusterResource(object):
                 return func(*args, **kwargs)
             except Exception as e:
                 # helpful to have this print statement when tests fail
-                logging.info("Got exception, sleeping: {}".format(traceback.format_exc()))
+                logging.info("Got exception, sleeping: {}".format(
+                    traceback.format_exc()))
                 time.sleep(seconds_between)
 
         if self.is_mock:
@@ -970,7 +988,7 @@ class CouchbaseClusterResource(object):
                 raise
             except Exception:
                 pass
-            
+
         raise CouchbaseClusterResourceException(
             "unsuccessful {} after {} times, waiting {} seconds between calls".format(func, num_times, seconds_between))
 
@@ -1031,7 +1049,8 @@ class ClusterTestCase(CouchbaseTestCase):
                                    seconds_between,  # type: SupportsFloat
                                    func,  # type: Callable
                                    *args,  # type: Any
-                                   expected_exceptions=(Exception,),  # type: Tuple[Type[Exception],...]
+                                   # type: Tuple[Type[Exception],...]
+                                   expected_exceptions=(Exception,),
                                    **kwargs  # type: Any
                                    ):
         # type: (...) -> Any
@@ -1041,7 +1060,8 @@ class ClusterTestCase(CouchbaseTestCase):
                 time.sleep(float(seconds_between))
             except expected_exceptions as e:
                 # helpful to have this print statement when tests fail
-                logging.info("Got one of expected exceptions {}, returning: {}".format(expected_exceptions, e))
+                logging.info("Got one of expected exceptions {}, returning: {}".format(
+                    expected_exceptions, e))
                 return
             except Exception as e:
                 logging.info("Got unexpected exception, raising: {}".format(e))
@@ -1069,7 +1089,8 @@ class ClusterTestCase(CouchbaseTestCase):
                     func,  # type: Callable
                     *args,  # type: Any
                     on_success=None,  # type: Callable
-                    expected_exceptions=(Exception,),  # type: Tuple[Type[Exception], ...]
+                    # type: Tuple[Type[Exception], ...]
+                    expected_exceptions=(Exception,),
                     **kwargs  # type: Any
                     ):
         # type: (...) -> Any
@@ -1080,7 +1101,8 @@ class ClusterTestCase(CouchbaseTestCase):
                 return on_success(ret)
             except expected_exceptions as e:
                 # helpful to have this print statement when tests fail
-                logging.info("Got exception, sleeping: {}".format(traceback.format_exc()))
+                logging.info("Got exception, sleeping: {}".format(
+                    traceback.format_exc()))
                 time.sleep(seconds_between)
         return self._fail(
             "unsuccessful {} after {} times, waiting {} seconds between calls".format(func, num_times, seconds_between))
@@ -1095,7 +1117,8 @@ class ClusterTestCase(CouchbaseTestCase):
                               ):
         # type: (...) -> ClusterTestCase.Triable
         def wrapper(*args, **kwargs):
-            success_func = kwargs.pop('on_success', on_success) or self._passthrough
+            success_func = kwargs.pop(
+                'on_success', on_success) or self._passthrough
             return self.try_n_times(num_times, seconds_between, func, *args, on_success=success_func, **kwargs)
 
         return wrapper
@@ -1112,11 +1135,13 @@ class ClusterTestCase(CouchbaseTestCase):
                 type(self)._cluster_resource.disconnect_cluster()
                 type(self)._cluster_resource = None
 
-            type(self)._cluster_resource = CouchbaseClusterResource(type(self).resources)
+            type(self)._cluster_resource = CouchbaseClusterResource(
+                type(self).resources)
             type(self)._cluster_resource.setup_cluster(**kwargs)
-        
+
         if not type(self)._cluster_resource:
-            type(self)._cluster_resource = CouchbaseClusterResource(type(self).resources)
+            type(self)._cluster_resource = CouchbaseClusterResource(
+                type(self).resources)
             type(self)._cluster_resource.setup_cluster()
 
         self.cluster = type(self)._cluster_resource.cluster
@@ -1124,24 +1149,25 @@ class ClusterTestCase(CouchbaseTestCase):
         self.bucket_name = type(self)._cluster_resource.bucket_name
         self.cluster_version = type(self)._cluster_resource.cluster_version
         self.query_props = QueryParams('SELECT mockrow', 1) if self.is_mock else \
-            QueryParams("SELECT * FROM `beer-sample` LIMIT 2", 2)  # type: QueryParams
+            QueryParams("SELECT * FROM `beer-sample` LIMIT 2",
+                        2)  # type: QueryParams
         self.empty_query_props = QueryParams('SELECT emptyrow', 0) if self.is_mock else \
             QueryParams("SELECT * FROM `beer-sample` LIMIT 0", 0)
 
     @classmethod
     def setUpClass(cls) -> None:
-        #PYCBC-1097: this is a temporary hack to help stabilize builds
+        # PYCBC-1097: this is a temporary hack to help stabilize builds
         #   a larger refactor needs to be done
         super(ClusterTestCase, cls).setUpClass()
         if cls._cluster_resource:
             return
-        
+
         cls._cluster_resource = CouchbaseClusterResource(cls.resources)
         cls._cluster_resource.setup_cluster()
 
     @classmethod
     def tearDownClass(cls) -> None:
-        #PYCBC-1097: this is a temporary hack to help stabilize builds
+        # PYCBC-1097: this is a temporary hack to help stabilize builds
         #   a larger refactor needs to be done
         if cls._cluster_resource:
             cls._cluster_resource.disconnect_cluster()
@@ -1170,23 +1196,25 @@ class ClusterTestCase(CouchbaseTestCase):
         # type: (...) -> ClusterTestCase.T
         cluster_class = cluster_class or self.cluster_factory
         mock_hack = self.cluster_info.mock_hack_options(self.is_mock)
-        auth = mock_hack.auth(self.cluster_info.admin_username, self.cluster_info.admin_password)
+        auth = mock_hack.auth(self.cluster_info.admin_username,
+                              self.cluster_info.admin_password)
         if not opts:
             opts = ClusterOptions(auth)
         else:
             opts['authenticator'] = auth
         if SLOWCONNECT_PATTERN.match(platform.platform()):
-            default_timeout_options = ClusterTimeoutOptions(config_total_timeout=timedelta(seconds=30))
+            default_timeout_options = ClusterTimeoutOptions(
+                config_total_timeout=timedelta(seconds=30))
             default_timeout_options.update(opts.get('timeout_options', {}))
             opts['timeout_options'] = default_timeout_options
 
         if not self.is_mock:
             return self.try_n_times(10, 3, cluster_class.connect,
-                                connection_string=str(connstr_nobucket),
-                                options=opts, **mock_hack.kwargs)
+                                    connection_string=str(connstr_nobucket),
+                                    options=opts, **mock_hack.kwargs)
 
         return cluster_class.connect(connection_string=str(connstr_nobucket),
-                                        options=opts, **mock_hack.kwargs)
+                                     options=opts, **mock_hack.kwargs)
 
     # NOTE: this really is only something you can trust in homogeneous clusters, but then again
     # this is a test suite.
@@ -1211,6 +1239,7 @@ def skip_if_no_collections(func):
 
 
 class CollectionTestCase(ClusterTestCase):
+    _beer_sample_collections = None  # type: namedtuple
     coll = None  # type: CBCollection
     initialised = defaultdict(lambda: {})
     cb = None  # type: CBCollection
@@ -1232,7 +1261,8 @@ class CollectionTestCase(ClusterTestCase):
 
     def setUp(self, default_collections=None, real_collections=None, **kwargs):
         default_collections = default_collections or {None: {None: "coll"}}
-        real_collections = real_collections or {"bedrock": {"flintstones": 'coll'}}
+        real_collections = real_collections or {
+            "bedrock": {"flintstones": 'coll'}}
         # prepare:
         # 1) Connect to a Cluster
         super(CollectionTestCase, self).setUp(**kwargs)
@@ -1247,20 +1277,130 @@ class CollectionTestCase(ClusterTestCase):
 
         for scope_name, collections in my_collections.items():
             CollectionTestCase._upsert_scope(cm, scope_name)
-            scope = self.bucket.scope(scope_name) if scope_name else self.bucket
+            scope = self.bucket.scope(
+                scope_name) if scope_name else self.bucket
             for collection_name, dest in collections.items():
-                CollectionTestCase._upsert_collection(cm, collection_name, scope_name)
+                CollectionTestCase._upsert_collection(
+                    cm, collection_name, scope_name)
                 # 2) Open a Collection
-                coll = scope.collection(collection_name) if collection_name else scope.default_collection()
+                coll = scope.collection(
+                    collection_name) if collection_name else scope.default_collection()
                 setattr(self, dest, coll)
 
         self.cb = self.coll  # type: CBCollection
+
+        if type(self)._beer_sample_collections:
+            self.beer_sample_collections = type(self)._beer_sample_collections
+
+    @classmethod
+    def setUpClass(cls, setup_beer_sample_collections=None  # type: bool
+                   ) -> None:
+        super(CollectionTestCase, cls).setUpClass()
+        try:
+            cls._cluster_resource.bucket.collections().get_all_scopes()
+            if setup_beer_sample_collections:
+                BeerSampleCollections = namedtuple('BeerSampleCollections', [
+                                               'scope', 'beers', 'breweries'])
+                cls._beer_sample_collections = BeerSampleCollections('beer-sample-scope', CollectionSpec(
+                    'beers', 'beer-sample-scope'), CollectionSpec('breweries', 'beer-sample-scope'))
+        except NotSupportedException:
+            pass
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        if cls._beer_sample_collections:
+            cm = cls._cluster_resource.bucket.collections()
+            cm.drop_collection(cls._beer_sample_collections.beers)
+            cm.drop_collection(cls._beer_sample_collections.breweries)
+            cm.drop_scope(cls._beer_sample_collections.scope)
+
+        super(CollectionTestCase, cls).tearDownClass()
+
+    def create_beer_sample_collections(self):
+        if self.beer_sample_collections_exist():
+            return
+        self.cm.create_scope(self.beer_sample_collections.scope)
+        self.try_n_times(10, 3, self.get_scope,
+                         self.beer_sample_collections.scope,
+                         collection_mgr=self.cm)
+        self.cm.create_collection(self.beer_sample_collections.beers)
+        self.try_n_times(10, 3, self.get_collection,
+                         self.beer_sample_collections.beers.name,
+                         self.beer_sample_collections.scope,
+                         collection_mgr=self.cm)
+        self.cm.create_collection(self.beer_sample_collections.breweries)
+        self.try_n_times(10, 3, self.get_collection,
+                         self.beer_sample_collections.breweries.name,
+                         self.beer_sample_collections.scope,
+                         collection_mgr=self.cm)
+        beers_fqdn = '`{}`.`{}`.{}'.format(
+            self.bucket_name, self.beer_sample_collections.scope,
+            self.beer_sample_collections.beers.name)
+        self.cluster.query(
+            "CREATE PRIMARY INDEX ON {}".format(beers_fqdn)).execute()
+        query_str = """
+        INSERT INTO {} (KEY id, VALUE doc)
+        SELECT META(b).id AS id,
+            b AS doc
+        FROM `beer-sample` b
+        WHERE b.type='beer'
+        """.format(beers_fqdn)
+        self.cluster.query(query_str).execute()
+        breweries_fqdn = '`{}`.`{}`.{}'.format(
+            self.bucket_name, self.beer_sample_collections.scope,
+            self.beer_sample_collections.breweries.name)
+        self.cluster.query(
+            "CREATE PRIMARY INDEX ON {}".format(breweries_fqdn)).execute()
+        query_str = """
+        INSERT INTO {} (KEY id, VALUE doc)
+        SELECT META(b).id AS id,
+            b AS doc
+        FROM `beer-sample` b
+        WHERE b.type='brewery'
+        """.format(breweries_fqdn)
+        self.cluster.query(query_str).execute()
+
+    def beer_sample_collections_exist(self):
+        scope = self.try_n_times(10, 3, self.get_scope,
+                                 self.beer_sample_collections.scope,
+                                 collection_mgr=self.cm)
+        beer_coll = self.try_n_times(10, 3, self.get_collection,
+                                     self.beer_sample_collections.scope,
+                                     self.beer_sample_collections.beers.name,
+                                     collection_mgr=self.cm)
+        brewery_coll = self.try_n_times(10, 3, self.get_collection,
+                                        self.beer_sample_collections.scope,
+                                        self.beer_sample_collections.breweries.name,
+                                        collection_mgr=self.cm)
+        return scope and beer_coll and brewery_coll
+
+    def get_scope(self, scope_name, bucket_name=None, collection_mgr=None):
+        if collection_mgr:
+            return next((s for s in collection_mgr.get_all_scopes() if s.name == scope_name), None)
+
+        bucket = self.try_n_times(10, 3, self.cluster.bucket, bucket_name)
+        if bucket:
+            cm = bucket.collections()
+            return next((s for s in cm.get_all_scopes() if s.name == scope_name), None)
+
+        return None
+
+    def get_collection(self, scope_name, coll_name, bucket_name=None, collection_mgr=None):
+        if collection_mgr:
+            scope = self.get_scope(scope_name, collection_mgr=collection_mgr)
+        else:
+            scope = self.get_scope(scope_name, bucket_name)
+        if scope:
+            return next((c for c in scope.collections if c.name == coll_name), None)
+
+        return None
 
     @staticmethod
     def _upsert_collection(cm, collection_name, scope_name):
         if not collection_name in CollectionTestCase.initialised[scope_name].keys():
             try:
-                cm.create_collection(CollectionSpec(collection_name, scope_name))
+                cm.create_collection(CollectionSpec(
+                    collection_name, scope_name))
                 CollectionTestCase.initialised[scope_name][collection_name] = None
             except CollectionAlreadyExistsException as e:
                 warnings.warn(e.message)
@@ -1285,12 +1425,14 @@ class AsyncClusterTestCase(ClusterTestCase):
                     **kwargs):
         # type: (...) -> AsyncClusterType
         args = list(args)
-        connstr_nobucket, bucket = self._get_connstr_and_bucket_name(args, kwargs)
+        connstr_nobucket, bucket = self._get_connstr_and_bucket_name(
+            args, kwargs)
         return self._instantiate_cluster(connstr_nobucket, self.cluster_class)
 
     def gen_bucket(self, *args, override_bucket=None, **kwargs):
         args = list(args)
-        connstr_nobucket, bucket = self._get_connstr_and_bucket_name(args, kwargs)
+        connstr_nobucket, bucket = self._get_connstr_and_bucket_name(
+            args, kwargs)
         bucket = override_bucket or bucket
         return self._instantiate_cluster(connstr_nobucket, self.cluster_class).bucket(bucket)
 
@@ -1337,7 +1479,8 @@ class TracedCase(CollectionTestCase):
         # self.enable_logging = enable_logging or os.environ.get("PYCBC_ENABLE_LOGGING")
         self.use_parent_tracer = use_parent_tracer
         self.using_jaeger = (os.environ.get("PYCBC_USE_JAEGER") == "TRUE")
-        self.flushdict = {k: v for k, v in zip(map(str, range(1, 100)), map(str, range(1, 100)))}
+        self.flushdict = {k: v for k, v in zip(
+            map(str, range(1, 100)), map(str, range(1, 100)))}
         self.trace_all = os.environ.get("PYCBC_TRACE_ALL") or trace_all
         self.flushcount = flushcount
         if self.using_jaeger and self.flushcount > 5:
@@ -1350,12 +1493,14 @@ class TracedCase(CollectionTestCase):
         kwargs['enable_tracing'] = "true"
         if self.trace_all:
             tracing_options = ClusterTracingOptions(
-                tracing_orphaned_queue_flush_interval=timedelta(milliseconds=1),
+                tracing_orphaned_queue_flush_interval=timedelta(
+                    milliseconds=1),
                 tracing_orphaned_queue_size=9,
-                tracing_threshold_queue_flush_interval=timedelta(milliseconds=1),
+                tracing_threshold_queue_flush_interval=timedelta(
+                    milliseconds=1),
                 tracing_threshold_queue_size=9,
                 tracing_threshold_kv=timedelta(milliseconds=1),
-                #tracing_threshold_query=timedelta(milliseconds=1),
+                # tracing_threshold_query=timedelta(milliseconds=1),
                 tracing_threshold_view=timedelta(milliseconds=1),
                 tracing_threshold_search=timedelta(milliseconds=1),
                 tracing_threshold_analytics=timedelta(milliseconds=1)
@@ -1363,7 +1508,8 @@ class TracedCase(CollectionTestCase):
             dummy_auth = PasswordAuthenticator("default", "password")
             # the dummy_auth isn't really used, the base class decides between classic
             # and password dependng on mock or not.
-            opts = ClusterOptions(authenticator=dummy_auth, tracing_options=tracing_options)
+            opts = ClusterOptions(authenticator=dummy_auth,
+                                  tracing_options=tracing_options)
             kwargs["cluster_options"] = opts
         super(TracedCase, self).setUp(**kwargs)
 
@@ -1394,10 +1540,12 @@ class AnalyticsTestCaseBase(CollectionTestCase):
         if self.is_mock:
             raise SkipTest("analytics not mocked")
         if int(self.get_cluster_version().split('.')[0]) < 6:
-            raise SkipTest("no analytics in {}".format(self.get_cluster_version()))
+            raise SkipTest("no analytics in {}".format(
+                self.get_cluster_version()))
         self.mgr = self.cluster.analytics_indexes()
         # create a dataset to query
-        self.mgr.create_dataset(self.dataset_name, 'beer-sample', CreateDatasetOptions(ignore_if_exists=True))
+        self.mgr.create_dataset(
+            self.dataset_name, 'beer-sample', CreateDatasetOptions(ignore_if_exists=True))
 
         def has_dataset(name, *args, **kwargs):
             datasets = self.mgr.get_all_datasets()
@@ -1407,4 +1555,5 @@ class AnalyticsTestCaseBase(CollectionTestCase):
             # connect it...
             return self.mgr.connect_link()
 
-        self.try_n_times(10, 3, has_dataset, self.dataset_name, on_success=on_dataset)
+        self.try_n_times(10, 3, has_dataset, self.dataset_name,
+                         on_success=on_dataset)
