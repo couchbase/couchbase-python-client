@@ -15,9 +15,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+
+import time
+
 from couchbase_tests.base import CollectionTestCase, SkipTest, AnalyticsTestCaseBase
-from couchbase.management.analytics import CreateDatasetOptions, DropDatasetOptions
+from couchbase.management.analytics import DropDatasetOptions
 from couchbase.analytics import AnalyticsOptions
+from couchbase.exceptions import DatasetNotFoundException, DataverseNotFoundException, NotSupportedException
 
 
 class AnalyticsTestCase(AnalyticsTestCaseBase):
@@ -49,43 +53,210 @@ class AnalyticsTestCase(AnalyticsTestCaseBase):
 
     def test_query_positional_params(self):
         rows_attempt = self.try_n_times(10, 3, self.assertQueryReturnsRows,
-                                'SELECT * FROM `{}` WHERE `type` = $1 LIMIT 1'.format(self.dataset_name),
-                                AnalyticsOptions(positional_parameters=["brewery"]))
+                                        'SELECT * FROM `{}` WHERE `type` = $1 LIMIT 1'.format(
+                                            self.dataset_name),
+                                        AnalyticsOptions(positional_parameters=["brewery"]))
         print(rows_attempt)
         return self.checkResult(rows_attempt, lambda result:  self.assertEqual("brewery", result[0][self.dataset_name]['type']))
 
-
     def test_query_positional_params_no_option(self):
         rows_attempt = self.try_n_times(10, 3, self.assertQueryReturnsRows,
-                                'SELECT * FROM `{}` WHERE `type` = $1 LIMIT 1'.format(self.dataset_name),
-                                "brewery")
+                                        'SELECT * FROM `{}` WHERE `type` = $1 LIMIT 1'.format(
+                                            self.dataset_name),
+                                        "brewery")
         return self.checkResult(rows_attempt, lambda result: self.assertEqual("brewery", result[0][self.dataset_name]['type']))
 
     def test_query_positional_params_override(self):
         rows_attempt = self.try_n_times(10, 3, self.assertQueryReturnsRows,
-                                'SELECT * FROM `{}` WHERE `type` = $1 LIMIT 1'.format(self.dataset_name),
-                                AnalyticsOptions(positional_parameters=["jfjfjfjfjfj"]),
-                                "brewery")
+                                        'SELECT * FROM `{}` WHERE `type` = $1 LIMIT 1'.format(
+                                            self.dataset_name),
+                                        AnalyticsOptions(
+                                            positional_parameters=["jfjfjfjfjfj"]),
+                                        "brewery")
         return self.checkResult(rows_attempt, lambda result: self.assertEqual("brewery", result[0][self.dataset_name]['type']))
 
     def test_query_named_parameters(self):
         rows_attempt = self.try_n_times(10, 3, self.assertQueryReturnsRows,
-                                "SELECT * FROM `{}` WHERE `type` = $btype LIMIT 1".format(self.dataset_name),
-                                AnalyticsOptions(named_parameters={"btype": "brewery"}))
+                                        "SELECT * FROM `{}` WHERE `type` = $btype LIMIT 1".format(
+                                            self.dataset_name),
+                                        AnalyticsOptions(named_parameters={"btype": "brewery"}))
         return self.checkResult(rows_attempt, lambda result: self.assertEqual("brewery", result[0][self.dataset_name]['type']))
 
     def test_query_named_parameters_no_options(self):
         rows_attempt = self.try_n_times(10, 3, self.assertQueryReturnsRows,
-                                "SELECT * FROM `{}` WHERE `type` = $btype LIMIT 1".format(self.dataset_name),
-                                btype="brewery")
+                                        "SELECT * FROM `{}` WHERE `type` = $btype LIMIT 1".format(
+                                            self.dataset_name),
+                                        btype="brewery")
         return self.checkResult(rows_attempt, lambda result: self.assertEqual("brewery", result[0][self.dataset_name]['type']))
 
     def test_query_named_parameters_override(self):
         rows_attempt = self.try_n_times(10, 3, self.assertQueryReturnsRows,
-                                "SELECT * FROM `{}` WHERE `type` = $btype LIMIT 1".format(self.dataset_name),
-                                AnalyticsOptions(named_parameters={"btype": "jfjfjfjf"}),
-                                btype="brewery")
+                                        "SELECT * FROM `{}` WHERE `type` = $btype LIMIT 1".format(
+                                            self.dataset_name),
+                                        AnalyticsOptions(named_parameters={
+                                                         "btype": "jfjfjfjf"}),
+                                        btype="brewery")
         return self.checkResult(rows_attempt, lambda result: self.assertEqual("brewery", result[0][self.dataset_name]['type']))
 
 
+class AnalyticsCollectionTests(CollectionTestCase):
+    def setUp(self):
+        super(AnalyticsCollectionTests, self).setUp(bucket='beer-sample')
 
+        if not self.is_realserver:
+            raise SkipTest('Analytics not mocked')
+
+        if int(self.get_cluster_version().split('.')[0]) < 6:
+            raise SkipTest("no analytics in {}".format(
+                self.get_cluster_version()))
+
+        # SkipTest if collections not supported
+        try:
+            self.bucket.collections().get_all_scopes()
+        except NotSupportedException:
+            raise SkipTest('Cluster does not support collections')
+
+        self.cm = self.bucket.collections()
+        self._scope_name = 'beer-sample-scope'
+        self.create_beer_sample_collections()
+        self.create_analytics_collections()
+
+        # make sure the collection loads...
+        query_str = 'USE {}; SELECT COUNT(1) AS beers FROM beers;'.format(
+            self.dataverse_fqdn)
+        for _ in range(10):
+            res = self.try_n_times(
+                10, 10, self.cluster.analytics_query, query_str)
+            beers = res.rows()[0]['beers']
+            if beers > 100:
+                break
+            print('Found {} beers in collection, waiting a bit...'.format(beers))
+            time.sleep(5)
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super(AnalyticsCollectionTests, cls).setUpClass(True)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        if cls._beer_sample_collections:
+            dataverse_fqdn = '`{}`.`{}`'.format(cls._cluster_resource.bucket_name,
+                                                cls._beer_sample_collections.scope)
+            beers_fqdn = '`{}`.`{}`.{}'.format(cls._cluster_resource.bucket_name,
+                                               cls._beer_sample_collections.scope,
+                                               cls._beer_sample_collections.beers.name)
+            cluster = cls._cluster_resource.cluster
+
+            query_str = """
+            USE {};
+            DISCONNECT LINK Local;
+            """.format(dataverse_fqdn,
+                        cls._beer_sample_collections.beers.name,
+                        beers_fqdn)
+            cluster.analytics_query(query_str).rows()
+
+            query_str = "USE {};DROP DATASET {} IF EXISTS;".format(dataverse_fqdn,
+                                                                   cls._beer_sample_collections.beers.name,
+                                                                   beers_fqdn)
+            cluster.analytics_query(query_str).rows()
+
+            query_str = "DROP DATAVERSE {} IF EXISTS;".format(dataverse_fqdn)
+            cluster.analytics_query(query_str).rows()
+        super(AnalyticsCollectionTests, cls).tearDownClass()
+
+    def assertRows(self,
+                   result,  # type: AnalyticsResult
+                   expected_count):
+        count = 0
+        self.assertIsNotNone(result)
+        for row in result.rows():
+            self.assertIsNotNone(row)
+            count += 1
+        self.assertEqual(count, expected_count)
+
+    def create_analytics_collections(self):
+
+        self.dataverse_fqdn = '`{}`.`{}`'.format(
+            self.bucket_name, self.beer_sample_collections.scope)
+        self.beers_fqdn = '`{}`.`{}`.{}'.format(self.bucket_name,
+                                                self.beer_sample_collections.scope,
+                                                self.beer_sample_collections.beers.name)
+
+        query_str = "CREATE DATAVERSE {} IF NOT EXISTS;".format(
+            self.dataverse_fqdn)
+        self.cluster.analytics_query(query_str).rows()
+
+        query_str = """USE {}; 
+        CREATE DATASET IF NOT EXISTS {} ON {}""".format(self.dataverse_fqdn,
+                                                        self.beer_sample_collections.beers.name,
+                                                        self.beers_fqdn)
+        self.cluster.analytics_query(query_str).rows()
+
+        query_str = "USE {}; CONNECT LINK Local;".format(self.dataverse_fqdn)
+        self.cluster.analytics_query(query_str).rows()
+
+    def test_query_fully_qualified(self):
+        result = self.cluster.analytics_query(
+            "SELECT * FROM {} LIMIT 2".format(self.beers_fqdn))
+        self.assertRows(result, 2)
+
+    def test_cluster_query_context(self):
+        q_context = 'default:{}'.format(self.dataverse_fqdn)
+        # test with QueryOptions
+        a_opts = AnalyticsOptions(query_context=q_context)
+        result = self.cluster.analytics_query(
+            "SELECT * FROM beers LIMIT 2", a_opts)
+        self.assertRows(result, 2)
+
+        # test with kwargs
+        result = self.cluster.analytics_query(
+            "SELECT * FROM beers LIMIT 2", query_context=q_context)
+        self.assertRows(result, 2)
+
+    def test_bad_query_context(self):
+        # test w/ no context
+        result = self.cluster.analytics_query("SELECT * FROM beers LIMIT 2")
+        with self.assertRaises(DatasetNotFoundException):
+            result.rows()
+
+        # test w/ bad scope
+        q_context = 'default:`{}`.`{}`'.format(self.bucket_name, 'fake-scope')
+        result = self.cluster.analytics_query(
+            "SELECT * FROM beers LIMIT 2", AnalyticsOptions(query_context=q_context))
+        with self.assertRaises(DataverseNotFoundException):
+            result.rows()
+
+    def test_scope_query(self):
+        scope = self.bucket.scope(self.beer_sample_collections.scope)
+        result = scope.analytics_query("SELECT * FROM beers LIMIT 2")
+        self.assertRows(result, 2)
+        result = scope.analytics_query(
+            "SELECT * FROM {} LIMIT 2".format(self.beers_fqdn), query_context='')
+        self.assertRows(result, 2)
+
+    def test_bad_scope_query(self):
+        scope = self.bucket.scope(self.beer_sample_collections.scope)
+        q_context = 'default:`{}`.`{}`'.format(self.bucket_name, 'fake-scope')
+        result = scope.analytics_query("SELECT * FROM beers LIMIT 2",
+                                       AnalyticsOptions(query_context=q_context))
+        with self.assertRaises(DataverseNotFoundException):
+            result.rows()
+
+        q_context = 'default:`{}`.`{}`'.format(
+            'fake-bucket', self.beer_sample_collections.scope)
+        result = scope.analytics_query("SELECT * FROM beers LIMIT 2",
+                                       query_context=q_context)
+        with self.assertRaises(DataverseNotFoundException):
+            result.rows()
+
+    def test_scope_query_with_positional_params_in_options(self):
+        scope = self.bucket.scope(self.beer_sample_collections.scope)
+        result = scope.analytics_query("SELECT * FROM beers WHERE META().id LIKE $1 LIMIT 1",
+                                       AnalyticsOptions(positional_parameters=['21st_amendment%']))
+        self.assertRows(result, 1)
+
+    def test_scope_query_with_named_params_in_options(self):
+        scope = self.bucket.scope(self.beer_sample_collections.scope)
+        result = scope.analytics_query("SELECT * FROM beers WHERE META().id LIKE $brewery LIMIT 1",
+                                       AnalyticsOptions(named_parameters={'brewery': '21st_amendment%'}))
+        self.assertRows(result, 1)

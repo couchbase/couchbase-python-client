@@ -1654,6 +1654,42 @@ class Scope(object):
                                     statement, *opts, **kwargs),
                                 itercls=itercls)
 
+    def analytics_query(self,       # type: Cluster
+                        statement,  # type: str
+                        *options,   # type: AnalyticsOptions
+                        **kwargs
+                        ):
+        # type: (...) -> AnalyticsResult
+        """
+        Executes an Analytics query against the remote cluster and returns a AnalyticsResult with the results
+        of the query.
+
+        :param statement: the analytics statement to execute
+        :param options: the optional parameters that the Analytics service takes based on the Analytics RFC.
+        :return: An AnalyticsResult object with the results of the query or error message if the query failed on the server.
+        :raise: :exc:`~.exceptions.AnalyticsException` errors associated with the analytics query itself.
+            Also, any exceptions raised by the underlying platform - :class:`~.exceptions.TimeoutException`
+            for example.
+        """
+        # following the query implementation, but this seems worth revisiting soon
+        itercls = kwargs.pop('itercls', AnalyticsResult)
+        opt = AnalyticsOptions()
+        opts = list(options)
+        for o in opts:
+            if isinstance(o, AnalyticsOptions):
+                opt = o
+                opts.remove(o)
+
+        # set the query context as this bucket and scope if not provided
+        if not ('query_context' in opt or 'query_context' in kwargs):
+            opt['query_context'] = 'default:`{}`.`{}`'.format(
+                self.bucket.name, self.name)
+
+        return CoreClient.analytics_query(self.bucket,
+                                          opt.to_query_object(
+                                              statement, *opts, **kwargs),
+                                          itercls=itercls)
+
 
 class CoreClientDatastructureWrap(CoreClient):
     def _wrap_dsop(self, sdres, has_value=False, **kwargs):

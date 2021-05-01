@@ -32,9 +32,9 @@ class AnalyticsIndex(dict):
 
 
 class AnalyticsDataType(Enum):
-    STRING='string'
-    INT64='int64'
-    DOUBLE='double'
+    STRING = 'string'
+    INT64 = 'int64'
+    DOUBLE = 'double'
 
 
 class AnalyticsDataset(dict):
@@ -89,6 +89,7 @@ class AnalyticsOptions(QueryBaseOptions):
                   'client_context_id': {},
                   'positional_parameters': {},
                   'named_parameters': {},
+                  'query_context': {'query_context': identity},
                   'raw': {}}
 
     TARGET_CLASS = AnalyticsQuery
@@ -102,6 +103,7 @@ class AnalyticsOptions(QueryBaseOptions):
                  priority=None,  # type: bool
                  positional_parameters=None,  # type: Iterable[str]
                  named_parameters=None,  # type: Dict[str, str]
+                 query_context=None,          # type: str
                  raw=None,  # type: Dict[str,Any]
                  ):
         """
@@ -113,6 +115,7 @@ class AnalyticsOptions(QueryBaseOptions):
         :param priority:
         :param positional_parameters:
         :param named_parameters:
+        :param query_context:
         :param raw:
         """
         pass
@@ -121,6 +124,3 @@ class AnalyticsOptions(QueryBaseOptions):
                  **kwargs
                  ):
         super(AnalyticsOptions, self).__init__(**kwargs)
-
-
-

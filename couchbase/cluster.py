@@ -659,7 +659,7 @@ class Cluster(CoreClient):
         return results
 
     def analytics_query(self,       # type: Cluster
-                        statement,  # type: str,
+                        statement,  # type: str
                         *options,   # type: AnalyticsOptions
                         **kwargs
                         ):

@@ -1360,6 +1360,24 @@ class CollectionTestCase(ClusterTestCase):
         """.format(breweries_fqdn)
         self.cluster.query(query_str).execute()
 
+        beers_query_str = 'SELECT COUNT(1) AS beers FROM {};'.format(
+            beers_fqdn)
+        breweries_query_str = 'SELECT COUNT(1) AS breweries FROM {};'.format(
+            breweries_fqdn)
+        for _ in range(10):
+            res = self.try_n_times(10, 10, self.cluster.query, beers_query_str)
+            beers = res.rows()[0]['beers']
+            res = self.try_n_times(
+                10, 10, self.cluster.query, breweries_query_str)
+            breweries = res.rows()[0]['breweries']
+
+            if beers > 100 and breweries > 100:
+                break
+
+            print('Found {} beers, {} breweries in collection, waiting a bit...'.format(
+                beers, breweries))
+            time.sleep(5)
+
     def beer_sample_collections_exist(self):
         scope = self.try_n_times(10, 3, self.get_scope,
                                  self.beer_sample_collections.scope,
