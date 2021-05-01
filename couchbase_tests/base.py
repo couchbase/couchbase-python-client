@@ -1300,7 +1300,7 @@ class CollectionTestCase(ClusterTestCase):
             cls._cluster_resource.bucket.collections().get_all_scopes()
             if setup_beer_sample_collections:
                 BeerSampleCollections = namedtuple('BeerSampleCollections', [
-                                               'scope', 'beers', 'breweries'])
+                    'scope', 'beers', 'breweries'])
                 cls._beer_sample_collections = BeerSampleCollections('beer-sample-scope', CollectionSpec(
                     'beers', 'beer-sample-scope'), CollectionSpec('breweries', 'beer-sample-scope'))
         except NotSupportedException:
@@ -1317,8 +1317,30 @@ class CollectionTestCase(ClusterTestCase):
         super(CollectionTestCase, cls).tearDownClass()
 
     def create_beer_sample_collections(self):
+        self.beers_fqdn = '`{}`.`{}`.{}'.format(
+            self.bucket_name, self.beer_sample_collections.scope,
+            self.beer_sample_collections.beers.name)
+
+        self.breweries_fqdn = '`{}`.`{}`.{}'.format(
+            self.bucket_name, self.beer_sample_collections.scope,
+            self.beer_sample_collections.breweries.name)
+
         if self.beer_sample_collections_exist():
+            # collections might exist, need to validate doc counts
+            counts_good = False
+            for i in range(2):
+                if not self.check_beer_sample_collections_docs():
+                    if i == 1:
+                        break
+                    self.populate_beer_sample_collections()
+                else:
+                    counts_good = True
+                    break
+
+            if not counts_good:
+                raise Exception("Unable to populate beer sample collections")
             return
+
         self.cm.create_scope(self.beer_sample_collections.scope)
         self.try_n_times(10, 3, self.get_scope,
                          self.beer_sample_collections.scope,
@@ -1333,50 +1355,34 @@ class CollectionTestCase(ClusterTestCase):
                          self.beer_sample_collections.breweries.name,
                          self.beer_sample_collections.scope,
                          collection_mgr=self.cm)
-        beers_fqdn = '`{}`.`{}`.{}'.format(
-            self.bucket_name, self.beer_sample_collections.scope,
-            self.beer_sample_collections.beers.name)
+
+        self.try_n_times(5, 3, self.populate_beer_sample_collections)
+
+        if not self.check_beer_sample_collections_docs():
+            raise Exception("Unable to populate beer sample collections")
+
+    def populate_beer_sample_collections(self):
         self.cluster.query(
-            "CREATE PRIMARY INDEX ON {}".format(beers_fqdn)).execute()
+            "CREATE PRIMARY INDEX ON {}".format(self.beers_fqdn)).execute()
         query_str = """
         INSERT INTO {} (KEY id, VALUE doc)
         SELECT META(b).id AS id,
             b AS doc
         FROM `beer-sample` b
         WHERE b.type='beer'
-        """.format(beers_fqdn)
+        """.format(self.beers_fqdn)
         self.cluster.query(query_str).execute()
-        breweries_fqdn = '`{}`.`{}`.{}'.format(
-            self.bucket_name, self.beer_sample_collections.scope,
-            self.beer_sample_collections.breweries.name)
+
         self.cluster.query(
-            "CREATE PRIMARY INDEX ON {}".format(breweries_fqdn)).execute()
+            "CREATE PRIMARY INDEX ON {}".format(self.breweries_fqdn)).execute()
         query_str = """
         INSERT INTO {} (KEY id, VALUE doc)
         SELECT META(b).id AS id,
             b AS doc
         FROM `beer-sample` b
         WHERE b.type='brewery'
-        """.format(breweries_fqdn)
+        """.format(self.breweries_fqdn)
         self.cluster.query(query_str).execute()
-
-        beers_query_str = 'SELECT COUNT(1) AS beers FROM {};'.format(
-            beers_fqdn)
-        breweries_query_str = 'SELECT COUNT(1) AS breweries FROM {};'.format(
-            breweries_fqdn)
-        for _ in range(10):
-            res = self.try_n_times(10, 10, self.cluster.query, beers_query_str)
-            beers = res.rows()[0]['beers']
-            res = self.try_n_times(
-                10, 10, self.cluster.query, breweries_query_str)
-            breweries = res.rows()[0]['breweries']
-
-            if beers > 100 and breweries > 100:
-                break
-
-            print('Found {} beers, {} breweries in collection, waiting a bit...'.format(
-                beers, breweries))
-            time.sleep(5)
 
     def beer_sample_collections_exist(self):
         scope = self.try_n_times(10, 3, self.get_scope,
@@ -1391,6 +1397,33 @@ class CollectionTestCase(ClusterTestCase):
                                         self.beer_sample_collections.breweries.name,
                                         collection_mgr=self.cm)
         return scope and beer_coll and brewery_coll
+
+    def check_beer_sample_collections_docs(self):
+        beers_query_str = 'SELECT COUNT(1) AS beers FROM {};'.format(
+            self.beers_fqdn)
+        breweries_query_str = 'SELECT COUNT(1) AS breweries FROM {};'.format(
+            self.breweries_fqdn)
+        counts_good = False
+        for i in range(10):
+            res = self.try_n_times(10, 10, self.cluster.query, beers_query_str)
+            beers = res.rows()[0]['beers']
+            res = self.try_n_times(
+                10, 10, self.cluster.query, breweries_query_str)
+            breweries = res.rows()[0]['breweries']
+
+            if beers > 100 and breweries > 100:
+                counts_good = True
+                break
+
+            # should have increased population by now, break to retry population queries
+            if beers == 0 and breweries == 0 and i == 5:
+                break
+
+            print('Found {} beers, {} breweries in collection, waiting a bit...'.format(
+                beers, breweries))
+            time.sleep(5)
+
+        return counts_good
 
     def get_scope(self, scope_name, bucket_name=None, collection_mgr=None):
         if collection_mgr:

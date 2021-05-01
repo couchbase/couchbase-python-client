@@ -501,6 +501,10 @@ class _Params(object):
                 'Clear "consistency" before specifying "consistent_with"')
         self._ms = ms
 
+    collections = _genprop(
+        list, 'collections', doc="""
+        Specify a list of collections by which to filter the results
+        """)
 
 class SearchQuery(object):
     """
@@ -1562,7 +1566,9 @@ class SearchOptions(OptionBlockTimeOut):
                  consistent_with=None,   # type: MutationState
                  facets=None,            # type: Dict[str, Facet]
                  raw=None,               # type: JSON
-                 sort=None               # type: List[str]
+                 sort=None,              # type: List[str]
+                 disable_scoring=None,   # type: bool
+                 collections=None        # type: List[str]
                  ):
         pass
 
@@ -1600,6 +1606,8 @@ class SearchOptions(OptionBlockTimeOut):
             List of various :class:`~.Sort` objects to sort the results.
         :param bool disable_scoring:
             Disable scoring of the search results.
+        :param Iterable[str] collections:
+            List of collections to limit query results.
         """
         # convert highlight_style to str if it is present...
         style = kwargs.get('highlight_style', None)

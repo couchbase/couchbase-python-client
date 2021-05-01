@@ -22,7 +22,8 @@ import couchbase.search as search
 from couchbase.management.search import SearchIndex
 from couchbase.search import SearchResult, SearchOptions, SearchScanConsistency
 from couchbase.mutation_state import MutationState
-from couchbase_tests.base import CouchbaseTestCase
+from couchbase_tests.base import CouchbaseTestCase, CollectionTestCase
+from couchbase.exceptions import NotSupportedException
 
 try:
     from abc import ABC
@@ -48,11 +49,11 @@ search_testcases = os.path.join(sdk_testcases, "search")
 
 class MRESWrapper(object):
     def __init__(self, **orig_json):
-        self._orig_json=orig_json
-        self._hits=self._orig_json['data'].pop('hits')
-        self.done=False
+        self._orig_json = orig_json
+        self._hits = self._orig_json['data'].pop('hits')
+        self.done = False
         try:
-            self._iterhits=iter(self._hits)
+            self._iterhits = iter(self._hits)
         except Exception as e:
             raise
 
@@ -62,12 +63,12 @@ class MRESWrapper(object):
 
     def fetch(self, _):
         yield from self._iterhits
-        self.done=True
+        self.done = True
 
 
 class SearchRequestMock(search.SearchRequest):
     def __init__(self, body, parent, orig_json, **kwargs):
-        self._orig_json=orig_json
+        self._orig_json = orig_json
         super(SearchRequestMock, self).__init__(body, parent, **kwargs)
 
     def _start(self):
@@ -76,6 +77,7 @@ class SearchRequestMock(search.SearchRequest):
 
         self._mres = {None: MRESWrapper(**self._orig_json)}
         self.__raw = self._mres[None]
+
     @property
     def raw(self):
         try:
@@ -116,107 +118,116 @@ class SearchResultTest(CouchbaseTestCase):
         self.assertIsInstance(metrics.error_partition_count, int)
         self.assertIsInstance(metrics.max_score, float)
         self.assertIsInstance(metrics.success_partition_count, int)
-        self.assertEqual(metrics.error_partition_count + metrics.success_partition_count, metrics.total_partition_count)
+        self.assertEqual(metrics.error_partition_count +
+                         metrics.success_partition_count, metrics.total_partition_count)
         took = metrics.took
         # TODO: lets revisit why we chose this 0.1.  I often find the difference is greater,
         # running the tests locally.  Commenting out for now...
         self.assertGreater(took.total_seconds(), 0)
         self.assertIsInstance(metadata.metrics.total_partition_count, int)
-        min_partition_count = min(metadata.metrics.total_partition_count, min_hits)
-        self.assertGreaterEqual(metadata.metrics.success_partition_count, min_partition_count)
+        min_partition_count = min(
+            metadata.metrics.total_partition_count, min_hits)
+        self.assertGreaterEqual(
+            metadata.metrics.success_partition_count, min_partition_count)
         self.assertGreaterEqual(metadata.metrics.total_rows, min_hits)
 
     def test_parsing_locations(self):
-        with open(os.path.join(search_testcases,"good-response-61.json")) as good_response_f:
-            input=good_response_f.read()
-            raw_json=json.loads(input)
+        with open(os.path.join(search_testcases, "good-response-61.json")) as good_response_f:
+            input = good_response_f.read()
+            raw_json = json.loads(input)
             good_response = SearchResultMock(None, None, raw_json)
-            first_row=good_response.rows()[0]
-            self.assertIsInstance(first_row,search.SearchRow)
-            locations=first_row.locations
+            first_row = good_response.rows()[0]
+            self.assertIsInstance(first_row, search.SearchRow)
+            locations = first_row.locations
             self.assertEqual(
                 [search.SearchRowLocation(field='airlineid', term='airline_137', position=1, start=0, end=11, array_positions=None)], locations.get("airlineid", "airline_137"))
-            self.assertEqual([search.SearchRowLocation(field='airlineid', term='airline_137', position=1, start=0, end=11, array_positions=None)], locations.get_all())
+            self.assertEqual([search.SearchRowLocation(field='airlineid', term='airline_137',
+                             position=1, start=0, end=11, array_positions=None)], locations.get_all())
             self.assertSetEqual({'airline_137'}, locations.terms())
             self.assertEqual(['airline_137'], locations.terms_for("airlineid"))
             self._check_search_results_min_hits(1, good_response)
+
 
 class SearchTest(ClusterTestCase):
     def setUp(self, *args, **kwargs):
         super(SearchTest, self).setUp(**kwargs)
         if self.is_mock:
             raise SkipTest("Search not available on Mock")
-        with open(os.path.join(search_testcases,"beer-search-index-params.json")) as params_file:
-            input=params_file.read()
-            params_json=json.loads(input)
+        with open(os.path.join(search_testcases, "beer-search-index-params.json")) as params_file:
+            input = params_file.read()
+            params_json = json.loads(input)
             sm = self.cluster.search_indexes()
             try:
                 sm.get_index('beer-search-index')
             except Exception:
                 sm.upsert_index(
-                    SearchIndex(name="beer-search-index", 
-                        idx_type="fulltext-index", 
-                        source_name="beer-sample", 
-                        source_type="couchbase",
-                        params=params_json)
+                    SearchIndex(name="beer-search-index",
+                                idx_type="fulltext-index",
+                                source_name="beer-sample",
+                                source_type="couchbase",
+                                params=params_json)
                 )
-                #make sure the index loads...
-                for _ in range(10):
-                    indexed_docs = self.try_n_times(10, 10, sm.get_indexed_documents_count, 'beer-search-index')
-                    if indexed_docs == 7303:
+                # make sure the index loads...
+                for _ in range(20):
+                    indexed_docs = self.try_n_times(
+                        10, 10, sm.get_indexed_documents_count, 'beer-search-index')
+                    if indexed_docs == 3000:
                         print('All docs indexed!')
                         break
-                    print('Found {} indexed docs, waiting a bit...'.format(indexed_docs))
-                    time.sleep(5)
+                    print('Found {} indexed docs, waiting a bit...'.format(
+                        indexed_docs))
+                    time.sleep(30)
+
 
     def test_cluster_search(self):
-        options = search.SearchOptions(fields=["*"], limit=10, sort=["-_score"],
-                                       scan_consistency=SearchScanConsistency.NOT_BOUNDED.value)
         initial = datetime.datetime.now()
-        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index", 
-                                                search.TermQuery("north"), 
-                                                search.SearchOptions(limit=10))  # type: SearchResult
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(limit=10))  # type: SearchResult
         SearchResultTest._check_search_result(self, initial, 6, x)
 
-
     def test_cluster_search_fields(self  # type: SearchTest
-                            ):
+                                   ):
         if self.is_mock:
             raise SkipTest("F.T.S. not supported by mock")
-        test_fields = ['category','name']
+        test_fields = ['category', 'name']
         initial = datetime.datetime.now()
-        #verify fields works w/in kwargs
-        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index", 
-                                            search.TermQuery("north"), 
-                                            fields=test_fields)  # type: SearchResult
+        # verify fields works w/in kwargs
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          fields=test_fields)  # type: SearchResult
 
         first_entry = x.rows()[0]
         self.assertNotEqual(first_entry.fields, {})
-        res = list(map(lambda f: f in test_fields,first_entry.fields.keys()))
+        res = list(map(lambda f: f in test_fields, first_entry.fields.keys()))
         self.assertTrue(all(res))
         SearchResultTest._check_search_result(self, initial, 6, x)
 
-        #verify fields works w/in SearchOptions
-        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index", 
-                                            search.TermQuery("north"), 
-                                            search.SearchOptions(fields=test_fields))  # type: SearchResult
+        # verify fields works w/in SearchOptions
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(fields=test_fields))  # type: SearchResult
         first_entry = x.rows()[0]
         self.assertNotEqual(first_entry.fields, {})
-        res = list(map(lambda f: f in test_fields,first_entry.fields.keys()))
+        res = list(map(lambda f: f in test_fields, first_entry.fields.keys()))
         self.assertTrue(all(res))
 
     def test_cluster_search_term_facets(self  # type: SearchTest
-                            ):
+                                        ):
         if self.is_mock:
             raise SkipTest("F.T.S. not supported by mock")
 
         facet_name = 'beers'
         facet = search.TermFacet('category', 10)
         x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
-                                            search.TermQuery("north"),
-                                            search.SearchOptions(facets={
-                                                            facet_name:facet
-                                                        }))  # type: SearchResult
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(facets={
+                                                                              facet_name: facet
+                                                                          }))  # type: SearchResult
 
         x.rows()
         result_facet = x.facets()[facet_name]
@@ -231,7 +242,7 @@ class SearchTest(ClusterTestCase):
                           facets={'beers': None})
 
     def test_cluster_search_numeric_facets(self  # type: SearchTest
-                            ):
+                                           ):
         if self.is_mock:
             raise SkipTest("F.T.S. not supported by mock")
 
@@ -241,10 +252,11 @@ class SearchTest(ClusterTestCase):
         facet.add_range('med', min=7, max=10)
         facet.add_range('high', min=10)
         x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
-                                            search.TermQuery("north"),
-                                            search.SearchOptions(facets={
-                                                            facet_name:facet
-                                                        }))  # type: SearchResult
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(facets={
+                                                                              facet_name: facet
+                                                                          }))  # type: SearchResult
 
         x.rows()
         result_facet = x.facets()[facet_name]
@@ -257,10 +269,11 @@ class SearchTest(ClusterTestCase):
         # try again but verify the limit is applied (i.e. limit < len(numeric_ranges))
         facet.limit = 2
         x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
-                                    search.TermQuery("north"),
-                                    search.SearchOptions(facets={
-                                                    facet_name:facet
-                                                }))  # type: SearchResult
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(facets={
+                                                                              facet_name: facet
+                                                                          }))  # type: SearchResult
 
         x.rows()
         result_facet = x.facets()[facet_name]
@@ -275,20 +288,22 @@ class SearchTest(ClusterTestCase):
                           facets={'abv': search.NumericFacet('abv', 10)})
 
     def test_cluster_search_date_facets(self  # type: SearchTest
-                            ):
+                                        ):
         if self.is_mock:
             raise SkipTest("F.T.S. not supported by mock")
 
         facet_name = 'updated'
         facet = search.DateFacet('updated')
         facet.add_range('early', end='2010-12-01T00:00:00Z')
-        facet.add_range('mid', start='2010-12-01T00:00:00Z', end='2011-01-01T00:00:00Z')
+        facet.add_range('mid', start='2010-12-01T00:00:00Z',
+                        end='2011-01-01T00:00:00Z')
         facet.add_range('late', start='2011-01-01T00:00:00Z')
         x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
-                                            search.TermQuery("north"),
-                                            search.SearchOptions(facets={
-                                                            facet_name:facet
-                                                        }))  # type: SearchResult
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(facets={
+                                                                              facet_name: facet
+                                                                          }))  # type: SearchResult
 
         x.rows()
         result_facet = x.facets()[facet_name]
@@ -301,10 +316,11 @@ class SearchTest(ClusterTestCase):
         # try again but verify the limit is applied (i.e. limit < len(date_ranges))
         facet.limit = 2
         x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
-                                    search.TermQuery("north"),
-                                    search.SearchOptions(facets={
-                                                    facet_name:facet
-                                                }))  # type: SearchResult
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(facets={
+                                                                              facet_name: facet
+                                                                          }))  # type: SearchResult
 
         x.rows()
         result_facet = x.facets()[facet_name]
@@ -318,107 +334,120 @@ class SearchTest(ClusterTestCase):
                           search.TermQuery("north"),
                           facets={'abv': search.DateFacet('abv', 10)})
 
-    def test_cluster_search_disable_scoring(self # type: SearchTest
-                                ):
+    def test_cluster_search_disable_scoring(self  # type: SearchTest
+                                            ):
         if self.is_mock:
             raise SkipTest("F.T.S. not supported by mock")
 
         if float(self.cluster_version[0:3]) < 6.5:
-            raise SkipTest("Disable scoring not available on server version < 6.5")
+            raise SkipTest(
+                "Disable scoring not available on server version < 6.5")
 
-        #verify disable scoring works w/in SearchOptions
-        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index", 
-                                                search.TermQuery("north"), 
-                                                search.SearchOptions(limit=10, 
-                                                    disable_scoring=True) )  # type: SearchResult
+        # verify disable scoring works w/in SearchOptions
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(limit=10,
+                                                                                               disable_scoring=True))  # type: SearchResult
         rows = x.rows()
         res = list(map(lambda r: r.score == 0, rows))
         self.assertTrue(all(res))
 
         # verify disable scoring works w/in kwargs
-        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index", 
-                                                search.TermQuery("north"), 
-                                                search.SearchOptions(limit=10),
-                                                disable_scoring=True)  # type: SearchResult
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(
+                                                                              limit=10),
+                                                                          disable_scoring=True)  # type: SearchResult
         rows = x.rows()
         res = list(map(lambda r: r.score == 0, rows))
         self.assertTrue(all(res))
-        
-        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index", 
-                                                search.TermQuery("north"), 
-                                                search.SearchOptions(limit=10, 
-                                                    disable_scoring=False) )  # type: SearchResult
+
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(limit=10,
+                                                                                               disable_scoring=False))  # type: SearchResult
 
         rows = x.rows()
         res = list(map(lambda r: r.score != 0, rows))
         self.assertTrue(all(res))
 
-        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index", 
-                                                search.TermQuery("north"), 
-                                                search.SearchOptions(limit=10))  # type: SearchResult
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(limit=10))  # type: SearchResult
 
         rows = x.rows()
         res = list(map(lambda r: r.score != 0, rows))
         self.assertTrue(all(res))
 
-    def test_cluster_search_highlight(self # type: SearchTest
-                                ):
+    def test_cluster_search_highlight(self  # type: SearchTest
+                                      ):
         if self.is_mock:
             raise SkipTest("F.T.S. not supported by mock")
 
         initial = datetime.datetime.now()
-        #verify locations/fragments works w/in SearchOptions
-        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index", 
-                                                search.TermQuery("north"), 
-                                                search.SearchOptions(highlight_style=search.HighlightStyle.Html, limit=10))  # type: SearchResult
+        # verify locations/fragments works w/in SearchOptions
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(highlight_style=search.HighlightStyle.Html, limit=10))  # type: SearchResult
 
         rows = x.rows()
         self.assertGreaterEqual(10, len(rows))
         locations = rows[0].locations
         fragments = rows[0].fragments
         self.assertIsInstance(fragments, dict)
-        res = list(map(lambda l: isinstance(l, search.SearchRowLocation), locations.get_all()))
+        res = list(map(lambda l: isinstance(
+            l, search.SearchRowLocation), locations.get_all()))
         self.assertTrue(all(res))
         self.assertIsInstance(locations, search.SearchRowLocations)
         SearchResultTest._check_search_result(self, initial, 6, x)
 
         initial = datetime.datetime.now()
-        #verify locations/fragments works w/in kwargs
-        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index", 
-                                                search.TermQuery("north"), 
-                                                search.SearchOptions(limit=10),
-                                                highlight_style='html')  # type: SearchResult
+        # verify locations/fragments works w/in kwargs
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(
+                                                                              limit=10),
+                                                                          highlight_style='html')  # type: SearchResult
 
         rows = x.rows()
         self.assertGreaterEqual(10, len(rows))
         locations = rows[0].locations
         fragments = rows[0].fragments
         self.assertIsInstance(fragments, dict)
-        res = list(map(lambda l: isinstance(l, search.SearchRowLocation), locations.get_all()))
+        res = list(map(lambda l: isinstance(
+            l, search.SearchRowLocation), locations.get_all()))
         self.assertTrue(all(res))
         self.assertIsInstance(locations, search.SearchRowLocations)
         SearchResultTest._check_search_result(self, initial, 6, x)
 
-    def test_cluster_search_scan_consistency(self # type: SearchTest
-                                ):
+    def test_cluster_search_scan_consistency(self  # type: SearchTest
+                                             ):
         if self.is_mock:
             raise SkipTest("F.T.S. not supported by mock")
 
         initial = datetime.datetime.now()
-        #verify scan consistency works w/in SearchOptions
-        x = self.try_n_times_decorator(self.cluster.search_query, 2, 1)("beer-search-index", 
-                                                search.TermQuery("north"), 
-                                                search.SearchOptions(scan_consistency=search.SearchScanConsistency.NOT_BOUNDED))  # type: SearchResult
+        # verify scan consistency works w/in SearchOptions
+        x = self.try_n_times_decorator(self.cluster.search_query, 2, 1)("beer-search-index",
+                                                                        search.TermQuery(
+                                                                            "north"),
+                                                                        search.SearchOptions(scan_consistency=search.SearchScanConsistency.NOT_BOUNDED))  # type: SearchResult
 
         rows = x.rows()
         self.assertGreaterEqual(10, len(rows))
         SearchResultTest._check_search_result(self, initial, 6, x)
 
         initial = datetime.datetime.now()
-        #verify scan consistency works w/in SearchOptions
-        x = self.try_n_times_decorator(self.cluster.search_query, 2, 1)("beer-search-index", 
-                                                search.TermQuery("north"), 
-                                                search.SearchOptions(scan_consistency=search.SearchScanConsistency.AT_PLUS))  # type: SearchResult
+        # verify scan consistency works w/in SearchOptions
+        x = self.try_n_times_decorator(self.cluster.search_query, 2, 1)("beer-search-index",
+                                                                        search.TermQuery(
+                                                                            "north"),
+                                                                        search.SearchOptions(scan_consistency=search.SearchScanConsistency.AT_PLUS))  # type: SearchResult
 
         rows = x.rows()
         self.assertGreaterEqual(10, len(rows))
@@ -428,7 +457,7 @@ class SearchTest(ClusterTestCase):
 class SearchStringsTest(CouchbaseTestCase):
     def test_fuzzy(self):
         q = search.TermQuery('someterm', field='field', boost=1.5,
-                               prefix_length=23, fuzziness=12)
+                             prefix_length=23, fuzziness=12)
         p = search.SearchOptions(explain=True)
 
         exp_json = {
@@ -459,7 +488,7 @@ class SearchStringsTest(CouchbaseTestCase):
 
         p = search.SearchOptions(limit=10)
         q = search.MatchPhraseQuery('salty beers', boost=1.5, analyzer='analyzer',
-                                      field='field')
+                                    field='field')
         self.assertEqual(exp_json, p._gen_search_params('ix', q).body)
 
     def test_match_query(self):
@@ -477,7 +506,7 @@ class SearchStringsTest(CouchbaseTestCase):
         }
 
         q = search.MatchQuery('salty beers', boost=1.5, analyzer='analyzer',
-                                field='field', fuzziness=1234, prefix_length=4)
+                              field='field', fuzziness=1234, prefix_length=4)
         p = search.SearchOptions(limit=10)
         self.assertEqual(exp_json, p._gen_search_params('ix', q).body)
 
@@ -497,7 +526,8 @@ class SearchStringsTest(CouchbaseTestCase):
 
     def test_params(self):
         self.assertEqual({}, SearchOptions().as_encodable('ix'))
-        self.assertEqual({'size': 10}, SearchOptions(limit=10).as_encodable('ix'))
+        self.assertEqual({'size': 10}, SearchOptions(
+            limit=10).as_encodable('ix'))
         self.assertEqual({'from': 100},
                          SearchOptions(skip=100).as_encodable('ix'))
 
@@ -510,16 +540,16 @@ class SearchStringsTest(CouchbaseTestCase):
         self.assertEqual({'highlight': {'style': 'ansi',
                                         'fields': ['foo', 'bar', 'baz']}},
                          SearchOptions(highlight_style=search.HighlightStyle.Ansi,
-                                        highlight_fields=['foo', 'bar', 'baz'])
+                                       highlight_fields=['foo', 'bar', 'baz'])
                          .as_encodable('ix'))
 
         self.assertEqual({'fields': ['foo', 'bar', 'baz']},
                          SearchOptions(fields=['foo', 'bar', 'baz']
-                                        ).as_encodable('ix'))
+                                       ).as_encodable('ix'))
 
         self.assertEqual({'sort': ['f1', 'f2', '-_score']},
                          SearchOptions(sort=['f1', 'f2', '-_score']
-                                        ).as_encodable('ix'))
+                                       ).as_encodable('ix'))
 
         self.assertEqual({'sort': ['f1', 'f2', '-_score']},
                          SearchOptions(sort=[
@@ -555,7 +585,7 @@ class SearchStringsTest(CouchbaseTestCase):
             }
         }
         self.assertEqual(exp, p.as_encodable('ix'))
-        self.assertEqual({'ctl': {'consistency': {'level':''}}},
+        self.assertEqual({'ctl': {'consistency': {'level': ''}}},
                          SearchOptions(scan_consistency=search.SearchScanConsistency.NOT_BOUNDED.value).as_encodable('ix'))
 
     def test_facets(self):
@@ -668,7 +698,8 @@ class SearchStringsTest(CouchbaseTestCase):
 
     def test_match_all_none_queries(self):
         self.assertEqual({'match_all': None}, search.MatchAllQuery().encodable)
-        self.assertEqual({'match_none': None}, search.MatchNoneQuery().encodable)
+        self.assertEqual({'match_none': None},
+                         search.MatchNoneQuery().encodable)
 
     def test_phrase_query(self):
         pq = search.PhraseQuery('salty', 'beers')
@@ -723,10 +754,10 @@ class SearchStringsTest(CouchbaseTestCase):
 
     def test_advanced_sort(self):
         self.assertEqual({'by': 'score'}, search.SortScore().as_encodable())
-        #test legacy 'descending' support
+        # test legacy 'descending' support
         self.assertEqual({'by': 'score', 'desc': False},
                          search.SortScore(descending=False).as_encodable())
-        #official RFC format
+        # official RFC format
         self.assertEqual({'by': 'score', 'desc': False},
                          search.SortScore(desc=False).as_encodable())
         self.assertEqual({'by': 'id'}, search.SortID().as_encodable())
@@ -735,3 +766,143 @@ class SearchStringsTest(CouchbaseTestCase):
                          search.SortField('foo').as_encodable())
         self.assertEqual({'by': 'field', 'field': 'foo', 'type': 'int'},
                          search.SortField('foo', type='int').as_encodable())
+
+
+class SearchCollectionTests(CollectionTestCase):
+
+    def setUp(self):
+        super(SearchCollectionTests, self).setUp(bucket='beer-sample')
+
+        if self.is_mock:
+            raise SkipTest("Search not available on Mock")
+
+        # SkipTest if collections not supported
+        try:
+            self.bucket.collections().get_all_scopes()
+        except NotSupportedException:
+            raise SkipTest('Cluster does not support collections')
+
+        self.cm = self.bucket.collections()
+        self.create_beer_sample_collections()
+
+        with open(os.path.join(search_testcases, "beer-search-coll-index-params.json")) as params_file:
+            input = params_file.read()
+            params_json = json.loads(input)
+            sm = self.cluster.search_indexes()
+            try:
+                sm.get_index('beer-search-coll-index')
+            except Exception:
+                sm.upsert_index(
+                    SearchIndex(name="beer-search-coll-index",
+                                idx_type="fulltext-index",
+                                source_name="beer-sample",
+                                source_type="couchbase",
+                                params=params_json)
+                )
+                # make sure the index loads, for some reason over time
+                # loading the index becomes SLOW, hence the 30 second sleep
+                for _ in range(20):
+                    indexed_docs = self.try_n_times(
+                        10, 10, sm.get_indexed_documents_count, 'beer-search-coll-index')
+                    if indexed_docs > 3000:
+                        break
+                    print('Found {} indexed docs, waiting a bit...'.format(
+                        indexed_docs))
+                    time.sleep(30)
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super(SearchCollectionTests, cls).setUpClass(True)
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        if cls._beer_sample_collections:
+            im = cls._cluster_resource.cluster.search_indexes()
+            im.drop_index("beer-search-coll-index")
+        super(SearchCollectionTests, cls).tearDownClass()
+
+    def test_cluster_query_collections(self):
+        initial = datetime.datetime.now()
+        scope = self.bucket.scope(self.beer_sample_collections.scope)
+        x = self.try_n_times_decorator(scope.search_query, 10, 10)("beer-search-coll-index",
+                                                                   search.TermQuery(
+                                                                       "north"),
+                                                                   search.SearchOptions(limit=10,
+                                                                                        collections=['breweries']))  # type: SearchResult
+
+        rows = x.rows()
+        collections = list(map(lambda r: r.fields['_$c'], rows))
+        self.assertTrue(all([c for c in collections if c == 'breweries']))
+        SearchResultTest._check_search_result(self, initial, 6, x)
+
+    def test_scope_query(self):
+        initial = datetime.datetime.now()
+        scope = self.bucket.scope(self.beer_sample_collections.scope)
+        x = self.try_n_times_decorator(scope.search_query, 10, 10)("beer-search-coll-index",
+                                                                   search.TermQuery(
+                                                                       "north"),
+                                                                   search.SearchOptions(limit=10))  # type: SearchResult
+        rows = x.rows()
+        collections = list(map(lambda r: r.fields['_$c'], rows))
+        self.assertTrue(any([c for c in collections if c == 'beers']) and
+                        any([c for c in collections if c == 'breweries']))
+        SearchResultTest._check_search_result(self, initial, 6, x)
+
+        initial = datetime.datetime.now()
+        x = self.try_n_times_decorator(scope.search_query, 10, 10)("beer-search-coll-index",
+                                                                   search.TermQuery(
+                                                                       "north"),
+                                                                   search.SearchOptions(limit=10,
+                                                                                        collections=['breweries']))  # type: SearchResult
+
+        rows = x.rows()
+        collections = list(map(lambda r: r.fields['_$c'], rows))
+        self.assertTrue(all([c for c in collections if c == 'breweries']))
+        SearchResultTest._check_search_result(self, initial, 6, x)
+
+    def test_scope_search_fields(self):
+        scope = self.bucket.scope(self.beer_sample_collections.scope)
+        test_fields = ['category', 'name']
+        initial = datetime.datetime.now()
+        # verify fields works w/in kwargs
+        x = self.try_n_times_decorator(scope.search_query, 10, 10)("beer-search-coll-index",
+                                                                   search.TermQuery(
+                                                                       "north"),
+                                                                   fields=test_fields,
+                                                                   collections=['beers'])  # type: SearchResult
+
+        rows = x.rows()
+        collections = list(map(lambda r: r.fields['_$c'], rows))
+        self.assertTrue(all([c for c in collections if c == 'beers']))
+        first_entry = rows[0]
+        self.assertNotEqual(first_entry.fields, {})
+        # add the collection key to returned fields
+        test_fields.append('_$c')
+        res = list(map(lambda f: f in test_fields, first_entry.fields.keys()))
+        self.assertTrue(all(res))
+        SearchResultTest._check_search_result(self, initial, 6, x)
+
+    def test_cluster_search_highlight(self):
+
+        scope = self.bucket.scope(self.beer_sample_collections.scope)
+        initial = datetime.datetime.now()
+        # verify locations/fragments works w/in SearchOptions
+        x = self.try_n_times_decorator(scope.search_query, 10, 10)("beer-search-coll-index",
+                                                                   search.TermQuery(
+                                                                       "north"),
+                                                                   search.SearchOptions(highlight_style=search.HighlightStyle.Html,
+                                                                                        limit=10,
+                                                                                        collections=['beers']))  # type: SearchResult
+
+        rows = x.rows()
+        collections = list(map(lambda r: r.fields['_$c'], rows))
+        self.assertTrue(all([c for c in collections if c == 'beers']))
+        self.assertGreaterEqual(10, len(rows))
+        locations = rows[0].locations
+        fragments = rows[0].fragments
+        self.assertIsInstance(fragments, dict)
+        res = list(map(lambda l: isinstance(
+            l, search.SearchRowLocation), locations.get_all()))
+        self.assertTrue(all(res))
+        self.assertIsInstance(locations, search.SearchRowLocations)
+        SearchResultTest._check_search_result(self, initial, 6, x)

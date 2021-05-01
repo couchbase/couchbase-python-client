@@ -26,8 +26,10 @@ from .result import (GetResult, GetReplicaResult, ExistsResult, get_result_wrapp
                      get_multi_get_result, lookup_in_result_wrapper, mutate_in_result_wrapper)
 from .subdocument import (LookupInSpec, MutateInSpec, MutateInOptions,
                           gen_projection_spec)
-
 import couchbase_core.subdocument as SD
+from couchbase.n1ql import QueryResult
+from couchbase.analytics import AnalyticsOptions, AnalyticsResult
+from couchbase.search import SearchOptions
 
 
 class DeltaValue(ConstrainedInt):
@@ -1689,6 +1691,39 @@ class Scope(object):
                                           opt.to_query_object(
                                               statement, *opts, **kwargs),
                                           itercls=itercls)
+
+    def search_query(self,
+                     index,     # type: str
+                     query,     # type: SearchQuery
+                     *options,  # type: SearchOptions
+                     **kwargs
+                     ):
+        # type: (...) -> SearchResult
+        """
+        Executes a Search or FTS query against the remote cluster and returns a SearchResult implementation with the
+        results of the query.
+
+        .. code-block:: python
+
+            from couchbase.search import MatchQuery, SearchOptions
+
+            it = cb.search('name', MatchQuery('nosql'), SearchOptions(limit=10))
+            for hit in it:
+                print(hit)
+
+        :param str index: Name of the index to use for this query.
+        :param query: the fluent search API to construct a query for FTS.
+        :param options: the options to pass to the cluster with the query.
+        :param kwargs: Overrides corresponding value in options.
+        :return: A :class:`~.search.SearchResult` object with the results of the query or error message if the query
+            failed on the server.
+        :raise: :exc:`~.exceptions.SearchException` Errors related to the query itself.
+            Also, any exceptions raised by the underlying platform - :class:`~.exceptions.TimeoutException`
+            for example.
+
+        """
+        search_params = SearchOptions.gen_search_params_cls(index, query, *options, **kwargs)
+        return search_params.itercls(search_params.body, self.bucket, **search_params.iterargs)
 
 
 class CoreClientDatastructureWrap(CoreClient):
