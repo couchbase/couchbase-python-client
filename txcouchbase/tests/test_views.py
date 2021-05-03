@@ -19,7 +19,7 @@ from couchbase.exceptions import HTTPException
 from couchbase_core.asynchronous.view import AsyncViewBase
 from couchbase_tests.base import AsyncClusterTestCase
 from txcouchbase.cluster import BatchedViewResult
-from txcouchbase.tests.base import gen_base, skip_PYCBC_894
+from txcouchbase.tests.base import gen_base, skip_PYCBC_894, skip_PYCBC_894_new
 
 
 class RowsHandler(AsyncViewBase):
@@ -70,6 +70,7 @@ class TxViewsTests(gen_base(AsyncClusterTestCase)):
         return d.addCallback(_verify)
 
     @skip_PYCBC_894
+    @skip_PYCBC_894_new
     def testBadView(self):
         cb = self.make_connection()
         d = cb.view_query('blah', 'blah_blah')

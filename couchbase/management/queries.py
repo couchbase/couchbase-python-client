@@ -1,13 +1,19 @@
+import attr
+from attr.validators import instance_of as io, deep_mapping as dm
+from typing import *
+
 from couchbase_core._ixmgmt import N1QL_PRIMARY_INDEX, IxmgmtRequest, N1qlIndex
 from couchbase_core.bucketmanager import BucketManager
 from couchbase.options import OptionBlock, OptionBlockTimeOut, forward_args, timedelta
-from typing import *
 from couchbase.management.generic import GenericManager
-import attr
-from attr.validators import instance_of as io, deep_mapping as dm
-from couchbase_core._pyport import Protocol
-from couchbase.exceptions import HTTPException, ErrorMapper, AnyPattern, QueryIndexAlreadyExistsException, \
-    QueryIndexNotFoundException, DocumentNotFoundException, DocumentExistsException
+
+from couchbase.exceptions import (ErrorMapper, AnyPattern, QueryIndexAlreadyExistsException,
+                                  QueryIndexNotFoundException, DocumentNotFoundException, DocumentExistsException)
+
+try:
+    from typing import Protocol
+except:
+    from typing_extensions import Protocol
 
 
 class QueryErrorMapper(ErrorMapper):
@@ -26,7 +32,7 @@ class QueryIndexManager(GenericManager):
         The Query Index Manager interface contains the means for managing indexes used for queries.
         :param parent_cluster: Parent cluster
         """
-        super(QueryIndexManager,self).__init__(parent_cluster)
+        super(QueryIndexManager, self).__init__(parent_cluster)
 
     def get_all_indexes(self,           # type: QueryIndexManager
                         bucket_name,    # type: str
@@ -49,7 +55,8 @@ class QueryIndexManager(GenericManager):
         # ORDER BY is_primary DESC, name ASC
         info = N1qlIndex()
         info.keyspace = bucket_name
-        response = IxmgmtRequest(self._admin_bucket, 'list', info, **forward_args(kwargs, *options)).execute()
+        response = IxmgmtRequest(
+            self._admin_bucket, 'list', info, **forward_args(kwargs, *options)).execute()
         return list(map(QueryIndex.from_n1qlindex, response))
 
     def _mk_index_def(self, bucket_name, ix, primary=False):
@@ -67,7 +74,7 @@ class QueryIndexManager(GenericManager):
 
         return info
 
-    def _n1ql_index_create(self, bucket_name, ix, defer=False, ignore_exists=False, primary=False, fields=None, cond = None, timeout=None, **kwargs):
+    def _n1ql_index_create(self, bucket_name, ix, defer=False, ignore_exists=False, primary=False, fields=None, cond=None, timeout=None, **kwargs):
         """
         Create an index for use with N1QL.
 
@@ -120,7 +127,7 @@ class QueryIndexManager(GenericManager):
         }
 
         if timeout:
-            options['timeout']=timeout
+            options['timeout'] = timeout
         # Now actually create the indexes
         return IxmgmtRequest(self._admin_bucket, 'create', info, **options).execute()
 
@@ -153,11 +160,11 @@ class QueryIndexManager(GenericManager):
             k.replace('deferred', 'defer').replace('condition', 'cond').replace('ignore_if_exists', 'ignore_exists'): v
             for k, v in forward_args(kwargs, *options).items()}
         try:
-            self._n1ql_index_create(bucket_name, index_name, fields=fields, **final_args)
+            self._n1ql_index_create(
+                bucket_name, index_name, fields=fields, **final_args)
         except QueryIndexAlreadyExistsException:
             if not final_args.get('ignore_exists', False):
                 raise
-
 
     def create_primary_index(self,  # type: QueryIndexManager
                              bucket_name,  # type: str
@@ -179,16 +186,18 @@ class QueryIndexManager(GenericManager):
         #
         kwargs['primary'] = True
         index_name = ""
-        if options and options[0] :
+        if options and options[0]:
             index_name = options[0].pop("index_name", "")
         fields = []
         self._create_index(bucket_name, fields, index_name, *options, **kwargs)
 
     def _drop_index(self, bucket_name, index_name, *options, **kwargs):
-        info = BucketManager._mk_index_def(bucket_name, index_name, primary=kwargs.pop('primary',False))
-        final_args = {k.replace('ignore_if_not_exists','ignore_missing'):v for k,v in  forward_args(kwargs, *options).items()}
+        info = BucketManager._mk_index_def(
+            bucket_name, index_name, primary=kwargs.pop('primary', False))
+        final_args = {k.replace('ignore_if_not_exists', 'ignore_missing'): v for k, v in forward_args(kwargs, *options).items()}
         try:
-            IxmgmtRequest(self._admin_bucket, 'drop', info, **final_args).execute()
+            IxmgmtRequest(self._admin_bucket, 'drop',
+                          info, **final_args).execute()
         except QueryIndexNotFoundException:
             if not final_args.get("ignore_missing", False):
                 raise
@@ -226,7 +235,7 @@ class QueryIndexManager(GenericManager):
         :raises: QueryIndexNotFoundException
         :raises: InvalidArgumentsException
         """
-        final_args=forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, *options)
         final_args['primary'] = True
         index_name = final_args.pop("index_name", "")
         self._drop_index(bucket_name, index_name, **final_args)
@@ -246,8 +255,9 @@ class QueryIndexManager(GenericManager):
         :raises: QueryIndexNotFoundException
         :raises: InvalidArgumentsException
         """
-        final_args=forward_args(kwargs, *options)
-        BucketManager(self._admin_bucket).n1ql_index_watch(index_names, **final_args)
+        final_args = forward_args(kwargs, *options)
+        BucketManager(self._admin_bucket).n1ql_index_watch(
+            index_names, **final_args)
 
     def build_deferred_indexes(self,            # type: QueryIndexManager
                                bucket_name,     # type: str
@@ -263,7 +273,7 @@ class QueryIndexManager(GenericManager):
         :raise: InvalidArgumentsException
 
         """
-        final_args=forward_args(kwargs, *options)
+        final_args = forward_args(kwargs, *options)
         return BucketManager._n1ql_index_build_deferred(bucket_name, self._admin_bucket, **final_args)
 
 
@@ -282,6 +292,7 @@ class QueryIndex(Protocol):
     keyspace = attr.ib(validator=io(str))  # type: str
     index_key = attr.ib(validator=io(Iterable))  # type: Iterable[str]
     condition = attr.ib(validator=io(str))  # type: str
+
     @classmethod
     def from_n1qlindex(cls,
                        n1qlindex  # type: N1qlIndex

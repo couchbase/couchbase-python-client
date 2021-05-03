@@ -2,15 +2,17 @@ import copy
 from datetime import timedelta
 from functools import wraps
 from typing import *
+import wrapt
+from mypy_extensions import VarArg, KwArg, Arg
 
 from couchbase_core._libcouchbase import Bucket as _Base
 from couchbase_core._libcouchbase import FMT_UTF8
-from mypy_extensions import VarArg, KwArg, Arg
 
 import couchbase.exceptions
 from couchbase.durability import DurabilityType, DurabilityOptionBlock
-from couchbase.exceptions import NotSupportedException, DocumentNotFoundException, PathNotFoundException, QueueEmpty, \
-    PathExistsException, DocumentExistsException
+from couchbase.exceptions import (NotSupportedException,
+                                  DocumentNotFoundException, PathNotFoundException, QueueEmpty,
+                                  PathExistsException, DocumentExistsException)
 from couchbase_core import JSON, operation_mode
 from couchbase_core.asynchronous.client import AsyncClientMixin
 from couchbase_core.client import Client as CoreClient
@@ -18,20 +20,12 @@ from couchbase_core.supportability import volatile, internal
 from .options import AcceptableInts
 from .options import forward_args, OptionBlockTimeOut, OptionBlockDeriv, ConstrainedInt, SignedInt64
 import couchbase.options
-from .result import GetResult, GetReplicaResult, ExistsResult, get_result_wrapper, CoreResult, ResultPrecursor, \
-    LookupInResult, MutateInResult, \
-    MutationResult, _wrap_in_mutation_result, get_replica_result_wrapper, get_multi_mutation_result, \
-    get_multi_get_result, lookup_in_result_wrapper, mutate_in_result_wrapper
-from .subdocument import LookupInSpec, MutateInSpec, MutateInOptions, \
-    gen_projection_spec
-
-try:
-    from typing import TypedDict
-except:
-    from typing_extensions import TypedDict
-import os
-from couchbase_core import abstractmethod, ABCMeta, with_metaclass
-import wrapt
+from .result import (GetResult, GetReplicaResult, ExistsResult, get_result_wrapper,
+                     CoreResult, ResultPrecursor, LookupInResult, MutateInResult,
+                     MutationResult, _wrap_in_mutation_result, get_replica_result_wrapper, get_multi_mutation_result,
+                     get_multi_get_result, lookup_in_result_wrapper, mutate_in_result_wrapper)
+from .subdocument import (LookupInSpec, MutateInSpec, MutateInOptions,
+                          gen_projection_spec)
 
 import couchbase_core.subdocument as SD
 
@@ -51,11 +45,11 @@ class DeltaValue(ConstrainedInt):
         """
         super(DeltaValue, self).__init__(value)
 
-    @classmethod
+    @ classmethod
     def max(cls):
         return 0x7FFFFFFFFFFFFFFF
 
-    @classmethod
+    @ classmethod
     def min(cls):
         return 0
 
@@ -72,11 +66,12 @@ class ReplaceOptions(DurabilityOptionBlock):
         :param durability:
         :param cas:
         """
-        super(ReplaceOptions, self).__init__(timeout=timeout, durability=durability, cas=cas)
+        super(ReplaceOptions, self).__init__(
+            timeout=timeout, durability=durability, cas=cas)
 
 
 class RemoveOptions(DurabilityOptionBlock):
-    @overload
+    @ overload
     def __init__(self,
                  durability=None,  # type: DurabilityType
                  cas=0,            # type: int
@@ -104,7 +99,7 @@ class RemoveOptions(DurabilityOptionBlock):
 
 class ExtensionOptions(DurabilityOptionBlock):
     def __init__(self,  # type: ExtensionOptions
-                 durability=None,   # type: DurabilityType,
+                 durability=None,   # type: DurabilityType
                  cas=None,          # type: int
                  timeout=None       # type: timedelta
                  ):
@@ -115,7 +110,8 @@ class ExtensionOptions(DurabilityOptionBlock):
         :param timeout: Timeout for operation
         :param durability: Durability settings
         """
-        super(ExtensionOptions, self).__init__(cas=cas, timeout=timeout, durability=durability)
+        super(ExtensionOptions, self).__init__(
+            cas=cas, timeout=timeout, durability=durability)
 
 
 class PrependOptions(ExtensionOptions._wrap_docs(extending='prepending')):
@@ -146,7 +142,8 @@ class CounterOptions(DurabilityOptionBlock):
         :param initial: Initial value
         :param delta: Variation
         """
-        super(CounterOptions, self).__init__(durability=durability, cas=cas, timeout=timeout, expiry=expiry, delta=delta, initial=initial)
+        super(CounterOptions, self).__init__(durability=durability, cas=cas,
+                                             timeout=timeout, expiry=expiry, delta=delta, initial=initial)
 
 
 class IncrementOptions(CounterOptions._wrap_docs(counter_type='increment')):
@@ -166,7 +163,7 @@ class ExistsOptions(OptionBlockTimeOut):
 
 
 class GetOptions(OptionBlockTimeOut):
-    @overload
+    @ overload
     def __init__(self,
                  timeout=None,  # type: timedelta
                  with_expiry=None,  # type: bool
@@ -180,12 +177,12 @@ class GetOptions(OptionBlockTimeOut):
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         super(GetOptions, self).__init__(**kwargs)
 
-    @property
+    @ property
     def with_expiry(self):
         # type: (...) -> bool
         return self.get('with_expiry', False)
 
-    @property
+    @ property
     def project(self):
         # type: (...) -> Iterable[str]
         return self.get('project', [])
@@ -224,7 +221,8 @@ RawCollectionMethodInt = Callable[
 
     [Arg('CBCollection', 'self'), Arg(str, 'key'), int, VarArg(OptionBlockDeriv), KwArg(Any)], R]
 RawCollectionMethod = Union[RawCollectionMethodDefault, RawCollectionMethodInt]
-RawCollectionMethodSpecial = TypeVar('RawCollectionMethodSpecial', bound=RawCollectionMethod)
+RawCollectionMethodSpecial = TypeVar(
+    'RawCollectionMethodSpecial', bound=RawCollectionMethod)
 
 
 def _get_result_and_inject(func  # type: RawCollectionMethod
@@ -248,7 +246,7 @@ def _mutate_result_and_inject(func  # type: RawCollectionMethod
 def _inject_scope_and_collection(func  # type: RawCollectionMethodSpecial
                                  ):
     # type: (...) -> RawCollectionMethod
-    @wraps(func)
+    @ wraps(func)
     def wrapped(self,  # type: CBCollection
                 *args,  # type: Any
                 **kwargs  # type:  Any
@@ -264,7 +262,8 @@ def _inject_scope_and_collection(func  # type: RawCollectionMethodSpecial
     return wrapped
 
 
-CoreBucketOpRead = TypeVar("CoreBucketOpRead", Callable[[Any], CoreResult], Callable[[Any], GetResult])
+CoreBucketOpRead = TypeVar(
+    "CoreBucketOpRead", Callable[[Any], CoreResult], Callable[[Any], GetResult])
 
 
 def _wrap_get_result(func  # type: CoreBucketOpRead
@@ -289,7 +288,8 @@ class LookupInOptions(OptionBlockTimeOut):
     pass
 
 
-CoreBucketOp = TypeVar("CoreBucketOp", Callable[[Any], CoreResult], Callable[[Any], MutationResult])
+CoreBucketOp = TypeVar(
+    "CoreBucketOp", Callable[[Any], CoreResult], Callable[[Any], MutationResult])
 
 
 def _wrap_multi_mutation_result(wrapped  # type: CoreBucketOp
@@ -301,7 +301,6 @@ def _wrap_multi_mutation_result(wrapped  # type: CoreBucketOp
         return get_multi_mutation_result(target.bucket, wrapped, keys, *options, **kwargs)
 
     return _inject_scope_and_collection(wrapper)
-
 
 
 def _dsop(create_type=None, wrap_missing_path=True):
@@ -373,7 +372,8 @@ class CBCollection(wrapt.ObjectProxy):
         :param name: name of collection
         :param options: miscellaneous options
         """
-        assert issubclass(type(parent_scope.bucket), CoreClientDatastructureWrap)
+        assert issubclass(type(parent_scope.bucket),
+                          CoreClientDatastructureWrap)
         self._wrap_collections_class()
         wrapt.ObjectProxy.__init__(self, parent_scope.bucket)
         self._self_scope = parent_scope  # type: Scope
@@ -428,7 +428,8 @@ class CBCollection(wrapt.ObjectProxy):
         # type: (...) -> CBCollection
         coll_args = dict(**parent_scope.bucket._bucket_args)
         coll_args.update(name=name, parent_scope=parent_scope)
-        result = parent_scope.bucket._collection_factory(connection_string=parent_scope.bucket._connstr, **coll_args)
+        result = parent_scope.bucket._collection_factory(
+            connection_string=parent_scope.bucket._connstr, **coll_args)
         return result
 
     def _get_generic(self, key, kwargs, options):
@@ -675,7 +676,8 @@ class CBCollection(wrapt.ObjectProxy):
         persist_to = kwargs.get('persist_to', 0)
         replicate_to = kwargs.get('replicate_to', 0)
         if persist_to > 0 or replicate_to > 0:
-            raise NotSupportedException("Client durability not supported yet for remove")
+            raise NotSupportedException(
+                "Client durability not supported yet for remove")
         return get_multi_mutation_result(self.bucket, CoreClient.remove_multi, keys, *options, **kwargs)
 
     replace_multi = _wrap_multi_mutation_result(_Base.replace_multi)
@@ -916,7 +918,8 @@ class CBCollection(wrapt.ObjectProxy):
         persist_to = final_options.get('persist_to', 0)
         replicate_to = final_options.get('replicate_to', 0)
         if persist_to > 0 or replicate_to > 0:
-            raise NotSupportedException("Client durability not supported yet for remove")
+            raise NotSupportedException(
+                "Client durability not supported yet for remove")
         return ResultPrecursor(CoreClient.remove(self.bucket, key, **final_options), final_options)
 
     @_inject_scope_and_collection
@@ -928,7 +931,6 @@ class CBCollection(wrapt.ObjectProxy):
                   **kwargs      # type: Any
                   ):
         # type: (...) -> LookupInResult
-
         """Atomically retrieve one or more paths from a document.
 
         :param key: The key of the document to lookup
@@ -1296,7 +1298,8 @@ class CBCollection(wrapt.ObjectProxy):
             except IndexError:
                 raise QueueEmpty
 
-            kwargs.update({k: v for k, v in getattr(itm, '__dict__', {}).items() if k in {'cas'}})
+            kwargs.update({k: v for k, v in getattr(
+                itm, '__dict__', {}).items() if k in {'cas'}})
             try:
                 self.list_remove(key, -1, **kwargs)
                 return itm
@@ -1393,7 +1396,8 @@ class BinaryCollection(object):
         """
         final_options = {"format": FMT_UTF8}
         final_options.update(forward_args(kwargs, *options))
-        x = CoreClient.append(self._collection.bucket, key, value, **final_options)
+        x = CoreClient.append(self._collection.bucket,
+                              key, value, **final_options)
         return ResultPrecursor(x, options)
 
     @_mutate_result_and_inject
@@ -1415,7 +1419,8 @@ class BinaryCollection(object):
         """
         final_options = {"format": FMT_UTF8}
         final_options.update(forward_args(kwargs, *options))
-        x = CoreClient.prepend(self._collection.bucket, key, value, **final_options)
+        x = CoreClient.prepend(self._collection.bucket,
+                               key, value, **final_options)
         return ResultPrecursor(x, options)
 
     @_mutate_result_and_inject
@@ -1535,11 +1540,13 @@ class BinaryCollection(object):
     def _check_delta_initial(kwargs, *options):
         final_opts = forward_args(kwargs, *options)
         init_arg = final_opts.get('initial')
-        initial = None if init_arg is None else int(SignedInt64.verified(init_arg))
+        initial = None if init_arg is None else int(
+            SignedInt64.verified(init_arg))
         if initial is not None:
             final_opts['initial'] = initial
         delta_arg = final_opts.get('delta')
-        delta = None if delta_arg is None else int(DeltaValue.verified(delta_arg))
+        delta = None if delta_arg is None else int(
+            DeltaValue.verified(delta_arg))
         if delta is not None:
             final_opts['delta'] = delta
         return final_opts

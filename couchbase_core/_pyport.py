@@ -17,55 +17,22 @@
 
 # This module contains various mappings for modules which have had
 # their names changed across Python major versions
-import sys
 
-V = sys.version_info[0]
+from six import raise_from, with_metaclass
+import urllib.parse as ulp
+from urllib.request import urlopen
+from urllib.parse import parse_qs
+izip = zip
 
-if V == 3:
-    import urllib.parse as ulp
-    from urllib.request import urlopen
-    from urllib.parse import parse_qs
-    izip = zip
-else:
-    import urllib as ulp
-    from urllib2 import urlopen
-    from urlparse import parse_qs
-    from itertools import izip
+long = int
+xrange = range
+basestring = str
+unicode = str
 
-long = long if V == 2 else int
-xrange = xrange if V == 2 else range
-basestring = basestring if V == 2 else str
-unicode = unicode if V == 2 else str
 
-if V == 2:
-    exec("def PyErr_Restore(cls, obj, bt): raise cls, obj, bt\n")
-else:
-    def PyErr_Restore(cls, obj, bt):
-        raise obj.with_traceback(bt)
+def single_dict_key(d):
+    for k in d.keys():
+        return k
 
-if V == 2:
-    def single_dict_key(d):
-        return d.keys()[0]
-else:
-    def single_dict_key(d):
-        for k in d.keys():
-            return k
 
 ANY_STR = (basestring, str)
-
-try:
-    from six import with_metaclass
-except:
-    from future.utils import with_metaclass
-
-try:
-    from typing import *
-except:
-    pass
-
-try:
-    from typing_extensions import *
-except:
-    pass
-
-from six import raise_from

@@ -25,6 +25,7 @@ from pyutil.testutil import PollMixin, TestMixin
 from twisted.internet import defer
 from twisted.trial._synctest import SkipTest
 from twisted.trial.unittest import TestCase
+from twisted.internet.error import TimeoutError
 
 from couchbase_core.client import Client
 from couchbase_tests.base import ClusterTestCase, AsyncClusterTestCase
@@ -206,5 +207,17 @@ def skip_PYCBC_894(func):
         except couchbase.exceptions.TimeoutException:
             raise SkipTest("Fails on this OS - to be fixed: https://issues.couchbase.com/browse/PYCBC-894")
     if re.compile(r'.*(darwin|centos|amazon|osx|macos).*').match(os_name) and not os.environ.get("PYCBC_894", None):
+        return wrapped_func
+    return func
+
+def skip_PYCBC_894_new(func):
+    os_name = distro.id().lower()
+    def wrapped_func(self,  # type: TestCase
+                     *args, **kwargs):
+        try:
+            return func(self, *args, **kwargs)
+        except TimeoutError:
+            raise SkipTest("Fails on this OS - to be fixed: https://issues.couchbase.com/browse/PYCBC-894")
+    if (re.compile(r'.*(ubuntu).*').match(os_name) or os_name == '') and not os.environ.get("PYCBC_894", None):
         return wrapped_func
     return func

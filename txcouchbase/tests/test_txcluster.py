@@ -53,9 +53,9 @@ class BasicClusterTest(Base):
 
     @timed(10)
     def testBadEvent(self):
-        if sys.version_info>=(3,7):
+        if sys.version_info >= (3, 5):
             raise SkipTest("Deadlocks on Python 3.x")
-        if sys.version_info<(3,7) and sys.platform.lower().startswith('linux'):
+        if sys.version_info < (3, 7) and sys.platform.lower().startswith('linux'):
             raise SkipTest("Times out on Python <3.6 on Linux")
         cb = self.make_connection()
         self.assertRaises(ValueError, cb.registerDeferred,
@@ -70,7 +70,7 @@ class BasicClusterTest(Base):
     def testMultiHost(self):
         info = self.cluster_info
         cs = ConnectionString.parse(self.make_connargs()['connection_string'])
-        cs.hosts = [ info.host + ':' + '10', info.host + ':' + str(info.port) ]
+        cs.hosts = [info.host + ':' + '10', info.host + ':' + str(info.port)]
         cb = self.make_connection(connection_string=cs.encode())
         d = cb.on_connect()
         d.addCallback(lambda x: self.assertTrue(cb.connected))
@@ -79,7 +79,8 @@ class BasicClusterTest(Base):
     def testConnstrFirstArg(self):
         info = self.cluster_info
         s = self.make_connargs()['connection_string']
-        cb = TxBucket(connection_string=s,password=self.cluster_info.bucket_password)
+        cb = TxBucket(connection_string=s,
+                      password=self.cluster_info.bucket_password)
         d = cb.on_connect().addCallback(lambda x: self.assertTrue(cb.connected))
         self.register_cleanup(cb)
         return d

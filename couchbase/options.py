@@ -1,20 +1,16 @@
 import copy
 from functools import wraps
 from typing import *
-
-import couchbase.exceptions
-import ctypes
-from couchbase_core import abstractmethod, ABCMeta, operation_mode
-from couchbase_core._pyport import with_metaclass
 from datetime import timedelta
 from enum import IntEnum
 import time
 import warnings
-try:
-    from typing import TypedDict
-except:
-    from typing_extensions import TypedDict
+import ctypes
 from enum import IntEnum
+
+import couchbase.exceptions
+from couchbase_core import abstractmethod, ABCMeta, operation_mode
+from couchbase_core._pyport import with_metaclass
 from couchbase_core._libcouchbase import LOCKMODE_EXC, LOCKMODE_NONE, LOCKMODE_WAIT
 
 OptionBlockBase = dict
@@ -37,7 +33,8 @@ class OptionBlock(OptionBlockBase):
         :param args:
         :param kwargs: parameters to pass in to the OptionBlock
         """
-        super(OptionBlock, self).__init__(**{k: v for k, v in kwargs.items() if v is not None})
+        super(OptionBlock, self).__init__(
+            **{k: v for k, v in kwargs.items() if v is not None})
         self._args = args
 
     @classmethod
@@ -57,7 +54,8 @@ class OptionBlock(OptionBlockBase):
                 except Exception as e:
                     raise
 
-            operation_mode.operate_on_doc(__init__, lambda x: cls.__init__.__doc__.format(**doc_params))
+            operation_mode.operate_on_doc(
+                __init__, lambda x: cls.__init__.__doc__.format(**doc_params))
         return DocWrapper
 
 
@@ -98,7 +96,8 @@ class Forwarder(with_metaclass(ABCMeta)):
                      ):
         # type: (...) -> OptionBlockDeriv[str,Any]
         arg_vars = copy.copy(arg_vars) if arg_vars else {}
-        temp_options = copy.copy(options[0]) if (options and options[0]) else OptionBlock()
+        temp_options = copy.copy(options[0]) if (
+            options and options[0]) else OptionBlock()
         kwargs = arg_vars.pop('kwargs', {})
         temp_options.update(kwargs)
         temp_options.update(arg_vars)
@@ -119,15 +118,18 @@ class Forwarder(with_metaclass(ABCMeta)):
     def arg_mapping(self):
         pass
 
+
 WORKAROUND_EXPIRY_CUTOFF_SECONDS = 50 * 365 * 24 * 60 * 60
 RELATIVE_EXPIRY_CUTOFF_SECONDS = 30 * 24 * 60 * 60
 DURATION_WARNING = "The specified expiry duration {seconds} is longer than 50 years. For bug-compatibility with previous versions of SDK 3.0.x, the number of seconds in the duration will be interpreted as the epoch second when the document should expire ({actual}). Passing an epoch second as a Duration is deprecated and will no longer work in SDK 3.1."
 
+
 def timedelta_as_timestamp(duration  # type: timedelta
                            ):
     # type: (...)->int
-    if not isinstance(duration,timedelta):
-        raise couchbase.exceptions.InvalidArgumentException("Expected timedelta instead of {}".format(duration))
+    if not isinstance(duration, timedelta):
+        raise couchbase.exceptions.InvalidArgumentException(
+            "Expected timedelta instead of {}".format(duration))
 
     # PYCBC-948 apply heuristic:
     # if (duration > 50 years) {
@@ -150,10 +152,11 @@ def timedelta_as_timestamp(duration  # type: timedelta
 
 
 def timedelta_as_microseconds(duration  # type: timedelta
-                           ):
+                              ):
     # type: (...)->int
-    if not isinstance(duration,timedelta):
-        raise couchbase.exceptions.InvalidArgumentException("Expected timedelta instead of {}".format(duration))
+    if not isinstance(duration, timedelta):
+        raise couchbase.exceptions.InvalidArgumentException(
+            "Expected timedelta instead of {}".format(duration))
     return int(duration.total_seconds()*1e6 if duration else 0)
 
 
@@ -164,7 +167,7 @@ class DefaultForwarder(Forwarder):
                 'expiry': {'ttl': timedelta_as_timestamp},
                 'self': {},
                 'options': {},
-                'durability': {'durability_level': lambda durability: getattr(durability.get('level', None),'value', None),
+                'durability': {'durability_level': lambda durability: getattr(durability.get('level', None), 'value', None),
                                "replicate_to": lambda client_dur: client_dur.get('replicate_to', None),
                                "persist_to": lambda client_dur: client_dur.get('persist_to', None)},
                 'disable_scoring': {'disable_scoring': lambda dis_score: True if dis_score else None}}
@@ -172,11 +175,12 @@ class DefaultForwarder(Forwarder):
 
 forward_args = DefaultForwarder().forward_args
 
-AcceptableInts = Union['ConstrainedValue', ctypes.c_int64, ctypes.c_uint64, int]
+AcceptableInts = Union['ConstrainedValue',
+                       ctypes.c_int64, ctypes.c_uint64, int]
 
 
 class ConstrainedInt(object):
-    def __init__(self,value):
+    def __init__(self, value):
         """
         A signed integer between cls.min() and cls.max() inclusive
 
@@ -187,11 +191,12 @@ class ConstrainedInt(object):
 
     @classmethod
     def verified_value(cls, item  # type: AcceptableInts
-                        ):
+                       ):
         # type: (...) -> int
         value = getattr(item, 'value', item)
-        if not isinstance(value, int) or not (cls.min()<=value<=cls.max()):
-            raise couchbase.exceptions.InvalidArgumentException("Integer in range {} and {} inclusiverequired".format(cls.min(), cls.max()))
+        if not isinstance(value, int) or not (cls.min() <= value <= cls.max()):
+            raise couchbase.exceptions.InvalidArgumentException(
+                "Integer in range {} and {} inclusiverequired".format(cls.min(), cls.max()))
         return value
 
     @classmethod
@@ -200,7 +205,8 @@ class ConstrainedInt(object):
                  ):
         if isinstance(item, cls):
             return item
-        raise couchbase.exceptions.InvalidArgumentException("Argument is not {}".format(cls))
+        raise couchbase.exceptions.InvalidArgumentException(
+            "Argument is not {}".format(cls))
 
     def __neg__(self):
         return -self.value
@@ -210,7 +216,8 @@ class ConstrainedInt(object):
 
     def __add__(self, other):
         if not (self.min() <= (self.value + int(other)) <= self.max()):
-            raise couchbase.exceptions.ArgumentError("{} + {} would be out of range {}-{}".format(self.value, other, self.min(), self.min()))
+            raise couchbase.exceptions.ArgumentError(
+                "{} + {} would be out of range {}-{}".format(self.value, other, self.min(), self.min()))
 
     @classmethod
     def max(cls):
@@ -244,7 +251,7 @@ class SignedInt64(ConstrainedInt):
         :param couchbase.options.AcceptableInts value: the value to initialise this with.
         :raise: :exc:`~couchbase.exceptions.InvalidArgumentException` if not in range
         """
-        super(SignedInt64,self).__init__(value)
+        super(SignedInt64, self).__init__(value)
 
     @classmethod
     def max(cls):
@@ -320,12 +327,14 @@ class QueryBaseOptions(OptionBlockTimeOut):
         # now the named parameters.  NOTE: all the kwargs that are
         # not VALID_OPTS must be named parameters, and the kwargs
         # OVERRIDE the list of named_parameters
-        new_keys = list(filter(lambda x: x not in self.VALID_OPTS, args.keys()))
+        new_keys = list(
+            filter(lambda x: x not in self.VALID_OPTS, args.keys()))
         named_parameters = args.pop('named_parameters', {})
         for k in new_keys:
             named_parameters[k] = args[k]
 
-        query = self.TARGET_CLASS(statement, *positional_parameters, **named_parameters)
+        query = self.TARGET_CLASS(
+            statement, *positional_parameters, **named_parameters)
         # now lets try to setup the options.
         # but for now we will use the existing _N1QLQuery.  Could be we can
         # add to it, etc...

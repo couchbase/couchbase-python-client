@@ -19,8 +19,6 @@
 Abstract class for handling async row-based APIs (i.e. N1QL, Views, 2i, etc)
 """
 
-from couchbase_core._pyport import PyErr_Restore
-
 
 class AsyncRowsBase(object):
     # This class relies on having various properties defined in the base
@@ -81,7 +79,7 @@ class AsyncRowsBase(object):
 
     def _errback(self, mres, ex_cls, ex_obj, ex_bt):
         try:
-            PyErr_Restore(ex_cls, ex_obj, ex_bt)
+            ex_obj.with_traceback(ex_bt)
         except Exception as e:
             self.on_error(e)
             self.on_done()

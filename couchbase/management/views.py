@@ -16,14 +16,13 @@
 #
 
 from enum import Enum
+import json
 
 from couchbase.options import forward_args
-from couchbase_core._pyport import *
 from couchbase_core.client import Client
-from couchbase.exceptions import HTTPException, ErrorMapper, DictMatcher
+from couchbase.exceptions import HTTPException, ErrorMapper
 from couchbase.options import OptionBlockTimeOut
 import couchbase_core._libcouchbase as _LCB
-import json
 
 
 class DesignDocumentNamespace(Enum):
@@ -39,7 +38,6 @@ class DesignDocumentNamespace(Enum):
         for prefix in ('_design/', 'dev_'):
             name = name[name.startswith(prefix) and len(prefix):]
         return name
-
 
 
 class DesignDocumentNotFoundException(HTTPException):
@@ -64,8 +62,10 @@ class GetAllDesignDocumentsOptions(OptionBlockTimeOut):
 class UpsertDesignDocumentOptions(OptionBlockTimeOut):
     pass
 
+
 class DropDesignDocumentOptions(OptionBlockTimeOut):
     pass
+
 
 class PublishDesignDocumentOptions(OptionBlockTimeOut):
     pass
@@ -129,7 +129,8 @@ class ViewIndexManager(object):
         """
 
         args = forward_args(kwargs, *options)
-        args['path'] = "pools/default/buckets/{bucketname}/ddocs".format(bucketname=self._bucketname)
+        args['path'] = "pools/default/buckets/{bucketname}/ddocs".format(
+            bucketname=self._bucketname)
         response = self._http_request(**args).value
 
         def matches(row):
@@ -158,7 +159,8 @@ class ViewIndexManager(object):
         ddoc = json.dumps(design_doc_data.as_dict(namespace))
 
         args = forward_args(kwargs, *options)
-        args['path'] = "_design/{name}".format(name=name, bucketname=self._bucketname)
+        args['path'] = "_design/{name}".format(
+            name=name, bucketname=self._bucketname)
         args['method'] = _LCB.LCB_HTTP_METHOD_PUT
         args['post_data'] = ddoc
         self._http_request(False, **args)
@@ -191,7 +193,6 @@ class ViewIndexManager(object):
                                 *options,           # type: PublishDesignDocumentOptions
                                 **kwargs):
         # type: (...) -> None
-
         """
         Publishes a design document. This method is equivalent to getting a document from the development namespace and upserting it to the production namespace.
 
@@ -205,15 +206,17 @@ class ViewIndexManager(object):
         # later that will confuse things when the functions we call also call forward args, so we must
         # construct an options block no matter what
 
-        doc = self.get_design_document(design_doc_name, DesignDocumentNamespace.DEVELOPMENT, *options, **kwargs)
-        self.upsert_design_document(doc, DesignDocumentNamespace.PRODUCTION, *options, **kwargs)
+        doc = self.get_design_document(
+            design_doc_name, DesignDocumentNamespace.DEVELOPMENT, *options, **kwargs)
+        self.upsert_design_document(
+            doc, DesignDocumentNamespace.PRODUCTION, *options, **kwargs)
 
 
 class View(object):
     def __init__(self,
                  map,           # type: str
                  reduce=None    # type: str
-                ):
+                 ):
         # type: (...) -> View
         self._map = map
         self._reduce = reduce
@@ -228,7 +231,7 @@ class View(object):
 
     def as_dict(self):
         # type: (...) -> Dict[str, Any]
-        return {k: v for k, v in  {"map": self._map, "reduce": self._reduce }.items() if v}
+        return {k: v for k, v in {"map": self._map, "reduce": self._reduce}.items() if v}
 
     def to_json(self):
         # type: (...) -> str
@@ -287,8 +290,3 @@ class DesignDocument(object):
         views = kwargs.get('views', dict())
         views = dict({key: View(**value) for key, value in views.items()})
         return cls(name, views)
-
-
-
-
-
