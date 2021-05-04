@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.5.1)
 project(couchbase_python_client)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(THIRDPARTY_LCB_ROOT libcouchbase_src-prefix)
@@ -247,10 +247,18 @@ if (LCB_SRC)
     SET(LIBCOUCHBASE_STATIC_LIBRARY_NAME "libcouchbase_d.lib")
     SET(LCB_CMAKE_ARGS -DLCB_NO_TOOLS=1 -DLCB_NO_TESTS=1)
     if (WIN32)
-        if (CMAKE_GENERATOR_PLATFORM MATCHES x64)
-            set(WIN_PLATFORM "Visual Studio 14 2015 Win64")
+        if(NOT "$ENV{IS_JENKINS_BUILD}" STREQUAL "" AND "$ENV{IS_JENKINS_BUILD}" STREQUAL "TRUE")
+            if (CMAKE_GENERATOR_PLATFORM MATCHES x64)
+                set(WIN_PLATFORM_ARGS -G "Visual Studio 14 2015 Win64")
+            else()
+                set(WIN_PLATFORM_ARGS -G "Visual Studio 14 2015")
+            endif()
         else()
-            set(WIN_PLATFORM "Visual Studio 14 2015")
+            if (CMAKE_GENERATOR_PLATFORM MATCHES x64)
+                set(WIN_PLATFORM_ARGS -G ${CMAKE_GENERATOR} " " -A "x64")
+            else()
+                set(WIN_PLATFORM_ARGS -G ${CMAKE_GENERATOR} " " -A "Win32")
+            endif()
         endif()
         set(LCB_CMAKE_ARGS ${LCB_CMAKE_ARGS} -DLCB_NO_MOCK=1 ${LCB_SSL_OPTS} -DCMAKE_BUILD_PARALLEL_LEVEL=1)
         SET(LIBCOUCHBASE_LIBRARY_FILE "${LCB_BUILD_DIR}/lib/Release/${LIBCOUCHBASE_LIBRARY_NAME}")
@@ -261,7 +269,7 @@ if (LCB_SRC)
             CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory ${LCB_BUILD_DIR}
             COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_CURRENT_BINARY_DIR}/install
 
-            COMMAND cd ${LCB_BUILD_DIR} && echo "in ${LCB_BUILD_DIR}" && cmake -DLCB_NO_PLUGINS=1  -B . -G ${WIN_PLATFORM} ${LCB_CMAKE_ARGS} -S <SOURCE_DIR>
+            COMMAND cd ${LCB_BUILD_DIR} && echo "in ${LCB_BUILD_DIR}" && cmake -DLCB_NO_PLUGINS=1  -B . ${WIN_PLATFORM_ARGS} ${LCB_CMAKE_ARGS} -S <SOURCE_DIR>
             BUILD_COMMAND cd ${LCB_BUILD_DIR} && cmake --build ${LCB_BUILD_DIR} --config Release
 
             INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/install

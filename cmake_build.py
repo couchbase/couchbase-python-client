@@ -60,8 +60,8 @@ class CMakeBuild(cbuild_config.CBuildCommon):
             if platform.system() == "Windows":
                 cmake_version = LooseVersion(re.search(r'version\s*([\d.]+)',
                                                        out.decode()).group(1))
-                if cmake_version < '3.1.0':
-                    raise RuntimeError("CMake >= 3.1.0 is required on Windows")
+                if cmake_version < '3.5.1':
+                    raise RuntimeError("CMake >= 3.5.1 is required on Windows")
             CMakeBuild.hasrun = True
             if CMakeBuild.hybrid:
                 build_ext.run(self)
