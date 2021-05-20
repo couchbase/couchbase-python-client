@@ -98,11 +98,12 @@ class CMakeBuild(cbuild_config.CBuildCommon):
                                           '-DPYTHON_EXECUTABLE=' + sys.executable]
             cmake_args += ['-DPYTHON_INCLUDE_DIR={}'.format(get_python_inc())]
             self.info.setbase(self.build_temp)
-            self.info.cfg=cfg
+            self.info.cfg = cfg
             from distutils import sysconfig
             import os.path as op
             v = sysconfig.get_config_vars()
-            print("LIBDIR {}, LIBPL {}".format(v.get("LIBDIR"), v.get("LIBPL")))
+            print("LIBDIR {}, LIBPL {}".format(
+                v.get("LIBDIR"), v.get("LIBPL")))
             fpaths = [op.join(v.get(pv, ''), v.get('LDLIBRARY', '')) for pv in ('LIBDIR', 'LIBPL')] + [os.path.normpath(
                 os.path.join(get_python_inc(), "..", "..", "lib",
                              "libpython{}.dylib".format('.'.join(map(str, sys.version_info[0:2]))))),
@@ -121,7 +122,8 @@ class CMakeBuild(cbuild_config.CBuildCommon):
                         continue
                     else:
                         entries = os.listdir(entry)
-                        print("fpath {} is directory, contents {}".format(entry, entries))
+                        print("fpath {} is directory, contents {}".format(
+                            entry, entries))
                         for subentry in entries:
                             fullname = op.normpath(op.join(entry, subentry))
                             try:
@@ -139,8 +141,10 @@ class CMakeBuild(cbuild_config.CBuildCommon):
                 except:
                     pass
             cmake_args += ['-DHYBRID_BUILD=TRUE'] if CMakeBuild.hybrid else []
-            cmake_args += ['-DPYTHON_LIBFILE={}'.format(python_lib)] if python_lib else []
-            cmake_args += ['-DPYTHON_LIBDIR={}'.format(python_libdir)] if python_libdir else []
+            cmake_args += ['-DPYTHON_LIBFILE={}'.format(
+                python_lib)] if python_lib else []
+            cmake_args += ['-DPYTHON_LIBDIR={}'.format(
+                python_libdir)] if python_libdir else []
             cmake_args += [
                 '-DPYTHON_VERSION_EXACT={}'.format('.'.join(map(str, sys.version_info[0:2])))] if python_libdir else []
             build_args = ['--config', cfg]
@@ -158,29 +162,32 @@ class CMakeBuild(cbuild_config.CBuildCommon):
             env = os.environ.copy()
             python_executable = win_cmake_path(sys.executable)
             pass_path = False
-            if re.match(r'.*(CONAN|ALL).*',PYCBC_SSL_FETCH):
+            if re.match(r'.*(CONAN|ALL).*', PYCBC_SSL_FETCH):
                 try:
                     import conans.conan
-                    env['PATH'] = env['PATH']+";{}".format(os.path.dirname(conans.conan.__file__))
+                    env['PATH'] = env['PATH'] + \
+                        ";{}".format(os.path.dirname(conans.conan.__file__))
                     pass_path = True
                 except:
-                    logging.warning("Cannot find conan : {}".format(traceback.format_exc()))
+                    logging.warning("Cannot find conan : {}".format(
+                        traceback.format_exc()))
             if re.match(r'.*(GITHUB|ALL).*', PYCBC_SSL_FETCH):
                 pass_path = True
             if pass_path:
                 pathsep = ';' if platform.system().lower().startswith('win') else ':'
                 env['PYTHONPATH'] = pathsep.join(sys.path)
             cmake_args += [
-                           '-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON',
-                           '-DPYTHON_EXECUTABLE={}'.format(python_executable)]
+                '-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON',
+                '-DPYTHON_EXECUTABLE={}'.format(python_executable)]
             if PYCBC_SSL_FETCH:
                 cmake_args += ['-DPYCBC_SSL_FETCH={}'.format(PYCBC_SSL_FETCH)]
             PYCBC_CMAKE_DEBUG = env.get('PYCBC_CMAKE_DEBUG')
             if PYCBC_CMAKE_DEBUG:
                 cmake_args += [
-                '--trace-source=CMakeLists.txt',
-                '--trace-expand']
-            cxx_compile_args=filter(re.compile(r'^(?!-std\s*=\s*c(11|99)).*').match, ext.extra_compile_args)
+                    '--trace-source=CMakeLists.txt',
+                    '--trace-expand']
+            cxx_compile_args = filter(re.compile(
+                r'^(?!-std\s*=\s*c(11|99)).*').match, ext.extra_compile_args)
             env['CXXFLAGS'] = '{} {} -DVERSION_INFO=\\"{}\\"'.format(
                 env.get('CXXFLAGS', ''), ' '.join(cxx_compile_args),
                 self.distribution.get_version())
@@ -188,7 +195,8 @@ class CMakeBuild(cbuild_config.CBuildCommon):
             env['CFLAGS'] = '{} {}'.format(
                 env.get('CFLAGS', ''), ' '.join(ext.extra_compile_args),
                 self.distribution.get_version())
-            print("Launching build with env: {}, build_args: {}, cmake_args: {}".format(env, build_args, cmake_args))
+            print("Launching build with env: {}, build_args: {}, cmake_args: {}".format(
+                env, build_args, cmake_args))
             if not os.path.exists(self.build_temp):
                 os.makedirs(self.build_temp)
             subprocess.check_call(['cmake', ext.sourcedir] + cmake_args, stdout=sys.stdout, stderr=sys.stdout,
@@ -204,9 +212,12 @@ class CMakeBuild(cbuild_config.CBuildCommon):
 
             for name in self.info.entries():
                 try:
-                    pkg_build_dir=os.path.join(build_dir, cbuild_config.couchbase_core)
-                    self.copy_binary_to(cfg, pkg_build_dir, self.info.lcb_pkgs_srcs(), name)
-                    self.copy_binary_to(cfg, self.info.pkg_data_dir, self.info.lcb_pkgs_srcs(), name)
+                    pkg_build_dir = os.path.join(
+                        build_dir, cbuild_config.couchbase_core)
+                    self.copy_binary_to(cfg, pkg_build_dir,
+                                        self.info.lcb_pkgs_srcs(), name)
+                    self.copy_binary_to(
+                        cfg, self.info.pkg_data_dir, self.info.lcb_pkgs_srcs(), name)
                 except:
                     print("failure")
                     raise
@@ -215,7 +226,6 @@ class CMakeBuild(cbuild_config.CBuildCommon):
 def gen_cmake_build(extoptions, pkgdata):
     CMakeBuild.hybrid = build_type in ['CMAKE_HYBRID']
     CMakeBuild.setup_build_info(extoptions, pkgdata)
-    e_mods = [CMakeExtension(str(couchbase_core+'._libcouchbase'), '', **extoptions)]
+    e_mods = [CMakeExtension(
+        str(couchbase_core+'._libcouchbase'), '', **extoptions)]
     return e_mods, CMakeBuild.requires(), cbuild_config.LazyCommandClass(CMakeBuild)
-
-

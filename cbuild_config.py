@@ -128,10 +128,10 @@ def get_ext_options():
             extoptions['extra_compile_args'] += ['-O0', '-g3']
             extoptions['extra_link_args'] += ['-O0', '-g3']
         if sys.platform == 'darwin':
-            extoptions['library_dirs'] = [
-                '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/10.0.0/lib/darwin/']
             extoptions['extra_compile_args'] += ['-Wsometimes-uninitialized',
-                                                 '-Wconditional-uninitialized']
+                                                 '-Wconditional-uninitialized',
+                                                 '-Wno-nullability-completeness',
+                                                 '-Wno-expansion-to-defined']
         extoptions['extra_compile_args'] += ['-Wuninitialized',
                                              '-Wswitch', '-Werror', '-Wno-missing-braces']
         print(pkgdata)
