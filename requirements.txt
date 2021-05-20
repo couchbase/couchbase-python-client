@@ -1,5 +1,5 @@
 # Typing support
-typing-extensions==3.7.4.3; python_version<"3.7"
+typing-extensions==3.7.4.3; python_version<"3.8"
 mypy_extensions
 
 # Prevent installation of Python < 3 package on Windows.
