@@ -34,13 +34,14 @@ from flaky import flaky
 import warnings
 import time
 
+
 class CollectionTests(CollectionTestCase):
     """
     These tests should just test the collection interface, as simply
     as possible.  We have the Scenario tests for more complicated
     stuff.
     """
-    CONTENT = {"some":"content"}
+    CONTENT = {"some": "content"}
     KEY = "imakey"
     NOKEY = "somerandomkey"
 
@@ -76,34 +77,39 @@ class CollectionTests(CollectionTestCase):
         self.assertFalse(self.cb.exists(self.KEY).exists)
 
     def test_upsert(self):
-        self.cb.upsert(self.NOKEY, {"some":"thing"}, UpsertOptions(timeout=timedelta(seconds=3)))
+        self.cb.upsert(self.NOKEY, {"some": "thing"},
+                       UpsertOptions(timeout=timedelta(seconds=3)))
         result = self.try_n_times(10, 1, self.cb.get, self.NOKEY)
         self.assertEqual(self.NOKEY, result.id)
-        self.assertDictEqual({"some":"thing"}, result.content_as[dict])
+        self.assertDictEqual({"some": "thing"}, result.content_as[dict])
 
     def test_insert(self):
         self.cb.insert(self.NOKEY, {"some": "thing"})
         result = self.try_n_times(10, 1, self.cb.get, self.NOKEY)
         self.assertEqual(self.NOKEY, result.id)
-        self.assertDictEqual({"some":"thing"}, result.content_as[dict])
+        self.assertDictEqual({"some": "thing"}, result.content_as[dict])
 
     def test_insert_fail(self):
-        self.assertRaises(DocumentExistsException, self.cb.insert, self.KEY, self.CONTENT)
+        self.assertRaises(DocumentExistsException,
+                          self.cb.insert, self.KEY, self.CONTENT)
 
     def test_replace(self):
-        result = self.cb.replace(self.KEY, {"some":"other content"})
+        result = self.cb.replace(self.KEY, {"some": "other content"})
         self.assertTrue(result.success)
 
     def test_replace_with_cas(self):
         old_cas = self.cb.get(self.KEY).cas
-        result = self.cb.replace(self.KEY, self.CONTENT, ReplaceOptions(cas=old_cas))
+        result = self.cb.replace(
+            self.KEY, self.CONTENT, ReplaceOptions(cas=old_cas))
         self.assertTrue(result.success)
         # try same cas again, must fail.
-        self.assertRaises(CASMismatchException, self.cb.replace, self.KEY, self.CONTENT, ReplaceOptions(cas=old_cas))
+        self.assertRaises(CASMismatchException, self.cb.replace,
+                          self.KEY, self.CONTENT, ReplaceOptions(cas=old_cas))
 
     def test_replace_fail(self):
         self.assertRaises(DocumentNotFoundException, self.cb.get, self.NOKEY)
-        self.assertRaises(DocumentNotFoundException, self.cb.replace, self.NOKEY, self.CONTENT)
+        self.assertRaises(DocumentNotFoundException,
+                          self.cb.replace, self.NOKEY, self.CONTENT)
 
     def test_remove(self):
         result = self.cb.remove(self.KEY)
@@ -111,7 +117,8 @@ class CollectionTests(CollectionTestCase):
         self.try_n_times_till_exception(10, 1, self.cb.get, self.KEY)
 
     def test_remove_fail(self):
-        self.assertRaises(DocumentNotFoundException, self.cb.remove, self.NOKEY)
+        self.assertRaises(DocumentNotFoundException,
+                          self.cb.remove, self.NOKEY)
 
     def test_get(self):
         result = self.cb.get(self.KEY)
@@ -121,7 +128,8 @@ class CollectionTests(CollectionTestCase):
         self.assertDictEqual(self.CONTENT, result.content_as[dict])
 
     def test_get_options(self):
-        result = self.cb.get(self.KEY, GetOptions(timeout=timedelta(seconds=2), with_expiry=False))
+        result = self.cb.get(self.KEY, GetOptions(
+            timeout=timedelta(seconds=2), with_expiry=False))
         self.assertIsNotNone(result.cas)
         self.assertEqual(result.id, self.KEY)
         self.assertIsNone(result.expiryTime)
@@ -131,20 +139,23 @@ class CollectionTests(CollectionTestCase):
         self.assertRaises(DocumentNotFoundException, self.cb.get, self.NOKEY)
 
     def test_expiry_really_expires(self):
-        result = self.coll.upsert(self.KEY, self.CONTENT, UpsertOptions(expiry=timedelta(seconds=3)))
+        result = self.coll.upsert(
+            self.KEY, self.CONTENT, UpsertOptions(expiry=timedelta(seconds=3)))
         self.assertTrue(result.success)
         self.try_n_times_till_exception(10, 2, self.coll.get, self.KEY)
 
     def test_get_with_expiry(self):
         if self.is_mock:
             raise SkipTest("mock will not return the expiry in the xaddrs")
-        self.coll.upsert(self.KEY, self.CONTENT, UpsertOptions(expiry=timedelta(seconds=1000)))
+        self.coll.upsert(self.KEY, self.CONTENT, UpsertOptions(
+            expiry=timedelta(seconds=1000)))
 
         result = self.coll.get(self.KEY, GetOptions(with_expiry=True))
         self.assertIsNotNone(result.expiryTime)
         self.assertDictEqual(self.CONTENT, result.content_as[dict])
         expires_in = (result.expiryTime - datetime.now()).total_seconds()
-        self.assertTrue(1001 >= expires_in > 0, msg="Expected expires_in {} to be between 1000 and 0".format(expires_in))
+        self.assertTrue(1001 >= expires_in > 0,
+                        msg="Expected expires_in {} to be between 1000 and 0".format(expires_in))
 
     def test_deprecated_expiry(self):
         # PYCBC-999 Deprecate GetResult.expiry()
@@ -152,7 +163,8 @@ class CollectionTests(CollectionTestCase):
         # an instant (aka unix timestamp)
         if self.is_mock:
             raise SkipTest("mock will not return the expiry in the xaddrs")
-        self.coll.upsert(self.KEY, self.CONTENT, UpsertOptions(expiry=timedelta(seconds=1000)))
+        self.coll.upsert(self.KEY, self.CONTENT, UpsertOptions(
+            expiry=timedelta(seconds=1000)))
         result = self.coll.get(self.KEY, GetOptions(with_expiry=True))
         warnings.resetwarnings()
         with warnings.catch_warnings(record=True) as w:
@@ -160,7 +172,8 @@ class CollectionTests(CollectionTestCase):
             self.assertEqual(len(w), 1)
 
         expires_in = (result.expiry - datetime.now()).total_seconds()
-        self.assertTrue(1001 >= expires_in > 0, msg="Expected expires_in {} to be between 1000 and 0".format(expires_in))
+        self.assertTrue(1001 >= expires_in > 0,
+                        msg="Expected expires_in {} to be between 1000 and 0".format(expires_in))
 
     def test_project(self):
         content = {"a": "aaa", "b": "bbb", "c": "ccc"}
@@ -201,14 +214,16 @@ class CollectionTests(CollectionTestCase):
             raise SkipTest('need replicas to test get_all/get_any_replicas')
             # TODO: this is far to difficult - having to use the test framework to get the bucket
         kv_results = self.bucket.ping().endpoints.get(ServiceType.KeyValue, None)
-        num_expected = num_replicas+1 if all_up else 2 # 2 means at least one replica is up
+        # 2 means at least one replica is up
+        num_expected = num_replicas+1 if all_up else 2
         if not kv_results or len(kv_results) < num_expected:
             raise SkipTest('not all replicas are online')
 
     def test_get_any_replica(self):
         self._check_replicas(False)
         self.coll.upsert('imakey100', self.CONTENT)
-        result = self.try_n_times(10, 3, self.coll.get_any_replica, 'imakey100')
+        result = self.try_n_times(
+            10, 3, self.coll.get_any_replica, 'imakey100')
         self.assertDictEqual(self.CONTENT, result.content_as[dict])
 
     def test_get_all_replicas(self):
@@ -224,7 +239,8 @@ class CollectionTests(CollectionTestCase):
     def test_get_all_replicas_returns_master(self):
         self._check_replicas()
         self.coll.upsert('imakey100', self.CONTENT)
-        result = self.try_n_times(10, 3, self.coll.get_all_replicas, 'imakey100')
+        result = self.try_n_times(
+            10, 3, self.coll.get_all_replicas, 'imakey100')
         if not hasattr(result, '__iter__'):
             result = [result]
         # TODO: this isn't implemented yet - waiting on CCBC-1169
@@ -255,19 +271,22 @@ class CollectionTests(CollectionTestCase):
     def test_get_and_touch(self):
         self.cb.get_and_touch(self.KEY, timedelta(seconds=3))
         self.cb.get(self.KEY)
-        self.try_n_times_till_exception(10, 3, self.cb.get, self.KEY, DocumentNotFoundException)
+        self.try_n_times_till_exception(
+            10, 3, self.cb.get, self.KEY, DocumentNotFoundException)
 
     def test_get_and_lock(self):
         self.cb.get_and_lock(self.KEY, timedelta(seconds=3))
         # upsert should definitely fail
-        self.assertRaises(DocumentLockedException, self.cb.upsert, self.KEY, self.CONTENT)
+        self.assertRaises(DocumentLockedException,
+                          self.cb.upsert, self.KEY, self.CONTENT)
         # but succeed eventually
         self.try_n_times(10, 1, self.cb.upsert, self.KEY, self.CONTENT)
 
     def test_get_and_lock_upsert_with_cas(self):
         result = self.cb.get_and_lock(self.KEY, timedelta(seconds=15))
         cas = result.cas
-        self.assertRaises(DocumentLockedException, self.cb.upsert, self.KEY, self.CONTENT)
+        self.assertRaises(DocumentLockedException,
+                          self.cb.upsert, self.KEY, self.CONTENT)
         self.cb.replace(self.KEY, self.CONTENT, ReplaceOptions(cas=cas))
 
     def test_unlock(self):
@@ -275,6 +294,7 @@ class CollectionTests(CollectionTestCase):
         self.cb.unlock(self.KEY, cas)
         self.cb.upsert(self.KEY, self.CONTENT)
 
+    @flaky(5, 1)
     def test_unlock_wrong_cas(self):
         cas = self.cb.get_and_lock(self.KEY, timedelta(seconds=15)).cas
         expectedException = TemporaryFailException if self.is_mock else DocumentLockedException
@@ -283,8 +303,10 @@ class CollectionTests(CollectionTestCase):
 
     def test_client_durable_upsert(self):
         num_replicas = self.bucket._bucket.configured_replica_count
-        durability = ClientDurability(persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
-        self.cb.upsert(self.NOKEY, self.CONTENT, UpsertOptions(durability=durability))
+        durability = ClientDurability(
+            persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+        self.cb.upsert(self.NOKEY, self.CONTENT,
+                       UpsertOptions(durability=durability))
         result = self.cb.get(self.NOKEY)
         self.assertEqual(self.CONTENT, result.content_as[dict])
 
@@ -292,14 +314,17 @@ class CollectionTests(CollectionTestCase):
         if not self.supports_sync_durability():
             raise SkipTest("ServerDurability not supported")
         durability = ServerDurability(level=Durability.PERSIST_TO_MAJORITY)
-        self.cb.upsert(self.NOKEY, self.CONTENT, UpsertOptions(durability=durability))
+        self.cb.upsert(self.NOKEY, self.CONTENT,
+                       UpsertOptions(durability=durability))
         result = self.cb.get(self.NOKEY)
         self.assertEqual(self.CONTENT, result.content_as[dict])
 
     def test_client_durable_insert(self):
         num_replicas = self.bucket._bucket.configured_replica_count
-        durability = ClientDurability(persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
-        self.cb.insert(self.NOKEY, self.CONTENT, InsertOptions(durability=durability))
+        durability = ClientDurability(
+            persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+        self.cb.insert(self.NOKEY, self.CONTENT,
+                       InsertOptions(durability=durability))
         result = self.cb.get(self.NOKEY)
         self.assertEqual(self.CONTENT, result.content_as[dict])
 
@@ -307,31 +332,36 @@ class CollectionTests(CollectionTestCase):
         if not self.supports_sync_durability():
             raise SkipTest("ServerDurability not supported")
         durability = ServerDurability(level=Durability.PERSIST_TO_MAJORITY)
-        self.cb.insert(self.NOKEY, self.CONTENT, InsertOptions(durability=durability))
+        self.cb.insert(self.NOKEY, self.CONTENT,
+                       InsertOptions(durability=durability))
         result = self.cb.get(self.NOKEY)
         self.assertEqual(self.CONTENT, result.content_as[dict])
 
     def test_client_durable_replace(self):
         num_replicas = self.bucket._bucket.configured_replica_count
-        content = {"new":"content"}
-        durability = ClientDurability(persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
-        self.cb.replace(self.KEY, content, ReplaceOptions(durability=durability))
+        content = {"new": "content"}
+        durability = ClientDurability(
+            persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+        self.cb.replace(self.KEY, content,
+                        ReplaceOptions(durability=durability))
         result = self.cb.get(self.KEY)
         self.assertEqual(content, result.content_as[dict])
 
     def test_server_durable_replace(self):
-        content = {"new":"content"}
+        content = {"new": "content"}
         if not self.supports_sync_durability():
             raise SkipTest("ServerDurability not supported")
         durability = ServerDurability(level=Durability.PERSIST_TO_MAJORITY)
-        self.cb.replace(self.KEY, content, ReplaceOptions(durability=durability))
+        self.cb.replace(self.KEY, content,
+                        ReplaceOptions(durability=durability))
         result = self.cb.get(self.KEY)
         self.assertEqual(content, result.content_as[dict])
 
     @unittest.skip("Client Durable remove not yet supported (CCBC-1199)")
     def test_client_durable_remove(self):
         num_replicas = self.bucket._bucket.configured_replica_count
-        durability = ClientDurability(persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+        durability = ClientDurability(
+            persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
         self.cb.remove(self.KEY, RemoveOptions(durability=durability))
         self.assertRaises(DocumentNotFoundException, self.cb.get, self.KEY)
 
@@ -365,17 +395,21 @@ class CollectionTests(CollectionTestCase):
 
         bucket = self.cluster.bucket(self.cluster_info.bucket_name)
         cm = bucket.collections()
+
         def upsert_values(coll, scope_name, coll_name, result_key_dict, key, value):
             return coll.upsert(key, value)
         from collections import defaultdict
+
         def recurse():
             return defaultdict(recurse)
-        resultdict=recurse()
+        resultdict = recurse()
+
         def check_values(coll, scope_name, coll_name, result_key_dict, key, value):
-            result_key_dict[key]=coll.get(key).content
+            result_key_dict[key] = coll.get(key).content
             return True
         for action in [upsert_values, check_values]:
-            self._traverse_scope_tree(bucket, cm, resultdict, test_dict, action)
+            self._traverse_scope_tree(
+                bucket, cm, resultdict, test_dict, action)
 
         self.assertSanitizedEqual(test_dict, resultdict)
 
@@ -391,25 +425,28 @@ class CollectionTests(CollectionTestCase):
             for coll_name, key_dict in coll_dict.items():
                 result_key_dict = result_coll_dict[coll_name]
                 logging.error(
-                        "Creating collection {} in scope {}".format(coll_name, scope_name)
+                    "Creating collection {} in scope {}".format(
+                        coll_name, scope_name)
                 )
                 try:
                     cm.create_collection(
-                            CollectionSpec(scope_name=scope_name, collection_name=coll_name)
+                        CollectionSpec(scope_name=scope_name,
+                                       collection_name=coll_name)
                     )
                 except:
                     pass
                 coll = scope.collection(coll_name)
                 for key, value in key_dict.items():
-                    result=coll_verb(coll, scope_name, coll_name, result_key_dict, key, value)
+                    result = coll_verb(
+                        coll, scope_name, coll_name, result_key_dict, key, value)
                     logging.error(
-                            "Called {} on {} to {} in {} and got {}".format(
-                                    coll_verb,
-                                    key,
-                                    value,
-                                    dict(scope_name=scope_name, coll_name=coll_name),
-                                    result,
-                            )
+                        "Called {} on {} to {} in {} and got {}".format(
+                            coll_verb,
+                            key,
+                            value,
+                            dict(scope_name=scope_name, coll_name=coll_name),
+                            result,
+                        )
                     )
 
     def test_document_expiry_values(self):
@@ -450,7 +487,7 @@ class CollectionTests(CollectionTestCase):
                 warnings.resetwarnings()
                 with warnings.catch_warnings(record=True) as ws:
                     try:
-                        result = self.cb.upsert(self.NOKEY, {"x":"y"},
+                        result = self.cb.upsert(self.NOKEY, {"x": "y"},
                                                 expiry=expiry)
                         self.assertTrue(result.success)
                         warns = ws
@@ -468,7 +505,8 @@ class CollectionTests(CollectionTestCase):
                     self.assertEqual(len(warns), 1)
                     # ttl taken as expiry time
                     if verify_expiry and ttl > now:
-                        self.assertTrue(int(result.expiryTime.timestamp()) == ttl)
+                        self.assertTrue(
+                            int(result.expiryTime.timestamp()) == ttl)
                     else:
                         # doc expired immediately
                         self.assertTrue(result is DocumentNotFoundException)
@@ -478,4 +516,5 @@ class CollectionTests(CollectionTestCase):
                         # ttl >= 30 days (and <= 50 yrs) changed to a timestamp
                         # on the client; server interprets ttl < 30 as a true
                         # duration. Either way expiryTime is a timestamp.
-                        self.assertTrue(now+ttl <= int(result.expiryTime.timestamp()) <= then+ttl)
+                        self.assertTrue(
+                            now+ttl <= int(result.expiryTime.timestamp()) <= then+ttl)
