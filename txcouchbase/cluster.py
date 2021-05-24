@@ -52,7 +52,7 @@ class BatchedRowMixin(object):
         You will normally not need to construct this object manually.
         """
         self._d = Deferred()
-        self.__rows = [] # likely a superlcass might have this?
+        self.__rows = []  # likely a superlcass might have this?
 
     def _getDeferred(self):
         return self._d
@@ -146,6 +146,7 @@ class TxEventQueue(EventQueue):
     Subclass of EventQueue. This implements the relevant firing methods,
     treating an 'Event' as a 'Deferred'
     """
+
     def fire_async(self, event):
         reactor.callLater(0, event.callback, None)
 
@@ -160,6 +161,7 @@ class ConnectionEventQueue(TxEventQueue):
     """
     For events fired upon connect
     """
+
     def maybe_raise(self, err, *args, **kwargs):
         if not err:
             return
@@ -171,15 +173,15 @@ T = TypeVar('T', bound=CoreClient)
 
 class TxRawClientMixin(object):
     @internal
-    def __init__(self, connstr=None, **kwargs):
+    def __init__(self, connstr=None, *args, **kwargs):
         """
         Client mixin for Twisted. This inherits from an 'AsyncClient' class,
         but also adds some twisted-specific logic for hooking on a connection.
         """
-        if connstr and 'connstr' not in kwargs:
-            kwargs['connstr'] = connstr
+
         iops = v0Iops(reactor)
-        super(TxRawClientMixin, self).__init__(iops=iops, **kwargs)
+        super(TxRawClientMixin, self).__init__(
+            connstr, *args, iops=iops, **kwargs)
 
         self._evq = {
             'connect': ConnectionEventQueue(),
@@ -281,7 +283,7 @@ class TxRawClientMixin(object):
 
     def deferred_verb(self, itercls, raw_verb, cooked_verb, *args, **kwargs):
         if not self.connected:
-            cb = lambda x: cooked_verb(*args, **kwargs)
+            def cb(x): return cooked_verb(*args, **kwargs)
             return self.on_connect().addCallback(cb)
         kwargs['itercls'] = itercls
         o = raw_verb(*args, **kwargs)
@@ -300,7 +302,7 @@ class TxDeferredClientMixin(TxRawClientMixin):
         return super(TxDeferredClientMixin, cls).__new__(cls, *args, **kwargs)
 
     @internal
-    def __init__(self, *args, **kwargs):
+    def __init__(self, connstr=None, *args, **kwargs):
         """
         This mixin inherits from :class:`TxRawClientMixin`.
         In addition to the connection methods, this class' data access methods
@@ -350,7 +352,8 @@ class TxDeferredClientMixin(TxRawClientMixin):
           d_get.addCallback(on_mres)
 
         """
-        super(TxDeferredClientMixin, self).__init__(*args, **kwargs)
+
+        super(TxDeferredClientMixin, self).__init__(connstr, *args, **kwargs)
 
     def _connectSchedule(self, f, meth, *args, **kwargs):
         qop = Deferred()
@@ -370,8 +373,8 @@ class TxDeferredClientMixin(TxRawClientMixin):
         opres = meth(self, *args, **kwargs)
         return self.defer(opres)
 
+    # Generate the methods
 
-    ### Generate the methods
     @staticmethod
     def _meth_factory(meth, _):
         def ret(self, *args, **kwargs):
@@ -390,7 +393,8 @@ class TxCollection(TxDeferredClientMixin, TxRawCollection):
 class TxRawBucket(TxRawClientMixin, V3AsyncBucket):
     @internal
     def __init__(self, *args, **kwargs):
-        super(TxRawBucket, self).__init__(collection_factory=kwargs.pop('collection_factory', TxRawCollection), *args, **kwargs)
+        super(TxRawBucket, self).__init__(collection_factory=kwargs.pop(
+            'collection_factory', TxRawCollection), *args, **kwargs)
 
     def view_query_ex(self, viewcls, *args, **kwargs):
         """
@@ -436,7 +440,7 @@ class TxRawBucket(TxRawClientMixin, V3AsyncBucket):
         """
 
         if not self.connected:
-            cb = lambda x: self.view_query(*args, **kwargs)
+            def cb(x): return self.view_query(*args, **kwargs)
             return self.on_connect().addCallback(cb)
 
         kwargs['itercls'] = BatchedViewResult
@@ -451,7 +455,8 @@ class TxRawBucket(TxRawClientMixin, V3AsyncBucket):
 class TxBucket(TxDeferredClientMixin, TxRawBucket):
     @internal
     def __init__(self, *args, **kwargs):
-        super(TxBucket,self).__init__(collection_factory=TxCollection, *args, **kwargs)
+        super(TxBucket, self).__init__(
+            collection_factory=TxCollection, *args, **kwargs)
 
 
 class TxBaseCluster(TxRawClientMixin, V3AsyncCluster):
@@ -460,8 +465,9 @@ class TxBaseCluster(TxRawClientMixin, V3AsyncCluster):
 
 
 class TxRawCluster(TxBaseCluster):
-    def __init__(self, *args, **kwargs):
-        super(TxRawCluster, self).__init__(*args, bucket_factory=kwargs.pop('bucket_factory', TxRawBucket), **kwargs)
+    def __init__(self, connstr=None, *args, **kwargs):
+        super(TxRawCluster, self).__init__(connstr, *args,
+                                           bucket_factory=kwargs.pop('bucket_factory', TxRawBucket), **kwargs)
 
     def query_ex(self, cls, *args, **kwargs):
         """
@@ -510,7 +516,7 @@ class TxRawCluster(TxBaseCluster):
 
         .. seealso:: :meth:`~couchbase_v2.bucket.Bucket.n1ql_query`
         """
-        return self.deferred_verb(BatchedQueryResult, super(TxRawCluster,self).query, self.query, *args, **kwargs)
+        return self.deferred_verb(BatchedQueryResult, super(TxRawCluster, self).query, self.query, *args, **kwargs)
 
     def analytics_query(self, *args, **kwargs):
         return self.deferred_verb(BatchedAnalyticsResult, super(TxRawCluster, self).analytics_query, self.analytics_query, *args,
@@ -568,7 +574,7 @@ class TxRawCluster(TxBaseCluster):
         """
 
         if not self.connected:
-            cb = lambda x: self.search_query(*args, **kwargs)
+            def cb(x): return self.search_query(*args, **kwargs)
             return self.on_connect().addCallback(cb)
 
         kwargs['itercls'] = BatchedSearchResult
@@ -578,10 +584,12 @@ class TxRawCluster(TxBaseCluster):
 
 
 class TxCluster(TxDeferredClientMixin, TxRawCluster):
-    def __init__(self, *args, **kwargs):
-        super(TxCluster, self).__init__(*args, bucket_factory=kwargs.pop('bucket_factory', TxBucket), **kwargs)
+    def __init__(self, connection_string, *args, **kwargs):
+        super(TxCluster, self).__init__(connection_string, *args,
+                                        bucket_factory=kwargs.pop('bucket_factory', TxBucket), **kwargs)
 
 
 class TxSyncCluster(V3SyncCluster):
-    def __init__(self, *args, **kwargs):
-        super(TxSyncCluster, self).__init__(*args, bucket_factory=kwargs.pop('bucket_factory', TxBucket), **kwargs)
+    def __init__(self, connection_string, *args, **kwargs):
+        super(TxSyncCluster, self).__init__(connection_string, *args,
+                                            bucket_factory=kwargs.pop('bucket_factory', TxBucket), **kwargs)

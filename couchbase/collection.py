@@ -361,9 +361,9 @@ class CBCollection(wrapt.ObjectProxy):
 
     @internal
     def __init__(self,  # type: CBCollection
+                 *options,
                  name=None,  # type: str
                  parent_scope=None,  # type: Scope
-                 *options,
                  **kwargs
                  ):
         # type: (...) -> None
@@ -1722,7 +1722,8 @@ class Scope(object):
             for example.
 
         """
-        search_params = SearchOptions.gen_search_params_cls(index, query, *options, **kwargs)
+        search_params = SearchOptions.gen_search_params_cls(
+            index, query, *options, **kwargs)
         return search_params.itercls(search_params.body, self.bucket, **search_params.iterargs)
 
 

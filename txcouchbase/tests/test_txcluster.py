@@ -24,7 +24,7 @@ from couchbase.exceptions import (
 from couchbase.exceptions import UnknownHostException, TimeoutException
 from couchbase_core.connstr import ConnectionString
 from couchbase_tests.base import AsyncClusterTestCase
-from txcouchbase.cluster import TxBucket
+from txcouchbase.cluster import TxCluster
 from txcouchbase.tests.base import gen_base
 
 Base = gen_base(AsyncClusterTestCase)
@@ -78,9 +78,16 @@ class BasicClusterTest(Base):
 
     def testConnstrFirstArg(self):
         info = self.cluster_info
-        s = self.make_connargs()['connection_string']
-        cb = TxBucket(connection_string=s,
-                      password=self.cluster_info.bucket_password)
+        connstr = self.make_connargs()['connection_string']
+        connstr_nobucket = ConnectionString.parse(connstr)
+        bucket = connstr_nobucket.bucket
+        connstr_nobucket.bucket = None
+        mock_hack = info.mock_hack_options(self.is_mock)
+        auth = mock_hack.auth(info.admin_username,
+                              info.admin_password)
+        cb = TxCluster(connection_string=connstr_nobucket,
+                       authenticator=auth,
+                       bucket=bucket)
         d = cb.on_connect().addCallback(lambda x: self.assertTrue(cb.connected))
         self.register_cleanup(cb)
         return d

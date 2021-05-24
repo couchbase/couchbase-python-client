@@ -1,25 +1,19 @@
+from typing import *
+import asyncio
 from asyncio import AbstractEventLoop
 
-try:
-    import asyncio
-except ImportError:
-    import trollius as asyncio
-
+from couchbase.cluster import AsyncCluster as V3AsyncCluster
+from couchbase.bucket import AsyncBucket as V3AsyncBucket
+from couchbase_core.client import Client as CoreClient
+from couchbase.collection import AsyncCBCollection as BaseAsyncCBCollection
 from acouchbase.asyncio_iops import IOPS
 from acouchbase.iterator import AQueryResult, ASearchResult, AAnalyticsResult, AViewResult
-from couchbase_core.experimental import enable; enable()
-from couchbase_core.experimental import enabled_or_raise; enabled_or_raise()
-from couchbase.collection import AsyncCBCollection as BaseAsyncCBCollection
-from couchbase_core.client import Client as CoreClient
-from couchbase.bucket import AsyncBucket as V3AsyncBucket
-from typing import *
-from couchbase.cluster import AsyncCluster as V3AsyncCluster
 
 T = TypeVar('T', bound=CoreClient)
 
 
 class AIOClientMixin(object):
-    def __new__(cls, *args,**kwargs):
+    def __new__(cls, *args, **kwargs):
         # type: (...) -> Type[T]
         if not hasattr(cls, "AIO_wrapped"):
             for k, method in cls._gen_memd_wrappers(AIOClientMixin._meth_factory).items():
@@ -49,9 +43,8 @@ class AIOClientMixin(object):
 
     def __init__(self, connstr=None, *args, **kwargs):
         loop = asyncio.get_event_loop()
-        if connstr and 'connstr' not in kwargs:
-            kwargs['connstr'] = connstr
-        super(AIOClientMixin, self).__init__(IOPS(loop), *args, **kwargs)
+        super(AIOClientMixin, self).__init__(
+            connstr, *args, iops=IOPS(loop), **kwargs)
         self._loop = loop
 
         cft = asyncio.Future(loop=loop)
@@ -86,7 +79,8 @@ Collection = AsyncCBCollection
 
 class ABucket(AIOClientMixin, V3AsyncBucket):
     def __init__(self, *args, **kwargs):
-        super(ABucket,self).__init__(collection_factory=AsyncCBCollection, *args, **kwargs)
+        super(ABucket, self).__init__(
+            collection_factory=AsyncCBCollection, *args, **kwargs)
 
     def view_query(self, *args, **kwargs):
         if "itercls" not in kwargs:
@@ -99,7 +93,8 @@ Bucket = ABucket
 
 class ACluster(AIOClientMixin, V3AsyncCluster):
     def __init__(self, connection_string, *options, **kwargs):
-        super(ACluster, self).__init__(connection_string=connection_string, *options, bucket_factory=Bucket, **kwargs)
+        super(ACluster, self).__init__(connection_string,
+                                       *options, bucket_factory=Bucket, **kwargs)
 
     def query(self, *args, **kwargs):
         if "itercls" not in kwargs:
@@ -113,7 +108,7 @@ class ACluster(AIOClientMixin, V3AsyncCluster):
 
     def analytics_query(self, *args, **kwargs):
         return super(ACluster, self).analytics_query(*args, itercls=kwargs.pop('itercls', AAnalyticsResult),
-                                                           **kwargs)
+                                                     **kwargs)
 
 
 Cluster = ACluster

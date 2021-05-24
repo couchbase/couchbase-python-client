@@ -107,7 +107,7 @@ class AsyncClientMixin(object):
 
     """
 
-    def __init__(self, iops=None, *args, **kwargs):
+    def __init__(self, connstr, *args, iops=None, **kwargs):
         """
         Create a new Async Bucket. An async Bucket is an object
         which functions like a normal synchronous bucket connection,
@@ -148,7 +148,7 @@ class AsyncClientMixin(object):
         # kwargs['unlock_gil'] = False
         # This is always set to false in connection.c
 
-        super(AsyncClientMixin, self).__init__(*args, **kwargs)
+        super(AsyncClientMixin, self).__init__(connstr, *args, **kwargs)
 
     def view_query(self, *args, **kwargs):
         """
@@ -173,7 +173,8 @@ class AsyncClientMixin(object):
             raise
 
     def endure(self, key, *args, **kwargs):
-        res = super(AsyncClientMixin, self).endure_multi([key], *args, **kwargs)
+        res = super(AsyncClientMixin, self).endure_multi(
+            [key], *args, **kwargs)
         res._set_single()
         return res
 
@@ -186,4 +187,3 @@ class AsyncClientFactory(type):
         class AsyncClientSpecialised(AsyncClientMixin, syncbase):
             pass
         return AsyncClientSpecialised
-
