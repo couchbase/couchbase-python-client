@@ -1608,3 +1608,84 @@ class AnalyticsTestCaseBase(CollectionTestCase):
 
         self.try_n_times(10, 3, has_dataset, self.dataset_name,
                          on_success=on_dataset)
+
+
+class CouchbaseClusterInfoException(Exception):
+    pass
+
+
+class CouchbaseClusterInfo(object):
+    def __init__(self, cluster_resource, loop=None):
+        self._cluster_resource = cluster_resource
+        self._loop = loop
+        self._cluster = None
+        self._bucket_name = None
+        self._bucket = None
+        self._collection = None
+
+    @property
+    def loop(self):
+        return self._loop
+
+    @property
+    def cluster_resource(self):
+        return self._cluster_resource
+
+    @property
+    def cluster_version(self):
+        return self._cluster_resource.cluster_version
+
+    @property
+    def cluster(self):
+        return self._cluster
+
+    @property
+    def bucket_name(self):
+        return self._bucket_name
+
+    @property
+    def bucket(self):
+        return self._bucket
+
+    @property
+    def collection(self):
+        return self._collection
+
+    def set_cluster(self, cluster_class):
+        conn_args = self.cluster_resource.info.make_connargs()
+        connstr = conn_args.pop('connection_string')
+        connstr_nobucket = ConnectionString.parse(connstr)
+        mock_hack = self.cluster_resource.info.mock_hack_options(
+            self.cluster_resource.is_mock)
+        auth = mock_hack.auth(self.cluster_resource.info.admin_username,
+                              self.cluster_resource.info.admin_password)
+
+        self.set_bucket_name('beer-sample')
+        connstr_nobucket.bucket = None
+        self._cluster = cluster_class(
+            str(connstr_nobucket), ClusterOptions(auth), **mock_hack.kwargs)
+
+    def set_bucket_name(self, bucket_name):
+        self._bucket_name = bucket_name
+
+    def set_bucket(self, bucket_name=None, loop=None):
+        if bucket_name:
+            self._bucket_name = bucket_name
+
+        if not self.bucket_name:
+            return
+
+        self._bucket = self.cluster.bucket(self.bucket_name)
+
+        evloop = self.loop or loop
+        if evloop:
+            evloop.run_until_complete(self.bucket.on_connect())
+
+    def set_collection(self, collection_name=None):
+        if not self.bucket:
+            return
+
+        if collection_name:
+            self._collection = self.bucket.collection(collection_name)
+        else:
+            self._collection = self.bucket.default_collection()

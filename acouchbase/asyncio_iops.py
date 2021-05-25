@@ -1,14 +1,10 @@
-try:
-    import asyncio
-except ImportError:
-    import trollius as asyncio
+import asyncio
+import selectors
 
 from couchbase_core.iops.base import (
     TimerEvent, LCB_READ_EVENT, LCB_WRITE_EVENT,
     PYCBC_EVACTION_WATCH, PYCBC_EVACTION_UNWATCH
 )
-
-import selectors
 
 
 class AsyncioTimer(TimerEvent):
@@ -22,24 +18,30 @@ class AsyncioTimer(TimerEvent):
             self._ashandle = None
 
     def schedule(self, loop, usec):
-        sec = float(usec) / 1000000.0
-        self._ashandle = loop.call_later(sec, self.ready, 0)
+        if not loop.is_closed():
+            sec = float(usec) / 1000000.0
+            self._ashandle = loop.call_later(sec, self.ready, 0)
 
 
 class IOPS(object):
-    required_methods = {'add_reader', 'remove_reader', 'add_writer', 'remove_writer'}
-    _working_loop=None
+    required_methods = {'add_reader', 'remove_reader',
+                        'add_writer', 'remove_writer'}
+    _working_loop = None
 
     @staticmethod
     def _get_working_loop():
         if IOPS._working_loop:
             return IOPS._working_loop
         evloop = asyncio.get_event_loop()
+        if evloop.is_closed():
+            evloop = asyncio.new_event_loop()
+            asyncio.set_event_loop(evloop)
         if IOPS._is_working_loop(evloop):
             IOPS._working_loop = evloop
         else:
             selector = selectors.SelectSelector()
-            IOPS._working_loop=asyncio.SelectorEventLoop(selector)
+            IOPS._working_loop = asyncio.SelectorEventLoop(selector)
+            asyncio.set_event_loop(IOPS._working_loop)
         return IOPS._working_loop
 
     @staticmethod
@@ -49,11 +51,18 @@ class IOPS(object):
         IOPS._working_loop = evloop
 
     @staticmethod
+    def _close_working_loop():
+        if IOPS._working_loop:
+            IOPS._working_loop.close()
+            IOPS._working_loop = None
+
+    @staticmethod
     def _is_working_loop(evloop):
         if not evloop:
             return False
         for meth in IOPS.required_methods:
-            abs_meth, actual_meth = (getattr(asyncio.AbstractEventLoop, meth), getattr(evloop.__class__, meth))
+            abs_meth, actual_meth = (
+                getattr(asyncio.AbstractEventLoop, meth), getattr(evloop.__class__, meth))
             if abs_meth == actual_meth:
                 return False
         return True
@@ -65,7 +74,11 @@ class IOPS(object):
             return evloop
         return IOPS._get_working_loop()
 
-    def __init__(self, evloop = None):
+    @staticmethod
+    def close_event_loop():
+        IOPS._close_working_loop()
+
+    def __init__(self, evloop=None):
         if evloop is None:
             evloop = IOPS.get_event_loop()
         self.loop = evloop
@@ -97,8 +110,9 @@ class IOPS(object):
 
     def start_watching(self):
         pass
+
     def stop_watching(self):
         pass
+
     def timer_event_factory(self):
         return AsyncioTimer()
-

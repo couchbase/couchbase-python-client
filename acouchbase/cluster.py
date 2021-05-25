@@ -127,3 +127,10 @@ def get_event_loop(evloop=None  # type: AbstractEventLoop
     alternative event loop.
     """
     return IOPS.get_event_loop(evloop)
+
+
+def close_event_loop():
+    """
+    Close the event loop used by acouchbase.
+    """
+    IOPS.close_event_loop()

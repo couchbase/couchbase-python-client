@@ -46,6 +46,7 @@ def get_imps(*caseslist):
 
 imps = get_imps(*caseslist)
 
+
 def _get_packages():
     """
     Returns a dictionary of { name: module_object } for all cases
@@ -55,12 +56,13 @@ def _get_packages():
         # print(repr(modname))
 
         try:
-            module = __import__(modname, fromlist=str.split(modname,'.'))
+            module = __import__(modname, fromlist=str.split(modname, '.'))
             ret[modname] = module
         except Exception as e:
             print(e)
             pass
     return ret
+
 
 def _get_classes(modules):
     """
@@ -77,7 +79,7 @@ def _get_classes(modules):
                 continue
 
             from couchbase_tests.base import CouchbaseTestCase
-            if not issubclass(attrobj, CouchbaseTestCase):
+            if not issubclass(attrobj, CouchbaseTestCase) and attrname != 'TestAcouchbaseConnection':
                 continue
 
             ret[attrname] = attrobj
@@ -110,6 +112,7 @@ def get_configured_classes(implconfig, implstr=None, skiplist=None):
         ret[name+implstr] = cls
 
     return ret
+
 
 if __name__ == "__main__":
     mods, classes = get_all()
