@@ -19,13 +19,15 @@ class AioBase:
 
     def __iter__(self):
         if self._future is not None:
-            raise ValueError("yield from result.future before calling non-async for.")
+            raise ValueError(
+                "yield from result.future before calling non-async for.")
 
         yield from iter(self.__accum.get_nowait, None)
 
     def __aiter__(self):
         if self._future is None:
-            raise ValueError("do not yield from result.future before calling async for.")
+            raise ValueError(
+                "do not yield from result.future before calling async for.")
 
         return self
 
@@ -38,8 +40,11 @@ class AioBase:
             elif not self._future.done():
                 out = yield from self.__accum.get()
 
-            if out is None:
+            if out is None and self._future.exception() is None:
                 raise StopAsyncIteration
+
+            if self._future.exception() is not None:
+                raise self._future.exception()
 
             return out
         except asyncio.queues.QueueEmpty:
@@ -50,12 +55,14 @@ class AioBase:
             self.__accum.put_nowait(row)
 
     def on_done(self):
-        self._future.set_result(None)
-        self.__accum.put_nowait(None)
+        if not (self._future.done() or self._future.cancelled()):
+            self._future.set_result(None)
+            self.__accum.put_nowait(None)
 
     def on_error(self, ex):
-        self._future.set_exception(ex)
-        self.__accum.put_nowait(None)
+        if not (self._future.done() or self._future.cancelled()):
+            self._future.set_exception(ex)
+            self.__accum.put_nowait(None)
 
 
 class AViewResult(AioBase, AsyncViewResult):

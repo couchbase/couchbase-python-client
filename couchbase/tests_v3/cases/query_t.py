@@ -51,7 +51,6 @@ class QueryTests(CollectionTestCase):
         for row in result.rows():
             self.assertIsNotNone(row)
             count += 1
-        print(result.errors)
         self.assertEqual(count, expected_count)
 
     def test_simple_query(self):
@@ -120,7 +119,8 @@ class QueryTests(CollectionTestCase):
         self.assertLess(metrics.elapsed_time(), taken)
         self.assertGreater(metrics.elapsed_time(),
                            datetime.timedelta(milliseconds=0))
-        self.assertLess(metrics.elapsed_time(), taken)
+        self.assertIsInstance(metrics.execution_time(), datetime.timedelta)
+        self.assertLess(metrics.execution_time(), taken)
         self.assertGreater(metrics.execution_time(),
                            datetime.timedelta(milliseconds=0))
 
@@ -247,7 +247,6 @@ class QueryCollectionTests(CollectionTestCase):
         self.cm = self.bucket.collections()
         self.create_beer_sample_collections()
 
-
     @classmethod
     def setUpClass(cls) -> None:
         super(QueryCollectionTests, cls).setUpClass(True)
@@ -276,7 +275,8 @@ class QueryCollectionTests(CollectionTestCase):
         self.assertTrue(result._params._adhoc)
 
     def test_cluster_query_context(self):
-        q_context = '{}.{}'.format(self.bucket_name, self.beer_sample_collections.scope)
+        q_context = '{}.{}'.format(
+            self.bucket_name, self.beer_sample_collections.scope)
         # test with QueryOptions
         q_opts = QueryOptions(query_context=q_context, adhoc=True)
         result = self.cluster.query("SELECT * FROM beers LIMIT 2", q_opts)
@@ -317,7 +317,8 @@ class QueryCollectionTests(CollectionTestCase):
         with self.assertRaises(ScopeNotFoundException):
             result.rows()
 
-        q_context = '{}.{}'.format('fake-bucket', self.beer_sample_collections.scope)
+        q_context = '{}.{}'.format(
+            'fake-bucket', self.beer_sample_collections.scope)
         result = scope.query("SELECT * FROM beers LIMIT 2",
                              query_context=q_context)
         with self.assertRaises(KeyspaceNotFoundException):

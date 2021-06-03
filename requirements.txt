@@ -11,3 +11,4 @@ six==1.15.0
 attrs>=19.1.0; python_version>"3.5"
 attrs==19.1.0; python_version<="3.5"
 wrapt>=1.11.2
+durationpy==0.5

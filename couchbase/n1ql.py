@@ -18,6 +18,7 @@
 import enum
 from datetime import timedelta
 from typing import *
+from durationpy import from_str
 
 from couchbase.options import UnsignedInt64
 from couchbase_core import iterable_wrapper, JSON
@@ -62,7 +63,7 @@ class QueryMetrics(object):
         return self._parentquery.metrics
 
     def _as_timedelta(self, time_str):
-        return self._parentquery._duration_as_timedelta(self._raw_metrics.get(time_str))
+        return from_str(self._raw_metrics.get(time_str))
 
     def elapsed_time(self):
         # type: (...) -> timedelta
@@ -149,14 +150,16 @@ class QueryResult(iterable_wrapper(N1QLRequest)):
         nanoseconds = first_entry.get('$1', None) if first_entry else None
 
         if nanoseconds is None:
-            raise Exception("Cannot get result from first entry {} of query response {}".format(first_entry, conv_query.rows()))
+            raise Exception("Cannot get result from first entry {} of query response {}".format(
+                first_entry, conv_query.rows()))
         return timedelta(seconds=nanoseconds * 1e-9)
 
     def _duration_as_timedelta(self,
                                metrics_str):
         try:
-            conv_query = self._parent.query(r'select str_to_duration("{}");'.format(metrics_str), timeout=timedelta(seconds=5))
+            conv_query = self._parent.query(r'select str_to_duration("{}");'.format(
+                metrics_str), timeout=timedelta(seconds=5))
             return self._respond_to_timedelta(conv_query)
         except Exception as e:
-            raise QueryException.pyexc("Not able to get result in nanoseconds", inner=e)
-
+            raise QueryException.pyexc(
+                "Not able to get result in nanoseconds", inner=e)

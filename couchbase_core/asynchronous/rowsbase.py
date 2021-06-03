@@ -79,10 +79,9 @@ class AsyncRowsBase(object):
 
     def _errback(self, mres, ex_cls, ex_obj, ex_bt):
         try:
-            ex_obj.with_traceback(ex_bt)
+            raise ex_obj.with_traceback(ex_bt)
         except Exception as e:
             self.on_error(e)
-            self.on_done()
         finally:
             self._clear()
 
