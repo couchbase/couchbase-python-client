@@ -938,8 +938,9 @@ class CouchbaseClusterResource(object):
     def disconnect_cluster(self) -> None:
         self.cluster.disconnect()
 
-    def set_cluster_version(self) -> None:
-        pools = self.cluster._admin.http_request(path='/pools').value
+    def set_cluster_version(self, cluster=None) -> None:
+        clstr = cluster or self.cluster
+        pools = clstr._admin.http_request(path='/pools').value
         self.cluster_version = pools['implementationVersion'].split('-')[0]
 
     def is_ready(self) -> bool:
@@ -1621,6 +1622,7 @@ class CouchbaseClusterInfo(object):
         self._cluster = None
         self._bucket_name = None
         self._bucket = None
+        self._scope = None
         self._collection = None
 
     @property
@@ -1646,6 +1648,10 @@ class CouchbaseClusterInfo(object):
     @property
     def bucket(self):
         return self._bucket
+
+    @property
+    def scope(self):
+        return self._scope
 
     @property
     def collection(self):
@@ -1681,11 +1687,84 @@ class CouchbaseClusterInfo(object):
         if evloop:
             evloop.run_until_complete(self.bucket.on_connect())
 
-    def set_collection(self, collection_name=None):
+    def set_cluster_version(self):
+        if self.cluster_resource and self.cluster:
+            self.cluster_resource.set_cluster_version(self.cluster)
+
+    def set_collection(self, use_scopes_and_colls=None):
         if not self.bucket:
             return
 
-        if collection_name:
-            self._collection = self.bucket.collection(collection_name)
+        if use_scopes_and_colls and self.supports_scopes_and_collections():
+            self.create_test_scopes_and_colls()
+            self._scope = self.bucket.scope('test-scope')
+            self._collection = self.scope.collection('test-collection')
         else:
             self._collection = self.bucket.default_collection()
+
+    def supports_scopes_and_collections(self):
+        if not self.cluster:
+            return False
+
+        if not self.cluster_version:
+            self.set_cluster_version()
+
+        try:
+            v = float(self.cluster_version[0:3])
+            if v >= 7.0:
+                return True
+            else:
+                return False
+        except ValueError:
+            # lets assume it is the mock
+            return False
+
+    def create_test_scopes_and_colls(self):
+        cm = self.bucket.collections()
+        CouchbaseClusterInfo._upsert_scope(cm, 'test-scope')
+        CouchbaseClusterInfo._upsert_collection(
+            cm, 'test-scope', 'test-collection')
+        self.cluster_resource.try_n_times(
+            3, 3, CouchbaseClusterInfo._get_collection, cm, 'test-scope', 'test-collection')
+
+    def drop_test_scopes_and_colls(self):
+        cm = self.bucket.collections()
+        CouchbaseClusterInfo._drop_scope(cm, 'test-scope')
+
+    @staticmethod
+    def _upsert_collection(cm, scope_name, collection_name):
+        try:
+            if scope_name and collection_name:
+                cm.create_collection(CollectionSpec(
+                    collection_name, scope_name))
+        except CollectionAlreadyExistsException:
+            pass
+
+    @staticmethod
+    def _upsert_scope(cm, scope_name):
+        try:
+            if scope_name:
+                cm.create_scope(scope_name)
+        except ScopeAlreadyExistsException:
+            pass
+
+    @staticmethod
+    def _get_scope(cm, scope_name):
+        return next((s for s in cm.get_all_scopes() if s.name == scope_name), None)
+
+    @staticmethod
+    def _get_collection(cm, scope_name, coll_name):
+
+        scope = CouchbaseClusterInfo._get_scope(cm, scope_name)
+        collection = next(
+            (c for c in scope.collections if c.name == coll_name), None)
+
+        return collection, scope
+
+    @staticmethod
+    def _drop_scope(cm, scope_name):
+        try:
+            if scope_name:
+                cm.drop_scope(scope_name)
+        except ScopeAlreadyExistsException:
+            pass

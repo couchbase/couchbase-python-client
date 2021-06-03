@@ -22,10 +22,11 @@ ViewSubType = TypeVar('ViewSubType', bound=Type[ViewInstance])
 
 
 class Client(_Base):
-    _MEMCACHED_NOMULTI = ('stats', 'lookup_in', 'mutate_in')
+    _MEMCACHED_NOMULTI = ('stats', 'lookup_in', 'mutate_in',
+                          'get_and_lock', 'get_and_touch')
     _MEMCACHED_OPERATIONS = ('upsert', 'get', 'insert',
                              'replace', 'remove', 'touch',
-                             'unlock',
+                             'unlock', 'get_and_lock', 'get_and_touch',
                              'lookup_in', 'mutate_in')
 
     def __init__(self, *args, **kwargs):
@@ -170,7 +171,8 @@ class Client(_Base):
     def __repr__(self):
         return ('<{modname}.{cls} bucket={bucket}, nodes={nodes} at 0x{oid:x}>'
                 ).format(modname=__name__, cls=self.__class__.__name__,
-                         nodes=self.server_nodes, bucket=super(Client, self).bucket,
+                         nodes=self.server_nodes, bucket=super(
+                             Client, self).bucket,
                          oid=id(self))
 
     def _get_timeout_common(self, op):
@@ -181,7 +183,8 @@ class Client(_Base):
                             timeout  # type: timedelta
                             ):
         if not isinstance(timeout, timedelta):
-            raise E.InvalidArgumentException("Expected timedelta for timeout but got {}".format(timeout))
+            raise E.InvalidArgumentException(
+                "Expected timedelta for timeout but got {}".format(timeout))
         timeout_as_float = float(timeout.total_seconds())
         if timeout_as_float <= 0:
             raise ValueError('Timeout must be non-negative')
@@ -403,7 +406,7 @@ class Client(_Base):
         return super(Client, self).lookup_in({key: tuple(specs)}, **kwargs)
 
     def get(self, *args, **kwargs):
-        return super(Client, self).get(*args,**kwargs)
+        return super(Client, self).get(*args, **kwargs)
 
     def rget(self, key, replica_index=None, quiet=None, **kwargs):
         """Get an item from a replica node
@@ -433,7 +436,7 @@ class Client(_Base):
             return _Base._rget(self, key, **kwargs)
 
     def rgetall(self, key, **kwargs):
-      return _Base._rgetall(self, key, **kwargs)
+        return _Base._rgetall(self, key, **kwargs)
 
     def rget_multi(self, keys, replica_index=None, quiet=None):
         if replica_index is not None:
@@ -491,7 +494,7 @@ class Client(_Base):
                    design,  # type: str
                    view,  # type: str
                    use_devmode=False,  # type: bool
-                   itercls = View,  # type: ViewSubType
+                   itercls=View,  # type: ViewSubType
                    **kwargs  # type: Any
                    ):
         # type: (...)->ViewInstance
@@ -554,7 +557,7 @@ class Client(_Base):
             cb.ping()
             # {'services': {...}, ...}
         """
-        resultdict = self._ping(*options, **kwargs )
+        resultdict = self._ping(*options, **kwargs)
         return json.loads(resultdict['services_json'])
 
     def diagnostics(self, *options, **kwargs):
@@ -779,7 +782,7 @@ class Client(_Base):
                                    persist_to=persist_to,
                                    replicate_to=replicate_to)
 
-    def get_multi(self, # type: Client
+    def get_multi(self,  # type: Client
                   keys,  # type: Iterable[str]
                   ttl=0,  # type: int
                   quiet=None,  # type: bool
@@ -857,7 +860,6 @@ class Client(_Base):
                      keys  # type: Iterable[str]
                      ):
         # type: (...) -> Result
-
         """Unlock multiple keys. Multi variant of :meth:`unlock`
 
         :param dict keys: the keys to unlock
@@ -995,6 +997,9 @@ class Client(_Base):
         """
         d = {}
         for n in cls._MEMCACHED_OPERATIONS:
+            if n in ['get_and_lock', 'get_and_touch'] and 'AsyncCBCollection' != cls.__name__:
+                continue
+
             for variant in (n, n + "_multi"):
                 try:
                     d[variant] = factory(getattr(cls, variant), variant)
@@ -1039,7 +1044,8 @@ class Client(_Base):
         :return: Encrypted document.
         """
         json_encoded = json.dumps(document)
-        encrypted_string = _Base.encrypt_fields(self, json_encoded, fieldspec, prefix)
+        encrypted_string = _Base.encrypt_fields(
+            self, json_encoded, fieldspec, prefix)
         if not encrypted_string:
             raise E.CouchbaseException("Encryption failed")
         return json.loads(encrypted_string)

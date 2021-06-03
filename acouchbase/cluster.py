@@ -5,7 +5,7 @@ from asyncio import AbstractEventLoop
 from couchbase.cluster import AsyncCluster as V3AsyncCluster
 from couchbase.bucket import AsyncBucket as V3AsyncBucket
 from couchbase_core.client import Client as CoreClient
-from couchbase.collection import AsyncCBCollection as BaseAsyncCBCollection
+from couchbase.collection import AsyncCBCollection as BaseAsyncCBCollection, CBCollection
 from acouchbase.asyncio_iops import IOPS
 from acouchbase.iterator import AQueryResult, ASearchResult, AAnalyticsResult, AViewResult
 
@@ -46,6 +46,10 @@ class AIOClientMixin(object):
         super(AIOClientMixin, self).__init__(
             connstr, *args, iops=IOPS(loop), **kwargs)
         self._loop = loop
+
+        if issubclass(type(self), CBCollection):
+            # do not set the connection callback for a collection
+            return
 
         cft = asyncio.Future(loop=loop)
 
