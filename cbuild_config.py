@@ -297,16 +297,7 @@ class CBuildCommon(build_ext):
     def add_rpaths(self, ext=None, extoptions=None):
         rpaths = self.info.get_rpaths(self.cfg_type())
         if platform.system() != 'Windows':
-            if self.compiler:
-                try:
-                    existing_rpaths = self.compiler.runtime_library_dirs
-                    self.compiler.set_runtime_library_dirs(
-                        rpaths + existing_rpaths)
-                except:
-                    pass
             for rpath in rpaths:
-                if self.compiler:
-                    self.compiler.add_runtime_library_dir(rpath)
                 linker_arg = '-Wl,-rpath,' + rpath
                 ext.runtime_library_dirs = (
                     ext.runtime_library_dirs if ext.runtime_library_dirs else [])+[rpath]
