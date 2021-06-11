@@ -349,6 +349,7 @@ typedef struct {
     pycbc_MultiResult *mres;
     lcb_STATUS rc;
     uint64_t cas;
+    lcb_MUTATION_TOKEN mutinfo;
 } response_handler;
 
 #define PYCBC_X_FOR_EACH_OP(X, NOKEY, STATSOPS, GETOP, COUNTERSOPS, SDOPS) \
@@ -416,6 +417,8 @@ int pycbc_extract_respdata(const lcb_RESPBASE *resp,
         lcb_respstore_cookie((const lcb_RESPSTORE *)resp, (void **)mres);
         lcb_respstore_cas((const lcb_RESPSTORE *)resp,
                           (uint64_t *)&(handler->cas));
+        lcb_respstore_mutation_token((const lcb_RESPSTORE *)resp, 
+                          (lcb_MUTATION_TOKEN *)&(handler->mutinfo));
         break;
     case LCB_CALLBACK_REMOVE:
         lcb_respremove_key((const lcb_RESPREMOVE *)resp,
@@ -425,6 +428,8 @@ int pycbc_extract_respdata(const lcb_RESPBASE *resp,
         lcb_respremove_cookie((const lcb_RESPREMOVE *)resp, (void **)mres);
         lcb_respremove_cas((const lcb_RESPREMOVE *)resp,
                            (uint64_t *)&(handler->cas));
+        lcb_respremove_mutation_token((const lcb_RESPREMOVE *)resp, 
+                          (lcb_MUTATION_TOKEN *)&(handler->mutinfo));
         break;
     case LCB_CALLBACK_UNLOCK:
         lcb_respunlock_key((const lcb_RESPUNLOCK *)resp,
@@ -452,6 +457,8 @@ int pycbc_extract_respdata(const lcb_RESPBASE *resp,
         lcb_resptouch_cookie((const lcb_RESPTOUCH *)resp, (void **)mres);
         lcb_resptouch_cas((const lcb_RESPTOUCH *)resp,
                           (uint64_t *)&(handler->cas));
+        lcb_resptouch_mutation_token((const lcb_RESPTOUCH *)resp, 
+                          (lcb_MUTATION_TOKEN *)&(handler->mutinfo));
         break;
     case LCB_CALLBACK_GET:
         lcb_respget_key((const lcb_RESPGET *)resp,
@@ -479,6 +486,8 @@ int pycbc_extract_respdata(const lcb_RESPBASE *resp,
         lcb_respcounter_cookie((const lcb_RESPCOUNTER *)resp, (void **)mres);
         lcb_respcounter_cas((const lcb_RESPCOUNTER *)resp,
                             (uint64_t *)&(handler->cas));
+        lcb_respcounter_mutation_token((const lcb_RESPCOUNTER *)resp, 
+                          (lcb_MUTATION_TOKEN *)&(handler->mutinfo));
         break;
     case LCB_CALLBACK_STATS:;
         break;
@@ -504,6 +513,10 @@ int pycbc_extract_respdata(const lcb_RESPBASE *resp,
         lcb_respsubdoc_cookie((const lcb_RESPSUBDOC *)resp, (void **)mres);
         lcb_respsubdoc_cas((const lcb_RESPSUBDOC *)resp,
                            (uint64_t *)&(handler->cas));
+        if(handler->cbtype == LCB_CALLBACK_SDMUTATE){
+            lcb_respsubdoc_mutation_token((const lcb_RESPSUBDOC *)resp, 
+                    (lcb_MUTATION_TOKEN *)&(handler->mutinfo));
+        }
         break;
 #endif
         // none of these appear to be necessary for our purposes, this is just to satisfy the compiler
@@ -701,6 +714,26 @@ invoke_endure_test_notification(pycbc_Bucket *self, pycbc_Result *resp)
     Py_XDECREF(ret);
     Py_XDECREF(argtuple);
 }
+
+static void 
+pycbc_get_mutation_token(pycbc_Bucket *conn, pycbc_OperationResult *res, response_handler *handler){
+    Py_XDECREF(res->mutinfo);
+    if (lcb_mutation_token_is_valid((lcb_MUTATION_TOKEN *)&(handler->mutinfo))) {
+        // Create the mutation token tuple: (vb,uuid,seqno,bucket_name)
+        res->mutinfo = Py_BuildValue("HKKO",
+                                        pycbc_mutation_token_vbid((lcb_MUTATION_TOKEN *)&(handler->mutinfo)),
+                                        pycbc_mutation_token_uuid((lcb_MUTATION_TOKEN *)&(handler->mutinfo)),
+                                        pycbc_mutation_token_seqno((lcb_MUTATION_TOKEN *)&(handler->mutinfo)),
+                                        conn->bucket);
+        PYCBC_DEBUG_PYFORMAT_CONTEXT(res ? res->tracing_context : NULL, "Got mutinfo %R",res->mutinfo)
+        PYCBC_EXCEPTION_LOG_NOCLEAR
+    }
+    else{
+        Py_INCREF(Py_None);
+        res->mutinfo = Py_None;
+    }
+}
+
 static void
 dur_chain2(pycbc_Bucket *conn,
            pycbc_MultiResult *mres,
@@ -713,33 +746,7 @@ dur_chain2(pycbc_Bucket *conn,
     pycbc_extract_respdata(resp,&mres,&handler);
     res->rc = handler.rc;
     if(res->rc == LCB_SUCCESS) {
-#ifdef PYCBC_MUTATION_TOKENS_ENABLED
-
-        const lcb_MUTATION_TOKEN *mutinfo = lcb_resp_get_mutation_token(cbtype,resp);
-        Py_XDECREF(res->mutinfo);
-
-        if (mutinfo && lcb_mutation_token_is_valid(mutinfo)) {
-            // Create the mutation token tuple: (vb,uuid,seqno)
-            res->mutinfo = Py_BuildValue("HKKO",
-                                         pycbc_mutation_token_vbid(mutinfo),
-                                         pycbc_mutation_token_uuid(mutinfo),
-                                         pycbc_mutation_token_seqno(mutinfo),
-                                         conn->bucket);
-            PYCBC_DEBUG_PYFORMAT_CONTEXT(res ? res->tracing_context : NULL, "Got mutinfo %R",res->mutinfo)
-            PYCBC_EXCEPTION_LOG_NOCLEAR
-        } else {
-            Py_INCREF(Py_None);
-            res->mutinfo = Py_None;
-        }
-
-#else
-        /*
-        Until mlcb_resp_get_mutation_token is back in libcouchbase includes, do
-            this:*/
-        Py_INCREF(Py_None);
-        res->mutinfo = Py_None;
-#endif
-
+        pycbc_get_mutation_token(conn, res, &handler);
         res->cas = handler.cas;
     }
 
@@ -906,6 +913,12 @@ value_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
         uint64_t value = 0;
 
         lcb_respcounter_value(cresp, &value);
+        /*
+        * TODO:  PYCBC-1132 - append/prepend operations should have mutation tokens
+        *   pycbc_get_mutation_token(conn, res, &handler); expects res to be pycbc_OperationResult
+        *   but in this context res is a pycbc_ValueResult, need to figure out appropriate approach
+        *   to handle append/prepend operations and include mutation tokens
+        */
         res->value = pycbc_IntFromULL(value);
     }
     GT_DONE:
@@ -1047,6 +1060,9 @@ keyop_simple_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
     }
     if (handler.cas) {
         res->cas = handler.cas;
+    }
+    if(cbtype == LCB_CALLBACK_TOUCH){
+        pycbc_get_mutation_token(conn, res, &handler);
     }
 
     operation_completed_with_err_info(

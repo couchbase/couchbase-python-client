@@ -14,7 +14,7 @@ class AsyncioTestCase(CouchbaseTestCase):
     _use_scopes_and_collections = None
 
     @classmethod
-    def setUpClass(cls, loop, cluster_class=ACluster, use_scopes_and_colls=None) -> None:
+    def setUpClass(cls, loop, cluster_class=ACluster, use_scopes_and_colls=None, **kwargs) -> None:
         super(AsyncioTestCase, cls).setUpClass()
         if cls._cluster_info:
             return
@@ -23,7 +23,7 @@ class AsyncioTestCase(CouchbaseTestCase):
         cls._cluster_info = CouchbaseClusterInfo(
             CouchbaseClusterResource(cls.resources), loop)
         cls._cluster_info.cluster_resource.try_n_times(
-            3, 3, cls._cluster_info.set_cluster, cluster_class)
+            3, 3, cls._cluster_info.set_cluster, cluster_class, **kwargs)
         cls._cluster_info.cluster_resource.try_n_times(
             3, 3, cls._cluster_info.set_bucket)
         cls._cluster_info.set_cluster_version()

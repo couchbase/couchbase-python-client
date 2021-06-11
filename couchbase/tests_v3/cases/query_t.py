@@ -15,18 +15,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import datetime
-from unittest import SkipTest
+from unittest import SkipTest, TestCase
 import objgraph
 from collections import Counter
 import gc
+import json
 
 from couchbase.n1ql import UnsignedInt64
 from couchbase.cluster import QueryOptions, QueryProfile, QueryResult
 from couchbase.n1ql import QueryMetaData, QueryStatus, QueryWarning
-from couchbase_tests.base import CollectionTestCase
+from couchbase_tests.base import CollectionTestCase, CouchbaseTestCase
 from couchbase.exceptions import (KeyspaceNotFoundException, NotSupportedException,
                                   ScopeNotFoundException)
-from couchbase.management.collections import CollectionSpec
+from couchbase.mutation_state import MutationState
+from couchbase_core.n1ql import NOT_BOUNDED, REQUEST_PLUS
 
 
 class QueryTests(CollectionTestCase):
@@ -165,6 +167,57 @@ class QueryTests(CollectionTestCase):
         result = self.cluster.query("SELECT * FROM `beer-sample` WHERE brewery_id LIKE $brewery LIMIT 1",
                                     QueryOptions(named_parameters={'brewery': 'xxffqqlx'}), brewery='21st_am%')
         self.assertRows(result, 1)
+
+
+class QueryStringTests(TestCase):
+
+    def test_encoded_consistency(self):
+        qstr = 'SELECT * FROM default'
+        qopts = QueryOptions()
+        q = qopts.to_query_object(qstr)
+        q.consistency = REQUEST_PLUS
+        dval = json.loads(q.encoded)
+        self.assertEqual('request_plus', dval['scan_consistency'])
+
+        q.consistency = NOT_BOUNDED
+        dval = json.loads(q.encoded)
+        self.assertEqual('not_bounded', dval['scan_consistency'])
+
+    def test_encode_scanvec(self):
+        # The value is a vbucket's sequence number,
+        # and guard is a vbucket's UUID.
+
+        qstr = 'SELECT * FROM default'
+        qopts = QueryOptions()
+        q = qopts.to_query_object(qstr)
+        ms = MutationState()
+        ms._add_scanvec((42, 3004, 3, 'default'))
+        q.consistent_with = ms
+
+        dval = json.loads(q.encoded)
+        sv_exp = {
+            'default': {'42': [3, '3004']}
+        }
+
+        self.assertEqual('at_plus', dval['scan_consistency'])
+        self.assertEqual(sv_exp, dval['scan_vectors'])
+
+        # Ensure the vb field gets updated. No duplicates!
+        ms._add_scanvec((42, 3004, 4, 'default'))
+        sv_exp['default']['42'] = [4, '3004']
+        dval = json.loads(q.encoded)
+        self.assertEqual(sv_exp, dval['scan_vectors'])
+
+        ms._add_scanvec((91, 7779, 23, 'default'))
+        dval = json.loads(q.encoded)
+        sv_exp['default']['91'] = [23, '7779']
+        self.assertEqual(sv_exp, dval['scan_vectors'])
+
+        # Try with a second bucket
+        sv_exp['other'] = {'666': [99, '5551212']}
+        ms._add_scanvec((666, 5551212, 99, 'other'))
+        dval = json.loads(q.encoded)
+        self.assertEqual(sv_exp, dval['scan_vectors'])
 
 
 class QueryLeakTest(CollectionTestCase):

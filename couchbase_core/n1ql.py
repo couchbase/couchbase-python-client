@@ -192,6 +192,14 @@ class _N1QLQuery(object):
     def consistency(self, value):
         self._body['scan_consistency'] = value
 
+    @property
+    def consistent_with(self):
+        return {
+            'consistency': self.consistency,
+            'scan_vectors': self._body.get('scan_vectors', None)
+        }
+
+    @consistent_with.setter
     def consistent_with(self, state):
         """
         Indicate that the query should be consistent with one or more

@@ -17,6 +17,7 @@
 from couchbase.exceptions import CouchbaseException
 from couchbase_core import _from_json, _to_json
 
+
 class MissingTokenException(CouchbaseException):
     pass
 
@@ -43,26 +44,27 @@ class MutationState(object):
     .. note::
 
         This feature requires Couchbase Server 4.5 or greater,
-        and also requires that `enable_mutation_tokens=true`
-        be specified in the connection string when creating
-        a :class:`~couchbase_core.client.Client`
+        and is enabled by default with 3.x SDKs.  To disable,
+        set the enable_mutation_tokens option in the 
+        :class:`couchbase.cluster.ClusterOptions` to False
 
     .. code-block:: python
 
-        cb = Bucket('couchbase://localhost/default?enable_mutation_tokens=true')
+        cluster = Cluster('couchbase://localhost', 
+                    authenticator=PasswordAuthenticator('Administrator', 'password'))
+        bucket = cluster.bucket('default')
+        collection = bucket.default_collection()
 
-        rvs = cb.upsert_multi({
-            'foo': {'type': 'user', 'value': 'a foo value'},
-            'bar': {'type': 'user', 'value': 'a bar value'}
-        })
+        rv = collection.upsert('foo': {'type': 'user', 'value': 'a foo value'})
+        ms = MutationState(res)
+        q_opts = QueryOptions(consistent_with=ms)
+        q_str = 'SELECT type, value FROM default WHERE type="user"'
+        query_iter = cluster.query(q_str, q_opts)
 
-        nq = _N1QLQuery('SELECT type, value FROM default WHERE type="user"')
-        ms = MutationToken()
-        ms.add_result(rv
-        nq.consistent_with_ops(*rvs.values())
-        for row in cb.n1ql_query(nq):
+        for row in query_iter.rows():
             # ...
     """
+
     def __init__(self, *docs):
         self._sv = {}
         if docs:
@@ -128,7 +130,7 @@ class MutationState(object):
         if not rvs:
             raise MissingTokenException.pyexc(message='No results passed')
         for rv in rvs:
-            mi = rv._mutinfo
+            mi = rv.mutation_token().as_tuple()
             if not mi:
                 if kwargs.get('quiet'):
                     return False

@@ -411,6 +411,8 @@ void pycbc_asyncresult_invoke(pycbc_AsyncResult *ares,
         PYCBC_DEBUG_PYFORMAT("Ares at %p is type %R, values %S", ares, Py_TYPE(ares), ares)
         PYCBC_EXCEPTION_LOG_NOCLEAR
     } else {
+        PYCBC_DEBUG_PYFORMAT("cbmeth:[%R]", cbmeth);
+        PYCBC_DEBUG_PYFORMAT("Argtuple:[%R]", argtuple);
         PyObject *res =  PyObject_CallObject(cbmeth, argtuple);
         if (res) {
             Py_XDECREF(res);

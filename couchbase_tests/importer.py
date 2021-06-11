@@ -70,6 +70,7 @@ def _get_classes(modules):
     from all the modules provided
     """
     ret = {}
+    allowed = ["TestAcouchbaseConnection", "QueryStringTests"]
 
     for module in modules:
         for attrname in dir(module):
@@ -79,7 +80,7 @@ def _get_classes(modules):
                 continue
 
             from couchbase_tests.base import CouchbaseTestCase
-            if not issubclass(attrobj, CouchbaseTestCase) and attrname != 'TestAcouchbaseConnection':
+            if not issubclass(attrobj, CouchbaseTestCase) and attrname not in allowed:
                 continue
 
             ret[attrname] = attrobj

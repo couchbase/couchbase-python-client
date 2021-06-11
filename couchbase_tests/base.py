@@ -229,7 +229,7 @@ class ClusterInformation(object):
         return {key: value for key, value in
                 options.items() if
                 key in ["certpath", "keypath", "ipv6", "config_cache", "compression", "log_redaction", "enable_tracing",
-                        "network"]}
+                        "network", "enable_mutation_tokens"]}
 
     def make_connargs(self, **overrides):
         bucket = self.bucket_name
@@ -249,6 +249,8 @@ class ClusterInformation(object):
             overrides.pop(k)
             if v:
                 final_options[k] = v
+            elif k == 'enable_mutation_tokens':
+                final_options[k] = "false" if v is False else "true"
 
         conn_options = '&'.join((key + "=" + value) for key,
                                 value in filter(lambda tpl: tpl[1], final_options.items()))
@@ -1657,8 +1659,8 @@ class CouchbaseClusterInfo(object):
     def collection(self):
         return self._collection
 
-    def set_cluster(self, cluster_class):
-        conn_args = self.cluster_resource.info.make_connargs()
+    def set_cluster(self, cluster_class, **kwargs):
+        conn_args = self.cluster_resource.info.make_connargs(**kwargs)
         connstr = conn_args.pop('connection_string')
         connstr_nobucket = ConnectionString.parse(connstr)
         mock_hack = self.cluster_resource.info.mock_hack_options(

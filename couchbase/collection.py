@@ -689,7 +689,7 @@ class CBCollection(wrapt.ObjectProxy):
     append_multi = _wrap_multi_mutation_result(_Base.append_multi)
     prepend_multi = _wrap_multi_mutation_result(_Base.prepend_multi)
 
-    @_inject_scope_and_collection
+    @_mutate_result_and_inject
     def touch(self,         # type: CBCollection
               key,          # type: str
               expiry,       # type: timedelta

@@ -327,7 +327,7 @@ class ClusterTracingOptions(dict):
 
 class ClusterOptions(dict):
     KEYS = ['timeout_options', 'tracing_options', 'log_redaction', 'compression', 'compression_min_size',
-            'compression_min_ratio', 'certpath']
+            'compression_min_ratio', 'certpath', 'enable_mutation_tokens']
 
     @overload
     def __init__(self,
@@ -338,7 +338,8 @@ class ClusterOptions(dict):
                  compression=None,                   # type: Compression
                  compression_min_size=None,          # type: int
                  compression_min_ratio=None,         # type: float
-                 lockmode=None                       # type: LockMode
+                 lockmode=None,                      # type: LockMode
+                 enable_mutation_tokens=None         # type: bool
                  ):
         pass
 
@@ -357,6 +358,7 @@ class ClusterOptions(dict):
         :param Compression compression: A :class:`~.Compression` value for this cluster.
         :param int compression_min_size: Min size of the data before compression kicks in.
         :param float compression_min_ratio: A `float` representing the minimum compression ratio to use when compressing.
+        :param bool enable_mutation_tokens: Turn mutation tokens on/off.  On by default.
         """
         super(ClusterOptions, self).__init__(**kwargs)
         self['authenticator'] = authenticator
@@ -405,7 +407,7 @@ class ClusterOptions(dict):
                 continue
             elif k in ['timeout_options', 'tracing_options']:
                 opts.update(v.as_dict())
-            elif k in ['compression_min_size', 'log_redaction']:
+            elif k in ['compression_min_size', 'log_redaction', 'enable_mutation_tokens']:
                 opts[k] = str(int(v))
             elif k == 'compression':
                 opts[k] = v.value
