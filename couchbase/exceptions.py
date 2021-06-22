@@ -1205,6 +1205,11 @@ class NotImplementedInV3(CouchbaseException):
     pass
 
 
+class CompilationFailedException(AnalyticsException):
+    """Raised when analytics service fails to compile query statement."""
+    pass
+
+
 class DataverseAlreadyExistsException(AnalyticsException):
     """Raised when attempting to create dataverse when it already exists"""
     pass
@@ -1330,6 +1335,7 @@ _LCB_ERRNO_MAP = dict(list({
     C.LCB_ERR_INDEX_NOT_FOUND:               QueryIndexNotFoundException,
     C.LCB_ERR_INDEX_EXISTS:                  QueryIndexAlreadyExistsException,
     C.LCB_ERR_SUBDOC_NUMBER_TOO_BIG:         SubdocNumberTooBigException,
+    C.LCB_ERR_COMPILATION_FAILED:            CompilationFailedException,
     C.LCB_ERR_DATAVERSE_EXISTS:              DataverseAlreadyExistsException,
     C.LCB_ERR_DATAVERSE_NOT_FOUND:           DataverseNotFoundException,
     C.LCB_ERR_DATASET_NOT_FOUND:             DatasetNotFoundException,

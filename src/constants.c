@@ -74,6 +74,7 @@
     X(ERR_NO_MATCHING_SERVER)       \
     X(ERR_INDEX_NOT_FOUND)          \
     X(ERR_INDEX_EXISTS)             \
+    X(ERR_COMPILATION_FAILED)       \
     X(ERR_DATAVERSE_EXISTS)         \
     X(ERR_DATAVERSE_NOT_FOUND)      \
     X(ERR_DATASET_NOT_FOUND)        \

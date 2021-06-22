@@ -11,7 +11,7 @@ from datetime import timedelta
 
 class AnalyticsIndex(dict):
     def __init__(self, **kwargs):
-        print("creating index from {}".format(kwargs))
+        #print("creating index from {}".format(kwargs))
         super(AnalyticsIndex, self).__init__(**kwargs['Index'])
 
     @property

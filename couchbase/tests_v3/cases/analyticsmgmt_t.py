@@ -15,29 +15,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from couchbase_tests.base import CollectionTestCase, SkipTest
-from couchbase.management.analytics import CreateDataverseOptions, DropDataverseOptions, CreateDatasetOptions, \
-    CreateAnalyticsIndexOptions, DropAnalyticsIndexOptions, DropDatasetOptions, ConnectLinkOptions, DisconnectLinkOptions
-from couchbase.exceptions import CouchbaseException, DataverseAlreadyExistsException, DataverseNotFoundException, \
-    DatasetAlreadyExistsException, DatasetNotFoundException, NotSupportedException
-from couchbase.analytics import AnalyticsDataType
 import time
+
+from couchbase_tests.base import CollectionTestCase, SkipTest
+from couchbase.management.analytics import (CreateDataverseOptions, DropDataverseOptions, CreateDatasetOptions,
+                                            CreateAnalyticsIndexOptions, DropAnalyticsIndexOptions, DropDatasetOptions, ConnectLinkOptions, DisconnectLinkOptions)
+from couchbase.exceptions import (DataverseAlreadyExistsException, DataverseNotFoundException,
+                                  DatasetAlreadyExistsException, DatasetNotFoundException, NotSupportedException, CompilationFailedException, ParsingFailedException)
+from couchbase.analytics import AnalyticsDataType
 
 
 class AnalyticsIndexManagerTests(CollectionTestCase):
     def setUp(self):
         super(AnalyticsIndexManagerTests, self).setUp()
+        self._enable_print_statements = False
         if self.is_mock:
             raise SkipTest("mock doesn't mock management apis")
 
         if int(self.get_cluster_version().split('.')[0]) < 6:
-            raise SkipTest("no analytics in {}".format(self.get_cluster_version()))
+            raise SkipTest("no analytics in {}".format(
+                self.get_cluster_version()))
 
         self.mgr = self.cluster.analytics_indexes()
-        self.dataverse_name = "test_dataverse"
+        self.dataverse_name = "test/dataverse" if int(
+            self.get_cluster_version().split('.')[0]) == 7 else "test_dataverse"
         self.dataset_name = "test_breweries"
         # be sure the dataverse exists
-        self.mgr.create_dataverse(self.dataverse_name, CreateDataverseOptions(ignore_if_exists=True))
+        self.mgr.create_dataverse(
+            self.dataverse_name, CreateDataverseOptions(ignore_if_exists=True))
         # now ensure our dataset in there
         self.mgr.create_dataset(self.dataset_name,
                                 "beer-sample",
@@ -46,19 +51,24 @@ class AnalyticsIndexManagerTests(CollectionTestCase):
                                                      ignore_if_exists=True)
                                 )
         try:
-            self.mgr.disconnect_link(DisconnectLinkOptions(dataverse_name=self.dataverse_name))
+            self.mgr.disconnect_link(DisconnectLinkOptions(
+                dataverse_name=self.dataverse_name))
         except:
             pass
 
     def tearDown(self):
         super(AnalyticsIndexManagerTests, self).tearDown()
-        # be sure the dataset doesn't exist
+        # be sure the dataverse doesn't exist
         try:
-            self.cluster.analytics_query("USE `{}`; DISCONNECT LINK Local;".format(self.dataverse_name)).metadata()
+            dataverse_name = self.mgr._scrub_dataverse_name(
+                self.dataverse_name)
+            self.cluster.analytics_query(
+                "USE {}; DISCONNECT LINK Local;".format(dataverse_name)).metadata()
         except DataverseNotFoundException:
             pass
         try:
-            self.mgr.disconnect_link(DisconnectLinkOptions(dataverse_name=self.dataverse_name))
+            self.mgr.disconnect_link(DisconnectLinkOptions(
+                dataverse_name=self.dataverse_name))
         except:
             pass
         self.try_n_times(10, 3,
@@ -76,34 +86,42 @@ class AnalyticsIndexManagerTests(CollectionTestCase):
 
     def test_create_dataverse(self):
         # lets query for the existence of test-dataverse
-        statement = 'SELECT * FROM Metadata.`Dataverse` WHERE DataverseName="{}";'.format(self.dataverse_name)
+        statement = 'SELECT * FROM Metadata.`Dataverse` WHERE DataverseName="{}";'.format(
+            self.dataverse_name)
         result = self.cluster.analytics_query(statement)
         self.assertEqual(1, len(result.rows()))
 
     def test_create_dataverse_ignore_exists(self):
-        self.assertRaises(DataverseAlreadyExistsException, self.mgr.create_dataverse, self.dataverse_name)
-        self.mgr.create_dataverse(self.dataverse_name, CreateDataverseOptions(ignore_if_exists=True))
+        self.assertRaises(DataverseAlreadyExistsException,
+                          self.mgr.create_dataverse, self.dataverse_name)
+        self.mgr.create_dataverse(
+            self.dataverse_name, CreateDataverseOptions(ignore_if_exists=True))
 
     def test_drop_dataverse(self):
         self.mgr.drop_dataverse(self.dataverse_name)
         self.mgr.connect_link()
-        statement = 'SELECT * FROM Metadata.`Dataverse` WHERE DataverseName="{}";'.format(self.dataverse_name)
+        statement = 'SELECT * FROM Metadata.`Dataverse` WHERE DataverseName="{}";'.format(
+            self.dataverse_name)
         result = self.cluster.analytics_query(statement)
         self.assertEqual(0, len(result.rows()))
 
     def test_drop_dataverse_ignore_not_exists(self):
         self.mgr.drop_dataverse(self.dataverse_name)
-        self.assertRaises(DataverseNotFoundException, self.mgr.drop_dataverse, self.dataverse_name)
-        self.mgr.drop_dataverse(self.dataverse_name, DropDataverseOptions(ignore_if_not_exists=True))
+        self.assertRaises(DataverseNotFoundException,
+                          self.mgr.drop_dataverse, self.dataverse_name)
+        self.mgr.drop_dataverse(
+            self.dataverse_name, DropDataverseOptions(ignore_if_not_exists=True))
 
     def test_create_dataset(self):
         # we put a dataset in during the setUp, so...
         datasets = self.mgr.get_all_datasets()
         for dataset in datasets:
-            print(dataset)
+            if self._enable_print_statements:
+                print(dataset)
             if dataset.dataset_name == self.dataset_name:
                 return
-        self.fail("didn't find {} in listing of all datasets".format(self.dataset_name))
+        self.fail("didn't find {} in listing of all datasets".format(
+            self.dataset_name))
 
     def test_create_dataset_ignore_exists(self):
         self.assertRaises(DatasetAlreadyExistsException, self.mgr.create_dataset, self.dataset_name, 'beer-sample',
@@ -112,7 +130,8 @@ class AnalyticsIndexManagerTests(CollectionTestCase):
                                 CreateDatasetOptions(dataverse_name=self.dataverse_name), ignore_if_exists=True)
 
     def test_drop_dataset(self):
-        self.mgr.drop_dataset(self.dataset_name, DropDatasetOptions(dataverse_name=self.dataverse_name))
+        self.mgr.drop_dataset(self.dataset_name, DropDatasetOptions(
+            dataverse_name=self.dataverse_name))
         self.assertRaises(DatasetNotFoundException, self.mgr.drop_dataset, self.dataset_name,
                           DropDatasetOptions(dataverse_name=self.dataverse_name))
         self.mgr.drop_dataset(self.dataset_name, DropDatasetOptions(dataverse_name=self.dataverse_name,
@@ -120,58 +139,111 @@ class AnalyticsIndexManagerTests(CollectionTestCase):
 
     def test_create_index(self):
         self.mgr.create_index("test_brewery_idx", self.dataset_name,
-                              {'name': AnalyticsDataType.STRING, 'description': AnalyticsDataType.STRING },
+                              {'name': AnalyticsDataType.STRING,
+                                  'description': AnalyticsDataType.STRING},
                               CreateAnalyticsIndexOptions(dataverse_name=self.dataverse_name))
 
         def check_for_idx(idx):
             indexes = self.mgr.get_all_indexes()
             for index in indexes:
-                print(index)
+                if self._enable_print_statements:
+                    print(index)
                 if index.name == idx:
                     return
-            raise Exception("unable to find 'test_brewery_idx' in list of all indexes")
+            raise Exception(
+                "unable to find 'test_brewery_idx' in list of all indexes")
 
         self.try_n_times(10, 3, check_for_idx, 'test_brewery_idx')
 
     def test_drop_index(self):
         # create one first, if not already there
         self.mgr.create_index("test_brewery_idx", self.dataset_name,
-                              {'name': AnalyticsDataType.STRING, 'description': AnalyticsDataType.STRING },
+                              {'name': AnalyticsDataType.STRING,
+                                  'description': AnalyticsDataType.STRING},
                               CreateAnalyticsIndexOptions(dataverse_name=self.dataverse_name))
 
         def check_for_idx(idx):
             indexes = self.mgr.get_all_indexes()
             for index in indexes:
-                print(index)
+                if self._enable_print_statements:
+                    print(index)
                 if index.name == idx:
                     return
-            raise Exception("unable to find 'test_brewery_idx' in list of all indexes")
+            raise Exception(
+                "unable to find 'test_brewery_idx' in list of all indexes")
 
         self.try_n_times(10, 3, check_for_idx, 'test_brewery_idx')
         self.mgr.drop_index("test_brewery_idx", self.dataset_name,
                             DropAnalyticsIndexOptions(dataverse_name=self.dataverse_name))
-        self.try_n_times_till_exception(10, 3, check_for_idx, 'test_brewery_idx')
+        self.try_n_times_till_exception(
+            10, 3, check_for_idx, 'test_brewery_idx')
 
     def test_connect_link(self):
-        self.mgr.connect_link(ConnectLinkOptions(dataverse_name=self.dataverse_name))
+        self.mgr.connect_link(ConnectLinkOptions(
+            dataverse_name=self.dataverse_name))
 
         # connect link should result in documents in the dataset, so...
-        self.assertRows('USE `{}`; SELECT * FROM `{}` LIMIT 1'.format(self.dataverse_name, self.dataset_name))
+        dataverse_name = self.mgr._scrub_dataverse_name(self.dataverse_name)
+        self.assertRows(
+            'USE {}; SELECT * FROM `{}` LIMIT 1'.format(dataverse_name, self.dataset_name))
         # manually stop it for now
         self.cluster.analytics_query(
-            'USE `{}`; DISCONNECT LINK Local'.format(self.dataverse_name, self.dataset_name)).metadata()
+            'USE {}; DISCONNECT LINK Local'.format(dataverse_name, self.dataset_name)).metadata()
 
     def test_get_pending_mutations(self):
         try:
             result = self.mgr.get_pending_mutations()
-            # we expect no test_dataverse key yet
-            print(result)
+            if self._enable_print_statements:
+                # we expect no test_dataverse key yet
+                print(result)
             self.assertFalse("test_dataverse" in result.keys())
-            self.mgr.connect_link(ConnectLinkOptions(dataverse_name=self.dataverse_name))
+            self.mgr.connect_link(ConnectLinkOptions(
+                dataverse_name=self.dataverse_name))
             time.sleep(5)
             result = self.mgr.get_pending_mutations()
-            print(result)
-            self.assertTrue("test_dataverse" in result.keys())
+            if self._enable_print_statements:
+                print(result)
+            dataverse_name = self.mgr._scrub_dataverse_name(
+                self.dataverse_name).replace("`", "")
+            self.assertTrue(dataverse_name in result.keys())
         except NotSupportedException:
-            raise SkipTest("get pending mutations not supported on this cluster")
+            raise SkipTest(
+                "get pending mutations not supported on this cluster")
 
+    def test_v6_dataverse_name_parsing(self):
+        if int(self.cluster_version.split('.')[0]) != 6:
+            raise SkipTest("Test only for 6.x versions")
+
+        with self.assertRaises(CompilationFailedException):
+            # test.beer_sample => `test.beer_sample` which is not valid prior to 7.0
+            self.mgr.create_dataverse(
+                "test.beer_sample", CreateDataverseOptions(ignore_if_exists=True))
+
+        # wish the analytics service was consistent here :/
+        with self.assertRaises(ParsingFailedException):
+            # test/beer_sample => `test`.`beer_sample` which is not valid prior to 7.0
+            self.mgr.create_dataverse(
+                "test/beer_sample", CreateDataverseOptions(ignore_if_exists=True))
+
+    def test_v7_dataverse_name_parsing(self):
+        if int(self.cluster_version.split('.')[0]) != 7:
+            raise SkipTest("Test only for 7.x versions")
+
+        # test.beer_sample => `test.beer_sample` which is valid >= 7.0
+        self.mgr.create_dataverse(
+            "test.beer_sample", CreateDataverseOptions(ignore_if_exists=True))
+
+        statement = 'SELECT * FROM Metadata.`Dataverse` WHERE DataverseName="test.beer_sample";'.format(
+            self.dataverse_name)
+        result = self.cluster.analytics_query(statement)
+        self.assertEqual(1, len(result.rows()))
+        self.mgr.drop_dataverse("test.beer_sample")
+
+        # test/beer_sample => `test`.`beer_sample` which is valid >= 7.0
+        self.mgr.create_dataverse(
+            "test/beer_sample", CreateDataverseOptions(ignore_if_exists=True))
+        statement = 'SELECT * FROM Metadata.`Dataverse` WHERE DataverseName="test/beer_sample";'.format(
+            self.dataverse_name)
+        result = self.cluster.analytics_query(statement)
+        self.assertEqual(1, len(result.rows()))
+        self.mgr.drop_dataverse("test/beer_sample")

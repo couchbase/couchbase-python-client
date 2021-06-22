@@ -30,7 +30,7 @@ class BaseAnalyticsIndexManagerOptions(OptionBlockTimeOut):
 
     def to_analytics_options(self, **kwargs):
         final_opts = {**self, **kwargs}
-        return AnalyticsOptions(**{k:v for k, v in final_opts.items() if k in self.OPTION_KEYS})
+        return AnalyticsOptions(**{k: v for k, v in final_opts.items() if k in self.OPTION_KEYS})
 
 
 class GetPendingMutationsOptions(BaseAnalyticsIndexManagerOptions):
@@ -227,6 +227,10 @@ class AnalyticsIndexManager(object):
                               ):
         return option.to_analytics_options() if option else AnalyticsOptions()
 
+    def _scrub_dataverse_name(self, dataverse_name):
+        tokens = dataverse_name.split("/")
+        return "`" + "`.`".join(tokens) + "`"
+
     def create_dataverse(self,
                          dataverse_name,    # type: str
                          options=None,      # type: CreateDataverseOptions
@@ -245,11 +249,14 @@ class AnalyticsIndexManager(object):
         """
         if not options:
             options = CreateDataverseOptions()
-        ignore = options.ignore_if_exists or kwargs.get("ignore_if_exists", False)
-        n11q_if_exists_clause = "IF NOT EXISTS"
-        n1ql = "CREATE DATAVERSE `{}` {};".format(dataverse_name, n11q_if_exists_clause if ignore else "")
-        print("create_dataverse n1ql: {}".format(n1ql))
-        self._cluster.analytics_query(n1ql, AnalyticsIndexManager._to_analytics_options(options)).rows()
+        ignore = options.ignore_if_exists or kwargs.get(
+            "ignore_if_exists", False)
+        if_not_exists_clause = "IF NOT EXISTS"
+        query = "CREATE DATAVERSE {} {};".format(self._scrub_dataverse_name(
+            dataverse_name), if_not_exists_clause if ignore else "")
+        #print("create_dataverse query: {}".format(query))
+        self._cluster.analytics_query(
+            query, AnalyticsIndexManager._to_analytics_options(options)).rows()
 
     def drop_dataverse(self,
                        dataverse_name,  # type: str
@@ -259,11 +266,14 @@ class AnalyticsIndexManager(object):
         # type: (...) -> None
         if not options:
             options = DropDataverseOptions()
-        ignore = options.ignore_if_not_exists or kwargs.get("ignore_if_not_exists", False)
-        n11q_if_exists_clause = "IF EXISTS"
-        n1ql = "DROP DATAVERSE `{}` {};".format(dataverse_name, n11q_if_exists_clause if ignore else "")
-        print("drop dataverse n1ql: {}".format(n1ql))
-        self._cluster.analytics_query(n1ql, AnalyticsIndexManager._to_analytics_options(options)).rows()
+        ignore = options.ignore_if_not_exists or kwargs.get(
+            "ignore_if_not_exists", False)
+        if_exists_clause = "IF EXISTS"
+        query = "DROP DATAVERSE {} {};".format(self._scrub_dataverse_name(
+            dataverse_name), if_exists_clause if ignore else "")
+        #print("drop dataverse query: {}".format(query))
+        self._cluster.analytics_query(
+            query, AnalyticsIndexManager._to_analytics_options(options)).rows()
 
     def create_dataset(self,
                        dataset_name,    # type: str
@@ -275,18 +285,19 @@ class AnalyticsIndexManager(object):
             options = CreateDatasetOptions()
         ignore = kwargs.get('ignore_if_exists', options.ignore_if_exists)
         dataverse_name = kwargs.get('dataverse_name', options.dataverse_name)
-        n1ql_if_exists_clause = "IF NOT EXISTS"
+        if_not_exists_clause = "IF NOT EXISTS"
         where_clause = kwargs.get('condition', options.condition)
         if where_clause:
             where_clause = "WHERE {}".format(where_clause)
-        n1ql = "USE `{}`; CREATE DATASET {} `{}` ON `{}` {};" .format(dataverse_name,
-                                                                      n1ql_if_exists_clause if ignore else "",
-                                                                      dataset_name,
-                                                                      bucket_name,
-                                                                      where_clause,
-                                                                      )
-        print("create_dataset n1ql: {}".format(n1ql))
-        self._cluster.analytics_query(n1ql, AnalyticsIndexManager._to_analytics_options(options)).rows()
+        query = "USE {}; CREATE DATASET {} `{}` ON `{}` {};" .format(self._scrub_dataverse_name(dataverse_name),
+                                                                     if_not_exists_clause if ignore else "",
+                                                                     dataset_name,
+                                                                     bucket_name,
+                                                                     where_clause,
+                                                                     )
+        #print("create_dataset n1ql: {}".format(query))
+        self._cluster.analytics_query(
+            query, AnalyticsIndexManager._to_analytics_options(options)).rows()
 
     def drop_dataset(self,
                      dataset_name,  # type: str
@@ -304,13 +315,16 @@ class AnalyticsIndexManager(object):
         if not options:
             options = DropDatasetOptions()
         dataverse_name = kwargs.get('dataverse_name', options.dataverse_name)
-        ignore = kwargs.get('ignore_if_not_exists', options.ignore_if_not_exists)
-        ignore_clause = ""
+        ignore = kwargs.get('ignore_if_not_exists',
+                            options.ignore_if_not_exists)
+        if_exists_clause = ""
         if ignore:
-            ignore_clause = "IF EXISTS"
+            if_exists_clause = "IF EXISTS"
 
-        query = "USE `{}`; DROP DATASET `{}` {};".format(dataverse_name, dataset_name, ignore_clause)
-        self._cluster.analytics_query(query, options.to_analytics_options()).rows()
+        query = "USE {}; DROP DATASET `{}` {};".format(
+            self._scrub_dataverse_name(dataverse_name), dataset_name, if_exists_clause)
+        self._cluster.analytics_query(
+            query, options.to_analytics_options()).rows()
 
     def get_all_datasets(self,
                          options=None   # type: GetAllDatasetsOptions
@@ -324,7 +338,8 @@ class AnalyticsIndexManager(object):
         if not options:
             options = GetAllDatasetsOptions()
         query = 'SELECT d.* FROM Metadata.`Dataset` d WHERE d.DataverseName <> "Metadata"'
-        result = self._cluster.analytics_query(query, options.to_analytics_options())
+        result = self._cluster.analytics_query(
+            query, options.to_analytics_options())
         return_val = []
         for r in result.rows():
             return_val.append(AnalyticsDataset(**r))
@@ -353,16 +368,18 @@ class AnalyticsIndexManager(object):
             options = CreateAnalyticsIndexOptions()
         ignore = kwargs.get('ignore_if_exists', options.ignore_if_exists)
         dataverse_name = kwargs.get('dataverse_name', options.dataverse_name)
-        ignore_clause = ''
+        if_not_exists_clause = ''
         if ignore:
-            ignore_clause = "IF NOT EXISTS"
+            if_not_exists_clause = "IF NOT EXISTS"
 
         fields_clause = ", "
-        fields_clause = fields_clause.join(["{}: {}".format(k, v.value) for k, v in fields.items()])
-        statement = "CREATE INDEX `{}` {} ON `{}`.`{}` ({});".format(index_name, ignore_clause, dataverse_name,
-                                                                    dataset_name, fields_clause)
-        print("create index statement: {}".format(statement))
-        result = self._cluster.analytics_query(statement, options.to_analytics_options()).rows()
+        fields_clause = fields_clause.join(
+            ["{}: {}".format(k, v.value) for k, v in fields.items()])
+        statement = "CREATE INDEX `{}` {} ON {}.`{}` ({});".format(index_name, if_not_exists_clause, self._scrub_dataverse_name(dataverse_name),
+                                                                   dataset_name, fields_clause)
+        #print("create index statement: {}".format(statement))
+        self._cluster.analytics_query(
+            statement, options.to_analytics_options()).rows()
 
     def drop_index(self,
                    index_name,      # type: str
@@ -381,12 +398,15 @@ class AnalyticsIndexManager(object):
         if not options:
             options = DropAnalyticsIndexOptions()
         dataverse_name = kwargs.get('dataverse_name', options.dataverse_name)
-        ignore = kwargs.get('ignore_if_not_exists', options.ignore_if_not_exists)
-        ignore_clause = ""
+        ignore = kwargs.get('ignore_if_not_exists',
+                            options.ignore_if_not_exists)
+        if_exists_clause = ""
         if ignore:
-            ignore_clause = "IF EXISTS"
-        statement = 'DROP INDEX {} `{}`.`{}`.`{}`'.format(ignore_clause, dataverse_name, dataset_name, index_name)
-        self._cluster.analytics_query(statement, options.to_analytics_options(**kwargs)).rows()
+            if_exists_clause = "IF EXISTS"
+        statement = 'DROP INDEX {} {}.`{}`.`{}`'.format(
+            if_exists_clause, self._scrub_dataverse_name(dataverse_name), dataset_name, index_name)
+        self._cluster.analytics_query(
+            statement, options.to_analytics_options(**kwargs)).rows()
 
     def get_all_indexes(self,
                         options=None,   # type: GetAllAnalyticsIndexesOptions
@@ -402,7 +422,8 @@ class AnalyticsIndexManager(object):
         if not options:
             options = GetAllAnalyticsIndexesOptions()
         statement = 'SELECT * FROM Metadata.`Index` WHERE DataverseName <> "Metadata";'
-        result = self._cluster.analytics_query(statement, options.to_analytics_options())
+        result = self._cluster.analytics_query(
+            statement, options.to_analytics_options())
         return_val = []
         for r in result.rows():
             return_val.append(AnalyticsIndex(**r))
@@ -428,8 +449,10 @@ class AnalyticsIndexManager(object):
         force_clause = ""
         if force:
             force_clause = "WITH force: true"
-        statement = 'USE `{}`; CONNECT LINK {} {};'.format(dataverse_name, link_name, force_clause)
-        self._cluster.analytics_query(statement, options.to_analytics_options(**kwargs)).rows()
+        statement = 'USE {}; CONNECT LINK {} {};'.format(
+            self._scrub_dataverse_name(dataverse_name), link_name, force_clause)
+        self._cluster.analytics_query(
+            statement, options.to_analytics_options(**kwargs)).rows()
 
     def disconnect_link(self,
                         options=None,   # type: DisconnectLinkOptions
@@ -447,8 +470,10 @@ class AnalyticsIndexManager(object):
 
         dataverse_name = kwargs.get('dataverse_name', options.dataverse_name)
         link_name = kwargs.get('link_name', options.link_name)
-        statement = 'USE `{}`; DISCONNECT LINK {};'.format(dataverse_name, link_name)
-        self._cluster.analytics_query(statement, options.to_analytics_options(**kwargs)).rows()
+        statement = 'USE {}; DISCONNECT LINK {};'.format(
+            self._scrub_dataverse_name(dataverse_name), link_name)
+        self._cluster.analytics_query(
+            statement, options.to_analytics_options(**kwargs)).rows()
 
     def get_pending_mutations(self,
                               options=None,     # type: GetPendingMutationsOptions
@@ -460,18 +485,13 @@ class AnalyticsIndexManager(object):
 
         try:
             return self._cluster._admin._http_request(type=_LCB.LCB_HTTP_TYPE_ANALYTICS,
-                                                     method=_LCB.LCB_HTTP_METHOD_GET,
-                                                     path="analytics/node/agg/stats/remaining"
-                                                     ).value
+                                                      method=_LCB.LCB_HTTP_METHOD_GET,
+                                                      path="analytics/node/agg/stats/remaining"
+                                                      ).value
         except CouchbaseException as e:
             extra = getattr(e, 'objextra', None)
             if extra:
                 if int(getattr(extra, 'http_status', None)) == 404:
-                    raise NotSupportedException("get pending mutations not supported")
+                    raise NotSupportedException(
+                        "get pending mutations not supported")
             raise e
-
-
-
-
-
-
