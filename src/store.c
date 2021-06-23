@@ -25,6 +25,7 @@ struct storecmd_vars {
     unsigned long ttl;
     PyObject *flagsobj;
     lcb_U64 single_cas;
+    int preserve_expiry;
 };
 
 struct single_key_context {
@@ -140,6 +141,9 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
         lcb_cmdsubdoc_cas(cmd, scv->single_cas);
         lcb_cmdsubdoc_expiry(cmd, scv->ttl);
         pycbc_cmdsubdoc_flags_from_scv(scv->sd_doc_flags, cmd);
+        if(scv->preserve_expiry){
+            lcb_cmdsubdoc_preserve_expiry(cmd, scv->preserve_expiry);
+        }
         PYCBC_CMD_SET_KEY_SCOPE(subdoc, cmd, keybuf);
         rv = PYCBC_TRACE_WRAP(pycbc_sd_handle_speclist,
                               NULL,
@@ -237,6 +241,9 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
             lcb_cmdstore_cas(cmd, skc.cas);
             lcb_cmdstore_expiry(cmd, (uint32_t)skc.ttl);
             lcb_cmdstore_timeout(cmd, cv->timeout);
+            if(scv->preserve_expiry){
+                lcb_cmdstore_preserve_expiry(cmd, scv->preserve_expiry);
+            }
             PYCBC_TRACECMD_TYPED(store, cmd, context, cv->mres, curkey, self);
             err = pycbc_store(collection, cv->mres, cmd);
         }
@@ -299,6 +306,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
 
     Py_ssize_t ncmds = 0;
     PyObject *ttl_O = NULL;
+    int preserve_expiry = 0;
     PyObject *timeout_O =NULL;
     PyObject *dict = NULL;
     PyObject *key = NULL;
@@ -316,6 +324,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                                    "replicate_to",
                                    "durability_level",
                                    "timeout",
+                                   "preserve_expiry",
                                    NULL};
 
     static char *kwlist_single[] = {"key",
@@ -328,6 +337,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                                     "_sd_doc_flags",
                                     "durability_level",
                                     "timeout",
+                                    "preserve_expiry",
                                     NULL};
 
     scv.operation = operation;
@@ -336,7 +346,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     if (argopts & PYCBC_ARGOPT_MULTI) {
         rv = PyArg_ParseTupleAndKeywords(args,
                                          kwargs,
-                                         "O|OOBBIO",
+                                         "O|OOBBIOi",
                                          kwlist_multi,
                                          &dict,
                                          &ttl_O,
@@ -344,12 +354,13 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                                          &persist_to,
                                          &replicate_to,
                                          &dur_level,
-                                         &timeout_O);
+                                         &timeout_O,
+                                         &preserve_expiry);
 
     } else {
         rv = PyArg_ParseTupleAndKeywords(args,
                                          kwargs,
-                                         "OO|KOOBBIIO",
+                                         "OO|KOOBBIIOi",
                                          kwlist_single,
                                          &key,
                                          &value,
@@ -360,7 +371,8 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                                          &replicate_to,
                                          &scv.sd_doc_flags,
                                          &dur_level,
-                                         &timeout_O);
+                                         &timeout_O,
+                                         &preserve_expiry);
     }
 
     if (!rv) {
@@ -398,6 +410,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
         scv.flagsobj = self->dfl_fmt;
     }
 
+    scv.preserve_expiry = preserve_expiry;
     rv = pycbc_common_vars_init(&cv, self, argopts, ncmds, 1);
     if (rv < 0) {
         goto GT_FAIL;

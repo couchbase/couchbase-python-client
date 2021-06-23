@@ -184,9 +184,7 @@ static int parse_row_json(pycbc_Bucket *bucket,
 }
 
 void convert_view_error_context(const lcb_VIEW_ERROR_CONTEXT* ctx,
-                                pycbc_MultiResult* mres,
-                                const char* extended_context,
-                                const char* extended_ref) {
+                                pycbc_MultiResult* mres) {
 
     pycbc_enhanced_err_info* err_info = PyDict_New();
     PyObject* err_context = PyDict_New();
@@ -214,25 +212,17 @@ void convert_view_error_context(const lcb_VIEW_ERROR_CONTEXT* ctx,
         pycbc_dict_add_text_kv_strn2(err_context, "endpoint", val, len);
         pycbc_dict_add_text_kv(err_context, "type", "ViewErrorContext");
     }
-    if (extended_context) {
-        pycbc_dict_add_text_kv(err_context, "extended_context", extended_context);
-    }
-    if (extended_ref) {
-        pycbc_dict_add_text_kv(err_context, "extended_ref", extended_ref);
-    }
+
     mres->err_info = err_info;
     Py_DECREF(err_context);
 }
 
 void pycbc_add_view_error_context(const lcb_RESPVIEW* resp,
                                   pycbc_MultiResult* mres) {
-    /* get the extended error context and ref, if any */
-    const char* extended_ref = lcb_resp_get_error_ref(LCB_CALLBACK_VIEWQUERY, (lcb_RESPBASE*)resp);
-    const char* extended_context = lcb_resp_get_error_context(LCB_CALLBACK_VIEWQUERY, (lcb_RESPBASE*)resp);
     const lcb_VIEW_ERROR_CONTEXT* ctx;
     if (LCB_SUCCESS == lcb_respview_error_context(resp, &ctx)) {
         if (ctx) {
-            convert_view_error_context(ctx, mres, extended_context, extended_ref);
+            convert_view_error_context(ctx, mres);
         }
     }
 }

@@ -2,7 +2,7 @@ from typing import *
 from couchbase_core import JSON, subdocument as SD
 import couchbase_core.priv_constants as _P
 from couchbase.durability import DurabilityOptionBlock
-from couchbase_core.subdocument import  Spec
+from couchbase_core.subdocument import Spec
 from couchbase.exceptions import InvalidArgumentException
 
 SDType = type(SD)
@@ -36,7 +36,7 @@ def exists(
     :param xattr: operation is done on an Extended Attribute.
     :return: Spec
     """
-    return SD.exists(path,xattr=xattr)
+    return SD.exists(path, xattr=xattr)
 
 
 def get(path,  # type: str
@@ -50,7 +50,7 @@ def get(path,  # type: str
     :param bool xattr: operation is done on an Extended Attribute.
     :return: Spec
     """
-    return SD.get(path,xattr=xattr)
+    return SD.get(path, xattr=xattr)
 
 
 def upsert(path,                    # type: str,
@@ -74,7 +74,7 @@ def upsert(path,                    # type: str,
 
 def replace(path,       # type: str
             value,       # type: JSON
-            xattr=False # type: bool
+            xattr=False  # type: bool
             ):
     # type: (...) -> Spec
     """
@@ -162,7 +162,7 @@ def array_prepend(path,             # type: str
 def array_insert(path,          # type: str
                  xattr=False,   # type: bool
                  *values        # type: JSON
-                ):
+                 ):
     # type: (...) -> Spec
     """
     Insert values at into an array in a document at the position
@@ -291,6 +291,5 @@ def gen_projection_spec(project, with_exp=False):
 
 
 class MutateInOptions(DurabilityOptionBlock):
-    def __init__(self, *args, **kwargs):
-        super(MutateInOptions, self).__init__(*args, **kwargs)
-
+    def __init__(self, *args, preserve_expiry=False, **kwargs):
+        super(MutateInOptions, self).__init__(*args, preserve_expiry=preserve_expiry, **kwargs)

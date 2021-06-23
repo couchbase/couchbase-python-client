@@ -119,9 +119,7 @@ static void decode_data(pycbc_MultiResult *mres, pycbc_HttpResult *htres)
 #define HTTP_IS_OK(st) (st > 199 && st < 300)
 
 void pycbc_convert_http_error_context(const lcb_HTTP_ERROR_CONTEXT* ctx,
-                                      pycbc_enhanced_err_info** err_info,
-                                      const char* extended_context,
-                                      const char* extended_ref) {
+                                      pycbc_enhanced_err_info** err_info) {
     *err_info = PyDict_New();
     if (ctx && *err_info) {
         uint32_t response_code;
@@ -141,12 +139,6 @@ void pycbc_convert_http_error_context(const lcb_HTTP_ERROR_CONTEXT* ctx,
         pycbc_dict_add_text_kv_strn2(err_context, "endpoint", val, len);
         pycbc_dict_add_text_kv(err_context, "type", "HTTPErrorContext");
 
-        if (extended_context) {
-            pycbc_dict_add_text_kv(err_context, "extended_context", extended_context);
-        }
-        if (extended_ref) {
-            pycbc_dict_add_text_kv(err_context, "extended_ref", extended_ref);
-        }
         Py_DECREF(err_context);
     }
 }
@@ -156,13 +148,10 @@ void pycbc_add_error_context(const lcb_RESPHTTP* resp,
                              pycbc_HttpResult* htres,
                              int cbtype) {
 
-    /* get the extended error context and ref, if any */
-    const char *extended_ref = lcb_resp_get_error_ref(cbtype, (const lcb_RESPBASE*)resp);
-    const char *extended_context = lcb_resp_get_error_context(cbtype, (const lcb_RESPBASE*)resp);
     const lcb_HTTP_ERROR_CONTEXT* ctx;
     pycbc_enhanced_err_info* err_info = NULL;
     if (LCB_SUCCESS == lcb_resphttp_error_context(resp, &ctx)) {
-        pycbc_convert_http_error_context(ctx, &err_info, extended_context, extended_ref);
+        pycbc_convert_http_error_context(ctx, &err_info);
     }
     /* now stick it in the multiresult.  This will be passed along when an exception is raised */
     if (mres) {

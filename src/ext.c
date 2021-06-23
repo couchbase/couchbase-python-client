@@ -1819,7 +1819,7 @@ PYCBC_AUTODEF_TYPES(PYCBC_TYPE_DEF)
 #define PYCBC_X_FINISH_ARGS(TEXT, ULL) ULL(finish_time)
 
 #define PYCBC_X_LITERALTAGNAMES(TEXT, ULL, IDNUM) \
-    TEXT(DB_TYPE)                                 \
+    TEXT(SYSTEM)                                 \
     ULL(PEER_LATENCY)                             \
     TEXT(OPERATION_ID)                             \
     TEXT(SERVICE)                                 \
@@ -2602,9 +2602,9 @@ void pycbc_span_tags_args_dealloc(pycbc_tracer_tags_t* args) {
 #ifdef PYCBC_GEN_ARGS
     PYCBC_X_LITERALTAGNAMES(PYCBC_TEXT_FREE, PYCBC_ULL_FREE, PYCBC_ULL_FREE)
 #else
-    if (args->DB_TYPE) {
-        PYCBC_FREE((void *)args->DB_TYPE);
-        args->DB_TYPE = ((void *)0);
+    if (args->SYSTEM) {
+        PYCBC_FREE((void *)args->SYSTEM);
+        args->SYSTEM = ((void *)0);
     }
     if (args->PEER_LATENCY) {
         PYCBC_FREE((void *)args->PEER_LATENCY);
@@ -2811,7 +2811,7 @@ pycbc_tracer_payload_t *pycbc_persist_span(lcbtrace_SPAN *span)
             PYCBC_X_LITERALTAGNAMES(
                     TEXT_TO_PAYLOAD, ULL_TO_PAYLOAD, IDNUM_TO_DUMMY)
 #else
-            PYCBC_DUPE_STRING_TAG(span, "db.type", &tags_p->DB_TYPE);
+            PYCBC_DUPE_STRING_TAG(span, "system", &tags_p->SYSTEM);
             pycbc_dupe_uint64_tag(span, "peer.latency", &tags_p->PEER_LATENCY);
             PYCBC_DUPE_STRING_TAG(
                     span, "couchbase.operation_id", &tags_p->OPERATION_ID);

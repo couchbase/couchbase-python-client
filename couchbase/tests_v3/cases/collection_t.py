@@ -83,6 +83,52 @@ class CollectionTests(CollectionTestCase):
         self.assertEqual(self.NOKEY, result.id)
         self.assertDictEqual({"some": "thing"}, result.content_as[dict])
 
+    def test_upsert_preserve_expiry_not_used(self):
+        if self.is_mock:
+            raise SkipTest("Mock does not support preserve expiry")
+        if int(self.get_cluster_version().split('.')[0]) < 7:
+            raise SkipTest("Preserve expiry only in CBS 7.0+")
+        result = self.cb.upsert(self.KEY, {"some": "other content"}, UpsertOptions(
+            expiry=timedelta(seconds=5)))
+        expiry1 = self.cb.get(self.KEY, GetOptions(
+            with_expiry=True)).expiryTime
+        result = self.cb.upsert(self.KEY, {"some": "replaced content"})
+        self.assertTrue(result.success)
+        expiry2 = self.cb.get(self.KEY, GetOptions(
+            with_expiry=True)).expiryTime
+        self.assertIsNotNone(expiry1)
+        self.assertIsInstance(expiry1, datetime)
+        self.assertIsNone(expiry2)
+        self.assertNotEqual(expiry1, expiry2)
+        # if expiry was set, should be expired by now
+        time.sleep(6)
+        result = self.cb.get(self.KEY)
+        self.assertIsNotNone(result)
+
+    def test_upsert_preserve_expiry(self):
+        if self.is_mock:
+            raise SkipTest("Mock does not support preserve expiry")
+        if int(self.get_cluster_version().split('.')[0]) < 7:
+            raise SkipTest("Preserve expiry only in CBS 7.0+")
+        result = self.cb.upsert(self.KEY, {"some": "other content"}, UpsertOptions(
+            expiry=timedelta(seconds=5)))
+        expiry1 = self.cb.get(self.KEY, GetOptions(
+            with_expiry=True)).expiryTime
+        result = self.cb.upsert(
+            self.KEY, {"some": "replaced content"}, UpsertOptions(preserve_expiry=True))
+        self.assertTrue(result.success)
+        expiry2 = self.cb.get(self.KEY, GetOptions(
+            with_expiry=True)).expiryTime
+        self.assertIsNotNone(expiry1)
+        self.assertIsInstance(expiry1, datetime)
+        self.assertIsNotNone(expiry2)
+        self.assertIsInstance(expiry2, datetime)
+        self.assertEqual(expiry1, expiry2)
+        # if expiry was preserved, should be expired by now
+        time.sleep(6)
+        with self.assertRaises(DocumentNotFoundException):
+            self.cb.get(self.KEY)
+
     def test_insert(self):
         self.cb.insert(self.NOKEY, {"some": "thing"})
         result = self.try_n_times(10, 1, self.cb.get, self.NOKEY)
@@ -96,6 +142,61 @@ class CollectionTests(CollectionTestCase):
     def test_replace(self):
         result = self.cb.replace(self.KEY, {"some": "other content"})
         self.assertTrue(result.success)
+
+    def test_replace_preserve_expiry_not_used(self):
+        if self.is_mock:
+            raise SkipTest("Mock does not support preserve expiry")
+        if int(self.get_cluster_version().split('.')[0]) < 7:
+            raise SkipTest("Preserve expiry only in CBS 7.0+")
+        result = self.cb.upsert(self.KEY, {"some": "other content"}, UpsertOptions(
+            expiry=timedelta(seconds=5)))
+        expiry1 = self.cb.get(self.KEY, GetOptions(
+            with_expiry=True)).expiryTime
+        result = self.cb.replace(self.KEY, {"some": "replaced content"})
+        self.assertTrue(result.success)
+        expiry2 = self.cb.get(self.KEY, GetOptions(
+            with_expiry=True)).expiryTime
+        self.assertIsNotNone(expiry1)
+        self.assertIsInstance(expiry1, datetime)
+        self.assertIsNone(expiry2)
+        self.assertNotEqual(expiry1, expiry2)
+        # if expiry was set, should be expired by now
+        time.sleep(6)
+        result = self.cb.get(self.KEY)
+        self.assertIsNotNone(result)
+
+    def test_replace_preserve_expiry(self):
+        if self.is_mock:
+            raise SkipTest("Mock does not support preserve expiry")
+        if int(self.get_cluster_version().split('.')[0]) < 7:
+            raise SkipTest("Preserve expiry only in CBS 7.0+")
+        result = self.cb.upsert(self.KEY, {"some": "other content"}, UpsertOptions(
+            expiry=timedelta(seconds=5)))
+        expiry1 = self.cb.get(self.KEY, GetOptions(
+            with_expiry=True)).expiryTime
+        result = self.cb.replace(
+            self.KEY, {"some": "replaced content"}, ReplaceOptions(preserve_expiry=True))
+        self.assertTrue(result.success)
+        expiry2 = self.cb.get(self.KEY, GetOptions(
+            with_expiry=True)).expiryTime
+        self.assertIsNotNone(expiry1)
+        self.assertIsInstance(expiry1, datetime)
+        self.assertIsNotNone(expiry2)
+        self.assertIsInstance(expiry2, datetime)
+        self.assertEqual(expiry1, expiry2)
+        # if expiry was preserved, should be expired by now
+        time.sleep(6)
+        with self.assertRaises(DocumentNotFoundException):
+            self.cb.get(self.KEY)
+
+    def test_replace_preserve_expiry_fail(self):
+        if self.is_mock:
+            raise SkipTest("Mock does not support preserve expiry")
+        if int(self.get_cluster_version().split('.')[0]) < 7:
+            raise SkipTest("Preserve expiry only in CBS 7.0+")
+        opts = ReplaceOptions(expiry=timedelta(seconds=5), preserve_expiry=True)
+        with self.assertRaises(InvalidArgumentException):
+            self.cb.replace(self.KEY, {"some": "other content"}, opts)
 
     def test_replace_with_cas(self):
         old_cas = self.cb.get(self.KEY).cas
@@ -142,7 +243,9 @@ class CollectionTests(CollectionTestCase):
         result = self.coll.upsert(
             self.KEY, self.CONTENT, UpsertOptions(expiry=timedelta(seconds=3)))
         self.assertTrue(result.success)
-        self.try_n_times_till_exception(10, 2, self.coll.get, self.KEY)
+        time.sleep(4)
+        with self.assertRaises(DocumentNotFoundException):
+            self.coll.get(self.KEY)
 
     def test_get_with_expiry(self):
         if self.is_mock:
@@ -252,8 +355,9 @@ class CollectionTests(CollectionTestCase):
 
     def test_touch(self):
         self.cb.touch(self.KEY, timedelta(seconds=3))
-        self.try_n_times_till_exception(10, 3, self.cb.get, self.KEY)
-        self.assertRaises(DocumentNotFoundException, self.cb.get, self.KEY)
+        time.sleep(4)
+        with self.assertRaises(DocumentNotFoundException):
+            self.cb.get(self.KEY)
 
     def _authenticator(self):
         if self.is_mock:

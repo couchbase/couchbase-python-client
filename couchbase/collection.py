@@ -10,7 +10,7 @@ from couchbase_core._libcouchbase import FMT_UTF8
 
 import couchbase.exceptions
 from couchbase.durability import DurabilityType, DurabilityOptionBlock
-from couchbase.exceptions import (NotSupportedException,
+from couchbase.exceptions import (InvalidArgumentException, NotSupportedException,
                                   DocumentNotFoundException, PathNotFoundException, QueueEmpty,
                                   PathExistsException, DocumentExistsException)
 from couchbase_core import JSON, operation_mode
@@ -60,7 +60,9 @@ class ReplaceOptions(DurabilityOptionBlock):
     def __init__(self,
                  timeout=None,       # type: timedelta
                  durability=None,    # type: DurabilityType
-                 cas=0               # type: int
+                 cas=0,               # type: int
+                 preserve_expiry=False, # type: bool
+                 **kwargs               # type: Any
                  ):
         """
 
@@ -69,7 +71,7 @@ class ReplaceOptions(DurabilityOptionBlock):
         :param cas:
         """
         super(ReplaceOptions, self).__init__(
-            timeout=timeout, durability=durability, cas=cas)
+            timeout=timeout, durability=durability, cas=cas, preserve_expiry=preserve_expiry, **kwargs)
 
 
 class RemoveOptions(DurabilityOptionBlock):
@@ -211,7 +213,17 @@ class InsertOptions(DurabilityOptionBlock):
 
 
 class UpsertOptions(DurabilityOptionBlock):
-    pass
+    def __init__(self,
+                preserve_expiry=False, # type: bool
+                **kwargs
+                ):
+        """
+
+        :param timeout:
+        :param durability:
+        :param cas:
+        """
+        super(UpsertOptions, self).__init__(preserve_expiry=preserve_expiry, **kwargs)
 
 
 T = TypeVar('T', bound='CBCollection')
@@ -881,6 +893,12 @@ class CBCollection(wrapt.ObjectProxy):
         """
 
         final_options = forward_args(kwargs, *options)
+        
+        ttl = final_options.get('ttl', None)
+        preserve_expiry = final_options.get('preserve_expiry', False)
+        if ttl and preserve_expiry is True:
+            raise InvalidArgumentException('The expiry and preserve_expiry options cannot both be set for replace operations.')
+
         return ResultPrecursor(CoreClient.replace(self.bucket, key, value, **final_options), final_options)
 
     @_mutate_result_and_inject
@@ -994,6 +1012,17 @@ class CBCollection(wrapt.ObjectProxy):
         .. seealso:: :mod:`.couchbase_core.subdocument`
         """
         final_options = forward_args(kwargs, *options)
+
+        ttl = final_options.get('ttl', None)
+        preserve_expiry = final_options.get('preserve_expiry', False)
+        
+        spec_types = [s[0] for s in spec]
+        if SD.LCB_SDCMD_DICT_ADD in spec_types and preserve_expiry is True:
+            raise InvalidArgumentException('The preserve_expiry option cannot be set for mutate_in with insert operations.')
+
+        if SD.LCB_SDCMD_REPLACE in spec_types and ttl and preserve_expiry is True:
+            raise InvalidArgumentException('The expiry and preserve_expiry options cannot both be set for mutate_in with replace operations.')
+
         return ResultPrecursor(CoreClient.mutate_in(self.bucket, key, spec, **final_options), final_options)
 
     def binary(self):

@@ -71,6 +71,65 @@ class AcouchbaseCollectionTestSuite(object):
         self.assertTrue(result.success)
 
     @async_test
+    async def test_replace_preserve_expiry_not_used(self):
+        if self.is_mock:
+            raise SkipTest("Mock does not support preserve expiry")
+        if int(self.cluster_version.split('.')[0]) < 7:
+            raise SkipTest("Preserve expiry only in CBS 7.0+")
+        result = await self.collection.upsert(self.KEY, {"some": "other content"}, UpsertOptions(
+            expiry=timedelta(seconds=5)))
+        expiry1 = await self.collection.get(self.KEY, GetOptions(
+            with_expiry=True)).expiryTime
+        result = await self.collection.replace(self.KEY, {"some": "replaced content"})
+        self.assertTrue(result.success)
+        expiry2 = await self.collection.get(self.KEY, GetOptions(
+            with_expiry=True)).expiryTime
+        self.assertIsNotNone(expiry1)
+        self.assertIsInstance(expiry1, datetime)
+        self.assertIsNone(expiry2)
+        self.assertNotEqual(expiry1, expiry2)
+        # if expiry was set, should be expired by now
+        await asyncio.sleep(6)
+        result = await self.collection.get(self.KEY)
+        self.assertIsNotNone(result)
+
+    @async_test
+    async def test_replace_preserve_expiry(self):
+        if self.is_mock:
+            raise SkipTest("Mock does not support preserve expiry")
+        if int(self.cluster_version.split('.')[0]) < 7:
+            raise SkipTest("Preserve expiry only in CBS 7.0+")
+        result = await self.collection.upsert(self.KEY, {"some": "other content"}, UpsertOptions(
+            expiry=timedelta(seconds=5)))
+        expiry1 = await self.collection.get(self.KEY, GetOptions(
+            with_expiry=True)).expiryTime
+        result = await self.collection.replace(
+            self.KEY, {"some": "replaced content"}, ReplaceOptions(preserve_expiry=True))
+        self.assertTrue(result.success)
+        expiry2 = await self.collection.get(self.KEY, GetOptions(
+            with_expiry=True)).expiryTime
+        self.assertIsNotNone(expiry1)
+        self.assertIsInstance(expiry1, datetime)
+        self.assertIsNotNone(expiry2)
+        self.assertIsInstance(expiry2, datetime)
+        self.assertEqual(expiry1, expiry2)
+        # if expiry was preserved, should be expired by now
+        await asyncio.sleep(6)
+        with self.assertRaises(DocumentNotFoundException):
+            await self.collection.get(self.KEY)
+
+    @async_test
+    async def test_replace_preserve_expiry_fail(self):
+        if self.is_mock:
+            raise SkipTest("Mock does not support preserve expiry")
+        if int(self.cluster_version.split('.')[0]) < 7:
+            raise SkipTest("Preserve expiry only in CBS 7.0+")
+        opts = ReplaceOptions(expiry=timedelta(
+            seconds=5), preserve_expiry=True)
+        with self.assertRaises(InvalidArgumentException):
+            await self.collection.replace(self.KEY, {"some": "other content"}, opts)
+
+    @async_test
     async def test_replace_with_cas(self):
         result = await self.collection.get(self.KEY)
         old_cas = result.cas
@@ -118,7 +177,9 @@ class AcouchbaseCollectionTestSuite(object):
         result = await self.collection.upsert(
             self.KEY, self.CONTENT, UpsertOptions(expiry=timedelta(seconds=3)))
         self.assertTrue(result.success)
-        await self.try_n_times_till_exception_async(10, 2, self.collection.get, self.KEY)
+        await asyncio.sleep(4)
+        with self.assertRaises(DocumentNotFoundException):
+            await self.collection.get(self.KEY)
 
     @async_test
     async def test_get_with_expiry(self):
@@ -181,7 +242,7 @@ class AcouchbaseCollectionTestSuite(object):
     @async_test
     async def test_touch(self):
         await self.collection.touch(self.KEY, timedelta(seconds=3))
-        await self.try_n_times_till_exception_async(10, 3, self.collection.get, self.KEY)
+        await asyncio.sleep(4)
         with self.assertRaises(DocumentNotFoundException):
             await self.collection.get(self.KEY)
 

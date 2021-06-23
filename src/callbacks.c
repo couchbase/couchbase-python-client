@@ -177,9 +177,7 @@ void pycbc_enhanced_err_register_entry(PyObject **dict,
 }
 
 void pycbc_convert_kv_error_context(const lcb_KEY_VALUE_ERROR_CONTEXT* ctx,
-                                    pycbc_enhanced_err_info** err_info,
-                                    const char* extended_context,
-                                    const char* extended_ref) {
+                                    pycbc_enhanced_err_info** err_info) {
     PyObject* err_context = NULL;
     if (!*err_info) {
         *err_info = PyDict_New();
@@ -215,21 +213,11 @@ void pycbc_convert_kv_error_context(const lcb_KEY_VALUE_ERROR_CONTEXT* ctx,
         pycbc_dict_add_text_kv_strn2(err_context, "endpoint", val, len);
         pycbc_dict_add_text_kv(err_context, "type", "KVErrorContext");
     }
-    if (extended_context) {
-        pycbc_dict_add_text_kv(err_context, "extended_context", extended_context);
-    }
-    if (extended_ref) {
-        pycbc_dict_add_text_kv(err_context, "extended_ref", extended_ref);
-    }
     Py_DECREF(err_context);
 }
 
 pycbc_enhanced_err_info* get_operation_err_info(const lcb_RESPBASE* respbase,
                                                 lcb_CALLBACK_TYPE cbtype) {
-
-    /* get the extended error context and ref, if any */
-    const char *extended_ref = lcb_resp_get_error_ref(cbtype, respbase);
-    const char *extended_context = lcb_resp_get_error_context(cbtype, respbase);
     /* To get the error_context, we need to cast to appropriate resp type
        and call appropriate respXXX_error_context function
     */
@@ -289,7 +277,7 @@ pycbc_enhanced_err_info* get_operation_err_info(const lcb_RESPBASE* respbase,
     }
     if (LCB_SUCCESS == rc) {
         if (ctx) {
-            pycbc_convert_kv_error_context(ctx, &info, extended_context, extended_ref);
+            pycbc_convert_kv_error_context(ctx, &info);
         }
     }
     SKIP:

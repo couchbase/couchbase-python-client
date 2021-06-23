@@ -54,9 +54,7 @@ void pycbc_add_row_or_data(pycbc_MultiResult *mres,
    understand it again.  So, no. Maybe later.
    */
 void convert_analytics_error_context(const lcb_ANALYTICS_ERROR_CONTEXT* ctx,
-                                     pycbc_MultiResult *mres,
-                                     const char* extended_context,
-                                     const char* extended_ref) {
+                                     pycbc_MultiResult *mres) {
 
     pycbc_enhanced_err_info* err_info = PyDict_New();
     PyObject* err_context = PyDict_New();
@@ -84,19 +82,11 @@ void convert_analytics_error_context(const lcb_ANALYTICS_ERROR_CONTEXT* ctx,
         pycbc_dict_add_text_kv_strn2(err_context, "endpoint", val, len);
         pycbc_dict_add_text_kv(err_context, "type", "AnalyticsErrorContext");
     }
-    if (extended_context) {
-        pycbc_dict_add_text_kv(err_context, "extended_context", extended_context);
-    }
-    if (extended_ref) {
-        pycbc_dict_add_text_kv(err_context, "extended_ref", extended_ref);
-    }
     mres->err_info = err_info;
     Py_DECREF(err_context);
 }
 void convert_query_error_context(const lcb_QUERY_ERROR_CONTEXT* ctx,
-                                 pycbc_MultiResult *mres,
-                                 const char* extended_context,
-                                 const char* extended_ref) {
+                                 pycbc_MultiResult *mres) {
     pycbc_enhanced_err_info* err_info = PyDict_New();
     PyObject* err_context = PyDict_New();
     PyDict_SetItemString(err_info, "error_context", err_context);
@@ -123,12 +113,6 @@ void convert_query_error_context(const lcb_QUERY_ERROR_CONTEXT* ctx,
         pycbc_dict_add_text_kv_strn2(err_context, "endpoint", val, len);
         pycbc_dict_add_text_kv(err_context, "type", "QueryErrorContext");
     }
-    if (extended_context) {
-        pycbc_dict_add_text_kv(err_context, "extended_context", extended_context);
-    }
-    if (extended_ref) {
-        pycbc_dict_add_text_kv(err_context, "extended_ref", extended_ref);
-    }
     mres->err_info = err_info;
     Py_DECREF(err_context);
 }
@@ -138,26 +122,20 @@ void convert_query_error_context(const lcb_QUERY_ERROR_CONTEXT* ctx,
 */
 void pycbc_add_analytics_error_context(const lcb_RESPANALYTICS* resp,
                                        pycbc_MultiResult* mres) {
-    /* get the extended error context and ref, if any */
-    const char *extended_ref = lcb_resp_get_error_ref(LCB_CALLBACK_ANALYTICS, (lcb_RESPBASE*)resp);
-    const char *extended_context = lcb_resp_get_error_context(LCB_CALLBACK_ANALYTICS, (lcb_RESPBASE*)resp);
     const lcb_ANALYTICS_ERROR_CONTEXT* ctx;
     if (LCB_SUCCESS == lcb_respanalytics_error_context(resp, &ctx)) {
         if (ctx) {
-            convert_analytics_error_context(ctx, mres, extended_context, extended_ref);
+            convert_analytics_error_context(ctx, mres);
         }
     }
 }
 
 void pycbc_add_query_error_context(const lcb_RESPQUERY* resp,
                                    pycbc_MultiResult* mres) {
-    /* get the extended error context and ref, if any */
-    const char *extended_ref = lcb_resp_get_error_ref(LCB_CALLBACK_QUERY, (lcb_RESPBASE*)resp);
-    const char *extended_context = lcb_resp_get_error_context(LCB_CALLBACK_QUERY, (lcb_RESPBASE*)resp);
     const lcb_QUERY_ERROR_CONTEXT* ctx;
     if (LCB_SUCCESS == lcb_respquery_error_context(resp, &ctx)) {
         if (ctx) {
-            convert_query_error_context(ctx, mres, extended_context, extended_ref);
+            convert_query_error_context(ctx, mres);
         }
     }
 }

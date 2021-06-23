@@ -15,15 +15,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+from datetime import datetime, timedelta
+from unittest import SkipTest
+import time
+
 from couchbase.durability import ClientDurability
 from couchbase_tests.base import CollectionTestCase
 from couchbase.collection import GetOptions, LookupInOptions
-from couchbase.exceptions import InvalidArgumentException, PathNotFoundException, DurabilityImpossibleException
+from couchbase.exceptions import InvalidArgumentException, PathNotFoundException, DurabilityImpossibleException, DocumentNotFoundException
 from couchbase.collection import MutateInOptions
-from datetime import timedelta
 import couchbase.subdocument as SD
-from unittest import SkipTest
-from datetime import datetime
 
 
 class SubdocTests(CollectionTestCase):
@@ -68,12 +69,14 @@ class SubdocTests(CollectionTestCase):
     def test_lookup_in_one_path_not_found(self):
         cas = self.coll.upsert(self.KEY, {"a": "aaa", "b": [1, 2, 3, 4]}).cas
         self.try_n_times(10, 3, self._cas_matches, self.KEY, cas)
-        result = self.coll.lookup_in(self.KEY, (SD.exists("a"), SD.exists("qzzxy"),))
+        result = self.coll.lookup_in(
+            self.KEY, (SD.exists("a"), SD.exists("qzzxy"),))
         self.assertTrue(result.exists(0))
         self.assertFalse(result.exists(1))
 
     def test_lookup_in_simple_get_longer_path(self):
-        cas = self.coll.upsert(self.KEY, {"a": "aaa", "b": {"c": {"d": "yo!"}}}).cas
+        cas = self.coll.upsert(
+            self.KEY, {"a": "aaa", "b": {"c": {"d": "yo!"}}}).cas
         self.try_n_times(10, 3, self._cas_matches, self.KEY, cas)
         result = self.coll.lookup_in(self.KEY, (SD.get("b.c.d"),))
         self.assertEqual(result.cas, cas)
@@ -81,8 +84,10 @@ class SubdocTests(CollectionTestCase):
 
     def test_lookup_in_multiple_specs(self):
         if self.is_mock:
-            raise SkipTest("mock doesn't support getting xattrs (like $document.expiry)")
-        cas = self.coll.upsert(self.KEY, {"a": "aaa", "b": {"c": {"d": "yo!"}}}).cas
+            raise SkipTest(
+                "mock doesn't support getting xattrs (like $document.expiry)")
+        cas = self.coll.upsert(
+            self.KEY, {"a": "aaa", "b": {"c": {"d": "yo!"}}}).cas
         self.try_n_times(10, 3, self._cas_matches, self.KEY, cas)
         result = self.coll.lookup_in(self.KEY,
                                      (SD.with_expiry(),
@@ -96,14 +101,16 @@ class SubdocTests(CollectionTestCase):
         self.assertDictEqual({"d": "yo!"}, result.content_as[dict](3))
 
     def test_mutate_in_simple(self):
-        cas = self.coll.mutate_in(self.KEY, (SD.upsert("c", "ccc"), SD.replace("b", "XXX"),)).cas
+        cas = self.coll.mutate_in(self.KEY, (SD.upsert(
+            "c", "ccc"), SD.replace("b", "XXX"),)).cas
         self.try_n_times(10, 3, self._cas_matches, self.KEY, cas)
         result = self.coll.get(self.KEY).content_as[dict]
         self.assertDictEqual({"a": "aaa", "b": "XXX", "c": "ccc"}, result)
 
     def test_mutate_in_expiry(self):
         if self.is_mock:
-            raise SkipTest("mock doesn't support getting xattrs (like $document.expiry)")
+            raise SkipTest(
+                "mock doesn't support getting xattrs (like $document.expiry)")
 
         cas = self.coll.mutate_in(self.KEY,
                                   (SD.upsert("c", "ccc"), SD.replace("b", "XXX"),),
@@ -113,12 +120,92 @@ class SubdocTests(CollectionTestCase):
         expires_in = (result.expiryTime - datetime.now()).total_seconds()
         self.assertTrue(0 < expires_in < 1001)
 
+    def test_mutate_in_preserve_expiry_not_used(self):
+        if self.is_mock:
+            raise SkipTest(
+                "mock doesn't support getting xattrs (like $document.expiry)")
+        if int(self.get_cluster_version().split('.')[0]) < 7:
+            raise SkipTest("Preserve expiry only in CBS 7.0+")
+
+        result = self.coll.mutate_in(self.KEY,
+                                     (SD.upsert("c", "ccc"),
+                                      SD.replace("b", "XXX"),),
+                                     MutateInOptions(expiry=timedelta(seconds=5)))
+        self.assertTrue(result.success)
+        expiry1 = self.coll.get(
+            self.KEY, GetOptions(with_expiry=True)).expiryTime
+
+        result = self.coll.mutate_in(self.KEY,
+                                     (SD.upsert("d", "ddd"),))
+        self.assertTrue(result.success)
+        expiry2 = self.cb.get(self.KEY, GetOptions(
+            with_expiry=True)).expiryTime
+        self.assertIsNotNone(expiry1)
+        self.assertIsInstance(expiry1, datetime)
+        self.assertIsNone(expiry2)
+        self.assertNotEqual(expiry1, expiry2)
+        # if expiry was set, should be expired by now
+        time.sleep(6)
+        result = self.cb.get(self.KEY)
+        self.assertIsNotNone(result)
+
+    def test_mutate_in_preserve_expiry(self):
+        if self.is_mock:
+            raise SkipTest(
+                "mock doesn't support getting xattrs (like $document.expiry)")
+
+        if int(self.get_cluster_version().split('.')[0]) < 7:
+            raise SkipTest("Preserve expiry only in CBS 7.0+")
+
+        result = self.coll.mutate_in(self.KEY,
+                                     (SD.upsert("c", "ccc"),
+                                      SD.replace("b", "XXX"),),
+                                     MutateInOptions(expiry=timedelta(seconds=5)))
+        self.assertTrue(result.success)
+        expiry1 = self.coll.get(
+            self.KEY, GetOptions(with_expiry=True)).expiryTime
+
+        result = self.coll.mutate_in(self.KEY,
+                                     (SD.upsert("d", "ddd"),),
+                                     MutateInOptions(preserve_expiry=True))
+        self.assertTrue(result.success)
+        expiry2 = self.coll.get(
+            self.KEY, GetOptions(with_expiry=True)).expiryTime
+        self.assertIsNotNone(expiry1)
+        self.assertIsInstance(expiry1, datetime)
+        self.assertIsNotNone(expiry2)
+        self.assertIsInstance(expiry2, datetime)
+        self.assertEqual(expiry1, expiry2)
+        # if expiry was preserved, should be expired by now
+        time.sleep(6)
+        with self.assertRaises(DocumentNotFoundException):
+            self.coll.get(self.KEY)
+
+    def test_mutate_in_preserve_expiry_fails(self):
+        if self.is_mock:
+            raise SkipTest(
+                "mock doesn't support getting xattrs (like $document.expiry)")
+
+        if int(self.get_cluster_version().split('.')[0]) < 7:
+            raise SkipTest("Preserve expiry only in CBS 7.0+")
+
+        with self.assertRaises(InvalidArgumentException):
+            self.coll.mutate_in(self.KEY,
+                                (SD.insert("c", "ccc"),),
+                                MutateInOptions(preserve_expiry=True))
+
+        with self.assertRaises(InvalidArgumentException):
+            self.coll.mutate_in(self.KEY,
+                                (SD.replace("c", "ccc"),),
+                                MutateInOptions(expiry=timedelta(seconds=5), preserve_expiry=True))
+
     def test_mutate_in_durability(self):
         if self.is_mock:
-            raise SkipTest("mock doesn't support getting xattrs (like $document.expiry)")
-        self.assertRaises(DurabilityImpossibleException, self.coll.mutate_in,self.KEY,
-                                  (SD.upsert("c", "ccc"), SD.replace("b", "XXX"),),
-                                  MutateInOptions(durability=ClientDurability(replicate_to=5)))
+            raise SkipTest(
+                "mock doesn't support getting xattrs (like $document.expiry)")
+        self.assertRaises(DurabilityImpossibleException, self.coll.mutate_in, self.KEY,
+                          (SD.upsert("c", "ccc"), SD.replace("b", "XXX"),),
+                          MutateInOptions(durability=ClientDurability(replicate_to=5)))
 
     # refactor!  Also, this seems like it should timeout.  I suspect a bug here.  I don't really
     # believe there is any way this could not timeout on the first lookup_in
@@ -128,11 +215,13 @@ class SubdocTests(CollectionTestCase):
         self.try_n_times(10, 1, self.coll.get, "id")
 
         # ok, it is there...
-        self.coll.get("id", GetOptions(project=["someArray"], timeout=timedelta(seconds=1.0)))
+        self.coll.get("id", GetOptions(
+            project=["someArray"], timeout=timedelta(seconds=1.0)))
         self.assertRaisesRegex(InvalidArgumentException, "Expected timedelta", self.coll.get, "id",
                                GetOptions(project=["someArray"], timeout=456))
-        sdresult_2 = self.coll.lookup_in("id", (SD.get("someArray"),), LookupInOptions(timeout=timedelta(microseconds=1)))
-        self.assertEqual(['wibble', 'gronk'],sdresult_2.content_as[list](0))
-        sdresult_2 = self.coll.lookup_in("id", (SD.get("someArray"),), LookupInOptions(timeout=timedelta(seconds=1)), timeout=timedelta(microseconds=1))
-        self.assertEqual(['wibble', 'gronk'],sdresult_2.content_as[list](0))
-
+        sdresult_2 = self.coll.lookup_in(
+            "id", (SD.get("someArray"),), LookupInOptions(timeout=timedelta(microseconds=1)))
+        self.assertEqual(['wibble', 'gronk'], sdresult_2.content_as[list](0))
+        sdresult_2 = self.coll.lookup_in("id", (SD.get("someArray"),), LookupInOptions(
+            timeout=timedelta(seconds=1)), timeout=timedelta(microseconds=1))
+        self.assertEqual(['wibble', 'gronk'], sdresult_2.content_as[list](0))

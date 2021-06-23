@@ -640,17 +640,18 @@ class ErrorContext(dict):
         # type: (...) -> str
         return self.get('endpoint', None)
 
-    @property
-    @uncommitted
-    def extended_context(self):
-        # type: (...) -> str
-        return self.get('extended_context', None)
+    # deprecated??
+    # @property
+    # @uncommitted
+    # def extended_context(self):
+    #     # type: (...) -> str
+    #     return self.get('extended_context', None)
 
-    @property
-    @uncommitted
-    def extended_ref(self):
-        # type: (...) -> str
-        return self.get('extended_ref', None)
+    # @property
+    # @uncommitted
+    # def extended_ref(self):
+    #     # type: (...) -> str
+    #     return self.get('extended_ref', None)
 
 
 class HTTPErrorContextBase(ErrorContext):
