@@ -809,7 +809,7 @@ class Cluster(CoreClient):
             dataverses, etc.. on the cluster.
         """
         self._check_for_shutdown()
-        return AnalyticsIndexManager(self)
+        return AnalyticsIndexManager(self, self._admin)
 
     def buckets(self):
         # type: (...) -> BucketManager

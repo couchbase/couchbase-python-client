@@ -16,11 +16,21 @@
 # limitations under the License.
 #
 
-from couchbase.options import OptionBlockTimeOut
+from datetime import timedelta
 from typing import *
-from couchbase.analytics import AnalyticsOptions, AnalyticsResult, AnalyticsDataset, AnalyticsIndex
+
+from couchbase.management.generic import GenericManager
+from couchbase.options import OptionBlockTimeOut, forward_args
+from couchbase.analytics import (AnalyticsLinkType, AnalyticsOptions,
+                                 AnalyticsResult, AnalyticsDataset, AnalyticsIndex,
+                                 AnalyticsLink, CouchbaseRemoteAnalyticsLink,
+                                 S3ExternalAnalyticsLink, AzureBlobExternalAnalyticsLink)
 import couchbase_core._libcouchbase as _LCB
-from couchbase.exceptions import CouchbaseException, NotSupportedException
+from couchbase_core import ulp, mk_formstr
+from couchbase.exceptions import (CouchbaseException, DataverseNotFoundException, NotSupportedException,
+                                  InvalidArgumentException, ErrorMapper, HTTPException,
+                                  AnalyticsLinkExistsException, AnalyticsLinkNotFoundException)
+from couchbase.management.admin import Admin, METHMAP
 
 
 class BaseAnalyticsIndexManagerOptions(OptionBlockTimeOut):
@@ -216,16 +226,92 @@ class CreateDatasetOptions(BaseAnalyticsIndexManagerOptions):
         return self.get('dataverse_name', 'Default')
 
 
-class AnalyticsIndexManager(object):
+class CreateLinkAnalyticsOptions(OptionBlockTimeOut):
+    pass
+
+
+class ReplaceLinkAnalyticsOptions(OptionBlockTimeOut):
+    pass
+
+
+class DropLinkAnalyticsOptions(OptionBlockTimeOut):
+    pass
+
+
+class GetLinksAnalyticsOptions(OptionBlockTimeOut):
+    @overload
     def __init__(self,
-                 cluster,   # type: Cluster
+                 timeout=None,          # type: timedelta
+                 dataverse_name=None,   # type: str
+                 name=None,             # type: str
+                 link_type=None,        # type: AnalyticsLinkType
                  ):
+        pass
+
+    def __init__(self, **kwargs):
+        super(GetLinksAnalyticsOptions, self).__init__(**kwargs)
+
+    @property
+    def dataverse_name(self):
+        # type: (...) -> str
+        return self.get('dataverse_name', None)
+
+    @property
+    def name(self):
+        # type: (...) -> str
+        return self.get('name', None)
+
+    @property
+    def link_type(self):
+        # type: (...) -> AnalyticsLinkType
+        return self.get('link_type', None)
+
+
+class AnalyticsIndexErrorHandler(ErrorMapper):
+    @staticmethod
+    def mapping():
+        # type (...)->Mapping[str, CBErrorType]
+        return {HTTPException: {'24055.*already exists': AnalyticsLinkExistsException,
+                                '24006.*does not exist': AnalyticsLinkNotFoundException,
+                                '24034.*Cannot find': DataverseNotFoundException}}
+
+
+class AnalyticsIndexManager(GenericManager):
+    def __init__(self,         # type: "AnalyticsIndexManager"
+                 cluster,       # type: "Cluster"
+                 admin_bucket  # type: "Admin"
+                 ):
+        """Analytics Manager
+
+        :param admin_bucket: Admin bucket
+        """
+        super(AnalyticsIndexManager, self).__init__(admin_bucket)
         self._cluster = cluster
 
     @staticmethod
     def _to_analytics_options(option    # type: BaseAnalyticsIndexManagerOptions
                               ):
         return option.to_analytics_options() if option else AnalyticsOptions()
+
+    def _http_request(self, **kwargs):
+        #  TODO: maybe there is a more general way of making this
+        # call?  Ponder
+        # the kwargs can override the defaults
+        imeth = None
+        method = kwargs.get('method', 'GET')
+        if not method in METHMAP:
+            raise InvalidArgumentException("Unknown HTTP Method", method)
+
+        imeth = METHMAP[method]
+        return self._admin_bucket._http_request(
+            type=_LCB.LCB_HTTP_TYPE_ANALYTICS,
+            path=kwargs['path'],
+            method=imeth,
+            content_type=kwargs.get(
+                'content_type', 'application/x-www-form-urlencoded'),
+            post_data=kwargs.get('content', None),
+            response_format=_LCB.FMT_JSON,
+            timeout=kwargs.get('timeout', None))
 
     def _scrub_dataverse_name(self, dataverse_name):
         tokens = dataverse_name.split("/")
@@ -495,3 +581,161 @@ class AnalyticsIndexManager(object):
                     raise NotSupportedException(
                         "get pending mutations not supported")
             raise e
+
+    @AnalyticsIndexErrorHandler.mgmt_exc_wrap
+    def create_link(
+        self,  # type: "AnalyticsIndexManager"
+        link,  # type: "AnalyticsLink"
+        *options,     # type: CreateLinkAnalyticsOptions
+        **kwargs
+    ):
+        """Creates a new analytics link
+
+        :param link: the link to create
+        :param options: CreateLinkAnalyticsOptions to create a link.
+        :param kwargs: Override corresponding value in options.
+
+        :raises: AnalyticsLinkExistsException
+        :raises: DataverseNotFoundException
+        :raises: InvalidArgumentException
+        """
+
+        link.validate()
+
+        if "/" in link.dataverse_name():
+            path = "/analytics/link/{}/{}".format(
+                ulp.quote(link.dataverse_name(), safe=''), link.name())
+        else:
+            path = "/analytics/link"
+
+        self._http_request(
+            path=path,
+            method="POST",
+            content=link.form_encode(),
+            **forward_args(kwargs, *options))
+
+    @AnalyticsIndexErrorHandler.mgmt_exc_wrap
+    def replace_link(
+        self,  # type: "AnalyticsIndexManager"
+        link,  # type: "AnalyticsLink"
+        *options,     # type: ReplaceLinkAnalyticsOptions
+        **kwargs
+    ):
+        """Replaces an existing analytics link
+
+        :param link: the link to replace
+        :param options: CreateLinkAnalyticsOptions to create a link.
+        :param kwargs: Override corresponding value in options.
+
+        :raises: AnalyticsLinkNotFoundException
+        :raises: DataverseNotFoundException
+        :raises: InvalidArgumentException
+        """
+
+        link.validate()
+
+        if "/" in link.dataverse_name():
+            path = "/analytics/link/{}/{}".format(
+                ulp.quote(link.dataverse_name(), safe=''), link.name())
+        else:
+            path = "/analytics/link"
+
+        self._http_request(
+            path=path,
+            method="PUT",
+            content=link.form_encode(),
+            **forward_args(kwargs, *options))
+
+    @AnalyticsIndexErrorHandler.mgmt_exc_wrap
+    def drop_link(
+        self,  # type: "AnalyticsIndexManager"
+        link_name,  # type: str
+        dataverse_name,     # type: str
+        *options,  # type: DropLinkAnalyticsOptions
+        **kwargs
+    ):
+        """Drops an existing analytics link from provided dataverse
+
+        :param link_name: The name of the link to drop
+        :param dataverse_name: The name of the dataverse in which the link belongs
+        :param options: DropLinkAnalyticsOptions to create a link.
+        :param kwargs: Override corresponding value in options.
+
+        :raises: AnalyticsLinkNotFoundException
+        :raises: DataverseNotFoundException
+        """
+        content = None
+        if "/" in dataverse_name:
+            path = "/analytics/link/{}/{}".format(
+                ulp.quote(dataverse_name, safe=''), link_name)
+        else:
+            path = "/analytics/link"
+            content = mk_formstr({
+                "dataverse": dataverse_name,
+                "name": link_name,
+            })
+
+        self._http_request(
+            path=path,
+            method="DELETE",
+            content=content,
+            **forward_args(kwargs, *options))
+
+    @AnalyticsIndexErrorHandler.mgmt_exc_wrap
+    def get_links(
+        self,  # type: "AnalyticsIndexManager"
+        *options,  # type: GetLinksAnalyticsOptions
+        **kwargs
+    ) -> List[AnalyticsLink]:
+        """Gets existing analytics links
+
+        :param options: GetLinksAnalyticsOptions to create a link.
+        :param kwargs: Override corresponding value in options.
+
+        :raises: DataverseNotFoundException
+        :raises: InvalidArgumentException
+        """
+
+        path = "analytics/link"
+
+        final_args = forward_args(kwargs, *options)
+        link_type = final_args.pop("link_type", None)
+        link_name = final_args.pop("name", None)
+        dataverse_name = final_args.pop("dataverse_name", None)
+
+        if dataverse_name is not None:
+            if "/" in dataverse_name:
+                path += "/{}".format(ulp.quote(dataverse_name, safe=''))
+                if link_name is not None:
+                    path += "/{}".format(link_name)
+            else:
+                path += "?dataverse={}".format(dataverse_name)
+                if link_name is not None:
+                    path += "&name={}".format(link_name)
+
+        else:
+            if link_name is not None:
+                raise InvalidArgumentException(
+                    "Both the link name and the dataverse name must be set.")
+
+        if link_type is not None:
+            path += "?type={}".format(link_type.value)
+
+        links = self._http_request(
+            path=path,
+            method="GET",
+            **final_args).value
+
+        analytics_links = []
+        for link in links:
+            if link["type"] == AnalyticsLinkType.CouchbaseRemote.value:
+                analytics_links.append(
+                    CouchbaseRemoteAnalyticsLink.link_from_server_json(link))
+            elif link["type"] == AnalyticsLinkType.S3External.value:
+                analytics_links.append(
+                    S3ExternalAnalyticsLink.link_from_server_json(link))
+            if link["type"] == AnalyticsLinkType.AzureBlobExternal.value:
+                analytics_links.append(
+                    AzureBlobExternalAnalyticsLink.link_from_server_json(link))
+
+        return analytics_links

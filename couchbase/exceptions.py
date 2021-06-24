@@ -1229,6 +1229,14 @@ class DatasetAlreadyExistsException(AnalyticsException):
     """Raised when attempting to create a dataset which already exists"""
 
 
+class AnalyticsLinkExistsException(AnalyticsException):
+    """Raised when attempting to create an analytics link which already exists"""
+
+
+class AnalyticsLinkNotFoundException(AnalyticsException):
+    """Raised when attempting to replace or drop an analytics link that does not exists"""
+
+
 _PYCBC_CRYPTO_ERR_MAP = {
     C.PYCBC_CRYPTO_PROVIDER_NOT_FOUND: CryptoProviderNotFoundException,
     C.PYCBC_CRYPTO_PROVIDER_ALIAS_NULL: CryptoProviderAliasNullException,
