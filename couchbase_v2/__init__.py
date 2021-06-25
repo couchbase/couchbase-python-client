@@ -29,9 +29,6 @@ sys.modules[__name__ + '.analytics'] = analytics
 import couchbase_core.connstr as connstr
 sys.modules[__name__ + '.connstr'] = connstr
 
-import couchbase_core.crypto as crypto
-sys.modules[__name__ + '.crypto'] = crypto
-
 import couchbase_core.items as items
 sys.modules[__name__ + '.items'] = items
 
