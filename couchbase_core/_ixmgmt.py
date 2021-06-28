@@ -15,6 +15,7 @@
 #
 # This module is used internally by the BucketManager class. Do not use
 # this module directly.
+from typing import Optional
 import couchbase.exceptions as E
 import couchbase_core._libcouchbase as C
 from couchbase_core import _to_json
@@ -54,6 +55,7 @@ class N1qlIndex(object):
     state = _genprop('state')  # type: str
     condition = _genprop('condition')  # type: str
     fields = _genprop('index_key')  # type: list[str]
+    partition = _genprop('partition')  # type: Optional[str]
 
     def __repr__(self):
         return ('Index<name={0.name}, primary={0.primary}, raw={0.raw!r}>'
@@ -96,6 +98,7 @@ class IxmgmtRequest(object):
     This class has similar functionality as N1QLRequest and View. It
     implements iteration over index management results.
     """
+
     def __init__(self, parent, cmd, index, **kwargs):
         """
         :param Client parent: parent Client object

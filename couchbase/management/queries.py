@@ -1,5 +1,5 @@
 import attr
-from attr.validators import instance_of as io, deep_mapping as dm
+from attr.validators import instance_of as io, deep_mapping as dm, optional
 from typing import *
 
 from couchbase_core._ixmgmt import N1QL_PRIMARY_INDEX, IxmgmtRequest, N1qlIndex
@@ -194,7 +194,8 @@ class QueryIndexManager(GenericManager):
     def _drop_index(self, bucket_name, index_name, *options, **kwargs):
         info = BucketManager._mk_index_def(
             bucket_name, index_name, primary=kwargs.pop('primary', False))
-        final_args = {k.replace('ignore_if_not_exists', 'ignore_missing'): v for k, v in forward_args(kwargs, *options).items()}
+        final_args = {k.replace('ignore_if_not_exists', 'ignore_missing')
+                                : v for k, v in forward_args(kwargs, *options).items()}
         try:
             IxmgmtRequest(self._admin_bucket, 'drop',
                           info, **final_args).execute()
@@ -292,12 +293,22 @@ class QueryIndex(Protocol):
     keyspace = attr.ib(validator=io(str))  # type: str
     index_key = attr.ib(validator=io(Iterable))  # type: Iterable[str]
     condition = attr.ib(validator=io(str))  # type: str
+    partition = attr.ib(validator=optional(
+        validator=io(str)))  # type: Optional[str]
 
     @classmethod
     def from_n1qlindex(cls,
                        n1qlindex  # type: N1qlIndex
                        ):
-        return cls(n1qlindex.name, bool(n1qlindex.primary), IndexType(), n1qlindex.state, n1qlindex.keyspace, [], n1qlindex.condition or "")
+        return cls(n1qlindex.name,
+                   bool(n1qlindex.primary),
+                   IndexType(),
+                   n1qlindex.state,
+                   n1qlindex.keyspace,
+                   [],
+                   n1qlindex.condition or "",
+                   n1qlindex.partition
+                   )
 
 
 class GetAllQueryIndexOptions(OptionBlockTimeOut):
