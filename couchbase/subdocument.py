@@ -53,7 +53,7 @@ def get(path,  # type: str
     return SD.get(path, xattr=xattr)
 
 
-def upsert(path,                    # type: str,
+def upsert(path,                    # type: str
            value,                   # type: JSON
            create_parents=False,    # type: bool
            xattr=False              # type: False
@@ -160,8 +160,8 @@ def array_prepend(path,             # type: str
 
 
 def array_insert(path,          # type: str
-                 xattr=False,   # type: bool
-                 *values        # type: JSON
+                 *values,       # type: JSON
+                 xattr=False    # type: bool
                  ):
     # type: (...) -> Spec
     """
@@ -171,8 +171,8 @@ def array_insert(path,          # type: str
     :param str path: Path to the spot in the array where the values
         should be inserted.  Note in this case, the path is a path
         to a specific location in an array.
-    :param xattr: whether this is an xattr path
     :param values: Value(s) to insert.
+    :param xattr: whether this is an xattr path
     :return: Spec
     """
     return SD.array_insert(path, *values, xattr=xattr)
