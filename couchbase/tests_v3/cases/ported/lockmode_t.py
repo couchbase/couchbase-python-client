@@ -18,8 +18,8 @@ from threading import Thread
 import time
 
 
-from couchbase_v2.exceptions import ObjectThreadException
-from couchbase_tests.base import CouchbaseTestCase, CollectionTestCase
+from couchbase.exceptions import ObjectThreadException
+from couchbase_tests.base import CollectionTestCase
 from couchbase.options import LockMode
 
 class LockmodeTest(CollectionTestCase):

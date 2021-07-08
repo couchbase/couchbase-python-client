@@ -447,6 +447,8 @@ class Cluster(CoreClient):
             self._external_tracer = options.get('tracer', None)
         async_items = {k: kwargs.pop(k) for k in list(
             kwargs.keys()) if k in {'_iops', '_flags'}}
+        non_connstr_opts = {k: cluster_opts.pop(k) for k in list(
+            cluster_opts.keys()) if k in ['lockmode']}
         # fixup any overrides to the ClusterOptions here as well
         args, kwargs = cluster_opts.split_args(**kwargs)
         self.connstr = cluster_opts.update_connection_string(
@@ -458,6 +460,7 @@ class Cluster(CoreClient):
         credentials = self._authenticator.get_credentials()
         self._clusteropts = dict(**credentials.get('options', {}))
         # TODO: eliminate the 'mock hack' and ClassicAuthenticator, then you can remove this as well.
+        self._clusteropts.update(non_connstr_opts)
         self._clusteropts.update(kwargs)
         self._adminopts = dict(**self._clusteropts)
         self._clusteropts.update(async_items)
@@ -524,7 +527,13 @@ class Cluster(CoreClient):
         self._check_for_shutdown()
         if not self.__admin:
             self._adminopts['bucket'] = name
-        return self._cluster.open_bucket(name, admin=self._admin, tracer=self._external_tracer)
+        kwargs = {
+            "admin":self._admin
+        }
+        lockmode = self._clusteropts.get("lockmode", None)
+        if lockmode is not None:
+            kwargs["lockmode"] = lockmode
+        return self._cluster.open_bucket(name, tracer=self._external_tracer, **kwargs)
 
     # Temporary, helpful with working around CCBC-1204.  We should be able to get rid of this
     # logic when this issue is fixed.
