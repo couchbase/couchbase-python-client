@@ -80,7 +80,16 @@ class AnalyticsQuery(N._N1QLQuery):
         querystr = querystr.rstrip()
         if not querystr.endswith(';'):
             querystr += ';'
-        super(AnalyticsQuery, self).__init__(querystr,*args,**kwargs)
+        super(AnalyticsQuery, self).__init__(querystr, *args, **kwargs)
+
+    @property
+    def priority(self):
+        value = self._body.get('priority', False)
+        return value
+
+    @priority.setter
+    def priority(self, value):
+        self._body['priority'] = value
 
     def update(self, *args, **kwargs):
         if args:
@@ -92,7 +101,8 @@ class AnalyticsQuery(N._N1QLQuery):
         if kwargs:
             overlapping_keys = set(kwargs.keys()) & set(self._body.keys())
             if overlapping_keys:
-                raise couchbase.exceptions.InvalidArgumentException("Cannot overwrite named args in query")
+                raise couchbase.exceptions.InvalidArgumentException(
+                    "Cannot overwrite named args in query")
             else:
                 self._set_named_args(**kwargs)
 
@@ -162,8 +172,8 @@ class DeferredAnalyticsRequest(AnalyticsRequest):
     def __init__(self,   # type: DeferredAnalyticsRequest
                  params,  # type: DeferredAnalyticsQuery
                  parent,   # type: couchbase_core.client.Client
-                 timeout = None,  # type: float
-                 interval = None   # type: float
+                 timeout=None,  # type: float
+                 interval=None   # type: float
                  ):
         # type: (...) -> None
         """
@@ -191,17 +201,18 @@ class DeferredAnalyticsRequest(AnalyticsRequest):
         handle = handle_req.meta.get('handle')
 
         if not handle:
-            raise CouchbaseInternalException("Endpoint does not support deferred queries")
+            raise CouchbaseInternalException(
+                "Endpoint does not support deferred queries")
 
         self.parent = parent
         self._final_response = None
         self.finish_time = time.time() + (timeout if timeout else params._timeout)
-        self.handle_host=urlparse.urlparse(handle)
+        self.handle_host = urlparse.urlparse(handle)
         self.interval = interval or 10
-        super(DeferredAnalyticsRequest,self).__init__(params,parent)
+        super(DeferredAnalyticsRequest, self).__init__(params, parent)
 
     def _submit_query(self):
-        return {None:self.final_response()}
+        return {None: self.final_response()}
 
     def _is_ready(self):
         """
@@ -214,32 +225,34 @@ class DeferredAnalyticsRequest(AnalyticsRequest):
         :return: True if ready, False if not
         """
         while not self.finish_time or time.time() < self.finish_time:
-            result=self._poll_deferred()
-            if result=='success':
+            result = self._poll_deferred()
+            if result == 'success':
                 return True
-            if result=='failed':
-                raise couchbase.exceptions.InternalException("Failed exception")
+            if result == 'failed':
+                raise couchbase.exceptions.InternalException(
+                    "Failed exception")
             time.sleep(self.interval)
 
         raise couchbase.exceptions.TimeoutException("Deferred query timed out")
 
     class MRESWrapper:
         def __init__(self, response):
-            self.response=response
+            self.response = response
             if response.value:
-                self.iter=iter(response.value if isinstance(response.value,list) else [response.value])
+                self.iter = iter(response.value if isinstance(
+                    response.value, list) else [response.value])
             else:
-                self.iter=iter([])
+                self.iter = iter([])
 
         def __getattr__(self, item):
-            return getattr(self.response,item)
+            return getattr(self.response, item)
 
         @property
         def done(self):
             return not len(self.fetch(None))
 
         def fetch(self, mres):
-            result = next(self.iter,None)
+            result = next(self.iter, None)
             return [result] if result else []
 
     def _poll_deferred(self):
@@ -254,21 +267,26 @@ class DeferredAnalyticsRequest(AnalyticsRequest):
         except Exception as e:
             pass
         if status == 'failed':
-            raise couchbase.exceptions.InternalException("Deferred Query Failed")
+            raise couchbase.exceptions.InternalException(
+                "Deferred Query Failed")
         if status == 'success':
             response_handle = response_value.get('handle')
             if not response_handle:
-                raise couchbase.exceptions.InternalException("Got success but no handle from deferred query response")
+                raise couchbase.exceptions.InternalException(
+                    "Got success but no handle from deferred query response")
             try:
                 parsed_response_handle = urlparse.urlparse(response_handle)
             except Exception as e:
-                raise couchbase.exceptions.InternalException("Got invalid url: {}".format(e))
+                raise couchbase.exceptions.InternalException(
+                    "Got invalid url: {}".format(e))
             final_response = self.parent._http_request(type=LCB.LCB_HTTP_TYPE_ANALYTICS,
                                                        method=LCB.LCB_HTTP_METHOD_GET,
                                                        path=parsed_response_handle.path,
-                                                       host=self._to_host_URI(parsed_response_handle),
+                                                       host=self._to_host_URI(
+                                                           parsed_response_handle),
                                                        response_format=FMT_JSON)
-            self._final_response = DeferredAnalyticsRequest.MRESWrapper(final_response)
+            self._final_response = DeferredAnalyticsRequest.MRESWrapper(
+                final_response)
         return status
 
     @staticmethod
@@ -285,5 +303,3 @@ class DeferredAnalyticsRequest(AnalyticsRequest):
     @property
     def raw(self):
         return self.final_response()
-
-

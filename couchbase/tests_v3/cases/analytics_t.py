@@ -16,12 +16,14 @@
 # limitations under the License.
 #
 
+import datetime
 import time
 
 from couchbase_tests.base import CollectionTestCase, SkipTest, AnalyticsTestCaseBase
 from couchbase.management.analytics import DropDatasetOptions
-from couchbase.analytics import AnalyticsOptions
+from couchbase.analytics import AnalyticsOptions, AnalyticsMetaData, AnalyticsStatus, AnalyticsWarning
 from couchbase.exceptions import DatasetNotFoundException, DataverseNotFoundException, NotSupportedException
+from couchbase.n1ql import UnsignedInt64
 
 
 class AnalyticsTestCase(AnalyticsTestCaseBase):
@@ -42,11 +44,15 @@ class AnalyticsTestCase(AnalyticsTestCaseBase):
             raise Exception("no rows in result")
         return self.checkResult(result, verify_rows)
 
-    def assertRows(self, response):
-        for r in response:
-            if r:
-                return
-        self.fail("No rows in result!")
+    def assertRows(self, query, *options, **kwargs):
+        result = self.cluster.analytics_query(query, *options, **kwargs)
+
+        def verify_rows(actual_result):
+            rows = actual_result.rows()
+            if len(rows) > 0:
+                return actual_result
+            raise Exception("no rows in result")
+        return self.checkResult(result, verify_rows)
 
     def test_simple_query(self):
         return self.try_n_times(10, 3, self.assertQueryReturnsRows, "SELECT * FROM `{}` LIMIT 1".format(self.dataset_name))
@@ -56,7 +62,6 @@ class AnalyticsTestCase(AnalyticsTestCaseBase):
                                         'SELECT * FROM `{}` WHERE `type` = $1 LIMIT 1'.format(
                                             self.dataset_name),
                                         AnalyticsOptions(positional_parameters=["brewery"]))
-        print(rows_attempt)
         return self.checkResult(rows_attempt, lambda result:  self.assertEqual("brewery", result[0][self.dataset_name]['type']))
 
     def test_query_positional_params_no_option(self):
@@ -97,6 +102,52 @@ class AnalyticsTestCase(AnalyticsTestCaseBase):
                                                          "btype": "jfjfjfjf"}),
                                         btype="brewery")
         return self.checkResult(rows_attempt, lambda result: self.assertEqual("brewery", result[0][self.dataset_name]['type']))
+
+    def test_analytics_with_metrics(self):
+        initial = datetime.datetime.now()
+        result = self.try_n_times(10, 3, self.assertRows,
+                                  "SELECT * FROM `{}` LIMIT 1".format(self.dataset_name))
+        taken = datetime.datetime.now() - initial
+        metadata = result.metadata()  # type: AnalyticsMetaData
+        metrics = metadata.metrics()
+        self.assertIsInstance(metrics.elapsed_time(), datetime.timedelta)
+        self.assertLess(metrics.elapsed_time(), taken)
+        self.assertGreater(metrics.elapsed_time(),
+                           datetime.timedelta(milliseconds=0))
+        self.assertIsInstance(metrics.execution_time(), datetime.timedelta)
+        self.assertLess(metrics.execution_time(), taken)
+        self.assertGreater(metrics.execution_time(),
+                           datetime.timedelta(milliseconds=0))
+
+        expected_counts = {metrics.error_count: 0,
+                           metrics.result_count: 1,
+                           metrics.processed_objects: 1,
+                           metrics.warning_count: 0}
+        for method, expected in expected_counts.items():
+            count_result = method()
+            fail_msg = "{} failed".format(method)
+            self.assertIsInstance(count_result, UnsignedInt64, msg=fail_msg)
+            self.assertEqual(UnsignedInt64(expected),
+                             count_result, msg=fail_msg)
+        self.assertGreater(metrics.result_size(), UnsignedInt64(500))
+
+        self.assertEqual(UnsignedInt64(0), metrics.error_count())
+
+    def test_analytics_metadata(self):
+        result = self.try_n_times(10, 3, self.assertRows,
+                                  "SELECT * FROM `{}` LIMIT 2".format(self.dataset_name))
+        metadata = result.metadata()  # type: AnalyticsMetaData
+        for id_meth in (metadata.client_context_id, metadata.request_id):
+            id_res = id_meth()
+            fail_msg = "{} failed".format(id_meth)
+            self.assertIsInstance(id_res, str, msg=fail_msg)
+        self.assertEqual(AnalyticsStatus.SUCCESS, metadata.status())
+        self.assertIsInstance(metadata.signature(), (str, dict))
+        self.assertIsInstance(metadata.warnings(), (list))
+        for warning in metadata.warnings():
+            self.assertIsInstance(warning, AnalyticsWarning)
+            self.assertIsInstance(warning.message, str)
+            self.assertIsInstance(warning.code, int)
 
 
 class AnalyticsCollectionTests(CollectionTestCase):
@@ -260,3 +311,51 @@ class AnalyticsCollectionTests(CollectionTestCase):
         result = scope.analytics_query("SELECT * FROM beers WHERE META().id LIKE $brewery LIMIT 1",
                                        AnalyticsOptions(named_parameters={'brewery': '21st_amendment%'}))
         self.assertRows(result, 1)
+
+    def test_analytics_with_metrics(self):
+        initial = datetime.datetime.now()
+        scope = self.bucket.scope(self.beer_sample_collections.scope)
+        result = scope.analytics_query("SELECT * FROM beers LIMIT 1")
+        self.assertRows(result, 1)
+        taken = datetime.datetime.now() - initial
+        metadata = result.metadata()  # type: AnalyticsMetaData
+        metrics = metadata.metrics()
+        self.assertIsInstance(metrics.elapsed_time(), datetime.timedelta)
+        self.assertLess(metrics.elapsed_time(), taken)
+        self.assertGreater(metrics.elapsed_time(),
+                           datetime.timedelta(milliseconds=0))
+        self.assertIsInstance(metrics.execution_time(), datetime.timedelta)
+        self.assertLess(metrics.execution_time(), taken)
+        self.assertGreater(metrics.execution_time(),
+                           datetime.timedelta(milliseconds=0))
+
+        expected_counts = {metrics.error_count: 0,
+                           metrics.result_count: 1,
+                           metrics.processed_objects: 1,
+                           metrics.warning_count: 0}
+        for method, expected in expected_counts.items():
+            count_result = method()
+            fail_msg = "{} failed".format(method)
+            self.assertIsInstance(count_result, UnsignedInt64, msg=fail_msg)
+            self.assertEqual(UnsignedInt64(expected),
+                             count_result, msg=fail_msg)
+        self.assertGreater(metrics.result_size(), UnsignedInt64(500))
+
+        self.assertEqual(UnsignedInt64(0), metrics.error_count())
+
+    def test_analytics_metadata(self):
+        scope = self.bucket.scope(self.beer_sample_collections.scope)
+        result = scope.analytics_query("SELECT * FROM beers LIMIT 2")
+        self.assertRows(result, 2)
+        metadata = result.metadata()  # type: AnalyticsMetaData
+        for id_meth in (metadata.client_context_id, metadata.request_id):
+            id_res = id_meth()
+            fail_msg = "{} failed".format(id_meth)
+            self.assertIsInstance(id_res, str, msg=fail_msg)
+        self.assertEqual(AnalyticsStatus.SUCCESS, metadata.status())
+        self.assertIsInstance(metadata.signature(), (str, dict))
+        self.assertIsInstance(metadata.warnings(), (list))
+        for warning in metadata.warnings():
+            self.assertIsInstance(warning, AnalyticsWarning)
+            self.assertIsInstance(warning.message, str)
+            self.assertIsInstance(warning.code, int)

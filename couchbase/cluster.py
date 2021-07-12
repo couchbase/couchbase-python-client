@@ -103,7 +103,7 @@ class QueryOptions(QueryBaseOptions):
                   'read_only': {'readonly': identity},
                   'scan_consistency': {'consistency': enum_value},
                   'adhoc': {'adhoc': identity},
-                  'client_context_id': {},
+                  'client_context_id': {'client_context_id': identity},
                   'consistent_with': {'consistent_with': identity},
                   'max_parallelism': {},
                   'positional_parameters': {},
@@ -528,7 +528,7 @@ class Cluster(CoreClient):
         if not self.__admin:
             self._adminopts['bucket'] = name
         kwargs = {
-            "admin":self._admin
+            "admin": self._admin
         }
         lockmode = self._clusteropts.get("lockmode", None)
         if lockmode is not None:

@@ -391,6 +391,20 @@ class _N1QLQuery(object):
         self._body['profile'] = value
 
     @property
+    def client_context_id(self):
+        """
+        Get the N1QL client context id.
+        """
+        return self._body.get('client_context_id')
+
+    @client_context_id.setter
+    def client_context_id(self, value):
+        """
+        Sets a context ID returned by the service for debugging purposes.
+        """
+        self._body['client_context_id'] = value
+
+    @property
     def query_context(self):
         """
         Get the N1QL query context.

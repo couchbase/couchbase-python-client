@@ -3,6 +3,8 @@ from typing import *
 from datetime import timedelta
 from enum import Enum
 
+from durationpy import from_str
+
 from couchbase.options import QueryBaseOptions, enum_value
 from couchbase_core.mapper import identity
 from .n1ql import *
@@ -520,22 +522,15 @@ class AzureBlobExternalAnalyticsLink(AnalyticsLink):
 
 
 class AnalyticsResult(iterable_wrapper(AnalyticsRequest)):
-    def client_context_id(self):
-        return super(AnalyticsResult, self).client_context_id()
-
-    def signature(self):
-        return super(AnalyticsResult, self).signature()
-
-    def warnings(self):
-        return super(AnalyticsResult, self).warnings()
-
-    def request_id(self):
-        return super(AnalyticsResult, self).request_id()
-
     def __init__(self,
                  *args, **kwargs  # type: N1QLRequest
                  ):
         super(AnalyticsResult, self).__init__(*args, **kwargs)
+
+    def metadata(self  # type: AnalyticsResult
+                 ):
+        # type: (...) -> AnalyticsMetaData
+        return AnalyticsMetaData(self)
 
 
 class AnalyticsScanConsistency(enum.Enum):
@@ -547,7 +542,8 @@ class AnalyticsOptions(QueryBaseOptions):
     VALID_OPTS = {'timeout': {'timeout': timedelta.seconds},
                   'read_only': {'readonly': identity},
                   'scan_consistency': {'consistency': enum_value},
-                  'client_context_id': {},
+                  'client_context_id': {'client_context_id': identity},
+                  'priority': {'priority': identity},
                   'positional_parameters': {},
                   'named_parameters': {},
                   'query_context': {'query_context': identity},
@@ -569,15 +565,15 @@ class AnalyticsOptions(QueryBaseOptions):
                  ):
         """
 
-        :param timeout:
-        :param read_only:
-        :param scan_consistency:
-        :param client_context_id:
-        :param priority:
-        :param positional_parameters:
-        :param named_parameters:
-        :param query_context:
-        :param raw:
+        :param timedelta timeout:
+        :param bool read_only:
+        :param AnalyticsScanConsistency scan_consistency:
+        :param str client_context_id:
+        :param bool priority:
+        :param Iterable[JSON] positional_parameters:
+        :param dict[str,JSON] named_parameters:
+        :param str query_context:
+        :param dict[str,JSON] raw:
         """
         pass
 
@@ -585,3 +581,102 @@ class AnalyticsOptions(QueryBaseOptions):
                  **kwargs
                  ):
         super(AnalyticsOptions, self).__init__(**kwargs)
+
+
+class AnalyticsStatus(enum.Enum):
+    RUNNING = ()
+    SUCCESS = ()
+    ERRORS = ()
+    COMPLETED = ()
+    STOPPED = ()
+    TIMEOUT = ()
+    CLOSED = ()
+    FATAL = ()
+    ABORTED = ()
+    UNKNOWN = ()
+
+
+class AnalyticsWarning(object):
+    def __init__(self, raw_warning):
+        self._raw_warning = raw_warning
+
+    def code(self):
+        # type: (...) -> int
+        return self._raw_warning.get('code')
+
+    def message(self):
+        # type: (...) -> str
+        return self._raw_warning.get('msg')
+
+
+class AnalyticsMetrics(object):
+    def __init__(self,
+                 parent  # type: AnalyticsResult
+                 ):
+        self._parentquery = parent
+
+    @property
+    def _raw_metrics(self):
+        return self._parentquery.metrics
+
+    def _as_timedelta(self, time_str):
+        return from_str(self._raw_metrics.get(time_str))
+
+    def elapsed_time(self):
+        # type: (...) -> timedelta
+        return self._as_timedelta('elapsedTime')
+
+    def execution_time(self):
+        # type: (...) -> timedelta
+        return self._as_timedelta('executionTime')
+
+    def result_count(self):
+        # type: (...) -> UnsignedInt64
+        return UnsignedInt64(self._raw_metrics.get('resultCount', 0))
+
+    def result_size(self):
+        # type: (...) -> UnsignedInt64
+        return UnsignedInt64(self._raw_metrics.get('resultSize', 0))
+
+    def error_count(self):
+        # type: (...) -> UnsignedInt64
+        return UnsignedInt64(self._raw_metrics.get('errorCount', 0))
+
+    def processed_objects(self):
+        # type: (...) -> UnsignedInt64
+        return UnsignedInt64(self._raw_metrics.get('processedObjects', 0))
+
+    def warning_count(self):
+        # type: (...) -> UnsignedInt64
+        return UnsignedInt64(self._raw_metrics.get('warningCount', 0))
+
+
+class AnalyticsMetaData(object):
+    def __init__(self,
+                 parent  # type: AnalyticsResult
+                 ):
+        self._parentquery_for_metadata = parent
+
+    def request_id(self):
+        # type: (...) -> str
+        return self._parentquery_for_metadata.meta.get('requestID')
+
+    def client_context_id(self):
+        # type: (...) -> str
+        return self._parentquery_for_metadata.meta.get('clientContextID')
+
+    def signature(self):
+        # type: (...) -> Optional[JSON]
+        return self._parentquery_for_metadata.meta.get('signature')
+
+    def status(self):
+        # type: (...) -> AnalyticsStatus
+        return AnalyticsStatus[self._parentquery_for_metadata.meta.get('status').upper()]
+
+    def warnings(self):
+        # type: (...) -> List[AnalyticsWarning]
+        return list(map(AnalyticsWarning, self._parentquery_for_metadata.meta.get('warnings', [])))
+
+    def metrics(self):
+        # type: (...) -> Optional[AnalyticsMetrics]
+        return AnalyticsMetrics(self._parentquery_for_metadata)
