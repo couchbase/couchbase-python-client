@@ -22,7 +22,7 @@ class ViewScanConsistency(Enum):
 
 
 class ViewOrdering(Enum):
-    DESCENDING  = 'true'
+    DESCENDING = 'true'
     ASCENDING = 'false'
 
 
@@ -63,19 +63,20 @@ class ViewOptions(OptionBlockTimeOut):
         # we kill off the v2 stuff
         val = kwargs.pop('scan_consistency', None)
         if val:
-            kwargs['stale'] = val.value()
+            kwargs['stale'] = val.value
         val = kwargs.pop('order', None)
         if val:
-            kwargs['descending'] = val.value()
+            kwargs['descending'] = val.value
         val = kwargs.pop('on_error', None)
         if val:
-            kwargs['on_error'] = val.value()
+            kwargs['on_error'] = val.value
         val = kwargs.pop('raw', None)
         if val:
-            kwargs[val[0]] =  val[1]
+            kwargs[val[0]] = val[1]
         val = kwargs.pop('namespace', None)
         if val:
-           kwargs['use_devmode'] = (val == DesignDocumentNamespace.DEVELOPMENT)
+            kwargs['use_devmode'] = (
+                val == DesignDocumentNamespace.DEVELOPMENT)
         super(ViewOptions, self).__init__(**kwargs)
 
 
@@ -99,7 +100,8 @@ class PingOptions(OptionBlockTimeOut):
                  **kwargs
                  ):
         if 'service_types' in kwargs:
-            kwargs['service_types'] = list(map(lambda x : x.value, kwargs['service_types']))
+            kwargs['service_types'] = list(
+                map(lambda x: x.value, kwargs['service_types']))
 
         super(PingOptions, self).__init__(**kwargs)
 
@@ -197,7 +199,7 @@ class Bucket(CoreClientDatastructureWrap):
         self._bucket_args['bucket'] = name
         self._collection_factory = collection_factory
 
-        super(Bucket,self).__init__(connection_string, **self._bucket_args)
+        super(Bucket, self).__init__(connection_string, **self._bucket_args)
         self._admin = admin
 
     @property
@@ -274,9 +276,10 @@ class Bucket(CoreClientDatastructureWrap):
         :param kwargs: Override corresponding option in options.
         :return: A :class:`ViewResult` containing the view results
         """
-        final_kwargs={'itercls':ViewResult}
+        final_kwargs = {'itercls': ViewResult}
         final_kwargs.update(kwargs)
-        res = CoreClient.view_query(self, design_doc, view_name, **forward_args(final_kwargs, *view_options))
+        res = CoreClient.view_query(
+            self, design_doc, view_name, **forward_args(final_kwargs, *view_options))
         return res
 
     def view_indexes(self  # type: Bucket
@@ -302,7 +305,7 @@ class Bucket(CoreClientDatastructureWrap):
         :return: A :class:`PingResult` representing the state of all the pinged services.
         :raise: CouchbaseException for various communication issues.
         """
-        return PingResult(super(Bucket,self).ping(**forward_args(kwargs, *options)))
+        return PingResult(super(Bucket, self).ping(**forward_args(kwargs, *options)))
 
     @property
     def kv_timeout(self):
@@ -346,7 +349,7 @@ class Bucket(CoreClientDatastructureWrap):
         """
 
         return timedelta(seconds=self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL,
-                                                    value_type="timeout"))
+                                            value_type="timeout"))
 
     @property
     def tracing_orphaned_queue_size(self):
@@ -373,7 +376,7 @@ class Bucket(CoreClientDatastructureWrap):
         """
 
         return timedelta(seconds=self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_FLUSH_INTERVAL,
-                                                    value_type="timeout"))
+                                            value_type="timeout"))
 
     @property
     def tracing_threshold_queue_size(self):
