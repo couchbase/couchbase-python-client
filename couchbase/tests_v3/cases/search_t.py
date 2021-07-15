@@ -171,13 +171,12 @@ class SearchTest(ClusterTestCase):
                 for _ in range(20):
                     indexed_docs = self.try_n_times(
                         10, 10, sm.get_indexed_documents_count, 'beer-search-index')
-                    if indexed_docs == 3000:
-                        print('All docs indexed!')
+                    if indexed_docs >= 3000:
+                        print('Enough docs indexed (hopefully)...')
                         break
                     print('Found {} indexed docs, waiting a bit...'.format(
                         indexed_docs))
                     time.sleep(30)
-
 
     def test_cluster_search(self):
         initial = datetime.datetime.now()

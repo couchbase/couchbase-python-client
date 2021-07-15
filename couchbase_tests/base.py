@@ -889,7 +889,7 @@ class CouchbaseClusterResource(object):
         else:
             bucket_name = self.try_n_times(10,
                                            3, self.init_cluster_and_bucket, **kwargs)
-        self.bucket = self.cluster.bucket(bucket_name)
+        self.bucket = self.try_n_times(10, 3, self.cluster.bucket, bucket_name)
         self.bucket_name = bucket_name
         self.try_n_times(20, 3, self.is_ready)
         self.set_cluster_version()
@@ -942,8 +942,10 @@ class CouchbaseClusterResource(object):
 
     def set_cluster_version(self, cluster=None) -> None:
         clstr = cluster or self.cluster
-        pools = clstr._admin.http_request(path='/pools').value
-        self.cluster_version = pools['implementationVersion'].split('-')[0]
+        pools = self.try_n_times(
+            10, 3, clstr._admin.http_request, path='/pools')
+        self.cluster_version = pools.value['implementationVersion'].split(
+            '-')[0]
 
     def is_ready(self) -> bool:
         if self.is_mock:

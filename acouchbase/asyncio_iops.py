@@ -33,15 +33,20 @@ class IOPS(object):
         if IOPS._working_loop:
             return IOPS._working_loop
         evloop = asyncio.get_event_loop()
+        new_loop = False
         if evloop.is_closed():
-            evloop = asyncio.new_event_loop()
-            asyncio.set_event_loop(evloop)
-        if IOPS._is_working_loop(evloop):
+            new_loop = True
+        elif IOPS._is_working_loop(evloop):
             IOPS._working_loop = evloop
         else:
+            evloop.close()
+            new_loop = True
+
+        if new_loop:
             selector = selectors.SelectSelector()
             IOPS._working_loop = asyncio.SelectorEventLoop(selector)
             asyncio.set_event_loop(IOPS._working_loop)
+
         return IOPS._working_loop
 
     @staticmethod
