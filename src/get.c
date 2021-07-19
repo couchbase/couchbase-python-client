@@ -32,6 +32,30 @@ struct getcmd_vars_st {
     } u;
 };
 
+static const char* operation_name_from_optype(int optype) {
+    switch (optype) {
+        case PYCBC_CMD_GET:
+            return "get";
+        case PYCBC_CMD_TOUCH:
+            return "touch";
+        case PYCBC_CMD_GAT:
+            return "get_and_touch";
+        case PYCBC_CMD_LOCK:
+            return "lock";
+        case PYCBC_CMD_EXISTS:
+            return "exists";
+        case PYCBC_CMD_GETREPLICA:
+            return "get_any_replica";
+        case PYCBC_CMD_GETREPLICA_INDEX:
+            return "get_replica";
+        case PYCBC_CMD_GETREPLICA_ALL:
+            return "get_all_replicas";
+        default:
+            return "unknown_operation";
+    }
+    return "unknown";
+}
+
 TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                 static,
                 int,
@@ -59,11 +83,14 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     lcb_STATUS err = LCB_SUCCESS;
     pycbc_pybuffer keybuf = { NULL };
 
+    create_outer_span(self->tracer, cv, operation_name_from_optype(optype), &collection->collection);
     PYCBC_DEBUG_LOG_CONTEXT(context,"Started processing")
     (void)itm;
 
     PYCBC_DEBUG_LOG_CONTEXT(context, "Encoding")
+    lcbtrace_SPAN *encode_span = create_encode_span(self->tracer, cv);
     rv = pycbc_tc_encode_key(self, curkey, &keybuf);
+    lcbtrace_span_finish(encode_span, LCBTRACE_NOW);
     PYCBC_DEBUG_LOG_CONTEXT(context, "Encoded")
     if (rv == -1) {
         return -1;
@@ -146,6 +173,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                 } else {
                     lcb_cmdget_expiry(cmd, ttl);
                 }
+                lcb_cmdget_parent_span(cmd, cv->mres->outer_span);
                 PYCBC_CMD_SET_KEY_SCOPE(get, cmd, keybuf);
                 PYCBC_TRACECMD_TYPED(get, cmd, context, cv->mres, curkey, self);
                 err = pycbc_get(collection, cv->mres, cmd);
@@ -157,6 +185,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
             {
                 PYCBC_CMD_SET_KEY_SCOPE(exists, cmd, keybuf);
                 PYCBC_TRACECMD_TYPED(exists, cmd, context, cv->mres, curkey, self);
+                lcb_cmdexists_parent_span(cmd, cv->mres->outer_span);
                 err = pycbc_exists(collection, cv->mres, cmd);
             }
         } break;
@@ -166,6 +195,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
             {
                 COMMON_OPTS(PYCBC_touch_ATTR, touch, touch);
                 PYCBC_SYNCREP_INIT(err, cmd, touch, cv->durability_level);
+                lcb_cmdtouch_parent_span(cmd, cv->mres->outer_span);
                 err = pycbc_touch(collection, cv->mres, cmd);
             }
         } break;
@@ -176,6 +206,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
             CMDSCOPE_NG_PARAMS(GETREPLICA, getreplica, gv->u.replica.strategy)
             {
                 COMMON_OPTS(PYCBC_getreplica_ATTR, rget, getreplica);
+                lcb_cmdgetreplica_parent_span(cmd, cv->mres->outer_span);
                 err = pycbc_getreplica(collection, cv->mres, cmd);
             }
         } break;
@@ -195,6 +226,10 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     }
 
     GT_DONE:
+        if (rv != 0) {
+            // we never will get a callback.  so, finish span now
+            lcbtrace_span_finish(cv->mres->outer_span, LCBTRACE_NOW);
+        }
         PYCBC_DEBUG_LOG_CONTEXT(context, "Got rv %d", rv)
         PYCBC_PYBUF_RELEASE(&keybuf);
         PYCBC_DEBUG_LOG_CONTEXT(context, "Finished processing")
@@ -265,17 +300,18 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
     PyObject *replica_O = NULL;
     PyObject *nofmt_O = NULL;
     PyObject *timeout_O = NULL;
+    PyObject *external_span = NULL;
     pycbc_DURABILITY_LEVEL durability_level = LCB_DURABILITYLEVEL_NONE;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
     struct getcmd_vars_st gv = { 0 };
 #define X(name, target, type) name,
     static char *kwlist[] = {
-            "keys", "ttl", "quiet", "replica", "no_format", "durability_level", "timeout", NULL};
+            "keys", "ttl", "quiet", "replica", "no_format", "durability_level", "timeout", "span", NULL};
 #undef X
     pycbc_Collection_t collection = pycbc_Collection_as_value(self, kwargs);
     int rv = PyArg_ParseTupleAndKeywords(args,
                                          kwargs,
-                                         "O|OOOOIO",
+                                         "O|OOOOIOO",
                                          kwlist,
                                          &kobj,
                                          &ttl_O,
@@ -283,7 +319,8 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
                                          &replica_O,
                                          &nofmt_O,
                                          &durability_level,
-                                         &timeout_O);
+                                         &timeout_O,
+                                         &external_span);
 
     if (!rv) {
         if (!PyErr_Occurred()) {
@@ -342,6 +379,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
 
     }
 
+    cv.external_span = external_span;
     rv = pycbc_common_vars_init(&cv, self, argopts, ncmds, 0);
     cv.durability_level = durability_level;
     rv = pycbc_get_duration(timeout_O, &cv.timeout, 1);
@@ -456,12 +494,18 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
       PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Items not supported for subdoc!");
       return -1;
     }
-    if (pycbc_tc_encode_key(self, curkey, &keybuf) != 0) {
-      return -1;
+    create_outer_span(self->tracer, cv, "lookup_in", &collection->collection);
+    lcbtrace_SPAN *encode_span = create_encode_span(self->tracer, cv);
+    rv = pycbc_tc_encode_key(self, curkey, &keybuf);
+    lcbtrace_span_finish(encode_span, LCBTRACE_NOW);
+    if (rv != 0) {
+        lcbtrace_span_finish(cv->mres->outer_span, LCBTRACE_NOW);
+        return -1;
     }
     CMDSCOPE_NG(SUBDOC, subdoc) {
         PYCBC_DEBUG_LOG_CONTEXT(context, "setting timeout to %llu", cv->timeout)
         lcb_cmdsubdoc_timeout(cmd, cv->timeout);
+        lcb_cmdsubdoc_parent_span(cmd, cv->mres->outer_span);
         PYCBC_CMD_SET_KEY_SCOPE(subdoc, cmd, keybuf);
         rv = PYCBC_TRACE_WRAP(pycbc_sd_handle_speclist,
                               NULL,
@@ -474,7 +518,10 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     GT_ERR:
 GT_DONE:
     PYCBC_PYBUF_RELEASE(&keybuf);
-  return rv;
+    if (rv != 0) {
+        lcbtrace_span_finish(cv->mres->outer_span, LCBTRACE_NOW);
+    }
+    return rv;
 }
 
 TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
@@ -570,6 +617,7 @@ pycbc_Bucket_lookup_in_multi(pycbc_Bucket *self, PyObject *args, PyObject *kwarg
     PYCBC_TRACE_WRAP_TOPLEVEL(result,LCBTRACE_OP_REQUEST_ENCODING,get_common, self->tracer, self, args, kwargs, operation, mode); \
     return result;\
 }
+
 
 DECLFUNC(get, PYCBC_CMD_GET, PYCBC_ARGOPT_SINGLE)
 DECLFUNC(touch, PYCBC_CMD_TOUCH, PYCBC_ARGOPT_SINGLE)

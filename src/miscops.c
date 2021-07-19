@@ -147,6 +147,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, p
     PyObject *casobj = NULL;
     PyObject *is_quiet = NULL;
     PyObject *kobj = NULL;
+    PyObject *external_span = NULL;
     char persist_to = 0, replicate_to = 0;
     pycbc_DURABILITY_LEVEL durability_level =
             LCB_DURABILITYLEVEL_MAJORITY_AND_PERSIST_TO_ACTIVE;
@@ -158,6 +159,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, p
                              "persist_to",
                              "replicate_to",
                              "durability_level",
+                             "span",
                              NULL};
 
     pycbc_Collection_t collection = pycbc_Collection_as_value(self, kwargs);
@@ -165,20 +167,22 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING, static, PyObject*, keyop_common, p
     PYCBC_DEBUG_LOG_CONTEXT(context, "Parsing args %R", kwargs)
     rv = PyArg_ParseTupleAndKeywords(args,
                                      kwargs,
-                                     "O|OOBBB",
+                                     "O|OOBBBO",
                                      kwlist,
                                      &kobj,
                                      &casobj,
                                      &is_quiet,
                                      &persist_to,
                                      &replicate_to,
-                                     &durability_level);
+                                     &durability_level,
+                                     &external_span);
 
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
         goto GT_FAIL;
     }
 
+    cv.external_span = external_span;
     if (argopts & PYCBC_ARGOPT_MULTI) {
         rv = pycbc_oputil_check_sequence(kobj, 1, &ncmds, &seqtype);
         if (rv < 0) {
@@ -275,6 +279,7 @@ TRACED_FUNCTION_WRAPPER(endure_multi, LCBTRACE_OP_REQUEST_ENCODING, Bucket)
     lcb_durability_opts_t dopts = { 0 };
     PyObject *keys;
     PyObject *is_delete_O = Py_False;
+    PyObject *external_span = NULL;
     lcb_STATUS err;
     float timeout = 0.0;
     float interval = 0.00;
@@ -287,14 +292,15 @@ TRACED_FUNCTION_WRAPPER(endure_multi, LCBTRACE_OP_REQUEST_ENCODING, Bucket)
             "check_removed",
             "timeout",
             "interval",
+            "span",
             NULL
     };
     struct pycbc_Collection collection =
             pycbc_Collection_as_value(self, kwargs);
-    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "OBB|Off", kwlist,
+    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "OBB|OffO", kwlist,
                                      &keys,
                                      &persist_to, &replicate_to,
-                                     &is_delete_O, &timeout, &interval);
+                                     &is_delete_O, &timeout, &interval, &external_span);
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
         goto GT_ERR;
@@ -320,7 +326,7 @@ TRACED_FUNCTION_WRAPPER(endure_multi, LCBTRACE_OP_REQUEST_ENCODING, Bucket)
         PYCBC_EXCTHROW_SCHED(err);
         goto GT_DONE;
     }
-
+    cv.external_span = external_span;
     rv = PYCBC_OPUTIL_ITER_MULTI_COLLECTION(&collection,
                                             seqtype,
                                             keys,
@@ -393,17 +399,18 @@ TRACED_FUNCTION_WRAPPER(_stats,LCBTRACE_OP_REQUEST_ENCODING,Bucket)
     int ii;
     Py_ssize_t ncmds;
     lcb_STATUS err = LCB_ERR_GENERIC;
-    PyObject *keys = NULL, *is_keystats = NULL;
+    PyObject *keys = NULL, *is_keystats = NULL, *external_span = NULL;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
-    static char *kwlist[] = {  "keys", "keystats", NULL };
+    static char *kwlist[] = {  "keys", "keystats", "span", NULL };
 
-    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "|OO", kwlist,
-        &keys, &is_keystats);
+    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "|OOO", kwlist,
+        &keys, &is_keystats &exernal_span);
 
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;
     }
+    cv.external_span = external_span;
 
     if (keys == NULL || PyObject_IsTrue(keys) == 0) {
         keys = NULL;

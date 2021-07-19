@@ -9,6 +9,7 @@ import ctypes
 from enum import IntEnum
 
 import couchbase.exceptions
+from couchbase.tracing import CouchbaseSpan
 from couchbase_core import abstractmethod, ABCMeta, operation_mode
 from couchbase_core._pyport import with_metaclass
 from couchbase_core._libcouchbase import LOCKMODE_EXC, LOCKMODE_NONE, LOCKMODE_WAIT
@@ -62,6 +63,7 @@ class OptionBlock(OptionBlockBase):
 class OptionBlockTimeOut(OptionBlock):
     def __init__(self,  # type: OptionBlockTimeOut
                  timeout=None,  # type: timedelta
+                 span=None,     # type: CouchbaseSpan
                  **kwargs  # type: Any
                  ):
         # type: (...) -> None
@@ -70,13 +72,20 @@ class OptionBlockTimeOut(OptionBlock):
 
         :param timeout: Timeout for an operation
         """
-        super(OptionBlockTimeOut, self).__init__(timeout=timeout, **kwargs)
+        super(OptionBlockTimeOut, self).__init__(timeout=timeout, span=span, **kwargs)
 
     def timeout(self,  # type: T
                 duration  # type: timedelta
                 ):
         # type: (...) -> T
         self['timeout'] = duration
+        return self
+
+    def span(self, # type: T
+             span  # type: CouchbaseSpan
+            ):
+        # type: (...) -> T
+        self['span'] = span
         return self
 
 

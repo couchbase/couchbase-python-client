@@ -134,7 +134,7 @@ def get_row_doc(row_json):
 
 class View(object):
     def __init__(self, parent, design, view, row_processor=None,
-                 include_docs=False, query=None, streaming=True, spatial_row_factory=SpatialRow, row_factory=ViewRow, **params):
+                 include_docs=False, query=None, streaming=True, spatial_row_factory=SpatialRow, row_factory=ViewRow, span=None, **params):
         """
         Construct a iterable which can be used to iterate over view query
         results.
@@ -241,6 +241,7 @@ class View(object):
         self._errors = []
         self.rows_returned = 0
         self._indexed_rows = 0
+        self._span = span
 
         # Sentinel used to ensure confusing metadata properties don't get
         # returned unless metadata is actually parsed (or query is complete)
@@ -293,7 +294,7 @@ class View(object):
 
         self._mres = self._parent._view_request(
             design=self.design, view=self.view, options=self.query,
-            _flags=self._flags)
+            _flags=self._flags, span=self._span)
         self.__raw = self._mres[None]
 
     def _clear(self):

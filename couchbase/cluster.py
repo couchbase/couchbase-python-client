@@ -5,6 +5,7 @@ from couchbase.mutation_state import MutationState
 from couchbase.management.queries import QueryIndexManager
 from couchbase.management.search import SearchIndexManager
 from couchbase.management.analytics import AnalyticsIndexManager
+from couchbase.tracing import CouchbaseTracer, CouchbaseSpan
 from couchbase.analytics import AnalyticsOptions
 from couchbase_core.mapper import identity
 from .auth import NoBucketException, Authenticator
@@ -115,7 +116,8 @@ class QueryOptions(QueryBaseOptions):
                   'scan_wait': {},
                   'scan_cap': {'scan_cap': identity},
                   'metrics': {'metrics': identity},
-                  'flex_index': {'flex_index': int}}
+                  'flex_index': {'flex_index': int},
+                  'span': {'span': identity}}
 
     TARGET_CLASS = _N1QLQuery
 
@@ -138,7 +140,8 @@ class QueryOptions(QueryBaseOptions):
                  scan_wait=None,              # type: timedelta
                  scan_cap=None,               # type: int
                  metrics=False,               # type: bool
-                 flex_index=False                # type: bool
+                 flex_index=False,            # type: bool
+                 span=None                    # type: Span
                  ):
         pass
 
@@ -188,6 +191,8 @@ class QueryOptions(QueryBaseOptions):
             Specifies whether or not to include metrics with the :class:`~.QueryResult`.
         :param bool flex_index
             Specifies whether this query may make use of Search indexes
+        :param CouchbaseSpan span
+            Specifies the parent span for this query
         """
         super(QueryOptions, self).__init__(**kwargs)
 
@@ -327,7 +332,7 @@ class ClusterTracingOptions(dict):
 
 class ClusterOptions(dict):
     KEYS = ['timeout_options', 'tracing_options', 'log_redaction', 'compression', 'compression_min_size',
-            'compression_min_ratio', 'certpath', 'enable_mutation_tokens']
+            'compression_min_ratio', 'certpath', 'enable_mutation_tokens', 'tracer']
 
     @overload
     def __init__(self,
@@ -339,7 +344,8 @@ class ClusterOptions(dict):
                  compression_min_size=None,          # type: int
                  compression_min_ratio=None,         # type: float
                  lockmode=None,                      # type: LockMode
-                 enable_mutation_tokens=None         # type: bool
+                 enable_mutation_tokens=None,        # type: bool
+                 tracer=None                         # type: CouchbaseTracer
                  ):
         pass
 
@@ -359,6 +365,7 @@ class ClusterOptions(dict):
         :param int compression_min_size: Min size of the data before compression kicks in.
         :param float compression_min_ratio: A `float` representing the minimum compression ratio to use when compressing.
         :param bool enable_mutation_tokens: Turn mutation tokens on/off.  On by default.
+        :param CouchbaseTracer tracer: Tracer to use.  None by default, which uses internal tracing only.
         """
         super(ClusterOptions, self).__init__(**kwargs)
         self['authenticator'] = authenticator
@@ -426,6 +433,8 @@ class Cluster(CoreClient):
                  **kwargs                   # type: Any
                  ):
         self._authenticator = kwargs.pop('authenticator', None)
+        # get tracer from kwargs, if present
+        self._external_tracer = kwargs.pop('tracer', None)
         self.__is_6_5 = None
         # copy options if they exist, as we mutate it
         cluster_opts = deepcopy(options) or ClusterOptions(self._authenticator)
@@ -433,6 +442,9 @@ class Cluster(CoreClient):
             self._authenticator = cluster_opts.pop('authenticator', None)
             if not self._authenticator:
                 raise InvalidArgumentException("Authenticator is mandatory")
+        # get tracer from options, if not in kwargs
+        if not self._external_tracer and options:
+            self._external_tracer = options.get('tracer', None)
         async_items = {k: kwargs.pop(k) for k in list(
             kwargs.keys()) if k in {'_iops', '_flags'}}
         # fixup any overrides to the ClusterOptions here as well
@@ -456,6 +468,8 @@ class Cluster(CoreClient):
         # (it has been copied into self.connstr)
         self._clusteropts.pop('certpath', None)
         self._adminopts.pop('certpath', None)
+        # pop tracer into _clusteropts, since you can't copy a tracer
+        self._clusteropts['tracer'] = self._external_tracer
 
         super(Cluster, self).__init__(connection_string=str(self.connstr),
                                       _conntype=_LCB.LCB_TYPE_CLUSTER, **self._clusteropts)
@@ -510,7 +524,7 @@ class Cluster(CoreClient):
         self._check_for_shutdown()
         if not self.__admin:
             self._adminopts['bucket'] = name
-        return self._cluster.open_bucket(name, admin=self._admin)
+        return self._cluster.open_bucket(name, admin=self._admin, tracer=self._external_tracer)
 
     # Temporary, helpful with working around CCBC-1204.  We should be able to get rid of this
     # logic when this issue is fixed.

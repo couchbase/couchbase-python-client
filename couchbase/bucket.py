@@ -10,6 +10,7 @@ from .result import *
 from .collection import Scope
 from datetime import timedelta
 from enum import Enum
+from couchbase.tracing import CouchbaseSpan
 import logging
 from couchbase_core.asynchronous.client import AsyncClientMixin
 
@@ -51,7 +52,8 @@ class ViewOptions(OptionBlockTimeOut):
                  on_error=None,              # type: ViewErrorMode
                  debug=None,                 # type: bool
                  raw=None,                   # type: Tuple(str,str)
-                 namespace=None              # type: DesignDocumentNamespace
+                 namespace=None,             # type: DesignDocumentNamespace
+                 span=None                   # type: CouchbaseSpan
                  ):
         pass
 

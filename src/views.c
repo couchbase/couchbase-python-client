@@ -230,7 +230,6 @@ static void row_callback(lcb_t instance, int cbtype, const lcb_RESPVIEW *resp)
 {
     pycbc_MultiResult *mres;
     lcb_respview_cookie(resp, (void **)&mres);
-    //= (pycbc_MultiResult*)resp->cookie;
     pycbc_Bucket *bucket = mres->parent;
     const char * const * hdrs = NULL;
     short htcode = 0;
@@ -261,7 +260,6 @@ static void row_callback(lcb_t instance, int cbtype, const lcb_RESPVIEW *resp)
         pycbc_add_view_error_context(resp, mres);
         pycbc_httpresult_complete(
                 &vres->base, mres, lcb_respview_status(resp), htcode, hdrs);
-        PYCBC_DECREF(mres);
     } else {
         PYCBC_CONN_THR_BEGIN(bucket);
     }
@@ -318,12 +316,13 @@ TRACED_FUNCTION_WRAPPER(_view_request, LCBTRACE_OP_REQUEST_ENCODING, Bucket)
     lcb_STATUS rc=LCB_SUCCESS;
     const char *view = NULL, *design = NULL;
     PyObject *options = NULL;
+    PyObject *external_span = NULL;
     int flags;
 
-    static char *kwlist[] = { "design", "view", "options", "_flags", NULL };
+    static char *kwlist[] = { "design", "view", "options", "_flags", "span", NULL };
 
-    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "ss|Oi", kwlist,
-                                     &design, &view, &options, &flags);
+    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "ss|OiO", kwlist,
+                                     &design, &view, &options, &flags, &external_span);
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;
@@ -340,6 +339,7 @@ TRACED_FUNCTION_WRAPPER(_view_request, LCBTRACE_OP_REQUEST_ENCODING, Bucket)
     }
 
     mres = (pycbc_MultiResult *)pycbc_multiresult_new(self);
+    create_outer_view_span(self->tracer, mres, external_span, design, view);
     vres = pycbc_propagate_view_result(
             context);
     vres->base.htype = PYCBC_HTTP_HVIEW;
@@ -348,6 +348,7 @@ TRACED_FUNCTION_WRAPPER(_view_request, LCBTRACE_OP_REQUEST_ENCODING, Bucket)
 
     rv = get_viewpath_str(self, &vp, options);
     if (rv != 0) {
+        lcbtrace_span_finish(mres->outer_span, LCBTRACE_NOW);
         goto GT_DONE;
     }
     CMDSCOPE_NG(VIEW, view)
@@ -362,9 +363,11 @@ TRACED_FUNCTION_WRAPPER(_view_request, LCBTRACE_OP_REQUEST_ENCODING, Bucket)
         lcb_cmdview_post_data(vcmd, vp.body, (size_t)vp.nbody);
         lcb_cmdview_handle(vcmd, &vres->base.u.vh);
         lcb_cmdview_callback(vcmd, row_callback);
-
+        lcb_cmdview_parent_span(vcmd, mres->outer_span);
         lcb_cmdview_include_docs(vcmd, flags & LCB_CMDVIEWQUERY_F_INCLUDE_DOCS);
         lcb_cmdview_no_row_parse(vcmd, flags & LCB_CMDVIEWQUERY_F_NOROWPARSE);
+        //TODO - this appears to not really jump as no label matches the one that
+        //CMDSCOPE_GENERIC_FAIL expects.  Fix!
         if (rc) {
             CMDSCOPE_GENERIC_FAIL(, VIEW, view)
         }
@@ -386,6 +389,7 @@ TRACED_FUNCTION_WRAPPER(_view_request, LCBTRACE_OP_REQUEST_ENCODING, Bucket)
     }
 GT_ERR:
     if (rc != LCB_SUCCESS) {
+        lcbtrace_span_finish(mres->outer_span, LCBTRACE_NOW);
         PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, rc, "Couldn't schedule view");
         goto GT_DONE;
     }

@@ -30,10 +30,6 @@ cb_thr_end(pycbc_Bucket *self)
 static void
 cb_thr_begin(pycbc_Bucket *self)
 {
-    if (self && self->tracer) {
-        PYCBC_DEBUG_LOG("propagating tracer from %p, %p", self, self->tracer);
-        pycbc_Tracer_propagate(self->tracer);
-    }
     if (Py_REFCNT(self) > 1) {
         Py_DECREF(self);
         PYCBC_CONN_THR_BEGIN(self);
@@ -315,6 +311,13 @@ static void operation_completed_with_err_info(pycbc_Bucket *self,
     PYCBC_CONTEXT_DEREF(context, 0);
     operation_completed3(self, mres, err_info);
     Py_XDECREF(err_info);
+    // multi operations mean wait till we are on last one before closing
+    // outer span.  TODO: ideally we'd be smarter and have an inner span
+    // for each of the multi operations, closing that here and closing the
+    // outer one when nremaining == 0.  Ponder that for the future.
+    if (self->nremaining == 0) {
+        lcbtrace_span_finish(mres->outer_span, LCBTRACE_NOW);
+    }
 }
 
 /**
@@ -405,7 +408,7 @@ int pycbc_extract_respdata(const lcb_RESPBASE *resp,
         lcb_respstore_cookie((const lcb_RESPSTORE *)resp, (void **)mres);
         lcb_respstore_cas((const lcb_RESPSTORE *)resp,
                           (uint64_t *)&(handler->cas));
-        lcb_respstore_mutation_token((const lcb_RESPSTORE *)resp, 
+        lcb_respstore_mutation_token((const lcb_RESPSTORE *)resp,
                           (lcb_MUTATION_TOKEN *)&(handler->mutinfo));
         break;
     case LCB_CALLBACK_REMOVE:
@@ -416,7 +419,7 @@ int pycbc_extract_respdata(const lcb_RESPBASE *resp,
         lcb_respremove_cookie((const lcb_RESPREMOVE *)resp, (void **)mres);
         lcb_respremove_cas((const lcb_RESPREMOVE *)resp,
                            (uint64_t *)&(handler->cas));
-        lcb_respremove_mutation_token((const lcb_RESPREMOVE *)resp, 
+        lcb_respremove_mutation_token((const lcb_RESPREMOVE *)resp,
                           (lcb_MUTATION_TOKEN *)&(handler->mutinfo));
         break;
     case LCB_CALLBACK_UNLOCK:
@@ -445,7 +448,7 @@ int pycbc_extract_respdata(const lcb_RESPBASE *resp,
         lcb_resptouch_cookie((const lcb_RESPTOUCH *)resp, (void **)mres);
         lcb_resptouch_cas((const lcb_RESPTOUCH *)resp,
                           (uint64_t *)&(handler->cas));
-        lcb_resptouch_mutation_token((const lcb_RESPTOUCH *)resp, 
+        lcb_resptouch_mutation_token((const lcb_RESPTOUCH *)resp,
                           (lcb_MUTATION_TOKEN *)&(handler->mutinfo));
         break;
     case LCB_CALLBACK_GET:
@@ -474,7 +477,7 @@ int pycbc_extract_respdata(const lcb_RESPBASE *resp,
         lcb_respcounter_cookie((const lcb_RESPCOUNTER *)resp, (void **)mres);
         lcb_respcounter_cas((const lcb_RESPCOUNTER *)resp,
                             (uint64_t *)&(handler->cas));
-        lcb_respcounter_mutation_token((const lcb_RESPCOUNTER *)resp, 
+        lcb_respcounter_mutation_token((const lcb_RESPCOUNTER *)resp,
                           (lcb_MUTATION_TOKEN *)&(handler->mutinfo));
         break;
     case LCB_CALLBACK_STATS:;
@@ -502,7 +505,7 @@ int pycbc_extract_respdata(const lcb_RESPBASE *resp,
         lcb_respsubdoc_cas((const lcb_RESPSUBDOC *)resp,
                            (uint64_t *)&(handler->cas));
         if(handler->cbtype == LCB_CALLBACK_SDMUTATE){
-            lcb_respsubdoc_mutation_token((const lcb_RESPSUBDOC *)resp, 
+            lcb_respsubdoc_mutation_token((const lcb_RESPSUBDOC *)resp,
                     (lcb_MUTATION_TOKEN *)&(handler->mutinfo));
         }
         break;
@@ -584,14 +587,6 @@ static int get_common_objects(const lcb_RESPBASE *resp,
         PYCBC_INCREF(hkey);
         parent_context = PYCBC_MULTIRESULT_EXTRACT_CONTEXT(
                 (pycbc_MultiResult *)*mres, hkey, res);
-        if (parent_context) {
-            decoding_context =
-                    pycbc_Result_start_context(parent_context,
-                                               hkey,
-                                               "get_common_objects",
-                                               LCBTRACE_OP_RESPONSE_DECODING,
-                                               LCBTRACE_REF_FOLLOWS_FROM);
-        };
         if (*res) {
             int exists_ok = (restype & RESTYPE_EXISTS_OK) ||
                             ((*mres)->mropts & PYCBC_MRES_F_UALLOCED);
@@ -703,7 +698,7 @@ invoke_endure_test_notification(pycbc_Bucket *self, pycbc_Result *resp)
     Py_XDECREF(argtuple);
 }
 
-static void 
+static void
 pycbc_get_mutation_token(pycbc_Bucket *conn, pycbc_OperationResult *res, response_handler *handler){
     Py_XDECREF(res->mutinfo);
     if (lcb_mutation_token_is_valid((lcb_MUTATION_TOKEN *)&(handler->mutinfo))) {

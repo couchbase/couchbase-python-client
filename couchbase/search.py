@@ -6,6 +6,7 @@ import attr
 import couchbase_core
 
 from couchbase.exceptions import CouchbaseException
+from couchbase.tracing import CouchbaseSpan
 from couchbase_core.views.iterator import AlreadyQueriedException
 from couchbase_core import abstractmethod, JSON, _to_json, iterable_wrapper
 from couchbase_core._pyport import unicode
@@ -1174,7 +1175,7 @@ class SearchRequest(object):
     You can iterate over this object (i.e. ``__iter__``) to receive the
     actual search results.
     """
-    def __init__(self, body, parent, row_factory=lambda x: x):
+    def __init__(self, body, parent, row_factory=lambda x: x, span=None):
         """
         :param str body: serialized JSON string
         :param Client parent:
@@ -1187,6 +1188,8 @@ class SearchRequest(object):
         self._do_iter = True
         self.__raw = False
         self.__meta_received = False
+        self._span = span
+        self._index = body.get('indexName', '') if body else ''
 
     @classmethod
     def mk_kwargs(cls, kwargs):
@@ -1194,7 +1197,7 @@ class SearchRequest(object):
         Pop recognized arguments from a keyword list.
         """
         ret = {}
-        kws = ['row_factory', 'body', 'parent']
+        kws = ['row_factory', 'body', 'parent', 'span']
         for k in kws:
             if k in kwargs:
                 ret[k] = kwargs.pop(k)
@@ -1205,7 +1208,7 @@ class SearchRequest(object):
         if self._mres:
             return
 
-        self._mres = self._parent._fts_query(self._body)
+        self._mres = self._parent._fts_query(self._body, span=self._span, index=self._index)
         self.__raw = self._mres[None]
 
     @property
@@ -1568,7 +1571,8 @@ class SearchOptions(OptionBlockTimeOut):
                  raw=None,               # type: JSON
                  sort=None,              # type: List[str]
                  disable_scoring=None,   # type: bool
-                 collections=None        # type: List[str]
+                 collections=None,       # type: List[str]
+                 span=None               # type: CouchbaseSpan
                  ):
         pass
 
@@ -1608,6 +1612,8 @@ class SearchOptions(OptionBlockTimeOut):
             Disable scoring of the search results.
         :param Iterable[str] collections:
             List of collections to limit query results.
+        :param CouchbaseSpan span:
+            Parent span for the search query.
         """
         # convert highlight_style to str if it is present...
         style = kwargs.get('highlight_style', None)

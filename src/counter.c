@@ -50,10 +50,6 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
 
     (void)item;
 
-    rv = pycbc_tc_encode_key(self, curkey, &keybuf);
-    if (rv < 0) {
-        return -1;
-    }
 
     if (options) {
         curvalue = options;
@@ -91,11 +87,19 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
             PYCBC_EXC_WRAP_KEY(PYCBC_EXC_ARGUMENTS, 0, "value for key must be an integer amount or a dict of parameters", curkey);
             return -1;
         }
+
     }
 
     {
         CMDSCOPE_NG(COUNTER, counter)
         {
+            lcbtrace_SPAN *encode_span = create_encode_span(self->tracer, cv);
+            rv = pycbc_tc_encode_key(self, curkey, &keybuf);
+            lcbtrace_span_finish(encode_span, LCBTRACE_NOW);
+            if (rv < 0) {
+                lcbtrace_span_finish(cv->mres->outer_span, LCBTRACE_NOW);
+                return -1;
+            }
             PYCBC_DEBUG_LOG("Encoding delta %llu", my_params.delta)
             lcb_cmdcounter_delta(cmd, my_params.delta);
             PYCBC_DEBUG_LOG("Encoded delta %llu", my_params.delta)
@@ -107,6 +111,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
             PYCBC_DEBUG_LOG_CONTEXT(
                     context, "Encoding timeout %d", my_params.ttl);
             lcb_cmdcounter_expiry(cmd, my_params.ttl);
+            lcb_cmdcounter_parent_span(cmd, cv->mres->outer_span);
             PYCBC_CMD_SET_KEY_SCOPE(counter, cmd, keybuf);
             PYCBC_TRACECMD_TYPED(counter, cmd, context, cv->mres, curkey, self);
             PYCBC_SYNCREP_INIT(err,cmd, counter,my_params.durability_level);
@@ -141,21 +146,23 @@ PyObject *arithmetic_common(pycbc_Collection_t *cb_collection,
     PyObject *all_initial_O = NULL;
     PyObject *all_ttl_O = NULL;
     PyObject *sequence;
+    PyObject *external_span = NULL;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
 
-    static const char *kwlist[] = {"keys", "delta", "initial", "ttl", "durability_level", NULL};
+    static const char *kwlist[] = {"keys", "delta", "initial", "ttl", "durability_level", "span", NULL};
 
     global_params.delta = 1;
 
     rv = PyArg_ParseTupleAndKeywords(args,
                                      kwargs,
-                                     "O|LOOI",
+                                     "O|LOOIO",
                                      (char **)kwlist,
                                      &sequence,
                                      &global_params.delta,
                                      &all_initial_O,
                                      &all_ttl_O,
-                                     &global_params.durability_level);
+                                     &global_params.durability_level,
+                                     &external_span);
     if (!rv) {
         PYCBC_EXCTHROW_ARGS();
         return NULL;
@@ -175,13 +182,14 @@ PyObject *arithmetic_common(pycbc_Collection_t *cb_collection,
         ncmds = 1;
     }
 
-
+    rv = pycbc_common_vars_init(&cv, self, argopts, ncmds, 0);
+    cv.external_span = external_span;
+    create_outer_span(self->tracer, &cv, "counter", &cb_collection->collection);
     if (all_initial_O && PyNumber_Check(all_initial_O)) {
         global_params.create = 1;
         global_params.initial = pycbc_IntAsULL(all_initial_O);
     }
 
-    rv = pycbc_common_vars_init(&cv, self, argopts, ncmds, 0);
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
         rv = PYCBC_OPUTIL_ITER_MULTI_COLLECTION(cb_collection,

@@ -1,4 +1,5 @@
 #include "oputil.h"
+#include "pycbc.h"
 #include "pycbc_http.h"
 
 void convert_search_error_context(const lcb_SEARCH_ERROR_CONTEXT* ctx,
@@ -54,6 +55,12 @@ static void fts_row_callback(lcb_t instance,
     short htcode = 0;
     lcb_respsearch_cookie(resp, (void **)&mres);
     bucket = mres->parent;
+    // it is possible to get the callback even if we didn't lcb_wait.  So, check for that.
+    // This is a hack, which we need because LCB now calls the callback even though the lcb_search
+    // errored out.
+    if (!bucket->thrstate && bucket->unlock_gil) {
+        return;
+    }
     PYCBC_CONN_THR_END(bucket);
     vres = (pycbc_ViewResult *)PyDict_GetItem((PyObject *)mres, Py_None);
     {
@@ -97,17 +104,24 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     lcb_STATUS rc = LCB_SUCCESS;
     pycbc_pybuffer buf = { 0 };
     PyObject *params_o = NULL;
-    pycbc_stack_context_handle context = PYCBC_TRACE_GET_STACK_CONTEXT_TOPLEVEL(
-            kwargs, LCBTRACE_OP_REQUEST_ENCODING, self->tracer, "fts_query");
-    static char *kwlist[] = { "params", NULL };
+    PyObject *external_span = NULL;
+    PyObject *index = NULL;
+    pycbc_stack_context_handle context = NULL;
+    static char *kwlist[] = { "params", "span", "index", NULL };
     pycbc_Collection_t collection = pycbc_Collection_as_value(self, kwargs);
-    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &params_o);
+    mres = (pycbc_MultiResult *)pycbc_multiresult_new(self);
 
+    rv = PyArg_ParseTupleAndKeywords(args, kwargs, "O|OO", kwlist, &params_o, &external_span, &index);
     if (!rv) {
         goto GT_FAIL;
     }
 
-    if (pycbc_tc_simple_encode(params_o, &buf, PYCBC_FMT_UTF8) != 0) {
+    create_outer_search_span(self->tracer, mres, external_span, PyUnicode_AsUTF8(index));
+
+    lcbtrace_SPAN *encode_span = create_encode_search_span(self->tracer, mres);
+    rv = pycbc_tc_simple_encode(params_o, &buf, PYCBC_FMT_UTF8);
+    lcbtrace_span_finish(encode_span, LCBTRACE_NOW);
+    if (rv != 0) {
         goto GT_FAIL;
     }
 
@@ -120,7 +134,6 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
                        "Search queries cannot be executed in pipeline context");
     }
 
-    mres = (pycbc_MultiResult *)pycbc_multiresult_new(self);
     vres = pycbc_propagate_view_result(context);
     pycbc_httpresult_init(&vres->base, mres);
     vres->rows = PyList_New(0);
@@ -132,6 +145,7 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
             lcb_cmdsearch_callback(cmd, fts_row_callback);
             lcb_cmdsearch_payload(cmd, buf.buffer, buf.length);
             lcb_cmdsearch_handle(cmd, &vres->base.u.search);
+            lcb_cmdsearch_parent_span(cmd, mres->outer_span);
 
             PYCBC_TRACECMD_SCOPED_GENERIC(rc,
                                           search,
@@ -150,6 +164,8 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
     PYCBC_PYBUF_RELEASE(&buf);
 
     if (rc != LCB_SUCCESS) {
+        // we never sent the request, so the callbacks will not close outer span.  Do that here.
+        lcbtrace_span_finish(mres->outer_span, LCBTRACE_NOW);
         PYCBC_EXC_WRAP(PYCBC_EXC_LCBERR, rc, "Couldn't schedule fts query");
         goto GT_DONE;
     }
@@ -164,6 +180,8 @@ pycbc_Bucket__fts_query(pycbc_Bucket *self, PyObject *args, PyObject *kwargs)
         pycbc_Collection_free_unmanaged_contents(&collection);
         return ret;
     GT_FAIL:
+        // we never sent the request, so the callbacks will not close outer span.  Do that here.
+        lcbtrace_span_finish(mres->outer_span, LCBTRACE_NOW);
         ret = NULL;
         goto GT_FINAL;
 }

@@ -917,28 +917,16 @@ pycbc_stack_context_handle pycbc_Tracer_start_span_debug(
         lcbtrace_REF_TYPE ref_type,
         const char *component);
 
-#ifdef PYCBC_DEBUG
-#define PYCBC_TRACER_START_SPAN(...) \
-    pycbc_Tracer_start_span_debug(__FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-#else
-#define PYCBC_TRACER_START_SPAN(...) pycbc_Tracer_start_span(__VA_ARGS__)
-#endif
+#define PYCBC_TRACER_START_SPAN(...) NULL
 
 void pycbc_Tracer_propagate(pycbc_Tracer_t *tracer);
 void pycbc_Tracer_set_child(pycbc_Tracer_t *pTracer, lcbtrace_TRACER *pTRACER);
 
 #define PYCBC_TRACE_GET_STACK_CONTEXT_TOPLEVEL(KWARGS, CATEGORY, TRACER, NAME) \
-    PYCBC_TRACER_START_SPAN(                                                   \
-            TRACER, KWARGS, CATEGORY, 0, NULL, LCBTRACE_REF_NONE, NAME)
 
 #define PYCBC_TRACECMD_PURE(TYPE, CMD, CONTEXT)                          \
     {                                                                    \
-        if (PYCBC_CHECK_CONTEXT(CONTEXT)) {                              \
-            PYCBC_LOG_KEY(CMD, key)                                      \
-            (void)PYCBC_CMD_SET_TRACESPAN(TYPE, (CMD), (CONTEXT)->span); \
-        } else {                                                         \
-            PYCBC_EXCEPTION_LOG_NOCLEAR;                                 \
-        }                                                                \
+        PYCBC_EXCEPTION_LOG_NOCLEAR;                                 \
     }
 
 #define PYCBC_TRACECMD_SCOPED_GENERIC(RV,           \
@@ -1280,6 +1268,8 @@ struct pycbc_MultiResult_st {
 
     /** Options for 'MultiResult' */
     int mropts;
+
+    lcbtrace_SPAN *outer_span;
 
     pycbc_enhanced_err_info *err_info;
 };
@@ -1935,5 +1925,15 @@ extern lcb_LOGGER *pycbc_lcb_logger;
  */
 extern PyObject *pycbc_DummyTuple;
 extern PyObject *pycbc_DummyKeywords;
+
+/**
+ * tracing primitives
+ */
+void create_outer_span(pycbc_Tracer_t *tracer, struct pycbc_common_vars *cv, const char* op, pycbc_Collection_coords* collection);
+void create_outer_n1ql_span(pycbc_Tracer_t *tracer, pycbc_MultiResult *mres, PyObject *external_span, int is_analytics, const char* payload);
+void create_outer_search_span(pycbc_Tracer_t *tracer, pycbc_MultiResult *mres, PyObject* external_span, const char *index);
+void create_outer_view_span(pycbc_Tracer_t *tracer, pycbc_MultiResult *mres, PyObject *external_span, const char *design, const char *view);
+lcbtrace_SPAN *create_encode_search_span(pycbc_Tracer_t *tracer, pycbc_MultiResult *mres);
+lcbtrace_SPAN *create_encode_span(pycbc_Tracer_t *tracer, struct pycbc_common_vars *cv);
 
 #endif /* PYCBC_H_ */

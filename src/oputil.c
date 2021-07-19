@@ -1008,3 +1008,108 @@ GT_DONE : {
     }
     return 0;
 }
+// TODO: move to the other create encode span implementation
+lcbtrace_SPAN *create_encode_span(pycbc_Tracer_t *tracer, struct pycbc_common_vars *cv)
+{
+    lcbtrace_SPAN *encode_span = NULL;
+    if (tracer && cv->mres->outer_span) {
+        lcbtrace_REF ref;
+        ref.type = LCBTRACE_REF_CHILD_OF;
+        ref.span = cv->mres->outer_span;
+        encode_span = lcbtrace_span_start(tracer->tracer, "request_encoding", LCBTRACE_NOW, &ref);
+        lcbtrace_span_set_is_encode(encode_span, 1);
+    }
+    return encode_span;
+}
+
+lcbtrace_SPAN *create_encode_search_span(pycbc_Tracer_t *tracer, pycbc_MultiResult *mres)
+{
+    lcbtrace_SPAN *encode_span = NULL;
+    if (tracer && mres->outer_span) {
+        lcbtrace_REF ref;
+        ref.type = LCBTRACE_REF_CHILD_OF;
+        ref.span = mres->outer_span;
+        encode_span = lcbtrace_span_start(tracer->tracer, "request_encoding", LCBTRACE_NOW, &ref);
+        lcbtrace_span_set_is_encode(encode_span, 1);
+    }
+    return encode_span;
+}
+
+void create_outer_n1ql_span(pycbc_Tracer_t *tracer, pycbc_MultiResult *mres, PyObject *external_span, int is_analytics, const char* payload)
+{
+    if (tracer && !mres->outer_span) {
+        if (tracer->tracer->flags == LCBTRACE_F_EXTERNAL && external_span && Py_None != external_span) {
+            // create external span to wrap, with external_span as the parent
+            void *new_external_span = tracer->tracer->v.v1.start_span(tracer->tracer, is_analytics ? LCBTRACE_OP_ANALYTICS : LCBTRACE_OP_QUERY, external_span);
+            lcbtrace_span_wrap(tracer->tracer, is_analytics ? LCBTRACE_OP_ANALYTICS : LCBTRACE_OP_QUERY, LCBTRACE_NOW, new_external_span, &mres->outer_span);
+        } else {
+            mres->outer_span = lcbtrace_span_start(tracer->tracer, is_analytics ? LCBTRACE_OP_ANALYTICS : LCBTRACE_OP_QUERY, LCBTRACE_NOW, NULL);
+        }
+        /* TODO: set more/all of the outer tags as well */
+        lcbtrace_span_set_is_outer(mres->outer_span, 1);
+        lcbtrace_span_set_service(mres->outer_span, is_analytics ? LCBTRACE_SERVICE_ANALYTICS : LCBTRACE_SERVICE_QUERY);
+        lcbtrace_span_add_tag_str(mres->outer_span, "db.system", "couchbase");
+        lcbtrace_span_add_tag_str(mres->outer_span, LCBTRACE_TAG_STATEMENT, payload);
+    }
+}
+
+void create_outer_search_span(pycbc_Tracer_t *tracer, pycbc_MultiResult *mres, PyObject *external_span, const char *index)
+{
+    if (tracer && !mres->outer_span) {
+        if (tracer->tracer->flags == LCBTRACE_F_EXTERNAL && external_span && Py_None != external_span) {
+            // create external span to wrap, with external_span as the parent
+            void *new_external_span = tracer->tracer->v.v1.start_span(tracer->tracer, LCBTRACE_OP_SEARCH, external_span);
+            lcbtrace_span_wrap(tracer->tracer, LCBTRACE_OP_SEARCH, LCBTRACE_NOW, new_external_span, &mres->outer_span);
+        } else {
+            mres->outer_span = lcbtrace_span_start(tracer->tracer, LCBTRACE_OP_SEARCH, LCBTRACE_NOW, NULL);
+        }
+        /* TODO: set more/all of the outer tags as well */
+        lcbtrace_span_set_is_outer(mres->outer_span, 1);
+        lcbtrace_span_add_tag_str(mres->outer_span, "db.system", "couchbase");
+        lcbtrace_span_set_service(mres->outer_span, LCBTRACE_SERVICE_SEARCH);
+        lcbtrace_span_add_tag_str(mres->outer_span, "db.operation", index);
+    }
+}
+
+void create_outer_view_span(pycbc_Tracer_t *tracer, pycbc_MultiResult *mres, PyObject *external_span, const char *design, const char *view)
+{
+    static char operation[256];
+    if (tracer && !mres->outer_span) {
+        if (tracer->tracer->flags == LCBTRACE_F_EXTERNAL && external_span && Py_None != external_span) {
+            // create external span to wrap, with external_span as the parent
+            void *new_external_span = tracer->tracer->v.v1.start_span(tracer->tracer, LCBTRACE_OP_VIEW, external_span);
+            lcbtrace_span_wrap(tracer->tracer, LCBTRACE_OP_VIEW, LCBTRACE_NOW, new_external_span, &mres->outer_span);
+        } else {
+            mres->outer_span = lcbtrace_span_start(tracer->tracer, LCBTRACE_OP_VIEW, LCBTRACE_NOW, NULL);
+        }
+        lcbtrace_span_set_is_outer(mres->outer_span, 1);
+        lcbtrace_span_add_tag_str(mres->outer_span, "db.system", "couchbase");
+        lcbtrace_span_set_service(mres->outer_span, LCBTRACE_SERVICE_VIEW);
+        snprintf(operation, sizeof(operation)/sizeof(char), "/%s/%s", design, view);
+        lcbtrace_span_add_tag_str(mres->outer_span, "db.operation", operation);
+    }
+}
+
+void create_outer_span(pycbc_Tracer_t *tracer, struct pycbc_common_vars *cv, const char* op, pycbc_Collection_coords* collection )
+{
+    /* TODO: add typical outer span tags */
+    if (tracer && !cv->mres->outer_span) {
+        if (tracer->tracer->flags == LCBTRACE_F_EXTERNAL && cv->external_span && Py_None != cv->external_span) {
+            // create external span to wrap, with external_span as the parent
+            void *new_external_span = tracer->tracer->v.v1.start_span(tracer->tracer, op, cv->external_span);
+            lcbtrace_span_wrap(tracer->tracer, op, LCBTRACE_NOW, new_external_span, &cv->mres->outer_span);
+        } else {
+            cv->mres->outer_span = lcbtrace_span_start(tracer->tracer, op, LCBTRACE_NOW, NULL);
+        }
+        lcbtrace_span_set_is_outer(cv->mres->outer_span, 1);
+        lcbtrace_span_add_tag_str(cv->mres->outer_span, "db.system", "couchbase");
+        lcbtrace_span_add_tag_str(cv->mres->outer_span, "db.name", PyUnicode_AsUTF8(cv->mres->parent->bucket));
+        if (collection) {
+            const char *coll = pycbc_strn_buf_psz(collection->collection);
+            const char *scope = pycbc_strn_buf_psz(collection->scope);
+            lcbtrace_span_add_tag_str(cv->mres->outer_span, "couchbase.collection", coll ? coll : "_default");
+           lcbtrace_span_add_tag_str(cv->mres->outer_span, "couchbase.scope", scope ? scope : "_default");
+        }
+        lcbtrace_span_set_service(cv->mres->outer_span, LCBTRACE_SERVICE_KV);
+    }
+}

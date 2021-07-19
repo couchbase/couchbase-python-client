@@ -36,6 +36,24 @@ struct single_key_context {
 
 };
 
+static const char *operation_name_from_storecmd_vars(const struct storecmd_vars *scv)
+{
+    switch (scv->operation) {
+        case LCB_STORE_UPSERT:
+            return (scv->argopts & PYCBC_ARGOPT_MULTI) ? "upsert_multi" : "upsert";
+        case LCB_STORE_INSERT:
+            return (scv->argopts & PYCBC_ARGOPT_MULTI) ? "insert_multi" : "insert";
+        case LCB_STORE_REPLACE:
+            return (scv->argopts & PYCBC_ARGOPT_MULTI) ? "replace_multi" :"replace";
+        case LCB_STORE_APPEND:
+            return (scv->argopts & PYCBC_ARGOPT_MULTI) ? "append_multi" : "append";
+        case LCB_STORE_PREPEND:
+            return (scv->argopts & PYCBC_ARGOPT_MULTI) ? "prepend_multi" : "prepend";
+        default:
+            return "unknown_operation";
+    }
+}
+
 static int
 handle_item_kv(pycbc_Item *itm, PyObject *options, const struct storecmd_vars *scv,
     struct single_key_context *skc)
@@ -132,14 +150,19 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
         PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Item not supported in subdoc mode");
         return -1;
     }
-
-    if (pycbc_tc_encode_key(self, curkey, &keybuf) != 0) {
+    create_outer_span(self->tracer, cv, "mutate_in", &collection->collection);
+    lcbtrace_SPAN *encode_span = create_encode_span(self->tracer, cv);
+    rv = pycbc_tc_encode_key(self, curkey, &keybuf);
+    lcbtrace_span_finish(encode_span, LCBTRACE_NOW);
+    if (rv != 0) {
+        lcbtrace_span_finish(cv->mres->outer_span, LCBTRACE_NOW);
         return -1;
     }
     CMDSCOPE_NG(SUBDOC, subdoc)
     {
         lcb_cmdsubdoc_cas(cmd, scv->single_cas);
         lcb_cmdsubdoc_expiry(cmd, scv->ttl);
+        lcb_cmdsubdoc_parent_span(cmd, cv->mres->outer_span);
         pycbc_cmdsubdoc_flags_from_scv(scv->sd_doc_flags, cmd);
         if(scv->preserve_expiry){
             lcb_cmdsubdoc_preserve_expiry(cmd, scv->preserve_expiry);
@@ -199,9 +222,12 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     skc.flagsobj = scv->flagsobj;
     skc.value = curvalue;
     skc.cas = scv->single_cas;
-
+    create_outer_span(self->tracer, cv, operation_name_from_storecmd_vars(scv), &collection->collection);
+    lcbtrace_SPAN *encode_span = create_encode_span(self->tracer, cv);
     rv = pycbc_tc_encode_key(self, curkey, &keybuf);
     if (rv < 0) {
+        lcbtrace_span_finish(encode_span, LCBTRACE_NOW);
+        lcbtrace_span_finish(cv->mres->outer_span, LCBTRACE_NOW);
         return -1;
     }
 
@@ -209,19 +235,24 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
         rv = handle_item_kv(itm, options, scv, &skc);
         if (rv < 0) {
             rv = -1;
+            lcbtrace_span_finish(encode_span, LCBTRACE_NOW);
+            lcbtrace_span_finish(cv->mres->outer_span, LCBTRACE_NOW);
             goto GT_DONE;
         }
     }
 
     rv = pycbc_tc_encode_value(self, skc.value, skc.flagsobj, &valbuf, &flags);
+    lcbtrace_span_finish(encode_span, LCBTRACE_NOW);
     if (rv < 0) {
         rv = -1;
+        lcbtrace_span_finish(cv->mres->outer_span, LCBTRACE_NOW);
         goto GT_DONE;
     }
     {
         CMDSCOPE_NG_PARAMS(STORE, store, scv->operation)
         {
             lcb_cmdstore_flags(cmd, flags);
+            lcb_cmdstore_parent_span(cmd, cv->mres->outer_span);
             PYCBC_DUR_INIT(err, cmd, store, cv->mres->dur);
             if (err) {
                 CMDSCOPE_GENERIC_FAIL(,STORE,store)
@@ -311,6 +342,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     PyObject *dict = NULL;
     PyObject *key = NULL;
     PyObject *value = NULL;
+    PyObject *external_span = NULL;
     pycbc_seqtype_t seqtype = PYCBC_SEQTYPE_GENERIC;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
     struct storecmd_vars scv = { 0 };
@@ -325,6 +357,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                                    "durability_level",
                                    "timeout",
                                    "preserve_expiry",
+                                   "span",
                                    NULL};
 
     static char *kwlist_single[] = {"key",
@@ -338,6 +371,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                                     "durability_level",
                                     "timeout",
                                     "preserve_expiry",
+                                    "span",
                                     NULL};
 
     scv.operation = operation;
@@ -346,7 +380,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     if (argopts & PYCBC_ARGOPT_MULTI) {
         rv = PyArg_ParseTupleAndKeywords(args,
                                          kwargs,
-                                         "O|OOBBIOi",
+                                         "O|OOBBIOiO",
                                          kwlist_multi,
                                          &dict,
                                          &ttl_O,
@@ -355,12 +389,13 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                                          &replicate_to,
                                          &dur_level,
                                          &timeout_O,
-                                         &preserve_expiry);
+                                         &preserve_expiry,
+                                         &external_span);
 
     } else {
         rv = PyArg_ParseTupleAndKeywords(args,
                                          kwargs,
-                                         "OO|KOOBBIIOi",
+                                         "OO|KOOBBIIOiO",
                                          kwlist_single,
                                          &key,
                                          &value,
@@ -372,7 +407,8 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                                          &scv.sd_doc_flags,
                                          &dur_level,
                                          &timeout_O,
-                                         &preserve_expiry);
+                                         &preserve_expiry,
+                                         &external_span);
     }
 
     if (!rv) {
@@ -425,6 +461,8 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     } else if (rv == -1) {
         goto GT_DONE;
     }
+
+    cv.external_span = external_span;
 
     if (argopts & PYCBC_ARGOPT_MULTI) {
         rv = PYCBC_OPUTIL_ITER_MULTI_COLLECTION(&collection,

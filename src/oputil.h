@@ -94,6 +94,8 @@ struct pycbc_common_vars {
     pycbc_DURABILITY_LEVEL durability_level;
 
     unsigned long timeout;
+
+    PyObject *external_span;
 };
 
 #define PYCBC_COMMON_VARS_STATIC_INIT { 0 }

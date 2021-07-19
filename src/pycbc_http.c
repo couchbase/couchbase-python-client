@@ -175,6 +175,8 @@ void pycbc_httpresult_complete(pycbc_HttpResult *htres,
         htres->rc = err;
     }
 
+
+
     htres->htcode = status;
     htres->done = 1;
     htres->u.htreq = NULL;
@@ -204,6 +206,9 @@ void pycbc_httpresult_complete(pycbc_HttpResult *htres,
 
     get_headers(htres, headers);
     decode_data(mres, htres);
+
+    lcbtrace_span_finish(mres->outer_span, LCBTRACE_NOW);
+    mres->outer_span = NULL;
 
     if ((bucket->flags & PYCBC_CONN_F_ASYNC) == 0) {
         if (!bucket->nremaining) {
@@ -266,11 +271,7 @@ PyObject *pycbc_Bucket__http_request(pycbc_Bucket *self,
                                      PyObject *args,
                                      PyObject *kwargs)
 {
-    pycbc_stack_context_handle context =
-            PYCBC_TRACE_GET_STACK_CONTEXT_TOPLEVEL(kwargs,
-                                                   LCBTRACE_OP_REQUEST_ENCODING,
-                                                   self->tracer,
-                                                   "bucket.http_request");
+    pycbc_stack_context_handle context = NULL;
     int rv;
     int method;
     int reqtype;

@@ -1157,7 +1157,7 @@ void pycbc_Bucket_init_tracer(pycbc_Bucket *self)
 {
     lcbtrace_TRACER *threshold_tracer = lcb_get_tracer(self->instance);
 
-    if (self->parent_tracer || threshold_tracer) {
+    if (threshold_tracer) {
         PyObject *tracer_args = PyTuple_New(2);
         PyObject *threshold_tracer_capsule =
                 threshold_tracer

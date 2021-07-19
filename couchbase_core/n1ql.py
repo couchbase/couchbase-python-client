@@ -126,6 +126,7 @@ class _N1QLQuery(object):
         """
         self._adhoc = True
         self._cross_bucket = False
+        self._span = None
         self._body = {'statement': query}
         if args:
             self._add_pos_args(*args)
@@ -251,6 +252,17 @@ class _N1QLQuery(object):
     @cross_bucket.setter
     def cross_bucket(self, value):
         self._cross_bucket = value
+
+    @property
+    def span(self):
+        """
+        Parent span for this query.
+        """
+        return self._span
+
+    @span.setter
+    def span(self, span):
+        self._span = span
 
     @property
     def timeout(self):
@@ -441,7 +453,8 @@ class N1QLRequest(object):
     def _submit_query(self):
         return self._parent._n1ql_query(self._params.encoded,
                                         not self._params.adhoc,
-                                        cross_bucket=self._params.cross_bucket)
+                                        cross_bucket=self._params.cross_bucket,
+                                        span=self._params.span)
 
     def _start(self):
         if self._mres:

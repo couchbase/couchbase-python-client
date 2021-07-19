@@ -9,6 +9,7 @@ from couchbase_core._libcouchbase import Bucket as _Base
 from couchbase_core._libcouchbase import FMT_UTF8
 
 import couchbase.exceptions
+from couchbase.tracing import CouchbaseSpan
 from couchbase.durability import DurabilityType, DurabilityOptionBlock
 from couchbase.exceptions import (InvalidArgumentException, NotSupportedException,
                                   DocumentNotFoundException, PathNotFoundException, QueueEmpty,
@@ -131,6 +132,7 @@ class CounterOptions(DurabilityOptionBlock):
                  durability=None,   # type: DurabilityType
                  cas=None,          # type: int
                  timeout=None,      # type: timedelta
+                 span=None,         # type: CouchbaseSpan
                  expiry=None,       # type: timedelta
                  initial=SignedInt64(0),      # type: SignedInt64
                  delta=DeltaValue(1)         # type: DeltaValue
@@ -142,12 +144,13 @@ class CounterOptions(DurabilityOptionBlock):
         :param durability: Durability settings
         :param cas: the CAS value
         :param timeout: Timeout for the operation
+        :param span: Parent span for the operation
         :param expiry: Expiration time
         :param initial: Initial value
         :param delta: Variation
         """
         super(CounterOptions, self).__init__(durability=durability, cas=cas,
-                                             timeout=timeout, expiry=expiry, delta=delta, initial=initial)
+                                             timeout=timeout, expiry=expiry, delta=delta, initial=initial, span=span)
 
 
 class IncrementOptions(CounterOptions._wrap_docs(counter_type='increment')):
@@ -599,7 +602,8 @@ class CBCollection(wrapt.ObjectProxy):
                      keys,  # type: Mapping[str,Any]
                      ttl=0,  # type: int
                      format=None,  # type: int
-                     durability=None  # type: DurabilityType
+                     durability=None,  # type: DurabilityType
+                     span=None # type: CouchbaseSpan
                      ):
         pass
 
@@ -893,7 +897,7 @@ class CBCollection(wrapt.ObjectProxy):
         """
 
         final_options = forward_args(kwargs, *options)
-        
+
         ttl = final_options.get('ttl', None)
         preserve_expiry = final_options.get('preserve_expiry', False)
         if ttl and preserve_expiry is True:
@@ -1015,7 +1019,7 @@ class CBCollection(wrapt.ObjectProxy):
 
         ttl = final_options.get('ttl', None)
         preserve_expiry = final_options.get('preserve_expiry', False)
-        
+
         spec_types = [s[0] for s in spec]
         if SD.LCB_SDCMD_DICT_ADD in spec_types and preserve_expiry is True:
             raise InvalidArgumentException('The preserve_expiry option cannot be set for mutate_in with insert operations.')
