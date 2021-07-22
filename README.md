@@ -374,7 +374,7 @@ for row in row_iter:
 ## Async Operations<a id="sdk-async-ops"></a>
 The Python Couchbase SDK supports asynchronous I/O through the use of the asyncio (Python standard library) or the Twisted async framework.
 
->**NOTE:** The gcouchbase API has been omitted for the 3.x version.
+>**NOTE:** Currently, the gcouchbase API is not available in the 3.x version of the Python SDK.
 
 ### Asyncio
 
@@ -387,19 +387,19 @@ from couchbase.auth import PasswordAuthenticator
 
 
 async def write_and_read(key, value):
-    cluster = Cluster(
-        connection_string='couchbase://localhost',
-        options=ClusterOptions(
-        authenticator=PasswordAuthenticator('Administrator','password')))
-    cb = cluster.bucket('test')
+    cluster = Cluster('couchbase://localhost',
+                      ClusterOptions(PasswordAuthenticator('Administrator', 'password')))
+    cb = cluster.bucket('default')
     await cb.on_connect()
     cb_coll = cb.default_collection()
     await cb_coll.upsert(key, value)
-    return await cb_coll.get(key)
+    result = await cb_coll.get(key)
+    cluster.disconnect()
+    return result
 
 loop = get_event_loop()
 rv = loop.run_until_complete(write_and_read('foo', 'bar'))
-print(rv.content)
+print(rv.content_as[str])
 ```
 ### Twisted
 
@@ -409,6 +409,7 @@ To use with Twisted, import ```txcouchbase.cluster``` instead of ```couchbase.cl
 from twisted.internet import reactor, defer
 
 from txcouchbase.cluster import TxCluster
+from couchbase.cluster import ClusterOptions
 from couchbase.auth import PasswordAuthenticator
 
 
@@ -433,8 +434,8 @@ def get_document(key):
 
 
 # create a cluster object
-cluster = TxCluster(connection_string='couchbase://localhost',
-                    authenticator=PasswordAuthenticator('Administrator', 'password'))
+cluster = TxCluster('couchbase://localhost',
+                    ClusterOptions(PasswordAuthenticator('Administrator', 'password')))
 
 # create a bucket object
 bucket = cluster.bucket('default')
@@ -520,6 +521,18 @@ $ brew install pyenv
 >- Use command ```xcode-select --install```
 >- Install the latest version of [Xcode](https://developer.apple.com/download)
 
+For *Zsh*, run the following commands to update *.zprofile* and *.zshrc*.  See pyenv install [docs](https://github.com/pyenv/pyenv#homebrew-on-macos) for further details on other shells.
+
+```console
+$ echo 'eval "$(pyenv init --path)"' >> ~/.zprofile
+```
+
+```console
+$ echo 'eval "$(pyenv init -)"' >> ~/.zshrc
+```
+
+>**NOTE:** You need to restart your login session for changes to take affect.  On MacOS, restarting terminal windows should suffice.
+
 Install Python version:
 ```console
 $ pyenv install 3.9.4
@@ -530,10 +543,12 @@ Set local shell to installed Python version:
 $  pyenv local 3.9.4
 ```
 
-Install virtualenvwrapper to allow pyenv to manage virtualenvs:
+To use virtualenvwrapper with pyenv, install pyenv-virtualenvwrapper:
 ```console
-$ pyenv virtualenvwrapper
+$ brew install pyenv-virtualenvwrapper
 ```
+
+To setup a virtualenvwrapper in your pyenv shell, run either ```pyenv virtualenvwrapper``` or ```pyenv virtualenvwrapper_lazy```
 
 >**NOTE:** If issues with ```pyenv virtualenvwrapper```, using ```python -m pip install virtualenvwrapper``` should accomplish the same goal.
 

@@ -62,6 +62,7 @@ packages = {
     couchbase_core+'.asynchronous',
     'couchbase.asynchronous',
     'couchbase.management',
+    'couchbase.encryption',
     'txcouchbase'
 }
 
