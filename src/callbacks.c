@@ -315,8 +315,9 @@ static void operation_completed_with_err_info(pycbc_Bucket *self,
     // outer span.  TODO: ideally we'd be smarter and have an inner span
     // for each of the multi operations, closing that here and closing the
     // outer one when nremaining == 0.  Ponder that for the future.
-    if (self->nremaining == 0) {
+    if ((self->flags & PYCBC_CONN_F_ASYNC) ||  (self->nremaining == 0)) {
         lcbtrace_span_finish(mres->outer_span, LCBTRACE_NOW);
+        mres->outer_span = NULL;
     }
 }
 
