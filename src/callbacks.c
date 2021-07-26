@@ -309,8 +309,6 @@ static void operation_completed_with_err_info(pycbc_Bucket *self,
                     res ? (PyObject *)res : NULL,
                     self ? self->nremaining : 0)
     PYCBC_CONTEXT_DEREF(context, 0);
-    operation_completed3(self, mres, err_info);
-    Py_XDECREF(err_info);
     // multi operations mean wait till we are on last one before closing
     // outer span.  TODO: ideally we'd be smarter and have an inner span
     // for each of the multi operations, closing that here and closing the
@@ -319,6 +317,8 @@ static void operation_completed_with_err_info(pycbc_Bucket *self,
         lcbtrace_span_finish(mres->outer_span, LCBTRACE_NOW);
         mres->outer_span = NULL;
     }
+    operation_completed3(self, mres, err_info);
+    Py_XDECREF(err_info);
 }
 
 /**
