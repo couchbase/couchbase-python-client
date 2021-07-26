@@ -22,7 +22,7 @@ relnotes_raw = requests.get(
     "{}/secure/ReleaseNote.jspa?projectId={}&version={}".format(server, project.id,
                                                                 project_version.id))
 soup = BeautifulSoup(relnotes_raw.text, 'html.parser')
-content = soup.find("section", class_="aui-page-panel-content")
+content = soup.find("main", class_="aui-page-panel-content")
 outputdir = os.path.join("build")
 
 date = datetime.date.today().strftime("{day} %B %Y").format(day=datetime.date.today().day)
