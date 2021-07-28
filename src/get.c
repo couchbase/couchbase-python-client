@@ -32,26 +32,26 @@ struct getcmd_vars_st {
     } u;
 };
 
-static const char* operation_name_from_optype(int optype) {
+static const char* operation_name_from_optype(int optype, int argopts) {
     switch (optype) {
         case PYCBC_CMD_GET:
-            return "get";
+            return (argopts & PYCBC_ARGOPT_MULTI) ? "get_multi" : "get";
         case PYCBC_CMD_TOUCH:
-            return "touch";
+            return (argopts & PYCBC_ARGOPT_MULTI) ? "touch_multi": "touch";
         case PYCBC_CMD_GAT:
-            return "get_and_touch";
+            return (argopts & PYCBC_ARGOPT_MULTI) ? "get_and_touch_multi" : "get_and_touch";
         case PYCBC_CMD_LOCK:
-            return "lock";
+            return (argopts & PYCBC_ARGOPT_MULTI) ? "lock_multi" : "lock";
         case PYCBC_CMD_EXISTS:
-            return "exists";
+            return (argopts & PYCBC_ARGOPT_MULTI) ? "exists_multi" : "exists";
         case PYCBC_CMD_GETREPLICA:
-            return "get_any_replica";
+            return (argopts & PYCBC_ARGOPT_MULTI) ? "get_any_replica_multi" : "get_any_replica";
         case PYCBC_CMD_GETREPLICA_INDEX:
-            return "get_replica";
+            return (argopts & PYCBC_ARGOPT_MULTI) ? "get_replica_multi" :  "get_replica";
         case PYCBC_CMD_GETREPLICA_ALL:
-            return "get_all_replicas";
+            return (argopts & PYCBC_ARGOPT_MULTI) ? "get_all_replicas_multi": "get_all_replicas";
         default:
-            return "unknown_operation";
+            return (argopts & PYCBC_ARGOPT_MULTI) ? "unknown_multi_operation": "unknown_operation";
     }
     return "unknown";
 }
@@ -83,7 +83,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     lcb_STATUS err = LCB_SUCCESS;
     pycbc_pybuffer keybuf = { NULL };
 
-    create_outer_span(self->tracer, cv, operation_name_from_optype(optype), &collection->collection);
+    create_outer_span(self->tracer, cv, operation_name_from_optype(optype, cv->argopts), &collection->collection);
     PYCBC_DEBUG_LOG_CONTEXT(context,"Started processing")
     (void)itm;
 
@@ -494,7 +494,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
       PYCBC_EXC_WRAP(PYCBC_EXC_ARGUMENTS, 0, "Items not supported for subdoc!");
       return -1;
     }
-    create_outer_span(self->tracer, cv, "lookup_in", &collection->collection);
+    create_outer_span(self->tracer, cv, (cv->argopts & PYCBC_ARGOPT_MULTI) ? "lookup_in_multi" : "lookup_in", &collection->collection);
     lcbtrace_SPAN *encode_span = create_encode_span(self->tracer, cv);
     rv = pycbc_tc_encode_key(self, curkey, &keybuf);
     lcbtrace_span_finish(encode_span, LCBTRACE_NOW);
@@ -531,18 +531,20 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     Py_ssize_t ncmds;
     PyObject *kobj = NULL;
     PyObject *quiet_key = NULL;
+    PyObject *external_span = NULL;
     pycbc_seqtype_t seqtype;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
     static char *kwlist[] = {
-            "ks", "quiet", PYCBC_COMMON_ARGS_TIMEOUT(KEYWORDS) NULL};
+            "ks", "quiet", "span", PYCBC_COMMON_ARGS_TIMEOUT(KEYWORDS) NULL};
     pycbc_common_args_timeout_t opts = {0};
     pycbc_Collection_t collection = pycbc_Collection_as_value(self, kwargs);
     if (!PyArg_ParseTupleAndKeywords(args,
                                      kwargs,
-                                     "O|O" PYCBC_COMMON_ARGS_TIMEOUT(ARGSPEC),
+                                     "O|OO" PYCBC_COMMON_ARGS_TIMEOUT(ARGSPEC),
                                      kwlist,
                                      &kobj,
                                      &quiet_key,
+                                     &external_span,
                                      &opts.timeout)) {
         PYCBC_EXCTHROW_ARGS();
         goto GT_FAIL;
@@ -558,6 +560,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     if (pycbc_get_duration(opts.timeout, &cv.timeout, 1)) {
         goto GT_FAIL;
     }
+    cv.external_span = external_span;
     if (PYCBC_OPUTIL_ITER_MULTI_COLLECTION(&collection,
                                            seqtype,
                                            kobj,
