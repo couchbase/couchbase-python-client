@@ -2729,6 +2729,7 @@ void pycbc_tracer_finish_span(void *span)
     } else {
         PyErr_Clear();
     }
+    PYCBC_XDECREF(finish_method);
     PyGILState_Release(gil_prev);
 }
 
