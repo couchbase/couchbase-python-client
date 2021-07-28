@@ -309,12 +309,17 @@ static void operation_completed_with_err_info(pycbc_Bucket *self,
                     res ? (PyObject *)res : NULL,
                     self ? self->nremaining : 0)
     PYCBC_CONTEXT_DEREF(context, 0);
-    // multi operations mean wait till we are on last one before closing
-    // outer span.  TODO: ideally we'd be smarter and have an inner span
-    // for each of the multi operations, closing that here and closing the
-    // outer one when nremaining == 0.  Ponder that for the future.
-    if ((self->flags & PYCBC_CONN_F_ASYNC) ||  (self->nremaining == 0)) {
+    /* Async operations need to close outer span when the last of its ops are complete,
+     * otherwise we close when nremaining is on the last one.  Note this probably
+     * is wrong for pipelining, but I don't believe we support that in sdk3
+     */
+    pycbc_AsyncResult *ares = NULL;
+    if (self->flags & PYCBC_CONN_F_ASYNC) {
+        ares = (pycbc_AsyncResult *)mres;
+    }
+    if ((ares && 1 == ares->nops) || (!ares && 1 == self->nremaining)) {
         lcbtrace_span_finish(mres->outer_span, LCBTRACE_NOW);
+        /* just to be sure we don't try to close it again */
         mres->outer_span = NULL;
     }
     operation_completed3(self, mres, err_info);
