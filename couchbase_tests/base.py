@@ -944,8 +944,7 @@ class CouchbaseClusterResource(object):
         clstr = cluster or self.cluster
         pools = self.try_n_times(
             10, 3, clstr._admin.http_request, path='/pools')
-        self.cluster_version = pools.value['implementationVersion'].split(
-            '-')[0]
+        self.cluster_version = pools.value['implementationVersion']
 
     def is_ready(self) -> bool:
         if self.is_mock:
@@ -1223,8 +1222,9 @@ class ClusterTestCase(CouchbaseTestCase):
 
     # NOTE: this really is only something you can trust in homogeneous clusters, but then again
     # this is a test suite.
-    def get_cluster_version(self):
-        return self.cluster_version
+    def get_cluster_version(self, full=False):
+        return self.cluster_version if full is True else self.cluster_version.split(
+            '-')[0]
 
     def get_bucket_info(self):
         return self.cluster._admin.bucket_info(self.bucket_name).value
@@ -1297,8 +1297,10 @@ class CollectionTestCase(ClusterTestCase):
         if type(self)._beer_sample_collections:
             self.beer_sample_collections = type(self)._beer_sample_collections
 
+
     @classmethod
-    def setUpClass(cls, setup_beer_sample_collections=None  # type: bool
+    def setUpClass(cls, 
+            setup_beer_sample_collections=None,  # type: bool
                    ) -> None:
         super(CollectionTestCase, cls).setUpClass()
         try:

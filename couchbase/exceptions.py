@@ -24,6 +24,7 @@ from couchbase_core import CompatibilityEnum
 from string import Template
 from collections import defaultdict
 from functools import wraps
+
 try:
     from typing import TypedDict
 except ImportError:
@@ -124,36 +125,40 @@ class CouchbaseException(Exception):
         """
         return issubclass(cls.rc_to_exctype(rc), cls)
 
-    ParamType = TypedDict('ParamType',
-                          {'rc': int,
-                           'all_results': Mapping,
-                           'result': Any,
-                           'inner_cause': Exception,
-                           'csrc_info': Any,
-                           'key': str,
-                           'objextra': Any,
-                           'message': str,
-                           'context': Any})
+    ParamType = TypedDict(
+        "ParamType",
+        {
+            "rc": int,
+            "all_results": Mapping,
+            "result": Any,
+            "inner_cause": Exception,
+            "csrc_info": Any,
+            "key": str,
+            "objextra": Any,
+            "message": str,
+            "context": Any,
+        },
+    )
 
-    def __init__(self,  # type: CouchbaseException
-                 params=None  # type: Union[CouchbaseException.ParamType,str]
-                 ):
+    def __init__(
+        self,  # type: CouchbaseException
+        params=None,  # type: Union[CouchbaseException.ParamType,str]
+    ):
         if isinstance(params, str):
-            params = {'message': params}
+            params = {"message": params}
         elif isinstance(params, CouchbaseException):
             self.__dict__.update(params.__dict__)
             return
 
-        self.rc = params.get('rc', self.CODE)
-        self.all_results = params.get('all_results', {})
-        self.result = params.get('result', None)
-        self.inner_cause = params.get('inner_cause', None)
-        self.csrc_info = params.get('csrc_info', ())
-        self.key = params.get('key', None)
-        self.objextra = params.get('objextra', None)
-        self.message = params.get('message', None)
-        self.context = ErrorContext.from_dict(
-            **params.get('error_context', dict()))
+        self.rc = params.get("rc", self.CODE)
+        self.all_results = params.get("all_results", {})
+        self.result = params.get("result", None)
+        self.inner_cause = params.get("inner_cause", None)
+        self.csrc_info = params.get("csrc_info", ())
+        self.key = params.get("key", None)
+        self.objextra = params.get("objextra", None)
+        self.message = params.get("message", None)
+        self.context = ErrorContext.from_dict(**params.get("error_context", dict()))
 
     @classmethod
     def pyexc(cls, message=None, obj=None, inner=None):
@@ -161,10 +166,14 @@ class CouchbaseException(Exception):
         if inner and isinstance(inner, CouchbaseException):
             context = inner.context
 
-        return cls({'message': message,
-                    'objextra': obj,
-                    'inner_cause': inner,
-                    'error_context': context})
+        return cls(
+            {
+                "message": message,
+                "objextra": obj,
+                "inner_cause": inner,
+                "error_context": context,
+            }
+        )
 
     @property
     def categories(self):
@@ -241,13 +250,12 @@ class CouchbaseException(Exception):
 
         ret_ok, ret_fail = {}, {}
         count = 0
-        nokey_prefix = (
-            [""] + sorted(filter(bool, self.all_results.keys())))[-1]
+        nokey_prefix = ([""] + sorted(filter(bool, self.all_results.keys())))[-1]
         for key, v in self.all_results.items():
             if not key:
                 key = nokey_prefix + ":nokey:" + str(count)
                 count += 1
-            success = getattr(v, 'success', True)
+            success = getattr(v, "success", True)
             if success:
                 ret_ok[key] = v
             else:
@@ -262,8 +270,7 @@ class CouchbaseException(Exception):
             details.append("Key={0}".format(repr(self.key)))
 
         if self.rc:
-            details.append("RC=0x{0:X}[{1}]".format(
-                self.rc, C._strerror(self.rc)))
+            details.append("RC=0x{0:X}[{1}]".format(self.rc, C._strerror(self.rc)))
         if self.message:
             details.append(self.message)
         if self.all_results:
@@ -283,8 +290,11 @@ class CouchbaseException(Exception):
 
         success, fail = self.split_results()
         if len(fail) > 0:
-            summary = {key: value.tracing_output for key,
-                       value in fail.items() if hasattr(value, "tracing_output")}
+            summary = {
+                key: value.tracing_output
+                for key, value in fail.items()
+                if hasattr(value, "tracing_output")
+            }
             details.append("Tracing Output={}".format(json.dumps(summary)))
 
         s = "<{0}>".format(", ".join(details))
@@ -317,6 +327,7 @@ class QueryException(CouchbaseException):
     The error(s) returned by response from the server by the Query/N1QL service
     Any additional information returned by the server, the node it executed on, payload, HTTP status
     """
+
     pass
 
 
@@ -359,6 +370,7 @@ class ViewException(CouchbaseException):
     Properties
     The error(s) returned by response from the server, contextId, any additional information returned by the server, the node it executed on, payload, HTTP status.
     """
+
     pass
 
 
@@ -372,6 +384,7 @@ class KeyValueException(CouchbaseException):
     XError and Enhanced error message information
     The document id
     The opaque used in the request"""
+
     pass
 
 
@@ -382,6 +395,7 @@ class SDKException(CouchbaseException):
     The error message returned from the SDK itself
     Properties
     """
+
     pass
 
 
@@ -425,6 +439,7 @@ class SearchIndexNotFoundException(SearchException):
 
 class KeyspaceNotFoundException(QueryException):
     """Keyspace not found (collection or bucket does not exist)"""
+
     pass
 
 
@@ -520,6 +535,7 @@ class InvalidConfigurationException(CouchbaseException):
     Properties
     TBD
     """
+
     pass
 
 
@@ -529,6 +545,7 @@ class BootstrappingException(CouchbaseException):
     "A bootstrapping error has occurred." details and inner exceptions, any stacktrace info.
     Properties
     TBD"""
+
     pass
 
 
@@ -546,11 +563,13 @@ class TimeoutException(SharedException):
     Properties
     Reason: (Exception) Explains the underlying reason we expect this was caused.
     """
+
     pass
 
 
 class NetworkException(CouchbaseException):
     """A generic network error"""
+
     pass
 
 
@@ -560,6 +579,7 @@ class NodeUnavailableException(CouchbaseException):
     "The node that the operation has been requested on is down or not available". details and inner exceptions, any stacktrace info.
     Properties
     TBD"""
+
     pass
 
 
@@ -570,6 +590,7 @@ class CollectionMissingException(CouchbaseException):
     Properties
     TBD
     """
+
     pass
 
 
@@ -622,7 +643,7 @@ _LCB_ERRCAT_MAP = {
     C.LCB_ERROR_TYPE_ANALYTICS: AnalyticsException,
     C.LCB_ERROR_TYPE_SEARCH: SearchException,
     C.LCB_ERROR_TYPE_VIEW: ViewException,
-    C.LCB_ERROR_TYPE_SDK: SDKException
+    C.LCB_ERROR_TYPE_SDK: SDKException,
 }
 
 
@@ -630,7 +651,7 @@ class ErrorContext(dict):
     @staticmethod
     def from_dict(**kwargs):
         # type: (...) -> ErrorContext
-        klass = kwargs.get('type', "ErrorContext")
+        klass = kwargs.get("type", "ErrorContext")
         cl = getattr(sys.modules[__name__], klass)
         return cl(**kwargs)
 
@@ -638,7 +659,7 @@ class ErrorContext(dict):
     @uncommitted
     def endpoint(self):
         # type: (...) -> str
-        return self.get('endpoint', None)
+        return self.get("endpoint", None)
 
     # deprecated??
     # @property
@@ -659,13 +680,13 @@ class HTTPErrorContextBase(ErrorContext):
     @uncommitted
     def http_response_code(self):
         # type: (...) -> int
-        return self.get('response_code', None)
+        return self.get("response_code", None)
 
     @property
     @uncommitted
     def http_response_body(self):
         # type: (...) -> str
-        return self.get('response_body', None)
+        return self.get("response_body", None)
 
 
 class ViewErrorContext(HTTPErrorContextBase):
@@ -673,31 +694,31 @@ class ViewErrorContext(HTTPErrorContextBase):
     @uncommitted
     def first_error_message(self):
         # type: (...) -> str
-        return self.get('first_error_message', None)
+        return self.get("first_error_message", None)
 
     @property
     @uncommitted
     def first_error_code(self):
         # type: (...) -> str
-        return self.get('first_error_code', None)
+        return self.get("first_error_code", None)
 
     @property
     @uncommitted
     def design_document(self):
         # type: (...) -> str
-        return self.get('design_document', None)
+        return self.get("design_document", None)
 
     @property
     @uncommitted
     def view(self):
         # type: (...) -> str
-        return self.get('view', None)
+        return self.get("view", None)
 
     @property
     @uncommitted
     def query_params(self):
         # type: (...) -> str
-        return self.get('query_params', None)
+        return self.get("query_params", None)
 
 
 class SearchErrorContext(HTTPErrorContextBase):
@@ -705,25 +726,25 @@ class SearchErrorContext(HTTPErrorContextBase):
     @uncommitted
     def error_message(self):
         # type: (...) -> str
-        return self.get('error_message', None)
+        return self.get("error_message", None)
 
     @property
     @uncommitted
     def index_name(self):
         # type: (...) -> str
-        return self.get('index_name', None)
+        return self.get("index_name", None)
 
     @property
     @uncommitted
     def query(self):
         # type: (...) -> str
-        return self.get('query', None)
+        return self.get("query", None)
 
     @property
     @uncommitted
     def params(self):
         # type: (...) -> str
-        return self.get('params', None)
+        return self.get("params", None)
 
 
 class QueryErrorContext(HTTPErrorContextBase):
@@ -731,31 +752,31 @@ class QueryErrorContext(HTTPErrorContextBase):
     @uncommitted
     def first_error_code(self):
         # type: (...) -> int
-        return self.get('first_error_code', None)
+        return self.get("first_error_code", None)
 
     @property
     @uncommitted
     def first_error_message(self):
         # type: (...) -> str
-        return self.get('first_error_message', None)
+        return self.get("first_error_message", None)
 
     @property
     @uncommitted
     def statement(self):
         # type: (...) -> str
-        return self.get('statement', None)
+        return self.get("statement", None)
 
     @property
     @uncommitted
     def client_context_id(self):
         # type: (...) -> str
-        return self.get('client_context_id', None)
+        return self.get("client_context_id", None)
 
     @property
     @uncommitted
     def query_params(self):
         # type: (...) -> str
-        return self.get('query_params', None)
+        return self.get("query_params", None)
 
 
 class AnalyticsErrorContext(QueryErrorContext):
@@ -767,19 +788,19 @@ class HTTPErrorContext(ErrorContext):
     @uncommitted
     def response_code(self):
         # type: (...) -> int
-        return self.get('response_code', None)
+        return self.get("response_code", None)
 
     @property
     @uncommitted
     def path(self):
         # type: (...) -> str
-        return self.get('path', None)
+        return self.get("path", None)
 
     @property
     @uncommitted
     def response_body(self):
         # type: (...) -> str
-        return self.get('response_body', None)
+        return self.get("response_body", None)
 
 
 class KVErrorContext(ErrorContext):
@@ -787,55 +808,55 @@ class KVErrorContext(ErrorContext):
     @uncommitted
     def status_code(self):
         # type: (...) -> int
-        return self.get('status_code', None)
+        return self.get("status_code", None)
 
     @property
     @uncommitted
     def cas(self):
         # type: (...) -> int
-        return self.get('cas', None)
+        return self.get("cas", None)
 
     @property
     @uncommitted
     def opaque(self):
         # type: (...) -> int
-        return self.get('opaque', None)
+        return self.get("opaque", None)
 
     @property
     @uncommitted
     def key(self):
         # type: (...) -> str
-        return self.get('key', None)
+        return self.get("key", None)
 
     @property
     @uncommitted
     def bucket(self):
         # type: (...) -> str
-        return self.get('bucket', None)
+        return self.get("bucket", None)
 
     @property
     @uncommitted
     def scope(self):
         # type: (...) -> str
-        return self.get('scope', '_default')
+        return self.get("scope", "_default")
 
     @property
     @uncommitted
     def collection(self):
         # type: (...) -> str
-        return self.get('collection', '_default')
+        return self.get("collection", "_default")
 
     @property
     @uncommitted
     def context(self):
         # type: (...) -> str
-        return self.get('context', None)
+        return self.get("context", None)
 
     @property
     @uncommitted
     def ref(self):
         # type: (...) -> str
-        return self.get('ref', None)
+        return self.get("ref", None)
 
 
 # v2 exception types -- needs to go!
@@ -864,6 +885,8 @@ class CouchbaseDataException(CouchbaseException):
     indicate that the server could not satisfy the request because of certain
     data constraints (such as an item not being present, or a CAS mismatch)
     """
+
+
 # END V2 exception types -- needs to go eventually
 
 
@@ -895,6 +918,7 @@ class ValueFormatException(CouchbaseException):
 
 
 # The following exceptions are derived from libcouchbase
+
 
 class DeltaBadvalException(CouchbaseException):
     """The given value is not a number
@@ -961,6 +985,7 @@ class TemporaryFailException(SharedException):
 
 class ParsingFailedException(SharedException):
     """Parsing failure (from server)"""
+
     pass
 
 
@@ -1110,21 +1135,23 @@ class SubdocEmptyPathException(CouchbaseException):
 class CryptoException(CouchbaseException):
     def __init__(self, params=None, message="Generic Cryptography exception", **kwargs):
         params = params or {}
-        param_dict = params.get('objextra') or defaultdict(lambda: "unknown")
-        params['message'] = Template(message).safe_substitute(**param_dict)
+        param_dict = params.get("objextra") or defaultdict(lambda: "unknown")
+        params["message"] = Template(message).safe_substitute(**param_dict)
         super(CryptoException, self).__init__(params=params, **kwargs)
 
 
 class EncryptionFailureException(CryptoException):
     def __init__(self, params=None, message="Generic encryption failure.", **kwargs):
         super(EncryptionFailureException, self).__init__(
-            params=params, message=message, **kwargs)
+            params=params, message=message, **kwargs
+        )
 
 
 class DecryptionFailureException(CryptoException):
     def __init__(self, params=None, message="Generic decryption failure.", **kwargs):
         super(DecryptionFailureException, self).__init__(
-            params=params, message=message, **kwargs)
+            params=params, message=message, **kwargs
+        )
 
 
 class CryptoKeyNotFoundException(CryptoException):
@@ -1192,26 +1219,31 @@ class InvalidCipherTextException(CryptoException):
 
 class NotImplementedInV3(CouchbaseException):
     """Not available on PYCBC>=3.0.0-alpha1"""
+
     pass
 
 
 class CompilationFailedException(AnalyticsException):
     """Raised when analytics service fails to compile query statement."""
+
     pass
 
 
 class DataverseAlreadyExistsException(AnalyticsException):
     """Raised when attempting to create dataverse when it already exists"""
+
     pass
 
 
 class DataverseNotFoundException(AnalyticsException):
     """Raised when attempting to drop a dataverse which does not exist"""
+
     pass
 
 
 class DatasetNotFoundException(AnalyticsException):
     """Raised when attempting to drop a dataset which does not exist."""
+
     pass
 
 
@@ -1227,6 +1259,34 @@ class AnalyticsLinkNotFoundException(AnalyticsException):
     """Raised when attempting to replace or drop an analytics link that does not exists"""
 
 
+class EventingFunctionNotFoundException(CouchbaseException):
+    """Raised when an eventing function is not found"""
+
+
+class EventingFunctionCompilationFailureException(CouchbaseException):
+    """Raised when compilation of an eventing function failed"""
+
+
+class EventingFunctionNotBootstrappedException(CouchbaseException):
+    """Raised when an eventing function is deployed but not “fully” bootstrapped"""
+
+
+class EventingFunctionNotDeployedException(CouchbaseException):
+    """Raised when an eventing function is not deployed, but the action expects it to be deployed"""
+
+
+class EventingFunctionNotUnDeployedException(CouchbaseException):
+    """Raised when an eventing function is deployed, but the action expects it to be undeployed"""
+
+
+class EventingFunctionAlreadyDeployedException(CouchbaseException):
+    """Raised when an eventing function has already been deployed"""
+
+
+class EventingFunctionCollectionNotFoundException(CouchbaseException):
+    """Raised when collection in specified keyspace is not found"""
+
+
 _LCB_ERRCAT_MAP = {
     C.LCB_ERROR_TYPE_BASE: BaseException,
     C.LCB_ERROR_TYPE_SHARED: SharedException,
@@ -1235,7 +1295,7 @@ _LCB_ERRCAT_MAP = {
     C.LCB_ERROR_TYPE_ANALYTICS: AnalyticsException,
     C.LCB_ERROR_TYPE_SEARCH: SearchException,
     C.LCB_ERROR_TYPE_VIEW: ViewException,
-    C.LCB_ERROR_TYPE_SDK: SDKException
+    C.LCB_ERROR_TYPE_SDK: SDKException,
 }
 
 
@@ -1263,67 +1323,72 @@ class DurabilityErrorCode(CompatibilityEnum):
     @classmethod
     def prefix(cls):
         return "LCB_DURABILITY_"
+
     INVALID_LEVEL = DurabilityInvalidLevelException
     IMPOSSIBLE = DurabilityImpossibleException
     SYNC_WRITE_IN_PROGRESS = DurabilitySyncWriteInProgressException
     SYNC_WRITE_AMBIGUOUS = DurabilitySyncWriteAmbiguousException
 
 
-_LCB_SYNCREP_MAP = {
-    item.value: item.orig_value for item in DurabilityErrorCode}
+_LCB_SYNCREP_MAP = {item.value: item.orig_value for item in DurabilityErrorCode}
 
 
-_LCB_ERRNO_MAP = dict(list({
-    C.LCB_ERR_AUTHENTICATION_FAILURE:        AuthenticationException,
-    C.LCB_ERR_INVALID_DELTA:                 DeltaBadvalException,
-    C.LCB_ERR_VALUE_TOO_LARGE:               ValueTooBigException,
-    C.LCB_ERR_NO_MEMORY:                     NoMemoryException,
-    C.LCB_ERR_TEMPORARY_FAILURE:             TemporaryFailException,
-    C.LCB_ERR_PARSING_FAILURE:               ParsingFailedException,
-    C.LCB_ERR_SCOPE_NOT_FOUND:               ScopeNotFoundException,
-    C.LCB_ERR_DOCUMENT_EXISTS:               DocumentExistsException,
-    C.LCB_ERR_DOCUMENT_NOT_FOUND:            DocumentNotFoundException,
-    C.LCB_ERR_DOCUMENT_LOCKED:               DocumentLockedException,
-    C.LCB_ERR_CAS_MISMATCH:                  CASMismatchException,
-    C.LCB_ERR_DLOPEN_FAILED:                 DlopenFailedException,
-    C.LCB_ERR_DLSYM_FAILED:                  DlsymFailedException,
-    C.LCB_ERR_NETWORK:                       NetworkException,
-    C.LCB_ERR_NOT_MY_VBUCKET:                NotMyVbucketException,
-    C.LCB_ERR_NOT_STORED:                    NotStoredException,
-    C.LCB_ERR_UNSUPPORTED_OPERATION:    NotSupportedException,
-    C.LCB_ERR_UNKNOWN_HOST:             UnknownHostException,
-    C.LCB_ERR_PROTOCOL_ERROR:           ProtocolException,
-    C.LCB_ERR_TIMEOUT:                  TimeoutException,
-    C.LCB_ERR_CONNECT_ERROR:            ConnectException,
-    C.LCB_ERR_BUCKET_NOT_FOUND:         BucketNotFoundException,
-    C.LCB_ERR_QUERY:                    QueryException,
-    C.LCB_ERR_KEYSPACE_NOT_FOUND:       KeyspaceNotFoundException,
-    C.LCB_ERR_NO_MATCHING_SERVER:       DocumentUnretrievableException,
-    C.LCB_ERR_INVALID_HOST_FORMAT:      InvalidException,
-    C.LCB_ERR_INVALID_CHAR:             InvalidException,
-    C.LCB_ERR_INVALID_ARGUMENT:         InvalidArgumentException,
-    C.LCB_ERR_DURABILITY_TOO_MANY:      DurabilityImpossibleException,
-    C.LCB_ERR_DUPLICATE_COMMANDS:       InvalidArgumentException,
-    C.LCB_ERR_NO_CONFIGURATION:         ClientTemporaryFailException,
-    C.LCB_ERR_HTTP:                     HTTPException,
-    C.LCB_ERR_SUBDOC_PATH_NOT_FOUND:    PathNotFoundException,
-    C.LCB_ERR_SUBDOC_PATH_EXISTS:       PathExistsException,
-    C.LCB_ERR_SUBDOC_PATH_INVALID:      SubdocPathInvalidException,
-    C.LCB_ERR_SUBDOC_PATH_TOO_DEEP:     DocumentTooDeepException,
-    C.LCB_ERR_SUBDOC_DOCUMENT_NOT_JSON: DocumentNotJsonException,
-    C.LCB_ERR_SUBDOC_VALUE_TOO_DEEP:    SubdocValueTooDeepException,
-    C.LCB_ERR_SUBDOC_PATH_MISMATCH:          SubdocPathMismatchException,
-    C.LCB_ERR_SUBDOC_VALUE_INVALID:          SubdocCantInsertValueException,
-    C.LCB_ERR_SUBDOC_DELTA_INVALID:          SubdocBadDeltaException,
-    C.LCB_ERR_INDEX_NOT_FOUND:               QueryIndexNotFoundException,
-    C.LCB_ERR_INDEX_EXISTS:                  QueryIndexAlreadyExistsException,
-    C.LCB_ERR_SUBDOC_NUMBER_TOO_BIG:         SubdocNumberTooBigException,
-    C.LCB_ERR_COMPILATION_FAILED:            CompilationFailedException,
-    C.LCB_ERR_DATAVERSE_EXISTS:              DataverseAlreadyExistsException,
-    C.LCB_ERR_DATAVERSE_NOT_FOUND:           DataverseNotFoundException,
-    C.LCB_ERR_DATASET_NOT_FOUND:             DatasetNotFoundException,
-    C.LCB_ERR_DATASET_EXISTS:                DatasetAlreadyExistsException
-}.items()) + list(_LCB_SYNCREP_MAP.items()))
+_LCB_ERRNO_MAP = dict(
+    list(
+        {
+            C.LCB_ERR_AUTHENTICATION_FAILURE: AuthenticationException,
+            C.LCB_ERR_INVALID_DELTA: DeltaBadvalException,
+            C.LCB_ERR_VALUE_TOO_LARGE: ValueTooBigException,
+            C.LCB_ERR_NO_MEMORY: NoMemoryException,
+            C.LCB_ERR_TEMPORARY_FAILURE: TemporaryFailException,
+            C.LCB_ERR_PARSING_FAILURE: ParsingFailedException,
+            C.LCB_ERR_SCOPE_NOT_FOUND: ScopeNotFoundException,
+            C.LCB_ERR_DOCUMENT_EXISTS: DocumentExistsException,
+            C.LCB_ERR_DOCUMENT_NOT_FOUND: DocumentNotFoundException,
+            C.LCB_ERR_DOCUMENT_LOCKED: DocumentLockedException,
+            C.LCB_ERR_CAS_MISMATCH: CASMismatchException,
+            C.LCB_ERR_DLOPEN_FAILED: DlopenFailedException,
+            C.LCB_ERR_DLSYM_FAILED: DlsymFailedException,
+            C.LCB_ERR_NETWORK: NetworkException,
+            C.LCB_ERR_NOT_MY_VBUCKET: NotMyVbucketException,
+            C.LCB_ERR_NOT_STORED: NotStoredException,
+            C.LCB_ERR_UNSUPPORTED_OPERATION: NotSupportedException,
+            C.LCB_ERR_UNKNOWN_HOST: UnknownHostException,
+            C.LCB_ERR_PROTOCOL_ERROR: ProtocolException,
+            C.LCB_ERR_TIMEOUT: TimeoutException,
+            C.LCB_ERR_CONNECT_ERROR: ConnectException,
+            C.LCB_ERR_BUCKET_NOT_FOUND: BucketNotFoundException,
+            C.LCB_ERR_QUERY: QueryException,
+            C.LCB_ERR_KEYSPACE_NOT_FOUND: KeyspaceNotFoundException,
+            C.LCB_ERR_NO_MATCHING_SERVER: DocumentUnretrievableException,
+            C.LCB_ERR_INVALID_HOST_FORMAT: InvalidException,
+            C.LCB_ERR_INVALID_CHAR: InvalidException,
+            C.LCB_ERR_INVALID_ARGUMENT: InvalidArgumentException,
+            C.LCB_ERR_DURABILITY_TOO_MANY: DurabilityImpossibleException,
+            C.LCB_ERR_DUPLICATE_COMMANDS: InvalidArgumentException,
+            C.LCB_ERR_NO_CONFIGURATION: ClientTemporaryFailException,
+            C.LCB_ERR_HTTP: HTTPException,
+            C.LCB_ERR_SUBDOC_PATH_NOT_FOUND: PathNotFoundException,
+            C.LCB_ERR_SUBDOC_PATH_EXISTS: PathExistsException,
+            C.LCB_ERR_SUBDOC_PATH_INVALID: SubdocPathInvalidException,
+            C.LCB_ERR_SUBDOC_PATH_TOO_DEEP: DocumentTooDeepException,
+            C.LCB_ERR_SUBDOC_DOCUMENT_NOT_JSON: DocumentNotJsonException,
+            C.LCB_ERR_SUBDOC_VALUE_TOO_DEEP: SubdocValueTooDeepException,
+            C.LCB_ERR_SUBDOC_PATH_MISMATCH: SubdocPathMismatchException,
+            C.LCB_ERR_SUBDOC_VALUE_INVALID: SubdocCantInsertValueException,
+            C.LCB_ERR_SUBDOC_DELTA_INVALID: SubdocBadDeltaException,
+            C.LCB_ERR_INDEX_NOT_FOUND: QueryIndexNotFoundException,
+            C.LCB_ERR_INDEX_EXISTS: QueryIndexAlreadyExistsException,
+            C.LCB_ERR_SUBDOC_NUMBER_TOO_BIG: SubdocNumberTooBigException,
+            C.LCB_ERR_COMPILATION_FAILED: CompilationFailedException,
+            C.LCB_ERR_DATAVERSE_EXISTS: DataverseAlreadyExistsException,
+            C.LCB_ERR_DATAVERSE_NOT_FOUND: DataverseNotFoundException,
+            C.LCB_ERR_DATASET_NOT_FOUND: DatasetNotFoundException,
+            C.LCB_ERR_DATASET_EXISTS: DatasetAlreadyExistsException,
+        }.items()
+    )
+    + list(_LCB_SYNCREP_MAP.items())
+)
 
 
 def _set_default_codes():
@@ -1357,9 +1422,10 @@ def _mk_lcberr(rc, name=None, default=CouchbaseException, docstr="", extrabase=[
 
     if name is None:
         name = "LCB_0x{0:0X} (generated, catch: {1})".format(
-            rc, ", ".join(x.__name__ for x in bases))
+            rc, ", ".join(x.__name__ for x in bases)
+        )
 
-    d = {'__doc__': docstr}
+    d = {"__doc__": docstr}
 
     if not bases:
         bases = [CouchbaseException]
@@ -1380,7 +1446,7 @@ def exc_from_rc(rc, msg=None, obj=None):
     :return: a raisable exception
     """
     newcls = CouchbaseException.rc_to_exctype(rc)
-    return newcls(params={'rc': rc, 'objextra': obj, 'message': msg})
+    return newcls(params={"rc": rc, "objextra": obj, "message": msg})
 
 
 class QueueEmpty(Exception):
@@ -1389,7 +1455,7 @@ class QueueEmpty(Exception):
     """
 
 
-CBErrorType = TypeVar('CBErrorType', bound=CouchbaseException)
+CBErrorType = TypeVar("CBErrorType", bound=CouchbaseException)
 
 
 class AnyPattern(object):
@@ -1410,12 +1476,12 @@ class NotSupportedWrapper(object):
             try:
                 return func(*args, **kwargs)
             except HTTPException as e:
-                extra = getattr(e, 'objextra', None)
-                status = getattr(extra, 'http_status', None)
+                extra = getattr(e, "objextra", None)
+                status = getattr(extra, "http_status", None)
                 if status == 404:
-                    raise NotSupportedException(
-                        'Server does not support this api call')
+                    raise NotSupportedException("Server does not support this api call")
                 raise
+
         return wrapped
 
     @classmethod
@@ -1426,11 +1492,10 @@ class NotSupportedWrapper(object):
             try:
                 return func(*args, **kwargs)
             except HTTPException as e:
-                extra = getattr(e, 'objextra', None)
-                status = getattr(extra, 'http_status', None)
+                extra = getattr(e, "objextra", None)
+                status = getattr(extra, "http_status", None)
                 if status == 404 or status == 400:
-                    raise NotSupportedException(
-                        'Server does not support this api call')
+                    raise NotSupportedException("Server does not support this api call")
                 raise
 
         return wrapped
@@ -1463,7 +1528,7 @@ class ErrorMapper(object):
             except CouchbaseException as e:
                 for orig_exc, text_to_final_exc in cls._compiled_mapping().items():
                     if isinstance(e, orig_exc):
-                        extra = getattr(e, 'objextra', None)
+                        extra = getattr(e, "objextra", None)
                         # TODO: this parsing is fragile, lets ponder a better approach, if any
                         if e.context:
                             value = e.context.response_body
@@ -1479,21 +1544,21 @@ class ErrorMapper(object):
                                     raise exc.pyexc(e.message, extra, e)
                         # fallback to old way
                         if extra:
-                            value = getattr(extra, 'value', "")
+                            value = getattr(extra, "value", "")
 
                             # this value could be a string or a json-encoded string...
                             if isinstance(value, dict):
                                 # there should be a key with the error
                                 # can be error or errors :(
-                                if 'error' in value:
-                                    value = value.get('error', None)
-                                elif 'errors' in value:
-                                    value = value.get('errors', None)
-                                elif '_' in value:
-                                    value = value.get('_', None)
+                                if "error" in value:
+                                    value = value.get("error", None)
+                                elif "errors" in value:
+                                    value = value.get("errors", None)
+                                elif "_" in value:
+                                    value = value.get("_", None)
                                 if value and isinstance(value, dict):
                                     # sometimes it is still a dict, so use the name field
-                                    value = value.get('name', None)
+                                    value = value.get("name", None)
                             if isinstance(value, bytearray) or isinstance(value, bytes):
                                 value = value.decode("utf-8")
                             for pattern, exc in text_to_final_exc.items():
@@ -1510,10 +1575,13 @@ class ErrorMapper(object):
 
     @classmethod
     def _compiled_mapping(cls):
-        if not getattr(cls, '_cm', None):
+        if not getattr(cls, "_cm", None):
             cls._cm = {
-                orig_exc: {{str: re.compile}.get(type(k), lambda x: x)(k): v for k, v in mapping.items()} for
-                orig_exc, mapping in cls.mapping().items()
+                orig_exc: {
+                    {str: re.compile}.get(type(k), lambda x: x)(k): v
+                    for k, v in mapping.items()
+                }
+                for orig_exc, mapping in cls.mapping().items()
             }
         return cls._cm
 
@@ -1525,17 +1593,17 @@ class ErrorMapper(object):
     @classmethod
     def wrap(cls, dest):
         for name, method in inspect.getmembers(dest, inspect.isfunction):
-            if not name.startswith('_'):
+            if not name.startswith("_"):
                 setattr(dest, name, cls.mgmt_exc_wrap(method))
         return dest
 
 
 _EXCTYPE_MAP = {
-    C.PYCBC_EXC_ARGUMENTS:  InvalidArgumentException,
-    C.PYCBC_EXC_ENCODING:   ValueFormatException,
-    C.PYCBC_EXC_INTERNAL:   InternalSDKException,
-    C.PYCBC_EXC_HTTP:       HTTPException,
-    C.PYCBC_EXC_THREADING:  ObjectThreadException,
-    C.PYCBC_EXC_DESTROYED:  ObjectDestroyedException,
-    C.PYCBC_EXC_PIPELINE:   PipelineException
+    C.PYCBC_EXC_ARGUMENTS: InvalidArgumentException,
+    C.PYCBC_EXC_ENCODING: ValueFormatException,
+    C.PYCBC_EXC_INTERNAL: InternalSDKException,
+    C.PYCBC_EXC_HTTP: HTTPException,
+    C.PYCBC_EXC_THREADING: ObjectThreadException,
+    C.PYCBC_EXC_DESTROYED: ObjectDestroyedException,
+    C.PYCBC_EXC_PIPELINE: PipelineException,
 }
