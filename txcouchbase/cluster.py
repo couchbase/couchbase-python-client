@@ -272,14 +272,18 @@ class TxRawClientMixin(object):
 
         """
         d = Deferred()
+        def _on_ok(res):
+            opres.clear_callbacks()
+            d.callback(res)
 
         def _on_err(mres, ex_type, ex_val, ex_tb):
+            opres.clear_callbacks()
             try:
                 raise ex_type(ex_val)
             except CouchbaseException:
                 d.errback()
 
-        opres.set_callbacks(d.callback, _on_err)
+        opres.set_callbacks(_on_ok, _on_err)
         return d
 
     def deferred_verb(self, itercls, raw_verb, cooked_verb, *args, **kwargs):
