@@ -184,3 +184,9 @@ class AcouchbaseQueryTests(AsyncioTestCase):
         with self.assertRaises(ParsingFailedException):
             query_iter = self.cluster.query("I'm not N1QL!")
             await self.assertRows(query_iter, 0)
+
+    @async_test
+    async def test_large_result_set(self):
+        query_iter = self.cluster.query(
+            "SELECT * FROM `{}` LIMIT 1500;".format(self.query_bucket))
+        await self.assertRows(query_iter, 1500)
