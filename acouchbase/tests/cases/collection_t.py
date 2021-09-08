@@ -33,7 +33,7 @@ class AcouchbaseCollectionTestSuite(object):
 
     async def initialize(self):
         # retry just in case doc is locked from previous test
-        await self.try_n_times_async(1, 3, self.collection.upsert, self.KEY, self.CONTENT)
+        await self.try_n_times_async(5, 3, self.collection.upsert, self.KEY, self.CONTENT)
 
         # be sure NOKEY isn't in there
         try:
@@ -78,16 +78,16 @@ class AcouchbaseCollectionTestSuite(object):
             raise SkipTest("Preserve expiry only in CBS 7.0+")
         result = await self.collection.upsert(self.KEY, {"some": "other content"}, UpsertOptions(
             expiry=timedelta(seconds=5)))
-        expiry1 = await self.collection.get(self.KEY, GetOptions(
-            with_expiry=True)).expiryTime
+        get_res1 = await self.collection.get(self.KEY, GetOptions(
+            with_expiry=True))
         result = await self.collection.replace(self.KEY, {"some": "replaced content"})
         self.assertTrue(result.success)
-        expiry2 = await self.collection.get(self.KEY, GetOptions(
-            with_expiry=True)).expiryTime
-        self.assertIsNotNone(expiry1)
-        self.assertIsInstance(expiry1, datetime)
-        self.assertIsNone(expiry2)
-        self.assertNotEqual(expiry1, expiry2)
+        get_res2 = await self.collection.get(self.KEY, GetOptions(
+            with_expiry=True))
+        self.assertIsNotNone(get_res1.expiryTime)
+        self.assertIsInstance(get_res1.expiryTime, datetime)
+        self.assertIsNone(get_res2.expiryTime)
+        self.assertNotEqual(get_res1.expiryTime, get_res2.expiryTime)
         # if expiry was set, should be expired by now
         await asyncio.sleep(6)
         result = await self.collection.get(self.KEY)
@@ -101,18 +101,18 @@ class AcouchbaseCollectionTestSuite(object):
             raise SkipTest("Preserve expiry only in CBS 7.0+")
         result = await self.collection.upsert(self.KEY, {"some": "other content"}, UpsertOptions(
             expiry=timedelta(seconds=5)))
-        expiry1 = await self.collection.get(self.KEY, GetOptions(
-            with_expiry=True)).expiryTime
+        get_res1 = await self.collection.get(self.KEY, GetOptions(
+            with_expiry=True))
         result = await self.collection.replace(
             self.KEY, {"some": "replaced content"}, ReplaceOptions(preserve_expiry=True))
         self.assertTrue(result.success)
-        expiry2 = await self.collection.get(self.KEY, GetOptions(
-            with_expiry=True)).expiryTime
-        self.assertIsNotNone(expiry1)
-        self.assertIsInstance(expiry1, datetime)
-        self.assertIsNotNone(expiry2)
-        self.assertIsInstance(expiry2, datetime)
-        self.assertEqual(expiry1, expiry2)
+        get_res2 = await self.collection.get(self.KEY, GetOptions(
+            with_expiry=True))
+        self.assertIsNotNone(get_res1.expiryTime)
+        self.assertIsInstance(get_res1.expiryTime, datetime)
+        self.assertIsNotNone(get_res2.expiryTime)
+        self.assertIsInstance(get_res2.expiryTime, datetime)
+        self.assertEqual(get_res1.expiryTime, get_res2.expiryTime)
         # if expiry was preserved, should be expired by now
         await asyncio.sleep(6)
         with self.assertRaises(DocumentNotFoundException):
@@ -247,11 +247,41 @@ class AcouchbaseCollectionTestSuite(object):
             await self.collection.get(self.KEY)
 
     @async_test
+    async def test_touch_no_expire(self):
+        if self.is_mock:
+            await self.collection.touch(self.KEY, timedelta(seconds=0))
+            await asyncio.sleep(1)
+            res = await self.collection.get(self.KEY)
+            self.assertIsNotNone(res.content_as[dict])
+        else:
+            await self.collection.touch(self.KEY, timedelta(seconds=15))
+            res = await self.collection.get(self.KEY, GetOptions(with_expiry=True))
+            self.assertIsNotNone(res.expiryTime)
+            await self.collection.touch(self.KEY, timedelta(seconds=0))
+            res = await self.collection.get(self.KEY, GetOptions(with_expiry=True))
+            self.assertIsNone(res.expiryTime)
+
+    @async_test
     async def test_get_and_touch(self):
         await self.collection.get_and_touch(self.KEY, timedelta(seconds=3))
         await self.collection.get(self.KEY)
         await self.try_n_times_till_exception_async(
             10, 3, self.collection.get, self.KEY, DocumentNotFoundException)
+
+    @async_test
+    async def test_get_and_touch_no_expire(self):
+        if self.is_mock:
+            await self.collection.get_and_touch(self.KEY, timedelta(seconds=0))
+            await asyncio.sleep(1)
+            res = await self.collection.get(self.KEY)
+            self.assertIsNotNone(res.content_as[dict])
+        else:
+            await self.collection.get_and_touch(self.KEY, timedelta(seconds=15))
+            res = await self.collection.get(self.KEY, GetOptions(with_expiry=True))
+            self.assertIsNotNone(res.expiryTime)
+            await self.collection.get_and_touch(self.KEY, timedelta(seconds=0))
+            res = await self.collection.get(self.KEY, GetOptions(with_expiry=True))
+            self.assertIsNone(res.expiryTime)
 
     @async_test
     async def test_get_and_lock(self):
@@ -269,6 +299,14 @@ class AcouchbaseCollectionTestSuite(object):
         with self.assertRaises(DocumentLockedException):
             await self.collection.upsert(self.KEY, self.CONTENT)
         await self.collection.replace(self.KEY, self.CONTENT, ReplaceOptions(cas=cas))
+
+    @async_test
+    async def test_get_after_lock(self):
+        orig = await self.collection.get_and_lock(self.KEY, timedelta(seconds=3))
+        # GET operation is allowed on locked document; however, returned CAS should be invalid
+        res = await self.collection.get(self.KEY)
+        self.assertEqual(orig.content_as[dict], res.content_as[dict])
+        self.assertNotEqual(orig.cas, res.cas)
 
     @async_test
     async def test_unlock(self):

@@ -24,6 +24,7 @@
 struct getcmd_vars_st {
     int optype;
     int allow_dval;
+    unsigned int touch_mode;
     union {
         unsigned long ttl;
         struct {
@@ -170,7 +171,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                 lcb_cmdget_timeout(cmd, timeout);
                 if (lock) {
                     lcb_cmdget_locktime(cmd, ttl);
-                } else {
+                } else if (gv->touch_mode) {
                     lcb_cmdget_expiry(cmd, ttl);
                 }
                 lcb_cmdget_parent_span(cmd, cv->mres->outer_span);
@@ -302,6 +303,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
     PyObject *timeout_O = NULL;
     PyObject *external_span = NULL;
     pycbc_DURABILITY_LEVEL durability_level = LCB_DURABILITYLEVEL_NONE;
+    unsigned int touch_mode = 0;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
     struct getcmd_vars_st gv = { 0 };
 #define X(name, target, type) name,
@@ -330,6 +332,12 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
     }
 
     gv.optype = optype;
+
+    // we only want to call lcb_cmdget_expiry if a ttl was passed in
+    if(ttl_O != NULL){
+        touch_mode = 1;
+    }
+    gv.touch_mode = touch_mode;
 
     rv = pycbc_get_duration(ttl_O, &gv.u.ttl, 1);
     if (rv < 0) {

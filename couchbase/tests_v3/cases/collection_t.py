@@ -359,6 +359,20 @@ class CollectionTests(CollectionTestCase):
         with self.assertRaises(DocumentNotFoundException):
             self.cb.get(self.KEY)
 
+    def test_touch_no_expire(self):
+        if self.is_mock:
+            self.cb.touch(self.KEY, timedelta(seconds=0))
+            time.sleep(1)
+            res = self.cb.get(self.KEY)
+            self.assertIsNotNone(res.content_as[dict])
+        else:
+            self.cb.touch(self.KEY, timedelta(seconds=15))
+            expiry = self.cb.get(self.KEY, GetOptions(with_expiry=True)).expiryTime
+            self.assertIsNotNone(expiry)
+            self.cb.touch(self.KEY, timedelta(seconds=0))
+            expiry = self.cb.get(self.KEY, GetOptions(with_expiry=True)).expiryTime
+            self.assertIsNone(expiry)
+
     def _authenticator(self):
         if self.is_mock:
             return ClassicAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)
@@ -378,6 +392,20 @@ class CollectionTests(CollectionTestCase):
         self.try_n_times_till_exception(
             10, 3, self.cb.get, self.KEY, DocumentNotFoundException)
 
+    def test_get_and_touch_no_expire(self):
+        if self.is_mock:
+            self.cb.get_and_touch(self.KEY, timedelta(seconds=0))
+            time.sleep(1)
+            res = self.cb.get(self.KEY)
+            self.assertIsNotNone(res.content_as[dict])
+        else:
+            self.cb.get_and_touch(self.KEY, timedelta(seconds=15))
+            expiry = self.cb.get(self.KEY, GetOptions(with_expiry=True)).expiryTime
+            self.assertIsNotNone(expiry)
+            self.cb.get_and_touch(self.KEY, timedelta(seconds=0))
+            expiry = self.cb.get(self.KEY, GetOptions(with_expiry=True)).expiryTime
+            self.assertIsNone(expiry)
+
     def test_get_and_lock(self):
         self.cb.get_and_lock(self.KEY, timedelta(seconds=3))
         # upsert should definitely fail
@@ -385,6 +413,13 @@ class CollectionTests(CollectionTestCase):
                           self.cb.upsert, self.KEY, self.CONTENT)
         # but succeed eventually
         self.try_n_times(10, 1, self.cb.upsert, self.KEY, self.CONTENT)
+
+    def test_get_after_lock(self):
+        orig = self.cb.get_and_lock(self.KEY, timedelta(seconds=3))
+        # GET operation is allowed on locked document; however, returned CAS should be invalid
+        res = self.cb.get(self.KEY)
+        self.assertEqual(orig.content_as[dict], res.content_as[dict])
+        self.assertNotEqual(orig.cas, res.cas)
 
     def test_get_and_lock_upsert_with_cas(self):
         result = self.cb.get_and_lock(self.KEY, timedelta(seconds=15))
