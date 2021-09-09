@@ -111,6 +111,7 @@ def _consistency(value):
         raise ValueError('Invalid value!')
     return value
 
+
 def _assign_kwargs(self, kwargs):
     """
     Assigns all keyword arguments to a given instance, raising an exception
@@ -120,6 +121,7 @@ def _assign_kwargs(self, kwargs):
         if not hasattr(self, k):
             raise AttributeError(k, 'Not valid for', self.__class__.__name__)
         setattr(self, k, kwargs[k])
+
 
 def _disable_scoring(value):
     if value:
@@ -131,6 +133,7 @@ class Facet(object):
     """
     Base facet class. Each facet must have a field which it aggregates
     """
+
     def __init__(self, field, limit=0):
         self._json_ = {'field': field}
         if limit:
@@ -149,7 +152,7 @@ class Facet(object):
     field = _genprop_str('field')
 
     limit = _genprop(int, 'size',
-                    doc="Maximum number of facet results to return")
+                     doc="Maximum number of facet results to return")
 
     def __repr__(self):
         return '{0.__class__.__name__}<{0._json_!r}>'.format(self)
@@ -159,6 +162,7 @@ class TermFacet(Facet):
     """
     Facet aggregating the most frequent terms used.
     """
+
     def __init__(self, field, limit=0):
         super(TermFacet, self).__init__(field, limit)
 
@@ -196,6 +200,7 @@ class DateFacet(Facet):
     This facet must have at least one invocation of :meth:`add_range` before
     it is added to :attr:`~Params.facets`.
     """
+
     def __init__(self, field, limit=0):
         super(DateFacet, self).__init__(field, limit)
         self._ranges = []
@@ -223,6 +228,7 @@ class NumericFacet(Facet):
     This facet must have at least one invocation of :meth:`add_range`
     before it is added to :attr:`Params.facets`
     """
+
     def __init__(self, field, limit=0):
         super(NumericFacet, self).__init__(field, limit)
         self._ranges = []
@@ -279,12 +285,11 @@ class _FacetDict(dict):
 
 class Sort(object):
     def __init__(self, by, **kwargs):
-        by = by.replace('descending','desc')
         self._json_ = {
             'by': by
         }
         if 'descending' in kwargs:
-            kwargs['desc']=kwargs.pop('descending')
+            kwargs['desc'] = kwargs.pop('descending')
         _assign_kwargs(self, kwargs)
 
     desc = _genprop(bool, 'desc', doc='Sort using descending order')
@@ -306,6 +311,7 @@ class SortString(Sort):
     Sorts by a list of fields. This is similar to specifying a list of
     fields in :attr:`Params.sort`
     """
+
     def __init__(self, *fields):
         self._json_ = list(fields)
 
@@ -314,6 +320,7 @@ class SortScore(Sort):
     """
     Sorts by the score of each match.
     """
+
     def __init__(self, **kwargs):
         super(SortScore, self).__init__('score', **kwargs)
 
@@ -322,6 +329,7 @@ class SortID(Sort):
     """
     Sorts lexically by the document ID of each match
     """
+
     def __init__(self, **kwargs):
         super(SortID, self).__init__('id', **kwargs)
 
@@ -330,6 +338,7 @@ class SortField(Sort):
     """
     Sorts according to the properties of a given field
     """
+
     def __init__(self, field, **kwargs):
         kwargs['field'] = field
         super(SortField, self).__init__('field', **kwargs)
@@ -354,6 +363,7 @@ class SortGeoDistance(Sort):
     """
     Sorts matches based on their distance from a specific location
     """
+
     def __init__(self, location, field, **kwargs):
         kwargs.update(location=location, field=field)
         super(SortGeoDistance, self).__init__('geo_distance', **kwargs)
@@ -367,13 +377,6 @@ class SortGeoDistance(Sort):
 class SortRaw(Sort):
     def __init__(self, raw):
         self._json_ = raw
-
-
-def _convert_sort(s):
-    if isinstance(s, Sort):
-        return s
-    else:
-        return list(s)
 
 
 # This is the Params class from SDK2, but is now only for internal use.
@@ -402,10 +405,14 @@ class _Params(object):
             params.facets['term_analysis'] = TermFacet('author', limit=10)
             params.facets['view_count'] = NumericFacet().add_range('low', max=50)
     """
+
     def __init__(self, **kwargs):
         self._json_ = {}
         self._ms = None
         self.facets = _FacetDict(**kwargs.pop('facets', {}))
+        sort = kwargs.pop("sort", None)
+        if sort is not None:
+            self.sort = sort
         _assign_kwargs(self, kwargs)
 
     def as_encodable(self, index_name):
@@ -429,7 +436,6 @@ class _Params(object):
             }
             self._json_.setdefault('ctl', {})['consistency'] = sv_val
 
-
         if self.consistency is not None and isinstance(self.consistency, str):
             # Encode according to scan vectors..
             sv_val = {
@@ -437,11 +443,11 @@ class _Params(object):
             }
             self._json_.setdefault('ctl', {})['consistency'] = sv_val
 
-        if self.sort:
-            if isinstance(self.sort, Sort):
-                self._json_['sort'] = self.sort.as_encodable()
-            else:
+        if hasattr(self, "sort") and self.sort is not None:
+            if all(map(lambda s: isinstance(s, str), self.sort)):
                 self._json_['sort'] = self.sort
+            else:
+                self._json_['sort'] = list(s.as_encodable() for s in self.sort)
 
         return self._json_
 
@@ -467,13 +473,6 @@ class _Params(object):
         list, 'highlight', 'fields', doc="""
         Highlight the results from these fields (list)
         """)
-
-    sort = _genprop(
-        _convert_sort, 'sort', doc="""
-        Specify a list of fields by which to sort the results. Can also be
-        a :class:`Sort` class
-        """
-    )
 
     disable_scoring = _genprop(
         _disable_scoring, 'score', doc='Whether to disable scoring on the FTS search')
@@ -507,6 +506,7 @@ class _Params(object):
         Specify a list of collections by which to filter the results
         """)
 
+
 class SearchQuery(object):
     """
     Base query object. You probably want to use one of the subclasses.
@@ -516,6 +516,7 @@ class SearchQuery(object):
         :class:`DateRangeQuery`, :class:`ConjunctionQuery`,
         :class:`DisjunctionQuery`, and others in this module.
     """
+
     def __init__(self):
         self._json_ = {}
 
@@ -545,14 +546,13 @@ class SearchQuery(object):
         pass
 
 
-
-
 class RawQuery(SearchQuery):
     """
     This class is used to wrap a raw query payload. It should be used
     for custom query parameters, or in cases where any of the other
     query classes are insufficient.
     """
+
     def __init__(self, obj):
         super(RawQuery, self).__init__()
         self._json_ = obj
@@ -816,7 +816,7 @@ class _RangeQuery(SearchQuery):
         _assign_kwargs(self, kwargs)
         if r1 is None and r2 is None:
             raise TypeError('At least one of {0} or {1} should be specified',
-                             *self._MINMAX)
+                            *self._MINMAX)
         if r1 is not None:
             setattr(self, self._MINMAX[0], r1)
         if r2 is not None:
@@ -831,6 +831,7 @@ class NumericRangeQuery(_RangeQuery):
 
     At least one of `min` or `max` must be specified.
     """
+
     def __init__(self, min=None, max=None, **kwargs):
         """
         :param float min: See :attr:`min`
@@ -874,6 +875,7 @@ class DateRangeQuery(_RangeQuery):
 
         DateRangeQuery(start='2014-12-25', end='2016-01-01')
     """
+
     def __init__(self, start=None, end=None, **kwargs):
         """
         :param str start: Start of date range
@@ -911,6 +913,7 @@ class TermRangeQuery(_RangeQuery):
     Search documents for fields containing a value within a given
     lexical range.
     """
+
     def __init__(self, start=None, end=None, **kwargs):
         super(TermRangeQuery, self).__init__(start=start, end=end, **kwargs)
 
@@ -1004,7 +1007,8 @@ class DisjunctionQuery(_CompoundQuery):
     def validate(self):
         super(DisjunctionQuery, self).validate()
         if not self.disjuncts or len(self.disjuncts) < self.min:
-            raise NoChildrenException('No children specified, or min is too big')
+            raise NoChildrenException(
+                'No children specified, or min is too big')
 
 
 def _bprop_wrap(name, reqtype, doc):
@@ -1016,6 +1020,7 @@ def _bprop_wrap(name, reqtype, doc):
     :param doc: Documentation for the field
     :return: the property.
     """
+
     def fget(self):
         return self._subqueries.get(name)
 
@@ -1106,6 +1111,7 @@ class MatchAllQuery(SearchQuery):
     """
     Special query which matches all documents
     """
+
     def __init__(self, **kwargs):
         super(MatchAllQuery, self).__init__()
         self._json_['match_all'] = None
@@ -1116,6 +1122,7 @@ class MatchNoneQuery(SearchQuery):
     """
     Special query which matches no documents
     """
+
     def __init__(self, **kwargs):
         super(MatchNoneQuery, self).__init__()
         self._json_['match_none'] = None
@@ -1138,6 +1145,7 @@ class NoChildrenException(CouchbaseException):
     """
     Compound query is missing children"
     """
+
     def __init__(self, msg='No child queries'):
         super(NoChildrenException, self).__init__({'message': msg})
 
@@ -1175,6 +1183,7 @@ class SearchRequest(object):
     You can iterate over this object (i.e. ``__iter__``) to receive the
     actual search results.
     """
+
     def __init__(self, body, parent, row_factory=lambda x: x, span=None):
         """
         :param str body: serialized JSON string
@@ -1208,7 +1217,8 @@ class SearchRequest(object):
         if self._mres:
             return
 
-        self._mres = self._parent._fts_query(self._body, span=self._span, index=self._index)
+        self._mres = self._parent._fts_query(
+            self._body, span=self._span, index=self._index)
         self.__raw = self._mres[None]
 
     @property
@@ -1312,7 +1322,7 @@ class SearchRequest(object):
         self._start()
         while self._do_iter:
             raw_rows = self.raw.fetch(self._mres)
-            actual_rows=list(raw_rows)
+            actual_rows = list(raw_rows)
             for row in self._process_payload(actual_rows):
                 yield row
 
@@ -1320,7 +1330,6 @@ class SearchRequest(object):
         return (
             '<{0.__class__.__name__} body={0._body!r} response={1}>'.format(
                 self, self.raw.value if self.raw else '<PENDING>'))
-
 
 
 @attr.s
@@ -1397,14 +1406,18 @@ class SearchRow(object):
     id = attr.ib(type=str)
     score = attr.ib(type=float)
     explanation = attr.ib(factory=dict, type=JSON)
-    locations = attr.ib(factory=SearchRowLocations, type=SearchRowLocations)  # type: SearchRowLocations
+    locations = attr.ib(factory=SearchRowLocations,
+                        type=SearchRowLocations)  # type: SearchRowLocations
     fragments = attr.ib(factory=dict, type=Optional[Mapping[str, str]])
-    fields = attr.ib(default=attr.Factory(SearchRowFields), type=SearchRowFields)
+    fields = attr.ib(default=attr.Factory(
+        SearchRowFields), type=SearchRowFields)
+
 
 @attr.s
 class SearchTermRange(object):
     term = attr.ib(type=str)
     count = attr.ib(type=UnsignedInt64)
+
 
 @attr.s
 class SearchNumericRange(object):
@@ -1412,13 +1425,15 @@ class SearchNumericRange(object):
     count = attr.ib(type=UnsignedInt64)
     min = attr.ib(type=float, default=None)
     max = attr.ib(type=float, default=None)
-    
+
+
 @attr.s
 class SearchDateRange(object):
     name = attr.ib(type=str)
     count = attr.ib(type=UnsignedInt64)
     start = attr.ib(type=datetime, default=None)
     end = attr.ib(type=datetime, default=None)
+
 
 @attr.s
 class SearchFacetResult(object):
@@ -1495,6 +1510,7 @@ class HighlightStyle(Enum):
 
 class SearchMetaData(object):
     """Represents the meta-data returned along with a search query result."""
+
     def __init__(self, **raw_json):
         self.metrics = SearchMetrics(raw_json)
         self.errors = raw_json
@@ -1512,30 +1528,36 @@ class SearchResultBase(object):
 
         """
 
-        super(SearchResultBase, self).__init__(*args, row_factory=(row_factory or self._row_factory), **kwargs)
+        super(SearchResultBase, self).__init__(
+            *args, row_factory=(row_factory or self._row_factory), **kwargs)
 
     @staticmethod
     def _row_factory(orig_value  # type: Dict[str, Any]
                      ):
         # type: (...) -> SearchRow
         return SearchRow(orig_value.pop('index'), orig_value.pop('id'), orig_value.pop('score'),
-                         locations=SearchRowLocations(**orig_value.pop('locations', {})),
+                         locations=SearchRowLocations(
+                             **orig_value.pop('locations', {})),
                          **{k: orig_value[k] for k in ([f.name for f in attr.fields(SearchRow)] & orig_value.keys())})
 
     def facets(self):
         # type: (...) -> Dict[str, SearchFacetResult]
         facet_results = {}
         for k, v in super(SearchResultBase, self).facets.items():
-            facet_results[k] = SearchFacetResult(k, v.pop('field'), v.pop('total'), v.pop('missing'), v.pop('other'))
+            facet_results[k] = SearchFacetResult(
+                k, v.pop('field'), v.pop('total'), v.pop('missing'), v.pop('other'))
             terms = v.pop('terms', None)
             numeric_ranges = v.pop('numeric_ranges', None)
             date_ranges = v.pop('date_ranges', None)
             if terms:
-                facet_results[k].terms = list(map(lambda t: SearchTermRange(**t), terms))
+                facet_results[k].terms = list(
+                    map(lambda t: SearchTermRange(**t), terms))
             if numeric_ranges:
-                facet_results[k].numeric_ranges = list(map(lambda nr: SearchNumericRange(**nr), numeric_ranges))
+                facet_results[k].numeric_ranges = list(
+                    map(lambda nr: SearchNumericRange(**nr), numeric_ranges))
             if date_ranges:
-                facet_results[k].date_ranges = list(map(lambda dr: SearchDateRange(**dr), date_ranges))
+                facet_results[k].date_ranges = list(
+                    map(lambda dr: SearchDateRange(**dr), date_ranges))
 
         return facet_results
 
@@ -1569,7 +1591,7 @@ class SearchOptions(OptionBlockTimeOut):
                  consistent_with=None,   # type: MutationState
                  facets=None,            # type: Dict[str, Facet]
                  raw=None,               # type: JSON
-                 sort=None,              # type: List[str]
+                 sort=None,              # type: Union[List[str],List[Sort]]
                  disable_scoring=None,   # type: bool
                  collections=None,       # type: List[str]
                  span=None               # type: CouchbaseSpan
@@ -1606,7 +1628,7 @@ class SearchOptions(OptionBlockTimeOut):
             Specify a set of :class:`~.Facet` objects that aggregate the result data.
         :param dict[str,JSON] raw:
             A way to support unknown commands, and be future-compatible.
-        :param Iterable[Sort] sort:
+        :param Union[Iterable[str], Iterable[Sort]] sort:
             List of various :class:`~.Sort` objects to sort the results.
         :param bool disable_scoring:
             Disable scoring of the search results.
@@ -1619,9 +1641,6 @@ class SearchOptions(OptionBlockTimeOut):
         style = kwargs.get('highlight_style', None)
         if style:
             kwargs['highlight_style'] = style.value
-        sort = kwargs.get('sort', None)
-        if sort:
-            kwargs['sort'] = SortString(*sort)
         disable_scoring = kwargs.pop('disable_scoring', None)
         if disable_scoring:
             kwargs['disable_scoring'] = True
@@ -1630,10 +1649,12 @@ class SearchOptions(OptionBlockTimeOut):
     @classmethod
     def gen_search_params_cls(cls, index, query, *options, **kwargs):
         # type: (...) -> SearchParams
-        iterargs, itercls, params = cls._gen_params_kwargs_options(*options, **kwargs)
+        iterargs, itercls, params = cls._gen_params_kwargs_options(
+            *options, **kwargs)
         return SearchParams(_make_search_body(index, query, params), iterargs, itercls)
 
-    SearchParamsInternal = NamedTuple('SearchParamsInternal', [('iterargs',Dict[str,Any]), ('itercls', Type[SearchResult]), ('params', _Params)])
+    SearchParamsInternal = NamedTuple('SearchParamsInternal', [(
+        'iterargs', Dict[str, Any]), ('itercls', Type[SearchResult]), ('params', _Params)])
 
     @classmethod
     def _gen_params_kwargs_options(cls, *options, **kwargs):
@@ -1649,7 +1670,8 @@ class SearchOptions(OptionBlockTimeOut):
         consistency = final_args.pop('scan_consistency', None)
         if consistency is not None:
             final_args["consistency"] = consistency
-        params = final_args.pop('params', _Params(**final_args))  # type: _Params
+        params = final_args.pop('params', _Params(
+            **final_args))  # type: _Params
         if consistent_with:
             params.consistent_with(consistent_with)
         return params
@@ -1665,4 +1687,3 @@ class SearchOptions(OptionBlockTimeOut):
     def as_encodable(self, index):
         final_args = forward_args(None, self)
         return self._gen_params_from_final_args(final_args).as_encodable(index)
-

@@ -20,7 +20,7 @@ from unittest import SkipTest
 
 import couchbase.search as search
 from couchbase.management.search import SearchIndex
-from couchbase.search import SearchResult, SearchOptions, SearchScanConsistency
+from couchbase.search import SearchResult, SearchOptions, SearchScanConsistency, SortScore
 from couchbase.mutation_state import MutationState
 from couchbase_tests.base import CouchbaseTestCase, CollectionTestCase
 from couchbase.exceptions import NotSupportedException
@@ -451,6 +451,196 @@ class SearchTest(ClusterTestCase):
         rows = x.rows()
         self.assertGreaterEqual(10, len(rows))
         SearchResultTest._check_search_result(self, initial, 6, x)
+
+    def test_cluster_sort_str(self  # type: SearchTest
+                              ):
+        if self.is_mock:
+            raise SkipTest("F.T.S. not supported by mock")
+        # score - ascending
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(sort=["_score"]))  # type: SearchResult
+
+        rows = x.rows()
+        score = rows[0].score
+        for row in rows[1:]:
+            self.assertGreaterEqual(row.score, score)
+            score = row.score
+        # score - descending
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(sort=["-_score"]))  # type: SearchResult
+
+        rows = x.rows()
+        score = rows[0].score
+        for row in rows[1:]:
+            self.assertGreaterEqual(score, row.score)
+            score = row.score
+
+    def test_cluster_sort_score(self  # type: SearchTest
+                                ):
+        if self.is_mock:
+            raise SkipTest("F.T.S. not supported by mock")
+        # score - ascending
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(sort=[search.SortScore()]))  # type: SearchResult
+
+        rows = x.rows()
+        score = rows[0].score
+        for row in rows[1:]:
+            self.assertGreaterEqual(row.score, score)
+            score = row.score
+        # score - descending
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(sort=[search.SortScore(desc=True)]))  # type: SearchResult
+
+        rows = x.rows()
+        score = rows[0].score
+        for row in rows[1:]:
+            self.assertGreaterEqual(score, row.score)
+            score = row.score
+
+    def test_cluster_sort_id(self  # type: SearchTest
+                             ):
+        if self.is_mock:
+            raise SkipTest("F.T.S. not supported by mock")
+        # id - ascending
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(sort=[search.SortID()]))  # type: SearchResult
+
+        rows = x.rows()
+        id = rows[0].id
+        for row in rows[1:]:
+            self.assertGreaterEqual(row.id, id)
+            id = row.id
+        # id - descending
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(sort=[search.SortID(desc=True)]))  # type: SearchResult
+
+        rows = x.rows()
+        id = rows[0].id
+        for row in rows[1:]:
+            self.assertGreaterEqual(id, row.id)
+            id = row.id
+
+    def test_cluster_sort_field(self  # type: SearchTest
+                                ):
+        if self.is_mock:
+            raise SkipTest("F.T.S. not supported by mock")
+        sort_field = "abv"
+        # field - ascending
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(sort=[search.SortField(
+                                                                              field=sort_field, type="number", mode="min", missing="last")]),
+                                                                          fields=[sort_field])  # type: SearchResult
+
+        rows = x.rows()
+        self.assertGreaterEqual(10, len(rows))
+        abv = rows[0].fields[sort_field]
+        for row in rows[1:]:
+            self.assertGreaterEqual(row.fields[sort_field], abv)
+            abv = row.fields[sort_field]
+        # field - descending
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(sort=[search.SortField(
+                                                                              field=sort_field, type="number", missing="last", desc=True)]),
+                                                                          fields=[sort_field])  # type: SearchResult
+
+        rows = x.rows()
+        self.assertGreaterEqual(10, len(rows))
+        abv = rows[0].fields[sort_field]
+        for row in rows[1:]:
+            self.assertGreaterEqual(abv, row.fields[sort_field])
+            abv = row.fields[sort_field]
+
+    def test_cluster_sort_geo(self  # type: SearchTest
+                              ):
+        if self.is_mock:
+            raise SkipTest("F.T.S. not supported by mock")
+        # TODO:  better confirmation on results?
+        sort_field = "geo"
+        # geo - ascending
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(sort=[search.SortGeoDistance(
+                                                                              field=sort_field, location=(37.7749, 122.4194), unit="meters")]),
+                                                                          fields=[sort_field])  # type: SearchResult
+
+        rows = x.rows()
+        self.assertGreaterEqual(10, len(rows))
+        # geo - descending
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(sort=[search.SortGeoDistance(
+                                                                              field=sort_field, location=(37.7749, 122.4194), unit="meters", desc=True)]),
+                                                                          fields=[sort_field])  # type: SearchResult
+
+        rows = x.rows()
+        self.assertGreaterEqual(10, len(rows))
+
+    def test_cluster_sort_field_multi(self  # type: SearchTest
+                                      ):
+        if self.is_mock:
+            raise SkipTest("F.T.S. not supported by mock")
+        sort_fields = [
+            search.SortField(field="abv", type="number",
+                             mode="min", missing="last"),
+            search.SortField(field="updated", type="number",
+                             mode="min", missing="last"),
+            search.SortScore(),
+        ]
+        sort_field_names = ["abv", "updated"]
+
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(
+                                                                              sort=sort_fields),
+                                                                          fields=sort_field_names)  # type: SearchResult
+
+        rows = x.rows()
+        self.assertGreaterEqual(10, len(rows))
+        sort_fields = [
+            search.SortField(field="abv", type="number",
+                             mode="min", missing="last", desc=True),
+            search.SortField(field="updated", type="number",
+                             mode="min", missing="last"),
+            search.SortScore(desc=True),
+        ]
+
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(
+                                                                              sort=sort_fields),
+                                                                          fields=sort_field_names)  # type: SearchResult
+
+        rows = x.rows()
+        self.assertGreaterEqual(10, len(rows))
+
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(sort=["abv", "udpated", "-_score"]))  # type: SearchResult
+
+        rows = x.rows()
+        self.assertGreaterEqual(10, len(rows))
 
 
 class SearchStringsTest(CouchbaseTestCase):
