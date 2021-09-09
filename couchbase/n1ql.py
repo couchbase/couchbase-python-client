@@ -22,7 +22,7 @@ from durationpy import from_str
 
 from couchbase.options import UnsignedInt64
 from couchbase_core import iterable_wrapper, JSON
-from couchbase.exceptions import QueryException, InvalidArgumentException
+from couchbase.exceptions import QueryException
 from couchbase_core.n1ql import N1QLRequest
 
 
@@ -37,44 +37,6 @@ class QueryStatus(enum.Enum):
     FATAL = ()
     ABORTED = ()
     UNKNOWN = ()
-
-
-class QueryScanConsistency(enum.Enum):
-    """
-    QueryScanConsistency
-
-    This can be:
-
-    NOT_BOUNDED
-        Which means we just return what is currently in the indexes, or
-    REQUEST_PLUS
-        which means we 'read our own writes'.  Slower, since the query has to wait for the indexes to catch up.
-    """
-
-    REQUEST_PLUS = "request_plus"
-    NOT_BOUNDED = "not_bounded"
-
-    @classmethod
-    def to_eventing_server(cls, value):
-        if value == cls.REQUEST_PLUS:
-            return "request"
-        elif value == cls.NOT_BOUNDED:
-            return "none"
-        else:
-            raise InvalidArgumentException(
-                "Invalid value for eventing scan consistency: {}".format(value)
-            )
-
-    @classmethod
-    def from_eventing_server(cls, value):
-        if value == "request":
-            return cls.REQUEST_PLUS
-        elif value == "none":
-            return cls.NOT_BOUNDED
-        else:
-            raise InvalidArgumentException(
-                "Invalid value for eventing scan consistency: {}".format(value)
-            )
 
 
 class QueryWarning(object):
@@ -204,4 +166,5 @@ class QueryResult(iterable_wrapper(N1QLRequest)):
             )
             return self._respond_to_timedelta(conv_query)
         except Exception as e:
-            raise QueryException.pyexc("Not able to get result in nanoseconds", inner=e)
+            raise QueryException.pyexc(
+                "Not able to get result in nanoseconds", inner=e)

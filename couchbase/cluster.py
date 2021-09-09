@@ -12,11 +12,10 @@ from .auth import NoBucketException, Authenticator
 from .management.users import UserManager
 from .management.buckets import BucketManager
 from couchbase.management.admin import Admin
-from couchbase.management.eventing import EventingFunctionManager
 from couchbase.diagnostics import DiagnosticsResult
 from couchbase.search import SearchResult, SearchOptions, SearchQuery
 from .analytics import AnalyticsResult
-from .n1ql import QueryResult, QueryScanConsistency
+from .n1ql import QueryResult
 from couchbase_core.n1ql import _N1QLQuery
 from .options import (
     OptionBlock,
@@ -79,6 +78,44 @@ class DiagnosticsOptions(OptionBlock):
             )
 
 
+class QueryScanConsistency(Enum):
+    """
+    QueryScanConsistency
+
+    This can be:
+
+    NOT_BOUNDED
+        Which means we just return what is currently in the indexes, or
+    REQUEST_PLUS
+        which means we 'read our own writes'.  Slower, since the query has to wait for the indexes to catch up.
+    """
+
+    REQUEST_PLUS = "request_plus"
+    NOT_BOUNDED = "not_bounded"
+
+    @classmethod
+    def to_eventing_server(cls, value):
+        if value == cls.REQUEST_PLUS:
+            return "request"
+        elif value == cls.NOT_BOUNDED:
+            return "none"
+        else:
+            raise InvalidArgumentException(
+                "Invalid value for eventing scan consistency: {}".format(value)
+            )
+
+    @classmethod
+    def from_eventing_server(cls, value):
+        if value == "request":
+            return cls.REQUEST_PLUS
+        elif value == "none":
+            return cls.NOT_BOUNDED
+        else:
+            raise InvalidArgumentException(
+                "Invalid value for eventing scan consistency: {}".format(value)
+            )
+
+
 class QueryProfile(Enum):
     """
     QueryProfile
@@ -100,7 +137,8 @@ class QueryProfile(Enum):
 
 class NamedClass(type):
     def __new__(cls, name, bases=tuple(), namespace=dict()):
-        super(NamedClass, cls).__new__(cls, name, bases=bases, namespace=namespace)
+        super(NamedClass, cls).__new__(
+            cls, name, bases=bases, namespace=namespace)
 
 
 class QueryOptions(QueryBaseOptions):
@@ -493,7 +531,8 @@ class Cluster(CoreClient):
         }
         # fixup any overrides to the ClusterOptions here as well
         args, kwargs = cluster_opts.split_args(**kwargs)
-        self.connstr = cluster_opts.update_connection_string(connection_string, **args)
+        self.connstr = cluster_opts.update_connection_string(
+            connection_string, **args)
         self.__admin = None
         self._cluster = CoreCluster(
             self.connstr, bucket_factory=bucket_factory
@@ -546,7 +585,8 @@ class Cluster(CoreClient):
 
     def _check_for_shutdown(self):
         if not self._cluster:
-            raise AlreadyShutdownException("This cluster has already been shutdown")
+            raise AlreadyShutdownException(
+                "This cluster has already been shutdown")
 
     @property
     @internal
@@ -913,7 +953,7 @@ class Cluster(CoreClient):
         :return:  A :class:`~.management.EventingFunctionManager` with which you can create or modify eventing functions
             on the cluster.
         """
-
+        from couchbase.management.eventing import EventingFunctionManager
         self._check_for_shutdown()
         return EventingFunctionManager(self._admin)
 
@@ -965,7 +1005,8 @@ class Cluster(CoreClient):
         """
 
         return timedelta(
-            seconds=self._cntl(op=_LCB.TRACING_THRESHOLD_QUERY, value_type="timeout")
+            seconds=self._cntl(
+                op=_LCB.TRACING_THRESHOLD_QUERY, value_type="timeout")
         )
 
     @property
@@ -977,7 +1018,8 @@ class Cluster(CoreClient):
         """
 
         return timedelta(
-            seconds=self._cntl(op=_LCB.TRACING_THRESHOLD_SEARCH, value_type="timeout")
+            seconds=self._cntl(
+                op=_LCB.TRACING_THRESHOLD_SEARCH, value_type="timeout")
         )
 
     @property

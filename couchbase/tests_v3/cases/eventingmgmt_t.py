@@ -4,7 +4,7 @@ import attr
 from datetime import timedelta
 
 from couchbase_tests.base import CollectionTestCase
-from couchbase.n1ql import QueryScanConsistency
+from couchbase.cluster import QueryScanConsistency
 from couchbase.management.eventing import (
     EventingFunction,
     EventingFunctionDcpBoundary,
@@ -550,8 +550,8 @@ class EventingFunctionManagementTests(CollectionTestCase):
                 )
             ],
             constant_bindings=[
-                EventingFunctionConstantBinding(alias="testConstant", literal="1234")
-                # EventingFunctionConstantBinding(alias="testConstant1", literal="another test value")
+                EventingFunctionConstantBinding(alias="testConstant", literal="1234"),
+                EventingFunctionConstantBinding(alias="testConstant1", literal="\"another test value\"")
             ]
         )
 

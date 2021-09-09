@@ -7,7 +7,7 @@ from enum import Enum
 
 from .generic import GenericManager
 from ..options import OptionBlockTimeOut, forward_args
-from couchbase.n1ql import QueryScanConsistency
+from ..cluster import QueryScanConsistency
 from couchbase.management.admin import METHMAP
 from couchbase.exceptions import (
     ErrorMapper,
