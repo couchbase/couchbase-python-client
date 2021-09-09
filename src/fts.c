@@ -55,12 +55,6 @@ static void fts_row_callback(lcb_t instance,
     short htcode = 0;
     lcb_respsearch_cookie(resp, (void **)&mres);
     bucket = mres->parent;
-    // it is possible to get the callback even if we didn't lcb_wait.  So, check for that.
-    // This is a hack, which we need because LCB now calls the callback even though the lcb_search
-    // errored out.
-    if (!bucket->thrstate && bucket->unlock_gil) {
-        return;
-    }
     PYCBC_CONN_THR_END(bucket);
     vres = (pycbc_ViewResult *)PyDict_GetItem((PyObject *)mres, Py_None);
     {
