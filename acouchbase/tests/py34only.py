@@ -11,7 +11,8 @@ import couchbase.search as SEARCH
 class CouchbaseBeerTest(AioTestCase):
     def setUp(self, **kwargs):
         try:
-            return super(CouchbaseBeerTest,self).setUp(bucket='beer-sample', **kwargs)
+            return super(CouchbaseBeerTest, self).setUp(
+                bucket='beer-sample', **kwargs)
         except CouchbaseException:
             raise SkipTest("Need 'beer-sample' bucket for this")
 
@@ -23,7 +24,7 @@ class CouchbaseBeerKVTest(CouchbaseBeerTest):
     @asynct
     @asyncio.coroutine
     def test_get_data(self):
-        connargs=self.make_connargs(bucket='beer-sample')
+        connargs = self.make_connargs(bucket='beer-sample')
         beer_default_collection = self.gen_collection(**connargs)
 
         yield from (beer_default_collection.on_connect() or asyncio.sleep(0.01))
@@ -35,11 +36,13 @@ class CouchbaseBeerKVTest(CouchbaseBeerTest):
 class CouchbaseBeerViewTest(CouchbaseBeerTest):
     def setUp(self):
         super(CouchbaseBeerViewTest, self).setUp(type='Bucket')
+
     @asynct
     @asyncio.coroutine
     def test_query(self):
 
-        beer_bucket = self.gen_cluster(**self.make_connargs()).bucket('beer-sample')
+        beer_bucket = self.gen_cluster(
+            **self.make_connargs()).bucket('beer-sample')
 
         yield from (beer_bucket.on_connect() or asyncio.sleep(0.01))
         viewiter = beer_bucket.view_query("beer", "brewery_beers", limit=10)
@@ -98,7 +101,8 @@ class AIOClusterTest(AioTestCase):
             self.assertIsInstance(it, AsyncSearchResult)
             self.assertEqual(10, len(data))
         except SearchException as e:
-            if isinstance(e.inner_cause, NotSupportedException) and self.is_mock:
+            if isinstance(e.inner_cause,
+                          NotSupportedException) and self.is_mock:
                 raise SkipTest("Not supported")
 
 
@@ -108,9 +112,9 @@ class AnalyticsTest(AioTestCase):
         cluster = self.gen_cluster(**self.make_connargs())
         yield from (cluster.on_connect() or asyncio.sleep(0.01))
 
-        it = cluster.analytics_query("SELECT * FROM `{}` LIMIT 1".format(self.dataset_name))
+        it = cluster.analytics_query(
+            "SELECT * FROM `{}` LIMIT 1".format(self.dataset_name))
         yield from it.future
 
         self.assertIsInstance(it, AsyncAnalyticsResult)
         self.assertEqual(1, len(it.rows()))
-

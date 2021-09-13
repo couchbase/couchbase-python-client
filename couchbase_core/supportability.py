@@ -22,7 +22,7 @@ class Level(object):
         :return: marked function
         """.format(cls.__name__)
 
-        message = cls.desc+"\n"
+        message = cls.desc + "\n"
         msg_params = kwargs.get(cls.msg_params)
         if msg_params:
             message = message.format(**msg_params)
@@ -32,7 +32,7 @@ class Level(object):
         result = cls.get_final_fn(function, message, func_name)
         operation_mode.operate_on_doc(result,
                                       lambda x:
-                                      (function.__doc__+"\n\n" if function.__doc__ else "") + \
+                                      (function.__doc__ + "\n\n" if function.__doc__ else "") +
                                       "    :warning: " + message % "This")
         return result
 
@@ -48,9 +48,10 @@ class Level(object):
 
 class Deprecated(Level):
     desc = \
-    """
+        """
     %s is a deprecated API, use {instead} instead.
     """
+
     def __new__(cls, instead):
         def decorator(function):
             warn_on_attribute_access(cls, [function], "deprecated")
@@ -60,12 +61,13 @@ class Deprecated(Level):
 
         return decorator
 
+
 deprecated = Deprecated
 
 
 class Uncommitted(Level):
     desc = \
-    """
+        """
     %s is an uncommitted API call that is unlikely to change, but may still change as final consensus on its behavior has not yet been reached.
     """
 
@@ -75,7 +77,7 @@ uncommitted = Uncommitted
 
 class Volatile(Level):
     desc = \
-    """
+        """
     %s is a volatile API call that is still in flux and may likely be changed.
 
     It may also be an inherently private API call that may be exposed, but "YMMV" (your mileage may vary) principles apply.
@@ -87,7 +89,7 @@ volatile = Volatile
 
 class Internal(Level):
     desc = \
-    """
+        """
     %s is an internal API call.
 
     Components external to Couchbase Python Client should not rely on it is not intended for use outside the module, even to other Couchbase components.
@@ -103,7 +105,7 @@ internal = Internal
 
 class Committed(Level):
     desc = \
-    """
+        """
     %s is guaranteed to be supported and remain stable between SDK versions.
     """
 

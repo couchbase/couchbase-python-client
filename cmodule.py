@@ -26,7 +26,8 @@ from cbuild_config import couchbase_core, install_headers, CBuildCommon
 def gen_cmodule(extoptions):
     if platform.python_implementation() != 'PyPy':
         print("sources are {}".format(extoptions['sources']))
-        module = Extension(str(couchbase_core+'._libcouchbase'), **extoptions)
+        module = Extension(
+            str(couchbase_core + '._libcouchbase'), **extoptions)
     else:
         warnings.warn('The C extension libary does not work on PyPy. '
                       'You should install the couchbase_ffi module. Installation of this '
@@ -35,10 +36,8 @@ def gen_cmodule(extoptions):
     return module
 
 
-def gen_distutils_build(extoptions,pkgdata):
+def gen_distutils_build(extoptions, pkgdata):
     e_mods = [gen_cmodule(extoptions)]
-    CBuildCommon.setup_build_info(extoptions,pkgdata)
+    CBuildCommon.setup_build_info(extoptions, pkgdata)
     cmdclass = {'install_headers': install_headers, 'build_ext': CBuildCommon}
     return e_mods, cmdclass
-
-

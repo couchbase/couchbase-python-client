@@ -65,17 +65,16 @@ class MiscTest(ConnectionTestCaseBase):
     def test_conn_repr(self):
         repr(self.cb)
 
-
     def test_connection_defaults(self):
         # This will only work on the basic Connection class
         from couchbase_v2.bucket import Bucket
         ctor_params = self.make_connargs()
         # XXX: Change these if any of the defaults change
         defaults = {
-            'quiet' : False,
-            'default_format' : FMT_JSON,
-            'unlock_gil' : True,
-            'transcoder' : None
+            'quiet': False,
+            'default_format': FMT_JSON,
+            'unlock_gil': True,
+            'transcoder': None
         }
 
         cb_ctor = Bucket(**ctor_params)
@@ -84,7 +83,6 @@ class MiscTest(ConnectionTestCaseBase):
             actual = getattr(cb_ctor, option)
             self.assertEqual(actual, value)
 
-
     def test_closed(self):
         cb = self.cb
         self.assertFalse(cb.closed)
@@ -92,18 +90,16 @@ class MiscTest(ConnectionTestCaseBase):
         self.assertTrue(cb.closed)
         self.assertRaises(ClientTemporaryFailException, self.cb.get, "foo")
 
-
     def test_fmt_args(self):
         # Regression
         cb = self.make_connection(default_format=123)
         self.assertEqual(cb.default_format, 123)
 
         key = self.gen_key("fmt_auto_ctor")
-        cb = self.make_connection(default_format = FMT_AUTO)
+        cb = self.make_connection(default_format=FMT_AUTO)
         cb.upsert("foo", set([]))
         rv = cb.get("foo")
         self.assertEqual(rv.flags, FMT_PICKLE)
-
 
     def test_cntl(self):
         cb = self.make_connection()
@@ -133,11 +129,11 @@ class MiscTest(ConnectionTestCaseBase):
     def test_newer_ctls(self):
         cb = self.make_connection()
         self.skipLcbMin("2.3.1")
-        rv = cb._cntl(0x1f, value_type="string") # LCB_CNTL_CHANGESET
-        "" + rv # String
+        rv = cb._cntl(0x1f, value_type="string")  # LCB_CNTL_CHANGESET
+        "" + rv  # String
 
         # CONFIG_CACHE_LOADED
-        rv = cb._cntl(0x15, value_type="int") #
+        rv = cb._cntl(0x15, value_type="int")
         self.assertEqual(0, rv)
 
     def test_cntl_string(self):
@@ -159,7 +155,7 @@ class MiscTest(ConnectionTestCaseBase):
 
         self.assertFalse(lcb.lcb_logging())
 
-        logfn = lambda x: x
+        def logfn(x): return x
         lcb.lcb_logging(logfn)
         self.assertEqual(logfn, lcb.lcb_logging())
 
@@ -183,11 +179,11 @@ class MiscTest(ConnectionTestCaseBase):
             for num, entry in reversed(list(expected.items())):
                 for level, val in entry.items():
 
-                    optype='connstr'
+                    optype = 'connstr'
                     with self.assertLogs(level=level, recursive_check=True) as cm:
                         curbc = self.make_connection(log_redaction=val['text'])
                         self.assertEqual(num != 0, curbc.redaction != 0)
-                    result_str=''.join(cm.output)
+                    result_str = ''.join(cm.output)
                     logging.info(
                         'checking {pattern} matches {optype} addition {text} result:{result_str}'.format(optype=optype,
                                                                                                          result_str=result_str,
@@ -197,18 +193,21 @@ class MiscTest(ConnectionTestCaseBase):
                     opposite = 1 - num
                     opposite_val = expected[opposite][level]
 
-                    optype='cntl'
+                    optype = 'cntl'
                     with self.assertLogs(level=level) as cm:
                         curbc.redaction = opposite
                         curbc.upsert(key='test', value='value')
                         self.assertEqual(opposite != 0, curbc.redaction != 0)
 
-                    result_str=''.join(cm.output)
+                    result_str = ''.join(cm.output)
                     logging.info(
                         'checking {pattern} matches {optype} addition {text} result:{result_str}'.format(optype=optype,
                                                                                                          result_str=result_str,
                                                                                                          **val))
-                    self.assertRegex(''.join(cm.output), opposite_val['pattern'])
+                    self.assertRegex(
+                        ''.join(
+                            cm.output),
+                        opposite_val['pattern'])
         finally:
             couchbase.disable_logging()
 
@@ -238,7 +237,8 @@ class MiscTest(ConnectionTestCaseBase):
                     cb = self.make_connection(compression=connstr)
                     if min_size:
                         if min_size < 32:
-                            self.assertRaises(CouchbaseInputException, set_comp)
+                            self.assertRaises(
+                                CouchbaseInputException, set_comp)
                         else:
                             set_comp()
 
@@ -253,11 +253,12 @@ class MiscTest(ConnectionTestCaseBase):
 
     @staticmethod
     def send_compressed(entry):
-        return entry in map(_LCB.__getattribute__, ('COMPRESS_FORCE', 'COMPRESS_INOUT', 'COMPRESS_OUT'))
+        return entry in map(_LCB.__getattribute__,
+                            ('COMPRESS_FORCE', 'COMPRESS_INOUT', 'COMPRESS_OUT'))
 
     def test_compression_named(self):
         cb = self.make_connection()
-        cb.compression =couchbase_v2.COMPRESS_INOUT
+        cb.compression = couchbase_v2.COMPRESS_INOUT
 
     def test_consistency_check_pyexception(self):
         items = {str(k): str(v) for k, v in zip(range(0, 100), range(0, 100))}
@@ -278,5 +279,7 @@ class MiscTest(ConnectionTestCaseBase):
             def raiser():
                 raise exception
 
-            self.assertRaisesRegex(InternalSDKException, r'self->nremaining!=0, resetting to 0', raiser)
-
+            self.assertRaisesRegex(
+                InternalSDKException,
+                r'self->nremaining!=0, resetting to 0',
+                raiser)

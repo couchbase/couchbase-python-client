@@ -20,6 +20,7 @@ import json
 import os.path
 import select
 
+
 class BucketSpec(object):
     def __init__(self, name='default', bucket_type='couchbase', password=''):
         self.name = name
@@ -28,6 +29,7 @@ class BucketSpec(object):
 
     def __str__(self):
         return ':'.join([self.name, self.password, self.bucket_type])
+
 
 class MockControlClient(object):
     def __init__(self, mockport=18091, host='127.0.0.1'):
@@ -53,8 +55,8 @@ class MockControlClient(object):
                        cas=None,
                        value=None):
         r = {
-            'Key' : key,
-            'OnMaster' : on_master
+            'Key': key,
+            'OnMaster': on_master
         }
         if bucket:
             r['Bucket'] = bucket
@@ -99,7 +101,7 @@ class MockControlClient(object):
 class CouchbaseMock(object):
     def _setup_listener(self):
         sock = socket.socket()
-        sock.bind( ('', 0) )
+        sock.bind(('', 0))
         sock.listen(5)
 
         addr, port = sock.getsockname()
@@ -165,7 +167,6 @@ class CouchbaseMock(object):
         Note that you must have ``java`` in your `PATH`
         """
 
-
         self.runpath = runpath
         self.buckets = buckets
         self.nodes = nodes
@@ -174,7 +175,8 @@ class CouchbaseMock(object):
 
         if not os.path.exists(runpath):
             if not url:
-                raise Exception(runpath + " Does not exist and no URL specified")
+                raise Exception(
+                    runpath + " Does not exist and no URL specified")
             fp = open(runpath, "wb")
             ulp = urlopen(url)
             jarblob = ulp.read()
@@ -209,5 +211,3 @@ class CouchbaseMock(object):
             self.po.communicate()
         except OSError:
             pass
-
-

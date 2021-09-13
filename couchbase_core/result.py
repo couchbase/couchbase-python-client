@@ -28,6 +28,7 @@ import couchbase.exceptions as E
 from datetime import datetime
 import couchbase_core.priv_constants as _P
 
+
 class SubdocResult(C._SDResult):
     """
     Class for objects returned via a subdoc operation. This may contain
@@ -186,4 +187,5 @@ class SubdocResult(C._SDResult):
 
     @property
     def value(self):
-        raise AttributeError(".value not applicable in multiple result operation")
+        raise AttributeError(
+            ".value not applicable in multiple result operation")

@@ -22,6 +22,7 @@ from couchbase.exceptions import ObjectThreadException
 from couchbase_tests.base import CollectionTestCase
 from couchbase.options import LockMode
 
+
 class LockmodeTest(CollectionTestCase):
     def test_lockmode_defaults(self):
         # default is LOCKMODE_EXC
@@ -70,7 +71,7 @@ class LockmodeTest(CollectionTestCase):
         cb = self.make_connection(lockmode=LockMode.WAIT, unlock_gil=True)
 
         d = {
-            'ended' : 0
+            'ended': 0
         }
 
         def runfunc():

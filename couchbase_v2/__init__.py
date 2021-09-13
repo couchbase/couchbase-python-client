@@ -15,40 +15,40 @@
 # limitations under the License.
 #
 
+import couchbase_core.analytics_ingester as analytics_ingester
+import couchbase.auth as auth_domain
+import couchbase_core.user_constants as user_constants
+import couchbase_core.subdocument as subdocument
+import couchbase_core.transcoder as transcoder
+import couchbase_core.result as result
+import couchbase_core.items as items
+import couchbase_core.connstr as connstr
+import couchbase_core.analytics as analytics
+import couchbase_core.n1ql as n1ql
 import sys
 
 import couchbase_v2.exceptions_shim as exceptions
 sys.modules[__name__ + '.exceptions'] = exceptions
 
-import couchbase_core.n1ql as n1ql
 sys.modules[__name__ + '.n1ql'] = n1ql
 
-import couchbase_core.analytics as analytics
 sys.modules[__name__ + '.analytics'] = analytics
 
-import couchbase_core.connstr as connstr
 sys.modules[__name__ + '.connstr'] = connstr
 
-import couchbase_core.items as items
 sys.modules[__name__ + '.items'] = items
 
 # import couchbase_core.experimental as experimental
 # sys.modules[__name__ + '.experimental'] = experimental
 
-import couchbase_core.result as result
 sys.modules[__name__ + '.result'] = result
 
-import couchbase_core.transcoder as transcoder
 sys.modules[__name__ + '.transcoder'] = transcoder
 
-import couchbase_core.subdocument as subdocument
 sys.modules[__name__ + '.subdocument'] = subdocument
 
-import couchbase_core.user_constants as user_constants
 sys.modules[__name__ + '.user_constants'] = user_constants
 
-import couchbase.auth as auth_domain
 sys.modules[__name__ + '.auth_domain'] = auth_domain
 
-import couchbase_core.analytics_ingester as analytics_ingester
 sys.modules[__name__ + '.analytics_ingester'] = analytics_ingester

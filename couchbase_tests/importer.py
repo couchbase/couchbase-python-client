@@ -80,7 +80,8 @@ def _get_classes(modules):
                 continue
 
             from couchbase_tests.base import CouchbaseTestCase
-            if not issubclass(attrobj, CouchbaseTestCase) and attrname not in allowed:
+            if not issubclass(
+                    attrobj, CouchbaseTestCase) and attrname not in allowed:
                 continue
 
             ret[attrname] = attrobj
@@ -109,8 +110,8 @@ def get_configured_classes(implconfig, implstr=None, skiplist=None):
         if name in skiplist:
             continue
 
-        cls = type(name+implstr, (case, implconfig), {})
-        ret[name+implstr] = cls
+        cls = type(name + implstr, (case, implconfig), {})
+        ret[name + implstr] = cls
 
     return ret
 

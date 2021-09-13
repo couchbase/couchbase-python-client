@@ -142,7 +142,7 @@ def gen_version(do_write=True, txt=None):
         vstr = info.package_version
     except MalformedGitTag:
         warnings.warn("Malformed input '{0}'".format(txt))
-        vstr = '0.0.0'+txt
+        vstr = '0.0.0' + txt
 
     if not do_write:
         print(vstr)
@@ -157,6 +157,7 @@ def gen_version(do_write=True, txt=None):
     )
     with open(VERSION_FILE, "w") as fp:
         fp.write("\n".join(lines))
+
 
 if __name__ == '__main__':
     from argparse import ArgumentParser

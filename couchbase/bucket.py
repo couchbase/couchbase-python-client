@@ -305,7 +305,8 @@ class Bucket(CoreClientDatastructureWrap):
         :return: A :class:`PingResult` representing the state of all the pinged services.
         :raise: CouchbaseException for various communication issues.
         """
-        return PingResult(super(Bucket, self).ping(**forward_args(kwargs, *options)))
+        return PingResult(super(Bucket, self).ping(
+            **forward_args(kwargs, *options)))
 
     @property
     def kv_timeout(self):
@@ -319,7 +320,8 @@ class Bucket(CoreClientDatastructureWrap):
             # Get the current default:
             timeout = bucket.kv_timeout
         """
-        return timedelta(seconds=self._get_timeout_common(_LCB.LCB_CNTL_OP_TIMEOUT))
+        return timedelta(seconds=self._get_timeout_common(
+            _LCB.LCB_CNTL_OP_TIMEOUT))
 
     @property
     def views_timeout(self):
@@ -334,8 +336,10 @@ class Bucket(CoreClientDatastructureWrap):
             timeout = cb.view_timeout
         """
         # lets use the private function in the private _bucket for now.  Soon
-        # that _bucket will be gone and we will have migrated this all into here.
-        return timedelta(seconds=self._get_timeout_common(_LCB.LCB_CNTL_VIEW_TIMEOUT))
+        # that _bucket will be gone and we will have migrated this all into
+        # here.
+        return timedelta(seconds=self._get_timeout_common(
+            _LCB.LCB_CNTL_VIEW_TIMEOUT))
 
     @property
     def tracing_orphaned_queue_flush_interval(self):
@@ -362,7 +366,8 @@ class Bucket(CoreClientDatastructureWrap):
 
         """
 
-        return self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_SIZE, value_type="uint32_t")
+        return self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_SIZE,
+                          value_type="uint32_t")
 
     @property
     def tracing_threshold_queue_flush_interval(self):
@@ -389,7 +394,8 @@ class Bucket(CoreClientDatastructureWrap):
 
         """
 
-        return self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_SIZE, value_type="uint32_t")
+        return self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_SIZE,
+                          value_type="uint32_t")
 
     @property
     def tracing_threshold_kv(self):
@@ -402,7 +408,8 @@ class Bucket(CoreClientDatastructureWrap):
 
         """
 
-        return timedelta(seconds=self._cntl(op=_LCB.TRACING_THRESHOLD_KV, value_type="timeout"))
+        return timedelta(seconds=self._cntl(
+            op=_LCB.TRACING_THRESHOLD_KV, value_type="timeout"))
 
     @property
     def tracing_threshold_view(self):
@@ -414,7 +421,8 @@ class Bucket(CoreClientDatastructureWrap):
             cb.tracing_threshold_view = timedelta(seconds=0.5)
 
         """
-        return timedelta(seconds=self._cntl(op=_LCB.TRACING_THRESHOLD_VIEW, value_type="timeout"))
+        return timedelta(seconds=self._cntl(
+            op=_LCB.TRACING_THRESHOLD_VIEW, value_type="timeout"))
 
 
 class AsyncBucket(AsyncClientMixin, Bucket):

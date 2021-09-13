@@ -120,7 +120,7 @@ class ClusterTests(CollectionTestCase):
         if self.is_mock:
             try:
                 query_result.rows()
-            except:
+            except BaseException:
                 pass
         else:
             self.assertTrue(len(query_result.rows()) > 0)
@@ -175,7 +175,8 @@ class ClusterTests(CollectionTestCase):
             raise SkipTest("query not mocked")
         cluster = Cluster.connect(self.cluster.connstr, ClusterOptions(
             PasswordAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)))
-        # Temporarily, lets open a bucket to insure the admin object was created
+        # Temporarily, lets open a bucket to insure the admin object was
+        # created
         b = cluster.bucket(self.bucket_name)
         # verify that we can get a bucket manager
         self.assertIsNotNone(cluster.buckets())
@@ -185,8 +186,10 @@ class ClusterTests(CollectionTestCase):
 
     def _authenticator(self):
         if self.is_mock:
-            return ClassicAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)
-        return PasswordAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)
+            return ClassicAuthenticator(
+                self.cluster_info.admin_username, self.cluster_info.admin_password)
+        return PasswordAuthenticator(
+            self.cluster_info.admin_username, self.cluster_info.admin_password)
 
     def _create_cluster_opts(self, **kwargs):
         return ClusterOptions(self._authenticator(), **kwargs)

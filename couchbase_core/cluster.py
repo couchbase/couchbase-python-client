@@ -31,7 +31,8 @@ class _OverrideSet(set):
 
 
 class _Cluster(object):
-    # list of all authentication types, keep up to date, used to identify connstr/kwargs auth styles
+    # list of all authentication types, keep up to date, used to identify
+    # connstr/kwargs auth styles
 
     def __init__(self, connection_string='couchbase://localhost',
                  bucket_factory=Client):
@@ -46,7 +47,9 @@ class _Cluster(object):
         self.authenticator = None
         self._buckets = {}
         if self.connstr.bucket:
-            raise ValueError('Cannot pass bucket to connection string: ' + self.connstr.bucket)
+            raise ValueError(
+                'Cannot pass bucket to connection string: ' +
+                self.connstr.bucket)
         if 'username' in self.connstr.options:
             raise ValueError('username must be specified in the authenticator, '
                              'not the connection string')
@@ -81,7 +84,8 @@ class _Cluster(object):
             :meth:`__init__`
         """
         if self.authenticator:
-            auth_credentials_full = self.authenticator.get_auto_credentials(bucket_name)
+            auth_credentials_full = self.authenticator.get_auto_credentials(
+                bucket_name)
         else:
             auth_credentials_full = {'options': {}}
 
@@ -97,10 +101,12 @@ class _Cluster(object):
         # Also sets its own 'auth_type' field to the type of authentication it
         # thinks is being specified
 
-        normalizer = _Cluster._ParamNormaliser(self.authenticator, connstr, **kwargs)
+        normalizer = _Cluster._ParamNormaliser(
+            self.authenticator, connstr, **kwargs)
 
         # we don't do anything with this information unless the Normaliser thinks
-        # Cert Auth is involved as this is outside the remit of PYCBC-487/488/489
+        # Cert Auth is involved as this is outside the remit of
+        # PYCBC-487/488/489
 
         if issubclass(normalizer.auth_type, CertAuthenticator) or issubclass(type(self.authenticator),
                                                                              CertAuthenticator):
@@ -159,10 +165,15 @@ class _Cluster(object):
 
         def __init__(self, authenticator, connstr, **kwargs):
 
-            # build a dictionary of all potentially overlapping/conflicting parameter names
+            # build a dictionary of all potentially overlapping/conflicting
+            # parameter names
 
-            self.param_keys = dict(kwargs=_OverrideSet(kwargs), connstr=set(connstr.options))
-            self.param_keys.update({'auth_credential': authenticator.unique_keys()} if authenticator else {})
+            self.param_keys = dict(
+                kwargs=_OverrideSet(kwargs),
+                connstr=set(
+                    connstr.options))
+            self.param_keys.update(
+                {'auth_credential': authenticator.unique_keys()} if authenticator else {})
             self.param_keys.update(self.auth_unique_params)
 
             self.authenticator = authenticator
@@ -187,7 +198,8 @@ class _Cluster(object):
             """
             unwanted_keys = self.auth_type.unwanted_keys() if self.auth_type else set()
 
-            clash_list = ((k, self._entry(unwanted_keys, k)) for k in set(self.param_keys) - {'auth-credential'})
+            clash_list = ((k, self._entry(unwanted_keys, k))
+                          for k in set(self.param_keys) - {'auth-credential'})
             self._handle_clashes({k: v for k, v in clash_list if v})
 
         def check_clash_free_params(self):
@@ -196,7 +208,8 @@ class _Cluster(object):
             """
             auth_clashes = self.clash_dict.get('auth_credential')
             if auth_clashes:
-                actual_clashes = {k: v for k, v in auth_clashes.items() if self.auth_type.__name__ != k}
+                actual_clashes = {
+                    k: v for k, v in auth_clashes.items() if self.auth_type.__name__ != k}
                 if actual_clashes:
                     complaint = ', and'.join(
                         "param set {}: [{}] ".format(second_set, clashes)
@@ -207,12 +220,17 @@ class _Cluster(object):
 
         def _build_clash_dict(self):
             self.clash_dict = defaultdict(defaultdict)
-            # build a dictionary {'first_set_name':{'second_set_name':{'key1','key2'}}} listing all overlaps
+            # build a dictionary
+            # {'first_set_name':{'second_set_name':{'key1','key2'}}} listing
+            # all overlaps
             for item in itertools.combinations(self.param_keys.items(), 2):
                 clashes = item[0][1] & item[1][1]
                 if clashes:
-                    warnings.warn("{} and {} options overlap on keys {}".format(item[0][0], item[1][0], clashes))
-                    # make dictionary bidirectional, so we can list all clashes for a given param set directly
+                    warnings.warn(
+                        "{} and {} options overlap on keys {}".format(
+                            item[0][0], item[1][0], clashes))
+                    # make dictionary bidirectional, so we can list all clashes
+                    # for a given param set directly
                     self.clash_dict[item[0][0]][item[1][0]] = clashes
                     self.clash_dict[item[1][0]][item[0][0]] = clashes
 
@@ -261,7 +279,8 @@ class _Cluster(object):
             if len(clashes):
                 clash_dict = defaultdict(lambda: defaultdict(list))
                 for clash, intersection in clashes.items():
-                    clash_dict[isinstance(self.param_keys[clash], _OverrideSet)][clash].append(intersection)
+                    clash_dict[isinstance(self.param_keys[clash], _OverrideSet)][clash].append(
+                        intersection)
 
                 action = {False: self._warning, True: self._exception}
                 for is_override, param_dict in clash_dict.items():
@@ -269,7 +288,8 @@ class _Cluster(object):
 
         @staticmethod
         def _gen_complaint(param_dict):
-            complaint = ", and".join(("{} contains {}".format(k, list(*entry)) for k, entry in param_dict.items()))
+            complaint = ", and".join(("{} contains {}".format(
+                k, list(*entry)) for k, entry in param_dict.items()))
             return complaint
 
         def _get_generic_complaint(self, clash_param_dict, auth_type):
@@ -278,9 +298,11 @@ class _Cluster(object):
                                                                                           clash_param_dict))
 
         def _exception(self, clash_param_dict, auth_type):
-            self.critical_complaints.append(self._get_generic_complaint(clash_param_dict, auth_type))
+            self.critical_complaints.append(
+                self._get_generic_complaint(
+                    clash_param_dict, auth_type))
 
         def _warning(self, clash_param_dict, auth_type):
-            warnings.warn(self._get_generic_complaint(clash_param_dict, auth_type))
-
-
+            warnings.warn(
+                self._get_generic_complaint(
+                    clash_param_dict, auth_type))

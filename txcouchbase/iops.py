@@ -29,7 +29,7 @@ def update_theseus(func):
     def wrapper(*args, **kwargs):
         t.write_data(theseus_log)
         theseus_log.flush()
-        return func(*args,**kwargs)
+        return func(*args, **kwargs)
     return wrapper if THESEUS_LOGFILE else func
 
 
@@ -109,7 +109,7 @@ class v0Iops(object):
     IOPS Implementation to be used with Twisted's "FD" based reactors
     """
 
-    __slots__ = [ 'reactor', 'is_sync', '_stop' ]
+    __slots__ = ['reactor', 'is_sync', '_stop']
 
     def __init__(self, reactor, is_sync=False):
         self.reactor = reactor

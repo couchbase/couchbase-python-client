@@ -9,7 +9,7 @@ from datetime import timedelta
 
 try:
     from typing import TypedDict
-except:
+except BaseException:
     from typing_extensions import TypedDict
 
 ReplicateTo = Cardinal
@@ -21,7 +21,7 @@ T = TypeVar('T', bound=OptionBlock)
 
 class DurabilityTypeBase(dict):
     def __init__(self, content):
-        super(DurabilityTypeBase,self).__init__(**content)
+        super(DurabilityTypeBase, self).__init__(**content)
 
 
 class DurabilityType(dict):
@@ -39,7 +39,9 @@ class DurabilityType(dict):
 
 
 class ClientDurability(DurabilityType):
-    Storage = TypedDict('Storage', {'replicate_to': ReplicateTo, 'persist_to': PersistTo}, total=True)
+    Storage = TypedDict(
+        'Storage', {
+            'replicate_to': ReplicateTo, 'persist_to': PersistTo}, total=True)
 
     def __init__(self,  # type: T
                  replicate_to=ReplicateTo.NONE,  # type: ReplicateTo
@@ -56,7 +58,12 @@ class ClientDurability(DurabilityType):
             from the cache of at least these many nodes
             (excluding the master)
         """
-        super(ClientDurability, self).__init__(ClientDurability.Storage(replicate_to=replicate_to, persist_to=persist_to))
+        super(
+            ClientDurability,
+            self).__init__(
+            ClientDurability.Storage(
+                replicate_to=replicate_to,
+                persist_to=persist_to))
 
 
 class ServerDurability(DurabilityType):
@@ -71,7 +78,11 @@ class ServerDurability(DurabilityType):
 
         :param Durability level: durability level
         """
-        super(ServerDurability, self).__init__(ServerDurability.Storage(level=level))
+        super(
+            ServerDurability,
+            self).__init__(
+            ServerDurability.Storage(
+                level=level))
 
 
 class ClientDurableOptionBlock(OptionBlockTimeOut):
@@ -86,7 +97,11 @@ class ClientDurableOptionBlock(OptionBlockTimeOut):
         :param durability: Client durability settings
         :param timeout: Timeout for operation
         """
-        super(ClientDurableOptionBlock, self).__init__(durability=durability, timeout=timeout)
+        super(
+            ClientDurableOptionBlock,
+            self).__init__(
+            durability=durability,
+            timeout=timeout)
 
 
 class ServerDurableOptionBlock(OptionBlockTimeOut):
@@ -101,7 +116,11 @@ class ServerDurableOptionBlock(OptionBlockTimeOut):
         :param durability: Server durability settings
         :param timeout: Timeout for operation
         """
-        super(ServerDurableOptionBlock, self).__init__(durability=durability, timeout=timeout)
+        super(
+            ServerDurableOptionBlock,
+            self).__init__(
+            durability=durability,
+            timeout=timeout)
 
 
 class DurabilityOptionBlock(OptionBlockTimeOut):
@@ -118,7 +137,13 @@ class DurabilityOptionBlock(OptionBlockTimeOut):
         :param expiry: When any mutation should expire
         :param timeout: Timeout for operation
         """
-        super(DurabilityOptionBlock, self).__init__(durability=durability, expiry=expiry, timeout=timeout, **kwargs)
+        super(
+            DurabilityOptionBlock,
+            self).__init__(
+            durability=durability,
+            expiry=expiry,
+            timeout=timeout,
+            **kwargs)
 
     @property
     def expiry(self):

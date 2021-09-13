@@ -103,8 +103,8 @@ class AnalyticsLink(ABC):
     def form_encode(
         self,  # type: "AnalyticsLink"
     ) -> bytes:
-        """Encodes the :class:`couchbase.analytics.AnalyticsLink` into a form data representation, 
-            to send as the body of a :func:`couchbase.management.analytics.CreateLink` or 
+        """Encodes the :class:`couchbase.analytics.AnalyticsLink` into a form data representation,
+            to send as the body of a :func:`couchbase.management.analytics.CreateLink` or
             :func:`couchbase.management.analytics.ReplaceLink`
 
         :return: A form encoded :class:`couchbase.analytics.AnalyticsLink`
@@ -207,11 +207,13 @@ class CouchbaseAnalyticsEncryptionSettings(object):
         elif raw_data["encryption"] == AnalyticsEncryptionLevel.FULL.value:
             encryption_settings.encryption_level = AnalyticsEncryptionLevel.FULL
 
-        if "certificate" in raw_data and raw_data["certificate"] and raw_data["certificate"].split():
+        if "certificate" in raw_data and raw_data["certificate"] and raw_data["certificate"].split(
+        ):
             encryption_settings.certificate = bytes(
                 raw_data["certificate"], "utf-8")
 
-        if "clientCertificate" in raw_data and raw_data["clientCertificate"] and raw_data["clientCertificate"].split():
+        if "clientCertificate" in raw_data and raw_data["clientCertificate"] and raw_data["clientCertificate"].split(
+        ):
             encryption_settings.certificate = bytes(
                 raw_data["clientCertificate"], "utf-8")
 
@@ -270,15 +272,18 @@ class CouchbaseRemoteAnalyticsLink(AnalyticsLink):
         if not is_null_or_empty(self._password):
             params["password"] = self._password
 
-        if self._encryption.certificate and len(self._encryption.certificate) > 0:
+        if self._encryption.certificate and len(
+                self._encryption.certificate) > 0:
             params["certificate"] = self._encryption.certificate.decode(
                 "utf-8")
 
-        if self._encryption.client_certificate and len(self._encryption.client_certificate) > 0:
+        if self._encryption.client_certificate and len(
+                self._encryption.client_certificate) > 0:
             params["clientCertificate"] = self._encryption.client_certificate.decode(
                 "utf-8")
 
-        if self._encryption.client_key and len(self._encryption.client_key) > 0:
+        if self._encryption.client_key and len(
+                self._encryption.client_key) > 0:
             params["clientKey"] = self._encryption.client_key.decode("utf-8")
 
         return mk_formstr(params).encode()
@@ -296,12 +301,15 @@ class CouchbaseRemoteAnalyticsLink(AnalyticsLink):
             raise InvalidArgumentException(
                 "Hostname must be set for couchbase analytics links.")
 
-        if self._encryption.encryption_level in [AnalyticsEncryptionLevel.NONE, AnalyticsEncryptionLevel.HALF]:
-            if is_null_or_empty(self._username) or is_null_or_empty(self._password):
+        if self._encryption.encryption_level in [
+                AnalyticsEncryptionLevel.NONE, AnalyticsEncryptionLevel.HALF]:
+            if is_null_or_empty(
+                    self._username) or is_null_or_empty(self._password):
                 raise InvalidArgumentException(
                     "When encryption level is half or none, username and password must be set for couchbase analytics links.")
         elif self._encryption.encryption_level == AnalyticsEncryptionLevel.FULL:
-            if not (self._encryption.certificate and len(self._encryption.certificate) > 0):
+            if not (self._encryption.certificate and len(
+                    self._encryption.certificate) > 0):
                 raise InvalidArgumentException(
                     "When encryption level is full a certificate must be set for couchbase analytics links.")
             if not ((self._encryption.client_certificate and len(self._encryption.client_certificate) > 0)
@@ -325,7 +333,8 @@ class CouchbaseRemoteAnalyticsLink(AnalyticsLink):
             raw_data)
         username = raw_data["username"]
 
-        return CouchbaseRemoteAnalyticsLink(dataverse, link_name, hostname, encryption, username)
+        return CouchbaseRemoteAnalyticsLink(
+            dataverse, link_name, hostname, encryption, username)
 
 
 class S3ExternalAnalyticsLink(AnalyticsLink):
@@ -415,7 +424,8 @@ class S3ExternalAnalyticsLink(AnalyticsLink):
         region = raw_data["region"]
         service_endpoint = raw_data["serviceEndpoint"]
 
-        return S3ExternalAnalyticsLink(dataverse, link_name, access_key_id, region, service_endpoint=service_endpoint)
+        return S3ExternalAnalyticsLink(
+            dataverse, link_name, access_key_id, region, service_endpoint=service_endpoint)
 
 
 class AzureBlobExternalAnalyticsLink(AnalyticsLink):
@@ -671,11 +681,13 @@ class AnalyticsMetaData(object):
 
     def status(self):
         # type: (...) -> AnalyticsStatus
-        return AnalyticsStatus[self._parentquery_for_metadata.meta.get('status').upper()]
+        return AnalyticsStatus[self._parentquery_for_metadata.meta.get(
+            'status').upper()]
 
     def warnings(self):
         # type: (...) -> List[AnalyticsWarning]
-        return list(map(AnalyticsWarning, self._parentquery_for_metadata.meta.get('warnings', [])))
+        return list(
+            map(AnalyticsWarning, self._parentquery_for_metadata.meta.get('warnings', [])))
 
     def metrics(self):
         # type: (...) -> Optional[AnalyticsMetrics]

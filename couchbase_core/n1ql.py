@@ -430,7 +430,8 @@ class _N1QLQuery(object):
 
 
 class N1QLRequest(object):
-    def __init__(self, params, parent, row_factory=lambda x: x, meta_lookahead=True, **kwargs):
+    def __init__(self, params, parent, row_factory=lambda x: x,
+                 meta_lookahead=True, **kwargs):
         """
         Object representing the execution of the request on the
         server.

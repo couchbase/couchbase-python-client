@@ -20,7 +20,7 @@ from couchbase.management.search import SearchIndex
 import uuid
 
 
-@flaky(10,3)
+@flaky(10, 3)
 class SearchIndexManagerTestCase(CollectionTestCase):
     def setUp(self):
         super(SearchIndexManagerTestCase, self).setUp()
@@ -37,10 +37,14 @@ class SearchIndexManagerTestCase(CollectionTestCase):
             pass
         finally:
             # now lets wait till it really seems gone...
-            self.try_n_times_till_exception(10, 3, self.indexmgr.get_index, self.indexname)
+            self.try_n_times_till_exception(
+                10, 3, self.indexmgr.get_index, self.indexname)
 
             # Now lets create a new one
-            self.indexmgr.upsert_index(SearchIndex(name=self.indexname, source_name='default'))
+            self.indexmgr.upsert_index(
+                SearchIndex(
+                    name=self.indexname,
+                    source_name='default'))
 
             # insure it is there before we begin test
             self.try_n_times(10, 3, self.indexmgr.get_index, self.indexname)
@@ -56,63 +60,112 @@ class SearchIndexManagerTestCase(CollectionTestCase):
     def tearDown(self):
         try:
             self.indexmgr.drop_index(self.indexname)
-        except:
+        except BaseException:
             pass
 
     def test_ingestion_control(self):
         # can't easily test this, but lets at least call them and insure we get no
         # exceptions
-        self.assertIsNone(self.try_n_times(10, 3, self.indexmgr.pause_ingest, self.indexname))
-        self.assertIsNone(self.try_n_times(10, 3, self.indexmgr.resume_ingest, self.indexname))
+        self.assertIsNone(
+            self.try_n_times(
+                10,
+                3,
+                self.indexmgr.pause_ingest,
+                self.indexname))
+        self.assertIsNone(
+            self.try_n_times(
+                10,
+                3,
+                self.indexmgr.resume_ingest,
+                self.indexname))
 
     def test_query_control(self):
-        self.assertIsNone(self.try_n_times(10, 3, self.indexmgr.disallow_querying, self.indexname))
-        self.assertIsNone(self.try_n_times(10, 3, self.indexmgr.allow_querying, self.indexname))
+        self.assertIsNone(
+            self.try_n_times(
+                10,
+                3,
+                self.indexmgr.disallow_querying,
+                self.indexname))
+        self.assertIsNone(
+            self.try_n_times(
+                10,
+                3,
+                self.indexmgr.allow_querying,
+                self.indexname))
 
     def test_plan_freeze_control(self):
-        self.assertIsNone(self.try_n_times(10, 3, self.indexmgr.freeze_plan, self.indexname))
-        self.assertIsNone(self.try_n_times(10, 3, self.indexmgr.unfreeze_plan, self.indexname))
+        self.assertIsNone(
+            self.try_n_times(
+                10,
+                3,
+                self.indexmgr.freeze_plan,
+                self.indexname))
+        self.assertIsNone(
+            self.try_n_times(
+                10,
+                3,
+                self.indexmgr.unfreeze_plan,
+                self.indexname))
 
     def test_get_indexed_document_count(self):
         # just be sure we get something back.  NOTE: immediately after creation,
         # the document count can give an exception.  So...  lets try a few times
         # with a sleep.
-        self.assertIsNotNone(self.try_n_times(5, 2, self.indexmgr.get_indexed_documents_count, self.indexname))
+        self.assertIsNotNone(
+            self.try_n_times(
+                5,
+                2,
+                self.indexmgr.get_indexed_documents_count,
+                self.indexname))
 
     def test_drop_index(self):
         # you may not be able to drop an index immediately after creating it, so
         # lets retry it till successful.
         self.try_n_times(10, 3, self.indexmgr.drop_index, self.indexname)
-        self.try_n_times_till_exception(10, 3, self.indexmgr.get_index, self.indexname)
-        self.assertRaises(SearchIndexNotFoundException, self.indexmgr.get_index, self.indexname)
+        self.try_n_times_till_exception(
+            10, 3, self.indexmgr.get_index, self.indexname)
+        self.assertRaises(
+            SearchIndexNotFoundException,
+            self.indexmgr.get_index,
+            self.indexname)
 
     def test_get_all_indexes(self):
         # we know of one, lets make sure it is in the list
         indexes = self.try_n_times(10, 3, self.indexmgr.get_all_indexes)
         for idx in indexes:
             if idx.name == self.indexname:
-                return;
+                return
         self.fail('did not find {} as expected'.format(self.indexname))
 
     def test_get_index(self):
-        index = self.try_n_times(10, 3, self.indexmgr.get_index, self.indexname)
+        index = self.try_n_times(
+            10, 3, self.indexmgr.get_index, self.indexname)
         self.assertIsNotNone(index)
 
     def test_get_index_fail_no_index_name(self):
-        self.assertRaises(InvalidArgumentException, self.indexmgr.get_index, None)
+        self.assertRaises(
+            InvalidArgumentException,
+            self.indexmgr.get_index,
+            None)
 
     def test_get_index_fail(self):
-        self.assertRaises(SearchIndexNotFoundException, self.indexmgr.get_index, 'foo')
+        self.assertRaises(
+            SearchIndexNotFoundException,
+            self.indexmgr.get_index,
+            'foo')
 
     def test_upsert_index(self):
-        index = self.try_n_times(10, 3, self.indexmgr.get_index, self.indexname)
+        index = self.try_n_times(
+            10, 3, self.indexmgr.get_index, self.indexname)
         self.assertIsNone(
             self.indexmgr.upsert_index(SearchIndex(uuid=index.uuid, name=self.indexname, source_name='default')))
 
     @skip_if_no_collections
     def test_analyze_doc(self):
-        # like getting the doc count, this can fail immediately after index creation
+        # like getting the doc count, this can fail immediately after index
+        # creation
         doc = {"field": "I got text in here"}
-        analysis = self.try_n_times(5, 2, self.indexmgr.analyze_document, self.indexname, doc)
+        analysis = self.try_n_times(
+            5, 2, self.indexmgr.analyze_document, self.indexname, doc)
         self.assertIsNotNone(analysis)
         self.assertEquals(analysis['status'], 'ok')

@@ -30,8 +30,9 @@ pkgversion = couchbase_version.get_version()
 def handle_build_type_and_gen_deps():
     cmake_build = build_type in ['CMAKE', 'CMAKE_HYBRID']
     print("Build type: {}, cmake:{}".format(build_type, cmake_build))
-    general_requires = open(str(curdir.joinpath('requirements.txt'))).readlines()
-    extoptions, pkgdata=get_ext_options()
+    general_requires = open(
+        str(curdir.joinpath('requirements.txt'))).readlines()
+    extoptions, pkgdata = get_ext_options()
 
     if cmake_build:
         e_mods, extra_requires, cmdclass = gen_cmake_build(extoptions, pkgdata)
@@ -47,7 +48,9 @@ def handle_build_type_and_gen_deps():
     setup_kw['install_requires'] = general_requires
     setup_kw['cmdclass'] = cmdclass
     setup_kw['package_data'] = pkgdata
-    setup_kw['eager_resources'] = list(itertools.chain.from_iterable(pkgdata.values()))
+    setup_kw['eager_resources'] = list(
+        itertools.chain.from_iterable(
+            pkgdata.values()))
     return setup_kw
 
 
@@ -57,9 +60,9 @@ packages = {
     'acouchbase',
     'couchbase',
     couchbase_core,
-    couchbase_core+'.views',
-    couchbase_core+'.iops',
-    couchbase_core+'.asynchronous',
+    couchbase_core + '.views',
+    couchbase_core + '.iops',
+    couchbase_core + '.asynchronous',
     'couchbase.asynchronous',
     'couchbase.management',
     'couchbase.encryption',
@@ -67,8 +70,8 @@ packages = {
 }
 
 setup(
-    name = 'couchbase',
-    version = pkgversion,
+    name='couchbase',
+    version=pkgversion,
     url="https://github.com/couchbase/couchbase-python-client",
     author="Couchbase, Inc.",
     author_email="PythonPackage@couchbase.com",
@@ -89,8 +92,12 @@ setup(
         "Topic :: Software Development :: Libraries",
         "Topic :: Software Development :: Libraries :: Python Modules"],
     python_requires=">=3.5",
-    packages = list(packages),
-    tests_require=['utilspie','nose', 'testresources>=0.2.7', 'basictracer==2.2.0'],
+    packages=list(packages),
+    tests_require=[
+        'utilspie',
+        'nose',
+        'testresources>=0.2.7',
+        'basictracer==2.2.0'],
     test_suite='couchbase_tests.test_sync',
     **setup_kw
 )

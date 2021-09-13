@@ -192,5 +192,5 @@ if __name__ == "__main__":
     cs.bucket = "Hi"
     print("Encoded again", cs)
 
-    kwargs = convert_1x_args('beer-sample', host=[('192.168.37.101',8091)])
+    kwargs = convert_1x_args('beer-sample', host=[('192.168.37.101', 8091)])
     print(kwargs)

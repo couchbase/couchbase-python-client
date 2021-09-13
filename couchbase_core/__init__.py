@@ -14,6 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import sys
+import os
+from couchbase_core._pyport import ulp, with_metaclass
+from types import ModuleType
+from importlib import reload
+from typing import *
+import couchbase_core._libcouchbase as _LCB
 from datetime import datetime, timedelta
 from warnings import warn
 
@@ -22,7 +29,7 @@ import warnings
 from collections import defaultdict
 try:
     from abc import abstractmethod, ABCMeta
-except:
+except BaseException:
     import abstractmethod
 
 from copy import deepcopy
@@ -39,12 +46,10 @@ warnings.filterwarnings(action='default',
 
 try:
     import ssl
-except:
-    warnings.warn("Couldn't import SSL, TLS functionality may not be available")
+except BaseException:
+    warnings.warn(
+        "Couldn't import SSL, TLS functionality may not be available")
 
-import couchbase_core._libcouchbase as _LCB
-
-from typing import *
 
 JSON = Union[str, int, float, bool, None, Mapping[str, 'JSON'], List['JSON']]
 
@@ -54,17 +59,11 @@ try:
 except ImportError:
     __version__ = "0.0.0-could-not-find-git"
 
-from importlib import reload
-
-from types import ModuleType
-import os, sys
 
 try:
     StopAsyncIteration = StopAsyncIteration
-except:
+except BaseException:
     StopAsyncIteration = StopIteration
-
-from couchbase_core._pyport import ulp, with_metaclass
 
 
 def set_json_converters(encode, decode):
@@ -160,7 +159,8 @@ class CompatibilityEnum(enum.Enum):
 
     def __init__(self, value=None):
         self.orig_value = value
-        self._value_ = real_or_placeholder(type(self), type(self).prefix() + self._name_)
+        self._value_ = real_or_placeholder(
+            type(self), type(self).prefix() + self._name_)
 
     def __int__(self):
         return self.value
@@ -178,7 +178,7 @@ class JSONMapping(object):
         for k, v in raw_json.items():
             try:
                 setattr(self, k, v)
-            except:
+            except BaseException:
                 self._raw_json[k] = v
 
     @staticmethod
@@ -202,6 +202,7 @@ class JSONMapping(object):
     def defaults(self):
         return {}
 
+
 class Mapped(with_metaclass(ABCMeta)):
     @classmethod
     def of(cls, *args, **kwargs):
@@ -211,7 +212,8 @@ class Mapped(with_metaclass(ABCMeta)):
     def _of(cls, *args, **kwargs):
         final_args = cls.defaults()
         final_args.update(*args)
-        final_args.update({cls.mappings().get(k, k): v for k, v in kwargs.items()})
+        final_args.update(
+            {cls.mappings().get(k, k): v for k, v in kwargs.items()})
         try:
             return cls.factory(**final_args)
         except Exception as e:
@@ -239,7 +241,7 @@ def recursive_reload(module, paths=None, mdict=None):
     reload(module)
     for attribute_name in dir(module):
         attribute = getattr(module, attribute_name)
-        if type(attribute) is ModuleType:
+        if isinstance(attribute, ModuleType):
             if attribute not in mdict[module]:
                 if attribute.__name__ not in sys.builtin_module_names:
                     if os.path.dirname(attribute.__file__) in paths:
@@ -289,7 +291,7 @@ def iterable_wrapper(basecls  # type: Type[WrappedIterable]
     # type: (...) -> Type[IterableWrapper]
     class IterableWrapperSpecific(IterableWrapper, basecls):
         def __init__(self, *args, **kwargs):
-            IterableWrapper.__init__(self, basecls,  *args, **kwargs)
+            IterableWrapper.__init__(self, basecls, *args, **kwargs)
 
     return IterableWrapperSpecific
 
@@ -309,8 +311,12 @@ def mk_formstr(d):
 
 
 def syncwait_or_deadline_time(syncwait, timeout):
-    deadline = (datetime.now() + timedelta(microseconds=timeout)) if timeout else None
-    return lambda: syncwait if syncwait else (deadline - datetime.now()).total_seconds()
+    deadline = (
+        datetime.now() +
+        timedelta(
+            microseconds=timeout)) if timeout else None
+    return lambda: syncwait if syncwait else (
+        deadline - datetime.now()).total_seconds()
 
 
 class OperationMode(object):
@@ -330,7 +336,7 @@ class DebugMode(OperationMode):
                        item,  # type: object
                        action  # type: Callable[str,str]
                        ):
-        item.__doc__=action(item.__doc__)
+        item.__doc__ = action(item.__doc__)
 
 
 operation_mode = DebugMode() if __debug__ else OptimisedMode()

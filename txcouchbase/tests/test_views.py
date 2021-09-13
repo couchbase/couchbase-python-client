@@ -88,8 +88,8 @@ class TxViewsTests(gen_base(AsyncClusterTestCase)):
             self.assertTrue(o.indexed_rows > 7000)
             self.assertEqual(o._rows_received, o.indexed_rows)
 
-            ## Commented because we can't really verify this now,
-            ## can we?
+            # Commented because we can't really verify this now,
+            # can we?
             #self.assertTrue(o._call_count > 1)
 
         d.addCallback(verify)

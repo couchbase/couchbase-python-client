@@ -81,7 +81,7 @@ for row in vret:
     pprint.pprint(row, indent=4)
 
 # Sample output:
-#[   {   u'id': u'WMD sad', u'key': 92772, u'value': None},
+# [   {   u'id': u'WMD sad', u'key': 92772, u'value': None},
 #    {   u'id': u'WMD thoughtful', u'key': 76222, u'value': None},
 #    {   u'id': u'cow happy', u'key': 71984, u'value': None},
 #    {   u'id': u'computer sad', u'key': 68849, u'value': None},

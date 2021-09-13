@@ -74,7 +74,9 @@ class IndexManagementTestCase(RealServerTestCase):
         # Drop the indexes
         mgr.n1ql_index_drop_primary()
         mgr.n1ql_index_drop_primary(ignore_missing=True)
-        self.assertRaises(E.DocumentNotFoundException, mgr.n1ql_index_drop_primary)
+        self.assertRaises(
+            E.DocumentNotFoundException,
+            mgr.n1ql_index_drop_primary)
 
         # Test with _named_ primaries
         mgr.n1ql_index_create(ixname, primary=True)
@@ -84,7 +86,10 @@ class IndexManagementTestCase(RealServerTestCase):
 
         mgr.n1ql_index_drop(ixname)
         mgr.n1ql_index_drop(ixname, ignore_missing=True)
-        self.assertRaises(E.DocumentNotFoundException, mgr.n1ql_index_drop, ixname)
+        self.assertRaises(
+            E.DocumentNotFoundException,
+            mgr.n1ql_index_drop,
+            ixname)
 
     def test_alt_indexes(self):
         cb = self.cb  # type: Bucket
@@ -112,7 +117,10 @@ class IndexManagementTestCase(RealServerTestCase):
         # Drop it
         mgr.n1ql_index_drop(ixname)
         mgr.n1ql_index_drop(ixname, ignore_missing=True)
-        self.assertRaises(E.DocumentNotFoundException, mgr.n1ql_index_drop, ixname)
+        self.assertRaises(
+            E.DocumentNotFoundException,
+            mgr.n1ql_index_drop,
+            ixname)
 
         # Create an index with a condition
         ixname = 'ix_with_condition'
@@ -156,4 +164,7 @@ class IndexManagementTestCase(RealServerTestCase):
         self.assertEqual(6, len(pending))
         mgr.n1ql_index_watch(pending)  # Should be OK
         mgr.n1ql_index_watch(pending)  # Should be OK again
-        self.assertRaises(E.DocumentNotFoundException, mgr.n1ql_index_watch, ['nonexist'])
+        self.assertRaises(
+            E.DocumentNotFoundException,
+            mgr.n1ql_index_watch,
+            ['nonexist'])

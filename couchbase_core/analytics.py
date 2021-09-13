@@ -22,7 +22,7 @@ import time
 from couchbase.exceptions import CouchbaseInternalException
 try:
     import urlparse
-except:
+except BaseException:
     import urllib.parse as urlparse
 from typing import *
 

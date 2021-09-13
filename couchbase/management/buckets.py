@@ -67,8 +67,8 @@ class BucketManager(GenericManager):
             **forward_args(kwargs, *options))
 
     def update_bucket(self,     # type: BucketManager
-                      settings, # type: BucketSettings
-                      *options, # type: UpdateBucketOptions
+                      settings,  # type: BucketSettings
+                      *options,  # type: UpdateBucketOptions
                       **kwargs  # type: Any
                       ):
         """
@@ -84,7 +84,7 @@ class BucketManager(GenericManager):
         """
 
         # prune the missing settings...
-        params = settings.as_dict ()#*options, **kwargs)
+        params = settings.as_dict()  # *options, **kwargs)
 
         # insure flushEnabled is an int
         params['flushEnabled'] = int(params.get('flushEnabled', 0))
@@ -139,18 +139,17 @@ class BucketManager(GenericManager):
         :raises: InvalidArgumentsException
         """
         return BucketSettings.from_raw(
-          self._admin_bucket.http_request(
-              path='/pools/default/buckets/' + bucket_name,
-              method='GET',
-              **forward_args(kwargs, *options)
+            self._admin_bucket.http_request(
+                path='/pools/default/buckets/' + bucket_name,
+                method='GET',
+                **forward_args(kwargs, *options)
             ).value)
 
     def get_all_buckets(self,     # type: BucketManager
-                        *options, # type: GetAllBucketOptions
+                        *options,  # type: GetAllBucketOptions
                         **kwargs  # type: Any
                         ):
         # type: (...) -> Iterable[BucketSettings]
-
         """
         Gets all bucket settings. Note,  # type: the ram quota returned is in bytes
         not mb so requires x  / 1024 twice.
@@ -167,7 +166,7 @@ class BucketManager(GenericManager):
                     path='/pools/default/buckets',
                     method='GET',
                     **forward_args(kwargs, *options)
-                  ).value))
+            ).value))
 
     def flush_bucket(self,          # type: BucketManager
                      bucket_name,   # type: str
@@ -187,7 +186,8 @@ class BucketManager(GenericManager):
         :raises: FlushDisabledException
         """
         self._admin_bucket.http_request(
-            path="/pools/default/buckets/{bucket_name}/controller/doFlush".format(bucket_name=bucket_name),
+            path="/pools/default/buckets/{bucket_name}/controller/doFlush".format(
+                bucket_name=bucket_name),
             method='POST',
             **forward_args(kwargs, *options))
 
@@ -256,7 +256,7 @@ class BucketSettings(dict):
         """BucketSettings provides a means of mapping bucket settings into an object.
 
         """
-        if kwargs.get('bucket_type',None) == "couchbase":
+        if kwargs.get('bucket_type', None) == "couchbase":
             kwargs['bucket_type'] = BucketType.COUCHBASE
 
         """
@@ -269,14 +269,16 @@ class BucketSettings(dict):
             if isinstance(durability, Durability):
                 kwargs['minimum_durability_level'] = durability.to_server_str()
             else:
-                kwargs['minimum_durability_level'] = Durability.from_server_str(durability)
+                kwargs['minimum_durability_level'] = Durability.from_server_str(
+                    durability)
 
-        super(BucketSettings, self).__init__(**self.mapping.sanitize_src(kwargs))
+        super(BucketSettings, self).__init__(
+            **self.mapping.sanitize_src(kwargs))
 
     def as_dict(self, *options, **kwargs):
         final_opts = dict(**Admin.bc_defaults)
-        final_opts.update(**forward_args(kwargs,*options))
-        params=self.mapping.to_src(self)
+        final_opts.update(**forward_args(kwargs, *options))
+        params = self.mapping.to_src(self)
         params.update({
             'authType': 'sasl',
             'saslPassword': final_opts['bucket_password']
@@ -371,7 +373,7 @@ class CreateBucketSettings(BucketSettings):
                  conflict_resolution_type=None,  # type: ConflictResolutionType
                  bucket_password=None,  # type: str
                  ejection_method=None  # type: EjectionMethod
-    ):
+                 ):
         """
         Bucket creation settings.
 

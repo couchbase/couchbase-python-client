@@ -1,5 +1,5 @@
 
-def gen_role(real_role, real_name,  new_prefix):
+def gen_role(real_role, real_name, new_prefix):
     def myrole(rtype, rawtext, text, lineno, inliner, options={}, content={}):
 
         # new_prefix=couchbase_core.client

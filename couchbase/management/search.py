@@ -9,11 +9,11 @@ import json
 
 
 class SearchIndexErrorHandler(ErrorMapper):
-  @staticmethod
-  def mapping():
-      # type (...)->Mapping[str, CBErrorType]
-      return {HTTPException: {'.*index not found': SearchIndexNotFoundException,
-                          'Page not found': NotSupportedException}}
+    @staticmethod
+    def mapping():
+        # type (...)->Mapping[str, CBErrorType]
+        return {HTTPException: {'.*index not found': SearchIndexNotFoundException,
+                                'Page not found': NotSupportedException}}
 
 
 @SearchIndexErrorHandler.wrap
@@ -41,7 +41,7 @@ class SearchIndexManager(GenericManager):
             timeout=kwargs.get('timeout', None))
 
     def get_index(self,       # type: SearchIndexManager
-                  index_name, # type: str
+                  index_name,  # type: str
                   *options,   # type: GetSearchIndexOptions
                   **kwargs    # type: Any
                   ):
@@ -64,7 +64,8 @@ class SearchIndexManager(GenericManager):
         Uri
         GET http://localhost:8094/api/index/<name>"""
         if not index_name:
-            raise InvalidArgumentException("expected index_name to not be empty")
+            raise InvalidArgumentException(
+                "expected index_name to not be empty")
 
         return SearchIndex.from_server(
             **self._http_request(
@@ -74,7 +75,7 @@ class SearchIndexManager(GenericManager):
         )
 
     def get_all_indexes(self,     # type: SearchIndexManager
-                        *options, # type: GetAllIndexesOptions
+                        *options,  # type: GetAllIndexesOptions
                         **kwargs  # type: Any
                         ):
         # type: (...) -> list[SearchIndex]
@@ -89,7 +90,8 @@ class SearchIndexManager(GenericManager):
         Uri
         GET http://localhost:8094/api/index
         """
-        result = self._http_request(path='api/index', **forward_args(kwargs, *options)).value
+        result = self._http_request(
+            path='api/index', **forward_args(kwargs, *options)).value
         retval = list()
         for r in result["indexDefs"]["indexDefs"].values():
             retval.append(SearchIndex.from_server(**r))
@@ -117,7 +119,8 @@ class SearchIndexManager(GenericManager):
             raise InvalidArgumentException("expected index to not be None")
         else:
             if not index.is_valid():
-                raise InvalidArgumentException("Index must have name, source set")
+                raise InvalidArgumentException(
+                    "Index must have name, source set")
         try:
             self._http_request(
                 path="api/index/{}".format(index.name),
@@ -125,12 +128,20 @@ class SearchIndexManager(GenericManager):
                 content=json.dumps(index.as_dict()),
                 **forward_args(kwargs, *options))
         except HTTPException as h:
-            error = getattr(getattr(h, 'objextra', None), 'value', {}).get('error', "")
+            error = getattr(
+                getattr(
+                    h,
+                    'objextra',
+                    None),
+                'value',
+                {}).get(
+                'error',
+                "")
             if not "index with the same name already exists" in error:
                 raise
 
     def drop_index(self,       # type: SearchIndexManager
-                   index_name, # type: str
+                   index_name,  # type: str
                    *options,   # type: DropSearchIndexOptions
                    **kwargs    # type: Any
                    ):
@@ -158,7 +169,7 @@ class SearchIndexManager(GenericManager):
             **forward_args(kwargs, *options))
 
     def get_indexed_documents_count(self,       # type: SearchIndexManager
-                                    index_name, # type: str
+                                    index_name,  # type: str
                                     *options,   # type: GetSearchIndexedDocumentsCountOptions
                                     **kwargs    # type: Any
                                     ):
@@ -385,8 +396,9 @@ class SearchIndexManager(GenericManager):
             raise InvalidArgumentException("expected a document to analyze")
         try:
             jsonDoc = json.dumps(document)
-        except:
-            raise InvalidArgumentException("cannot convert doc to json to analyze")
+        except BaseException:
+            raise InvalidArgumentException(
+                "cannot convert doc to json to analyze")
         return self._http_request(
             path="api/index/{}/analyzeDoc".format(index_name),
             method='POST',
@@ -430,7 +442,8 @@ class SearchIndex(dict):
 
     def is_valid(self):
         idx = self.as_dict()
-        return bool(idx['name']) and bool(idx['type']) and bool(idx['sourceType'])
+        return bool(idx['name']) and bool(
+            idx['type']) and bool(idx['sourceType'])
 
     @property
     def name(self):

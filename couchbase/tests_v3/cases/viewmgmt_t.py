@@ -33,10 +33,12 @@ class DesignDocManagementTest(ClusterTestCase):
         self.mgr = self.bucket.view_indexes()
 
         # insist that it exists in the development namespace
-        self.mgr.upsert_design_document(self.DOC, DesignDocumentNamespace.DEVELOPMENT)
+        self.mgr.upsert_design_document(
+            self.DOC, DesignDocumentNamespace.DEVELOPMENT)
         # and be sure to drop it from the production namespace
         try:
-            self.mgr.drop_design_document(self.DOCNAME, DesignDocumentNamespace.PRODUCTION)
+            self.mgr.drop_design_document(
+                self.DOCNAME, DesignDocumentNamespace.PRODUCTION)
         except HTTPException:
             pass
         # now wait till we are sure the design doc is there
@@ -74,17 +76,26 @@ class DesignDocManagementTest(ClusterTestCase):
 
     def test_get_all_design_documents_excludes_namespaces(self):
         # we know the self.DOCNAME is _only_ in development, so...
-        result = self.mgr.get_all_design_documents(DesignDocumentNamespace.PRODUCTION)
+        result = self.mgr.get_all_design_documents(
+            DesignDocumentNamespace.PRODUCTION)
         names = [doc.name for doc in result if doc.name == self.DOCNAME]
         self.assertEqual(0, names.count(self.DOCNAME))
 
     def test_upsert_design_doc(self):
-        # we started with this already in here, so this isn't really necessary...`
-        self.mgr.upsert_design_document(self.DOC, DesignDocumentNamespace.DEVELOPMENT)
-        self.try_n_times(10, 3, self.mgr.get_design_document, self.DOCNAME, DesignDocumentNamespace.DEVELOPMENT)
+        # we started with this already in here, so this isn't really
+        # necessary...`
+        self.mgr.upsert_design_document(
+            self.DOC, DesignDocumentNamespace.DEVELOPMENT)
+        self.try_n_times(
+            10,
+            3,
+            self.mgr.get_design_document,
+            self.DOCNAME,
+            DesignDocumentNamespace.DEVELOPMENT)
 
     def test_drop_design_doc(self):
-        self.mgr.drop_design_document(self.DOCNAME, DesignDocumentNamespace.DEVELOPMENT)
+        self.mgr.drop_design_document(
+            self.DOCNAME, DesignDocumentNamespace.DEVELOPMENT)
         self.try_n_times_till_exception(10, 3, self.mgr.get_design_document, self.DOCNAME,
                                         DesignDocumentNamespace.DEVELOPMENT,
                                         GetDesignDocumentOptions(timeout=timedelta(seconds=10)))
@@ -97,8 +108,22 @@ class DesignDocManagementTest(ClusterTestCase):
         # starts off not in prod
         self.assertRaises(DesignDocumentNotFoundException, self.mgr.get_design_document,
                           self.DOCNAME, DesignDocumentNamespace.PRODUCTION)
-        self.mgr.publish_design_document(self.DOCNAME, PublishDesignDocumentOptions(timeout=timedelta(seconds=10)))
+        self.mgr.publish_design_document(
+            self.DOCNAME,
+            PublishDesignDocumentOptions(
+                timeout=timedelta(
+                    seconds=10)))
         # should be in prod now
-        self.try_n_times(10, 3, self.mgr.get_design_document, self.DOCNAME, DesignDocumentNamespace.PRODUCTION)
+        self.try_n_times(
+            10,
+            3,
+            self.mgr.get_design_document,
+            self.DOCNAME,
+            DesignDocumentNamespace.PRODUCTION)
         # and still in dev
-        self.try_n_times(10, 3, self.mgr.get_design_document, self.DOCNAME, DesignDocumentNamespace.DEVELOPMENT)
+        self.try_n_times(
+            10,
+            3,
+            self.mgr.get_design_document,
+            self.DOCNAME,
+            DesignDocumentNamespace.DEVELOPMENT)

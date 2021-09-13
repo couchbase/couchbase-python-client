@@ -555,7 +555,7 @@ class UserManagementTests(CollectionTestCase):
                 UpsertUserOptions(domain_name="external"))
         except InvalidArgumentException:
             raise
-        except:
+        except BaseException:
             pass
         finally:
             self.um.drop_user(username, domain_name="external")
@@ -776,7 +776,8 @@ class UserManagementTests(CollectionTestCase):
         self.um.upsert_group(fresh_group)
         all_groups = self.um.get_all_groups()
         # NOTE: we could well have other groups on this server, apart from the one we added, so
-        # lets be ok with there being more of them.  However, the one we added _MUST_ be there.
+        # lets be ok with there being more of them.  However, the one we added
+        # _MUST_ be there.
         known_group = Group('qweqwe', roles=[Role(name='admin')])
         self.um.drop_group('my-test-group')
         for g in all_groups:

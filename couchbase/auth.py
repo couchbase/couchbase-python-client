@@ -17,6 +17,8 @@ class NoBucketException(CouchbaseException):
     """
 
 # TODO: refactor this into base class perhaps?
+
+
 def _recursive_creds_merge(base, overlay):
     for k, v in overlay.items():
         base_k = base.get(k, None)
@@ -77,7 +79,8 @@ class Authenticator(object):
         return {}
 
     def _base_options(self, bucket, overlay):
-        base_dict = {'options': {'certpath': self._cert_path} if self._cert_path else {}}
+        base_dict = {'options': {'certpath': self._cert_path}
+                     if self._cert_path else {}}
         return _recursive_creds_merge(base_dict, overlay)
 
     def get_cred_bucket(self, bucket, **overlay):
@@ -143,7 +146,8 @@ class PasswordAuthenticator(Authenticator):
         return self.get_cred_not_bucket(**overlay)
 
     def get_cred_not_bucket(self, **overlay):
-        merged = _recursive_creds_merge({'options': {'username': self.username, 'password': self.password}}, overlay)
+        merged = _recursive_creds_merge(
+            {'options': {'username': self.username, 'password': self.password}}, overlay)
         return super(PasswordAuthenticator, self).get_cred_not_bucket(**merged)
 
     @classmethod
@@ -179,8 +183,10 @@ class ClassicAuthenticator(Authenticator):
             **{'options': {'username': self.username, 'password': self.password}})
 
     def get_cred_bucket(self, bucket, **overlay):
-        merged = _recursive_creds_merge({'options': {'password': self.buckets.get(bucket)}}, overlay)
-        return super(ClassicAuthenticator, self).get_cred_bucket(bucket, **merged)
+        merged = _recursive_creds_merge(
+            {'options': {'password': self.buckets.get(bucket)}}, overlay)
+        return super(ClassicAuthenticator, self).get_cred_bucket(
+            bucket, **merged)
 
 
 class CertAuthenticator(Authenticator):
@@ -220,7 +226,8 @@ class CertAuthenticator(Authenticator):
         return super(CertAuthenticator, self).get_cred_bucket(bucket, **merged)
 
     def get_cred_not_bucket(self):
-        return super(CertAuthenticator, self).get_cred_not_bucket(**{'options': {'password': self.password}})
+        return super(CertAuthenticator, self).get_cred_not_bucket(
+            **{'options': {'password': self.password}})
 
     def supports_non_tls(self):
         return False

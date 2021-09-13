@@ -66,7 +66,10 @@ class SpatialTest(RealServerTestCase):
         mgr = self.cb.bucket_manager()
         ret = mgr.design_create('geo', DESIGN_JSON, use_devmode=False)
         self.assertTrue(ret.success)
-        self.assertTrue(self.cb.upsert_multi(DOCS_JSON, format=FMT_JSON).all_ok)
+        self.assertTrue(
+            self.cb.upsert_multi(
+                DOCS_JSON,
+                format=FMT_JSON).all_ok)
 
     def test_simple_spatial(self):
         spq = SpatialQuery()
@@ -79,7 +82,7 @@ class SpatialTest(RealServerTestCase):
 
         # Get everything on the US west
         spq.start_range = [-130, None]
-        spq.end_range  = [-110, None]
+        spq.end_range = [-110, None]
         rows_found = [r for r in self.cb.query('geo', 'simpleGeo', query=spq)]
         self.assertEqual(2, len(rows_found))
 

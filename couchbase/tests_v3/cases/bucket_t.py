@@ -63,7 +63,10 @@ class BucketSimpleTest(CollectionTestCase):
 
     def test_ping_timeout(self):
         self.skipIfMock()
-        result = self.bucket.ping(PingOptions(timeout=timedelta(microseconds=1.0)))
+        result = self.bucket.ping(
+            PingOptions(
+                timeout=timedelta(
+                    microseconds=1.0)))
         self.assertIsNotNone(result)
         for k, vals in result.endpoints.items():
             for v in vals:
@@ -124,8 +127,9 @@ class BucketSimpleTest(CollectionTestCase):
     def test_view_query(self  # type: BucketSimpleTest
                         ):
         beer_bucket = self.cluster.bucket('beer-sample')  # type: Bucket
-        EXPECTED_ROW_COUNT=10
-        view_result = beer_bucket.view_query("beer", "brewery_beers", limit=EXPECTED_ROW_COUNT)  # type: ViewResult
+        EXPECTED_ROW_COUNT = 10
+        view_result = beer_bucket.view_query(
+            "beer", "brewery_beers", limit=EXPECTED_ROW_COUNT)  # type: ViewResult
 
         count = 0
         for _ in view_result:

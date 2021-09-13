@@ -20,8 +20,8 @@ import json
 import pickle
 
 from couchbase_core._libcouchbase import (FMT_JSON, FMT_AUTO,
-                       FMT_BYTES, FMT_UTF8, FMT_PICKLE,
-                       FMT_LEGACY_MASK, FMT_COMMON_MASK)
+                                          FMT_BYTES, FMT_UTF8, FMT_PICKLE,
+                                          FMT_LEGACY_MASK, FMT_COMMON_MASK)
 
 from couchbase_core._libcouchbase import Transcoder
 from couchbase_core._pyport import unicode
@@ -168,5 +168,7 @@ class TranscoderPP(object):
 
 class LegacyTranscoderPP(TranscoderPP):
     def encode_value(self, value, format):
-        encoded, flags = super(LegacyTranscoderPP, self).encode_value(value, format)
+        encoded, flags = super(
+            LegacyTranscoderPP, self).encode_value(
+            value, format)
         return encoded, flags & FMT_LEGACY_MASK

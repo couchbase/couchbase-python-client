@@ -303,7 +303,8 @@ class AcouchbaseCollectionTestSuite(object):
     @async_test
     async def test_get_after_lock(self):
         orig = await self.collection.get_and_lock(self.KEY, timedelta(seconds=3))
-        # GET operation is allowed on locked document; however, returned CAS should be invalid
+        # GET operation is allowed on locked document; however, returned CAS
+        # should be invalid
         res = await self.collection.get(self.KEY)
         self.assertEqual(orig.content_as[dict], res.content_as[dict])
         self.assertNotEqual(orig.cas, res.cas)
@@ -341,7 +342,8 @@ class AcouchbaseCollectionTestSuite(object):
     # TODO:  durability and replica testing
 
 
-class AcouchbaseDefaultCollectionTests(AsyncioTestCase, AcouchbaseCollectionTestSuite):
+class AcouchbaseDefaultCollectionTests(
+        AsyncioTestCase, AcouchbaseCollectionTestSuite):
     @classmethod
     def setUpClass(cls) -> None:
         super(AcouchbaseDefaultCollectionTests, cls).setUpClass(
@@ -358,12 +360,13 @@ class AcouchbaseDefaultCollectionTests(AsyncioTestCase, AcouchbaseCollectionTest
         self.loop.run_until_complete(self.initialize())
 
 # TODO: use once CCBC-1412 is worked out.
-# class AcouchbaseCollectionTests(AsyncioTestCase, AcouchbaseCollectionTestSuite):
+# class AcouchbaseCollectionTests(AsyncioTestCase,
+# AcouchbaseCollectionTestSuite):
 
 #     @classmethod
 #     def setUpClass(cls) -> None:
 #         super(AcouchbaseCollectionTests, cls).setUpClass(
-#             get_event_loop(), cluster_class=Cluster, use_scopes_and_colls=True)
+# get_event_loop(), cluster_class=Cluster, use_scopes_and_colls=True)
 
 #     @classmethod
 #     def tearDownClass(cls) -> None:

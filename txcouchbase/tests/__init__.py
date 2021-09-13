@@ -20,6 +20,5 @@ import couchbase
 
 try:
     from twisted.trial.unittest import TestCase
-except:
+except BaseException:
     raise SkipTest("Twisted not found")
-

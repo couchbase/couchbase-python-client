@@ -22,14 +22,20 @@ from couchbase_core.connstr import ConnectionString
 class ConnStrTest(CouchbaseTestCase):
 
     def test_pathless_connstr(self):
-        connstr = ConnectionString.parse('couchbase://localhost?opt1=val1&opt2=val2')
+        connstr = ConnectionString.parse(
+            'couchbase://localhost?opt1=val1&opt2=val2')
         self.assertTrue('opt1' in connstr.options)
         self.assertTrue('opt2' in connstr.options)
 
     def test_does_not_encode_slashes(self):
-        connstr = ConnectionString.parse('couchbases://10.112.170.101?certpath=/var/rootcert.pem')
+        connstr = ConnectionString.parse(
+            'couchbases://10.112.170.101?certpath=/var/rootcert.pem')
         self.assertTrue('certpath' in connstr.options)
-        self.assertEqual('/var/rootcert.pem', connstr.options.get('certpath')[0])
+        self.assertEqual(
+            '/var/rootcert.pem',
+            connstr.options.get('certpath')[0])
 
         encoded = connstr.encode()
-        self.assertEqual('couchbases://10.112.170.101?certpath=/var/rootcert.pem', encoded)
+        self.assertEqual(
+            'couchbases://10.112.170.101?certpath=/var/rootcert.pem',
+            encoded)

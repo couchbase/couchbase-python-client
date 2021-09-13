@@ -72,6 +72,7 @@ class CouchbaseOtelTracer(CouchbaseTracer):
                     ClusterOptions(PasswordAuthenticator("Administrator", "password"), tracer=thetracer))
 
     """
+
     def __init__(self,
                  otel_tracer    # type: Tracer
                  ):
@@ -84,7 +85,8 @@ class CouchbaseOtelTracer(CouchbaseTracer):
                    ):
         # type: (...) -> CouchbaseOtelSpan
         context = set_span_in_context(parent.span) if parent else None
-        return CouchbaseOtelSpan(self._external_tracer.start_span(name, context=context))
+        return CouchbaseOtelSpan(
+            self._external_tracer.start_span(name, context=context))
 
     def __deepcopy__(self, memo):
         """

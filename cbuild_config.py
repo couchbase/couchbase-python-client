@@ -45,7 +45,8 @@ PYCBC_LCB_API = os.getenv("PYCBC_LCB_API", BUILD_CFG.get(
 
 
 def get_all_sources():
-    return BUILD_CFG.get('source', []) + BUILD_CFG.get('apis', {}).get(PYCBC_LCB_API, {}).get('sources', [])
+    return BUILD_CFG.get('source', []) + BUILD_CFG.get('apis',
+                                                       {}).get(PYCBC_LCB_API, {}).get('sources', [])
 
 
 def get_sources():
@@ -54,7 +55,7 @@ def get_sources():
     SOURCEMODS = list(filter(re.compile(r'^.*\.c$').match, all_sources))
     SOURCEMODS_CPP = list(
         filter(re.compile(r'^.*\.(cpp|cxx|cc)$').match, all_sources))
-    sources_ext['sources'] = list(map(str, SOURCEMODS+SOURCEMODS_CPP))
+    sources_ext['sources'] = list(map(str, SOURCEMODS + SOURCEMODS_CPP))
     return sources_ext
 
 
@@ -76,7 +77,8 @@ def get_cbuild_options():
     COMP_OPTION_PREFIX = "PYCBC_COMP_OPT_"
 
     def comp_option(flag):
-        return ["-{}={}".format(flag.replace(COMP_OPTION_PREFIX, ""), os.environ.get(flag))]
+        return [
+            "-{}={}".format(flag.replace(COMP_OPTION_PREFIX, ""), os.environ.get(flag))]
 
     COMP_OPTION_BOOL_PREFIX = "PYCBC_COMP_OPT_BOOL_"
 
@@ -206,7 +208,8 @@ class CBuildInfo:
         return self._cmake_base + ['install', 'lib']
 
     def lcb_pkgs_srcs(self):
-        return {'Debug': self.lcb_build_base() + ['Debug'], 'Release': self.lcb_build_base() + ['Release']}
+        return {'Debug': self.lcb_build_base(
+        ) + ['Debug'], 'Release': self.lcb_build_base() + ['Release']}
 
     def lcb_pkgs(self, cfg):
         return map(lambda x: self.lcb_pkgs_srcs()[cfg] + [x], self.entries())
@@ -285,9 +288,9 @@ class CBuildCommon(build_ext):
         self.info.setbase(self.build_temp)
         self.info.cfg = self.cfg_type()
         self.compiler.add_include_dir(os.path.join(
-            *self.info.base+["install", "include"]))
+            *self.info.base + ["install", "include"]))
         self.compiler.add_library_dir(os.path.join(
-            *self.info.base+["install", "lib", self.cfg_type()]))
+            *self.info.base + ["install", "lib", self.cfg_type()]))
         if sys.platform == 'darwin':
             warnings.warn('Adding /usr/local to lib search path for OS X')
             self.compiler.add_library_dir('/usr/local/lib')
@@ -300,7 +303,7 @@ class CBuildCommon(build_ext):
             for rpath in rpaths:
                 linker_arg = '-Wl,-rpath,' + rpath
                 ext.runtime_library_dirs = (
-                    ext.runtime_library_dirs if ext.runtime_library_dirs else [])+[rpath]
+                    ext.runtime_library_dirs if ext.runtime_library_dirs else []) + [rpath]
                 ext.extra_link_args += [linker_arg]
                 (extoptions['extra_link_args'] if extoptions else ext.extra_link_args if ext else [
                 ]).insert(0, linker_arg)
@@ -311,7 +314,7 @@ class CBuildCommon(build_ext):
     def copy_binary_to(self, cfg, dest_dir, lib_paths, name):
         try:
             os.makedirs(dest_dir)
-        except:
+        except BaseException:
             pass
         dest = os.path.join(dest_dir, name)
         failures = {}
@@ -357,14 +360,14 @@ class CBuildCommon(build_ext):
         compiler = self.compiler  # type: CCompiler
         lcb_include = os.path.join(self.build_temp, "install", "include")
         try:
-            compiler.set_include_dirs([lcb_include]+compiler.include_dirs)
-        except:
+            compiler.set_include_dirs([lcb_include] + compiler.include_dirs)
+        except BaseException:
             compiler.add_include_dirs([lcb_include])
         lib_dirs = [self.info.pkg_data_dir] + self.info.get_lcb_dirs()
         try:
             existing_lib_dirs = compiler.library_dirs
             compiler.set_library_dirs(lib_dirs + existing_lib_dirs)
-        except:
+        except BaseException:
             compiler.add_library_dirs(lib_dirs)
 
     def get_pycbc_lcb_api(self):
@@ -373,7 +376,8 @@ class CBuildCommon(build_ext):
 
     def get_lcb_api_flags(self):
         pycbc_lcb_api = self.get_pycbc_lcb_api()
-        return ['-DPYCBC_LCB_API={}'.format(pycbc_lcb_api)] if pycbc_lcb_api else []
+        return [
+            '-DPYCBC_LCB_API={}'.format(pycbc_lcb_api)] if pycbc_lcb_api else []
 
 
 class install_headers(install_headers_orig):

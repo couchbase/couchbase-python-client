@@ -19,6 +19,7 @@ from couchbase_tests.base import ConnectionTestCase
 from couchbase_v2.exceptions import InvalidArgumentException, ValueFormatException
 from couchbase_core.user_constants import FMT_UTF8
 
+
 class ItertypeTest(ConnectionTestCase):
 
     def test_itertypes(self):
@@ -45,16 +46,16 @@ class ItertypeTest(ConnectionTestCase):
         self.assertRaises(
             (InvalidArgumentException, ValueFormatException),
             self.cb.set_multi,
-            { None: "value" })
+            {None: "value"})
 
         self.assertRaises(ValueFormatException,
                           self.cb.set_multi,
-                          { "Value" : None},
+                          {"Value": None},
                           format=FMT_UTF8)
 
     def test_iterclass(self):
         class IterTemp(object):
-            def __init__(self, gen_ints = False, badlen=False):
+            def __init__(self, gen_ints=False, badlen=False):
                 self.current = 0
                 self.max = 5
                 self.gen_ints = gen_ints
@@ -74,9 +75,9 @@ class ItertypeTest(ConnectionTestCase):
                 return self.max
 
         self.cb.remove_multi(IterTemp(gen_ints=False), quiet=True)
-        self.cb.counter_multi(IterTemp(gen_ints = False), initial=10)
+        self.cb.counter_multi(IterTemp(gen_ints=False), initial=10)
         self.cb.get_multi(IterTemp(gen_ints=False))
-        self.cb.remove_multi(IterTemp(gen_ints = False))
+        self.cb.remove_multi(IterTemp(gen_ints=False))
 
         # Try with a mismatched len-iter
         self.assertRaises(InvalidArgumentException,

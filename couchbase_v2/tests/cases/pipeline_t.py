@@ -19,6 +19,7 @@ from couchbase_v2.exceptions import PipelineException, DocumentNotFoundException
 from couchbase_tests.base import ConnectionTestCase
 from couchbase_core import FMT_UTF8
 
+
 class PipelineTest(ConnectionTestCase):
 
     def test_simple_pipeline(self):
@@ -121,7 +122,6 @@ class PipelineTest(ConnectionTestCase):
             for k in kvs:
                 self.assertTrue(k in mres)
                 self.assertTrue(mres[k].success)
-
 
         for k, v in pipeline.results[1].items():
             self.assertEqual(v.value, kvs[k])

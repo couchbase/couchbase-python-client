@@ -111,7 +111,7 @@ class EventingFunctionManager(GenericManager):
         """
         Upserts an eventing function
 
-        **UNCOMMITTED** 
+        **UNCOMMITTED**
         This is an uncommitted API call that is unlikely to change, but may still change as final consensus on its behavior has not yet been reached.
 
         :param function: the EventingFunction to upsert
@@ -140,7 +140,7 @@ class EventingFunctionManager(GenericManager):
         """
         Drops an existing eventing function
 
-        **UNCOMMITTED** 
+        **UNCOMMITTED**
         This is an uncommitted API call that is unlikely to change, but may still change as final consensus on its behavior has not yet been reached.
 
         :param name: the name of the eventing function to drop
@@ -166,7 +166,7 @@ class EventingFunctionManager(GenericManager):
         """
         Deploys an existing eventing function
 
-        **UNCOMMITTED** 
+        **UNCOMMITTED**
         This is an uncommitted API call that is unlikely to change, but may still change as final consensus on its behavior has not yet been reached.
 
         :param name: the name of the eventing function to drop
@@ -191,7 +191,7 @@ class EventingFunctionManager(GenericManager):
         """
         Returns a list of all eventing functions
 
-        **UNCOMMITTED** 
+        **UNCOMMITTED**
         This is an uncommitted API call that is unlikely to change, but may still change as final consensus on its behavior has not yet been reached.
 
         :param options: GetAllFunctionOptions to get all eventing functions
@@ -218,7 +218,7 @@ class EventingFunctionManager(GenericManager):
         """
         Returns specified eventing function
 
-        **UNCOMMITTED** 
+        **UNCOMMITTED**
         This is an uncommitted API call that is unlikely to change, but may still change as final consensus on its behavior has not yet been reached.
 
         :param name: the name of the eventing function to retreive
@@ -248,7 +248,7 @@ class EventingFunctionManager(GenericManager):
         """
         Pauses an existing eventing function
 
-        **UNCOMMITTED** 
+        **UNCOMMITTED**
         This is an uncommitted API call that is unlikely to change, but may still change as final consensus on its behavior has not yet been reached.
 
         :param name: the name of the eventing function to pause
@@ -274,7 +274,7 @@ class EventingFunctionManager(GenericManager):
         """
         Resumes an existing eventing function
 
-        **UNCOMMITTED** 
+        **UNCOMMITTED**
         This is an uncommitted API call that is unlikely to change, but may still change as final consensus on its behavior has not yet been reached.
 
         :param name: the name of the eventing function to resume
@@ -300,7 +300,7 @@ class EventingFunctionManager(GenericManager):
         """
         Undeploys an existing eventing function
 
-        **UNCOMMITTED** 
+        **UNCOMMITTED**
         This is an uncommitted API call that is unlikely to change, but may still change as final consensus on its behavior has not yet been reached.
 
         :param name: the name of the eventing function to drop
@@ -324,7 +324,7 @@ class EventingFunctionManager(GenericManager):
         """
         Returns the `EventingFunctionStatus` of all eventing functions
 
-        **UNCOMMITTED** 
+        **UNCOMMITTED**
         This is an uncommitted API call that is unlikely to change, but may still change as final consensus on its behavior has not yet been reached.
 
         :param options: UndeployFunctionOptions to undeploy an eventing function
@@ -581,7 +581,9 @@ class EventingFunctionBucketBinding(object):
     """
 
     alias = attr.ib(type=str)
-    name = attr.ib(factory=EventingFunctionKeyspace, type=EventingFunctionKeyspace)
+    name = attr.ib(
+        factory=EventingFunctionKeyspace,
+        type=EventingFunctionKeyspace)
     access = attr.ib(
         factory=EventingFunctionBucketAccess, type=EventingFunctionBucketAccess
     )
@@ -690,7 +692,9 @@ class EventingFunctionUrlBinding(object):
     alias = attr.ib(type=str)
     allow_cookies = attr.ib(type=bool)
     validate_ssl_certificate = attr.ib(type=bool)
-    auth = attr.ib(factory=EventingFunctionUrlAuth, type=EventingFunctionUrlAuth)
+    auth = attr.ib(
+        factory=EventingFunctionUrlAuth,
+        type=EventingFunctionUrlAuth)
 
     def to_server_dict(
         self,  # type: "EventingFunctionUrlBinding"
@@ -837,7 +841,8 @@ class EventingFunctionSettings(object):
     execution_timeout = attr.ib(
         type=timedelta,
         default=None,
-        validator=attr.validators.optional(attr.validators.instance_of(timedelta)),
+        validator=attr.validators.optional(
+            attr.validators.instance_of(timedelta)),
     )
     lcb_inst_capacity = attr.ib(
         type=int,
@@ -852,7 +857,8 @@ class EventingFunctionSettings(object):
     lcb_timeout = attr.ib(
         type=timedelta,
         default=None,
-        validator=attr.validators.optional(attr.validators.instance_of(timedelta)),
+        validator=attr.validators.optional(
+            attr.validators.instance_of(timedelta)),
     )
     num_timer_partitions = attr.ib(
         type=int,
@@ -942,8 +948,12 @@ class EventingFunctionSettings(object):
         factory=EventingFunctionLanguageCompatibility,
         type=EventingFunctionLanguageCompatibility,
     )
-    log_level = attr.ib(factory=EventingFunctionLogLevel, type=EventingFunctionLogLevel)
-    query_consistency = attr.ib(factory=QueryScanConsistency, type=QueryScanConsistency)
+    log_level = attr.ib(
+        factory=EventingFunctionLogLevel,
+        type=EventingFunctionLogLevel)
+    query_consistency = attr.ib(
+        factory=QueryScanConsistency,
+        type=QueryScanConsistency)
     handler_headers = attr.ib(factory=list, type=List[str])
     handler_footers = attr.ib(factory=list, type=List[str])
 
@@ -1064,7 +1074,8 @@ class EventingFunctionSettings(object):
 
         value = server_dict.get("log_level", None)
         if value is not None and value.split():
-            server_dict["log_level"] = EventingFunctionLogLevel.from_server(value)
+            server_dict["log_level"] = EventingFunctionLogLevel.from_server(
+                value)
         else:
             server_dict["log_level"] = None
 
@@ -1150,7 +1161,8 @@ class EventingFunction(object):
         type=EventingFunctionKeyspace,
         validator=attr.validators.instance_of(EventingFunctionKeyspace),
     )
-    bucket_bindings = attr.ib(factory=list, type=List[EventingFunctionBucketBinding])
+    bucket_bindings = attr.ib(factory=list,
+                              type=List[EventingFunctionBucketBinding])
     url_bindings = attr.ib(factory=list, type=List[EventingFunctionUrlBinding])
     constant_bindings = attr.ib(
         factory=list, type=List[EventingFunctionConstantBinding]
@@ -1232,7 +1244,8 @@ class EventingFunction(object):
             if len(urls) > 0:
                 server_dict["depcfg"]["curl"] = urls
 
-        if self.constant_bindings is not None and len(self.constant_bindings) > 0:
+        if self.constant_bindings is not None and len(
+                self.constant_bindings) > 0:
             constants = []
             for binding in self.constant_bindings:
                 constants.append(binding.to_server_dict())
@@ -1274,7 +1287,8 @@ class EventingFunction(object):
                 depcfg["source_scope"],
                 depcfg["source_collection"],
             ),
-            settings=EventingFunctionSettings.from_server(server_json["settings"]),
+            settings=EventingFunctionSettings.from_server(
+                server_json["settings"]),
         )
         if "buckets" in depcfg:
             buckets = []
@@ -1302,7 +1316,8 @@ class EventingFunction(object):
                     hostname=url.get("hostname"),
                     alias=url.get("value"),
                     allow_cookies=url.get("allow_cookies"),
-                    validate_ssl_certificate=url.get("validate_ssl_certificate"),
+                    validate_ssl_certificate=url.get(
+                        "validate_ssl_certificate"),
                 )
                 auth_type = url.get("auth_type")
                 if auth_type == "no-auth":
@@ -1376,7 +1391,8 @@ class EventingFunctionState(Enum):
         elif value == "pausing":
             return cls.Pausing
         else:
-            raise InvalidArgumentException("Invalid value for state: {}".format(value))
+            raise InvalidArgumentException(
+                "Invalid value for state: {}".format(value))
 
 
 @attr.s(kw_only=True)
@@ -1404,7 +1420,8 @@ class EventingFunctionStatus(object):
     num_bootstrapping_nodes = attr.ib(
         type=int, validator=attr.validators.instance_of(int)
     )
-    num_deployed_nodes = attr.ib(type=int, validator=attr.validators.instance_of(int))
+    num_deployed_nodes = attr.ib(
+        type=int, validator=attr.validators.instance_of(int))
     state = attr.ib(factory=EventingFunctionState, type=EventingFunctionState)
     deployment_status = attr.ib(
         factory=EventingFunctionDeploymentStatus, type=EventingFunctionDeploymentStatus
@@ -1445,7 +1462,8 @@ class EventingFunctionsStatus(object):
     :type functions: List[`EventingFunctionStatus`]
     """
 
-    num_eventing_nodes = attr.ib(type=int, validator=attr.validators.instance_of(int))
+    num_eventing_nodes = attr.ib(
+        type=int, validator=attr.validators.instance_of(int))
     functions = attr.ib(factory=list, type=List[EventingFunctionStatus])
 
     @classmethod
@@ -1553,7 +1571,11 @@ class UndeployFunctionOptions(EventingFunctionOptions):
         timeout=None,  # type: timedelta
         **kwargs  # type: Any
     ) -> None:
-        super(UndeployFunctionOptions, self).__init__(timeout=timeout, **kwargs)
+        super(
+            UndeployFunctionOptions,
+            self).__init__(
+            timeout=timeout,
+            **kwargs)
 
 
 class FunctionsStatusOptions(EventingFunctionOptions):

@@ -49,13 +49,15 @@ class BasicClusterTest(Base):
         cb = self.make_connection(host="qweqwe")
         d = cb.on_connect()
         d.addCallback(lambda x: x, cb)
-        return self.assertFailure(d, UnknownHostException, TimeoutException, DocumentUnretrievableException)
+        return self.assertFailure(
+            d, UnknownHostException, TimeoutException, DocumentUnretrievableException)
 
     @timed(10)
     def testBadEvent(self):
         if sys.version_info >= (3, 5):
             raise SkipTest("Deadlocks on Python 3.x")
-        if sys.version_info < (3, 7) and sys.platform.lower().startswith('linux'):
+        if sys.version_info < (
+                3, 7) and sys.platform.lower().startswith('linux'):
             raise SkipTest("Times out on Python <3.6 on Linux")
         cb = self.make_connection()
         self.assertRaises(ValueError, cb.registerDeferred,

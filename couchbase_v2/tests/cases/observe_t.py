@@ -33,7 +33,6 @@ class ObserveTest(ConnectionTestCase):
 
         found_master = False
 
-
         for oi in rv.value:
             self.assertIsInstance(oi, self.cls_ObserveInfo)
             oi.cas

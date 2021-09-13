@@ -23,4 +23,4 @@ import couchbase_core._libcouchbase as _LCB
 import sys
 
 for name, value in _LCB.PUBLIC_CONSTANTS.items():
-    setattr(sys.modules[__name__],name, value)
+    setattr(sys.modules[__name__], name, value)

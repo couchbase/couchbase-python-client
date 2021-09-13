@@ -47,7 +47,8 @@ class AnalyticsIngester:
     data_converter = None  # type: DataConverter
     operation = None  # type: BucketOperator
 
-    def __init__(self, id_generator=None, data_converter=lambda x: x, operation=BucketOperators.UPSERT):
+    def __init__(self, id_generator=None, data_converter=lambda x: x,
+                 operation=BucketOperators.UPSERT):
         # type: (IdGenerator, DataConverter, BucketOperator) -> None
         """
         Initialise ingester.
@@ -63,13 +64,15 @@ class AnalyticsIngester:
             raise InvalidArgumentException("Operation is not a BucketOperator")
 
         if operation == BucketOperators.REPLACE and not id_generator:
-            raise InvalidArgumentException("Replace cannot use default ID generator.")
+            raise InvalidArgumentException(
+                "Replace cannot use default ID generator.")
 
         self.id_generator = id_generator or (lambda x: str(uuid.uuid4()))
         self.data_converter = data_converter
         self.operation = operation
 
-    def __call__(self, bucket, query, host=None, ignore_ingest_error=False, *args, **kwargs):
+    def __call__(self, bucket, query, host=None,
+                 ignore_ingest_error=False, *args, **kwargs):
         # type: (Client, Query, str, bool, *Any, **Any) -> None
         """
         Run an analytics query, pass the results through the data converter, and the results of that
@@ -89,10 +92,11 @@ class AnalyticsIngester:
             for item in request:
                 try:
                     converted_data = self.data_converter(item)
-                    operation(bucket, self.id_generator(converted_data), converted_data)
-                except:
+                    operation(bucket, self.id_generator(
+                        converted_data), converted_data)
+                except BaseException:
                     if not ignore_ingest_error:
                         raise
-        except:
+        except BaseException:
             if not ignore_ingest_error:
                 raise

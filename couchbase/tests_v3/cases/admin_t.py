@@ -38,7 +38,7 @@ class AdminSimpleTest(CouchbaseTestCase):
         super(AdminSimpleTest, self).tearDown()
         if self.should_check_refcount:
             rc = sys.getrefcount(self.admin)
-            #TODO: revaluate GC - fragile assumption
+            # TODO: revaluate GC - fragile assumption
             #self.assertEqual(rc, 2)
 
         del self.admin
@@ -57,9 +57,11 @@ class AdminSimpleTest(CouchbaseTestCase):
         # connection string.  If you give it one, you need to put it in yourself.
         # But, only for the mock
         if self.is_mock:
-            conn_str = 'http://{0}:{1}/{2}'.format(self.cluster_info.host, self.cluster_info.port, 'default')
+            conn_str = 'http://{0}:{1}/{2}'.format(
+                self.cluster_info.host, self.cluster_info.port, 'default')
         else:
-            conn_str = 'http://{0}:{1}'.format(self.cluster_info.host, self.cluster_info.port)
+            conn_str = 'http://{0}:{1}'.format(
+                self.cluster_info.host, self.cluster_info.port)
 
         admin = Admin('Administrator',
                       'password',
@@ -139,7 +141,8 @@ class AdminSimpleTest(CouchbaseTestCase):
         self.act_on_special_bucket(bucket_name, password,
                                    basic_upsert_test)
 
-    def act_on_special_bucket(self, bucket_name, password, action, perm_generator=None):
+    def act_on_special_bucket(
+            self, bucket_name, password, action, perm_generator=None):
 
         try:
             if self.is_realserver:
@@ -154,13 +157,19 @@ class AdminSimpleTest(CouchbaseTestCase):
             if perm_generator:
                 roles = perm_generator(bucket_name)
             else:
-                roles = [Role(name='data_reader', bucket=bucket_name), Role(name='data_writer', bucket=bucket_name)]
+                roles = [
+                    Role(
+                        name='data_reader', bucket=bucket_name), Role(
+                        name='data_writer', bucket=bucket_name)]
 
-            self.admin.user_upsert(bucket_name, AuthDomain.Local, password, roles)
+            self.admin.user_upsert(
+                bucket_name, AuthDomain.Local, password, roles)
             # connect to bucket to ensure we can use it
             conn_str = "http://{0}:{1}/{2}".format(self.cluster_info.host, self.cluster_info.port,
-                                                   bucket_name) + "?ipv6="+self.cluster_info.ipv6
-            bucket = self.factory(connection_string=conn_str, password=password)
+                                                   bucket_name) + "?ipv6=" + self.cluster_info.ipv6
+            bucket = self.factory(
+                connection_string=conn_str,
+                password=password)
             self.assertIsNotNone(bucket)
 
             action(bucket)
@@ -176,9 +185,6 @@ class AdminSimpleTest(CouchbaseTestCase):
                                              ram_quota=100,
                                              bucket_password=password)
                     self.admin.wait_ready("default", timeout=100)
-
-
-
 
     def test_build_user_management_path(self):
 

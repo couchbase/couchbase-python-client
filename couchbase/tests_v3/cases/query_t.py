@@ -97,7 +97,8 @@ class QueryTests(CollectionTestCase):
         self.assertRows(result, 1)
 
     # NOTE: Ideally I'd notice that a named parameter wasn't an option parameter name, and just _assume_ that it is a
-    # named parameter for the query.  However I worry about overlap being confusing, etc...
+    # named parameter for the query.  However I worry about overlap being
+    # confusing, etc...
     def test_simple_query_without_options_with_kwargs_named_params(self):
         result = self.cluster.query("SELECT * FROM `beer-sample` WHERE brewery_id LIKE $brewery LIMIT 1",
                                     named_parameters={'brewery': '21st_amendment%'})
@@ -255,7 +256,7 @@ class QueryLeakTest(CollectionTestCase):
                 del metadata
                 gc.collect()
                 print("POST: key: {}".format(i))
-            except:
+            except BaseException:
                 pass
             growth = objgraph.growth(shortnames=False)
             print("growth is {}".format(growth))

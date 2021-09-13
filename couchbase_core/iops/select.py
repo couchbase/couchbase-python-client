@@ -28,6 +28,7 @@ from couchbase_core._libcouchbase import (
     PYCBC_EVACTION_UNWATCH
 )
 
+
 class SelectTimer(TimerEvent):
     def __init__(self):
         super(SelectTimer, self).__init__()
@@ -69,8 +70,6 @@ class SelectIOPS(object):
         # Active readers and writers
         self._evwr = set()
         self._evrd = set()
-
-
 
     def _unregister_timer(self, timer):
         timer.deactivate()

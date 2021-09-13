@@ -1,5 +1,5 @@
-caseslist=[]
+caseslist = []
 try:
     import couchbase.tests
-except:
+except BaseException:
     pass

@@ -65,7 +65,7 @@ NOSE_EXE = os.path.join(PYPATH, "Lib", "site-packages", "nose", "__main__.py")
 
 
 VC_VERSION = None
-vmaj, vmin = [ int(x) for x in opts.version ]
+vmaj, vmin = [int(x) for x in opts.version]
 if vmaj == 2:
     VC_VERSION = '9'
 else:
@@ -82,14 +82,15 @@ SDK_VERS = '6.1' if VC_VERSION == '9' else '7.1'
 
 # Find libcouchbase version
 
-VERSION_DICT=dict(ver = opts.lcb_version,
-    arch = ARCH_STR,
-    vcvers = VC_VERSION)
+VERSION_DICT = dict(ver=opts.lcb_version,
+                    arch=ARCH_STR,
+                    vcvers=VC_VERSION)
 
 LCB_VSTR = "libcouchbase-{ver}_{arch}_vc{vcvers}".format(**VERSION_DICT)
 
-if opts.jenkins and len(opts.jenkins)>0:
-    LCB_REPO = "http://sdkbuilds.sc.couchbase.com/job/"+opts.jenkins+"/ARCH={arch},MSVCC_VER={vcvers},label=windows-builder/ws/BUILD/_CPack_Packages/{platarch}/ZIP/".format(platarch='win'+re.sub(r'86',r'32',re.sub(r'^[^0-9]*(.*)$',r'\1',ARCH_STR)),**VERSION_DICT)
+if opts.jenkins and len(opts.jenkins) > 0:
+    LCB_REPO = "http://sdkbuilds.sc.couchbase.com/job/" + opts.jenkins + "/ARCH={arch},MSVCC_VER={vcvers},label=windows-builder/ws/BUILD/_CPack_Packages/{platarch}/ZIP/".format(
+        platarch='win' + re.sub(r'86', r'32', re.sub(r'^[^0-9]*(.*)$', r'\1', ARCH_STR)), **VERSION_DICT)
 else:
     LCB_REPO = "http://packages.couchbase.com/clients/c/"
 zipurl = LCB_REPO + LCB_VSTR + ".zip"
@@ -115,20 +116,21 @@ if not os.path.exists(lcb_deproot):
 bname = 'BUILD-{0}-{1}.bat'.format(LCB_VSTR, opts.version)
 batchfile = open(bname, "w")
 
+
 def format_bootstrap_line(path, args=""):
     return '"{0}" {1}'.format(path, args)
 
 
 vcvars_base = "C:\\Program Files (x86)\\Microsoft Visual Studio {vc_version}.0\\VC"
-vcvars_base = vcvars_base.format(vc_version = VC_VERSION)
+vcvars_base = vcvars_base.format(vc_version=VC_VERSION)
 if VC_VERSION == '9':
     vcvars_script = 'vcvars32.bat' if ARCH_STR == 'x86' else 'vcvars64.bat'
     vcvars_line = vcvars_base + '\\bin\\' + vcvars_script
     vcvars_line = format_bootstrap_line(vcvars_line)
 
 else:
-    #Visual Studio 2010 Express doesn't have the 64 bit compiler, but
-    #it's included in the Windows SDK v7.1
+    # Visual Studio 2010 Express doesn't have the 64 bit compiler, but
+    # it's included in the Windows SDK v7.1
     basepath = (
         "C:\\Program Files\\Microsoft SDKs\\Windows\\v7.1\\Bin\\SetEnv.cmd")
 
@@ -140,11 +142,11 @@ batchfile.write('''
 setlocal enabledelayedexpansion
 {pyexe} -c "import sys; print(sys.version)"
 call {vcvars_line}
-{pyexe} setup.py build_ext --include-dirs {lcb}\include --library-dirs {lcb}\lib --inplace
-{pyexe} setup.py build_ext --include-dirs {lcb}\include --library-dirs {lcb}\lib
+{pyexe} setup.py build_ext --include-dirs {lcb}\\include --library-dirs {lcb}\\lib --inplace
+{pyexe} setup.py build_ext --include-dirs {lcb}\\include --library-dirs {lcb}\\lib
 {pyexe} -c "import couchbase_core; print(couchbase_core.__version__)"
-'''.format(vcvars_line = vcvars_line,
-           pyexe = PY_EXE,
+'''.format(vcvars_line=vcvars_line,
+           pyexe=PY_EXE,
            lcb=lcb_deproot))
 
 batchfile.close()
@@ -154,13 +156,14 @@ shutil.copyfile(os.path.join(lcb_deproot, "bin", "libcouchbase.dll"),
 
 rv = os.system(bname)
 assert rv == 0
-result=os.system(PIP_EXE + "install wheel")
+result = os.system(PIP_EXE + "install wheel")
 print("got wheel install result {}".format(result))
 os.system(PIP_EXE + "install --upgrade pip")
 os.system(PIP_EXE + "--version")
 os.system(PY_EXE + " setup.py bdist_wininst")
 os.system(PY_EXE + " setup.py bdist")
 os.system(PY_EXE + " setup.py bdist_wheel")
+
 
 def download_and_bootstrap(src, name, prereq=None):
     """
@@ -180,6 +183,7 @@ def download_and_bootstrap(src, name, prereq=None):
     rv = os.system(cmdline)
     assert rv == 0
 
+
 def maybe_install(pkgname, impname=None):
     if not impname:
         impname = pkgname
@@ -189,7 +193,8 @@ def maybe_install(pkgname, impname=None):
     if rv == 0:
         return
 
-    cmd = "{0} --exists-action=w install --build=PIPBUILD {1}".format(PIP_EXE, pkgname)
+    cmd = "{0} --exists-action=w install --build=PIPBUILD {1}".format(
+        PIP_EXE, pkgname)
     rv = os.system(cmd)
     assert rv == 0
 
@@ -203,7 +208,7 @@ def try_java(path='java'):
         else:
             print("Java failed to return 0")
             return False
-    except:
+    except BaseException:
         return False
 
 
@@ -223,8 +228,9 @@ def ensure_java():
 
     raise Exception("Couldn't get a working Java version!")
 
-print("sys.version_info: "+str(sys.version_info))
-if vmaj==3 and vmin<3:
+
+print("sys.version_info: " + str(sys.version_info))
+if vmaj == 3 and vmin < 3:
     print("Using legacy PIP for 3.2")
     PIP_URL = "https://bootstrap.pypa.io/3.2/get-pip.py"
     EZ_SETUP = "https://bitbucket.org/pypa/setuptools/raw/0.7.4/ez_setup.py"
@@ -237,18 +243,19 @@ if opts.test:
     download_and_bootstrap(PIP_URL, "get_pip", "import pip")
     maybe_install("testresources")
     maybe_install("nose")
-    maybe_install("jsonschema") 
-    maybe_install("configparser") 
-    #maybe_install("configparser2") 
-    maybe_install("testfixtures") 
-    maybe_install("basictracer") 
-    #maybe_install("jaeger_client") 
+    maybe_install("jsonschema")
+    maybe_install("configparser")
+    # maybe_install("configparser2")
+    maybe_install("testfixtures")
+    maybe_install("basictracer")
+    # maybe_install("jaeger_client")
     #cmd = "{0} --exists-action=w install --build=PIPBUILD -r requirements.txt".format(PIP_EXE)
     #rv = os.system(cmd)
     #print("calling "+str(cmd)+" gave "+str(rv))
-    cmd = "{0} --exists-action=w install --build=PIPBUILD -r dev_requirements.txt".format(PIP_EXE)
+    cmd = "{0} --exists-action=w install --build=PIPBUILD -r dev_requirements.txt".format(
+        PIP_EXE)
     rv = os.system(cmd)
-    print("calling "+str(cmd)+" gave "+str(rv))
+    print("calling " + str(cmd) + " gave " + str(rv))
     # Write the test configuration..
     fp = open("tests.ini.sample", "r")
     template = ConfigParser()
@@ -259,19 +266,18 @@ if opts.test:
 
     if os.path.exists("tests.ini"):
         raise Exception("tests.ini already exists")
-    
+
     print("template is:[")
     template.write(sys.stdout)
-    print(repr(template)+"]")
-    tests_ini_path = os.path.join(os.getcwd(),"tests.ini")
-    print("writing template to "+tests_ini_path)
+    print(repr(template) + "]")
+    tests_ini_path = os.path.join(os.getcwd(), "tests.ini")
+    print("writing template to " + tests_ini_path)
     with open(tests_ini_path, "w+") as fp:
         template.write(fp)
 
-
     os.environ['LIBCOUCHBASE_EVENT_PLUGIN_NAME'] = 'select'
     ensure_java()
-    cmd = "{} {} --with-xunit -v".format(PY_EXE,NOSE_EXE)
+    cmd = "{} {} --with-xunit -v".format(PY_EXE, NOSE_EXE)
     print("About to launch {}".format(cmd))
     rv = os.system(cmd)
     os.unlink("tests.ini")

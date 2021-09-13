@@ -47,10 +47,11 @@ class CollectionManager(GenericManager):
         :raises: ScopeNotFoundException
         """
         try:
-          return next(s for s in self.get_all_scopes(*options, **kwargs) if s.name == scope_name)
+            return next(s for s in self.get_all_scopes(
+                *options, **kwargs) if s.name == scope_name)
         except StopIteration:
-          raise ScopeNotFoundException("no scope with name {}".format(scope_name))
-
+            raise ScopeNotFoundException(
+                "no scope with name {}".format(scope_name))
 
     @NotSupportedWrapper.a_400_or_404_means_not_supported
     def get_all_scopes(self,            # type: CollectionManager
@@ -65,9 +66,10 @@ class CollectionManager(GenericManager):
         :param kwargs: keyword version of options
         :return: An Iterable[ScopeSpec] containing all scopes in the associated bucket.
         """
-        kwargs.update({ 'path':   self.base_path,
-                        'method': 'GET' })
-        response = self._admin_bucket.http_request(**forward_args(kwargs, *options))
+        kwargs.update({'path': self.base_path,
+                       'method': 'GET'})
+        response = self._admin_bucket.http_request(
+            **forward_args(kwargs, *options))
         # now lets turn the response into a list of ScopeSpec...
         # the response looks like:
         # {'uid': '0', 'scopes': [{'name': '_default', 'uid': '0', 'collections': [{'name': '_default', 'uid': '0'}]}]}
@@ -108,7 +110,8 @@ class CollectionManager(GenericManager):
                        'method': 'POST',
                        'content_type': 'application/x-www-form-urlencoded',
                        'content': form})
-        return self._admin_bucket.http_request(**forward_args(kwargs, *options))
+        return self._admin_bucket.http_request(
+            **forward_args(kwargs, *options))
 
     @CollectionsErrorHandler.mgmt_exc_wrap
     def drop_collection(self,           # type: CollectionManager
@@ -125,8 +128,8 @@ class CollectionManager(GenericManager):
         :param kwargs: keyword version of `options`
         :raises: CollectionNotFoundException
         """
-        kwargs.update({ 'path': '{}/{}/collections/{}'.format(self.base_path, collection.scope_name, collection.name),
-                        'method': 'DELETE'})
+        kwargs.update({'path': '{}/{}/collections/{}'.format(self.base_path, collection.scope_name, collection.name),
+                       'method': 'DELETE'})
         self._admin_bucket.http_request(**forward_args(kwargs, *options))
 
     @CollectionsErrorHandler.mgmt_exc_wrap
@@ -177,8 +180,8 @@ class CollectionManager(GenericManager):
         :raises: ScopeNotFoundException
         """
 
-        kwargs.update({ 'path': '{}/{}'.format(self.base_path, scope_name),
-                        'method': 'DELETE'})
+        kwargs.update({'path': '{}/{}'.format(self.base_path, scope_name),
+                       'method': 'DELETE'})
         self._admin_bucket.http_request(**forward_args(kwargs, *options))
 
 

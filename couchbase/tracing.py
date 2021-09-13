@@ -24,9 +24,10 @@ class CouchbaseSpan(ABC):
     and :meth:`finish` methods.
     See :class:`CouchbaseOtelSpan` for an example, using opentelemetry for python spans.
     """
+
     def __init__(self,
-                    span   # type: Any
-                   ):
+                 span   # type: Any
+                 ):
         # type: (...) -> CouchbaseSpan
         """
         Construct a new :class:`~CouchbaseSpan`.
@@ -76,9 +77,10 @@ class CouchbaseTracer(ABC):
     :meth:`start_span`, which must be implemented in the derived class.  For an example,
     see :class:`.CouchbaseOtelTracer`.
     """
+
     def __init__(self,
                  external_tracer    # type: Any
-                ):
+                 ):
         # type: (...) -> CouchbaseTracer
         """
         Construct a new :class:`~.CouchbaseTracer`.
@@ -87,7 +89,6 @@ class CouchbaseTracer(ABC):
         """
         self._external_tracer = external_tracer
         super().__init__()
-
 
     @abstractmethod
     def start_span(self,

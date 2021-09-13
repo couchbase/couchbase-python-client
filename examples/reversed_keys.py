@@ -12,7 +12,7 @@ class ReverseTranscoder(Transcoder):
 
 
 c_reversed = Bucket('couchbase://localhost/default',
-        transcoder=ReverseTranscoder())
+                    transcoder=ReverseTranscoder())
 c_plain = Bucket('couchbase://localhost/default')
 
 c_plain.remove_multi(('ABC', 'CBA', 'XYZ', 'ZYX'), quiet=True)

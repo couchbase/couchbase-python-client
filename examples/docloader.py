@@ -76,7 +76,7 @@ class DocLoader(object):
 
         try:
             r.raise_for_status()
-        except:
+        except BaseException:
             self.logger.exception("Couldn't delete bucket")
 
         cr_url = '{0}/buckets'.format(self.cluster_prefix)
@@ -131,7 +131,7 @@ class DocLoader(object):
             try:
                 fp = self._zf.open(name, mode='r')
                 ret[docname] = fp.read()
-            except:
+            except BaseException:
                 self.logger.error("Couldn't load %s (%s)", name, docname)
                 raise
             finally:
@@ -146,7 +146,8 @@ class DocLoader(object):
         try:
             self._client.upsert_multi(kvs)
         except CouchbaseTransientException as e:
-            self.logger.info('Items have failed. Placing into retry queue: %r', e)
+            self.logger.info(
+                'Items have failed. Placing into retry queue: %r', e)
             for k, v in e.all_results.items():
                 if not v.success:
                     self._retries[k] = kvs[k]

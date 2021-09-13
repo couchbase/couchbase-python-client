@@ -412,7 +412,8 @@ class AcouchbaseSubdocTestSuite(object):
         self.assertEqual(100, content["some"]["counter"])
 
 
-class AcouchbaseDefaultCollectionSubdocTests(AsyncioTestCase, AcouchbaseSubdocTestSuite):
+class AcouchbaseDefaultCollectionSubdocTests(
+        AsyncioTestCase, AcouchbaseSubdocTestSuite):
     @classmethod
     def setUpClass(cls) -> None:
         super(AcouchbaseDefaultCollectionSubdocTests, cls).setUpClass(

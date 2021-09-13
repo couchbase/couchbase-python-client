@@ -546,7 +546,8 @@ class User(object):
                 == (other._username, other._display_name, other._groups, other._roles))
 
     def __hash__(self):
-        return hash((self._username, self._display_name, self._groups, self._roles))
+        return hash((self._username, self._display_name,
+                    self._groups, self._roles))
 
     @classmethod
     def load_from_server(cls, json_data, roles=None):

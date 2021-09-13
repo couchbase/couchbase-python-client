@@ -1,4 +1,4 @@
-#-*- coding:utf-8 -*-
+# -*- coding:utf-8 -*-
 #
 # Copyright 2013, Couchbase, Inc.
 # All Rights Reserved
@@ -21,9 +21,13 @@ from time import sleep
 from nose.plugins.attrib import attr
 
 from couchbase_core import FMT_JSON, FMT_PICKLE, FMT_UTF8
-from couchbase_v2.exceptions import (KeyExistsException, InvalidArgumentException, DocumentNotFoundException)
+from couchbase_v2.exceptions import (
+    KeyExistsException,
+    InvalidArgumentException,
+    DocumentNotFoundException)
 from couchbase_tests.base import ConnectionTestCase
 import json
+
 
 class UpsertTest(ConnectionTestCase):
 
@@ -44,12 +48,12 @@ class UpsertTest(ConnectionTestCase):
 
     def test_utf8_set_nonascii(self):
 
-        rv = self.cb.upsert("documentID",  u'Öüç', format=FMT_UTF8)
+        rv = self.cb.upsert("documentID", u'Öüç', format=FMT_UTF8)
         self.assertTrue(rv)
         self.assertTrue(rv.cas > 0)
         rv = self.cb.get("documentID")
         self.assertTrue(rv.cas > 0)
-        self.assertEqual(rv.value,  u'Öüç')
+        self.assertEqual(rv.value, u'Öüç')
 
     def test_set_with_cas(self):
         key = self.gen_key('cas')
@@ -57,7 +61,7 @@ class UpsertTest(ConnectionTestCase):
         self.assertTrue(rv1.cas > 0)
 
         self.assertRaises(KeyExistsException, self.cb.upsert,
-                          key, 'value2', cas=rv1.cas+1)
+                          key, 'value2', cas=rv1.cas + 1)
 
         rv2 = self.cb.upsert(key, 'value3', cas=rv1.cas)
         self.assertTrue(rv2.cas > 0)
@@ -100,8 +104,8 @@ class UpsertTest(ConnectionTestCase):
             self.assertTrue(k in rvs)
             self.assertTrue(rvs[k].success)
 
-        self.assertRaises((InvalidArgumentException,TypeError), self.cb.upsert_multi, kv,
-                          cas = 123)
+        self.assertRaises((InvalidArgumentException, TypeError), self.cb.upsert_multi, kv,
+                          cas=123)
 
     def test_add(self):
         key = self.gen_key('add')

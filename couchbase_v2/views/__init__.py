@@ -15,8 +15,8 @@
 # limitations under the License.
 #
 
+from couchbase_core.views import *
 import couchbase_core.views
 import sys
 
 sys.modules[__name__] = couchbase_core.views
-from couchbase_core.views import *

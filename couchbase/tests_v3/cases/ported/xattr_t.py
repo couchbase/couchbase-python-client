@@ -1,6 +1,6 @@
 from random import random
 
-from couchbase.exceptions import  PathNotFoundException
+from couchbase.exceptions import PathNotFoundException
 from couchbase_tests.base import MockTestCase, CollectionTestCase
 import couchbase.subdocument as SD
 

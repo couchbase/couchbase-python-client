@@ -29,7 +29,9 @@ class AlreadyQueriedException(CouchbaseException):
     """Thrown when iterating over a View which was already iterated over"""
 
 
-ViewRow = NamedTuple('ViewRow', [('key', str), ('value', Any), ('docid', str), ('doc',Any)])
+ViewRow = NamedTuple(
+    'ViewRow', [
+        ('key', str), ('value', Any), ('docid', str), ('doc', Any)])
 """
 Default class for a single row.
 """
@@ -84,6 +86,7 @@ class RowProcessor(object):
 
         By default, the :class:`ViewRow` is used.
     """
+
     def __init__(self, rowclass):
         self.rowclass = rowclass
 

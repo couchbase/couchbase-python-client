@@ -19,12 +19,15 @@ from unittest import SkipTest
 from couchbase_v2.exceptions import InvalidArgumentException, TimeoutException
 from couchbase_tests.base import MockTestCase
 import couchbase_core._libcouchbase as LCB
+
+
 class EndureTest(MockTestCase):
-    #XXX: Require LCB 2.1.0
+    # XXX: Require LCB 2.1.0
     def setUp(self, **kwargs):
         if not LCB.PYCBC_ENDURE:
             raise SkipTest("Endure op not supported in V4")
-        super(EndureTest,self).setUp(**kwargs)
+        super(EndureTest, self).setUp(**kwargs)
+
     def test_excessive(self):
         self.assertRaises(InvalidArgumentException,
                           self.cb.set,
@@ -43,7 +46,6 @@ class EndureTest(MockTestCase):
             self.cb._dur_testhook = cb1
             rv = self.cb.upsert(key, "blah blah")
             self.assertTrue(rv.success)
-
 
             def cb2(res):
                 self.mockclient.unpersist(key, on_master=True,
@@ -72,15 +74,12 @@ class EndureTest(MockTestCase):
             rv_rm = self.cb.remove(key)
             self.assertTrue(rv_rm.success)
 
-
-
             self.mockclient.endure(key, on_master=True,
                                    replica_count=self.mock.replicas,
                                    cas=cas, value="blah")
 
-            self.cb._dur_testhook =  None
+            self.cb._dur_testhook = None
             self.assertRaises(TimeoutException, self.cb.delete, key)
-
 
     def test_single_poll(self):
         key = self.gen_key("endure_single_poll")

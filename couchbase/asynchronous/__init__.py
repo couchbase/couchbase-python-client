@@ -7,8 +7,6 @@ from couchbase.asynchronous.search import AsyncSearchRequest
 from couchbase_core.asynchronous.rowsbase import AsyncRowsBase
 
 
-
-
 class AsyncViewResult(AsyncViewBase, ViewResult):
     def __init__(self, *args, **kwargs):
         """

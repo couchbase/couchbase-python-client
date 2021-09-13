@@ -101,7 +101,8 @@ class AcouchbaseQueryTests(AsyncioTestCase):
         await self.assertRows(query_iter, 1)
 
     # NOTE: Ideally I'd notice that a named parameter wasn't an option parameter name, and just _assume_ that it is a
-    # named parameter for the query.  However I worry about overlap being confusing, etc...
+    # named parameter for the query.  However I worry about overlap being
+    # confusing, etc...
     @async_test
     async def test_simple_query_without_options_with_kwargs_named_params(self):
         query_iter = self.cluster.query("SELECT * FROM `{}` WHERE brewery_id LIKE $brewery LIMIT 1".format(self.query_bucket),

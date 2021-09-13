@@ -49,7 +49,6 @@ class RowsHandler(AsyncN1QLRequest):
 Base = gen_base(AsyncClusterTestCase)
 
 
-
 class TxN1QLTests(Base):
     def setUp(self, *args, **kwargs):
         super(TxN1QLTests, self).setUp(*args, **kwargs)
@@ -87,17 +86,17 @@ class TxN1QLTests(Base):
             self.assertEqual(self.query_props.rowcount, len(rows))
             logging.error("End of callback")
 
-        result= d.addCallback(verify)
+        result = d.addCallback(verify)
         logging.error("ready to return")
         return result
 
     def testBatchedSearch(self  # type: Base
-                    ):
+                          ):
         if self.is_mock:
             raise SkipTest("No analytics on mock")
         cb = self.make_connection()
         d = cb.search_query("beer-search", SEARCH.TermQuery("category"),
-                                      facets={'fred': SEARCH.TermFacet('category', 10)})
+                            facets={'fred': SEARCH.TermFacet('category', 10)})
 
         def verify(o):
             logging.error("Called back")
@@ -136,7 +135,8 @@ class AnalyticsTest(gen_base(AnalyticsTestBase)):
     def testBatchedAnalytics(self  # type: Base
                              ):
         cb = self.make_connection()
-        d = cb.analytics_query("SELECT * FROM `{}` LIMIT 1".format(self.dataset_name))
+        d = cb.analytics_query(
+            "SELECT * FROM `{}` LIMIT 1".format(self.dataset_name))
 
         def verify(o):
             logging.error("Called back")

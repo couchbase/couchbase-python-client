@@ -32,7 +32,8 @@ class IndexManagementTestCase(CollectionTestCase):
             print("dropping {}".format(index.name))
             self.mgr.drop_index(self.cluster_info.bucket_name, index.name)
         for _ in range(10):
-            if 0 == len(self.mgr.get_all_indexes(self.cluster_info.bucket_name)):
+            if 0 == len(self.mgr.get_all_indexes(
+                    self.cluster_info.bucket_name)):
                 return
             time.sleep(3)
         self.fail(
@@ -199,7 +200,8 @@ class IndexManagementTestCase(CollectionTestCase):
 
     def test_index_partition_info(self):
         bucket_name = self.cluster_info.bucket_name
-        # use query to create index w/ partition, cannot do that via manager ATM
+        # use query to create index w/ partition, cannot do that via manager
+        # ATM
         qstr = 'CREATE INDEX idx_fld1 ON `{0}`(fld1) PARTITION BY HASH(fld1)'.format(
             bucket_name)
         self.cluster.query(qstr).execute()

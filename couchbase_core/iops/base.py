@@ -36,6 +36,7 @@ from couchbase_core._libcouchbase import (
     Event
 )
 
+
 class IOPS(object):
     def __init__(self):
         """

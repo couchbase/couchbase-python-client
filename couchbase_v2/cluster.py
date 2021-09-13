@@ -4,7 +4,8 @@ from couchbase_core.cluster import _Cluster as CoreCluster
 
 
 class Cluster(CoreCluster):
-    # list of all authentication types, keep up to date, used to identify connstr/kwargs auth styles
+    # list of all authentication types, keep up to date, used to identify
+    # connstr/kwargs auth styles
 
     def __init__(self, connection_string='couchbase://localhost',
                  bucket_class=Bucket):

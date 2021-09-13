@@ -18,6 +18,7 @@ This file contains various utility classes for scheduling
 and destroying events
 """
 
+
 class EventQueue(object):
     def __init__(self):
         self.called = False
@@ -67,9 +68,9 @@ class EventQueue(object):
             for event in self.waiters:
                 try:
                     self.call_single_success(event, *args, **kwargs)
-                except:
+                except BaseException:
                     pass
-        except:
+        except BaseException:
             for event in self.waiters:
                 try:
                     self.call_single_failure(event, event, *args, **kwargs)

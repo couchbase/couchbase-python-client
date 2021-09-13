@@ -59,7 +59,8 @@ class MutationTokensTest(ConnectionTestCase):
             self.assertIsInstance(seq, (int, long))
         except NotSupportedException as e:
             # as per CCBC-1051
-            logging.info("Skipped VBucket mutation info test because not supported: {}".format(e))
+            logging.info(
+                "Skipped VBucket mutation info test because not supported: {}".format(e))
 
     def test_mutinfo_disabled(self):
         cb = self.make_connection(no_mutinfo=True)
@@ -70,7 +71,8 @@ class MutationTokensTest(ConnectionTestCase):
             self.assertEqual(0, len(cb._mutinfo()))
         except NotSupportedException as e:
             # as per CCBC-1051
-            logging.info("Skipped VBucket mutation info test because not supported: {}".format(e))
+            logging.info(
+                "Skipped VBucket mutation info test because not supported: {}".format(e))
 
     def test_mutation_state(self):
         cb = self.cb

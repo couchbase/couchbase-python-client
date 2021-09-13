@@ -61,7 +61,6 @@ class Admin(LCB.Bucket):
     @internal
     def __init__(self, username, password, host='localhost', port=8091,
                  **kwargs):
-
         """Connect to a cluster
 
         :param string username: The administrative username for the cluster,
@@ -103,7 +102,8 @@ class Admin(LCB.Bucket):
 
     def _is_6_5_plus(self):
 
-        # lets just check once.  Below, we will only set this if we are sure about the value.
+        # lets just check once.  Below, we will only set this if we are sure
+        # about the value.
         if self.__is_6_5 is not None:
             return self.__is_6_5
 
@@ -119,7 +119,8 @@ class Admin(LCB.Bucket):
             # instances check every time, but this is only temporary.
             return True
         except ValueError:
-            # this comes from the conversion to float -- the mock says "CouchbaseMock..."
+            # this comes from the conversion to float -- the mock says
+            # "CouchbaseMock..."
             self.__is_6_5 = True
         return self.__is_6_5
 
@@ -176,7 +177,8 @@ class Admin(LCB.Bucket):
         """
         imeth = None
         if not method in METHMAP:
-            raise E.InvalidArgumentException.pyexc("Unknown HTTP Method", method)
+            raise E.InvalidArgumentException.pyexc(
+                "Unknown HTTP Method", method)
 
         imeth = METHMAP[method]
         return self._http_request(type=LCB.LCB_HTTP_TYPE_MANAGEMENT,
@@ -187,9 +189,9 @@ class Admin(LCB.Bucket):
                                   response_format=response_format,
                                   timeout=timeout)
 
-    bc_defaults=dict(bucket_type='couchbase',
-                  bucket_password='', replicas=0,
-                  flush_enabled=False)
+    bc_defaults = dict(bucket_type='couchbase',
+                       bucket_password='', replicas=0,
+                       flush_enabled=False)
 
     @internal
     def bucket_create(self, name, **kwargs):
@@ -225,7 +227,8 @@ class Admin(LCB.Bucket):
         :raise: :exc:`~.HTTPException` if the bucket could not be created.
         """
         final_opts = dict(**Admin.bc_defaults)
-        final_opts.update(**{k: v for k, v in kwargs.items() if (v is not None)})
+        final_opts.update(
+            **{k: v for k, v in kwargs.items() if (v is not None)})
         params = {
             'name': name,
             'bucketType': final_opts['bucket_type'],
@@ -261,6 +264,7 @@ class Admin(LCB.Bucket):
         """
         Information about a bucket
         """
+
         def __init__(self,
                      raw_json  # type: JSON
                      ):
@@ -283,7 +287,8 @@ class Admin(LCB.Bucket):
         :return: An iterable of :Class:`Admin.BucketInfo` objects describing
         the buckets currently active on the cluster.
         """
-        buckets_list = self.http_request(path='/pools/default/buckets', method='GET')
+        buckets_list = self.http_request(
+            path='/pools/default/buckets', method='GET')
         return map(Admin.BucketInfo, buckets_list.value)
 
     @internal
@@ -322,7 +327,8 @@ class Admin(LCB.Bucket):
                 info = self.bucket_info(name).value
                 for node in info['nodes']:
                     if node['status'] != 'healthy':
-                        raise NotReadyException.pyexc('Not all nodes are healthy')
+                        raise NotReadyException.pyexc(
+                            'Not all nodes are healthy')
                 return  # No error and all OK
             except E.CouchbaseException:
                 if time() + sleep_interval > end:
@@ -332,12 +338,14 @@ class Admin(LCB.Bucket):
     @staticmethod
     def _get_management_path(auth_domain, userid=None):
 
-        if isinstance(auth_domain, str) and auth_domain in ["local", "external"]:
+        if isinstance(auth_domain, str) and auth_domain in [
+                "local", "external"]:
             domain = auth_domain
         elif isinstance(auth_domain, AuthDomain):
             domain = AuthDomain.to_str(auth_domain)
         else:
-            raise E.InvalidArgumentException.pyexc("Unknown Authentication Domain", auth_domain)
+            raise E.InvalidArgumentException.pyexc(
+                "Unknown Authentication Domain", auth_domain)
 
         path = '/settings/rbac/users/{0}'.format(domain)
         if userid is not None:
@@ -378,7 +386,8 @@ class Admin(LCB.Bucket):
                                  timeout=timeout)
 
     @internal
-    def user_upsert(self, username, domain, password=None, roles=None, groups=None, name=None, timeout=None):
+    def user_upsert(self, username, domain, password=None,
+                    roles=None, groups=None, name=None, timeout=None):
         """
         Upsert a user in the cluster
 
@@ -416,15 +425,17 @@ class Admin(LCB.Bucket):
             domain = AuthDomain.to_str(domain)
 
         if password and domain == "external":
-            raise E.InvalidArgumentException("External domains must not have passwords")
-        
+            raise E.InvalidArgumentException(
+                "External domains must not have passwords")
+
         params = {}
         if roles:
-            params['roles'] = ','.join(list(map(lambda r: r.to_server_str(), roles)))
+            params['roles'] = ','.join(
+                list(map(lambda r: r.to_server_str(), roles)))
         # For backwards compatibility with Couchbase Server 6.0 and earlier,
-        # the "groups" parameter MUST be omitted if the group list is empty. 
-        # Couchbase Server 6.5 treats the absent parameter the same as an 
-        # explicit parameter with no value (removes any existing group associations, 
+        # the "groups" parameter MUST be omitted if the group list is empty.
+        # Couchbase Server 6.5 treats the absent parameter the same as an
+        # explicit parameter with no value (removes any existing group associations,
         # which is what we want in this case).
         if groups and self._is_6_5_plus():
             params['groups'] = ','.join(groups)
@@ -445,7 +456,7 @@ class Admin(LCB.Bucket):
     def user_remove(self, username, domain, timeout=None):
         """
         Remove a user
-        
+
         :param AuthDomain domain: The authentication domain for the user.
         :param username: The user ID to remove
 
@@ -474,9 +485,10 @@ class Admin(LCB.Bucket):
         return self.http_request(path="/settings/rbac/roles/",
                                  method='GET',
                                  timeout=timeout)
-    
+
     @internal
-    def group_upsert(self, group_name, roles=None, description=None, ldap_group_reference=None, timeout=None):
+    def group_upsert(self, group_name, roles=None, description=None,
+                     ldap_group_reference=None, timeout=None):
         """
         Upsert a group in the cluster
 
@@ -498,7 +510,8 @@ class Admin(LCB.Bucket):
         """
         params = {}
         if roles:
-            params['roles'] = ','.join(list(map(lambda r: r.to_server_str(), roles)))
+            params['roles'] = ','.join(
+                list(map(lambda r: r.to_server_str(), roles)))
 
         if description:
             params['description'] = description
@@ -520,7 +533,7 @@ class Admin(LCB.Bucket):
         Retrieve a group from the server
 
         :param group_name: the name of the group to get
-        
+
         :raise: :exc:`couchbase.exceptions.HTTPException` if the group does not exist.
 
         :return: :class:`~.HttpResult`. The group can be obtained from the
@@ -542,7 +555,7 @@ class Admin(LCB.Bucket):
         :return: :class:`~.HttpResult`. The list of users can be obtained from
             the returned object's `value` property.
         """
-        
+
         return self.http_request(path='/settings/rbac/groups/',
                                  method='GET',
                                  timeout=timeout)
@@ -551,7 +564,7 @@ class Admin(LCB.Bucket):
     def group_remove(self, group_name, **kwargs):
         """
         Remove a group
-        
+
         :param group_name: the name of the group to get
 
         :raise: :exc:`couchbase.exceptions.HTTPException` if the group does not exist.

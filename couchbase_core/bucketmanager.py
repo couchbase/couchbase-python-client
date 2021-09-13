@@ -35,6 +35,7 @@ class BucketManager(object):
     to a :class:`~couchbase_core.client.Client` object. It is normally returned via
     the :meth:`~couchbase_core.client.Client.bucket_manager` method
     """
+
     def __init__(self, cb, bucket_name=None):
         self._cb = cb
         self._bname = bucket_name or self._cb.bucket
@@ -85,7 +86,7 @@ class BucketManager(object):
         query.limit = 1
 
         for r in self._cb.view_query(dname, vname, use_devmode=use_devmode,
-                                query=query):
+                                     query=query):
             pass
         return True
 
@@ -105,7 +106,8 @@ class BucketManager(object):
             return True
 
         if timeout < 0:
-            raise InvalidArgumentException.pyexc("Interval must not be negative")
+            raise InvalidArgumentException.pyexc(
+                "Interval must not be negative")
 
         t_end = time.time() + timeout
         old_rev = None
@@ -371,11 +373,12 @@ class BucketManager(object):
 
         return info
 
-    def n1ql_index_create(self, ix,  **kwargs):
+    def n1ql_index_create(self, ix, **kwargs):
         self._n1ql_index_create(self._bucketname, self._cb, **kwargs)
 
     @staticmethod
-    def _n1ql_index_create(bucketname, bucket, ix, defer=False, ignore_exists=False, primary=False, fields=None, cond=None, **kwargs):
+    def _n1ql_index_create(bucketname, bucket, ix, defer=False,
+                           ignore_exists=False, primary=False, fields=None, cond=None, **kwargs):
         """
         Create an index for use with N1QL.
 
@@ -458,7 +461,7 @@ class BucketManager(object):
             `ignore_missing` was not specified
         """
         info = BucketManager._mk_index_def(self._bucketname, ix, primary)
-        kwargs['ignore_missing']=ignore_missing
+        kwargs['ignore_missing'] = ignore_missing
         return IxmgmtRequest(self._cb, 'drop', info, **kwargs).execute()
 
     def n1ql_index_drop_primary(self, **kwargs):
@@ -518,7 +521,8 @@ class BucketManager(object):
             mgr.n1ql_index_watch(indexes, timeout=30, interval=1)
 
         """
-        return self._n1ql_index_build_deferred(self._bucketname, self._cb, other_buckets)
+        return self._n1ql_index_build_deferred(
+            self._bucketname, self._cb, other_buckets)
 
     def n1ql_index_watch(self, indexes,
                          timeout=30, interval=0.2, watch_primary=False):

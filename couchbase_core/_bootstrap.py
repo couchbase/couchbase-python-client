@@ -90,7 +90,6 @@ def _observeinfo__repr__(self):
                  'OBS_NOTFOUND',
                  'OBS_LOGICALLY_DELETED')
 
-
     flag_str = ''
     for c in constants:
         if self.flags == getattr(C, c):
@@ -122,6 +121,7 @@ def _json_encode_wrapper(*args):
 class FMT_AUTO_object_not_a_number(object):
     pass
 
+
 # TODO: Make this more readable and have PEP8 ignore it.
 _FMT_AUTO = FMT_AUTO_object_not_a_number()
 
@@ -142,26 +142,27 @@ def _view_path_helper(options):
 
     return encoded, post_body
 
-_default_helpers=dict(result_reprfunc=_result__repr__,
-                      fmt_utf8_flags=C.FMT_UTF8,
-                      fmt_bytes_flags=C.FMT_BYTES,
-                      fmt_json_flags=C.FMT_JSON,
-                      fmt_pickle_flags=C.FMT_PICKLE,
-                      pickle_encode=pickle.dumps,
-                      pickle_decode=pickle.loads,
-                      json_encode=_json_encode_wrapper,
-                      json_decode=json.loads,
-                      lcb_errno_map=E._LCB_ERRNO_MAP,
-                      misc_errno_map=E._EXCTYPE_MAP,
-                      default_exception=E.CouchbaseException,
-                      obsinfo_reprfunc=_observeinfo__repr__,
-                      itmcoll_base_type=ItemCollection,
-                      itmopts_dict_type=ItemOptionDict,
-                      itmopts_seq_type=ItemSequence,
-                      fmt_auto=_FMT_AUTO,
-                      view_path_helper=_view_path_helper,
-                      sd_result_type=SubdocResult,
-                      sd_multival_type=MultiValue)
+
+_default_helpers = dict(result_reprfunc=_result__repr__,
+                        fmt_utf8_flags=C.FMT_UTF8,
+                        fmt_bytes_flags=C.FMT_BYTES,
+                        fmt_json_flags=C.FMT_JSON,
+                        fmt_pickle_flags=C.FMT_PICKLE,
+                        pickle_encode=pickle.dumps,
+                        pickle_decode=pickle.loads,
+                        json_encode=_json_encode_wrapper,
+                        json_decode=json.loads,
+                        lcb_errno_map=E._LCB_ERRNO_MAP,
+                        misc_errno_map=E._EXCTYPE_MAP,
+                        default_exception=E.CouchbaseException,
+                        obsinfo_reprfunc=_observeinfo__repr__,
+                        itmcoll_base_type=ItemCollection,
+                        itmopts_dict_type=ItemOptionDict,
+                        itmopts_seq_type=ItemSequence,
+                        fmt_auto=_FMT_AUTO,
+                        view_path_helper=_view_path_helper,
+                        sd_result_type=SubdocResult,
+                        sd_multival_type=MultiValue)
 
 
 def run_init(m):
@@ -178,7 +179,8 @@ C.FMT_AUTO = _FMT_AUTO
 
 
 def describe_lcb_api():
-    return "PYCBC_LCB_API {}, LCB API version {}".format(pycbc_lcb_api_str(), C.LCB_VERSION_STRING)
+    return "PYCBC_LCB_API {}, LCB API version {}".format(
+        pycbc_lcb_api_str(), C.LCB_VERSION_STRING)
 
 
 def pycbc_lcb_api_str():

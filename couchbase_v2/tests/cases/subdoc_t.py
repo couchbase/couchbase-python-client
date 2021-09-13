@@ -65,7 +65,7 @@ class SubdocTest(CollectionTestCase):
                           cb.lookup_in, bkey, SD.exists('path'))
 
         # Empty paths fail for get_in
-        #self.assertRaises(E.SubdocEmptyPathException,
+        # self.assertRaises(E.SubdocEmptyPathException,
         #                  cb.retrieve_in, key, '')
 
         # Try on non-existing document. Should fail
@@ -95,7 +95,7 @@ class SubdocTest(CollectionTestCase):
         # Test CAS operations
         self.assertTrue(result.cas)
         self.assertRaises(E.DocumentExistsException, cb.mutate_in,
-                          key, SD.upsert('newDict', None), cas=result.cas+1)
+                          key, SD.upsert('newDict', None), cas=result.cas + 1)
 
         # Try it again, using the CAS
         result2 = cb.mutate_in(key, SD.upsert('newDict', {}), cas=result.cas)
@@ -184,7 +184,6 @@ class SubdocTest(CollectionTestCase):
             quiet=True
         )
 
-
         # LCB used to be consider success to be true only if it found
         # _all_ the paths.  Now, however, lcb returns success if it found
         # any of them, so...
@@ -239,7 +238,8 @@ class SubdocTest(CollectionTestCase):
         self.assertEqual([True, 1, 2, 3], cb.get(key, project=['array'])[0])
 
         cb.mutate_in(key, (SD.array_prepend('array', [42]),))
-        self.assertEqual([[42], True, 1, 2, 3], cb.get(key, project=['array'])[0])
+        self.assertEqual([[42], True, 1, 2, 3],
+                         cb.get(key, project=['array'])[0])
 
     def test_result_iter(self):
         cb = self.cb
@@ -280,19 +280,31 @@ class SubdocTest(CollectionTestCase):
         self.assertEqual(3, cb.get(key, project=['']).content[''][2])
 
         cb.upsert(key, {'k1': 1, 'k2': 2, 'k3': 3})
-        self.assertEqual(3, cb.lookup_in(key, (SD.get_count(''),)).content_as[int](0))
+        self.assertEqual(
+            3, cb.lookup_in(
+                key, (SD.get_count(''),)).content_as[int](0))
 
     def test_create_doc(self):
         cb = self.cb
         key = self.gen_key('create_doc')
         cb.mutate_in(key, (SD.upsert('new.path', 'newval'),), upsert_doc=True)
-        result= cb.get(key, project=['new.path'])
-        self.assertEqual('newval',result.content['new.path'])
+        result = cb.get(key, project=['new.path'])
+        self.assertEqual('newval', result.content['new.path'])
 
         # Check 'insert_doc'
 
-        self.assertRaises(E.DocumentExistsException, cb.mutate_in, key, (SD.upsert('new.path', 'newval'),), insert_doc=True)
+        self.assertRaises(
+            E.DocumentExistsException,
+            cb.mutate_in,
+            key,
+            (SD.upsert(
+                'new.path',
+                'newval'),
+             ),
+            insert_doc=True)
         cb.remove(key)
 
         cb.mutate_in(key, (SD.upsert('new.path', 'newval'),), insert_doc=True)
-        self.assertEqual('newval', cb.get(key, project=['new.path']).content['new.path'])
+        self.assertEqual(
+            'newval', cb.get(
+                key, project=['new.path']).content['new.path'])

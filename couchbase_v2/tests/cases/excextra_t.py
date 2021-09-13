@@ -21,6 +21,7 @@ from couchbase_tests.base import ConnectionTestCase
 # These tests try to see if the 'result' and 'all_results' appear properly
 # also verify that other documented exception fields are present
 
+
 class ExceptionsTest(ConnectionTestCase):
 
     def test_simple_excextra(self):
@@ -54,7 +55,7 @@ class ExceptionsTest(ConnectionTestCase):
         exc = None
         try:
             self.cb.get_multi(list(kv_missing.keys()) + list(kv_existing.keys()),
-                        quiet=False)
+                              quiet=False)
         except E.CouchbaseException as e:
             exc = e
 
@@ -62,7 +63,6 @@ class ExceptionsTest(ConnectionTestCase):
         self.assertIsInstance(exc, E.DocumentNotFoundException)
         self.assertEqual(len(exc.all_results),
                          len(kv_missing) + len(kv_existing))
-
 
         res_ok, res_fail = exc.split_results()
         all_results = exc.all_results

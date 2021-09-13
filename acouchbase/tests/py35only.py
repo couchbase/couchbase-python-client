@@ -7,13 +7,18 @@ class CouchbasePy35Test(AioTestCase):
 
     def setUp(self):
         try:
-            super(CouchbasePy35Test,self).setUp(bucket='beer-sample', type="Bucket")
+            super(
+                CouchbasePy35Test,
+                self).setUp(
+                bucket='beer-sample',
+                type="Bucket")
         except CouchbaseException as e:
             raise SkipTest("Need 'beer-sample' bucket for this")
 
     @asynct
     async def test_query_with_async_iterator(self):
-        beer_bucket = self.gen_bucket(**self.make_connargs(bucket='beer-sample'))
+        beer_bucket = self.gen_bucket(
+            **self.make_connargs(bucket='beer-sample'))
         from acouchbase.cluster import asyncio
         await (beer_bucket.on_connect() or asyncio.sleep(0.01))
         viewiter = beer_bucket.view_query("beer", "brewery_beers", limit=10)

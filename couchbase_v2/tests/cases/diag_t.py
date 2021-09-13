@@ -29,15 +29,15 @@ except NameError:
     basestring = str
 
 service_schema = {"type": "object",
-             "properties": {"details": {"type": "string"},
-                            "latency": {"anyOf": [{"type": "number"}, {"type": "string"}]},
-                            "server": {"type": "string"},
-                            "status": {"type": "number"}
-                            },
-             "required": ["latency", "server", "status"]}
+                  "properties": {"details": {"type": "string"},
+                                 "latency": {"anyOf": [{"type": "number"}, {"type": "string"}]},
+                                 "server": {"type": "string"},
+                                 "status": {"type": "number"}
+                                 },
+                  "required": ["latency", "server", "status"]}
 
 any_of_required_services_schema = {"type": "array",
-                  "items": service_schema}
+                                   "items": service_schema}
 
 
 def gen_schema_for_services_with_required_entry(name):
@@ -48,7 +48,8 @@ def gen_schema_for_services_with_required_entry(name):
 
 
 any_of_required_services_schema = {"anyOf":
-                                       [gen_schema_for_services_with_required_entry(name) for name in ["n1ql", "views", "fts", "kv"]]
+                                   [gen_schema_for_services_with_required_entry(
+                                       name) for name in ["n1ql", "views", "fts", "kv"]]
                                    }
 
 ping_schema = {"anyOf": [{
@@ -60,29 +61,29 @@ ping_schema = {"anyOf": [{
 }]}
 
 server_and_port_schema = {"type": "string",
-                          "pattern": "([0-9]{1,3}\.){3,3}[0-9]{1,3}:[0-9]+"}
+                          "pattern": "([0-9]{1,3}\\.){3,3}[0-9]{1,3}:[0-9]+"}
 connection_status_schema = {"type": "string",
                             "pattern": "connected"}
 config_schema = {"type": "array",
                  "items": {"type": "object",
-                 "properties": {
-                     "id": {"type": "string"},
-                     "last_activity_us": {"type": "number"},
-                     "local": server_and_port_schema,
-                     "remote": server_and_port_schema,
-                     "status": connection_status_schema
-                 }}}
+                           "properties": {
+                               "id": {"type": "string"},
+                               "last_activity_us": {"type": "number"},
+                               "local": server_and_port_schema,
+                               "remote": server_and_port_schema,
+                               "status": connection_status_schema
+                           }}}
 
-python_id="PYCBC"
+python_id = "PYCBC"
 
 client_id_schema = {"type": "string",
-                    "pattern": "^0x[a-f0-9]+/"+python_id}
+                    "pattern": "^0x[a-f0-9]+/" + python_id}
 
-two_part_ver_num = "([0-9]+\.)+[0-9]+"
+two_part_ver_num = "([0-9]+\\.)+[0-9]+"
 
 sdk_schema = {"type": "string",
               "pattern": "libcouchbase" +
-                         re.escape("/") + re.escape(LCB.lcb_version()[0]) + "\s*"+
+                         re.escape("/") + re.escape(LCB.lcb_version()[0]) + "\\s*" +
                          re.escape(PYCBC_CB_VERSION)}
 
 
@@ -102,7 +103,7 @@ class DiagnosticsTests(ConnectionTestCase):
         super(DiagnosticsTests, self).setUp()
 
     def test_diagnostics(self):
-        if getattr(self.cluster_info,"network","") == "external":
+        if getattr(self.cluster_info, "network", "") == "external":
             raise SkipTest("Issue with diagnostics on external network")
         if self.is_mock:
             raise SkipTest()

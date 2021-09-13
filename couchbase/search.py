@@ -1651,7 +1651,8 @@ class SearchOptions(OptionBlockTimeOut):
         # type: (...) -> SearchParams
         iterargs, itercls, params = cls._gen_params_kwargs_options(
             *options, **kwargs)
-        return SearchParams(_make_search_body(index, query, params), iterargs, itercls)
+        return SearchParams(_make_search_body(
+            index, query, params), iterargs, itercls)
 
     SearchParamsInternal = NamedTuple('SearchParamsInternal', [(
         'iterargs', Dict[str, Any]), ('itercls', Type[SearchResult]), ('params', _Params)])

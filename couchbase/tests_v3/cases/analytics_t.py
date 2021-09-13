@@ -29,10 +29,12 @@ from couchbase.n1ql import UnsignedInt64
 class AnalyticsTestCase(AnalyticsTestCaseBase):
 
     def _drop_dataset(self, result, *args, **kwargs):
-        return self.mgr.drop_dataset(self.dataset_name, DropDatasetOptions(ignore_if_not_exists=True))
+        return self.mgr.drop_dataset(
+            self.dataset_name, DropDatasetOptions(ignore_if_not_exists=True))
 
     def tearDown(self):
-        return self.try_n_times(10, 3, self.mgr.disconnect_link, on_success=self._drop_dataset)
+        return self.try_n_times(
+            10, 3, self.mgr.disconnect_link, on_success=self._drop_dataset)
 
     def assertQueryReturnsRows(self, query, *options, **kwargs):
         result = self.cluster.analytics_query(query, *options, **kwargs)
@@ -55,21 +57,24 @@ class AnalyticsTestCase(AnalyticsTestCaseBase):
         return self.checkResult(result, verify_rows)
 
     def test_simple_query(self):
-        return self.try_n_times(10, 3, self.assertQueryReturnsRows, "SELECT * FROM `{}` LIMIT 1".format(self.dataset_name))
+        return self.try_n_times(10, 3, self.assertQueryReturnsRows,
+                                "SELECT * FROM `{}` LIMIT 1".format(self.dataset_name))
 
     def test_query_positional_params(self):
         rows_attempt = self.try_n_times(10, 3, self.assertQueryReturnsRows,
                                         'SELECT * FROM `{}` WHERE `type` = $1 LIMIT 1'.format(
                                             self.dataset_name),
                                         AnalyticsOptions(positional_parameters=["brewery"]))
-        return self.checkResult(rows_attempt, lambda result:  self.assertEqual("brewery", result[0][self.dataset_name]['type']))
+        return self.checkResult(rows_attempt, lambda result: self.assertEqual(
+            "brewery", result[0][self.dataset_name]['type']))
 
     def test_query_positional_params_no_option(self):
         rows_attempt = self.try_n_times(10, 3, self.assertQueryReturnsRows,
                                         'SELECT * FROM `{}` WHERE `type` = $1 LIMIT 1'.format(
                                             self.dataset_name),
                                         "brewery")
-        return self.checkResult(rows_attempt, lambda result: self.assertEqual("brewery", result[0][self.dataset_name]['type']))
+        return self.checkResult(rows_attempt, lambda result: self.assertEqual(
+            "brewery", result[0][self.dataset_name]['type']))
 
     def test_query_positional_params_override(self):
         rows_attempt = self.try_n_times(10, 3, self.assertQueryReturnsRows,
@@ -78,21 +83,24 @@ class AnalyticsTestCase(AnalyticsTestCaseBase):
                                         AnalyticsOptions(
                                             positional_parameters=["jfjfjfjfjfj"]),
                                         "brewery")
-        return self.checkResult(rows_attempt, lambda result: self.assertEqual("brewery", result[0][self.dataset_name]['type']))
+        return self.checkResult(rows_attempt, lambda result: self.assertEqual(
+            "brewery", result[0][self.dataset_name]['type']))
 
     def test_query_named_parameters(self):
         rows_attempt = self.try_n_times(10, 3, self.assertQueryReturnsRows,
                                         "SELECT * FROM `{}` WHERE `type` = $btype LIMIT 1".format(
                                             self.dataset_name),
                                         AnalyticsOptions(named_parameters={"btype": "brewery"}))
-        return self.checkResult(rows_attempt, lambda result: self.assertEqual("brewery", result[0][self.dataset_name]['type']))
+        return self.checkResult(rows_attempt, lambda result: self.assertEqual(
+            "brewery", result[0][self.dataset_name]['type']))
 
     def test_query_named_parameters_no_options(self):
         rows_attempt = self.try_n_times(10, 3, self.assertQueryReturnsRows,
                                         "SELECT * FROM `{}` WHERE `type` = $btype LIMIT 1".format(
                                             self.dataset_name),
                                         btype="brewery")
-        return self.checkResult(rows_attempt, lambda result: self.assertEqual("brewery", result[0][self.dataset_name]['type']))
+        return self.checkResult(rows_attempt, lambda result: self.assertEqual(
+            "brewery", result[0][self.dataset_name]['type']))
 
     def test_query_named_parameters_override(self):
         rows_attempt = self.try_n_times(10, 3, self.assertQueryReturnsRows,
@@ -101,7 +109,8 @@ class AnalyticsTestCase(AnalyticsTestCaseBase):
                                         AnalyticsOptions(named_parameters={
                                                          "btype": "jfjfjfjf"}),
                                         btype="brewery")
-        return self.checkResult(rows_attempt, lambda result: self.assertEqual("brewery", result[0][self.dataset_name]['type']))
+        return self.checkResult(rows_attempt, lambda result: self.assertEqual(
+            "brewery", result[0][self.dataset_name]['type']))
 
     def test_analytics_with_metrics(self):
         initial = datetime.datetime.now()
@@ -237,7 +246,7 @@ class AnalyticsCollectionTests(CollectionTestCase):
             self.dataverse_fqdn)
         self.cluster.analytics_query(query_str).rows()
 
-        query_str = """USE {}; 
+        query_str = """USE {};
         CREATE DATASET IF NOT EXISTS {} ON {}""".format(self.dataverse_fqdn,
                                                         self.beer_sample_collections.beers.name,
                                                         self.beers_fqdn)

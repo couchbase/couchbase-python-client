@@ -40,7 +40,8 @@ class AioBase:
             elif not self._future.done():
                 out = yield from self.__accum.get()
 
-            if out is None and (self._future.done() and self._future.exception() is None):
+            if out is None and (self._future.done()
+                                and self._future.exception() is None):
                 raise StopAsyncIteration
 
             if self._future.done() and self._future.exception() is not None:

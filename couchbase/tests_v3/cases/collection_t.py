@@ -20,7 +20,7 @@ from couchbase.cluster import ClusterOptions, ClassicAuthenticator, PasswordAuth
 from couchbase.collection import GetOptions, UpsertOptions, ReplaceOptions, InsertOptions, \
     RemoveOptions
 from couchbase.durability import ServerDurability, ClientDurability, Durability, PersistTo, ReplicateTo
-from couchbase.exceptions import InvalidArgumentException,  DocumentExistsException, DocumentNotFoundException, \
+from couchbase.exceptions import InvalidArgumentException, DocumentExistsException, DocumentNotFoundException, \
     TemporaryFailException, PathNotFoundException, DocumentLockedException, CASMismatchException
 import unittest
 from datetime import timedelta
@@ -194,7 +194,10 @@ class CollectionTests(CollectionTestCase):
             raise SkipTest("Mock does not support preserve expiry")
         if int(self.get_cluster_version().split('.')[0]) < 7:
             raise SkipTest("Preserve expiry only in CBS 7.0+")
-        opts = ReplaceOptions(expiry=timedelta(seconds=5), preserve_expiry=True)
+        opts = ReplaceOptions(
+            expiry=timedelta(
+                seconds=5),
+            preserve_expiry=True)
         with self.assertRaises(InvalidArgumentException):
             self.cb.replace(self.KEY, {"some": "other content"}, opts)
 
@@ -315,10 +318,11 @@ class CollectionTests(CollectionTestCase):
         num_replicas = self.bucket.configured_replica_count
         if num_replicas < 1:
             raise SkipTest('need replicas to test get_all/get_any_replicas')
-            # TODO: this is far to difficult - having to use the test framework to get the bucket
+            # TODO: this is far to difficult - having to use the test framework
+            # to get the bucket
         kv_results = self.bucket.ping().endpoints.get(ServiceType.KeyValue, None)
         # 2 means at least one replica is up
-        num_expected = num_replicas+1 if all_up else 2
+        num_expected = num_replicas + 1 if all_up else 2
         if not kv_results or len(kv_results) < num_expected:
             raise SkipTest('not all replicas are online')
 
@@ -367,16 +371,22 @@ class CollectionTests(CollectionTestCase):
             self.assertIsNotNone(res.content_as[dict])
         else:
             self.cb.touch(self.KEY, timedelta(seconds=15))
-            expiry = self.cb.get(self.KEY, GetOptions(with_expiry=True)).expiryTime
+            expiry = self.cb.get(
+                self.KEY, GetOptions(
+                    with_expiry=True)).expiryTime
             self.assertIsNotNone(expiry)
             self.cb.touch(self.KEY, timedelta(seconds=0))
-            expiry = self.cb.get(self.KEY, GetOptions(with_expiry=True)).expiryTime
+            expiry = self.cb.get(
+                self.KEY, GetOptions(
+                    with_expiry=True)).expiryTime
             self.assertIsNone(expiry)
 
     def _authenticator(self):
         if self.is_mock:
-            return ClassicAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)
-        return PasswordAuthenticator(self.cluster_info.admin_username, self.cluster_info.admin_password)
+            return ClassicAuthenticator(
+                self.cluster_info.admin_username, self.cluster_info.admin_password)
+        return PasswordAuthenticator(
+            self.cluster_info.admin_username, self.cluster_info.admin_password)
 
     def _create_cluster_opts(self, **kwargs):
         return ClusterOptions(self._authenticator(), **kwargs)
@@ -400,10 +410,14 @@ class CollectionTests(CollectionTestCase):
             self.assertIsNotNone(res.content_as[dict])
         else:
             self.cb.get_and_touch(self.KEY, timedelta(seconds=15))
-            expiry = self.cb.get(self.KEY, GetOptions(with_expiry=True)).expiryTime
+            expiry = self.cb.get(
+                self.KEY, GetOptions(
+                    with_expiry=True)).expiryTime
             self.assertIsNotNone(expiry)
             self.cb.get_and_touch(self.KEY, timedelta(seconds=0))
-            expiry = self.cb.get(self.KEY, GetOptions(with_expiry=True)).expiryTime
+            expiry = self.cb.get(
+                self.KEY, GetOptions(
+                    with_expiry=True)).expiryTime
             self.assertIsNone(expiry)
 
     def test_get_and_lock(self):
@@ -416,7 +430,8 @@ class CollectionTests(CollectionTestCase):
 
     def test_get_after_lock(self):
         orig = self.cb.get_and_lock(self.KEY, timedelta(seconds=3))
-        # GET operation is allowed on locked document; however, returned CAS should be invalid
+        # GET operation is allowed on locked document; however, returned CAS
+        # should be invalid
         res = self.cb.get(self.KEY)
         self.assertEqual(orig.content_as[dict], res.content_as[dict])
         self.assertNotEqual(orig.cas, res.cas)
@@ -535,7 +550,8 @@ class CollectionTests(CollectionTestCase):
         bucket = self.cluster.bucket(self.cluster_info.bucket_name)
         cm = bucket.collections()
 
-        def upsert_values(coll, scope_name, coll_name, result_key_dict, key, value):
+        def upsert_values(coll, scope_name, coll_name,
+                          result_key_dict, key, value):
             return coll.upsert(key, value)
         from collections import defaultdict
 
@@ -543,7 +559,8 @@ class CollectionTests(CollectionTestCase):
             return defaultdict(recurse)
         resultdict = recurse()
 
-        def check_values(coll, scope_name, coll_name, result_key_dict, key, value):
+        def check_values(coll, scope_name, coll_name,
+                         result_key_dict, key, value):
             result_key_dict[key] = coll.get(key).content
             return True
         for action in [upsert_values, check_values]:
@@ -552,13 +569,14 @@ class CollectionTests(CollectionTestCase):
 
         self.assertSanitizedEqual(test_dict, resultdict)
 
-    def _traverse_scope_tree(self, bucket, cm, result_dict, test_dict, coll_verb):
+    def _traverse_scope_tree(
+            self, bucket, cm, result_dict, test_dict, coll_verb):
         for scope_name, coll_dict in test_dict.items():
             result_coll_dict = result_dict[scope_name]
             logging.error("Creating scope {}".format(scope_name))
             try:
                 cm.create_scope(scope_name)
-            except:
+            except BaseException:
                 pass
             scope = bucket.scope(scope_name)
             for coll_name, key_dict in coll_dict.items():
@@ -572,7 +590,7 @@ class CollectionTests(CollectionTestCase):
                         CollectionSpec(scope_name=scope_name,
                                        collection_name=coll_name)
                     )
-                except:
+                except BaseException:
                     pass
                 coll = scope.collection(coll_name)
                 for key, value in key_dict.items():
@@ -656,4 +674,4 @@ class CollectionTests(CollectionTestCase):
                         # on the client; server interprets ttl < 30 as a true
                         # duration. Either way expiryTime is a timestamp.
                         self.assertTrue(
-                            now+ttl <= int(result.expiryTime.timestamp()) <= then+ttl)
+                            now + ttl <= int(result.expiryTime.timestamp()) <= then + ttl)

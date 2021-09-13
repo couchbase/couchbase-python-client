@@ -16,9 +16,9 @@ class Durability(CompatibilityEnum):
     def to_server_str(self):
         if self.name == 'MAJORITY_AND_PERSIST_TO_ACTIVE':
             return 'majorityAndPersistActive'
-        elif  self.name == 'NONE':
+        elif self.name == 'NONE':
             return 'none'
-        elif  self.name == 'MAJORITY':
+        elif self.name == 'MAJORITY':
             return 'majority'
         elif self.name == 'PERSIST_TO_MAJORITY':
             return 'persistToMajority'

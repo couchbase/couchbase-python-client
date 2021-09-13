@@ -36,6 +36,7 @@ class PingState(Enum):
     TIMEOUT = 'timeout'
     ERROR = 'error'
 
+
 class EndPointDiagnostics(object):
     def __init__(self,          # type: EndPointDiagnostics
                  service_type,  # type: ServiceType
@@ -67,7 +68,8 @@ class EndPointDiagnostics(object):
     @property
     def last_activity(self):
         # type: (...) -> timedelta
-        return timedelta(microseconds=self._raw_endpoint.get('last_activity_us'))
+        return timedelta(
+            microseconds=self._raw_endpoint.get('last_activity_us'))
 
     @property
     def namespace(self):
@@ -90,14 +92,16 @@ class EndPointDiagnostics(object):
 
 class DiagnosticsResult(object):
     def __init__(self,  # type: DiagnosticsResult
-                 source_diagnostics  # type: Union[Mapping[str,Any], list[Mapping[str,Any]]]
+                 # type: Union[Mapping[str,Any], list[Mapping[str,Any]]]
+                 source_diagnostics
                  ):
         self._id = self._version = self._sdk = self._endpoints = None
         # we could have an array of dicts, or just a single dict
         if isinstance(source_diagnostics, dict):
             source_diagnostics = [source_diagnostics]
         if not isinstance(source_diagnostics, list):
-            raise InvalidArgumentException("DiagnosticsResult expects a dict or list(dict)")
+            raise InvalidArgumentException(
+                "DiagnosticsResult expects a dict or list(dict)")
         for d in source_diagnostics:
             self.append_endpoints(d)
 
@@ -105,7 +109,7 @@ class DiagnosticsResult(object):
         # type: (...) -> str
         tmp = copy.deepcopy(self.__dict__)
         for k, val in tmp['_endpoints'].items():
-            json_vals=[]
+            json_vals = []
             for v in val:
                 v_dict = v.as_dict()
                 v_dict.pop('type')
@@ -115,10 +119,12 @@ class DiagnosticsResult(object):
             tmp['_endpoints'][k] = json_vals
         return_val = {
             'version': self.version,
-            'id':self.id,
+            'id': self.id,
             'sdk': self.sdk
         }
-        return_val['services'] = {k.value: v for k, v in tmp['_endpoints'].items()}
+        return_val['services'] = {
+            k.value: v for k,
+            v in tmp['_endpoints'].items()}
         return json.dumps(return_val)
 
     def append_endpoints(self, source_diagnostics):
@@ -170,10 +176,9 @@ class DiagnosticsResult(object):
 
         if num_found == num_connected:
             return ClusterState.Online
-        if num_connected > 0 :
+        if num_connected > 0:
             return ClusterState.Degraded
         return ClusterState.Offline
-
 
 
 class EndpointPingReport(object):
@@ -208,7 +213,8 @@ class EndpointPingReport(object):
     def namespace(self):
         # type: (...) -> str
         # was 'scope', now 'namespace'
-        return self._src_ping.get('namespace', self._src_ping.get('scope', None))
+        return self._src_ping.get(
+            'namespace', self._src_ping.get('scope', None))
 
     @property
     def latency(self):
@@ -223,5 +229,3 @@ class EndpointPingReport(object):
     def as_dict(self):
         # type: (...) -> dict
         return self._src_ping
-
-

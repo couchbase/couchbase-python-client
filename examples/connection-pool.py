@@ -31,6 +31,7 @@ class BucketWrapper(Bucket):
     """
     This is a simple subclass which adds usage statistics to inspect later on
     """
+
     def __init__(self, **kwargs):
         super(BucketWrapper, self).__init__(**kwargs)
         self.use_count = 0

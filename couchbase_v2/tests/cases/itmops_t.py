@@ -21,6 +21,7 @@ from couchbase_v2.exceptions import (
     DocumentNotFoundException, ValueFormatException, InvalidArgumentException, KeyExistsException)
 from couchbase_core.user_constants import FMT_BYTES, FMT_UTF8
 
+
 class ItemTest(ConnectionTestCase):
     """
     This class tests the new 'Item' API
@@ -75,7 +76,7 @@ class ItemTest(ConnectionTestCase):
         k = self.gen_key("itm_format_options")
         it = Item(k, {})
         itcoll = ItemOptionDict()
-        itcoll.dict[it] = { "format" : FMT_BYTES }
+        itcoll.dict[it] = {"format": FMT_BYTES}
         self.assertRaises(ValueFormatException, self.cb.upsert_multi, itcoll)
 
     def test_items_append(self):
@@ -130,9 +131,11 @@ class ItemTest(ConnectionTestCase):
         class MyItem(Item):
             def __init__(self):
                 pass
+
             @property
             def value(self):
                 return "This should not be present!!!"
+
             @value.setter
             def value(self, other):
                 return
@@ -159,7 +162,10 @@ class ItemTest(ConnectionTestCase):
     def test_invalid_item(self):
         itcoll = ItemOptionDict()
         itcoll.add(None)
-        self.assertRaises(InvalidArgumentException, self.cb.upsert_multi, itcoll)
+        self.assertRaises(
+            InvalidArgumentException,
+            self.cb.upsert_multi,
+            itcoll)
 
         self.assertRaises(InvalidArgumentException,
                           self.cb.upsert_multi, ItemSequence([None]))
@@ -167,7 +173,11 @@ class ItemTest(ConnectionTestCase):
     def test_create_and_add(self):
         itcoll = ItemOptionDict()
         itcoll.create_and_add('foo', value='fooValue', cas=123, persist_to=-1)
-        itcoll.create_and_add('bar', value='barValue', cas=321, replicate_to=-1)
+        itcoll.create_and_add(
+            'bar',
+            value='barValue',
+            cas=321,
+            replicate_to=-1)
 
         dd = itcoll.dict
         self.assertEqual(2, len(dd))

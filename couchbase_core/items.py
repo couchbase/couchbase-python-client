@@ -25,6 +25,7 @@
 
 from couchbase_core._libcouchbase import Item as _Item
 
+
 class Item(_Item):
     def __init__(self, key=None, value=None):
         """
@@ -97,10 +98,12 @@ class Item(_Item):
         else:
             return ItemOptionDict({self: kwargs})
 
+
 class ItemCollection(object):
     """
     The base class for a collection of Items.
     """
+
     def __len__(self):
         raise NotImplementedError()
 
@@ -118,6 +121,7 @@ class ItemCollection(object):
         for each item in this collection.
         """
         return iter(self)
+
 
 class ItemOptionDict(ItemCollection):
     def __init__(self, d=None):
@@ -175,6 +179,7 @@ class ItemOptionDict(ItemCollection):
     def __len__(self):
         return len(self._d)
 
+
 class ItemSequence(ItemCollection):
     def __init__(self, obj):
         """
@@ -183,7 +188,7 @@ class ItemSequence(ItemCollection):
         :param seq: A sequence containing the items
         :type seq: An iterable or a single item
         """
-        self._seq = [ obj ] if isinstance(obj, Item) else obj
+        self._seq = [obj] if isinstance(obj, Item) else obj
         # Verify this is indeed a sequence
         len(self._seq)
 

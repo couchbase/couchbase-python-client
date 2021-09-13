@@ -24,6 +24,7 @@ import sys
 import time
 from nose import SkipTest
 
+
 class EnhancedErrorTest(CouchbaseTestCase):
     def setUp(self):
         super(EnhancedErrorTest, self).setUp()
@@ -41,38 +42,48 @@ class EnhancedErrorTest(CouchbaseTestCase):
         super(EnhancedErrorTest, self).tearDown()
         if self.should_check_refcount:
             rc = sys.getrefcount(self.admin)
-            #TODO: revise GC handling - broken on Mac
+            # TODO: revise GC handling - broken on Mac
             #self.assertEqual(rc, 2)
 
         del self.admin
 
     def test_enhanced_err_present_authorisation(self):
         import couchbase_core.subdocument as SD
-        users=[('writer',('s3cr3t',[Role(name='data_reader', bucket='default'), Role(name='data_writer', bucket='default')])),
-              ('reader',('s3cr3t',[Role(name='data_reader', bucket='default')]))]
-        #self.mockclient._do_request("SET_ENHANCED_ERRORS",{"enabled":True})
+        users = [('writer', ('s3cr3t', [Role(name='data_reader', bucket='default'), Role(name='data_writer', bucket='default')])),
+                 ('reader', ('s3cr3t', [Role(name='data_reader', bucket='default')]))]
+        # self.mockclient._do_request("SET_ENHANCED_ERRORS",{"enabled":True})
         for user in users:
             print(str(user))
-            (userid, password, roles) = user[0],user[1][0],user[1][1]
+            (userid, password, roles) = user[0], user[1][0], user[1][1]
             # add user
             self.admin.user_upsert(userid, AuthDomain.Local, password, roles)
             time.sleep(1)
             try:
-                connection = self.make_connection(username=userid,password=password)
+                connection = self.make_connection(
+                    username=userid, password=password)
 
                 key = self.gen_key('create_doc')
-                connection.mutate_in(key, (SD.upsert('new.path', 'newval'),), upsert_doc=True)
+                connection.mutate_in(
+                    key, (SD.upsert('new.path', 'newval'),), upsert_doc=True)
             except CouchbaseException as e:
                 print(str(e))
-                if userid=="writer":
+                if userid == "writer":
                     raise e
                 else:
-                    self.assertRegexpMatches(e.context,r".*Authorization failure.*","doesn't have correct Context field")
-                    self.assertRegexpMatches(e.ref,r"(.*?)-(.*?)-.*","doesn't have correct Ref field")
-                    self.assertRegexpMatches(str(e),r".*Context=Authorization failure.*,.*Ref=.*","exception as string doesn't contain both fields")
+                    self.assertRegexpMatches(
+                        e.context,
+                        r".*Authorization failure.*",
+                        "doesn't have correct Context field")
+                    self.assertRegexpMatches(
+                        e.ref, r"(.*?)-(.*?)-.*", "doesn't have correct Ref field")
+                    self.assertRegexpMatches(
+                        str(e),
+                        r".*Context=Authorization failure.*,.*Ref=.*",
+                        "exception as string doesn't contain both fields")
             finally:
-                #remove user
+                # remove user
                 self.admin.user_remove(userid, AuthDomain.Local)
+
 
 if __name__ == "__main__":
     unittest.main()

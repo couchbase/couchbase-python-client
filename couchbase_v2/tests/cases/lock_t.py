@@ -42,7 +42,11 @@ class LockTest(ConnectionTestCase):
         # Test set-while-locked
         self.assertRaises(DocumentExistsException, self.cb.upsert, k, v)
 
-        self.assertRaises(TemporaryFailException, self.cb.unlock, k, cas=0xdeadbeef)
+        self.assertRaises(
+            TemporaryFailException,
+            self.cb.unlock,
+            k,
+            cas=0xdeadbeef)
 
         rv = self.cb.unlock(k, rv.cas)
         self.assertTrue(rv.success)
@@ -83,13 +87,13 @@ class LockTest(ConnectionTestCase):
         self.cb.upsert(key, val)
 
         rv = self.cb.lock(key, ttl=5)
-        rvs = self.cb.unlock_multi({key:rv.cas})
+        rvs = self.cb.unlock_multi({key: rv.cas})
         self.assertTrue(rvs.all_ok)
         self.assertTrue(rvs[key].success)
 
         rv = self.cb.lock(key, ttl=5)
         self.assertTrue(rv.success)
-        rvs = self.cb.unlock_multi({key:rv})
+        rvs = self.cb.unlock_multi({key: rv})
         self.assertTrue(rvs.all_ok)
         self.assertTrue(rvs[key].success)
 
@@ -105,7 +109,7 @@ class LockTest(ConnectionTestCase):
                           ("foo", "bar"))
         self.assertRaises(InvalidArgumentException,
                           self.cb.unlock_multi,
-                          {"foo":0, "bar":0})
+                          {"foo": 0, "bar": 0})
 
     def test_resobjs(self):
         keys = self.gen_kv_dict(prefix="Lock_test_resobjs")

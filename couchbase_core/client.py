@@ -837,7 +837,8 @@ class Client(_Base):
 
         .. seealso:: :meth:`touch`
         """
-        return _Base.touch_multi(self, keys, ttl=ttl, durability_level=durability_level.value)
+        return _Base.touch_multi(
+            self, keys, ttl=ttl, durability_level=durability_level.value)
 
     def lock_multi(self,  # type: Client
                    keys,  # type: Iterable[str]
@@ -925,7 +926,8 @@ class Client(_Base):
             values.
         :param Durability durability_level: Sync replication durability level.
         """
-        return _Base.remove_multi(self, kvs, quiet=quiet, durability_level=durability_level.value, **kwargs)
+        return _Base.remove_multi(
+            self, kvs, quiet=quiet, durability_level=durability_level.value, **kwargs)
 
     def counter_multi(self,
                       kvs,
@@ -997,7 +999,8 @@ class Client(_Base):
         """
         d = {}
         for n in cls._MEMCACHED_OPERATIONS:
-            if n in ['get_and_lock', 'get_and_touch'] and 'AsyncCBCollection' != cls.__name__:
+            if n in ['get_and_lock',
+                     'get_and_touch'] and 'AsyncCBCollection' != cls.__name__:
                 continue
 
             for variant in (n, n + "_multi"):

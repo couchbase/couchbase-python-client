@@ -53,7 +53,14 @@ class AIOClientMixin(object):
 
     def __init__(self, connstr=None, *args, **kwargs):
         loop = asyncio.get_event_loop()
-        super(AIOClientMixin, self).__init__(connstr, *args, iops=IOPS(loop), **kwargs)
+        super(
+            AIOClientMixin,
+            self).__init__(
+            connstr,
+            *
+            args,
+            iops=IOPS(loop),
+            **kwargs)
         self._loop = loop
 
         if issubclass(type(self), CBCollection):

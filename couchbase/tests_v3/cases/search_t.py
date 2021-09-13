@@ -27,7 +27,7 @@ from couchbase.exceptions import NotSupportedException
 
 try:
     from abc import ABC
-except:
+except BaseException:
     from abc import ABCMeta
 
 import datetime
@@ -86,7 +86,8 @@ class SearchRequestMock(search.SearchRequest):
             raise
 
 
-class SearchResultMock(search.SearchResultBase, iterable_wrapper(SearchRequestMock)):
+class SearchResultMock(search.SearchResultBase,
+                       iterable_wrapper(SearchRequestMock)):
     pass
 
 
@@ -262,10 +263,12 @@ class SearchTest(ClusterTestCase):
         self.assertIsInstance(result_facet, search.SearchFacetResult)
         self.assertEqual(facet_name, result_facet.name)
         self.assertEqual(facet.field, result_facet.field)
-        # if a limit is not provided, only the top-level facet results are provided
+        # if a limit is not provided, only the top-level facet results are
+        # provided
         self.assertEqual(0, len(result_facet.numeric_ranges))
 
-        # try again but verify the limit is applied (i.e. limit < len(numeric_ranges))
+        # try again but verify the limit is applied (i.e. limit <
+        # len(numeric_ranges))
         facet.limit = 2
         x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
                                                                           search.TermQuery(
@@ -309,10 +312,12 @@ class SearchTest(ClusterTestCase):
         self.assertIsInstance(result_facet, search.SearchFacetResult)
         self.assertEqual(facet_name, result_facet.name)
         self.assertEqual(facet.field, result_facet.field)
-        # if a limit is not provided, only the top-level facet results are provided
+        # if a limit is not provided, only the top-level facet results are
+        # provided
         self.assertEqual(0, len(result_facet.date_ranges))
 
-        # try again but verify the limit is applied (i.e. limit < len(date_ranges))
+        # try again but verify the limit is applied (i.e. limit <
+        # len(date_ranges))
         facet.limit = 2
         x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
                                                                           search.TermQuery(
@@ -653,7 +658,7 @@ class SearchStringsTest(CouchbaseTestCase):
             'query': {
                 'term': 'someterm',
                 'boost': 1.5,
-                'fuzziness':  12,
+                'fuzziness': 12,
                 'prefix_length': 23,
                 'field': 'field'
             },

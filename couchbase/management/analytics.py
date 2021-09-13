@@ -35,12 +35,13 @@ from couchbase.management.admin import Admin, METHMAP
 
 class BaseAnalyticsIndexManagerOptions(OptionBlockTimeOut):
     # valid AnalyticsOptions keys
-    OPTION_KEYS = ["timeout", "readonly", "scan_consistency", "client_context_id",  "priority",
+    OPTION_KEYS = ["timeout", "readonly", "scan_consistency", "client_context_id", "priority",
                    "positional_parameters", "named_parameters", "raw"]
 
     def to_analytics_options(self, **kwargs):
         final_opts = {**self, **kwargs}
-        return AnalyticsOptions(**{k: v for k, v in final_opts.items() if k in self.OPTION_KEYS})
+        return AnalyticsOptions(
+            **{k: v for k, v in final_opts.items() if k in self.OPTION_KEYS})
 
 
 class GetPendingMutationsOptions(BaseAnalyticsIndexManagerOptions):

@@ -28,9 +28,9 @@ class ErrorContextTests(CollectionTestCase):
         super(ErrorContextTests, self).setUp()
 
     def test_kv_error(self):
-        self.cb.upsert("foo", {"some":"content"})
+        self.cb.upsert("foo", {"some": "content"})
         try:
-            self.cb.insert("foo", {"some":"other content"})
+            self.cb.insert("foo", {"some": "other content"})
             self.fail("expected an exception")
         except CouchbaseException as e:
             self.assertIsInstance(e.context, KVErrorContext)
@@ -46,7 +46,8 @@ class ErrorContextTests(CollectionTestCase):
 
     def test_analytics_error(self):
         try:
-            self.cluster.analytics_query("notanindex", "I'm also not n1ql").rows()
+            self.cluster.analytics_query(
+                "notanindex", "I'm also not n1ql").rows()
             self.fail("expected an exception")
         except NotSupportedException:
             raise SkipTest("analytics not supported in this cluster")
@@ -55,7 +56,8 @@ class ErrorContextTests(CollectionTestCase):
 
     def test_search_error(self):
         try:
-            for x in self.cluster.search_query("not_an_index", TermQuery("whatever")):
+            for x in self.cluster.search_query(
+                    "not_an_index", TermQuery("whatever")):
                 pass
             self.fail("expected an exception")
         except NotSupportedException:

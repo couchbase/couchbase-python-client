@@ -62,7 +62,7 @@ class ReplaceOptions(DurabilityOptionBlock):
                  timeout=None,       # type: timedelta
                  durability=None,    # type: DurabilityType
                  cas=0,               # type: int
-                 preserve_expiry=False, # type: bool
+                 preserve_expiry=False,  # type: bool
                  **kwargs               # type: Any
                  ):
         """
@@ -217,16 +217,20 @@ class InsertOptions(DurabilityOptionBlock):
 
 class UpsertOptions(DurabilityOptionBlock):
     def __init__(self,
-                preserve_expiry=False, # type: bool
-                **kwargs
-                ):
+                 preserve_expiry=False,  # type: bool
+                 **kwargs
+                 ):
         """
 
         :param timeout:
         :param durability:
         :param cas:
         """
-        super(UpsertOptions, self).__init__(preserve_expiry=preserve_expiry, **kwargs)
+        super(
+            UpsertOptions,
+            self).__init__(
+            preserve_expiry=preserve_expiry,
+            **kwargs)
 
 
 T = TypeVar('T', bound='CBCollection')
@@ -292,7 +296,8 @@ def _wrap_get_result(func  # type: CoreBucketOpRead
                 **kwargs  # type:  Any
                 ):
         # type: (...)->Any
-        return _inject_scope_and_collection(get_result_wrapper(func))(self, *args, **kwargs)
+        return _inject_scope_and_collection(
+            get_result_wrapper(func))(self, *args, **kwargs)
 
     return wrapped
 
@@ -315,7 +320,8 @@ def _wrap_multi_mutation_result(wrapped  # type: CoreBucketOp
     @wraps(wrapped)
     def wrapper(target, keys, *options, **kwargs
                 ):
-        return get_multi_mutation_result(target.bucket, wrapped, keys, *options, **kwargs)
+        return get_multi_mutation_result(
+            target.bucket, wrapped, keys, *options, **kwargs)
 
     return _inject_scope_and_collection(wrapper)
 
@@ -366,7 +372,8 @@ class CBCollection(wrapt.ObjectProxy):
         # NOTE: BinaryCollection, for instance, contains a collection and has an interface
         # which uses this annotation.  So -- anything this depends on must be supported by
         # that interface.  If we add/remove something that depends on self from here, we need
-        # to do same in BinaryCollection (and any other object that does likewise).
+        # to do same in BinaryCollection (and any other object that does
+        # likewise).
         if self.true_collections:
             if self._self_name and not self._self_scope:
                 raise couchbase.exceptions.CollectionNotFoundException
@@ -462,7 +469,8 @@ class CBCollection(wrapt.ObjectProxy):
         # NOTE: there is no reason for the options in the ResultPrecursor below.  Once
         # we get expiry done correctly, lets eliminate that as well.  Previously the
         # expiry you passed in was just duplicated into the result, which of course made
-        # no sense since expiry should have been with_expiry (a bool) in the options.
+        # no sense since expiry should have been with_expiry (a bool) in the
+        # options.
         return ResultPrecursor(x, options)
 
     @_get_result_and_inject
@@ -578,7 +586,8 @@ class CBCollection(wrapt.ObjectProxy):
         :raise: :exc:`.DocumentNotFoundException` if the key does not exist
               :exc:`.DocumentUnretrievableException` if no replicas exist
         """
-        return CoreClient.rgetall(self.bucket, key, **forward_args(kwargs, *options))
+        return CoreClient.rgetall(
+            self.bucket, key, **forward_args(kwargs, *options))
 
     @_inject_scope_and_collection
     @volatile
@@ -595,7 +604,8 @@ class CBCollection(wrapt.ObjectProxy):
         :type keys: list of keys to get
         :return: a dictionary of :class:`~.GetResult` objects by key
         """
-        return get_multi_get_result(self.bucket, _Base.get_multi, keys, **kwargs)
+        return get_multi_get_result(
+            self.bucket, _Base.get_multi, keys, **kwargs)
 
     @overload
     def upsert_multi(self,  # type: CBCollection
@@ -603,7 +613,7 @@ class CBCollection(wrapt.ObjectProxy):
                      ttl=0,  # type: int
                      format=None,  # type: int
                      durability=None,  # type: DurabilityType
-                     span=None # type: CouchbaseSpan
+                     span=None  # type: CouchbaseSpan
                      ):
         pass
 
@@ -653,7 +663,8 @@ class CBCollection(wrapt.ObjectProxy):
 
         .. seealso:: :meth:`upsert`
         """
-        return get_multi_mutation_result(self.bucket, CoreClient.upsert_multi, keys, *options, **kwargs)
+        return get_multi_mutation_result(
+            self.bucket, CoreClient.upsert_multi, keys, *options, **kwargs)
 
     @_inject_scope_and_collection
     @volatile
@@ -671,7 +682,8 @@ class CBCollection(wrapt.ObjectProxy):
 
         .. seealso:: :meth:`upsert_multi` - for other optional arguments
         """
-        return get_multi_mutation_result(self.bucket, _Base.insert_multi, keys, *options, **kwargs)
+        return get_multi_mutation_result(
+            self.bucket, _Base.insert_multi, keys, *options, **kwargs)
 
     @_inject_scope_and_collection
     @volatile
@@ -696,7 +708,8 @@ class CBCollection(wrapt.ObjectProxy):
         if persist_to > 0 or replicate_to > 0:
             raise NotSupportedException(
                 "Client durability not supported yet for remove")
-        return get_multi_mutation_result(self.bucket, CoreClient.remove_multi, keys, *options, **kwargs)
+        return get_multi_mutation_result(
+            self.bucket, CoreClient.remove_multi, keys, *options, **kwargs)
 
     replace_multi = _wrap_multi_mutation_result(_Base.replace_multi)
     touch_multi = _wrap_multi_mutation_result(_Base.touch_multi)
@@ -726,9 +739,11 @@ class CBCollection(wrapt.ObjectProxy):
         .. seealso:: :meth:`get_and_touch` - which can be used to get *and* update the
             expiry
         """
-        # lets just pop the expiry into the kwargs.  If one was present, we override it
+        # lets just pop the expiry into the kwargs.  If one was present, we
+        # override it
         kwargs['expiry'] = expiry
-        return CoreClient.touch(self.bucket, key, **forward_args(kwargs, *options))
+        return CoreClient.touch(
+            self.bucket, key, **forward_args(kwargs, *options))
 
     @_mutate_result_and_inject
     def unlock(self,
@@ -757,7 +772,8 @@ class CBCollection(wrapt.ObjectProxy):
         """
         # pop the cas into the kwargs
         kwargs['cas'] = cas
-        return CoreClient.unlock(self.bucket, key, **forward_args(kwargs, *options))
+        return CoreClient.unlock(
+            self.bucket, key, **forward_args(kwargs, *options))
 
     @_inject_scope_and_collection
     def exists(self,      # type: CBCollection
@@ -773,7 +789,8 @@ class CBCollection(wrapt.ObjectProxy):
         :return: An object with a boolean value indicating the presence of the document.
         :raise: Any exceptions raised by the underlying platform.
         """
-        return ExistsResult(CoreClient.exists(self.bucket, key, **forward_args(kwargs, *options)))
+        return ExistsResult(CoreClient.exists(
+            self.bucket, key, **forward_args(kwargs, *options)))
 
     @_mutate_result_and_inject
     def upsert(self,        # type: CBCollection
@@ -842,7 +859,8 @@ class CBCollection(wrapt.ObjectProxy):
         """
 
         final_options = forward_args(kwargs, *options)
-        return ResultPrecursor(CoreClient.upsert(self.bucket, key, value, **final_options), final_options)
+        return ResultPrecursor(CoreClient.upsert(
+            self.bucket, key, value, **final_options), final_options)
 
     @_mutate_result_and_inject
     def insert(self,
@@ -901,9 +919,11 @@ class CBCollection(wrapt.ObjectProxy):
         ttl = final_options.get('ttl', None)
         preserve_expiry = final_options.get('preserve_expiry', False)
         if ttl and preserve_expiry is True:
-            raise InvalidArgumentException('The expiry and preserve_expiry options cannot both be set for replace operations.')
+            raise InvalidArgumentException(
+                'The expiry and preserve_expiry options cannot both be set for replace operations.')
 
-        return ResultPrecursor(CoreClient.replace(self.bucket, key, value, **final_options), final_options)
+        return ResultPrecursor(CoreClient.replace(
+            self.bucket, key, value, **final_options), final_options)
 
     @_mutate_result_and_inject
     def remove(self,        # type: CBCollection
@@ -944,7 +964,8 @@ class CBCollection(wrapt.ObjectProxy):
         if persist_to > 0 or replicate_to > 0:
             raise NotSupportedException(
                 "Client durability not supported yet for remove")
-        return ResultPrecursor(CoreClient.remove(self.bucket, key, **final_options), final_options)
+        return ResultPrecursor(CoreClient.remove(
+            self.bucket, key, **final_options), final_options)
 
     @_inject_scope_and_collection
     @lookup_in_result_wrapper
@@ -980,7 +1001,8 @@ class CBCollection(wrapt.ObjectProxy):
 
         """
         final_options = forward_args(kwargs, *options)
-        return ResultPrecursor(CoreClient.lookup_in(self.bucket, key, spec, **final_options), final_options)
+        return ResultPrecursor(CoreClient.lookup_in(
+            self.bucket, key, spec, **final_options), final_options)
 
     @_inject_scope_and_collection
     @mutate_in_result_wrapper
@@ -1022,12 +1044,15 @@ class CBCollection(wrapt.ObjectProxy):
 
         spec_types = [s[0] for s in spec]
         if SD.LCB_SDCMD_DICT_ADD in spec_types and preserve_expiry is True:
-            raise InvalidArgumentException('The preserve_expiry option cannot be set for mutate_in with insert operations.')
+            raise InvalidArgumentException(
+                'The preserve_expiry option cannot be set for mutate_in with insert operations.')
 
         if SD.LCB_SDCMD_REPLACE in spec_types and ttl and preserve_expiry is True:
-            raise InvalidArgumentException('The expiry and preserve_expiry options cannot both be set for mutate_in with replace operations.')
+            raise InvalidArgumentException(
+                'The expiry and preserve_expiry options cannot both be set for mutate_in with replace operations.')
 
-        return ResultPrecursor(CoreClient.mutate_in(self.bucket, key, spec, **final_options), final_options)
+        return ResultPrecursor(CoreClient.mutate_in(
+            self.bucket, key, spec, **final_options), final_options)
 
     def binary(self):
         # type: (...) -> BinaryCollection
@@ -1111,7 +1136,8 @@ class CBCollection(wrapt.ObjectProxy):
         .. seealso:: :meth:`map_add`
         """
 
-        return self._get_content(self.lookup_in(key, (SD.get_count(''),), **kwargs))[0]
+        return self._get_content(self.lookup_in(
+            key, (SD.get_count(''),), **kwargs))[0]
 
     @_dsop(create_type=list)
     def list_append(self, key, value, create=False, **kwargs):
@@ -1706,7 +1732,8 @@ class Scope(object):
             Also, any exceptions raised by the underlying platform - :class:`~.exceptions.TimeoutException`
             for example.
         """
-        # following the query implementation, but this seems worth revisiting soon
+        # following the query implementation, but this seems worth revisiting
+        # soon
         itercls = kwargs.pop('itercls', AnalyticsResult)
         opt = AnalyticsOptions()
         opts = list(options)
@@ -1757,7 +1784,8 @@ class Scope(object):
         """
         search_params = SearchOptions.gen_search_params_cls(
             index, query, *options, **kwargs)
-        return search_params.itercls(search_params.body, self.bucket, **search_params.iterargs)
+        return search_params.itercls(
+            search_params.body, self.bucket, **search_params.iterargs)
 
 
 class CoreClientDatastructureWrap(CoreClient):
@@ -1766,7 +1794,8 @@ class CoreClientDatastructureWrap(CoreClient):
 
     @property
     def lockmode(self):
-        return couchbase.options.LockMode(super(CoreClientDatastructureWrap, self).lockmode)
+        return couchbase.options.LockMode(
+            super(CoreClientDatastructureWrap, self).lockmode)
 
 
 class AsyncCBCollection(AsyncClientMixin, CBCollection):

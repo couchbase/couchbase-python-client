@@ -72,7 +72,12 @@ class OptionBlockTimeOut(OptionBlock):
 
         :param timeout: Timeout for an operation
         """
-        super(OptionBlockTimeOut, self).__init__(timeout=timeout, span=span, **kwargs)
+        super(
+            OptionBlockTimeOut,
+            self).__init__(
+            timeout=timeout,
+            span=span,
+            **kwargs)
 
     def timeout(self,  # type: T
                 duration  # type: timedelta
@@ -81,9 +86,9 @@ class OptionBlockTimeOut(OptionBlock):
         self['timeout'] = duration
         return self
 
-    def span(self, # type: T
+    def span(self,  # type: T
              span  # type: CouchbaseSpan
-            ):
+             ):
         # type: (...) -> T
         self['span'] = span
         return self
@@ -166,7 +171,7 @@ def timedelta_as_microseconds(duration  # type: timedelta
     if not isinstance(duration, timedelta):
         raise couchbase.exceptions.InvalidArgumentException(
             "Expected timedelta instead of {}".format(duration))
-    return int(duration.total_seconds()*1e6 if duration else 0)
+    return int(duration.total_seconds() * 1e6 if duration else 0)
 
 
 class DefaultForwarder(Forwarder):
@@ -238,13 +243,14 @@ class ConstrainedInt(object):
         raise NotImplementedError()
 
     def __str__(self):
-        return "{cls_name} with value {value}".format(cls_name=type(self), value=self.value)
+        return "{cls_name} with value {value}".format(
+            cls_name=type(self), value=self.value)
 
     def __repr__(self):
         return str(self)
 
     def __eq__(self, other):
-        return type(self) == type(other) and self.value == other.value
+        return isinstance(self, type(other)) and self.value == other.value
 
     def __gt__(self, other):
         return self.value > other.value

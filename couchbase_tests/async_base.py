@@ -14,7 +14,8 @@ class AsyncioTestCase(CouchbaseTestCase):
     _use_scopes_and_collections = None
 
     @classmethod
-    def setUpClass(cls, loop, cluster_class=ACluster, use_scopes_and_colls=None, **kwargs) -> None:
+    def setUpClass(cls, loop, cluster_class=ACluster,
+                   use_scopes_and_colls=None, **kwargs) -> None:
         super(AsyncioTestCase, cls).setUpClass()
         if cls._cluster_info:
             return

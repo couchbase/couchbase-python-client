@@ -73,7 +73,7 @@ class CMakeBuild(cbuild_config.CBuildCommon):
     def check_for_cmake():
         try:
             return subprocess.check_output(['cmake', '--version'])
-        except:
+        except BaseException:
             return None
 
     @staticmethod
@@ -128,17 +128,18 @@ class CMakeBuild(cbuild_config.CBuildCommon):
                             fullname = op.normpath(op.join(entry, subentry))
                             try:
                                 fullname = op.readlink(fullname)
-                            except:
+                            except BaseException:
                                 pass
                             print("trying subentry:{}".format(fullname))
 
                             if op.exists(fullname):
                                 python_lib = python_lib or fullname
                                 python_libdir = op.normpath(entry)
-                                print("got match {}, breaking out".format(fullname))
+                                print(
+                                    "got match {}, breaking out".format(fullname))
                                 continue
 
-                except:
+                except BaseException:
                     pass
             cmake_args += ['-DHYBRID_BUILD=TRUE'] if CMakeBuild.hybrid else []
             cmake_args += ['-DPYTHON_LIBFILE={}'.format(
@@ -168,7 +169,7 @@ class CMakeBuild(cbuild_config.CBuildCommon):
                     env['PATH'] = env['PATH'] + \
                         ";{}".format(os.path.dirname(conans.conan.__file__))
                     pass_path = True
-                except:
+                except BaseException:
                     logging.warning("Cannot find conan : {}".format(
                         traceback.format_exc()))
             if re.match(r'.*(GITHUB|ALL).*', PYCBC_SSL_FETCH):
@@ -218,7 +219,7 @@ class CMakeBuild(cbuild_config.CBuildCommon):
                                         self.info.lcb_pkgs_srcs(), name)
                     self.copy_binary_to(
                         cfg, self.info.pkg_data_dir, self.info.lcb_pkgs_srcs(), name)
-                except:
+                except BaseException:
                     print("failure")
                     raise
 
@@ -227,5 +228,5 @@ def gen_cmake_build(extoptions, pkgdata):
     CMakeBuild.hybrid = build_type in ['CMAKE_HYBRID']
     CMakeBuild.setup_build_info(extoptions, pkgdata)
     e_mods = [CMakeExtension(
-        str(couchbase_core+'._libcouchbase'), '', **extoptions)]
+        str(couchbase_core + '._libcouchbase'), '', **extoptions)]
     return e_mods, CMakeBuild.requires(), cbuild_config.LazyCommandClass(CMakeBuild)

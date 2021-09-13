@@ -77,7 +77,8 @@ class EventingFunctionManagementTests(CollectionTestCase):
         version = self.get_cluster_version(full=True)
 
         if int(version.split(".")[0]) < 7:
-            raise SkipTest("No eventing function management in {}".format(version))
+            raise SkipTest(
+                "No eventing function management in {}".format(version))
 
         self.EVT_VERSION = "evt-{}".format(
             version.replace("enterprise", "ee").replace("community", "ce")
@@ -137,7 +138,8 @@ class EventingFunctionManagementTests(CollectionTestCase):
                     if field == "name":
                         self.assertIsInstance(value, EventingFunctionKeyspace)
                     elif field == "access":
-                        self.assertIsInstance(value, EventingFunctionBucketAccess)
+                        self.assertIsInstance(
+                            value, EventingFunctionBucketAccess)
                     else:
                         self.assertIsInstance(value, fields[field].type)
 
@@ -158,7 +160,8 @@ class EventingFunctionManagementTests(CollectionTestCase):
                         elif isinstance(value, EventingFunctionUrlAuthBearer):
                             self.assertIsNone(value.key)
                         else:
-                            self.assertIsInstance(value, EventingFunctionUrlNoAuth)
+                            self.assertIsInstance(
+                                value, EventingFunctionUrlNoAuth)
                     else:
                         self.assertIsInstance(value, fields[field].type)
 
@@ -180,11 +183,14 @@ class EventingFunctionManagementTests(CollectionTestCase):
                 if field == "dcp_stream_boundary":
                     self.assertIsInstance(value, EventingFunctionDcpBoundary)
                 elif field == "deployment_status":
-                    self.assertIsInstance(value, EventingFunctionDeploymentStatus)
+                    self.assertIsInstance(
+                        value, EventingFunctionDeploymentStatus)
                 elif field == "processing_status":
-                    self.assertIsInstance(value, EventingFunctionProcessingStatus)
+                    self.assertIsInstance(
+                        value, EventingFunctionProcessingStatus)
                 elif field == "language_compatibility":
-                    self.assertIsInstance(value, EventingFunctionLanguageCompatibility)
+                    self.assertIsInstance(
+                        value, EventingFunctionLanguageCompatibility)
                 elif field == "log_level":
                     self.assertIsInstance(value, EventingFunctionLogLevel)
                 elif field == "query_consistency":
@@ -300,7 +306,8 @@ class EventingFunctionManagementTests(CollectionTestCase):
 
     def test_drop_function_fail(self):
         with self.assertRaises(
-            (EventingFunctionNotDeployedException, EventingFunctionNotFoundException)
+            (EventingFunctionNotDeployedException,
+             EventingFunctionNotFoundException)
         ):
             self.efm.drop_function("not-a-function")
 
@@ -318,7 +325,8 @@ class EventingFunctionManagementTests(CollectionTestCase):
             self.efm.drop_function(self.BASIC_FUNC.name)
 
     def test_get_function(self):
-        func = self.try_n_times(5, 3, self.efm.get_function, self.BASIC_FUNC.name)
+        func = self.try_n_times(
+            5, 3, self.efm.get_function, self.BASIC_FUNC.name)
         self._validate_function(func)
 
     def test_get_function_fail(self):
@@ -379,7 +387,8 @@ class EventingFunctionManagementTests(CollectionTestCase):
         self._wait_until_status(
             15, 2, EventingFunctionState.Deployed, self.BASIC_FUNC.name
         )
-        func = self.try_n_times(5, 1, self.efm.get_function, self.BASIC_FUNC.name)
+        func = self.try_n_times(
+            5, 1, self.efm.get_function, self.BASIC_FUNC.name)
         self._validate_function(func, shallow=True)
         # verify function deployement status has changed
         self.assertEqual(
@@ -410,7 +419,8 @@ class EventingFunctionManagementTests(CollectionTestCase):
         self._wait_until_status(
             15, 2, EventingFunctionState.Deployed, self.BASIC_FUNC.name
         )
-        func = self.try_n_times(5, 1, self.efm.get_function, self.BASIC_FUNC.name)
+        func = self.try_n_times(
+            5, 1, self.efm.get_function, self.BASIC_FUNC.name)
         self._validate_function(func, shallow=True)
         # verify function deployement status
         self.assertEqual(
@@ -421,7 +431,8 @@ class EventingFunctionManagementTests(CollectionTestCase):
         self._wait_until_status(
             15, 2, EventingFunctionState.Undeployed, self.BASIC_FUNC.name
         )
-        func = self.try_n_times(5, 1, self.efm.get_function, self.BASIC_FUNC.name)
+        func = self.try_n_times(
+            5, 1, self.efm.get_function, self.BASIC_FUNC.name)
         self._validate_function(func, shallow=True)
         # verify function deployement status has changed
         self.assertEqual(
@@ -430,7 +441,8 @@ class EventingFunctionManagementTests(CollectionTestCase):
 
     def test_undeploy_function_fail(self):
         with self.assertRaises(
-            (EventingFunctionNotDeployedException, EventingFunctionNotFoundException)
+            (EventingFunctionNotDeployedException,
+             EventingFunctionNotFoundException)
         ):
             self.efm.undeploy_function("not-a-function")
 
@@ -443,7 +455,8 @@ class EventingFunctionManagementTests(CollectionTestCase):
             15, 2, EventingFunctionState.Deployed, self.BASIC_FUNC.name
         )
         self.efm.pause_function(self.BASIC_FUNC.name)
-        func = self.try_n_times(5, 1, self.efm.get_function, self.BASIC_FUNC.name)
+        func = self.try_n_times(
+            5, 1, self.efm.get_function, self.BASIC_FUNC.name)
         self._validate_function(func, shallow=True)
         # verify function processing status
         self.assertEqual(
@@ -477,7 +490,8 @@ class EventingFunctionManagementTests(CollectionTestCase):
         )
         # resume function
         self.efm.resume_function(self.BASIC_FUNC.name)
-        func = self.try_n_times(5, 1, self.efm.get_function, self.BASIC_FUNC.name)
+        func = self.try_n_times(
+            5, 1, self.efm.get_function, self.BASIC_FUNC.name)
         self._validate_function(func, shallow=True)
         # verify function processing status
         self.assertEqual(
@@ -531,7 +545,8 @@ class EventingFunctionManagementTests(CollectionTestCase):
         self._validate_function(func)
 
     def test_constant_bindings(self):
-        # TODO:  look into why timeout occurs when providing > 1 constant binding
+        # TODO:  look into why timeout occurs when providing > 1 constant
+        # binding
         local_func = EventingFunction(
             "test-evt-const-func",
             self.SIMPLE_EVT_CODE,
@@ -550,8 +565,10 @@ class EventingFunctionManagementTests(CollectionTestCase):
                 )
             ],
             constant_bindings=[
-                EventingFunctionConstantBinding(alias="testConstant", literal="1234"),
-                EventingFunctionConstantBinding(alias="testConstant1", literal="\"another test value\"")
+                EventingFunctionConstantBinding(
+                    alias="testConstant", literal="1234"),
+                EventingFunctionConstantBinding(
+                    alias="testConstant1", literal="\"another test value\"")
             ]
         )
 

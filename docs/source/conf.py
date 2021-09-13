@@ -11,6 +11,9 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
+import logging
+import couchbase_version
+from distutils.util import get_platform
 import os
 import sys
 
@@ -22,19 +25,18 @@ import sys
 sys.path.insert(0, os.path.abspath('../..'))
 sys.path.insert(0, os.path.dirname(__file__))
 
-from distutils.util import get_platform
-sys.path.insert(0, os.path.abspath('../../build/lib.%s-%s' % (get_platform(), sys.version[0:3])))
+sys.path.insert(0, os.path.abspath('../../build/lib.%s-%s' %
+                (get_platform(), sys.version[0:3])))
 
-import couchbase_version
 try:
     import gen_config
 
     libcouchbase_version = gen_config.get_lcb_min_version()
-except:
+except BaseException:
     libcouchbase_version = (3, 0, 0)
-# -- General configuration -----------------------------------------------------
+# -- General configuration -----------------------------------------------
 rst_epilog = """
-.. |libcouchbase_version| replace:: {}""".format('.'.join(map(str,libcouchbase_version)))
+.. |libcouchbase_version| replace:: {}""".format('.'.join(map(str, libcouchbase_version)))
 
 # If your documentation needs a minimal Sphinx version, state it here.
 #needs_sphinx = '1.0'
@@ -42,7 +44,7 @@ rst_epilog = """
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.viewcode', 'numpydoc', 'sphinx.ext.autosummary',
-              'pycbc_xref'] + (['sphinx_autodoc_typehints'] if sys.version_info>(3,0,0) else [])
+              'pycbc_xref'] + (['sphinx_autodoc_typehints'] if sys.version_info > (3, 0, 0) else [])
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -60,9 +62,9 @@ master_doc = 'index'
 project = 'Couchbase Python Client Library'
 try:
     from datetime import date
-    year=str(date.year)
-except:
-    year="2019"
+    year = str(date.year)
+except BaseException:
+    year = "2019"
 copyright = "2013-{}, Couchbase, Inc.".format(year)
 
 # The version info for the project you're documenting, acts as replacement for
@@ -109,9 +111,8 @@ pygments_style = 'sphinx'
 # A list of ignored prefixes for module index sorting.
 #modindex_common_prefix = []
 
-import logging
 logging.getLogger().setLevel(logging.INFO)
-# -- Options for HTML output ---------------------------------------------------
+# -- Options for HTML output ---------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
@@ -191,17 +192,17 @@ html_theme = 'classic'
 htmlhelp_basename = 'CouchbasePythonClientLibrarydoc'
 
 
-# -- Options for LaTeX output --------------------------------------------------
+# -- Options for LaTeX output --------------------------------------------
 
 latex_elements = {
     # The paper size ('letterpaper' or 'a4paper').
-    #'papersize': 'letterpaper',
+    # 'papersize': 'letterpaper',
 
     # The font size ('10pt', '11pt' or '12pt').
-    #'pointsize': '10pt',
+    # 'pointsize': '10pt',
 
     # Additional stuff for the LaTeX preamble.
-    #'preamble': '',
+    # 'preamble': '',
 }
 
 # Grouping the document tree into LaTeX files. List of tuples
@@ -232,7 +233,7 @@ latex_documents = [
 #latex_domain_indices = True
 
 
-# -- Options for manual page output --------------------------------------------
+# -- Options for manual page output --------------------------------------
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
@@ -246,7 +247,7 @@ intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}
 #man_show_urls = False
 
 
-# -- Options for Texinfo output ------------------------------------------------
+# -- Options for Texinfo output ------------------------------------------
 
 # Grouping the document tree into Texinfo files. List of tuples
 # (source start file, target name, title, author,

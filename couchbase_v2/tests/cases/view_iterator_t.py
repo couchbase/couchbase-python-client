@@ -27,6 +27,7 @@ from couchbase_core._bootstrap import MAX_URI_LENGTH
 # We'll be using the beer-sample database as it has a sufficiently large
 # dataset with well-defined return values
 
+
 class Brewery(object):
     __ALL_BREWERIES = {}
     __BY_ID = {}
@@ -54,6 +55,7 @@ class Brewery(object):
     @classmethod
     def by_id(cls, name):
         return cls.__BY_ID.get(name)
+
 
 class Beer(object):
     __ALL_BEERS = {}
@@ -88,6 +90,7 @@ class BreweryBeerRowProcessor(object):
 
     This only returns beers, skipping over any breweries.
     """
+
     def __init__(self):
         # Iterates over names of beers. We get them via 'get_beer'.
         self._riter = None
@@ -239,7 +242,7 @@ class ViewIteratorTest(ViewTestCase):
                           query=Query(),
                           limit=10)
 
-        self.cb.query("d","v", query=Query(limit=5).update(skip=15))
+        self.cb.query("d", "v", query=Query(limit=5).update(skip=15))
 
     def test_range_query(self):
         q = Query()
@@ -255,11 +258,11 @@ class ViewIteratorTest(ViewTestCase):
         rows = list(ret)
         self.assertEqual(len(rows), 4)
 
-        q.mapkey_range = [ ["u"], ["v"] ]
+        q.mapkey_range = [["u"], ["v"]]
         ret = self.cb.query("beer", "brewery_beers", query=q)
         self.assertEqual(len(list(ret)), 88)
 
-        q.mapkey_range = [ ["u"], ["uppper"+Query.STRING_RANGE_END]]
+        q.mapkey_range = [["u"], ["uppper" + Query.STRING_RANGE_END]]
         ret = self.cb.query("beer", "brewery_beers", query=q)
         rows = list(ret)
         self.assertEqual(len(rows), 56)
@@ -316,10 +319,9 @@ class ViewIteratorTest(ViewTestCase):
         for row in ret:
             raise Exception("...")
 
-
     def test_long_uri(self):
         qobj = Query()
-        qobj.mapkey_multi = [ str(x) for x in xrange(MAX_URI_LENGTH) ]
+        qobj.mapkey_multi = [str(x) for x in xrange(MAX_URI_LENGTH)]
         ret = self.cb.query("beer", "brewery_beers", query=qobj)
         # No assertions, just make sure it didn't break
         for row in ret:
@@ -327,16 +329,24 @@ class ViewIteratorTest(ViewTestCase):
 
         # Apparently only the "keys" parameter is supposed to be in POST.
         # Let's fetch 100 items now
-        keys = [r.key for r in self.cb.query("beer", "brewery_beers", limit=100)]
+        keys = [
+            r.key for r in self.cb.query(
+                "beer",
+                "brewery_beers",
+                limit=100)]
         self.assertEqual(100, len(keys))
 
         kslice = keys[90:]
         self.assertEqual(10, len(kslice))
-        rows = [x for x in self.cb.query("beer", "brewery_beers", mapkey_multi=kslice, limit=5)]
+        rows = [
+            x for x in self.cb.query(
+                "beer",
+                "brewery_beers",
+                mapkey_multi=kslice,
+                limit=5)]
         self.assertEqual(5, len(rows))
         for row in rows:
             self.assertTrue(row.key in kslice)
-
 
     def _verify_data(self, ret):
         list(ret)
@@ -344,7 +354,6 @@ class ViewIteratorTest(ViewTestCase):
         self.assertTrue('rows' in data)
         self.assertTrue('total_rows' in data)
         self.assertTrue('debug_info' in data)
-
 
     def test_http_data(self):
         q = Query(limit=30, debug=True)

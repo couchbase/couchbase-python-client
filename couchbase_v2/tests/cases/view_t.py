@@ -27,10 +27,10 @@ from nose.plugins.attrib import attr
 
 
 DESIGN_JSON = {
-    'language' : 'javascript',
-    'views' : {
-        'recent_posts' : {
-            'map' :
+    'language': 'javascript',
+    'views': {
+        'recent_posts': {
+            'map':
             """
             function(doc) {
                 if (doc.date && doc.title) {
@@ -43,21 +43,21 @@ DESIGN_JSON = {
 }
 
 DOCS_JSON = {
-    "bought-a-cat" : {
-        "title" : "Bought a Cat",
-        "body" : "I went to the pet store earlier and brought home a "
-                "little kitty",
-        "date" : "2009/01/30 18:04:11"
+    "bought-a-cat": {
+        "title": "Bought a Cat",
+        "body": "I went to the pet store earlier and brought home a "
+        "little kitty",
+        "date": "2009/01/30 18:04:11"
     },
-    "biking" : {
-        "title" : "Biking",
-        "body" : "My biggest hobby is mountainbiking. The other day..",
-        "date" : "2009/01/30 18:04:11"
+    "biking": {
+        "title": "Biking",
+        "body": "My biggest hobby is mountainbiking. The other day..",
+        "date": "2009/01/30 18:04:11"
     },
-    "hello-world" : {
-        "title" : "Hello World",
-        "body" : "Well hello and welcome to my new blog",
-        "date" : "2009/01/15 15:52:20"
+    "hello-world": {
+        "title": "Hello World",
+        "body": "Well hello and welcome to my new blog",
+        "date": "2009/01/15 15:52:20"
     }
 }
 
@@ -71,21 +71,24 @@ class ViewTest(ViewTestCase):
         mgr = self.cb.bucket_manager()
         ret = mgr.design_create('blog', DESIGN_JSON, use_devmode=False)
         self.assertTrue(ret.success)
-        self.assertTrue(self.cb.upsert_multi(DOCS_JSON, format=FMT_JSON).all_ok)
+        self.assertTrue(
+            self.cb.upsert_multi(
+                DOCS_JSON,
+                format=FMT_JSON).all_ok)
 
     def test_simple_view(self):
         ret = self.cb._view("blog", "recent_posts",
-                            params={ 'stale' : 'false' })
+                            params={'stale': 'false'})
         self.assertTrue(ret.success)
         rows = ret.value
         self.assertIsInstance(rows, dict)
         print(rows)
-        self.assertTrue(rows['total_rows']  >= 3)
+        self.assertTrue(rows['total_rows'] >= 3)
         self.assertTrue(len(rows['rows']) == rows['total_rows'])
 
     def test_with_params(self):
         ret = self.cb._view("blog", "recent_posts",
-                            params={'limit':1})
+                            params={'limit': 1})
         self.assertTrue(ret.success)
         rows = ret.value['rows']
         self.assertEqual(len(rows), 1)
@@ -100,9 +103,9 @@ class ViewTest(ViewTestCase):
 
         ret = self.cb._view("blog", "recent_posts",
                             params={
-                                'startkey' : jkey_pure,
-                                'endkey' : jkey_pure,
-                                'inclusive_end' : 'true'
+                                'startkey': jkey_pure,
+                                'endkey': jkey_pure,
+                                'inclusive_end': 'true'
                             })
         print(ret)
         self.assertTrue(ret.success)
@@ -112,7 +115,6 @@ class ViewTest(ViewTestCase):
         self.assertEqual(single_row['id'], 'hello-world')
         self.assertEqual(single_row['key'], jkey_pure)
 
-
         jkey_pure = []
         for v in DOCS_JSON.values():
             curdate = v['date']
@@ -120,7 +122,7 @@ class ViewTest(ViewTestCase):
 
         ret = self.cb._view("blog", "recent_posts",
                             params={
-                                'keys' : jkey_pure
+                                'keys': jkey_pure
                             })
         self.assertTrue(ret.success)
         self.assertTrue(len(ret.value['rows']), 3)
@@ -136,31 +138,43 @@ class ViewTest(ViewTestCase):
     def test_reject_ephemeral_attempt(self):
         if not self._realserver_info:
             raise SkipTest("Need real server")
-        admin=self.make_admin_connection()
+        admin = self.make_admin_connection()
         bucket_name = 'ephemeral'
-        users=[('writer',('s3cr3t',[Role(name='data_reader', bucket='ephemeral'), Role(name='data_writer', bucket='ephemeral')])),
-               ('reader',('s3cr3t',[Role(name='data_reader', bucket='ephemeral')])),
-               ('viewer',('s3cr3t',[Role(name='views_reader', bucket='ephemeral'), Role(name='views_admin', bucket='ephemeral')]))]
-        user=users[2]
-        (userid, password, roles) = user[0],user[1][0],user[1][1]
+        users = [('writer', ('s3cr3t', [Role(name='data_reader', bucket='ephemeral'), Role(name='data_writer', bucket='ephemeral')])),
+                 ('reader', ('s3cr3t', [
+                     Role(name='data_reader', bucket='ephemeral')])),
+                 ('viewer', ('s3cr3t', [Role(name='views_reader', bucket='ephemeral'), Role(name='views_admin', bucket='ephemeral')]))]
+        user = users[2]
+        (userid, password, roles) = user[0], user[1][0], user[1][1]
         # add user
         try:
             admin.bucket_delete(bucket_name)
-        except:
+        except BaseException:
             pass
         try:
             admin.bucket_create(name=bucket_name,
-                                     bucket_type='ephemeral',
-                                     ram_quota=100)
+                                bucket_type='ephemeral',
+                                ram_quota=100)
         except HTTPException:
             raise SkipTest("Unable to provision ephemeral bucket")
         try:
             admin.user_upsert(userid, AuthDomain.Local, password, roles)
             admin.wait_ready(bucket_name, timeout=10)
-            conn_str = "couchbase://{0}/{1}".format(self.cluster_info.host, bucket_name)
-            bucket = Bucket(connection_string=conn_str,username=userid,password=password)
+            conn_str = "couchbase://{0}/{1}".format(
+                self.cluster_info.host, bucket_name)
+            bucket = Bucket(
+                connection_string=conn_str,
+                username=userid,
+                password=password)
             self.assertIsNotNone(bucket)
-            self.assertRaisesRegex(NotSupportedException, "Ephemeral", lambda: bucket.query("beer", "brewery_beers", streaming=True, limit=100))
+            self.assertRaisesRegex(
+                NotSupportedException,
+                "Ephemeral",
+                lambda: bucket.query(
+                    "beer",
+                    "brewery_beers",
+                    streaming=True,
+                    limit=100))
         finally:
             admin.bucket_delete(bucket_name)
             admin.user_remove(userid, AuthDomain.Local)

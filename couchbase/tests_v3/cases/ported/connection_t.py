@@ -31,11 +31,11 @@ class ConnectionTest(ClusterTestCase):
     def test_server_not_found(self):
         connargs = self.make_connargs()
         cs = ConnectionString.parse(connargs['connection_string'])
-        cs.hosts = [ 'example.com' ]
+        cs.hosts = ['example.com']
         connargs['connection_string'] = cs.encode()
         self.assertRaises(TimeoutException, self.factory, **connargs)
 
-        cs.hosts = [ self.cluster_info.host + ':' + str(34567)]
+        cs.hosts = [self.cluster_info.host + ':' + str(34567)]
         self.assertRaises(TimeoutException, self.factory, **connargs)
 
     def test_bucket(self):
@@ -60,7 +60,6 @@ class ConnectionTest(ClusterTestCase):
         cb = self.factory(quiet=False, **connparams)
         self.assertRaises(DocumentNotFoundException, cb.get, 'missing_key')
 
-
     def test_configcache(self):
         cachefile = None
         # On Windows, the NamedTemporaryFile is deleted right when it's
@@ -68,10 +67,12 @@ class ConnectionTest(ClusterTestCase):
         # ourselves when it's closed
         try:
             cachefile = tempfile.NamedTemporaryFile(delete=False)
-            cb = self.factory(**self.make_connargs(config_cache=cachefile.name))
+            cb = self.factory(
+                **self.make_connargs(config_cache=cachefile.name))
             self.assertTrue(cb.upsert("foo", "bar").success)
 
-            cb2 = self.factory(**self.make_connargs(config_cache=cachefile.name))
+            cb2 = self.factory(
+                **self.make_connargs(config_cache=cachefile.name))
 
             self.assertTrue(cb2.upsert("foo", "bar").success)
             self.assertEqual("bar", cb.get("foo").content)
@@ -100,7 +101,7 @@ class ConnectionTest(ClusterTestCase):
             cb = self.factory(str(cs), password=passwd)
             self.assertTrue(cb.upsert("foo", "bar").success)
 
-        cs.hosts = [ self.cluster_info.host + ':' + str(self.cluster_info.port) ]
+        cs.hosts = [self.cluster_info.host + ':' + str(self.cluster_info.port)]
         cs.scheme = 'http'
         cluster = self._instantiate_cluster(cs)
         cb = cluster.bucket(self.cluster_info.bucket_name)

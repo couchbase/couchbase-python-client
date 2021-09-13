@@ -15,8 +15,11 @@
 # limitations under the License.
 #
 
-from couchbase_v2.exceptions import (KeyExistsException, DocumentNotFoundException)
+from couchbase_v2.exceptions import (
+    KeyExistsException,
+    DocumentNotFoundException)
 from couchbase_tests.base import ConnectionTestCase
+
 
 class DeleteTest(ConnectionTestCase):
 
@@ -36,8 +39,8 @@ class DeleteTest(ConnectionTestCase):
         # With 'quiet' ensure that it returns false. Without 'quiet', ensure that
         # it raises a DocumentNotFoundException
 
-        self.cb.remove("foo", quiet = True)
-        rv = self.cb.remove("foo", quiet = True)
+        self.cb.remove("foo", quiet=True)
+        rv = self.cb.remove("foo", quiet=True)
         self.assertFalse(rv.success)
         self.assertRaises(DocumentNotFoundException, self.cb.remove, 'foo')
 
@@ -47,7 +50,7 @@ class DeleteTest(ConnectionTestCase):
         key = self.gen_key("delete_cas")
         rv1 = self.cb.upsert(key, 'bar')
         self.assertTrue(rv1.cas > 0)
-        rv2 = self.cb.remove(key, cas = rv1.cas)
+        rv2 = self.cb.remove(key, cas=rv1.cas)
         self.assertTrue(rv2.success)
 
     def test_delete_badcas(self):
@@ -56,7 +59,7 @@ class DeleteTest(ConnectionTestCase):
         key = self.gen_key("delete_badcas")
         self.cb.upsert(key, 'bar')
         self.assertRaises(KeyExistsException,
-                self.cb.remove, key, cas = 0xdeadbeef)
+                          self.cb.remove, key, cas=0xdeadbeef)
 
     def test_delete_multi(self):
         # Delete passing a list of keys
@@ -92,12 +95,12 @@ class DeleteTest(ConnectionTestCase):
         # Test with mixed found/not-found
         # Test with mixed cas-valid/cas-invalid
 
-        self.cb.remove("foo", quiet = True)
+        self.cb.remove("foo", quiet=True)
 
         self.cb.upsert("bar", "a_value")
         # foo does not exit,
 
-        rvs = self.cb.remove_multi(('foo', 'bar'), quiet = True)
+        rvs = self.cb.remove_multi(('foo', 'bar'), quiet=True)
         self.assertFalse(rvs.all_ok)
         self.assertTrue(rvs['bar'].success)
         self.assertFalse(rvs['foo'].success)
@@ -118,6 +121,7 @@ class DeleteTest(ConnectionTestCase):
         cas_rvs[keys[0]] = 0xdeadbeef
         self.assertRaises(KeyExistsException,
                           self.cb.remove_multi, cas_rvs)
+
 
 if __name__ == '__main__':
     unittest.main()

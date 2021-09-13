@@ -3,6 +3,7 @@ from twisted.internet.defer import inlineCallbacks, Deferred
 
 from txcouchbase.connection import Connection
 
+
 class MyClient(object):
     def __init__(self):
         self.cb = Connection(bucket='default')
@@ -21,6 +22,7 @@ class MyClient(object):
     def on_get(self, res):
         print res
 
+
 @inlineCallbacks
 def run_sync_example():
     cb = Connection(bucket='default')
@@ -28,6 +30,7 @@ def run_sync_example():
     print rv_set
     rv_get = yield cb.get("foo")
     print rv_get
+
 
 cb = MyClient()
 run_sync_example()

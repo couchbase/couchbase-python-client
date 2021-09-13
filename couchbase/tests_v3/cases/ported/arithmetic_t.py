@@ -15,21 +15,27 @@
 # limitations under the License.
 #
 
-from couchbase.exceptions import (DocumentNotFoundException, DeltaBadvalException)
+from couchbase.exceptions import (
+    DocumentNotFoundException,
+    DeltaBadvalException)
 from couchbase_tests.base import CollectionTestCase
 from couchbase.collection import SignedInt64, DeltaValue
+
 
 class ArithmeticTest(CollectionTestCase):
     def setUp(self):
         super(ArithmeticTest, self).setUp()
-        self.bin_coll=self.cb.binary()
+        self.bin_coll = self.cb.binary()
+
     def test_trivial_incrdecr(self):
         key = self.gen_key("trivial_incrdecr")
         self.cb.remove(key, quiet=True)
-        rv_arith = self.bin_coll.increment(key, initial=SignedInt64(1), delta=DeltaValue(1))
+        rv_arith = self.bin_coll.increment(
+            key, initial=SignedInt64(1), delta=DeltaValue(1))
         rv_get = self.cb.get(key)
 
-        # self.assertEqual(rv_arith.content, 1) SDK3 MutationResult has no content
+        # self.assertEqual(rv_arith.content, 1) SDK3 MutationResult has no
+        # content
         self.assertEqual(int(rv_get.content), 1)
 
         rv = self.bin_coll.increment(key)
@@ -46,7 +52,10 @@ class ArithmeticTest(CollectionTestCase):
     def test_incr_notfound(self):
         key = self.gen_key("incr_notfound")
         self.cb.remove(key, quiet=True)
-        self.assertRaises(DocumentNotFoundException, self.bin_coll.increment, key)
+        self.assertRaises(
+            DocumentNotFoundException,
+            self.bin_coll.increment,
+            key)
 
     def test_incr_badval(self):
         key = self.gen_key("incr_badval")
@@ -79,7 +88,10 @@ class ArithmeticTest(CollectionTestCase):
 
         self.cb.remove(keys[0])
 
-        self.assertRaises(DocumentNotFoundException, self.bin_coll.increment_multi, keys)
+        self.assertRaises(
+            DocumentNotFoundException,
+            self.bin_coll.increment_multi,
+            keys)
 
     def test_incr_extended(self):
         key = self.gen_key("incr_extended")

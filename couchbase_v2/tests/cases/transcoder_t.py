@@ -26,6 +26,7 @@ import couchbase_v2.exceptions as E
 # mainly to see if error messages are appropriate and how the application handles
 # a misbehaving transcoder. The Transcoder API is fairly simple.. so
 
+
 def gen_func(fname):
     def fn(self, *args):
         if fname in self._op_next:
@@ -37,12 +38,14 @@ def gen_func(fname):
         return getattr(self._tc, fname)(*args)
     return fn
 
+
 class MangledTranscoder(object):
     """
     This is a custom transcoder class where we can optionally set a 'next_value'
     field for a specific operation. If this field is empty, then the default
     method is used
     """
+
     def __init__(self):
         self._tc = TranscoderPP()
         self._op_next = {}
@@ -59,6 +62,7 @@ class MangledTranscoder(object):
     decode_value = gen_func('decode_value')
     encode_value = gen_func('encode_value')
 
+
 class TranscoderTest(ConnectionTestCase):
 
     def test_simple_transcoder(self):
@@ -71,7 +75,6 @@ class TranscoderTest(ConnectionTestCase):
             self.cb.upsert(key, curval)
             ret = self.cb.get(key)
             self.assertEqual(ret.value, curval)
-
 
     # Try to test some bad transcoders:
 
@@ -89,13 +92,11 @@ class TranscoderTest(ConnectionTestCase):
         self.assertRaises(E.ValueFormatError, self.cb.upsert, key, "bar")
         self.assertRaises(E.ValueFormatError, self.cb.get, key)
 
-
         mangled = MangledTranscoder()
         # Ensure we actually work
         self.cb.transcoder = mangled
         self.cb.upsert(key, "value")
         self.cb.get(key)
-
 
         for badret in (None, (), [], ""):
             mangled.set_all(badret)
@@ -106,7 +107,6 @@ class TranscoderTest(ConnectionTestCase):
         # Try with only bad keys:
         mangled._op_next['encode_key'] = None
         self.assertRaises(E.ValueFormatError, self.cb.upsert, key, "value")
-
 
     def test_transcoder_bad_encvals(self):
         mangled = MangledTranscoder()
@@ -152,13 +152,12 @@ class TranscoderTest(ConnectionTestCase):
         self.cb.transcoder = mangled
         key = self.gen_key('kdec_err')
         self.cb.upsert(key, 'blah', format=FMT_UTF8)
+
         def exthrow():
             raise UnicodeDecodeError()
 
         mangled.set_next('decode_value', exthrow)
         self.assertRaises(E.ValueFormatError, self.cb.get, key)
-
-
 
     def test_transcoder_anyobject(self):
         # This tests the versatility of the transcoder object
@@ -176,7 +175,6 @@ class TranscoderTest(ConnectionTestCase):
             self.cb.upsert(o, o, format=o)
             rv = self.cb.get(o)
             self.assertEqual(rv.value, o)
-
 
     def test_transcoder_unhashable_keys(self):
         #raise SkipTest("to be fixed")

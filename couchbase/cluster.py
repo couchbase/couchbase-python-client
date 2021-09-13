@@ -540,7 +540,8 @@ class Cluster(CoreClient):
         self._cluster.authenticate(self._authenticator)
         credentials = self._authenticator.get_credentials()
         self._clusteropts = dict(**credentials.get("options", {}))
-        # TODO: eliminate the 'mock hack' and ClassicAuthenticator, then you can remove this as well.
+        # TODO: eliminate the 'mock hack' and ClassicAuthenticator, then you
+        # can remove this as well.
         self._clusteropts.update(non_connstr_opts)
         self._clusteropts.update(kwargs)
         self._adminopts = dict(**self._clusteropts)
@@ -617,14 +618,16 @@ class Cluster(CoreClient):
         lockmode = self._clusteropts.get("lockmode", None)
         if lockmode is not None:
             kwargs["lockmode"] = lockmode
-        return self._cluster.open_bucket(name, tracer=self._external_tracer, **kwargs)
+        return self._cluster.open_bucket(
+            name, tracer=self._external_tracer, **kwargs)
 
     # Temporary, helpful with working around CCBC-1204.  We should be able to get rid of this
     # logic when this issue is fixed.
     def _is_6_5_plus(self):
         self._check_for_shutdown()
 
-        # lets just check once.  Below, we will only set this if we are sure about the value.
+        # lets just check once.  Below, we will only set this if we are sure
+        # about the value.
         if self.__is_6_5 is not None:
             return self.__is_6_5
 
@@ -640,7 +643,8 @@ class Cluster(CoreClient):
             # instances check every time, but this is only temporary.
             return True
         except ValueError:
-            # this comes from the conversion to float -- the mock says "CouchbaseMock..."
+            # this comes from the conversion to float -- the mock says
+            # "CouchbaseMock..."
             self.__is_6_5 = True
         return self.__is_6_5
 
@@ -696,7 +700,8 @@ class Cluster(CoreClient):
             return choice(clients)
         raise NoBucketException(err_msg)
 
-    def _maybe_operate_on_an_open_bucket(self, verb, failtype, *args, **kwargs):
+    def _maybe_operate_on_an_open_bucket(
+            self, verb, failtype, *args, **kwargs):
         if self._is_6_5_plus():
             kwargs.pop("err_msg", None)
             return self._operate_on_cluster(verb, failtype, *args, **kwargs)
@@ -741,7 +746,8 @@ class Cluster(CoreClient):
                 e,
             )
 
-    # for now this just calls functions.  We can return stuff if we need it, later.
+    # for now this just calls functions.  We can return stuff if we need it,
+    # later.
     def _sync_operate_on_entire_cluster(self, verb, *args, **kwargs):
         clients = [v() for k, v in self._cluster._buckets.items()]
         clients = [v for v in clients if v]
@@ -791,7 +797,8 @@ class Cluster(CoreClient):
             Also, any exceptions raised by the underlying platform - :class:`~.exceptions.TimeoutException`
             for example.
         """
-        # following the query implementation, but this seems worth revisiting soon
+        # following the query implementation, but this seems worth revisiting
+        # soon
         self._check_for_shutdown()
         itercls = kwargs.pop("itercls", AnalyticsResult)
         opt = AnalyticsOptions()
@@ -889,7 +896,8 @@ class Cluster(CoreClient):
         :raise: :class:`~.exceptions.CouchbaseException` for various communication issues.
         """
 
-        return PingResult(CoreClient.ping(self, **forward_args(kwargs, *options)))
+        return PingResult(CoreClient.ping(
+            self, **forward_args(kwargs, *options)))
 
     def users(self):
         # type: (...) -> UserManager
@@ -994,7 +1002,8 @@ class Cluster(CoreClient):
         whichever is lower.
         """
         self._check_for_shutdown()
-        return timedelta(seconds=self._get_timeout_common(_LCB.LCB_CNTL_QUERY_TIMEOUT))
+        return timedelta(seconds=self._get_timeout_common(
+            _LCB.LCB_CNTL_QUERY_TIMEOUT))
 
     @property
     def tracing_threshold_query(self):
@@ -1058,7 +1067,8 @@ class Cluster(CoreClient):
         :class:`~.ClusterOptions` with the size set in it.
         """
 
-        return self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_SIZE, value_type="uint32_t")
+        return self._cntl(op=_LCB.TRACING_ORPHANED_QUEUE_SIZE,
+                          value_type="uint32_t")
 
     @property
     def tracing_threshold_queue_flush_interval(self):
@@ -1082,7 +1092,8 @@ class Cluster(CoreClient):
         passing in a :class:`~.ClusterOptions` with the desired size set in it.
         """
 
-        return self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_SIZE, value_type="uint32_t")
+        return self._cntl(op=_LCB.TRACING_THRESHOLD_QUEUE_SIZE,
+                          value_type="uint32_t")
 
     @property
     def redaction(self):
@@ -1112,7 +1123,8 @@ class Cluster(CoreClient):
         Minimum size (in bytes) of the document payload to be compressed when compression enabled. This can be set
         in the :meth:`connect` by passing in a :class:`~.ClusterOptions` with the desired compression set in it.
         """
-        return self._cntl(_LCB.LCB_CNTL_COMPRESSION_MIN_SIZE, value_type="uint32_t")
+        return self._cntl(_LCB.LCB_CNTL_COMPRESSION_MIN_SIZE,
+                          value_type="uint32_t")
 
     @property
     def compression_min_ratio(self):
@@ -1122,7 +1134,8 @@ class Cluster(CoreClient):
         This can be set in the :meth:`connect` by passing in a :class:`~.ClusterOptions` with the desired
         ratio set in it.
         """
-        return self._cntl(_LCB.LCB_CNTL_COMPRESSION_MIN_RATIO, value_type="float")
+        return self._cntl(_LCB.LCB_CNTL_COMPRESSION_MIN_RATIO,
+                          value_type="float")
 
     @property
     def is_ssl(self):

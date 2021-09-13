@@ -118,7 +118,8 @@ class QueryMetaData(object):
 
     def status(self):
         # type: (...) -> QueryStatus
-        return QueryStatus[self._parentquery_for_metadata.meta.get("status").upper()]
+        return QueryStatus[self._parentquery_for_metadata.meta.get(
+            "status").upper()]
 
     def warnings(self):
         # type: (...) -> List[QueryWarning]

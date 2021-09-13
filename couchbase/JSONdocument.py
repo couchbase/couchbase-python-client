@@ -15,8 +15,8 @@ class JSONDocument(Transcodable):
 
     def put(self, key, value):
         # type: (str, JSON) -> JSONDocument
-        result=JSONDocument(parent=self)
-        result.record=result.record.set(key,value)
+        result = JSONDocument(parent=self)
+        result.record = result.record.set(key, value)
         return result
 
     def encode_canonical(self):
@@ -30,7 +30,7 @@ class JSONDocument(Transcodable):
 
     def __eq__(self,
                other):
-        return type(other)==type(self) and other.record==self.record
+        return isinstance(other, type(self)) and other.record == self.record
 
     def __hash__(self):
         return hash(self.record)

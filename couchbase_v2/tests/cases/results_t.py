@@ -20,8 +20,9 @@ from couchbase_tests.base import ConnectionTestCase
 INT_TYPES = None
 try:
     INT_TYPES = (long, int)
-except:
+except BaseException:
     INT_TYPES = (int,)
+
 
 class ResultsTest(ConnectionTestCase):
 
@@ -85,7 +86,7 @@ class ResultsTest(ConnectionTestCase):
         kvs = self.gen_kv_dict(prefix="multi_results")
         rvs = self.cb.upsert_multi(kvs)
         self.assertIsInstance(rvs, self.cls_MultiResult)
-        [ self.__test_oprsesult(x) for x in rvs.values() ]
+        [self.__test_oprsesult(x) for x in rvs.values()]
         repr(rvs)
         str(rvs)
 
@@ -93,7 +94,7 @@ class ResultsTest(ConnectionTestCase):
         self.assertIsInstance(rvs, self.cls_MultiResult)
         self.assertTrue(rvs.all_ok)
 
-        [ self.__test_valresult(v, kvs[k]) for k, v in rvs.items()]
+        [self.__test_valresult(v, kvs[k]) for k, v in rvs.items()]
 
         rvs = self.cb.remove_multi(kvs.keys())
-        [ self.__test_oprsesult(x) for x in rvs.values() ]
+        [self.__test_oprsesult(x) for x in rvs.values()]

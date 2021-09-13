@@ -26,6 +26,7 @@ from couchbase_v2.exceptions import (
 
 from couchbase_tests.base import ConnectionTestCase
 
+
 class GetTest(ConnectionTestCase):
     def test_trivial_get(self):
         key = self.gen_key('trivial_get')
@@ -62,7 +63,6 @@ class GetTest(ConnectionTestCase):
         rv2 = self.cb.get_multi(kv.keys())
         self.assertEqual(rv2.keys(), kv.keys())
 
-
     def test_multi_mixed(self):
         kv_missing = self.gen_kv_dict(amount=3, prefix='multi_missing_mixed')
         kv_existing = self.gen_kv_dict(amount=3, prefix='multi_existing_mixed')
@@ -75,7 +75,6 @@ class GetTest(ConnectionTestCase):
         rvs = self.cb.get_multi(
             list(kv_existing.keys()) + list(kv_missing.keys()),
             quiet=True)
-
 
         self.assertFalse(rvs.all_ok)
 
@@ -94,7 +93,11 @@ class GetTest(ConnectionTestCase):
         # Try this again, but without quiet
         cb_exc = None
         try:
-            self.cb.get_multi(list(kv_existing.keys()) + list(kv_missing.keys()))
+            self.cb.get_multi(
+                list(
+                    kv_existing.keys()) +
+                list(
+                    kv_missing.keys()))
         except DocumentNotFoundException as e:
             cb_exc = e
 
@@ -115,7 +118,6 @@ class GetTest(ConnectionTestCase):
             self.assertTrue(all_res[k].value is None)
 
         del cb_exc
-
 
     def test_extended_get(self):
         key = self.gen_key(prefix='key_extended')
@@ -184,6 +186,7 @@ class GetTest(ConnectionTestCase):
             self.assertFalse(v.success)
             self.assertTrue(k in kvs)
             self.assertTrue(DocumentNotFoundException._can_derive(v.rc))
+
 
 if __name__ == '__main__':
     unittest.main()

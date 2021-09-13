@@ -18,7 +18,6 @@ try:
 
         return wrapper
 
-
     def gen_collection(connection_string, *args, **kwargs):
         try:
             base_cluster = Cluster(connection_string, *args, **kwargs)
@@ -27,16 +26,15 @@ try:
         except Exception as e:
             raise
 
-
-    default = Details({'Collection': gen_collection, 'Bucket': Bucket}, lambda x: x.content)
+    default = Details({'Collection': gen_collection,
+                      'Bucket': Bucket}, lambda x: x.content)
     target_dict = {
-                   'Collection':   default}
+        'Collection': default}
 
 except (ImportError, SyntaxError):
     target_dict = {}
 
 targets = list(map(lambda x: (x,), target_dict.keys()))
-
 
 
 class AioTestCase(AsyncClusterTestCase, ClusterTestCase):
@@ -48,7 +46,6 @@ class AioTestCase(AsyncClusterTestCase, ClusterTestCase):
 
     def __init__(self, *args, **kwargs):
         super(AioTestCase, self).__init__(*args, **kwargs)
-
 
     @property
     def cluster_class(self):  # type: (...) -> Cluster

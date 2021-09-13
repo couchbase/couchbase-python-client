@@ -158,7 +158,8 @@ class CouchbaseException(Exception):
         self.key = params.get("key", None)
         self.objextra = params.get("objextra", None)
         self.message = params.get("message", None)
-        self.context = ErrorContext.from_dict(**params.get("error_context", dict()))
+        self.context = ErrorContext.from_dict(
+            **params.get("error_context", dict()))
 
     @classmethod
     def pyexc(cls, message=None, obj=None, inner=None):
@@ -250,7 +251,8 @@ class CouchbaseException(Exception):
 
         ret_ok, ret_fail = {}, {}
         count = 0
-        nokey_prefix = ([""] + sorted(filter(bool, self.all_results.keys())))[-1]
+        nokey_prefix = (
+            [""] + sorted(filter(bool, self.all_results.keys())))[-1]
         for key, v in self.all_results.items():
             if not key:
                 key = nokey_prefix + ":nokey:" + str(count)
@@ -270,7 +272,10 @@ class CouchbaseException(Exception):
             details.append("Key={0}".format(repr(self.key)))
 
         if self.rc:
-            details.append("RC=0x{0:X}[{1}]".format(self.rc, C._strerror(self.rc)))
+            details.append(
+                "RC=0x{0:X}[{1}]".format(
+                    self.rc, C._strerror(
+                        self.rc)))
         if self.message:
             details.append(self.message)
         if self.all_results:
@@ -1133,7 +1138,8 @@ class SubdocEmptyPathException(CouchbaseException):
 
 
 class CryptoException(CouchbaseException):
-    def __init__(self, params=None, message="Generic Cryptography exception", **kwargs):
+    def __init__(self, params=None,
+                 message="Generic Cryptography exception", **kwargs):
         params = params or {}
         param_dict = params.get("objextra") or defaultdict(lambda: "unknown")
         params["message"] = Template(message).safe_substitute(**param_dict)
@@ -1141,14 +1147,16 @@ class CryptoException(CouchbaseException):
 
 
 class EncryptionFailureException(CryptoException):
-    def __init__(self, params=None, message="Generic encryption failure.", **kwargs):
+    def __init__(self, params=None,
+                 message="Generic encryption failure.", **kwargs):
         super(EncryptionFailureException, self).__init__(
             params=params, message=message, **kwargs
         )
 
 
 class DecryptionFailureException(CryptoException):
-    def __init__(self, params=None, message="Generic decryption failure.", **kwargs):
+    def __init__(self, params=None,
+                 message="Generic decryption failure.", **kwargs):
         super(DecryptionFailureException, self).__init__(
             params=params, message=message, **kwargs
         )
@@ -1330,7 +1338,8 @@ class DurabilityErrorCode(CompatibilityEnum):
     SYNC_WRITE_AMBIGUOUS = DurabilitySyncWriteAmbiguousException
 
 
-_LCB_SYNCREP_MAP = {item.value: item.orig_value for item in DurabilityErrorCode}
+_LCB_SYNCREP_MAP = {
+    item.value: item.orig_value for item in DurabilityErrorCode}
 
 
 _LCB_ERRNO_MAP = dict(
@@ -1401,7 +1410,8 @@ def _set_default_codes():
 _set_default_codes()
 
 
-def _mk_lcberr(rc, name=None, default=CouchbaseException, docstr="", extrabase=[]):
+def _mk_lcberr(rc, name=None, default=CouchbaseException,
+               docstr="", extrabase=[]):
     """
     Create a new error class derived from the appropriate exceptions.
     :param int rc: libcouchbase error code to map
@@ -1479,7 +1489,8 @@ class NotSupportedWrapper(object):
                 extra = getattr(e, "objextra", None)
                 status = getattr(extra, "http_status", None)
                 if status == 404:
-                    raise NotSupportedException("Server does not support this api call")
+                    raise NotSupportedException(
+                        "Server does not support this api call")
                 raise
 
         return wrapped
@@ -1495,7 +1506,8 @@ class NotSupportedWrapper(object):
                 extra = getattr(e, "objextra", None)
                 status = getattr(extra, "http_status", None)
                 if status == 404 or status == 400:
-                    raise NotSupportedException("Server does not support this api call")
+                    raise NotSupportedException(
+                        "Server does not support this api call")
                 raise
 
         return wrapped
@@ -1515,7 +1527,8 @@ class DictMatcher(object):
         return hash(self._pattern)
 
     def __eq__(self, other):
-        return isinstance(other, DictMatcher) and other._pattern == self._pattern
+        return isinstance(
+            other, DictMatcher) and other._pattern == self._pattern
 
 
 class ErrorMapper(object):
@@ -1529,10 +1542,12 @@ class ErrorMapper(object):
                 for orig_exc, text_to_final_exc in cls._compiled_mapping().items():
                     if isinstance(e, orig_exc):
                         extra = getattr(e, "objextra", None)
-                        # TODO: this parsing is fragile, lets ponder a better approach, if any
+                        # TODO: this parsing is fragile, lets ponder a better
+                        # approach, if any
                         if e.context:
                             value = e.context.response_body
-                            if isinstance(value, bytearray) or isinstance(value, bytes):
+                            if isinstance(value, bytearray) or isinstance(
+                                    value, bytes):
                                 value = value.decode("utf-8")
                             for pattern, exc in text_to_final_exc.items():
                                 matches = False
@@ -1546,7 +1561,8 @@ class ErrorMapper(object):
                         if extra:
                             value = getattr(extra, "value", "")
 
-                            # this value could be a string or a json-encoded string...
+                            # this value could be a string or a json-encoded
+                            # string...
                             if isinstance(value, dict):
                                 # there should be a key with the error
                                 # can be error or errors :(
@@ -1557,9 +1573,11 @@ class ErrorMapper(object):
                                 elif "_" in value:
                                     value = value.get("_", None)
                                 if value and isinstance(value, dict):
-                                    # sometimes it is still a dict, so use the name field
+                                    # sometimes it is still a dict, so use the
+                                    # name field
                                     value = value.get("name", None)
-                            if isinstance(value, bytearray) or isinstance(value, bytes):
+                            if isinstance(value, bytearray) or isinstance(
+                                    value, bytes):
                                 value = value.decode("utf-8")
                             for pattern, exc in text_to_final_exc.items():
                                 matches = False

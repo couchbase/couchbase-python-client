@@ -23,6 +23,7 @@ import couchbase_core
 import couchbase_core._libcouchbase as LCB
 from couchbase_core.user_constants import FMT_JSON
 
+
 class ConverertSetTest(ConnectionTestCase):
     def _swap_converters(self, swapfunc, kbase, new_enc, new_dec):
         kencode = kbase + "_encode"
@@ -38,8 +39,8 @@ class ConverertSetTest(ConnectionTestCase):
 
     def test_json_conversions(self):
         d = {
-            'encode' : 0,
-            'decode' : 0
+            'encode': 0,
+            'decode': 0
         }
 
         def _encode(val):
@@ -70,8 +71,8 @@ class ConverertSetTest(ConnectionTestCase):
 
     def test_pickle_conversions(self):
         d = {
-            'encode' : 0,
-            'decode' : 0
+            'encode': 0,
+            'decode': 0
         }
 
         def _encode(val):
@@ -87,7 +88,7 @@ class ConverertSetTest(ConnectionTestCase):
                                     "pickle",
                                     _encode,
                                     _decode)
-        fn = set([1,2,3])
+        fn = set([1, 2, 3])
         self.cb.upsert(key, fn, format=couchbase_core.FMT_PICKLE)
         rv = self.cb.get(key)
         self.assertEqual(rv.value, fn)

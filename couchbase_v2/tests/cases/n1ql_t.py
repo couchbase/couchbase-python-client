@@ -36,7 +36,7 @@ class N1QLTest(MockTestCase):
         self.assertEqual(None, rv)
 
     def test_meta(self):
-        q = self.cb.query('SELECT mockrow',meta_lookahead=False)
+        q = self.cb.query('SELECT mockrow', meta_lookahead=False)
         self.assertRaises(RuntimeError, getattr, q, 'meta')
         q.execute()
         self.assertIsInstance(q.meta, dict)
@@ -49,7 +49,7 @@ class N1QLTest(MockTestCase):
         self.assertTrue(json.loads(q.encoded)['metrics'])
 
     def test_meta_lookahead(self):
-        q = self.cb.query('SELECT mockrow',meta_lookahead=True)
+        q = self.cb.query('SELECT mockrow', meta_lookahead=True)
         self.assertIsInstance(q.meta, dict)
 
     def test_httperror_str(self):

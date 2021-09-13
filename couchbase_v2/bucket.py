@@ -81,8 +81,8 @@ class DurabilityContext(object):
 
 
 class Bucket(CoreClient):
-    _MEMCACHED_OPERATIONS = CoreClient._MEMCACHED_OPERATIONS+('endure',
-                                                   'observe', 'rget', 'set', 'add', 'delete', 'counter','lock', 'append', 'prepend')
+    _MEMCACHED_OPERATIONS = CoreClient._MEMCACHED_OPERATIONS + ('endure',
+                                                                'observe', 'rget', 'set', 'add', 'delete', 'counter', 'lock', 'append', 'prepend')
 
     def pipeline(self):
         """
@@ -144,7 +144,8 @@ class Bucket(CoreClient):
 
     def upsert(self, key, value, cas=0, ttl=0, format=None,
                persist_to=0, replicate_to=0):
-        # type: (Union[str, bytes], Any, int, int, int, int, int, int) -> Result
+        # type: (Union[str, bytes], Any, int, int, int, int, int, int) ->
+        # Result
         """Unconditionally store the object in Couchbase.
 
         :param key:
@@ -229,7 +230,8 @@ class Bucket(CoreClient):
         return _Base.upsert(self, key, value, *args, **kwargs)
 
     @overload
-    def insert(self, key, value, ttl=0, format=None, persist_to=0, replicate_to=0):
+    def insert(self, key, value, ttl=0, format=None,
+               persist_to=0, replicate_to=0):
         """Store an object in Couchbase unless it already exists.
 
         Follows the same conventions as :meth:`upsert` but the value is
@@ -649,7 +651,7 @@ class Bucket(CoreClient):
 
         .. seealso:: :meth:`retrieve_in` which acts as a convenience wrapper
         """
-        return super(Bucket, self).lookup_in(key,specs,**kwargs)
+        return super(Bucket, self).lookup_in(key, specs, **kwargs)
 
     def mutate_in(self, key, *specs, **kwargs):
         """Perform multiple atomic modifications within a document.
@@ -903,7 +905,7 @@ class Bucket(CoreClient):
     def _analytics_query(self, query, *args, **kwargs):
         # we used to take the ANALYTICS host as the second parameter, but
         # LCB now retrieves the hostname from the cluster
-        return super(Bucket,self).analytics_query(query, *args, **kwargs)
+        return super(Bucket, self).analytics_query(query, *args, **kwargs)
 
     analytics_query = _analytics_query
 
@@ -946,7 +948,7 @@ class Bucket(CoreClient):
 
         return rv
 
-    _OLDOPS = { 'set': 'upsert', 'add': 'insert', 'delete': 'remove'}
+    _OLDOPS = {'set': 'upsert', 'add': 'insert', 'delete': 'remove'}
     for o, n in _OLDOPS.items():
         for variant in ('', '_multi'):
             oldname = o + variant

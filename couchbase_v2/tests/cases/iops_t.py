@@ -21,6 +21,7 @@ import unittest
 # For now, this just checks that basic set/get doesn't explode
 # We'll definitely want to add more here before we consider it stable
 
+
 @unittest.skip("These fail on jenkins, and seems SelectIOPS isn't used by us, so skip them for now")
 class IopsTest(CouchbaseTestCase):
     def setUp(self):

@@ -27,16 +27,17 @@ from couchbase_v2.views.params import (make_options_string,
 from couchbase_v2.exceptions import InvalidArgumentException
 from couchbase_tests.base import CouchbaseTestCase
 
+
 class ViewStringTest(CouchbaseTestCase):
     def setUp(self):
         super(ViewStringTest, self).setUp()
 
     def _assert_vopteq(self, expected, key, value):
-        s = make_options_string({key:value})
+        s = make_options_string({key: value})
         self.assertEqual(s, expected)
 
     def _assert_vopteq_multi(self, d, key, value):
-        q = Query(**{key:value})
+        q = Query(**{key: value})
         enc = q.encoded
         res = {}
         for kvp in enc.split("&"):
@@ -57,7 +58,6 @@ class ViewStringTest(CouchbaseTestCase):
         self._assert_vopteq('stale=false', 'stale', 0)
         self._assert_vopteq('stale=false', 'stale', "false")
 
-
     def test_bad_stale(self):
         self.assertRaises(InvalidArgumentException,
                           self._assert_vopteq,
@@ -65,7 +65,6 @@ class ViewStringTest(CouchbaseTestCase):
         self.assertRaises(InvalidArgumentException,
                           self._assert_vopteq,
                           'stale=None', 'stale', None)
-
 
     def test_unrecognized_params(self):
         self.assertRaises(InvalidArgumentException,
@@ -81,22 +80,22 @@ class ViewStringTest(CouchbaseTestCase):
 
         for p in bparams:
             # with string "false"
-            self._assert_vopteq(p+"=false",
+            self._assert_vopteq(p + "=false",
                                 p,
                                 "false")
 
             # with string "true"
-            self._assert_vopteq(p+"=true",
+            self._assert_vopteq(p + "=true",
                                 p,
                                 "true")
 
             self.assertRaises(InvalidArgumentException,
                               self._assert_vopteq,
-                              p+'=gobble', p, 'gobble')
+                              p + '=gobble', p, 'gobble')
 
             self.assertRaises(InvalidArgumentException,
                               self._assert_vopteq,
-                              p+'=None', p, None)
+                              p + '=None', p, None)
 
     def test_misc_numeric(self):
         nparams = (
@@ -105,25 +104,25 @@ class ViewStringTest(CouchbaseTestCase):
             'skip')
 
         for p in nparams:
-            self._assert_vopteq(p+'=42',
+            self._assert_vopteq(p + '=42',
                                 p,
                                 42)
 
-            self._assert_vopteq(p+'=42',
+            self._assert_vopteq(p + '=42',
                                 p,
                                 "42")
 
             self.assertRaises(InvalidArgumentException,
                               self._assert_vopteq,
-                              p+'=true', p, True)
+                              p + '=true', p, True)
 
             self.assertRaises(InvalidArgumentException,
                               self._assert_vopteq,
-                              p+'=blah', p, 'blah')
+                              p + '=blah', p, 'blah')
 
-            self._assert_vopteq(p+'=0', p, 0)
-            self._assert_vopteq(p+'=0', p, "0")
-            self._assert_vopteq(p+'=-1', p, -1)
+            self._assert_vopteq(p + '=0', p, 0)
+            self._assert_vopteq(p + '=0', p, "0")
+            self._assert_vopteq(p + '=-1', p, -1)
 
     def test_encode_string_to_json(self):
         jparams = (
@@ -137,7 +136,7 @@ class ViewStringTest(CouchbaseTestCase):
             None,
             True,
             False,
-            { "chicken" : "broth" },
+            {"chicken": "broth"},
             ["noodle", "soup"],
             ["lone element"],
             ("empty tuple",)
@@ -153,16 +152,15 @@ class ViewStringTest(CouchbaseTestCase):
                               self._assert_vopteq,
                               "blah", p, object())
 
-
     def test_encode_to_jarray(self):
-        jparams = ('keys',) #add more here
+        jparams = ('keys',)  # add more here
         values = (
             ['foo', 'bar'],
             ['foo'])
 
         badvalues = (True,
                      False,
-                     {"foo":"bar"},
+                     {"foo": "bar"},
                      1,
                      "string")
 
@@ -178,7 +176,6 @@ class ViewStringTest(CouchbaseTestCase):
                                   self._assert_vopteq,
                                   "blah", p, v)
 
-
     def test_passthrough(self):
         values = (
             "blah",
@@ -188,42 +185,38 @@ class ViewStringTest(CouchbaseTestCase):
         for p in _HANDLER_MAP.keys():
             for v in values:
                 expected = "{0}={1}".format(p, v)
-                got = make_options_string({p:v}, passthrough=True)
+                got = make_options_string({p: v}, passthrough=True)
                 self.assertEqual(expected, got)
-
 
         # Ensure we still can't use unrecognized params
         self.assertRaises(InvalidArgumentException,
                           make_options_string,
-                          {'foo':'bar'},
+                          {'foo': 'bar'},
                           passthrough=True)
-
 
         # ensure we still can't use "stupid" params
         badvals = (object(), None, True, False)
         for bv in badvals:
             self.assertRaises(InvalidArgumentException,
                               make_options_string,
-                              {'stale':bv},
+                              {'stale': bv},
                               passthrough=True)
-
 
     def test_unrecognized(self):
         keys = ("new_param", "another_param")
         values = ("blah", -1, "-invalid-uri-char^&")
         for p in keys:
             for v in values:
-                got = make_options_string({p:v},
-                    unrecognized_ok=True)
+                got = make_options_string({p: v},
+                                          unrecognized_ok=True)
                 expected = "{0}={1}".format(p, v)
                 self.assertEqual(expected, got)
-
 
         badvals = (object(), True, False, None)
         for bv in badvals:
             self.assertRaises(InvalidArgumentException,
                               make_options_string,
-                              {'foo':bv},
+                              {'foo': bv},
                               unrecognized_ok=True)
 
     def test_string_params(self):
@@ -243,36 +236,34 @@ class ViewStringTest(CouchbaseTestCase):
             for v in badvals:
                 self.assertRaises(InvalidArgumentException,
                                   make_options_string,
-                                  {p:v})
-
+                                  {p: v})
 
     def test_ranges(self):
         expected = "startkey={0}".format(ulp.quote(json.dumps("foo")))
         self._assert_vopteq(expected, "mapkey_range", ["foo"])
         self._assert_vopteq_multi(
-            {'startkey' : json.dumps("foo"),
-             'endkey' : json.dumps("bar") },
+            {'startkey': json.dumps("foo"),
+             'endkey': json.dumps("bar")},
             "mapkey_range",
             ["foo", "bar"])
-
 
         expected = "startkey_docid=bar"
         self._assert_vopteq(expected, "dockey_range", ["bar"])
         self._assert_vopteq_multi(
-            {'startkey_docid' : "range_begin",
-             'endkey_docid' : "range_end"},
+            {'startkey_docid': "range_begin",
+             'endkey_docid': "range_end"},
             "dockey_range",
             ["range_begin", "range_end"])
 
         for p in ('mapkey_range', 'dockey_range'):
             self._assert_vopteq('', p, [])
             self._assert_vopteq('', p, UNSPEC)
-            self._assert_vopteq('', p, [UNSPEC,UNSPEC])
+            self._assert_vopteq('', p, [UNSPEC, UNSPEC])
             self._assert_vopteq('', p, [UNSPEC])
 
             self.assertRaises(InvalidArgumentException,
-                  self._assert_vopteq,
-                  "blah", p, [object()])
+                              self._assert_vopteq,
+                              "blah", p, [object()])
 
             self.assertRaises(InvalidArgumentException,
                               self._assert_vopteq,

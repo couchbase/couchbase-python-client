@@ -17,8 +17,9 @@
 
 from couchbase_v2.exceptions import InvalidArgumentException
 
-from couchbase.exceptions import  NotSupportedException
+from couchbase.exceptions import NotSupportedException
 from couchbase_tests.base import CollectionTestCase
+
 
 class EmptyKeyTest(CollectionTestCase):
 

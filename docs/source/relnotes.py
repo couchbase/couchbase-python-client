@@ -13,11 +13,17 @@ jira = JIRA(options)
 project_code = "PYCBC"
 project = jira.project(project_code)
 print("got project {}".format(project.versions))
-parser = argparse.ArgumentParser(description="Generate release notes in Asciidoc format")
-parser.add_argument('version',type=str)
-args=parser.parse_args()
+parser = argparse.ArgumentParser(
+    description="Generate release notes in Asciidoc format")
+parser.add_argument('version', type=str)
+args = parser.parse_args()
 ver_num = args.version
-project_version = next(iter(filter(lambda x: x.name == ver_num, project.versions)), None)
+project_version = next(
+    iter(
+        filter(
+            lambda x: x.name == ver_num,
+            project.versions)),
+    None)
 relnotes_raw = requests.get(
     "{}/secure/ReleaseNote.jspa?projectId={}&version={}".format(server, project.id,
                                                                 project_version.id))
@@ -25,10 +31,11 @@ soup = BeautifulSoup(relnotes_raw.text, 'html.parser')
 content = soup.find("main", class_="aui-page-panel-content")
 outputdir = os.path.join("build")
 
-date = datetime.date.today().strftime("{day} %B %Y").format(day=datetime.date.today().day)
+date = datetime.date.today().strftime(
+    "{day} %B %Y").format(day=datetime.date.today().day)
 try:
     os.makedirs(outputdir)
-except:
+except BaseException:
     pass
 with open(os.path.join(outputdir, "relnotes.adoc"), "w+") as outputfile:
     section_type = None
@@ -37,7 +44,9 @@ with open(os.path.join(outputdir, "relnotes.adoc"), "w+") as outputfile:
                "Improvement": "Enhancements",
                "New Feature": "Enhancements",
                "Bug": "Fixes"}
-    version = re.match(r'^(.*)Version ([0-9]+\.[0-9]+\.[0-9]+).*$', content.title.text).group(2)
+    version = re.match(
+        r'^(.*)Version ([0-9]+\.[0-9]+\.[0-9]+).*$',
+        content.title.text).group(2)
     print("got version {}".format(version))
     for entry in content.body.find_all():
         if re.match(r'h[0-9]+', entry.name):

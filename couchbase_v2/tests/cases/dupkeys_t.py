@@ -20,6 +20,7 @@ from couchbase_tests.base import ConnectionTestCase
 from couchbase_v2.exceptions import DocumentNotFoundException, TemporaryFailException
 import couchbase_core._libcouchbase as LCB
 
+
 class DupKeyTest(ConnectionTestCase):
     def setUp(self):
         super(DupKeyTest, self).setUp()

@@ -116,7 +116,8 @@ if loglevel:
 
 
 def version_to_tuple(version_str, default=None):
-    return tuple(map(int, str.split(version_str, "."))) if version_str else default
+    return tuple(map(int, str.split(version_str, "."))
+                 ) if version_str else default
 
 
 PYCBC_SERVER_VERSION = version_to_tuple(os.environ.get("PYCBC_SERVER_VERSION"))
@@ -165,7 +166,8 @@ class ResourcedTestCase(ResourcedTestCaseReal):
                                       ignore_numeric_type_changes=True, ignore_type_subclasses=True,
                                       ignore_string_type_changes=True))
 
-    def assertSanitizedEqual(self, actual, expected, ignored=None, comparator=None):
+    def assertSanitizedEqual(self, actual, expected,
+                             ignored=None, comparator=None):
         comparator = comparator or self.assertEqual
         ignored = ignored or {}
         actual_json_sanitized = sanitize_json(actual, ignored)
@@ -189,7 +191,7 @@ class ResourcedTestCase(ResourcedTestCaseReal):
     def run_and_collect_exceptions(self, command):
         try:
             command()
-        except:
+        except BaseException:
             if not hasattr(self, "exceptions"):
                 self.exceptions = []
             self.exceptions.append(traceback.format_exc())
@@ -283,7 +285,8 @@ class ClusterInformation(object):
         # We should not be using classic here!  But, somewhere in the tests, we need
         # this for hitting the mock, it seems
 
-        return MockHackArgs(ClassicAuthenticator, {'bucket': self.bucket_name}) if is_mock else MockHackArgs(PasswordAuthenticator, {})
+        return MockHackArgs(ClassicAuthenticator, {
+                            'bucket': self.bucket_name}) if is_mock else MockHackArgs(PasswordAuthenticator, {})
 
     def make_admin_connection(self, is_mock):
 
@@ -378,7 +381,7 @@ class MockResourceManager(TestResourceManager):
 
         try:
             mock.start()
-        except:
+        except BaseException:
             self._failed = True
             raise
 
@@ -594,18 +597,22 @@ class CouchbaseTestCase(ResourcedTestCase):
     # noinspection PyCompatibility
     def assertRegex(self, text, expected_regex, *args, **kwargs):
         try:
-            return super(CouchbaseTestCase, self).assertRegex(text, expected_regex, *args, **kwargs)
+            return super(CouchbaseTestCase, self).assertRegex(
+                text, expected_regex, *args, **kwargs)
         except NameError:
             pass
         except AttributeError:
             pass
 
-        return super(CouchbaseTestCase, self).assertRegexpMatches(*args, **kwargs)
+        return super(CouchbaseTestCase, self).assertRegexpMatches(
+            *args, **kwargs)
 
     # noinspection PyCompatibility
-    def assertRaisesRegex(self, expected_exception, expected_regex, *args, **kwargs):
+    def assertRaisesRegex(self, expected_exception,
+                          expected_regex, *args, **kwargs):
         try:
-            return super(CouchbaseTestCase, self).assertRaisesRegex(expected_exception, expected_regex, *args, **kwargs)
+            return super(CouchbaseTestCase, self).assertRaisesRegex(
+                expected_exception, expected_regex, *args, **kwargs)
         except NameError:
             pass
         except AttributeError:
@@ -676,7 +683,7 @@ class ConnectionTestCaseBase(CouchbaseTestCase):
             graphdir = os.path.join(os.getcwd(), "ref_graphs")
             try:
                 os.makedirs(graphdir)
-            except:
+            except BaseException:
                 pass
 
             for attrib_name in ["cb.tracer.parent", "cb"]:
@@ -684,7 +691,7 @@ class ConnectionTestCaseBase(CouchbaseTestCase):
                     logging.info("evaluating " + attrib_name)
                     attrib = eval("self." + attrib_name)
                     self.gen_obj_graph(attrib, attrib_name, graphdir)
-                except:
+                except BaseException:
                     pass
         gc.collect()
         for x in range(10):
@@ -708,7 +715,7 @@ class ConnectionTestCaseBase(CouchbaseTestCase):
                 break
             try:
                 self.cb.get("dummy", ttl=remaining_time)
-            except:
+            except BaseException:
                 pass
 
     def tearDown(self):
@@ -828,7 +835,7 @@ def check_fds():
     try:
         output, _ = fds.communicate(timeout=3)
         fd_output = output.decode().split('\n')
-        print('found {} fds'.format(len(fd_output)-1))
+        print('found {} fds'.format(len(fd_output) - 1))
 
     except TimeoutExpired:
         fds.kill()
@@ -960,7 +967,8 @@ class CouchbaseClusterResource(object):
         if all(k in resp.endpoints.keys() for k in service_types):
             print("all services are present ({})".format(service_types))
             for service in service_types:
-                if not any(x for x in resp.endpoints[service] if x.state == PingState.OK):
+                if not any(
+                        x for x in resp.endpoints[service] if x.state == PingState.OK):
                     raise Exception("{} isn't ready yet".format(service))
             return True
         raise Exception("not all services present in {}".format(resp))
@@ -1123,12 +1131,14 @@ class ClusterTestCase(CouchbaseTestCase):
         def wrapper(*args, **kwargs):
             success_func = kwargs.pop(
                 'on_success', on_success) or self._passthrough
-            return self.try_n_times(num_times, seconds_between, func, *args, on_success=success_func, **kwargs)
+            return self.try_n_times(
+                num_times, seconds_between, func, *args, on_success=success_func, **kwargs)
 
         return wrapper
 
     def factory(self, *args, **kwargs):
-        return V3Bucket(*args, username="default", **kwargs).default_collection()
+        return V3Bucket(*args, username="default", **
+                        kwargs).default_collection()
 
     def setUp(self, **kwargs):
         super(ClusterTestCase, self).setUp()
@@ -1252,7 +1262,8 @@ class CollectionTestCase(ClusterTestCase):
     def __init__(self, *args, **kwargs):
         super(CollectionTestCase, self).__init__(*args, **kwargs)
 
-    # soon we should have a Cluster function that does this (DP _or_ 7.0, etc...)
+    # soon we should have a Cluster function that does this (DP _or_ 7.0,
+    # etc...)
     def supports_collections(self):
         try:
             v = float(self.get_cluster_version()[0:3])
@@ -1272,7 +1283,8 @@ class CollectionTestCase(ClusterTestCase):
         # 1) Connect to a Cluster
         super(CollectionTestCase, self).setUp(**kwargs)
         cm = self.bucket.collections()
-        # check for collection support.  Return use default_collection otherwise
+        # check for collection support.  Return use default_collection
+        # otherwise
         if self.supports_collections():
             my_collections = real_collections
         else:
@@ -1297,10 +1309,9 @@ class CollectionTestCase(ClusterTestCase):
         if type(self)._beer_sample_collections:
             self.beer_sample_collections = type(self)._beer_sample_collections
 
-
     @classmethod
-    def setUpClass(cls, 
-            setup_beer_sample_collections=None,  # type: bool
+    def setUpClass(cls,
+                   setup_beer_sample_collections=None,  # type: bool
                    ) -> None:
         super(CollectionTestCase, cls).setUpClass()
         try:
@@ -1422,7 +1433,8 @@ class CollectionTestCase(ClusterTestCase):
                 counts_good = True
                 break
 
-            # should have increased population by now, break to retry population queries
+            # should have increased population by now, break to retry
+            # population queries
             if beers == 0 and breweries == 0 and i == 5:
                 break
 
@@ -1434,28 +1446,33 @@ class CollectionTestCase(ClusterTestCase):
 
     def get_scope(self, scope_name, bucket_name=None, collection_mgr=None):
         if collection_mgr:
-            return next((s for s in collection_mgr.get_all_scopes() if s.name == scope_name), None)
+            return next((s for s in collection_mgr.get_all_scopes()
+                        if s.name == scope_name), None)
 
         bucket = self.try_n_times(10, 3, self.cluster.bucket, bucket_name)
         if bucket:
             cm = bucket.collections()
-            return next((s for s in cm.get_all_scopes() if s.name == scope_name), None)
+            return next((s for s in cm.get_all_scopes()
+                        if s.name == scope_name), None)
 
         return None
 
-    def get_collection(self, scope_name, coll_name, bucket_name=None, collection_mgr=None):
+    def get_collection(self, scope_name, coll_name,
+                       bucket_name=None, collection_mgr=None):
         if collection_mgr:
             scope = self.get_scope(scope_name, collection_mgr=collection_mgr)
         else:
             scope = self.get_scope(scope_name, bucket_name)
         if scope:
-            return next((c for c in scope.collections if c.name == coll_name), None)
+            return next(
+                (c for c in scope.collections if c.name == coll_name), None)
 
         return None
 
     @staticmethod
     def _upsert_collection(cm, collection_name, scope_name):
-        if not collection_name in CollectionTestCase.initialised[scope_name].keys():
+        if not collection_name in CollectionTestCase.initialised[scope_name].keys(
+        ):
             try:
                 cm.create_collection(CollectionSpec(
                     collection_name, scope_name))
@@ -1492,7 +1509,8 @@ class AsyncClusterTestCase(ClusterTestCase):
         connstr_nobucket, bucket = self._get_connstr_and_bucket_name(
             args, kwargs)
         bucket = override_bucket or bucket
-        return self._instantiate_cluster(connstr_nobucket, self.cluster_class).bucket(bucket)
+        return self._instantiate_cluster(
+            connstr_nobucket, self.cluster_class).bucket(bucket)
 
     def gen_collection(self,
                        *args, **kwargs):
@@ -1532,7 +1550,8 @@ class TracedCase(CollectionTestCase):
     def tracer(self):
         return TracedCase._tracer
 
-    def setUp(self, trace_all=True, flushcount=0, enable_logging=False, use_parent_tracer=False, *args, **kwargs):
+    def setUp(self, trace_all=True, flushcount=0, enable_logging=False,
+              use_parent_tracer=False, *args, **kwargs):
         self.timeout = None
         # self.enable_logging = enable_logging or os.environ.get("PYCBC_ENABLE_LOGGING")
         self.use_parent_tracer = use_parent_tracer
@@ -1585,10 +1604,11 @@ class TracedCase(CollectionTestCase):
         couchbase.disable_logging()
         if self.tracer and getattr(self.tracer, "close", None):
             try:
-                # yield to IOLoop to flush the spans - https://github.com/jaegertracing/jaeger-client-python/issues/50
+                # yield to IOLoop to flush the spans -
+                # https://github.com/jaegertracing/jaeger-client-python/issues/50
                 time.sleep(2)
                 self.tracer.close()  # flush any buffered spans
-            except:
+            except BaseException:
                 pass
 
 
@@ -1756,7 +1776,8 @@ class CouchbaseClusterInfo(object):
 
     @staticmethod
     def _get_scope(cm, scope_name):
-        return next((s for s in cm.get_all_scopes() if s.name == scope_name), None)
+        return next((s for s in cm.get_all_scopes()
+                    if s.name == scope_name), None)
 
     @staticmethod
     def _get_collection(cm, scope_name, coll_name):

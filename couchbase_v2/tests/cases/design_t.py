@@ -26,13 +26,14 @@ DNAME = "tmp"
 VNAME = "a_view"
 
 DESIGN_JSON = {
-    'language' : 'javascript',
-    'views' : {
-        VNAME : {
-            'map' : "function(doc) { emit(null,null); }"
+    'language': 'javascript',
+    'views': {
+        VNAME: {
+            'map': "function(doc) { emit(null,null); }"
         }
     }
 }
+
 
 @attr('slow')
 class DesignDocManagementTest(DDocTestCase):
@@ -55,14 +56,13 @@ class DesignDocManagementTest(DDocTestCase):
         del self.mgr
         super(DesignDocManagementTest, self).tearDown()
 
-
     def test_design_management(self):
         rv = self.mgr.design_create(
             DNAME, DESIGN_JSON, use_devmode=True, syncwait=5)
         self.assertTrue(rv.success)
 
         rv = self.cb._view(DNAME, VNAME, use_devmode=True,
-                           params = { 'limit':10 })
+                           params={'limit': 10})
         print(rv)
         self.assertTrue(rv.success)
 
@@ -70,7 +70,7 @@ class DesignDocManagementTest(DDocTestCase):
         self.assertTrue(rv.success)
 
         rv = self.cb._view(DNAME, VNAME, use_devmode=False,
-                           params = { 'limit':10 })
+                           params={'limit': 10})
         self.assertTrue(rv.success)
 
         self.assertRaises(HTTPException,
@@ -88,7 +88,7 @@ class DesignDocManagementTest(DDocTestCase):
 
     def test_design_headers(self):
         rv = self.mgr.design_create(DNAME, DESIGN_JSON, use_devmode=True,
-                                   syncwait=5)
+                                    syncwait=5)
 
         rv = self.mgr.design_get(DNAME, use_devmode=True)
         self.assertTrue(rv.headers)

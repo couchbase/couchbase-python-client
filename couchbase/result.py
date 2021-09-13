@@ -50,7 +50,8 @@ def extract_value(content, decode_canonical, full=False):
 
 def get_decoder(item  # type: Type[Union[Transcodable,Any]]
                 ):
-    return getattr(item, 'decode_canonical', None) if issubclass(item, Transcodable) else item
+    return getattr(item, 'decode_canonical', None) if issubclass(
+        item, Transcodable) else item
 
 
 class ContentProxy(object):
@@ -265,7 +266,8 @@ class PingResult(object):
 
     @property
     def id(self):
-        # the actual format is "0xdeaddeadbeef/<the string you passed in the options>"
+        # the actual format is "0xdeaddeadbeef/<the string you passed in the
+        # options>"
         return self._id
 
     @property
@@ -554,7 +556,8 @@ class MutationToken(object):
 
     def as_tuple(self):
         # type:(...) -> tuple(int, int, int, str)
-        return (self.vbucketId, self.vbucketUUID, self.sequenceNumber, self.bucketName)
+        return (self.vbucketId, self.vbucketUUID,
+                self.sequenceNumber, self.bucketName)
 
 
 def get_mutation_result(result  # type: CoreResult

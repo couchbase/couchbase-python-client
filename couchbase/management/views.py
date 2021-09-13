@@ -134,10 +134,12 @@ class ViewIndexManager(object):
         response = self._http_request(**args).value
 
         def matches(row):
-            return namespace == DesignDocumentNamespace(row['doc']['meta']['id'].startswith("_design/dev_"))
+            return namespace == DesignDocumentNamespace(
+                row['doc']['meta']['id'].startswith("_design/dev_"))
 
         rows = [r for r in response['rows'] if matches(r)]
-        return list(map(lambda x: DesignDocument.from_json(x['doc']['meta']['id'], **x['doc']['json']), rows))
+        return list(map(lambda x: DesignDocument.from_json(
+            x['doc']['meta']['id'], **x['doc']['json']), rows))
 
     def upsert_design_document(self,                # type: ViewIndexManager
                                design_doc_data,     # type: DesignDocument
@@ -231,7 +233,8 @@ class View(object):
 
     def as_dict(self):
         # type: (...) -> Dict[str, Any]
-        return {k: v for k, v in {"map": self._map, "reduce": self._reduce}.items() if v}
+        return {k: v for k, v in {"map": self._map,
+                                  "reduce": self._reduce}.items() if v}
 
     def to_json(self):
         # type: (...) -> str

@@ -61,7 +61,7 @@ class AnalyticsIndexManagerTests(CollectionTestCase):
         try:
             self.mgr.disconnect_link(DisconnectLinkOptions(
                 dataverse_name=self.dataverse_name))
-        except:
+        except BaseException:
             pass
 
     def tearDown(self):
@@ -77,7 +77,7 @@ class AnalyticsIndexManagerTests(CollectionTestCase):
         try:
             self.mgr.disconnect_link(DisconnectLinkOptions(
                 dataverse_name=self.dataverse_name))
-        except:
+        except BaseException:
             pass
         self.try_n_times(10, 3,
                          self.mgr.drop_dataverse, self.dataverse_name,
@@ -223,13 +223,15 @@ class AnalyticsIndexManagerTests(CollectionTestCase):
             raise SkipTest("Test only for 6.x versions")
 
         with self.assertRaises(CompilationFailedException):
-            # test.beer_sample => `test.beer_sample` which is not valid prior to 7.0
+            # test.beer_sample => `test.beer_sample` which is not valid prior
+            # to 7.0
             self.mgr.create_dataverse(
                 "test.beer_sample", CreateDataverseOptions(ignore_if_exists=True))
 
         # wish the analytics service was consistent here :/
         with self.assertRaises(ParsingFailedException):
-            # test/beer_sample => `test`.`beer_sample` which is not valid prior to 7.0
+            # test/beer_sample => `test`.`beer_sample` which is not valid prior
+            # to 7.0
             self.mgr.create_dataverse(
                 "test/beer_sample", CreateDataverseOptions(ignore_if_exists=True))
 

@@ -88,7 +88,11 @@ class SubdocTests(CollectionTestCase):
         self.assertFalse(result.exists(1))
 
     def test_lookup_in_simple_get_longer_path(self):
-        cas = self.coll.upsert(self.KEY, {"a": "aaa", "b": {"c": {"d": "yo!"}}}).cas
+        cas = self.coll.upsert(
+            self.KEY, {
+                "a": "aaa", "b": {
+                    "c": {
+                        "d": "yo!"}}}).cas
         self.try_n_times(10, 3, self._cas_matches, self.KEY, cas)
         result = self.coll.lookup_in(self.KEY, (SD.get("b.c.d"),))
         self.assertEqual(result.cas, cas)
@@ -99,10 +103,15 @@ class SubdocTests(CollectionTestCase):
             raise SkipTest(
                 "mock doesn't support getting xattrs (like $document.expiry)"
             )
-        cas = self.coll.upsert(self.KEY, {"a": "aaa", "b": {"c": {"d": "yo!"}}}).cas
+        cas = self.coll.upsert(
+            self.KEY, {
+                "a": "aaa", "b": {
+                    "c": {
+                        "d": "yo!"}}}).cas
         self.try_n_times(10, 3, self._cas_matches, self.KEY, cas)
         result = self.coll.lookup_in(
-            self.KEY, (SD.with_expiry(), SD.get("a"), SD.exists("b"), SD.get("b.c"))
+            self.KEY, (SD.with_expiry(), SD.get("a"),
+                       SD.exists("b"), SD.get("b.c"))
         )
         self.assertTrue(result.success)
         self.assertIsNone(result.expiry)
@@ -158,11 +167,15 @@ class SubdocTests(CollectionTestCase):
             MutateInOptions(expiry=timedelta(seconds=5)),
         )
         self.assertTrue(result.success)
-        expiry1 = self.coll.get(self.KEY, GetOptions(with_expiry=True)).expiryTime
+        expiry1 = self.coll.get(
+            self.KEY, GetOptions(
+                with_expiry=True)).expiryTime
 
         result = self.coll.mutate_in(self.KEY, (SD.upsert("d", "ddd"),))
         self.assertTrue(result.success)
-        expiry2 = self.cb.get(self.KEY, GetOptions(with_expiry=True)).expiryTime
+        expiry2 = self.cb.get(
+            self.KEY, GetOptions(
+                with_expiry=True)).expiryTime
         self.assertIsNotNone(expiry1)
         self.assertIsInstance(expiry1, datetime)
         self.assertIsNone(expiry2)
@@ -190,13 +203,19 @@ class SubdocTests(CollectionTestCase):
             MutateInOptions(expiry=timedelta(seconds=5)),
         )
         self.assertTrue(result.success)
-        expiry1 = self.coll.get(self.KEY, GetOptions(with_expiry=True)).expiryTime
+        expiry1 = self.coll.get(
+            self.KEY, GetOptions(
+                with_expiry=True)).expiryTime
 
         result = self.coll.mutate_in(
-            self.KEY, (SD.upsert("d", "ddd"),), MutateInOptions(preserve_expiry=True)
+            self.KEY, (SD.upsert(
+                "d", "ddd"),), MutateInOptions(
+                preserve_expiry=True)
         )
         self.assertTrue(result.success)
-        expiry2 = self.coll.get(self.KEY, GetOptions(with_expiry=True)).expiryTime
+        expiry2 = self.coll.get(
+            self.KEY, GetOptions(
+                with_expiry=True)).expiryTime
         self.assertIsNotNone(expiry1)
         self.assertIsInstance(expiry1, datetime)
         self.assertIsNotNone(expiry2)
@@ -227,7 +246,10 @@ class SubdocTests(CollectionTestCase):
             self.coll.mutate_in(
                 self.KEY,
                 (SD.replace("c", "ccc"),),
-                MutateInOptions(expiry=timedelta(seconds=5), preserve_expiry=True),
+                MutateInOptions(
+                    expiry=timedelta(
+                        seconds=5),
+                    preserve_expiry=True),
             )
 
     def test_mutate_in_durability(self):
@@ -255,7 +277,9 @@ class SubdocTests(CollectionTestCase):
 
         # ok, it is there...
         self.coll.get(
-            "id", GetOptions(project=["someArray"], timeout=timedelta(seconds=1.0))
+            "id", GetOptions(
+                project=["someArray"], timeout=timedelta(
+                    seconds=1.0))
         )
         self.assertRaisesRegex(
             InvalidArgumentException,
@@ -324,7 +348,10 @@ class SubdocTests(CollectionTestCase):
         self.assertEqual(2, result[2])
 
     def test_array_append_multi_insert(self):
-        cas = self.coll.upsert(self.KEY, {"a": "aaa", "b": [1, 2, 3, 4, 5, 6, 7]}).cas
+        cas = self.coll.upsert(
+            self.KEY, {
+                "a": "aaa", "b": [
+                    1, 2, 3, 4, 5, 6, 7]}).cas
         self.try_n_times(10, 3, self._cas_matches, self.KEY, cas)
         self.coll.mutate_in(self.KEY, (SD.array_append("b", 8, 9, 10),))
         result = self.coll.get(self.KEY).content_as[dict]
@@ -334,7 +361,10 @@ class SubdocTests(CollectionTestCase):
         self.assertEqual(insert_res, [8, 9, 10])
 
     def test_array_prepend_multi_insert(self):
-        cas = self.coll.upsert(self.KEY, {"a": "aaa", "b": [4, 5, 6, 7, 8, 9, 10]}).cas
+        cas = self.coll.upsert(
+            self.KEY, {
+                "a": "aaa", "b": [
+                    4, 5, 6, 7, 8, 9, 10]}).cas
         self.try_n_times(10, 3, self._cas_matches, self.KEY, cas)
         self.coll.mutate_in(self.KEY, (SD.array_prepend("b", 1, 2, 3),))
         result = self.coll.get(self.KEY).content_as[dict]
@@ -344,7 +374,10 @@ class SubdocTests(CollectionTestCase):
         self.assertEqual(insert_res, [1, 2, 3])
 
     def test_array_insert_multi_insert(self):
-        cas = self.coll.upsert(self.KEY, {"a": "aaa", "b": [1, 2, 3, 4, 8, 9, 10]}).cas
+        cas = self.coll.upsert(
+            self.KEY, {
+                "a": "aaa", "b": [
+                    1, 2, 3, 4, 8, 9, 10]}).cas
         self.try_n_times(10, 3, self._cas_matches, self.KEY, cas)
         self.coll.mutate_in(self.KEY, (SD.array_insert("b.[4]", 5, 6, 7),))
         result = self.coll.get(self.KEY).content_as[dict]
@@ -376,14 +409,18 @@ class SubdocTests(CollectionTestCase):
             self.coll.mutate_in(self.KEY, (SD.array_addunique("b", 3),))
 
         with self.assertRaises(SubdocCantInsertValueException):
-            self.coll.mutate_in(self.KEY, (SD.array_addunique("b", [4, 5, 6]),))
+            self.coll.mutate_in(
+                self.KEY, (SD.array_addunique("b", [4, 5, 6]),))
 
         # apparently adding floats is okay?
         # with self.assertRaises(SubdocCantInsertValueException):
         self.coll.mutate_in(self.KEY, (SD.array_addunique("b", 4.5),))
 
         with self.assertRaises(SubdocCantInsertValueException):
-            self.coll.mutate_in(self.KEY, (SD.array_addunique("b", {"b1": "b1b1b1"}),))
+            self.coll.mutate_in(
+                self.KEY, (SD.array_addunique(
+                    "b", {
+                        "b1": "b1b1b1"}),))
 
         with self.assertRaises(SubdocPathMismatchException):
             self.coll.mutate_in(self.KEY, (SD.array_addunique("c", 2),))

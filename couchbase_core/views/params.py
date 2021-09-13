@@ -45,7 +45,9 @@ class _Unspec(object):
     def __repr__(self):
         return "<Placeholder>"
 
+
 UNSPEC = _Unspec()
+
 
 def _bool_param_handler(input):
     if isinstance(input, bool):
@@ -57,7 +59,7 @@ def _bool_param_handler(input):
     if isinstance(input, basestring):
         if input not in ("true", "false"):
             raise InvalidArgumentException.pyexc("String for boolean must be "
-                                      "'true' or 'false'", input)
+                                                 "'true' or 'false'", input)
         return input
 
     try:
@@ -69,19 +71,20 @@ def _bool_param_handler(input):
 
     except TypeError:
         raise InvalidArgumentException.pyexc("Boolean value must be boolean, "
-                                  "numeric, or a string of 'true' "
-                                  "or 'false'", input)
+                                             "numeric, or a string of 'true' "
+                                             "or 'false'", input)
 
 
 def _num_param_handler(input):
     # Don't allow booleans:
     if isinstance(input, bool):
         raise InvalidArgumentException.pyexc("Cannot use booleans as numeric values",
-                                      input)
+                                             input)
     try:
         return str(int(input))
     except Exception as e:
-        raise InvalidArgumentException.pyexc("Expected a numeric argument", input, e)
+        raise InvalidArgumentException.pyexc(
+            "Expected a numeric argument", input, e)
 
 
 def _string_param_common(input, do_quote=False):
@@ -94,7 +97,8 @@ def _string_param_common(input, do_quote=False):
         s = input
 
     elif isinstance(input, bool):
-        raise InvalidArgumentException.pyexc("Can't use boolean as string", input)
+        raise InvalidArgumentException.pyexc(
+            "Can't use boolean as string", input)
 
     elif isinstance(input, (int, long, float)):
         # Basic numeric types:
@@ -102,7 +106,7 @@ def _string_param_common(input, do_quote=False):
 
     else:
         raise InvalidArgumentException.pyexc("Expected simple numeric type or string ",
-                                      input)
+                                             input)
     if do_quote:
         s = ulp.quote(s)
 
@@ -140,7 +144,8 @@ def _jval_param_handler(input):
         ret = json.dumps(input)
         return _string_param_handler(ret)
     except Exception as e:
-        raise InvalidArgumentException.pyexc("Couldn't convert value to JSON", input, e)
+        raise InvalidArgumentException.pyexc(
+            "Couldn't convert value to JSON", input, e)
 
 
 def _jarry_param_handler(input):
@@ -156,59 +161,60 @@ def _jarry_param_handler(input):
 class Params(object):
     # Random, unspecified value.
 
-    DESCENDING              = "descending"
-    STARTKEY                = "startkey"
-    STARTKEY_DOCID          = "startkey_docid"
-    ENDKEY                  = "endkey"
-    ENDKEY_DOCID            = "endkey_docid"
-    KEY                     = "key"
-    KEYS                    = "keys"
-    INCLUSIVE_END           = "inclusive_end"
+    DESCENDING = "descending"
+    STARTKEY = "startkey"
+    STARTKEY_DOCID = "startkey_docid"
+    ENDKEY = "endkey"
+    ENDKEY_DOCID = "endkey_docid"
+    KEY = "key"
+    KEYS = "keys"
+    INCLUSIVE_END = "inclusive_end"
 
-    GROUP                   = "group"
-    GROUP_LEVEL             = "group_level"
-    REDUCE                  = "reduce"
+    GROUP = "group"
+    GROUP_LEVEL = "group_level"
+    REDUCE = "reduce"
 
-    SKIP                    = "skip"
-    LIMIT                   = "limit"
+    SKIP = "skip"
+    LIMIT = "limit"
 
-    ON_ERROR                = "on_error"
-    STALE                   = "stale"
-    DEBUG                   = "debug"
-    CONNECTION_TIMEOUT      = "connection_timeout"
-    FULL_SET                = "full_set"
+    ON_ERROR = "on_error"
+    STALE = "stale"
+    DEBUG = "debug"
+    CONNECTION_TIMEOUT = "connection_timeout"
+    FULL_SET = "full_set"
 
-    MAPKEY_SINGLE           = "mapkey_single"
-    MAPKEY_MULTI            = "mapkey_multi"
-    MAPKEY_RANGE            = "mapkey_range"
-    DOCKEY_RANGE            = "dockey_range"
-    START_RANGE             = "start_range"
-    END_RANGE               = "end_range"
+    MAPKEY_SINGLE = "mapkey_single"
+    MAPKEY_MULTI = "mapkey_multi"
+    MAPKEY_RANGE = "mapkey_range"
+    DOCKEY_RANGE = "dockey_range"
+    START_RANGE = "start_range"
+    END_RANGE = "end_range"
+
 
 _HANDLER_MAP = {
-    Params.DESCENDING        : _bool_param_handler,
+    Params.DESCENDING: _bool_param_handler,
 
-    Params.STARTKEY          : _jval_param_handler,
-    Params.STARTKEY_DOCID    : _string_param_handler,
-    Params.ENDKEY            : _jval_param_handler,
-    Params.ENDKEY_DOCID      : _string_param_handler,
+    Params.STARTKEY: _jval_param_handler,
+    Params.STARTKEY_DOCID: _string_param_handler,
+    Params.ENDKEY: _jval_param_handler,
+    Params.ENDKEY_DOCID: _string_param_handler,
 
-    Params.FULL_SET          : _bool_param_handler,
+    Params.FULL_SET: _bool_param_handler,
 
-    Params.GROUP             : _bool_param_handler,
-    Params.GROUP_LEVEL       : _num_param_handler,
-    Params.INCLUSIVE_END     : _bool_param_handler,
-    Params.KEY               : _jval_param_handler,
-    Params.KEYS              : _jarry_param_handler,
-    Params.ON_ERROR          : _onerror_param_handler,
-    Params.REDUCE            : _bool_param_handler,
-    Params.STALE             : _stale_param_handler,
-    Params.SKIP              : _num_param_handler,
-    Params.LIMIT             : _num_param_handler,
-    Params.DEBUG             : _bool_param_handler,
+    Params.GROUP: _bool_param_handler,
+    Params.GROUP_LEVEL: _num_param_handler,
+    Params.INCLUSIVE_END: _bool_param_handler,
+    Params.KEY: _jval_param_handler,
+    Params.KEYS: _jarry_param_handler,
+    Params.ON_ERROR: _onerror_param_handler,
+    Params.REDUCE: _bool_param_handler,
+    Params.STALE: _stale_param_handler,
+    Params.SKIP: _num_param_handler,
+    Params.LIMIT: _num_param_handler,
+    Params.DEBUG: _bool_param_handler,
     Params.CONNECTION_TIMEOUT: _num_param_handler,
-    Params.START_RANGE       : _jarry_param_handler,
-    Params.END_RANGE         : _jarry_param_handler,
+    Params.START_RANGE: _jarry_param_handler,
+    Params.END_RANGE: _jarry_param_handler,
 }
 
 
@@ -305,8 +311,8 @@ class QueryBase(object):
 
         if len(value) not in (1, 2):
             raise InvalidArgumentException.pyexc("Range specification "
-                                      "must have one or two elements",
-                                          value)
+                                                 "must have one or two elements",
+                                                 value)
 
         value = value[::]
         if len(value) == 1:
@@ -431,7 +437,7 @@ class QueryBase(object):
             ctor_opts.update(**params)
             if cls is QueryBase:
                 if ('bbox' in params or 'start_range' in params or
-                            'end_range' in params):
+                        'end_range' in params):
                     return SpatialQuery(**ctor_opts)
                 else:
                     return ViewQuery(**ctor_opts)
@@ -442,7 +448,8 @@ class QueryBase(object):
             return ret
 
         else:
-            raise InvalidArgumentException.pyexc("Params must be Query, dict, or string")
+            raise InvalidArgumentException.pyexc(
+                "Params must be Query, dict, or string")
 
     @classmethod
     def from_string(cls, qstr):
@@ -514,49 +521,48 @@ class QueryBase(object):
     def __repr__(self):
         return "Query:'{0}'".format(self.encoded)
 
-
     # Common parameters:
-    stale               = _genprop(Params.STALE)
-    skip                = _genprop(Params.SKIP)
-    limit               = _genprop(Params.LIMIT)
-    full_set            = _genprop(Params.FULL_SET)
-    connection_timeout  = _genprop(Params.CONNECTION_TIMEOUT)
-    debug               = _genprop(Params.DEBUG)
-    on_error            = _genprop(Params.ON_ERROR)
+    stale = _genprop(Params.STALE)
+    skip = _genprop(Params.SKIP)
+    limit = _genprop(Params.LIMIT)
+    full_set = _genprop(Params.FULL_SET)
+    connection_timeout = _genprop(Params.CONNECTION_TIMEOUT)
+    debug = _genprop(Params.DEBUG)
+    on_error = _genprop(Params.ON_ERROR)
 
 
 class ViewQuery(QueryBase):
-    descending          = _genprop(Params.DESCENDING)
+    descending = _genprop(Params.DESCENDING)
 
     # Use the range parameters. They're easier
-    startkey            = _genprop(Params.STARTKEY)
-    endkey              = _genprop(Params.ENDKEY)
-    startkey_docid      = _genprop(Params.STARTKEY_DOCID)
-    endkey_docid        = _genprop(Params.ENDKEY_DOCID)
+    startkey = _genprop(Params.STARTKEY)
+    endkey = _genprop(Params.ENDKEY)
+    startkey_docid = _genprop(Params.STARTKEY_DOCID)
+    endkey_docid = _genprop(Params.ENDKEY_DOCID)
 
-    keys                = _genprop(Params.KEYS)
-    key                 = _genprop(Params.KEY)
-    inclusive_end       = _genprop(Params.INCLUSIVE_END)
+    keys = _genprop(Params.KEYS)
+    key = _genprop(Params.KEY)
+    inclusive_end = _genprop(Params.INCLUSIVE_END)
 
-    reduce              = _genprop(Params.REDUCE)
-    group               = _genprop(Params.GROUP)
-    group_level         = _genprop(Params.GROUP_LEVEL)
+    reduce = _genprop(Params.REDUCE)
+    group = _genprop(Params.GROUP)
+    group_level = _genprop(Params.GROUP_LEVEL)
 
     # Aliases:
-    mapkey_single       = _genprop(Params.KEY)
-    mapkey_multi        = _genprop(Params.KEYS)
+    mapkey_single = _genprop(Params.KEY)
+    mapkey_multi = _genprop(Params.KEYS)
 
-    mapkey_range        = _rangeprop(Params.MAPKEY_RANGE,
-                                     Params.STARTKEY, Params.ENDKEY)
+    mapkey_range = _rangeprop(Params.MAPKEY_RANGE,
+                              Params.STARTKEY, Params.ENDKEY)
 
-    dockey_range        = _rangeprop(Params.DOCKEY_RANGE,
-                                     Params.STARTKEY_DOCID,
-                                     Params.ENDKEY_DOCID)
+    dockey_range = _rangeprop(Params.DOCKEY_RANGE,
+                              Params.STARTKEY_DOCID,
+                              Params.ENDKEY_DOCID)
 
 
 class SpatialQuery(QueryBase):
-    start_range         = _genprop(Params.START_RANGE)
-    end_range           = _genprop(Params.END_RANGE)
+    start_range = _genprop(Params.START_RANGE)
+    end_range = _genprop(Params.END_RANGE)
 
 
 class Query(ViewQuery):

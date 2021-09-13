@@ -194,7 +194,8 @@ def array_addunique(path,                   # type: str
     :param bool create_parents: If True, create the array if it does not already exist.
     :return: Spec
     """
-    return SD.array_addunique(path, value, xattr=xattr, create_parents=create_parents)
+    return SD.array_addunique(path, value, xattr=xattr,
+                              create_parents=create_parents)
 
 
 def counter(path,                   # type: str
@@ -292,4 +293,9 @@ def gen_projection_spec(project, with_exp=False):
 
 class MutateInOptions(DurabilityOptionBlock):
     def __init__(self, *args, preserve_expiry=False, **kwargs):
-        super(MutateInOptions, self).__init__(*args, preserve_expiry=preserve_expiry, **kwargs)
+        super(
+            MutateInOptions,
+            self).__init__(
+            *args,
+            preserve_expiry=preserve_expiry,
+            **kwargs)

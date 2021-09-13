@@ -185,9 +185,18 @@ class TxRawClientMixin(object):
         """
 
         iops = v0Iops(reactor)
-        super(TxRawClientMixin, self).__init__(connstr, *args, iops=iops, **kwargs)
+        super(
+            TxRawClientMixin,
+            self).__init__(
+            connstr,
+            *
+            args,
+            iops=iops,
+            **kwargs)
 
-        self._evq = {"connect": ConnectionEventQueue(), "_dtor": TxEventQueue()}
+        self._evq = {
+            "connect": ConnectionEventQueue(),
+            "_dtor": TxEventQueue()}
 
         self._conncb = self._evq["connect"]
         self._dtorcb = self._evq["_dtor"]
@@ -272,6 +281,7 @@ class TxRawClientMixin(object):
 
         """
         d = Deferred()
+
         def _on_ok(res):
             opres.clear_callbacks()
             d.callback(res)
@@ -409,7 +419,8 @@ class TxRawBucket(TxRawClientMixin, V3AsyncBucket):
     @internal
     def __init__(self, *args, **kwargs):
         super(TxRawBucket, self).__init__(
-            collection_factory=kwargs.pop("collection_factory", TxRawCollection),
+            collection_factory=kwargs.pop(
+                "collection_factory", TxRawCollection),
             *args,
             **kwargs
         )
@@ -476,7 +487,12 @@ class TxRawBucket(TxRawClientMixin, V3AsyncBucket):
 class TxBucket(TxDeferredClientMixin, TxRawBucket):
     @internal
     def __init__(self, *args, **kwargs):
-        super(TxBucket, self).__init__(collection_factory=TxCollection, *args, **kwargs)
+        super(
+            TxBucket,
+            self).__init__(
+            collection_factory=TxCollection,
+            *args,
+            **kwargs)
 
 
 class TxBaseCluster(TxRawClientMixin, V3AsyncCluster):

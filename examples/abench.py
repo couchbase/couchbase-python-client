@@ -14,7 +14,8 @@
 # limitations under the License.
 #
 try:
-    import asyncio
+from acouchbase.cluster import V2Bucket
+import asyncio
 except ImportError:
     import trollius
     asyncio = trollius
@@ -24,8 +25,8 @@ from time import time
 
 
 from couchbase_core.user_constants import FMT_BYTES
-from couchbase_core.experimental import enable; enable()
-from acouchbase.cluster import V2Bucket
+from couchbase_core.experimental import enable
+enable()
 
 ap = argparse.ArgumentParser()
 
@@ -38,7 +39,11 @@ ap.add_argument('-d', '--delay', default=0, type=float,
                 "may be a fraction")
 
 ap.add_argument('-p', '--password', default=None, type=str)
-ap.add_argument('-U', '--connstr', default='couchbase://localhost/default', type=str)
+ap.add_argument(
+    '-U',
+    '--connstr',
+    default='couchbase://localhost/default',
+    type=str)
 ap.add_argument('-D', '--duration', default=10, type=int,
                 help="Duration of run (in seconds)")
 
@@ -107,6 +112,7 @@ def run(self):
                 self.wait_time += time() - begin_time
                 self.opcount += options.batch
 
+
 global_begin = None
 tasks = []
 worker_threads = []
@@ -127,5 +133,5 @@ for t in worker_threads:
 print("Total run took an absolute time of %0.2f seconds" % (global_duration,))
 print("Did a total of %d operations" % (total_ops,))
 print("Total wait time of %0.2f seconds" % (total_time,))
-print("[WAIT] %0.2f ops/second" % (float(total_ops)/float(total_time),))
-print("[ABS] %0.2f ops/second" % (float(total_ops)/float(global_duration),))
+print("[WAIT] %0.2f ops/second" % (float(total_ops) / float(total_time),))
+print("[ABS] %0.2f ops/second" % (float(total_ops) / float(global_duration),))

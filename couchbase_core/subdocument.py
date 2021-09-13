@@ -290,4 +290,3 @@ def get_count(path, **kwargs):
     .. versionadded:: 2.2.5
     """
     return _gen_3spec(_P.SDCMD_GET_COUNT, path, **kwargs)
-

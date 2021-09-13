@@ -9,7 +9,7 @@ Src = TypeVar('Src')
 Dest = TypeVar('Dest')
 
 
-Functor = TypeVar('Functor', bound=Callable[[Src],Dest])
+Functor = TypeVar('Functor', bound=Callable[[Src], Dest])
 SrcToDest = TypeVar('SrcToDest', bound=Callable[[Src], Dest])
 DestToSrc = TypeVar('DestToSrc', bound=Callable[[Dest], Src])
 
@@ -29,7 +29,7 @@ class Bijection(Generic[Src, Dest, SrcToDest, DestToSrc]):
         :param dest_to_src: callable to convert Dest type to Src
         :param parent: interanl use only - used to construct the inverse
         """
-        self._src_to_dest=src_to_dest
+        self._src_to_dest = src_to_dest
         if parent:
             self._inverse = parent
         else:
@@ -61,14 +61,16 @@ def identity(input: Src) -> Src:
     return input
 
 
-class Identity(Bijection[Src,Src, identity, identity]):
+class Identity(Bijection[Src, Src, identity, identity]):
     def __init__(self, type: Type[Src]):
         self._type = type
         super(Identity, self).__init__(self, self)
 
     def __call__(self, x: Src) -> Src:
         if not isinstance(x, self._type):
-            raise InvalidArgumentException("Argument must be of type {} but got {}".format(self._type, x))
+            raise InvalidArgumentException(
+                "Argument must be of type {} but got {}".format(
+                    self._type, x))
         return x
 
 
@@ -77,39 +79,51 @@ Enum_Type = TypeVar('Enum_Type', bound=enum.Enum)
 
 class EnumToStr(Generic[Enum_Type]):
     def __init__(self, type: Type[Enum_Type], enforce=True):
-        self._type=type
-        self._enforce=enforce
+        self._type = type
+        self._enforce = enforce
 
     def __call__(self, src: Enum_Type) -> str:
-        if not self._enforce and isinstance(src, str) and src in map(lambda x: x.value, self._type):
+        if not self._enforce and isinstance(
+                src, str) and src in map(lambda x: x.value, self._type):
             warnings.warn("Using deprecated string parameter {}".format(src))
             return src
         if not isinstance(src, self._type):
-            raise InvalidArgumentException("Argument must be of type {} but got {}".format(self._type, src))
+            raise InvalidArgumentException(
+                "Argument must be of type {} but got {}".format(
+                    self._type, src))
         return src.value
 
 
 class StrToEnum(Generic[Enum_Type]):
     def __init__(self, type: Enum_Type):
-        self._type=type
+        self._type = type
+
     def __call__(self, dest: str
-               ) -> Enum_Type:
+                 ) -> Enum_Type:
         return self._type(dest)
 
 
-class StringEnum(Bijection[Enum_Type, str, EnumToStr[Enum_Type], StrToEnum[Enum_Type]]):
+class StringEnum(
+        Bijection[Enum_Type, str, EnumToStr[Enum_Type], StrToEnum[Enum_Type]]):
     def __init__(self, type: Type[Enum_Type]):
-        super(StringEnum, self).__init__(EnumToStr(type),StrToEnum(type))
+        super(StringEnum, self).__init__(EnumToStr(type), StrToEnum(type))
 
 
-class StringEnumLoose(Bijection[Enum_Type, str, EnumToStr[Enum_Type], StrToEnum[Enum_Type]]):
+class StringEnumLoose(
+        Bijection[Enum_Type, str, EnumToStr[Enum_Type], StrToEnum[Enum_Type]]):
     def __init__(self, type: Type[Enum_Type]):
         """
         Like StringEnum bijection, but allows use of string constants as src (falling back to identity transform)
 
         :param type: type of enum
         """
-        super(StringEnumLoose, self).__init__(EnumToStr(type, False),StrToEnum(type))
+        super(
+            StringEnumLoose,
+            self).__init__(
+            EnumToStr(
+                type,
+                False),
+            StrToEnum(type))
 
 
 NumberType = TypeVar('NumberType', bound=Union[float, int])
@@ -117,7 +131,7 @@ NumberType = TypeVar('NumberType', bound=Union[float, int])
 
 class TimedeltaToSeconds(object):
     def __init__(self, dest_type: Type[NumberType]):
-        self._numtype=dest_type
+        self._numtype = dest_type
 
     def __call__(self, td: datetime.timedelta) -> float:
         if isinstance(td, (float, int)):
@@ -129,20 +143,27 @@ def _seconds_to_timedelta(seconds: NumberType) -> datetime.timedelta:
     try:
         return datetime.timedelta(seconds=seconds)
     except (OverflowError, ValueError) as e:
-        raise InvalidArgumentException("Invalid duration arg: {} ".format(seconds)) from e
+        raise InvalidArgumentException(
+            "Invalid duration arg: {} ".format(seconds)) from e
 
 
-class Timedelta(Bijection[datetime.timedelta, NumberType, TimedeltaToSeconds, _seconds_to_timedelta]):
+class Timedelta(Bijection[datetime.timedelta, NumberType,
+                TimedeltaToSeconds, _seconds_to_timedelta]):
     def __init__(self, dest_type: Type[NumberType]):
-        super(Timedelta, self).__init__(TimedeltaToSeconds(dest_type), _seconds_to_timedelta)
+        super(
+            Timedelta,
+            self).__init__(
+            TimedeltaToSeconds(dest_type),
+            _seconds_to_timedelta)
 
 
 class Division(Bijection[float, float, float.__mul__, float.__mul__]):
     def __init__(self, divisor):
-        super(Division, self).__init__((1/divisor).__mul__, divisor.__mul__)
+        super(Division, self).__init__((1 / divisor).__mul__, divisor.__mul__)
 
 
-Orig_Mapping = TypeVar('OrigMapping', bound=Mapping[str, Mapping[str, Bijection]])
+Orig_Mapping = TypeVar(
+    'OrigMapping', bound=Mapping[str, Mapping[str, Bijection]])
 
 
 class BijectiveMapping(object):
@@ -155,10 +176,10 @@ class BijectiveMapping(object):
 
         :param fwd_mapping: the forward mapping from Src to Dest
         """
-        self.mapping=dict()
-        self.reverse_mapping=dict()
+        self.mapping = dict()
+        self.reverse_mapping = dict()
         for src_key, transform_dict in fwd_mapping.items():
-            self.mapping[src_key]={}
+            self.mapping[src_key] = {}
             for dest_key, transform in transform_dict.items():
                 self.mapping[src_key][dest_key] = transform
                 self.reverse_mapping[dest_key] = {src_key: -transform}
@@ -168,12 +189,14 @@ class BijectiveMapping(object):
                 raw_info: Mapping[str, Any]) -> Mapping[str, Any]:
         converted = {}
         for k, v in raw_info.items():
-            entry = mapping.get(k, {k:Identity(object)})
+            entry = mapping.get(k, {k: Identity(object)})
             for dest, transform in entry.items():
                 try:
                     converted[dest] = transform(v)
                 except InvalidArgumentException as e:
-                    raise InvalidArgumentException("Problem processing argument {}: {}".format(k, e.message))
+                    raise InvalidArgumentException(
+                        "Problem processing argument {}: {}".format(
+                            k, e.message))
         return converted
 
     def sanitize_src(self, src_data):

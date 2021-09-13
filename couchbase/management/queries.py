@@ -12,7 +12,7 @@ from couchbase.exceptions import (ErrorMapper, AnyPattern, QueryIndexAlreadyExis
 
 try:
     from typing import Protocol
-except:
+except BaseException:
     from typing_extensions import Protocol
 
 
@@ -74,7 +74,8 @@ class QueryIndexManager(GenericManager):
 
         return info
 
-    def _n1ql_index_create(self, bucket_name, ix, defer=False, ignore_exists=False, primary=False, fields=None, cond=None, timeout=None, **kwargs):
+    def _n1ql_index_create(self, bucket_name, ix, defer=False, ignore_exists=False,
+                           primary=False, fields=None, cond=None, timeout=None, **kwargs):
         """
         Create an index for use with N1QL.
 
@@ -129,7 +130,8 @@ class QueryIndexManager(GenericManager):
         if timeout:
             options['timeout'] = timeout
         # Now actually create the indexes
-        return IxmgmtRequest(self._admin_bucket, 'create', info, **options).execute()
+        return IxmgmtRequest(self._admin_bucket, 'create',
+                             info, **options).execute()
 
     def create_index(self,          # type: QueryIndexManager
                      bucket_name,   # type: str
@@ -155,7 +157,8 @@ class QueryIndexManager(GenericManager):
         #
         self._create_index(bucket_name, fields, index_name, *options, **kwargs)
 
-    def _create_index(self, bucket_name, fields, index_name, *options, **kwargs):
+    def _create_index(self, bucket_name, fields,
+                      index_name, *options, **kwargs):
         final_args = {
             k.replace('deferred', 'defer').replace('condition', 'cond').replace('ignore_if_exists', 'ignore_exists'): v
             for k, v in forward_args(kwargs, *options).items()}
@@ -194,8 +197,13 @@ class QueryIndexManager(GenericManager):
     def _drop_index(self, bucket_name, index_name, *options, **kwargs):
         info = BucketManager._mk_index_def(
             bucket_name, index_name, primary=kwargs.pop('primary', False))
-        final_args = {k.replace('ignore_if_not_exists', 'ignore_missing')
-                                : v for k, v in forward_args(kwargs, *options).items()}
+        final_args = {
+            k.replace(
+                'ignore_if_not_exists',
+                'ignore_missing'): v for k,
+            v in forward_args(
+                kwargs,
+                *options).items()}
         try:
             IxmgmtRequest(self._admin_bucket, 'drop',
                           info, **final_args).execute()
@@ -275,7 +283,8 @@ class QueryIndexManager(GenericManager):
 
         """
         final_args = forward_args(kwargs, *options)
-        return BucketManager._n1ql_index_build_deferred(bucket_name, self._admin_bucket, **final_args)
+        return BucketManager._n1ql_index_build_deferred(
+            bucket_name, self._admin_bucket, **final_args)
 
 
 class IndexType(object):

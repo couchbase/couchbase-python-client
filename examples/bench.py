@@ -71,9 +71,9 @@ class Worker(Thread):
             self.kv[self.key + str(x)] = self.value
         self.wait_time = 0
         self.opcount = 0
-        connopts = { "connstr" : options.connstr,
-                     "unlock_gil": DO_UNLOCK_GIL,
-                     "password": options.password}
+        connopts = {"connstr": options.connstr,
+                    "unlock_gil": DO_UNLOCK_GIL,
+                    "password": options.password}
         if options.iops:
             connopts["experimental_gevent_support"] = True
 
@@ -127,5 +127,5 @@ for t in worker_threads:
 print("Total run took an absolute time of %0.2f seconds" % (global_duration,))
 print("Did a total of %d operations" % (total_ops,))
 print("Total wait time of %0.2f seconds" % (total_time,))
-print("[WAIT] %0.2f ops/second" % (float(total_ops)/float(total_time),))
-print("[ABS] %0.2f ops/second" % (float(total_ops)/float(global_duration),))
+print("[WAIT] %0.2f ops/second" % (float(total_ops) / float(total_time),))
+print("[ABS] %0.2f ops/second" % (float(total_ops) / float(global_duration),))

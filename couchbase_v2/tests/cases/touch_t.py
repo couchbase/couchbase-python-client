@@ -45,7 +45,7 @@ class TouchTest(ConnectionTestCase):
         self.assertFalse(rv.success)
         self.assertTrue(E.DocumentNotFoundException._can_derive(rv.rc))
 
-    @flaky(20,1)
+    @flaky(20, 1)
     def test_trivial_multi_touch(self):
         kv = self.gen_kv_dict(prefix="trivial_multi_touch")
         self.cb.upsert_multi(kv, ttl=1)
@@ -68,9 +68,9 @@ class TouchTest(ConnectionTestCase):
         k_existing = self.gen_key("dict_touch_multi_existing")
 
         self.cb.upsert_multi(
-            {k_missing : "missing_val", k_existing : "existing_val"})
+            {k_missing: "missing_val", k_existing: "existing_val"})
 
-        self.cb.touch_multi({k_missing : 1, k_existing : 3})
+        self.cb.touch_multi({k_missing: 1, k_existing: 3})
         self.sleep(2)
         rvs = self.cb.get_multi([k_missing, k_existing], quiet=True)
         self.assertTrue(rvs[k_existing].success)

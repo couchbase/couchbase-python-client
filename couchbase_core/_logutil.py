@@ -17,12 +17,12 @@
 
 import logging
 LEVEL_MAP = (
-    logging.DEBUG, # TRACE
-    logging.DEBUG, # DEBUG
-    logging.INFO, # INFO
-    logging.WARN, # WARN
-    logging.ERROR, # Error
-    logging.FATAL # Fatal
+    logging.DEBUG,  # TRACE
+    logging.DEBUG,  # DEBUG
+    logging.INFO,  # INFO
+    logging.WARN,  # WARN
+    logging.ERROR,  # Error
+    logging.FATAL  # Fatal
 )
 
 
@@ -43,4 +43,3 @@ def configure(val):
         logging.getLogger('couchbase').info(initmsg)
     else:
         couchbase_core._libcouchbase.lcb_logging(None)
-

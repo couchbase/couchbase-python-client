@@ -45,12 +45,12 @@ class MutationState(object):
 
         This feature requires Couchbase Server 4.5 or greater,
         and is enabled by default with 3.x SDKs.  To disable,
-        set the enable_mutation_tokens option in the 
+        set the enable_mutation_tokens option in the
         :class:`couchbase.cluster.ClusterOptions` to False
 
     .. code-block:: python
 
-        cluster = Cluster('couchbase://localhost', 
+        cluster = Cluster('couchbase://localhost',
                     authenticator=PasswordAuthenticator('Administrator', 'password'))
         bucket = cluster.bucket('default')
         collection = bucket.default_collection()

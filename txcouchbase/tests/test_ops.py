@@ -36,7 +36,8 @@ class OperationTestCase(Base):
 
         def t(ret):
             self.assertIsInstance(ret, MutationResult)
-            #self.assertEqual(ret.id, key) - seemingly MutationResults don't have IDs - recheck
+            # self.assertEqual(ret.id, key) - seemingly MutationResults don't
+            # have IDs - recheck
             del ret
 
         d.addCallback(t)
@@ -72,9 +73,11 @@ class OperationTestCase(Base):
               ):
             self.assertEqual(len(ret), len(kvs))
             self.assertEqual(ret.keys(), kvs.keys())
-            #self.assertTrue(ret.all_ok)  # to be defined by SDK3 multi-ops RFC
+            # self.assertTrue(ret.all_ok)  # to be defined by SDK3 multi-ops
+            # RFC
             for k in kvs:
-                #self.assertEqual(ret[k].id, k)  # MutationResult has no key or id
+                # self.assertEqual(ret[k].id, k)  # MutationResult has no key
+                # or id
                 self.assertTrue(ret[k].success)
 
             del ret
@@ -90,6 +93,7 @@ class OperationTestCase(Base):
         d_del = cb.remove(key, quiet=True)
 
         d = cb.get(key, quiet=False)
+
         def t(err):
             self.assertIsInstance(err.value, DocumentNotFoundException)
             return True
@@ -100,9 +104,9 @@ class OperationTestCase(Base):
 
     @skip_PYCBC_894
     def test_multi_errors(self  # type: Base
-                        ):
+                          ):
         orig_cb = self.make_connection()
-        kv = self.gen_kv_dict(prefix = "test_multi_errors")
+        kv = self.gen_kv_dict(prefix="test_multi_errors")
 
         cb = orig_cb.upsert_multi(kv)
         rmkey = list(kv.keys())[0]
