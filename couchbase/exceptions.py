@@ -1056,6 +1056,8 @@ class QueryIndexNotFoundException(CouchbaseException):
 class QueryIndexAlreadyExistsException(CouchbaseException):
     """The requested index already exists"""
 
+class WatchQueryIndexTimeoutException(CouchbaseException):
+    """Unable to find all requested indexes online within specified timeout"""
 
 class ClientNoMemoryException(CouchbaseException):
     """The client ran out of memory"""
@@ -1569,7 +1571,12 @@ class ErrorMapper(object):
                                 if "error" in value:
                                     value = value.get("error", None)
                                 elif "errors" in value:
-                                    value = value.get("errors", None)
+                                    if "requestID" in value:
+                                        value = value.get("errors", None)[0]
+                                        if "msg" in value:
+                                            value = value["msg"]
+                                    else:
+                                        value = value.get("errors", None)
                                 elif "_" in value:
                                     value = value.get("_", None)
                                 if value and isinstance(value, dict):

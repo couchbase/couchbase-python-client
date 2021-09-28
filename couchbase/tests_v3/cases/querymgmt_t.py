@@ -18,9 +18,9 @@ import time
 
 from nose.plugins.attrib import attr
 
-from couchbase.management.queries import CreateQueryIndexOptions, QueryIndexManager
-from couchbase.exceptions import (CouchbaseException,
-                                  QueryIndexNotFoundException, QueryIndexAlreadyExistsException)
+from couchbase.management.queries import CreateQueryIndexOptions, QueryIndexManager, WatchQueryIndexOptions
+from couchbase.exceptions import (CouchbaseException, QueryIndexNotFoundException,
+                                  QueryIndexAlreadyExistsException, WatchQueryIndexTimeoutException)
 from couchbase_tests.base import SkipTest, CollectionTestCase
 
 
@@ -29,7 +29,6 @@ class IndexManagementTestCase(CollectionTestCase):
     def _clear_indexes(self):
         # Drop all indexes!
         for index in self.mgr.get_all_indexes(self.cluster_info.bucket_name):
-            print("dropping {}".format(index.name))
             self.mgr.drop_index(self.cluster_info.bucket_name, index.name)
         for _ in range(10):
             if 0 == len(self.mgr.get_all_indexes(
@@ -230,8 +229,29 @@ class IndexManagementTestCase(CollectionTestCase):
             self.cluster_info.bucket_name)
         self.assertEqual(6, len(pending))
         self.mgr.watch_indexes(
-            self.cluster_info.bucket_name, pending)  # Should be OK
+            self.cluster_info.bucket_name, pending, WatchQueryIndexOptions(timeout=timedelta(seconds=30)))  # Should be OK
         self.mgr.watch_indexes(self.cluster_info.bucket_name,
-                               pending)  # Should be OK again
+                               pending, WatchQueryIndexOptions(timeout=timedelta(seconds=30), watch_primary=True))  # Should be OK again
         self.assertRaises(QueryIndexNotFoundException, self.mgr.watch_indexes,
-                          self.cluster_info.bucket_name, ['nonexist'])
+                          self.cluster_info.bucket_name, ['nonexist'], WatchQueryIndexOptions(timeout=timedelta(seconds=10)))
+
+    def test_watch(self):
+        # Create primary index
+        self.mgr.create_primary_index(
+            self.cluster_info.bucket_name, deferred=True)
+        ix = self.mgr.get_all_indexes(self.cluster_info.bucket_name)
+        self.assertEqual('deferred', next(iter(ix)).state)
+
+        # Create a bunch of other indexes
+        for n in range(5):
+            defer = False
+            if n % 2 == 0:
+                defer = True
+            self.mgr.create_index(self.cluster_info.bucket_name,
+                                  'ix{0}'.format(n), fields=['fld{0}'.format(n)], deferred=defer)
+
+        ix = self.mgr.get_all_indexes(self.cluster_info.bucket_name)
+        self.assertEqual(6, len(ix))
+        # by not buildind deffered indexes, should timeout
+        self.assertRaises(WatchQueryIndexTimeoutException, self.mgr.watch_indexes,
+                          self.cluster_info.bucket_name, [i.name for i in ix], WatchQueryIndexOptions(timeout=timedelta(seconds=5)))

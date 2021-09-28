@@ -1,14 +1,17 @@
+import time
 import attr
-from attr.validators import instance_of as io, deep_mapping as dm, optional
+from attr.validators import instance_of as io, optional
 from typing import *
 
-from couchbase_core._ixmgmt import N1QL_PRIMARY_INDEX, IxmgmtRequest, N1qlIndex
-from couchbase_core.bucketmanager import BucketManager
+import couchbase_core._libcouchbase as LCB
+from couchbase_core import mk_formstr
 from couchbase.options import OptionBlock, OptionBlockTimeOut, forward_args, timedelta
+from couchbase.management.admin import METHMAP
 from couchbase.management.generic import GenericManager
 
-from couchbase.exceptions import (ErrorMapper, AnyPattern, QueryIndexAlreadyExistsException,
-                                  QueryIndexNotFoundException, DocumentNotFoundException, DocumentExistsException)
+from couchbase.exceptions import (ErrorMapper, HTTPException, QueryIndexAlreadyExistsException,
+                                  WatchQueryIndexTimeoutException, QueryIndexNotFoundException,
+                                  InvalidArgumentException)
 
 try:
     from typing import Protocol
@@ -20,8 +23,8 @@ class QueryErrorMapper(ErrorMapper):
     @staticmethod
     def mapping():
         # type: (...) -> Dict[CBErrorType,Dict[Any, CBErrorType]]
-        return {DocumentNotFoundException: {AnyPattern(): QueryIndexNotFoundException},
-                DocumentExistsException: {AnyPattern(): QueryIndexAlreadyExistsException}}
+        return {HTTPException: {".*[iI]ndex.*already exists.*": QueryIndexAlreadyExistsException,
+                                ".*[iI]ndex.*[nN]ot [fF]ound.*": QueryIndexNotFoundException}}
 
 
 @QueryErrorMapper.wrap
@@ -34,9 +37,142 @@ class QueryIndexManager(GenericManager):
         """
         super(QueryIndexManager, self).__init__(parent_cluster)
 
-    def get_all_indexes(self,           # type: QueryIndexManager
+    def _http_request(self, **kwargs):
+        # the kwargs can override the defaults
+        imeth = None
+        method = kwargs.get('method', 'GET')
+        if not method in METHMAP:
+            raise InvalidArgumentException("Unknown HTTP Method", method)
+
+        imeth = METHMAP[method]
+        return self._admin_bucket._http_request(
+            type=LCB.LCB_HTTP_TYPE_QUERY,
+            path=kwargs['path'],
+            method=imeth,
+            content_type=kwargs.get('content_type', 'application/json'),
+            post_data=kwargs.get('content', None),
+            response_format=LCB.FMT_JSON,
+            timeout=kwargs.get('timeout', None))
+
+    def _create_index(self, bucket_name, fields,
+                      index_name=None, **kwargs):
+        primary = kwargs.get("primary", False)
+        condition = kwargs.get("condition", None)
+
+        if primary and fields:
+            raise TypeError('Cannot create primary index with explicit fields')
+        elif not primary and not fields:
+            raise ValueError('Fields required for non-primary index')
+
+        if condition and primary:
+            raise ValueError('cannot specify condition for primary index')
+
+        query_str = ""
+
+        if not fields:
+            query_str += "CREATE PRIMARY INDEX"
+        else:
+            query_str += "CREATE INDEX"
+
+        if index_name and index_name.split():
+            query_str += " `{}` ".format(index_name)
+
+        query_str += " ON `{}` ".format(bucket_name)
+
+        if fields:
+            field_names = ["`{}`".format(f) for f in fields]
+            query_str += "({})".format(", ".join(field_names))
+
+        if condition:
+            query_str += " WHERE {}".format(condition)
+
+        options = {}
+        deferred = kwargs.get("deferred", False)
+        if deferred:
+            options["defer_build"] = deferred
+
+        num_replicas = kwargs.get("num_replicas", None)
+        if num_replicas:
+            options["num_replica"] = num_replicas
+
+        if options:
+            query_str += " WITH {{{}}}".format(
+                ", ".join(["'{0}':{1}".format(k, v) for k, v in options.items()]))
+
+        def possibly_raise(error):
+            if isinstance(error, list) and "msg" in error[0] and "already exists" in error[0]["msg"]:
+                if not kwargs.get('ignore_if_exists', False):
+                    raise
+
+        try:
+            resp = self._http_request(
+                path="",
+                method="POST",
+                content=mk_formstr({"statement": query_str}),
+                content_type='application/x-www-form-urlencoded',
+                **kwargs
+            ).value
+            if "errors" in resp and possibly_raise(resp["errors"]):
+                msg = resp["errors"][0].get("msg", "Index already exists")
+                raise QueryIndexAlreadyExistsException.pyexc(
+                    msg, resp["errors"])
+        except HTTPException as h:
+            error = getattr(
+                getattr(
+                    h,
+                    'objextra',
+                    None),
+                'value',
+                {}).get(
+                'errors',
+                "")
+            if possibly_raise(error):
+                raise
+
+    def _drop_index(self, bucket_name, index_name=None, **kwargs):
+        # previous ignore_missing was a viable kwarg - should only have ignore_if_not_exists
+        ignore_missing = kwargs.pop("ignore_missing", None)
+        if ignore_missing:
+            kwargs["ignore_if_not_exists"] = ignore_missing
+
+        query_str = ""
+        if not index_name:
+            query_str += "DROP PRIMARY INDEX ON `{}`".format(bucket_name)
+        else:
+            query_str += "DROP INDEX `{0}`.`{1}`".format(
+                bucket_name, index_name)
+
+        def possibly_raise(error):
+            if isinstance(error, list) and "msg" in error[0] and "not found" in error[0]["msg"]:
+                if not kwargs.get('ignore_if_not_exists', False):
+                    return True
+        try:
+            resp = self._http_request(
+                path="",
+                method="POST",
+                content=mk_formstr({"statement": query_str}),
+                content_type='application/x-www-form-urlencoded',
+                **kwargs
+            ).value
+            if "errors" in resp and possibly_raise(resp["errors"]):
+                msg = resp["errors"][0].get("msg", "Index not found")
+                raise QueryIndexNotFoundException.pyexc(msg, resp["errors"])
+        except HTTPException as h:
+            error = getattr(
+                getattr(
+                    h,
+                    'objextra',
+                    None),
+                'value',
+                {}).get(
+                'errors',
+                "")
+            if possibly_raise(error):
+                raise
+
+    def get_all_indexes(self,           # type: "QueryIndexManager"
                         bucket_name,    # type: str
-                        *options,       # type: GetAllQueryIndexOptions
+                        *options,       # type: "GetAllQueryIndexOptions"
                         **kwargs        # type: Any
                         ):
         # type: (...) -> List[QueryIndex]
@@ -49,95 +185,36 @@ class QueryIndexManager(GenericManager):
         :return: A list of QueryIndex objects.
         :raises: InvalidArgumentsException
         """
-        # N1QL
-        # SELECT idx.* FROM system:indexes AS idx
-        # WHERE keyspace_id = "bucket_name"
-        # ORDER BY is_primary DESC, name ASC
-        info = N1qlIndex()
-        info.keyspace = bucket_name
-        response = IxmgmtRequest(
-            self._admin_bucket, 'list', info, **forward_args(kwargs, *options)).execute()
-        return list(map(QueryIndex.from_n1qlindex, response))
 
-    def _mk_index_def(self, bucket_name, ix, primary=False):
-        if isinstance(ix, N1qlIndex):
-            return N1qlIndex(ix)
+        query_str = """
+        SELECT idx.* FROM system:indexes AS idx
+        WHERE (
+            (`bucket_id` IS MISSING AND `keyspace_id`="{0}")
+            OR `bucket_id`="{0}"
+        ) AND `using`="gsi"
+        ORDER BY is_primary DESC, name ASC
+        """.format(bucket_name)
 
-        info = N1qlIndex()
-        info.keyspace = bucket_name
-        info.primary = primary
+        response = self._http_request(
+            path="",
+            method="POST",
+            content=mk_formstr({"statement": query_str}),
+            content_type='application/x-www-form-urlencoded',
+            **forward_args(kwargs, *options)
+        ).value
 
-        if ix:
-            info.name = ix
-        elif not primary:
-            raise ValueError('Missing name for non-primary index')
+        if response and "results" in response:
+            results = response.get("results")
+            res = list(map(QueryIndex.from_server, results))
+            return res
 
-        return info
+        return []
 
-    def _n1ql_index_create(self, bucket_name, ix, defer=False, ignore_exists=False,
-                           primary=False, fields=None, cond=None, timeout=None, **kwargs):
-        """
-        Create an index for use with N1QL.
-
-        :param str ix: The name of the index to create
-        :param bool defer: Whether the building of indexes should be
-            deferred. If creating multiple indexes on an existing
-            dataset, using the `defer` option in conjunction with
-            :meth:`build_deferred_indexes` and :meth:`watch_indexes` may
-            result in substantially reduced build times.
-        :param bool ignore_exists: Do not throw an exception if the index
-            already exists.
-        :param Iterable[str] fields: A list of fields that should be supplied
-            as keys for the index. For non-primary indexes, this must
-            be specified and must contain at least one field name.
-        :param bool primary: Whether this is a primary index. If creating
-            a primary index, the name may be an empty string and `fields`
-            must be empty.
-        :param str condition: Specify a condition for indexing. Using
-            a condition reduces an index size
-        :raise: :exc:`~.DocumentExistsException` if the index already exists
-
-        .. seealso:: :meth:`n1ql_index_create_primary`
-        """
-        fields = fields or []
-
-        if kwargs:
-            raise TypeError('Unknown keyword arguments', kwargs)
-
-        info = self._mk_index_def(bucket_name, ix, primary)
-
-        if primary and fields:
-            raise TypeError('Cannot create primary index with explicit fields')
-        elif not primary and not fields:
-            raise ValueError('Fields required for non-primary index')
-
-        if fields:
-            info.fields = fields
-
-        if primary and info.name is N1QL_PRIMARY_INDEX:
-            del info.name
-
-        if cond:
-            if primary:
-                raise ValueError('cannot specify condition for primary index')
-            info.condition = cond
-
-        options = {
-            'ignore_exists': ignore_exists,
-            'defer': defer
-        }
-
-        if timeout:
-            options['timeout'] = timeout
-        # Now actually create the indexes
-        return IxmgmtRequest(self._admin_bucket, 'create',
-                             info, **options).execute()
-
-    def create_index(self,          # type: QueryIndexManager
+    def create_index(self,          # type: "QueryIndexManager"
                      bucket_name,   # type: str
                      index_name,    # type: str
                      fields,        # type: Iterable[str]
-                     *options,      # type: CreateQueryIndexOptions
+                     *options,      # type: "CreateQueryIndexOptions"
                      **kwargs
                      ):
         # type: (...) -> None
@@ -155,23 +232,13 @@ class QueryIndexManager(GenericManager):
         # CREATE INDEX index_name ON bucket_name WITH { "num_replica": 2 }
         #         https://docs.couchbase.com/server/current/n1ql/n1ql-language-reference/createindex.html
         #
-        self._create_index(bucket_name, fields, index_name, *options, **kwargs)
 
-    def _create_index(self, bucket_name, fields,
-                      index_name, *options, **kwargs):
-        final_args = {
-            k.replace('deferred', 'defer').replace('condition', 'cond').replace('ignore_if_exists', 'ignore_exists'): v
-            for k, v in forward_args(kwargs, *options).items()}
-        try:
-            self._n1ql_index_create(
-                bucket_name, index_name, fields=fields, **final_args)
-        except QueryIndexAlreadyExistsException:
-            if not final_args.get('ignore_exists', False):
-                raise
+        final_args = forward_args(kwargs, *options)
+        self._create_index(bucket_name, fields, index_name, **final_args)
 
-    def create_primary_index(self,  # type: QueryIndexManager
+    def create_primary_index(self,  # type: "QueryIndexManager"
                              bucket_name,  # type: str
-                             *options,  # type: CreatePrimaryQueryIndexOptions
+                             *options,  # type: "CreatePrimaryQueryIndexOptions"
                              **kwargs
                              ):
         """
@@ -187,34 +254,16 @@ class QueryIndexManager(GenericManager):
         # CREATE INDEX index_name ON bucket_name WITH { "num_replica": 2 }
         #         https://docs.couchbase.com/server/current/n1ql/n1ql-language-reference/createindex.html
         #
+
         kwargs['primary'] = True
-        index_name = ""
-        if options and options[0]:
-            index_name = options[0].pop("index_name", "")
-        fields = []
-        self._create_index(bucket_name, fields, index_name, *options, **kwargs)
+        final_args = forward_args(kwargs, *options)
+        index_name = final_args.pop("index_name", None)
+        self._create_index(bucket_name, [], index_name, *options, **final_args)
 
-    def _drop_index(self, bucket_name, index_name, *options, **kwargs):
-        info = BucketManager._mk_index_def(
-            bucket_name, index_name, primary=kwargs.pop('primary', False))
-        final_args = {
-            k.replace(
-                'ignore_if_not_exists',
-                'ignore_missing'): v for k,
-            v in forward_args(
-                kwargs,
-                *options).items()}
-        try:
-            IxmgmtRequest(self._admin_bucket, 'drop',
-                          info, **final_args).execute()
-        except QueryIndexNotFoundException:
-            if not final_args.get("ignore_missing", False):
-                raise
-
-    def drop_index(self,            # type: QueryIndexManager
+    def drop_index(self,            # type: "QueryIndexManager"
                    bucket_name,     # type: str
                    index_name,      # type: str
-                   *options,        # type: DropQueryIndexOptions
+                   *options,        # type: "DropQueryIndexOptions"
                    **kwargs):
         """
         Drops an index.
@@ -229,9 +278,9 @@ class QueryIndexManager(GenericManager):
         final_args = forward_args(kwargs, *options)
         self._drop_index(bucket_name, index_name, **final_args)
 
-    def drop_primary_index(self,            # type: QueryIndexManager
+    def drop_primary_index(self,            # type: "QueryIndexManager"
                            bucket_name,     # type: str
-                           *options,        # type: DropPrimaryQueryIndexOptions
+                           *options,        # type: "DropPrimaryQueryIndexOptions"
                            **kwargs):
         """
         Drops a primary index.
@@ -245,14 +294,13 @@ class QueryIndexManager(GenericManager):
         :raises: InvalidArgumentsException
         """
         final_args = forward_args(kwargs, *options)
-        final_args['primary'] = True
-        index_name = final_args.pop("index_name", "")
+        index_name = final_args.pop("index_name", None)
         self._drop_index(bucket_name, index_name, **final_args)
 
-    def watch_indexes(self,         # type: QueryIndexManager
+    def watch_indexes(self,         # type: "QueryIndexManager"
                       bucket_name,  # type: str
                       index_names,  # type: Iterable[str]
-                      *options,     # type: WatchQueryIndexOptions
+                      *options,     # type: "WatchQueryIndexOptions"
                       **kwargs):
         """
         Watch polls indexes until they are online.
@@ -262,15 +310,58 @@ class QueryIndexManager(GenericManager):
         :param WatchQueryIndexOptions options: Options for request to watch indexes.
         :param Any kwargs: Override corresponding valud in options.
         :raises: QueryIndexNotFoundException
-        :raises: InvalidArgumentsException
+        :raises: WatchQueryIndexTimeoutException
         """
         final_args = forward_args(kwargs, *options)
-        BucketManager(self._admin_bucket).n1ql_index_watch(
-            index_names, **final_args)
+        if final_args.get("watch_primary", False):
+            index_names.append("#primary")
 
-    def build_deferred_indexes(self,            # type: QueryIndexManager
+        timeout = final_args.get("timeout", None)
+        if not timeout:
+            raise ValueError(
+                'Must specify a timeout condition for watch indexes')
+
+        def check_indexes(index_names, indexes):
+            for idx_name in index_names:
+                match = next((i for i in indexes if i.name == idx_name), None)
+                if not match:
+                    raise QueryIndexNotFoundException(
+                        "Cannot find index with name: {}".format(idx_name))
+
+            return all(map(lambda i: i.state == "online", indexes))
+
+        # timeout is converted to microsecs via final_args()
+        timeout_millis = timeout / 1000
+
+        interval_millis = float(50)
+        start = time.perf_counter()
+        time_left = timeout_millis
+        while True:
+
+            indexes = self.get_all_indexes(bucket_name, GetAllQueryIndexOptions(
+                timeout=timedelta(milliseconds=time_left)))
+
+            all_online = check_indexes(index_names, indexes)
+            if all_online:
+                break
+
+            interval_millis += 500
+            if interval_millis > 1000:
+                interval_millis = 1000
+
+            time_left = timeout_millis - ((time.perf_counter() - start) * 1000)
+            if interval_millis > time_left:
+                interval_millis = time_left
+
+            if time_left <= 0:
+                raise WatchQueryIndexTimeoutException(
+                    "Failed to find all indexes online within the alloted time.")
+
+            time.sleep(interval_millis / 1000)
+
+    def build_deferred_indexes(self,            # type: "QueryIndexManager"
                                bucket_name,     # type: str
-                               *options,        # type: BuildDeferredQueryIndexOptions
+                               *options,        # type: "BuildDeferredQueryIndexOptions"
                                **kwargs
                                ):
         """
@@ -283,8 +374,23 @@ class QueryIndexManager(GenericManager):
 
         """
         final_args = forward_args(kwargs, *options)
-        return BucketManager._n1ql_index_build_deferred(
-            bucket_name, self._admin_bucket, **final_args)
+        indexes = self.get_all_indexes(bucket_name, GetAllQueryIndexOptions(
+            timeout=final_args.get("timeout", None)))
+        deferred_indexes = [
+            idx.name for idx in indexes if idx.state in ["deferred", "pending"]]
+
+        query_str = "BUILD INDEX ON `{}` ({})".format(
+            bucket_name, ", ".join(["`{}`".format(di) for di in deferred_indexes]))
+
+        self._http_request(
+            path="",
+            method="POST",
+            content=mk_formstr({"statement": query_str}),
+            content_type='application/x-www-form-urlencoded',
+            **final_args
+        )
+
+        return deferred_indexes
 
 
 class IndexType(object):
@@ -306,17 +412,17 @@ class QueryIndex(Protocol):
         validator=io(str)))  # type: Optional[str]
 
     @classmethod
-    def from_n1qlindex(cls,
-                       n1qlindex  # type: N1qlIndex
-                       ):
-        return cls(n1qlindex.name,
-                   bool(n1qlindex.primary),
+    def from_server(cls,
+                    json_data  # type: Dict[str, Any]
+                    ):
+        return cls(json_data.get("name"),
+                   bool(json_data.get("is_primary")),
                    IndexType(),
-                   n1qlindex.state,
-                   n1qlindex.keyspace,
+                   json_data.get("state"),
+                   json_data.get("keyspace_id"),
                    [],
-                   n1qlindex.condition or "",
-                   n1qlindex.partition
+                   json_data.get("condition", ""),
+                   json_data.get("partition", None)
                    )
 
 
@@ -331,7 +437,7 @@ class CreateQueryIndexOptions(OptionBlockTimeOut):
                  ignore_if_exists=None,  # type: bool
                  num_replicas=None,      # type: int
                  deferred=None,          # type: bool
-                 condition=None,         # type: str
+                 condition=None        # type: str
                  ):
         pass
 
@@ -358,7 +464,7 @@ class CreatePrimaryQueryIndexOptions(CreateQueryIndexOptions):
                  timeout=None,           # type: timedelta
                  ignore_if_exists=None,  # type: bool
                  num_replicas=None,      # type: int
-                 deferred=None,          # type: bool
+                 deferred=None           # type: bool
                  ):
         pass
 
