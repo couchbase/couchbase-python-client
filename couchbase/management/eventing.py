@@ -1414,6 +1414,8 @@ class EventingFunctionStatus(object):
     :type deployment_status: `EventingFunctionDeploymentStatus`
     :param processing_status: Indicates if the function is running
     :type processing_status: `EventingFunctionProcessingStatus`
+    :param redeploy_required: Indicates if function needs to be redeployed
+    :type redeploy_required: bool
     """
 
     name = attr.ib(type=str, validator=attr.validators.instance_of(str))
@@ -1429,6 +1431,8 @@ class EventingFunctionStatus(object):
     processing_status = attr.ib(
         factory=EventingFunctionProcessingStatus, type=EventingFunctionProcessingStatus
     )
+    redeploy_required = attr.ib(
+        type=bool, validator=attr.validators.instance_of(bool))
 
     @classmethod
     def from_server(
@@ -1481,7 +1485,7 @@ class EventingFunctionsStatus(object):
         :rtype: `EventingFunctionsStatus`
         """
         functions = []
-        if "apps" in server_json:
+        if "apps" in server_json and server_json["apps"]:
             for func in server_json["apps"]:
                 functions.append(EventingFunctionStatus.from_server(func))
         return cls(
