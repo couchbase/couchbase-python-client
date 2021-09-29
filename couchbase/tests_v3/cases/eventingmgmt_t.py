@@ -231,11 +231,15 @@ class EventingFunctionManagementTests(CollectionTestCase):
         func_status = None
         for _ in range(num_times):
             func_status = self.efm._get_status(name)
-            if func_status.state != state:
+            if func_status is None or func_status.state != state:
                 time.sleep(seconds_between)
             else:
                 break
 
+        if func_status is None:
+            raise EventingFunctionManagementTestStatusException(
+                "Unable to obtain function status for {}".format(name)
+            )
         if func_status.state != state:
             raise EventingFunctionManagementTestStatusException(
                 "Function {} status is {} which does not match desired status of {}.".format(

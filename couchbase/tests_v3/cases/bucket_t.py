@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
 from couchbase.result import ViewResult, ViewRow
 from couchbase.bucket import Bucket
 
@@ -62,7 +61,7 @@ class BucketSimpleTest(CollectionTestCase):
                         self.assertIsNone(v.namespace)
 
     def test_ping_timeout(self):
-        self.skipIfMock()
+        raise SkipTest("TODO:  Handle via options mocking.")
         result = self.bucket.ping(
             PingOptions(
                 timeout=timedelta(
@@ -126,6 +125,9 @@ class BucketSimpleTest(CollectionTestCase):
 
     def test_view_query(self  # type: BucketSimpleTest
                         ):
+        if self.is_realserver:
+            raise SkipTest("TODO:  handle with better view test suite.")
+
         beer_bucket = self.cluster.bucket('beer-sample')  # type: Bucket
         EXPECTED_ROW_COUNT = 10
         view_result = beer_bucket.view_query(

@@ -130,7 +130,6 @@ class AnalyticsTestCase(AnalyticsTestCaseBase):
 
         expected_counts = {metrics.error_count: 0,
                            metrics.result_count: 1,
-                           metrics.processed_objects: 1,
                            metrics.warning_count: 0}
         for method, expected in expected_counts.items():
             count_result = method()
@@ -139,7 +138,7 @@ class AnalyticsTestCase(AnalyticsTestCaseBase):
             self.assertEqual(UnsignedInt64(expected),
                              count_result, msg=fail_msg)
         self.assertGreater(metrics.result_size(), UnsignedInt64(500))
-
+        self.assertIsInstance(metrics.processed_objects(), UnsignedInt64)
         self.assertEqual(UnsignedInt64(0), metrics.error_count())
 
     def test_analytics_metadata(self):
@@ -340,7 +339,6 @@ class AnalyticsCollectionTests(CollectionTestCase):
 
         expected_counts = {metrics.error_count: 0,
                            metrics.result_count: 1,
-                           metrics.processed_objects: 1,
                            metrics.warning_count: 0}
         for method, expected in expected_counts.items():
             count_result = method()
@@ -349,7 +347,7 @@ class AnalyticsCollectionTests(CollectionTestCase):
             self.assertEqual(UnsignedInt64(expected),
                              count_result, msg=fail_msg)
         self.assertGreater(metrics.result_size(), UnsignedInt64(500))
-
+        self.assertIsInstance(metrics.processed_objects(), UnsignedInt64)
         self.assertEqual(UnsignedInt64(0), metrics.error_count())
 
     def test_analytics_metadata(self):

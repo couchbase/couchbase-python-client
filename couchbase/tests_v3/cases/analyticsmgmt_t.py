@@ -222,13 +222,16 @@ class AnalyticsIndexManagerTests(CollectionTestCase):
         if int(self.cluster_version.split('.')[0]) != 6:
             raise SkipTest("Test only for 6.x versions")
 
-        with self.assertRaises(CompilationFailedException):
-            # test.beer_sample => `test.beer_sample` which is not valid prior
-            # to 7.0
+        # wish the analytics service was consistent here :/
+        if float(self.cluster_version[:3]) >= 6.6:
+            with self.assertRaises(CompilationFailedException):
+                self.mgr.create_dataverse(
+                    "test.beer_sample", CreateDataverseOptions(ignore_if_exists=True))
+        else:
             self.mgr.create_dataverse(
                 "test.beer_sample", CreateDataverseOptions(ignore_if_exists=True))
 
-        # wish the analytics service was consistent here :/
+        # wish the analytics service was consistent here also :/
         with self.assertRaises(ParsingFailedException):
             # test/beer_sample => `test`.`beer_sample` which is not valid prior
             # to 7.0

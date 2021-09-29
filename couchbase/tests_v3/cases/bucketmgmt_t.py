@@ -162,8 +162,13 @@ class BucketManagementTests(CollectionTestCase):
         # flush the bucket
         self.try_n_times(10, 3, self.bm.flush_bucket, bucket.name)
 
-        # disable bucket flush
-        self.bm.update_bucket(BucketSettings(name='fred', flush_enabled=False))
+    def test_bucket_flush_fail(self):
+        # Create the bucket
+        self.bm.create_bucket(
+            CreateBucketSettings(
+                name='fred',
+                ram_quota_mb=100,
+                flush_enabled=False))
         bucket = self.try_n_times(10, 3, self.bm.get_bucket, 'fred')
         self.assertFalse(bucket.flush_enabled)
 

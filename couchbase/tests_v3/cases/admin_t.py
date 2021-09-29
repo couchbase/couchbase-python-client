@@ -17,6 +17,8 @@
 
 import sys
 
+from flaky import flaky
+
 from couchbase.management.admin import Admin
 from couchbase_core.result import HttpResult
 from couchbase.exceptions import (
@@ -109,8 +111,9 @@ class AdminSimpleTest(CouchbaseTestCase):
         # admin connections don't really connect until an action is performed
         try:
             admin = Admin('username', 'password', host='127.0.0.1', port=1)
-            self.assertRaises(NetworkException, admin.bucket_info, 'default')
-        except NetworkException:
+            self.assertRaises(
+                (NetworkException, CouchbaseException), admin.bucket_info, 'default')
+        except (NetworkException, CouchbaseException):
             pass
 
     def test_bad_handle(self):
@@ -121,6 +124,7 @@ class AdminSimpleTest(CouchbaseTestCase):
         self.assertRaises(CouchbaseException, self.admin.unlock, "foo", 1)
         str(None)
 
+    @flaky(10, 1)
     def test_create_ephemeral_bucket_and_use(self):
         # if not self.is_realserver:
         #     raise SkipTest('Mock server must be used for admin tests')
