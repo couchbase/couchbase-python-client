@@ -56,7 +56,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
         curval = curkey;
         curkey = ((pycbc_OperationResult*)curkey)->key;
     }
-    rv = pycbc_tc_encode_key(self, curkey, &keybuf);
+    rv = pycbc_tc_encode_key(self, curkey, &keybuf, NULL);
     if (rv == -1) {
         return -1;
     }

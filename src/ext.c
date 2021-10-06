@@ -1720,12 +1720,12 @@ void pycbc_MultiResult_init_context(pycbc_MultiResult *self, PyObject *curkey,
         return;
     }
     PYCBC_REF_CONTEXT(context);
-    if (pycbc_tc_encode_key(bucket, curkey, &keybuf))
+    if (pycbc_tc_encode_key(bucket, curkey, &keybuf, NULL))
     {
         PYCBC_EXCEPTION_LOG
         goto DONE;
     }
-    if (pycbc_tc_decode_key(bucket, keybuf.buffer, keybuf.length, &curkey)){
+    if (pycbc_tc_decode_key(bucket, keybuf.buffer, keybuf.length, &curkey, NULL)){
         PYCBC_EXCEPTION_LOG
         goto DONE;
     }

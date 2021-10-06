@@ -94,7 +94,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
         CMDSCOPE_NG(COUNTER, counter)
         {
             lcbtrace_SPAN *encode_span = create_encode_span(self->tracer, cv);
-            rv = pycbc_tc_encode_key(self, curkey, &keybuf);
+            rv = pycbc_tc_encode_key(self, curkey, &keybuf, NULL);
             lcbtrace_span_finish(encode_span, LCBTRACE_NOW);
             if (rv < 0) {
                 lcbtrace_span_finish(cv->mres->outer_span, LCBTRACE_NOW);

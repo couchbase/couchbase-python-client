@@ -1272,6 +1272,9 @@ struct pycbc_MultiResult_st {
     lcbtrace_SPAN *outer_span;
 
     pycbc_enhanced_err_info *err_info;
+
+    /** Transcoder object */
+    PyObject *tc;
 };
 
 typedef struct {
@@ -1619,6 +1622,12 @@ void pycbc_sdresult_addresult(pycbc__SDResult *obj, size_t ii, PyObject *item);
 void pycbc_Result_dealloc(pycbc_Result *self);
 
 /**
+ * Set the MultiResult transcoder.  Used for per-operation transcoders.
+ * See bucket.c for global transcoder
+ */
+int pycbc_MultiResult_set_transcoder(pycbc_MultiResult* mres, PyObject *transcoder);
+
+/**
  * Traps the current exception and adds it to the current MultiResult
  * context.
  * @param mres The MultiResult object.
@@ -1771,6 +1780,7 @@ PyObject *pycbc_exc_mktuple(void);
  * new python object which contains the underlying buffer for the key.
  * @param buf a pointer to a buffer pointer
  * @param nbuf pointer to the length of the buffer
+ * @param opTranscoder pointer to operation transcoder
  *
  * The buf parameter will likely be tied to the key parameter, so be sure not
  * to decrement its refcount until buf is no longer needed
@@ -1778,7 +1788,7 @@ PyObject *pycbc_exc_mktuple(void);
  * @return
  * 0 on success, nonzero on error
  */
-int pycbc_tc_encode_key(pycbc_Bucket *conn, PyObject *src, pycbc_pybuffer *dst);
+int pycbc_tc_encode_key(pycbc_Bucket *conn, PyObject *src, pycbc_pybuffer *dst, PyObject *opTranscoder);
 
 /**
  * Decodes a key buffer into a python object.
@@ -1787,12 +1797,13 @@ int pycbc_tc_encode_key(pycbc_Bucket *conn, PyObject *src, pycbc_pybuffer *dst);
  * @param nkey the size of the key
  * @param pobj a pointer to a PyObject*, will be set with a newly-created python
  * object which represents the converted key
+ * @param opTranscoder pointer to operation transcoder
  *
  * @return
  * 0 on success, nonzero on error
  */
 int pycbc_tc_decode_key(pycbc_Bucket *conn, const void *key, size_t nkey,
-                        PyObject **pobj);
+                        PyObject **pobj, PyObject *opTranscoder);
 
 /**
  * Encode a value with flags
@@ -1803,10 +1814,11 @@ int pycbc_tc_decode_key(pycbc_Bucket *conn, const void *key, size_t nkey,
  * @param buf a pointer to a buffer, likely tied to 'buf'
  * @param nbuf pointer to buffer length
  * @param flags pointer to a flags variable, will be set with the appropriate
+ * @param opTranscoder pointer to operation transcoder
  * flags
  */
 int pycbc_tc_encode_value(pycbc_Bucket *conn, PyObject *srcbuf, PyObject *flag_v,
-                          pycbc_pybuffer *dstbuf, lcb_U32 *dstflags);
+                          pycbc_pybuffer *dstbuf, lcb_U32 *dstflags, PyObject *opTranscoder);
 
 /**
  * Decode a value with flags
@@ -1815,9 +1827,10 @@ int pycbc_tc_encode_value(pycbc_Bucket *conn, PyObject *srcbuf, PyObject *flag_v
  * @param nvalue length of value
  * @param flags flags as received from the server
  * @param pobj the pythonized value
+ * @param opTranscoder pointer to operation transcoder
  */
 int pycbc_tc_decode_value(pycbc_Bucket *conn, const void *value, size_t nvalue,
-                          lcb_U32 flags, PyObject **pobj);
+                          lcb_U32 flags, PyObject **pobj, PyObject *opTranscoder);
 
 /**
  * Like encode_value, but only uses built-in encoders

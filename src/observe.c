@@ -97,7 +97,7 @@ handle_single_observe(pycbc_Bucket *self, PyObject *curkey, int master_only,
     lcb_STATUS err=LCB_SUCCESS;
     pycbc_cmdobserve_create(&cmd);
     (void)cmd;
-    rv = pycbc_tc_encode_key(self, curkey, &keybuf);
+    rv = pycbc_tc_encode_key(self, curkey, &keybuf, NULL);
     if (rv < 0) {
         return -1;
     }

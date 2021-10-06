@@ -757,7 +757,7 @@ pycbc_encode_sd_keypath(pycbc_Bucket *conn, PyObject *src,
     kobj = PyTuple_GET_ITEM(src, 0);
     pthobj = PyTuple_GET_ITEM(src, 1);
 
-    rv = pycbc_tc_encode_key(conn, kobj, keybuf);
+    rv = pycbc_tc_encode_key(conn, kobj, keybuf, NULL);
     if (rv != 0) {
         return rv;
     }

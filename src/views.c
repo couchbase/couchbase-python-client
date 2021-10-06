@@ -126,7 +126,7 @@ static int parse_row_json(pycbc_Bucket *bucket,
     size_t doc_id_len;
     lcb_respview_doc_id(resp, &doc_id, &doc_id_len);
     if (doc_id_len) {
-        rv = pycbc_tc_decode_key(bucket, doc_id, doc_id_len, &docid);
+        rv = pycbc_tc_decode_key(bucket, doc_id, doc_id_len, &docid, NULL);
         if (rv == -1) {
             goto GT_DONE;
         } else {
@@ -167,7 +167,7 @@ static int parse_row_json(pycbc_Bucket *bucket,
                 size_t val_len;
                 lcb_respget_value(rg, &val, &val_len);
                 rv = pycbc_tc_decode_value(
-                        bucket, val, val_len, docres->flags, &docres->value);
+                        bucket, val, val_len, docres->flags, &docres->value, NULL);
             }
             if (rv != 0) {
                 pycbc_multiresult_adderr(mres);

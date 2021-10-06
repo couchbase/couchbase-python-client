@@ -63,6 +63,7 @@ class ReplaceOptions(DurabilityOptionBlock):
                  durability=None,    # type: DurabilityType
                  cas=0,               # type: int
                  preserve_expiry=False,  # type: bool
+                 transcoder=None,        # type: Transcoder
                  **kwargs               # type: Any
                  ):
         """
@@ -72,7 +73,7 @@ class ReplaceOptions(DurabilityOptionBlock):
         :param cas:
         """
         super(ReplaceOptions, self).__init__(
-            timeout=timeout, durability=durability, cas=cas, preserve_expiry=preserve_expiry, **kwargs)
+            timeout=timeout, durability=durability, cas=cas, preserve_expiry=preserve_expiry, transcoder=transcoder, **kwargs)
 
 
 class RemoveOptions(DurabilityOptionBlock):
@@ -174,7 +175,8 @@ class GetOptions(OptionBlockTimeOut):
     def __init__(self,
                  timeout=None,  # type: timedelta
                  with_expiry=None,  # type: bool
-                 project=None  # type: Iterable[str]
+                 project=None,   # type: Iterable[str]
+                 transcoder=None    # type: Transcoder
                  ):
         pass
 
@@ -212,12 +214,25 @@ class GetAllReplicasOptions(GetOptions):
 
 
 class InsertOptions(DurabilityOptionBlock):
-    pass
+    def __init__(self,
+                 transcoder=None,    # type: Transcoder
+                 **kwargs
+                 ):
+        """
+        :param transcoder: operation Transcoder
+        :param transcoder: Transcoder
+        """
+        super(
+            InsertOptions,
+            self).__init__(
+            transcoder=transcoder,
+            **kwargs)
 
 
 class UpsertOptions(DurabilityOptionBlock):
     def __init__(self,
                  preserve_expiry=False,  # type: bool
+                 transcoder=None,    # type: Transcoder
                  **kwargs
                  ):
         """
@@ -230,6 +245,7 @@ class UpsertOptions(DurabilityOptionBlock):
             UpsertOptions,
             self).__init__(
             preserve_expiry=preserve_expiry,
+            transcoder=transcoder,
             **kwargs)
 
 

@@ -906,10 +906,12 @@ class CouchbaseClusterResource(object):
                                 ):
         # type: (...) -> str
         opts = kwargs.pop('cluster_options', None)
+        transcoder = kwargs.pop("transcoder", None)
         connargs = self.info.make_connargs(**kwargs)
         connstr_abstract, bucket_name = self.get_connstr_and_bucket_name(
             [], connargs)
-        self.cluster = self.instantiate_cluster(connstr_abstract, opts)
+        self.cluster = self.instantiate_cluster(
+            connstr_abstract, opts, transcoder=transcoder)
         return bucket_name
 
     def get_connstr_and_bucket_name(self,
@@ -925,7 +927,8 @@ class CouchbaseClusterResource(object):
 
     def instantiate_cluster(self,
                             connstr_nobucket,  # type: str
-                            opts=None  # type: Any
+                            opts=None,  # type: Any
+                            **kwargs      # type: Any
                             ):
         # type: (...) -> Cluster
         mock_hack = self.info.mock_hack_options(self.is_mock)
@@ -935,6 +938,9 @@ class CouchbaseClusterResource(object):
             opts = ClusterOptions(auth)
         else:
             opts['authenticator'] = auth
+        transcoder = kwargs.pop("transcoder", None)
+        if transcoder:
+            opts["transcoder"] = transcoder
         if SLOWCONNECT_PATTERN.match(platform.platform()):
             default_timeout_options = ClusterTimeoutOptions(
                 config_total_timeout=timedelta(seconds=30))
@@ -1169,7 +1175,9 @@ class ClusterTestCase(CouchbaseTestCase):
             QueryParams("SELECT * FROM `beer-sample` LIMIT 0", 0)
 
     @classmethod
-    def setUpClass(cls) -> None:
+    def setUpClass(cls,
+                   **kwargs  # type: Any
+                   ) -> None:
         # PYCBC-1097: this is a temporary hack to help stabilize builds
         #   a larger refactor needs to be done
         super(ClusterTestCase, cls).setUpClass()
@@ -1177,7 +1185,7 @@ class ClusterTestCase(CouchbaseTestCase):
             return
 
         cls._cluster_resource = CouchbaseClusterResource(cls.resources)
-        cls._cluster_resource.setup_cluster()
+        cls._cluster_resource.setup_cluster(**kwargs)
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -1312,8 +1320,9 @@ class CollectionTestCase(ClusterTestCase):
     @classmethod
     def setUpClass(cls,
                    setup_beer_sample_collections=None,  # type: bool
+                   **kwargs  # type: Any
                    ) -> None:
-        super(CollectionTestCase, cls).setUpClass()
+        super(CollectionTestCase, cls).setUpClass(**kwargs)
         try:
             cls._cluster_resource.bucket.collections().get_all_scopes()
             if setup_beer_sample_collections:
@@ -1684,6 +1693,7 @@ class CouchbaseClusterInfo(object):
         return self._collection
 
     def set_cluster(self, cluster_class, **kwargs):
+        transcoder = kwargs.pop("transcoder", None)
         conn_args = self.cluster_resource.info.make_connargs(**kwargs)
         connstr = conn_args.pop('connection_string')
         connstr_nobucket = ConnectionString.parse(connstr)
@@ -1694,6 +1704,8 @@ class CouchbaseClusterInfo(object):
 
         self.set_bucket_name('beer-sample')
         connstr_nobucket.bucket = None
+        if transcoder is not None:
+            mock_hack.kwargs["transcoder"] = transcoder
         self._cluster = cluster_class(
             str(connstr_nobucket), ClusterOptions(auth), **mock_hack.kwargs)
 

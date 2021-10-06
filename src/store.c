@@ -152,7 +152,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     }
     create_outer_span(self->tracer, cv, "mutate_in", &collection->collection);
     lcbtrace_SPAN *encode_span = create_encode_span(self->tracer, cv);
-    rv = pycbc_tc_encode_key(self, curkey, &keybuf);
+    rv = pycbc_tc_encode_key(self, curkey, &keybuf, NULL);
     lcbtrace_span_finish(encode_span, LCBTRACE_NOW);
     if (rv != 0) {
         lcbtrace_span_finish(cv->mres->outer_span, LCBTRACE_NOW);
@@ -224,7 +224,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     skc.cas = scv->single_cas;
     create_outer_span(self->tracer, cv, operation_name_from_storecmd_vars(scv), &collection->collection);
     lcbtrace_SPAN *encode_span = create_encode_span(self->tracer, cv);
-    rv = pycbc_tc_encode_key(self, curkey, &keybuf);
+    rv = pycbc_tc_encode_key(self, curkey, &keybuf, NULL);
     if (rv < 0) {
         lcbtrace_span_finish(encode_span, LCBTRACE_NOW);
         lcbtrace_span_finish(cv->mres->outer_span, LCBTRACE_NOW);
@@ -241,7 +241,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
         }
     }
 
-    rv = pycbc_tc_encode_value(self, skc.value, skc.flagsobj, &valbuf, &flags);
+    rv = pycbc_tc_encode_value(self, skc.value, skc.flagsobj, &valbuf, &flags, cv->mres->tc);
     lcbtrace_span_finish(encode_span, LCBTRACE_NOW);
     if (rv < 0) {
         rv = -1;
@@ -343,6 +343,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     PyObject *key = NULL;
     PyObject *value = NULL;
     PyObject *external_span = NULL;
+    PyObject *transcoder = NULL;
     pycbc_seqtype_t seqtype = PYCBC_SEQTYPE_GENERIC;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
     struct storecmd_vars scv = { 0 };
@@ -358,6 +359,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                                    "timeout",
                                    "preserve_expiry",
                                    "span",
+                                   "transcoder",
                                    NULL};
 
     static char *kwlist_single[] = {"key",
@@ -372,6 +374,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                                     "timeout",
                                     "preserve_expiry",
                                     "span",
+                                    "transcoder",
                                     NULL};
 
     scv.operation = operation;
@@ -380,7 +383,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     if (argopts & PYCBC_ARGOPT_MULTI) {
         rv = PyArg_ParseTupleAndKeywords(args,
                                          kwargs,
-                                         "O|OOBBIOiO",
+                                         "O|OOBBIOiOO",
                                          kwlist_multi,
                                          &dict,
                                          &ttl_O,
@@ -390,12 +393,13 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                                          &dur_level,
                                          &timeout_O,
                                          &preserve_expiry,
-                                         &external_span);
+                                         &external_span,
+                                         &transcoder);
 
     } else {
         rv = PyArg_ParseTupleAndKeywords(args,
                                          kwargs,
-                                         "OO|KOOBBIIOiO",
+                                         "OO|KOOBBIIOiOO",
                                          kwlist_single,
                                          &key,
                                          &value,
@@ -408,7 +412,8 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
                                          &dur_level,
                                          &timeout_O,
                                          &preserve_expiry,
-                                         &external_span);
+                                         &external_span,
+                                         &transcoder);
     }
 
     if (!rv) {
@@ -450,6 +455,10 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     rv = pycbc_common_vars_init(&cv, self, argopts, ncmds, 1);
     if (rv < 0) {
         goto GT_FAIL;
+    }
+
+    if(operation == LCB_STORE_UPSERT || operation == LCB_STORE_INSERT || operation == LCB_STORE_REPLACE){
+        pycbc_MultiResult_set_transcoder(cv.mres, transcoder);
     }
 
     rv = pycbc_handle_durability_args(

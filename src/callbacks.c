@@ -567,7 +567,7 @@ static int get_common_objects(const lcb_RESPBASE *resp,
     CB_THR_END(*conn);
 
     rv = pycbc_tc_decode_key(
-            *conn, handler->key.buffer, handler->key.length, &hkey);
+            *conn, handler->key.buffer, handler->key.length, &hkey, (*mres)->tc);
 
     if (rv < 0) {
         pycbc_multiresult_adderr((pycbc_MultiResult *)*mres);
@@ -868,7 +868,7 @@ value_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
             size_t nvalue = 0;
             lcb_respgetreplica_value(gresp, &value, &nvalue);
             rv = pycbc_tc_decode_value(
-                    mres->parent, value, nvalue, eflags, &res->value);
+                    mres->parent, value, nvalue, eflags, &res->value, mres->tc);
         }
         if (rv < 0) {
             pycbc_multiresult_adderr(mres);
@@ -892,7 +892,7 @@ value_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
             size_t nvalue = 0;
             lcb_respget_value(gresp, &value, &nvalue);
             rv = pycbc_tc_decode_value(
-                    mres->parent, value, nvalue, eflags, &res->value);
+                    mres->parent, value, nvalue, eflags, &res->value, mres->tc);
         }
         if (rv < 0) {
             pycbc_multiresult_adderr(mres);

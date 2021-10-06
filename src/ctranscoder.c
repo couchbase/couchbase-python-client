@@ -72,21 +72,31 @@ decode_key(PyObject *self, PyObject *args)
 static PyObject *
 encode_value(PyObject *self, PyObject *args)
 {
-    lcb_uint32_t flags;
+    lcb_uint32_t flags = -1;
     int rv;
     PyObject *vobj;
-    PyObject *flagsobj;
+    PyObject *flagsobj = NULL;
     pycbc_pybuffer valbuf = { NULL };
     PyObject *ret;
 
-    rv = PyArg_ParseTuple(args, "OO", &vobj, &flagsobj);
+    rv = PyArg_ParseTuple(args, "O|O", &vobj, &flagsobj);
     if (!rv) {
         return NULL;
     }
 
-    rv = pycbc_get_u32(flagsobj, &flags);
-    if (rv < 0) {
-        return NULL;
+    if(flagsobj != NULL){
+        rv = pycbc_get_u32(flagsobj, &flags);
+        if (rv < 0) {
+            return NULL;
+        }
+    }
+
+    if(flags < 0){
+        if (PyBytes_Check(vobj) || PyByteArray_Check(vobj)) {
+            PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ENCODING, 0,
+                "The JSONTranscoder (default transcoder) does not support binary data", vobj);
+        }
+        flags = PYCBC_FMT_JSON;
     }
 
     rv = pycbc_tc_simple_encode(vobj, &valbuf, flags);

@@ -413,6 +413,7 @@ class ClusterOptions(dict):
         lockmode=None,  # type: LockMode
         enable_mutation_tokens=None,  # type: bool
         tracer=None,  # type: CouchbaseTracer
+        transcoder=None  # type: Transcoder
     ):
         pass
 
@@ -435,6 +436,7 @@ class ClusterOptions(dict):
         :param float compression_min_ratio: A `float` representing the minimum compression ratio to use when compressing.
         :param bool enable_mutation_tokens: Turn mutation tokens on/off.  On by default.
         :param CouchbaseTracer tracer: Tracer to use.  None by default, which uses internal tracing only.
+        :param Transcoder transcoder: Global transcoder to use.  None by default, which uses default transcoder.
         """
         super(ClusterOptions, self).__init__(**kwargs)
         self["authenticator"] = authenticator
@@ -527,7 +529,7 @@ class Cluster(CoreClient):
         non_connstr_opts = {
             k: cluster_opts.pop(k)
             for k in list(cluster_opts.keys())
-            if k in ["lockmode"]
+            if k in ["lockmode", "transcoder"]
         }
         # fixup any overrides to the ClusterOptions here as well
         args, kwargs = cluster_opts.split_args(**kwargs)
@@ -618,6 +620,9 @@ class Cluster(CoreClient):
         lockmode = self._clusteropts.get("lockmode", None)
         if lockmode is not None:
             kwargs["lockmode"] = lockmode
+        transcoder = self._clusteropts.get("transcoder", None)
+        if transcoder is not None:
+            kwargs["transcoder"] = transcoder
         return self._cluster.open_bucket(
             name, tracer=self._external_tracer, **kwargs)
 

@@ -90,7 +90,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
 
     PYCBC_DEBUG_LOG_CONTEXT(context, "Encoding")
     lcbtrace_SPAN *encode_span = create_encode_span(self->tracer, cv);
-    rv = pycbc_tc_encode_key(self, curkey, &keybuf);
+    rv = pycbc_tc_encode_key(self, curkey, &keybuf, cv->mres->tc);
     lcbtrace_span_finish(encode_span, LCBTRACE_NOW);
     PYCBC_DEBUG_LOG_CONTEXT(context, "Encoded")
     if (rv == -1) {
@@ -302,18 +302,19 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
     PyObject *nofmt_O = NULL;
     PyObject *timeout_O = NULL;
     PyObject *external_span = NULL;
+    PyObject *transcoder = NULL;
     pycbc_DURABILITY_LEVEL durability_level = LCB_DURABILITYLEVEL_NONE;
     unsigned int touch_mode = 0;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
     struct getcmd_vars_st gv = { 0 };
 #define X(name, target, type) name,
     static char *kwlist[] = {
-            "keys", "ttl", "quiet", "replica", "no_format", "durability_level", "timeout", "span", NULL};
+            "keys", "ttl", "quiet", "replica", "no_format", "durability_level", "timeout", "span", "transcoder", NULL};
 #undef X
     pycbc_Collection_t collection = pycbc_Collection_as_value(self, kwargs);
     int rv = PyArg_ParseTupleAndKeywords(args,
                                          kwargs,
-                                         "O|OOOOIOO",
+                                         "O|OOOOIOOO",
                                          kwlist,
                                          &kobj,
                                          &ttl_O,
@@ -322,7 +323,8 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
                                          &nofmt_O,
                                          &durability_level,
                                          &timeout_O,
-                                         &external_span);
+                                         &external_span,
+                                         &transcoder);
 
     if (!rv) {
         if (!PyErr_Occurred()) {
@@ -389,6 +391,7 @@ get_common(pycbc_Bucket *self, PyObject *args, PyObject *kwargs, int optype,
 
     cv.external_span = external_span;
     rv = pycbc_common_vars_init(&cv, self, argopts, ncmds, 0);
+    pycbc_MultiResult_set_transcoder(cv.mres, transcoder);
     cv.durability_level = durability_level;
     rv = pycbc_get_duration(timeout_O, &cv.timeout, 1);
     if (rv < 0) {
@@ -504,7 +507,7 @@ TRACED_FUNCTION(LCBTRACE_OP_REQUEST_ENCODING,
     }
     create_outer_span(self->tracer, cv, (cv->argopts & PYCBC_ARGOPT_MULTI) ? "lookup_in_multi" : "lookup_in", &collection->collection);
     lcbtrace_SPAN *encode_span = create_encode_span(self->tracer, cv);
-    rv = pycbc_tc_encode_key(self, curkey, &keybuf);
+    rv = pycbc_tc_encode_key(self, curkey, &keybuf, NULL);
     lcbtrace_span_finish(encode_span, LCBTRACE_NOW);
     if (rv != 0) {
         lcbtrace_span_finish(cv->mres->outer_span, LCBTRACE_NOW);

@@ -127,6 +127,7 @@ static struct PyMethodDef AsyncResult_TABLE_methods[] = {
         { NULL }
 };
 
+
 static int
 MultiResultType__init__(pycbc_MultiResult *self, PyObject *args, PyObject *kwargs)
 {
@@ -141,6 +142,7 @@ MultiResultType__init__(pycbc_MultiResult *self, PyObject *args, PyObject *kwarg
     self->errop = NULL;
     self->mropts = 0;
     self->err_info = NULL;
+    self->tc = NULL;
 
     return 0;
 }
@@ -152,6 +154,7 @@ MultiResult_dealloc(pycbc_MultiResult *self)
     Py_XDECREF(self->exceptions);
     Py_XDECREF(self->errop);
     Py_XDECREF(self->err_info);
+    Py_XDECREF(self->tc);
     pycbc_multiresult_destroy_dict(self);
 }
 
@@ -264,6 +267,19 @@ pycbc_multiresult_new(pycbc_Bucket *parent)
     }
 
     return (PyObject*)ret;
+}
+
+int
+pycbc_MultiResult_set_transcoder(pycbc_MultiResult *mres, PyObject *transcoder)
+{
+    Py_XDECREF(mres->tc);
+    if (transcoder && PyObject_IsTrue(transcoder)) {
+        mres->tc = transcoder;
+        Py_INCREF(mres->tc);
+    } else {
+        mres->tc = NULL;
+    }
+    return 0;
 }
 
 void

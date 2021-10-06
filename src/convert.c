@@ -269,7 +269,7 @@ enum {
 
 static int
 do_call_tc(pycbc_Bucket *conn, PyObject *obj, PyObject *flags,
-           PyObject **result, int mode)
+           PyObject **result, int mode, PyObject *opTranscoder)
 {
     PyObject *meth = NULL;
     PyObject *args = NULL;
@@ -288,7 +288,7 @@ do_call_tc(pycbc_Bucket *conn, PyObject *obj, PyObject *flags,
 
     case ENCODE_VALUE:
         strlookup = pycbc_helpers.tcname_encode_value;
-        args = PyTuple_Pack(2, obj, flags);
+        args = PyTuple_Pack(1, obj);
         break;
 
     case DECODE_VALUE:
@@ -301,7 +301,12 @@ do_call_tc(pycbc_Bucket *conn, PyObject *obj, PyObject *flags,
         goto GT_DONE;
     }
 
-    meth = PyObject_GetAttr(conn->tc, strlookup);
+    if(opTranscoder == NULL){
+        meth = PyObject_GetAttr(conn->tc, strlookup);
+    } else {
+        meth = PyObject_GetAttr(opTranscoder, strlookup);
+    }
+
     if (!meth) {
         PYCBC_EXC_WRAP_OBJ(PYCBC_EXC_ENCODING, 0,
                            "Couldn't find transcoder method",
@@ -327,13 +332,13 @@ do_call_tc(pycbc_Bucket *conn, PyObject *obj, PyObject *flags,
 
 
 int
-pycbc_tc_encode_key(pycbc_Bucket *conn, PyObject *src, pycbc_pybuffer *dst)
+pycbc_tc_encode_key(pycbc_Bucket *conn, PyObject *src, pycbc_pybuffer *dst, PyObject *opTranscoder)
 {
     int rv;
     Py_ssize_t plen;
 
     PYCBC_DEBUG_LOG("Inside %s", __FUNCTION__)
-    if (!conn->tc) {
+    if (!conn->tc && opTranscoder == NULL) {
         PYCBC_DEBUG_LOG("Encoding with default transcoder")
         rv = encode_common(src, dst, PYCBC_FMT_UTF8);
         if (rv == 0 && dst->length == 0) {
@@ -344,10 +349,28 @@ pycbc_tc_encode_key(pycbc_Bucket *conn, PyObject *src, pycbc_pybuffer *dst)
         return rv;
     }
 
+    /* SDK3: no method for encoding key, encode w/ flags=PYCBC_FMT_UTF8 by default */
+    int hasEncodeKeyMeth = 1;
+    if(opTranscoder == NULL){
+        hasEncodeKeyMeth = PyObject_HasAttr(conn->tc, pycbc_helpers.tcname_encode_key);
+    }
+    else{
+        hasEncodeKeyMeth = PyObject_HasAttr(opTranscoder,  pycbc_helpers.tcname_encode_key);
+    }
+
+    if (!hasEncodeKeyMeth) {
+        rv = encode_common(src, dst, PYCBC_FMT_UTF8);
+        if (rv == 0 && dst->length == 0) {
+            PYCBC_EXCTHROW_EMPTYKEY();
+            rv = -1;
+        }
+        return rv;
+    }
+
     /* Swap out key and new key. Assign back later on */
 
     PYCBC_DEBUG_LOG("Encoding with custom transcoder")
-    rv = do_call_tc(conn, src, NULL, &dst->pyobj, ENCODE_KEY);
+    rv = do_call_tc(conn, src, NULL, &dst->pyobj, ENCODE_KEY, opTranscoder);
     PYCBC_DEBUG_LOG("Encoded with custom transcoder")
 
     if (dst->pyobj == NULL || rv < 0) {
@@ -385,7 +408,7 @@ pycbc_tc_encode_key(pycbc_Bucket *conn, PyObject *src, pycbc_pybuffer *dst)
 
 int
 pycbc_tc_decode_key(pycbc_Bucket *conn, const void *key, size_t nkey,
-                    PyObject **pobj)
+                    PyObject **pobj, PyObject *opTranscoder)
 {
     PyObject *bobj;
     int rv = 0;
@@ -393,14 +416,28 @@ pycbc_tc_decode_key(pycbc_Bucket *conn, const void *key, size_t nkey,
         bobj = PyBytes_FromStringAndSize(key, nkey);
         *pobj = bobj;
 
-    } else if (!conn->tc) {
+    } else if (!conn->tc && opTranscoder == NULL) {
         return decode_common(pobj, key, nkey, PYCBC_FMT_UTF8);
 
     } else {
+        /* SDK3: no method for decoding key, decode w/ flags=PYCBC_FMT_UTF8 by default */
+        int hasDecodeKeyMeth = 1;
+        if(opTranscoder == NULL){
+            hasDecodeKeyMeth = PyObject_HasAttr(conn->tc, pycbc_helpers.tcname_decode_key);
+        }
+        else{
+            hasDecodeKeyMeth = PyObject_HasAttr(opTranscoder, pycbc_helpers.tcname_decode_key);
+        }
+
+        if (!hasDecodeKeyMeth) {
+            rv = decode_common(pobj, key, nkey, PYCBC_FMT_UTF8);
+            return rv;
+        }
+
         bobj = PyBytes_FromStringAndSize(key, nkey);
         if (bobj) {
             PYCBC_STASH_EXCEPTION(
-                    rv = do_call_tc(conn, bobj, NULL, pobj, DECODE_KEY));
+                    rv = do_call_tc(conn, bobj, NULL, pobj, DECODE_KEY, opTranscoder));
             Py_XDECREF(bobj);
 
         } else {
@@ -451,7 +488,7 @@ pycbc_tc_determine_format(PyObject *value)
 
 int
 pycbc_tc_encode_value(pycbc_Bucket *conn, PyObject *srcbuf, PyObject *srcflags,
-                      pycbc_pybuffer *dstbuf, lcb_U32 *dstflags)
+                      pycbc_pybuffer *dstbuf, lcb_U32 *dstflags, PyObject *opTranscoder)
 {
     PyObject *flags_obj;
     PyObject *new_value = NULL;
@@ -464,7 +501,7 @@ pycbc_tc_encode_value(pycbc_Bucket *conn, PyObject *srcbuf, PyObject *srcflags,
         srcflags = conn->dfl_fmt;
     }
 
-    if (!conn->tc) {
+    if (!conn->tc && opTranscoder == NULL) {
         if (srcflags == pycbc_helpers.fmt_auto) {
             srcflags = pycbc_tc_determine_format(srcbuf);
         }
@@ -483,7 +520,7 @@ pycbc_tc_encode_value(pycbc_Bucket *conn, PyObject *srcbuf, PyObject *srcflags,
     /**
      * Calling into Transcoder
      */
-    rv = do_call_tc(conn, srcbuf, srcflags, &result_tuple, ENCODE_VALUE);
+    rv = do_call_tc(conn, srcbuf, srcflags, &result_tuple, ENCODE_VALUE, opTranscoder);
     if (rv < 0) {
         return -1;
     }
@@ -545,14 +582,15 @@ pycbc_tc_decode_value(pycbc_Bucket *conn,
                       const void *value,
                       size_t nvalue,
                       lcb_uint32_t flags,
-                      PyObject **pobj)
+                      PyObject **pobj,
+                      PyObject *opTranscoder)
 {
     PyObject *result = NULL;
     PyObject *pint = NULL;
     PyObject *pbuf = NULL;
     int rv;
 
-    if (conn->data_passthrough == 0 && conn->tc == NULL) {
+    if (conn->data_passthrough == 0 && conn->tc == NULL && opTranscoder == NULL) {
         return decode_common(pobj, value, nvalue, flags);
     }
 
@@ -576,7 +614,7 @@ pycbc_tc_decode_value(pycbc_Bucket *conn,
         goto GT_DONE;
     }
 
-    rv = do_call_tc(conn, pbuf, pint, &result, DECODE_VALUE);
+    rv = do_call_tc(conn, pbuf, pint, &result, DECODE_VALUE, opTranscoder);
 
     GT_DONE:
     Py_XDECREF(pint);
