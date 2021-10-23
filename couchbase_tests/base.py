@@ -1042,7 +1042,7 @@ class ClusterTestCase(CouchbaseTestCase):
             self._parent = parent
 
         def assertDsValue(self, expected, item):
-            self._parent.assertEquals(expected, item)
+            self._parent.assertEqual(expected, item)
 
         def assertSuccess(self, item):
             pass

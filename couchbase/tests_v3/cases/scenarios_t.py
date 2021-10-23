@@ -471,7 +471,7 @@ class Scenarios(CollectionTestCase):
         count = 0
         for row in result.rows():
             count += 1
-        self.assertEquals(1, count)
+        self.assertEqual(1, count)
 
     @staticmethod
     def get_multi_result_as_dict(result):
