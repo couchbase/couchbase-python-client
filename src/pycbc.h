@@ -1165,7 +1165,8 @@ typedef struct {
 #define pycbc_ValResult_HEAD \
     pycbc_OpResult_HEAD \
     PyObject *value; \
-    lcb_uint32_t flags;
+    lcb_uint32_t flags; \
+    PyObject *is_active;
 
 typedef struct {
     pycbc_ValResult_HEAD

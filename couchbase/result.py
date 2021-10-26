@@ -368,9 +368,20 @@ class GetResult(Result):
 
 
 class GetReplicaResult(GetResult):
+
+    @internal
+    def __init__(self,
+                 original
+                 ):
+        """
+        GetReplicaResult is the return type for full read operations.
+        """
+        super(GetReplicaResult, self).__init__(original)
+        self._is_active = getattr(original, '_is_active', None)
+
     @property
-    def is_replica(self):
-        raise NotImplementedError("To be implemented in final sdk3 release")
+    def is_active(self):
+        return self._is_active
 
 
 ResultDeriv = TypeVar("ResultDeriv", bound=Result)

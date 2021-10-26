@@ -350,12 +350,17 @@ class CollectionTests(CollectionTestCase):
             10, 3, self.coll.get_all_replicas, 'imakey100')
         if not hasattr(result, '__iter__'):
             result = [result]
-        # TODO: this isn't implemented yet - waiting on CCBC-1169
-        # when it does work, we just need to make sure one of the
-        # results returns True for is_replica()
+        active_cnt = 0
+        replica_cnt = 0
         for r in result:
-            with self.assertRaises(NotImplementedError):
-                r.is_replica()
+            self.assertDictEqual(self.CONTENT, r.content_as[dict])
+            if r.is_active:
+                active_cnt += 1
+            else:
+                replica_cnt += 1
+
+        self.assertEqual(active_cnt, 1)
+        self.assertGreaterEqual(replica_cnt, active_cnt)
 
     def test_touch(self):
         self.cb.touch(self.KEY, timedelta(seconds=3))

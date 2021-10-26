@@ -42,6 +42,7 @@ static void
 ValueResult_dealloc(pycbc_ValueResult *self)
 {
     Py_XDECREF(self->value);
+    Py_XDECREF(self->is_active);
     OperationResult_dealloc((pycbc_OperationResult*)self);
 }
 
@@ -89,6 +90,10 @@ static struct PyMemberDef ValueResult_TABLE_members[] = {
         { "flags",
                 T_ULONG, offsetof(pycbc_ValueResult, flags),
                 READONLY
+        },
+        { "_is_active",
+                T_OBJECT_EX, offsetof(pycbc_ValueResult, is_active),
+                READONLY, PyDoc_STR("True if value is active replica (only set for replica operations)")
         },
         { NULL }
 };

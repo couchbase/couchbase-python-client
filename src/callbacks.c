@@ -873,6 +873,17 @@ value_callback(lcb_t instance, int cbtype, const lcb_RESPBASE *resp)
         if (rv < 0) {
             pycbc_multiresult_adderr(mres);
         }
+        if (res->is_active) {
+            Py_DECREF(res->is_active);
+            res->is_active = NULL;
+        }
+        if (lcb_respgetreplica_is_active(gresp)) {
+            Py_INCREF(Py_True);
+            res->is_active = Py_True;
+        } else {
+            Py_INCREF(Py_False);
+            res->is_active = Py_False;
+        }
     } else if (cbtype == LCB_CALLBACK_GET) {
         const lcb_RESPGET *gresp = (const lcb_RESPGET *)resp;
         lcb_U32 eflags;
