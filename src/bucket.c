@@ -20,6 +20,7 @@
 #include "oputil.h"
 #include "iops.h"
 #include "python_wrappers.h"
+#include "pycbc_http.h"
 #include <libcouchbase/vbucket.h>
 #include <libcouchbase/error.h>
 
@@ -693,6 +694,12 @@ static struct PyMemberDef Bucket_TABLE_members[] = {
                 PyDoc_STR("Internal hook for durability tests")
         },
 
+        { "server_version", T_OBJECT,
+                offsetof(pycbc_Bucket, server_version),
+                0,
+                PyDoc_STR("Server version")
+        },
+
         { NULL }
 };
 
@@ -1203,11 +1210,16 @@ Bucket__connect(pycbc_Bucket *self, PyObject* args, PyObject* kwargs)
     }
 
     pycbc_oputil_wait_common(self, NULL);
+
     if ((self->flags & PYCBC_CONN_F_ASYNC) == 0) {
         err = lcb_get_bootstrap_status(self->instance);
         if (err != LCB_SUCCESS) {
             PYCBC_EXCTHROW_WAIT(err);
             return NULL;
+        }
+        // for non-Admin, sync cluster client type, get the server version at this point
+        if(!strcmp(Py_TYPE(self)->tp_name, "Cluster") && !(self->flags & PYCBC_GET_VERSION_ATTEMPT)){
+            pycbc_get_couchbase_version(self);
         }
     }
     {
@@ -1247,6 +1259,7 @@ Bucket_dtor(pycbc_Bucket *self)
     Py_XDECREF(self->conncb);
     Py_XDECREF(self->dur_testhook);
     Py_XDECREF(self->iopswrap);
+    Py_XDECREF(self->server_version);
 
     if (self->instance) {
         lcb_destroy(self->instance);

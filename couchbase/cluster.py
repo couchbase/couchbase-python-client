@@ -1,4 +1,5 @@
 import asyncio
+from typing import NamedTuple
 
 from couchbase_core.asynchronous.client import AsyncClientMixin
 from couchbase.mutation_state import MutationState
@@ -46,7 +47,11 @@ from datetime import timedelta
 
 
 T = TypeVar("T")
-
+ServerVersion = NamedTuple(
+    "ServerVersion", [("full_version", str),
+                      ("short_version", float),
+                      ("is_dp", bool),
+                      ("is_enterprise", bool)])
 
 CallableOnOptionBlock = Callable[[OptionBlockDeriv, Any], Any]
 
@@ -508,6 +513,7 @@ class Cluster(CoreClient):
         connection_string,  # type: str
         options=None,  # type: ClusterOptions
         bucket_factory=Bucket,  # type: Any
+        admin_factory=Admin,  # type: Admin
         **kwargs  # type: Any
     ):
         self._authenticator = kwargs.pop("authenticator", None)
@@ -547,6 +553,8 @@ class Cluster(CoreClient):
         self._clusteropts.update(non_connstr_opts)
         self._clusteropts.update(kwargs)
         self._adminopts = dict(**self._clusteropts)
+        if "admin_factory" not in self._adminopts:
+            self._adminopts["admin_factory"] = admin_factory
         self._clusteropts.update(async_items)
         self.connstr = cluster_opts.update_connection_string(
             self.connstr, **self._clusteropts
@@ -564,6 +572,8 @@ class Cluster(CoreClient):
             _conntype=_LCB.LCB_TYPE_CLUSTER,
             **self._clusteropts
         )
+        if(type(self).__name__ == "Cluster"):
+            self._set_server_version()
 
     @classmethod
     def connect(
@@ -591,6 +601,42 @@ class Cluster(CoreClient):
             raise AlreadyShutdownException(
                 "This cluster has already been shutdown")
 
+    @internal
+    def _set_server_version(self,  # type: "Cluster"
+                            override=None  # type: Union[str, dict]
+                            ) -> None:
+        """ 
+        Internal method to set the server version.
+
+        :param override: HTTP response from /pools (optional).
+        """
+        if override is not None:
+            self.server_version = override
+
+        if self.server_version:
+            try:
+                version_json = self.server_version
+                if isinstance(self.server_version, str):
+                    version_json = json.loads(self.server_version)
+                version_raw = version_json.get("implementationVersion")
+                is_dp = version_json.get("isDeveloperPreview", False)
+                is_enterprise = version_json.get(
+                    "isEnterprise", False)
+                # version string should be X.Y.Z-XXXX-YYYY
+                self.server_version = ServerVersion(version_raw[:10],
+                                                    float(version_raw[:3]),
+                                                    is_dp,
+                                                    is_enterprise)
+            except ValueError:
+                # this comes from the conversion to float -- the mock says
+                # "CouchbaseMock..."
+                self.server_version = ServerVersion(
+                    "CouchbaseMock", float(6.5), False, True)
+
+    def get_server_version(self     # type: "Cluster"
+                           ) -> ServerVersion:
+        return self.server_version
+
     @property
     @internal
     def _admin(self):
@@ -599,7 +645,8 @@ class Cluster(CoreClient):
             c = ConnectionString.parse(self.connstr)
             if not c.bucket:
                 c.bucket = self._adminopts.pop("bucket", None)
-            self.__admin = Admin(connection_string=str(c), **self._adminopts)
+            factory = self._adminopts.pop("admin_factory", Admin)
+            self.__admin = factory(connection_string=str(c), **self._adminopts)
         return self.__admin
 
     def bucket(
@@ -628,6 +675,7 @@ class Cluster(CoreClient):
 
     # Temporary, helpful with working around CCBC-1204.  We should be able to get rid of this
     # logic when this issue is fixed.
+
     def _is_6_5_plus(self):
         self._check_for_shutdown()
 
@@ -636,21 +684,30 @@ class Cluster(CoreClient):
         if self.__is_6_5 is not None:
             return self.__is_6_5
 
+        if self.server_version:
+            if isinstance(self.server_version, str):
+                self._set_server_version()
+            self.__is_6_5 = self.server_version.short_version >= 6.5
+            return self.__is_6_5
+
+        # If an async Admin cluster is used (needed for access to management API),
+        # The HTTP request will return w/o a result (it will be pending the async
+        # future/callback).  As _is_6_5_plus() is synchronous, there will be no way
+        # to get the result.  This scenario should not happen, but in the event it
+        # does, lets give the user an easier error to understand why there is a problem.
+        if type(self._admin).__name__ in ["AAdmin", "TxAdmin"]:
+            raise NotImplementedError(
+                "Cannot execute synchronous HTTP request with asynchronous Admin cluster.")
+
         try:
             response = self._admin.http_request(path="/pools").value
-            v = response.get("implementationVersion")
-            # lets just get first 3 characters -- the string should be X.Y.Z-XXXX-YYYY and we only care about
-            # major and minor version
-            self.__is_6_5 = float(v[:3]) >= 6.5
+            self._set_server_version(override=response)
+            self.__is_6_5 = self.server_version.short_version >= 6.5
         except NetworkException as e:
             # the cloud doesn't let us query this endpoint, and so lets assume this is a cloud instance.  However
             # lets not actually set the __is_6_5 flag as this also could be a transient error.  That means cloud
             # instances check every time, but this is only temporary.
             return True
-        except ValueError:
-            # this comes from the conversion to float -- the mock says
-            # "CouchbaseMock..."
-            self.__is_6_5 = True
         return self.__is_6_5
 
     def query(
@@ -988,9 +1045,25 @@ class Cluster(CoreClient):
     # Only useful for 6.5 DP testing
     def _is_dev_preview(self):
         self._check_for_shutdown()
-        return self._admin.http_request(path="/pools").value.get(
-            "isDeveloperPreview", False
-        )
+
+        if self.server_version:
+            if isinstance(self.server_version, str):
+                self._set_server_version()
+            return self.server_version.is_dp
+
+        # If an async Admin cluster is used (needed for access to management API),
+        # The HTTP request will return w/o a result (it will be pending the async
+        # future/callback).  As _is_dev_preview() is synchronous, there will be no way
+        # to get the result.  This scenario should not happen, but in the event it
+        # does, lets give the user an easier error to understand why there is a problem.
+        if type(self._admin).__name__ in ["AAdmin", "TxAdmin"]:
+            raise NotImplementedError(
+                "Cannot execute synchronous HTTP request with asynchronous Admin cluster.")
+
+        response = self._admin.http_request(path="/pools").value
+        self._set_server_version(override=response)
+
+        return self.server_version.is_dp
 
     @property
     def query_timeout(self):

@@ -1,10 +1,14 @@
-from typing import *
+from typing import TypeVar, Type
 import asyncio
 from asyncio import AbstractEventLoop
 
+from couchbase_core._libcouchbase import (
+    PYCBC_CONN_F_ASYNC,
+    PYCBC_CONN_F_ASYNC_DTOR)
+from couchbase_core.client import Client as CoreClient
 from couchbase.cluster import AsyncCluster as V3AsyncCluster
 from couchbase.bucket import AsyncBucket as V3AsyncBucket
-from couchbase_core.client import Client as CoreClient
+from couchbase.management.admin import Admin as AsyncAdminBucket
 from couchbase.collection import (
     AsyncCBCollection as BaseAsyncCBCollection,
     CBCollection,
@@ -67,21 +71,30 @@ class AIOClientMixin(object):
             # do not set the connection callback for a collection
             return
 
-        cft = asyncio.Future(loop=loop)
+        self._setup_connect()
+
+    def _setup_connect(self):
+        cft = asyncio.Future()
 
         def ftresult(err):
             if err:
                 cft.set_exception(err)
             else:
+                if(issubclass(type(self), V3AsyncCluster)):
+                    self._set_server_version()
                 cft.set_result(True)
 
         self._cft = cft
         self._conncb = ftresult
 
     def on_connect(self):
-        if not self.connected:
+        # only if the connect callback has already been hit
+        # do we ant to attempt _connect() again
+        if not self.connected and self._conncb is None:
+            self._setup_connect()
             self._connect()
-            return self._cft
+
+        return self._cft
 
     connected = CoreClient.connected
 
@@ -109,8 +122,51 @@ class ABucket(AIOClientMixin, V3AsyncBucket):
 Bucket = ABucket
 
 
+class AAdmin(AsyncAdminBucket):
+    def __init__(self, connection_string=None, **kwargs):
+        loop = asyncio.get_event_loop()
+
+        kwargs.setdefault('_flags', 0)
+        # Flags should be async
+        kwargs['_flags'] |= PYCBC_CONN_F_ASYNC | PYCBC_CONN_F_ASYNC_DTOR
+        super(AAdmin, self).__init__(
+            connection_string=connection_string, _iops=IOPS(loop), **kwargs
+        )
+        self._loop = loop
+
+        self._setup_connect()
+
+    def _setup_connect(self):
+        cft = asyncio.Future()
+
+        def ftresult(err):
+            if err:
+                cft.set_exception(err)
+            else:
+                cft.set_result(True)
+
+        self._cft = cft
+        self._conncb = ftresult
+
+    def on_connect(self):
+        # only if the connect callback has already been hit
+        # do we ant to attempt _connect() again
+        if not self.connected and self._conncb is None:
+            self._setup_connect()
+            self._connect()
+
+        return self._cft
+
+    connected = CoreClient.connected
+
+
+Admin = AAdmin
+
+
 class ACluster(AIOClientMixin, V3AsyncCluster):
     def __init__(self, connection_string, *options, **kwargs):
+        if "admin_factory" not in kwargs:
+            kwargs["admin_factory"] = Admin
         super(ACluster, self).__init__(
             connection_string, *options, bucket_factory=Bucket, **kwargs
         )

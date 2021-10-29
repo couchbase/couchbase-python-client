@@ -15,6 +15,7 @@
 
 from __future__ import absolute_import
 from typing import *
+import asyncio
 from couchbase_core._libcouchbase import PYCBC_TRACING
 from basictracer import BasicTracer, SpanRecorder
 from couchbase_core._version import __version__ as cb_version
@@ -953,11 +954,37 @@ class CouchbaseClusterResource(object):
     def disconnect_cluster(self) -> None:
         self.cluster.disconnect()
 
+    def async_http_request(self, cluster, path):
+        result = cluster._admin.http_request(path=path)
+        ft = asyncio.Future()
+
+        def on_ok(response):
+            ft.set_result(response)
+            result.clear_callbacks()
+
+        def on_err(_, excls, excval, __):
+            err = excls(excval)
+            ft.set_exception(err)
+            result.clear_callbacks()
+
+        result.set_callbacks(on_ok, on_err)
+        return ft
+
     def set_cluster_version(self, cluster=None) -> None:
         clstr = cluster or self.cluster
-        pools = self.try_n_times(
-            10, 3, clstr._admin.http_request, path='/pools')
-        self.cluster_version = pools.value['implementationVersion']
+        if clstr.server_version:
+            if isinstance(clstr.server_version, str):
+                clstr._set_server_version()
+            self.cluster_version = clstr.server_version.full_version
+        else:
+            if hasattr(clstr, "_admin") and type(clstr._admin).__name__ == "AAdmin":
+                pools = clstr._loop.run_until_complete(self.try_n_times_async(
+                    10, 3, self.async_http_request, clstr, "/pools"))
+            else:
+                pools = self.try_n_times(
+                    10, 3, clstr._admin.http_request, path='/pools')
+
+            self.cluster_version = pools.value['implementationVersion']
 
     def is_ready(self) -> bool:
         if self.is_mock:
@@ -1002,6 +1029,38 @@ class CouchbaseClusterResource(object):
             try:
                 self.restart_mock()
                 return func(*args, **kwargs)
+            except MockRestartException:
+                raise
+            except Exception:
+                pass
+
+        raise CouchbaseClusterResourceException(
+            "unsuccessful {} after {} times, waiting {} seconds between calls".format(func, num_times, seconds_between))
+
+    async def try_n_times_async(self,  # type: "ClusterTestCase"
+                                num_times,  # type: int
+                                seconds_between,  # type: SupportsFloat
+                                func,  # type: Callable
+                                *args,  # type: Any
+                                **kwargs  # type: Any
+                                ):
+        # type: (...) -> Any
+
+        for _ in range(num_times):
+            try:
+                return await func(*args, **kwargs)
+            except Exception as e:
+                # helpful to have this print statement when tests fail
+                # print(e)
+                logging.info("Got exception, sleeping: {}".format(
+                    traceback.format_exc()))
+                await asyncio.sleep(float(seconds_between), loop=self.loop)
+
+        if self.is_mock:
+
+            try:
+                self.restart_mock()
+                return await func(*args, **kwargs)
             except MockRestartException:
                 raise
             except Exception:
@@ -1708,6 +1767,10 @@ class CouchbaseClusterInfo(object):
             mock_hack.kwargs["transcoder"] = transcoder
         self._cluster = cluster_class(
             str(connstr_nobucket), ClusterOptions(auth), **mock_hack.kwargs)
+
+        evloop = self.loop or self._cluster._loop
+        if evloop:
+            evloop.run_until_complete(self._cluster.on_connect())
 
     def set_bucket_name(self, bucket_name):
         self._bucket_name = bucket_name

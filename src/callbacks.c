@@ -1166,7 +1166,15 @@ bootstrap_callback(lcb_t instance, lcb_STATUS err)
         return;
     }
     PYCBC_DEBUG_LOG("bootstrap callback on bucket %p", self);
-    pycbc_invoke_connected_event(self, err);
+    /**
+     *  If no errors, and asyncio non-Admin cluster, make call to get server version.
+     *  NOTE:  Connect callback invoked in server version HTTP response callback
+     **/
+    if(err == LCB_SUCCESS && !strcmp(Py_TYPE(self)->tp_name, "ACluster") && !(self->flags & PYCBC_GET_VERSION_ATTEMPT)){
+        pycbc_get_couchbase_version(self);
+    } else {
+        pycbc_invoke_connected_event(self, err);
+    }
     end_global_callback(instance, self);
 }
 

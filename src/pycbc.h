@@ -353,9 +353,11 @@ enum {
     PYCBC_CONN_F_CONNECTED = 1 << 4,
 
     /** Schedule destruction of iops and lcb instance for later */
-    PYCBC_CONN_F_ASYNC_DTOR = 1 << 5
-};
+    PYCBC_CONN_F_ASYNC_DTOR = 1 << 5,
 
+    // Set after inital attempt to retrieve server version
+    PYCBC_GET_VERSION_ATTEMPT = 1 << 6
+};
 
 #ifndef PYCBC_DUR_DISABLED
 #define PYCBC_DUR_ENABLED
@@ -571,7 +573,8 @@ typedef struct {
     unsigned int flags;                                                      \
                                                                              \
     pycbc_dur_params dur_global;                                             \
-    unsigned long dur_timeout;
+    unsigned long dur_timeout;                                               \
+    PyObject *server_version;
     PYCBC_BUCKET_BASE
 } pycbc_Bucket;
 
