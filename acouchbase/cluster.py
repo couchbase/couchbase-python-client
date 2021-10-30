@@ -1,4 +1,4 @@
-from typing import TypeVar, Type
+from typing import TypeVar, Type, Union, Any
 import asyncio
 from asyncio import AbstractEventLoop
 
@@ -17,6 +17,7 @@ from acouchbase.iterator import (
     AAnalyticsResult,
     AViewResult,
 )
+from acouchbase.management.buckets import ABucketManager
 
 T = TypeVar("T", bound=CoreClient)
 
@@ -219,6 +220,16 @@ class ACluster(AIOClientMixin, V3AsyncCluster):
         return super(ACluster, self).analytics_query(
             *args, itercls=kwargs.pop("itercls", AAnalyticsResult), **kwargs
         )
+
+    def buckets(self):
+        # type: (...) -> ABucketManager
+        """
+        Get the BucketManager.
+
+        :return: A :class:`~.management.ABucketManager` with which you can create or modify buckets on the cluster.
+        """
+        self._check_for_shutdown()
+        return ABucketManager(self._admin)
 
 
 Cluster = ACluster

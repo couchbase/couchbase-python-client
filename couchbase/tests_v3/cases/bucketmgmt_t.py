@@ -47,7 +47,7 @@ class BucketManagementTests(CollectionTestCase):
                 bucket['minimum_durability_level'],
                 Durability.NONE)
 
-    def test_bucket_create_replica_index(self):
+    def test_bucket_create_replica_index_true(self):
         self.bm.create_bucket(
             CreateBucketSettings(
                 name="fred",
@@ -56,11 +56,8 @@ class BucketManagementTests(CollectionTestCase):
                 replica_index=True))
         bucket = self.try_n_times(10, 1, self.bm.get_bucket, "fred")
         self.assertTrue(bucket.replica_index)
-        self.try_n_times(10, 1, self.bm.drop_bucket, 'fred')
-        self.assertRaises(
-            BucketDoesNotExistException,
-            self.bm.drop_bucket,
-            'fred')
+
+    def test_bucket_create_replica_index_false(self):
         self.bm.create_bucket(
             CreateBucketSettings(
                 name="fred",

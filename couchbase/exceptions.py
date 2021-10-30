@@ -1056,8 +1056,10 @@ class QueryIndexNotFoundException(CouchbaseException):
 class QueryIndexAlreadyExistsException(CouchbaseException):
     """The requested index already exists"""
 
+
 class WatchQueryIndexTimeoutException(CouchbaseException):
     """Unable to find all requested indexes online within specified timeout"""
+
 
 class ClientNoMemoryException(CouchbaseException):
     """The client ran out of memory"""
@@ -1514,6 +1516,23 @@ class NotSupportedWrapper(object):
 
         return wrapped
 
+    @classmethod
+    def a_400_or_404_means_not_supported_async(cls, func):
+        # some functions 404 if < 6.5, but 400 if 6.5 with
+        # developer preview off.  <Sigh>
+        async def wrapped(*args, **kwargs):
+            try:
+                return await func(*args, **kwargs)
+            except HTTPException as e:
+                extra = getattr(e, "objextra", None)
+                status = getattr(extra, "http_status", None)
+                if status == 404 or status == 400:
+                    raise NotSupportedException(
+                        "Server does not support this api call")
+                raise
+
+        return wrapped
+
 
 class DictMatcher(object):
     def __init__(self, **kwargs):
@@ -1541,62 +1560,78 @@ class ErrorMapper(object):
             try:
                 return func(*args, **kwargs)
             except CouchbaseException as e:
-                for orig_exc, text_to_final_exc in cls._compiled_mapping().items():
-                    if isinstance(e, orig_exc):
-                        extra = getattr(e, "objextra", None)
-                        # TODO: this parsing is fragile, lets ponder a better
-                        # approach, if any
-                        if e.context:
-                            value = e.context.response_body
-                            if isinstance(value, bytearray) or isinstance(
-                                    value, bytes):
-                                value = value.decode("utf-8")
-                            for pattern, exc in text_to_final_exc.items():
-                                matches = False
-                                try:
-                                    matches = pattern.match(value)
-                                except Exception as f:
-                                    pass
-                                if matches:
-                                    raise exc.pyexc(e.message, extra, e)
-                        # fallback to old way
-                        if extra:
-                            value = getattr(extra, "value", "")
-
-                            # this value could be a string or a json-encoded
-                            # string...
-                            if isinstance(value, dict):
-                                # there should be a key with the error
-                                # can be error or errors :(
-                                if "error" in value:
-                                    value = value.get("error", None)
-                                elif "errors" in value:
-                                    if "requestID" in value:
-                                        value = value.get("errors", None)[0]
-                                        if "msg" in value:
-                                            value = value["msg"]
-                                    else:
-                                        value = value.get("errors", None)
-                                elif "_" in value:
-                                    value = value.get("_", None)
-                                if value and isinstance(value, dict):
-                                    # sometimes it is still a dict, so use the
-                                    # name field
-                                    value = value.get("name", None)
-                            if isinstance(value, bytearray) or isinstance(
-                                    value, bytes):
-                                value = value.decode("utf-8")
-                            for pattern, exc in text_to_final_exc.items():
-                                matches = False
-                                try:
-                                    matches = pattern.match(value)
-                                except Exception as f:
-                                    pass
-                                if matches:
-                                    raise exc.pyexc(e.message, extra, e)
+                cls._parse_mappings(e)
                 raise
 
         return wrapped
+
+    @classmethod
+    def mgmt_exc_wrap_async(cls, func):
+        @wraps(func)
+        async def wrapped(*args, **kwargs):
+            try:
+                return await func(*args, **kwargs)
+            except CouchbaseException as e:
+                cls._parse_mappings(e)
+                raise
+
+        return wrapped
+
+    @classmethod
+    def _parse_mappings(cls, e):
+        for orig_exc, text_to_final_exc in cls._compiled_mapping().items():
+            if isinstance(e, orig_exc):
+                extra = getattr(e, "objextra", None)
+                # TODO: this parsing is fragile, lets ponder a better
+                # approach, if any
+                if e.context:
+                    value = e.context.response_body
+                    if isinstance(value, bytearray) or isinstance(
+                            value, bytes):
+                        value = value.decode("utf-8")
+                    for pattern, exc in text_to_final_exc.items():
+                        matches = False
+                        try:
+                            matches = pattern.match(value)
+                        except Exception as f:
+                            pass
+                        if matches:
+                            raise exc.pyexc(e.message, extra, e)
+                # fallback to old way
+                if extra:
+                    value = getattr(extra, "value", "")
+
+                    # this value could be a string or a json-encoded
+                    # string...
+                    if isinstance(value, dict):
+                        # there should be a key with the error
+                        # can be error or errors :(
+                        if "error" in value:
+                            value = value.get("error", None)
+                        elif "errors" in value:
+                            if "requestID" in value:
+                                value = value.get("errors", None)[0]
+                                if "msg" in value:
+                                    value = value["msg"]
+                            else:
+                                value = value.get("errors", None)
+                        elif "_" in value:
+                            value = value.get("_", None)
+                        if value and isinstance(value, dict):
+                            # sometimes it is still a dict, so use the
+                            # name field
+                            value = value.get("name", None)
+                    if isinstance(value, bytearray) or isinstance(
+                            value, bytes):
+                        value = value.decode("utf-8")
+                    for pattern, exc in text_to_final_exc.items():
+                        matches = False
+                        try:
+                            matches = pattern.match(value)
+                        except Exception as f:
+                            pass
+                        if matches:
+                            raise exc.pyexc(e.message, extra, e)
 
     @classmethod
     def _compiled_mapping(cls):
@@ -1619,7 +1654,10 @@ class ErrorMapper(object):
     def wrap(cls, dest):
         for name, method in inspect.getmembers(dest, inspect.isfunction):
             if not name.startswith("_"):
-                setattr(dest, name, cls.mgmt_exc_wrap(method))
+                if hasattr(dest, "_HANDLE_ERRORS_ASYNC") and getattr(dest, "_HANDLE_ERRORS_ASYNC") is True:
+                    setattr(dest, name, cls.mgmt_exc_wrap_async(method))
+                else:
+                    setattr(dest, name, cls.mgmt_exc_wrap(method))
         return dest
 
 
