@@ -18,6 +18,7 @@ from acouchbase.iterator import (
     AViewResult,
 )
 from acouchbase.management.buckets import ABucketManager
+from acouchbase.management.collections import ACollectionManager
 
 T = TypeVar("T", bound=CoreClient)
 
@@ -147,6 +148,15 @@ class ABucket(AIOClientMixin, V3AsyncBucket):
         super(ABucket, self).__init__(
             collection_factory=AsyncCBCollection, *args, **kwargs
         )
+
+    def collections(self  # type: "ABucket"
+                    ) -> ACollectionManager:
+        """
+        Get the ACollectionManager.
+
+        :return: the :class:`.management.ACollectionManager` for this bucket.
+        """
+        return ACollectionManager(self._admin, self._name)
 
     def view_query(self, *args, **kwargs):
         if "itercls" not in kwargs:

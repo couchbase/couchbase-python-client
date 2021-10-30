@@ -15,11 +15,12 @@
 
 from couchbase.management.collections import CollectionSpec
 from couchbase_tests.base import SkipTest, CollectionTestCase
-from couchbase.exceptions import BucketDoesNotExistException, DocumentExistsException, DocumentNotFoundException, NotSupportedException, ScopeNotFoundException, ScopeAlreadyExistsException, \
-    CollectionAlreadyExistsException, CollectionNotFoundException
+from couchbase.exceptions import (BucketDoesNotExistException, DocumentNotFoundException,
+                                  NotSupportedException, ScopeNotFoundException,
+                                  ScopeAlreadyExistsException, CollectionAlreadyExistsException,
+                                  CollectionNotFoundException)
 from couchbase.management.buckets import CreateBucketSettings
 from datetime import timedelta
-import time
 
 
 class CollectionManagerTestCase(CollectionTestCase):
