@@ -1,6 +1,8 @@
 import logging
 import asyncio
 import traceback
+from functools import wraps
+from nose.tools import nottest
 
 from .base import (CouchbaseTestCase, CouchbaseClusterResource,
                    CouchbaseClusterInfo, CouchbaseClusterInfoException,
@@ -8,6 +10,14 @@ from .base import (CouchbaseTestCase, CouchbaseClusterResource,
                    CouchbaseClusterResourceException)
 from acouchbase.cluster import ACluster
 
+
+@nottest
+def async_test(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        return self.loop.run_until_complete(func(self, *args, **kwargs))
+
+    return wrapper
 
 class AsyncioTestCase(CouchbaseTestCase):
     _cluster_info = None

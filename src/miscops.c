@@ -479,7 +479,7 @@ TRACED_FUNCTION_WRAPPER(_stats,LCBTRACE_OP_REQUEST_ENCODING,Bucket)
 TRACED_FUNCTION_WRAPPER(_ping,LCBTRACE_OP_REQUEST_ENCODING,Bucket)
 {
     int rv;
-    Py_ssize_t ncmds = 0;
+    Py_ssize_t ncmds = 1;
     lcb_STATUS err = LCB_ERR_GENERIC;
     struct pycbc_common_vars cv = PYCBC_COMMON_VARS_STATIC_INIT;
 

@@ -9,10 +9,7 @@ from couchbase_core.client import Client as CoreClient
 from couchbase.cluster import AsyncCluster as V3AsyncCluster
 from couchbase.bucket import AsyncBucket as V3AsyncBucket
 from couchbase.management.admin import Admin as AsyncAdminBucket
-from couchbase.collection import (
-    AsyncCBCollection as BaseAsyncCBCollection,
-    CBCollection,
-)
+from couchbase.collection import CBCollection
 from acouchbase.asyncio_iops import IOPS
 from acouchbase.iterator import (
     AQueryResult,
@@ -27,11 +24,13 @@ T = TypeVar("T", bound=CoreClient)
 class AIOClientMixin(object):
     def __new__(cls, *args, **kwargs):
         # type: (...) -> Type[T]
-        if not hasattr(cls, "AIO_wrapped"):
-            for k, method in cls._gen_memd_wrappers(
-                AIOClientMixin._meth_factory
-            ).items():
-                setattr(cls, k, method)
+        if not hasattr(cls, "AIO_wrapped") and cls.__name__ in ["ACluster", "ABucket"]:
+            for m in ["ping"]:
+                try:
+                    method = cls._meth_factory(getattr(cls, m), m)
+                    setattr(cls, m, method)
+                except AttributeError:
+                    raise
             cls.AIO_wrapped = True
         return super(AIOClientMixin, cls).__new__(cls)
 
@@ -99,7 +98,42 @@ class AIOClientMixin(object):
     connected = CoreClient.connected
 
 
-class AsyncCBCollection(AIOClientMixin, BaseAsyncCBCollection):
+class AIOCollectionMixin(object):
+    def __new__(cls, *args, **kwargs):
+        # type: (...) -> Type[T]
+        if not hasattr(cls, "AIO_wrapped"):
+            for k, method in cls._gen_memd_wrappers(
+                AIOCollectionMixin._meth_factory
+            ).items():
+                setattr(cls, k, method)
+            cls.AIO_wrapped = True
+        return super(AIOCollectionMixin, cls).__new__(cls)
+
+    @staticmethod
+    def _meth_factory(meth, _):
+        def ret(self, *args, **kwargs):
+            rv = meth(self, *args, **kwargs)
+            ft = asyncio.Future()
+
+            def on_ok(res):
+                ft.set_result(res)
+                rv.clear_callbacks()
+
+            def on_err(_, excls, excval, __):
+                err = excls(excval)
+                ft.set_exception(err)
+                rv.clear_callbacks()
+
+            rv.set_callbacks(on_ok, on_err)
+            return ft
+
+        return ret
+
+    def __init__(self, *args, **kwargs):
+        super(AIOCollectionMixin, self).__init__(*args, **kwargs)
+
+
+class AsyncCBCollection(AIOCollectionMixin, CBCollection):
     def __init__(self, *args, **kwargs):
         super(AsyncCBCollection, self).__init__(*args, **kwargs)
 
@@ -150,8 +184,8 @@ class AAdmin(AsyncAdminBucket):
 
     def on_connect(self):
         # only if the connect callback has already been hit
-        # do we ant to attempt _connect() again
-        if not self.connected and self._conncb is None:
+        # do we want to attempt _connect() again
+        if not self.connected and not hasattr(self, "_conncb"):
             self._setup_connect()
             self._connect()
 

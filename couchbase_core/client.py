@@ -558,6 +558,8 @@ class Client(_Base):
             # {'services': {...}, ...}
         """
         resultdict = self._ping(*options, **kwargs)
+        if type(resultdict).__name__ == "AsyncResult":
+            return resultdict
         return json.loads(resultdict['services_json'])
 
     def diagnostics(self, *options, **kwargs):

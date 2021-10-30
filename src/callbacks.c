@@ -1254,6 +1254,7 @@ static void ping_callback(lcb_t instance,
     const lcb_RESPPING *resp = (const lcb_RESPPING *)resp_base;
 
     pycbc_MultiResult *mres = NULL;
+    pycbc_Result *res = NULL;
     PyObject *resultdict = NULL;
 
     lcb_respping_cookie(resp, (void **)&mres);
@@ -1262,7 +1263,7 @@ static void ping_callback(lcb_t instance,
     CB_THR_END(parent);
     if (lcb_respping_status(resp) != LCB_SUCCESS) {
         if (mres->errop == NULL) {
-            pycbc_Result *res = (pycbc_Result *)pycbc_result_new(parent);
+            res = (pycbc_Result *)pycbc_result_new(parent);
             res->rc = lcb_respping_status(resp);
             res->key = Py_None;
             Py_INCREF(res->key);
@@ -1337,13 +1338,7 @@ static void ping_callback(lcb_t instance,
                     json);
         }
     }
-#ifdef PYCBC_V3_DEPRECATED
-    if (resp->rflags & LCB_RESP_F_FINAL) {
-        /* Note this can happen in both success and error cases!*/
-        operation_completed_with_err_info(
-                parent, mres, cbtype, resp_base, NULL);
-    }
-#endif
+    operation_completed_with_err_info(parent, mres, cbtype, resp_base, res);
     CB_THR_BEGIN(parent);
 }
 
@@ -1382,12 +1377,6 @@ static void diag_callback(lcb_t instance,
                     json);
         }
     }
-#ifdef PYCBC_V3_DEPRECATED
-    if (resp->rflags & LCB_RESP_F_FINAL) {
-        /* Note this can happen in both success and error cases!*/
-        operation_completed_with_err_info(parent, mres, cbtype, resp_base, res);
-    }
-#endif
     CB_THR_BEGIN(parent);
 }
 

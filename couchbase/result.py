@@ -246,13 +246,16 @@ class MutateInResult(MutationResult):
 class PingResult(object):
     @internal
     def __init__(self,
-                 original  # type: Mapping[str, Any]
+                 original,  # type: Mapping[str, Any]
+                 is_async=None
                  ):
-        self._id = original.get("id", None)
-        self._sdk = original.get("sdk", None)
-        self._version = original.get("version", None)
+        result = json.loads(original["services_json"]
+                            ) if is_async is True else original
+        self._id = result.get("id", None)
+        self._sdk = result.get("sdk", None)
+        self._version = result.get("version", None)
         self._endpoints = dict()
-        for k, v in original['services'].items():
+        for k, v in result['services'].items():
             # construct an EndpointPingReport for each
             k = ServiceType(k)
             self._endpoints[k] = list()
@@ -461,6 +464,13 @@ class AsyncLookupInResult(AsyncWrapper.gen_wrapper(LookupInResult)):
         super(AsyncLookupInResult, self).__init__(core_result)
 
 
+class AsyncPingResult(AsyncWrapper.gen_wrapper(PingResult)):
+    def __init__(self,
+                 core_result  # type: CoreResult
+                 ):
+        super(AsyncPingResult, self).__init__(core_result, is_async=True)
+
+
 # TODO: eliminate the options shortly.  They serve no purpose
 ResultPrecursor = NamedTuple('ResultPrecursor', [(
     'orig_result', CoreResult), ('orig_options', Mapping[str, Any])])
@@ -504,6 +514,22 @@ def lookup_in_result_wrapper(func  # type: Callable[[Any], ResultPrecursor]
     def wrapped(*args, **kwargs):
         x, opts = func(*args, **kwargs)
         return factory_class(x)
+
+    wrapped.__name__ = func.__name__
+    operation_mode.operate_on_doc(wrapped, lambda x: func.__doc__)
+    return wrapped
+
+
+def get_wrapped_pinged_result(x):
+    factory_class = AsyncPingResult if _is_async(x) else PingResult
+    return factory_class(x)
+
+
+def ping_result_wrapper(func):
+    @wraps(func)
+    def wrapped(*args, **kwargs):
+        x = func(*args, **kwargs)
+        return get_wrapped_pinged_result(x)
 
     wrapped.__name__ = func.__name__
     operation_mode.operate_on_doc(wrapped, lambda x: func.__doc__)

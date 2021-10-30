@@ -943,6 +943,13 @@ class Cluster(CoreClient):
         )
         return DiagnosticsResult(result)
 
+    def _ping_result_handler(func):
+        result = ping_result_wrapper(func)
+        operation_mode.operate_on_doc(result, lambda x: func.__doc__)
+        result.__name__ = func.__name__
+        return result
+
+    @_ping_result_handler
     def ping(
         self,
         *options,  # type: PingOptions
@@ -958,8 +965,7 @@ class Cluster(CoreClient):
         :raise: :class:`~.exceptions.CouchbaseException` for various communication issues.
         """
 
-        return PingResult(CoreClient.ping(
-            self, **forward_args(kwargs, *options)))
+        return CoreClient.ping(self, **forward_args(kwargs, *options))
 
     def users(self):
         # type: (...) -> UserManager
