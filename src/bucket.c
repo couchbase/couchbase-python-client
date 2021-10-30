@@ -1200,6 +1200,18 @@ Bucket__connect(pycbc_Bucket *self, PyObject* args, PyObject* kwargs)
         Py_RETURN_NONE;
     }
 
+    /**
+     *  libcouchbase will reset the bootstrap callback once executed.
+     *  In the event of recalling _connect() after a failed bootstrap,
+     *  we need to reset to the bootstrap callback().  If the
+     *  bootstrapping process succeeded, PYCBC_CONN_F_CONNECTED will be set
+     *  and this code is not reached.
+     **/
+    if (self->bootstrap_callback_hit){
+        self->bootstrap_callback_hit = 0;
+        pycbc_reset_bootstrap_callback(self->instance);
+    }
+
     err = lcb_connect(self->instance);
 
     if (err != LCB_SUCCESS) {

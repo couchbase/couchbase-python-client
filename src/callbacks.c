@@ -1166,6 +1166,7 @@ bootstrap_callback(lcb_t instance, lcb_STATUS err)
         return;
     }
     PYCBC_DEBUG_LOG("bootstrap callback on bucket %p", self);
+    self->bootstrap_callback_hit = 1;
     /**
      *  If no errors, and asyncio non-Admin cluster, make call to get server version.
      *  NOTE:  Connect callback invoked in server version HTTP response callback
@@ -1475,4 +1476,10 @@ pycbc_callbacks_init(lcb_t instance)
     lcb_set_bootstrap_callback(instance, bootstrap_callback);
 
     pycbc_http_callbacks_init(instance);
+}
+
+void 
+pycbc_reset_bootstrap_callback(lcb_t instance)
+{
+    lcb_set_bootstrap_callback(instance, bootstrap_callback);
 }

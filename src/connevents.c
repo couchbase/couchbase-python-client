@@ -32,7 +32,9 @@ pycbc_invoke_connected_event(pycbc_Bucket *conn, lcb_STATUS err)
         return;
     }
 
-    conn->flags |= PYCBC_CONN_F_CONNECTED;
+    if(err == LCB_SUCCESS){
+        conn->flags |= PYCBC_CONN_F_CONNECTED;
+    }
 
     if (conn->conncb == NULL || PyObject_IsTrue(conn->conncb) == 0) {
         return;

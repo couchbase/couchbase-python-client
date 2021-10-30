@@ -574,7 +574,9 @@ typedef struct {
                                                                              \
     pycbc_dur_params dur_global;                                             \
     unsigned long dur_timeout;                                               \
-    PyObject *server_version;
+    PyObject *server_version;                                                \
+    /** whether bootstrap callback has already been called */                \
+    unsigned char bootstrap_callback_hit;
     PYCBC_BUCKET_BASE
 } pycbc_Bucket;
 
@@ -1669,6 +1671,7 @@ void pycbc_asyncresult_invoke(pycbc_AsyncResult *mres,
  * Initialize the callbacks for the lcb_t
  */
 void pycbc_callbacks_init(lcb_t instance);
+void pycbc_reset_bootstrap_callback(lcb_t instance);
 void pycbc_http_callbacks_init(lcb_t instance);
 void pycbc_views_callbacks_init(lcb_t instance);
 

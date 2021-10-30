@@ -89,8 +89,8 @@ class AIOClientMixin(object):
 
     def on_connect(self):
         # only if the connect callback has already been hit
-        # do we ant to attempt _connect() again
-        if not self.connected and self._conncb is None:
+        # do we want to attempt _connect() again
+        if not self.connected and not hasattr(self, "_conncb"):
             self._setup_connect()
             self._connect()
 
