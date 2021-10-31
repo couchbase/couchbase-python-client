@@ -19,6 +19,7 @@ The contents of this module do not have a stable API and are subject to
 change
 """
 from time import time, sleep
+import asyncio
 
 import couchbase_core._libcouchbase as LCB
 
@@ -123,6 +124,73 @@ class Admin(LCB.Bucket):
             # "CouchbaseMock..."
             self.__is_6_5 = True
         return self.__is_6_5
+
+    async def _is_6_5_plus_async(self):
+
+        # lets just check once.  Below, we will only set this if we are sure
+        # about the value.
+        if self.__is_6_5 is not None:
+            return self.__is_6_5
+
+        try:
+            response = (await self.http_request_async(path="/pools")).value
+            v = response.get("implementationVersion")
+            # lets just get first 3 characters -- the string should be X.Y.Z-XXXX-YYYY and we only care about
+            # major and minor version
+            self.__is_6_5 = (float(v[:3]) >= 6.5)
+        except E.NetworkException as e:
+            # the cloud doesn't let us query this endpoint, and so lets assume this is a cloud instance.  However
+            # lets not actually set the __is_6_5 flag as this also could be a transient error.  That means cloud
+            # instances check every time, but this is only temporary.
+            return True
+        except ValueError:
+            # this comes from the conversion to float -- the mock says
+            # "CouchbaseMock..."
+            self.__is_6_5 = True
+        return self.__is_6_5
+
+    @internal
+    def http_request_async(self,
+                           path,
+                           method='GET',
+                           content=None,
+                           content_type="application/json",
+                           response_format=FMT_JSON,
+                           timeout=None):
+        """
+        Perform an administrative HTTP request.
+
+        :return: a :class:`~.HttpResult` object.
+
+        .. seealso:: :meth:`http_request`
+        """
+        imeth = None
+        if not method in METHMAP:
+            raise E.InvalidArgumentException.pyexc(
+                "Unknown HTTP Method", method)
+
+        imeth = METHMAP[method]
+        result = self._http_request(type=LCB.LCB_HTTP_TYPE_MANAGEMENT,
+                                    path=path,
+                                    method=imeth,
+                                    content_type=content_type,
+                                    post_data=content,
+                                    response_format=response_format,
+                                    timeout=timeout)
+
+        ft = asyncio.Future()
+
+        def on_ok(response):
+            ft.set_result(response)
+            result.clear_callbacks()
+
+        def on_err(_, excls, excval, __):
+            err = excls(excval)
+            ft.set_exception(err)
+            result.clear_callbacks()
+
+        result.set_callbacks(on_ok, on_err)
+        return ft
 
     @internal
     def http_request(self,

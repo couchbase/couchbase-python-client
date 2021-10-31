@@ -75,6 +75,17 @@ class AsyncioTestCase(CouchbaseTestCase):
     def factory(self):
         pass
 
+    def supports_collections(self):
+        try:
+            v = float(self.cluster_version[0:3])
+            if v >= 7.0:
+                return True
+        except ValueError:
+            # lets assume it is the mock
+            return False
+        # if < 7, check for DP
+        return self.cluster._is_dev_preview()
+
     async def try_n_times_async(self,  # type: AsyncioTestCase
                                 num_times,  # type: int
                                 seconds_between,  # type: SupportsFloat

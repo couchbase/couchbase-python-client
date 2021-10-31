@@ -1,4 +1,4 @@
-from typing import TypeVar, Type, Union, Any
+from typing import TypeVar, Type
 import asyncio
 from asyncio import AbstractEventLoop
 
@@ -20,6 +20,7 @@ from acouchbase.iterator import (
 from acouchbase.management.buckets import ABucketManager
 from acouchbase.management.collections import ACollectionManager
 from acouchbase.management.queries import AQueryIndexManager
+from acouchbase.management.users import AUserManager
 
 T = TypeVar("T", bound=CoreClient)
 
@@ -252,6 +253,16 @@ class ACluster(AIOClientMixin, V3AsyncCluster):
         """
         self._check_for_shutdown()
         return AQueryIndexManager(self._admin)
+
+    def users(self):
+        # type: (...) -> AUserManager
+        """
+        Get the UserManager.
+
+        :return: A :class:`~.management.AUserManager` with which you can create or update cluster users and roles.
+        """
+        self._check_for_shutdown()
+        return AUserManager(self._admin)
 
 
 Cluster = ACluster
