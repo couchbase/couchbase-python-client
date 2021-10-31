@@ -19,6 +19,7 @@ from acouchbase.iterator import (
 )
 from acouchbase.management.buckets import ABucketManager
 from acouchbase.management.collections import ACollectionManager
+from acouchbase.management.queries import AQueryIndexManager
 
 T = TypeVar("T", bound=CoreClient)
 
@@ -240,6 +241,17 @@ class ACluster(AIOClientMixin, V3AsyncCluster):
         """
         self._check_for_shutdown()
         return ABucketManager(self._admin)
+
+    def query_indexes(self):
+        # type: (...) -> AQueryIndexManager
+        """
+        Get the AQueryIndexManager.
+
+        :return:  A :class:`~.management.AQueryIndexManager` with which you can create or modify query indexes on
+            the cluster.
+        """
+        self._check_for_shutdown()
+        return AQueryIndexManager(self._admin)
 
 
 Cluster = ACluster
