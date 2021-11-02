@@ -58,6 +58,7 @@ setup_kw = handle_build_type_and_gen_deps()
 
 packages = {
     'acouchbase',
+    'acouchbase.management',
     'couchbase',
     couchbase_core,
     couchbase_core + '.views',
