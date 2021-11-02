@@ -168,4 +168,4 @@ class SearchIndexManagerTestCase(CollectionTestCase):
         analysis = self.try_n_times(
             5, 2, self.indexmgr.analyze_document, self.indexname, doc)
         self.assertIsNotNone(analysis)
-        self.assertEquals(analysis['status'], 'ok')
+        self.assertEqual(analysis['status'], 'ok')

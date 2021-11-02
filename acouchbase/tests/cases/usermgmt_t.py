@@ -338,7 +338,7 @@ class AcouchbaseUserManagerTests(AsyncioTestCase):
                                                      user.username,
                                                      GetUserOptions(domain_name="local"))
 
-        self.assertEquals(user_metadata.user.display_name, user.display_name)
+        self.assertEqual(user_metadata.user.display_name, user.display_name)
 
         await self.um.drop_user(user.username, DropUserOptions(domain_name="local"))
 

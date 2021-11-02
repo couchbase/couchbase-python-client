@@ -99,7 +99,7 @@ class ClusterTests(CollectionTestCase):
         self.assertIn("imareportid", result.id)
         self.assertIsNotNone(result.sdk)
         self.assertIsNotNone(result.version)
-        self.assertEquals(result.state, ClusterState.Online)
+        self.assertEqual(result.state, ClusterState.Online)
         if not self.is_mock:
             # no matter what there should be a config service type in there,
             # as long as we are not the mock.
@@ -153,7 +153,7 @@ class ClusterTests(CollectionTestCase):
         self.assertIn("imareportid", result.id)
         self.assertIsNotNone(result.sdk)
         self.assertIsNotNone(result.version)
-        self.assertEquals(result.state, ClusterState.Online)
+        self.assertEqual(result.state, ClusterState.Online)
         result_str = result.as_json()
         self.assertIsInstance(result_str, str)
         result_json = json.loads(result_str)
