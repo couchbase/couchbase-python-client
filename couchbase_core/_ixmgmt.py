@@ -95,6 +95,10 @@ def index_to_rawjson(ix):
 
 class IxmgmtRequest(object):
     """
+    **DEPRECATED**
+    The IxmgmtRequest is a deprecated API that will be removed in the next release.
+    Use the `Management API <https://docs.couchbase.com/sdk-api/couchbase-python-client/#management-apis>`_ instead.
+
     This class has similar functionality as N1QLRequest and View. It
     implements iteration over index management results.
     """

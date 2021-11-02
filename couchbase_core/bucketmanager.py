@@ -27,10 +27,15 @@ from couchbase.exceptions import CouchbaseException, InvalidArgumentException
 from couchbase_core.views.params import Query, SpatialQuery, STALE_OK
 from couchbase_core._pyport import single_dict_key
 from couchbase_core._ixmgmt import IxmgmtRequest, N1qlIndex, N1QL_PRIMARY_INDEX
+from couchbase_core.supportability import deprecated
 
 
 class BucketManager(object):
     """
+    **DEPRECATED**
+    The BucketManager is a deprecated API that will be removed in the next release.
+    Use the `Management API <https://docs.couchbase.com/sdk-api/couchbase-python-client/#management-apis>`_ instead.
+
     The `BucketManager` class allows access to common maintenance APIs related
     to a :class:`~couchbase_core.client.Client` object. It is normally returned via
     the :meth:`~couchbase_core.client.Client.bucket_manager` method
@@ -138,8 +143,12 @@ class BucketManager(object):
         raise exceptions.TimeoutException.pyexc(
             "Wait time for design action completion exceeded")
 
+    @deprecated(instead="couchbase.management.ViewIndexManager")
     def design_create(self, name, ddoc, use_devmode=True, syncwait=0):
         """
+        **DEPRECATED**
+        This is a deprecated API that will be removed in the next release. Use `couchbase.management.ViewIndexManager`
+
         Store a design document
 
         :param string name: The name of the design
@@ -201,8 +210,12 @@ class BucketManager(object):
                           use_devmode=use_devmode)
         return ret
 
+    @deprecated(instead="couchbase.management.ViewIndexManager")
     def design_get(self, name, use_devmode=True):
         """
+        **DEPRECATED**
+        This is a deprecated API that will be removed in the next release. Use `couchbase.management.ViewIndexManager`
+
         Retrieve a design document
 
         :param string name: The name of the design document
@@ -226,12 +239,16 @@ class BucketManager(object):
                                       content_type="application/json")
         return existing
 
+    @deprecated(instead="couchbase.management.ViewIndexManager")
     def design_publish(self,
                        name,  # type: str
                        syncwait=0,  # type: int
                        timeout=None  # type: int
                        ):
         """
+        **DEPRECATED**
+        This is a deprecated API that will be removed in the next release. Use `couchbase.management.ViewIndexManager`
+
         Convert a development mode view into a production mode views.
         Production mode views, as opposed to development views, operate on the
         entire cluster data (rather than a restricted subset thereof).
@@ -266,8 +283,12 @@ class BucketManager(object):
                           timeout=syncwait_fn(), use_devmode=False)
         return rv
 
+    @deprecated(instead="couchbase.management.ViewIndexManager")
     def design_delete(self, name, use_devmode=True, syncwait=0):
         """
+        **DEPRECATED**
+        This is a deprecated API that will be removed in the next release. Use `couchbase.management.ViewIndexManager`
+
         Delete a design document
 
         :param string name: The name of the design document to delete
@@ -303,8 +324,12 @@ class BucketManager(object):
         self._design_poll(name, 'del', existing, syncwait)
         return ret
 
+    @deprecated(instead="couchbase.management.ViewIndexManager")
     def design_list(self):
         """
+        **DEPRECATED**
+        This is a deprecated API that will be removed in the next release. Use `couchbase.management.ViewIndexManager`
+
         List all design documents for the current bucket.
 
         :return: A :class:`~couchbase_core.result.HttpResult` containing
@@ -373,7 +398,12 @@ class BucketManager(object):
 
         return info
 
+    @deprecated(instead="couchbase.management.QueryIndexManager")
     def n1ql_index_create(self, ix, **kwargs):
+        """
+        **DEPRECATED**
+        This is a deprecated API that will be removed in the next release. Use `couchbase.management.QueryIndexManager`
+        """
         self._n1ql_index_create(self._bucketname, self._cb, **kwargs)
 
     @staticmethod
@@ -433,8 +463,12 @@ class BucketManager(object):
         # Now actually create the indexes
         return IxmgmtRequest(bucket, 'create', info, **options).execute()
 
+    @deprecated(instead="couchbase.management.QueryIndexManager")
     def n1ql_index_create_primary(self, defer=False, ignore_exists=False):
         """
+        **DEPRECATED**
+        This is a deprecated API that will be removed in the next release. Use `couchbase.management.QueryIndexManager`
+
         Create the primary index on the bucket.
 
         Equivalent to::
@@ -449,8 +483,12 @@ class BucketManager(object):
         return self.n1ql_index_create(
             '', defer=defer, primary=True, ignore_exists=ignore_exists)
 
+    @deprecated(instead="couchbase.management.QueryIndexManager")
     def n1ql_index_drop(self, ix, primary=False, ignore_missing=False):
         """
+        **DEPRECATED**
+        This is a deprecated API that will be removed in the next release. Use `couchbase.management.QueryIndexManager`
+
         Delete an index from the cluster.
 
         :param str ix: the name of the index
@@ -464,16 +502,24 @@ class BucketManager(object):
         kwargs['ignore_missing'] = ignore_missing
         return IxmgmtRequest(self._cb, 'drop', info, **kwargs).execute()
 
+    @deprecated(instead="couchbase.management.QueryIndexManager")
     def n1ql_index_drop_primary(self, **kwargs):
         """
+        **DEPRECATED**
+        This is a deprecated API that will be removed in the next release. Use `couchbase.management.QueryIndexManager`
+
         Remove the primary index
 
         Equivalent to ``n1ql_index_drop('', primary=True, **kwargs)``
         """
         return self.n1ql_index_drop('', primary=True, **kwargs)
 
+    @deprecated(instead="couchbase.management.QueryIndexManager")
     def n1ql_index_list(self, other_buckets=False):
         """
+        **DEPRECATED**
+        This is a deprecated API that will be removed in the next release. Use `couchbase.management.QueryIndexManager`
+
         List indexes in the cluster.
 
         :param bool other_buckets: Whether to also include indexes belonging
@@ -493,8 +539,12 @@ class BucketManager(object):
             info.keyspace = bucketname
             return IxmgmtRequest(bucket, 'build', info).execute()
 
+    @deprecated(instead="couchbase.management.QueryIndexManager")
     def n1ql_index_build_deferred(self, other_buckets=False):
         """
+        **DEPRECATED**
+        This is a deprecated API that will be removed in the next release. Use `couchbase.management.QueryIndexManager`
+
         Instruct the server to begin building any previously deferred index
         definitions.
 
@@ -524,9 +574,13 @@ class BucketManager(object):
         return self._n1ql_index_build_deferred(
             self._bucketname, self._cb, other_buckets)
 
+    @deprecated(instead="couchbase.management.QueryIndexManager")
     def n1ql_index_watch(self, indexes,
                          timeout=30, interval=0.2, watch_primary=False):
         """
+        **DEPRECATED**
+        This is a deprecated API that will be removed in the next release. Use `couchbase.management.QueryIndexManager`
+
         Await completion of index building
 
         This method will wait up to `timeout` seconds for every index in
