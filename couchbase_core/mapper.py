@@ -27,7 +27,7 @@ class Bijection(Generic[Src, Dest, SrcToDest, DestToSrc]):
 
         :param src_to_dest: callable to convert Src type to Dest
         :param dest_to_src: callable to convert Dest type to Src
-        :param parent: interanl use only - used to construct the inverse
+        :param parent: internal use only - used to construct the inverse
         """
         self._src_to_dest = src_to_dest
         if parent:

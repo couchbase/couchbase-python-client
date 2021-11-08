@@ -18,7 +18,7 @@ asynchronous nature. Where the synchronous API returns a
 an :class:`AsyncResult` which will have its callback invoked with a result.
 
 As such, we will omit the mentions of the normal key value operations, which
-function identially to their synchronous conterparts documented in the
+function identically to their synchronous conterparts documented in the
 :class:`~couchbase.cluster.Cluster` :class:`~couchbase.bucket.Bucket`,
 and :class:`~couchbase.collection.Collection` classes.
 

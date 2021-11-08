@@ -1043,7 +1043,7 @@ class Cluster(CoreClient):
 
         """
         # in this context, if we invoke the _cluster's destructor, that will do same for
-        # all the buckets we've opened, unless they are stored elswhere and are actively
+        # all the buckets we've opened, unless they are stored elsewhere and are actively
         # being used.
         self._cluster = None
         self.__admin = None

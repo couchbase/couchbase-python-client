@@ -209,7 +209,7 @@ class TxRawClientMixin(object):
           value may be `_dtor` which will register an event to fire when this
           object has been completely destroyed.
 
-        :param event: The defered to fire when the event succeeds or failes
+        :param event: The defered to fire when the event succeeds or fails
         :type event: :class:`Deferred`
 
         If this event has already fired, the deferred will be triggered

@@ -142,7 +142,7 @@ class Facet(object):
     @property
     def encodable(self):
         """
-        Returns a reprentation of the object suitable for serialization
+        Returns a representation of the object suitable for serialization
         """
         return self._json_
 

@@ -1208,7 +1208,7 @@ class ClusterTestCase(CouchbaseTestCase):
     def setUp(self, **kwargs):
         super(ClusterTestCase, self).setUp()
 
-        # if kwargs are passed in, reset conneciton w/ specied options
+        # if kwargs are passed in, reset connection w/ specied options
         if kwargs:
             if type(self)._cluster_resource:
                 type(self)._cluster_resource.disconnect_cluster()

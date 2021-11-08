@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-# This file constains private constants. This should be used internally
+# This file contains private constants. This should be used internally
 # and is to avoid version/compilation dependencies on newer LCBs
 
 CMDSUBDOC_F_UPSERT_DOC = 1 << 16

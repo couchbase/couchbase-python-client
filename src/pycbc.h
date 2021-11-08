@@ -355,7 +355,7 @@ enum {
     /** Schedule destruction of iops and lcb instance for later */
     PYCBC_CONN_F_ASYNC_DTOR = 1 << 5,
 
-    // Set after inital attempt to retrieve server version
+    // Set after initial attempt to retrieve server version
     PYCBC_GET_VERSION_ATTEMPT = 1 << 6
 };
 
