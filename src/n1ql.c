@@ -1,5 +1,4 @@
 #include "pycbc.h"
-#include <libcouchbase/ixmgmt.h>
 #include "oputil.h"
 #include "pycbc_http.h"
 

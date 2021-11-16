@@ -751,8 +751,6 @@ static PyMethodDef Bucket_TABLE_methods[] = {
         OPFUNC(_n1ql_query, "Internal routine for N1QL queries"),
         OPFUNC(_cbas_query, "Internal routine for analytics queries"),
         OPFUNC(_fts_query, "Internal routine for Fulltext queries"),
-        OPFUNC(_ixmanage, "Internal routine for managing indexes"),
-        OPFUNC(_ixwatch, "Internal routine for monitoring indexes"),
 
         OPFUNC(observe, "Get replication/persistence status for keys"),
         OPFUNC(observe_multi, "multi-key variant of observe"),

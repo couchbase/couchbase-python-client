@@ -16,7 +16,6 @@
     "src/htresult.c",
     "src/iops.c",
     "src/iops.h",
-    "src/ixmgmt.c",
     "src/miscops.c",
     "src/mresdict.h",
     "src/multiresult.c",
