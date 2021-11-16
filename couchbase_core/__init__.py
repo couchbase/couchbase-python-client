@@ -310,15 +310,6 @@ def mk_formstr(d):
     return '&'.join(l)
 
 
-def syncwait_or_deadline_time(syncwait, timeout):
-    deadline = (
-        datetime.now() +
-        timedelta(
-            microseconds=timeout)) if timeout else None
-    return lambda: syncwait if syncwait else (
-        deadline - datetime.now()).total_seconds()
-
-
 class OperationMode(object):
     def operate_on_doc(self,
                        item,  # type: object
