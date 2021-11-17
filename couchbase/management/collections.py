@@ -5,8 +5,11 @@ from .generic import GenericManager
 from couchbase_core import mk_formstr
 from couchbase_core.supportability import deprecated
 
-from couchbase.exceptions import ErrorMapper, NotSupportedWrapper, HTTPException, ScopeNotFoundException, \
-    ScopeAlreadyExistsException, CollectionNotFoundException, CollectionAlreadyExistsException
+from couchbase.exceptions import (ErrorMapper, NotSupportedWrapper,
+                                  HTTPException, ScopeNotFoundException,
+                                  ScopeAlreadyExistsException, CollectionNotFoundException,
+                                  CollectionAlreadyExistsException, QuotaLimitedException,
+                                  RateLimitedException)
 from datetime import timedelta
 
 
@@ -19,7 +22,9 @@ class CollectionsErrorHandler(ErrorMapper):
                                 '.*Collection with.*name.*not found': CollectionNotFoundException,
                                 '.*Collection with.*name.*already exists': CollectionAlreadyExistsException,
                                 '.*collection_not_found.*': CollectionNotFoundException,
-                                '.*scope_not_found.*': ScopeNotFoundException}}
+                                '.*scope_not_found.*': ScopeNotFoundException,
+                                '.*Maximum number of collections has been reached for scope.*': QuotaLimitedException,
+                                '.*Limit\(s\) exceeded\s+\[.*\].*': RateLimitedException}}
 
 
 class CollectionManager(GenericManager):

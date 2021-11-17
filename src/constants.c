@@ -78,7 +78,9 @@
     X(ERR_DATAVERSE_EXISTS)         \
     X(ERR_DATAVERSE_NOT_FOUND)      \
     X(ERR_DATASET_NOT_FOUND)        \
-    X(ERR_DATASET_EXISTS)
+    X(ERR_DATASET_EXISTS)           \
+    X(ERR_RATE_LIMITED)             \
+    X(ERR_QUOTA_LIMITED)
 
 #define XHTTP(X) \
     X(HTTP_METHOD_GET) \

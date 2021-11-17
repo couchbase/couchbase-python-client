@@ -1331,6 +1331,26 @@ class DurabilitySyncWriteAmbiguousException(CouchbaseDurabilityException):
     result - it may Succeed or Fail; but the final value is not yet known"""
 
 
+class RateLimitedException(CouchbaseException):
+    """
+    **UNCOMMITTED**
+    Rate limited exceptions are an uncommitted API that is unlikely to change, 
+    but may still change as final consensus on its behavior has not yet been reached.
+
+    The server decided that the caller must be rate limited due to
+    exceeding a rate threshold."""
+
+
+class QuotaLimitedException(CouchbaseException):
+    """
+    **UNCOMMITTED**
+    Quota limited exceptions are an uncommitted API that is unlikely to change, 
+    but may still change as final consensus on its behavior has not yet been reached.
+
+    The server decided that the caller must be limited due to exceeding
+    a quota threshold."""
+
+
 class DurabilityErrorCode(CompatibilityEnum):
     @classmethod
     def prefix(cls):
@@ -1398,6 +1418,8 @@ _LCB_ERRNO_MAP = dict(
             C.LCB_ERR_DATAVERSE_NOT_FOUND: DataverseNotFoundException,
             C.LCB_ERR_DATASET_NOT_FOUND: DatasetNotFoundException,
             C.LCB_ERR_DATASET_EXISTS: DatasetAlreadyExistsException,
+            C.LCB_ERR_RATE_LIMITED: RateLimitedException,
+            C.LCB_ERR_QUOTA_LIMITED: QuotaLimitedException
         }.items()
     )
     + list(_LCB_SYNCREP_MAP.items())

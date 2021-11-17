@@ -19,6 +19,7 @@ def async_test(func):
 
     return wrapper
 
+
 class AsyncioTestCase(CouchbaseTestCase):
     _cluster_info = None
     _use_scopes_and_collections = None
@@ -36,7 +37,7 @@ class AsyncioTestCase(CouchbaseTestCase):
         cls._cluster_info.cluster_resource.try_n_times(
             3, 3, cls._cluster_info.set_cluster, cluster_class, **kwargs)
         cls._cluster_info.cluster_resource.try_n_times(
-            3, 3, cls._cluster_info.set_bucket)
+            3, 3, cls._cluster_info.set_bucket, bucket_name=kwargs.get("bucket_name", None))
         cls._cluster_info.set_cluster_version()
         cls._cluster_info.set_collection(use_scopes_and_colls)
 

@@ -2,8 +2,9 @@ from ..options import OptionBlockTimeOut, forward_args
 from couchbase.management.admin import Admin, METHMAP
 from typing import *
 from .generic import GenericManager
-from couchbase.exceptions import ErrorMapper, HTTPException, NotSupportedException, \
-    InvalidArgumentException, SearchIndexNotFoundException
+from couchbase.exceptions import (ErrorMapper, HTTPException, NotSupportedException,
+                                  InvalidArgumentException, SearchIndexNotFoundException,
+                                  QuotaLimitedException)
 import couchbase_core._libcouchbase as LCB
 import json
 
@@ -13,7 +14,8 @@ class SearchIndexErrorHandler(ErrorMapper):
     def mapping():
         # type (...)->Mapping[str, CBErrorType]
         return {HTTPException: {'.*index not found': SearchIndexNotFoundException,
-                                'Page not found': NotSupportedException}}
+                                'Page not found': NotSupportedException,
+                                '.*err: num_fts_indexes \(active \+ pending\),.*>=\s+\d+': QuotaLimitedException}}
 
 
 @SearchIndexErrorHandler.wrap
