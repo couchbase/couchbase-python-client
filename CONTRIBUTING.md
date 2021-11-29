@@ -23,7 +23,7 @@ All you should need to set up your development environment should be:
 
     ~$ mkdir sdk
     ~$ cd sdk
-    ~/sdk$ repo init -u git://github.com/vmx/manifest.git -m sdks/python.xml
+    ~/sdk$ repo init -u https://github.com/vmx/manifest.git -m sdks/python.xml
     ~/sdk$ repo sync
     ~/sdk$ repo start my-branch-name --all
     ~/sdk$ cd python

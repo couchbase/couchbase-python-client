@@ -114,7 +114,7 @@ You can always get the latest supported release version from [pypi](https://pypi
 
 >**NOTE:** If you have a recent version of *pip*, you may use the latest development version by issuing the following incantation:
 >```console
->pip install git+git://github.com/couchbase/couchbase-python-client
+>pip install git+https://github.com/couchbase/couchbase-python-client.git
 >```
 
 >**NOTE:** Currently the Python Client source distribution requires the OpenSSL headers and libraries that the Python client itself was built against to be installed prior to the client itself for TLS support to be provided. Additionally the installer relies on PEP517 which older versions of PIP do not support. If you experience issues installing it is advised to upgrade your PIP/setuptools installation as follows:<br>
