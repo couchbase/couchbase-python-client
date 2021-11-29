@@ -169,6 +169,19 @@ class QueryTests(CollectionTestCase):
                                     QueryOptions(named_parameters={'brewery': 'xxffqqlx'}), brewery='21st_am%')
         self.assertRows(result, 1)
 
+    def test_query_raw_options(self):
+        # via raw, we should be able to pass any option
+        # if using named params, need to match full name param in query
+        # which is different for when we pass in name_parameters via their specific
+        # query option (i.e. include the $ when using raw)
+        result = self.cluster.query("SELECT * FROM `beer-sample` WHERE brewery_id LIKE $brewery LIMIT $1",
+                                    QueryOptions(raw={"$brewery": "21st_amendment%", "args": [2]}))
+        self.assertRows(result, 2)
+
+        result = self.cluster.query("SELECT * FROM `beer-sample` WHERE brewery_id LIKE $1 LIMIT 1",
+                                    QueryOptions(raw={"args": ['21st_amendment%']}))
+        self.assertRows(result, 1)
+
 
 class QueryStringTests(TestCase):
 

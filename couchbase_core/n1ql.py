@@ -128,6 +128,7 @@ class _N1QLQuery(object):
         self._cross_bucket = False
         self._span = None
         self._body = {'statement': query}
+        self._raw = None
         if args:
             self._add_pos_args(*args)
         if kwargs:
@@ -298,6 +299,10 @@ class _N1QLQuery(object):
         This is used internally by the client, and can be useful
         to debug queries.
         """
+        if self.raw:
+            for k, v in self.raw.items():
+                self.set_option(k, v)
+
         return json.dumps(self._body)
 
     @property
@@ -418,6 +423,25 @@ class _N1QLQuery(object):
         and/or scope.
         """
         self._body['query_context'] = value
+
+    @property
+    def raw(self):
+        """
+        Get the N1QL raw options.
+        """
+        return self._raw
+
+    @raw.setter
+    def raw(self, value):
+        """
+        Sets the N1QL raw options.
+        """
+        if not isinstance(value, dict):
+            raise TypeError("Raw option must be of type Dict[str, Any].")
+        for k, v in value.items():
+            if not isinstance(k, str):
+                raise TypeError("key for raw value must be str")
+        self._raw = value
 
     def __repr__(self):
         return ('<{cls} stmt={stmt} at {oid}>'.format(

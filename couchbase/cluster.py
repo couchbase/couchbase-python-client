@@ -161,7 +161,7 @@ class QueryOptions(QueryBaseOptions):
         "pipeline_cap": {"pipeline_cap": identity},
         "profile": {"profile": enum_value},
         "query_context": {"query_context": identity},
-        "raw": {},
+        "raw": {"raw": identity},
         "scan_wait": {},
         "scan_cap": {"scan_cap": identity},
         "metrics": {"metrics": identity},
