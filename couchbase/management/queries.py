@@ -258,7 +258,7 @@ class QueryIndexManager(GenericManager):
         kwargs['primary'] = True
         final_args = forward_args(kwargs, *options)
         index_name = final_args.pop("index_name", None)
-        self._create_index(bucket_name, [], index_name, *options, **final_args)
+        self._create_index(bucket_name, [], index_name, **final_args)
 
     def drop_index(self,            # type: "QueryIndexManager"
                    bucket_name,     # type: str

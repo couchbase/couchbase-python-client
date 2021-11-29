@@ -18,7 +18,8 @@ import time
 
 from nose.plugins.attrib import attr
 
-from couchbase.management.queries import CreateQueryIndexOptions, QueryIndexManager, WatchQueryIndexOptions
+from couchbase.management.queries import (CreateQueryIndexOptions, QueryIndexManager,
+                                          WatchQueryIndexOptions, CreatePrimaryQueryIndexOptions)
 from couchbase.exceptions import (CouchbaseException, QueryIndexNotFoundException,
                                   QueryIndexAlreadyExistsException, WatchQueryIndexTimeoutException)
 from couchbase_tests.base import SkipTest, CollectionTestCase
@@ -82,6 +83,15 @@ class IndexManagementTestCase(CollectionTestCase):
     def test_create_primary_ignore_if_exists(self):
         bucket_name = self.cluster_info.bucket_name
         self.mgr.create_primary_index(bucket_name)
+        self.mgr.create_primary_index(
+            bucket_name, CreatePrimaryQueryIndexOptions(ignore_if_exists=True))
+
+        self.assertRaises(QueryIndexAlreadyExistsException,
+                          self.mgr.create_primary_index, bucket_name)
+
+    def test_create_primary_ignore_if_exists_kwargs(self):
+        bucket_name = self.cluster_info.bucket_name
+        self.mgr.create_primary_index(bucket_name)
         self.mgr.create_primary_index(bucket_name, ignore_if_exists=True)
 
         self.assertRaises(QueryIndexAlreadyExistsException,
@@ -118,8 +128,8 @@ class IndexManagementTestCase(CollectionTestCase):
         self.mgr._admin_bucket.timeout = 10000
         self.mgr.create_index(bucket_name, ixname,
                               fields=fields, timeout=timedelta(days=1))
-        qq = 'select {1}, {2} from `{0}` where {1}=1 and {2}=2 limit 1'\
-            .format(bucket_name, *fields)
+        qq = "select {1}, {2} from `{0}` where {1}=1 and {2}=2 limit 1".format(
+            bucket_name, *fields)
         self.cluster.query(qq).rows()
 
     def test_create_secondary_indexes_condition(self):
@@ -149,8 +159,8 @@ class IndexManagementTestCase(CollectionTestCase):
         self.mgr.create_index(bucket_name, ixname,
                               fields=fields, timeout=timedelta(days=1))
 
-        qq = 'select {1}, {2} from `{0}` where {1}=1 and {2}=2 limit 1' \
-            .format(bucket_name, *fields)
+        qq = "select {1}, {2} from `{0}` where {1}=1 and {2}=2 limit 1".format(
+            bucket_name, *fields)
 
         # Drop the index
         self.mgr.drop_index(bucket_name, ixname)
