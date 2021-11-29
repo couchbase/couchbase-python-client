@@ -133,9 +133,7 @@ class Forwarder(with_metaclass(ABCMeta)):
         pass
 
 
-WORKAROUND_EXPIRY_CUTOFF_SECONDS = 50 * 365 * 24 * 60 * 60
-RELATIVE_EXPIRY_CUTOFF_SECONDS = 30 * 24 * 60 * 60
-DURATION_WARNING = "The specified expiry duration {seconds} is longer than 50 years. For bug-compatibility with previous versions of SDK 3.0.x, the number of seconds in the duration will be interpreted as the epoch second when the document should expire ({actual}). Passing an epoch second as a Duration is deprecated and will no longer work in SDK 3.1."
+THIRTY_DAYS_IN_SECONDS = 30 * 24 * 60 * 60
 
 
 def timedelta_as_timestamp(duration  # type: timedelta
@@ -145,21 +143,13 @@ def timedelta_as_timestamp(duration  # type: timedelta
         raise couchbase.exceptions.InvalidArgumentException(
             "Expected timedelta instead of {}".format(duration))
 
-    # PYCBC-948 apply heuristic:
-    # if (duration > 50 years) {
+    # PYCBC-1177 remove deprecated heuristic from PYCBC-948:
+    #   if (duration > 50 years):
     #     log.warn(“suspicious duration; don’t do this”)
     #     return duration in seconds;
-    # }
-    # if (duration < 30 days) return duration in seconds;
-    # return now in seconds + duration in seconds;
     #
     seconds = int(duration.total_seconds())
-    if seconds > WORKAROUND_EXPIRY_CUTOFF_SECONDS:
-        actual = time.ctime(seconds)
-        warnings.warn(DURATION_WARNING.format(seconds=seconds, actual=actual))
-        return seconds
-
-    if seconds < RELATIVE_EXPIRY_CUTOFF_SECONDS:
+    if seconds < THIRTY_DAYS_IN_SECONDS:
         return seconds
 
     return seconds + int(time.time())

@@ -612,71 +612,44 @@ class CollectionTests(CollectionTestCase):
                     )
 
     def test_document_expiry_values(self):
-        # per PYCBC-968
+        if self.is_mock:
+            raise SkipTest("Mock will not return the expiry in the xaddrs")
 
-        # WORKAROUND_EXPIRY_CUTOFF_SECONDS:
         fifty_years = 50 * 365 * 24 * 60 * 60
-        # RELATIVE_EXPIRY_CUTOFF_SECONDS:
         thirty_days = 30 * 24 * 60 * 60
-
         now = int(time.time() - 1.0)
         ttls = [
             fifty_years + 1,
             fifty_years,
             thirty_days - 1,
             thirty_days,
-
             now + 60,
             60,
+            -1
         ]
-        bad_ttls = [
-            -1,
-        ]
-        verify_expiry = True
-        if self.is_mock:
-            # other tests are skipped because "mock will not return the
-            # expiry in the xaddrs", but we can at least test errors and
-            # the warning added for PYCBC-968.
-            ttls = [fifty_years + 1, fifty_years]
-            verify_expiry = False
 
         options = GetOptions(with_expiry=True)
 
-        for cases in (ttls, bad_ttls):
+        for ttl in ttls:
             warns = []
-            for ttl in cases:
-                expiry = timedelta(seconds=ttl)
-                warnings.resetwarnings()
-                with warnings.catch_warnings(record=True) as ws:
-                    try:
-                        result = self.cb.upsert(self.NOKEY, {"x": "y"},
-                                                expiry=expiry)
-                        self.assertTrue(result.success)
-                        warns = ws
-                    except InvalidArgumentException:
-                        if ttl not in bad_ttls:
-                            raise
-                        continue
+            expiry = timedelta(seconds=ttl)
+            warnings.resetwarnings()
+            with warnings.catch_warnings(record=True) as ws:
                 try:
-                    result = self.cb.get(self.NOKEY, options)
-                except DocumentNotFoundException:
-                    result = DocumentNotFoundException
+                    result = self.cb.upsert(self.NOKEY, {"x": "y"},
+                                            expiry=expiry)
+                    self.assertTrue(result.success)
+                    warns = ws
+                except InvalidArgumentException:
+                    if ttl != -1:
+                        raise
+                    continue
+            result = self.try_n_times(10, 1, self.cb.get, self.NOKEY, options)
 
-                then = int(time.time() + 1.0)
-                if ttl > fifty_years:
-                    self.assertEqual(len(warns), 1)
-                    # ttl taken as expiry time
-                    if verify_expiry and ttl > now:
-                        self.assertTrue(
-                            int(result.expiryTime.timestamp()) == ttl)
-                    else:
-                        # doc expired immediately
-                        self.assertTrue(result is DocumentNotFoundException)
-                else:
-                    self.assertEqual(len(warns), 0)
-                    if verify_expiry:
-                        # ttl >= 30 days (and <= 50 yrs) changed to a timestamp
-                        # on the client; server interprets ttl < 30 as a true
-                        # duration. Either way expiryTime is a timestamp.
-                        self.assertTrue(
-                            now + ttl <= int(result.expiryTime.timestamp()) <= then + ttl)
+            then = int(time.time() + 1.0)
+            # PYCBC-1177: removed deprecated code, so no more warnings
+            self.assertEqual(len(warns), 0)
+            # server interprets ttl < 30 day sas duration, ttl >= 30 days
+            # client converts to timestamp. Either way expiryTime is a timestamp.
+            self.assertTrue(
+                now + ttl <= int(result.expiryTime.timestamp()) <= then + ttl)
