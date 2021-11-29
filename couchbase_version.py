@@ -49,7 +49,9 @@ class VersionInfo(object):
             self.ver_extra = re.sub(r'^dp', 'a', self.ver_extra, count=1)
             self.ver_extra = re.sub(r'^alpha', 'a', self.ver_extra, count=1)
             self.ver_extra = re.sub(r'^beta', 'b', self.ver_extra, count=1)
-            m = re.search(r'^([ab])(\d+)?', self.ver_extra)
+            m = re.search(r'^([ab]|dev|rc|post)(\d+)?', self.ver_extra)
+            if m.group(1) in ["dev", "post"]:
+                self.ver_extra = "." + self.ver_extra
             if m.group(2) is None:
                 # No suffix, then add the number
                 first = self.ver_extra[0]
