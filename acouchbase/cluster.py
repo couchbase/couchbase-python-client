@@ -9,7 +9,7 @@ from couchbase_core.client import Client as CoreClient
 from couchbase.cluster import AsyncCluster as V3AsyncCluster
 from couchbase.bucket import AsyncBucket as V3AsyncBucket
 from couchbase.management.admin import Admin as AsyncAdminBucket
-from couchbase.collection import CBCollection
+from couchbase.collection import CBCollection, BinaryCollection as CBBinaryCollection
 from acouchbase.asyncio_iops import IOPS
 from acouchbase.iterator import (
     AQueryResult,
@@ -141,8 +141,51 @@ class AsyncCBCollection(AIOCollectionMixin, CBCollection):
     def __init__(self, *args, **kwargs):
         super(AsyncCBCollection, self).__init__(*args, **kwargs)
 
+    def binary(self):
+        # type: (...) -> AsyncBinaryCollection
+        return AsyncBinaryCollection(self)
+
 
 Collection = AsyncCBCollection
+
+
+class AIOBinaryCollectionMixin(object):
+    def __new__(cls, *args, **kwargs):
+        # type: (...) -> Type[T]
+        if not hasattr(cls, "AIO_wrapped"):
+            for method_name in cls._MEMCACHED_OPERATIONS:
+                setattr(cls, method_name, AIOBinaryCollectionMixin._meth_factory(
+                    getattr(cls, method_name), method_name))
+            cls.AIO_wrapped = True
+        return super(AIOBinaryCollectionMixin, cls).__new__(cls)
+
+    @staticmethod
+    def _meth_factory(meth, _):
+        def ret(self, *args, **kwargs):
+            rv = meth(self, *args, **kwargs)
+            ft = asyncio.Future()
+
+            def on_ok(res):
+                ft.set_result(res)
+                rv.clear_callbacks()
+
+            def on_err(_, excls, excval, __):
+                err = excls(excval)
+                ft.set_exception(err)
+                rv.clear_callbacks()
+
+            rv.set_callbacks(on_ok, on_err)
+            return ft
+
+        return ret
+
+    def __init__(self, *args, **kwargs):
+        super(AIOBinaryCollectionMixin, self).__init__(*args, **kwargs)
+
+
+class AsyncBinaryCollection(AIOBinaryCollectionMixin, CBBinaryCollection):
+    def __init__(self, *args, **kwargs):
+        super(AsyncBinaryCollection, self).__init__(*args, **kwargs)
 
 
 class ABucket(AIOClientMixin, V3AsyncBucket):
