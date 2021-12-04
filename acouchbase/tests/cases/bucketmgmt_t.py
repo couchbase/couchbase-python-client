@@ -7,7 +7,8 @@ from acouchbase.cluster import (Cluster, get_event_loop,
 from couchbase_tests.async_base import AsyncioTestCase, async_test
 from couchbase.exceptions import (BucketDoesNotExistException, BucketAlreadyExistsException,
                                   BucketNotFlushableException)
-from couchbase.management.buckets import CreateBucketSettings, BucketSettings, BucketType
+from couchbase.management.buckets import (CreateBucketSettings, BucketSettings,
+                                          BucketType, StorageBackend)
 from couchbase_core.durability import Durability
 
 
@@ -200,3 +201,53 @@ class AcouchbaseBucketManagerTests(AsyncioTestCase):
         # verify appropriate Exception when flush attempted
         with self.assertRaises(BucketNotFlushableException):
             await self.bm.flush_bucket("fred")
+
+    @async_test
+    async def test_bucket_backend_default(self):
+        version = self.cluster.get_server_version()
+        if version.short_version < 7.1:
+            raise SkipTest(
+                "Bucket storage backend testing only available on server versions >= 7.1")
+
+        # Create the bucket
+        await self.bm.create_bucket(
+            CreateBucketSettings(
+                name='fred',
+                ram_quota_mb=100,
+                flush_enabled=False))
+        bucket = await self.try_n_times_async(10, 3, self.bm.get_bucket, 'fred')
+        self.assertEqual(bucket.storage_backend, StorageBackend.COUCHSTORE)
+
+    @async_test
+    async def test_bucket_backend_magma(self):
+        version = self.cluster.get_server_version()
+        if version.short_version < 7.1:
+            raise SkipTest(
+                "Bucket storage backend testing only available on server versions >= 7.1")
+
+        # Create the bucket
+        await self.bm.create_bucket(
+            CreateBucketSettings(
+                name='fred',
+                ram_quota_mb=256,
+                flush_enabled=False,
+                storage_backend=StorageBackend.MAGMA))
+        bucket = await self.try_n_times_async(10, 3, self.bm.get_bucket, 'fred')
+        self.assertEqual(bucket.storage_backend, StorageBackend.MAGMA)
+
+    @async_test
+    async def test_bucket_backend_ephemeral(self):
+        version = self.cluster.get_server_version()
+        if version.short_version < 7.1:
+            raise SkipTest(
+                "Bucket storage backend testing only available on server versions >= 7.1")
+
+        # Create the bucket
+        await self.bm.create_bucket(
+            CreateBucketSettings(
+                name='fred',
+                ram_quota_mb=100,
+                bucket_type=BucketType.EPHEMERAL,
+                flush_enabled=False))
+        bucket = await self.try_n_times_async(10, 3, self.bm.get_bucket, 'fred')
+        self.assertEqual(bucket.storage_backend, StorageBackend.UNDEFINED)

@@ -4,14 +4,20 @@ from unittest import SkipTest
 
 from flaky import flaky
 
-from couchbase.exceptions import BucketDoesNotExistException, BucketAlreadyExistsException, BucketNotFlushableException
-from couchbase.management.buckets import CreateBucketSettings, BucketSettings, BucketType
+from couchbase.exceptions import (BucketDoesNotExistException,
+                                  BucketAlreadyExistsException,
+                                  BucketNotFlushableException)
+from couchbase.management.buckets import (CreateBucketSettings, BucketSettings,
+                                          BucketType, StorageBackend)
 from couchbase_tests.base import CollectionTestCase
 from couchbase_core.durability import Durability
 
 
 @flaky(10, 1)
 class BucketManagementTests(CollectionTestCase):
+
+    BUCKETS_TO_ADD = {'fred': {}, 'jane': {}, 'sally': {}}
+
     def setUp(self, *args, **kwargs):
         super(BucketManagementTests, self).setUp(*args, **kwargs)
         self.bm = self.cluster.buckets()
@@ -19,13 +25,12 @@ class BucketManagementTests(CollectionTestCase):
             raise SkipTest('Real server must be used for admin tests')
 
         self.purge_buckets()
-    buckets_to_add = {'fred': {}, 'jane': {}, 'sally': {}}
 
     def tearDown(self):
         self.purge_buckets()
 
     def purge_buckets(self):
-        for bucket, kwargs in BucketManagementTests.buckets_to_add.items():
+        for bucket, kwargs in BucketManagementTests.BUCKETS_TO_ADD.items():
             try:
                 self.bm.drop_bucket(bucket)
             except BucketDoesNotExistException:
@@ -103,7 +108,7 @@ class BucketManagementTests(CollectionTestCase):
             'fred')
 
     def test_bucket_list(self):
-        for bucket, kwargs in BucketManagementTests.buckets_to_add.items():
+        for bucket, kwargs in BucketManagementTests.BUCKETS_TO_ADD.items():
             self.bm.create_bucket(
                 CreateBucketSettings(
                     name=bucket,
@@ -174,3 +179,50 @@ class BucketManagementTests(CollectionTestCase):
             BucketNotFlushableException,
             self.bm.flush_bucket,
             'fred')
+
+    def test_bucket_backend_default(self):
+        version = self.cluster.get_server_version()
+        if version.short_version < 7.1:
+            raise SkipTest(
+                "Bucket storage backend testing only available on server versions >= 7.1")
+
+        # Create the bucket
+        self.bm.create_bucket(
+            CreateBucketSettings(
+                name='fred',
+                ram_quota_mb=100,
+                flush_enabled=False))
+        bucket = self.try_n_times(10, 3, self.bm.get_bucket, 'fred')
+        self.assertEqual(bucket.storage_backend, StorageBackend.COUCHSTORE)
+
+    def test_bucket_backend_magma(self):
+        version = self.cluster.get_server_version()
+        if version.short_version < 7.1:
+            raise SkipTest(
+                "Bucket storage backend testing only available on server versions >= 7.1")
+
+        # Create the bucket
+        self.bm.create_bucket(
+            CreateBucketSettings(
+                name='fred',
+                ram_quota_mb=256,
+                flush_enabled=False,
+                storage_backend=StorageBackend.MAGMA))
+        bucket = self.try_n_times(10, 3, self.bm.get_bucket, 'fred')
+        self.assertEqual(bucket.storage_backend, StorageBackend.MAGMA)
+
+    def test_bucket_backend_ephemeral(self):
+        version = self.cluster.get_server_version()
+        if version.short_version < 7.1:
+            raise SkipTest(
+                "Bucket storage backend testing only available on server versions >= 7.1")
+
+        # Create the bucket
+        self.bm.create_bucket(
+            CreateBucketSettings(
+                name='fred',
+                ram_quota_mb=100,
+                bucket_type=BucketType.EPHEMERAL,
+                flush_enabled=False))
+        bucket = self.try_n_times(10, 3, self.bm.get_bucket, 'fred')
+        self.assertEqual(bucket.storage_backend, StorageBackend.UNDEFINED)

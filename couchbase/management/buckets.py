@@ -1,14 +1,14 @@
 from couchbase.management.admin import Admin
-from couchbase_core.mapper import BijectiveMapping, \
-    StringEnum, Identity, Timedelta, Bijection, StringEnumLoose
+from couchbase_core.mapper import (BijectiveMapping, StringEnum, Identity,
+                                   Timedelta, Bijection, StringEnumLoose)
 from ..options import OptionBlockTimeOut, forward_args
 from couchbase.management.generic import GenericManager
 from typing import *
 from couchbase_core import abstractmethod, mk_formstr
 from couchbase_core.durability import Durability
-from couchbase.exceptions import HTTPException, ErrorMapper, \
-    BucketAlreadyExistsException, BucketDoesNotExistException, \
-    BucketNotFlushableException
+from couchbase.exceptions import (HTTPException, ErrorMapper,
+                                  BucketAlreadyExistsException, BucketDoesNotExistException,
+                                  BucketNotFlushableException)
 import enum
 import datetime
 
@@ -221,6 +221,19 @@ class ConflictResolutionType(enum.Enum):
     SEQUENCE_NUMBER = "seqno"
 
 
+class StorageBackend(enum.Enum):
+    """
+    **UNCOMMITTED**
+    StorageBackend is part of an uncommitted API that is unlikely to change, 
+    but may still change as final consensus on its behavior has not yet been reached.
+
+    Specifies the storage type to use for the bucket.
+    """
+    UNDEFINED = "undefined"
+    COUCHSTORE = "couchstore"
+    MAGMA = "magma"
+
+
 class BucketSettings(dict):
     mapping = BijectiveMapping({'flushEnabled': {'flush_enabled': Bijection(int.__bool__, bool.__int__)},
                                 'numReplicas': {'num_replicas': Identity(int)},
@@ -235,7 +248,8 @@ class BucketSettings(dict):
                                 'evictionPolicy': {'eviction_policy': -StringEnumLoose(EvictionPolicyType)},
                                 'ejectionMethod': {'ejection_method': -StringEnumLoose(EjectionMethod)},
                                 'name': {'name': Identity(str)},
-                                'durabilityMinLevel': {'minimum_durability_level': Identity(str)}})
+                                'durabilityMinLevel': {'minimum_durability_level': Identity(str)},
+                                'storageBackend': {'storage_backend': -StringEnum(StorageBackend)}})
 
     @overload
     def __init__(self,
@@ -247,7 +261,8 @@ class BucketSettings(dict):
                  bucket_type=None,  # type: BucketType
                  eviction_policy=None,  # type: EvictionPolicyType
                  max_ttl=None,  # type: Union[datetime.timedelta,float,int]
-                 compression_mode=None  # type: CompressionMode
+                 compression_mode=None,  # type: CompressionMode
+                 storage_backend=None,  # type: StorageBackend
                  ):
         # type: (...) -> None
         pass
@@ -271,6 +286,9 @@ class BucketSettings(dict):
             else:
                 kwargs['minimum_durability_level'] = Durability.from_server_str(
                     durability)
+
+        if not kwargs.get("storage_backend", None):
+            kwargs["storage_backend"] = StorageBackend.COUCHSTORE
 
         super(BucketSettings, self).__init__(
             **self.mapping.sanitize_src(kwargs))
@@ -357,6 +375,17 @@ class BucketSettings(dict):
         """{off | passive | active} - The compression mode to use."""
         return self.get('compression_mode')
 
+    @property
+    def storage_backend(self):
+        # type: (...) -> StorageBackend
+        """
+        **UNCOMMITTED**
+        StorageBackend is part of an uncommitted API that is unlikely to change, 
+        but may still change as final consensus on its behavior has not yet been reached.
+        {couchstore | magma | undefined} - The storage backend to use.
+        """
+        return self.get('storage_backend')
+
 
 class CreateBucketSettings(BucketSettings):
     @overload
@@ -372,7 +401,8 @@ class CreateBucketSettings(BucketSettings):
                  compression_mode=None,  # type: CompressionMode
                  conflict_resolution_type=None,  # type: ConflictResolutionType
                  bucket_password=None,  # type: str
-                 ejection_method=None  # type: EjectionMethod
+                 ejection_method=None,  # type: EjectionMethod
+                 storage_backend=None  # type: StorageBackend
                  ):
         """
         Bucket creation settings.
@@ -387,6 +417,7 @@ class CreateBucketSettings(BucketSettings):
         :param max_ttl: max time to live for bucket
         :param compression_mode: compression mode
         :param ejection_method: ejection method (deprecated, please use eviction_policy instead)
+        :param storage_backend: **UNCOMMITTED** specifies the storage type to use for the bucket
         """
 
     def __init__(self, **kwargs):
