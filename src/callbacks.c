@@ -139,6 +139,14 @@ static void operation_completed3(pycbc_Bucket *self,
     pycbc_assert(self->nremaining);
     --self->nremaining;
     if (mres) {
+        /**
+         * If reusing the multi-result, decrement the error info
+         * prior to resetting to a new value, otherwise the 
+         * previous error info dict will leak.
+         */
+        if(mres->err_info != NULL){
+            Py_XDECREF(mres->err_info);
+        }
         mres->err_info = err_info;
         Py_XINCREF(err_info);
     }
