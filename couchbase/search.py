@@ -32,6 +32,19 @@ class SearchScanConsistency(Enum):
     AT_PLUS = "at_plus"
 
 
+class MatchOperator(Enum):
+    """
+    **UNCOMMITTED** This API may change in the future. 
+    Specifies how the individual match terms should be logically concatenated.
+
+    Members:
+    OR (default): Specifies that individual match terms are concatenated with a logical OR.
+    AND: Specifies that individual match terms are concatenated with a logical AND.
+    """
+    OR = "or"
+    AND = "and"
+
+
 def _genprop(converter, *apipaths, **kwargs):
     """
     This internal helper method returns a property (similar to the
@@ -108,6 +121,17 @@ def _consistency(value):
     if isinstance(value, SearchScanConsistency):
         value = value.value
     if value and value.lower() not in ('', 'at_plus'):
+        raise ValueError('Invalid value!')
+    return value
+
+
+def _match_operator(value):
+    """
+    Validator for 'match_operator' parameter
+    """
+    if isinstance(value, MatchOperator):
+        value = value.value
+    if value and value.lower() not in ('or', 'and'):
         raise ValueError('Invalid value!')
     return value
 
@@ -487,6 +511,9 @@ class _Params(object):
         """
     )
 
+    include_locations = _genprop(
+        bool, 'includeLocations', doc='Whether to return the SearchRowlocations of the search')
+
     def consistent_with(self, ms):
         """
         Ensure that this query is consistent with the given mutations. When
@@ -692,6 +719,8 @@ class MatchQuery(_SingleQuery):
         'match', doc="""
         String to search for
         """)
+    match_operator = _genprop(
+        _match_operator, 'operator', doc='**UNCOMMITTED** This API may change in the future. Specifies how the individual match terms should be logically concatenated.')
 
 
 @_with_fields('fuzziness', 'prefix_length', 'field')
@@ -1594,6 +1623,7 @@ class SearchOptions(OptionBlockTimeOut):
                  sort=None,              # type: Union[List[str],List[Sort]]
                  disable_scoring=None,   # type: bool
                  collections=None,       # type: List[str]
+                 include_locations=None,  # type: bool
                  span=None               # type: CouchbaseSpan
                  ):
         pass
@@ -1634,6 +1664,8 @@ class SearchOptions(OptionBlockTimeOut):
             Disable scoring of the search results.
         :param Iterable[str] collections:
             List of collections to limit query results.
+        :param bool include_locations:
+            **UNCOMITTED** If set to true, will include the SearchRowLocations.
         :param CouchbaseSpan span:
             Parent span for the search query.
         """

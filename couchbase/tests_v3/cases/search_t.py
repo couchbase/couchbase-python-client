@@ -20,7 +20,7 @@ from unittest import SkipTest
 
 import couchbase.search as search
 from couchbase.management.search import SearchIndex
-from couchbase.search import SearchResult, SearchOptions, SearchScanConsistency, SortScore
+from couchbase.search import MatchOperator, SearchResult, SearchOptions
 from couchbase.mutation_state import MutationState
 from couchbase_tests.base import CouchbaseTestCase, CollectionTestCase
 from couchbase.exceptions import NotSupportedException
@@ -706,6 +706,84 @@ class SearchTest(ClusterTestCase):
                                                                           search.SearchOptions(limit=10))  # type: SearchResult
         SearchResultTest._check_search_result(self, initial, 1, x)
 
+    def test_search_no_include_locations(self  # type: SearchTest
+                                         ):
+        if self.is_mock:
+            raise SkipTest("F.T.S. not supported by mock")
+
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(limit=10))  # type: SearchResult
+
+        rows = x.rows()
+        locations = rows[0].locations
+        all_locations = locations.get_all()
+        self.assertEqual(0, len(all_locations))
+        self.assertIsInstance(locations, search.SearchRowLocations)
+
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(include_locations=False, limit=10))  # type: SearchResult
+
+        rows = x.rows()
+        locations = rows[0].locations
+        all_locations = locations.get_all()
+        self.assertEqual(0, len(all_locations))
+        self.assertIsInstance(locations, search.SearchRowLocations)
+
+    def test_search_include_locations(self  # type: SearchTest
+                                      ):
+        if self.is_mock:
+            raise SkipTest("F.T.S. not supported by mock")
+
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.TermQuery(
+                                                                              "north"),
+                                                                          search.SearchOptions(include_locations=True, limit=10))  # type: SearchResult
+
+        rows = x.rows()
+        locations = rows[0].locations
+        all_locations = locations.get_all()
+        self.assertNotEqual(0, len(all_locations))
+        res = list(map(lambda l: isinstance(
+            l, search.SearchRowLocation), all_locations))
+        self.assertTrue(all(res))
+        self.assertIsInstance(locations, search.SearchRowLocations)
+
+    def test_search_match_operator(self  # type: SearchTest
+                                   ):
+        if self.is_mock:
+            raise SkipTest("F.T.S. not supported by mock")
+
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.MatchQuery(
+                                                                              "north south", match_operator=MatchOperator.OR),
+                                                                          search.SearchOptions(limit=10))  # type: SearchResult
+
+        rows = x.rows()
+        self.assertNotEqual(0, len(rows))
+
+        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.MatchQuery(
+                                                                              "north south", match_operator=MatchOperator.AND),
+                                                                          search.SearchOptions(limit=10))  # type: SearchResult
+
+        rows = x.rows()
+        self.assertNotEqual(0, len(rows))
+
+    def test_search_match_operator_fail(self  # type: SearchTest
+                                        ):
+        if self.is_mock:
+            raise SkipTest("F.T.S. not supported by mock")
+
+        with self.assertRaises(ValueError):
+            self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                          search.MatchQuery(
+                                                                              "north south", match_operator="NOT"),
+                                                                          search.SearchOptions(limit=10))  # type: SearchResult
+
 
 class SearchStringsTest(CouchbaseTestCase):
     def test_fuzzy(self):
@@ -752,14 +830,22 @@ class SearchStringsTest(CouchbaseTestCase):
                 'boost': 1.5,
                 'field': 'field',
                 'fuzziness': 1234,
-                'prefix_length': 4
+                'prefix_length': 4,
+                'operator': 'or'
             },
             'size': 10,
             'indexName': 'ix'
         }
 
         q = search.MatchQuery('salty beers', boost=1.5, analyzer='analyzer',
-                              field='field', fuzziness=1234, prefix_length=4)
+                              field='field', fuzziness=1234, prefix_length=4, match_operator=MatchOperator.OR)
+        p = search.SearchOptions(limit=10)
+        self.assertEqual(exp_json, p._gen_search_params('ix', q).body)
+
+        exp_json["query"]["operator"] = "and"
+
+        q = search.MatchQuery('salty beers', boost=1.5, analyzer='analyzer',
+                              field='field', fuzziness=1234, prefix_length=4, match_operator=MatchOperator.AND)
         p = search.SearchOptions(limit=10)
         self.assertEqual(exp_json, p._gen_search_params('ix', q).body)
 
@@ -807,6 +893,9 @@ class SearchStringsTest(CouchbaseTestCase):
         self.assertEqual({'sort': ['f1', 'f2', '-_score']},
                          SearchOptions(sort=[
                              'f1', 'f2', '-_score']).as_encodable('ix'))
+
+        self.assertEqual({'includeLocations': True},
+                         SearchOptions(include_locations=True).as_encodable('ix'))
 
         p = SearchOptions(facets={
             'term': search.TermFacet('somefield', limit=10),
