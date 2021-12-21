@@ -217,8 +217,19 @@ class CompressionMode(enum.Enum):
 
 
 class ConflictResolutionType(enum.Enum):
+    """
+    Specifies the conflict resolution type to use for the bucket.
+
+    Members:
+    TIMESTAMP: specifies to use timestamp conflict resolution
+    SEQUENCE_NUMBER: specifies to use sequence number conflict resolution
+    CUSTOM: **VOLATILE** This API is subject to change at any time. In Couchbase Server 7.1, 
+    this feature is only available in "developer-preview" mode. See the UI XDCR settings.
+
+    """
     TIMESTAMP = "lww"
     SEQUENCE_NUMBER = "seqno"
+    CUSTOM = "custom"
 
 
 class StorageBackend(enum.Enum):
