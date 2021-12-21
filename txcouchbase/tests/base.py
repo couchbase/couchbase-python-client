@@ -224,7 +224,7 @@ def skip_PYCBC_894_new(func):
         except TimeoutError:
             raise SkipTest(
                 "Fails on this OS - to be fixed: https://issues.couchbase.com/browse/PYCBC-894")
-    if (re.compile(r'.*(ubuntu).*').match(os_name) or os_name ==
+    if (re.compile(r'.*(ubuntu|alpine).*').match(os_name) or os_name ==
             '') and not os.environ.get("PYCBC_894", None):
         return wrapped_func
     return func
