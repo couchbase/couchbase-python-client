@@ -497,21 +497,6 @@ create_timer(lcb_io_opt_t io)
     return create_event_python(io, PYCBC_EVTYPE_TIMER);
 }
 
-static void
-destroy_event_common(lcb_io_opt_t io, void *arg)
-{
-    pycbc_Event *ev = arg;
-    lcb_U32 dummy = 0;
-    pycbc_assert(ev->state != PYCBC_EVSTATE_ACTIVE);
-    PYCBC_DEBUG_LOG("Calling destroy event for %p", arg)
-    modify_event_python(PYCBC_IOW_FROM_IOPS(io), ev, PYCBC_EVACTION_CLEANUP,
-                        0, &dummy);
-    PYCBC_DEBUG_LOG("Called destroy event for %p", arg)
-
-    ev->state = PYCBC_EVSTATE_FREED;
-    Py_DECREF(ev);
-}
-
 static int
 update_event(lcb_io_opt_t io, lcb_socket_t sock, void *event, short flags,
              void *data, pycbc_lcb_cb_t handler)
@@ -557,6 +542,30 @@ delete_timer(lcb_io_opt_t io, void *timer)
     pycbc_IOPSWrapper *pio = PYCBC_IOW_FROM_IOPS(io);
     modify_event_python(pio, (pycbc_Event*)timer, PYCBC_EVACTION_UNWATCH, -1,
                         &dummy);
+}
+
+static void
+destroy_event_common(lcb_io_opt_t io, void *arg)
+{
+    pycbc_Event *ev = arg;
+    lcb_U32 dummy = 0;
+    if(ev->state == PYCBC_EVSTATE_ACTIVE) {
+        if(ev->type == PYCBC_EVTYPE_IO) {
+            PYCBC_DEBUG_LOG("Event state still active, calling delete event, event.id: %" PRIuPTR "", (uintptr_t)arg)
+            delete_event(io, (lcb_socket_t)((pycbc_IOEvent*)arg)->fd, arg);
+        } else {
+            PYCBC_DEBUG_LOG("Timer state still active, calling delete timer, timer.id: %" PRIuPTR "", (uintptr_t)arg)
+            delete_timer(io, arg);
+        }
+    }
+    pycbc_assert(ev->state != PYCBC_EVSTATE_ACTIVE);
+    PYCBC_DEBUG_LOG("Calling destroy event for %p", arg)
+    modify_event_python(PYCBC_IOW_FROM_IOPS(io), ev, PYCBC_EVACTION_CLEANUP,
+                        0, &dummy);
+    PYCBC_DEBUG_LOG("Called destroy event for %p", arg)
+
+    ev->state = PYCBC_EVSTATE_FREED;
+    Py_DECREF(ev);
 }
 
 static int
