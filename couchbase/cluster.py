@@ -167,6 +167,7 @@ class QueryOptions(QueryBaseOptions):
         "metrics": {"metrics": identity},
         "flex_index": {"flex_index": int},
         "span": {"span": identity},
+        "preserve_expiry": {"preserve_expiry": identity}
     }
 
     TARGET_CLASS = _N1QLQuery
@@ -193,6 +194,7 @@ class QueryOptions(QueryBaseOptions):
         metrics=False,  # type: bool
         flex_index=False,  # type: bool
         span=None,  # type: Span
+        preserve_expiry=None  # type: bool
     ):
         pass
 
@@ -242,6 +244,11 @@ class QueryOptions(QueryBaseOptions):
             Specifies whether this query may make use of Search indexes
         :param CouchbaseSpan span
             Specifies the parent span for this query
+        :param bool preserve_expiry
+            **UNCOMMITTED**
+            preserve_expiry is an uncommitted API that is unlikely to change,
+            but may still change as final consensus on its behavior has not yet been reached.
+            Specifies whether this query will preserve expiry on mutation
         """
         super(QueryOptions, self).__init__(**kwargs)
 

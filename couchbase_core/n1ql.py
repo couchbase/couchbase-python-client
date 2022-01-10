@@ -443,6 +443,18 @@ class _N1QLQuery(object):
                 raise TypeError("key for raw value must be str")
         self._raw = value
 
+    @property
+    def preserve_expiry(self):
+        """
+        Controls whether a query will preserve expiry on mutation.
+        """
+        value = self._body.get('preserve_expiry', False)
+        return value
+
+    @readonly.setter
+    def preserve_expiry(self, value):
+        self._body['preserve_expiry'] = value
+
     def __repr__(self):
         return ('<{cls} stmt={stmt} at {oid}>'.format(
             cls=self.__class__.__name__,

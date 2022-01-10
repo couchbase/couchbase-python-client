@@ -182,6 +182,16 @@ class QueryTests(CollectionTestCase):
                                     QueryOptions(raw={"args": ['21st_amendment%']}))
         self.assertRows(result, 1)
 
+    def test_preserve_expiry(self):
+        version = self.cluster.get_server_version()
+        if version.short_version < 7.1:
+            raise SkipTest("QueryOptions.preserve expiry only available on server versions >= {}".format(
+                self.MIN_VERSION))
+
+        # only testing that the query doesn't fail
+        self.cluster.query("UPDATE `beer-sample` AS b USE KEYS '{}' SET b.country = 'USA'".format("21st_amendment_brewery_cafe"),
+                           QueryOptions(preserve_expiry=True)).execute()
+
 
 class QueryStringTests(TestCase):
 
@@ -232,6 +242,18 @@ class QueryStringTests(TestCase):
         ms._add_scanvec((666, 5551212, 99, 'other'))
         dval = json.loads(q.encoded)
         self.assertEqual(sv_exp, dval['scan_vectors'])
+
+    def test_preserve_expiry(self):
+        qstr = 'SELECT * FROM default'
+        qopts = QueryOptions(preserve_expiry=True)
+        q = qopts.to_query_object(qstr)
+        dval = json.loads(q.encoded)
+        self.assertEqual(True, dval.get('preserve_expiry', None))
+
+        qopts = QueryOptions()
+        q = qopts.to_query_object(qstr)
+        dval = json.loads(q.encoded)
+        self.assertIsNone(dval.get("preserve_expiry", None))
 
 
 class QueryLeakTest(CollectionTestCase):
