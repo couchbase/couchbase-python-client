@@ -15,7 +15,7 @@ class SearchIndexErrorHandler(ErrorMapper):
         # type (...)->Mapping[str, CBErrorType]
         return {HTTPException: {'.*index not found': SearchIndexNotFoundException,
                                 'Page not found': NotSupportedException,
-                                '.*err: num_fts_indexes \(active \+ pending\),.*>=\s+\d+': QuotaLimitedException}}
+                                '.*[Cc]reate[Ii]ndex, [Pp]repare failed, err: [Ee]xceeds indexes limit': QuotaLimitedException}}
 
 
 @SearchIndexErrorHandler.wrap
