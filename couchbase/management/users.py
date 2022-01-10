@@ -4,7 +4,8 @@ from couchbase.options import OptionBlock, OptionBlockTimeOut, timedelta, forwar
 from couchbase.management.generic import GenericManager
 from couchbase.auth import AuthDomain
 from typing import *
-from couchbase.exceptions import HTTPException, ErrorMapper, InvalidArgumentException, FeatureNotFoundException
+from couchbase.exceptions import (HTTPException, ErrorMapper, InvalidArgumentException,
+                                  FeatureNotFoundException, RateLimitedException)
 from copy import deepcopy
 
 
@@ -23,7 +24,8 @@ class UserErrorHandler(ErrorMapper):
         return {HTTPException: {'Unknown group': GroupNotFoundException,
                                 'Unknown user': UserNotFoundException,
                                 'Not found': FeatureNotFoundException,
-                                'Method Not Allowed': FeatureNotFoundException},
+                                'Method Not Allowed': FeatureNotFoundException,
+                                '.*Limit\(s\) exceeded\s+\[.*\].*': RateLimitedException}
                 }
 
 

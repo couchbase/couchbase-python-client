@@ -8,7 +8,7 @@ from couchbase_core import abstractmethod, mk_formstr
 from couchbase_core.durability import Durability
 from couchbase.exceptions import (HTTPException, ErrorMapper,
                                   BucketAlreadyExistsException, BucketDoesNotExistException,
-                                  BucketNotFlushableException)
+                                  BucketNotFlushableException, RateLimitedException)
 import enum
 import datetime
 
@@ -19,7 +19,8 @@ class BucketManagerErrorHandler(ErrorMapper):
         # type (...)->Mapping[str, CBErrorType]
         return {HTTPException: {'Bucket with given name (already|still) exists': BucketAlreadyExistsException,
                                 'Requested resource not found': BucketDoesNotExistException,
-                                'Flush is disabled for the bucket': BucketNotFlushableException}}
+                                'Flush is disabled for the bucket': BucketNotFlushableException,
+                                '.*Limit\(s\) exceeded\s+\[.*\].*': RateLimitedException}}
 
 
 @BucketManagerErrorHandler.wrap

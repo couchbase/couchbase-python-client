@@ -20,7 +20,7 @@ import json
 
 from couchbase.options import forward_args
 from couchbase_core.client import Client
-from couchbase.exceptions import HTTPException, ErrorMapper
+from couchbase.exceptions import HTTPException, ErrorMapper, RateLimitedException
 from couchbase.options import OptionBlockTimeOut
 import couchbase_core._libcouchbase as _LCB
 
@@ -48,7 +48,8 @@ class ViewErrorHandler(ErrorMapper):
     @staticmethod
     def mapping():
         # type (...) -> Mapping[CBErrorType, Mapping[Any,CBErrorType]]
-        return {HTTPException: {'not_found': DesignDocumentNotFoundException}}
+        return {HTTPException: {'not_found': DesignDocumentNotFoundException,
+                                '.*Limit\(s\) exceeded\s+\[.*\].*': RateLimitedException}}
 
 
 class GetDesignDocumentOptions(OptionBlockTimeOut):

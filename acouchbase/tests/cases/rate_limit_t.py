@@ -16,9 +16,11 @@ from couchbase.collection import GetOptions
 from couchbase_core import mk_formstr
 from couchbase.exceptions import (CollectionNotFoundException, RateLimitedException,
                                   ScopeNotFoundException, QuotaLimitedException,
-                                  KeyspaceNotFoundException)
+                                  KeyspaceNotFoundException,
+                                  BucketDoesNotExistException, BucketAlreadyExistsException)
 from couchbase.management.collections import CollectionSpec
-from couchbase.management.users import GetUserOptions
+from couchbase.management.users import GetUserOptions, Role, User
+from couchbase.management.buckets import CreateBucketSettings
 
 
 @flaky(5, 1)
@@ -49,10 +51,12 @@ class AcouchbaseRateLimitTests(AsyncioTestCase):
 
         self._check_version()
         self.loop.run_until_complete(self._enforce_rate_limits())
+        self.loop.run_until_complete(self._purge_buckets())
 
     def tearDown(self):
         self.loop.run_until_complete(self._drop_rate_limit_user())
         self.loop.run_until_complete(self._drop_scopes())
+        self.loop.run_until_complete(self._purge_buckets())
         return super(AcouchbaseRateLimitTests, self).tearDown()
 
     def _check_version(self):
@@ -71,6 +75,23 @@ class AcouchbaseRateLimitTests(AsyncioTestCase):
         if build < self.MIN_BUILD:
             raise SkipTest("Rate limit testing only available on server versions >= {}.0:{}".format(
                 self.MIN_VERSION, self.MIN_BUILD))
+
+    async def _purge_buckets(self):
+        bucket_list = [CreateBucketSettings(
+            name="testBucket{}".format(i),
+            bucket_type="couchbase",
+            ram_quota_mb=100) for i in range(10)]
+
+        bm = self.cluster.buckets()
+        for bucket in bucket_list:
+            try:
+                await bm.drop_bucket(bucket.name)
+            except (BucketDoesNotExistException, BucketAlreadyExistsException):
+                continue
+            except Exception as e:
+                raise
+                # now be sure it is really gone
+            await self.try_n_times_till_exception_async(10, 3, bm.get_bucket, bucket.name)
 
     async def _enforce_rate_limits(self):
         path = "/internalSettings"
@@ -536,3 +557,31 @@ class AcouchbaseRateLimitTests(AsyncioTestCase):
 
         with self.assertRaises(RateLimitedException):
             await asyncio.gather(*[create_collection(s) for s in scope_names])
+
+        bm = cluster.buckets()
+
+        async def create_bucket(bucket_settings):
+            await bm.create_bucket(bucket_settings)
+
+        bucket_list = [CreateBucketSettings(
+            name="testBucket{}".format(i),
+            bucket_type="couchbase",
+            ram_quota_mb=100) for i in range(10)]
+
+        with self.assertRaises(RateLimitedException):
+            await asyncio.gather(*[create_bucket(b) for b in bucket_list])
+
+        um = cluster.users()
+
+        async def create_user(user):
+            await um.upsert_user(user, domain_name="local")
+
+        roles = [
+            Role(name='data_reader', bucket='default'),
+            Role(name='data_writer', bucket='default')
+        ]
+        user_list = [User(username="user{}".format(
+            i), roles=roles, password="password{}".format(i)) for i in range(10)]
+
+        with self.assertRaises(RateLimitedException):
+            await asyncio.gather(*[create_user(u) for u in user_list])
