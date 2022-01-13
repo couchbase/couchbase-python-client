@@ -7,7 +7,7 @@ from flaky import flaky
 from couchbase.exceptions import (BucketDoesNotExistException,
                                   BucketAlreadyExistsException,
                                   BucketNotFlushableException)
-from couchbase.management.buckets import (CreateBucketSettings, BucketSettings,
+from couchbase.management.buckets import (ConflictResolutionType, CreateBucketSettings, BucketSettings,
                                           BucketType, StorageBackend)
 from couchbase_tests.base import CollectionTestCase
 from couchbase_core.durability import Durability
@@ -226,3 +226,20 @@ class BucketManagementTests(CollectionTestCase):
                 flush_enabled=False))
         bucket = self.try_n_times(10, 3, self.bm.get_bucket, 'fred')
         self.assertEqual(bucket.storage_backend, StorageBackend.UNDEFINED)
+
+    def test_bucket_custom_conflict_resolution(self):
+        version = self.cluster.get_server_version()
+        if version.short_version < 7.1 or not version.is_dp:
+            raise SkipTest(
+                "Custom conflict resolution testing only available on server versions >= 7.1 with developer preview enabled")
+
+        # Create the bucket
+        self.bm.create_bucket(
+            CreateBucketSettings(
+                name='fred',
+                ram_quota_mb=100,
+                conflict_resolution_type=ConflictResolutionType.CUSTOM,
+                flush_enabled=False))
+        bucket = self.try_n_times(10, 3, self.bm.get_bucket, 'fred')
+        self.assertEqual(bucket['conflict_resolution_type'],
+                         ConflictResolutionType.CUSTOM)
