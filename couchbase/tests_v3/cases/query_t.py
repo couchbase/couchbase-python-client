@@ -186,8 +186,8 @@ class QueryTests(CollectionTestCase):
     def test_preserve_expiry(self):
         version = self.cluster.get_server_version()
         if version.short_version < 7.1:
-            raise SkipTest("QueryOptions.preserve expiry only available on server versions >= {}".format(
-                self.MIN_VERSION))
+            raise SkipTest("QueryOptions.preserve_expiry only available on server versions >= {}".format(
+                7.1))
 
         key = "imakey"
         content = {"a": "aaa", "b": "bbb"}
