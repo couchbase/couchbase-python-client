@@ -52,7 +52,7 @@ from couchbase.cluster import Cluster, ClusterOptions, ClusterTracingOptions, \
     ClusterTimeoutOptions
 from couchbase.auth import PasswordAuthenticator, ClassicAuthenticator, Authenticator
 from couchbase.collection import CBCollection
-from couchbase.exceptions import CollectionAlreadyExistsException, ScopeAlreadyExistsException, NotSupportedException, \
+from couchbase.exceptions import CollectionAlreadyExistsException, QueryIndexAlreadyExistsException, ScopeAlreadyExistsException, NotSupportedException, \
     CouchbaseException
 from couchbase.management.analytics import CreateDatasetOptions
 from couchbase.management.collections import CollectionSpec
@@ -998,7 +998,6 @@ class CouchbaseClusterResource(object):
         resp = self.bucket.ping()
         # first make sure all are there:
         if all(k in resp.endpoints.keys() for k in service_types):
-            print("all services are present ({})".format(service_types))
             for service in service_types:
                 if not any(
                         x for x in resp.endpoints[service] if x.state == PingState.OK):
@@ -1448,8 +1447,18 @@ class CollectionTestCase(ClusterTestCase):
             raise Exception("Unable to populate beer sample collections")
 
     def populate_beer_sample_collections(self):
-        self.cluster.query(
-            "CREATE PRIMARY INDEX ON {}".format(self.beers_fqdn)).execute()
+        ixm = self.cluster.query_indexes()
+        ixm.create_primary_index(self.bucket_name, ignore_if_exists=True)
+        ixm.create_primary_index(self.bucket_name,
+                                 scope_name=self.beer_sample_collections.scope,
+                                 collection_name=self.beer_sample_collections.beers.name,
+                                 ignore_if_exists=True)
+
+        ixm.create_primary_index(self.bucket_name,
+                                 scope_name=self.beer_sample_collections.scope,
+                                 collection_name=self.beer_sample_collections.breweries.name,
+                                 ignore_if_exists=True)
+
         query_str = """
         INSERT INTO {} (KEY id, VALUE doc)
         SELECT META(b).id AS id,
@@ -1459,8 +1468,6 @@ class CollectionTestCase(ClusterTestCase):
         """.format(self.beers_fqdn)
         self.cluster.query(query_str).execute()
 
-        self.cluster.query(
-            "CREATE PRIMARY INDEX ON {}".format(self.breweries_fqdn)).execute()
         query_str = """
         INSERT INTO {} (KEY id, VALUE doc)
         SELECT META(b).id AS id,

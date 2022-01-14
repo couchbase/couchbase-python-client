@@ -269,3 +269,8 @@ class AcouchbaseQueryIndexManagerTests(AsyncioTestCase):
         # by not buildind deffered indexes, should timeout
         with self.assertRaises(WatchQueryIndexTimeoutException):
             await self.mgr.watch_indexes(self.cluster_info.bucket_name, [i.name for i in ix], WatchQueryIndexOptions(timeout=timedelta(seconds=5)))
+
+
+# TODO:  PYCBC-1220 - add tests for collections
+# class AcouchbaseQueryIndexManagerCollectionTests(AsyncioTestCase):
+#     pass
