@@ -24,6 +24,8 @@ from couchbase.search import MatchOperator, SearchResult, SearchOptions
 from couchbase.mutation_state import MutationState
 from couchbase_tests.base import CouchbaseTestCase, CollectionTestCase
 from couchbase.exceptions import NotSupportedException
+import string
+import random
 
 try:
     from abc import ABC
@@ -757,21 +759,25 @@ class SearchTest(ClusterTestCase):
         if self.is_mock:
             raise SkipTest("F.T.S. not supported by mock")
 
-        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
-                                                                          search.MatchQuery(
-                                                                              "north south", match_operator=MatchOperator.OR),
-                                                                          search.SearchOptions(limit=10))  # type: SearchResult
+        random_query_term = "".join(random.choice(string.ascii_letters)
+                            for _ in range(10))
 
-        rows = x.rows()
-        self.assertNotEqual(0, len(rows))
+        # (operator, query, expect_rows)
+        cases = [(search.MatchOperator.AND, "north south", True), (search.MatchOperator.AND, "north {}".format(random_query_term), False),
+                 (search.MatchOperator.OR, "north south", True), (search.MatchOperator.OR, "north {}".format(random_query_term), True)]
 
-        x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
-                                                                          search.MatchQuery(
-                                                                              "north south", match_operator=MatchOperator.AND),
-                                                                          search.SearchOptions(limit=10))  # type: SearchResult
+        for (operator, query, expect_rows) in cases:
+            x = self.try_n_times_decorator(self.cluster.search_query, 10, 10)("beer-search-index",
+                                                                              search.MatchQuery(
+                                                                                  query, match_operator=operator),
+                                                                              search.SearchOptions(limit=10))  # type: SearchResult
 
-        rows = x.rows()
-        self.assertNotEqual(0, len(rows))
+            rows = x.rows()
+
+            if expect_rows:
+                self.assertNotEqual(0, len(rows))
+            else:
+                self.assertEqual(0, len(rows))
 
     def test_search_match_operator_fail(self  # type: SearchTest
                                         ):
