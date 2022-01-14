@@ -20,6 +20,7 @@ import objgraph
 from collections import Counter
 import gc
 import json
+from couchbase.collection import GetOptions, UpsertOptions
 
 from couchbase.n1ql import UnsignedInt64
 from couchbase.cluster import QueryOptions, QueryProfile, QueryResult
@@ -188,9 +189,22 @@ class QueryTests(CollectionTestCase):
             raise SkipTest("QueryOptions.preserve expiry only available on server versions >= {}".format(
                 self.MIN_VERSION))
 
-        # only testing that the query doesn't fail
-        self.cluster.query("UPDATE `beer-sample` AS b USE KEYS '{}' SET b.country = 'USA'".format("21st_amendment_brewery_cafe"),
+        key = "imakey"
+        content = {"a": "aaa", "b": "bbb"}
+
+        self.bucket.default_collection().upsert(key, content, UpsertOptions(
+            expiry=datetime.timedelta(days=1)))
+
+        expected_expiry = self.bucket.default_collection().get(
+            key, GetOptions(with_expiry=True)).expiryTime
+        self.assertIsNotNone(expected_expiry)
+
+        self.cluster.query("UPDATE `{}` AS content USE KEYS '{}' SET content.a = 'aaaa'".format(self.bucket_name, key),
                            QueryOptions(preserve_expiry=True)).execute()
+
+        doc = self.bucket.default_collection().get(key, GetOptions(with_expiry=True))
+        self.assertEqual(doc.content["a"], "aaaa")
+        self.assertEqual(doc.expiryTime, expected_expiry)
 
 
 class QueryStringTests(TestCase):
