@@ -35,6 +35,7 @@ import traceback
 
 
 PYCBC_SSL_FETCH = os.getenv('PYCBC_SSL_FETCH', '')
+PYCBC_OPENSSL_DIR = os.getenv("PYCBC_OPENSSL_DIR", None)
 
 
 class CMakeExtension(Extension):
@@ -182,6 +183,8 @@ class CMakeBuild(cbuild_config.CBuildCommon):
                 '-DPYTHON_EXECUTABLE={}'.format(python_executable)]
             if PYCBC_SSL_FETCH:
                 cmake_args += ['-DPYCBC_SSL_FETCH={}'.format(PYCBC_SSL_FETCH)]
+            if PYCBC_OPENSSL_DIR:
+                cmake_args += ['-DOPENSSL_ROOT_DIR={}'.format(PYCBC_OPENSSL_DIR)]
             PYCBC_CMAKE_DEBUG = env.get('PYCBC_CMAKE_DEBUG')
             if PYCBC_CMAKE_DEBUG:
                 cmake_args += [
