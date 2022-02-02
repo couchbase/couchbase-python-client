@@ -438,21 +438,29 @@ class QueryIndexManager(GenericManager):
 
             time.sleep(interval_millis / 1000)
 
-    def build_deferred_indexes(self,            # type: "QueryIndexManager"
-                               bucket_name,     # type: str
-                               *options,        # type: "BuildDeferredQueryIndexOptions"
-                               **kwargs
-                               ):
+    def _build_deferred_prior_6_5(self, bucket_name, **final_args):
         """
-        Build Deferred builds all indexes which are currently in deferred state.
-
-        :param str bucket_name: name of the bucket.
-        :param BuildDeferredQueryIndexOptions options: Options for building deferred indexes.
-        :param Any kwargs: Override corresponding value in options.
-        :raise: InvalidArgumentsException
-
+        ** INTERNAL **
         """
-        final_args = forward_args(kwargs, *options)
+        indexes = self.get_all_indexes(bucket_name, GetAllQueryIndexOptions(
+            timeout=final_args.get("timeout", None)))
+        deferred_indexes = [
+            idx.name for idx in indexes if idx.state in ["deferred", "pending"]]
+        query_str = "BUILD INDEX ON `{}` ({})".format(
+            bucket_name, ", ".join(["`{}`".format(di) for di in deferred_indexes]))
+
+        self._http_request(
+            path="",
+            method="POST",
+            content=mk_formstr({"statement": query_str}),
+            content_type='application/x-www-form-urlencoded',
+            **final_args
+        )
+
+    def _build_deferred_6_5_plus(self, bucket_name, **final_args):
+        """
+        ** INTERNAL **
+        """
         scope_name = final_args.get("scope_name", None)
         collection_name = final_args.get("collection_name", None)
 
@@ -486,6 +494,26 @@ class QueryIndexManager(GenericManager):
             content_type='application/x-www-form-urlencoded',
             **final_args
         )
+
+    def build_deferred_indexes(self,            # type: "QueryIndexManager"
+                               bucket_name,     # type: str
+                               *options,        # type: "BuildDeferredQueryIndexOptions"
+                               **kwargs
+                               ):
+        """
+        Build Deferred builds all indexes which are currently in deferred state.
+
+        :param str bucket_name: name of the bucket.
+        :param BuildDeferredQueryIndexOptions options: Options for building deferred indexes.
+        :param Any kwargs: Override corresponding value in options.
+        :raise: InvalidArgumentsException
+
+        """
+        final_args = forward_args(kwargs, *options)
+        if self._admin_bucket._is_6_5_plus():
+            self._build_deferred_6_5_plus(bucket_name, **final_args)
+        else:
+            self._build_deferred_prior_6_5(bucket_name, **final_args)
 
 
 class IndexType(object):

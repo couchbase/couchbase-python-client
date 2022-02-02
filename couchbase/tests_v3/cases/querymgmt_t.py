@@ -238,13 +238,14 @@ class IndexManagementTestCase(CollectionTestCase):
         ix = self.mgr.get_all_indexes(self.cluster_info.bucket_name)
         self.assertEqual(6, len(ix))
 
-        pending = self.mgr.build_deferred_indexes(
+        ix_names = list(map(lambda i: i.name, ix))
+
+        self.mgr.build_deferred_indexes(
             self.cluster_info.bucket_name)
-        self.assertEqual(6, len(pending))
         self.mgr.watch_indexes(
-            self.cluster_info.bucket_name, pending, WatchQueryIndexOptions(timeout=timedelta(seconds=30)))  # Should be OK
+            self.cluster_info.bucket_name, ix_names, WatchQueryIndexOptions(timeout=timedelta(seconds=30)))  # Should be OK
         self.mgr.watch_indexes(self.cluster_info.bucket_name,
-                               pending, WatchQueryIndexOptions(timeout=timedelta(seconds=30), watch_primary=True))  # Should be OK again
+                               ix_names, WatchQueryIndexOptions(timeout=timedelta(seconds=30), watch_primary=True))  # Should be OK again
         self.assertRaises(QueryIndexNotFoundException, self.mgr.watch_indexes,
                           self.cluster_info.bucket_name, ['nonexist'], WatchQueryIndexOptions(timeout=timedelta(seconds=10)))
 
@@ -462,13 +463,13 @@ class IndexManagementCollectionTests(CollectionTestCase):
             self.bucket_name, BuildDeferredQueryIndexOptions(scope_name=self._scope, collection_name=self._coll1))
         self.mgr.watch_indexes(
             self.bucket_name, ix_names, WatchQueryIndexOptions(timeout=timedelta(seconds=30),
-                                                              scope_name=self._scope,
-                                                              collection_name=self._coll1))  # Should be OK
+                                                               scope_name=self._scope,
+                                                               collection_name=self._coll1))  # Should be OK
         self.mgr.watch_indexes(self.bucket_name,
                                ix_names, WatchQueryIndexOptions(timeout=timedelta(seconds=30),
-                                                               watch_primary=True,
-                                                               scope_name=self._scope,
-                                                               collection_name=self._coll1))  # Should be OK again
+                                                                watch_primary=True,
+                                                                scope_name=self._scope,
+                                                                collection_name=self._coll1))  # Should be OK again
         self.assertRaises(QueryIndexNotFoundException, self.mgr.watch_indexes,
                           self.bucket_name, ['nonexist'], WatchQueryIndexOptions(timeout=timedelta(seconds=10),
                                                                                  scope_name=self._scope,

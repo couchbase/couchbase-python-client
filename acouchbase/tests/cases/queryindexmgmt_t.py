@@ -237,14 +237,14 @@ class AcouchbaseQueryIndexManagerTests(AsyncioTestCase):
 
         ix = await self.mgr.get_all_indexes(self.cluster_info.bucket_name)
         self.assertEqual(6, len(ix))
+        ix_names = list(map(lambda i: i.name, ix))
 
-        pending = await self.mgr.build_deferred_indexes(
+        await self.mgr.build_deferred_indexes(
             self.cluster_info.bucket_name)
-        self.assertEqual(6, len(pending))
         await self.mgr.watch_indexes(
-            self.cluster_info.bucket_name, pending, WatchQueryIndexOptions(timeout=timedelta(seconds=30)))  # Should be OK
+            self.cluster_info.bucket_name, ix_names, WatchQueryIndexOptions(timeout=timedelta(seconds=30)))  # Should be OK
         await self.mgr.watch_indexes(self.cluster_info.bucket_name,
-                                     pending, WatchQueryIndexOptions(timeout=timedelta(seconds=30), watch_primary=True))  # Should be OK again
+                                     ix_names, WatchQueryIndexOptions(timeout=timedelta(seconds=30), watch_primary=True))  # Should be OK again
         with self.assertRaises(QueryIndexNotFoundException):
             await self.mgr.watch_indexes(self.cluster_info.bucket_name, ['nonexist'], WatchQueryIndexOptions(timeout=timedelta(seconds=10)))
 
