@@ -110,6 +110,8 @@ void convert_query_error_context(const lcb_QUERY_ERROR_CONTEXT* ctx,
         pycbc_dict_add_text_kv_strn2(err_context, "http_response_body", val, len);
         lcb_errctx_query_endpoint(ctx, &val, &len);
         pycbc_dict_add_text_kv_strn2(err_context, "endpoint", val, len);
+        lcb_errctx_query_error_response_body(ctx, &val, &len);
+        pycbc_dict_add_text_kv_strn2(err_context, "http_error_response_body", val, len);
         pycbc_dict_add_text_kv(err_context, "type", "QueryErrorContext");
     }
     mres->err_info = err_info;

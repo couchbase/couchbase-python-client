@@ -26,8 +26,8 @@ from couchbase.n1ql import UnsignedInt64
 from couchbase.cluster import QueryOptions, QueryProfile, QueryResult
 from couchbase.n1ql import QueryMetaData, QueryStatus, QueryWarning
 from couchbase_tests.base import CollectionTestCase, CouchbaseTestCase
-from couchbase.exceptions import (KeyspaceNotFoundException, NotSupportedException,
-                                  ScopeNotFoundException)
+from couchbase.exceptions import (CouchbaseException, KeyspaceNotFoundException, NotSupportedException,
+                                  ScopeNotFoundException, QueryErrorContext)
 from couchbase.mutation_state import MutationState
 from couchbase_core.n1ql import NOT_BOUNDED, REQUEST_PLUS
 
@@ -205,6 +205,22 @@ class QueryTests(CollectionTestCase):
         doc = self.bucket.default_collection().get(key, GetOptions(with_expiry=True))
         self.assertEqual(doc.content["a"], "aaaa")
         self.assertEqual(doc.expiryTime, expected_expiry)
+
+    def test_query_error_context(self):
+        version = self.cluster.get_server_version()
+        if version.short_version < 7.1:
+            raise SkipTest("QueryErrorContext.error_response_body only available on server versions >= {}".format(
+                7.1))
+        try:
+            self.cluster.query("SELECT * FROM no_such_bucket").rows()
+        except CouchbaseException as ex:
+            self.assertIsInstance(ex.context, QueryErrorContext)
+            self.assertIsNotNone(ex.context.statement)
+            self.assertIsNotNone(ex.context.first_error_code)
+            self.assertIsNotNone(ex.context.first_error_message)
+            self.assertIsNotNone(ex.context.client_context_id)
+            self.assertIsNotNone(ex.context.endpoint)
+            self.assertIsNotNone(ex.context.error_response_body)
 
 
 class QueryStringTests(TestCase):

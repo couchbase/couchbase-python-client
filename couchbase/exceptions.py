@@ -753,6 +753,13 @@ class SearchErrorContext(HTTPErrorContextBase):
 
 
 class QueryErrorContext(HTTPErrorContextBase):
+    def __init__(self, **kwargs):
+        http_error_resp_body = kwargs.pop("http_error_response_body", None)
+        if http_error_resp_body:
+            json_data = json.loads(http_error_resp_body)
+            kwargs["error_response_body"] = {"errors":json_data.get("errors", None)}
+        super(QueryErrorContext, self).__init__(**kwargs)
+
     @property
     @uncommitted
     def first_error_code(self):
@@ -782,6 +789,12 @@ class QueryErrorContext(HTTPErrorContextBase):
     def query_params(self):
         # type: (...) -> str
         return self.get("query_params", None)
+
+    @property
+    @uncommitted
+    def error_response_body(self):
+        # type: (...) -> str
+        return self.get("error_response_body", None)
 
 
 class AnalyticsErrorContext(QueryErrorContext):
