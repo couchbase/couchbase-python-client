@@ -386,7 +386,8 @@ do_safecall(PyObject *callable, PyObject *args)
 
 static int
 modify_event_python(pycbc_IOPSWrapper *pio, pycbc_Event *ev,
-                    pycbc_evaction_t action, lcb_socket_t newsock, void *arg)
+                    pycbc_evaction_t action, lcb_socket_t newsock, 
+                    short event_flags, unsigned long timer_usecs)
 {
     int ret;
     PyObject *result;
@@ -403,13 +404,13 @@ modify_event_python(pycbc_IOPSWrapper *pio, pycbc_Event *ev,
     PyTuple_SET_ITEM(argtuple, 1, pycbc_IntFromL(action));
 
     if (ev->type == PYCBC_EVTYPE_IO) {
-        flags = *(short*)arg;
+        flags = event_flags;
         o_arg = pycbc_IntFromL(flags);
         ((pycbc_IOEvent *)ev)->fd = newsock;
         meth = pio->modevent;
 
     } else {
-        usecs = *(lcb_uint32_t*)arg;
+        usecs = (lcb_uint32_t)timer_usecs;
         o_arg = pycbc_IntFromL(usecs);
         meth = pio->modtimer;
     }
@@ -522,7 +523,7 @@ update_event(lcb_io_opt_t io, lcb_socket_t sock, void *event, short flags,
     }
 
     return modify_event_python(PYCBC_IOW_FROM_IOPS(io), (pycbc_Event*)ev,
-                               action, sock, &flags);
+                               action, sock, flags, 0);
 }
 
 static void
@@ -532,7 +533,7 @@ delete_event(lcb_io_opt_t io, lcb_socket_t sock, void *event)
     pycbc_IOPSWrapper *pio = PYCBC_IOW_FROM_IOPS(io);
     short tmp = 0;
 
-    modify_event_python(pio, ev, PYCBC_EVACTION_UNWATCH, sock, &tmp);
+    modify_event_python(pio, ev, PYCBC_EVACTION_UNWATCH, sock, tmp, 0);
 }
 
 static void
@@ -541,7 +542,7 @@ delete_timer(lcb_io_opt_t io, void *timer)
     lcb_U32 dummy = 0;
     pycbc_IOPSWrapper *pio = PYCBC_IOW_FROM_IOPS(io);
     modify_event_python(pio, (pycbc_Event*)timer, PYCBC_EVACTION_UNWATCH, -1,
-                        &dummy);
+                        0, dummy);
 }
 
 static void
@@ -561,7 +562,7 @@ destroy_event_common(lcb_io_opt_t io, void *arg)
     pycbc_assert(ev->state != PYCBC_EVSTATE_ACTIVE);
     PYCBC_DEBUG_LOG("Calling destroy event for %p", arg)
     modify_event_python(PYCBC_IOW_FROM_IOPS(io), ev, PYCBC_EVACTION_CLEANUP,
-                        0, &dummy);
+                        0, 0, dummy);
     PYCBC_DEBUG_LOG("Called destroy event for %p", arg)
 
     ev->state = PYCBC_EVSTATE_FREED;
@@ -577,7 +578,7 @@ update_timer(lcb_io_opt_t io, void *timer, lcb_U32 usec, void *data,
     ev->cb.handler = handler;
 
     return modify_event_python(PYCBC_IOW_FROM_IOPS(io), (pycbc_Event*)ev,
-                               PYCBC_EVACTION_WATCH, -1, &usec);
+                               PYCBC_EVACTION_WATCH, -1, 0, usec);
 }
 
 static void
