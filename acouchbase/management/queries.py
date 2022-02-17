@@ -381,7 +381,7 @@ class AQueryIndexManager(object):
         kwargs['primary'] = True
         final_args = forward_args(kwargs, *options)
         index_name = final_args.pop("index_name", None)
-        await self._create_index(bucket_name, [], index_name, *options, **final_args)
+        await self._create_index(bucket_name, [], index_name, **final_args)
 
     async def drop_index(self,      # type: "AQueryIndexManager"
                          bucket_name,     # type: str

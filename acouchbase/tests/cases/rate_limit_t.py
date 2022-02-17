@@ -21,6 +21,10 @@ from couchbase.exceptions import (CollectionNotFoundException, RateLimitedExcept
 from couchbase.management.collections import CollectionSpec
 from couchbase.management.users import GetUserOptions, Role, User
 from couchbase.management.buckets import CreateBucketSettings
+from couchbase.management.queries import (CreatePrimaryQueryIndexOptions,
+                                          DropPrimaryQueryIndexOptions,
+                                          GetAllQueryIndexOptions,
+                                          CreateQueryIndexOptions)
 
 
 @flaky(5, 1)
@@ -455,45 +459,39 @@ class AcouchbaseRateLimitTests(AsyncioTestCase):
             10, 3, self._get_collection, cm, scope_name, collection_spec.name)
         self.assertIsNotNone(created)
 
-        # make sure query service sees the new keyspace
-        fqdn = "`{}`.`{}`.`{}`".format(
-            "default", scope_name, collection_spec.name)
-        num_tries = 10
-        for i in range(num_tries):
-            try:
-                q_iter = self.cluster.query(
-                    "CREATE PRIMARY INDEX ON {}".format(fqdn))
-                [r async for r in q_iter]
-            except KeyspaceNotFoundException:
-                if i < (num_tries - 1):
-                    time.sleep(3)
-            except Exception:
-                raise
-
-            # if the keyspace doesn't exist, the exception will be raised here
-            # if the keyspace does exist, lets remove the previously created idx
-            #   it will be created again shortly
-            q_iter = self.cluster.query(
-                "DROP PRIMARY INDEX ON {}".format(fqdn))
-            [r async for r in q_iter]
-            break
-
         ixm = self.cluster.query_indexes()
+        # make sure query service sees the new keyspace
+        # drop the index and then re-create
+        await self.try_n_times_async(
+            10, 3, ixm.create_primary_index, "default",
+            CreatePrimaryQueryIndexOptions(scope_name=scope_name,
+                                           collection_name=collection_spec.name))
+        await self.try_n_times_async(
+            10, 3, ixm.drop_primary_index, "default",
+            DropPrimaryQueryIndexOptions(scope_name=scope_name,
+                                         collection_name=collection_spec.name))
+
         q_context = '{}.{}'.format(
             self.bucket_name, scope_name)
         with self.assertRaises(QuotaLimitedException):
-            q_iter = self.cluster.query("CREATE PRIMARY INDEX ON `{}`".format(
-                collection_spec.name), query_context=q_context)
-            [r async for r in q_iter]
-            indexes = await ixm.get_all_indexes("default")
-            filtered_idxs = [
-                i for i in indexes if i.keyspace == collection_spec.name]
-            self.assertGreaterEqual(len(filtered_idxs), 1)
-            self.assertTrue(filtered_idxs[0].is_primary)
-            self.assertEqual('#primary', filtered_idxs[0].name)
-            self.assertEqual(collection_spec.name, filtered_idxs[0].keyspace)
+            await self.try_n_times_async(
+                10, 3, ixm.create_primary_index, "default",
+                CreatePrimaryQueryIndexOptions(scope_name=scope_name,
+                                               collection_name=collection_spec.name))
+            indexes = await ixm.get_all_indexes("default",
+                                                GetAllQueryIndexOptions(scope_name=scope_name,
+                                                                        collection_name=collection_spec.name))
+            self.assertGreaterEqual(len(indexes), 1)
+            self.assertTrue(indexes[0].is_primary)
+            self.assertEqual('#primary', indexes[0].name)
+            self.assertEqual(collection_spec.name, indexes[0].collection_name)
             # helps to avoid "Index already exist" failure
             idx_name = "rate-limit-idx-{}".format(random.randrange(0, 100))
+            # @TODO:  exception not raised when using QueryIndexManager
+            # fields = ('fld1', 'fld2')
+            # await ixm.create_index("default", idx_name, fields,
+            #                        CreateQueryIndexOptions(scope_name=scope_name,
+            #                                                collection_name=collection_spec.name))
             q_iter = self.cluster.query("CREATE INDEX `{}` ON `{}`(testField)".format(
                 idx_name, collection_spec.name), query_context=q_context)
             [r async for r in q_iter]

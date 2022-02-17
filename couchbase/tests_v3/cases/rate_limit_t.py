@@ -16,6 +16,10 @@ from couchbase.management.search import SearchIndex
 import couchbase.search as search
 from couchbase.management.collections import CollectionSpec
 from couchbase.management.users import GetUserOptions
+from couchbase.management.queries import (CreatePrimaryQueryIndexOptions,
+                                          DropPrimaryQueryIndexOptions,
+                                          GetAllQueryIndexOptions,
+                                          CreateQueryIndexOptions)
 
 
 @flaky(5, 1)
@@ -422,39 +426,30 @@ class RateLimitTests(CollectionTestCase):
         self.assertIsNotNone(created)
 
         # make sure query service sees the new keyspace
-        fqdn = "`{}`.`{}`.`{}`".format(
-            "default", scope_name, collection_spec.name)
-        num_tries = 10
-        for i in range(num_tries):
-            try:
-                self.cluster.query(
-                    "CREATE PRIMARY INDEX ON {}".format(fqdn)).execute()
-            except KeyspaceNotFoundException:
-                if i < (num_tries - 1):
-                    time.sleep(3)
-            except Exception:
-                raise
-
-            # if the keyspace doesn't exist, the exception will be raised here
-            # if the keyspace does exist, lets remove the previously created idx
-            #   it will be created again shortly
-            self.cluster.query(
-                "DROP PRIMARY INDEX ON {}".format(fqdn)).execute()
-            break
+        # drop the index and then re-create
+        ixm = self.cluster.query_indexes()
+        self.try_n_times(
+            10, 3, ixm.create_primary_index, "default",
+            CreatePrimaryQueryIndexOptions(scope_name=scope_name,
+                                           collection_name=collection_spec.name))
+        self.try_n_times(
+            10, 3, ixm.drop_primary_index, "default",
+            DropPrimaryQueryIndexOptions(scope_name=scope_name,
+                                         collection_name=collection_spec.name))
 
         scope = self.bucket.scope(scope_name)
-        ixm = self.cluster.query_indexes()
 
         with self.assertRaises(QuotaLimitedException):
-            scope.query("CREATE PRIMARY INDEX ON `{}`".format(
-                collection_spec.name)).execute()
-            indexes = ixm.get_all_indexes("default")
-            filtered_idxs = [
-                i for i in indexes if i.keyspace == collection_spec.name]
-            self.assertGreaterEqual(len(filtered_idxs), 1)
-            self.assertTrue(filtered_idxs[0].is_primary)
-            self.assertEqual('#primary', filtered_idxs[0].name)
-            self.assertEqual(collection_spec.name, filtered_idxs[0].keyspace)
+            self.try_n_times(
+                10, 3, ixm.create_primary_index, "default",
+                CreatePrimaryQueryIndexOptions(scope_name=scope_name,
+                                               collection_name=collection_spec.name))
+            indexes = ixm.get_all_indexes("default", GetAllQueryIndexOptions(scope_name=scope_name,
+                                                                             collection_name=collection_spec.name))
+            self.assertGreaterEqual(len(indexes), 1)
+            self.assertTrue(indexes[0].is_primary)
+            self.assertEqual('#primary', indexes[0].name)
+            self.assertEqual(collection_spec.name, indexes[0].collection_name)
             # helps to avoid "Index already exist" failure
             idx_name = "rate-limit-idx-{}".format(random.randrange(0, 100))
             scope.query("CREATE INDEX `{}` ON `{}`(testField)".format(
