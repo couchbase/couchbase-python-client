@@ -1,10 +1,14 @@
 from typing import TypeVar, Type
 import asyncio
 from asyncio import AbstractEventLoop
+from functools import partial
 
 from couchbase_core._libcouchbase import (
     PYCBC_CONN_F_ASYNC,
-    PYCBC_CONN_F_ASYNC_DTOR)
+    PYCBC_CONN_F_ASYNC_DTOR,
+    LCB_HTTP_TYPE_MANAGEMENT,
+    LCB_HTTP_METHOD_GET,
+    FMT_JSON)
 from couchbase_core.client import Client as CoreClient
 from couchbase.cluster import AsyncCluster as V3AsyncCluster
 from couchbase.bucket import AsyncBucket as V3AsyncBucket
@@ -74,6 +78,7 @@ class AIOClientMixin(object):
             # do not set the connection callback for a collection
             return
 
+        self._cft = None
         self._setup_connect()
 
     def _setup_connect(self):
@@ -83,12 +88,48 @@ class AIOClientMixin(object):
             if err:
                 cft.set_exception(err)
             else:
-                if(issubclass(type(self), V3AsyncCluster)):
-                    self._set_server_version()
                 cft.set_result(True)
 
-        self._cft = cft
+        self._conn_ft = cft
         self._conncb = ftresult
+
+    @classmethod
+    def _chain_futures(cls, ft, fn, cft):
+        """
+        **INTERNAL**
+        """
+        try:
+            if cft.cancelled():
+                ft.cancel()
+            exc = cft.exception()
+            if exc is not None:
+                ft.set_exception(exc)
+            else:
+                fn(ft)
+        except Exception:
+            ft.cancel()
+            raise
+
+    def _get_server_version(self, ft):
+        result = self._http_request(type=LCB_HTTP_TYPE_MANAGEMENT,
+                                    path="/pools",
+                                    method=LCB_HTTP_METHOD_GET,
+                                    content_type="application/json",
+                                    response_format=FMT_JSON)
+
+        def on_ok(response):
+            if(issubclass(type(self), V3AsyncCluster)):
+                self._set_server_version(override=response.value)
+            ft.set_result(True)
+            result.clear_callbacks()
+
+        def on_err(_, excls, excval, __):
+            err = excls(excval)
+            ft.set_exception(err)
+            result.clear_callbacks()
+
+        result.set_callbacks(on_ok, on_err)
+        return ft
 
     def on_connect(self):
         # only if the connect callback has already been hit
@@ -97,7 +138,16 @@ class AIOClientMixin(object):
             self._setup_connect()
             self._connect()
 
-        return self._cft
+        if not self.connected and issubclass(type(self), V3AsyncCluster) and self._cft is None:
+            self._cft = asyncio.Future()
+            self._conn_ft.add_done_callback(
+                partial(AIOClientMixin._chain_futures, self._cft, self._get_server_version))
+
+        if(issubclass(type(self), V3AsyncCluster)):
+            return self._cft
+
+        # for buckets
+        return self._conn_ft
 
     connected = CoreClient.connected
 

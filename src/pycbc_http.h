@@ -131,39 +131,4 @@ void pycbc_viewresult_step(pycbc_ViewResult *vres,
                            pycbc_Bucket *bucket,
                            int force_callback);
 
-
-/**
- * Callback to complete attempt to get the Couchbase Server version.
- *
- * This is a work-around until CBC-1204 is fixed.  Once a fix is in
- * play, we do not need to check if we are on a version >= 6.5
- * prior to running queries, searches or analytics queries
- *
- * @param instance lcb instance
- * @param cbtype lcb callback type
- * @param rb lcb callback response
- * @param bucket The Bucket
- */
-lcb_STATUS pycbc_get_couchbase_version_complete(lcb_t instance,int cbtype,const lcb_RESPBASE *rb, pycbc_Bucket *bucket);
-
-/**
- * Callback to complete HTTP requests
- *
- * @param instance lcb instance
- * @param cbtype lcb callback type
- * @param rb lcb callback response
- */
-void complete_callback(lcb_t instance,int cbtype,const lcb_RESPBASE *rb);
-
-/**
- * Attempt to get the Couchbase Server version.
- *
- * This is a work-around until CBC-1204 is fixed.  Once a fix is in
- * play, we do not need to check if we are on a version >= 6.5
- * prior to running queries, searches or analytics queries
- *
- * @param bucket The Bucket
- */
-void pycbc_get_couchbase_version(pycbc_Bucket *bucket);
-
 #endif // COUCHBASE_PYTHON_CLIENT_HTTP_H

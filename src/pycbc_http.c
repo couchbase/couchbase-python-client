@@ -225,7 +225,7 @@ void pycbc_httpresult_complete(pycbc_HttpResult *htres,
     PYCBC_TRACE_POP_CONTEXT(htres->tracing_context);
 }
 
-void complete_callback(lcb_t instance,
+static void complete_callback(lcb_t instance,
                               int cbtype,
                               const lcb_RESPBASE *rb)
 {
@@ -257,67 +257,9 @@ void complete_callback(lcb_t instance,
     (void)cbtype;
 }
 
-lcb_STATUS pycbc_get_couchbase_version_complete(lcb_t instance,
-                              int cbtype,
-                              const lcb_RESPBASE *rb,
-                              pycbc_Bucket* bucket)
-{
-    lcb_STATUS rc;
-    uint16_t status;
-    const lcb_RESPHTTP *resp = (const lcb_RESPHTTP *)rb;
-    PYCBC_CONN_THR_END(bucket);
-    lcb_resphttp_http_status(resp, &status);
-    rc = lcb_resphttp_status(resp);
-
-    if (rc != LCB_SUCCESS) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_HTTP, rc,
-            "HTTP Request failed trying to obtain server version.");
-    } else {
-        const char *body;
-        size_t nbody;
-        lcb_resphttp_body(resp, &body, &nbody);
-        if(nbody > 0){
-            bucket->server_version = PyUnicode_FromStringAndSize(body, (Py_ssize_t )nbody);
-        }else{
-            bucket->server_version = NULL;
-        }
-    }
-    if (!(bucket->flags & PYCBC_CONN_F_ASYNC)) {
-        PYCBC_CONN_THR_BEGIN(bucket);
-    }
-    (void)instance;
-    (void)cbtype;
-    return rc;
-}
-
-static void http_callback_complete(lcb_t instance,
-                              int cbtype,
-                              const lcb_RESPBASE *rb)
-{
-    pycbc_Bucket *bucket = (pycbc_Bucket *)lcb_get_cookie(instance);
-    //exit in case lcb_destroy has been called
-    if(bucket == NULL){
-        return;
-    }
-
-    const char* clusterType = Py_TYPE(bucket)->tp_name;
-    if((!strcmp(clusterType, "Cluster") || !strcmp(clusterType, "ACluster"))
-        && !(bucket->flags & PYCBC_GET_VERSION_ATTEMPT)){
-        //Only going to allow for a single attempt right after bootstrapping
-        bucket->flags |= PYCBC_GET_VERSION_ATTEMPT;
-        lcb_STATUS rc = pycbc_get_couchbase_version_complete(instance, cbtype, rb, bucket);
-        //If acouchbase, invoke connect callback
-        if(!strcmp(Py_TYPE(bucket)->tp_name, "ACluster")){
-            pycbc_invoke_connected_event(bucket, rc);
-        }
-    }else{
-        complete_callback(instance, cbtype, rb);
-    }
-}
-
 void pycbc_http_callbacks_init(lcb_t instance)
 {
-    lcb_install_callback(instance, LCB_CALLBACK_HTTP, http_callback_complete);
+    lcb_install_callback(instance, LCB_CALLBACK_HTTP, complete_callback);
     pycbc_views_callbacks_init(instance);
 }
 
@@ -458,37 +400,4 @@ GT_DONE:
     Py_XDECREF(mres);
     pycbc_oputil_conn_unlock(self);
     return ret;
-}
-
-void pycbc_get_couchbase_version(pycbc_Bucket *bucket)
-{
-    lcb_STATUS rc;
-    const char *path = "/pools";
-    const char *content_type = "application/json";
-
-    if (-1 == pycbc_oputil_conn_lock(bucket)) {
-        return;
-    }
-
-    lcb_CMDHTTP *cmd = NULL;
-    lcb_HTTP_HANDLE *htreq;
-    lcb_cmdhttp_create(&cmd, LCB_HTTP_TYPE_MANAGEMENT);
-    lcb_cmdhttp_content_type(cmd, content_type, strlen(content_type));
-    lcb_cmdhttp_method(cmd, LCB_HTTP_METHOD_GET);
-    lcb_cmdhttp_handle(cmd, &htreq);
-    lcb_cmdhttp_path(cmd, path, strlen(path));
-    rc = lcb_http(bucket->instance, NULL, cmd);
-    lcb_cmdhttp_destroy(cmd);
-
-    if (rc != LCB_SUCCESS) {
-        PYCBC_EXC_WRAP(PYCBC_EXC_HTTP, rc,
-            "HTTP Request failed trying to obtain server version.");
-    } else {
-        if (!(bucket->flags & PYCBC_CONN_F_ASYNC)) {
-            PYCBC_CONN_THR_BEGIN(bucket);
-            lcb_wait(bucket->instance, LCB_WAIT_DEFAULT);
-            PYCBC_CONN_THR_END(bucket);
-        }
-    }
-    pycbc_oputil_conn_unlock(bucket);
 }

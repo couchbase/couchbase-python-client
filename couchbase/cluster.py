@@ -579,8 +579,6 @@ class Cluster(CoreClient):
             _conntype=_LCB.LCB_TYPE_CLUSTER,
             **self._clusteropts
         )
-        if(type(self).__name__ == "Cluster"):
-            self._set_server_version()
 
     @classmethod
     def connect(
@@ -642,6 +640,10 @@ class Cluster(CoreClient):
 
     def get_server_version(self     # type: "Cluster"
                            ) -> ServerVersion:
+        if self.server_version is None:
+            # will set the server_version in order to determine if server
+            # version is >= 6.5
+            self._is_6_5_plus()
         return self.server_version
 
     @property

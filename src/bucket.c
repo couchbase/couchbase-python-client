@@ -1227,10 +1227,6 @@ Bucket__connect(pycbc_Bucket *self, PyObject* args, PyObject* kwargs)
             PYCBC_EXCTHROW_WAIT(err);
             return NULL;
         }
-        // for non-Admin, sync cluster client type, get the server version at this point
-        if(!strcmp(Py_TYPE(self)->tp_name, "Cluster") && !(self->flags & PYCBC_GET_VERSION_ATTEMPT)){
-            pycbc_get_couchbase_version(self);
-        }
     }
     {
         lcb_BTYPE btype;
