@@ -3,6 +3,7 @@ import json
 from datetime import timedelta
 from typing import Any, List, Dict, Optional
 import attr
+from attr import fields_dict
 from enum import Enum
 
 from .generic import GenericManager
@@ -1025,7 +1026,9 @@ class EventingFunctionSettings(object):
         if "query_consistency" not in kwargs:
             kwargs["query_consistency"] = None
 
-        return cls(**kwargs)
+        fields = list(fields_dict(cls).keys())
+        final_json = {k: v for k, v in kwargs.items() if k in fields}
+        return cls(**final_json)
 
     @classmethod
     def from_server(
@@ -1100,7 +1103,9 @@ class EventingFunctionSettings(object):
             if key in server_dict:
                 server_dict[key] = timedelta(seconds=int(server_dict[key]))
 
-        return cls(**server_dict)
+        fields = list(fields_dict(cls).keys())
+        final_json = {k: v for k, v in server_dict.items() if k in fields}
+        return cls(**final_json)
 
 
 @attr.s
@@ -1416,6 +1421,8 @@ class EventingFunctionStatus(object):
     :type processing_status: `EventingFunctionProcessingStatus`
     :param redeploy_required: Indicates if function needs to be redeployed
     :type redeploy_required: bool
+    :param function_scope: Indicates the eventing function's scope
+    :type function_scope: Dict[str, Any]
     """
 
     name = attr.ib(type=str, validator=attr.validators.instance_of(str))
@@ -1433,12 +1440,14 @@ class EventingFunctionStatus(object):
     )
     redeploy_required = attr.ib(
         type=bool, validator=attr.validators.instance_of(bool))
+    function_scope = attr.ib(factory=dict,
+                             type=Dict[str, str])
 
     @classmethod
     def from_server(
-        cls,  # type: "EventingFunction"
+        cls,  # type: "EventingFunctionStatus"
         server_json,  # type: Dict[str, Any]
-    ) -> "EventingFunction":
+    ) -> "EventingFunctionStatus":
         """Returns a new `EventingFunctionStatus` object based
         on the JSON response received from Couchbase Server
 
@@ -1448,12 +1457,22 @@ class EventingFunctionStatus(object):
         :return: new `EventingFunctionStatus` object
         :rtype: `EventingFunctionStatus`
         """
+        keys = ['name',
+                'num_bootstrapping_nodes',
+                'num_deployed_nodes',
+                'redeploy_required',
+                'state',
+                'deployment_status',
+                'processing_status']
         status = server_json.pop("composite_status", None)
         if status is not None:
             server_json["state"] = EventingFunctionState.from_server(status)
         else:
             server_json["state"] = EventingFunctionState.Undeployed
-        return cls(**server_json)
+
+        fields = list(fields_dict(cls).keys())
+        final_json = {k: v for k, v in server_json.items() if k in fields}
+        return cls(**final_json)
 
 
 @attr.s
