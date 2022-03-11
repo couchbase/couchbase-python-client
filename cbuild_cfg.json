@@ -39,7 +39,7 @@
   "comp_options": {
     "PYCBC_LCB_API": "0x02FF04",
     "PYCBC_CORE": "couchbase_core",
-    "lcb_tag": "e4de408c96550b48745b3a142d9827c898d4e96f",
+    "lcb_tag": "3.2.5",
     "lcb_archive_repo": "https://github.com/couchbase/libcouchbase"
   }
 }
