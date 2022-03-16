@@ -25,7 +25,7 @@ jira>=2.0.0
 flaky>=3.6.1
 Automat==0.8.0; python_version=="3.5"
 Twisted==19.10.0; python_version=="3.5"
-Twisted==22.1.0; python_version>="3.6"
+Twisted==22.2.0; python_version>="3.6"
 mmh3==2.5.1; python_version=="3.5"
 deepdiff==5.0.2; python_version=="3.5"
 deepdiff==5.5.0; python_version>="3.6"
