@@ -1,49 +1,85 @@
-from functools import wraps
-from typing import *
+from __future__ import annotations
 
-from couchbase_core.supportability import internal
-
-from .options import Cardinal, OptionBlock, OptionBlockTimeOut
-from couchbase_core.durability import Durability
-from datetime import timedelta
-
-try:
-    from typing import TypedDict
-except BaseException:
-    from typing_extensions import TypedDict
-
-ReplicateTo = Cardinal
-PersistTo = Cardinal
+from enum import IntEnum
+from typing import (Dict,
+                    Optional,
+                    TypeVar,
+                    Union)
 
 
-T = TypeVar('T', bound=OptionBlock)
+class ReplicateTo(IntEnum):
+    NONE = 0
+    ONE = 1
+    TWO = 2
+    THREE = 3
 
 
-class DurabilityTypeBase(dict):
-    def __init__(self, content):
-        super(DurabilityTypeBase, self).__init__(**content)
+class PersistTo(IntEnum):
+    NONE = 0
+    ONE = 1
+    TWO = 2
+    THREE = 3
 
 
-class DurabilityType(dict):
-    @internal
-    def __init__(self,  # type: DurabilityType
-                 content  # type: Dict[str, Any]
-                 ):
-        # type: (...) -> None
-        """
-        Durability configuration options
+class Durability(IntEnum):
+    """Synchronous Durability Level
 
-        :param content: dictionary passed up from subclasses
-        """
-        super(DurabilityType, self).__init__(content)
+    **DEPRECATED** Use `DurabilityLevel`
+    """
+    NONE = 0
+    MAJORITY = 1
+    MAJORITY_AND_PERSIST_TO_ACTIVE = 2
+    PERSIST_TO_MAJORITY = 3
 
 
-class ClientDurability(DurabilityType):
-    Storage = TypedDict(
-        'Storage', {
-            'replicate_to': ReplicateTo, 'persist_to': PersistTo}, total=True)
+class DurabilityLevel(IntEnum):
+    NONE = 0
+    MAJORITY = 1
+    MAJORITY_AND_PERSIST_TO_ACTIVE = 2
+    PERSIST_TO_MAJORITY = 3
 
-    def __init__(self,  # type: T
+    # def to_server_str(self):
+    #     if self.name == 'MAJORITY_AND_PERSIST_TO_ACTIVE':
+    #         return 'majorityAndPersistActive'
+    #     elif self.name == 'NONE':
+    #         return 'none'
+    #     elif self.name == 'MAJORITY':
+    #         return 'majority'
+    #     elif self.name == 'PERSIST_TO_MAJORITY':
+    #         return 'persistToMajority'
+    #     else:
+    #         return 'none'
+
+    @classmethod
+    def to_server_str(cls, value):
+        if value == cls.MAJORITY_AND_PERSIST_TO_ACTIVE:
+            return 'majorityAndPersistActive'
+        elif value == cls.NONE:
+            return 'none'
+        elif value == cls.MAJORITY:
+            return 'majority'
+        elif value == cls.PERSIST_TO_MAJORITY:
+            return 'persistToMajority'
+        else:
+            return 'none'
+
+    @classmethod
+    def from_server_str(cls, value):
+        if value == 'majorityAndPersistActive':
+            return cls.MAJORITY_AND_PERSIST_TO_ACTIVE
+        elif value == 'none':
+            return cls.NONE
+        elif value == 'majority':
+            return cls.MAJORITY
+        elif value == 'persistToMajority':
+            return cls.PERSIST_TO_MAJORITY
+        else:
+            return cls.NONE
+
+
+class ClientDurability:
+
+    def __init__(self,
                  replicate_to=ReplicateTo.NONE,  # type: ReplicateTo
                  persist_to=PersistTo.NONE  # type: PersistTo
                  ):
@@ -58,19 +94,22 @@ class ClientDurability(DurabilityType):
             from the cache of at least these many nodes
             (excluding the master)
         """
-        super(
-            ClientDurability,
-            self).__init__(
-            ClientDurability.Storage(
-                replicate_to=replicate_to,
-                persist_to=persist_to))
+        self._replicate_to = replicate_to
+        self._persist_to = persist_to
+
+    @property
+    def replicate_to(self) -> ReplicateTo:
+        return self._replicate_to
+
+    @property
+    def persist_to(self) -> PersistTo:
+        return self._persist_to
 
 
-class ServerDurability(DurabilityType):
-    Storage = TypedDict('Storage', {'level': Durability}, total=True)
+class ServerDurability:
 
     def __init__(self,  # type: ServerDurability
-                 level,  # type: Durability
+                 level,  # type: DurabilityLevel
                  ):
         # type: (...) -> None
         """
@@ -78,73 +117,27 @@ class ServerDurability(DurabilityType):
 
         :param Durability level: durability level
         """
-        super(
-            ServerDurability,
-            self).__init__(
-            ServerDurability.Storage(
-                level=level))
-
-
-class ClientDurableOptionBlock(OptionBlockTimeOut):
-    def __init__(self,  # type: ClientDurableOptionBlock
-                 timeout=None,       # type: timedelta
-                 durability=None     # type: ClientDurability
-                 ):
-        # type: (...) -> None
-        """
-        Options for operations with client-type durability
-
-        :param durability: Client durability settings
-        :param timeout: Timeout for operation
-        """
-        super(
-            ClientDurableOptionBlock,
-            self).__init__(
-            durability=durability,
-            timeout=timeout)
-
-
-class ServerDurableOptionBlock(OptionBlockTimeOut):
-    def __init__(self,               # type: ServerDurableOptionBlock
-                 timeout=None,       # type: timedelta
-                 durability=None     # type: ServerDurability
-                 ):
-        # type: (...) -> None
-        """
-        Options for operations with server-type durability
-
-        :param durability: Server durability settings
-        :param timeout: Timeout for operation
-        """
-        super(
-            ServerDurableOptionBlock,
-            self).__init__(
-            durability=durability,
-            timeout=timeout)
-
-
-class DurabilityOptionBlock(OptionBlockTimeOut):
-    def __init__(self,      # type: DurabilityOptionBlock
-                 timeout=None,       # type: timedelta
-                 durability=None,    # type: DurabilityType
-                 expiry=None,        # type: timedelta
-                 **kwargs):
-        # type: (...) -> None
-        """
-        Options for operations with any type of durability
-
-        :param durability: Durability settings
-        :param expiry: When any mutation should expire
-        :param timeout: Timeout for operation
-        """
-        super(
-            DurabilityOptionBlock,
-            self).__init__(
-            durability=durability,
-            expiry=expiry,
-            timeout=timeout,
-            **kwargs)
+        self._level = level
 
     @property
-    def expiry(self):
-        return self.get('expiry', None)
+    def level(self) -> DurabilityLevel:
+        return self._level
+
+
+DurabilityType = TypeVar('DurabilityType', bound=Union[ClientDurability, ServerDurability])
+
+
+class DurabilityParser:
+    @staticmethod
+    def parse_durability(durability  # type: DurabilityType
+                         ) -> Optional[Union[int, Dict[str, int]]]:
+        if isinstance(durability, ClientDurability):
+            return {
+                durability.replicate_to.name: durability.replicate_to.value,
+                durability.persist_to.name: durability.persist_to.value
+            }
+
+        if isinstance(durability, ServerDurability):
+            return durability.level.value
+
+        return None

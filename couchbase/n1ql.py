@@ -1,171 +1,94 @@
-#
-# Copyright 2019, Couchbase, Inc.
-# All Rights Reserved
-#
-# Licensed under the Apache License, Version 2.0 (the "License")
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
-import enum
-from datetime import timedelta
-from typing import *
-from durationpy import from_str
-
-from couchbase.options import UnsignedInt64
-from couchbase_core import iterable_wrapper, JSON
-from couchbase.exceptions import QueryException
-from couchbase_core.n1ql import N1QLRequest
+from couchbase.exceptions import (PYCBC_ERROR_MAP,
+                                  CouchbaseException,
+                                  ExceptionMap)
+from couchbase.logic.n1ql import N1QLQuery  # noqa: F401
+from couchbase.logic.n1ql import QueryError  # noqa: F401
+from couchbase.logic.n1ql import QueryMetaData  # noqa: F401
+from couchbase.logic.n1ql import QueryMetrics  # noqa: F401
+from couchbase.logic.n1ql import QueryProfile  # noqa: F401
+from couchbase.logic.n1ql import QueryScanConsistency  # noqa: F401
+from couchbase.logic.n1ql import QueryStatus  # noqa: F401
+from couchbase.logic.n1ql import QueryWarning  # noqa: F401
+from couchbase.logic.n1ql import QueryRequestLogic
 
 
-class QueryStatus(enum.Enum):
-    RUNNING = ()
-    SUCCESS = ()
-    ERRORS = ()
-    COMPLETED = ()
-    STOPPED = ()
-    TIMEOUT = ()
-    CLOSED = ()
-    FATAL = ()
-    ABORTED = ()
-    UNKNOWN = ()
+class N1QLRequest(QueryRequestLogic):
+    def __init__(self,
+                 connection,
+                 query_params,
+                 row_factory=lambda x: x,
+                 **kwargs
+                 ):
+        super().__init__(connection, query_params, row_factory=row_factory, **kwargs)
 
+    @classmethod
+    def generate_n1ql_request(cls, connection, query_params, row_factory=lambda x: x):
+        return cls(connection, query_params, row_factory=row_factory)
 
-class QueryWarning(object):
-    def __init__(self, raw_warning):
-        self._raw_warning = raw_warning
+    def execute(self):
+        return [r for r in list(self)]
 
-    def code(self):
-        # type: (...) -> int
-        return self._raw_warning.get("code")
-
-    def message(self):
-        # type: (...) -> str
-        return self._raw_warning.get("msg")
-
-
-class QueryMetrics(object):
-    def __init__(
-        self, parent  # type: QueryResult
-    ):
-        self._parentquery = parent
-
-    @property
-    def _raw_metrics(self):
-        return self._parentquery.metrics
-
-    def _as_timedelta(self, time_str):
-        return from_str(self._raw_metrics.get(time_str))
-
-    def elapsed_time(self):
-        # type: (...) -> timedelta
-        return self._as_timedelta("elapsedTime")
-
-    def execution_time(self):
-        # type: (...) -> timedelta
-        return self._as_timedelta("executionTime")
-
-    def sort_count(self):
-        # type: (...) -> UnsignedInt64
-        return UnsignedInt64(self._raw_metrics.get("sortCount", 0))
-
-    def result_count(self):
-        # type: (...) -> UnsignedInt64
-        return UnsignedInt64(self._raw_metrics.get("resultCount", 0))
-
-    def result_size(self):
-        # type: (...) -> UnsignedInt64
-        return UnsignedInt64(self._raw_metrics.get("resultSize", 0))
-
-    def mutation_count(self):
-        # type: (...) -> UnsignedInt64
-        return UnsignedInt64(self._raw_metrics.get("mutationCount", 0))
-
-    def error_count(self):
-        # type: (...) -> UnsignedInt64
-        return UnsignedInt64(self._raw_metrics.get("errorCount", 0))
-
-    def warning_count(self):
-        # type: (...) -> UnsignedInt64
-        return UnsignedInt64(self._raw_metrics.get("warningCount", 0))
-
-
-class QueryMetaData(object):
-    def __init__(
-        self, parent  # type: QueryResult
-    ):
-        self._parentquery_for_metadata = parent
-
-    def request_id(self):
-        # type: (...) -> str
-        return self._parentquery_for_metadata.meta.get("requestID")
-
-    def client_context_id(self):
-        # type: (...) -> str
-        return self._parentquery_for_metadata.meta.get("clientContextID")
-
-    def signature(self):
-        # type: (...) -> Optional[JSON]
-        return self._parentquery_for_metadata.meta.get("signature")
-
-    def status(self):
-        # type: (...) -> QueryStatus
-        return QueryStatus[self._parentquery_for_metadata.meta.get(
-            "status").upper()]
-
-    def warnings(self):
-        # type: (...) -> List[QueryWarning]
-        return list(
-            map(QueryWarning, self._parentquery_for_metadata.meta.get("warnings", []))
-        )
-
-    def metrics(self):
-        # type: (...) -> Optional[QueryMetrics]
-        return QueryMetrics(self._parentquery_for_metadata)
-
-    def profile(self):
-        # type: (...) -> Optional[JSON]
-        return self._parentquery_for_metadata.profile
-
-
-class QueryResult(iterable_wrapper(N1QLRequest)):
-    def __init__(self, params, parent, **kwargs):
-        # type (...)->None
-        super(QueryResult, self).__init__(params, parent, **kwargs)
-
-    def metadata(
-        self,  # type: QueryResult
-    ):
-        # type: (...) -> QueryMetaData
-        return QueryMetaData(self)
-
-    def _respond_to_timedelta(self, conv_query):
-        first_entry = next(iter(conv_query), None)
-        nanoseconds = first_entry.get("$1", None) if first_entry else None
-
-        if nanoseconds is None:
-            raise Exception(
-                "Cannot get result from first entry {} of query response {}".format(
-                    first_entry, conv_query.rows()
-                )
-            )
-        return timedelta(seconds=nanoseconds * 1e-9)
-
-    def _duration_as_timedelta(self, metrics_str):
+    def _get_metadata(self):
         try:
-            conv_query = self._parent.query(
-                r'select str_to_duration("{}");'.format(metrics_str),
-                timeout=timedelta(seconds=5),
-            )
-            return self._respond_to_timedelta(conv_query)
-        except Exception as e:
-            raise QueryException.pyexc(
-                "Not able to get result in nanoseconds", inner=e)
+            query_response = next(self._streaming_result)
+            self._set_metadata(query_response)
+        except StopIteration:
+            pass
+        # if self._query_request_ftr.done():
+        #     if self._query_request_ftr.exception():
+        #         print('raising exception')
+        #         raise self._query_request_ftr.exception()
+        #     else:
+        #         self._set_metadata()
+        # else:
+        #     self._loop.run_until_complete(self._query_request_ftr)
+        #     self._set_metadata()
+            # print(self._query_request_result)
+
+    def __iter__(self):
+        # if self._query_request_ftr is not None and self._query_request_ftr.done():
+        if self.done_streaming:
+            # @TODO(jc): better exception
+            raise Exception("Previously iterated over results.")
+
+        # if self._query_request_ftr is None:
+        if not self.started_streaming:
+            self._submit_query()
+
+        return self
+
+    def _get_next_row(self):
+        if self.done_streaming is True:
+            return
+
+        # try:
+        row = next(self._streaming_result)
+        if row is None:
+            raise StopIteration
+
+        return self.serializer.deserialize(row)
+        # except StopIteration:
+        #     self._done_streaming = True
+        #     self._get_metadata()
+
+    def __next__(self):
+        try:
+            # if self._query_request_ftr.done() and self._query_request_ftr.exception():
+            #     raise self._query_request_ftr.exception()
+            return self._get_next_row()
+            # return self._rows.get_nowait()
+        # except asyncio.QueueEmpty:
+        #     self._get_metadata()
+        #     raise StopIteration
+        except StopIteration:
+            self._done_streaming = True
+            self._get_metadata()
+            raise
+        except CouchbaseException as ex:
+            raise ex
+        except Exception as ex:
+            print(f'base exception: {ex}')
+            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
+            print(exc_cls.__name__)
+            excptn = exc_cls(str(ex))
+            raise excptn

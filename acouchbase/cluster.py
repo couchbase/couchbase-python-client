@@ -1,384 +1,292 @@
-from typing import TypeVar, Type
+from __future__ import annotations
+
 import asyncio
 from asyncio import AbstractEventLoop
-from functools import partial
+from datetime import timedelta
+from time import perf_counter
+from typing import (TYPE_CHECKING,
+                    Any,
+                    Awaitable,
+                    Dict)
 
-from couchbase_core._libcouchbase import (
-    PYCBC_CONN_F_ASYNC,
-    PYCBC_CONN_F_ASYNC_DTOR,
-    LCB_HTTP_TYPE_MANAGEMENT,
-    LCB_HTTP_METHOD_GET,
-    FMT_JSON)
-from couchbase_core.client import Client as CoreClient
-from couchbase.cluster import AsyncCluster as V3AsyncCluster
-from couchbase.bucket import AsyncBucket as V3AsyncBucket
-from couchbase.management.admin import Admin as AsyncAdminBucket
-from couchbase.collection import CBCollection, BinaryCollection as CBBinaryCollection
-from acouchbase.asyncio_iops import IOPS
-from acouchbase.iterator import (
-    AQueryResult,
-    ASearchResult,
-    AAnalyticsResult,
-    AViewResult,
-)
-from acouchbase.management.buckets import ABucketManager
-from acouchbase.management.collections import ACollectionManager
-from acouchbase.management.queries import AQueryIndexManager
-from acouchbase.management.users import AUserManager
+from acouchbase import get_event_loop
+from acouchbase.analytics import AnalyticsQuery, AsyncAnalyticsRequest
+from acouchbase.bucket import AsyncBucket
+from acouchbase.logic import AsyncWrapper
+from acouchbase.management.analytics import AnalyticsIndexManager
+from acouchbase.management.buckets import BucketManager
+from acouchbase.management.eventing import EventingFunctionManager
+from acouchbase.management.queries import QueryIndexManager
+from acouchbase.management.search import SearchIndexManager
+from acouchbase.management.users import UserManager
+from acouchbase.n1ql import AsyncN1QLRequest, N1QLQuery
+from acouchbase.search import AsyncSearchRequest, SearchQueryBuilder
+from couchbase.diagnostics import ClusterState, ServiceType
+from couchbase.exceptions import UnAmbiguousTimeoutException
+from couchbase.logic.cluster import ClusterLogic
+from couchbase.options import PingOptions, forward_args
+from couchbase.result import (AnalyticsResult,
+                              ClusterInfoResult,
+                              DiagnosticsResult,
+                              PingResult,
+                              QueryResult,
+                              SearchResult)
 
-T = TypeVar("T", bound=CoreClient)
+if TYPE_CHECKING:
+    from acouchbase.search import SearchQuery
+    from couchbase.options import (AnalyticsOptions,
+                                   ClusterOptions,
+                                   DiagnosticsOptions,
+                                   QueryOptions,
+                                   SearchOptions,
+                                   WaitUntilReadyOptions)
 
 
-class AIOClientMixin(object):
-    def __new__(cls, *args, **kwargs):
-        # type: (...) -> Type[T]
-        if not hasattr(cls, "AIO_wrapped") and cls.__name__ in ["ACluster", "ABucket"]:
-            for m in ["ping"]:
-                try:
-                    method = cls._meth_factory(getattr(cls, m), m)
-                    setattr(cls, m, method)
-                except AttributeError:
-                    raise
-            cls.AIO_wrapped = True
-        return super(AIOClientMixin, cls).__new__(cls)
+class AsyncCluster(ClusterLogic):
 
-    @staticmethod
-    def _meth_factory(meth, _):
-        def ret(self, *args, **kwargs):
-            rv = meth(self, *args, **kwargs)
-            ft = asyncio.Future()
+    def __init__(self,
+                 connstr,  # type: str
+                 *options,  # type: ClusterOptions
+                 **kwargs,  # type: Dict[str, Any]
+                 ) -> AsyncCluster:
 
-            def on_ok(res):
-                ft.set_result(res)
-                rv.clear_callbacks()
+        self._loop = self._get_loop(kwargs.pop("loop", None))
+        super().__init__(connstr, *options, **kwargs)
 
-            def on_err(_, excls, excval, __):
-                err = excls(excval)
-                ft.set_exception(err)
-                rv.clear_callbacks()
+        self._close_ftr = None
+        self._connect_ftr = self._connect()
 
-            rv.set_callbacks(on_ok, on_err)
-            return ft
-
-        return ret
-
-    def __init__(self, connstr=None, *args, **kwargs):
-        loop = asyncio.get_event_loop()
-        super(
-            AIOClientMixin,
-            self).__init__(
-            connstr,
-            *
-            args,
-            iops=IOPS(loop),
-            **kwargs)
-        self._loop = loop
-
-        if issubclass(type(self), CBCollection):
-            # do not set the connection callback for a collection
-            return
-
-        self._cft = None
-        self._setup_connect()
-
-    def _setup_connect(self):
-        cft = asyncio.Future()
-
-        def ftresult(err):
-            if err:
-                cft.set_exception(err)
-            else:
-                cft.set_result(True)
-
-        self._conn_ft = cft
-        self._conncb = ftresult
-
-    @classmethod
-    def _chain_futures(cls, ft, fn, cft):
+    @property
+    def loop(self) -> AbstractEventLoop:
         """
         **INTERNAL**
         """
-        try:
-            if cft.cancelled():
-                ft.cancel()
-            exc = cft.exception()
-            if exc is not None:
-                ft.set_exception(exc)
-            else:
-                fn(ft)
-        except Exception:
-            ft.cancel()
-            raise
+        return self._loop
 
-    def _get_server_version(self, ft):
-        result = self._http_request(type=LCB_HTTP_TYPE_MANAGEMENT,
-                                    path="/pools",
-                                    method=LCB_HTTP_METHOD_GET,
-                                    content_type="application/json",
-                                    response_format=FMT_JSON)
+    def _get_loop(self, loop=None) -> AbstractEventLoop:
+        if not loop:
+            loop = get_event_loop()
 
-        def on_ok(response):
-            if(issubclass(type(self), V3AsyncCluster)):
-                self._set_server_version(override=response.value)
-            ft.set_result(True)
-            result.clear_callbacks()
+        if not loop.is_running():
+            raise RuntimeError("Event loop is not running.")
 
-        def on_err(_, excls, excval, __):
-            err = excls(excval)
-            ft.set_exception(err)
-            result.clear_callbacks()
+        return loop
 
-        result.set_callbacks(on_ok, on_err)
-        return ft
-
-    def on_connect(self):
-        # only if the connect callback has already been hit
-        # do we want to attempt _connect() again
-        if not self.connected and not hasattr(self, "_conncb"):
-            self._setup_connect()
-            self._connect()
-
-        if not self.connected and issubclass(type(self), V3AsyncCluster) and self._cft is None:
-            self._cft = asyncio.Future()
-            self._conn_ft.add_done_callback(
-                partial(AIOClientMixin._chain_futures, self._cft, self._get_server_version))
-
-        if(issubclass(type(self), V3AsyncCluster)):
-            return self._cft
-
-        # for buckets
-        return self._conn_ft
-
-    connected = CoreClient.connected
-
-
-class AIOCollectionMixin(object):
-    def __new__(cls, *args, **kwargs):
-        # type: (...) -> Type[T]
-        if not hasattr(cls, "AIO_wrapped"):
-            for k, method in cls._gen_memd_wrappers(
-                AIOCollectionMixin._meth_factory
-            ).items():
-                setattr(cls, k, method)
-            cls.AIO_wrapped = True
-        return super(AIOCollectionMixin, cls).__new__(cls)
-
-    @staticmethod
-    def _meth_factory(meth, _):
-        def ret(self, *args, **kwargs):
-            rv = meth(self, *args, **kwargs)
-            ft = asyncio.Future()
-
-            def on_ok(res):
-                ft.set_result(res)
-                rv.clear_callbacks()
-
-            def on_err(_, excls, excval, __):
-                err = excls(excval)
-                ft.set_exception(err)
-                rv.clear_callbacks()
-
-            rv.set_callbacks(on_ok, on_err)
-            return ft
-
-        return ret
-
-    def __init__(self, *args, **kwargs):
-        super(AIOCollectionMixin, self).__init__(*args, **kwargs)
-
-
-class AsyncCBCollection(AIOCollectionMixin, CBCollection):
-    def __init__(self, *args, **kwargs):
-        super(AsyncCBCollection, self).__init__(*args, **kwargs)
-
-    def binary(self):
-        # type: (...) -> AsyncBinaryCollection
-        return AsyncBinaryCollection(self)
-
-
-Collection = AsyncCBCollection
-
-
-class AIOBinaryCollectionMixin(object):
-    def __new__(cls, *args, **kwargs):
-        # type: (...) -> Type[T]
-        if not hasattr(cls, "AIO_wrapped"):
-            for method_name in cls._MEMCACHED_OPERATIONS:
-                setattr(cls, method_name, AIOBinaryCollectionMixin._meth_factory(
-                    getattr(cls, method_name), method_name))
-            cls.AIO_wrapped = True
-        return super(AIOBinaryCollectionMixin, cls).__new__(cls)
-
-    @staticmethod
-    def _meth_factory(meth, _):
-        def ret(self, *args, **kwargs):
-            rv = meth(self, *args, **kwargs)
-            ft = asyncio.Future()
-
-            def on_ok(res):
-                ft.set_result(res)
-                rv.clear_callbacks()
-
-            def on_err(_, excls, excval, __):
-                err = excls(excval)
-                ft.set_exception(err)
-                rv.clear_callbacks()
-
-            rv.set_callbacks(on_ok, on_err)
-            return ft
-
-        return ret
-
-    def __init__(self, *args, **kwargs):
-        super(AIOBinaryCollectionMixin, self).__init__(*args, **kwargs)
-
-
-class AsyncBinaryCollection(AIOBinaryCollectionMixin, CBBinaryCollection):
-    def __init__(self, *args, **kwargs):
-        super(AsyncBinaryCollection, self).__init__(*args, **kwargs)
-
-
-class ABucket(AIOClientMixin, V3AsyncBucket):
-    def __init__(self, *args, **kwargs):
-        super(ABucket, self).__init__(
-            collection_factory=AsyncCBCollection, *args, **kwargs
-        )
-
-    def collections(self  # type: "ABucket"
-                    ) -> ACollectionManager:
+    @AsyncWrapper.inject_connection_callbacks()
+    def _connect(self, **kwargs) -> Awaitable:
         """
-        Get the ACollectionManager.
-
-        :return: the :class:`.management.ACollectionManager` for this bucket.
+        **INTERNAL**
         """
-        return ACollectionManager(self._admin, self._name)
+        super()._connect_cluster(**kwargs)
 
-    def view_query(self, *args, **kwargs):
-        if "itercls" not in kwargs:
-            kwargs["itercls"] = AViewResult
-        return super(ABucket, self).view_query(*args, **kwargs)
+    def on_connect(self) -> Awaitable:
+        if not (self._connect_ftr or self.connected):
+            self._connect_ftr = self._connect()
+            self._close_ftr = None
 
+        return self._connect_ftr
 
-Bucket = ABucket
+    @AsyncWrapper.inject_close_callbacks()
+    def _close(self, **kwargs) -> Awaitable:
+        """
+        **INTERNAL**
+        """
+        super()._close_cluster(**kwargs)
 
+    async def close(self) -> None:
+        if self.connected and not self._close_ftr:
+            self._close_ftr = self._close()
+            self._connect_ftr = None
 
-class AAdmin(AsyncAdminBucket):
-    def __init__(self, connection_string=None, **kwargs):
-        loop = asyncio.get_event_loop()
+        await self._close_ftr
+        super()._destroy_connection()
 
-        kwargs.setdefault('_flags', 0)
-        # Flags should be async
-        kwargs['_flags'] |= PYCBC_CONN_F_ASYNC | PYCBC_CONN_F_ASYNC_DTOR
-        super(AAdmin, self).__init__(
-            connection_string=connection_string, _iops=IOPS(loop), **kwargs
+    def bucket(self, bucket_name) -> AsyncBucket:
+        return AsyncBucket(self, bucket_name)
+
+    def cluster_info(self) -> Awaitable[ClusterInfoResult]:
+        if not self.connected:
+            # @TODO(jc):  chain??
+            raise RuntimeError(
+                "Cluster is not connected, cannot get cluster info. "
+                "Use await cluster.on_connect() to connect a cluster.")
+
+        return self._get_cluster_info()
+
+    @AsyncWrapper.inject_cluster_callbacks(ClusterInfoResult, set_cluster_info=True)
+    def _get_cluster_info(self, **kwargs) -> Awaitable[ClusterInfoResult]:
+        """**INTERNAL**
+
+        use cluster_info()
+
+        Returns:
+            Awaitable: _description_
+        """
+        super()._get_cluster_info(**kwargs)
+
+    @AsyncWrapper.inject_cluster_callbacks(PingResult, chain_connection=True)
+    def ping(self,
+             *opts,  # type: PingOptions
+             **kwargs  # type: Any
+             ) -> Awaitable[PingResult]:
+        return super().ping(*opts, **kwargs)
+
+    @AsyncWrapper.inject_cluster_callbacks(DiagnosticsResult, chain_connection=True)
+    def diagnostics(self,
+                    *opts,  # type: DiagnosticsOptions
+                    **kwargs  # type: Dict[str, Any]
+                    ) -> Awaitable[DiagnosticsResult]:
+
+        return super().diagnostics(*opts, **kwargs)
+
+    async def wait_until_ready(self,
+                               timeout,  # type: timedelta
+                               *opts,  # type: WaitUntilReadyOptions
+                               **kwargs  # type: Dict[str, Any]
+                               ) -> Awaitable[None]:
+        final_args = forward_args(kwargs, *opts)
+        service_types = final_args.get("service_types", None)
+        if not service_types:
+            service_types = [ServiceType(st.value) for st in ServiceType]
+
+        desired_state = final_args.get("desired_state", ClusterState.Online)
+        service_types_set = set(map(lambda st: st.value if isinstance(st, ServiceType) else st, service_types))
+
+        # @TODO: handle units
+        timeout_millis = timeout.total_seconds() * 1000
+
+        interval_millis = float(50)
+        start = perf_counter()
+        time_left = timeout_millis
+        while True:
+
+            diag_res = await self.diagnostics()
+            endpoint_svc_types = set(map(lambda st: st.value, diag_res.endpoints.keys()))
+            if not endpoint_svc_types.issuperset(service_types_set):
+                await self.ping(PingOptions(service_types=service_types))
+                diag_res = await self.diagnostics()
+
+            if diag_res.state == desired_state:
+                break
+
+            interval_millis += 500
+            if interval_millis > 1000:
+                interval_millis = 1000
+
+            time_left = timeout_millis - ((perf_counter() - start) * 1000)
+            if interval_millis > time_left:
+                interval_millis = time_left
+
+            if time_left <= 0:
+                raise UnAmbiguousTimeoutException(message="Desired state not found.")
+
+            await asyncio.sleep(interval_millis / 1000)
+
+    def query(
+        self,
+        statement,  # type: str
+        *options,  # type: QueryOptions
+        **kwargs  # type: Any
+    ) -> QueryResult:
+
+        query = N1QLQuery.create_query_object(
+            statement, *options, **kwargs)
+        return QueryResult(AsyncN1QLRequest.generate_n1ql_request(self.connection,
+                                                                  self.loop,
+                                                                  query.params))
+
+    def analytics_query(
+        self,  # type: Cluster
+        statement,  # type: str
+        *options,  # type: AnalyticsOptions
+        **kwargs
+    ) -> AnalyticsResult:
+        query = AnalyticsQuery.create_query_object(
+            statement, *options, **kwargs)
+        return AnalyticsResult(AsyncAnalyticsRequest.generate_analytics_request(self.connection,
+                                                                                self.loop,
+                                                                                query.params))
+
+    def search_query(
+        self,
+        index,  # type: str
+        query,  # type: SearchQuery
+        *options,  # type: SearchOptions
+        **kwargs
+    ) -> SearchResult:
+        query = SearchQueryBuilder.create_search_query_object(
+            index, query, *options, **kwargs
         )
-        self._loop = loop
+        return SearchResult(AsyncSearchRequest.generate_search_request(self.connection,
+                                                                       self.loop,
+                                                                       query.as_encodable()))
 
-        self._setup_connect()
-
-    def _setup_connect(self):
-        cft = asyncio.Future()
-
-        def ftresult(err):
-            if err:
-                cft.set_exception(err)
-            else:
-                cft.set_result(True)
-
-        self._cft = cft
-        self._conncb = ftresult
-
-    def on_connect(self):
-        # only if the connect callback has already been hit
-        # do we want to attempt _connect() again
-        if not self.connected and not hasattr(self, "_conncb"):
-            self._setup_connect()
-            self._connect()
-
-        return self._cft
-
-    connected = CoreClient.connected
-
-
-Admin = AAdmin
-
-
-class ACluster(AIOClientMixin, V3AsyncCluster):
-    def __init__(self, connection_string, *options, **kwargs):
-        if "admin_factory" not in kwargs:
-            kwargs["admin_factory"] = Admin
-        super(ACluster, self).__init__(
-            connection_string, *options, bucket_factory=Bucket, **kwargs
-        )
-
-    def query(self, *args, **kwargs):
-        if "itercls" not in kwargs:
-            kwargs["itercls"] = AQueryResult
-        return super(ACluster, self).query(*args, **kwargs)
-
-    def search_query(self, *args, **kwargs):
-        if "itercls" not in kwargs:
-            kwargs["itercls"] = ASearchResult
-        return super(ACluster, self).search_query(*args, **kwargs)
-
-    def analytics_query(self, *args, **kwargs):
-        return super(ACluster, self).analytics_query(
-            *args, itercls=kwargs.pop("itercls", AAnalyticsResult), **kwargs
-        )
-
-    def buckets(self):
-        # type: (...) -> ABucketManager
+    def buckets(self) -> BucketManager:
         """
         Get the BucketManager.
 
-        :return: A :class:`~.management.ABucketManager` with which you can create or modify buckets on the cluster.
+        :return: A :class:`~.management.BucketManager` with which you can create or modify buckets on the cluster.
         """
-        self._check_for_shutdown()
-        return ABucketManager(self._admin)
+        # TODO:  AlreadyShutdownException?
+        return BucketManager(self.connection, self.loop)
 
-    def query_indexes(self):
-        # type: (...) -> AQueryIndexManager
-        """
-        Get the AQueryIndexManager.
-
-        :return:  A :class:`~.management.AQueryIndexManager` with which you can create or modify query indexes on
-            the cluster.
-        """
-        self._check_for_shutdown()
-        return AQueryIndexManager(self._admin)
-
-    def users(self):
-        # type: (...) -> AUserManager
+    def users(self) -> UserManager:
         """
         Get the UserManager.
 
-        :return: A :class:`~.management.AUserManager` with which you can create or update cluster users and roles.
+        :return: A :class:`~.management.UserManager` with which you can create or update cluster users and roles.
         """
-        self._check_for_shutdown()
-        return AUserManager(self._admin)
+        # TODO:  AlreadyShutdownException?
+        return UserManager(self.connection, self.loop)
+
+    def query_indexes(self) -> QueryIndexManager:
+        """
+        Get the QueryIndexManager.
+
+        :return:  A :class:`~.management.queries.QueryIndexManager` with which you can create or modify query indexes on
+            the cluster.
+        """
+        # TODO:  AlreadyShutdownException?
+        return QueryIndexManager(self.connection, self.loop)
+
+    def analytics_indexes(self) -> AnalyticsIndexManager:
+        """
+        Get the AnalyticsIndexManager.
+
+        :return:  A :class:`~.management.AnalyticsIndexManager` with which you can create or modify analytics datasets,
+            dataverses, etc.. on the cluster.
+        """
+        # TODO:  AlreadyShutdownException?
+        return AnalyticsIndexManager(self.connection, self.loop)
+
+    def search_indexes(self) -> SearchIndexManager:
+        """
+        Get the SearchIndexManager.
+
+        :return:  A :class:`~.management.SearchIndexManager` with which you can create or modify search indexes
+            on the cluster.
+        """
+        # TODO:  AlreadyShutdownException?
+        return SearchIndexManager(self.connection, self.loop)
+
+    def eventing_functions(self) -> EventingFunctionManager:
+        """
+        Get the EventingFunctionManager.
+
+        :return:  A :class:`~.management.EventingFunctionManager` with which you can create or modify eventing
+            functions
+        """
+        # TODO:  AlreadyShutdownException?
+        return EventingFunctionManager(self.connection, self.loop)
+
+    @staticmethod
+    async def connect(connstr,  # type: str
+                      *options,  # type: ClusterOptions
+                      **kwargs,  # type: Dict[str, Any]
+                      ) -> AsyncCluster:
+        cluster = AsyncCluster(connstr, *options, **kwargs)
+        await cluster.on_connect()
+        return cluster
 
 
-Cluster = ACluster
-
-
-def get_event_loop(
-    evloop=None,  # type: AbstractEventLoop
-):
-    """
-    Get an event loop compatible with acouchbase.
-    Some Event loops, such as ProactorEventLoop (the default asyncio event
-    loop for Python 3.8 on Windows) are not compatible with acouchbase as
-    they don't implement all members in the abstract base class.
-
-    :param evloop: preferred event loop
-    :return: The preferred event loop, if compatible, otherwise, a compatible
-    alternative event loop.
-    """
-    return IOPS.get_event_loop(evloop)
-
-
-def close_event_loop():
-    """
-    Close the event loop used by acouchbase.
-    """
-    IOPS.close_event_loop()
+Cluster = AsyncCluster

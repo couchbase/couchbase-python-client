@@ -1,45 +1,19 @@
-build
-dist
-MANIFEST
-couchbase/libcouchbase*.so
-couchbase/libcouchbase.c
-couchbase/libcouchbase.h
-couchbase/__pycache__
-*.pyc
-*.pdb
-*.swp
-*.out
-*.log
 *.so
-*.dylib
-*.pyd
+*.dylib*.*
 *.dll
-*.exe
-tests.ini
-*.out*
-# My personal development stuff
-p3
-p2
-p3_nose
-p2_nose
-BUILD*
-couchbase*/_version.py
-ci/
-buildall.py
-*egg-info*
-_trial*
-*.dSYM
-.idea/
-CouchbaseMock*.jar
-/.cproject
-/.eclipse-pmd
-/.project
-/.pydevproject
-/cmake-build-debug/
-/make.sh
-html
-latex
-.eggs/
-.vscode/
-openssl_version.json
+*.idea
+__pycache__/
+cmake-build-*/
+*.DS_Store
 
+# Distribution / packaging
+build/
+
+# VS Code
+.vscode/
+
+# tests
+tests/test_*/
+CouchbaseMock*.jar
+gocaves*
+.pytest_cache/

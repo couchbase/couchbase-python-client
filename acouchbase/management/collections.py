@@ -1,226 +1,70 @@
-import asyncio
-from typing import Any, Iterable
+from typing import (TYPE_CHECKING,
+                    Any,
+                    Awaitable,
+                    Dict,
+                    Iterable)
 
-from couchbase_core import mk_formstr
-from couchbase.options import forward_args
-from couchbase.management.admin import Admin
-from couchbase.exceptions import NotSupportedWrapper
-from couchbase.management.collections import (CollectionsErrorHandler, ScopeSpec,
-                                              GetAllScopesOptions, CreateScopeOptions,
-                                              DropScopeOptions, DropCollectionOptions,
-                                              CollectionSpec, CreateCollectionOptions)
+from acouchbase.management.logic import CollectionMgmtWrapper
+from couchbase.management.logic.collections_logic import (CollectionManagerLogic,
+                                                          CollectionSpec,
+                                                          ScopeSpec)
+
+if TYPE_CHECKING:
+    from couchbase.management.options import (CreateCollectionOptions,
+                                              CreateScopeOptions,
+                                              DropCollectionOptions,
+                                              DropScopeOptions,
+                                              GetAllScopesOptions)
 
 
-class ACollectionManager(object):
-    _HANDLE_ERRORS_ASYNC = True
+class CollectionManager(CollectionManagerLogic):
 
-    def __init__(self,  # type: "ACollectionManager"
-                 admin_bucket,  # type: Admin
-                 bucket_name  # type: str
-                 ):
-        self._admin_bucket = admin_bucket
-        self._base_path = "pools/default/buckets/{}/scopes".format(bucket_name)
+    def __init__(self, connection, loop, bucket_name):
+        super().__init__(connection, bucket_name)
+        self._loop = loop
 
-    @CollectionsErrorHandler.mgmt_exc_wrap_async
-    def create_scope(self,            # type: "ACollectionManager"
+    @property
+    def loop(self):
+        """
+        **INTERNAL**
+        """
+        return self._loop
+
+    @CollectionMgmtWrapper.inject_callbacks(None, CollectionManagerLogic._ERROR_MAPPING)
+    def create_scope(self,
                      scope_name,      # type: str
                      *options,        # type: CreateScopeOptions
-                     **kwargs         # type: Any
-                     ):
-        # type: (...) -> None
-        """
-        Creates a new scope.
+                     **kwargs         # type: Dict[str, Any]
+                     ) -> Awaitable[None]:
+        super().create_scope(scope_name, *options, **kwargs)
 
-        :param str scope_name: name of the scope.
-        :param CreateScopeOptions options: options (currently just timeout).
-        :param kwargs: keyword version of `options`
-        :return:
-
-        :raises: InvalidArgumentsException
-        Any exceptions raised by the underlying platform
-        Uri
-        POST http://localhost:8091/pools/default/buckets/<bucket>/collections -d name=<scope_name>
-        """
-        params = {
-            'name': scope_name
-        }
-
-        form = mk_formstr(params)
-        kwargs.update({'path': self._base_path,
-                       'method': 'POST',
-                       'content_type': 'application/x-www-form-urlencoded',
-                       'content': form})
-
-        result = self._admin_bucket.http_request(
-            **forward_args(kwargs, *options))
-
-        ft = asyncio.Future()
-
-        def on_ok(_):
-            ft.set_result(True)
-            result.clear_callbacks()
-
-        def on_err(_, excls, excval, __):
-            err = excls(excval)
-            ft.set_exception(err)
-            result.clear_callbacks()
-
-        result.set_callbacks(on_ok, on_err)
-        return ft
-
-    @CollectionsErrorHandler.mgmt_exc_wrap_async
-    def drop_scope(self,            # type: "ACollectionManager"
+    @CollectionMgmtWrapper.inject_callbacks(None, CollectionManagerLogic._ERROR_MAPPING)
+    def drop_scope(self,
                    scope_name,      # type: str
                    *options,        # type: DropScopeOptions
-                   **kwargs         # type: Any
-                   ):
-        """
-        Removes a scope.
+                   **kwargs         # type: Dict[str, Any]
+                   ) -> Awaitable[None]:
+        super().drop_scope(scope_name, *options, **kwargs)
 
-        :param str scope_name: name of the scope
-        :param DropScopeOptions options: (currently just timeout)
-        :param kwargs: keyword version of `options`
-
-        :raises: ScopeNotFoundException
-        """
-
-        kwargs.update({'path': '{}/{}'.format(self._base_path, scope_name),
-                       'method': 'DELETE'})
-        result = self._admin_bucket.http_request(
-            **forward_args(kwargs, *options))
-
-        ft = asyncio.Future()
-
-        def on_ok(_):
-            ft.set_result(True)
-            result.clear_callbacks()
-
-        def on_err(_, excls, excval, __):
-            err = excls(excval)
-            ft.set_exception(err)
-            result.clear_callbacks()
-
-        result.set_callbacks(on_ok, on_err)
-        return ft
-
-    @NotSupportedWrapper.a_400_or_404_means_not_supported_async
-    def get_all_scopes(self,            # type: "ACollectionManager"
+    @CollectionMgmtWrapper.inject_callbacks((ScopeSpec, CollectionSpec), CollectionManagerLogic._ERROR_MAPPING)
+    def get_all_scopes(self,
                        *options,        # type: GetAllScopesOptions
-                       **kwargs         # type: Any
-                       ):
-        # type: (...) -> Iterable[ScopeSpec]
-        """
-        Gets all scopes. This will fetch a manifest and then pull the scopes out of it.
+                       **kwargs         # type: Dict[str, Any]
+                       ) -> Awaitable[Iterable[ScopeSpec]]:
+        super().get_all_scopes(*options, **kwargs)
 
-        :param GetAllScopesOptions options: (currently just timeout).
-        :param kwargs: keyword version of options
-        :return: An Iterable[ScopeSpec] containing all scopes in the associated bucket.
-        """
-        kwargs.update({'path': self._base_path,
-                       'method': 'GET'})
-        result = self._admin_bucket.http_request(
-            **forward_args(kwargs, *options))
-
-        ft = asyncio.Future()
-
-        def on_ok(response):
-            # now lets turn the response into a list of ScopeSpec...
-            # the response looks like:
-            # {'uid': '0', 'scopes': [{'name': '_default', 'uid': '0', 'collections': [{'name': '_default', 'uid': '0'}]}]}
-            retval = list()
-            for s in response.value['scopes']:
-                scope = ScopeSpec(s['name'], list())
-                for c in s['collections']:
-                    scope.collections.append(
-                        CollectionSpec(c['name'], scope.name))
-                retval.append(scope)
-            ft.set_result(retval)
-            result.clear_callbacks()
-
-        def on_err(_, excls, excval, __):
-            err = excls(excval)
-            ft.set_exception(err)
-            result.clear_callbacks()
-
-        result.set_callbacks(on_ok, on_err)
-        return ft
-
-    @CollectionsErrorHandler.mgmt_exc_wrap_async
-    def create_collection(self,           # type: "ACollectionManager"
+    @CollectionMgmtWrapper.inject_callbacks(None, CollectionManagerLogic._ERROR_MAPPING)
+    def create_collection(self,
                           collection,     # type: CollectionSpec
                           *options,       # type: CreateCollectionOptions
-                          **kwargs        # type: Any
-                          ):
-        """
-        Creates a new collection.
+                          **kwargs        # type: Dict[str, Any]
+                          ) -> Awaitable[None]:
+        super().create_collection(collection, *options, **kwargs)
 
-        :param CollectionSpec collection: specification of the collection.
-        :param CreateCollectionOptions options:  options (currently just timeout).
-        :param kwargs: keyword version of 'options'
-        :return:
-        :raises: InvalidArgumentsException
-        :raises: CollectionAlreadyExistsException
-        :raises: ScopeNotFoundException
-        """
-
-        params = {
-            'name': collection.name
-        }
-        if collection.max_ttl:
-            params['maxTTL'] = int(collection.max_ttl.total_seconds())
-
-        form = mk_formstr(params)
-        kwargs.update({'path': '{}/{}/collections'.format(self._base_path, collection.scope_name),
-                       'method': 'POST',
-                       'content_type': 'application/x-www-form-urlencoded',
-                       'content': form})
-        result = self._admin_bucket.http_request(
-            **forward_args(kwargs, *options))
-
-        ft = asyncio.Future()
-
-        def on_ok(response):
-            ft.set_result(response)
-            result.clear_callbacks()
-
-        def on_err(_, excls, excval, __):
-            err = excls(excval)
-            ft.set_exception(err)
-            result.clear_callbacks()
-
-        result.set_callbacks(on_ok, on_err)
-        return ft
-
-    @CollectionsErrorHandler.mgmt_exc_wrap_async
-    def drop_collection(self,           # type: "ACollectionManager"
+    @CollectionMgmtWrapper.inject_callbacks(None, CollectionManagerLogic._ERROR_MAPPING)
+    def drop_collection(self,
                         collection,     # type: CollectionSpec
                         *options,       # type: DropCollectionOptions
-                        **kwargs        # type: Any
-                        ):
-        # type: (...) -> None
-        """
-        Removes a collection.
-
-        :param CollectionSpec collection: namspece of the collection.
-        :param DropCollectionOptions options: (currently just timeout).
-        :param kwargs: keyword version of `options`
-        :raises: CollectionNotFoundException
-        """
-        kwargs.update({'path': '{}/{}/collections/{}'.format(self._base_path, collection.scope_name, collection.name),
-                       'method': 'DELETE'})
-        result = self._admin_bucket.http_request(
-            **forward_args(kwargs, *options))
-
-        ft = asyncio.Future()
-
-        def on_ok(response):
-            ft.set_result(response)
-            result.clear_callbacks()
-
-        def on_err(_, excls, excval, __):
-            err = excls(excval)
-            ft.set_exception(err)
-            result.clear_callbacks()
-
-        result.set_callbacks(on_ok, on_err)
-        return ft
+                        **kwargs        # type: Dict[str, Any]
+                        ) -> Awaitable[None]:
+        super().drop_collection(collection, *options, **kwargs)

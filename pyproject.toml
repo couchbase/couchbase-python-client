@@ -1,3 +1,34 @@
 [build-system]
+requires = [
+  "setuptools>=42",
+  "wheel",
+  "cmake"
+]
+build-backend = "setuptools.build_meta"
 
-requires = ["setuptools", "wheel", "scikit-build", "cmake", "ninja"]
+[tool.pytest.ini_options]
+minversion = "6.0"
+#addopts = "-ra -q"
+testpaths = [
+    "tests",
+    "acouchbase/tests"
+]
+python_classes = [
+    "*Tests"
+]
+python_files = [
+    "*_t.py"
+]
+
+[tool.autopep8]
+max_line_length = 120
+in-place = true
+recursive = true
+
+[tool.isort]
+multi_line_output = 1
+force_grid_wrap = 3
+use_parentheses = true
+ensure_newline_before_comments = true
+line_length = 120
+order_by_type = true

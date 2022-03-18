@@ -1,12 +1,24 @@
-import json
-import pickle
-from typing import Any, Tuple, Union
-from abc import ABC, abstractmethod
+from __future__ import annotations
 
-from couchbase.exceptions import ValueFormatException
-from couchbase_core._libcouchbase import (Transcoder, FMT_JSON,
-                                          FMT_BYTES, FMT_UTF8, FMT_PICKLE,
-                                          FMT_LEGACY_MASK, FMT_COMMON_MASK)
+import json
+import pickle  # nosec
+from abc import ABC, abstractmethod
+from typing import (TYPE_CHECKING,
+                    Any,
+                    Tuple,
+                    Union)
+
+from couchbase.constants import (FMT_BYTES,
+                                 FMT_COMMON_MASK,
+                                 FMT_JSON,
+                                 FMT_LEGACY_MASK,
+                                 FMT_PICKLE,
+                                 FMT_UTF8)
+from couchbase.exceptions import InvalidArgumentException, ValueFormatException
+from couchbase.serializer import DefaultJsonSerializer
+
+if TYPE_CHECKING:
+    from couchbase.serializer import Serializer
 
 UNIFIED_FORMATS = (FMT_JSON, FMT_BYTES, FMT_UTF8, FMT_PICKLE)
 LEGACY_FORMATS = tuple([x & FMT_LEGACY_MASK for x in UNIFIED_FORMATS])
@@ -40,29 +52,37 @@ class Transcoder(ABC):
     """
 
     @abstractmethod
-    def encode_value(self,  # type: "Transcoder"
+    def encode_value(self,
                      value  # type: Any
                      ) -> Tuple[bytes, int]:
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
-    def decode_value(self,  # type: "Transcoder"
+    def decode_value(self,
                      value,  # type: bytes
                      flags  # type: int
                      ) -> Any:
-        pass
+        raise NotImplementedError()
 
 
 class JSONTranscoder(Transcoder):
 
-    def encode_value(self,  # type: "JSONTranscoder"
+    def __init__(self, serializer=None  # type: Serializer
+                 ):
+
+        if not serializer:
+            self._serializer = DefaultJsonSerializer()
+        else:
+            self._serializer = serializer
+
+    def encode_value(self,
                      value,  # type: Any
                      ) -> Tuple[bytes, int]:
 
         if isinstance(value, str):
             format = FMT_JSON
         elif isinstance(value, (bytes, bytearray)):
-            raise ValueError(
+            raise ValueFormatException(
                 "The JSONTranscoder (default transcoder) does not support binary data.")
         elif isinstance(value, (list, tuple, dict, bool, int, float)) or value is None:
             format = FMT_JSON
@@ -73,9 +93,9 @@ class JSONTranscoder(Transcoder):
         if format != FMT_JSON:
             raise ValueFormatException("Unrecognized format {}".format(format))
 
-        return json.dumps(value, ensure_ascii=False).encode("utf-8"), FMT_JSON
+        return self._serializer.serialize(value), FMT_JSON
 
-    def decode_value(self,  # type: "JSONTranscoder"
+    def decode_value(self,
                      value,  # type: bytes
                      flags  # type: int
                      ) -> Any:
@@ -89,7 +109,7 @@ class JSONTranscoder(Transcoder):
             raise ValueFormatException(
                 "The JSONTranscoder (default transcoder) does not support string format")
         elif format == FMT_JSON:
-            return json.loads(value.decode('utf-8'))
+            return self._serializer.deserialize(value)
         else:
             raise ValueFormatException(
                 "Unrecognized format provided: {}".format(format))
@@ -97,7 +117,7 @@ class JSONTranscoder(Transcoder):
 
 class RawJSONTranscoder(Transcoder):
 
-    def encode_value(self,  # type: "RawJSONTranscoder"
+    def encode_value(self,
                      value  # type: Union[str,bytes,bytearray]
                      ) -> Tuple[bytes, int]:
 
@@ -111,7 +131,7 @@ class RawJSONTranscoder(Transcoder):
             raise ValueFormatException(
                 "Only binary and string data supported by RawJSONTranscoder")
 
-    def decode_value(self,  # type: "RawJSONTranscoder"
+    def decode_value(self,
                      value,  # type: bytes
                      flags  # type: int
                      ) -> Union[str, bytes]:
@@ -135,12 +155,12 @@ class RawJSONTranscoder(Transcoder):
                 raise ValueFormatException(
                     "Only binary and string data supported by RawJSONTranscoder")
         else:
-            raise ValueError("Unexpected flags value.")
+            raise InvalidArgumentException("Unexpected flags value.")
 
 
 class RawStringTranscoder(Transcoder):
 
-    def encode_value(self,  # type: "RawStringTranscoder"
+    def encode_value(self,
                      value  # type: str
                      ) -> Tuple[bytes, int]:
 
@@ -150,7 +170,7 @@ class RawStringTranscoder(Transcoder):
             raise ValueFormatException(
                 "Only string data supported by RawStringTranscoder")
 
-    def decode_value(self,  # type: "RawStringTranscoder"
+    def decode_value(self,
                      value,  # type: bytes
                      flags  # type: int
                      ) -> Union[str, bytes]:
@@ -166,11 +186,11 @@ class RawStringTranscoder(Transcoder):
             raise ValueFormatException(
                 "JSON format type not supported by RawStringTranscoder")
         else:
-            raise ValueError("Unexpected flags value.")
+            raise InvalidArgumentException("Unexpected flags value.")
 
 
 class RawBinaryTranscoder(Transcoder):
-    def encode_value(self,  # type: "RawBinaryTranscoder"
+    def encode_value(self,
                      value  # type: Union[bytes,bytearray]
                      ) -> Tuple[bytes, int]:
 
@@ -182,7 +202,7 @@ class RawBinaryTranscoder(Transcoder):
             raise ValueFormatException(
                 "Only binary data supported by RawBinaryTranscoder")
 
-    def decode_value(self,  # type: "RawBinaryTranscoder"
+    def decode_value(self,
                      value,  # type: bytes
                      flags  # type: int
                      ) -> bytes:
@@ -200,12 +220,12 @@ class RawBinaryTranscoder(Transcoder):
             raise ValueFormatException(
                 "JSON format type not supported by RawBinaryTranscoder")
         else:
-            raise ValueError("Unexpected flags value.")
+            raise InvalidArgumentException("Unexpected flags value.")
 
 
 class LegacyTranscoder(Transcoder):
 
-    def encode_value(self,  # type: "LegacyTranscoder"
+    def encode_value(self,
                      value  # type: Any
                      ) -> Tuple[bytes, int]:
 
@@ -240,7 +260,7 @@ class LegacyTranscoder(Transcoder):
         else:
             raise ValueFormatException("Unrecognized format {}".format(format))
 
-    def decode_value(self,  # type: "LegacyTranscoder"
+    def decode_value(self,
                      value,  # type: bytes
                      flags  # type: int
                      ) -> Any:
@@ -258,7 +278,7 @@ class LegacyTranscoder(Transcoder):
                 # if error encountered, assume return bytes
                 return value
         elif format == FMT_PICKLE:
-            return pickle.loads(value)
+            return pickle.loads(value)  # nosec
         else:
             # default to returning bytes
             return value

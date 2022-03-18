@@ -1,2 +1,0 @@
-from couchbase.management.collections import CollectionManager
-from couchbase.management.views import ViewIndexManager

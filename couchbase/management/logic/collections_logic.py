@@ -1,0 +1,240 @@
+from __future__ import annotations
+
+from datetime import timedelta
+from typing import (TYPE_CHECKING,
+                    Any,
+                    Dict,
+                    Iterable,
+                    List,
+                    Optional)
+
+from couchbase.exceptions import (CollectionAlreadyExistsException,
+                                  CollectionNotFoundException,
+                                  QuotaLimitedException,
+                                  RateLimitedException,
+                                  ScopeAlreadyExistsException,
+                                  ScopeNotFoundException)
+from couchbase.options import forward_args
+from couchbase.pycbc_core import (collection_mgmt_operations,
+                                  management_operation,
+                                  mgmt_operations)
+
+if TYPE_CHECKING:
+    from couchbase.management.options import (CreateCollectionOptions,
+                                              CreateScopeOptions,
+                                              DropCollectionOptions,
+                                              DropScopeOptions,
+                                              GetAllScopesOptions)
+
+
+class CollectionManagerLogic:
+
+    _ERROR_MAPPING = {r'.*Scope with.*name.*already exists': ScopeAlreadyExistsException,
+                      r'.*Scope with.*name.*not found': ScopeNotFoundException,
+                      r'.*Collection with.*name.*not found': CollectionNotFoundException,
+                      r'.*Collection with.*name.*already exists': CollectionAlreadyExistsException,
+                      r'.*collection_not_found.*': CollectionNotFoundException,
+                      r'.*scope_not_found.*': ScopeNotFoundException,
+                      r'.*Maximum number of collections has been reached for scope.*': QuotaLimitedException,
+                      r'.*Limit\(s\) exceeded\s+\[.*\].*': RateLimitedException}
+
+    def __init__(self, connection, bucket_name):
+        self._connection = connection
+        self._bucket_name = bucket_name
+
+    def create_scope(self,
+                     scope_name,      # type: str
+                     *options,        # type: CreateScopeOptions
+                     **kwargs         # type: Dict[str, Any]
+                     ) -> None:
+
+        op_args = {
+            "bucket_name": self._bucket_name,
+            "scope_name": scope_name
+        }
+
+        mgmt_kwargs = {
+            "conn": self._connection,
+            "mgmt_op": mgmt_operations.COLLECTION.value,
+            "op_type": collection_mgmt_operations.CREATE_SCOPE.value,
+            "op_args": op_args
+        }
+
+        callback = kwargs.pop('callback', None)
+        if callback:
+            mgmt_kwargs['callback'] = callback
+
+        errback = kwargs.pop('errback', None)
+        if errback:
+            mgmt_kwargs['errback'] = errback
+
+        final_args = forward_args(kwargs, *options)
+        if final_args.get("timeout", None) is not None:
+            mgmt_kwargs["timeout"] = final_args.get("timeout")
+
+        return management_operation(**mgmt_kwargs)
+
+    def drop_scope(self,
+                   scope_name,      # type: str
+                   *options,        # type: DropScopeOptions
+                   **kwargs         # type: Dict[str, Any]
+                   ) -> None:
+        op_args = {
+            "bucket_name": self._bucket_name,
+            "scope_name": scope_name
+        }
+
+        mgmt_kwargs = {
+            "conn": self._connection,
+            "mgmt_op": mgmt_operations.COLLECTION.value,
+            "op_type": collection_mgmt_operations.DROP_SCOPE.value,
+            "op_args": op_args
+        }
+
+        callback = kwargs.pop('callback', None)
+        if callback:
+            mgmt_kwargs['callback'] = callback
+
+        errback = kwargs.pop('errback', None)
+        if errback:
+            mgmt_kwargs['errback'] = errback
+
+        final_args = forward_args(kwargs, *options)
+        if final_args.get("timeout", None) is not None:
+            mgmt_kwargs["timeout"] = final_args.get("timeout")
+
+        return management_operation(**mgmt_kwargs)
+
+    def get_all_scopes(self,
+                       *options,        # type: GetAllScopesOptions
+                       **kwargs         # type: Dict[str, Any]
+                       ) -> List[ScopeSpec]:
+        op_args = {
+            "bucket_name": self._bucket_name
+        }
+
+        mgmt_kwargs = {
+            "conn": self._connection,
+            "mgmt_op": mgmt_operations.COLLECTION.value,
+            "op_type": collection_mgmt_operations.GET_ALL_SCOPES.value,
+            "op_args": op_args
+        }
+
+        callback = kwargs.pop('callback', None)
+        if callback:
+            mgmt_kwargs['callback'] = callback
+
+        errback = kwargs.pop('errback', None)
+        if errback:
+            mgmt_kwargs['errback'] = errback
+
+        final_args = forward_args(kwargs, *options)
+        if final_args.get("timeout", None) is not None:
+            mgmt_kwargs["timeout"] = final_args.get("timeout")
+
+        return management_operation(**mgmt_kwargs)
+
+    def create_collection(self,
+                          collection,     # type: CollectionSpec
+                          *options,       # type: CreateCollectionOptions
+                          **kwargs        # type: Dict[str, Any]
+                          ) -> None:
+        op_args = {
+            "bucket_name": self._bucket_name,
+            "scope_name": collection.scope_name,
+            "collection_name": collection.name
+        }
+
+        if collection.max_ttl is not None:
+            op_args["max_expiry"] = int(collection.max_ttl.total_seconds())
+
+        mgmt_kwargs = {
+            "conn": self._connection,
+            "mgmt_op": mgmt_operations.COLLECTION.value,
+            "op_type": collection_mgmt_operations.CREATE_COLLECTION.value,
+            "op_args": op_args
+        }
+
+        callback = kwargs.pop('callback', None)
+        if callback:
+            mgmt_kwargs['callback'] = callback
+
+        errback = kwargs.pop('errback', None)
+        if errback:
+            mgmt_kwargs['errback'] = errback
+
+        final_args = forward_args(kwargs, *options)
+        if final_args.get("timeout", None) is not None:
+            kwargs["timeout"] = final_args.get("timeout")
+
+        return management_operation(**mgmt_kwargs)
+
+    def drop_collection(self,
+                        collection,     # type: CollectionSpec
+                        *options,       # type: DropCollectionOptions
+                        **kwargs        # type: Dict[str, Any]
+                        ) -> None:
+        op_args = {
+            "bucket_name": self._bucket_name,
+            "scope_name": collection.scope_name,
+            "collection_name": collection.name
+        }
+
+        mgmt_kwargs = {
+            "conn": self._connection,
+            "mgmt_op": mgmt_operations.COLLECTION.value,
+            "op_type": collection_mgmt_operations.DROP_COLLECTION.value,
+            "op_args": op_args
+        }
+
+        callback = kwargs.pop('callback', None)
+        if callback:
+            mgmt_kwargs['callback'] = callback
+
+        errback = kwargs.pop('errback', None)
+        if errback:
+            mgmt_kwargs['errback'] = errback
+
+        final_args = forward_args(kwargs, *options)
+        if final_args.get("timeout", None) is not None:
+            mgmt_kwargs["timeout"] = final_args.get("timeout")
+
+        return management_operation(**mgmt_kwargs)
+
+
+class CollectionSpec(object):
+    def __init__(self,
+                 collection_name,           # type: str
+                 scope_name='_default',     # type: str
+                 max_ttl=None               # type: timedelta
+                 ):
+        self._name, self._scope_name = collection_name, scope_name
+        self._max_ttl = max_ttl
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def scope_name(self) -> str:
+        return self._scope_name
+
+    @property
+    def max_ttl(self) -> Optional[timedelta]:
+        return self._max_ttl
+
+
+class ScopeSpec(object):
+    def __init__(self,
+                 name,  # type : str
+                 collections,  # type: Iterable[CollectionSpec]
+                 ):
+        self._name, self._collections = name, collections
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def collections(self) -> Iterable[CollectionSpec]:
+        return self._collections
