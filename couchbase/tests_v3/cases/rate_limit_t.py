@@ -35,6 +35,7 @@ class RateLimitTests(CollectionTestCase):
     USERNAME = "rate-limit-user"
     MIN_VERSION = 7.1
     MIN_BUILD = 1621
+    RATE_LIMIT_SCOPE_NAME = 'rate-limit-scope'
 
     def setUp(self):
         super(RateLimitTests, self).setUp()
@@ -51,7 +52,7 @@ class RateLimitTests(CollectionTestCase):
         self._drop_rate_limit_user()
         cm = self.bucket.collections()
         for scope in cm.get_all_scopes():
-            if "_default" not in scope.name:
+            if scope.name == self.RATE_LIMIT_SCOPE_NAME:
                 cm.drop_scope(scope.name)
 
         if len(self._fts_indexes) > 0:
@@ -309,23 +310,27 @@ class RateLimitTests(CollectionTestCase):
                 "egress_mib_per_min": 10
             }
         })
-        cluster = Cluster("couchbase://{}".format(self.cluster_info.host),
-                          ClusterOptions(PasswordAuthenticator(self.USERNAME, "password")))
-        bucket = cluster.bucket("default")
-        collection = bucket.default_collection()
-        collection.exists("some-key")
-
+        cluster = None
+        cluster1 = None
         with self.assertRaises((RateLimitedException)):
+            cluster = Cluster("couchbase://{}".format(self.cluster_info.host),
+                            ClusterOptions(PasswordAuthenticator(self.USERNAME, "password")))
+            bucket = cluster.bucket("default")
+            collection = bucket.default_collection()
+            collection.exists("some-key")
+
             cluster1 = Cluster("couchbase://{}".format(self.cluster_info.host),
                                ClusterOptions(PasswordAuthenticator(self.USERNAME, "password")))
             bucket1 = cluster1.bucket("default")
             collection1 = bucket1.default_collection()
             collection1.exists("some-key")
 
-        cluster._close()
-        cluster.disconnect()
-        cluster1._close()
-        cluster1.disconnect()
+        if cluster:
+            cluster._close()
+            cluster.disconnect()
+        if cluster1:
+            cluster1._close()
+            cluster1.disconnect()
 
     def test_rate_limits_query(self):
         self._create_rate_limit_user(self.USERNAME, {
@@ -379,7 +384,7 @@ class RateLimitTests(CollectionTestCase):
         cluster.disconnect()
 
     def test_rate_limits_kv_scopes_data_size(self):
-        scope_name = "rate-limit-scope"
+        scope_name = self.RATE_LIMIT_SCOPE_NAME
         cm = self.bucket.collections()
         self._create_rate_limit_scope(cm, scope_name, "default", {
             "kv_limits": {"data_size": 1024*1024}
@@ -410,7 +415,7 @@ class RateLimitTests(CollectionTestCase):
             10, 3, self._get_scope, cm, scope_name, (ScopeNotFoundException,))
 
     def test_rate_limits_index_scopes(self):
-        scope_name = "rate-limit-scope"
+        scope_name = self.RATE_LIMIT_SCOPE_NAME
         cm = self.bucket.collections()
         self._create_rate_limit_scope(cm, scope_name, "default", {
             "index_limits": {"num_indexes": 1}
@@ -428,10 +433,29 @@ class RateLimitTests(CollectionTestCase):
         # make sure query service sees the new keyspace
         # drop the index and then re-create
         ixm = self.cluster.query_indexes()
-        self.try_n_times(
-            10, 3, ixm.create_primary_index, "default",
-            CreatePrimaryQueryIndexOptions(scope_name=scope_name,
+        def create_primary_index():
+            try:
+                ixm.create_primary_index("default", CreatePrimaryQueryIndexOptions(scope_name=scope_name,
                                            collection_name=collection_spec.name))
+                indexes = ixm.get_all_indexes("default", GetAllQueryIndexOptions(scope_name=scope_name,collection_name=collection_spec.name))
+                if len(indexes) == 0:
+                    return False
+            except CouchbaseException:
+                return False
+
+            return True
+
+        count = 1
+        while not create_primary_index():
+            if count == 5:
+                raise SkipTest("Unable to create primary index.")
+
+            count += 1
+            indexes = ixm.get_all_indexes("default", GetAllQueryIndexOptions(scope_name=scope_name,collection_name=collection_spec.name))
+            time.sleep(1)
+            if len(indexes) > 0:
+                break
+
         self.try_n_times(
             10, 3, ixm.drop_primary_index, "default",
             DropPrimaryQueryIndexOptions(scope_name=scope_name,
@@ -463,7 +487,7 @@ class RateLimitTests(CollectionTestCase):
             10, 3, self._get_scope, cm, scope_name, (ScopeNotFoundException,))
 
     def test_rate_limits_fts_scopes(self):
-        scope_name = "rate-limit-scope"
+        scope_name = self.RATE_LIMIT_SCOPE_NAME
         cm = self.bucket.collections()
         self._create_rate_limit_scope(cm, scope_name, "default", {
             "fts_limits": {"num_fts_indexes": 1}
@@ -546,7 +570,7 @@ class RateLimitTests(CollectionTestCase):
             10, 3, self._get_scope, cm, scope_name, (ScopeNotFoundException,))
 
     def test_rate_limits_collections_scopes_limits(self):
-        scope_name = "rate-limit-scope"
+        scope_name = self.RATE_LIMIT_SCOPE_NAME
         cm = self.bucket.collections()
         self._create_rate_limit_scope(cm, scope_name, "default", {
             "cluster_mgr_limits": {"num_collections": 1}

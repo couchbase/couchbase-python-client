@@ -2,6 +2,7 @@ import time
 from unittest import SkipTest
 import attr
 from datetime import timedelta
+from flaky import flaky
 
 from couchbase_tests.base import CollectionTestCase
 from couchbase.cluster import QueryScanConsistency
@@ -44,7 +45,7 @@ class EventingFunctionManagementTestStatusException(Exception):
 
     pass
 
-
+@flaky(5, 1)
 class EventingFunctionManagementTests(CollectionTestCase):
     EVT_BUCKET_NAME = "beer-sample"
     SIMPLE_EVT_CODE = 'function OnUpdate(doc, meta) {\n    log("Doc created/updated", meta.id);\n}\n\nfunction OnDelete(meta, options) {\n    log("Doc deleted/expired", meta.id);\n}'
@@ -308,6 +309,7 @@ class EventingFunctionManagementTests(CollectionTestCase):
             EventingFunctionNotFoundException
         )
 
+    @flaky(5, 1)
     def test_drop_function_fail(self):
         with self.assertRaises(
             (EventingFunctionNotDeployedException,
@@ -322,7 +324,7 @@ class EventingFunctionManagementTests(CollectionTestCase):
         self.efm.deploy_function(self.BASIC_FUNC.name)
         # now, wait for it to be deployed
         self._wait_until_status(
-            15, 2, EventingFunctionState.Deployed, self.BASIC_FUNC.name
+            20, 3, EventingFunctionState.Deployed, self.BASIC_FUNC.name
         )
 
         with self.assertRaises(EventingFunctionNotUnDeployedException):
@@ -382,6 +384,7 @@ class EventingFunctionManagementTests(CollectionTestCase):
         for func in funcs:
             self._validate_function(func)
 
+    @flaky(5, 1)
     def test_deploy_function(self):
         # deploy function -- but first verify in undeployed state
         self._wait_until_status(
@@ -389,7 +392,7 @@ class EventingFunctionManagementTests(CollectionTestCase):
         )
         self.efm.deploy_function(self.BASIC_FUNC.name)
         self._wait_until_status(
-            15, 2, EventingFunctionState.Deployed, self.BASIC_FUNC.name
+            20, 3, EventingFunctionState.Deployed, self.BASIC_FUNC.name
         )
         func = self.try_n_times(
             5, 1, self.efm.get_function, self.BASIC_FUNC.name)
@@ -399,6 +402,7 @@ class EventingFunctionManagementTests(CollectionTestCase):
             func.settings.deployment_status, EventingFunctionDeploymentStatus.Deployed
         )
 
+    @flaky(5, 1)
     def test_deploy_function_fail(self):
         with self.assertRaises(EventingFunctionNotFoundException):
             self.efm.deploy_function("not-a-function")
@@ -409,11 +413,12 @@ class EventingFunctionManagementTests(CollectionTestCase):
         )
         self.efm.deploy_function(self.BASIC_FUNC.name)
         self._wait_until_status(
-            15, 2, EventingFunctionState.Deployed, self.BASIC_FUNC.name
+            20, 3, EventingFunctionState.Deployed, self.BASIC_FUNC.name
         )
         with self.assertRaises(EventingFunctionAlreadyDeployedException):
             self.efm.deploy_function(self.BASIC_FUNC.name)
 
+    @flaky(5, 1)
     def test_undeploy_function(self):
         # deploy function -- but first verify in undeployed state
         self._wait_until_status(
@@ -421,7 +426,7 @@ class EventingFunctionManagementTests(CollectionTestCase):
         )
         self.efm.deploy_function(self.BASIC_FUNC.name)
         self._wait_until_status(
-            15, 2, EventingFunctionState.Deployed, self.BASIC_FUNC.name
+            20, 3, EventingFunctionState.Deployed, self.BASIC_FUNC.name
         )
         func = self.try_n_times(
             5, 1, self.efm.get_function, self.BASIC_FUNC.name)
@@ -450,13 +455,14 @@ class EventingFunctionManagementTests(CollectionTestCase):
         ):
             self.efm.undeploy_function("not-a-function")
 
+    @flaky(5, 1)
     def test_pause_function(self):
         self._wait_until_status(
             10, 1, EventingFunctionState.Undeployed, self.BASIC_FUNC.name
         )
         self.efm.deploy_function(self.BASIC_FUNC.name)
         self._wait_until_status(
-            15, 2, EventingFunctionState.Deployed, self.BASIC_FUNC.name
+            20, 3, EventingFunctionState.Deployed, self.BASIC_FUNC.name
         )
         self.efm.pause_function(self.BASIC_FUNC.name)
         func = self.try_n_times(
@@ -467,6 +473,7 @@ class EventingFunctionManagementTests(CollectionTestCase):
             func.settings.processing_status, EventingFunctionProcessingStatus.Paused
         )
 
+    @flaky(5, 1)
     def test_pause_function_fail(self):
         self._wait_until_status(
             10, 1, EventingFunctionState.Undeployed, self.BASIC_FUNC.name
@@ -478,6 +485,7 @@ class EventingFunctionManagementTests(CollectionTestCase):
         with self.assertRaises(EventingFunctionNotBootstrappedException):
             self.efm.pause_function(self.BASIC_FUNC.name)
 
+    @flaky(5, 1)
     def test_resume_function(self):
         # make sure function has been deployed
         self._wait_until_status(
@@ -485,7 +493,7 @@ class EventingFunctionManagementTests(CollectionTestCase):
         )
         self.efm.deploy_function(self.BASIC_FUNC.name)
         self._wait_until_status(
-            15, 2, EventingFunctionState.Deployed, self.BASIC_FUNC.name
+            20, 3, EventingFunctionState.Deployed, self.BASIC_FUNC.name
         )
         # pause function - verify status is paused
         self.efm.pause_function(self.BASIC_FUNC.name)
@@ -502,6 +510,7 @@ class EventingFunctionManagementTests(CollectionTestCase):
             func.settings.processing_status, EventingFunctionProcessingStatus.Running
         )
 
+    @flaky(5, 1)
     def test_resume_function_fail(self):
         self._wait_until_status(
             10, 1, EventingFunctionState.Undeployed, self.BASIC_FUNC.name

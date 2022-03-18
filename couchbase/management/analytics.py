@@ -272,9 +272,9 @@ class AnalyticsIndexErrorHandler(ErrorMapper):
     @staticmethod
     def mapping():
         # type (...)->Mapping[str, CBErrorType]
-        return {HTTPException: {'24055.*already exists': AnalyticsLinkExistsException,
-                                '24006.*does not exist': AnalyticsLinkNotFoundException,
-                                '24034.*Cannot find': DataverseNotFoundException}}
+        return {HTTPException: {r'.*24055.*already exists': AnalyticsLinkExistsException,
+                                r'.*24006.*does not exist': AnalyticsLinkNotFoundException,
+                                r'.*24034.*Cannot find': DataverseNotFoundException}}
 
 
 class AnalyticsIndexManager(GenericManager):

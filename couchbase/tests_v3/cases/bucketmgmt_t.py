@@ -13,7 +13,6 @@ from couchbase_tests.base import CollectionTestCase
 from couchbase_core.durability import Durability
 
 
-@flaky(10, 1)
 class BucketManagementTests(CollectionTestCase):
 
     BUCKETS_TO_ADD = {'fred': {}, 'jane': {}, 'sally': {}}
@@ -40,6 +39,7 @@ class BucketManagementTests(CollectionTestCase):
                 # now be sure it is really gone
             self.try_n_times_till_exception(10, 3, self.bm.get_bucket, bucket)
 
+    @flaky(5, 1)
     def test_bucket_create(self):
         self.bm.create_bucket(
             CreateBucketSettings(
@@ -52,6 +52,7 @@ class BucketManagementTests(CollectionTestCase):
                 bucket['minimum_durability_level'],
                 Durability.NONE)
 
+    @flaky(5, 1)
     def test_bucket_create_replica_index_true(self):
         self.bm.create_bucket(
             CreateBucketSettings(
@@ -62,6 +63,7 @@ class BucketManagementTests(CollectionTestCase):
         bucket = self.try_n_times(10, 1, self.bm.get_bucket, "fred")
         self.assertTrue(bucket.replica_index)
 
+    @flaky(5, 1)
     def test_bucket_create_replica_index_false(self):
         self.bm.create_bucket(
             CreateBucketSettings(
@@ -72,6 +74,7 @@ class BucketManagementTests(CollectionTestCase):
         bucket = self.try_n_times(10, 1, self.bm.get_bucket, "fred")
         self.assertFalse(bucket.replica_index)
 
+    @flaky(5, 1)
     def test_bucket_create_durability(self):
         if float(self.cluster_version[0:3]) < 6.6:
             raise SkipTest(
@@ -84,6 +87,7 @@ class BucketManagementTests(CollectionTestCase):
         bucket = self.try_n_times(10, 1, self.bm.get_bucket, "fred")
         self.assertEqual(bucket['minimum_durability_level'], min_durability)
 
+    @flaky(5, 1)
     def test_bucket_create_fail(self):
         settings = CreateBucketSettings(
             name='fred',
@@ -95,6 +99,7 @@ class BucketManagementTests(CollectionTestCase):
             self.bm.create_bucket,
             settings)
 
+    @flaky(5, 1)
     def test_bucket_drop_fail(self):
         settings = CreateBucketSettings(
             name='fred',
@@ -107,6 +112,7 @@ class BucketManagementTests(CollectionTestCase):
             self.bm.drop_bucket,
             'fred')
 
+    @flaky(5, 1)
     def test_bucket_list(self):
         for bucket, kwargs in BucketManagementTests.BUCKETS_TO_ADD.items():
             self.bm.create_bucket(
@@ -119,6 +125,7 @@ class BucketManagementTests(CollectionTestCase):
         self.assertEqual(set(), {"fred", "jane", "sally"}.difference(
             set(map(lambda x: x.name, self.bm.get_all_buckets()))))
 
+    @flaky(5, 1)
     def test_cluster_sees_bucket(self):
         # Create the bucket
         self.bm.create_bucket(
@@ -128,6 +135,7 @@ class BucketManagementTests(CollectionTestCase):
         # cluster should be able to return it (though, not right away)
         self.try_n_times(10, 3, self.cluster.bucket, 'fred')
 
+    @flaky(5, 1)
     def test_change_ttl(self):
         # Create the bucket
         self.bm.create_bucket(
@@ -152,6 +160,7 @@ class BucketManagementTests(CollectionTestCase):
             datetime.timedelta(
                 seconds=500))
 
+    @flaky(5, 1)
     def test_bucket_flush(self):
         # Create the bucket
         self.bm.create_bucket(
@@ -164,6 +173,7 @@ class BucketManagementTests(CollectionTestCase):
         # flush the bucket
         self.try_n_times(10, 3, self.bm.flush_bucket, bucket.name)
 
+    @flaky(5, 1)
     def test_bucket_flush_fail(self):
         # Create the bucket
         self.bm.create_bucket(
@@ -180,6 +190,7 @@ class BucketManagementTests(CollectionTestCase):
             self.bm.flush_bucket,
             'fred')
 
+    @flaky(5, 1)
     def test_bucket_backend_default(self):
         version = self.cluster.get_server_version()
         if version.short_version < 7.1:
@@ -195,6 +206,7 @@ class BucketManagementTests(CollectionTestCase):
         bucket = self.try_n_times(10, 3, self.bm.get_bucket, 'fred')
         self.assertEqual(bucket.storage_backend, StorageBackend.COUCHSTORE)
 
+    @flaky(5, 1)
     def test_bucket_backend_magma(self):
         version = self.cluster.get_server_version()
         if version.short_version < 7.1:
@@ -211,6 +223,7 @@ class BucketManagementTests(CollectionTestCase):
         bucket = self.try_n_times(10, 3, self.bm.get_bucket, 'fred')
         self.assertEqual(bucket.storage_backend, StorageBackend.MAGMA)
 
+    @flaky(5, 1)
     def test_bucket_backend_ephemeral(self):
         version = self.cluster.get_server_version()
         if version.short_version < 7.1:
@@ -227,6 +240,7 @@ class BucketManagementTests(CollectionTestCase):
         bucket = self.try_n_times(10, 3, self.bm.get_bucket, 'fred')
         self.assertEqual(bucket.storage_backend, StorageBackend.UNDEFINED)
 
+    @flaky(5, 1)
     def test_bucket_custom_conflict_resolution(self):
         version = self.cluster.get_server_version()
         if version.short_version < 7.1 or not version.is_dp:

@@ -289,6 +289,13 @@ class AnalyticsCollectionTests(CollectionTestCase):
         scope = self.bucket.scope(self.beer_sample_collections.scope)
         result = scope.analytics_query("SELECT * FROM beers LIMIT 2")
         self.assertRows(result, 2)
+
+    def test_scope_query_fqdn(self):
+        version = self.cluster.get_server_version()
+        if version.short_version >= 7.1:
+            raise SkipTest("Analytics scope query format not allowed on server versions >= 7.1")
+
+        scope = self.bucket.scope(self.beer_sample_collections.scope)
         result = scope.analytics_query(
             "SELECT * FROM {} LIMIT 2".format(self.beers_fqdn), query_context='')
         self.assertRows(result, 2)
