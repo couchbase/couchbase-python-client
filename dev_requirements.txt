@@ -27,7 +27,7 @@ PyYAML==6.0
 requests==2.26.0
 six==1.16.0
 toml==0.10.2
-Twisted==21.7.0
+Twisted==22.4.0
 urllib3==1.26.7
 virtualenv==20.13.1
 zipp==3.7.0
