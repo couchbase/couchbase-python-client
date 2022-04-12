@@ -8,6 +8,7 @@ cmake-build-*/
 
 # Distribution / packaging
 build/
+couchbase/_version.py
 
 # VS Code
 .vscode/

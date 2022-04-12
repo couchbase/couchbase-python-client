@@ -10,8 +10,18 @@ from setuptools import (Extension,
                         setup)
 from setuptools.command.build_ext import build_ext
 
+import couchbase_version
+
 CMAKE_EXE = os.environ.get('CMAKE_EXE', shutil.which('cmake'))
 
+try:
+    couchbase_version.gen_version()
+except couchbase_version.CantInvokeGit:
+    pass
+
+COUCHBASE_VERSION = couchbase_version.get_version()
+
+COUCHBASE_README = os.path.join(os.path.dirname(__file__), 'README.md')
 
 def check_for_cmake():
     if not CMAKE_EXE:
@@ -148,11 +158,34 @@ if sanitizers:
 # now pop these in CMAKE_COMMON_VARIABLES, and they will be used by cmake...
 os.environ['CMAKE_COMMON_VARIABLES'] = ' '.join(cmake_extra_args)
 
-# should be just couchbase, but don't want any conflict during early dev.
-setup(name='couchbase4',
-      version='0.1',
+print(f'version: {COUCHBASE_VERSION}')
+print(f'README location: {COUCHBASE_README}')
+
+setup(name='couchbase',
+      version=COUCHBASE_VERSION,
       ext_modules=[CMakeExtension('couchbase.pycbc_core')],
       cmdclass={'build_ext': CMakeBuildExt},
+      python_requires='>=3.7',
       packages=find_packages(
-          include=['acouchbase', 'couchbase', 'txcouchbase', 'couchbase.*'])
+          include=['acouchbase', 'couchbase', 'txcouchbase', 'couchbase.*', 'acouchbase.*', 'txcouchbase.*'],
+          exclude=['acouchbase.tests', 'couchbase.tests', 'txcouchbase.tests']),
+      url="https://github.com/couchbase/couchbase-python-client",
+      author="Couchbase, Inc.",
+      author_email="PythonPackage@couchbase.com",
+      license="Apache License 2.0",
+      description="Python Client for Couchbase",
+      long_description=open(COUCHBASE_README, "r").read(),
+      long_description_content_type='text/markdown',
+      keywords=["couchbase", "nosql", "pycouchbase", "libcouchbase"],
+      classifiers=[
+          "Development Status :: 5 - Production/Stable",
+          "License :: OSI Approved :: Apache Software License",
+          "Intended Audience :: Developers",
+          "Operating System :: OS Independent",
+          "Programming Language :: Python",
+          "Programming Language :: Python :: 3",
+          "Programming Language :: Python :: Implementation :: CPython",
+          "Topic :: Database",
+          "Topic :: Software Development :: Libraries",
+          "Topic :: Software Development :: Libraries :: Python Modules"],
       )
