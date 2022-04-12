@@ -26,6 +26,7 @@ from couchbase.result import (ClusterInfoResult,
                               DiagnosticsResult,
                               PingResult)
 from couchbase.transcoder import JSONTranscoder
+from couchbase.options import TransactionConfig
 
 if TYPE_CHECKING:
     from couchbase.options import DiagnosticsOptions, PingOptions
@@ -56,6 +57,9 @@ class ClusterLogic:
         if len(auth_kwargs.keys()) > 0:
             raise InvalidArgumentException(
                 "Authentication kwargs now allowed.  Only provide the Authenticator.")
+
+        self._transaction_config = final_args.pop("transaction_config", TransactionConfig())
+        self._transactions = None
 
         final_args = self._parse_connection_string(**final_args)
         conn_opts = self._validate_connect_options(**final_args)
@@ -187,6 +191,10 @@ class ClusterLogic:
 
     def _close_cluster(self, **kwargs):
 
+        # first close the transactions object, if any
+        if self._transactions:
+            self._transactions.close()
+
         close_kwargs = {}
 
         callback = kwargs.pop('callback', None)
@@ -251,6 +259,7 @@ class ClusterLogic:
             enable_dp_kwargs['errback'] = errback
 
         return management_operation(**enable_dp_kwargs)
+
 
     def ping(self,
              *opts,  # type: PingOptions

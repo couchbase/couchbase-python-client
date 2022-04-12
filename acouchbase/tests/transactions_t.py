@@ -43,10 +43,9 @@ class AsyncTransactionsTests:
 
         coll = b.default_collection()
         if request.param == CollectionType.DEFAULT:
-            cb_env = TestEnvironment(c, b, coll, couchbase_config, transactions=True, manage_buckets=True)
+            cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True)
         elif request.param == CollectionType.NAMED:
-            cb_env = TestEnvironment(c, b, coll, couchbase_config, transactions=True,
-                                     manage_buckets=True, manage_collections=True)
+            cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True, manage_collections=True)
             await cb_env.setup_named_collections()
 
         await cb_env.load_data()
@@ -54,7 +53,6 @@ class AsyncTransactionsTests:
         await cb_env.purge_data()
         if request.param == CollectionType.NAMED:
             await cb_env.teardown_named_collections()
-        cb_env.transactions.close()
         await c.close()
 
     @pytest.fixture(scope="class")
@@ -74,7 +72,7 @@ class AsyncTransactionsTests:
             # hack until I put in the transcoder support
             assert res.content_as[dict] == value
 
-        await cb_env.transactions.run(txn_logic)
+        await cb_env.cluster.transactions.run(txn_logic)
 
     @pytest.mark.asyncio
     async def test_replace(self, cb_env):
@@ -93,7 +91,7 @@ class AsyncTransactionsTests:
             # assert replace_res.content_as[str] == new_value
             assert get_res.cas != replace_res.cas
 
-        await cb_env.transactions.run(txn_logic)
+        await cb_env.cluster.transactions.run(txn_logic)
         result = await coll.get(key)
         assert result.content_as[dict] == new_value
 
@@ -106,7 +104,7 @@ class AsyncTransactionsTests:
         async def txn_logic(ctx):
             await ctx.insert(coll, key, value)
 
-        await cb_env.transactions.run(txn_logic)
+        await cb_env.cluster.transactions.run(txn_logic)
         get_result = await coll.get(key)
         assert get_result.content_as[dict] == value
 
@@ -121,7 +119,7 @@ class AsyncTransactionsTests:
             get_res = await ctx.get(coll, key)
             await ctx.remove(get_res)
 
-        await cb_env.transactions.run(txn_logic)
+        await cb_env.cluster.transactions.run(txn_logic)
         result = await coll.exists(key)
         assert result.exists is False
 
@@ -138,7 +136,7 @@ class AsyncTransactionsTests:
             raise RuntimeError("this should rollback txn")
 
         with pytest.raises(CouchbaseException):
-            await cb_env.transactions.run(txn_logic)
+            await cb_env.cluster.transactions.run(txn_logic)
 
         result = await coll.exists(key)
         result.exists is False
@@ -160,7 +158,7 @@ class AsyncTransactionsTests:
                 pytest.fail(f"Expected insert to raise CouchbaseException, not {e2.__class__.__name__}")
 
         with pytest.raises(CouchbaseException):
-            await cb_env.transactions.run(txn_logic)
+            await cb_env.cluster.transactions.run(txn_logic)
 
         result = await coll.get(default_kvp.key)
         assert result.cas == cas
@@ -180,12 +178,12 @@ class AsyncTransactionsTests:
             for r in res.rows():
                 rows.append(r)
 
-        await cb_env.transactions.run(txn_logic)
+        await cb_env.cluster.transactions.run(txn_logic)
         assert len(rows) == 1
         assert list(rows[0].items())[0][1] == value
 
     @pytest.mark.asyncio
-    async def test_per_txn_query(self, cb_env, default_kvp):
+    async def test_per_txn_config(self, cb_env, default_kvp):
         coll = cb_env.collection
         key = str(uuid4())
         value = default_kvp.value
@@ -193,10 +191,12 @@ class AsyncTransactionsTests:
         async def txn_logic(ctx):
             ctx.insert(coll, key, value)
             await asyncio.sleep(0.001)
-            ctx.get(coll, key)
+            await ctx.get(coll, key)
 
         cfg = PerTransactionConfig(expiration_time=timedelta(microseconds=1))
         with pytest.raises(CouchbaseException):
-            await cb_env.transactions.run(txn_logic, cfg)
+            await cb_env.cluster.transactions.run(txn_logic, cfg)
         result = await coll.exists(key)
         assert result.exists is False
+
+

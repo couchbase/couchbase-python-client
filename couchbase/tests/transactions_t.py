@@ -29,10 +29,10 @@ class TransactionTests:
         b = c.bucket(f"{couchbase_config.bucket_name}")
         coll = b.default_collection()
         if request.param == CollectionType.DEFAULT:
-            cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True, transactions=True)
+            cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True)
         elif request.param == CollectionType.NAMED:
             cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True,
-                                     manage_collections=True, transactions=True)
+                                     manage_collections=True)
             cb_env.setup_named_collections()
 
         cb_env.load_data()
@@ -42,8 +42,6 @@ class TransactionTests:
         if request.param == CollectionType.NAMED:
             cb_env.teardown_named_collections()
             print("named collections torn down")
-        cb_env.transactions.close()
-        print("transactions closed")
         c.close()
         print("cluster closed")
 
@@ -67,7 +65,7 @@ class TransactionTests:
             assert res.id == key
             assert res.content_as[dict] == value
 
-        cb_env.transactions.run(txn_logic)
+        cb_env.cluster.transactions.run(txn_logic)
 
     def test_replace(self, cb_env):
         coll = cb_env.collection
@@ -85,7 +83,7 @@ class TransactionTests:
             # assert replace_res.content_as[str] == new_value
             assert get_res.cas != replace_res.cas
 
-        cb_env.transactions.run(txn_logic)
+        cb_env.cluster.transactions.run(txn_logic)
         result = coll.get(key)
         assert result.content_as[dict] == new_value
 
@@ -97,7 +95,7 @@ class TransactionTests:
         def txn_logic(ctx):
             ctx.insert(coll, key, value)
 
-        cb_env.transactions.run(txn_logic)
+        cb_env.cluster.transactions.run(txn_logic)
         get_result = coll.get(key)
         assert get_result.content_as[dict] == value
 
@@ -111,7 +109,7 @@ class TransactionTests:
             get_res = ctx.get(coll, key)
             ctx.remove(get_res)
 
-        cb_env.transactions.run(txn_logic)
+        cb_env.cluster.transactions.run(txn_logic)
         result = coll.exists(key)
         assert result.exists is False
 
@@ -127,7 +125,7 @@ class TransactionTests:
             raise RuntimeError("this should rollback txn")
 
         with pytest.raises(CouchbaseException):
-            cb_env.transactions.run(txn_logic)
+            cb_env.cluster.transactions.run(txn_logic)
 
         result = coll.exists(key)
         result.exists is False
@@ -148,7 +146,7 @@ class TransactionTests:
                 pytest.fail(f"Expected insert to raise CouchbaseException, not {e2.__class__.__name__}")
 
         with pytest.raises(CouchbaseException):
-            cb_env.transactions.run(txn_logic)
+            cb_env.cluster.transactions.run(txn_logic)
 
         result = coll.get(default_kvp.key)
         assert result.cas == cas
@@ -168,7 +166,7 @@ class TransactionTests:
             for r in res.rows():
                 rows.append(r)
 
-        cb_env.transactions.run(txn_logic)
+        cb_env.cluster.transactions.run(txn_logic)
         assert len(rows) == 1
         assert list(rows[0].items())[0][1] == value
 
@@ -182,5 +180,5 @@ class TransactionTests:
             ctx.get(coll, key)
 
         with pytest.raises(CouchbaseException):
-            cb_env.transactions.run(txn_logic, PerTransactionConfig(expiration_time=timedelta(microseconds=1)))
+            cb_env.cluster.transactions.run(txn_logic, PerTransactionConfig(expiration_time=timedelta(microseconds=1)))
         assert coll.exists(key).exists is False

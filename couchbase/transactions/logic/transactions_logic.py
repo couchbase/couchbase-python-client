@@ -3,20 +3,21 @@ from typing import TYPE_CHECKING
 from couchbase.pycbc_core import (create_transactions,
                                   destroy_transactions,
                                   run_transaction)
-
 if TYPE_CHECKING:
-    from couchbase.cluster import Cluster
-    from couchbase.transactions.transaction_config import TransactionConfig
+    from couchbase.logic.cluster_logic import ClusterLogic
+    from couchbase.options import TransactionConfig
 
 
 class TransactionsLogic:
     def __init__(self,
-                 cluster,  # type: Cluster
+                 cluster,  # type: ClusterLogic
                  config   # type: TransactionConfig
                  ):
         self._conn = cluster.connection
         self._config = config
-        self._loop = cluster.loop
+        self._loop = None
+        if hasattr(cluster, "loop"):
+            self._loop = cluster.loop
         self._txns = create_transactions(self._conn, self._config._base)
 
     def run(self,

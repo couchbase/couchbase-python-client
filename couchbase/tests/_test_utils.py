@@ -22,7 +22,6 @@ from couchbase.management.search import SearchIndexManager
 from couchbase.management.users import UserManager
 from couchbase.management.views import ViewIndexManager
 from couchbase.scope import Scope
-from couchbase.transactions import TransactionConfig, Transactions
 from couchbase.transcoder import RawBinaryTranscoder, RawStringTranscoder
 from tests.helpers import CollectionType  # noqa: F401
 from tests.helpers import KVPair  # noqa: F401
@@ -64,10 +63,6 @@ class TestEnvironment(CouchbaseTestEnvironment):
             self.check_if_feature_supported('view_index_mgmt')
             self._vixm = self.bucket.view_indexes()
 
-        if kwargs.get("transactions", False) is True:
-            # , TransactionConfig(cleanup_lost_attempts=False))
-            self._txns = Transactions(self.cluster, TransactionConfig())
-
         self._test_bucket = None
         self._test_bucket_cm = None
         self._collection_spec = None
@@ -92,11 +87,6 @@ class TestEnvironment(CouchbaseTestEnvironment):
     def bm(self) -> Optional[BucketManager]:
         """Returns the default bucket's BucketManager"""
         return self._bm if hasattr(self, '_bm') else None
-
-    @property
-    def transactions(self) -> Optional[Transactions]:
-        """Returns the transactions object, if supported"""
-        return self._txns
 
     @property
     def cm(self) -> Optional[CollectionManager]:

@@ -21,6 +21,7 @@ from acouchbase.management.search import SearchIndexManager
 from acouchbase.management.users import UserManager
 from acouchbase.n1ql import AsyncN1QLRequest, N1QLQuery
 from acouchbase.search import AsyncSearchRequest, SearchQueryBuilder
+from acouchbase.transactions import Transactions
 from couchbase.diagnostics import ClusterState, ServiceType
 from couchbase.exceptions import UnAmbiguousTimeoutException
 from couchbase.logic.cluster import ClusterLogic
@@ -71,6 +72,12 @@ class AsyncCluster(ClusterLogic):
             raise RuntimeError("Event loop is not running.")
 
         return loop
+
+    @property
+    def transactions(self) -> Transactions:
+        if not self._transactions:
+            self._transactions = Transactions(self, self._transaction_config)
+        return self._transactions
 
     @AsyncWrapper.inject_connection_callbacks()
     def _connect(self, **kwargs) -> Awaitable:

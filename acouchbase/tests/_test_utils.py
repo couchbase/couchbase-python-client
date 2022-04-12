@@ -17,7 +17,6 @@ from acouchbase.management.search import SearchIndexManager
 from acouchbase.management.users import UserManager
 from acouchbase.management.views import ViewIndexManager
 from acouchbase.scope import Scope
-from acouchbase.transactions import Transactions
 from couchbase.exceptions import (BucketDoesNotExistException,
                                   CollectionAlreadyExistsException,
                                   CouchbaseException,
@@ -25,7 +24,6 @@ from couchbase.exceptions import (BucketDoesNotExistException,
                                   ScopeNotFoundException)
 from couchbase.management.buckets import BucketType, CreateBucketSettings
 from couchbase.management.collections import CollectionSpec
-from couchbase.transactions import TransactionConfig
 from couchbase.transcoder import RawBinaryTranscoder, RawStringTranscoder
 from tests.helpers import CollectionType  # noqa: F401
 from tests.helpers import KVPair  # noqa: F401
@@ -70,10 +68,6 @@ class TestEnvironment(CouchbaseTestEnvironment):
         if kwargs.get('manage_eventing_functions', False) is True:
             self.check_if_feature_supported('eventing_function_mgmt')
             self._efm = self.cluster.eventing_functions()
-
-        if kwargs.get("transactions", False) is True:
-            # for now, turn the lost attempts thread off, so we don't have issues shutting down.
-            self._txns = Transactions(self.cluster, TransactionConfig(cleanup_lost_attempts=False))
 
         self._test_bucket = None
         self._test_bucket_cm = None
@@ -144,11 +138,6 @@ class TestEnvironment(CouchbaseTestEnvironment):
     def test_bucket_cm(self) -> Optional[CollectionManager]:
         """Returns the test bucket's CollectionManager"""
         return self._test_bucket_cm if hasattr(self, '_test_bucket_cm') else None
-
-    @property
-    def transactions(self) -> Optional[Transactions]:
-        """Returns a transactions object connected to the cluster"""
-        return self._txns
 
     async def get_new_key_value(self, reset=True):
         if reset is True:

@@ -85,7 +85,7 @@ class Transactions(TransactionsLogic):
 
         super().run(wrapped_logic, per_txn_config, **kwargs)
 
-    # TODO: make async!
+    # TODO: make async?
     def close(self):
         # stop transactions object -- ideally this is done before closing the cluster.
         super().close()

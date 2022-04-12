@@ -30,6 +30,7 @@ from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
 from couchbase.search import SearchQueryBuilder, SearchRequest
+from couchbase.transactions import Transactions
 
 if TYPE_CHECKING:
     from couchbase.options import (AnalyticsOptions,
@@ -60,6 +61,12 @@ class Cluster(ClusterLogic):
         res = super()._close_cluster()
         if res is not None:
             super()._destroy_connection()
+
+    @property
+    def transactions(self) -> Transactions:
+        if not self._transactions:
+            self._transactions = Transactions(self, self._transaction_config)
+        return self._transactions
 
     def close(self):
         if self.connected:
