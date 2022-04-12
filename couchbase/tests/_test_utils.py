@@ -17,6 +17,7 @@ from couchbase.management.buckets import (BucketManager,
                                           BucketType,
                                           CreateBucketSettings)
 from couchbase.management.collections import CollectionManager, CollectionSpec
+from couchbase.management.eventing import EventingFunctionManager
 from couchbase.management.queries import QueryIndexManager
 from couchbase.management.search import SearchIndexManager
 from couchbase.management.users import UserManager
@@ -24,6 +25,7 @@ from couchbase.management.views import ViewIndexManager
 from couchbase.scope import Scope
 from couchbase.transcoder import RawBinaryTranscoder, RawStringTranscoder
 from tests.helpers import CollectionType  # noqa: F401
+from tests.helpers import EventingFunctionManagementTestStatusException  # noqa: F401
 from tests.helpers import KVPair  # noqa: F401
 from tests.helpers import CouchbaseTestEnvironment, CouchbaseTestEnvironmentException
 
@@ -62,6 +64,10 @@ class TestEnvironment(CouchbaseTestEnvironment):
         if kwargs.get("manage_view_indexes", False) is True:
             self.check_if_feature_supported('view_index_mgmt')
             self._vixm = self.bucket.view_indexes()
+
+        if kwargs.get('manage_eventing_functions', False) is True:
+            self.check_if_feature_supported('eventing_function_mgmt')
+            self._efm = self.cluster.eventing_functions()
 
         self._test_bucket = None
         self._test_bucket_cm = None
@@ -117,6 +123,11 @@ class TestEnvironment(CouchbaseTestEnvironment):
     def am(self) -> Optional[AnalyticsIndexManager]:
         """Returns the default AnalyticsIndexManager"""
         return self._am if hasattr(self, '_am') else None
+
+    @property
+    def efm(self) -> Optional[EventingFunctionManager]:
+        """Returns the default EventingFunctionManager"""
+        return self._efm if hasattr(self, '_efm') else None
 
     @property
     def test_bucket(self) -> Optional[Bucket]:

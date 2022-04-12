@@ -1524,7 +1524,7 @@ get_function_url_bindings(PyObject* pyObj_function_url_bindings)
                 url_binding.auth = auth;
             } else if (auth_type.compare("bearer") == 0) {
                 couchbase::operations::management::eventing::function_url_auth_bearer auth{};
-                PyObject* pyObj_key = PyDict_GetItemString(pyObj_binding, "key");
+                PyObject* pyObj_key = PyDict_GetItemString(pyObj_binding, "bearer_key");
                 auth.key = std::string(PyUnicode_AsUTF8(pyObj_key));
                 url_binding.auth = auth;
             }
@@ -1741,107 +1741,119 @@ handle_eventing_function_mgmt_op(connection* conn,
     PyObject* res = nullptr;
     auto barrier = std::make_shared<std::promise<PyObject*>>();
     auto f = barrier->get_future();
-    switch (options->op_type) {
-        case EventingFunctionManagementOperations::UPSERT_FUNCTION: {
-            couchbase::operations::management::eventing_upsert_function_request req{};
-            PyObject* pyObj_client_context_id = PyDict_GetItemString(options->op_args, "client_context_id");
-            if (pyObj_client_context_id != nullptr) {
-                auto client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
-                req.client_context_id = client_context_id;
+    try {
+        switch (options->op_type) {
+            case EventingFunctionManagementOperations::UPSERT_FUNCTION: {
+                couchbase::operations::management::eventing_upsert_function_request req{};
+                PyObject* pyObj_client_context_id = PyDict_GetItemString(options->op_args, "client_context_id");
+                if (pyObj_client_context_id != nullptr) {
+                    auto client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
+                    req.client_context_id = client_context_id;
+                }
+                PyObject* pyObj_eventing_function = PyDict_GetItemString(options->op_args, "eventing_function");
+                req.function = get_eventing_function(pyObj_eventing_function);
+                req.timeout = options->timeout_ms;
+
+                res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_upsert_function_request>(
+                  *conn, req, pyObj_callback, pyObj_errback, barrier);
+                break;
             }
-            PyObject* pyObj_eventing_function = PyDict_GetItemString(options->op_args, "eventing_function");
-            req.function = get_eventing_function(pyObj_eventing_function);
-            req.timeout = options->timeout_ms;
+            case EventingFunctionManagementOperations::DEPLOY_FUNCTION: {
+                auto req =
+                  get_eventing_function_mgmt_req<couchbase::operations::management::eventing_deploy_function_request>(options->op_args);
+                req.timeout = options->timeout_ms;
 
-            res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_upsert_function_request>(
-              *conn, req, pyObj_callback, pyObj_errback, barrier);
-            break;
-        }
-        case EventingFunctionManagementOperations::DEPLOY_FUNCTION: {
-            auto req =
-              get_eventing_function_mgmt_req<couchbase::operations::management::eventing_deploy_function_request>(options->op_args);
-            req.timeout = options->timeout_ms;
-
-            res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_deploy_function_request>(
-              *conn, req, pyObj_callback, pyObj_errback, barrier);
-            break;
-        }
-        case EventingFunctionManagementOperations::GET_FUNCTION: {
-            auto req = get_eventing_function_mgmt_req<couchbase::operations::management::eventing_get_function_request>(options->op_args);
-            req.timeout = options->timeout_ms;
-
-            res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_get_function_request>(
-              *conn, req, pyObj_callback, pyObj_errback, barrier);
-            break;
-        }
-        case EventingFunctionManagementOperations::PAUSE_FUNCTION: {
-            auto req = get_eventing_function_mgmt_req<couchbase::operations::management::eventing_pause_function_request>(options->op_args);
-            req.timeout = options->timeout_ms;
-
-            res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_pause_function_request>(
-              *conn, req, pyObj_callback, pyObj_errback, barrier);
-            break;
-        }
-        case EventingFunctionManagementOperations::RESUME_FUNCTION: {
-            auto req =
-              get_eventing_function_mgmt_req<couchbase::operations::management::eventing_resume_function_request>(options->op_args);
-            req.timeout = options->timeout_ms;
-
-            res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_resume_function_request>(
-              *conn, req, pyObj_callback, pyObj_errback, barrier);
-            break;
-        }
-        case EventingFunctionManagementOperations::UNDEPLOY_FUNCTION: {
-            auto req =
-              get_eventing_function_mgmt_req<couchbase::operations::management::eventing_undeploy_function_request>(options->op_args);
-            req.timeout = options->timeout_ms;
-
-            res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_undeploy_function_request>(
-              *conn, req, pyObj_callback, pyObj_errback, barrier);
-            break;
-        }
-        case EventingFunctionManagementOperations::DROP_FUNCTION: {
-            auto req = get_eventing_function_mgmt_req<couchbase::operations::management::eventing_drop_function_request>(options->op_args);
-            req.timeout = options->timeout_ms;
-
-            res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_drop_function_request>(
-              *conn, req, pyObj_callback, pyObj_errback, barrier);
-            break;
-        }
-        case EventingFunctionManagementOperations::GET_ALL_FUNCTIONS: {
-            couchbase::operations::management::eventing_get_all_functions_request req{};
-            PyObject* pyObj_client_context_id = PyDict_GetItemString(options->op_args, "client_context_id");
-            if (pyObj_client_context_id != nullptr) {
-                auto client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
-                req.client_context_id = client_context_id;
+                res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_deploy_function_request>(
+                  *conn, req, pyObj_callback, pyObj_errback, barrier);
+                break;
             }
-            req.timeout = options->timeout_ms;
+            case EventingFunctionManagementOperations::GET_FUNCTION: {
+                auto req =
+                  get_eventing_function_mgmt_req<couchbase::operations::management::eventing_get_function_request>(options->op_args);
+                req.timeout = options->timeout_ms;
 
-            res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_get_all_functions_request>(
-              *conn, req, pyObj_callback, pyObj_errback, barrier);
-            break;
-        }
-        case EventingFunctionManagementOperations::GET_STATUS: {
-            couchbase::operations::management::eventing_get_status_request req{};
-            PyObject* pyObj_client_context_id = PyDict_GetItemString(options->op_args, "client_context_id");
-            if (pyObj_client_context_id != nullptr) {
-                auto client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
-                req.client_context_id = client_context_id;
+                res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_get_function_request>(
+                  *conn, req, pyObj_callback, pyObj_errback, barrier);
+                break;
             }
-            req.timeout = options->timeout_ms;
+            case EventingFunctionManagementOperations::PAUSE_FUNCTION: {
+                auto req =
+                  get_eventing_function_mgmt_req<couchbase::operations::management::eventing_pause_function_request>(options->op_args);
+                req.timeout = options->timeout_ms;
 
-            res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_get_status_request>(
-              *conn, req, pyObj_callback, pyObj_errback, barrier);
-            break;
-        }
-        default: {
-            pycbc_set_python_exception(
-              "Unrecognized eventing function mgmt operation passed in.", PycbcError::InvalidArgument, __FILE__, __LINE__);
-            Py_XDECREF(pyObj_callback);
-            Py_XDECREF(pyObj_errback);
-            return nullptr;
-        }
-    };
+                res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_pause_function_request>(
+                  *conn, req, pyObj_callback, pyObj_errback, barrier);
+                break;
+            }
+            case EventingFunctionManagementOperations::RESUME_FUNCTION: {
+                auto req =
+                  get_eventing_function_mgmt_req<couchbase::operations::management::eventing_resume_function_request>(options->op_args);
+                req.timeout = options->timeout_ms;
+
+                res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_resume_function_request>(
+                  *conn, req, pyObj_callback, pyObj_errback, barrier);
+                break;
+            }
+            case EventingFunctionManagementOperations::UNDEPLOY_FUNCTION: {
+                auto req =
+                  get_eventing_function_mgmt_req<couchbase::operations::management::eventing_undeploy_function_request>(options->op_args);
+                req.timeout = options->timeout_ms;
+
+                res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_undeploy_function_request>(
+                  *conn, req, pyObj_callback, pyObj_errback, barrier);
+                break;
+            }
+            case EventingFunctionManagementOperations::DROP_FUNCTION: {
+                auto req =
+                  get_eventing_function_mgmt_req<couchbase::operations::management::eventing_drop_function_request>(options->op_args);
+                req.timeout = options->timeout_ms;
+
+                res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_drop_function_request>(
+                  *conn, req, pyObj_callback, pyObj_errback, barrier);
+                break;
+            }
+            case EventingFunctionManagementOperations::GET_ALL_FUNCTIONS: {
+                couchbase::operations::management::eventing_get_all_functions_request req{};
+                PyObject* pyObj_client_context_id = PyDict_GetItemString(options->op_args, "client_context_id");
+                if (pyObj_client_context_id != nullptr) {
+                    auto client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
+                    req.client_context_id = client_context_id;
+                }
+                req.timeout = options->timeout_ms;
+
+                res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_get_all_functions_request>(
+                  *conn, req, pyObj_callback, pyObj_errback, barrier);
+                break;
+            }
+            case EventingFunctionManagementOperations::GET_STATUS: {
+                couchbase::operations::management::eventing_get_status_request req{};
+                PyObject* pyObj_client_context_id = PyDict_GetItemString(options->op_args, "client_context_id");
+                if (pyObj_client_context_id != nullptr) {
+                    auto client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
+                    req.client_context_id = client_context_id;
+                }
+                req.timeout = options->timeout_ms;
+
+                res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_get_status_request>(
+                  *conn, req, pyObj_callback, pyObj_errback, barrier);
+                break;
+            }
+            default: {
+                pycbc_set_python_exception(
+                  "Unrecognized eventing function mgmt operation passed in.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+                Py_XDECREF(pyObj_callback);
+                Py_XDECREF(pyObj_errback);
+                return nullptr;
+            }
+        };
+    } catch (const std::invalid_argument&) {
+    }
+
+    if (res == nullptr) {
+        Py_XDECREF(pyObj_callback);
+        Py_XDECREF(pyObj_errback);
+        return nullptr;
+    }
     if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
         // can only be a single future (if not doing std::shared),
         // so use move semantics

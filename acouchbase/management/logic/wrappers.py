@@ -50,7 +50,6 @@ class BucketMgmtWrapper:
                             retval = get_all_bucket_settings(res, return_cls)
                         else:
                             retval = return_cls(res)
-                    print(f'{fn.__name__} returning {retval}')
 
                     self.loop.call_soon_threadsafe(ft.set_result, retval)
 
@@ -70,7 +69,6 @@ class BucketMgmtWrapper:
                     exc = MissingConnectionException('Not connected.  Cannot perform bucket management operation.')
                     ft.set_exception(exc)
                 else:
-                    print(f'calling {fn.__name__}')
                     call_async_fn(ft, self, fn, *args, **kwargs)
 
                 return ft
@@ -100,7 +98,6 @@ class CollectionMgmtWrapper:
                             retval = get_all_scopes(res, return_cls)
                         else:
                             retval = return_cls(res)
-                    print(f'{fn.__name__} returning {retval}')
 
                     self.loop.call_soon_threadsafe(ft.set_result, retval)
 
@@ -119,7 +116,6 @@ class CollectionMgmtWrapper:
                     exc = MissingConnectionException('Not connected.  Cannot perform bucket management operation.')
                     ft.set_exception(exc)
                 else:
-                    print(f'calling {fn.__name__}')
                     call_async_fn(ft, self, fn, *args, **kwargs)
 
                 return ft
@@ -157,7 +153,6 @@ class UserMgmtWrapper:
                             retval = get_all_groups(res, return_cls)
                         else:
                             retval = return_cls(res)
-                    print(f'{fn.__name__} returning {retval}')
 
                     self.loop.call_soon_threadsafe(ft.set_result, retval)
 
@@ -176,7 +171,6 @@ class UserMgmtWrapper:
                     exc = MissingConnectionException('Not connected.  Cannot perform bucket management operation.')
                     ft.set_exception(exc)
                 else:
-                    print(f'calling {fn.__name__}')
                     call_async_fn(ft, self, fn, *args, **kwargs)
 
                 return ft
@@ -212,7 +206,6 @@ class AnalyticsMgmtWrapper:
                             retval = get_links(res, return_cls)
                         else:
                             retval = return_cls(res)
-                    print(f'{fn.__name__} returning {retval}')
 
                     self.loop.call_soon_threadsafe(ft.set_result, retval)
 
@@ -231,7 +224,6 @@ class AnalyticsMgmtWrapper:
                     exc = MissingConnectionException('Not connected.  Cannot perform bucket management operation.')
                     ft.set_exception(exc)
                 else:
-                    print(f'calling {fn.__name__}')
                     call_async_fn(ft, self, fn, *args, **kwargs)
 
                 return ft
@@ -261,7 +253,6 @@ class QueryIndexMgmtWrapper:
                             retval = get_all_query_indexes(res, return_cls)
                         else:
                             retval = return_cls(res)
-                    print(f'{fn.__name__} returning {retval}')
 
                     self.loop.call_soon_threadsafe(ft.set_result, retval)
 
@@ -280,7 +271,6 @@ class QueryIndexMgmtWrapper:
                     exc = MissingConnectionException('Not connected.  Cannot perform bucket management operation.')
                     ft.set_exception(exc)
                 else:
-                    print(f'calling {fn.__name__}')
                     call_async_fn(ft, self, fn, *args, **kwargs)
 
                 return ft
@@ -320,7 +310,6 @@ class SearchIndexMgmtWrapper:
                             retval = get_all_search_index_stats(res)
                         else:
                             retval = return_cls(res)
-                    print(f'{fn.__name__} returning {retval}')
 
                     self.loop.call_soon_threadsafe(ft.set_result, retval)
 
@@ -339,7 +328,6 @@ class SearchIndexMgmtWrapper:
                     exc = MissingConnectionException('Not connected.  Cannot perform bucket management operation.')
                     ft.set_exception(exc)
                 else:
-                    print(f'calling {fn.__name__}')
                     call_async_fn(ft, self, fn, *args, **kwargs)
 
                 return ft
@@ -371,7 +359,6 @@ class ViewIndexMgmtWrapper:
                             retval = get_all_design_documents(res, return_cls)
                         else:
                             retval = return_cls(res)
-                    print(f'{fn.__name__} returning {retval}')
 
                     self.loop.call_soon_threadsafe(ft.set_result, retval)
 
@@ -390,7 +377,6 @@ class ViewIndexMgmtWrapper:
                     exc = MissingConnectionException('Not connected.  Cannot perform bucket management operation.')
                     ft.set_exception(exc)
                 else:
-                    print(f'calling {fn.__name__}')
                     call_async_fn(ft, self, fn, *args, **kwargs)
 
                 return ft
@@ -424,12 +410,12 @@ class EventingFunctionMgmtWrapper:
                             retval = get_eventing_functions_status(res, return_cls)
                         else:
                             retval = return_cls(res)
-                    print(f'{fn.__name__} returning {retval}')
 
                     self.loop.call_soon_threadsafe(ft.set_result, retval)
 
-                def on_err(exc, exc_info=None, error_msg=None):
+                def on_err(exc, exc_info=None, error_msg=None, eventing_problem=None):
                     print(f'error: {exc}, {exc_info}, {error_msg}')
+                    print(eventing_problem)
                     err_msg = error_msg
                     if exc_info and not err_msg:
                         err_msg = exc_info.get('error_msg', None)
@@ -443,7 +429,6 @@ class EventingFunctionMgmtWrapper:
                     exc = MissingConnectionException('Not connected.  Cannot perform bucket management operation.')
                     ft.set_exception(exc)
                 else:
-                    print(f'calling {fn.__name__}')
                     call_async_fn(ft, self, fn, *args, **kwargs)
 
                 return ft

@@ -619,6 +619,10 @@ class EventingFunctionCompilationFailureException(CouchbaseException):
     """Raised when compilation of an eventing function failed"""
 
 
+class EventingFunctionIdenticalKeyspaceException(CouchbaseException):
+    """Raised when the source and metadata keyspaces are the same"""
+
+
 class EventingFunctionNotBootstrappedException(CouchbaseException):
     """Raised when an eventing function is deployed but not “fully” bootstrapped"""
 
@@ -783,6 +787,11 @@ class ErrorMapper:
                             err_text = None
                 else:
                     err_text = errors.get("name", None)
+            # eventing function mgmt cases
+            elif isinstance(http_body, dict) and http_body.get('name', None) is not None:
+                exc = ErrorMapper._process_mapping(pycbc_excptn, compiled_map, http_body.get('name', None))
+                if exc is not None:
+                    return exc
 
             # TODO:  This doesn't seem good: re: test_bucket_flush_fail
             #   Currently the regex matches w/ the previous string check in the

@@ -1,11 +1,10 @@
-import asyncio
+import time
 from datetime import timedelta
 
 import pytest
-import pytest_asyncio
 
-from acouchbase.cluster import Cluster, get_event_loop
 from couchbase.auth import PasswordAuthenticator
+from couchbase.cluster import Cluster
 from couchbase.exceptions import CollectionAlreadyExistsException  # EventingFunctionCompilationFailureException,
 from couchbase.exceptions import (EventingFunctionAlreadyDeployedException,
                                   EventingFunctionCollectionNotFoundException,
@@ -65,80 +64,72 @@ class EventingManagementTests:
         ]
     )
 
-    @pytest_asyncio.fixture(scope="class")
-    def event_loop(self):
-        loop = get_event_loop()
-        yield loop
-        loop.close()
-
-    @pytest_asyncio.fixture(scope="class", name="cb_env")
-    async def couchbase_test_environment(self, couchbase_config):
+    @pytest.fixture(scope="class", name="cb_env")
+    def couchbase_test_environment(self, couchbase_config):
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
         cluster = Cluster(
             conn_string, opts)
-        await cluster.on_connect()
-        await cluster.cluster_info()
+        cluster.cluster_info()
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        await bucket.on_connect()
 
         coll = bucket.default_collection()
         cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_eventing_functions=True)
 
         if cb_env.is_feature_supported('collections'):
             cb_env._cm = cb_env.bucket.collections()
-            await cb_env.setup_named_collections()
+            cb_env.setup_named_collections()
 
         yield cb_env
         if cb_env.is_feature_supported('collections'):
-            await cb_env.teardown_named_collections()
-        await cluster.close()
+            cb_env.teardown_named_collections()
+        cluster.close()
 
     @pytest.fixture(scope="class", name='evt_version')
     def get_eventing_function_version(self, cb_env):
         version = "evt-{}".format(
-            cb_env.server_version.replace("enterprise", "ee").replace("community", "ce")
+            cb_env.server_version_full.replace("enterprise", "ee").replace("community", "ce")
         )
         return version
 
-    @pytest_asyncio.fixture()
-    async def create_eventing_function(self, cb_env):
-        await cb_env.efm.upsert_function(self.BASIC_FUNC)
+    @pytest.fixture()
+    def create_eventing_function(self, cb_env):
+        cb_env.efm.upsert_function(self.BASIC_FUNC)
 
-    @pytest_asyncio.fixture()
-    async def drop_eventing_function(self, cb_env):
+    @pytest.fixture()
+    def drop_eventing_function(self, cb_env):
         yield
-        await cb_env.efm.drop_function(self.TEST_EVT_NAME)
+        cb_env.efm.drop_function(self.TEST_EVT_NAME)
 
-    @pytest_asyncio.fixture()
-    async def undeploy_and_drop_eventing_function(self, cb_env):
+    @pytest.fixture()
+    def undeploy_and_drop_eventing_function(self, cb_env):
         yield
-        await cb_env.efm.undeploy_function(self.TEST_EVT_NAME)
-        await self._wait_until_status(
-            cb_env, 15, 2, EventingFunctionState.Undeployed, self.TEST_EVT_NAME
+        cb_env.efm.undeploy_function(self.TEST_EVT_NAME)
+        self._wait_until_status(
+            cb_env, 15, 2, EventingFunctionState.Undeployed, self.BASIC_FUNC.name
         )
-        await cb_env.efm.drop_function(self.TEST_EVT_NAME)
+        cb_env.efm.drop_function(self.TEST_EVT_NAME)
 
-    @pytest_asyncio.fixture()
-    async def create_and_drop_eventing_function(self, cb_env):
-        await cb_env.efm.upsert_function(self.BASIC_FUNC)
+    @pytest.fixture()
+    def create_and_drop_eventing_function(self, cb_env):
+        cb_env.efm.upsert_function(self.BASIC_FUNC)
         yield
-        await cb_env.efm.drop_function(self.BASIC_FUNC.name)
+        cb_env.efm.drop_function(self.BASIC_FUNC.name)
 
-    async def _wait_until_status(self,
-                                 cb_env,  # type: TestEnvironment
-                                 num_times,  # type: int
-                                 seconds_between,  # type: int
-                                 state,  # type: EventingFunctionState
-                                 name  # type: str
-                                 ) -> None:
+    def _wait_until_status(self,
+                           cb_env,  # type: TestEnvironment
+                           num_times,  # type: int
+                           seconds_between,  # type: int
+                           state,  # type: EventingFunctionState
+                           name  # type: str
+                           ) -> None:
 
         func_status = None
         for _ in range(num_times):
-            func_status = await cb_env.efm._get_status(name)
+            func_status = cb_env.efm._get_status(name)
             if func_status is None or func_status.state != state:
-                await asyncio.sleep(seconds_between)
+                time.sleep(seconds_between)
             else:
                 break
 
@@ -153,11 +144,9 @@ class EventingManagementTests:
                 )
             )
 
-    @pytest.mark.usefixtures("drop_eventing_function")
-    @pytest.mark.asyncio
-    async def test_upsert_function(self, cb_env, evt_version):
+    def test_upsert_function(self, cb_env, evt_version):
         local_func = EventingFunction(
-            self.TEST_EVT_NAME,
+            "test-evt-func-1",
             self.SIMPLE_EVT_CODE,
             evt_version,
             metadata_keyspace=EventingFunctionKeyspace("default"),
@@ -173,15 +162,14 @@ class EventingManagementTests:
                 )
             ]
         )
-        await cb_env.efm.upsert_function(local_func)
-        func = await cb_env.try_n_times(5, 3, cb_env.efm.get_function, local_func.name)
+        cb_env.efm.upsert_function(local_func)
+        func = cb_env.try_n_times(5, 3, cb_env.efm.get_function, local_func.name)
         cb_env.validate_eventing_function(func, shallow=True)
 
-    @pytest.mark.asyncio
-    async def test_upsert_function_fail(self, cb_env, evt_version):
+    def test_upsert_function_fail(self, cb_env, evt_version):
         # bad appcode
         local_func = EventingFunction(
-            self.TEST_EVT_NAME,
+            "test-evt-func-1",
             'func OnUpdate(doc, meta) {\n    log("Doc created/updated", meta.id);\n}\n\n',
             evt_version,
             metadata_keyspace=EventingFunctionKeyspace("default"),
@@ -198,22 +186,21 @@ class EventingManagementTests:
             ]
         )
 
-        # @TODO:
+        # @TODO:  couchbase++ seg faults on this...
         # with pytest.raises(EventingFunctionCompilationFailureException):
-        #     await cb_env.efm.upsert_function(local_func)
+        #     cb_env.efm.upsert_function(local_func)
 
         local_func.code = self.SIMPLE_EVT_CODE
         local_func.source_keyspace = EventingFunctionKeyspace(
             "beer-sample", "test-scope", "test-collection"
         )
         with pytest.raises(EventingFunctionCollectionNotFoundException):
-            await cb_env.efm.upsert_function(local_func)
+            cb_env.efm.upsert_function(local_func)
 
     @pytest.mark.usefixtures("create_eventing_function")
-    @pytest.mark.asyncio
-    async def test_drop_function(self, cb_env):
-        await cb_env.efm.drop_function(self.BASIC_FUNC.name)
-        await cb_env.try_n_times_till_exception(
+    def test_drop_function(self, cb_env):
+        cb_env.efm.drop_function(self.BASIC_FUNC.name)
+        cb_env.try_n_times_till_exception(
             10,
             1,
             cb_env.efm.get_function,
@@ -223,41 +210,37 @@ class EventingManagementTests:
 
     @pytest.mark.usefixtures('create_eventing_function')
     @pytest.mark.usefixtures('undeploy_and_drop_eventing_function')
-    @pytest.mark.asyncio
-    async def test_drop_function_fail(self, cb_env):
+    def test_drop_function_fail(self, cb_env):
         with pytest.raises(
             (EventingFunctionNotDeployedException,
              EventingFunctionNotFoundException)
         ):
-            await cb_env.efm.drop_function("not-a-function")
+            cb_env.efm.drop_function("not-a-function")
 
         # deploy function -- but first verify in undeployed state
-        await self._wait_until_status(
+        self._wait_until_status(
             cb_env, 15, 2, EventingFunctionState.Undeployed, self.BASIC_FUNC.name
         )
-        await cb_env.efm.deploy_function(self.BASIC_FUNC.name)
+        cb_env.efm.deploy_function(self.BASIC_FUNC.name)
         # now, wait for it to be deployed
-        await self._wait_until_status(
+        self._wait_until_status(
             cb_env, 20, 3, EventingFunctionState.Deployed, self.BASIC_FUNC.name
         )
 
         with pytest.raises(EventingFunctionNotUnDeployedException):
-            await cb_env.efm.drop_function(self.BASIC_FUNC.name)
+            cb_env.efm.drop_function(self.BASIC_FUNC.name)
 
     @pytest.mark.usefixtures("create_and_drop_eventing_function")
-    @pytest.mark.asyncio
-    async def test_get_function(self, cb_env):
-        func = await cb_env.try_n_times(
+    def test_get_function(self, cb_env):
+        func = cb_env.try_n_times(
             5, 3, cb_env.efm.get_function, self.BASIC_FUNC.name)
         cb_env.validate_eventing_function(func)
 
-    @pytest.mark.asyncio
-    async def test_get_function_fail(self, cb_env):
+    def test_get_function_fail(self, cb_env):
         with pytest.raises(EventingFunctionNotFoundException):
-            await cb_env.efm.get_function("not-a-function")
+            cb_env.efm.get_function("not-a-function")
 
-    @pytest.mark.asyncio
-    async def test_get_all_functions(self, cb_env):
+    def test_get_all_functions(self, cb_env):
         new_funcs = [
             EventingFunction(
                 "test-evt-func-1",
@@ -295,26 +278,25 @@ class EventingManagementTests:
             )
         ]
         for func in new_funcs:
-            await cb_env.efm.upsert_function(func)
-            await cb_env.try_n_times(5, 3, cb_env.efm.get_function, func.name)
+            cb_env.efm.upsert_function(func)
+            cb_env.try_n_times(5, 3, cb_env.efm.get_function, func.name)
 
-        funcs = await cb_env.efm.get_all_functions()
+        funcs = cb_env.efm.get_all_functions()
         for func in funcs:
             cb_env.validate_eventing_function(func)
 
     @pytest.mark.usefixtures('create_eventing_function')
     @pytest.mark.usefixtures('undeploy_and_drop_eventing_function')
-    @pytest.mark.asyncio
-    async def test_deploy_function(self, cb_env):
+    def test_deploy_function(self, cb_env):
         # deploy function -- but first verify in undeployed state
-        await self._wait_until_status(
+        self._wait_until_status(
             cb_env, 10, 1, EventingFunctionState.Undeployed, self.BASIC_FUNC.name
         )
-        await cb_env.efm.deploy_function(self.BASIC_FUNC.name)
-        await self._wait_until_status(
+        cb_env.efm.deploy_function(self.BASIC_FUNC.name)
+        self._wait_until_status(
             cb_env, 20, 3, EventingFunctionState.Deployed, self.BASIC_FUNC.name
         )
-        func = await cb_env.try_n_times(
+        func = cb_env.try_n_times(
             5, 1, cb_env.efm.get_function, self.BASIC_FUNC.name)
         cb_env.validate_eventing_function(func, shallow=True)
         # verify function deployement status has changed
@@ -322,128 +304,120 @@ class EventingManagementTests:
 
     @pytest.mark.usefixtures('create_eventing_function')
     @pytest.mark.usefixtures('undeploy_and_drop_eventing_function')
-    @pytest.mark.asyncio
-    async def test_deploy_function_fail(self, cb_env):
+    def test_deploy_function_fail(self, cb_env):
         with pytest.raises(EventingFunctionNotFoundException):
-            await cb_env.efm.deploy_function("not-a-function")
+            cb_env.efm.deploy_function("not-a-function")
 
         # deploy function -- but first verify in undeployed state
-        await self._wait_until_status(
+        self._wait_until_status(
             cb_env, 10, 1, EventingFunctionState.Undeployed, self.BASIC_FUNC.name
         )
-        await cb_env.efm.deploy_function(self.BASIC_FUNC.name)
-        await self._wait_until_status(
+        cb_env.efm.deploy_function(self.BASIC_FUNC.name)
+        self._wait_until_status(
             cb_env, 20, 3, EventingFunctionState.Deployed, self.BASIC_FUNC.name
         )
         with pytest.raises(EventingFunctionAlreadyDeployedException):
-            await cb_env.efm.deploy_function(self.BASIC_FUNC.name)
+            cb_env.efm.deploy_function(self.BASIC_FUNC.name)
 
     @pytest.mark.usefixtures('create_and_drop_eventing_function')
-    @pytest.mark.asyncio
-    async def test_undeploy_function(self, cb_env):
+    def test_undeploy_function(self, cb_env):
         # deploy function -- but first verify in undeployed state
-        await self._wait_until_status(
+        self._wait_until_status(
             cb_env, 10, 1, EventingFunctionState.Undeployed, self.BASIC_FUNC.name
         )
-        await cb_env.efm.deploy_function(self.BASIC_FUNC.name)
-        await self._wait_until_status(
+        cb_env.efm.deploy_function(self.BASIC_FUNC.name)
+        self._wait_until_status(
             cb_env, 20, 3, EventingFunctionState.Deployed, self.BASIC_FUNC.name
         )
-        func = await cb_env.try_n_times(
+        func = cb_env.try_n_times(
             5, 1, cb_env.efm.get_function, self.BASIC_FUNC.name)
         cb_env.validate_eventing_function(func, shallow=True)
         # verify function deployement status
         assert func.settings.deployment_status == EventingFunctionDeploymentStatus.Deployed
         # now, undeploy function
-        await cb_env.efm.undeploy_function(self.BASIC_FUNC.name)
-        await self._wait_until_status(
+        cb_env.efm.undeploy_function(self.BASIC_FUNC.name)
+        self._wait_until_status(
             cb_env, 15, 2, EventingFunctionState.Undeployed, self.BASIC_FUNC.name
         )
-        func = await cb_env.try_n_times(
+        func = cb_env.try_n_times(
             5, 1, cb_env.efm.get_function, self.BASIC_FUNC.name)
         cb_env.validate_eventing_function(func, shallow=True)
         # verify function deployement status has changed
         assert func.settings.deployment_status == EventingFunctionDeploymentStatus.Undeployed
 
-    @pytest.mark.asyncio
-    async def test_undeploy_function_fail(self, cb_env):
+    def test_undeploy_function_fail(self, cb_env):
         with pytest.raises(
             (EventingFunctionNotDeployedException,
              EventingFunctionNotFoundException)
         ):
-            await cb_env.efm.undeploy_function("not-a-function")
+            cb_env.efm.undeploy_function("not-a-function")
 
     @pytest.mark.usefixtures('create_eventing_function')
     @pytest.mark.usefixtures('undeploy_and_drop_eventing_function')
-    @pytest.mark.asyncio
-    async def test_pause_function(self, cb_env):
-        await self._wait_until_status(
+    def test_pause_function(self, cb_env):
+        self._wait_until_status(
             cb_env, 10, 1, EventingFunctionState.Undeployed, self.BASIC_FUNC.name
         )
-        await cb_env.efm.deploy_function(self.BASIC_FUNC.name)
-        await self._wait_until_status(
+        cb_env.efm.deploy_function(self.BASIC_FUNC.name)
+        self._wait_until_status(
             cb_env, 20, 3, EventingFunctionState.Deployed, self.BASIC_FUNC.name
         )
-        await cb_env.efm.pause_function(self.BASIC_FUNC.name)
-        func = await cb_env.try_n_times(
+        cb_env.efm.pause_function(self.BASIC_FUNC.name)
+        func = cb_env.try_n_times(
             5, 1, cb_env.efm.get_function, self.BASIC_FUNC.name)
         cb_env.validate_eventing_function(func, shallow=True)
         # verify function processing status
         assert func.settings.processing_status == EventingFunctionProcessingStatus.Paused
 
     @pytest.mark.usefixtures('create_and_drop_eventing_function')
-    @pytest.mark.asyncio
-    async def test_pause_function_fail(self, cb_env):
-        await self._wait_until_status(
+    def test_pause_function_fail(self, cb_env):
+        self._wait_until_status(
             cb_env, 10, 1, EventingFunctionState.Undeployed, self.BASIC_FUNC.name
         )
 
         with pytest.raises(EventingFunctionNotFoundException):
-            await cb_env.efm.pause_function("not-a-function")
+            cb_env.efm.pause_function("not-a-function")
 
         with pytest.raises(EventingFunctionNotBootstrappedException):
-            await cb_env.efm.pause_function(self.BASIC_FUNC.name)
+            cb_env.efm.pause_function(self.BASIC_FUNC.name)
 
     @pytest.mark.usefixtures('create_eventing_function')
     @pytest.mark.usefixtures('undeploy_and_drop_eventing_function')
-    @pytest.mark.asyncio
-    async def test_resume_function(self, cb_env):
+    def test_resume_function(self, cb_env):
         # make sure function has been deployed
-        await self._wait_until_status(
+        self._wait_until_status(
             cb_env, 10, 1, EventingFunctionState.Undeployed, self.BASIC_FUNC.name
         )
-        await cb_env.efm.deploy_function(self.BASIC_FUNC.name)
-        await self._wait_until_status(
+        cb_env.efm.deploy_function(self.BASIC_FUNC.name)
+        self._wait_until_status(
             cb_env, 20, 3, EventingFunctionState.Deployed, self.BASIC_FUNC.name
         )
         # pause function - verify status is paused
-        await cb_env.efm.pause_function(self.BASIC_FUNC.name)
-        await self._wait_until_status(
+        cb_env.efm.pause_function(self.BASIC_FUNC.name)
+        self._wait_until_status(
             cb_env, 15, 2, EventingFunctionState.Paused, self.BASIC_FUNC.name
         )
         # resume function
-        await cb_env.efm.resume_function(self.BASIC_FUNC.name)
-        func = await cb_env.try_n_times(
+        cb_env.efm.resume_function(self.BASIC_FUNC.name)
+        func = cb_env.try_n_times(
             5, 1, cb_env.efm.get_function, self.BASIC_FUNC.name)
         cb_env.validate_eventing_function(func, shallow=True)
         # verify function processing status
         assert func.settings.processing_status == EventingFunctionProcessingStatus.Running
 
     @pytest.mark.usefixtures('create_and_drop_eventing_function')
-    @pytest.mark.asyncio
-    async def test_resume_function_fail(self, cb_env):
-        await self._wait_until_status(
+    def test_resume_function_fail(self, cb_env):
+        self._wait_until_status(
             cb_env, 10, 1, EventingFunctionState.Undeployed, self.BASIC_FUNC.name
         )
 
         with pytest.raises(EventingFunctionNotFoundException):
-            await cb_env.efm.pause_function("not-a-function")
+            cb_env.efm.pause_function("not-a-function")
 
         with pytest.raises(EventingFunctionNotBootstrappedException):
-            await cb_env.efm.pause_function(self.BASIC_FUNC.name)
+            cb_env.efm.pause_function(self.BASIC_FUNC.name)
 
-    @pytest.mark.asyncio
-    async def test_constant_bindings(self, cb_env):
+    def test_constant_bindings(self, cb_env):
         # TODO:  look into why timeout occurs when providing > 1 constant
         # binding
         local_func = EventingFunction(
@@ -471,15 +445,14 @@ class EventingManagementTests:
             ]
         )
 
-        await cb_env.efm.upsert_function(local_func)
-        await self._wait_until_status(
+        cb_env.efm.upsert_function(local_func)
+        self._wait_until_status(
             cb_env, 10, 1, EventingFunctionState.Undeployed, local_func.name
         )
-        func = await cb_env.try_n_times(5, 3, cb_env.efm.get_function, local_func.name)
+        func = cb_env.try_n_times(5, 3, cb_env.efm.get_function, local_func.name)
         cb_env.validate_eventing_function(func)
 
-    @pytest.mark.asyncio
-    async def test_url_bindings(self, cb_env):
+    def test_url_bindings(self, cb_env):
         local_func = EventingFunction(
             "test-evt-url-func",
             self.SIMPLE_EVT_CODE,
@@ -531,15 +504,14 @@ class EventingManagementTests:
             ]
         )
 
-        await cb_env.efm.upsert_function(local_func)
-        await self._wait_until_status(
+        cb_env.efm.upsert_function(local_func)
+        self._wait_until_status(
             cb_env, 10, 1, EventingFunctionState.Undeployed, local_func.name
         )
-        func = await cb_env.try_n_times(5, 3, cb_env.efm.get_function, local_func.name)
+        func = cb_env.try_n_times(5, 3, cb_env.efm.get_function, local_func.name)
         cb_env.validate_eventing_function(func)
 
-    @pytest.mark.asyncio
-    async def test_functions_status(self, cb_env):
+    def test_functions_status(self, cb_env):
         new_funcs = [
             EventingFunction(
                 "test-evt-func-1",
@@ -577,16 +549,15 @@ class EventingManagementTests:
             )
         ]
         for func in new_funcs:
-            await cb_env.efm.upsert_function(func)
-            await cb_env.try_n_times(5, 3, cb_env.efm.get_function, func.name)
+            cb_env.efm.upsert_function(func)
+            cb_env.try_n_times(5, 3, cb_env.efm.get_function, func.name)
 
-        funcs = await cb_env.efm.functions_status()
+        funcs = cb_env.efm.functions_status()
         assert isinstance(funcs, EventingFunctionsStatus)
         for func in funcs.functions:
             assert isinstance(func, EventingFunctionStatus)
 
-    @pytest.mark.asyncio
-    async def test_options_simple(self, cb_env):
+    def test_options_simple(self, cb_env):
         local_func = EventingFunction(
             "test-evt-func-1",
             self.SIMPLE_EVT_CODE,
@@ -604,10 +575,10 @@ class EventingManagementTests:
                 )
             ]
         )
-        await cb_env.efm.upsert_function(
+        cb_env.efm.upsert_function(
             local_func, UpsertFunctionOptions(timeout=timedelta(seconds=20))
         )
-        func = await cb_env.try_n_times(
+        func = cb_env.try_n_times(
             5,
             3,
             cb_env.efm.get_function,
@@ -616,23 +587,22 @@ class EventingManagementTests:
         )
         cb_env.validate_eventing_function(func, shallow=True)
 
-    @pytest.mark.asyncio
-    async def test_with_scope_and_collection(self, cb_env, evt_version):
+    def test_with_scope_and_collection(self, cb_env, evt_version):
         if not cb_env.is_feature_supported('collections'):
             pytest.skip('Server does not support scopes/collections.')
 
         coll_name = 'test-collection-1'
         collection_spec = CollectionSpec(coll_name, cb_env.TEST_SCOPE)
         try:
-            await cb_env.cm.create_collection(collection_spec)
+            cb_env.cm.create_collection(collection_spec)
         except CollectionAlreadyExistsException:
-            await cb_env.cm.drop_collection(collection_spec)
-            await cb_env.cm.create_collection(collection_spec)
+            cb_env.cm.drop_collection(collection_spec)
+            cb_env.cm.create_collection(collection_spec)
 
-        await cb_env.try_n_times(5, 3, cb_env.get_collection,
-                                 cb_env.TEST_SCOPE,
-                                 coll_name,
-                                 bucket_name=cb_env.bucket.name)
+        cb_env.try_n_times(5, 3, cb_env.get_collection,
+                           cb_env.TEST_SCOPE,
+                           coll_name,
+                           bucket_name=cb_env.bucket.name)
 
         local_func = EventingFunction(
             "test-evt-func-coll",
@@ -660,11 +630,11 @@ class EventingManagementTests:
                 )
             ]
         )
-        await cb_env.efm.upsert_function(local_func)
-        await self._wait_until_status(
+        cb_env.efm.upsert_function(local_func)
+        self._wait_until_status(
             cb_env, 10, 1, EventingFunctionState.Undeployed, local_func.name
         )
-        func = await cb_env.try_n_times(5, 3, cb_env.efm.get_function, local_func.name)
+        func = cb_env.try_n_times(5, 3, cb_env.efm.get_function, local_func.name)
         cb_env.validate_eventing_function(func)
 
-        await cb_env.efm.drop_function(local_func.name)
+        cb_env.efm.drop_function(local_func.name)

@@ -23,6 +23,7 @@ COUCHBASE_VERSION = couchbase_version.get_version()
 
 COUCHBASE_README = os.path.join(os.path.dirname(__file__), 'README.md')
 
+
 def check_for_cmake():
     if not CMAKE_EXE:
         print('cmake executable not found. '

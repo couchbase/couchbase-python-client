@@ -433,6 +433,13 @@ class ClusterInfoResult:
         return self._server_version_short
 
     @property
+    def server_version_full(self) -> Optional[str]:
+        if not self._server_version_raw:
+            self._set_server_version()
+
+        return self._server_version_raw
+
+    @property
     def server_version_build(self) -> Optional[int]:
         if not self._server_build:
             self._set_server_version()

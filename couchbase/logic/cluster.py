@@ -125,6 +125,13 @@ class ClusterLogic:
         return None
 
     @property
+    def server_version_full(self) -> Optional[str]:
+        if self._cluster_info:
+            return self._cluster_info.server_version_full
+
+        return None
+
+    @property
     def is_developer_preview(self) -> Optional[bool]:
         if self._cluster_info:
             return False

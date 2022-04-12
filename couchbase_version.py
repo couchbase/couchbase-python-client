@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 
 from __future__ import print_function
-import subprocess
+
 import datetime
 import os.path
-import warnings
 import re
+import subprocess
+import warnings
+
 
 class CantInvokeGit(Exception):
     pass

@@ -72,7 +72,8 @@ repos:
               simple_acouchbase.py|
               simple_couchbase.py|
               simple_txcouchbase.py|
-              couchbase_kv_tests.py
+              couchbase_kv_tests.py|
+              couchbase_version.py
           )
         args:
           [

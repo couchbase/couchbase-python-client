@@ -26,6 +26,7 @@ from couchbase.management.buckets import BucketType, CreateBucketSettings
 from couchbase.management.collections import CollectionSpec
 from couchbase.transcoder import RawBinaryTranscoder, RawStringTranscoder
 from tests.helpers import CollectionType  # noqa: F401
+from tests.helpers import EventingFunctionManagementTestStatusException  # noqa: F401
 from tests.helpers import KVPair  # noqa: F401
 from tests.helpers import CouchbaseTestEnvironment, CouchbaseTestEnvironmentException
 

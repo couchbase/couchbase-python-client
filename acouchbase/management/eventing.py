@@ -8,7 +8,8 @@ from typing import (TYPE_CHECKING,
 from acouchbase.management.logic.wrappers import EventingFunctionMgmtWrapper
 from couchbase.management.logic.eventing_logic import (EventingFunction,
                                                        EventingFunctionManagerLogic,
-                                                       EventingFunctionsStatus)
+                                                       EventingFunctionsStatus,
+                                                       EventingFunctionStatus)
 
 if TYPE_CHECKING:
     from couchbase.management.options import (DeployFunctionOptions,
@@ -35,8 +36,7 @@ class EventingFunctionManager(EventingFunctionManagerLogic):
         """
         return self._loop
 
-    EventingFunctionMgmtWrapper.inject_callbacks(None, EventingFunctionManagerLogic._ERROR_MAPPING)
-
+    @EventingFunctionMgmtWrapper.inject_callbacks(None, EventingFunctionManagerLogic._ERROR_MAPPING)
     def upsert_function(
         self,
         function,  # type: EventingFunction
@@ -45,8 +45,7 @@ class EventingFunctionManager(EventingFunctionManagerLogic):
     ) -> None:
         super().upsert_function(function, *options, **kwargs)
 
-    EventingFunctionMgmtWrapper.inject_callbacks(None, EventingFunctionManagerLogic._ERROR_MAPPING)
-
+    @EventingFunctionMgmtWrapper.inject_callbacks(None, EventingFunctionManagerLogic._ERROR_MAPPING)
     def drop_function(
         self,
         name,  # type: str
@@ -55,8 +54,7 @@ class EventingFunctionManager(EventingFunctionManagerLogic):
     ) -> None:
         super().drop_function(name, *options, **kwargs)
 
-    EventingFunctionMgmtWrapper.inject_callbacks(None, EventingFunctionManagerLogic._ERROR_MAPPING)
-
+    @EventingFunctionMgmtWrapper.inject_callbacks(None, EventingFunctionManagerLogic._ERROR_MAPPING)
     def deploy_function(
         self,
         name,  # type: str
@@ -65,8 +63,7 @@ class EventingFunctionManager(EventingFunctionManagerLogic):
     ) -> None:
         super().deploy_function(name, *options, **kwargs)
 
-    EventingFunctionMgmtWrapper.inject_callbacks(EventingFunction, EventingFunctionManagerLogic._ERROR_MAPPING)
-
+    @EventingFunctionMgmtWrapper.inject_callbacks(EventingFunction, EventingFunctionManagerLogic._ERROR_MAPPING)
     def get_all_functions(
         self,
         *options,  # type: GetAllFunctionOptions
@@ -74,8 +71,7 @@ class EventingFunctionManager(EventingFunctionManagerLogic):
     ) -> List[EventingFunction]:
         super().get_all_functions(*options, **kwargs)
 
-    EventingFunctionMgmtWrapper.inject_callbacks(EventingFunction, EventingFunctionManagerLogic._ERROR_MAPPING)
-
+    @EventingFunctionMgmtWrapper.inject_callbacks(EventingFunction, EventingFunctionManagerLogic._ERROR_MAPPING)
     def get_function(
         self,
         name,  # type: str
@@ -84,8 +80,7 @@ class EventingFunctionManager(EventingFunctionManagerLogic):
     ) -> EventingFunction:
         super().get_function(name, *options, **kwargs)
 
-    EventingFunctionMgmtWrapper.inject_callbacks(None, EventingFunctionManagerLogic._ERROR_MAPPING)
-
+    @EventingFunctionMgmtWrapper.inject_callbacks(None, EventingFunctionManagerLogic._ERROR_MAPPING)
     def pause_function(
         self,
         name,  # type: str
@@ -94,8 +89,7 @@ class EventingFunctionManager(EventingFunctionManagerLogic):
     ) -> None:
         super().pause_function(name, *options, **kwargs)
 
-    EventingFunctionMgmtWrapper.inject_callbacks(None, EventingFunctionManagerLogic._ERROR_MAPPING)
-
+    @EventingFunctionMgmtWrapper.inject_callbacks(None, EventingFunctionManagerLogic._ERROR_MAPPING)
     def resume_function(
         self,
         name,  # type: str
@@ -104,8 +98,7 @@ class EventingFunctionManager(EventingFunctionManagerLogic):
     ) -> None:
         super().resume_function(name, *options, **kwargs)
 
-    EventingFunctionMgmtWrapper.inject_callbacks(None, EventingFunctionManagerLogic._ERROR_MAPPING)
-
+    @EventingFunctionMgmtWrapper.inject_callbacks(None, EventingFunctionManagerLogic._ERROR_MAPPING)
     def undeploy_function(
         self,
         name,  # type: str
@@ -114,11 +107,22 @@ class EventingFunctionManager(EventingFunctionManagerLogic):
     ) -> None:
         super().undeploy_function(name, *options, **kwargs)
 
-    EventingFunctionMgmtWrapper.inject_callbacks(EventingFunctionsStatus, EventingFunctionManagerLogic._ERROR_MAPPING)
-
+    @EventingFunctionMgmtWrapper.inject_callbacks(EventingFunctionsStatus, EventingFunctionManagerLogic._ERROR_MAPPING)
     def functions_status(
         self,
         *options,  # type: FunctionsStatusOptions
         **kwargs  # type: Any
     ) -> EventingFunctionsStatus:
         super().functions_status(*options, **kwargs)
+
+    async def _get_status(
+        self,
+        name,  # type: str
+    ) -> EventingFunctionStatus:
+
+        statuses = await self.functions_status()
+
+        if statuses.functions:
+            return next((f for f in statuses.functions if f.name == name), None)
+
+        return None

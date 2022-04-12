@@ -5,15 +5,34 @@ import pathlib
 import time
 from collections import namedtuple
 from configparser import ConfigParser
+from dataclasses import fields
 from datetime import datetime
 from enum import Enum, IntEnum
 from typing import (List,
                     Optional,
-                    Union)
+                    Union,
+                    get_type_hints)
 
 import pytest
 
 from couchbase.auth import AuthDomain
+from couchbase.management.eventing import (EventingFunction,
+                                           EventingFunctionBucketAccess,
+                                           EventingFunctionBucketBinding,
+                                           EventingFunctionConstantBinding,
+                                           EventingFunctionDcpBoundary,
+                                           EventingFunctionDeploymentStatus,
+                                           EventingFunctionKeyspace,
+                                           EventingFunctionLanguageCompatibility,
+                                           EventingFunctionLogLevel,
+                                           EventingFunctionProcessingStatus,
+                                           EventingFunctionSettings,
+                                           EventingFunctionUrlAuthBasic,
+                                           EventingFunctionUrlAuthBearer,
+                                           EventingFunctionUrlAuthDigest,
+                                           EventingFunctionUrlBinding,
+                                           EventingFunctionUrlNoAuth)
+from couchbase.management.logic.eventing_logic import QueryScanConsistency
 from couchbase.management.users import (Role,
                                         RoleAndOrigins,
                                         User)
@@ -31,6 +50,10 @@ KVPair = namedtuple("KVPair", "key value")
 
 class CouchbaseTestEnvironmentException(Exception):
     """Raised when something with the test environment is incorrect."""
+
+
+class EventingFunctionManagementTestStatusException(Exception):
+    """Raised when waiting for a certained status does not happen within a specified timeframe"""
 
 
 class DataSize(IntEnum):
@@ -186,6 +209,10 @@ class CouchbaseTestEnvironment():
     @property
     def server_version_short(self) -> Optional[float]:
         return self._cluster.server_version_short
+
+    @property
+    def server_version_full(self) -> Optional[str]:
+        return self._cluster.server_version_full
 
     @property
     def is_developer_preview(self) -> Optional[bool]:
@@ -450,6 +477,105 @@ class CouchbaseTestEnvironment():
             assert set(roles) == group.roles  # nosec
 
         return True
+
+    # commong eventing function validation
+    def validate_bucket_bindings(self, bindings  # type: List[EventingFunctionBucketBinding]
+                                 ) -> None:
+        binding_fields = fields(EventingFunctionBucketBinding)
+        type_hints = get_type_hints(EventingFunctionBucketBinding)
+        for binding in bindings:
+            assert isinstance(binding, EventingFunctionBucketBinding)  # nosec
+            for field in binding_fields:
+                value = getattr(binding, field.name)
+                if value is not None:
+                    if field.name == "name":
+                        assert isinstance(value, EventingFunctionKeyspace)  # nosec
+                    elif field.name == "access":
+                        assert isinstance(value, EventingFunctionBucketAccess)  # nosec
+                    else:
+                        assert isinstance(value, type_hints[field.name])  # nosec
+
+    def validate_url_bindings(self, bindings  # type: List[EventingFunctionUrlBinding]
+                              ) -> None:
+        binding_fields = fields(EventingFunctionUrlBinding)
+        type_hints = get_type_hints(EventingFunctionUrlBinding)
+        for binding in bindings:
+            assert isinstance(binding, EventingFunctionUrlBinding)  # nosec
+            for field in binding_fields:
+                value = getattr(binding, field.name)
+                if value is not None:
+                    if field.name == "auth":
+                        if isinstance(value, EventingFunctionUrlAuthBasic):
+                            assert isinstance(value.username, str)  # nosec
+                            assert value.password is None  # nosec
+                        elif isinstance(value, EventingFunctionUrlAuthDigest):
+                            assert isinstance(value.username, str)  # nosec
+                            assert value.password is None  # nosec
+                        elif isinstance(value, EventingFunctionUrlAuthBearer):
+                            assert value.key is None  # nosec
+                        else:
+                            assert isinstance(value, EventingFunctionUrlNoAuth)  # nosec
+                    else:
+                        assert isinstance(value, type_hints[field.name])  # nosec
+
+    def validate_constant_bindings(self, bindings  # type: List[EventingFunctionConstantBinding]
+                                   ) -> None:
+        binding_fields = fields(EventingFunctionConstantBinding)
+        type_hints = get_type_hints(EventingFunctionConstantBinding)
+        for binding in bindings:
+            assert isinstance(binding, EventingFunctionConstantBinding)  # nosec
+            for field in binding_fields:
+                value = getattr(binding, field.name)
+                if value is not None:
+                    assert isinstance(value, type_hints[field.name])  # nosec
+
+    def validate_settings(self, settings  # type: EventingFunctionSettings  # noqa: C901
+                          ) -> None:  # noqa: C901
+        assert isinstance(settings, EventingFunctionSettings)  # nosec
+        settings_fields = fields(EventingFunctionSettings)
+        type_hints = get_type_hints(EventingFunctionSettings)
+        for field in settings_fields:
+            value = getattr(settings, field.name)
+            if value is not None:
+                if field.name == "dcp_stream_boundary":
+                    assert isinstance(value, EventingFunctionDcpBoundary)  # nosec
+                elif field.name == "deployment_status":
+                    assert isinstance(value, EventingFunctionDeploymentStatus)  # nosec
+                elif field.name == "processing_status":
+                    assert isinstance(value, EventingFunctionProcessingStatus)  # nosec
+                elif field.name == "language_compatibility":
+                    assert isinstance(value, EventingFunctionLanguageCompatibility)  # nosec
+                elif field.name == "log_level":
+                    assert isinstance(value, EventingFunctionLogLevel)  # nosec
+                elif field.name == "query_consistency":
+                    assert isinstance(value, QueryScanConsistency)  # nosec
+                elif field.name == "handler_headers":
+                    assert isinstance(value, list)  # nosec
+                elif field.name == "handler_footers":
+                    assert isinstance(value, list)  # nosec
+                else:
+                    assert isinstance(value, type_hints[field.name])  # nosec
+
+    def validate_eventing_function(self, func,  # type: EventingFunction
+                                   shallow=False  # type: Optional[bool]
+                                   ) -> None:
+        assert isinstance(func, EventingFunction)  # nosec
+        if shallow is False:
+            func_fields = fields(EventingFunction)
+            type_hints = get_type_hints(EventingFunction)
+            for field in func_fields:
+                value = getattr(func, field.name)
+                if value is not None:
+                    if field.name == "bucket_bindings":
+                        self.validate_bucket_bindings(value)
+                    elif field.name == "url_bindings":
+                        self.validate_url_bindings(value)
+                    elif field.name == "constant_bindings":
+                        self.validate_constant_bindings(value)
+                    elif field.name == "settings":
+                        self.validate_settings(value)
+                    else:
+                        assert isinstance(value, type_hints[field.name])  # nosec
 
 
 class ClusterInformation():

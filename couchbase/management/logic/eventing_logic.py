@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import timedelta
 from enum import Enum
 from typing import (TYPE_CHECKING,
@@ -13,6 +13,7 @@ from couchbase._utils import is_null_or_empty, timedelta_as_microseconds
 from couchbase.exceptions import (EventingFunctionAlreadyDeployedException,
                                   EventingFunctionCollectionNotFoundException,
                                   EventingFunctionCompilationFailureException,
+                                  EventingFunctionIdenticalKeyspaceException,
                                   EventingFunctionNotBootstrappedException,
                                   EventingFunctionNotDeployedException,
                                   EventingFunctionNotFoundException,
@@ -44,19 +45,11 @@ class EventingFunctionManagerLogic:
                       r'.*ERR_APP_NOT_DEPLOYED': EventingFunctionNotDeployedException,
                       r'.*ERR_APP_NOT_UNDEPLOYED': EventingFunctionNotUnDeployedException,
                       r'.*ERR_COLLECTION_MISSING': EventingFunctionCollectionNotFoundException,
-                      r'.*ERR_APP_ALREADY_DEPLOYED': EventingFunctionAlreadyDeployedException}
+                      r'.*ERR_APP_ALREADY_DEPLOYED': EventingFunctionAlreadyDeployedException,
+                      r'.*ERR_SRC_MB_SAME': EventingFunctionIdenticalKeyspaceException}
 
     def __init__(self, connection):
         self._connection = connection
-
-    def _get_status(
-        self,
-        name,  # type: str
-    ) -> EventingFunctionStatus:
-
-        statuses = self.functions_status()
-
-        return next((f for f in statuses.functions if f.name == name), None)
 
     def upsert_function(
         self,
@@ -938,7 +931,8 @@ class EventingFunctionUrlBinding:
             username = url_binding.get('username', None)
             input['auth'] = EventingFunctionUrlAuthDigest(username=username)
         elif auth_type == 'bearer':
-            input['auth'] = EventingFunctionUrlAuthBearer(username=username)
+            key = url_binding.get('key', None)
+            input['auth'] = EventingFunctionUrlAuthBearer(key=key)
         return cls(**input)
 
 
@@ -1179,6 +1173,38 @@ class EventingFunctionSettings:
             output['checkpoint_interval'] = int(self.checkpoint_interval.total_seconds())
 
         return output
+
+    @classmethod
+    def new_settings(cls, **kwargs):
+        """Returns a new `EventingFunctionSettings` object
+
+        :param kwargs: Keyword arguments to populate `EventingFunctionSettings` object
+        :type kwargs: dict
+
+        :return: new `EventingFunctionSettings` object
+        :rtype: `EventingFunctionSettings`
+        """
+        if "dcp_stream_boundary" not in kwargs:
+            kwargs["dcp_stream_boundary"] = None
+
+        if "deployment_status" not in kwargs:
+            kwargs["deployment_status"] = EventingFunctionDeploymentStatus.Undeployed
+
+        if "processing_status" not in kwargs:
+            kwargs["processing_status"] = EventingFunctionProcessingStatus.Paused
+
+        if "language_compatibility" not in kwargs:
+            kwargs["language_compatibility"] = None
+
+        if "log_level" not in kwargs:
+            kwargs["log_level"] = None
+
+        if "query_consistency" not in kwargs:
+            kwargs["query_consistency"] = None
+
+        settings_fields = [f.name for f in fields(cls)]
+        final_json = {k: v for k, v in kwargs.items() if k in settings_fields}
+        return cls(**final_json)
 
     @classmethod  # noqa: C901
     def from_server(  # noqa: C901
