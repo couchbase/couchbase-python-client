@@ -10,6 +10,7 @@ from setuptools import (Extension,
                         setup)
 from setuptools.command.build_ext import build_ext
 
+sys.path.append('.')
 import couchbase_version
 
 CMAKE_EXE = os.environ.get('CMAKE_EXE', shutil.which('cmake'))
@@ -159,8 +160,12 @@ if sanitizers:
 # now pop these in CMAKE_COMMON_VARIABLES, and they will be used by cmake...
 os.environ['CMAKE_COMMON_VARIABLES'] = ' '.join(cmake_extra_args)
 
-print(f'version: {COUCHBASE_VERSION}')
-print(f'README location: {COUCHBASE_README}')
+package_data = {}
+# some more Windows tomfoolery...
+if platform.system() == 'Windows':
+    package_data = {'couchbase': ['libssl-1_1*.dll', 'libcrypto-1_1*.dll', 'pycbc_core.pyd']}
+
+print(f'Python SDK version: {COUCHBASE_VERSION}')
 
 setup(name='couchbase',
       version=COUCHBASE_VERSION,
@@ -170,6 +175,7 @@ setup(name='couchbase',
       packages=find_packages(
           include=['acouchbase', 'couchbase', 'txcouchbase', 'couchbase.*', 'acouchbase.*', 'txcouchbase.*'],
           exclude=['acouchbase.tests', 'couchbase.tests', 'txcouchbase.tests']),
+      package_data=package_data,
       url="https://github.com/couchbase/couchbase-python-client",
       author="Couchbase, Inc.",
       author_email="PythonPackage@couchbase.com",

@@ -1,0 +1,10 @@
+include *.txt LICENSE
+include couchbase_version.py
+recursive-include couchbase *.py
+recursive-include acouchbase *.py
+recursive-include txcouchbase *.py
+recursive-include tests *.py
+recursive-include src *
+recursive-include deps *
+recursive-exclude deps/couchbase-transactions-cxx/deps/couchbase-cxx-client/ *
+exclude MANIFEST.in
