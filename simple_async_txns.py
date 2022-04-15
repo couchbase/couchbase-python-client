@@ -60,7 +60,7 @@ async def run():
     ok = True
     while ok:
         try:
-            await my_cluster.transactions.run(txn_logic)
+            print(f'txn_result: {await my_cluster.transactions.run(txn_logic)}')
         except CouchbaseException as e:
             print(f'txn raised exception: {e}')
             ok = False

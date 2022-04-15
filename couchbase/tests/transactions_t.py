@@ -9,8 +9,9 @@ from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.exceptions import CouchbaseException
 from couchbase.options import ClusterOptions
-from couchbase.transactions import PerTransactionConfig, TransactionQueryOptions
-
+from couchbase.transactions import (PerTransactionConfig,
+                                    TransactionQueryOptions,
+                                    TransactionResult)
 from ._test_utils import (CollectionType,
                           KVPair,
                           TestEnvironment)
@@ -182,3 +183,17 @@ class TransactionTests:
         with pytest.raises(CouchbaseException):
             cb_env.cluster.transactions.run(txn_logic, PerTransactionConfig(expiration_time=timedelta(microseconds=1)))
         assert coll.exists(key).exists is False
+
+    def test_transaction_result(self, cb_env):
+        coll = cb_env.collection
+        key = str(uuid4())
+
+        def txn_logic(ctx):
+            ctx.insert(coll, key, {"some": "thing"})
+            doc = ctx.get(coll, key)
+            ctx.replace(doc, {"some": "thing else"})
+
+        result = cb_env.cluster.transactions.run(txn_logic)
+        assert isinstance(result, TransactionResult) is True
+        assert result.transaction_id is not None
+        assert result.unstaging_complete is True

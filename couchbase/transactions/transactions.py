@@ -7,6 +7,7 @@ from couchbase.transactions.logic import AttemptContextLogic, TransactionsLogic
 from .transaction_get_result import TransactionGetResult
 from .transaction_query_options import TransactionQueryOptions
 from .transaction_query_results import TransactionQueryResults
+from .transaction_result import TransactionResult
 
 if TYPE_CHECKING:
     from couchbase._utils import PyCapsuleType
@@ -47,7 +48,7 @@ class Transactions(TransactionsLogic):
                 raise e
 
         try:
-            return super().run(wrapped_txn_logic, per_txn_config)
+            return TransactionResult(**super().run(wrapped_txn_logic, per_txn_config))
         except CouchbaseException as cb_exc:
             raise cb_exc
         except Exception as e:

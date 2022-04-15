@@ -903,6 +903,19 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
 }
 
 PyObject*
+transaction_result_to_dict(std::optional<tx::transaction_result> res)
+{
+    PyObject* dict = PyDict_New();
+    if (res) {
+        PyObject* tmp = PyUnicode_FromString(res->transaction_id.c_str());
+        PyDict_SetItemString(dict, "transaction_id", tmp);
+        Py_DECREF(tmp);
+        PyDict_SetItemString(dict, "unstaging_complete", res->unstaging_complete ? Py_True : Py_False);
+    }
+    return dict;
+}
+
+PyObject*
 pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
 {
     // we expect to be called like:
@@ -974,12 +987,13 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
                 func = pyObj_errback;
             }
         } else {
+            PyObject* ret = transaction_result_to_dict(res);
             if (nullptr == pyObj_callback) {
-                Py_INCREF(Py_None);
-                barrier->set_value(Py_None);
+                barrier->set_value(ret);
+            } else {
+                args = PyTuple_Pack(1, ret);
+                func = pyObj_callback;
             }
-            args = PyTuple_Pack(1, Py_None);
-            func = pyObj_callback;
         }
         if (nullptr != func) {
             PyObject_CallObject(func, args);
@@ -996,9 +1010,7 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
     Py_BEGIN_ALLOW_THREADS if (nullptr == cfg)
     {
         txns->txns->run(logic, cb);
-    }
-    else
-    {
+    } else {
         auto expiry = cfg->expiration_time();
         LOG_INFO("calling transactions.run with expiry {}ms", expiry.has_value() ? expiry->count() : 0);
         txns->txns->run(*cfg, logic, cb);
@@ -1006,9 +1018,10 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
     Py_END_ALLOW_THREADS if (nullptr == pyObj_callback || nullptr == pyObj_errback)
     {
         std::string msg;
+        PyObject* retval = nullptr;
         Py_BEGIN_ALLOW_THREADS
         try {
-            f.get();
+            retval = f.get();
         } catch (const std::exception& e) {
             // ideally we form a python exception that uses the info in
             // extract_error_context(std::current_exception())
@@ -1018,6 +1031,8 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
         {
             PyErr_SetString(PyExc_ValueError, msg.c_str());
             return nullptr;
+        } else {
+            return retval;
         }
     }
     Py_RETURN_NONE;

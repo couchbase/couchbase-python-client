@@ -72,7 +72,7 @@ class Transactions(TransactionsLogic):
                  ):
         super().__init__(cluster, config)
 
-    @AsyncWrapper.inject_callbacks(None)
+    @AsyncWrapper.inject_callbacks(TransactionResult)
     def run(self, txn_logic, per_txn_config=None, **kwargs) -> Awaitable[TransactionResult]:
         def wrapped_logic(c):
             try:

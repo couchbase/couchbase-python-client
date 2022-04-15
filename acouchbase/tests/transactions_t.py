@@ -10,7 +10,9 @@ from acouchbase.cluster import Cluster
 from couchbase.auth import PasswordAuthenticator
 from couchbase.exceptions import CouchbaseException
 from couchbase.options import ClusterOptions
-from couchbase.transactions import PerTransactionConfig, TransactionQueryOptions
+from couchbase.transactions import (PerTransactionConfig,
+                                    TransactionQueryOptions,
+                                    TransactionResult)
 
 from ._test_utils import (CollectionType,
                           KVPair,
@@ -198,5 +200,19 @@ class AsyncTransactionsTests:
             await cb_env.cluster.transactions.run(txn_logic, cfg)
         result = await coll.exists(key)
         assert result.exists is False
+
+    @pytest.mark.asyncio
+    async def test_transaction_result(self, cb_env):
+        coll = cb_env.collection
+        key = str(uuid4())
+
+        async def txn_logic(ctx):
+            doc = await ctx.insert(coll, key, {"some": "thing"})
+            await ctx.replace(doc, {"some": "thing else"})
+
+        result = await cb_env.cluster.transactions.run(txn_logic)
+        assert isinstance(result, TransactionResult) is True
+        assert result.transaction_id is not None
+        assert result.unstaging_complete is True
 
 
