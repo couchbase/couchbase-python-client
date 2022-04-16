@@ -1,7 +1,8 @@
 from enum import IntEnum
 from typing import (Any,
                     Dict,
-                    Iterable)
+                    Iterable,
+                    Optional)
 
 from couchbase.exceptions import InvalidArgumentException
 
@@ -30,6 +31,9 @@ enum class subdoc_opcode : uint8_t {
 
 
 class SubDocOp(IntEnum):
+    GET_DOC = 0
+    SET_DOC = 1
+    REMOVE_DOC = 4
     GET = 197
     EXISTS = 198
     DICT_ADD = 199
@@ -118,10 +122,9 @@ class ArrayValues(tuple):
 
 
 def exists(
-        path,  # type: str
-        xattr=False  # type: bool
-):
-    # type: (...) -> Spec
+    path,  # type: str
+    xattr=False  # type: Optional[bool]
+) -> Spec:
     """
     Checks for the existence of a field given a path.
 
@@ -134,9 +137,8 @@ def exists(
 
 
 def get(path,  # type: str
-        xattr=False  # type: bool
-        ):
-    # type: (...) -> Spec
+        xattr=False  # type: Optional[bool]
+        ) -> Spec:
     """
     Fetches an element's value given a path.
 
@@ -148,9 +150,8 @@ def get(path,  # type: str
 
 
 def count(path,  # type: str
-          xattr=False  # type: bool
-          ):
-    # type: (...) -> Spec
+          xattr=False  # type: Optional[bool]
+          ) -> Spec:
     """
     Gets the count of a list or dictionary element given a path
 
@@ -163,9 +164,9 @@ def count(path,  # type: str
 
 def insert(path,                     # type: str
            value,                    # type: Dict[str, Any]
-           create_parents=False,     # type: bool
-           xattr=False,               # type: False
-           **kwargs                 # type: Any
+           create_parents=False,     # type: Optional[bool]
+           xattr=False,               # type: Optional[bool]
+           **kwargs                 # type: Dict[str, Any]
            ) -> Spec:
     """
     Insert a value at a given path in a document.
@@ -190,8 +191,8 @@ def insert(path,                     # type: str
 
 def upsert(path,                     # type: str
            value,                    # type: Dict[str, Any]
-           create_parents=False,     # type: bool
-           xattr=False               # type: bool
+           create_parents=False,     # type: Optional[bool]
+           xattr=False               # type: Optional[bool]
            ) -> Spec:
     """
     Upsert a value at a given path in a document.
@@ -214,7 +215,7 @@ def upsert(path,                     # type: str
 
 def replace(path,                     # type: str
             value,                    # type: Dict[str, Any]
-            xattr=False,              # type: bool
+            xattr=False,              # type: Optional[bool]
             ) -> Spec:
     """
     Upsert a value at a given path in a document.
@@ -228,7 +229,7 @@ def replace(path,                     # type: str
 
 
 def remove(path,                     # type: str
-           xattr=False,              # type: bool
+           xattr=False,              # type: Optional[bool]
            ) -> Spec:
     """
     Remove a path from a document.
@@ -242,8 +243,8 @@ def remove(path,                     # type: str
 
 def array_append(path,              # type: str
                  *values,                 # type: Iterable[Any]
-                 create_parents=False,     # type: bool
-                 xattr=False               # type: bool
+                 create_parents=False,     # type: Optional[bool]
+                 xattr=False               # type: Optional[bool]
                  ) -> Spec:
     """
     Add new values to the end of an array.
@@ -265,8 +266,8 @@ def array_append(path,              # type: str
 
 def array_prepend(path,              # type: str
                   *values,                 # type: Iterable[Any]
-                  create_parents=False,     # type: bool
-                  xattr=False               # type: bool
+                  create_parents=False,     # type: Optional[bool]
+                  xattr=False               # type: Optional[bool]
                   ) -> Spec:
     """
     Add new values to the beginning of an array.
@@ -293,8 +294,8 @@ def array_prepend(path,              # type: str
 
 def array_insert(path,              # type: str
                  *values,                 # type: Iterable[Any]
-                 create_parents=False,     # type: bool
-                 xattr=False               # type: bool
+                 create_parents=False,     # type: Optional[bool]
+                 xattr=False               # type: Optional[bool]
                  ) -> Spec:
     """
     Insert values at into an array in a document at the position
@@ -319,8 +320,8 @@ def array_insert(path,              # type: str
 
 def array_addunique(path,              # type: str
                     *values,                 # type: Iterable[Any]
-                    create_parents=False,     # type: bool
-                    xattr=False               # type: bool
+                    create_parents=False,     # type: Optional[bool]
+                    xattr=False               # type: Optional[bool]
                     ) -> Spec:
     """
     Add a value to an existing array, if it doesn't currently exist in the array.  Note the
@@ -344,8 +345,8 @@ def array_addunique(path,              # type: str
 
 def counter(path,                   # type: str
             delta,                  # type: int
-            xattr=False,            # type: bool
-            create_parents=False    # type: bool
+            xattr=False,            # type: Optional[bool]
+            create_parents=False    # type: Optional[bool]
             ) -> Spec:
     """
     **DEPRECATED** use increment() or decrement()
@@ -367,10 +368,9 @@ def counter(path,                   # type: str
 
 def increment(path,                   # type: str
               delta,                  # type: int
-              xattr=False,            # type: bool
-              create_parents=False    # type: bool
-              ):
-    # type: (...) -> Spec
+              xattr=False,            # type: Optional[bool]
+              create_parents=False    # type: Optional[bool]
+              ) -> Spec:
     """
     Increment a counter in a document.
 
@@ -392,10 +392,9 @@ def increment(path,                   # type: str
 
 def decrement(path,                   # type: str
               delta,                  # type: int
-              xattr=False,            # type: bool
-              create_parents=False    # type: bool
-              ):
-    # type: (...) -> Spec
+              xattr=False,            # type: Optional[bool]
+              create_parents=False    # type: Optional[bool]
+              ) -> Spec:
     """
     Increment a counter in a document.
 
@@ -414,3 +413,21 @@ def decrement(path,                   # type: str
 
     return Spec(SubDocOp.COUNTER, path, create_parents,
                 xattr, False, -1 * delta)
+
+
+def get_full() -> Spec:
+    """
+    Fetches the entire document.
+
+    :return: Spec
+    """
+    return Spec(SubDocOp.GET_DOC, '', False)
+
+
+def with_expiry() -> Spec:
+    """
+    Fetches the expiry from the xattrs of the doc
+
+    :return: Spec
+    """
+    return Spec(SubDocOp.GET, '$document.exptime', True)

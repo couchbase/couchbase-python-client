@@ -661,6 +661,12 @@ class FeatureUnavailableException(CouchbaseException):
 class MissingTokenException(CouchbaseException):
     pass
 
+
+class QueueEmpty(Exception):
+    """
+    Thrown if a datastructure queue is empty
+    """
+
 # Ratelimiting
 
 

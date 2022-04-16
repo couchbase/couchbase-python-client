@@ -354,7 +354,7 @@ class MutationToken:
 
 
 class LookupInResult(Result):
-    def exists(self,  # type: "LookupInResult"
+    def exists(self,  # type: LookupInResult
                index  # type: int
                ) -> bool:
 
@@ -610,3 +610,44 @@ class ViewResult:
 
     def __aiter__(self):
         return self._request.__aiter__()
+
+
+class OperationResult:
+    """ **DEPRECATED** """
+
+    def __init__(self, cas, mut_token):
+        self._mutation_token = mut_token
+        self._cas = cas
+
+    @property
+    def cas(self) -> Optional[int]:
+        return self._cas
+
+    def mutation_token(self) -> Optional[MutationToken]:
+        return self._mutation_token
+
+    def __repr__(self):
+        return f'OperationResult(mutation_token={self._mutation_token}, cas={self._cas})'
+
+
+class ValueResult:
+    """ **DEPRECATED** """
+
+    def __init__(self, cas, mut_token, value):
+        self._mutation_token = mut_token
+        self._cas = cas
+        self._value = value
+
+    @property
+    def cas(self) -> Optional[int]:
+        return self._cas
+
+    @property
+    def value(self) -> Optional[Any]:
+        return self._value
+
+    def mutation_token(self) -> Optional[MutationToken]:
+        return self._mutation_token
+
+    def __repr__(self):
+        return f'OperationResult(mutation_token={self._mutation_token}, cas={self._cas})'

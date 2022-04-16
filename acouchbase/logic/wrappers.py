@@ -4,6 +4,8 @@ from functools import partial, wraps
 
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   CouchbaseException,
+                                  DocumentExistsException,
+                                  DocumentNotFoundException,
                                   ErrorMapper,
                                   ExceptionMap,
                                   MissingConnectionException,
@@ -322,4 +324,24 @@ class AsyncWrapper:
 
             return wrapped_fn
 
+        return decorator
+
+    @classmethod
+    def datastructure_op(cls, create_type=None):
+        def decorator(fn):
+            @wraps(fn)
+            async def wrapped_fn(self, *args, **kwargs):
+                try:
+                    return await fn(self, *args, **kwargs)
+                except DocumentNotFoundException:
+                    if create_type is not None:
+                        try:
+                            await self._collection.insert(self._key, create_type())
+                        except DocumentExistsException:
+                            pass
+                        return await fn(self, *args, **kwargs)
+                    else:
+                        raise
+
+            return wrapped_fn
         return decorator

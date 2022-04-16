@@ -7,6 +7,10 @@ from typing import (TYPE_CHECKING,
                     Iterable,
                     Union)
 
+from acouchbase.datastructures import (CouchbaseList,
+                                       CouchbaseMap,
+                                       CouchbaseQueue,
+                                       CouchbaseSet)
 from acouchbase.logic import AsyncWrapper
 from couchbase.binary_collection import BinaryCollection
 from couchbase.logic.collection import CollectionLogic
@@ -261,6 +265,22 @@ class AsyncCollection(CollectionLogic):
         **kwargs,  # type: Any
     ) -> Awaitable[CounterResult]:
         super().decrement(key, *opts, **kwargs)
+
+    def couchbase_list(self, key  # type: str
+                       ) -> CouchbaseList:
+        return CouchbaseList(key, self)
+
+    def couchbase_map(self, key  # type: str
+                      ) -> CouchbaseMap:
+        return CouchbaseMap(key, self)
+
+    def couchbase_set(self, key  # type: str
+                      ) -> CouchbaseSet:
+        return CouchbaseSet(key, self)
+
+    def couchbase_queue(self, key  # type: str
+                        ) -> CouchbaseQueue:
+        return CouchbaseQueue(key, self)
 
     @staticmethod
     def default_name():

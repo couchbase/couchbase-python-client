@@ -2,12 +2,21 @@ from __future__ import annotations
 
 from typing import (TYPE_CHECKING,
                     Any,
+                    Dict,
                     Iterable,
+                    Optional,
                     Union,
                     overload)
 
 from couchbase.binary_collection import BinaryCollection
-from couchbase.exceptions import InvalidArgumentException
+from couchbase.datastructures import (CouchbaseList,
+                                      CouchbaseMap,
+                                      CouchbaseQueue,
+                                      CouchbaseSet)
+from couchbase.exceptions import (DocumentExistsException,
+                                  InvalidArgumentException,
+                                  PathExistsException,
+                                  QueueEmpty)
 from couchbase.logic import BlockingWrapper
 from couchbase.logic.collection import CollectionLogic
 from couchbase.options import forward_args
@@ -16,7 +25,16 @@ from couchbase.result import (CounterResult,
                               GetResult,
                               LookupInResult,
                               MutateInResult,
-                              MutationResult)
+                              MutationResult,
+                              OperationResult)
+from couchbase.subdocument import (array_addunique,
+                                   array_append,
+                                   array_prepend,
+                                   count)
+from couchbase.subdocument import get as subdoc_get
+from couchbase.subdocument import remove as subdoc_remove
+from couchbase.subdocument import replace
+from couchbase.subdocument import upsert as subdoc_upsert
 
 if TYPE_CHECKING:
     from datetime import timedelta
@@ -255,6 +273,387 @@ class Collection(CollectionLogic):
         **kwargs,  # type: Any
     ) -> CounterResult:
         return super().decrement(key, *opts, **kwargs)
+
+    def couchbase_list(self, key  # type: str
+                       ) -> CouchbaseList:
+        return CouchbaseList(key, self)
+
+    @BlockingWrapper._dsop(create_type='list')
+    def list_append(self, key,  # type: str
+                    value,  # type: JSONType
+                    create=False,  # type: Optional[bool]
+                    **kwargs,  # type: Dict[str, Any]
+                    ) -> OperationResult:
+        """
+        Add an item to the end of a list.
+
+        :param key: The document ID of the list
+        :param value: The value to append
+        :param create: Whether the list should be created if it does not
+               exist. Note that this option only works on servers >= 4.6
+        :param kwargs: Additional arguments to :meth:`mutate_in`
+        :return: :class:`OperationResult`.
+        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
+            and `create` was not specified.
+
+        example::
+
+            cb.list_append('a_list', 'hello')
+            cb.list_append('a_list', 'world')
+
+        .. seealso:: :meth:`map_add`
+        """
+        op = array_append('', value)
+        sd_res = self.mutate_in(key, (op,), **kwargs)
+        return OperationResult(sd_res.cas, sd_res.mutation_token())
+
+    @BlockingWrapper._dsop(create_type='list')
+    def list_prepend(self, key,  # type: str
+                     value,  # type: JSONType
+                     create=False,  # type: Optional[bool]
+                     **kwargs,  # type: Dict[str, Any]
+                     ) -> OperationResult:
+        """
+        Add an item to the beginning of a list.
+
+        :param key: Document ID
+        :param value: Value to prepend
+        :param create:
+            Whether the list should be created if it does not exist
+        :param kwargs: Additional arguments to :meth:`mutate_in`.
+        :return: :class:`OperationResult`.
+        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
+            and `create` was not specified.
+
+        This function is identical to :meth:`list_append`, except for prepending
+        rather than appending the item
+
+        .. seealso:: :meth:`list_append`, :meth:`map_add`
+        """
+        op = array_prepend('', value)
+        sd_res = self.mutate_in(key, (op,), **kwargs)
+        return OperationResult(sd_res.cas, sd_res.mutation_token())
+
+    @BlockingWrapper._dsop()
+    def list_set(self, key,  # type: str
+                 index,  # type: int
+                 value,  # type: JSONType
+                 **kwargs  # type: Dict[str, Any]
+                 ) -> OperationResult:
+        """
+        Sets an item within a list at a given position.
+
+        :param key: The key of the document
+        :param index: The position to replace
+        :param value: The value to be inserted
+        :param kwargs: Additional arguments to :meth:`mutate_in`
+        :return: :class:`OperationResult`
+        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
+        :raise: :exc:`IndexError` if the index is out of bounds
+
+        example::
+
+            cb.upsert('a_list', ['hello', 'world'])
+            cb.list_set('a_list', 1, 'good')
+            cb.get('a_list').value # => ['hello', 'good']
+
+        .. seealso:: :meth:`map_add`, :meth:`list_append`
+        """
+
+        op = replace(f'[{index}]', value)
+        sd_res = self.mutate_in(key, (op,), **kwargs)
+        return OperationResult(sd_res.cas, sd_res.mutation_token())
+
+    @BlockingWrapper._dsop()
+    def list_get(self, key,  # type: str
+                 index,  # type: int
+                 **kwargs  # type: Dict[str, Any]
+                 ) -> Any:
+        """
+        Get a specific element within a list.
+
+        :param key: The document ID
+        :param index: The index to retrieve
+        :return: value for the element
+        :raise: :exc:`IndexError` if the index does not exist
+        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
+        """
+        op = subdoc_get(f'[{index}]')
+        sd_res = self.lookup_in(key, (op,), **kwargs)
+        return sd_res.value[0].get("value", None)
+
+    @BlockingWrapper._dsop()
+    def list_remove(self, key,  # type: str
+                    index,  # type: int
+                    **kwargs  # type: Dict[str, Any]
+                    ) -> OperationResult:
+        """
+        Remove the element at a specific index from a list.
+
+        :param key: The document ID of the list
+        :param index: The index to remove
+        :param kwargs: Arguments to :meth:`mutate_in`
+        :return: :class:`OperationResult`
+        :raise: :exc:`IndexError` if the index does not exist
+        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
+        """
+
+        op = subdoc_remove(f'[{index}]')
+        sd_res = self.mutate_in(key, (op,), **kwargs)
+        return OperationResult(sd_res.cas, sd_res.mutation_token())
+
+    @BlockingWrapper._dsop()
+    def list_size(self, key,  # type: str
+                  **kwargs  # type: Dict[str, Any]
+                  ) -> int:
+        """
+        Get a specific element within a list.
+
+        :param key: The document ID
+        :param index: The index to retrieve
+        :return: value for the element
+        :raise: :exc:`IndexError` if the index does not exist
+        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
+        """
+        op = count('')
+        sd_res = self.lookup_in(key, (op,), **kwargs)
+        return sd_res.value[0].get("value", None)
+
+    def couchbase_map(self, key  # type: str
+                      ) -> CouchbaseMap:
+        return CouchbaseMap(key, self)
+
+    @BlockingWrapper._dsop(create_type='dict')
+    def map_add(self, key,  # type: str
+                mapkey,  # type: str
+                value,  # type: Any
+                create=False,  # type: Optional[bool]
+                **kwargs  # type: Dict[str, Any]
+                ) -> OperationResult:
+        """
+        Set a value for a key in a map.
+
+        These functions are all wrappers around the :meth:`mutate_in` or
+        :meth:`lookup_in` methods.
+
+        :param key: The document ID of the map
+        :param mapkey: The key in the map to set
+        :param value: The value to use (anything serializable to JSON)
+        :param create: Whether the map should be created if it does not exist
+        :param kwargs: Additional arguments passed to :meth:`mutate_in`
+        :raise: :cb_exc:`Document.DocumentNotFoundException` if the document does not exist.
+            and `create` was not specified
+
+        .. Initialize a map and add a value
+
+            cb.upsert('a_map', {})
+            cb.map_add('a_map', 'some_key', 'some_value')
+            cb.map_get('a_map', 'some_key').value  # => 'some_value'
+            cb.get('a_map').value  # => {'some_key': 'some_value'}
+
+        """
+        op = subdoc_upsert(mapkey, value)
+        sd_res = self.mutate_in(key, (op,), **kwargs)
+        return OperationResult(sd_res.cas, sd_res.mutation_token())
+
+    @BlockingWrapper._dsop()
+    def map_get(self, key,  # type: str
+                mapkey,  # type: str
+                **kwargs  # type: Dict[str, Any]
+                ) -> Any:
+        """
+        Retrieve a value from a map.
+
+        :param key: The document ID
+        :param mapkey: Key within the map to retrieve
+        :return: :class:`~.ValueResult`
+        :raise: :exc:`IndexError` if the mapkey does not exist
+        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
+
+        .. seealso:: :meth:`map_add` for an example
+        """
+        op = subdoc_get(mapkey)
+        sd_res = self.lookup_in(key, (op,), **kwargs)
+        return sd_res.value[0].get("value", None)
+
+    @BlockingWrapper._dsop()
+    def map_remove(self, key,  # type: str
+                   mapkey,  # type: str
+                   **kwargs  # type: Dict[str, Any]
+                   ) -> OperationResult:
+        """
+        Remove an item from a map.
+
+        :param key: The document ID
+        :param mapkey: The key in the map
+        :param See:meth:`mutate_in` for options
+        :raise: :exc:`IndexError` if the mapkey does not exist
+        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
+
+        .. Remove a map key-value pair:
+
+            cb.map_remove('a_map', 'some_key')
+
+        .. seealso:: :meth:`map_add`
+        """
+        op = subdoc_remove(mapkey)
+        sd_res = self.mutate_in(key, (op,), **kwargs)
+        return OperationResult(sd_res.cas, sd_res.mutation_token())
+
+    @BlockingWrapper._dsop()
+    def map_size(self, key,  # type: str
+                 **kwargs  # type: Dict[str, Any]
+                 ) -> int:
+        """
+        Get the number of items in the map.
+
+        :param key: The document ID of the map
+        :return int: The number of items in the map
+        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
+
+        .. seealso:: :meth:`map_add`
+        """
+        op = count('')
+        sd_res = self.lookup_in(key, (op,), **kwargs)
+        return sd_res.value[0].get("value", None)
+
+    def couchbase_set(self, key  # type: str
+                      ) -> CouchbaseSet:
+        return CouchbaseSet(key, self)
+
+    @BlockingWrapper._dsop(create_type='list')
+    def set_add(self, key, value, create=False, **kwargs):
+        """
+        Add an item to a set if the item does not yet exist.
+
+        :param key: The document ID
+        :param value: Value to add
+        :param create: Create the set if it does not exist
+        :param kwargs: Arguments to :meth:`mutate_in`
+        :return: A :class:`~.OperationResult` if the item was added,
+        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist
+            and `create` was not specified.
+
+        .. seealso:: :meth:`map_add`
+        """
+        op = array_addunique('', value)
+        try:
+            sd_res = self.mutate_in(key, (op,), **kwargs)
+            return OperationResult(sd_res.cas, sd_res.mutation_token())
+        except PathExistsException:
+            pass
+
+    @BlockingWrapper._dsop()
+    def set_remove(self, key, value, **kwargs):
+        """
+        Remove an item from a set.
+
+        :param key: The docuent ID
+        :param value: Value to remove
+        :param kwargs: Arguments to :meth:`mutate_in`
+        :return: A :class:`OperationResult` if the item was removed, false
+                 otherwise
+        :raise: :cb_exc:`DocumentNotFoundException` if the set does not exist.
+
+        .. seealso:: :meth:`set_add`, :meth:`map_add`
+        """
+        while True:
+            rv = self.get(key, **kwargs)
+            try:
+                ix = rv.value.index(value)
+                kwargs['cas'] = rv.cas
+                return self.list_remove(key, ix, **kwargs)
+            except DocumentExistsException:
+                pass
+            except ValueError:
+                return
+
+    def set_size(self, key, **kwargs):
+        """
+        Get the length of a set.
+
+        :param key: The document ID of the set
+        :return: The length of the set
+        :raise: :cb_exc:`DocumentNotFoundException` if the set does not exist.
+
+        """
+        return self.list_size(key, **kwargs)
+
+    def set_contains(self, key, value, **kwargs):
+        """
+        Determine if an item exists in a set
+        :param key: The document ID of the set
+        :param value: The value to check for
+        :return: True if `value` exists in the set
+        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist
+        """
+        rv = self.get(key, **kwargs)
+        return value in rv.value
+
+    def couchbase_queue(self, key  # type: str
+                        ) -> CouchbaseQueue:
+        return CouchbaseQueue(key, self)
+
+    @BlockingWrapper._dsop(create_type='list')
+    def queue_push(self, key, value, create=False, **kwargs):
+        """
+        Add an item to the end of a queue.
+
+        :param key: The document ID of the queue
+        :param value: The item to add to the queue
+        :param create: Whether the queue should be created if it does not exist
+        :param kwargs: Arguments to pass to :meth:`mutate_in`
+        :return: :class:`OperationResult`
+        :raise: :cb_exc:`DocumentNotFoundException` if the queue does not exist and
+            `create` was not specified.
+
+        example::
+
+            # Ensure it's removed first
+
+            cb.remove('a_queue')
+            cb.queue_push('a_queue', 'job9999', create=True)
+            cb.queue_pop('a_queue').value  # => job9999
+        """
+        return self.list_prepend(key, value, **kwargs)
+
+    @BlockingWrapper._dsop()
+    def queue_pop(self, key, **kwargs):
+        """
+        Remove and return the first item queue.
+
+        :param key: The document ID
+        :param kwargs: Arguments passed to :meth:`mutate_in`
+        :return: A :class:`ValueResult`
+        :raise: :cb_exc:`QueueEmpty` if there are no items in the queue.
+        :raise: :cb_exc:`DocumentNotFoundException` if the queue does not exist.
+        """
+        while True:
+            try:
+                itm = self.list_get(key, -1, **kwargs)
+            except IndexError:
+                raise QueueEmpty
+
+            kwargs.update({k: v for k, v in getattr(
+                itm, '__dict__', {}).items() if k in {'cas'}})
+            try:
+                self.list_remove(key, -1, **kwargs)
+                return itm
+            except DocumentExistsException:
+                pass
+            except IndexError:
+                raise QueueEmpty
+
+    @BlockingWrapper._dsop()
+    def queue_size(self, key):
+        """
+        Get the length of the queue.
+
+        :param key: The document ID of the queue
+        :return: The length of the queue
+        :raise: :cb_exc:`DocumentNotFoundException` if the queue does not exist.
+        """
+        return self.list_size(key)
 
     @staticmethod
     def default_name():
