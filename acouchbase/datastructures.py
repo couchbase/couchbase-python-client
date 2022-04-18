@@ -1,29 +1,31 @@
-from ast import Raise
 import asyncio
-from datetime import timedelta
 import time
-from typing import TYPE_CHECKING, Any, List, Generator, Optional, Dict
-
-from couchbase.options import MutateInOptions
-from couchbase.exceptions import (CasMismatchException, 
-DocumentNotFoundException, 
-PathExistsException, 
-PathNotFoundException, 
-InvalidArgumentException,
-QueueEmpty, 
-UnAmbiguousTimeoutException)
-from couchbase.subdocument import (array_append,
-                                   array_prepend,
-                                   array_addunique,
-                                   replace,
-                                   get as subdoc_get,
-                                   remove,
-                                   upsert,
-                                   count,
-                                   exists as subdoc_exists,
-                                   StoreSemantics)
+from datetime import timedelta
+from typing import (TYPE_CHECKING,
+                    Any,
+                    Dict,
+                    Generator,
+                    List,
+                    Optional)
 
 from acouchbase.logic.wrappers import AsyncWrapper
+from couchbase.exceptions import (CasMismatchException,
+                                  DocumentNotFoundException,
+                                  InvalidArgumentException,
+                                  PathExistsException,
+                                  PathNotFoundException,
+                                  QueueEmpty,
+                                  UnAmbiguousTimeoutException)
+from couchbase.options import MutateInOptions
+from couchbase.subdocument import (array_addunique,
+                                   array_append,
+                                   array_prepend,
+                                   count)
+from couchbase.subdocument import exists as subdoc_exists
+from couchbase.subdocument import get as subdoc_get
+from couchbase.subdocument import (remove,
+                                   replace,
+                                   upsert)
 
 if TYPE_CHECKING:
     from acouchbase.collection import Collection
@@ -49,7 +51,7 @@ class CouchbaseList:
 
     @AsyncWrapper.datastructure_op(create_type=list)
     async def append(self, value  # type: JSONType
-               ) -> None:
+                     ) -> None:
         """
         Add an item to the end of a list.
 
@@ -70,7 +72,7 @@ class CouchbaseList:
 
     @AsyncWrapper.datastructure_op(create_type=list)
     async def prepend(self, value  # type: JSONType
-                ) -> None:
+                      ) -> None:
         """
         Add an item to the beginning of a list.
 
@@ -88,8 +90,8 @@ class CouchbaseList:
         await self._collection.mutate_in(self._key, (op,))
 
     async def set_at(self, index,  # type: int
-               value  # type: JSONType
-               ) -> None:
+                     value  # type: JSONType
+                     ) -> None:
         """
         Sets an item within a list at a given position.
 
@@ -114,7 +116,7 @@ class CouchbaseList:
 
     @AsyncWrapper.datastructure_op(create_type=list)
     async def get_at(self, index  # type: int
-               ) -> Any:
+                     ) -> Any:
         """
         Get a specific element within a list.
 
@@ -131,7 +133,7 @@ class CouchbaseList:
             raise InvalidArgumentException(message=f'Index: {index} is out of range.') from None
 
     async def remove_at(self, index  # type: int
-                  ) -> None:
+                        ) -> None:
         """
         Remove the element at a specific index from a list.
 
@@ -161,7 +163,7 @@ class CouchbaseList:
 
     @AsyncWrapper.datastructure_op(create_type=list)
     async def index_of(self, value  # type: Any
-                 ) -> int:
+                       ) -> int:
         """
         Retrieve the index of the specified value in the list.
 
@@ -218,6 +220,7 @@ class CouchbaseList:
             self._iter = False
             raise StopAsyncIteration
 
+
 class CouchbaseMap:
     def __init__(self, key,  # type: str
                  collection  # type: Collection
@@ -235,8 +238,8 @@ class CouchbaseMap:
 
     @AsyncWrapper.datastructure_op(create_type=dict)
     async def add(self, mapkey,  # type: str
-                value # type: Any
-                ) -> None:
+                  value  # type: Any
+                  ) -> None:
         """
         Set a value for a key in a map.
 
@@ -261,7 +264,7 @@ class CouchbaseMap:
 
     @AsyncWrapper.datastructure_op(create_type=dict)
     async def get(self, mapkey,  # type: str
-                ) -> Any:
+                  ) -> Any:
         """
         Retrieve a value from a map.
 
@@ -278,7 +281,7 @@ class CouchbaseMap:
         return sd_res.value[0].get("value", None)
 
     async def remove(self, mapkey  # type: str
-                   ) -> None:
+                     ) -> None:
         """
         Remove an item from a map.
 
@@ -316,8 +319,8 @@ class CouchbaseMap:
         return sd_res.value[0].get("value", None)
 
     @AsyncWrapper.datastructure_op(create_type=dict)
-    async def exists(self, key # type: Any
-                 ) -> bool:
+    async def exists(self, key  # type: Any
+                     ) -> bool:
         """
         hecks whether a specific key exists in the map.
 
@@ -385,7 +388,8 @@ class CouchbaseMap:
         """
 
         map_ = await self._get()
-        return ((k,v) for k,v in map_.content_as[dict].items())
+        return ((k, v) for k, v in map_.content_as[dict].items())
+
 
 class CouchbaseSet:
     def __init__(self, key,  # type: str
@@ -402,8 +406,8 @@ class CouchbaseSet:
         return await self._collection.get(self._key)
 
     @AsyncWrapper.datastructure_op(create_type=list)
-    async def add(self, value # type: Any
-    ) -> None:
+    async def add(self, value  # type: Any
+                  ) -> None:
         """
         Add an item to a set if the item does not yet exist.
 
@@ -417,9 +421,9 @@ class CouchbaseSet:
         except PathExistsException:
             return False
 
-    async def remove(self, value, # type: Any
-    timeout=None # type: Optional[timedelta]
-    ) -> None:
+    async def remove(self, value,  # type: Any  # noqa: C901
+                     timeout=None  # type: Optional[timedelta]
+                     ) -> None:
         """
         Remove an item from a set.
 
@@ -446,7 +450,7 @@ class CouchbaseSet:
                 if v == value:
                     val_idx = idx
                     break
-            
+
             if val_idx >= 0:
                 try:
                     op = remove(f'[{val_idx}]')
@@ -470,10 +474,9 @@ class CouchbaseSet:
 
             await asyncio.sleep(interval_millis / 1000)
 
-
     @AsyncWrapper.datastructure_op(create_type=list)
-    async def contains(self, value # type: Any
-    ) -> None:
+    async def contains(self, value  # type: Any
+                       ) -> None:
         """
         Check whether or not the CouchbaseSet contains a value
 
@@ -524,6 +527,7 @@ class CouchbaseSet:
         list_ = await self._get()
         return list_.content_as[list]
 
+
 class CouchbaseQueue:
     def __init__(self, key,  # type: str
                  collection  # type: Collection
@@ -542,7 +546,7 @@ class CouchbaseQueue:
 
     @AsyncWrapper.datastructure_op(create_type=list)
     async def push(self, value  # type: JSONType
-                ) -> None:
+                   ) -> None:
         """
         Add an item to the queue.
 
@@ -551,8 +555,8 @@ class CouchbaseQueue:
         op = array_prepend('', value)
         await self._collection.mutate_in(self._key, (op,))
 
-    async def pop(self, timeout=None # type: Optional[timedelta]
-    ) -> None:
+    async def pop(self, timeout=None  # type: Optional[timedelta]
+                  ) -> None:
         """
         Pop an item from the queue.
 
@@ -577,7 +581,7 @@ class CouchbaseQueue:
                 val = sd_res.value[0].get("value", None)
 
                 try:
-                    op = remove(f'[-1]')
+                    op = remove('[-1]')
                     await self._collection.mutate_in(self._key, (op,), MutateInOptions(cas=sd_res.cas))
                     return val
                 except CasMismatchException:
@@ -592,7 +596,7 @@ class CouchbaseQueue:
                     interval_millis = time_left
 
                 if time_left <= 0:
-                    raise UnAmbiguousTimeoutException(message=f"Unable to pop from the CouchbaseQueue.")
+                    raise UnAmbiguousTimeoutException(message="Unable to pop from the CouchbaseQueue.")
 
                 await asyncio.sleep(interval_millis / 1000)
             except PathNotFoundException:

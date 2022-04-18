@@ -11,7 +11,7 @@ from setuptools import (Extension,
 from setuptools.command.build_ext import build_ext
 
 sys.path.append('.')
-import couchbase_version
+import couchbase_version  # nopep8 # isort:skip # noqa: E402
 
 CMAKE_EXE = os.environ.get('CMAKE_EXE', shutil.which('cmake'))
 

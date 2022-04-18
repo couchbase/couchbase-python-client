@@ -1,10 +1,11 @@
-from couchbase.cluster import Cluster
-from couchbase.auth import PasswordAuthenticator
-from couchbase.options import ClusterOptions, TransactionConfig
-from couchbase.exceptions import CouchbaseException
 from datetime import timedelta
-from uuid import uuid4
 from typing import TYPE_CHECKING
+from uuid import uuid4
+
+from couchbase.auth import PasswordAuthenticator
+from couchbase.cluster import Cluster
+from couchbase.exceptions import CouchbaseException
+from couchbase.options import ClusterOptions, TransactionConfig
 
 if TYPE_CHECKING:
     from couchbase.transactions import AttemptContext

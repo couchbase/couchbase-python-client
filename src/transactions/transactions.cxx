@@ -110,8 +110,7 @@ pycbc_txns::transaction_config__new__(PyTypeObject* type, PyObject* args, PyObje
         self->cfg->custom_metadata_collection(metadata_bucket, metadata_scope, metadata_collection);
     }
     if (nullptr != scan_consistency) {
-        self->cfg->scan_consistency(
-          str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
+        self->cfg->scan_consistency(str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
     }
     return reinterpret_cast<PyObject*>(self);
 }
@@ -145,8 +144,7 @@ pycbc_txns::per_transaction_config__new__(PyTypeObject* type, PyObject* args, Py
         self->cfg->expiration_time(std::chrono::microseconds(PyLong_AsUnsignedLongLong(expiration_time)));
     }
     if (nullptr != scan_consistency) {
-        self->cfg->scan_consistency(
-          str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
+        self->cfg->scan_consistency(str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
     }
     return reinterpret_cast<PyObject*>(self);
 }
@@ -283,8 +281,7 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
         // TODO: look at profile mode enum, and then put it in here.
     }
     if (nullptr != scan_consistency) {
-        self->opts->scan_consistency(
-          str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
+        self->opts->scan_consistency(str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
     }
     if (nullptr != pyObj_ad_hoc) {
         self->opts->ad_hoc(!!PyObject_IsTrue(pyObj_ad_hoc));
@@ -1011,7 +1008,9 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
     Py_BEGIN_ALLOW_THREADS if (nullptr == cfg)
     {
         txns->txns->run(logic, cb);
-    } else {
+    }
+    else
+    {
         auto expiry = cfg->expiration_time();
         LOG_INFO("calling transactions.run with expiry {}ms", expiry.has_value() ? expiry->count() : 0);
         txns->txns->run(*cfg, logic, cb);
@@ -1032,7 +1031,9 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
         {
             PyErr_SetString(PyExc_ValueError, msg.c_str());
             return nullptr;
-        } else {
+        }
+        else
+        {
             return retval;
         }
     }

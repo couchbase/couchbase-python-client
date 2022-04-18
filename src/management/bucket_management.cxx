@@ -246,7 +246,7 @@ create_result_from_bucket_mgmt_response([[maybe_unused]] const Response& resp)
 
 template<>
 result*
-create_result_from_bucket_mgmt_response(const couchbase::operations::management::bucket_update_response& resp )
+create_result_from_bucket_mgmt_response(const couchbase::operations::management::bucket_update_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -597,11 +597,9 @@ get_bucket_settings(PyObject* settings)
     if (pyObj_conflict_res_type != nullptr) {
         auto crt = std::string(PyUnicode_AsUTF8(pyObj_conflict_res_type));
         if (crt.compare("lww") == 0) {
-            bucket_settings.conflict_resolution_type =
-              couchbase::management::cluster::bucket_conflict_resolution::timestamp;
+            bucket_settings.conflict_resolution_type = couchbase::management::cluster::bucket_conflict_resolution::timestamp;
         } else if (crt.compare("seqno") == 0) {
-            bucket_settings.conflict_resolution_type =
-              couchbase::management::cluster::bucket_conflict_resolution::sequence_number;
+            bucket_settings.conflict_resolution_type = couchbase::management::cluster::bucket_conflict_resolution::sequence_number;
         } else if (crt.compare("custom") == 0) {
             bucket_settings.conflict_resolution_type = couchbase::management::cluster::bucket_conflict_resolution::custom;
         }

@@ -96,9 +96,30 @@ def timedelta_as_microseconds(
 ) -> int:
     if duration and not isinstance(duration, timedelta):
         raise InvalidArgumentException(
-            "Expected timedelta instead of {}".format(duration)
+            message="Expected timedelta instead of {}".format(duration)
         )
     return int(duration.total_seconds() * 1e6 if duration else 0)
+
+
+def validate_int(value  # type: int
+                 ) -> int:
+    if not isinstance(value, int):
+        raise InvalidArgumentException(message='Expected value to be of type int.')
+    return value
+
+
+def validate_bool(value  # type: bool
+                  ) -> int:
+    if not isinstance(value, bool):
+        raise InvalidArgumentException(message='Expected value to be of type bool.')
+    return value
+
+
+def validate_str(value  # type: str
+                 ) -> int:
+    if not isinstance(value, str):
+        raise InvalidArgumentException(message='Expected value to be of type str.')
+    return value
 
 
 class Identity:

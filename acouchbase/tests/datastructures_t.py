@@ -2,25 +2,18 @@ import pytest
 import pytest_asyncio
 
 from acouchbase.cluster import Cluster, get_event_loop
+from acouchbase.datastructures import (CouchbaseList,
+                                       CouchbaseMap,
+                                       CouchbaseQueue,
+                                       CouchbaseSet)
 from couchbase.auth import PasswordAuthenticator
-from acouchbase.datastructures import (CouchbaseList, 
-CouchbaseMap, 
-CouchbaseSet, 
-CouchbaseQueue)
-from couchbase.exceptions import DocumentNotFoundException, InvalidArgumentException, QueueEmpty
-from couchbase.options import (ClusterOptions,
-                               GetOptions,
-                               InsertOptions,
-                               RemoveOptions,
-                               ReplaceOptions,
-                               UpsertOptions)
-from couchbase.result import (ExistsResult,
-                              GetResult,
-                              MutationResult)
+from couchbase.exceptions import (DocumentNotFoundException,
+                                  InvalidArgumentException,
+                                  QueueEmpty)
+from couchbase.options import ClusterOptions
 
-from ._test_utils import (CollectionType,
-                          KVPair,
-                          TestEnvironment)
+from ._test_utils import CollectionType, TestEnvironment
+
 
 class DatastructuresTests:
 
@@ -48,7 +41,8 @@ class DatastructuresTests:
         if request.param == CollectionType.DEFAULT:
             cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config)
         elif request.param == CollectionType.NAMED:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True, manage_collections=True)
+            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config,
+                                     manage_buckets=True, manage_collections=True)
             await cb_env.setup_named_collections()
 
         yield cb_env
@@ -82,12 +76,12 @@ class DatastructuresTests:
         rv = await cb_list.get_at(1)
         assert str(rv) == 'world'
         assert 2 == await cb_list.size()
-        
+
         await cb_list.remove_at(1)
         res = await cb_env.collection.get(self.TEST_DS_KEY)
         assert ['hello'] == res.content_as[list]
 
-        await cb_list.append( 'world')
+        await cb_list.append('world')
         res = await cb_env.collection.get(self.TEST_DS_KEY)
         assert ['hello', 'world'] == res.content_as[list]
 
@@ -111,11 +105,10 @@ class DatastructuresTests:
 
         assert 0 == await cb_list.size()
 
-
     @pytest.mark.usefixtures("remove_ds")
     @pytest.mark.asyncio
     async def test_map(self, cb_env):
-        
+
         cb_map = cb_env.collection.couchbase_map(self.TEST_DS_KEY)
         assert isinstance(cb_map, CouchbaseMap)
 
@@ -161,7 +154,7 @@ class DatastructuresTests:
     @pytest.mark.usefixtures("remove_ds")
     @pytest.mark.asyncio
     async def test_sets(self, cb_env):
-        
+
         cb_set = cb_env.collection.couchbase_set(self.TEST_DS_KEY)
         assert isinstance(cb_set, CouchbaseSet)
 
@@ -182,7 +175,7 @@ class DatastructuresTests:
         await cb_set.add(4)
 
         values = await cb_set.values()
-        assert values == [1,2,3,4]
+        assert values == [1, 2, 3, 4]
         await cb_set.clear()
         assert 0 == await cb_set.size()
 

@@ -1,15 +1,21 @@
 import pytest
-from couchbase.datastructures import CouchbaseList, CouchbaseMap, CouchbaseQueue, CouchbaseSet
-from couchbase.exceptions import DocumentNotFoundException, InvalidArgumentException, QueueEmpty
-from couchbase.result import OperationResult
 
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
+from couchbase.datastructures import (CouchbaseList,
+                                      CouchbaseMap,
+                                      CouchbaseQueue,
+                                      CouchbaseSet)
+from couchbase.exceptions import (DocumentNotFoundException,
+                                  InvalidArgumentException,
+                                  QueueEmpty)
 from couchbase.options import ClusterOptions
+from couchbase.result import OperationResult
 
 from ._test_utils import (CollectionType,
                           KVPair,
                           TestEnvironment)
+
 
 class LegacyDatastructuresTests:
 
@@ -31,9 +37,9 @@ class LegacyDatastructuresTests:
             cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_collections=True)
             cb_env.setup_named_collections()
 
-        #cb_env.load_data()
+        # cb_env.load_data()
         yield cb_env
-        #cb_env.purge_data()
+        # cb_env.purge_data()
         if request.param == CollectionType.NAMED:
             cb_env.teardown_named_collections()
         cluster.close()
@@ -45,7 +51,6 @@ class LegacyDatastructuresTests:
             cb_env.collection.remove(self.TEST_DS_KEY)
         except DocumentNotFoundException:
             pass
-
 
     @pytest.mark.usefixtures("remove_ds")
     def test_list(self, cb_env):
@@ -67,7 +72,7 @@ class LegacyDatastructuresTests:
 
         with pytest.raises(DocumentNotFoundException):
             cb.list_get('not-a-key', 0)
-        
+
         cb.list_remove(self.TEST_DS_KEY, 1)
         res = cb.get(self.TEST_DS_KEY)
         assert ['hello'] == res.content_as[list]
@@ -88,7 +93,6 @@ class LegacyDatastructuresTests:
             cb.map_add(self.TEST_DS_KEY, 'key1', 'val1')
 
         cb.map_add(self.TEST_DS_KEY, 'key1', 'val1', create=True)
-
 
         rv = cb.map_get(self.TEST_DS_KEY, 'key1')
         assert rv == 'val1'
@@ -140,6 +144,7 @@ class LegacyDatastructuresTests:
         with pytest.raises(QueueEmpty):
             cb.queue_pop(self.TEST_DS_KEY)
 
+
 class DatastructuresTests:
 
     TEST_DS_KEY = 'ds-key'
@@ -160,9 +165,9 @@ class DatastructuresTests:
             cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_collections=True)
             cb_env.setup_named_collections()
 
-        #cb_env.load_data()
+        # cb_env.load_data()
         yield cb_env
-        #cb_env.purge_data()
+        # cb_env.purge_data()
         if request.param == CollectionType.NAMED:
             cb_env.teardown_named_collections()
         cluster.close()
@@ -192,12 +197,12 @@ class DatastructuresTests:
         rv = cb_list.get_at(1)
         assert str(rv) == 'world'
         assert 2 == cb_list.size()
-        
+
         cb_list.remove_at(1)
         res = cb_env.collection.get(self.TEST_DS_KEY)
         assert ['hello'] == res.content_as[list]
 
-        cb_list.append( 'world')
+        cb_list.append('world')
         res = cb_env.collection.get(self.TEST_DS_KEY)
         assert ['hello', 'world'] == res.content_as[list]
 
@@ -221,7 +226,7 @@ class DatastructuresTests:
 
     @pytest.mark.usefixtures("remove_ds")
     def test_map(self, cb_env):
-        
+
         cb_map = cb_env.collection.couchbase_map(self.TEST_DS_KEY)
         assert isinstance(cb_map, CouchbaseMap)
 
@@ -265,7 +270,7 @@ class DatastructuresTests:
 
     @pytest.mark.usefixtures("remove_ds")
     def test_sets(self, cb_env):
-        
+
         cb_set = cb_env.collection.couchbase_set(self.TEST_DS_KEY)
         assert isinstance(cb_set, CouchbaseSet)
 
@@ -286,7 +291,7 @@ class DatastructuresTests:
         cb_set.add(4)
 
         values = cb_set.values()
-        assert values == [1,2,3,4]
+        assert values == [1, 2, 3, 4]
         cb_set.clear()
         assert 0 == cb_set.size()
 

@@ -214,5 +214,3 @@ class AsyncTransactionsTests:
         assert isinstance(result, TransactionResult) is True
         assert result.transaction_id is not None
         assert result.unstaging_complete is True
-
-

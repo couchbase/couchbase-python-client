@@ -4,7 +4,8 @@ from typing import (TYPE_CHECKING,
                     Optional,
                     overload)
 
-from couchbase.pycbc_core import per_transaction_config, transaction_config
+from couchbase.pycbc_core import transaction_config  # noqa: F401
+from couchbase.pycbc_core import per_transaction_config
 
 if TYPE_CHECKING:
     from datetime import timedelta

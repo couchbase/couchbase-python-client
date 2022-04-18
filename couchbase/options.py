@@ -18,7 +18,10 @@ from typing import (TYPE_CHECKING,
                     Union,
                     overload)
 
-from couchbase._utils import timedelta_as_microseconds
+from couchbase._utils import (timedelta_as_microseconds,
+                              validate_bool,
+                              validate_int,
+                              validate_str)
 from couchbase.durability import DurabilityParser
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.pycbc_core import transaction_config
@@ -28,8 +31,9 @@ if TYPE_CHECKING:
     from couchbase._utils import JSONType
     from couchbase.analytics import AnalyticsScanConsistency
     from couchbase.auth import Authenticator
+    from couchbase.collection import Collection
     from couchbase.diagnostics import ClusterState, ServiceType
-    from couchbase.durability import DurabilityType
+    from couchbase.durability import DurabilityType, ServerDurability
     from couchbase.management.views import DesignDocumentNamespace
     from couchbase.mutation_state import MutationState
     from couchbase.n1ql import QueryProfile, QueryScanConsistency
@@ -43,9 +47,6 @@ if TYPE_CHECKING:
     from couchbase.views import (ViewErrorMode,
                                  ViewOrdering,
                                  ViewScanConsistency)
-    from couchbase.collection import Collection
-    from couchbase.durability import ServerDurability
-    from couchbase.logic.n1ql import QueryScanConsistency
 
 
 OptionsBase = dict
@@ -122,6 +123,26 @@ class OptionsTimeout(OptionsBase):
 
 
 class ClusterTimeoutOptions(dict):
+    """ClusterTimeoutOptions
+
+    These will be the default timeouts for operations for the entire cluster
+
+    Args:
+        bootstrap_timeout (timedelta, optional): bootstrap timeout. Defaults to None.
+        resolve_timeout (timedelta, optional): bootstrap timeout. Defaults to None.
+        connect_timeout (timedelta, optional): connect timeout. Defaults to None.
+        kv_timeout (timedelta, optional): KV operations timeout. Defaults to None.
+        kv_durable_timeout (timedelta, optional): KV durability operations timeout. Defaults to None.
+        views_timeout (timedelta, optional): views operations timeout. Defaults to None.
+        query_timeout (timedelta, optional): query operations timeout. Defaults to None.
+        analytics_timeout (timedelta, optional): analytics operations timeout. Defaults to None.
+        search_timeout (timedelta, optional): search operations timeout. Defaults to None.
+        management_timeout (timedelta, optional): management operations timeout. Defaults to None.
+        dns_srv_timeout (timedelta, optional): DNS SRV connection timeout. Defaults to None.
+        idle_http_connection_timeout (timedelta, optional): Idle HTTP connection timeout. Defaults to None.
+        config_idle_redial_timeout (timedelta, optional): Idle redial timeout. Defaults to None.
+        config_total_timeout (timedelta, optional): **DEPRECATED** complete bootstrap timeout. Defaults to None.
+    """
 
     _VALID_OPTS = {
         "bootstrap_timeout": {"bootstrap_timeout": timedelta_as_microseconds},
@@ -157,26 +178,7 @@ class ClusterTimeoutOptions(dict):
         config_idle_redial_timeout=None,  # type: Optional[timedelta]
         config_total_timeout=None  # type: Optional[timedelta]
     ):
-        """ClusterTimeoutOptions
-
-        These will be the default timeouts for operations for the entire cluster
-
-        Args:
-            bootstrap_timeout (timedelta, optional): bootstrap timeout. Defaults to None.
-            resolve_timeout (timedelta, optional): bootstrap timeout. Defaults to None.
-            connect_timeout (timedelta, optional): connect timeout. Defaults to None.
-            kv_timeout (timedelta, optional): KV operations timeout. Defaults to None.
-            kv_durable_timeout (timedelta, optional): KV durability operations timeout. Defaults to None.
-            views_timeout (timedelta, optional): views operations timeout. Defaults to None.
-            query_timeout (timedelta, optional): query operations timeout. Defaults to None.
-            analytics_timeout (timedelta, optional): analytics operations timeout. Defaults to None.
-            search_timeout (timedelta, optional): search operations timeout. Defaults to None.
-            management_timeout (timedelta, optional): management operations timeout. Defaults to None.
-            dns_srv_timeout (timedelta, optional): DNS SRV connection timeout. Defaults to None.
-            idle_http_connection_timeout (timedelta, optional): Idle HTTP connection timeout. Defaults to None.
-            config_idle_redial_timeout (timedelta, optional): Idle redial timeout. Defaults to None.
-            config_total_timeout (timedelta, optional): **DEPRECATED** complete bootstrap timeout. Defaults to None.
-        """
+        """Cluster timeout options."""
         pass
 
     def __init__(self, **kwargs):
@@ -221,6 +223,25 @@ class ClusterTimeoutOptions(dict):
 
 
 class ClusterTracingOptions(dict):
+    """ClusterTracingOptions
+
+    These will be the default timeouts for operations for the entire cluster
+
+    Args:
+        tracing_threshold_kv (timedelta, optional): KV operations threshold. Defaults to None.
+        tracing_threshold_view (timedelta, optional): Views operations threshold. Defaults to None.
+        tracing_threshold_query (timedelta, optional): Query operations threshold. Defaults to None.
+        tracing_threshold_search (timedelta, optional): Search operations threshold.. Defaults to None.
+        tracing_threshold_analytics (timedelta, optional): Analytics operations threshold. Defaults to None.
+        tracing_threshold_eventing (timedelta, optional): Eventing operations threshold. Defaults to None.
+        tracing_threshold_management (timedelta, optional): Management operations threshold. Defaults to None.
+        tracing_threshold_queue_size (int, optional): Size of tracing operations queue. Defaults to None.
+        tracing_threshold_queue_flush_interval (timedelta, optional): Interveral to flush tracing operations queue.
+            Defaults to None.
+        tracing_orphaned_queue_size (int, optional): Size of tracing orphaned operations queue. Defaults to None.
+        tracing_orphaned_queue_flush_interval (timedelta, optional): Interveral to flush tracing orphaned operations
+            queue. Defaults to None.
+    """
 
     _VALID_OPTS = {
         "tracing_threshold_kv": {"key_value_threshold": timedelta_as_microseconds},
@@ -230,9 +251,9 @@ class ClusterTracingOptions(dict):
         "tracing_threshold_analytics": {"analytics_threshold": timedelta_as_microseconds},
         "tracing_threshold_eventing": {"eventing_threshold": timedelta_as_microseconds},
         "tracing_threshold_management": {"management_threshold": timedelta_as_microseconds},
-        "tracing_threshold_queue_size": {"threshold_sample_size": lambda x: x},
+        "tracing_threshold_queue_size": {"threshold_sample_size": validate_int},
         "tracing_threshold_queue_flush_interval": {"threshold_emit_interval": timedelta_as_microseconds},
-        "tracing_orphaned_queue_size": {"orphaned_sample_size": lambda x: x},
+        "tracing_orphaned_queue_size": {"orphaned_sample_size": validate_int},
         "tracing_orphaned_queue_flush_interval": {"orphaned_emit_interval": timedelta_as_microseconds}
     }
 
@@ -251,6 +272,7 @@ class ClusterTracingOptions(dict):
         tracing_orphaned_queue_size=None,  # type: Optional[int]
         tracing_orphaned_queue_flush_interval=None,  # type: Optional[timedelta]
     ):
+        """ClusterTracingOptions"""
         pass
 
     def __init__(self, **kwargs):
@@ -295,15 +317,76 @@ class TLSVerifyMode(Enum):
     NO_VERIFY = 'no_verify'
 
     @classmethod
-    def from_str(cls, value):
-        if value == cls.NONE.value:
-            return cls.NONE
-        elif value == cls.PEER.value:
-            return cls.PEER
-        elif value == cls.NO_VERIFY.value:
-            return cls.NONE
-        else:
-            raise ValueError(f'{value} is not a valid TLSVerifyMode option.  See couchbase.options.TLSVerifyMode.')
+    def from_str(cls, value  # type: str
+                 ) -> str:
+        if isinstance(value, str):
+            if value == cls.NONE.value:
+                return cls.NONE
+            elif value == cls.PEER.value:
+                return cls.PEER
+            elif value == cls.NO_VERIFY.value:
+                return cls.NONE
+
+        raise InvalidArgumentException(message=(f"{value} is not a valid TLSVerifyMode option. "
+                                                "Excepted str representation of type TLSVerifyMode."))
+
+    @classmethod
+    def to_str(cls, value  # type: Union[TLSVerifyMode, str]
+               ) -> str:
+        if isinstance(value, TLSVerifyMode):
+            if value == cls.NO_VERIFY:
+                return cls.NONE.value
+            return value.value
+        if isinstance(value, str):
+            if value == cls.NONE.value:
+                return cls.NONE.value
+            elif value == cls.PEER.value:
+                return cls.PEER.value
+            elif value == cls.NO_VERIFY.value:
+                return cls.NONE.value
+
+        raise InvalidArgumentException(message=(f"{value} is not a valid TLSVerifyMode option. "
+                                                "Excepted TLS verify mode to be either of type "
+                                                "TLSVerifyMode or str representation "
+                                                "of TLSVerifyMode."))
+
+
+class IpProtocol(Enum):
+    Any = 'any'
+    ForceIPv4 = 'force_ipv4'
+    ForceIPv6 = 'force_ipv6'
+
+    @classmethod
+    def from_str(cls, value  # type: str
+                 ) -> str:
+        if isinstance(value, str):
+            if value == cls.Any.value:
+                return cls.Any
+            elif value == cls.ForceIPv4.value:
+                return cls.ForceIPv4
+            elif value == cls.ForceIPv6.value:
+                return cls.ForceIPv6
+
+        raise InvalidArgumentException(message=(f"{value} is not a valid IpProtocol option. "
+                                                "Excepted str representation of type IpProtocol."))
+
+    @classmethod
+    def to_str(cls, value  # type: Union[IpProtocol, str]
+               ) -> str:
+        if isinstance(value, IpProtocol):
+            return value.value
+        if isinstance(value, str):
+            if value == cls.Any.value:
+                return cls.Any.value
+            elif value == cls.ForceIPv4.value:
+                return cls.ForceIPv4.value
+            elif value == cls.ForceIPv6.value:
+                return cls.ForceIPv6.value
+
+        raise InvalidArgumentException(message=(f"{value} is not a valid IpProtocol option. "
+                                                "Excepted IP Protocol mode to be either of type "
+                                                "IpProtocol or str representation "
+                                                "of IpProtocol."))
 
 
 class Compression(Enum):
@@ -355,31 +438,82 @@ class Compression(Enum):
 
 
 class ClusterOptions(dict):
+    """Avaliabe options to set when creating a cluster.
+
+    Cluster options enable the configuration of various global cluster settings.
+    Some options can be set globally for the cluster, but overridden for specific
+    operations (i.e. ClusterTimeoutOptions)
+
+    .. note::
+
+        The authenticator is mandatory, all the other cluster options are optional.
+
+    Args:
+        authenticator
+         (Union[:class:`~couchbase.auth.PasswordAuthenticator`, :class:`~couchbase.auth.CertificateAuthenticator`]):
+            An authenticator object
+        timeout_options (:class:`~couchbase.options.ClusterTimeoutOptions`): Timeout options for
+            various SDK operations. See :class:`~couchbase.options.ClusterTimeoutOptions` for details.
+        tracing_options (:class:`~couchbase.options.ClusterTimeoutOptions`): Tracing options for SDK tracing bevavior.
+            See :class:`~couchbase.options.ClusterTracingOptions` for details.
+        enable_tls (bool, optional): Set to True to enable tls. Defaults to False (disabled).
+        enable_mutation_tokens (bool, optional): Set to False to disable mutation tokens in mutation results.
+            Defaults to True (enabled).
+        enable_tcp_keep_alive (bool, optional): Set to False to disable tcp keep alive. Defaults to True (enabled).
+        ip_protocol (Union[str, :class:`.IpProtocol`): Set IP protocol. Defaults to IpProtocol.Any.
+        enable_dns_srv (bool, optional): Set to False to disable DNS SRV. Defaults to True (enabled).
+        show_queries (bool, optional): Set to True to enabled showing queries. Defaults to False (disabled).
+        enable_unordered_execution (bool, optional): Set to False to disable unordered query execution.
+            Defaults to True (enabled).
+        enable_clustermap_notification (bool, optional): Set to False to disable cluster map notification.
+            Defaults to True (enabled).
+        enable_compression (bool, optional): Set to False to disable compression. Defaults to True (enabled).
+        enable_tracing (bool, optional): Set to False to disable tracing. Defaults to True (enabled).
+        enable_metrics (bool, optional): Set to False to disable metrics. Defaults to True (enabled).
+        network (str, optional): Set to False to disable compression. Defaults to True (enabled).
+        tls_verify (Union[str, :class:`.TLSVerifyMode`], optional): Set tls verify mode. Defaults to TLSVerifyMode.PEER.
+        serializer (`Serializer`, optional): Global serializer to translate JSON to Python objects.
+            Defaults to DefaultJsonSerializer.
+        transcoder (`Transcoder`, optional): Global transcoder to use for kv-operations.  Defaults to JsonTranscoder.
+        span (`CouchbaseSpan`, optional): Global span to use for tracing.  Defaults to None.
+        tcp_keep_alive_interval (timedelta, optional): TCP keep-alive interval. Defaults to None.
+        config_poll_interval (timedelta, optional): Config polling floor interval.
+            Defaults to None.
+        config_poll_floor (timedelta, optional): Config polling floor interval.
+            Defaults to None.
+        max_http_connections (int, optional): Maximum number of HTTP connections.  Defaults to None.
+        user_agent_extra (str, optional): Set for additional user agent info in HTTP requests.  Defaults to None.
+        logging_meter_emit_interval (int, optional): Logging meter emit interval.  Defaults to None.
+        transaction_config (`TransactionConfig`, optional): Global span to use for tracing.  Defaults to None.
+    """
 
     _VALID_OPTS = {
         "authenticator": {"authenticator": lambda x: x},
-        "enable_tls": {"enable_tls": lambda x: x},
-        "enable_mutation_tokens": {"enable_mutation_tokens": lambda x: x},
-        "enable_tcp_keep_alive": {"enable_tcp_keep_alive": lambda x: x},
-        "force_ipv4": {"force_ipv4": lambda x: x},
-        "enable_dns_srv": {"enable_dns_srv": lambda x: x},
-        "show_queries": {"show_queries": lambda x: x},
-        "enable_unordered_execution": {"enable_unordered_execution": lambda x: x},
-        "enable_clustermap_notification": {"enable_clustermap_notification": lambda x: x},
-        "enable_compression": {"enable_compression": lambda x: x},
-        "enable_tracing": {"enable_tracing": lambda x: x},
-        "enable_metrics": {"enable_metrics": lambda x: x},
-        "network": {"network": lambda x: x},
-        "tls_verify": {"tls_verify": lambda x: x},
+        "enable_tls": {"enable_tls": validate_bool},
+        "enable_mutation_tokens": {"enable_mutation_tokens": validate_bool},
+        "enable_tcp_keep_alive": {"enable_tcp_keep_alive": validate_bool},
+        "ip_protocol": {"use_ip_protocol": IpProtocol.to_str},
+        "enable_dns_srv": {"enable_dns_srv": validate_bool},
+        "show_queries": {"show_queries": validate_bool},
+        "enable_unordered_execution": {"enable_unordered_execution": validate_bool},
+        "enable_clustermap_notification": {"enable_clustermap_notification": validate_bool},
+        "enable_compression": {"enable_compression": validate_bool},
+        "enable_tracing": {"enable_tracing": validate_bool},
+        "enable_metrics": {"enable_metrics": validate_bool},
+        "network": {"network": validate_str},
+        "tls_verify": {"tls_verify": TLSVerifyMode.to_str},
+        "serializer": {"serializer": lambda x: x},
         "transcoder": {"transcoder": lambda x: x},
         "span": {"span": lambda x: x},
         "tcp_keep_alive_interval": {"tcp_keep_alive_interval": timedelta_as_microseconds},
         "config_poll_interval": {"config_poll_interval": timedelta_as_microseconds},
         "config_poll_floor": {"config_poll_floor": timedelta_as_microseconds},
-        "max_http_connections": {"max_http_connections": lambda x: x},
-        "user_agent_extra": {"user_agent_extra": lambda x: x},
-        "logging_meter_emit_interval": {"emit_interval": lambda x: x},
-        "num_io_threads": {"num_io_threads": lambda x: x},
+        "max_http_connections": {"max_http_connections": validate_int},
+        "user_agent_extra": {"user_agent_extra": validate_str},
+        "trust_store_path": {"trust_store_path": validate_str},
+        "cert_path": {"cert_path": validate_str},
+        "logging_meter_emit_interval": {"emit_interval": validate_int},
+        "num_io_threads": {"num_io_threads": validate_int},
         "transaction_config": {"transaction_config": lambda x: x},
     }
 
@@ -392,7 +526,7 @@ class ClusterOptions(dict):
         enable_tls=None,    # type: Optional[bool]
         enable_mutation_tokens=None,    # type: Optional[bool]
         enable_tcp_keep_alive=None,    # type: Optional[bool]
-        force_ipv4=None,    # type: Optional[bool]
+        ip_protocol=None,    # type: Optional[Union[IpProtocol, str]]
         enable_dns_srv=None,    # type: Optional[bool]
         show_queries=None,    # type: Optional[bool]
         enable_unordered_execution=None,    # type: Optional[bool]
@@ -401,7 +535,8 @@ class ClusterOptions(dict):
         enable_tracing=None,    # type: Optional[bool]
         enable_metrics=None,    # type: Optional[bool]
         network=None,    # type: Optional[str]
-        tls_verify=None,    # type: Optional[bool]
+        tls_verify=None,    # type: Optional[Union[TLSVerifyMode, str]]
+        serializer=None,  # type: Optional[Serializer]
         transcoder=None,  # type: Optional[Transcoder]
         span=None,  # type: Optional[Any]
         tcp_keep_alive_interval=None,  # type: Optional[timedelta]
@@ -410,9 +545,9 @@ class ClusterOptions(dict):
         max_http_connections=None,  # type: Optional[int]
         user_agent_extra=None,  # type: Optional[str]
         logging_meter_emit_interval=None,  # type: Optional[int]
-        num_io_threads=None,  # type: Optional[int]
         transaction_config=None  # type: Optional[TransactionConfig]
     ):
+        """Cluster Options"""
         pass
 
     def __init__(self,
@@ -462,6 +597,8 @@ class ClusterOptions(dict):
         valid_keys = ClusterTimeoutOptions.get_allowed_option_keys()
         valid_keys.extend(ClusterTracingOptions.get_allowed_option_keys())
         valid_keys.extend(list(ClusterOptions._VALID_OPTS.keys()))
+
+        return valid_keys
 
     @staticmethod
     def get_valid_options() -> Dict[str, Any]:

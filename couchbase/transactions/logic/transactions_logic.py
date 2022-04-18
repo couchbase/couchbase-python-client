@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 from couchbase.pycbc_core import (create_transactions,
                                   destroy_transactions,
                                   run_transaction)
+
 if TYPE_CHECKING:
     from couchbase.logic.cluster_logic import ClusterLogic
     from couchbase.options import TransactionConfig

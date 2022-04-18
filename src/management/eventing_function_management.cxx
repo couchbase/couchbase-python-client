@@ -770,8 +770,8 @@ build_function_url_bindings(std::vector<couchbase::management::eventing::functio
             }
             Py_DECREF(pyObj_tmp);
 
-            pyObj_tmp = PyUnicode_FromString(
-              std::get<couchbase::management::eventing::function_url_auth_basic>(binding.auth).username.c_str());
+            pyObj_tmp =
+              PyUnicode_FromString(std::get<couchbase::management::eventing::function_url_auth_basic>(binding.auth).username.c_str());
             if (-1 == PyDict_SetItemString(pyObj_binding, "username", pyObj_tmp)) {
                 Py_DECREF(pyObj_binding);
                 Py_XDECREF(pyObj_url_bindings);
@@ -789,8 +789,8 @@ build_function_url_bindings(std::vector<couchbase::management::eventing::functio
             }
             Py_DECREF(pyObj_tmp);
 
-            pyObj_tmp = PyUnicode_FromString(
-              std::get<couchbase::management::eventing::function_url_auth_digest>(binding.auth).username.c_str());
+            pyObj_tmp =
+              PyUnicode_FromString(std::get<couchbase::management::eventing::function_url_auth_digest>(binding.auth).username.c_str());
             if (-1 == PyDict_SetItemString(pyObj_binding, "username", pyObj_tmp)) {
                 Py_DECREF(pyObj_binding);
                 Py_XDECREF(pyObj_url_bindings);

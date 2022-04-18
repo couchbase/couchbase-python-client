@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
-                    Optional)
+                    Optional,
+                    Tuple,
+                    Union)
 from urllib.parse import parse_qs, urlparse
 
 from couchbase.auth import CertificateAuthenticator
@@ -13,6 +15,7 @@ from couchbase.options import (ClusterOptions,
                                ClusterTimeoutOptions,
                                ClusterTracingOptions,
                                TLSVerifyMode,
+                               TransactionConfig,
                                forward_args,
                                get_valid_args)
 from couchbase.pycbc_core import (close_connection,
@@ -25,8 +28,8 @@ from couchbase.pycbc_core import (close_connection,
 from couchbase.result import (ClusterInfoResult,
                               DiagnosticsResult,
                               PingResult)
+from couchbase.serializer import DefaultJsonSerializer
 from couchbase.transcoder import JSONTranscoder
-from couchbase.options import TransactionConfig
 
 if TYPE_CHECKING:
     from couchbase.options import DiagnosticsOptions, PingOptions
@@ -34,58 +37,83 @@ if TYPE_CHECKING:
 
 
 class ClusterLogic:
+
+    _LEGACY_CONNSTR_QUERY_ARGS = {
+        'ssl': {'tls_verify': TLSVerifyMode.to_str},
+        'certpath': {'cert_path': lambda x: x},
+        'cert_path': {'cert_path': lambda x: x},
+        'truststorepath': {'trust_store_path': lambda x: x},
+        'trust_store_path': {'trust_store_path': lambda x: x}
+    }
+
     def __init__(self,  # noqa: C901
                  connstr,  # type: str
                  *options,  # type: ClusterOptions
                  **kwargs  # type: Dict[str, Any]
                  ) -> ClusterLogic:
 
-        self._connstr = connstr
+        # parse query string prior to parsing ClusterOptions
+        connection_str, query_opts, legacy_opts = self._parse_connection_string(connstr)
+        self._connstr = connection_str
 
-        final_args = get_valid_args(ClusterOptions, kwargs, *options)
-        authenticator = final_args.pop("authenticator", None)
+        kwargs.update(query_opts)
+        cluster_opts = get_valid_args(ClusterOptions, kwargs, *options)
+        # add legacy options after parsing ClusterOptions to keep logic separate
+        cluster_opts.update(self._parse_legacy_query_options(**legacy_opts))
+
+        authenticator = cluster_opts.pop("authenticator", None)
         if not authenticator:
-            raise InvalidArgumentException("Authenticator is mandatory")
+            raise InvalidArgumentException(message="Authenticator is mandatory.")
+
+        # the cert_path _might_ be a part of the query options
+        cert_path = cluster_opts.pop('cert_path', None)
 
         # lets only pass in the authenticator, no kwargs
-        auth_kwargs = {k: v for k, v in final_args.items() if k in authenticator.valid_keys()}
+        auth_kwargs = {k: v for k, v in cluster_opts.items() if k in authenticator.valid_keys()}
         if isinstance(authenticator, CertificateAuthenticator) and 'trust_store_path' in auth_kwargs:
             # the trust_store_path _should_ be in the cluster opts, however < = 3.x SDK allowed it in
             # the CertificateAuthenticator, pop the trust_store_path from the auth_kwargs in case
             if 'trust_store_path' not in authenticator.as_dict():
                 auth_kwargs.pop('trust_store_path')
+
         if len(auth_kwargs.keys()) > 0:
             raise InvalidArgumentException(
-                "Authentication kwargs now allowed.  Only provide the Authenticator.")
+                message="Authentication kwargs now allowed.  Only provide the Authenticator.")
 
-        self._transaction_config = final_args.pop("transaction_config", TransactionConfig())
+        self._auth = authenticator.as_dict()
+        # add the cert_path to the authenticator if found
+        if cert_path and 'cert_path' not in self._auth:
+            self._auth['cert_path'] = cert_path
+
+        # after cluster options have been parsed (both from the query string and provided
+        # options/kwargs), separate into cluster options, timeout options and tracing options and txns config.
+
+        self._transaction_config = cluster_opts.pop("transaction_config", TransactionConfig())
         self._transactions = None
-
-        final_args = self._parse_connection_string(**final_args)
-        conn_opts = self._validate_connect_options(**final_args)
 
         timeout_opts = {}
         for key in ClusterTimeoutOptions.get_allowed_option_keys(use_transform_keys=True):
-            if key in conn_opts:
-                timeout_opts[key] = conn_opts.pop(key)
+            if key in cluster_opts:
+                timeout_opts[key] = cluster_opts.pop(key)
         if timeout_opts:
-            conn_opts['timeout_options'] = timeout_opts
+            cluster_opts['timeout_options'] = timeout_opts
 
         tracing_opts = {}
         for key in ClusterTracingOptions.get_allowed_option_keys(use_transform_keys=True):
-            if key in conn_opts:
-                tracing_opts[key] = conn_opts.pop(key)
+            if key in cluster_opts:
+                tracing_opts[key] = cluster_opts.pop(key)
         if tracing_opts:
-            conn_opts['tracing_options'] = tracing_opts
+            cluster_opts['tracing_options'] = tracing_opts
 
-        self._transcoder = conn_opts.pop("transcoder", None)
+        self._serializer = cluster_opts.pop("serializer", None)
+        if not self._serializer:
+            self._serializer = DefaultJsonSerializer()
+
+        self._transcoder = cluster_opts.pop("transcoder", None)
         if not self._transcoder:
             self._transcoder = JSONTranscoder()
 
-        print(f'connection opts: {conn_opts}')
-        self._auth = authenticator.as_dict()
-        print(f'auth opts: {self._auth}')
-        self._conn_opts = conn_opts
+        self._cluster_opts = cluster_opts
         self._connection = None
         self._cluster_info = None
         self._server_version = None
@@ -137,49 +165,79 @@ class ClusterLogic:
             return False
         return None
 
-    def _parse_connection_string(self, **connect_kwargs):
-        parsed_conn = urlparse(self._connstr)
+    def _parse_connection_string(self, connection_str  # type: str
+                                 ) -> Tuple[str, Dict[str, Any], Dict[str, Any]]:
+        """Parse the provided connection string
+
+        The provided connection string will be parsed to split the connection string
+        and the the query options.  Query options will be split into legacy options
+        and 'current' options.
+
+        Args:
+            connection_str (str): The connection string for the cluster.
+
+        Returns:
+            Tuple[str, Dict[str, Any], Dict[str, Any]]: The parsed connection string,
+                current options and legacy options.
+        """
+        parsed_conn = urlparse(connection_str)
+        conn_str = ''
+        if parsed_conn.scheme:
+            conn_str = f'{parsed_conn.scheme}://{parsed_conn.netloc}{parsed_conn.path}'
+        else:
+            conn_str = f'{parsed_conn.netloc}{parsed_conn.path}'
         query_str = parsed_conn.query
         options = parse_qs(query_str)
         # @TODO:  issue warning if it is overriding cluster options?
-        ssl = options.pop('ssl', None)
-        if ssl is not None:
-            connect_kwargs['tls_verify'] = TLSVerifyMode.from_str(ssl[0])
-        valid_opts = ClusterOptions.get_allowed_option_keys()
-        # @TODO:  any further validation??
-        for k, v in options.items():
-            if v is None:
+        legacy_query_str_opts = {k: v[0] for k, v in options.items() if k in self._LEGACY_CONNSTR_QUERY_ARGS.keys()}
+        query_str_opts = {k: v[0] for k, v in options.items() if k not in self._LEGACY_CONNSTR_QUERY_ARGS.keys()}
+        return conn_str, query_str_opts, legacy_query_str_opts
+
+    def _parse_legacy_query_options(self, **query_opts  # type: Dict[str, Any]
+                                    ) -> Dict[str, Any]:
+        """Parse legacy query string options
+
+        See :attr:`~.ClusterLogic._LEGACY_CONNSTR_QUERY_ARGS`
+
+        Returns:
+            Dict[str, Any]: Representation of parsed query string parameters.
+        """
+        final_options = {}
+        for opt_key, opt_value in query_opts.items():
+            if opt_key not in self._LEGACY_CONNSTR_QUERY_ARGS:
                 continue
-            if k in valid_opts:
-                connect_kwargs[k] = v[0]
+            for final_key, transform in self._LEGACY_CONNSTR_QUERY_ARGS[opt_key].items():
+                converted = transform(opt_value)
+                if converted is not None:
+                    final_options[final_key] = converted
+        return final_options
 
-        return connect_kwargs
+    def _get_connection_opts(self, auth_only=False,  # type: Optional[bool]
+                             conn_only=False  # type: Optional[bool]
+                             ) -> Union[Dict[str, Any], Dict[str, Any], Tuple[Dict[str, Any], Dict[str, Any]]]:
+        """Get connection related options
 
-    def _validate_connect_options(self, **connect_kwargs):
-        final_opts = {}
-        for k, v in connect_kwargs.items():
-            if v is None:
-                continue
-            if k == 'tls_verify':
-                final_opts[k] = v.value
-            else:
-                final_opts[k] = v
+        **INTERNAL** not intended for use in public API.
 
-        return final_opts
+        Args:
+            auth_only (bool, optional): Set to True to return only auth options. Defaults to False.
+            conn_only (bool, optional): Set to True to return only cluster options. Defaults to False.
 
-    def _get_connection_opts(self, auth_only=False, conn_only=False):
+        Returns:
+            Union[Dict[str, Any], Dict[str, Any], Tuple[Dict[str, Any], Dict[str, Any]]]: Either the
+                cluster auth, cluster options or a tuple of both the cluster auth and cluster options.
+        """
         if auth_only is True:
             return self._auth
         if conn_only is True:
-            return self._conn_opts
-
-        return self._auth, self._conn_opts
+            return self._cluster_opts
+        return self._auth, self._cluster_opts
 
     def _connect_cluster(self, **kwargs):
 
         connect_kwargs = {
             'auth': self._auth,
-            'options': self._conn_opts
+            'options': self._cluster_opts
         }
 
         callback = kwargs.pop('callback', None)
@@ -224,7 +282,8 @@ class ClusterLogic:
 
     def _destroy_connection(self):
         print("destroying connection!")
-        del self._connection
+        if hasattr(self, '_connection'):
+            del self._connection
 
     def _get_cluster_info(self, **kwargs) -> Optional[ClusterInfoResult]:
 
@@ -266,7 +325,6 @@ class ClusterLogic:
             enable_dp_kwargs['errback'] = errback
 
         return management_operation(**enable_dp_kwargs)
-
 
     def ping(self,
              *opts,  # type: PingOptions

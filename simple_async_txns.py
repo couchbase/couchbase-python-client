@@ -1,11 +1,12 @@
 import asyncio
+from datetime import timedelta
+from typing import TYPE_CHECKING
+from uuid import uuid4
+
 from acouchbase.cluster import Cluster
 from couchbase.auth import PasswordAuthenticator
-from couchbase.options import ClusterOptions, TransactionConfig
 from couchbase.exceptions import CouchbaseException
-from datetime import timedelta
-from uuid import uuid4
-from typing import TYPE_CHECKING
+from couchbase.options import ClusterOptions, TransactionConfig
 
 if TYPE_CHECKING:
     from acouchbase.transactions import AttemptContext

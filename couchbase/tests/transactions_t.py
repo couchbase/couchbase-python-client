@@ -12,6 +12,7 @@ from couchbase.options import ClusterOptions
 from couchbase.transactions import (PerTransactionConfig,
                                     TransactionQueryOptions,
                                     TransactionResult)
+
 from ._test_utils import (CollectionType,
                           KVPair,
                           TestEnvironment)

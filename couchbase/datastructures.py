@@ -1,30 +1,33 @@
-from datetime import timedelta
 import time
-from typing import TYPE_CHECKING, Any, List, Generator, Optional
+from datetime import timedelta
+from typing import (TYPE_CHECKING,
+                    Any,
+                    Generator,
+                    List,
+                    Optional)
 
-from couchbase.options import MutateInOptions
-from couchbase.exceptions import (CasMismatchException, 
-DocumentNotFoundException, 
-PathExistsException, 
-PathNotFoundException, 
-InvalidArgumentException,
-QueueEmpty, 
-UnAmbiguousTimeoutException)
-from couchbase.subdocument import (array_append,
-                                   array_prepend,
-                                   array_addunique,
-                                   replace,
-                                   get as subdoc_get,
-                                   remove,
-                                   upsert,
-                                   count,
-                                   exists as subdoc_exists)
-
+from couchbase.exceptions import (CasMismatchException,
+                                  DocumentNotFoundException,
+                                  InvalidArgumentException,
+                                  PathExistsException,
+                                  PathNotFoundException,
+                                  QueueEmpty,
+                                  UnAmbiguousTimeoutException)
 from couchbase.logic.wrappers import BlockingWrapper
+from couchbase.options import MutateInOptions
+from couchbase.subdocument import (array_addunique,
+                                   array_append,
+                                   array_prepend,
+                                   count)
+from couchbase.subdocument import exists as subdoc_exists
+from couchbase.subdocument import get as subdoc_get
+from couchbase.subdocument import (remove,
+                                   replace,
+                                   upsert)
 
 if TYPE_CHECKING:
-    from couchbase.collection import Collection
     from couchbase._utils import JSONType
+    from couchbase.collection import Collection
 
 
 class CouchbaseList:
@@ -222,8 +225,8 @@ class CouchbaseMap:
 
     @BlockingWrapper.datastructure_op(create_type=dict)
     def add(self, mapkey,  # type: str
-                value # type: Any
-                ) -> None:
+            value  # type: Any
+            ) -> None:
         """
         Set a value for a key in a map.
 
@@ -248,7 +251,7 @@ class CouchbaseMap:
 
     @BlockingWrapper.datastructure_op(create_type=dict)
     def get(self, mapkey,  # type: str
-                ) -> Any:
+            ) -> Any:
         """
         Retrieve a value from a map.
 
@@ -265,7 +268,7 @@ class CouchbaseMap:
         return sd_res.value[0].get("value", None)
 
     def remove(self, mapkey  # type: str
-                   ) -> None:
+               ) -> None:
         """
         Remove an item from a map.
 
@@ -303,8 +306,8 @@ class CouchbaseMap:
         return sd_res.value[0].get("value", None)
 
     @BlockingWrapper.datastructure_op(create_type=dict)
-    def exists(self, key # type: Any
-                 ) -> bool:
+    def exists(self, key  # type: Any
+               ) -> bool:
         """
         hecks whether a specific key exists in the map.
 
@@ -372,7 +375,7 @@ class CouchbaseMap:
         """
 
         map_ = self._get()
-        return ((k,v) for k,v in map_.content_as[dict].items())
+        return ((k, v) for k, v in map_.content_as[dict].items())
 
 
 class CouchbaseSet:
@@ -390,8 +393,8 @@ class CouchbaseSet:
         return self._collection.get(self._key)
 
     @BlockingWrapper.datastructure_op(create_type=list)
-    def add(self, value # type: Any
-    ) -> None:
+    def add(self, value  # type: Any
+            ) -> None:
         """
         Add an item to a set if the item does not yet exist.
 
@@ -405,9 +408,9 @@ class CouchbaseSet:
         except PathExistsException:
             return False
 
-    def remove(self, value, # type: Any
-    timeout=None # type: Optional[timedelta]
-    ) -> None:
+    def remove(self, value,  # type: Any  # noqa: C901
+               timeout=None  # type: Optional[timedelta]
+               ) -> None:
         """
         Remove an item from a set.
 
@@ -434,7 +437,7 @@ class CouchbaseSet:
                 if v == value:
                     val_idx = idx
                     break
-            
+
             if val_idx >= 0:
                 try:
                     op = remove(f'[{val_idx}]')
@@ -458,10 +461,9 @@ class CouchbaseSet:
 
             time.sleep(interval_millis / 1000)
 
-
     @BlockingWrapper.datastructure_op(create_type=list)
-    def contains(self, value # type: Any
-    ) -> None:
+    def contains(self, value  # type: Any
+                 ) -> None:
         """
         Check whether or not the CouchbaseSet contains a value
 
@@ -471,7 +473,7 @@ class CouchbaseSet:
 
         .. seealso:: :meth:`set_add`, :meth:`map_add`
         """
-        list_ = self._get().content_as[list]    
+        list_ = self._get().content_as[list]
         return value in list_
 
     @BlockingWrapper.datastructure_op(create_type=list)
@@ -511,6 +513,7 @@ class CouchbaseSet:
         list_ = self._get()
         return list_.content_as[list]
 
+
 class CouchbaseQueue:
     def __init__(self, key,  # type: str
                  collection  # type: Collection
@@ -528,7 +531,7 @@ class CouchbaseQueue:
 
     @BlockingWrapper.datastructure_op(create_type=list)
     def push(self, value  # type: JSONType
-                ) -> None:
+             ) -> None:
         """
         Add an item to the queue.
 
@@ -537,8 +540,8 @@ class CouchbaseQueue:
         op = array_prepend('', value)
         self._collection.mutate_in(self._key, (op,))
 
-    def pop(self, timeout=None # type: Optional[timedelta]
-    ) -> None:
+    def pop(self, timeout=None  # type: Optional[timedelta]
+            ) -> None:
         """
         Pop an item from the queue.
 
@@ -563,7 +566,7 @@ class CouchbaseQueue:
                 val = sd_res.value[0].get("value", None)
 
                 try:
-                    op = remove(f'[-1]')
+                    op = remove('[-1]')
                     self._collection.mutate_in(self._key, (op,), MutateInOptions(cas=sd_res.cas))
                     return val
                 except CasMismatchException:
@@ -578,7 +581,7 @@ class CouchbaseQueue:
                     interval_millis = time_left
 
                 if time_left <= 0:
-                    raise UnAmbiguousTimeoutException(message=f"Unable to pop from the CouchbaseQueue.")
+                    raise UnAmbiguousTimeoutException(message="Unable to pop from the CouchbaseQueue.")
 
                 time.sleep(interval_millis / 1000)
             except PathNotFoundException:

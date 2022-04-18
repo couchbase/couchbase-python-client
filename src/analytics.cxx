@@ -462,8 +462,7 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
     req.priority = priority == 1;
 
     if (scan_consistency) {
-        req.scan_consistency =
-          str_to_scan_consistency_type<couchbase::analytics_scan_consistency>(scan_consistency);
+        req.scan_consistency = str_to_scan_consistency_type<couchbase::analytics_scan_consistency>(scan_consistency);
     }
 
     // raw options

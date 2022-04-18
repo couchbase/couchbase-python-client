@@ -274,7 +274,7 @@ template<>
 couchbase::management::analytics::couchbase_remote_link
 get_link([[maybe_unused]] PyObject* pyObj_link)
 {
-    couchbase::management::analytics::couchbase_remote_link link {};
+    couchbase::management::analytics::couchbase_remote_link link{};
     PyObject* pyObj_link_name = PyDict_GetItemString(pyObj_link, "link_name");
     auto link_name = std::string(PyUnicode_AsUTF8(pyObj_link_name));
     link.link_name = link_name;
