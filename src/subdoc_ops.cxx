@@ -1,6 +1,7 @@
 #include "subdoc_ops.hxx"
 #include "exceptions.hxx"
 #include "result.hxx"
+#include <couchbase/cas.hxx>
 
 template<typename T>
 result*
@@ -467,9 +468,9 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
         durability_level = static_cast<couchbase::protocol::durability_level>(options->durability);
     }
 
-    couchbase::protocol::cas cas = couchbase::protocol::cas{ 0 };
+    couchbase::cas cas = couchbase::cas{ 0 };
     if (options->cas != 0) {
-        cas = couchbase::protocol::cas{ options->cas };
+        cas = couchbase::cas{ options->cas };
     }
 
     couchbase::protocol::mutate_in_request_body::store_semantics_type store_semantics;

@@ -1,24 +1,25 @@
 #include "user_management.hxx"
 #include "../exceptions.hxx"
+#include <couchbase/management/rbac.hxx>
 
-couchbase::operations::management::rbac::auth_domain
+couchbase::management::rbac::auth_domain
 str_to_auth_domain(std::string domain)
 {
     if (domain.compare("external") == 0) {
-        return couchbase::operations::management::rbac::auth_domain::external;
+        return couchbase::management::rbac::auth_domain::external;
     }
-    return couchbase::operations::management::rbac::auth_domain::local;
+    return couchbase::management::rbac::auth_domain::local;
     ;
 }
 
 PyObject*
-auth_domain_to_str(couchbase::operations::management::rbac::auth_domain domain)
+auth_domain_to_str(couchbase::management::rbac::auth_domain domain)
 {
     PyObject* pyObj_domain = nullptr;
 
-    if (domain == couchbase::operations::management::rbac::auth_domain::local) {
+    if (domain == couchbase::management::rbac::auth_domain::local) {
         pyObj_domain = PyUnicode_FromString("local");
-    } else if (domain == couchbase::operations::management::rbac::auth_domain::external) {
+    } else if (domain == couchbase::management::rbac::auth_domain::external) {
         pyObj_domain = PyUnicode_FromString("external");
     } else {
         pyObj_domain = PyUnicode_FromString("unknown");
@@ -27,10 +28,10 @@ auth_domain_to_str(couchbase::operations::management::rbac::auth_domain domain)
     return pyObj_domain;
 }
 
-couchbase::operations::management::rbac::role
+couchbase::management::rbac::role
 get_role(PyObject* pyObj_role)
 {
-    couchbase::operations::management::rbac::role role{};
+    couchbase::management::rbac::role role{};
 
     PyObject* role_name = PyDict_GetItemString(pyObj_role, "name");
     if (role_name) {
@@ -55,10 +56,10 @@ get_role(PyObject* pyObj_role)
     return role;
 }
 
-couchbase::operations::management::rbac::user
+couchbase::management::rbac::user
 get_user(PyObject* pyObj_user)
 {
-    couchbase::operations::management::rbac::user user{};
+    couchbase::management::rbac::user user{};
 
     PyObject* pyObj_username = PyDict_GetItemString(pyObj_user, "username");
     if (pyObj_username) {
@@ -95,10 +96,10 @@ get_user(PyObject* pyObj_user)
     return user;
 }
 
-couchbase::operations::management::rbac::group
+couchbase::management::rbac::group
 get_group(PyObject* pyObj_group)
 {
-    couchbase::operations::management::rbac::group group{};
+    couchbase::management::rbac::group group{};
 
     PyObject* pyObj_name = PyDict_GetItemString(pyObj_group, "name");
     if (pyObj_name) {
@@ -173,7 +174,7 @@ build_role(const T& role)
 }
 
 PyObject*
-build_role_and_origins(couchbase::operations::management::rbac::role_and_origins role)
+build_role_and_origins(couchbase::management::rbac::role_and_origins role)
 {
     PyObject* pyObj_role_and_origin = PyDict_New();
     PyObject* pyObj_role = build_role(role);
@@ -230,7 +231,7 @@ build_role_and_origins(couchbase::operations::management::rbac::role_and_origins
 }
 
 PyObject*
-build_user(couchbase::operations::management::rbac::user_and_metadata uam)
+build_user(couchbase::management::rbac::user_and_metadata uam)
 {
     PyObject* pyObj_user = PyDict_New();
 
@@ -294,7 +295,7 @@ build_user(couchbase::operations::management::rbac::user_and_metadata uam)
 }
 
 PyObject*
-build_user_and_metadata(couchbase::operations::management::rbac::user_and_metadata uam)
+build_user_and_metadata(couchbase::management::rbac::user_and_metadata uam)
 {
     PyObject* pyObj_uam = PyDict_New();
 
@@ -372,7 +373,7 @@ build_user_and_metadata(couchbase::operations::management::rbac::user_and_metada
 }
 
 PyObject*
-build_group(couchbase::operations::management::rbac::group group)
+build_group(couchbase::management::rbac::group group)
 {
     PyObject* pyObj_group = PyDict_New();
 

@@ -2,6 +2,8 @@
 #include "exceptions.hxx"
 #include "result.hxx"
 #include "n1ql.hxx"
+#include <couchbase/search_highlight_style.hxx>
+#include <couchbase/search_scan_consistency.hxx>
 
 PyObject*
 get_result_row_fragments(std::map<std::string, std::vector<std::string>> fragments)
@@ -715,9 +717,9 @@ get_search_request(PyObject* op_args)
     if (pyObj_highlight_style != nullptr) {
         auto highlight_style = std::string(PyUnicode_AsUTF8(pyObj_highlight_style));
         if (highlight_style.compare("html") == 0) {
-            req.highlight_style = couchbase::operations::search_request::highlight_style_type::html;
+            req.highlight_style = couchbase::search_highlight_style::html;
         } else if (highlight_style.compare("ansi") == 0) {
-            req.highlight_style = couchbase::operations::search_request::highlight_style_type::ansi;
+            req.highlight_style = couchbase::search_highlight_style::ansi;
         }
     }
 
@@ -779,7 +781,7 @@ get_search_request(PyObject* op_args)
     if (pyObj_scan_consistency != nullptr) {
         auto scan_consistency = std::string(PyUnicode_AsUTF8(pyObj_scan_consistency));
         if (scan_consistency.compare("not_bounded") == 0) {
-            req.scan_consistency = couchbase::operations::search_request::scan_consistency_type::not_bounded;
+            req.scan_consistency = couchbase::search_scan_consistency::not_bounded;
         }
     }
 

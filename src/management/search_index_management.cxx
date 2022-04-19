@@ -1,8 +1,9 @@
 #include "search_index_management.hxx"
 #include "../exceptions.hxx"
+#include <couchbase/management/search_index.hxx>
 
 PyObject*
-build_search_index(couchbase::operations::management::search_index index)
+build_search_index(couchbase::management::search::index index)
 {
     PyObject* pyObj_index = PyDict_New();
 
@@ -107,8 +108,7 @@ create_result_from_search_index_mgmt_response(const T& resp)
 
 template<>
 result*
-create_result_from_search_index_mgmt_response<couchbase::operations::management::search_index_get_response>(
-  const couchbase::operations::management::search_index_get_response& resp)
+create_result_from_search_index_mgmt_response(const couchbase::operations::management::search_index_get_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -146,8 +146,7 @@ create_result_from_search_index_mgmt_response<couchbase::operations::management:
 
 template<>
 result*
-create_result_from_search_index_mgmt_response<couchbase::operations::management::search_index_get_all_response>(
-  const couchbase::operations::management::search_index_get_all_response& resp)
+create_result_from_search_index_mgmt_response(const couchbase::operations::management::search_index_get_all_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -192,8 +191,7 @@ create_result_from_search_index_mgmt_response<couchbase::operations::management:
 
 template<>
 result*
-create_result_from_search_index_mgmt_response<couchbase::operations::management::search_index_get_documents_count_response>(
-  const couchbase::operations::management::search_index_get_documents_count_response& resp)
+create_result_from_search_index_mgmt_response(const couchbase::operations::management::search_index_get_documents_count_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -227,8 +225,7 @@ create_result_from_search_index_mgmt_response<couchbase::operations::management:
 
 template<>
 result*
-create_result_from_search_index_mgmt_response<couchbase::operations::management::search_index_get_stats_response>(
-  const couchbase::operations::management::search_index_get_stats_response& resp)
+create_result_from_search_index_mgmt_response(const couchbase::operations::management::search_index_get_stats_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -262,8 +259,7 @@ create_result_from_search_index_mgmt_response<couchbase::operations::management:
 
 template<>
 result*
-create_result_from_search_index_mgmt_response<couchbase::operations::management::search_index_analyze_document_response>(
-  const couchbase::operations::management::search_index_analyze_document_response& resp)
+create_result_from_search_index_mgmt_response(const couchbase::operations::management::search_index_analyze_document_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -297,8 +293,7 @@ create_result_from_search_index_mgmt_response<couchbase::operations::management:
 
 template<>
 result*
-create_result_from_search_index_mgmt_response<couchbase::operations::management::search_index_stats_response>(
-  const couchbase::operations::management::search_index_stats_response& resp)
+create_result_from_search_index_mgmt_response(const couchbase::operations::management::search_index_stats_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -427,10 +422,10 @@ create_result_from_search_index_mgmt_op_response(const Response& resp,
     PyGILState_Release(state);
 }
 
-couchbase::operations::management::search_index
+couchbase::management::search::index
 get_search_index(PyObject* pyObj_index)
 {
-    couchbase::operations::management::search_index index{};
+    couchbase::management::search::index index{};
 
     PyObject* pyObj_uuid = PyDict_GetItemString(pyObj_index, "uuid");
     if (pyObj_uuid != nullptr) {

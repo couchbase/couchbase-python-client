@@ -2,6 +2,7 @@
 #define KV_OPS_H_
 
 #include "client.hxx"
+#include <couchbase/cas.hxx>
 
 /**
  * GET, GET_PROJECTED, GET_AND_LOCK, GET_AND_TOUCH
@@ -20,7 +21,7 @@ struct read_options {
     bool with_expiry;
     uint32_t expiry;
     uint32_t lock_time;
-    couchbase::protocol::cas cas;
+    couchbase::cas cas;
     PyObject* span;
     PyObject* project;
 
@@ -48,7 +49,7 @@ struct mutation_options {
     PyObject* span;
 
     // optional: REPLACE
-    couchbase::protocol::cas cas;
+    couchbase::cas cas;
     bool preserve_expiry;
 
     // TODO:

@@ -1,15 +1,16 @@
 #include "analytics.hxx"
 #include "exceptions.hxx"
 #include "result.hxx"
+#include <couchbase/analytics_scan_consistency.hxx>
 
-couchbase::operations::analytics_request::scan_consistency_type
+couchbase::analytics_scan_consistency
 str_to_scan_consistency_type(std::string consistency)
 {
     if (consistency.compare("not_bounded") == 0) {
-        return couchbase::operations::analytics_request::scan_consistency_type::not_bounded;
+        return couchbase::analytics_scan_consistency::not_bounded;
     }
     if (consistency.compare("request_plus") == 0) {
-        return couchbase::operations::analytics_request::scan_consistency_type::request_plus;
+        return couchbase::analytics_scan_consistency::request_plus;
     }
 
     // TODO: better exception
@@ -462,7 +463,7 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
 
     if (scan_consistency) {
         req.scan_consistency =
-          str_to_scan_consistency_type<couchbase::operations::analytics_request::scan_consistency_type>(scan_consistency);
+          str_to_scan_consistency_type<couchbase::analytics_scan_consistency>(scan_consistency);
     }
 
     // raw options

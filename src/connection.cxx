@@ -1,5 +1,6 @@
 #include "connection.hxx"
 #include "exceptions.hxx"
+#include <couchbase/io/ip_protocol.hxx>
 
 static void
 dealloc_conn(PyObject* obj)
@@ -456,7 +457,7 @@ update_cluster_options(couchbase::cluster_options& options, PyObject* pyObj_opti
 
     PyObject* pyObj_force_ipv4 = PyDict_GetItemString(pyObj_options, "force_ipv4");
     if (pyObj_force_ipv4 != nullptr && pyObj_force_ipv4 == Py_True) {
-        options.force_ipv4 = true;
+        options.use_ip_protocol = couchbase::io::ip_protocol::force_ipv4;
     }
 
     PyObject* pyObj_enable_dns_srv = PyDict_GetItemString(pyObj_options, "enable_dns_srv");

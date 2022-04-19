@@ -189,9 +189,9 @@ prepare_and_execute_counter_op(struct counter_options* options, PyObject* pyObj_
 PyObject*
 prepare_and_execute_binary_mutation_op(struct binary_mutation_options* options, PyObject* pyObj_callback, PyObject* pyObj_errback)
 {
-    couchbase::protocol::cas cas = couchbase::protocol::cas{ 0 };
+    couchbase::cas cas = couchbase::cas{ 0 };
     if (options->cas != 0) {
-        cas = couchbase::protocol::cas{ options->cas };
+        cas = couchbase::cas{ options->cas };
     }
 
     if (!PyBytes_Check(options->pyObj_value)) {

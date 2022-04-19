@@ -1,8 +1,10 @@
 #include "view_index_management.hxx"
 #include "../exceptions.hxx"
+#include <couchbase/management/design_document.hxx>
+#include <couchbase/design_document_namespace.hxx>
 
 PyObject*
-build_design_doc(couchbase::operations::design_document dd)
+build_design_doc(couchbase::management::views::design_document dd)
 {
     PyObject* pyObj_dd = PyDict_New();
 
@@ -23,7 +25,7 @@ build_design_doc(couchbase::operations::design_document dd)
     Py_DECREF(pyObj_tmp);
 
     std::string ns = "development";
-    if (dd.ns == couchbase::operations::design_document::name_space::production) {
+    if (dd.ns == couchbase::design_document_namespace::production) {
         ns = "production";
     }
 
@@ -254,7 +256,7 @@ create_result_from_view_index_mgmt_op_response(const Response& resp,
     PyGILState_Release(state);
 }
 
-couchbase::operations::design_document
+couchbase::management::views::design_document
 get_design_doc(PyObject* pyObj_dd)
 {
     PyObject* pyObj_name = PyDict_GetItemString(pyObj_dd, "name");
@@ -263,12 +265,12 @@ get_design_doc(PyObject* pyObj_dd)
     PyObject* pyObj_name_space = PyDict_GetItemString(pyObj_dd, "name_space");
     auto name_space = std::string(PyUnicode_AsUTF8(pyObj_name_space));
 
-    auto ns = couchbase::operations::design_document::name_space::development;
+    auto ns = couchbase::design_document_namespace::development;
     if (name_space.compare("production") == 0) {
-        ns = couchbase::operations::design_document::name_space::production;
+        ns = couchbase::design_document_namespace::production;
     }
 
-    std::map<std::string, couchbase::operations::design_document::view> views{};
+    std::map<std::string, couchbase::management::views::design_document::view> views{};
     PyObject* pyObj_views = PyDict_GetItemString(pyObj_dd, "views");
     if (pyObj_views && PyDict_Check(pyObj_views)) {
         PyObject *pyObj_key, *pyObj_value;
@@ -281,7 +283,7 @@ get_design_doc(PyObject* pyObj_dd)
                 k = std::string(PyUnicode_AsUTF8(pyObj_key));
             }
             if (PyDict_Check(pyObj_value) && !k.empty()) {
-                couchbase::operations::design_document::view view{ k };
+                couchbase::management::views::design_document::view view{ k };
 
                 PyObject* pyObj_tmp = PyDict_GetItemString(pyObj_value, "map");
                 if (pyObj_tmp != nullptr) {
@@ -298,7 +300,7 @@ get_design_doc(PyObject* pyObj_dd)
             }
         }
     }
-    couchbase::operations::design_document dd{};
+    couchbase::management::views::design_document dd{};
     dd.name = name;
     dd.ns = ns;
 
@@ -342,11 +344,11 @@ get_view_index_get_all_req(PyObject* op_args)
     PyObject* pyObj_name_space = PyDict_GetItemString(op_args, "name_space");
     auto name_space = std::string(PyUnicode_AsUTF8(pyObj_name_space));
 
-    auto ns = couchbase::operations::design_document::name_space::development;
+    auto ns = couchbase::design_document_namespace::development;
     if (name_space.compare("production") == 0) {
-        ns = couchbase::operations::design_document::name_space::production;
+        ns = couchbase::design_document_namespace::production;
     }
-    req.name_space = ns;
+    req.ns = ns;
 
     return req;
 }
@@ -362,11 +364,11 @@ get_view_index_get_req(PyObject* op_args)
     PyObject* pyObj_name_space = PyDict_GetItemString(op_args, "name_space");
     auto name_space = std::string(PyUnicode_AsUTF8(pyObj_name_space));
 
-    auto ns = couchbase::operations::design_document::name_space::development;
+    auto ns = couchbase::design_document_namespace::development;
     if (name_space.compare("production") == 0) {
-        ns = couchbase::operations::design_document::name_space::production;
+        ns = couchbase::design_document_namespace::production;
     }
-    req.name_space = ns;
+    req.ns = ns;
 
     return req;
 }
@@ -382,11 +384,11 @@ get_view_index_drop_req(PyObject* op_args)
     PyObject* pyObj_name_space = PyDict_GetItemString(op_args, "name_space");
     auto name_space = std::string(PyUnicode_AsUTF8(pyObj_name_space));
 
-    auto ns = couchbase::operations::design_document::name_space::development;
+    auto ns = couchbase::design_document_namespace::development;
     if (name_space.compare("production") == 0) {
-        ns = couchbase::operations::design_document::name_space::production;
+        ns = couchbase::design_document_namespace::production;
     }
-    req.name_space = ns;
+    req.ns = ns;
 
     return req;
 }

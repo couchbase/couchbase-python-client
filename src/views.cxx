@@ -1,6 +1,10 @@
 #include "views.hxx"
 #include "exceptions.hxx"
 #include "result.hxx"
+#include <couchbase/view_scan_consistency.hxx>
+#include <couchbase/view_sort_order.hxx>
+#include <couchbase/management/design_document.hxx>
+#include <couchbase/design_document_namespace.hxx>
 
 result*
 create_result_from_view_response(couchbase::operations::document_view_response resp)
@@ -231,11 +235,11 @@ get_view_request(PyObject* op_args)
 
     PyObject* pyObj_name_space = PyDict_GetItemString(op_args, "name_space");
     if (pyObj_name_space != nullptr) {
-        auto ns = couchbase::operations::design_document::name_space::development;
+        auto ns = couchbase::design_document_namespace::development;
         if (pyObj_name_space == Py_False) {
-            ns = couchbase::operations::design_document::name_space::production;
+            ns = couchbase::design_document_namespace::production;
         }
-        req.name_space = ns;
+        req.ns = ns;
     }
 
     PyObject* pyObj_limit = PyDict_GetItemString(op_args, "limit");
@@ -254,11 +258,11 @@ get_view_request(PyObject* op_args)
     if (pyObj_scan_consistency != nullptr) {
         auto scan_consistency = std::string(PyUnicode_AsUTF8(pyObj_scan_consistency));
         if (scan_consistency.compare("ok") == 0) {
-            req.consistency = couchbase::operations::document_view_request::scan_consistency::not_bounded;
+            req.consistency = couchbase::view_scan_consistency::not_bounded;
         } else if (scan_consistency.compare("update_after") == 0) {
-            req.consistency = couchbase::operations::document_view_request::scan_consistency::update_after;
+            req.consistency = couchbase::view_scan_consistency::update_after;
         } else if (scan_consistency.compare("false") == 0) {
-            req.consistency = couchbase::operations::document_view_request::scan_consistency::request_plus;
+            req.consistency = couchbase::view_scan_consistency::request_plus;
         }
     }
 
@@ -350,9 +354,9 @@ get_view_request(PyObject* op_args)
     if (pyObj_order != nullptr) {
         auto order = std::string(PyUnicode_AsUTF8(pyObj_order));
         if (order.compare("ascending") == 0) {
-            req.order = couchbase::operations::document_view_request::sort_order::ascending;
+            req.order = couchbase::view_sort_order::ascending;
         } else if (order.compare("descending") == 0) {
-            req.order = couchbase::operations::document_view_request::sort_order::descending;
+            req.order = couchbase::view_sort_order::descending;
         }
     }
 

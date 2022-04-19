@@ -2,7 +2,6 @@
 
 #include "client.hxx"
 #include "result.hxx"
-#include <couchbase/operations/document_query.hxx>
 
 streamed_result*
 handle_n1ql_query(PyObject* self, PyObject* args, PyObject* kwargs);
@@ -24,7 +23,7 @@ str_to_scan_consistency_type(std::string consistency)
 }
 
 std::string
-scan_consistency_type_to_string(couchbase::operations::query_request::scan_consistency_type consistency);
+scan_consistency_type_to_string(couchbase::query_scan_consistency consistency);
 
 std::vector<couchbase::mutation_token>
 get_mutation_state(PyObject* pyObj_mutation_state);

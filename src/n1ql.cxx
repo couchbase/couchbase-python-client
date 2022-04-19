@@ -1,31 +1,33 @@
 #include "n1ql.hxx"
 #include "exceptions.hxx"
 #include "result.hxx"
+#include <couchbase/query_scan_consistency.hxx>
+#include <couchbase/query_profile_mode.hxx>
 
 std::string
-scan_consistency_type_to_string(couchbase::operations::query_request::scan_consistency_type consistency)
+scan_consistency_type_to_string(couchbase::query_scan_consistency consistency)
 {
     switch (consistency) {
-        case couchbase::operations::query_request::scan_consistency_type::not_bounded:
+        case couchbase::query_scan_consistency::not_bounded:
             return "not_bounded";
-        case couchbase::operations::query_request::scan_consistency_type::request_plus:
+        case couchbase::query_scan_consistency::request_plus:
             return "request_plus";
     }
     // should not be able to reach here, since this is an enum class
     return "unknown";
 }
 
-couchbase::operations::query_request::profile_mode
+couchbase::query_profile_mode
 str_to_profile_mode(std::string profile_mode)
 {
     if (profile_mode.compare("off") == 0) {
-        return couchbase::operations::query_request::profile_mode::off;
+        return couchbase::query_profile_mode::off;
     }
     if (profile_mode.compare("phases") == 0) {
-        return couchbase::operations::query_request::profile_mode::phases;
+        return couchbase::query_profile_mode::phases;
     }
     if (profile_mode.compare("timings") == 0) {
-        return couchbase::operations::query_request::profile_mode::timings;
+        return couchbase::query_profile_mode::timings;
     }
     // TODO: better exception
     PyErr_SetString(PyExc_ValueError, "Invalid Profile Mode.");
@@ -611,7 +613,7 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     }
 
     if (scan_consistency != nullptr) {
-        req.scan_consistency = str_to_scan_consistency_type<couchbase::operations::query_request::scan_consistency_type>(scan_consistency);
+        req.scan_consistency = str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency);
     }
 
     if (profile_mode != nullptr) {

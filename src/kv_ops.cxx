@@ -815,9 +815,9 @@ handle_kv_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
         timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
     }
 
-    couchbase::protocol::cas cas = couchbase::protocol::cas{ 0 };
+    couchbase::cas cas = couchbase::cas{ 0 };
     if (cas_int != 0) {
-        cas = couchbase::protocol::cas{ cas_int };
+        cas = couchbase::cas{ cas_int };
     }
 
     // PyObjects that need to be around for the cxx client lambda

@@ -5,6 +5,7 @@
 #include <couchbase/transactions/transaction_get_result.hxx>
 #include <couchbase/transactions/internal/exceptions_internal.hxx>
 #include <couchbase/operations.hxx>
+#include <couchbase/query_scan_consistency.hxx>
 #include <sstream>
 
 void
@@ -110,7 +111,7 @@ pycbc_txns::transaction_config__new__(PyTypeObject* type, PyObject* args, PyObje
     }
     if (nullptr != scan_consistency) {
         self->cfg->scan_consistency(
-          str_to_scan_consistency_type<couchbase::operations::query_request::scan_consistency_type>(scan_consistency));
+          str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
     }
     return reinterpret_cast<PyObject*>(self);
 }
@@ -145,7 +146,7 @@ pycbc_txns::per_transaction_config__new__(PyTypeObject* type, PyObject* args, Py
     }
     if (nullptr != scan_consistency) {
         self->cfg->scan_consistency(
-          str_to_scan_consistency_type<couchbase::operations::query_request::scan_consistency_type>(scan_consistency));
+          str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
     }
     return reinterpret_cast<PyObject*>(self);
 }
@@ -283,7 +284,7 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
     }
     if (nullptr != scan_consistency) {
         self->opts->scan_consistency(
-          str_to_scan_consistency_type<couchbase::operations::query_request::scan_consistency_type>(scan_consistency));
+          str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
     }
     if (nullptr != pyObj_ad_hoc) {
         self->opts->ad_hoc(!!PyObject_IsTrue(pyObj_ad_hoc));

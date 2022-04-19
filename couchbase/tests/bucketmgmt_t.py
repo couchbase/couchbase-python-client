@@ -164,6 +164,7 @@ class BucketManagementTests:
                 ram_quota_mb=100))
         cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, test_bucket)
         # cluster should be able to return it (though, not right away)
+        cb_env.try_n_times(10, 2, cb_env.cluster.bucket, test_bucket)
         b = cb_env.cluster.bucket(test_bucket)
         assert b is not None
 

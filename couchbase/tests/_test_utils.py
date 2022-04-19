@@ -308,8 +308,7 @@ class TestEnvironment(CouchbaseTestEnvironment):
                     seconds_between,  # type: Union[int, float]
                     func,  # type: Callable
                     *args,  # type: Any
-                    exceptions_to_raise=(
-                        Exception,),  # type: Tuple[Type[Exception]]
+                    exceptions_to_raise=(),  # type: Tuple[Type[Exception]]
                     **kwargs  # type: Any
                     ) -> Any:
 
@@ -319,6 +318,7 @@ class TestEnvironment(CouchbaseTestEnvironment):
             except exceptions_to_raise as ex:
                 raise ex
             except Exception:
+                print(f'trying {func} failed, sleeping for {seconds_between} seconds...')
                 self.sleep(seconds_between)
 
         raise CouchbaseTestEnvironmentException(

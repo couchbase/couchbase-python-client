@@ -2,9 +2,6 @@
 
 #include "../client.hxx"
 
-#include <couchbase/operations/management/bucket.hxx>
-#include <couchbase/operations/management/bucket_describe.hxx>
-
 class BucketManagementOperations
 {
   public:

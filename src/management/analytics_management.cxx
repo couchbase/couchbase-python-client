@@ -1,6 +1,10 @@
 #include "analytics_management.hxx"
 #include "analytics_link.hxx"
 #include "../exceptions.hxx"
+#include <couchbase/analytics_scan_consistency.hxx>
+#include <couchbase/management/analytics_link.hxx>
+#include <couchbase/management/analytics_index.hxx>
+#include <couchbase/management/analytics_dataset.hxx>
 
 /* couchbase::operations::management::analytics_* request building methods */
 
@@ -743,18 +747,18 @@ handle_analytics_mgmt_op(connection* conn, struct analytics_mgmt_options* option
             }
             auto link_type = std::string(PyUnicode_AsUTF8(pyObj_link_type));
             if (link_type.compare("couchbase") == 0) {
-                auto req = get_analytics_link_create_request<couchbase::operations::management::analytics_link::couchbase_remote>(options);
+                auto req = get_analytics_link_create_request<couchbase::management::analytics::couchbase_remote_link>(options);
                 res = do_analytics_mgmt_op<couchbase::operations::management::analytics_link_create_request<
-                  couchbase::operations::management::analytics_link::couchbase_remote>>(*conn, req, pyObj_callback, pyObj_errback, barrier);
+                  couchbase::management::analytics::couchbase_remote_link>>(*conn, req, pyObj_callback, pyObj_errback, barrier);
             } else if (link_type.compare("s3") == 0) {
-                auto req = get_analytics_link_create_request<couchbase::operations::management::analytics_link::s3_external>(options);
+                auto req = get_analytics_link_create_request<couchbase::management::analytics::s3_external_link>(options);
                 res = do_analytics_mgmt_op<couchbase::operations::management::analytics_link_create_request<
-                  couchbase::operations::management::analytics_link::s3_external>>(*conn, req, pyObj_callback, pyObj_errback, barrier);
+                  couchbase::management::analytics::s3_external_link>>(*conn, req, pyObj_callback, pyObj_errback, barrier);
             } else if (link_type.compare("azureblob") == 0) {
                 auto req =
-                  get_analytics_link_create_request<couchbase::operations::management::analytics_link::azure_blob_external>(options);
+                  get_analytics_link_create_request<couchbase::management::analytics::azure_blob_external_link>(options);
                 res = do_analytics_mgmt_op<couchbase::operations::management::analytics_link_create_request<
-                  couchbase::operations::management::analytics_link::azure_blob_external>>(
+                  couchbase::management::analytics::azure_blob_external_link>>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
             }
             break;
@@ -787,18 +791,18 @@ handle_analytics_mgmt_op(connection* conn, struct analytics_mgmt_options* option
             }
             auto link_type = std::string(PyUnicode_AsUTF8(pyObj_link_type));
             if (link_type.compare("couchbase") == 0) {
-                auto req = get_analytics_link_replace_request<couchbase::operations::management::analytics_link::couchbase_remote>(options);
+                auto req = get_analytics_link_replace_request<couchbase::management::analytics::couchbase_remote_link>(options);
                 res = do_analytics_mgmt_op<couchbase::operations::management::analytics_link_replace_request<
-                  couchbase::operations::management::analytics_link::couchbase_remote>>(*conn, req, pyObj_callback, pyObj_errback, barrier);
+                  couchbase::management::analytics::couchbase_remote_link>>(*conn, req, pyObj_callback, pyObj_errback, barrier);
             } else if (link_type.compare("s3") == 0) {
-                auto req = get_analytics_link_replace_request<couchbase::operations::management::analytics_link::s3_external>(options);
+                auto req = get_analytics_link_replace_request<couchbase::management::analytics::s3_external_link>(options);
                 res = do_analytics_mgmt_op<couchbase::operations::management::analytics_link_replace_request<
-                  couchbase::operations::management::analytics_link::s3_external>>(*conn, req, pyObj_callback, pyObj_errback, barrier);
+                  couchbase::management::analytics::s3_external_link>>(*conn, req, pyObj_callback, pyObj_errback, barrier);
             } else if (link_type.compare("azureblob") == 0) {
                 auto req =
-                  get_analytics_link_replace_request<couchbase::operations::management::analytics_link::azure_blob_external>(options);
+                  get_analytics_link_replace_request<couchbase::management::analytics::azure_blob_external_link>(options);
                 res = do_analytics_mgmt_op<couchbase::operations::management::analytics_link_replace_request<
-                  couchbase::operations::management::analytics_link::azure_blob_external>>(
+                  couchbase::management::analytics::azure_blob_external_link>>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
             }
             break;

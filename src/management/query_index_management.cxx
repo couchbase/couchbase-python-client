@@ -1,19 +1,11 @@
 #include "query_index_management.hxx"
 #include "../exceptions.hxx"
+#include <couchbase/management/query_index.hxx>
 
 PyObject*
-build_query_index(const couchbase::operations::management::query_index_get_all_response::query_index& index)
+build_query_index(const couchbase::management::query::index& index)
 {
     PyObject* pyObj_index = PyDict_New();
-
-    PyObject* pyObj_tmp = PyUnicode_FromString(index.id.c_str());
-    if (-1 == PyDict_SetItemString(pyObj_index, "id", pyObj_tmp)) {
-        Py_XDECREF(pyObj_index);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-    }
-    Py_DECREF(pyObj_tmp);
-
     if (index.is_primary) {
         //@TODO:  I do not think an increment is necessary since adding to the
         //  dict will increment the ref
@@ -30,7 +22,7 @@ build_query_index(const couchbase::operations::management::query_index_get_all_r
         }
     }
 
-    pyObj_tmp = PyUnicode_FromString(index.name.c_str());
+    PyObject* pyObj_tmp = PyUnicode_FromString(index.name.c_str());
     if (-1 == PyDict_SetItemString(pyObj_index, "name", pyObj_tmp)) {
         Py_DECREF(pyObj_index);
         Py_XDECREF(pyObj_tmp);
@@ -46,37 +38,15 @@ build_query_index(const couchbase::operations::management::query_index_get_all_r
     }
     Py_DECREF(pyObj_tmp);
 
-    pyObj_tmp = PyUnicode_FromString(index.datastore_id.c_str());
-    if (-1 == PyDict_SetItemString(pyObj_index, "datastore_id", pyObj_tmp)) {
-        Py_DECREF(pyObj_index);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
+    if (index.collection_name.has_value()) {
+        pyObj_tmp = PyUnicode_FromString(index.collection_name->c_str());
+        if (-1 == PyDict_SetItemString(pyObj_index, "collection_name", pyObj_tmp)) {
+            Py_DECREF(pyObj_index);
+            Py_XDECREF(pyObj_tmp);
+            return nullptr;
+        }
+        Py_DECREF(pyObj_tmp);
     }
-    Py_DECREF(pyObj_tmp);
-
-    pyObj_tmp = PyUnicode_FromString(index.keyspace_id.c_str());
-    if (-1 == PyDict_SetItemString(pyObj_index, "keyspace_id", pyObj_tmp)) {
-        Py_DECREF(pyObj_index);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-    }
-    Py_DECREF(pyObj_tmp);
-
-    pyObj_tmp = PyUnicode_FromString(index.namespace_id.c_str());
-    if (-1 == PyDict_SetItemString(pyObj_index, "namespace_id", pyObj_tmp)) {
-        Py_DECREF(pyObj_index);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-    }
-    Py_DECREF(pyObj_tmp);
-
-    pyObj_tmp = PyUnicode_FromString(index.collection_name.c_str());
-    if (-1 == PyDict_SetItemString(pyObj_index, "collection_name", pyObj_tmp)) {
-        Py_DECREF(pyObj_index);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-    }
-    Py_DECREF(pyObj_tmp);
 
     pyObj_tmp = PyUnicode_FromString(index.type.c_str());
     if (-1 == PyDict_SetItemString(pyObj_index, "type", pyObj_tmp)) {
@@ -123,19 +93,17 @@ build_query_index(const couchbase::operations::management::query_index_get_all_r
         Py_DECREF(pyObj_tmp);
     }
 
-    if (index.bucket_id.has_value()) {
-        pyObj_tmp = PyUnicode_FromString(index.bucket_id.value().c_str());
-        if (-1 == PyDict_SetItemString(pyObj_index, "bucket_id", pyObj_tmp)) {
-            Py_DECREF(pyObj_index);
-            Py_XDECREF(pyObj_tmp);
-            return nullptr;
-        }
-        Py_DECREF(pyObj_tmp);
+    pyObj_tmp = PyUnicode_FromString(index.bucket_name.c_str());
+    if (-1 == PyDict_SetItemString(pyObj_index, "bucket_name", pyObj_tmp)) {
+        Py_DECREF(pyObj_index);
+        Py_XDECREF(pyObj_tmp);
+        return nullptr;
     }
+    Py_DECREF(pyObj_tmp);
 
-    if (index.scope_id.has_value()) {
-        pyObj_tmp = PyUnicode_FromString(index.scope_id.value().c_str());
-        if (-1 == PyDict_SetItemString(pyObj_index, "scope_id", pyObj_tmp)) {
+    if (index.scope_name.has_value()) {
+        pyObj_tmp = PyUnicode_FromString(index.scope_name.value().c_str());
+        if (-1 == PyDict_SetItemString(pyObj_index, "scope_name", pyObj_tmp)) {
             Py_DECREF(pyObj_index);
             Py_XDECREF(pyObj_tmp);
             return nullptr;
@@ -199,8 +167,7 @@ create_result_from_query_index_mgmt_response(const T& resp)
 
 template<>
 result*
-create_result_from_query_index_mgmt_response<couchbase::operations::management::query_index_get_all_response>(
-  const couchbase::operations::management::query_index_get_all_response& resp)
+create_result_from_query_index_mgmt_response(const couchbase::operations::management::query_index_get_all_response& resp)
 {
     PyObject* result_obj = create_result_obj();
     result* res = reinterpret_cast<result*>(result_obj);
