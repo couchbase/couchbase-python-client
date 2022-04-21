@@ -1,3 +1,7 @@
+from couchbase.cluster import Cluster
+from couchbase.auth import PasswordAuthenticator
+from couchbase.options import ClusterOptions, TransactionConfig
+from couchbase.exceptions import TransactionFailed
 from datetime import timedelta
 from typing import TYPE_CHECKING
 from uuid import uuid4
@@ -45,8 +49,8 @@ print(f'doc 2 starts off as: {coll.get(key2).content_as[dict]}')
 while ok:
     try:
         print(f'txn_result: {my_cluster.transactions.run(txn_logic)}')
-    except CouchbaseException as e:
-        print(f'transaction failed {e}')
+    except TransactionFailed as e:
+        print(f'got {e}')
         ok = False
 
 print(f'doc 1 is now: {coll.get(key1).content_as[dict]}')

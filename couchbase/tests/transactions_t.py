@@ -7,7 +7,11 @@ import pytest
 
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
-from couchbase.exceptions import CouchbaseException
+from couchbase.exceptions import (
+    TransactionFailed,
+    TransactionOperationFailed,
+    TransactionExpired,
+    ParsingFailedException)
 from couchbase.options import ClusterOptions
 from couchbase.transactions import (PerTransactionConfig,
                                     TransactionQueryOptions,
@@ -126,7 +130,7 @@ class TransactionTests:
             assert res.cas > 0
             raise RuntimeError("this should rollback txn")
 
-        with pytest.raises(CouchbaseException):
+        with pytest.raises(TransactionFailed):
             cb_env.cluster.transactions.run(txn_logic)
 
         result = coll.exists(key)
@@ -141,13 +145,13 @@ class TransactionTests:
             try:
                 ctx.insert(coll, default_kvp.key, {"this": "should fail"})
                 pytest.fail("insert of existing key should have failed")
-            except CouchbaseException:
+            except TransactionOperationFailed:
                 # just eat the exception
                 pass
             except Exception as e2:
-                pytest.fail(f"Expected insert to raise CouchbaseException, not {e2.__class__.__name__}")
+                pytest.fail(f"Expected insert to raise TransactionOperationFailed, not {e2.__class__.__name__}")
 
-        with pytest.raises(CouchbaseException):
+        with pytest.raises(TransactionFailed):
             cb_env.cluster.transactions.run(txn_logic)
 
         result = coll.get(default_kvp.key)
@@ -172,6 +176,20 @@ class TransactionTests:
         assert len(rows) == 1
         assert list(rows[0].items())[0][1] == value
 
+    @pytest.mark.usefixtures("check_txn_queries_supported")
+    def test_bad_query(self, cb_env):
+
+        def txn_logic(ctx):
+            try:
+                ctx.query("this wont parse")
+                pytest.fail("expected bad query to raise exception")
+            except ParsingFailedException:
+                pass
+            except Exception as e:
+                pytest.fail(f"Expected bad query to raise ParsingFailedException, not {e.__class__.__name__}")
+
+        cb_env.cluster.transactions.run(txn_logic)
+
     def test_per_txn_config(self, cb_env, default_kvp):
         coll = cb_env.collection
         key = str(uuid4())
@@ -181,7 +199,7 @@ class TransactionTests:
             sleep(0.001)
             ctx.get(coll, key)
 
-        with pytest.raises(CouchbaseException):
+        with pytest.raises(TransactionExpired):
             cb_env.cluster.transactions.run(txn_logic, PerTransactionConfig(expiration_time=timedelta(microseconds=1)))
         assert coll.exists(key).exists is False
 

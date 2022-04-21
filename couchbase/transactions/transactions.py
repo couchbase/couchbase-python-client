@@ -22,11 +22,15 @@ class BlockingWrapper:
                 try:
                     ret = fn(self, *args, **kwargs)
                     print(f'{fn.__name__} got {ret}')
+                    if isinstance(ret, Exception):
+                        raise ret
                     if return_cls is None:
                         return None
                     retval = return_cls(ret)
                     print(f'{fn.__name__} returning {retval}')
                     return retval
+                except CouchbaseException as cb_exc:
+                    raise cb_exc
                 except Exception as e:
                     raise CouchbaseException(message=str(e), context=TransactionsErrorContext())
 
@@ -47,14 +51,7 @@ class Transactions(TransactionsLogic):
                 print(f'wrapped_txn_logic got {e.__class__.__name__}, {e}, re-raising')
                 raise e
 
-        try:
-            return TransactionResult(**super().run(wrapped_txn_logic, per_txn_config))
-        except CouchbaseException as cb_exc:
-            raise cb_exc
-        except Exception as e:
-            exc = CouchbaseException(message=str(e), context=TransactionsErrorContext())
-            print(f'run got {e.__class__.__name__}:{e}, raising {exc}')
-            raise exc
+        return TransactionResult(**super().run(wrapped_txn_logic, per_txn_config))
 
 
 class AttemptContext(AttemptContextLogic):

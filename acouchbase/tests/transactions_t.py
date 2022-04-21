@@ -8,7 +8,12 @@ import pytest_asyncio
 
 from acouchbase.cluster import Cluster
 from couchbase.auth import PasswordAuthenticator
-from couchbase.exceptions import CouchbaseException
+from couchbase.exceptions import (
+    CouchbaseException,
+    TransactionExpired,
+    TransactionFailed,
+    TransactionOperationFailed,
+    ParsingFailedException)
 from couchbase.options import ClusterOptions
 from couchbase.transactions import (PerTransactionConfig,
                                     TransactionQueryOptions,
@@ -137,11 +142,11 @@ class AsyncTransactionsTests:
             assert res.cas > 0
             raise RuntimeError("this should rollback txn")
 
-        with pytest.raises(CouchbaseException):
+        with pytest.raises(TransactionFailed):
             await cb_env.cluster.transactions.run(txn_logic)
 
         result = await coll.exists(key)
-        result.exists is False
+        assert result.exists is False
 
     @pytest.mark.asyncio
     async def test_rollback_eating_exceptions(self, cb_env, default_kvp):
@@ -159,7 +164,7 @@ class AsyncTransactionsTests:
             except Exception as e2:
                 pytest.fail(f"Expected insert to raise CouchbaseException, not {e2.__class__.__name__}")
 
-        with pytest.raises(CouchbaseException):
+        with pytest.raises(TransactionFailed):
             await cb_env.cluster.transactions.run(txn_logic)
 
         result = await coll.get(default_kvp.key)
@@ -175,14 +180,28 @@ class AsyncTransactionsTests:
 
         async def txn_logic(ctx):
             location = f"default:`{coll._scope.bucket_name}`.`{coll._scope.name}`.`{coll.name}`"
-            res = await ctx.query(f'INSERT INTO {location} VALUES("{key}", {json.dumps(value)}) RETURNING *',
-                                  TransactionQueryOptions(metrics=False))
+            res = await ctx.query(f'INSERT INTO {location} VALUES("{key}", {json.dumps(value)}) RETURNING *')
             for r in res.rows():
                 rows.append(r)
 
         await cb_env.cluster.transactions.run(txn_logic)
         assert len(rows) == 1
         assert list(rows[0].items())[0][1] == value
+
+    @pytest.mark.usefixtures("check_txn_queries_supported")
+    @pytest.mark.asyncio
+    async def test_query(self, cb_env):
+
+        async def txn_logic(ctx):
+            try:
+                await ctx.query("this wont parse")
+                pytest.fail("expected bad query to raise exception")
+            except ParsingFailedException:
+                pass
+            except Exception as e:
+                pytest.fail(f"Expected bad query to raise ParsingFailedException, not {e.__class__.__name__}")
+
+        await cb_env.cluster.transactions.run(txn_logic)
 
     @pytest.mark.asyncio
     async def test_per_txn_config(self, cb_env, default_kvp):
@@ -196,7 +215,7 @@ class AsyncTransactionsTests:
             await ctx.get(coll, key)
 
         cfg = PerTransactionConfig(expiration_time=timedelta(microseconds=1))
-        with pytest.raises(CouchbaseException):
+        with pytest.raises(TransactionExpired):
             await cb_env.cluster.transactions.run(txn_logic, cfg)
         result = await coll.exists(key)
         assert result.exists is False

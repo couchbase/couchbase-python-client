@@ -500,6 +500,8 @@ SubdocPathMismatchException = PathMismatchException
 class ParsingFailedException(CouchbaseException):
     pass
 
+
+
 # Search Exceptions
 
 
@@ -691,6 +693,73 @@ class QuotaLimitedException(CouchbaseException):
 
     The server decided that the caller must be limited due to exceeding
     a quota threshold."""
+
+
+# Transaction errors
+
+class TransactionException(CouchbaseException):
+    """
+    Base class for any transaction-related exception
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+
+class TransactionOperationFailed(TransactionException):
+    """
+    Indicates a transaction operation failed.
+
+    The transaction will be rolled back no matter what, but this error can give some context as to why it failed.
+    """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f'TransactionOperationFailed{{{super().__str__}}}'
+
+
+class TransactionFailed(TransactionException):
+    """
+    The transaction failed and was rolled back.
+
+     No actors can see any changes made by this transaction.
+     """
+
+    def __str__(self):
+        return f'TransactionFailed{{{super().__str__()}}}'
+
+
+class TransactionExpired(TransactionException):
+    """
+    The transaction could not be fully completed in the configured timeout.
+
+    It is in an undefined state, but it unambiguously did not reach the commit point.  No actors will be able to see the
+    contents of this transaction.The transaction exceeded the expiry set in the TransactionConfig, and was rolled back.
+    """
+    def __str__(self):
+        return f'TransactionExpired{{{super().__str__()}}}'
+
+
+class TransactionCommitAmbiguous(TransactionException):
+    """
+    The transaction expired at the point of trying to commit it.  It is ambiguous whether the transaction has committed
+    or not.  Actors may be able to see the content of this transaction.
+
+    This error is result of inevitable and unavoidable edge cases when working with unreliable networks.  For example,
+    consider an ordinary mutation being made over the network to any database.  The mutation could succeed on the
+    database-side, and then just before the result is returned to the client, the network connection drops.  The client
+    cannot receive the success result and will timeout - it is ambiguous to it whether the mutation succeeded or not.
+
+    The transactions layer will work to resolve the ambiguity up until the transaction expires, but if unable to resolve
+    it in that time, it is forced to raise this error.  The transaction may or may not have been successful, and
+    error-handling of this is highly application-dependent.
+
+    The asynchronous cleanup process will try to complete the transaction: roll it back if it didn't commit, roll it
+    forwards if it did.
+    """
+    def __str__(self):
+        return f'TransactionCommitAmbiguous{{{super().__str__()}}}'
+
 
 # CXX Error Map
 

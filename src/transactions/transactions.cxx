@@ -521,6 +521,74 @@ pycbc_txns::destroy_transactions([[maybe_unused]] PyObject* self, PyObject* args
     Py_END_ALLOW_THREADS Py_RETURN_NONE;
 }
 
+PyObject* init_transaction_exception_type(const char* klass)
+{
+    static PyObject* couchbase_exceptions = PyImport_ImportModule("couchbase.exceptions");
+    assert(nullptr != couchbase_exceptions);
+    return PyObject_GetAttrString(couchbase_exceptions, klass);
+}
+
+PyObject*
+convert_to_python_exc_type(std::exception_ptr err, bool set_exception=false)
+{
+    static PyObject* pyObj_txn_failed = init_transaction_exception_type("TransactionFailed");
+    static PyObject* pyObj_txn_expired = init_transaction_exception_type("TransactionExpired");
+    static PyObject* pyObj_txn_ambig = init_transaction_exception_type("TransactionCommitAmbiguous");
+    static PyObject* pyObj_txn_op_failed = init_transaction_exception_type("TransactionOperationFailed");
+    static PyObject* pyObj_query_parsing_failure = init_transaction_exception_type("ParsingFailedException");
+    static PyObject* pyObj_couchbase_error = init_transaction_exception_type("CouchbaseException");
+    PyObject* pyObj_error_ctx = PyDict_New();
+    PyObject* pyObj_exc_type = nullptr;
+    PyObject* pyObj_final_error = nullptr;
+    const char* message = nullptr;
+
+    // Must be an error
+    assert(!!err);
+
+    try {
+        std::rethrow_exception(err);
+    } catch (const tx::transaction_exception& e) {
+        pyObj_final_error = pyObj_txn_failed;
+        switch (e.type()) {
+            case tx::failure_type::FAIL:
+                pyObj_exc_type = pyObj_txn_failed;
+                break;
+            case tx::failure_type::COMMIT_AMBIGUOUS:
+                pyObj_exc_type = pyObj_txn_ambig;
+                break;
+            case tx::failure_type::EXPIRY:
+                pyObj_exc_type = pyObj_txn_expired;
+                break;
+        }
+        message = e.what();
+    } catch(const tx::transaction_operation_failed& e) {
+        pyObj_exc_type = pyObj_txn_op_failed;
+        message = e.what();
+    } catch(const tx::query_parsing_failure& e) {
+        pyObj_exc_type = pyObj_query_parsing_failure;
+        message = e.what();
+    } catch(const tx::query_exception& e) {
+        pyObj_exc_type = pyObj_couchbase_error;
+        message = e.what();
+    } catch(const std::exception& e) {
+        pyObj_exc_type = pyObj_couchbase_error;
+        message = e.what();
+    } catch(...) {
+        pyObj_exc_type = pyObj_couchbase_error;
+        message = "Unknown error";
+    }
+    PyObject* tmp = PyUnicode_FromString(message);
+    PyDict_SetItemString(pyObj_error_ctx, "message", tmp);
+    Py_DECREF(tmp);
+    PyObject* pyObj_args = PyTuple_New(0);
+    pyObj_final_error = PyObject_Call(pyObj_exc_type, pyObj_args, pyObj_error_ctx );
+    if (set_exception) {
+        PyErr_SetObject(pyObj_exc_type, pyObj_final_error);
+        return nullptr;
+    }
+    return pyObj_final_error;
+}
+
 void
 handle_returning_void(PyObject* pyObj_callback,
                       PyObject* pyObj_errback,
@@ -531,13 +599,11 @@ handle_returning_void(PyObject* pyObj_callback,
     PyObject* args = nullptr;
     PyObject* func = nullptr;
     if (err) {
-        // TODO: flesh out exception handling!
         if (nullptr == pyObj_errback) {
             Py_INCREF(Py_None);
-            barrier->set_value(Py_None);
-            PyErr_SetString(PyExc_ValueError, "Placeholder for coming transactions exceptions");
+            barrier->set_exception(err);
         } else {
-            args = PyTuple_Pack(1, Py_None);
+            args = PyTuple_Pack(1, convert_to_python_exc_type(err));
             func = pyObj_errback;
         }
     } else {
@@ -557,70 +623,6 @@ handle_returning_void(PyObject* pyObj_callback,
     PyGILState_Release(state);
 }
 
-PyObject*
-err_to_error_context(const tx::transaction_operation_failed& err)
-{
-    PyObject* pyObj_error_ctx = PyDict_New();
-    // TODO: fill in some context.  Probably the details are not important to our
-    //       users, but worth having in there.  For now, just some basic stuff.
-    //       Eventually the exception will have more info, which we can put here.
-    PyObject* pyObj_value = PyUnicode_FromString(err.what());
-    PyDict_SetItemString(pyObj_error_ctx, "message", pyObj_value);
-    Py_DECREF(pyObj_value);
-    pyObj_value = PyUnicode_FromString("transaction_op_failed");
-    PyDict_SetItemString(pyObj_error_ctx, "type", pyObj_value);
-    return pyObj_error_ctx;
-}
-
-PyObject*
-err_to_error_context(const tx::transaction_exception& err)
-{
-    PyObject* pyObj_error_ctx = PyDict_New();
-    const char* failure_type = "Unknown";
-    switch (err.type()) {
-        case tx::failure_type::FAIL:
-            failure_type = "Fail";
-            break;
-        case tx::failure_type::COMMIT_AMBIGUOUS:
-            failure_type = "Commit Ambiguous";
-            break;
-        case tx::failure_type::EXPIRY:
-            failure_type = "Expiry";
-            break;
-    }
-    PyObject* tmp = PyUnicode_FromString(failure_type);
-    PyDict_SetItemString(pyObj_error_ctx, "failure_type", tmp);
-    Py_DECREF(tmp);
-    tmp = PyUnicode_FromString(err.what());
-    PyDict_SetItemString(pyObj_error_ctx, "message", tmp);
-    Py_DECREF(tmp);
-    return pyObj_error_ctx;
-}
-
-PyObject*
-extract_error_context(std::exception_ptr err)
-{
-    PyObject* retval = PyDict_New();
-    // TODO: populate a dict with info on the exception,
-    //   however we don't have much in there now.
-    assert(!!err);
-    try {
-        std::rethrow_exception(err);
-        return retval;
-    } catch (const tx::transaction_exception e) {
-        return err_to_error_context(e);
-    } catch (const tx::transaction_operation_failed ex) {
-        return err_to_error_context(ex);
-    } catch (const std::exception& exc) {
-        PyObject* pyObj_value = PyUnicode_FromString(exc.what());
-        PyDict_SetItemString(retval, "message", pyObj_value);
-        Py_DECREF(pyObj_value);
-        pyObj_value = PyUnicode_FromString("transaction_op_failed");
-        PyDict_SetItemString(retval, "type", pyObj_value);
-        return retval;
-    }
-}
-
 void
 handle_returning_transaction_get_result(PyObject* pyObj_callback,
                                         PyObject* pyObj_errback,
@@ -636,7 +638,7 @@ handle_returning_transaction_get_result(PyObject* pyObj_callback,
         if (nullptr == pyObj_errback) {
             barrier->set_exception(err);
         } else {
-            args = PyTuple_Pack(1, extract_error_context(err));
+            args = PyTuple_Pack(1, convert_to_python_exc_type(err));
             func = pyObj_errback;
         }
     } else {
@@ -718,7 +720,7 @@ pycbc_txns::transaction_query_op([[maybe_unused]] PyObject* self, PyObject* args
                                                   if (nullptr == pyObj_errback) {
                                                       barrier->set_exception(err);
                                                   } else {
-                                                      args = PyTuple_Pack(1, extract_error_context(err));
+                                                      args = PyTuple_Pack(1, convert_to_python_exc_type(err));
                                                       func = pyObj_errback;
                                                   }
                                               } else {
@@ -743,17 +745,16 @@ pycbc_txns::transaction_query_op([[maybe_unused]] PyObject* self, PyObject* args
     {
         PyObject* ret = nullptr;
         std::string msg;
+        std::exception_ptr err;
         Py_BEGIN_ALLOW_THREADS
         try {
             ret = f.get();
-        } catch (const std::exception& e) {
-            // ideally we form a python exception that uses the info in
-            // extract_error_context(std::current_exception())
-            msg = e.what();
+        } catch (...) {
+            err = std::current_exception();
         }
-        Py_END_ALLOW_THREADS if (!msg.empty())
+        Py_END_ALLOW_THREADS if (err)
         {
-            PyErr_SetString(PyExc_ValueError, msg.c_str());
+            return convert_to_python_exc_type(err, true);
         }
         return ret;
     }
@@ -882,17 +883,16 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
     if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
         PyObject* ret = nullptr;
         std::string msg;
+        std::exception_ptr err;
         Py_BEGIN_ALLOW_THREADS
         try {
             ret = f.get();
-        } catch (const std::exception& e) {
-            // ideally we form a python exception that uses the info in
-            // extract_error_context(std::current_exception())
-            msg = e.what();
+        } catch (...) {
+            err = std::current_exception();
         }
-        Py_END_ALLOW_THREADS if (!msg.empty())
+        Py_END_ALLOW_THREADS if (err)
         {
-            PyErr_SetString(PyExc_ValueError, msg.c_str());
+            return convert_to_python_exc_type(err, true);
         }
         return ret;
     }
@@ -964,11 +964,29 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
         PyObject_CallObject(pyObj_logic, args);
         // ideally we get some info from the exception and pass it into the exception we throw below.  For
         // now, lets just check if one did occur, and make sure we throw a c++ exception so we rollback.
-        bool py_error = (nullptr != PyErr_Occurred());
+        PyObject* pyObj_exc_type = nullptr;
+        PyObject* pyObj_exc_value = nullptr;
+        PyObject* pyObj_exc_trace = nullptr;
+        bool py_error = false;
+        std::string py_error_message("Unknown Python Error");
+        PyErr_Fetch(&pyObj_exc_type, &pyObj_exc_value, &pyObj_exc_trace);
+        if (nullptr != pyObj_exc_type) {
+            PyObject* pyObj_txn_exc = init_transaction_exception_type("TransactionException");
+            if (nullptr == pyObj_exc_value || !PyErr_GivenExceptionMatches(pyObj_exc_value, pyObj_txn_exc)) {
+                // raise a c++ exception to insure rollback.
+                py_error = true;
+                if (nullptr != pyObj_exc_value) {
+                    py_error_message = PyUnicode_AsUTF8(PyObject_Repr(pyObj_exc_value));
+                }
+            }
+        }
+        // eat the exception in any case
+        PyErr_Restore(nullptr, nullptr, nullptr);
+
         PyGILState_Release(state);
         // now we raise an exception so we will rollback
         if (py_error) {
-            throw std::runtime_error("Python error caught - rolling back");
+            throw std::runtime_error(py_error_message);
         }
     };
     auto cb = [pyObj_callback, pyObj_errback, barrier, pyObj_logic](std::optional<tx::transaction_exception> err,
@@ -980,7 +998,7 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
             if (nullptr == pyObj_errback) {
                 barrier->set_exception(std::make_exception_ptr(*err));
             } else {
-                args = PyTuple_Pack(1, err_to_error_context(*err));
+                args = PyTuple_Pack(1, convert_to_python_exc_type(std::make_exception_ptr(*err)));
                 func = pyObj_errback;
             }
         } else {
@@ -1016,23 +1034,18 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
     }
     Py_END_ALLOW_THREADS if (nullptr == pyObj_callback || nullptr == pyObj_errback)
     {
-        std::string msg;
+        std::exception_ptr err;
         PyObject* retval = nullptr;
         Py_BEGIN_ALLOW_THREADS
         try {
             retval = f.get();
-        } catch (const std::exception& e) {
-            // ideally we form a python exception that uses the info in
-            // extract_error_context(std::current_exception())
-            msg = e.what();
+        } catch (...) {
+            err = std::current_exception();
         }
-        Py_END_ALLOW_THREADS if (!msg.empty())
+        Py_END_ALLOW_THREADS if (err)
         {
-            PyErr_SetString(PyExc_ValueError, msg.c_str());
-            return nullptr;
-        }
-        else
-        {
+            return convert_to_python_exc_type(err, true);
+        } else {
             return retval;
         }
     }

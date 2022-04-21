@@ -10,7 +10,6 @@ from couchbase.transactions import (TransactionGetResult,
                                     TransactionQueryResults,
                                     TransactionResult)
 from couchbase.transactions.logic import AttemptContextLogic, TransactionsLogic
-
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
 
@@ -39,12 +38,10 @@ class AsyncWrapper:
 
                 def on_err(exc):
                     print(f'{fn.__name__} got on_err called with {exc}')
-                    if not exc:
-                        exc = dict()
                     try:
-                        err = CouchbaseException(message=exc.get("message", "Unknown Error"),
-                                                 context=TransactionsErrorContext(**exc))
-                        self._loop.call_soon_threadsafe(ftr.set_exception, err)
+                        if not exc:
+                            raise RuntimeError(f'unknown error calling {fn.__name__}')
+                        self._loop.call_soon_threadsafe(ftr.set_exception, exc)
                     except Exception as e:
                         self._loop.call_soon_threadsafe(ftr.set_exception, e)
 

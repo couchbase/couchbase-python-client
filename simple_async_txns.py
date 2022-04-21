@@ -5,8 +5,11 @@ from uuid import uuid4
 
 from acouchbase.cluster import Cluster
 from couchbase.auth import PasswordAuthenticator
-from couchbase.exceptions import CouchbaseException
 from couchbase.options import ClusterOptions, TransactionConfig
+from couchbase.exceptions import TransactionFailed
+from datetime import timedelta
+from uuid import uuid4
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from acouchbase.transactions import AttemptContext
@@ -62,7 +65,7 @@ async def run():
     while ok:
         try:
             print(f'txn_result: {await my_cluster.transactions.run(txn_logic)}')
-        except CouchbaseException as e:
+        except TransactionFailed as e:
             print(f'txn raised exception: {e}')
             ok = False
 
