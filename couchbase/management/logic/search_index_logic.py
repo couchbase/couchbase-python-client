@@ -175,6 +175,15 @@ class SearchIndexManagerLogic:
             "op_type": search_index_mgmt_operations.GET_ALL_INDEXES.value,
             "op_args": op_args
         }
+
+        callback = kwargs.pop('callback', None)
+        if callback:
+            mgmt_kwargs['callback'] = callback
+
+        errback = kwargs.pop('errback', None)
+        if errback:
+            mgmt_kwargs['errback'] = errback
+
         if final_args.get("timeout", None) is not None:
             mgmt_kwargs["timeout"] = final_args.get("timeout")
 

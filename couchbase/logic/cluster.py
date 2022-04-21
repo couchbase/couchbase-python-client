@@ -248,8 +248,6 @@ class ClusterLogic:
         if errback:
             connect_kwargs['errback'] = errback
 
-        print(f'connect kwargs: {connect_kwargs}')
-
         return create_connection(
             self._connstr, **connect_kwargs,
         )
@@ -270,18 +268,14 @@ class ClusterLogic:
         if errback:
             close_kwargs['errback'] = errback
 
-        print("Closing connection: {}, kwargs: {}".format(self._connection, close_kwargs))
-
         return close_connection(
             self._connection, **close_kwargs
         )
 
     def _set_connection(self, conn):
-        print("setting connection!")
         self._connection = conn
 
     def _destroy_connection(self):
-        print("destroying connection!")
         if hasattr(self, '_connection'):
             del self._connection
 
@@ -359,7 +353,6 @@ class ClusterLogic:
         # final_args.pop("span", None)
 
         ping_kwargs.update(final_args)
-        print("cluster ping args: {}".format(final_args))
         return diagnostics_operation(**ping_kwargs)
 
     def diagnostics(self,

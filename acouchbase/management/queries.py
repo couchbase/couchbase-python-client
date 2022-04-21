@@ -7,8 +7,11 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     Iterable)
 
-from acouchbase.management.logic import QueryIndexMgmtWrapper
-from couchbase.exceptions import QueryIndexNotFoundException, WatchQueryIndexTimeoutException
+from acouchbase.management.logic.wrappers import AsyncMgmtWrapper
+from couchbase.exceptions import (InvalidArgumentException,
+                                  QueryIndexNotFoundException,
+                                  WatchQueryIndexTimeoutException)
+from couchbase.management.logic import ManagementType
 from couchbase.management.logic.query_index_logic import QueryIndex, QueryIndexManagerLogic
 from couchbase.management.options import GetAllQueryIndexOptions
 from couchbase.options import forward_args
@@ -34,7 +37,7 @@ class QueryIndexManager(QueryIndexManagerLogic):
         """
         return self._loop
 
-    @QueryIndexMgmtWrapper.inject_callbacks(None, QueryIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def create_index(self,
                      bucket_name,   # type: str
                      index_name,    # type: str
@@ -44,15 +47,15 @@ class QueryIndexManager(QueryIndexManagerLogic):
                      ) -> Awaitable[None]:
 
         if not isinstance(bucket_name, str):
-            raise ValueError("bucket_name must be provided when creating a secondary index.")
+            raise InvalidArgumentException("bucket_name must be provided when creating a secondary index.")
         if not isinstance(index_name, str):
-            raise ValueError("index_name must be provided when creating a secondary index.")
+            raise InvalidArgumentException("index_name must be provided when creating a secondary index.")
         if not isinstance(fields, (list, tuple)):
-            raise ValueError("fields must be provided when creating a secondary index.")
+            raise InvalidArgumentException("fields must be provided when creating a secondary index.")
 
         super().create_index(bucket_name, index_name, fields, *options, **kwargs)
 
-    @QueryIndexMgmtWrapper.inject_callbacks(None, QueryIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def create_primary_index(self,
                              bucket_name,   # type: str
                              *options,      # type: CreatePrimaryQueryIndexOptions
@@ -60,11 +63,11 @@ class QueryIndexManager(QueryIndexManagerLogic):
                              ) -> Awaitable[None]:
 
         if not isinstance(bucket_name, str):
-            raise ValueError("bucket_name must be provided when creating a primary index.")
+            raise InvalidArgumentException("bucket_name must be provided when creating a primary index.")
 
         super().create_primary_index(bucket_name, *options, **kwargs)
 
-    @QueryIndexMgmtWrapper.inject_callbacks(None, QueryIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def drop_index(self,
                    bucket_name,     # type: str
                    index_name,      # type: str
@@ -72,24 +75,24 @@ class QueryIndexManager(QueryIndexManagerLogic):
                    **kwargs) -> Awaitable[None]:
 
         if not isinstance(bucket_name, str):
-            raise ValueError("bucket_name must be provided when dropping a secondary index.")
+            raise InvalidArgumentException("bucket_name must be provided when dropping a secondary index.")
         if not isinstance(index_name, str):
-            raise ValueError("index_name must be provided when dropping a secondary index.")
+            raise InvalidArgumentException("index_name must be provided when dropping a secondary index.")
 
         super().drop_index(bucket_name, index_name, *options, **kwargs)
 
-    @QueryIndexMgmtWrapper.inject_callbacks(None, QueryIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def drop_primary_index(self,
                            bucket_name,     # type: str
                            *options,        # type: DropPrimaryQueryIndexOptions
                            **kwargs) -> Awaitable[None]:
 
         if not isinstance(bucket_name, str):
-            raise ValueError("bucket_name must be provided when dropping a primary index.")
+            raise InvalidArgumentException("bucket_name must be provided when dropping a primary index.")
 
         super().drop_primary_index(bucket_name, *options, **kwargs)
 
-    @QueryIndexMgmtWrapper.inject_callbacks(QueryIndex, QueryIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(QueryIndex, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def get_all_indexes(self,
                         bucket_name,    # type: str
                         *options,       # type: GetAllQueryIndexOptions
@@ -97,11 +100,11 @@ class QueryIndexManager(QueryIndexManagerLogic):
                         ) -> Awaitable[Iterable[QueryIndex]]:
 
         if not isinstance(bucket_name, str):
-            raise ValueError("bucket_name must be provided when dropping a secondary index.")
+            raise InvalidArgumentException("bucket_name must be provided when dropping a secondary index.")
 
         super().get_all_indexes(bucket_name, *options, **kwargs)
 
-    @QueryIndexMgmtWrapper.inject_callbacks(None, QueryIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.QueryIndexMgmt, QueryIndexManagerLogic._ERROR_MAPPING)
     def build_deferred_indexes(self,
                                bucket_name,     # type: str
                                *options,        # type: BuildDeferredQueryIndexOptions
@@ -117,7 +120,7 @@ class QueryIndexManager(QueryIndexManagerLogic):
 
         """
         if not isinstance(bucket_name, str):
-            raise ValueError("bucket_name must be provided when building deferred indexes.")
+            raise InvalidArgumentException("bucket_name must be provided when building deferred indexes.")
 
         super().build_deferred_indexes(bucket_name, *options, **kwargs)
 
@@ -138,9 +141,9 @@ class QueryIndexManager(QueryIndexManagerLogic):
         :raises: WatchQueryIndexTimeoutException
         """
         if not isinstance(bucket_name, str):
-            raise ValueError("bucket_name must be provided when watching indexes.")
+            raise InvalidArgumentException("bucket_name must be provided when watching indexes.")
         if not isinstance(index_names, (list, tuple)):
-            raise ValueError("index_names must be provided when watching indexes.")
+            raise InvalidArgumentException("index_names must be provided when watching indexes.")
 
         final_args = forward_args(kwargs, *options)
 
@@ -149,7 +152,7 @@ class QueryIndexManager(QueryIndexManagerLogic):
 
         timeout = final_args.get("timeout", None)
         if not timeout:
-            raise ValueError(
+            raise InvalidArgumentException(
                 'Must specify a timeout condition for watch indexes')
 
         def check_indexes(index_names, indexes):

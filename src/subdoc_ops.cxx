@@ -65,9 +65,6 @@ add_extras_to_result<couchbase::operations::lookup_in_response>(const couchbase:
             Py_DECREF(pyObj_tmp);
 
             if (f.value.length()) {
-                // PyObject* decoded = json_decode(f.value.c_str(), f.value.length());
-                //  no flags for sub-doc, pass in default
-                // PyObject* decoded = decode_value(transcoder, f.value.c_str(), f.value.length(), PYCBC_FMT_JSON);
                 pyObj_tmp = PyBytes_FromStringAndSize(f.value.c_str(), f.value.length());
                 if (-1 == PyDict_SetItemString(pyObj_field, RESULT_VALUE, pyObj_tmp)) {
                     Py_XDECREF(pyObj_fields);
@@ -142,9 +139,6 @@ add_extras_to_result<couchbase::operations::mutate_in_response>(const couchbase:
             Py_DECREF(pyObj_tmp);
 
             if (f.value.length()) {
-                // PyObject* decoded = json_decode(f.value.c_str(), f.value.length());
-                //  no flags for sub-doc, pass in default
-                // PyObject* decoded = decode_value(transcoder, f.value.c_str(), f.value.length(), PYCBC_FMT_JSON);
                 pyObj_tmp = PyBytes_FromStringAndSize(f.value.c_str(), f.value.length());
                 if (-1 == PyDict_SetItemString(pyObj_field, RESULT_VALUE, pyObj_tmp)) {
                     Py_XDECREF(pyObj_fields);
@@ -200,52 +194,6 @@ create_base_result_from_subdoc_op_response(const char* key, const T& resp)
     return res;
 }
 
-// template<typename T>
-// result*
-// create_result_from_subdoc_op_response(const char* key, const T& resp)
-// {
-//     // first the base ones
-//     auto res = create_base_result_from_subdoc_op_response(key, resp);
-//     // then the extra stuff
-//     return add_extras_to_result(resp, res);
-// }
-
-// template<typename T>
-// void
-// create_result_from_subdoc_op_response(const char* key, const T& resp, PyObject* pyObj_callback, PyObject* pyObj_errback,
-// std::shared_ptr<std::promise<PyObject*>> barrier)
-// {
-//     PyGILState_STATE state = PyGILState_Ensure();
-//     PyObject* pyObj_args = NULL;
-//     PyObject* pyObj_func = NULL;
-
-//     if (resp.ctx.ec.value()) {
-//         PyObject* pyObj_exc = build_exception(resp.ctx);
-//         pyObj_func = ctx.get_errback();
-//         pyObj_args = PyTuple_New(1);
-//         PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
-//     } else {
-//         auto res = create_base_result_from_subdoc_op_response(key, resp);
-//         res = add_extras_to_result(resp, res);
-//         // TODO:  check if PyErr_Occurred() != nullptr and raise error accordingly
-//         pyObj_func = ctx.get_callback();
-//         pyObj_args = PyTuple_New(1);
-//         PyTuple_SET_ITEM(pyObj_args, 0, reinterpret_cast<PyObject*>(res));
-//     }
-
-//     PyObject* pyObj_callback_res = PyObject_CallObject(const_cast<PyObject*>(pyObj_func), pyObj_args);
-//     if (pyObj_callback_res) {
-//         Py_XDECREF(pyObj_callback_res);
-//     } else {
-//         PyErr_Print();
-//     }
-
-//     Py_XDECREF(pyObj_args);
-//     Py_XDECREF(pyObj_func);
-//     ctx.decrement_PyObjects();
-//     PyGILState_Release(state);
-// }
-
 template<typename T>
 void
 create_result_from_subdoc_op_response(const char* key,
@@ -263,12 +211,10 @@ create_result_from_subdoc_op_response(const char* key,
     auto set_exception = false;
 
     if (resp.ctx.ec.value()) {
+        pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "Subdoc operation error.");
         if (pyObj_errback == nullptr) {
-            auto pycbc_ex = PycbcKeyValueException("Subdoc operation error.", __FILE__, __LINE__, resp.ctx);
-            auto exc = std::make_exception_ptr(pycbc_ex);
-            barrier->set_exception(exc);
+            barrier->set_value(pyObj_exc);
         } else {
-            pyObj_exc = build_exception_from_context(resp.ctx);
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
             PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
@@ -295,15 +241,13 @@ create_result_from_subdoc_op_response(const char* key,
     }
 
     if (set_exception) {
+        pyObj_exc = pycbc_build_exception(PycbcError::UnableToBuildResult, __FILE__, __LINE__, "Subdoc operation error.");
         if (pyObj_errback == nullptr) {
-            auto pycbc_ex = PycbcException("Subdoc operation error.", __FILE__, __LINE__, PycbcError::UnableToBuildResult);
-            auto exc = std::make_exception_ptr(pycbc_ex);
-            barrier->set_exception(exc);
+            barrier->set_value(pyObj_exc);
         } else {
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
-            PyTuple_SET_ITEM(pyObj_args, 0, Py_None);
-            pyObj_kwargs = pycbc_core_get_exception_kwargs("Subdoc operation error.", PycbcError::UnableToBuildResult, __FILE__, __LINE__);
+            PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
         }
     }
 
@@ -316,8 +260,8 @@ create_result_from_subdoc_op_response(const char* key,
             // @TODO:  how to handle this situation?
         }
         Py_DECREF(pyObj_args);
-        Py_XDECREF(pyObj_kwargs);
         Py_XDECREF(pyObj_exc);
+        Py_XDECREF(pyObj_kwargs);
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }
@@ -346,7 +290,6 @@ prepare_and_execute_lookup_in_op(struct lookup_in_options* options,
                                  PyObject* pyObj_errback,
                                  std::shared_ptr<std::promise<PyObject*>> barrier)
 {
-    // size_t nspecs = static_cast<size_t>(PyTuple_GET_SIZE(options->specs));
     size_t ii;
     couchbase::protocol::lookup_in_request_body::lookup_in_specs specs = couchbase::protocol::lookup_in_request_body::lookup_in_specs{};
     for (ii = 0; ii < nspecs; ++ii) {
@@ -360,14 +303,14 @@ prepare_and_execute_lookup_in_op(struct lookup_in_options* options,
         }
 
         if (!pyObj_spec) {
-            pycbc_set_python_exception("Unable to parse spec.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+            pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unable to parse spec.");
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
             return nullptr;
         }
 
         if (!PyArg_ParseTuple(pyObj_spec, "bsp", &new_spec.op, &new_spec.path, &new_spec.xattr)) {
-            pycbc_set_python_exception("Unable to parse spec.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+            pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unable to parse spec.");
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
             return nullptr;
@@ -389,7 +332,6 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
                                  PyObject* pyObj_errback,
                                  std::shared_ptr<std::promise<PyObject*>> barrier)
 {
-    // size_t nspecs = static_cast<size_t>(PyTuple_GET_SIZE(options->specs));
     size_t ii;
     couchbase::protocol::mutate_in_request_body::mutate_in_specs specs = couchbase::protocol::mutate_in_request_body::mutate_in_specs{};
     for (ii = 0; ii < nspecs; ++ii) {
@@ -403,7 +345,7 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
         }
 
         if (!pyObj_spec) {
-            pycbc_set_python_exception("Unable to parse spec.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+            pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unable to parse spec.");
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
             return nullptr;
@@ -417,23 +359,18 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
                               &new_spec.xattr,
                               &new_spec.expand_macros,
                               &new_spec.pyObj_value)) {
-            pycbc_set_python_exception("Unable to parse spec.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+            pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unable to parse spec.");
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
             return nullptr;
         }
         new_spec.flags = specs.build_path_flags(new_spec.xattr, new_spec.create_parents, new_spec.expand_macros);
-        // std::string tmp = !new_spec.pyObj_value ? std::string() : json_encode(new_spec.pyObj_value);
-        // auto encoded = !new_spec.pyObj_value ? std::tuple<std::string, uint32_t>{ std::string(), 0 }
-        //                                      : encode_value(callback_ctx.get_transcoder(), new_spec.pyObj_value);
 
         // **DO NOT DECREF** these -- things from tuples are borrowed references!!
         PyObject* pyObj_value = nullptr;
         std::string value = std::string();
 
         if (new_spec.pyObj_value) {
-            // pyObj_value = PyTuple_GET_ITEM(new_spec.pyObj_value, 0);
-
             if (PyUnicode_Check(new_spec.pyObj_value)) {
                 value = std::string(PyUnicode_AsUTF8(new_spec.pyObj_value));
             } else {
@@ -443,7 +380,6 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
             }
         }
 
-        // std::string spec_value = value;
         switch (couchbase::protocol::subdoc_opcode(new_spec.op)) {
             case couchbase::protocol::subdoc_opcode::array_push_last:
             case couchbase::protocol::subdoc_opcode::array_push_first:
@@ -507,51 +443,6 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
 }
 
 PyObject*
-handle_subdoc_blocking_result(std::future<PyObject*>&& fut)
-{
-    PyObject* ret = nullptr;
-    bool kv_ex = false;
-    std::string file;
-    int line;
-    couchbase::error_context::key_value ctx{};
-    std::error_code ec;
-    std::string msg;
-
-    Py_BEGIN_ALLOW_THREADS
-    try {
-        ret = fut.get();
-    } catch (PycbcKeyValueException e) {
-        kv_ex = true;
-        msg = e.what();
-        file = e.get_file();
-        line = e.get_line();
-        ec = e.get_error_code();
-        ctx = e.get_context();
-    } catch (PycbcException e) {
-        msg = e.what();
-        file = e.get_file();
-        line = e.get_line();
-        ec = e.get_error_code();
-    } catch (const std::exception& e) {
-        ec = PycbcError::InternalSDKError;
-        msg = e.what();
-    }
-    Py_END_ALLOW_THREADS
-
-      std::string ec_category = std::string(ec.category().name());
-    if (kv_ex) {
-        PyObject* pyObj_base_exc = build_exception_from_context(ctx);
-        pycbc_set_python_exception(msg.c_str(), ec, file.c_str(), line, pyObj_base_exc);
-        Py_DECREF(pyObj_base_exc);
-    } else if (!file.empty()) {
-        pycbc_set_python_exception(msg.c_str(), ec, file.c_str(), line);
-    } else if (ec_category.compare("pycbc") == 0) {
-        pycbc_set_python_exception(msg.c_str(), ec, __FILE__, __LINE__);
-    }
-    return ret;
-}
-
-PyObject*
 handle_subdoc_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
 {
     // need these for all operations
@@ -609,13 +500,13 @@ handle_subdoc_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwar
 
     if (!ret) {
         pycbc_set_python_exception(
-          "Cannot perform subdoc operation.  Unable to parse args/kwargs.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+          PycbcError::InvalidArgument, __FILE__, __LINE__, "Cannot perform subdoc operation.  Unable to parse args/kwargs.");
         return nullptr;
     }
 
     if (!PyTuple_Check(pyObj_spec) && !PyList_Check(pyObj_spec)) {
         pycbc_set_python_exception(
-          "Cannot perform subdoc operation.  Value must be a tuple or list.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+          PycbcError::InvalidArgument, __FILE__, __LINE__, "Cannot perform subdoc operation.  Value must be a tuple or list.");
         return nullptr;
     }
 
@@ -628,17 +519,16 @@ handle_subdoc_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwar
 
     if (nspecs == 0) {
         pycbc_set_python_exception(
-          "Cannot perform subdoc operation.  Need at least one command.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+          PycbcError::InvalidArgument, __FILE__, __LINE__, "Cannot perform subdoc operation.  Need at least one command.");
         return nullptr;
     }
 
     connection* conn = nullptr;
     conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
     if (nullptr == conn) {
-        pycbc_set_python_exception(NULL_CONN_OBJECT, PycbcError::InvalidArgument, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, NULL_CONN_OBJECT);
         return nullptr;
     }
-    // PyErr_Clear();
 
     couchbase::document_id id{ bucket, scope, collection, key };
 
@@ -689,14 +579,17 @@ handle_subdoc_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwar
             break;
         }
         default: {
-            pycbc_set_python_exception("Unrecognized subdoc operation passed in.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+            pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized subdoc operation passed in.");
+            barrier->set_value(nullptr);
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
-            return nullptr;
+            break;
         }
     };
     if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
-        return handle_subdoc_blocking_result(std::move(f));
+        PyObject* ret = nullptr;
+        Py_BEGIN_ALLOW_THREADS ret = f.get();
+        Py_END_ALLOW_THREADS return ret;
     }
     Py_RETURN_NONE;
 }

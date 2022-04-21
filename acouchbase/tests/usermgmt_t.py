@@ -8,7 +8,8 @@ import pytest_asyncio
 
 from acouchbase.cluster import Cluster
 from couchbase.auth import PasswordAuthenticator
-from couchbase.exceptions import (CouchbaseException,
+from couchbase.exceptions import (AmbiguousTimeoutException,
+                                  CouchbaseException,
                                   FeatureUnavailableException,
                                   GroupNotFoundException,
                                   InvalidArgumentException,
@@ -197,6 +198,27 @@ class UserManagementTests:
             username,
             domain_name="local",
             expected_exceptions=UserNotFoundException)
+
+    @pytest.mark.asyncio
+    async def test_internal_user_fail(self, cb_env):
+        """
+            test_internal_user()
+            Tests create, retrieve, update and removal
+            of internal (domain_name="local")
+            Uses *UserOptions() for options
+        """
+
+        username = 'custom-user'
+        password = 's3cr3t'
+        roles = [
+            Role(name='data_reader', bucket='not-a-bucket'),
+            Role(name='data_writer', bucket='not-a-bucket')
+        ]
+
+        with pytest.raises(InvalidArgumentException):
+            await cb_env.um.upsert_user(
+                User(username=username, roles=roles, password=password),
+                UpsertUserOptions(domain_name="local"))
 
     @pytest.mark.asyncio
     async def test_user_display_name(self, cb_env):
@@ -617,7 +639,8 @@ class UserManagementTests:
     @pytest.mark.usefixtures("check_user_groups_supported")
     @pytest.mark.asyncio
     async def test_timeout(self, cb_env):
-        await cb_env.um.get_all_groups(timeout=timedelta(seconds=0.1))
+        with pytest.raises(AmbiguousTimeoutException):
+            await cb_env.um.get_all_groups(timeout=timedelta(seconds=0.1))
 
     @pytest.mark.asyncio
     async def test_get_roles(self, cb_env):

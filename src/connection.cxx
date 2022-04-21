@@ -32,30 +32,26 @@ bucket_op_callback(std::error_code ec,
 {
     PyObject* pyObj_args = nullptr;
     PyObject* pyObj_func = nullptr;
+    PyObject* pyObj_exc = nullptr;
     PyObject* pyObj_callback_res = nullptr;
 
     PyGILState_STATE state = PyGILState_Ensure();
 
     if (ec.value()) {
-        // if(ctx.get_errback() == nullptr){
+        std::string msg = "Error trying to ";
+        msg.append((open ? "open" : "close") + std::string(" bucket."));
+        pyObj_exc = pycbc_build_exception(ec, __FILE__, __LINE__, msg);
         if (pyObj_errback == nullptr) {
-            std::string msg = "Error trying to ";
-            msg.append((open ? "open" : "close") + std::string(" bucket."));
-            auto pycbc_ex = PycbcException(msg, __FILE__, __LINE__, ec);
-            barrier->set_exception(std::make_exception_ptr(pycbc_ex));
+            barrier->set_value(pyObj_exc);
         } else {
-            PyObject* exc = build_exception(ec);
             pyObj_func = pyObj_errback;
-            // pyObj_func = ctx.get_errback();
             pyObj_args = PyTuple_New(1);
-            PyTuple_SET_ITEM(pyObj_args, 0, exc);
+            PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
         }
     } else {
-        // if(ctx.get_callback() == nullptr){
         if (pyObj_callback == nullptr) {
             barrier->set_value(PyBool_FromLong(static_cast<long>(1)));
         } else {
-            // pyObj_func = ctx.get_callback();
             pyObj_func = pyObj_callback;
             pyObj_args = PyTuple_New(1);
             PyTuple_SET_ITEM(pyObj_args, 0, PyBool_FromLong(static_cast<long>(1)));
@@ -69,9 +65,10 @@ bucket_op_callback(std::error_code ec,
         } else {
             std::string msg;
             msg.append((open ? "Open" : "Close") + std::string(" bucket callback failed"));
-            pycbc_set_python_exception(msg.c_str(), PycbcError::InternalSDKError, __FILE__, __LINE__);
+            pycbc_set_python_exception(PycbcError::InternalSDKError, __FILE__, __LINE__, msg.c_str());
         }
         Py_DECREF(pyObj_args);
+        Py_XDECREF(pyObj_exc);
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }
@@ -88,11 +85,9 @@ close_connection_callback(PyObject* pyObj_callback, PyObject* pyObj_errback, std
 
     PyGILState_STATE state = PyGILState_Ensure();
 
-    // if(ctx.get_callback() == nullptr){
     if (pyObj_callback == nullptr) {
         barrier->set_value(PyBool_FromLong(static_cast<long>(1)));
     } else {
-        // pyObj_func = ctx.get_callback();
         pyObj_func = pyObj_callback;
         pyObj_args = PyTuple_New(1);
         PyTuple_SET_ITEM(pyObj_args, 0, PyBool_FromLong(static_cast<long>(1)));
@@ -104,7 +99,7 @@ close_connection_callback(PyObject* pyObj_callback, PyObject* pyObj_errback, std
         if (pyObj_callback_res) {
             Py_DECREF(pyObj_callback_res);
         } else {
-            pycbc_set_python_exception("Close connection callback failed.", PycbcError::InternalSDKError, __FILE__, __LINE__);
+            pycbc_set_python_exception(PycbcError::InternalSDKError, __FILE__, __LINE__, "Close connection callback failed.");
         }
         Py_DECREF(pyObj_args);
         Py_XDECREF(pyObj_callback);
@@ -124,29 +119,24 @@ create_connection_callback(PyObject* pyObj_conn,
 {
     PyObject* pyObj_args = NULL;
     PyObject* pyObj_func = NULL;
+    PyObject* pyObj_exc = nullptr;
     PyObject* pyObj_callback_res = nullptr;
 
     PyGILState_STATE state = PyGILState_Ensure();
 
     if (ec.value()) {
-        // if(ctx.get_errback() == nullptr){
+        pyObj_exc = pycbc_build_exception(ec, __FILE__, __LINE__, "Error creating a connection.");
         if (pyObj_errback == nullptr) {
-            auto pycbc_ex = PycbcException("Error creating a connection.", __FILE__, __LINE__, ec);
-            auto exc = std::make_exception_ptr(pycbc_ex);
-            barrier->set_exception(exc);
+            barrier->set_value(pyObj_exc);
         } else {
-            PyObject* exc = build_exception(ec);
-            // pyObj_func = ctx.get_errback();
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
-            PyTuple_SET_ITEM(pyObj_args, 0, exc);
+            PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
         }
     } else {
-        // if(ctx.get_callback() == nullptr){
         if (pyObj_callback == nullptr) {
             barrier->set_value(pyObj_conn);
         } else {
-            // pyObj_func = ctx.get_callback();
             pyObj_func = pyObj_callback;
             pyObj_args = PyTuple_New(1);
             PyTuple_SET_ITEM(pyObj_args, 0, pyObj_conn);
@@ -158,9 +148,10 @@ create_connection_callback(PyObject* pyObj_conn,
         if (pyObj_callback_res) {
             Py_DECREF(pyObj_callback_res);
         } else {
-            pycbc_set_python_exception("Create connection callback failed.", PycbcError::InternalSDKError, __FILE__, __LINE__);
+            pycbc_set_python_exception(PycbcError::InternalSDKError, __FILE__, __LINE__, "Create connection callback failed.");
         }
         Py_DECREF(pyObj_args);
+        Py_XDECREF(pyObj_exc);
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }
@@ -569,7 +560,8 @@ handle_create_connection([[maybe_unused]] PyObject* self, PyObject* args, PyObje
       args, kwargs, kw_format, const_cast<char**>(kw_list), &conn_str, &pyObj_auth, &pyObj_options, &pyObj_callback, &pyObj_errback);
 
     if (!ret) {
-        pycbc_set_python_exception(CANNOT_PARSE_CONN_ARGS_MSG("create"), PycbcError::InvalidArgument, __FILE__, __LINE__);
+        std::string msg = "Cannot create connection. Unable to parse args/kwargs.";
+        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, msg.c_str());
         return nullptr;
     }
 
@@ -588,7 +580,7 @@ handle_create_connection([[maybe_unused]] PyObject* self, PyObject* args, PyObje
 
     if (pyObj_conn == nullptr) {
         pycbc_set_python_exception(
-          "Cannot create connection. Unable to create PyCapsule.", PycbcError::InternalSDKError, __FILE__, __LINE__);
+          PycbcError::InternalSDKError, __FILE__, __LINE__, "Cannot create connection. Unable to create PyCapsule.");
         return nullptr;
     }
 
@@ -614,36 +606,9 @@ handle_create_connection([[maybe_unused]] PyObject* self, PyObject* args, PyObje
         Py_END_ALLOW_THREADS
     }
     if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
-        return handle_conn_blocking_result(std::move(f));
-        // PyObject* ret = nullptr;
-        // std::string file;
-        // int line;
-        // std::error_code ec;
-        // std::string msg;
-
-        // Py_BEGIN_ALLOW_THREADS
-        // try {
-        //     ret = f.get();
-        // }
-        // catch (PycbcException e){
-        //     msg = e.what();
-        //     file = e.get_file();
-        //     line = e.get_line();
-        //     ec = e.get_error_code();
-        // }
-        // catch (const std::exception& e) {
-        //     ec = PycbcError::InternalSDKError;
-        //     msg = e.what();
-        // }
-        // Py_END_ALLOW_THREADS
-
-        // std::string ec_category = std::string(ec.category().name());
-        // if (!file.empty()){
-        //     pycbc_set_python_exception(msg.c_str(), ec, file.c_str(), line);
-        // }else if (ec_category.compare("pycbc") == 0){
-        //     pycbc_set_python_exception(msg.c_str(), ec, __FILE__, __LINE__);
-        // }
-        // return ret;
+        PyObject* ret = nullptr;
+        Py_BEGIN_ALLOW_THREADS ret = f.get();
+        Py_END_ALLOW_THREADS return ret;
     }
     Py_RETURN_NONE;
 }
@@ -663,13 +628,14 @@ handle_close_connection([[maybe_unused]] PyObject* self, PyObject* args, PyObjec
       args, kwargs, kw_format, const_cast<char**>(kw_list), &PyCapsule_Type, &pyObj_conn, &pyObj_callback, &pyObj_errback);
 
     if (!ret) {
-        pycbc_set_python_exception(CANNOT_PARSE_CONN_ARGS_MSG("close"), PycbcError::InvalidArgument, __FILE__, __LINE__);
+        std::string msg = "Cannot close connection. Unable to parse args/kwargs.";
+        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, msg.c_str());
         return nullptr;
     }
 
     connection* conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
     if (nullptr == conn) {
-        pycbc_set_python_exception(NULL_CONN_OBJECT, PycbcError::InvalidArgument, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, NULL_CONN_OBJECT);
         return nullptr;
     }
 
@@ -692,36 +658,9 @@ handle_close_connection([[maybe_unused]] PyObject* self, PyObject* args, PyObjec
         Py_END_ALLOW_THREADS
     }
     if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
-        return handle_conn_blocking_result(std::move(f));
-        // PyObject* ret = nullptr;
-        // std::string file;
-        // int line;
-        // std::error_code ec;
-        // std::string msg;
-
-        // Py_BEGIN_ALLOW_THREADS
-        // try {
-        //     ret = f.get();
-        // }
-        // catch (PycbcException e){
-        //     msg = e.what();
-        //     file = e.get_file();
-        //     line = e.get_line();
-        //     ec = e.get_error_code();
-        // }
-        // catch (const std::exception& e) {
-        //     ec = PycbcError::InternalSDKError;
-        //     msg = e.what();
-        // }
-        // Py_END_ALLOW_THREADS
-
-        // std::string ec_category = std::string(ec.category().name());
-        // if (!file.empty()){
-        //     pycbc_set_python_exception(msg.c_str(), ec, file.c_str(), line);
-        // }else if (ec_category.compare("pycbc") == 0){
-        //     pycbc_set_python_exception(msg.c_str(), ec, __FILE__, __LINE__);
-        // }
-        // return ret;
+        PyObject* ret = nullptr;
+        Py_BEGIN_ALLOW_THREADS ret = f.get();
+        Py_END_ALLOW_THREADS return ret;
     }
     Py_RETURN_NONE;
 }
@@ -756,14 +695,16 @@ handle_open_or_close_bucket([[maybe_unused]] PyObject* self, PyObject* args, PyO
                                           &open);
 
     if (!ret) {
-        pycbc_set_python_exception(
-          CANNOT_PARSE_BUCKET_ARGS_MSG(open == 1 ? "open" : "close"), PycbcError::InvalidArgument, __FILE__, __LINE__);
+        std::string msg = "Cannot ";
+        msg.append(open == 1 ? "open" : "close");
+        msg.append(" bucket.  Unable to parse args/kwargs.");
+        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, msg.c_str());
         return nullptr;
     }
 
     connection* conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
     if (nullptr == conn) {
-        pycbc_set_python_exception(NULL_CONN_OBJECT, PycbcError::InvalidArgument, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, NULL_CONN_OBJECT);
         return nullptr;
     }
 
@@ -801,68 +742,9 @@ handle_open_or_close_bucket([[maybe_unused]] PyObject* self, PyObject* args, PyO
         Py_END_ALLOW_THREADS
     }
     if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
-        return handle_conn_blocking_result(std::move(f));
-        // PyObject* ret = nullptr;
-        // std::string file;
-        // int line;
-        // std::error_code ec;
-        // std::string msg;
-
-        // Py_BEGIN_ALLOW_THREADS
-        // try {
-        //     ret = f.get();
-        // }
-        // catch (PycbcException e){
-        //     msg = e.what();
-        //     file = e.get_file();
-        //     line = e.get_line();
-        //     ec = e.get_error_code();
-        // }
-        // catch (const std::exception& e) {
-        //     ec = PycbcError::InternalSDKError;
-        //     msg = e.what();
-        // }
-        // Py_END_ALLOW_THREADS
-
-        // std::string ec_category = std::string(ec.category().name());
-        // if (!file.empty()){
-        //     pycbc_set_python_exception(msg.c_str(), ec, file.c_str(), line);
-        // }else if (ec_category.compare("pycbc") == 0){
-        //     pycbc_set_python_exception(msg.c_str(), ec, __FILE__, __LINE__);
-        // }
-        // return ret;
+        PyObject* ret = nullptr;
+        Py_BEGIN_ALLOW_THREADS ret = f.get();
+        Py_END_ALLOW_THREADS return ret;
     }
     Py_RETURN_NONE;
-}
-
-PyObject*
-handle_conn_blocking_result(std::future<PyObject*>&& fut)
-{
-    PyObject* ret = nullptr;
-    std::string file;
-    int line;
-    std::error_code ec;
-    std::string msg;
-
-    Py_BEGIN_ALLOW_THREADS
-    try {
-        ret = fut.get();
-    } catch (PycbcException e) {
-        msg = e.what();
-        file = e.get_file();
-        line = e.get_line();
-        ec = e.get_error_code();
-    } catch (const std::exception& e) {
-        ec = PycbcError::InternalSDKError;
-        msg = e.what();
-    }
-    Py_END_ALLOW_THREADS
-
-      std::string ec_category = std::string(ec.category().name());
-    if (!file.empty()) {
-        pycbc_set_python_exception(msg.c_str(), ec, file.c_str(), line);
-    } else if (ec_category.compare("pycbc") == 0) {
-        pycbc_set_python_exception(msg.c_str(), ec, __FILE__, __LINE__);
-    }
-    return ret;
 }

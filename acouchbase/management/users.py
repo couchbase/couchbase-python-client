@@ -3,7 +3,8 @@ from typing import (TYPE_CHECKING,
                     Awaitable,
                     Iterable)
 
-from acouchbase.management.logic import UserMgmtWrapper
+from acouchbase.management.logic.wrappers import AsyncMgmtWrapper
+from couchbase.management.logic import ManagementType
 from couchbase.management.logic.users_logic import (Group,
                                                     RoleAndDescription,
                                                     User,
@@ -35,7 +36,7 @@ class UserManager(UserManagerLogic):
         """
         return self._loop
 
-    @UserMgmtWrapper.inject_callbacks(UserAndMetadata, UserManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(UserAndMetadata, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def get_user(self,
                  username,  # type: str
                  *options,  # type: GetUserOptions
@@ -43,14 +44,14 @@ class UserManager(UserManagerLogic):
                  ) -> Awaitable[UserAndMetadata]:
         super().get_user(username, *options, **kwargs)
 
-    @UserMgmtWrapper.inject_callbacks(UserAndMetadata, UserManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(UserAndMetadata, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def get_all_users(self,
                       *options,  # type: GetAllUsersOptions
                       **kwargs  # type: Any
                       ) -> Awaitable[Iterable[UserAndMetadata]]:
         super().get_all_users(*options, **kwargs)
 
-    @UserMgmtWrapper.inject_callbacks(None, UserManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def upsert_user(self,
                     user,     # type: User
                     *options,  # type: UpsertUserOptions
@@ -59,7 +60,7 @@ class UserManager(UserManagerLogic):
 
         super().upsert_user(user, *options, **kwargs)
 
-    @UserMgmtWrapper.inject_callbacks(None, UserManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def drop_user(self,
                   username,  # type: str
                   *options,  # type: DropUserOptions
@@ -67,14 +68,14 @@ class UserManager(UserManagerLogic):
                   ) -> Awaitable[None]:
         super().drop_user(username, *options, **kwargs)
 
-    @UserMgmtWrapper.inject_callbacks(RoleAndDescription, UserManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(RoleAndDescription, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def get_roles(self,
                   *options,  # type: GetRolesOptions
                   **kwargs   # type: Any
                   ) -> Awaitable[Iterable[RoleAndDescription]]:
         super().get_roles(*options, **kwargs)
 
-    @UserMgmtWrapper.inject_callbacks(Group, UserManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(Group, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def get_group(self,
                   group_name,   # type: str
                   *options,     # type: GetGroupOptions
@@ -82,14 +83,14 @@ class UserManager(UserManagerLogic):
                   ) -> Awaitable[Group]:
         super().get_group(group_name, *options, **kwargs)
 
-    @UserMgmtWrapper.inject_callbacks(Group, UserManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(Group, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def get_all_groups(self,
                        *options,    # type: GetAllGroupsOptions
                        **kwargs     # type: Any
                        ) -> Awaitable[Iterable[Group]]:
         super().get_all_groups(*options, **kwargs)
 
-    @UserMgmtWrapper.inject_callbacks(None, UserManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def upsert_group(self,
                      group,     # type: Group
                      *options,  # type: UpsertGroupOptions
@@ -97,7 +98,7 @@ class UserManager(UserManagerLogic):
                      ) -> Awaitable[None]:
         super().upsert_group(group, *options, **kwargs)
 
-    @UserMgmtWrapper.inject_callbacks(None, UserManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
     def drop_group(self,
                    group_name,  # type: str
                    *options,    # type: DropGroupOptions

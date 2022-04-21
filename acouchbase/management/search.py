@@ -4,7 +4,8 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     Iterable)
 
-from acouchbase.management.logic import SearchIndexMgmtWrapper
+from acouchbase.management.logic.wrappers import AsyncMgmtWrapper
+from couchbase.management.logic import ManagementType
 from couchbase.management.logic.search_index_logic import SearchIndex, SearchIndexManagerLogic
 
 if TYPE_CHECKING:
@@ -36,7 +37,7 @@ class SearchIndexManager(SearchIndexManagerLogic):
         """
         return self._loop
 
-    @SearchIndexMgmtWrapper.inject_callbacks(None, SearchIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def upsert_index(self,
                      index,     # type: SearchIndex
                      *options,  # type: UpsertSearchIndexOptions
@@ -45,7 +46,7 @@ class SearchIndexManager(SearchIndexManagerLogic):
 
         super().upsert_index(index, *options, **kwargs)
 
-    @SearchIndexMgmtWrapper.inject_callbacks(None, SearchIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def drop_index(self,
                    index_name,  # type: str
                    *options,   # type: DropSearchIndexOptions
@@ -54,7 +55,8 @@ class SearchIndexManager(SearchIndexManagerLogic):
 
         super().drop_index(index_name, *options, **kwargs)
 
-    @SearchIndexMgmtWrapper.inject_callbacks(SearchIndex, SearchIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(SearchIndex, ManagementType.SearchIndexMgmt,
+                                       SearchIndexManagerLogic._ERROR_MAPPING)
     def get_index(self,
                   index_name,  # type: str
                   *options,   # type: GetSearchIndexOptions
@@ -63,14 +65,15 @@ class SearchIndexManager(SearchIndexManagerLogic):
 
         super().get_index(index_name, *options, **kwargs)
 
-    @SearchIndexMgmtWrapper.inject_callbacks(SearchIndex, SearchIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(SearchIndex, ManagementType.SearchIndexMgmt,
+                                       SearchIndexManagerLogic._ERROR_MAPPING)
     def get_all_indexes(self,
                         *options,  # type: GetAllSearchIndexesOptions
                         **kwargs  # type: Dict[str, Any]
                         ) -> Awaitable[Iterable[SearchIndex]]:
         super().get_all_indexes(*options, **kwargs)
 
-    @SearchIndexMgmtWrapper.inject_callbacks(int, SearchIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(int, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def get_indexed_documents_count(self,
                                     index_name,  # type: str
                                     *options,   # type: GetSearchIndexedDocumentsCountOptions
@@ -78,7 +81,7 @@ class SearchIndexManager(SearchIndexManagerLogic):
                                     ) -> Awaitable[int]:
         super().get_indexed_documents_count(index_name, *options, **kwargs)
 
-    @SearchIndexMgmtWrapper.inject_callbacks(None, SearchIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def pause_ingest(self,
                      index_name,  # type: str
                      *options,  # type: PauseIngestSearchIndexOptions
@@ -86,7 +89,7 @@ class SearchIndexManager(SearchIndexManagerLogic):
                      ) -> Awaitable[None]:
         super().pause_ingest(index_name, *options, **kwargs)
 
-    @SearchIndexMgmtWrapper.inject_callbacks(None, SearchIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def resume_ingest(self,
                       index_name,  # type: str
                       *options,  # type: ResumeIngestSearchIndexOptions
@@ -94,7 +97,7 @@ class SearchIndexManager(SearchIndexManagerLogic):
                       ) -> Awaitable[None]:
         super().resume_ingest(index_name, *options, **kwargs)
 
-    @SearchIndexMgmtWrapper.inject_callbacks(None, SearchIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def allow_querying(self,
                        index_name,  # type: str
                        *options,  # type: AllowQueryingSearchIndexOptions
@@ -102,7 +105,7 @@ class SearchIndexManager(SearchIndexManagerLogic):
                        ) -> Awaitable[None]:
         super().allow_querying(index_name, *options, **kwargs)
 
-    @SearchIndexMgmtWrapper.inject_callbacks(None, SearchIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def disallow_querying(self,
                           index_name,  # type: str
                           *options,  # type: DisallowQueryingSearchIndexOptions
@@ -110,7 +113,7 @@ class SearchIndexManager(SearchIndexManagerLogic):
                           ) -> Awaitable[None]:
         super().disallow_querying(index_name, *options, **kwargs)
 
-    @SearchIndexMgmtWrapper.inject_callbacks(None, SearchIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def freeze_plan(self,
                     index_name,  # type: str
                     *options,  # type: FreezePlanSearchIndexOptions
@@ -118,7 +121,7 @@ class SearchIndexManager(SearchIndexManagerLogic):
                     ) -> Awaitable[None]:
         super().freeze_plan(index_name, *options, **kwargs)
 
-    @SearchIndexMgmtWrapper.inject_callbacks(None, SearchIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def unfreeze_plan(self,
                       index_name,  # type: str
                       *options,  # type: UnfreezePlanSearchIndexOptions
@@ -126,7 +129,7 @@ class SearchIndexManager(SearchIndexManagerLogic):
                       ) -> Awaitable[None]:
         super().unfreeze_plan(index_name, *options, **kwargs)
 
-    @SearchIndexMgmtWrapper.inject_callbacks(dict, SearchIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def analyze_document(self,
                          index_name,  # type: str
                          document,  # type: Any
@@ -135,7 +138,7 @@ class SearchIndexManager(SearchIndexManagerLogic):
                          ) -> Awaitable[Dict[str, Any]]:
         super().analyze_document(index_name, document, *options, **kwargs)
 
-    @SearchIndexMgmtWrapper.inject_callbacks(dict, SearchIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def get_index_stats(self,
                         index_name,  # type: str
                         *options,  # type: GetSearchIndexStatsOptions
@@ -143,7 +146,7 @@ class SearchIndexManager(SearchIndexManagerLogic):
                         ) -> Awaitable[Dict[str, Any]]:
         super().get_index_stats(index_name, *options, **kwargs)
 
-    @SearchIndexMgmtWrapper.inject_callbacks(dict, SearchIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(dict, ManagementType.SearchIndexMgmt, SearchIndexManagerLogic._ERROR_MAPPING)
     def get_all_index_stats(self,
                             *options,  # type: GetAllSearchIndexStatsOptions
                             **kwargs  # type: Dict[str, Any]

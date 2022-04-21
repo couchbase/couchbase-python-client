@@ -4,7 +4,8 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     Iterable)
 
-from acouchbase.management.logic import ViewIndexMgmtWrapper
+from acouchbase.management.logic.wrappers import AsyncMgmtWrapper
+from couchbase.management.logic import ManagementType
 from couchbase.management.logic.view_index_logic import (DesignDocument,
                                                          DesignDocumentNamespace,
                                                          ViewIndexManagerLogic)
@@ -29,7 +30,8 @@ class ViewIndexManager(ViewIndexManagerLogic):
         """
         return self._loop
 
-    @ViewIndexMgmtWrapper.inject_callbacks(DesignDocument, ViewIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(DesignDocument, ManagementType.ViewIndexMgmt,
+                                       ViewIndexManagerLogic._ERROR_MAPPING)
     def get_design_document(self,
                             design_doc_name,  # type: str
                             namespace,  # type: DesignDocumentNamespace
@@ -38,7 +40,8 @@ class ViewIndexManager(ViewIndexManagerLogic):
                             ) -> Awaitable[DesignDocument]:
         super().get_design_document(design_doc_name, namespace, *options, **kwargs)
 
-    @ViewIndexMgmtWrapper.inject_callbacks(DesignDocument, ViewIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(DesignDocument, ManagementType.ViewIndexMgmt,
+                                       ViewIndexManagerLogic._ERROR_MAPPING)
     def get_all_design_documents(self,
                                  namespace,     # type: DesignDocumentNamespace
                                  *options,      # type: GetAllDesignDocumentsOptions
@@ -46,7 +49,7 @@ class ViewIndexManager(ViewIndexManagerLogic):
                                  ) -> Awaitable[Iterable[DesignDocument]]:
         super().get_all_design_documents(namespace, *options, **kwargs)
 
-    @ViewIndexMgmtWrapper.inject_callbacks(None, ViewIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.ViewIndexMgmt, ViewIndexManagerLogic._ERROR_MAPPING)
     def upsert_design_document(self,
                                design_doc_data,     # type: DesignDocument
                                namespace,           # type: DesignDocumentNamespace
@@ -55,7 +58,7 @@ class ViewIndexManager(ViewIndexManagerLogic):
                                ) -> Awaitable[None]:
         super().upsert_design_document(design_doc_data, namespace, *options, **kwargs)
 
-    @ViewIndexMgmtWrapper.inject_callbacks(None, ViewIndexManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.ViewIndexMgmt, ViewIndexManagerLogic._ERROR_MAPPING)
     def drop_design_document(self,
                              design_doc_name,   # type: str
                              namespace,         # type: DesignDocumentNamespace

@@ -26,8 +26,16 @@ static PyObject*
 exception_base__context__(exception_base* self, [[maybe_unused]] PyObject* args)
 {
     if (self->error_context) {
-        // Py_INCREF(self->error_context);
         return self->error_context;
+    }
+    Py_RETURN_NONE;
+}
+
+static PyObject*
+exception_base__info__(exception_base* self, [[maybe_unused]] PyObject* args)
+{
+    if (self->exc_info) {
+        return self->exc_info;
     }
     Py_RETURN_NONE;
 }
@@ -37,6 +45,9 @@ exception_base_dealloc(exception_base* self)
 {
     if (self->error_context) {
         Py_XDECREF(self->error_context);
+    }
+    if (self->exc_info) {
+        Py_XDECREF(self->exc_info);
     }
     LOG_INFO("{}: exception_base_dealloc completed", "PYCBC");
 }
@@ -64,6 +75,7 @@ static PyMethodDef exception_base_methods[] = {
     { "err", (PyCFunction)exception_base__err__, METH_NOARGS, PyDoc_STR("Integer error code") },
     { "err_category", (PyCFunction)exception_base__category__, METH_NOARGS, PyDoc_STR("error category, expressed as a string") },
     { "error_context", (PyCFunction)exception_base__context__, METH_NOARGS, PyDoc_STR("error context dict") },
+    { "error_info", (PyCFunction)exception_base__info__, METH_NOARGS, PyDoc_STR("error info dict") },
     { nullptr, nullptr, 0, nullptr }
 };
 
@@ -183,14 +195,6 @@ build_kv_error_map_info(couchbase::error_map::error_info error_info)
     return err_info;
 }
 
-PyObject*
-build_exception_from_err_code(const std::error_code& ec)
-{
-    exception_base* exc = create_exception_base_obj();
-    exc->ec = ec;
-    return reinterpret_cast<PyObject*>(exc);
-}
-
 struct PycbcErrorCategory : std::error_category {
     const char* name() const noexcept override;
     std::string message(int ec) const override;
@@ -273,7 +277,7 @@ get_pycbc_exception_class_enum_value(std::error_code ec)
 }
 
 void
-pycbc_set_python_exception(const char* msg, std::error_code ec, const char* file, int line, PyObject* pyObj_base_exc)
+pycbc_set_python_exception(std::error_code ec, const char* file, int line, const char* msg, PyObject* pyObj_base_exc)
 {
     PyObject *pyObj_type = nullptr, *pyObj_value = nullptr, *pyObj_traceback = nullptr;
     PyObject* pyObj_exc_class = nullptr;
@@ -395,7 +399,7 @@ pycbc_set_python_exception(const char* msg, std::error_code ec, const char* file
     Py_INCREF(Py_TYPE(pyObj_exc_instance));
     PyErr_Restore((PyObject*)Py_TYPE(pyObj_exc_instance), pyObj_exc_instance, pyObj_traceback);
 }
-
+// @TODO:  remove once streaming cleaned up
 PyObject*
 pycbc_core_get_exception_kwargs(std::string msg, std::error_code ec, const char* file, int line)
 {
@@ -467,6 +471,7 @@ pycbc_core_get_exception_kwargs(std::string msg, std::error_code ec, const char*
     return pyObj_kwargs;
 }
 
+// @TODO:  remove once streaming cleaned up
 PyObject*
 pycbc_get_exception_kwargs(std::string msg, const char* file, int line)
 {
@@ -503,4 +508,82 @@ pycbc_get_exception_kwargs(std::string msg, const char* file, int line)
     }
 
     return pyObj_kwargs;
+}
+
+PyObject*
+pycbc_build_exception(std::error_code ec, const char* file, int line, std::string msg)
+{
+    PyObject *pyObj_type = nullptr, *pyObj_value = nullptr, *pyObj_traceback = nullptr;
+
+    PyErr_Fetch(&pyObj_type, &pyObj_value, &pyObj_traceback);
+    PyErr_Clear();
+
+    PyObject* pyObj_exc_info = PyDict_New();
+
+    if (pyObj_type != nullptr) {
+        PyErr_NormalizeException(&pyObj_type, &pyObj_value, &pyObj_traceback);
+        if (-1 == PyDict_SetItemString(pyObj_exc_info, "inner_cause", pyObj_value)) {
+            PyErr_Print();
+            Py_DECREF(pyObj_type);
+            Py_XDECREF(pyObj_value);
+
+            Py_XDECREF(pyObj_exc_info);
+            return nullptr;
+        }
+        Py_DECREF(pyObj_type);
+        Py_XDECREF(pyObj_value);
+        Py_XDECREF(pyObj_traceback);
+    }
+
+    PyObject* pyObj_cinfo = Py_BuildValue("(s,i)", file, line);
+    if (-1 == PyDict_SetItemString(pyObj_exc_info, "cinfo", pyObj_cinfo)) {
+        PyErr_Print();
+        Py_XDECREF(pyObj_cinfo);
+        Py_XDECREF(pyObj_exc_info);
+        return nullptr;
+    }
+    Py_DECREF(pyObj_cinfo);
+
+    if (!msg.empty()) {
+        PyObject* pyObj_msg = PyUnicode_FromString(msg.c_str());
+        if (-1 == PyDict_SetItemString(pyObj_exc_info, "error_msg", pyObj_msg)) {
+            PyErr_Print();
+            Py_DECREF(pyObj_exc_info);
+            Py_XDECREF(pyObj_msg);
+            return nullptr;
+        }
+        Py_DECREF(pyObj_msg);
+    }
+
+    exception_base* exc = create_exception_base_obj();
+    exc->ec = ec;
+
+    exc->exc_info = pyObj_exc_info;
+    Py_INCREF(exc->exc_info);
+
+    return reinterpret_cast<PyObject*>(exc);
+}
+
+void
+pycbc_add_exception_info(PyObject* pyObj_exc_base, const char* key, PyObject* pyObj_value)
+{
+    exception_base* exc = reinterpret_cast<exception_base*>(pyObj_exc_base);
+
+    if (exc->exc_info) {
+        if (-1 == PyDict_SetItemString(exc->exc_info, key, pyObj_value)) {
+            PyErr_Print();
+            return;
+        }
+        Py_DECREF(pyObj_value);
+    } else {
+        PyObject* pyObj_exc_info = PyDict_New();
+        if (-1 == PyDict_SetItemString(pyObj_exc_info, key, pyObj_value)) {
+            PyErr_Print();
+            Py_XDECREF(pyObj_exc_info);
+            return;
+        }
+        Py_DECREF(pyObj_value);
+        exc->exc_info = pyObj_exc_info;
+        Py_INCREF(exc->exc_info);
+    }
 }

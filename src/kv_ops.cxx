@@ -72,8 +72,6 @@ create_base_result_from_get_operation_response(const char* key, const T& resp)
     }
 
     if (!res->ec) {
-        // PyObject* decoded = json_decode(resp.value.c_str(), resp.value.length());
-        // PyObject* decoded = decode_value(transcoder, resp.value.c_str(), resp.value.length(), resp.flags);
         pyObj_tmp = PyBytes_FromStringAndSize(resp.value.c_str(), resp.value.length());
         if (-1 == PyDict_SetItemString(res->dict, RESULT_VALUE, pyObj_tmp)) {
             Py_XDECREF(pyObj_result);
@@ -190,12 +188,10 @@ create_result_from_get_operation_response(const char* key,
     auto set_exception = false;
 
     if (resp.ctx.ec.value()) {
+        pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "KV read operation error.");
         if (pyObj_errback == nullptr) {
-            auto pycbc_ex = PycbcKeyValueException("KV read operation error.", __FILE__, __LINE__, resp.ctx);
-            auto exc = std::make_exception_ptr(pycbc_ex);
-            barrier->set_exception(exc);
+            barrier->set_value(pyObj_exc);
         } else {
-            pyObj_exc = build_exception_from_context(resp.ctx);
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
             PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
@@ -222,16 +218,13 @@ create_result_from_get_operation_response(const char* key,
     }
 
     if (set_exception) {
+        pyObj_exc = pycbc_build_exception(PycbcError::UnableToBuildResult, __FILE__, __LINE__, "KV read operation error.");
         if (pyObj_errback == nullptr) {
-            auto pycbc_ex = PycbcException("KV read operation error.", __FILE__, __LINE__, PycbcError::UnableToBuildResult);
-            auto exc = std::make_exception_ptr(pycbc_ex);
-            barrier->set_exception(exc);
+            barrier->set_value(pyObj_exc);
         } else {
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
-            PyTuple_SET_ITEM(pyObj_args, 0, Py_None);
-
-            pyObj_kwargs = pycbc_core_get_exception_kwargs("KV read operation error.", PycbcError::UnableToBuildResult, __FILE__, __LINE__);
+            PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
         }
     }
 
@@ -270,12 +263,10 @@ create_result_from_get_operation_response<couchbase::operations::exists_response
     auto set_exception = false;
 
     if (resp.ctx.ec.value() && resp.ctx.ec.value() != 101) {
+        pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "KV read operation error.");
         if (pyObj_errback == nullptr) {
-            auto pycbc_ex = PycbcKeyValueException("KV read operation error.", __FILE__, __LINE__, resp.ctx);
-            auto exc = std::make_exception_ptr(pycbc_ex);
-            barrier->set_exception(exc);
+            barrier->set_value(pyObj_exc);
         } else {
-            pyObj_exc = build_exception_from_context(resp.ctx);
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
             PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
@@ -302,20 +293,13 @@ create_result_from_get_operation_response<couchbase::operations::exists_response
     }
 
     if (set_exception) {
+        pyObj_exc = pycbc_build_exception(PycbcError::UnableToBuildResult, __FILE__, __LINE__, "KV read operation error.");
         if (pyObj_errback == nullptr) {
-            auto pycbc_ex = PycbcException("KV read operation error.", __FILE__, __LINE__, PycbcError::UnableToBuildResult);
-            auto exc = std::make_exception_ptr(pycbc_ex);
-            barrier->set_exception(exc);
+            barrier->set_value(pyObj_exc);
         } else {
-            // PyObject* pyObj_exc_info = pycbc_get_python_exception_info("KV read operation error.", PycbcError::UnableToBuildResult,
-            // __FILE__, __LINE__);
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
-            PyTuple_SET_ITEM(pyObj_args, 0, Py_None);
-
-            pyObj_kwargs = pycbc_core_get_exception_kwargs("KV read operation error.", PycbcError::UnableToBuildResult, __FILE__, __LINE__);
-            // PyDict_SetItemString(pyObj_kwargs, "exc_info", pyObj_exc_info);
-            // Py_DECREF(pyObj_exc_info);
+            PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
         }
     }
 
@@ -324,11 +308,11 @@ create_result_from_get_operation_response<couchbase::operations::exists_response
         if (pyObj_callback_res) {
             Py_DECREF(pyObj_callback_res);
         } else {
-            pycbc_set_python_exception("KV read operation callback failed.", PycbcError::InternalSDKError, __FILE__, __LINE__);
+            pycbc_set_python_exception(PycbcError::InternalSDKError, __FILE__, __LINE__, "KV read operation callback failed.");
         }
         Py_DECREF(pyObj_args);
-        Py_XDECREF(pyObj_kwargs);
         Py_XDECREF(pyObj_exc);
+        Py_XDECREF(pyObj_kwargs);
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }
@@ -379,7 +363,8 @@ prepare_and_execute_read_op(struct read_options* options, PyObject* pyObj_callba
                     }
                 }
                 if (!ok) {
-                    pycbc_set_python_exception("Project must be a list of strings.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+                    pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Project must be a list of strings.");
+                    barrier->set_value(nullptr);
                     Py_XDECREF(pyObj_callback);
                     Py_XDECREF(pyObj_errback);
                     return nullptr;
@@ -428,57 +413,17 @@ prepare_and_execute_read_op(struct read_options* options, PyObject* pyObj_callba
             break;
         }
         default: {
-            pycbc_set_python_exception("Unrecognized get operation passed in.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+            pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized get operation passed in.");
+            barrier->set_value(nullptr);
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
             return nullptr;
         }
     };
     if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
-        return handle_kv_blocking_result(std::move(f));
-        // PyObject* ret = nullptr;
-        // bool kv_ex = false;
-        // std::string file;
-        // int line;
-        // couchbase::error_context::key_value ctx{};
-        // std::error_code ec;
-        // std::string msg;
-
-        // Py_BEGIN_ALLOW_THREADS
-        // try {
-        //     ret = f.get();
-        // }
-        // catch (PycbcKeyValueException e){
-        //     kv_ex = true;
-        //     msg = e.what();
-        //     file = e.get_file();
-        //     line = e.get_line();
-        //     ec = e.get_error_code();
-        //     ctx = e.get_context();
-        // }
-        // catch (PycbcException e){
-        //     msg = e.what();
-        //     file = e.get_file();
-        //     line = e.get_line();
-        //     ec = e.get_error_code();
-        // }
-        // catch (const std::exception& e) {
-        //     ec = PycbcError::InternalSDKError;
-        //     msg = e.what();
-        // }
-        // Py_END_ALLOW_THREADS
-
-        // std::string ec_category = std::string(ec.category().name());
-        // if(kv_ex){
-        //     PyObject* pyObj_base_exc = build_exception_from_context(ctx);
-        //     pycbc_set_python_exception(msg.c_str(), ec, file.c_str(), line, pyObj_base_exc);
-        //     Py_DECREF(pyObj_base_exc);
-        // }else if (!file.empty()){
-        //     pycbc_set_python_exception(msg.c_str(), ec, file.c_str(), line);
-        // }else if (ec_category.compare("pycbc") == 0){
-        //     pycbc_set_python_exception(msg.c_str(), ec, __FILE__, __LINE__);
-        // }
-        // return ret;
+        PyObject* ret = nullptr;
+        Py_BEGIN_ALLOW_THREADS ret = f.get();
+        Py_END_ALLOW_THREADS return ret;
     }
     Py_RETURN_NONE;
 }
@@ -533,12 +478,10 @@ create_result_from_mutation_operation_response(const char* key,
     auto set_exception = false;
 
     if (resp.ctx.ec.value()) {
+        pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "KV mutation operation error.");
         if (pyObj_errback == nullptr) {
-            auto pycbc_ex = PycbcKeyValueException("Error doing mutation operation.", __FILE__, __LINE__, resp.ctx);
-            auto exc = std::make_exception_ptr(pycbc_ex);
-            barrier->set_exception(exc);
+            barrier->set_value(pyObj_exc);
         } else {
-            pyObj_exc = build_exception_from_context(resp.ctx);
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
             PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
@@ -563,21 +506,13 @@ create_result_from_mutation_operation_response(const char* key,
     }
 
     if (set_exception) {
+        pyObj_exc = pycbc_build_exception(PycbcError::UnableToBuildResult, __FILE__, __LINE__, "KV mutation operation error.");
         if (pyObj_errback == nullptr) {
-            auto pycbc_ex = PycbcException("Error doing mutation operation.", __FILE__, __LINE__, PycbcError::UnableToBuildResult);
-            auto exc = std::make_exception_ptr(pycbc_ex);
-            barrier->set_exception(exc);
+            barrier->set_value(pyObj_exc);
         } else {
-            // PyObject* pyObj_exc_info = pycbc_get_python_exception_info("Error doing mutation operation.",
-            // PycbcError::UnableToBuildResult, __FILE__, __LINE__);
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
-            PyTuple_SET_ITEM(pyObj_args, 0, Py_None);
-
-            pyObj_kwargs =
-              pycbc_core_get_exception_kwargs("Error doing mutation operation.", PycbcError::UnableToBuildResult, __FILE__, __LINE__);
-            // PyDict_SetItemString(pyObj_kwargs, "exc_info", pyObj_exc_info);
-            // Py_XDECREF(pyObj_exc_info);
+            PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
         }
     }
 
@@ -586,11 +521,11 @@ create_result_from_mutation_operation_response(const char* key,
         if (pyObj_callback_res) {
             Py_DECREF(pyObj_callback_res);
         } else {
-            pycbc_set_python_exception("Mutation operation callback failed.", PycbcError::InternalSDKError, __FILE__, __LINE__);
+            pycbc_set_python_exception(PycbcError::InternalSDKError, __FILE__, __LINE__, "Mutation operation callback failed.");
         }
         Py_DECREF(pyObj_args);
-        Py_XDECREF(pyObj_kwargs);
         Py_XDECREF(pyObj_exc);
+        Py_XDECREF(pyObj_kwargs);
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }
@@ -694,45 +629,17 @@ prepare_and_execute_mutation_op(struct mutation_options* options, PyObject* pyOb
             break;
         }
         default: {
-            pycbc_set_python_exception("Unrecognized mutation operation passed in.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+            pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized mutation operation passed in.");
+            barrier->set_value(nullptr);
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
             return nullptr;
         }
     }
     if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
-        return handle_kv_blocking_result(std::move(f));
-        // PyObject* ret = nullptr;
-        // PycbcException *kv_ex = nullptr;
-        // PycbcException *ex = nullptr;
-        // std::error_code ec;
-        // std::string msg;
-
-        // Py_BEGIN_ALLOW_THREADS
-        // try {
-        //     ret = f.get();
-        // }
-        // catch (PycbcKeyValueException e){
-        //     kv_ex = &e;
-        // }
-        // catch (PycbcException e){
-        //     ex = &e;
-        // }
-        // catch (const std::exception& e) {
-        //     std::error_code ec = PycbcError::InternalSDKError;
-        //     msg = e.what();
-        // }
-        // Py_END_ALLOW_THREADS
-
-        // std::string ec_category = std::string(ec.category().name());
-        // if(ex != nullptr){
-        //     pycbc_set_exception(*ex);
-        // }else if(kv_ex != nullptr){
-        //     pycbc_set_exception(*kv_ex);
-        // }else if (ec_category.compare("pycbc") == 0){
-        //     pycbc_set_python_exception(msg.c_str(), ec, __FILE__, __LINE__);
-        // }
-        // return ret;
+        PyObject* ret = nullptr;
+        Py_BEGIN_ALLOW_THREADS ret = f.get();
+        Py_END_ALLOW_THREADS return ret;
     }
     Py_RETURN_NONE;
 }
@@ -796,7 +703,7 @@ handle_kv_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
                                           &preserve_expiry);
     if (!ret) {
         pycbc_set_python_exception(
-          "Cannot perform kv operation.  Unable to parse args/kwargs.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+          PycbcError::InvalidArgument, __FILE__, __LINE__, "Cannot perform kv operation.  Unable to parse args/kwargs.");
         return nullptr;
     }
 
@@ -806,7 +713,7 @@ handle_kv_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
 
     conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
     if (nullptr == conn) {
-        pycbc_set_python_exception(NULL_CONN_OBJECT, PycbcError::InvalidArgument, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, NULL_CONN_OBJECT);
         return nullptr;
     }
     // PyErr_Clear();
@@ -825,7 +732,6 @@ handle_kv_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
     // struct callback_context callback_ctx = { pyObj_callback, pyObj_errback, pyObj_transcoder };
     Py_XINCREF(pyObj_callback);
     Py_XINCREF(pyObj_errback);
-    // Py_XINCREF(pyObj_transcoder);
 
     switch (op_type) {
         case Operations::INSERT:
@@ -873,7 +779,7 @@ handle_kv_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
             break;
         }
         default: {
-            pycbc_set_python_exception("Unrecognized KV operation passed in.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+            pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized KV operation passed in.");
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
             return nullptr;
@@ -881,49 +787,4 @@ handle_kv_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
     };
 
     return pyObj_result;
-}
-
-PyObject*
-handle_kv_blocking_result(std::future<PyObject*>&& fut)
-{
-    PyObject* ret = nullptr;
-    bool kv_ex = false;
-    std::string file;
-    int line;
-    couchbase::error_context::key_value ctx{};
-    std::error_code ec;
-    std::string msg;
-
-    Py_BEGIN_ALLOW_THREADS
-    try {
-        ret = fut.get();
-    } catch (PycbcKeyValueException e) {
-        kv_ex = true;
-        msg = e.what();
-        file = e.get_file();
-        line = e.get_line();
-        ec = e.get_error_code();
-        ctx = e.get_context();
-    } catch (PycbcException e) {
-        msg = e.what();
-        file = e.get_file();
-        line = e.get_line();
-        ec = e.get_error_code();
-    } catch (const std::exception& e) {
-        ec = PycbcError::InternalSDKError;
-        msg = e.what();
-    }
-    Py_END_ALLOW_THREADS
-
-      std::string ec_category = std::string(ec.category().name());
-    if (kv_ex) {
-        PyObject* pyObj_base_exc = build_exception_from_context(ctx);
-        pycbc_set_python_exception(msg.c_str(), ec, file.c_str(), line, pyObj_base_exc);
-        Py_DECREF(pyObj_base_exc);
-    } else if (!file.empty()) {
-        pycbc_set_python_exception(msg.c_str(), ec, file.c_str(), line);
-    } else if (ec_category.compare("pycbc") == 0) {
-        pycbc_set_python_exception(msg.c_str(), ec, __FILE__, __LINE__);
-    }
-    return ret;
 }

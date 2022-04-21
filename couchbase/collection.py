@@ -197,7 +197,7 @@ class Collection(CollectionLogic):
                *opts,  # type: UnlockOptions
                **kwargs,  # type: Any
                ) -> None:
-        super().unlock(key, cas, *opts, **kwargs)
+        return super().unlock(key, cas, *opts, **kwargs)
 
     def lookup_in(
         self,

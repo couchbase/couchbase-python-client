@@ -149,9 +149,6 @@ class CollectionLogic:
         final_args = forward_args(kwargs, *opts)
         transcoder = final_args.pop('transcoder', self.transcoder)
         transcoded_value = transcoder.encode_value(value)
-        # transcoder = final_args.get('transcoder', None)
-        # if not transcoder:
-        #     final_args['transcoder'] = self.transcoder
 
         pring_kwargs = kwargs.pop('print_kwargs', False)
         if pring_kwargs is True:
@@ -214,9 +211,6 @@ class CollectionLogic:
               **kwargs,  # type: Any
               ) -> Optional[MutationResult]:
         kwargs["expiry"] = expiry
-        # kw = dict(**self._get_connection_args(), **
-        #           forward_args(kwargs, *opts), key=key)
-        # print("touch args: {}".format(kw))
         op_type = operations.TOUCH.value
         return kv_operation(
             **self._get_connection_args(), **forward_args(kwargs, *opts), key=key, op_type=op_type
@@ -260,10 +254,6 @@ class CollectionLogic:
                   spec,  # type: Iterable[Spec]
                   **kwargs,  # type: Any
                   ) -> Optional[LookupInResult]:
-
-        kw = dict(**self._get_connection_args(), **kwargs, key=key, spec=spec)
-        print("lookup_in args: {}".format(kw))
-
         op_type = operations.LOOKUP_IN.value
         return subdoc_operation(
             **self._get_connection_args(),

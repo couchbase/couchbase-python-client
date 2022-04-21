@@ -1,15 +1,27 @@
 from __future__ import annotations
 
 import json
+from enum import Enum
 from functools import wraps
 
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   CouchbaseException,
-                                  ErrorMapper,
+                                  ErrorMapperNew,
                                   ExceptionMap,
-                                  HTTPException,
-                                  InvalidArgumentException,
-                                  PycbcException)
+                                  HTTPException)
+from couchbase.exceptions import exception as BaseCouchbaseException
+
+
+class ManagementType(Enum):
+    BucketMgmt = 'bucket_mgmt'
+    CollectionMgmt = 'collection_mgmt'
+    UserMgmt = 'user_mgmt'
+    QueryIndexMgmt = 'query_index_mgmt'
+    SearchIndexMgmt = 'search_index_mgmt'
+    AnalyticsIndexMgmt = 'analytics_index_mgmt'
+    ViewIndexMgmt = 'view_index_mgmt'
+    EventingFunctionMgmt = 'eventing_function_mgmt'
+
 
 """
 
@@ -20,11 +32,11 @@ Bucket mgmt helpers for parsing returned results
 
 def get_bucket_settings(res, return_cls):
     raw_settings = res.raw_result.get('bucket_settings', None)
+    bucket_settings = None
     if raw_settings:
         bucket_settings = return_cls.transform_from_dest(raw_settings)
-        return bucket_settings
 
-    raise InvalidArgumentException(message='No bucket settings provided.')
+    return bucket_settings
 
 
 def get_all_bucket_settings(res, return_cls):
@@ -34,9 +46,8 @@ def get_all_bucket_settings(res, return_cls):
         for b in raw_buckets:
             bucket_settings = return_cls.transform_from_dest(b)
             buckets.append(bucket_settings)
-        return buckets
 
-    raise InvalidArgumentException(message='No buckets provided.')
+    return buckets
 
 
 """
@@ -57,9 +68,8 @@ def get_all_scopes(res, return_cls):
                 scope.collections.append(
                     return_cls[1](c["name"], c["scope_name"]))
             scopes.append(scope)
-        return scopes
 
-    raise InvalidArgumentException(message='No scopes provided.')
+    return scopes
 
 
 """
@@ -71,11 +81,11 @@ User mgmt helpers for parsing returned results
 
 def get_user(res, return_cls):
     raw_user = res.raw_result.get('user_and_metadata', None)
+    user = None
     if raw_user:
-        user = return_cls.create_user_and_metadata(res)
-        return user
+        user = return_cls.create_user_and_metadata(raw_user)
 
-    raise InvalidArgumentException(message='No user metadata provided.')
+    return user
 
 
 def get_all_users(res, return_cls):
@@ -85,9 +95,8 @@ def get_all_users(res, return_cls):
         for u in raw_users:
             user = return_cls.create_user_and_metadata(u)
             users.append(user)
-        return users
 
-    raise InvalidArgumentException(message='No user metadata provided.')
+    return users
 
 
 def get_roles(res, return_cls):
@@ -97,18 +106,17 @@ def get_roles(res, return_cls):
         for r in raw_roles:
             role = return_cls.create_role_and_description(r)
             roles.append(role)
-        return roles
 
-    raise InvalidArgumentException(message='No roles provided.')
+    return roles
 
 
 def get_group(res, return_cls):
     raw_group = res.raw_result.get('group', None)
+    group = None
     if raw_group:
-        group = return_cls.create_group(res)
-        return group
+        group = return_cls.create_group(raw_group)
 
-    raise InvalidArgumentException(message='No group provided.')
+    return group
 
 
 def get_all_groups(res, return_cls):
@@ -118,9 +126,8 @@ def get_all_groups(res, return_cls):
         for g in raw_groups:
             group = return_cls.create_group(g)
             groups.append(group)
-        return groups
 
-    raise InvalidArgumentException(message='No groups provided.')
+    return groups
 
 
 """
@@ -135,9 +142,8 @@ def get_all_datasets(res, return_cls):
     raw_datasets = res.raw_result.get('datasets', None)
     if raw_datasets:
         datasets = [return_cls(**ds) for ds in raw_datasets]
-        return datasets
 
-    raise InvalidArgumentException(message='No datasets provided.')
+    return datasets
 
 
 def get_all_analytics_indexes(res, return_cls):
@@ -145,9 +151,8 @@ def get_all_analytics_indexes(res, return_cls):
     raw_indexes = res.raw_result.get('indexes', None)
     if raw_indexes:
         indexes = [return_cls(**ds) for ds in raw_indexes]
-        return indexes
 
-    raise InvalidArgumentException(message='No indexes provided.')
+    return indexes
 
 
 def get_links(res, return_cls):
@@ -289,374 +294,165 @@ def get_eventing_functions_status(res, return_cls):
     return status
 
 
-class BucketMgmtWrapper:
+"""
+
+"""
+
+
+def handle_mgmt_exception(exc, mgmt_type, error_map):
+    raise ErrorMapperNew.build_exception(exc, mapping=error_map)
+
+
+def handle_bucket_mgmt_response(ret, fn_name, return_cls):
+    if fn_name == 'get_bucket':
+        retval = get_bucket_settings(ret, return_cls)
+    elif fn_name == 'get_all_buckets':
+        retval = get_all_bucket_settings(ret, return_cls)
+    else:
+        retval = return_cls(ret)
+
+    return retval
+
+
+def handle_collection_mgmt_response(ret, fn_name, return_cls):
+    if fn_name == 'get_all_scopes':
+        retval = get_all_scopes(ret, return_cls)
+    else:
+        retval = return_cls(ret)
+
+    return retval
+
+
+def handle_user_mgmt_response(ret, fn_name, return_cls):
+    if fn_name == 'get_user':
+        retval = get_user(ret, return_cls)
+    elif fn_name == 'get_all_users':
+        retval = get_all_users(ret, return_cls)
+    elif fn_name == 'get_roles':
+        retval = get_roles(ret, return_cls)
+    elif fn_name == 'get_group':
+        retval = get_group(ret, return_cls)
+    elif fn_name == 'get_all_groups':
+        retval = get_all_groups(ret, return_cls)
+    else:
+        retval = return_cls(ret)
+
+    return retval
+
+
+def handle_query_index_mgmt_response(ret, fn_name, return_cls):
+    if fn_name == 'get_all_indexes':
+        retval = get_all_query_indexes(ret, return_cls)
+    else:
+        retval = return_cls(ret)
+
+    return retval
+
+
+def handle_analytics_index_mgmt_response(ret, fn_name, return_cls):
+    if fn_name == 'get_all_datasets':
+        retval = get_all_datasets(ret, return_cls)
+    elif fn_name == 'get_all_indexes':
+        retval = get_all_analytics_indexes(ret, return_cls)
+    elif fn_name == 'get_pending_mutations':
+        retval = ret.raw_result.get('stats', None)
+    elif fn_name == 'get_links':
+        retval = get_links(ret, return_cls)
+    else:
+        retval = return_cls(ret)
+
+    return retval
+
+
+def handle_search_index_mgmt_response(ret, fn_name, return_cls):
+    if fn_name == 'get_index':
+        retval = get_search_index(ret, return_cls)
+    elif fn_name == 'get_all_indexes':
+        retval = get_all_search_indexes(ret, return_cls)
+    elif fn_name == 'get_indexed_documents_count':
+        retval = ret.raw_result.get('count', 0)
+    elif fn_name == 'analyze_document':
+        retval = analyze_search_index_document(ret)
+    elif fn_name == 'get_index_stats':
+        retval = get_search_index_stats(ret)
+    elif fn_name == 'get_all_index_stats':
+        retval = get_all_search_index_stats(ret)
+    else:
+        retval = return_cls(ret)
+
+    return retval
+
+
+def handle_view_index_mgmt_response(ret, fn_name, return_cls):
+    if fn_name == 'get_design_document':
+        retval = get_design_document(ret, return_cls)
+    elif fn_name == 'get_all_design_documents':
+        retval = get_all_design_documents(ret, return_cls)
+    else:
+        retval = return_cls(ret)
+
+    return retval
+
+
+def handle_eventing_function_mgmt_response(ret, fn_name, return_cls):
+    if fn_name == 'get_function':
+        retval = get_eventing_function(ret, return_cls)
+    elif fn_name == 'get_all_functions':
+        retval = get_all_eventing_functions(ret, return_cls)
+    elif fn_name == 'functions_status':
+        retval = get_eventing_functions_status(ret, return_cls)
+    else:
+        retval = return_cls(ret)
+
+    return retval
+
+
+class BlockingMgmtWrapper:
 
     @classmethod  # noqa: C901
-    def block(cls, return_cls, error_map):  # noqa: C901
+    def block(cls, return_cls, mgmt_type, error_map):  # noqa: C901
         def decorator(fn):
             @wraps(fn)
             def wrapped_fn(self, *args, **kwargs):
                 try:
                     ret = fn(self, *args, **kwargs)
-                    print(f'{fn.__name__} got {ret}')
+                    if isinstance(ret, BaseCouchbaseException):
+                        handle_mgmt_exception(ret, mgmt_type, error_map)
                     if return_cls is None:
                         return None
                     elif return_cls is True:
                         retval = ret
                     else:
-                        if fn.__name__ == 'get_bucket':
-                            retval = get_bucket_settings(ret, return_cls)
-                        elif fn.__name__ == 'get_all_buckets':
-                            retval = get_all_bucket_settings(ret, return_cls)
+                        if mgmt_type == ManagementType.BucketMgmt:
+                            retval = handle_bucket_mgmt_response(ret, fn.__name__, return_cls)
+                        elif mgmt_type == ManagementType.CollectionMgmt:
+                            retval = handle_collection_mgmt_response(ret, fn.__name__, return_cls)
+                        elif mgmt_type == ManagementType.UserMgmt:
+                            retval = handle_user_mgmt_response(ret, fn.__name__, return_cls)
+                        elif mgmt_type == ManagementType.QueryIndexMgmt:
+                            retval = handle_query_index_mgmt_response(ret, fn.__name__, return_cls)
+                        elif mgmt_type == ManagementType.AnalyticsIndexMgmt:
+                            retval = handle_analytics_index_mgmt_response(ret, fn.__name__, return_cls)
+                        elif mgmt_type == ManagementType.SearchIndexMgmt:
+                            retval = handle_search_index_mgmt_response(ret, fn.__name__, return_cls)
+                        elif mgmt_type == ManagementType.ViewIndexMgmt:
+                            retval = handle_view_index_mgmt_response(ret, fn.__name__, return_cls)
+                        elif mgmt_type == ManagementType.EventingFunctionMgmt:
+                            retval = handle_eventing_function_mgmt_response(ret, fn.__name__, return_cls)
                         else:
-                            retval = return_cls(ret)
-                        print(f'{fn.__name__} returning {retval}')
+                            retval = None
                     return retval
-                except PycbcException as e:
-                    if e.context:
-                        excptn = ErrorMapper.parse_error_context(e, mapping=error_map, excptn_msg=e.message)
-                    else:
-                        exc_cls = PYCBC_ERROR_MAP.get(e.error_code, CouchbaseException)
-                        excptn = exc_cls(message=e.message, exc_info=e.exc_info)
-                    # we are creating a new exception on purpose
-                    raise excptn from None
                 except HTTPException as e:
                     raise e
                 except CouchbaseException as e:
                     raise e
                 except Exception as ex:
+                    if isinstance(ex, (TypeError, ValueError)):
+                        raise ex
                     print(f'base exception: {ex}')
                     exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
                     print(exc_cls.__name__)
                     excptn = exc_cls(message=str(ex))
-                    raise excptn
-
-            return wrapped_fn
-        return decorator
-
-
-class CollectionMgmtWrapper:
-
-    @classmethod  # noqa: C901
-    def block(cls, return_cls, error_map):  # noqa: C901
-        def decorator(fn):
-            @wraps(fn)
-            def wrapped_fn(self, *args, **kwargs):
-                try:
-                    ret = fn(self, *args, **kwargs)
-                    print(f'{fn.__name__} got {ret}')
-                    if return_cls is None:
-                        return None
-                    elif return_cls is True:
-                        retval = ret
-                    else:
-                        if fn.__name__ == 'get_all_scopes':
-                            retval = get_all_scopes(ret, return_cls)
-                        else:
-                            retval = return_cls(ret)
-                        print(f'{fn.__name__} returning {retval}')
-                    return retval
-                except PycbcException as e:
-                    if e.context:
-                        excptn = ErrorMapper.parse_error_context(e, mapping=error_map, excptn_msg=e.message)
-                    else:
-                        exc_cls = PYCBC_ERROR_MAP.get(e.error_code, CouchbaseException)
-                        excptn = exc_cls(message=e.message, exc_info=e.exc_info)
-                    # we are creating a new exception on purpose
-                    raise excptn from None
-                except HTTPException as e:
-                    raise e
-                except CouchbaseException as e:
-                    raise e
-                except Exception as ex:
-                    print(f'base exception: {ex}')
-                    exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-                    print(exc_cls.__name__)
-                    excptn = exc_cls(str(ex))
-                    raise excptn
-
-            return wrapped_fn
-        return decorator
-
-
-class UserMgmtWrapper:
-
-    @classmethod  # noqa: C901
-    def block(cls, return_cls, error_map):  # noqa: C901
-        def decorator(fn):
-            @wraps(fn)
-            def wrapped_fn(self, *args, **kwargs):
-                try:
-                    ret = fn(self, *args, **kwargs)
-                    if return_cls is None:
-                        return None
-                    elif return_cls is True:
-                        retval = ret
-                    else:
-                        if fn.__name__ == 'get_user':
-                            retval = get_user(ret, return_cls)
-                        elif fn.__name__ == 'get_all_users':
-                            retval = get_all_users(ret, return_cls)
-                        elif fn.__name__ == 'get_roles':
-                            retval = get_roles(ret, return_cls)
-                        elif fn.__name__ == 'get_group':
-                            retval = get_group(ret, return_cls)
-                        elif fn.__name__ == 'get_all_groups':
-                            retval = get_all_groups(ret, return_cls)
-                        else:
-                            retval = return_cls(ret)
-                    return retval
-                except PycbcException as e:
-                    if e.context:
-                        excptn = ErrorMapper.parse_error_context(e, mapping=error_map, excptn_msg=e.message)
-                    else:
-                        exc_cls = PYCBC_ERROR_MAP.get(e.error_code, CouchbaseException)
-                        excptn = exc_cls(message=e.message, exc_info=e.exc_info)
-                    # we are creating a new exception on purpose
-                    raise excptn from None
-                except HTTPException as e:
-                    raise e
-                except CouchbaseException as e:
-                    raise e
-                except Exception as ex:
-                    print(f'base exception: {ex}')
-                    exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-                    print(exc_cls.__name__)
-                    excptn = exc_cls(str(ex))
-                    raise excptn
-
-            return wrapped_fn
-        return decorator
-
-
-class AnalyticsMgmtWrapper:
-
-    @classmethod  # noqa: C901
-    def block(cls, return_cls, error_map):  # noqa: C901
-        def decorator(fn):
-            @wraps(fn)
-            def wrapped_fn(self, *args, **kwargs):
-                try:
-                    ret = fn(self, *args, **kwargs)
-                    if return_cls is None:
-                        return None
-                    elif return_cls is True:
-                        retval = ret
-                    else:
-                        if fn.__name__ == 'get_all_datasets':
-                            retval = get_all_datasets(ret, return_cls)
-                        elif fn.__name__ == 'get_all_indexes':
-                            retval = get_all_analytics_indexes(ret, return_cls)
-                        elif fn.__name__ == 'get_pending_mutations':
-                            retval = ret.raw_result.get('stats', None)
-                        elif fn.__name__ == 'get_links':
-                            retval = get_links(ret, return_cls)
-                        else:
-                            retval = return_cls(ret)
-                    return retval
-                except PycbcException as e:
-                    print(f'error context: {e.context}')
-                    print(f'error message: {e.message}')
-                    if e.context:
-                        excptn = ErrorMapper.parse_error_context(e, mapping=error_map, excptn_msg=e.message)
-                    else:
-                        exc_cls = PYCBC_ERROR_MAP.get(e.error_code, CouchbaseException)
-                        excptn = exc_cls(message=e.message, exc_info=e.exc_info)
-                    # we are creating a new exception on purpose
-                    raise excptn from None
-                except HTTPException as e:
-                    raise e
-                except CouchbaseException as e:
-                    raise e
-                except Exception as ex:
-                    print(f'base exception: {ex}')
-                    exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-                    print(exc_cls.__name__)
-                    excptn = exc_cls(str(ex))
-                    raise excptn
-
-            return wrapped_fn
-        return decorator
-
-
-class QueryIndexMgmtWrapper:
-
-    @classmethod  # noqa: C901
-    def block(cls, return_cls, error_map):  # noqa: C901
-        def decorator(fn):
-            @wraps(fn)
-            def wrapped_fn(self, *args, **kwargs):
-                try:
-                    ret = fn(self, *args, **kwargs)
-                    if return_cls is None:
-                        return None
-                    elif return_cls is True:
-                        retval = ret
-                    else:
-                        if fn.__name__ == 'get_all_indexes':
-                            retval = get_all_query_indexes(ret, return_cls)
-                        else:
-                            retval = return_cls(ret)
-                    return retval
-                except PycbcException as e:
-                    if e.context:
-                        excptn = ErrorMapper.parse_error_context(e, mapping=error_map, excptn_msg=e.message)
-                    else:
-                        exc_cls = PYCBC_ERROR_MAP.get(e.error_code, CouchbaseException)
-                        excptn = exc_cls(message=e.message, exc_info=e.exc_info)
-                    # we are creating a new exception on purpose
-                    raise excptn from None
-                except HTTPException as e:
-                    raise e
-                except CouchbaseException as e:
-                    raise e
-                except Exception as ex:
-                    print(f'base exception: {ex}')
-                    exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-                    print(exc_cls.__name__)
-                    excptn = exc_cls(str(ex))
-                    raise excptn
-
-            return wrapped_fn
-        return decorator
-
-
-class SearchIndexMgmtWrapper:
-
-    @classmethod  # noqa: C901
-    def block(cls, return_cls, error_map):  # noqa: C901
-        def decorator(fn):
-            @wraps(fn)
-            def wrapped_fn(self, *args, **kwargs):
-                try:
-                    ret = fn(self, *args, **kwargs)
-                    if return_cls is None:
-                        return None
-                    elif return_cls is True:
-                        retval = ret
-                    else:
-                        if fn.__name__ == 'get_index':
-                            retval = get_search_index(ret, return_cls)
-                        elif fn.__name__ == 'get_all_indexes':
-                            retval = get_all_search_indexes(ret, return_cls)
-                        elif fn.__name__ == 'get_indexed_documents_count':
-                            retval = ret.raw_result.get('count', 0)
-                        elif fn.__name__ == 'analyze_document':
-                            retval = analyze_search_index_document(ret)
-                        elif fn.__name__ == 'get_index_stats':
-                            retval = get_search_index_stats(ret)
-                        elif fn.__name__ == 'get_all_index_stats':
-                            retval = get_all_search_index_stats(ret)
-                        else:
-                            retval = return_cls(ret)
-                    return retval
-                except PycbcException as e:
-                    if e.context:
-                        excptn = ErrorMapper.parse_error_context(e, mapping=error_map, excptn_msg=e.message)
-                    else:
-                        exc_cls = PYCBC_ERROR_MAP.get(e.error_code, CouchbaseException)
-                        excptn = exc_cls(message=e.message, exc_info=e.exc_info)
-                    # we are creating a new exception on purpose
-                    raise excptn from None
-                except HTTPException as e:
-                    raise e
-                except CouchbaseException as e:
-                    raise e
-                except Exception as ex:
-                    print(f'base exception: {ex}')
-                    exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-                    print(exc_cls.__name__)
-                    excptn = exc_cls(str(ex))
-                    raise excptn
-
-            return wrapped_fn
-        return decorator
-
-
-class ViewIndexMgmtWrapper:
-
-    @classmethod  # noqa: C901
-    def block(cls, return_cls, error_map):  # noqa: C901
-        def decorator(fn):
-            @wraps(fn)
-            def wrapped_fn(self, *args, **kwargs):
-                try:
-                    ret = fn(self, *args, **kwargs)
-                    if return_cls is None:
-                        return None
-                    elif return_cls is True:
-                        retval = ret
-                    else:
-                        if fn.__name__ == 'get_design_document':
-                            retval = get_design_document(ret, return_cls)
-                        elif fn.__name__ == 'get_all_design_documents':
-                            retval = get_all_design_documents(ret, return_cls)
-                        else:
-                            retval = return_cls(ret)
-                    return retval
-                except PycbcException as e:
-                    if e.context:
-                        excptn = ErrorMapper.parse_error_context(e, mapping=error_map, excptn_msg=e.message)
-                    else:
-                        exc_cls = PYCBC_ERROR_MAP.get(e.error_code, CouchbaseException)
-                        excptn = exc_cls(message=e.message, exc_info=e.exc_info)
-                    # we are creating a new exception on purpose
-                    raise excptn from None
-                except HTTPException as e:
-                    raise e
-                except CouchbaseException as e:
-                    raise e
-                except Exception as ex:
-                    print(f'base exception: {ex}')
-                    exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-                    print(exc_cls.__name__)
-                    excptn = exc_cls(str(ex))
-                    raise excptn
-
-            return wrapped_fn
-        return decorator
-
-
-class EventingFunctionMgmtWrapper:
-
-    @classmethod  # noqa: C901
-    def block(cls, return_cls, error_map):  # noqa: C901
-        def decorator(fn):
-            @wraps(fn)
-            def wrapped_fn(self, *args, **kwargs):
-                try:
-                    ret = fn(self, *args, **kwargs)
-                    if return_cls is None:
-                        return None
-                    elif return_cls is True:
-                        retval = ret
-                    else:
-                        if fn.__name__ == 'get_function':
-                            retval = get_eventing_function(ret, return_cls)
-                        elif fn.__name__ == 'get_all_functions':
-                            retval = get_all_eventing_functions(ret, return_cls)
-                        elif fn.__name__ == 'functions_status':
-                            retval = get_eventing_functions_status(ret, return_cls)
-                        else:
-                            retval = return_cls(ret)
-                    return retval
-                except PycbcException as e:
-                    if e.context:
-                        excptn = ErrorMapper.parse_error_context(e, mapping=error_map, excptn_msg=e.message)
-                    else:
-                        exc_cls = PYCBC_ERROR_MAP.get(e.error_code, CouchbaseException)
-                        excptn = exc_cls(message=e.message, exc_info=e.exc_info)
-                    # we are creating a new exception on purpose
-                    raise excptn from None
-                except HTTPException as e:
-                    raise e
-                except CouchbaseException as e:
-                    raise e
-                except Exception as ex:
-                    print(f'base exception: {ex}')
-                    exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-                    print(exc_cls.__name__)
-                    excptn = exc_cls(str(ex))
                     raise excptn
 
             return wrapped_fn

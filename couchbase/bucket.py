@@ -5,6 +5,8 @@ from typing import (TYPE_CHECKING,
                     overload)
 
 from couchbase.collection import Collection
+from couchbase.exceptions import ErrorMapperNew
+from couchbase.exceptions import exception as BaseCouchbaseException
 from couchbase.logic import BlockingWrapper
 from couchbase.logic.bucket import BucketLogic
 from couchbase.management.collections import CollectionManager
@@ -31,8 +33,10 @@ class Bucket(BucketLogic):
 
     @BlockingWrapper.block(True)
     def _open_bucket(self, **kwargs):
-        connected = super()._open_or_close_bucket(open_bucket=True, **kwargs)
-        self._set_connected(connected)
+        ret = super()._open_or_close_bucket(open_bucket=True, **kwargs)
+        if isinstance(ret, BaseCouchbaseException):
+            raise ErrorMapperNew.build_exception(ret)
+        self._set_connected(ret)
 
     @BlockingWrapper.block(True)
     def _close_bucket(self, **kwargs):

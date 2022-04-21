@@ -902,7 +902,6 @@ build_eventing_function(const couchbase::management::eventing::function& functio
     }
 
     if (function.enforce_schema.has_value()) {
-        // pyObj_tmp = PyBool_FromLong(static_cast<long>(function.enforce_schema.value()));
         if (function.enforce_schema.value()) {
             if (-1 == PyDict_SetItemString(pyObj_eventing_function, "enforce_schema", Py_True)) {
                 Py_DECREF(pyObj_eventing_function);
@@ -1119,22 +1118,17 @@ create_result_from_eventing_function_mgmt_op_response(Response& resp,
         if (resp.error.has_value()) {
             pyObj_problem = build_eventing_function_mgmt_problem(resp.error.value());
         }
+        pyObj_exc = build_exception_from_context(
+          resp.ctx, __FILE__, __LINE__, "Error doing eventing function mgmt operation.", "EventingFunctionMgmt");
+        if (pyObj_problem != nullptr) {
+            pycbc_add_exception_info(pyObj_exc, "eventing_problem", pyObj_problem);
+        }
         if (pyObj_errback == nullptr) {
-            // make sure this is an HTTPException
-            auto pycbc_ex =
-              PycbcHttpException("Error doing eventing function mgmt operation.", __FILE__, __LINE__, resp.ctx, PycbcError::HTTPError);
-            auto exc = std::make_exception_ptr(pycbc_ex);
-            barrier->set_exception(exc);
+            barrier->set_value(pyObj_exc);
         } else {
-            pyObj_exc = build_exception_from_context(resp.ctx);
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
             PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
-            pyObj_kwargs = pycbc_get_exception_kwargs("Error doing eventing function mgmt operation.", __FILE__, __LINE__);
-            if (pyObj_problem != nullptr) {
-                PyDict_SetItemString(pyObj_kwargs, "eventing_problem", pyObj_problem);
-                Py_DECREF(pyObj_problem);
-            }
         }
         // lets clear any errors
         PyErr_Clear();
@@ -1155,16 +1149,13 @@ create_result_from_eventing_function_mgmt_op_response(Response& resp,
     }
 
     if (set_exception) {
+        pyObj_exc = pycbc_build_exception(PycbcError::UnableToBuildResult, __FILE__, __LINE__, "Eventing function mgmt operation error.");
         if (pyObj_errback == nullptr) {
-            auto pycbc_ex = PycbcException("Eventing function mgmt operation error.", __FILE__, __LINE__, PycbcError::UnableToBuildResult);
-            auto exc = std::make_exception_ptr(pycbc_ex);
-            barrier->set_exception(exc);
+            barrier->set_value(pyObj_exc);
         } else {
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
-            PyTuple_SET_ITEM(pyObj_args, 0, Py_None);
-            pyObj_kwargs = pycbc_core_get_exception_kwargs(
-              "Eventing function mgmt operation error.", PycbcError::UnableToBuildResult, __FILE__, __LINE__);
+            PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
         }
     }
 
@@ -1177,8 +1168,8 @@ create_result_from_eventing_function_mgmt_op_response(Response& resp,
             // @TODO:  how to handle this situation?
         }
         Py_DECREF(pyObj_args);
-        Py_XDECREF(pyObj_kwargs);
         Py_XDECREF(pyObj_exc);
+        Py_XDECREF(pyObj_kwargs);
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }
@@ -1417,7 +1408,7 @@ get_eventing_function_keyspace(PyObject* pyObj_keyspace)
     PyObject* pyObj_bucket = PyDict_GetItemString(pyObj_keyspace, "bucket");
     if (pyObj_bucket == nullptr) {
         pycbc_set_python_exception(
-          "Expected eventing function keyspace bucket to be provided.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+          PycbcError::InvalidArgument, __FILE__, __LINE__, "Expected eventing function keyspace bucket to be provided.");
         throw std::invalid_argument("bucket name");
     }
     auto bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket));
@@ -1446,7 +1437,7 @@ get_function_constant_bindings(PyObject* pyObj_function_constant_bindings)
         for (ii = 0; ii < nbindings; ++ii) {
             PyObject* pyObj_binding = PyList_GetItem(pyObj_function_constant_bindings, ii);
             if (!pyObj_binding) {
-                pycbc_set_python_exception("Could not determine constant binding.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+                pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Could not determine constant binding.");
                 throw std::invalid_argument("constant binding");
             }
             // PyList_GetItem returns borrowed ref, inc while using, decr after done
@@ -1480,7 +1471,7 @@ get_function_url_bindings(PyObject* pyObj_function_url_bindings)
         for (ii = 0; ii < nbindings; ++ii) {
             PyObject* pyObj_binding = PyList_GetItem(pyObj_function_url_bindings, ii);
             if (!pyObj_binding) {
-                pycbc_set_python_exception("Could not determine url binding.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+                pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Could not determine url binding.");
                 throw std::invalid_argument("url binding");
             }
             // PyList_GetItem returns borrowed ref, inc while using, decr after done
@@ -1551,7 +1542,7 @@ get_function_bucket_bindings(PyObject* pyObj_bucket_bindings)
         for (ii = 0; ii < nbindings; ++ii) {
             PyObject* pyObj_binding = PyList_GetItem(pyObj_bucket_bindings, ii);
             if (!pyObj_binding) {
-                pycbc_set_python_exception("Could not determine bucket binding.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+                pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Could not determine bucket binding.");
                 throw std::invalid_argument("bucket binding");
             }
             // PyList_GetItem returns borrowed ref, inc while using, decr after done
@@ -1588,7 +1579,7 @@ get_eventing_function(PyObject* pyObj_eventing_function)
 
     PyObject* pyObj_name = PyDict_GetItemString(pyObj_eventing_function, "name");
     if (pyObj_name == nullptr) {
-        pycbc_set_python_exception("Expected eventing function name to be provided.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Expected eventing function name to be provided.");
         throw std::invalid_argument("name");
     }
     auto name = std::string(PyUnicode_AsUTF8(pyObj_name));
@@ -1596,7 +1587,7 @@ get_eventing_function(PyObject* pyObj_eventing_function)
 
     PyObject* pyObj_code = PyDict_GetItemString(pyObj_eventing_function, "code");
     if (pyObj_code == nullptr) {
-        pycbc_set_python_exception("Expected eventing function code to be provided.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Expected eventing function code to be provided.");
         throw std::invalid_argument("code");
     }
     auto code = std::string(PyUnicode_AsUTF8(pyObj_code));
@@ -1689,51 +1680,6 @@ do_eventing_function_mgmt_op(connection& conn,
         create_result_from_eventing_function_mgmt_op_response(resp, pyObj_callback, pyObj_errback, barrier);
     });
     Py_END_ALLOW_THREADS Py_RETURN_NONE;
-}
-
-PyObject*
-handle_eventing_mgmt_blocking_result(std::future<PyObject*>&& fut)
-{
-    PyObject* ret = nullptr;
-    bool http_ex = false;
-    std::string file;
-    int line;
-    couchbase::error_context::http ctx{};
-    std::error_code ec;
-    std::string msg;
-
-    Py_BEGIN_ALLOW_THREADS
-    try {
-        ret = fut.get();
-    } catch (PycbcHttpException e) {
-        http_ex = true;
-        msg = e.what();
-        file = e.get_file();
-        line = e.get_line();
-        ec = e.get_error_code();
-        ctx = e.get_context();
-    } catch (PycbcException e) {
-        msg = e.what();
-        file = e.get_file();
-        line = e.get_line();
-        ec = e.get_error_code();
-    } catch (const std::exception& e) {
-        ec = PycbcError::InternalSDKError;
-        msg = e.what();
-    }
-    Py_END_ALLOW_THREADS
-
-      std::string ec_category = std::string(ec.category().name());
-    if (http_ex) {
-        PyObject* pyObj_base_exc = build_exception_from_context(ctx);
-        pycbc_set_python_exception(msg.c_str(), ec, file.c_str(), line, pyObj_base_exc);
-        Py_DECREF(pyObj_base_exc);
-    } else if (!file.empty()) {
-        pycbc_set_python_exception(msg.c_str(), ec, file.c_str(), line);
-    } else if (ec_category.compare("pycbc") == 0) {
-        pycbc_set_python_exception(msg.c_str(), ec, __FILE__, __LINE__);
-    }
-    return ret;
 }
 
 PyObject*
@@ -1844,13 +1790,18 @@ handle_eventing_function_mgmt_op(connection* conn,
             }
             default: {
                 pycbc_set_python_exception(
-                  "Unrecognized eventing function mgmt operation passed in.", PycbcError::InvalidArgument, __FILE__, __LINE__);
-                Py_XDECREF(pyObj_callback);
-                Py_XDECREF(pyObj_errback);
-                return nullptr;
+                  PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized eventing function mgmt operation passed in.");
+                barrier->set_value(nullptr);
+                break;
             }
         };
     } catch (const std::invalid_argument&) {
+    }
+
+    if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
+        PyObject* ret = nullptr;
+        Py_BEGIN_ALLOW_THREADS ret = f.get();
+        Py_END_ALLOW_THREADS return ret;
     }
 
     if (res == nullptr) {
@@ -1858,11 +1809,7 @@ handle_eventing_function_mgmt_op(connection* conn,
         Py_XDECREF(pyObj_errback);
         return nullptr;
     }
-    if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
-        // can only be a single future (if not doing std::shared),
-        // so use move semantics
-        return handle_eventing_mgmt_blocking_result(std::move(f));
-    }
+
     return res;
 }
 

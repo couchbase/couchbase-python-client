@@ -228,6 +228,7 @@ create_diagnostics_op_response(const T& resp,
     PyObject* pyObj_args = nullptr;
     PyObject* pyObj_kwargs = nullptr;
     PyObject* pyObj_func = nullptr;
+    PyObject* pyObj_exc = nullptr;
     PyObject* pyObj_callback_res = nullptr;
     auto set_exception = false;
 
@@ -247,17 +248,13 @@ create_diagnostics_op_response(const T& resp,
     }
 
     if (set_exception) {
+        pyObj_exc = pycbc_build_exception(PycbcError::UnableToBuildResult, __FILE__, __LINE__, "Diagnostic operation error.");
         if (pyObj_errback == nullptr) {
-            auto pycbc_ex = PycbcException("Diagnostic operation error.", __FILE__, __LINE__, PycbcError::UnableToBuildResult);
-            auto exc = std::make_exception_ptr(pycbc_ex);
-            barrier->set_exception(exc);
+            barrier->set_value(pyObj_exc);
         } else {
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
-            PyTuple_SET_ITEM(pyObj_args, 0, Py_None);
-
-            pyObj_kwargs =
-              pycbc_core_get_exception_kwargs("Diagnostic operation error.", PycbcError::UnableToBuildResult, __FILE__, __LINE__);
+            PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
         }
     }
 
@@ -270,44 +267,13 @@ create_diagnostics_op_response(const T& resp,
             // @TODO: how to catch exception here?
         }
         Py_DECREF(pyObj_args);
+        Py_XDECREF(pyObj_exc);
         Py_XDECREF(pyObj_kwargs);
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }
 
     PyGILState_Release(state);
-}
-
-PyObject*
-handle_diagnostics_blocking_result(std::future<PyObject*>&& fut)
-{
-    PyObject* ret = nullptr;
-    std::string file;
-    int line;
-    std::error_code ec;
-    std::string msg;
-
-    Py_BEGIN_ALLOW_THREADS
-    try {
-        ret = fut.get();
-    } catch (PycbcException e) {
-        msg = e.what();
-        file = e.get_file();
-        line = e.get_line();
-        ec = e.get_error_code();
-    } catch (const std::exception& e) {
-        ec = PycbcError::InternalSDKError;
-        msg = e.what();
-    }
-    Py_END_ALLOW_THREADS
-
-      std::string ec_category = std::string(ec.category().name());
-    if (!file.empty()) {
-        pycbc_set_python_exception(msg.c_str(), ec, file.c_str(), line);
-    } else if (ec_category.compare("pycbc") == 0) {
-        pycbc_set_python_exception(msg.c_str(), ec, __FILE__, __LINE__);
-    }
-    return ret;
 }
 
 PyObject*
@@ -341,7 +307,7 @@ handle_diagnostics_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject*
                                           &pyObj_errback);
     if (!ret) {
         pycbc_set_python_exception(
-          "Cannot perform diagnostics operation.  Unable to parse args/kwargs.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+          PycbcError::InvalidArgument, __FILE__, __LINE__, "Cannot perform diagnostics operation.  Unable to parse args/kwargs.");
         return nullptr;
     }
 
@@ -350,10 +316,9 @@ handle_diagnostics_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject*
 
     conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
     if (nullptr == conn) {
-        pycbc_set_python_exception(NULL_CONN_OBJECT, PycbcError::InvalidArgument, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, NULL_CONN_OBJECT);
         return nullptr;
     }
-    // PyErr_Clear();
 
     if (0 < timeout) {
         timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
@@ -401,9 +366,9 @@ handle_diagnostics_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject*
         Py_END_ALLOW_THREADS
     }
     if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
-        // can only be a single future (if not doing std::shared),
-        // so use move semantics
-        return handle_diagnostics_blocking_result(std::move(f));
+        PyObject* ret = nullptr;
+        Py_BEGIN_ALLOW_THREADS ret = f.get();
+        Py_END_ALLOW_THREADS return ret;
     }
     Py_RETURN_NONE;
 }

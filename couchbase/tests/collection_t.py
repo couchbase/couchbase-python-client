@@ -342,7 +342,12 @@ class CollectionTests:
         assert isinstance(result, MutationResult)
 
         with pytest.raises(DocumentNotFoundException):
-            cb_env.try_n_times(3, 1, cb.get, key, exceptions_to_raise=(DocumentNotFoundException,))
+            cb_env.try_n_times_till_exception(3,
+                                              1,
+                                              cb.get,
+                                              key,
+                                              expected_exceptions=(DocumentNotFoundException,),
+                                              raise_exception=True)
 
     def test_remove_fail(self, cb_env):
         cb = cb_env.collection

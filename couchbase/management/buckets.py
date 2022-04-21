@@ -1,5 +1,6 @@
 from typing import (TYPE_CHECKING,
                     Any,
+                    Dict,
                     List)
 
 from couchbase.management.logic.buckets_logic import BucketType  # noqa: F401
@@ -11,7 +12,7 @@ from couchbase.management.logic.buckets_logic import StorageBackend  # noqa: F40
 from couchbase.management.logic.buckets_logic import (BucketManagerLogic,
                                                       BucketSettings,
                                                       CreateBucketSettings)
-from couchbase.management.logic.wrappers import BucketMgmtWrapper
+from couchbase.management.logic.wrappers import BlockingMgmtWrapper, ManagementType
 
 if TYPE_CHECKING:
     from couchbase.management.options import (CreateBucketOptions,
@@ -26,11 +27,11 @@ class BucketManager(BucketManagerLogic):
     def __init__(self, connection):
         super().__init__(connection)
 
-    @BucketMgmtWrapper.block(None, BucketManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def create_bucket(self,
                       settings,  # type: CreateBucketSettings
                       *options,  # type: CreateBucketOptions
-                      **kwargs   # type: Any
+                      **kwargs   # type: Dict[str, Any]
                       ) -> None:
         """
         Creates a new bucket.
@@ -42,48 +43,48 @@ class BucketManager(BucketManagerLogic):
         :raises: BucketAlreadyExistsException
         :raises: InvalidArgumentsException
         """
-        super().create_bucket(settings, *options, **kwargs)
+        return super().create_bucket(settings, *options, **kwargs)
 
-    @BucketMgmtWrapper.block(None, BucketManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def update_bucket(self,
                       settings,  # type: BucketSettings
                       *options,  # type: UpdateBucketOptions
-                      **kwargs  # type: Any
+                      **kwargs  # type: Dict[str, Any]
                       ) -> None:
 
-        super().update_bucket(settings, *options, **kwargs)
+        return super().update_bucket(settings, *options, **kwargs)
 
-    @BucketMgmtWrapper.block(None, BucketManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def drop_bucket(self,
                     bucket_name,  # type: str
                     *options,     # type: DropBucketOptions
-                    **kwargs      # type: Any
+                    **kwargs      # type: Dict[str, Any]
                     ) -> None:
 
-        super().drop_bucket(bucket_name, *options, **kwargs)
+        return super().drop_bucket(bucket_name, *options, **kwargs)
 
-    @BucketMgmtWrapper.block(BucketSettings, BucketManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(BucketSettings, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def get_bucket(self,
                    bucket_name,   # type: str
                    *options,      # type: GetBucketOptions
-                   **kwargs       # type: Any
+                   **kwargs       # type: Dict[str, Any]
                    ) -> BucketSettings:
 
         return super().get_bucket(bucket_name, *options, **kwargs)
 
-    @BucketMgmtWrapper.block(BucketSettings, BucketManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(BucketSettings, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def get_all_buckets(self,
                         *options,  # type: GetAllBucketOptions
-                        **kwargs  # type: Any
+                        **kwargs  # type: Dict[str, Any]
                         ) -> List[BucketSettings]:
 
         return super().get_all_buckets(*options, **kwargs)
 
-    @BucketMgmtWrapper.block(None, BucketManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def flush_bucket(self,
                      bucket_name,   # type: str
                      *options,      # type: FlushBucketOptions
-                     **kwargs       # type: Any
+                     **kwargs       # type: Dict[str, Any]
                      ) -> None:
 
-        super().flush_bucket(bucket_name, *options, **kwargs)
+        return super().flush_bucket(bucket_name, *options, **kwargs)

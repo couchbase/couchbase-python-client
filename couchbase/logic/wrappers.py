@@ -8,11 +8,11 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   CouchbaseException,
                                   DocumentExistsException,
                                   DocumentNotFoundException,
-                                  ErrorMapper,
+                                  ErrorMapperNew,
                                   ExceptionMap,
                                   InternalSDKException,
-                                  PathNotFoundException,
-                                  PycbcException)
+                                  PathNotFoundException)
+from couchbase.exceptions import exception as BaseCouchbaseException
 
 
 def decode_value(transcoder, value, flags, is_subdoc=False):
@@ -45,6 +45,8 @@ class BlockingWrapper:
             def wrapped_fn(self, *args, **kwargs):
                 try:
                     ret = fn(self, *args, **kwargs)
+                    if isinstance(ret, BaseCouchbaseException):
+                        raise ErrorMapperNew.build_exception(ret)
                     if return_cls is None:
                         return None
                     elif return_cls is True:
@@ -54,17 +56,6 @@ class BlockingWrapper:
                             raise InternalSDKException('Expected return value to be non-empty.')
                         retval = return_cls(ret)
                     return retval
-                except PycbcException as e:
-                    print(e.context)
-                    print(e.error_code)
-                    print(e.exc_info)
-                    if e.context:
-                        excptn = ErrorMapper.parse_error_context(e, excptn_msg=e.message)
-                    else:
-                        exc_cls = PYCBC_ERROR_MAP.get(e.error_code, CouchbaseException)
-                        excptn = exc_cls(message=e.message)
-                    # we are creating a new exception on purpose
-                    raise excptn from None
                 except CouchbaseException as e:
                     raise e
                 except Exception as ex:
@@ -85,6 +76,8 @@ class BlockingWrapper:
                 try:
                     transcoder = kwargs.pop('transcoder')
                     ret = fn(self, *args, **kwargs)
+                    if isinstance(ret, BaseCouchbaseException):
+                        raise ErrorMapperNew.build_exception(ret)
                     value = ret.raw_result.get('value', None)
                     flags = ret.raw_result.get('flags', None)
 
@@ -97,17 +90,6 @@ class BlockingWrapper:
                     else:
                         retval = return_cls(ret)
                     return retval
-                except PycbcException as e:
-                    print(e.context)
-                    print(e.error_code)
-                    print(e.exc_info)
-                    if e.context:
-                        excptn = ErrorMapper.parse_error_context(e, excptn_msg=e.message)
-                    else:
-                        exc_cls = PYCBC_ERROR_MAP.get(e.error_code, CouchbaseException)
-                        excptn = exc_cls(message=e.message)
-                    # we are creating a new exception on purpose
-                    raise excptn from None
                 except CouchbaseException as e:
                     raise e
                 except Exception as ex:

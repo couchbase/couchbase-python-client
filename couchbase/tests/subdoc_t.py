@@ -5,7 +5,11 @@ import pytest
 import couchbase.subdocument as SD
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
-from couchbase.exceptions import (DocumentNotFoundException,
+from couchbase.durability import DurabilityLevel, ServerDurability
+from couchbase.exceptions import (DocumentExistsException,
+                                  DocumentNotFoundException,
+                                  DurabilityImpossibleException,
+                                  InvalidArgumentException,
                                   InvalidValueException,
                                   PathExistsException,
                                   PathMismatchException,
@@ -13,33 +17,91 @@ from couchbase.exceptions import (DocumentNotFoundException,
 from couchbase.options import (ClusterOptions,
                                GetOptions,
                                MutateInOptions)
-from couchbase.result import LookupInResult, MutateInResult
+from couchbase.result import (GetResult,
+                              LookupInResult,
+                              MutateInResult)
 
-from ._test_utils import TestEnvironment
+from ._test_utils import (CollectionType,
+                          KVPair,
+                          TestEnvironment)
 
 
 class SubDocumentTests:
     NO_KEY = "not-a-key"
 
-    @pytest.fixture(scope="class", name="cb_env")
-    def couchbase_test_environment(self, couchbase_config):
+    @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
+    def couchbase_test_environment(self, couchbase_config, request):
         conn_string = couchbase_config.get_connection_string()
         opts = ClusterOptions(PasswordAuthenticator(
             couchbase_config.admin_username, couchbase_config.admin_password))
         c = Cluster(
             conn_string, opts)
+        c.cluster_info()
         b = c.bucket(f"{couchbase_config.bucket_name}")
+
         coll = b.default_collection()
-        cb_env = TestEnvironment(c, b, coll, couchbase_config)
+        if request.param == CollectionType.DEFAULT:
+            cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True)
+        elif request.param == CollectionType.NAMED:
+            cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True, manage_collections=True)
+            cb_env.setup_named_collections()
+
         cb_env.load_data()
         yield cb_env
         cb_env.purge_data()
+        if request.param == CollectionType.NAMED:
+            cb_env.teardown_named_collections()
         c.close()
+
+    @pytest.fixture(scope="class")
+    def skip_if_less_than_cheshire_cat(self, cb_env):
+        if cb_env.cluster.server_version_short < 7.0:
+            pytest.skip("Feature only available on CBS >= 7.0")
+
+    @pytest.fixture(scope="class")
+    def skip_if_less_than_alice(self, cb_env):
+        if cb_env.cluster.server_version_short < 6.5:
+            pytest.skip("Feature only available on CBS >= 6.5")
+
+    @pytest.fixture(scope="class")
+    def num_replicas(self, cb_env):
+        bucket_settings = cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, cb_env.bucket.name)
+        num_replicas = bucket_settings.get("num_replicas")
+        return num_replicas
+
+    @pytest.fixture(name="new_kvp")
+    def new_key_and_value_with_reset(self, cb_env) -> KVPair:
+        key, value = cb_env.get_new_key_value()
+        yield KVPair(key, value)
+        cb_env.try_n_times_till_exception(10,
+                                          1,
+                                          cb_env.collection.remove,
+                                          key,
+                                          expected_exceptions=(DocumentNotFoundException,))
+
+    @pytest.fixture(name="default_kvp")
+    def default_key_and_value(self, cb_env) -> KVPair:
+        key, value = cb_env.get_default_key_value()
+        yield KVPair(key, value)
+
+    @pytest.fixture(name="default_kvp_and_reset")
+    def default_key_and_value_with_reset(self, cb_env) -> KVPair:
+        key, value = cb_env.get_default_key_value()
+        yield KVPair(key, value)
+        cb_env.collection.upsert(key, value)
 
     def test_lookup_in_simple_get(self, cb_env):
         cb = cb_env.collection
         key, value = cb_env.get_default_key_value()
         result = cb.lookup_in(key, (SD.get("geo"),))
+        assert isinstance(result, LookupInResult)
+        assert result.content_as[dict](0) == value["geo"]
+
+    def test_lookup_in_simple_get_spec_as_list(self, cb_env, default_kvp):
+        cb = cb_env.collection
+        key = default_kvp.key
+        value = default_kvp.value
+        result = cb.lookup_in(key, [SD.get("geo")])
         assert isinstance(result, LookupInResult)
         assert result.content_as[dict](0) == value["geo"]
 
@@ -137,6 +199,31 @@ class SubDocumentTests:
         result = cb.get(key)
         assert value == result.content_as[dict]
 
+    def test_mutate_in_simple_spec_as_list(self, cb_env, new_kvp):
+        cb = cb_env.collection
+        key = new_kvp.key
+        value = new_kvp.value
+        cb.upsert(key, value)
+        cb_env.try_n_times(10, 3, cb.get, key)
+
+        result = cb.mutate_in(key,
+                              [SD.upsert("city", "New City"),
+                               SD.replace("faa", "CTY")],
+                              MutateInOptions(expiry=timedelta(seconds=1000)))
+
+        value["city"] = "New City"
+        value["faa"] = "CTY"
+
+        def cas_matches(cb, new_cas):
+            r = cb.get(key)
+            if new_cas != r.cas:
+                raise Exception(f"{new_cas} != {r.cas}")
+
+        cb_env.try_n_times(10, 3, cas_matches, cb, result.cas)
+
+        result = cb.get(key)
+        assert value == result.content_as[dict]
+
     def test_mutate_in_expiry(self, cb_env):
         if cb_env.is_mock_server:
             pytest.skip("Mock will not return expiry in the xaddrs.")
@@ -165,7 +252,255 @@ class SubDocumentTests:
         # reset to norm
         cb.remove(key)
 
-    # # # TODO: preserve expiry
+    def test_mutate_in_remove(self, cb_env, new_kvp):
+        if cb_env.is_mock_server:
+            pytest.skip("Mock will not return expiry in the xaddrs.")
+
+        cb = cb_env.collection
+        key = new_kvp.key
+        value = new_kvp.value
+        cb.upsert(key, value)
+        cb_env.try_n_times(10, 3, cb.get, key)
+
+        cb.mutate_in(key, [SD.remove('geo.alt')])
+        result = cb.get(key)
+        assert 'alt' not in result.content_as[dict]['geo']
+
+    @pytest.mark.usefixtures("skip_if_less_than_cheshire_cat")
+    def test_mutate_in_preserve_expiry_not_used(self, cb_env, default_kvp_and_reset):
+        if cb_env.is_mock_server:
+            pytest.skip("Mock will not return expiry in the xaddrs.")
+
+        cb = cb_env.collection
+        key = default_kvp_and_reset.key
+
+        cb.mutate_in(key,
+                     (SD.upsert("city", "New City"),
+                         SD.replace("faa", "CTY")),
+                     MutateInOptions(expiry=timedelta(seconds=5)))
+
+        expiry_path = "$document.exptime"
+        res = cb_env.try_n_times(10, 3, cb.lookup_in, key, (SD.get(expiry_path, xattr=True),))
+        expiry1 = res.content_as[int](0)
+
+        cb.mutate_in(key, (SD.upsert("city", "Updated City"),))
+        res = cb_env.try_n_times(10, 3, cb.lookup_in, key, (SD.get(expiry_path, xattr=True),))
+        expiry2 = res.content_as[int](0)
+
+        assert expiry1 is not None
+        assert expiry2 is not None
+        assert expiry1 != expiry2
+        # if expiry was set, should be expired by now
+        cb_env.sleep(3)
+        result = cb.get(key)
+        assert isinstance(result, GetResult)
+        assert result.content_as[dict]['city'] == 'Updated City'
+
+    @pytest.mark.usefixtures("skip_if_less_than_cheshire_cat")
+    def test_mutate_in_preserve_expiry(self, cb_env, default_kvp_and_reset):
+        if cb_env.is_mock_server:
+            pytest.skip("Mock will not return expiry in the xaddrs.")
+
+        cb = cb_env.collection
+        key = default_kvp_and_reset.key
+
+        cb.mutate_in(key,
+                     (SD.upsert("city", "New City"),
+                         SD.replace("faa", "CTY")),
+                     MutateInOptions(expiry=timedelta(seconds=2)))
+
+        expiry_path = "$document.exptime"
+        res = cb_env.try_n_times(10, 3, cb.lookup_in, key, (SD.get(expiry_path, xattr=True),))
+        expiry1 = res.content_as[int](0)
+
+        cb.mutate_in(key, (SD.upsert("city", "Updated City"),),
+                     MutateInOptions(preserve_expiry=True))
+        res = cb_env.try_n_times(10, 3, cb.lookup_in, key, (SD.get(expiry_path, xattr=True),))
+        expiry2 = res.content_as[int](0)
+
+        assert expiry1 is not None
+        assert expiry2 is not None
+        assert expiry1 == expiry2
+        # if expiry was set, should be expired by now
+        cb_env.sleep(3)
+        with pytest.raises(DocumentNotFoundException):
+            cb.get(key)
+
+    @pytest.mark.usefixtures("skip_if_less_than_cheshire_cat")
+    def test_mutate_in_preserve_expiry_fails(self, cb_env, default_kvp_and_reset):
+        if cb_env.is_mock_server:
+            pytest.skip("Mock will not return expiry in the xaddrs.")
+
+        cb = cb_env.collection
+        key = default_kvp_and_reset.key
+        with pytest.raises(InvalidArgumentException):
+            cb.mutate_in(
+                key,
+                (SD.insert("c", "ccc"),),
+                MutateInOptions(preserve_expiry=True),
+            )
+
+        with pytest.raises(InvalidArgumentException):
+            cb.mutate_in(
+                key,
+                (SD.replace("c", "ccc"),),
+                MutateInOptions(
+                    expiry=timedelta(
+                        seconds=5),
+                    preserve_expiry=True),
+            )
+
+    @pytest.mark.usefixtures("skip_if_less_than_alice")
+    def test_mutate_in_server_durability(self, cb_env, default_kvp_and_reset, num_replicas):
+        if cb_env.is_mock_server:
+            pytest.skip("Mock will not return expiry in the xaddrs.")
+
+        cb = cb_env.collection
+        key = default_kvp_and_reset.key
+        if num_replicas > 1:
+            cb.mutate_in(key,
+                         (SD.upsert("city", "New City"),
+                             SD.replace("faa", "CTY")),
+                         MutateInOptions(durability=ServerDurability(
+                             level=DurabilityLevel.PERSIST_TO_MAJORITY)))
+        else:
+            with pytest.raises(DurabilityImpossibleException):
+                cb.mutate_in(key,
+                             (SD.upsert("city", "New City"),
+                                 SD.replace("faa", "CTY")),
+                             MutateInOptions(durability=ServerDurability(
+                                 level=DurabilityLevel.PERSIST_TO_MAJORITY)))
+
+    @pytest.mark.usefixtures("skip_if_less_than_alice")
+    def test_mutate_in_client_durability(self, cb_env, default_kvp_and_reset, num_replicas):
+        pytest.skip("C++ client has not implemented replicate/persist durability.")
+
+    """
+        @TODO(jc): verify the RFC store semantics terminology.  Should it really
+        replace the _whole_ document?
+
+        https://github.com/couchbaselabs/sdk-rfcs/blob/master/rfc/0053-sdk3-crud.md
+        StoreSemantics - the storage action
+            Replace - replace the document, fail if it doesn't exist
+            Upsert - replace the document or create it if it doesn't exist (0x01)
+            Insert - create document, fail if it exists (0x02)
+
+    """
+
+    def test_mutate_in_upsert_semantics(self, cb_env, new_kvp):
+        cb = cb_env.collection
+        key = new_kvp.key
+
+        with pytest.raises(DocumentNotFoundException):
+            cb.get(key)
+
+        cb.mutate_in(key,
+                     (SD.upsert('new_path', 'im new'),),
+                     MutateInOptions(store_semantics=SD.StoreSemantics.UPSERT))
+
+        res = cb_env.try_n_times(10, 3, cb.get, key)
+        assert res.content_as[dict] == {'new_path': 'im new'}
+
+    def test_mutate_in_upsert_semantics_kwargs(self, cb_env, new_kvp):
+        cb = cb_env.collection
+        key = new_kvp.key
+
+        with pytest.raises(DocumentNotFoundException):
+            cb.get(key)
+
+        cb.mutate_in(key,
+                     (SD.upsert('new_path', 'im new'),),
+                     upsert_doc=True)
+
+        res = cb_env.try_n_times(10, 3, cb.get, key)
+        assert res.content_as[dict] == {'new_path': 'im new'}
+
+    def test_mutate_in_insert_semantics(self, cb_env, new_kvp):
+        cb = cb_env.collection
+        key = new_kvp.key
+
+        with pytest.raises(DocumentNotFoundException):
+            cb.get(key)
+
+        cb.mutate_in(key,
+                     (SD.insert('new_path', 'im new'),),
+                     MutateInOptions(store_semantics=SD.StoreSemantics.INSERT))
+
+        res = cb_env.try_n_times(10, 3, cb.get, key)
+        assert res.content_as[dict] == {'new_path': 'im new'}
+
+    def test_mutate_in_insert_semantics_kwargs(self, cb_env, new_kvp):
+        cb = cb_env.collection
+        key = new_kvp.key
+
+        with pytest.raises(DocumentNotFoundException):
+            cb.get(key)
+
+        cb.mutate_in(key,
+                     (SD.insert('new_path', 'im new'),),
+                     insert_doc=True)
+
+        res = cb_env.try_n_times(10, 3, cb.get, key)
+        assert res.content_as[dict] == {'new_path': 'im new'}
+
+    def test_mutate_in_insert_semantics_fail(self, cb_env, default_kvp_and_reset):
+        cb = cb_env.collection
+        key = default_kvp_and_reset.key
+
+        with pytest.raises(DocumentExistsException):
+            cb.mutate_in(key,
+                         (SD.insert('new_path', 'im new'),),
+                         insert_doc=True)
+
+    def test_mutate_in_replace_semantics(self, cb_env, default_kvp_and_reset):
+        cb = cb_env.collection
+        key = default_kvp_and_reset.key
+
+        cb.mutate_in(key,
+                     (SD.upsert('new_path', 'im new'),),
+                     MutateInOptions(store_semantics=SD.StoreSemantics.REPLACE))
+
+        res = cb_env.try_n_times(10, 3, cb.get, key)
+        assert res.content_as[dict]['new_path'] == 'im new'
+
+    def test_mutate_in_replace_semantics_kwargs(self, cb_env, default_kvp_and_reset):
+        cb = cb_env.collection
+        key = default_kvp_and_reset.key
+
+        cb.mutate_in(key,
+                     (SD.upsert('new_path', 'im new'),),
+                     replace_doc=True)
+
+        res = cb_env.try_n_times(10, 3, cb.get, key)
+        assert res.content_as[dict]['new_path'] == 'im new'
+
+    def test_mutate_in_replace_semantics_fail(self, cb_env, new_kvp):
+        cb = cb_env.collection
+        key = new_kvp.key
+
+        with pytest.raises(DocumentNotFoundException):
+            cb.mutate_in(key,
+                         (SD.upsert('new_path', 'im new'),),
+                         replace_doc=True)
+
+    def test_mutate_in_store_semantics_fail(self, cb_env, new_kvp):
+        cb = cb_env.collection
+        key = new_kvp.key
+
+        with pytest.raises(InvalidArgumentException):
+            cb.mutate_in(key,
+                         (SD.upsert('new_path', 'im new'),),
+                         insert_doc=True, upsert_doc=True)
+
+        with pytest.raises(InvalidArgumentException):
+            cb.mutate_in(key,
+                         (SD.upsert('new_path', 'im new'),),
+                         insert_doc=True, replace_doc=True)
+
+        with pytest.raises(InvalidArgumentException):
+            cb.mutate_in(key,
+                         (SD.upsert('new_path', 'im new'),),
+                         upsert_doc=True, replace_doc=True)
 
     def test_array_append(self, cb_env):
         cb = cb_env.collection

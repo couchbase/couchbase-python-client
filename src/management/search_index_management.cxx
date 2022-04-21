@@ -309,42 +309,6 @@ create_result_from_search_index_mgmt_response(const couchbase::operations::manag
     return res;
 }
 
-// template<typename T>
-// void
-// create_result_from_search_index_mgmt_op_response(const T& resp, PyObject* pyObj_callback, PyObject* pyObj_errback,
-// std::shared_ptr<std::promise<PyObject*>> barrier)
-// {
-//     PyGILState_STATE state = PyGILState_Ensure();
-//     PyObject* pyObj_args = NULL;
-//     PyObject* pyObj_func = NULL;
-
-//     if (resp.ctx.ec.value()) {
-//         PyObject* pyObj_exc = build_exception(resp.ctx);
-//         pyObj_func = ctx.get_errback();
-//         pyObj_args = PyTuple_New(1);
-//         PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
-
-//     } else {
-//         auto res = create_result_from_search_index_mgmt_response(resp);
-//         // TODO:  check if PyErr_Occurred() != nullptr and raise error accordingly
-//         pyObj_func = ctx.get_callback();
-//         pyObj_args = PyTuple_New(1);
-//         PyTuple_SET_ITEM(pyObj_args, 0, reinterpret_cast<PyObject*>(res));
-//     }
-
-//     PyObject* r = PyObject_CallObject(const_cast<PyObject*>(pyObj_func), pyObj_args);
-//     if (r) {
-//         Py_XDECREF(r);
-//     } else {
-//         PyErr_Print();
-//     }
-
-//     Py_XDECREF(pyObj_args);
-//     // Py_XDECREF(pyObj_func);
-//     ctx.decrement_PyObjects();
-//     PyGILState_Release(state);
-// }
-
 template<typename Response>
 void
 create_result_from_search_index_mgmt_op_response(const Response& resp,
@@ -361,18 +325,15 @@ create_result_from_search_index_mgmt_op_response(const Response& resp,
 
     PyGILState_STATE state = PyGILState_Ensure();
     if (resp.ctx.ec.value()) {
+        pyObj_exc =
+          build_exception_from_context(resp.ctx, __FILE__, __LINE__, "Error doing search index mgmt operation.", "SearchIndexMgmt");
         if (pyObj_errback == nullptr) {
-            // make sure this is an HTTPException
-            auto pycbc_ex =
-              PycbcHttpException("Error doing search index mgmt operation.", __FILE__, __LINE__, resp.ctx, PycbcError::HTTPError);
-            auto exc = std::make_exception_ptr(pycbc_ex);
-            barrier->set_exception(exc);
+            barrier->set_value(pyObj_exc);
         } else {
-            pyObj_exc = build_exception_from_context(resp.ctx);
+            // pyObj_exc = build_exception_from_context(resp.ctx);
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
             PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
-            pyObj_kwargs = pycbc_get_exception_kwargs("Error doing search index mgmt operation.", __FILE__, __LINE__);
         }
         // lets clear any errors
         PyErr_Clear();
@@ -392,16 +353,13 @@ create_result_from_search_index_mgmt_op_response(const Response& resp,
     }
 
     if (set_exception) {
+        pyObj_exc = pycbc_build_exception(PycbcError::UnableToBuildResult, __FILE__, __LINE__, "Search index mgmt operation error.");
         if (pyObj_errback == nullptr) {
-            auto pycbc_ex = PycbcException("Search index mgmt operation error.", __FILE__, __LINE__, PycbcError::UnableToBuildResult);
-            auto exc = std::make_exception_ptr(pycbc_ex);
-            barrier->set_exception(exc);
+            barrier->set_value(pyObj_exc);
         } else {
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
-            PyTuple_SET_ITEM(pyObj_args, 0, Py_None);
-            pyObj_kwargs =
-              pycbc_core_get_exception_kwargs("Search index mgmt operation error.", PycbcError::UnableToBuildResult, __FILE__, __LINE__);
+            PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
         }
     }
 
@@ -414,8 +372,8 @@ create_result_from_search_index_mgmt_op_response(const Response& resp,
             // @TODO:  how to handle this situation?
         }
         Py_DECREF(pyObj_args);
-        Py_XDECREF(pyObj_kwargs);
         Py_XDECREF(pyObj_exc);
+        Py_XDECREF(pyObj_kwargs);
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }
@@ -656,51 +614,6 @@ do_search_index_mgmt_op(connection& conn,
 }
 
 PyObject*
-handle_search_mgmt_blocking_result(std::future<PyObject*>&& fut)
-{
-    PyObject* ret = nullptr;
-    bool http_ex = false;
-    std::string file;
-    int line;
-    couchbase::error_context::http ctx{};
-    std::error_code ec;
-    std::string msg;
-
-    Py_BEGIN_ALLOW_THREADS
-    try {
-        ret = fut.get();
-    } catch (PycbcHttpException e) {
-        http_ex = true;
-        msg = e.what();
-        file = e.get_file();
-        line = e.get_line();
-        ec = e.get_error_code();
-        ctx = e.get_context();
-    } catch (PycbcException e) {
-        msg = e.what();
-        file = e.get_file();
-        line = e.get_line();
-        ec = e.get_error_code();
-    } catch (const std::exception& e) {
-        ec = PycbcError::InternalSDKError;
-        msg = e.what();
-    }
-    Py_END_ALLOW_THREADS
-
-      std::string ec_category = std::string(ec.category().name());
-    if (http_ex) {
-        PyObject* pyObj_base_exc = build_exception_from_context(ctx);
-        pycbc_set_python_exception(msg.c_str(), ec, file.c_str(), line, pyObj_base_exc);
-        Py_DECREF(pyObj_base_exc);
-    } else if (!file.empty()) {
-        pycbc_set_python_exception(msg.c_str(), ec, file.c_str(), line);
-    } else if (ec_category.compare("pycbc") == 0) {
-        pycbc_set_python_exception(msg.c_str(), ec, __FILE__, __LINE__);
-    }
-    return ret;
-}
-
-PyObject*
 handle_search_index_mgmt_op(connection* conn, struct search_index_mgmt_options* options, PyObject* pyObj_callback, PyObject* pyObj_errback)
 {
     PyObject* res = nullptr;
@@ -798,16 +711,17 @@ handle_search_index_mgmt_op(connection* conn, struct search_index_mgmt_options* 
         }
         default: {
             pycbc_set_python_exception(
-              "Unrecognized search index mgmt operation passed in.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+              PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized search index mgmt operation passed in.");
+            barrier->set_value(nullptr);
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
-            return nullptr;
+            break;
         }
     };
     if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
-        // can only be a single future (if not doing std::shared),
-        // so use move semantics
-        return handle_search_mgmt_blocking_result(std::move(f));
+        PyObject* ret = nullptr;
+        Py_BEGIN_ALLOW_THREADS ret = f.get();
+        Py_END_ALLOW_THREADS return ret;
     }
     return res;
 }

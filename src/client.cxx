@@ -346,7 +346,7 @@ binary_operation(PyObject* self, PyObject* args, PyObject* kwargs)
 {
     PyObject* res = handle_binary_op(self, args, kwargs);
     if (res == nullptr && PyErr_Occurred() == nullptr) {
-        pycbc_set_python_exception("Unable to perform binary operation.", PycbcError::UnsuccessfulOperation, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::UnsuccessfulOperation, __FILE__, __LINE__, "Unable to perform binary operation.");
     }
     return res;
 }
@@ -356,7 +356,7 @@ kv_operation(PyObject* self, PyObject* args, PyObject* kwargs)
 {
     PyObject* res = handle_kv_op(self, args, kwargs);
     if (res == nullptr && PyErr_Occurred() == nullptr) {
-        pycbc_set_python_exception("Unable to perform KV operation.", PycbcError::UnsuccessfulOperation, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::UnsuccessfulOperation, __FILE__, __LINE__, "Unable to perform KV operation.");
     }
     return res;
 }
@@ -366,7 +366,7 @@ subdoc_operation(PyObject* self, PyObject* args, PyObject* kwargs)
 {
     PyObject* res = handle_subdoc_op(self, args, kwargs);
     if (res == nullptr && PyErr_Occurred() == nullptr) {
-        pycbc_set_python_exception("Unable to perform subdocument operation.", PycbcError::UnsuccessfulOperation, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::UnsuccessfulOperation, __FILE__, __LINE__, "Unable to perform subdocument operation.");
     }
     return res;
 }
@@ -376,7 +376,7 @@ diagnostics_operation(PyObject* self, PyObject* args, PyObject* kwargs)
 {
     PyObject* res = handle_diagnostics_op(self, args, kwargs);
     if (res == nullptr && PyErr_Occurred() == nullptr) {
-        pycbc_set_python_exception("Unable to perform diagnostics operation.", PycbcError::UnsuccessfulOperation, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::UnsuccessfulOperation, __FILE__, __LINE__, "Unable to perform diagnostics operation.");
     }
     return res;
 }
@@ -386,7 +386,7 @@ n1ql_query(PyObject* self, PyObject* args, PyObject* kwargs)
 {
     streamed_result* res = handle_n1ql_query(self, args, kwargs);
     if (res == nullptr && PyErr_Occurred() == nullptr) {
-        pycbc_set_python_exception("Unable to perform N1QL query.", PycbcError::UnsuccessfulOperation, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::UnsuccessfulOperation, __FILE__, __LINE__, "Unable to perform N1QL query.");
     }
     return reinterpret_cast<PyObject*>(res);
 }
@@ -428,7 +428,7 @@ cluster_info(PyObject* self, PyObject* args, PyObject* kwargs)
 {
     PyObject* res = handle_mgmt_op(self, args, kwargs);
     if (res == nullptr && PyErr_Occurred() == nullptr) {
-        pycbc_set_python_exception("Unable to perform cluster info operation.", PycbcError::UnsuccessfulOperation, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::UnsuccessfulOperation, __FILE__, __LINE__, "Unable to perform cluster info operation.");
     }
     return res;
 }
@@ -438,7 +438,7 @@ management_operation(PyObject* self, PyObject* args, PyObject* kwargs)
 {
     PyObject* res = handle_mgmt_op(self, args, kwargs);
     if (res == nullptr && PyErr_Occurred() == nullptr) {
-        pycbc_set_python_exception("Unable to perform management operation.", PycbcError::UnsuccessfulOperation, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::UnsuccessfulOperation, __FILE__, __LINE__, "Unable to perform management operation.");
     }
     return res;
 }
@@ -448,7 +448,7 @@ open_or_close_bucket(PyObject* self, PyObject* args, PyObject* kwargs)
 {
     PyObject* res = handle_open_or_close_bucket(self, args, kwargs);
     if (res == nullptr && PyErr_Occurred() == nullptr) {
-        pycbc_set_python_exception("Unable to open/close bucket.", PycbcError::UnsuccessfulOperation, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::UnsuccessfulOperation, __FILE__, __LINE__, "Unable to open/close bucket.");
     }
     return res;
 }
@@ -458,7 +458,7 @@ create_connection(PyObject* self, PyObject* args, PyObject* kwargs)
 {
     PyObject* res = handle_create_connection(self, args, kwargs);
     if (res == nullptr && PyErr_Occurred() == nullptr) {
-        pycbc_set_python_exception("Unable to create connection.", PycbcError::UnsuccessfulOperation, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::UnsuccessfulOperation, __FILE__, __LINE__, "Unable to create connection.");
     }
     return res;
 }
@@ -468,7 +468,7 @@ close_connection(PyObject* self, PyObject* args, PyObject* kwargs)
 {
     PyObject* res = handle_close_connection(self, args, kwargs);
     if (res == nullptr && PyErr_Occurred() != nullptr) {
-        pycbc_set_python_exception("Unable to close connection.", PycbcError::UnsuccessfulOperation, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::UnsuccessfulOperation, __FILE__, __LINE__, "Unable to close connection.");
     }
     return res;
 }

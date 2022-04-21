@@ -4,8 +4,8 @@ from functools import partial, wraps
 
 from twisted.internet.defer import Deferred
 
-from acouchbase.logic import build_exception, call_async_fn
-from couchbase.exceptions import MissingConnectionException
+from acouchbase.logic import call_async_fn
+from couchbase.exceptions import ErrorMapperNew, MissingConnectionException
 from couchbase.logic import decode_value
 
 
@@ -24,7 +24,7 @@ class TxWrapper:
                     self.loop.call_soon_threadsafe(ft.set_result, True)
 
                 def on_err(exc):
-                    excptn = build_exception(exc)
+                    excptn = ErrorMapperNew.build_exception(exc)
                     self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok
@@ -49,7 +49,7 @@ class TxWrapper:
                     self.loop.call_soon_threadsafe(ft.set_result, True)
 
                 def on_err(exc):
-                    excptn = build_exception(exc)
+                    excptn = ErrorMapperNew.build_exception(exc)
                     self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok
@@ -92,14 +92,14 @@ class TxWrapper:
                     self.loop.call_soon_threadsafe(ft.set_result, True)
 
                 def on_err(exc):
-                    excptn = build_exception(exc)
+                    excptn = ErrorMapperNew.build_exception(exc)
                     self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok
                 kwargs["errback"] = on_err
 
                 if not self._connection:
-                    cluster_conn_ft = self._cluster.on_connect()
+                    cluster_conn_ft = Deferred.asFuture(self._cluster.on_connect(), self.loop)
                     kwargs["args"] = args
                     cluster_conn_ft.add_done_callback(
                         partial(cls.chain_connect_futures, ft, self, fn, **kwargs))
@@ -154,8 +154,8 @@ class TxWrapper:
 
                     self.loop.call_soon_threadsafe(ft.set_result, retval)
 
-                def on_err(exc, exc_info=None):
-                    excptn = build_exception(exc, exc_info=exc_info)
+                def on_err(exc):
+                    excptn = ErrorMapperNew.build_exception(exc)
                     self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok
@@ -163,7 +163,7 @@ class TxWrapper:
 
                 if not self._connection:
                     if chain_connection is True:
-                        c_ft = self.on_connect()
+                        c_ft = Deferred.asFuture(self.on_connect(), self.loop)
                         # in order to keep arg passing simple, add operation args to kwargs
                         # this will keep the positional args passed to the callback only ones
                         # in the scope of handling logic w.r.t. to handling logic between the futures
@@ -201,15 +201,15 @@ class TxWrapper:
 
                     self.loop.call_soon_threadsafe(ft.set_result, retval)
 
-                def on_err(exc, exc_info=None):
-                    excptn = build_exception(exc, exc_info=exc_info)
+                def on_err(exc):
+                    excptn = ErrorMapperNew.build_exception(exc)
                     self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok
                 kwargs["errback"] = on_err
 
                 if not self._connection:
-                    bucket_conn_ft = self._scope._connect_bucket()
+                    bucket_conn_ft = Deferred.asFuture(self._scope._connect_bucket(), self.loop)
                     # in order to keep arg passing simple, add operation args to kwargs
                     # This allows the _chain_futures callback to only worry about positional args
                     # outside the scope of the operation.
@@ -252,15 +252,15 @@ class TxWrapper:
 
                     self.loop.call_soon_threadsafe(ft.set_result, retval)
 
-                def on_err(exc, exc_info=None):
-                    excptn = build_exception(exc, exc_info=exc_info)
+                def on_err(exc):
+                    excptn = ErrorMapperNew.build_exception(exc)
                     self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok
                 kwargs["errback"] = on_err
 
                 if not self._connection:
-                    bucket_conn_ft = self._scope._connect_bucket()
+                    bucket_conn_ft = Deferred.asFuture(self._scope._connect_bucket(), self.loop)
                     # in order to keep arg passing simple, add operation args to kwargs
                     # This allows the _chain_futures callback to only worry about positional args
                     # outside the scope of the operation.

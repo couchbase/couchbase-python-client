@@ -18,7 +18,7 @@ from couchbase.management.logic.analytics_logic import (AnalyticsDataset,
                                                         AnalyticsIndex,
                                                         AnalyticsLink,
                                                         AnalyticsManagerLogic)
-from couchbase.management.logic.wrappers import AnalyticsMgmtWrapper
+from couchbase.management.logic.wrappers import BlockingMgmtWrapper, ManagementType
 
 if TYPE_CHECKING:
     from couchbase.management.options import (ConnectLinkOptions,
@@ -43,7 +43,7 @@ class AnalyticsIndexManager(AnalyticsManagerLogic):
     def __init__(self, connection):
         super().__init__(connection)
 
-    @AnalyticsMgmtWrapper.block(None, AnalyticsManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
     def create_dataverse(self,
                          dataverse_name,    # type: str
                          options=None,      # type: Optional[CreateDataverseOptions]
@@ -51,11 +51,11 @@ class AnalyticsIndexManager(AnalyticsManagerLogic):
                          ) -> None:
 
         if not isinstance(dataverse_name, str):
-            raise ValueError("dataverse_name must be provided when creating an analytics dataverse.")
+            raise InvalidArgumentException("dataverse_name must be provided when creating an analytics dataverse.")
 
         return super().create_dataverse(dataverse_name, options, **kwargs)
 
-    @AnalyticsMgmtWrapper.block(None, AnalyticsManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
     def drop_dataverse(self,
                        dataverse_name,    # type: str
                        options=None,      # type: Optional[DropDataverseOptions]
@@ -63,11 +63,11 @@ class AnalyticsIndexManager(AnalyticsManagerLogic):
                        ) -> None:
 
         if not isinstance(dataverse_name, str):
-            raise ValueError("dataverse_name must be provided when dropping an analytics dataverse.")
+            raise InvalidArgumentException("dataverse_name must be provided when dropping an analytics dataverse.")
 
         return super().drop_dataverse(dataverse_name, options, **kwargs)
 
-    @AnalyticsMgmtWrapper.block(None, AnalyticsManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
     def create_dataset(self,
                        dataset_name,    # type: str
                        bucket_name,     # type: str
@@ -76,14 +76,14 @@ class AnalyticsIndexManager(AnalyticsManagerLogic):
                        ) -> None:
 
         if not isinstance(dataset_name, str):
-            raise ValueError("dataset_name must be provided when creating an analytics dataset.")
+            raise InvalidArgumentException("dataset_name must be provided when creating an analytics dataset.")
 
         if not isinstance(bucket_name, str):
-            raise ValueError("bucket_name must be provided when creating an analytics dataset.")
+            raise InvalidArgumentException("bucket_name must be provided when creating an analytics dataset.")
 
         return super().create_dataset(dataset_name, bucket_name, options, **kwargs)
 
-    @AnalyticsMgmtWrapper.block(None, AnalyticsManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
     def drop_dataset(self,
                      dataset_name,  # type: str
                      options=None,  # type: Optional[DropDatasetOptions]
@@ -91,11 +91,12 @@ class AnalyticsIndexManager(AnalyticsManagerLogic):
                      ) -> None:
 
         if not isinstance(dataset_name, str):
-            raise ValueError("dataset_name must be provided when dropping an analytics dataset.")
+            raise InvalidArgumentException("dataset_name must be provided when dropping an analytics dataset.")
 
         return super().drop_dataset(dataset_name, options, **kwargs)
 
-    @AnalyticsMgmtWrapper.block(AnalyticsDataset, AnalyticsManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(AnalyticsDataset, ManagementType.AnalyticsIndexMgmt,
+                               AnalyticsManagerLogic._ERROR_MAPPING)
     def get_all_datasets(self,
                          options=None,   # type: Optional[GetAllDatasetOptions]
                          **kwargs   # type: Dict[str, Any]
@@ -103,7 +104,7 @@ class AnalyticsIndexManager(AnalyticsManagerLogic):
 
         return super().get_all_datasets(options, **kwargs)
 
-    @AnalyticsMgmtWrapper.block(None, AnalyticsManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
     def create_index(self,
                      index_name,    # type: str
                      dataset_name,  # type: str
@@ -113,21 +114,21 @@ class AnalyticsIndexManager(AnalyticsManagerLogic):
                      ) -> None:
 
         if not isinstance(index_name, str):
-            raise ValueError("index_name must be provided when creating an analytics index.")
+            raise InvalidArgumentException("index_name must be provided when creating an analytics index.")
 
         if not isinstance(dataset_name, str):
-            raise ValueError("dataset_name must be provided when creating an analytics index.")
+            raise InvalidArgumentException("dataset_name must be provided when creating an analytics index.")
 
         if fields is not None:
             if not isinstance(fields, dict):
-                raise ValueError("fields must be provided when creating an analytics index.")
+                raise InvalidArgumentException("fields must be provided when creating an analytics index.")
 
             if not all(map(lambda v: isinstance(v, AnalyticsDataType), fields.values())):
                 raise InvalidArgumentException("fields must all be an AnalyticsDataType.")
 
         return super().create_index(index_name, dataset_name, fields, options, **kwargs)
 
-    @AnalyticsMgmtWrapper.block(None, AnalyticsManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
     def drop_index(self,
                    index_name,    # type: str
                    dataset_name,  # type: str
@@ -136,14 +137,14 @@ class AnalyticsIndexManager(AnalyticsManagerLogic):
                    ) -> None:
 
         if not isinstance(index_name, str):
-            raise ValueError("index_name must be provided when dropping an analytics index.")
+            raise InvalidArgumentException("index_name must be provided when dropping an analytics index.")
 
         if not isinstance(dataset_name, str):
-            raise ValueError("dataset_name must be provided when dropping an analytics index.")
+            raise InvalidArgumentException("dataset_name must be provided when dropping an analytics index.")
 
         return super().drop_index(index_name, dataset_name, options, **kwargs)
 
-    @AnalyticsMgmtWrapper.block(AnalyticsIndex, AnalyticsManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(AnalyticsIndex, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
     def get_all_indexes(self,
                         options=None,   # type: Optional[GetAllAnalyticsIndexesOptions]
                         **kwargs   # type: Dict[str, Any]
@@ -151,21 +152,21 @@ class AnalyticsIndexManager(AnalyticsManagerLogic):
 
         return super().get_all_indexes(options, **kwargs)
 
-    @AnalyticsMgmtWrapper.block(None, AnalyticsManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
     def connect_link(self,
                      options=None,  # type: Optional[ConnectLinkOptions]
                      **kwargs   # type: Dict[str, Any]
                      ) -> None:
         return super().connect_link(options, **kwargs)
 
-    @AnalyticsMgmtWrapper.block(None, AnalyticsManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
     def disconnect_link(self,
                         options=None,  # type: Optional[DisconnectLinkOptions]
                         **kwargs   # type: Dict[str, Any]
                         ) -> None:
         return super().disconnect_link(options, **kwargs)
 
-    @AnalyticsMgmtWrapper.block(dict, AnalyticsManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(dict, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
     def get_pending_mutations(self,
                               options=None,     # type: Optional[GetPendingMutationsOptions]
                               **kwargs     # type: Dict[str, Any]
@@ -173,7 +174,7 @@ class AnalyticsIndexManager(AnalyticsManagerLogic):
 
         return super().get_pending_mutations(options, **kwargs)
 
-    @AnalyticsMgmtWrapper.block(None, AnalyticsManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
     def create_link(
         self,
         link,  # type: AnalyticsLink
@@ -182,7 +183,7 @@ class AnalyticsIndexManager(AnalyticsManagerLogic):
     ) -> None:
         return super().create_link(link, options, **kwargs)
 
-    @AnalyticsMgmtWrapper.block(None, AnalyticsManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
     def replace_link(
         self,
         link,  # type: AnalyticsLink
@@ -191,7 +192,7 @@ class AnalyticsIndexManager(AnalyticsManagerLogic):
     ) -> None:
         return super().replace_link(link, options, **kwargs)
 
-    @AnalyticsMgmtWrapper.block(None, AnalyticsManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block(None, ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
     def drop_link(
         self,
         link_name,  # type: str
@@ -208,9 +209,10 @@ class AnalyticsIndexManager(AnalyticsManagerLogic):
 
         return super().drop_link(link_name, dataverse_name, options, **kwargs)
 
-    @AnalyticsMgmtWrapper.block((CouchbaseRemoteAnalyticsLink,
-                                 S3ExternalAnalyticsLink,
-                                 AzureBlobExternalAnalyticsLink), AnalyticsManagerLogic._ERROR_MAPPING)
+    @BlockingMgmtWrapper.block((CouchbaseRemoteAnalyticsLink,
+                                S3ExternalAnalyticsLink,
+                                AzureBlobExternalAnalyticsLink),
+                               ManagementType.AnalyticsIndexMgmt, AnalyticsManagerLogic._ERROR_MAPPING)
     def get_links(
         self,
         options=None,  # type: Optional[GetLinksAnalyticsOptions]

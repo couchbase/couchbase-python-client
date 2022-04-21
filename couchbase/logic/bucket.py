@@ -60,15 +60,12 @@ class BucketLogic:
         if errback:
             bucket_kwargs['errback'] = errback
 
-        print("Bucket conn: {}".format(self._connection))
         return open_or_close_bucket(self._connection, self._bucket_name, **bucket_kwargs)
 
     def _set_connected(self, value):
-        print("setting bucket connection to {}".format(value))
         self._connected = value
 
     def _destroy_connection(self):
-        print("destroying bucket!")
         del self._cluster
         del self._connection
 
@@ -105,5 +102,4 @@ class BucketLogic:
         # final_args.pop("span", None)
 
         ping_kwargs.update(final_args)
-        print("bucket ping args: {}".format(final_args))
         return diagnostics_operation(**ping_kwargs)

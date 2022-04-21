@@ -174,18 +174,13 @@ create_result_from_mgmt_op_response(const T& resp,
 
     PyGILState_STATE state = PyGILState_Ensure();
     if (resp.ctx.ec.value()) {
+        pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "Error doing collection mgmt operation.", "ClusterMgmt");
         if (pyObj_errback == nullptr) {
-            // make sure this is an HTTPException
-            auto pycbc_ex = PycbcHttpException("Error doing cluster mgmt operation.", __FILE__, __LINE__, resp.ctx, PycbcError::HTTPError);
-            auto exc = std::make_exception_ptr(pycbc_ex);
-            barrier->set_exception(exc);
+            barrier->set_value(pyObj_exc);
         } else {
-            pyObj_exc = build_exception_from_context(resp.ctx);
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
             PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
-
-            pyObj_kwargs = pycbc_get_exception_kwargs("Error doing cluster mgmt operation.", __FILE__, __LINE__);
         }
         // lets clear any errors
         PyErr_Clear();
@@ -203,24 +198,15 @@ create_result_from_mgmt_op_response(const T& resp,
             }
         }
     }
-    // one last check if there is an error prior to PyObjecj_Call()
-    if (PyErr_Occurred() != nullptr) {
-        PyErr_Print();
-        set_exception = true;
-    }
 
     if (set_exception) {
+        pyObj_exc = pycbc_build_exception(PycbcError::UnableToBuildResult, __FILE__, __LINE__, "Cluster mgmt operation error.");
         if (pyObj_errback == nullptr) {
-            auto pycbc_ex = PycbcException("Cluster mgmt operation error.", __FILE__, __LINE__, PycbcError::UnableToBuildResult);
-            auto exc = std::make_exception_ptr(pycbc_ex);
-            barrier->set_exception(exc);
+            barrier->set_value(pyObj_exc);
         } else {
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
-            PyTuple_SET_ITEM(pyObj_args, 0, Py_None);
-
-            pyObj_kwargs =
-              pycbc_core_get_exception_kwargs("Cluster mgmt operation error.", PycbcError::UnableToBuildResult, __FILE__, __LINE__);
+            PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
         }
     }
 
@@ -233,8 +219,8 @@ create_result_from_mgmt_op_response(const T& resp,
             // @TODO: how to catch exception here?
         }
         Py_DECREF(pyObj_args);
-        Py_XDECREF(pyObj_kwargs);
         Py_XDECREF(pyObj_exc);
+        Py_XDECREF(pyObj_kwargs);
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }
@@ -255,51 +241,6 @@ do_mgmt_op(connection& conn,
         create_result_from_mgmt_op_response(resp, pyObj_callback, pyObj_errback, barrier);
     });
     Py_END_ALLOW_THREADS Py_RETURN_NONE;
-}
-
-PyObject*
-handle_cluster_mgmt_blocking_result(std::future<PyObject*>&& fut)
-{
-    PyObject* ret = nullptr;
-    bool http_ex = false;
-    std::string file;
-    int line;
-    couchbase::error_context::http ctx{};
-    std::error_code ec;
-    std::string msg;
-
-    Py_BEGIN_ALLOW_THREADS
-    try {
-        ret = fut.get();
-    } catch (PycbcHttpException e) {
-        http_ex = true;
-        msg = e.what();
-        file = e.get_file();
-        line = e.get_line();
-        ec = e.get_error_code();
-        ctx = e.get_context();
-    } catch (PycbcException e) {
-        msg = e.what();
-        file = e.get_file();
-        line = e.get_line();
-        ec = e.get_error_code();
-    } catch (const std::exception& e) {
-        ec = PycbcError::InternalSDKError;
-        msg = e.what();
-    }
-    Py_END_ALLOW_THREADS
-
-      std::string ec_category = std::string(ec.category().name());
-    if (http_ex) {
-        PyObject* pyObj_base_exc = build_exception_from_context(ctx);
-        pycbc_set_python_exception(msg.c_str(), ec, file.c_str(), line, pyObj_base_exc);
-        Py_DECREF(pyObj_base_exc);
-    } else if (!file.empty()) {
-        pycbc_set_python_exception(msg.c_str(), ec, file.c_str(), line);
-    } else if (ec_category.compare("pycbc") == 0) {
-        pycbc_set_python_exception(msg.c_str(), ec, __FILE__, __LINE__);
-    }
-    return ret;
 }
 
 PyObject*
@@ -332,7 +273,7 @@ handle_mgmt_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs
                                           &op_args);
     if (!ret) {
         pycbc_set_python_exception(
-          "Cannot perform management operation.  Unable to parse args/kwargs.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+          PycbcError::InvalidArgument, __FILE__, __LINE__, "Cannot perform management operation.  Unable to parse args/kwargs.");
         return nullptr;
     }
 
@@ -341,7 +282,7 @@ handle_mgmt_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs
 
     conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
     if (nullptr == conn) {
-        pycbc_set_python_exception(NULL_CONN_OBJECT, PycbcError::InvalidArgument, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, NULL_CONN_OBJECT);
         return nullptr;
     }
     PyErr_Clear();
@@ -375,9 +316,9 @@ handle_mgmt_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs
             }
 
             if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
-                // can only be a single future (if not doing std::shared),
-                // so use move semantics
-                return handle_cluster_mgmt_blocking_result(std::move(f));
+                PyObject* ret = nullptr;
+                Py_BEGIN_ALLOW_THREADS ret = f.get();
+                Py_END_ALLOW_THREADS return ret;
             }
             break;
         }
@@ -435,7 +376,7 @@ handle_mgmt_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs
             break;
         }
         default: {
-            pycbc_set_python_exception("Unrecognized management operation passed in.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+            pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized management operation passed in.");
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
             break;

@@ -3,7 +3,8 @@ from typing import (TYPE_CHECKING,
                     Awaitable,
                     List)
 
-from acouchbase.management.logic import BucketMgmtWrapper
+from acouchbase.management.logic.wrappers import AsyncMgmtWrapper
+from couchbase.management.logic import ManagementType
 from couchbase.management.logic.buckets_logic import (BucketManagerLogic,
                                                       BucketSettings,
                                                       CreateBucketSettings)
@@ -29,7 +30,7 @@ class BucketManager(BucketManagerLogic):
         """
         return self._loop
 
-    @BucketMgmtWrapper.inject_callbacks(None, BucketManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def create_bucket(self,
                       settings,  # type: CreateBucketSettings
                       *options,  # type: CreateBucketOptions
@@ -47,7 +48,7 @@ class BucketManager(BucketManagerLogic):
         """
         super().create_bucket(settings, *options, **kwargs)
 
-    @BucketMgmtWrapper.inject_callbacks(None, BucketManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def update_bucket(self,
                       settings,  # type: BucketSettings
                       *options,  # type: UpdateBucketOptions
@@ -56,7 +57,7 @@ class BucketManager(BucketManagerLogic):
 
         super().update_bucket(settings, *options, **kwargs)
 
-    @BucketMgmtWrapper.inject_callbacks(None, BucketManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def drop_bucket(self,
                     bucket_name,  # type: str
                     *options,     # type: DropBucketOptions
@@ -65,7 +66,7 @@ class BucketManager(BucketManagerLogic):
 
         super().drop_bucket(bucket_name, *options, **kwargs)
 
-    @BucketMgmtWrapper.inject_callbacks(BucketSettings, BucketManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(BucketSettings, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def get_bucket(self,
                    bucket_name,   # type: str
                    *options,      # type: GetBucketOptions
@@ -74,7 +75,7 @@ class BucketManager(BucketManagerLogic):
 
         super().get_bucket(bucket_name, *options, **kwargs)
 
-    @BucketMgmtWrapper.inject_callbacks(BucketSettings, BucketManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(BucketSettings, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def get_all_buckets(self,
                         *options,  # type: GetAllBucketOptions
                         **kwargs  # type: Any
@@ -82,7 +83,7 @@ class BucketManager(BucketManagerLogic):
 
         super().get_all_buckets(*options, **kwargs)
 
-    @BucketMgmtWrapper.inject_callbacks(None, BucketManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def flush_bucket(self,
                      bucket_name,   # type: str
                      *options,      # type: FlushBucketOptions

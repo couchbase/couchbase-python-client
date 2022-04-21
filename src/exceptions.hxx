@@ -10,6 +10,7 @@
 #define RETRY_REASONS "retry_reasons"
 
 #define CONTEXT_TYPE "context_type"
+#define CONTEXT_DETAIL_TYPE "context_detail_type"
 #define CLIENT_CONTEXT_ID "client_context_id"
 
 #define KV_DOCUMENT_ID "key"
@@ -44,6 +45,7 @@
 struct exception_base {
     PyObject_HEAD std::error_code ec;
     PyObject* error_context = nullptr;
+    PyObject* exc_info = nullptr;
 };
 
 int
@@ -54,6 +56,27 @@ create_exception_base_obj();
 
 std::string
 retry_reason_to_string(couchbase::io::retry_reason reason);
+
+// start - needed for Pycbc error code
+enum class PycbcError {
+    InvalidArgument = 3,
+    InternalSDKError = 5000,
+    HTTPError = 5001,
+    UnsuccessfulOperation,
+    UnableToBuildResult,
+    CallbackUnsuccessful
+};
+
+namespace std
+{
+template<>
+struct is_error_code_enum<PycbcError> : true_type {
+};
+} // namespace std
+
+std::error_code
+make_error_code(PycbcError ec);
+// end - needed for Pycbc error code
 
 PyObject*
 build_kv_error_map_info(couchbase::error_map::error_info error_info);
@@ -179,7 +202,11 @@ build_base_http_error_context(const T& ctx, PyObject* pyObj_error_context)
 
 template<typename T>
 PyObject*
-build_exception_from_context(const T& ctx)
+build_exception_from_context(const T& ctx,
+                             const char* file = __FILE__,
+                             int line = __LINE__,
+                             std::string error_msg = std::string(),
+                             std::string context_detail_type = std::string())
 {
     exception_base* exc = create_exception_base_obj();
     exc->ec = ctx.ec;
@@ -191,7 +218,11 @@ build_exception_from_context(const T& ctx)
 
 template<>
 inline PyObject*
-build_exception_from_context(const couchbase::error_context::key_value& ctx)
+build_exception_from_context(const couchbase::error_context::key_value& ctx,
+                             const char* file,
+                             int line,
+                             std::string error_msg,
+                             std::string context_detail_type)
 {
     exception_base* exc = create_exception_base_obj();
     exc->ec = ctx.ec;
@@ -285,15 +316,41 @@ build_exception_from_context(const couchbase::error_context::key_value& ctx)
     exc->error_context = pyObj_error_context;
     Py_INCREF(exc->error_context);
 
+    PyObject* pyObj_exc_info = PyDict_New();
+
+    PyObject* pyObj_cinfo = Py_BuildValue("(s,i)", file, line);
+    if (-1 == PyDict_SetItemString(pyObj_exc_info, "cinfo", pyObj_cinfo)) {
+        PyErr_Print();
+        Py_XDECREF(pyObj_cinfo);
+    }
+    Py_DECREF(pyObj_cinfo);
+
+    if (!error_msg.empty()) {
+        PyObject* pyObj_error_msg = PyUnicode_FromString(error_msg.c_str());
+        if (-1 == PyDict_SetItemString(pyObj_exc_info, "error_message", pyObj_error_msg)) {
+            PyErr_Print();
+            Py_XDECREF(pyObj_error_msg);
+        }
+        Py_DECREF(pyObj_error_msg);
+    }
+
+    exc->exc_info = pyObj_exc_info;
+    Py_INCREF(exc->exc_info);
+
     return reinterpret_cast<PyObject*>(exc);
 }
 
 template<>
 inline PyObject*
-build_exception_from_context(const couchbase::error_context::http& ctx)
+build_exception_from_context(const couchbase::error_context::http& ctx,
+                             const char* file,
+                             int line,
+                             std::string error_msg,
+                             std::string context_detail_type)
 {
     exception_base* exc = create_exception_base_obj();
     exc->ec = ctx.ec;
+
     PyObject* pyObj_error_context = build_base_error_context(ctx);
     build_base_http_error_context(ctx, pyObj_error_context);
 
@@ -306,15 +363,49 @@ build_exception_from_context(const couchbase::error_context::http& ctx)
     }
     Py_DECREF(pyObj_tmp);
 
+    if (!context_detail_type.empty()) {
+        pyObj_tmp = PyUnicode_FromString(context_detail_type.c_str());
+        if (-1 == PyDict_SetItemString(pyObj_error_context, CONTEXT_DETAIL_TYPE, pyObj_tmp)) {
+            PyErr_Print();
+            PyErr_Clear();
+        }
+        Py_DECREF(pyObj_tmp);
+    }
+
     exc->error_context = pyObj_error_context;
     Py_INCREF(exc->error_context);
+
+    PyObject* pyObj_exc_info = PyDict_New();
+
+    PyObject* pyObj_cinfo = Py_BuildValue("(s,i)", file, line);
+    if (-1 == PyDict_SetItemString(pyObj_exc_info, "cinfo", pyObj_cinfo)) {
+        PyErr_Print();
+        Py_XDECREF(pyObj_cinfo);
+    }
+    Py_DECREF(pyObj_cinfo);
+
+    if (!error_msg.empty()) {
+        PyObject* pyObj_error_msg = PyUnicode_FromString(error_msg.c_str());
+        if (-1 == PyDict_SetItemString(pyObj_exc_info, "error_message", pyObj_error_msg)) {
+            PyErr_Print();
+            Py_XDECREF(pyObj_error_msg);
+        }
+        Py_DECREF(pyObj_error_msg);
+    }
+
+    exc->exc_info = pyObj_exc_info;
+    Py_INCREF(exc->exc_info);
 
     return reinterpret_cast<PyObject*>(exc);
 }
 
 template<>
 inline PyObject*
-build_exception_from_context(const couchbase::error_context::query& ctx)
+build_exception_from_context(const couchbase::error_context::query& ctx,
+                             const char* file,
+                             int line,
+                             std::string error_msg,
+                             std::string context_detail_type)
 {
     exception_base* exc = create_exception_base_obj();
     exc->ec = ctx.ec;
@@ -368,7 +459,11 @@ build_exception_from_context(const couchbase::error_context::query& ctx)
 
 template<>
 inline PyObject*
-build_exception_from_context(const couchbase::error_context::analytics& ctx)
+build_exception_from_context(const couchbase::error_context::analytics& ctx,
+                             const char* file,
+                             int line,
+                             std::string error_msg,
+                             std::string context_detail_type)
 {
     exception_base* exc = create_exception_base_obj();
     exc->ec = ctx.ec;
@@ -422,7 +517,11 @@ build_exception_from_context(const couchbase::error_context::analytics& ctx)
 
 template<>
 inline PyObject*
-build_exception_from_context(const couchbase::error_context::search& ctx)
+build_exception_from_context(const couchbase::error_context::search& ctx,
+                             const char* file,
+                             int line,
+                             std::string error_msg,
+                             std::string context_detail_type)
 {
     exception_base* exc = create_exception_base_obj();
     exc->ec = ctx.ec;
@@ -471,7 +570,11 @@ build_exception_from_context(const couchbase::error_context::search& ctx)
 
 template<>
 inline PyObject*
-build_exception_from_context(const couchbase::error_context::view& ctx)
+build_exception_from_context(const couchbase::error_context::view& ctx,
+                             const char* file,
+                             int line,
+                             std::string error_msg,
+                             std::string context_detail_type)
 {
     exception_base* exc = create_exception_base_obj();
     exc->ec = ctx.ec;
@@ -523,27 +626,7 @@ build_exception_from_context(const couchbase::error_context::view& ctx)
     return reinterpret_cast<PyObject*>(exc);
 }
 
-// start - needed for Pycbc error code
-enum class PycbcError {
-    InvalidArgument = 10,
-    HTTPError,
-    UnsuccessfulOperation,
-    UnableToBuildResult,
-    CallbackUnsuccessful,
-    InternalSDKError
-};
-
-namespace std
-{
-template<>
-struct is_error_code_enum<PycbcError> : true_type {
-};
-} // namespace std
-
-std::error_code
-make_error_code(PycbcError ec);
-// end - needed for Pycbc error code
-
+// @TODO:  remove once streaming cleaned up
 class PycbcException : public std::exception
 {
   public:
@@ -588,24 +671,6 @@ class PycbcException : public std::exception
     std::error_code ec;
 };
 
-class PycbcKeyValueException : public PycbcException
-{
-  public:
-    PycbcKeyValueException(std::string msg_, const char* file_, int line_, couchbase::error_context::key_value ctx_)
-      : PycbcException(msg_, file_, line_, ctx_.ec)
-      , ctx{ ctx_ }
-    {
-    }
-
-    couchbase::error_context::key_value get_context() const
-    {
-        return ctx;
-    }
-
-  protected:
-    couchbase::error_context::key_value ctx;
-};
-
 class PycbcHttpException : public PycbcException
 {
   public:
@@ -630,39 +695,18 @@ class PycbcHttpException : public PycbcException
 };
 
 void
-pycbc_set_python_exception(const char* msg, std::error_code ec, const char* file, int line, PyObject* pyObj_base = nullptr);
+pycbc_set_python_exception(std::error_code ec, const char* file, int line, const char* msg, PyObject* pyObj_base_exc = nullptr);
 
+// @TODO:  remove once streaming cleaned up
 PyObject*
 pycbc_core_get_exception_kwargs(std::string msg, std::error_code ec, const char* file, int line);
 
+// @TODO:  remove once streaming cleaned up
 PyObject*
 pycbc_get_exception_kwargs(std::string msg, const char* file, int line);
 
-template<typename T>
+PyObject*
+pycbc_build_exception(std::error_code ec, const char* file, int line, std::string msg);
+
 void
-pycbc_set_exception(const T& ex)
-{
-    pycbc_set_python_exception(ex.what(), ex.get_error_code(), ex.get_file(), ex.get_line());
-}
-
-template<>
-inline void
-pycbc_set_exception<PycbcKeyValueException>(const PycbcKeyValueException& ex)
-{
-    auto ctx = ex.get_context();
-    PyObject* pyObj_base_exc = build_exception_from_context(ctx);
-    pycbc_set_python_exception(ex.what(), ex.get_error_code(), ex.get_file(), ex.get_line(), pyObj_base_exc);
-    // Don't need the pyObj_base_exc any longer
-    Py_DECREF(pyObj_base_exc);
-}
-
-template<>
-inline void
-pycbc_set_exception<PycbcHttpException>(const PycbcHttpException& ex)
-{
-    auto ctx = ex.get_context();
-    PyObject* pyObj_base_exc = build_exception_from_context(ctx);
-    pycbc_set_python_exception(ex.what(), ex.get_error_code(), ex.get_file(), ex.get_line(), pyObj_base_exc);
-    // Don't need the pyObj_base_exc any longer
-    Py_DECREF(pyObj_base_exc);
-}
+pycbc_add_exception_info(PyObject* pyObj_exc_base, const char* key, PyObject* pyObj_value);

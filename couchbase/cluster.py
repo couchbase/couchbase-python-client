@@ -9,7 +9,8 @@ from typing import (TYPE_CHECKING,
 from couchbase.analytics import AnalyticsQuery, AnalyticsRequest
 from couchbase.bucket import Bucket
 from couchbase.diagnostics import ClusterState, ServiceType
-from couchbase.exceptions import UnAmbiguousTimeoutException
+from couchbase.exceptions import ErrorMapperNew, UnAmbiguousTimeoutException
+from couchbase.exceptions import exception as BaseCouchbaseException
 from couchbase.logic import BlockingWrapper
 from couchbase.logic.cluster import ClusterLogic
 from couchbase.management.analytics import AnalyticsIndexManager
@@ -53,8 +54,10 @@ class Cluster(ClusterLogic):
 
     @BlockingWrapper.block(True)
     def _connect(self, **kwargs):
-        conn = super()._connect_cluster(**kwargs)
-        self._set_connection(conn)
+        ret = super()._connect_cluster(**kwargs)
+        if isinstance(ret, BaseCouchbaseException):
+            raise ErrorMapperNew.build_exception(ret)
+        self._set_connection(ret)
 
     @BlockingWrapper.block(True)
     def _close_cluster(self):

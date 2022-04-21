@@ -444,7 +444,6 @@ class Role:
 
     @classmethod
     def create_role(cls, raw_data):
-        print(f'role: {raw_data}')
         return cls(
             name=raw_data.get("name", None),
             bucket=raw_data.get("bucket_name", None),
@@ -794,7 +793,6 @@ class Group:
         rs = list(map(lambda r: r.as_dict(), self.roles))
         for r in self.roles:
             r.as_dict()
-        # print(r)
         return {
             'name': self.name,
             'description': self.description,

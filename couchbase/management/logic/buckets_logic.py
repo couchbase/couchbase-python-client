@@ -91,8 +91,6 @@ class BucketManagerLogic:
         if final_args.get("timeout", None) is not None:
             mgmt_kwargs["timeout"] = final_args.get("timeout")
 
-        print(f'mgmt_kwargs: {mgmt_kwargs}')
-
         return management_operation(**mgmt_kwargs)
 
     def update_bucket(self,
@@ -469,7 +467,6 @@ class BucketSettings(dict):
         return self.get('storage_backend')
 
     def transform_to_dest(self) -> Dict[str, Any]:
-        print(self)
         kwargs = {**self}
         # needed?
         kwargs["bucket_password"] = ""  # nosec

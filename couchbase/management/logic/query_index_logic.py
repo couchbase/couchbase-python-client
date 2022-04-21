@@ -331,7 +331,7 @@ class QueryIndex:
                     json_data  # type: Dict[str, Any]
                     ):
 
-        bucket_name = json_data.get('bucket_id', None)
+        bucket_name = json_data.get('bucket_name', None)
         if bucket_name is None:
             bucket_name = json_data.get('keyspace_id', None)
         return cls(json_data.get('name'),
@@ -344,7 +344,7 @@ class QueryIndex:
                    json_data.get('index_key', []),
                    json_data.get('condition', None),
                    bucket_name,
-                   json_data.get('scope_id', None),
+                   json_data.get('scope_name', None),
                    json_data.get('collection_name', None),
                    json_data.get('partition', None)
                    )

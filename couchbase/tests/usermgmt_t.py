@@ -5,7 +5,8 @@ import pytest
 
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
-from couchbase.exceptions import (CouchbaseException,
+from couchbase.exceptions import (AmbiguousTimeoutException,
+                                  CouchbaseException,
                                   FeatureUnavailableException,
                                   GroupNotFoundException,
                                   InvalidArgumentException,
@@ -111,7 +112,7 @@ class UserManagementTests:
             cb_env.um.get_user,
             username,
             domain_name="local",
-            expected_exceptions=UserNotFoundException)
+            expected_exceptions=(UserNotFoundException,))
 
     def test_internal_user_kwargs(self, cb_env):
         """
@@ -181,6 +182,27 @@ class UserManagementTests:
             username,
             domain_name="local",
             expected_exceptions=UserNotFoundException)
+
+    def test_internal_user_fail(self, cb_env):
+        """
+            test_internal_user()
+            Tests create, retrieve, update and removal
+            of internal (domain_name="local")
+            Uses *UserOptions() for options
+        """
+
+        username = 'custom-user'
+        password = 's3cr3t'
+        roles = [
+            Role(name='data_reader', bucket='not-a-bucket'),
+            Role(name='data_writer', bucket='not-a-bucket')
+        ]
+
+        # create user
+        with pytest.raises(InvalidArgumentException):
+            cb_env.um.upsert_user(
+                User(username=username, roles=roles, password=password),
+                UpsertUserOptions(domain_name="local"))
 
     def test_user_display_name(self, cb_env):
         roles = [
@@ -590,7 +612,8 @@ class UserManagementTests:
 
     @pytest.mark.usefixtures("check_user_groups_supported")
     def test_timeout(self, cb_env):
-        cb_env.um.get_all_groups(timeout=timedelta(seconds=0.1))
+        with pytest.raises(AmbiguousTimeoutException):
+            cb_env.um.get_all_groups(timeout=timedelta(seconds=0.1))
 
     def test_get_roles(self, cb_env):
         roles = cb_env.um.get_roles()

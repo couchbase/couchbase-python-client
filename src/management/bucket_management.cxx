@@ -429,21 +429,17 @@ create_result_from_bucket_mgmt_op_response(Response& resp,
     if (resp.ctx.ec.value()) {
         // update and create responses might provide an erorr message
         auto error_msg = get_bucket_mgmt_error_msg(resp);
+        if (error_msg.empty()) {
+            error_msg = std::string("Error doing bucket mgmt operation.");
+        }
+        // make sure this is an HTTPException
+        pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, error_msg, "BucketMgmt");
         if (pyObj_errback == nullptr) {
-            if (error_msg.empty()) {
-                error_msg = std::string("Error doing bucket mgmt operation.");
-            }
-            // make sure this is an HTTPException
-            auto pycbc_ex = PycbcHttpException(error_msg, __FILE__, __LINE__, resp.ctx, PycbcError::HTTPError);
-            auto exc = std::make_exception_ptr(pycbc_ex);
-            barrier->set_exception(exc);
+            barrier->set_value(pyObj_exc);
         } else {
-            pyObj_exc = build_exception_from_context(resp.ctx);
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
             PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
-
-            pyObj_kwargs = pycbc_get_exception_kwargs(error_msg, __FILE__, __LINE__);
         }
         // lets clear any errors
         PyErr_Clear();
@@ -464,16 +460,13 @@ create_result_from_bucket_mgmt_op_response(Response& resp,
     }
 
     if (set_exception) {
+        pyObj_exc = pycbc_build_exception(PycbcError::UnableToBuildResult, __FILE__, __LINE__, "Bucket mgmt operation error.");
         if (pyObj_errback == nullptr) {
-            auto pycbc_ex = PycbcException("Bucket mgmt operation error.", __FILE__, __LINE__, PycbcError::UnableToBuildResult);
-            auto exc = std::make_exception_ptr(pycbc_ex);
-            barrier->set_exception(exc);
+            barrier->set_value(pyObj_exc);
         } else {
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
-            PyTuple_SET_ITEM(pyObj_args, 0, Py_None);
-            pyObj_kwargs =
-              pycbc_core_get_exception_kwargs("Bucket mgmt operation error.", PycbcError::UnableToBuildResult, __FILE__, __LINE__);
+            PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
         }
     }
 
@@ -486,8 +479,8 @@ create_result_from_bucket_mgmt_op_response(Response& resp,
             // @TODO:  how to handle this situation?
         }
         Py_DECREF(pyObj_args);
-        Py_XDECREF(pyObj_kwargs);
         Py_XDECREF(pyObj_exc);
+        Py_XDECREF(pyObj_kwargs);
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }
@@ -502,7 +495,7 @@ get_bucket_settings(PyObject* settings)
 
     PyObject* pyObj_name = PyDict_GetItemString(settings, "name");
     if (pyObj_name == nullptr) {
-        pycbc_set_python_exception("Expected bucket settings name to be provided.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Expected bucket settings name to be provided.");
         throw std::invalid_argument("name");
     }
     auto bucket_name = std::string(PyUnicode_AsUTF8(pyObj_name));
@@ -626,7 +619,7 @@ get_bucket_mgmt_with_bucket_settings_req(PyObject* op_args)
 
     PyObject* pyObj_bucket_settings = PyDict_GetItemString(op_args, "bucket_settings");
     if (pyObj_bucket_settings == nullptr) {
-        pycbc_set_python_exception("Expected bucket settings to be provided.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Expected bucket settings to be provided.");
         throw std::invalid_argument("bucket_settings");
     }
     req.bucket = get_bucket_settings(pyObj_bucket_settings);
@@ -648,7 +641,7 @@ get_bucket_mgmt_with_bucket_name_req(PyObject* op_args)
 
     PyObject* pyObj_bucket_name = PyDict_GetItemString(op_args, "bucket_name");
     if (pyObj_bucket_name == nullptr) {
-        pycbc_set_python_exception("Expected bucket_name to be provided.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Expected bucket_name to be provided.");
         throw std::invalid_argument("bucket_name");
     }
     auto bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
@@ -676,51 +669,6 @@ do_bucket_mgmt_op(connection& conn,
         create_result_from_bucket_mgmt_op_response(resp, pyObj_callback, pyObj_errback, barrier);
     });
     Py_END_ALLOW_THREADS Py_RETURN_NONE;
-}
-
-PyObject*
-handle_bucket_mgmt_blocking_result(std::future<PyObject*>&& fut)
-{
-    PyObject* ret = nullptr;
-    bool http_ex = false;
-    std::string file;
-    int line;
-    couchbase::error_context::http ctx{};
-    std::error_code ec;
-    std::string msg;
-
-    Py_BEGIN_ALLOW_THREADS
-    try {
-        ret = fut.get();
-    } catch (PycbcHttpException e) {
-        http_ex = true;
-        msg = e.what();
-        file = e.get_file();
-        line = e.get_line();
-        ec = e.get_error_code();
-        ctx = e.get_context();
-    } catch (PycbcException e) {
-        msg = e.what();
-        file = e.get_file();
-        line = e.get_line();
-        ec = e.get_error_code();
-    } catch (const std::exception& e) {
-        ec = PycbcError::InternalSDKError;
-        msg = e.what();
-    }
-    Py_END_ALLOW_THREADS
-
-      std::string ec_category = std::string(ec.category().name());
-    if (http_ex) {
-        PyObject* pyObj_base_exc = build_exception_from_context(ctx);
-        pycbc_set_python_exception(msg.c_str(), ec, file.c_str(), line, pyObj_base_exc);
-        Py_DECREF(pyObj_base_exc);
-    } else if (!file.empty()) {
-        pycbc_set_python_exception(msg.c_str(), ec, file.c_str(), line);
-    } else if (ec_category.compare("pycbc") == 0) {
-        pycbc_set_python_exception(msg.c_str(), ec, __FILE__, __LINE__);
-    }
-    return ret;
 }
 
 PyObject*
@@ -785,11 +733,18 @@ handle_bucket_mgmt_op(connection* conn, struct bucket_mgmt_options* options, PyO
             }
             default: {
                 pycbc_set_python_exception(
-                  "Unrecognized bucket mgmt operation passed in.", PycbcError::InvalidArgument, __FILE__, __LINE__);
+                  PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized bucket mgmt operation passed in.");
+                barrier->set_value(nullptr);
                 break;
             }
         };
     } catch (const std::invalid_argument&) {
+    }
+
+    if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
+        PyObject* ret = nullptr;
+        Py_BEGIN_ALLOW_THREADS ret = f.get();
+        Py_END_ALLOW_THREADS return ret;
     }
 
     if (res == nullptr) {
@@ -798,11 +753,6 @@ handle_bucket_mgmt_op(connection* conn, struct bucket_mgmt_options* options, PyO
         return nullptr;
     }
 
-    if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
-        // can only be a single future (if not doing std::shared),
-        // so use move semantics
-        return handle_bucket_mgmt_blocking_result(std::move(f));
-    }
     return res;
 }
 

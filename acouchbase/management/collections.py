@@ -4,7 +4,8 @@ from typing import (TYPE_CHECKING,
                     Dict,
                     Iterable)
 
-from acouchbase.management.logic import CollectionMgmtWrapper
+from acouchbase.management.logic.wrappers import AsyncMgmtWrapper
+from couchbase.management.logic import ManagementType
 from couchbase.management.logic.collections_logic import (CollectionManagerLogic,
                                                           CollectionSpec,
                                                           ScopeSpec)
@@ -30,7 +31,7 @@ class CollectionManager(CollectionManagerLogic):
         """
         return self._loop
 
-    @CollectionMgmtWrapper.inject_callbacks(None, CollectionManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.CollectionMgmt, CollectionManagerLogic._ERROR_MAPPING)
     def create_scope(self,
                      scope_name,      # type: str
                      *options,        # type: CreateScopeOptions
@@ -38,7 +39,7 @@ class CollectionManager(CollectionManagerLogic):
                      ) -> Awaitable[None]:
         super().create_scope(scope_name, *options, **kwargs)
 
-    @CollectionMgmtWrapper.inject_callbacks(None, CollectionManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.CollectionMgmt, CollectionManagerLogic._ERROR_MAPPING)
     def drop_scope(self,
                    scope_name,      # type: str
                    *options,        # type: DropScopeOptions
@@ -46,14 +47,15 @@ class CollectionManager(CollectionManagerLogic):
                    ) -> Awaitable[None]:
         super().drop_scope(scope_name, *options, **kwargs)
 
-    @CollectionMgmtWrapper.inject_callbacks((ScopeSpec, CollectionSpec), CollectionManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks((ScopeSpec, CollectionSpec), ManagementType.CollectionMgmt,
+                                       CollectionManagerLogic._ERROR_MAPPING)
     def get_all_scopes(self,
                        *options,        # type: GetAllScopesOptions
                        **kwargs         # type: Dict[str, Any]
                        ) -> Awaitable[Iterable[ScopeSpec]]:
         super().get_all_scopes(*options, **kwargs)
 
-    @CollectionMgmtWrapper.inject_callbacks(None, CollectionManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.CollectionMgmt, CollectionManagerLogic._ERROR_MAPPING)
     def create_collection(self,
                           collection,     # type: CollectionSpec
                           *options,       # type: CreateCollectionOptions
@@ -61,7 +63,7 @@ class CollectionManager(CollectionManagerLogic):
                           ) -> Awaitable[None]:
         super().create_collection(collection, *options, **kwargs)
 
-    @CollectionMgmtWrapper.inject_callbacks(None, CollectionManagerLogic._ERROR_MAPPING)
+    @AsyncMgmtWrapper.inject_callbacks(None, ManagementType.CollectionMgmt, CollectionManagerLogic._ERROR_MAPPING)
     def drop_collection(self,
                         collection,     # type: CollectionSpec
                         *options,       # type: DropCollectionOptions

@@ -6,10 +6,10 @@ from typing import (TYPE_CHECKING,
 from acouchbase.collection import Collection
 from acouchbase.logic import AsyncWrapper
 from acouchbase.management.collections import CollectionManager
+from acouchbase.management.views import ViewIndexManager
 from acouchbase.scope import Scope
 from acouchbase.views import AsyncViewRequest, ViewQuery
 from couchbase.logic.bucket import BucketLogic
-from couchbase.management.views import ViewIndexManager
 from couchbase.result import PingResult, ViewResult
 
 if TYPE_CHECKING:

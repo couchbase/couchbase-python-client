@@ -37,6 +37,3 @@ struct binary_mutation_options {
 
 PyObject*
 handle_binary_op(PyObject* self, PyObject* args, PyObject* kwargs);
-
-PyObject*
-handle_binary_blocking_result(std::future<PyObject*>&& fut);
