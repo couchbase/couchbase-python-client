@@ -177,7 +177,8 @@ create_result_from_get_operation_response(const char* key,
                                           const T& resp,
                                           PyObject* pyObj_callback,
                                           PyObject* pyObj_errback,
-                                          std::shared_ptr<std::promise<PyObject*>> barrier)
+                                          std::shared_ptr<std::promise<PyObject*>> barrier,
+                                          result* multi_result = nullptr)
 {
     PyGILState_STATE state = PyGILState_Ensure();
     PyObject* pyObj_args = NULL;
@@ -190,7 +191,19 @@ create_result_from_get_operation_response(const char* key,
     if (resp.ctx.ec.value()) {
         pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "KV read operation error.");
         if (pyObj_errback == nullptr) {
-            barrier->set_value(pyObj_exc);
+            if (multi_result != nullptr) {
+                Py_INCREF(Py_False);
+                barrier->set_value(Py_False);
+                if (-1 == PyDict_SetItemString(multi_result->dict, key, pyObj_exc)) {
+                    // TODO:  not much we can do here...maybe?
+                    PyErr_Print();
+                    PyErr_Clear();
+                }
+                // won't fall into logic path where pyObj_exc is decremented later
+                Py_DECREF(pyObj_exc);
+            } else {
+                barrier->set_value(pyObj_exc);
+            }
         } else {
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
@@ -208,7 +221,18 @@ create_result_from_get_operation_response(const char* key,
             set_exception = true;
         } else {
             if (pyObj_callback == nullptr) {
-                barrier->set_value(reinterpret_cast<PyObject*>(res));
+                if (multi_result != nullptr) {
+                    Py_INCREF(Py_True);
+                    barrier->set_value(Py_True);
+                    if (-1 == PyDict_SetItemString(multi_result->dict, key, reinterpret_cast<PyObject*>(res))) {
+                        // TODO:  not much we can do here...maybe?
+                        PyErr_Print();
+                        PyErr_Clear();
+                    }
+                    Py_DECREF(reinterpret_cast<PyObject*>(res));
+                } else {
+                    barrier->set_value(reinterpret_cast<PyObject*>(res));
+                }
             } else {
                 pyObj_func = pyObj_callback;
                 pyObj_args = PyTuple_New(1);
@@ -220,7 +244,19 @@ create_result_from_get_operation_response(const char* key,
     if (set_exception) {
         pyObj_exc = pycbc_build_exception(PycbcError::UnableToBuildResult, __FILE__, __LINE__, "KV read operation error.");
         if (pyObj_errback == nullptr) {
-            barrier->set_value(pyObj_exc);
+            if (multi_result != nullptr) {
+                Py_INCREF(Py_False);
+                barrier->set_value(Py_False);
+                if (-1 == PyDict_SetItemString(multi_result->dict, key, pyObj_exc)) {
+                    // TODO:  not much we can do here...maybe?
+                    PyErr_Print();
+                    PyErr_Clear();
+                }
+                // won't fall into logic path where pyObj_exc is decremented later
+                Py_DECREF(pyObj_exc);
+            } else {
+                barrier->set_value(pyObj_exc);
+            }
         } else {
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
@@ -252,7 +288,8 @@ create_result_from_get_operation_response<couchbase::operations::exists_response
                                                                                   const couchbase::operations::exists_response& resp,
                                                                                   PyObject* pyObj_callback,
                                                                                   PyObject* pyObj_errback,
-                                                                                  std::shared_ptr<std::promise<PyObject*>> barrier)
+                                                                                  std::shared_ptr<std::promise<PyObject*>> barrier,
+                                                                                  result* multi_result)
 {
     PyGILState_STATE state = PyGILState_Ensure();
     PyObject* pyObj_args = NULL;
@@ -265,7 +302,19 @@ create_result_from_get_operation_response<couchbase::operations::exists_response
     if (resp.ctx.ec.value() && resp.ctx.ec.value() != 101) {
         pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "KV read operation error.");
         if (pyObj_errback == nullptr) {
-            barrier->set_value(pyObj_exc);
+            if (multi_result != nullptr) {
+                Py_INCREF(Py_False);
+                barrier->set_value(Py_False);
+                if (-1 == PyDict_SetItemString(multi_result->dict, key, pyObj_exc)) {
+                    // TODO:  not much we can do here...maybe?
+                    PyErr_Print();
+                    PyErr_Clear();
+                }
+                // won't fall into logic path where pyObj_exc is decremented later
+                Py_DECREF(pyObj_exc);
+            } else {
+                barrier->set_value(pyObj_exc);
+            }
         } else {
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
@@ -283,7 +332,18 @@ create_result_from_get_operation_response<couchbase::operations::exists_response
             set_exception = true;
         } else {
             if (pyObj_callback == nullptr) {
-                barrier->set_value(reinterpret_cast<PyObject*>(res));
+                if (multi_result != nullptr) {
+                    Py_INCREF(Py_True);
+                    barrier->set_value(Py_True);
+                    if (-1 == PyDict_SetItemString(multi_result->dict, key, reinterpret_cast<PyObject*>(res))) {
+                        // TODO:  not much we can do here...maybe?
+                        PyErr_Print();
+                        PyErr_Clear();
+                    }
+                    Py_DECREF(reinterpret_cast<PyObject*>(res));
+                } else {
+                    barrier->set_value(reinterpret_cast<PyObject*>(res));
+                }
             } else {
                 pyObj_func = pyObj_callback;
                 pyObj_args = PyTuple_New(1);
@@ -295,7 +355,19 @@ create_result_from_get_operation_response<couchbase::operations::exists_response
     if (set_exception) {
         pyObj_exc = pycbc_build_exception(PycbcError::UnableToBuildResult, __FILE__, __LINE__, "KV read operation error.");
         if (pyObj_errback == nullptr) {
-            barrier->set_value(pyObj_exc);
+            if (multi_result != nullptr) {
+                Py_INCREF(Py_False);
+                barrier->set_value(Py_False);
+                if (-1 == PyDict_SetItemString(multi_result->dict, key, pyObj_exc)) {
+                    // TODO:  not much we can do here...maybe?
+                    PyErr_Print();
+                    PyErr_Clear();
+                }
+                // won't fall into logic path where pyObj_exc is decremented later
+                Py_DECREF(pyObj_exc);
+            } else {
+                barrier->set_value(pyObj_exc);
+            }
         } else {
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
@@ -321,26 +393,33 @@ create_result_from_get_operation_response<couchbase::operations::exists_response
 
 template<typename Request>
 void
-do_get(connection& conn, Request& req, PyObject* pyObj_callback, PyObject* pyObj_errback, std::shared_ptr<std::promise<PyObject*>> barrier)
+do_get(connection& conn,
+       Request& req,
+       PyObject* pyObj_callback,
+       PyObject* pyObj_errback,
+       std::shared_ptr<std::promise<PyObject*>> barrier,
+       result* multi_result = nullptr)
 {
     using response_type = typename Request::response_type;
-    Py_BEGIN_ALLOW_THREADS conn.cluster_->execute(req, [key = req.id.key(), pyObj_callback, pyObj_errback, barrier](response_type resp) {
-        create_result_from_get_operation_response(key.c_str(), resp, pyObj_callback, pyObj_errback, barrier);
-    });
+    Py_BEGIN_ALLOW_THREADS conn.cluster_->execute(
+      req, [key = req.id.key(), pyObj_callback, pyObj_errback, barrier, multi_result](response_type resp) {
+          create_result_from_get_operation_response(key.c_str(), resp, pyObj_callback, pyObj_errback, barrier, multi_result);
+      });
     Py_END_ALLOW_THREADS
 }
 
 PyObject*
-prepare_and_execute_read_op(struct read_options* options, PyObject* pyObj_callback, PyObject* pyObj_errback)
+prepare_and_execute_read_op(struct read_options* options,
+                            PyObject* pyObj_callback,
+                            PyObject* pyObj_errback,
+                            std::shared_ptr<std::promise<PyObject*>> barrier,
+                            result* multi_result = nullptr)
 {
-    auto barrier = std::make_shared<std::promise<PyObject*>>();
-    auto f = barrier->get_future();
-
     switch (options->op_type) {
         case Operations::GET: {
             couchbase::operations::get_request req{ options->id };
             req.timeout = options->timeout_ms;
-            do_get<couchbase::operations::get_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
+            do_get<couchbase::operations::get_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         case Operations::GET_PROJECTED: {
@@ -363,11 +442,24 @@ prepare_and_execute_read_op(struct read_options* options, PyObject* pyObj_callba
                     }
                 }
                 if (!ok) {
-                    pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Project must be a list of strings.");
-                    barrier->set_value(nullptr);
-                    Py_XDECREF(pyObj_callback);
-                    Py_XDECREF(pyObj_errback);
-                    return nullptr;
+                    if (multi_result != nullptr) {
+                        PyObject* pyObj_exc =
+                          pycbc_build_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Project must be a list of strings.");
+                        if (-1 == PyDict_SetItemString(multi_result->dict, options->id.key().c_str(), pyObj_exc)) {
+                            // TODO:  not much we can do here...maybe?
+                            PyErr_Print();
+                            PyErr_Clear();
+                        }
+                        Py_DECREF(pyObj_exc);
+                        Py_INCREF(Py_False);
+                        barrier->set_value(Py_False);
+                    } else {
+                        barrier->set_value(nullptr);
+                        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Project must be a list of strings.");
+                        Py_XDECREF(pyObj_callback);
+                        Py_XDECREF(pyObj_errback);
+                        return nullptr;
+                    }
                 }
             }
 
@@ -375,56 +467,68 @@ prepare_and_execute_read_op(struct read_options* options, PyObject* pyObj_callba
             req.timeout = options->timeout_ms;
             req.with_expiry = !!options->with_expiry;
             req.projections = projections;
-            do_get<couchbase::operations::get_projected_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
+            do_get<couchbase::operations::get_projected_request>(
+              *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         case Operations::GET_AND_TOUCH: {
             couchbase::operations::get_and_touch_request req{ options->id };
             req.expiry = options->expiry;
             req.timeout = options->timeout_ms;
-            do_get<couchbase::operations::get_and_touch_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
+            do_get<couchbase::operations::get_and_touch_request>(
+              *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         case Operations::GET_AND_LOCK: {
             couchbase::operations::get_and_lock_request req{ options->id };
             req.lock_time = options->lock_time;
             req.timeout = options->timeout_ms;
-            do_get<couchbase::operations::get_and_lock_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
+            do_get<couchbase::operations::get_and_lock_request>(
+              *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         case Operations::EXISTS: {
             couchbase::operations::exists_request req{ options->id };
             req.timeout = options->timeout_ms;
-            do_get<couchbase::operations::exists_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
+            do_get<couchbase::operations::exists_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         case Operations::TOUCH: {
             couchbase::operations::touch_request req{ options->id };
             req.expiry = options->expiry;
             req.timeout = options->timeout_ms;
-            do_get<couchbase::operations::touch_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
+            do_get<couchbase::operations::touch_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         case Operations::UNLOCK: {
             couchbase::operations::unlock_request req{ options->id };
             req.cas = options->cas;
             req.timeout = options->timeout_ms;
-            do_get<couchbase::operations::unlock_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
+            do_get<couchbase::operations::unlock_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         default: {
-            pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized get operation passed in.");
-            barrier->set_value(nullptr);
-            Py_XDECREF(pyObj_callback);
-            Py_XDECREF(pyObj_errback);
-            return nullptr;
+            if (multi_result != nullptr) {
+                PyObject* pyObj_exc =
+                  pycbc_build_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized get operation passed in.");
+                if (-1 == PyDict_SetItemString(multi_result->dict, options->id.key().c_str(), pyObj_exc)) {
+                    // TODO:  not much we can do here...maybe?
+                    PyErr_Print();
+                    PyErr_Clear();
+                }
+                Py_DECREF(pyObj_exc);
+                Py_INCREF(Py_False);
+                barrier->set_value(Py_False);
+                break;
+            } else {
+                barrier->set_value(nullptr);
+                pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized get operation passed in.");
+                Py_XDECREF(pyObj_callback);
+                Py_XDECREF(pyObj_errback);
+                return nullptr;
+            }
         }
     };
-    if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
-        PyObject* ret = nullptr;
-        Py_BEGIN_ALLOW_THREADS ret = f.get();
-        Py_END_ALLOW_THREADS return ret;
-    }
     Py_RETURN_NONE;
 }
 
@@ -467,7 +571,8 @@ create_result_from_mutation_operation_response(const char* key,
                                                const T& resp,
                                                PyObject* pyObj_callback,
                                                PyObject* pyObj_errback,
-                                               std::shared_ptr<std::promise<PyObject*>> barrier)
+                                               std::shared_ptr<std::promise<PyObject*>> barrier,
+                                               result* multi_result = nullptr)
 {
     PyGILState_STATE state = PyGILState_Ensure();
     PyObject* pyObj_args = nullptr;
@@ -480,7 +585,19 @@ create_result_from_mutation_operation_response(const char* key,
     if (resp.ctx.ec.value()) {
         pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "KV mutation operation error.");
         if (pyObj_errback == nullptr) {
-            barrier->set_value(pyObj_exc);
+            if (multi_result != nullptr) {
+                Py_INCREF(Py_False);
+                barrier->set_value(Py_False);
+                if (-1 == PyDict_SetItemString(multi_result->dict, key, pyObj_exc)) {
+                    // TODO:  not much we can do here...maybe?
+                    PyErr_Print();
+                    PyErr_Clear();
+                }
+                // won't fall into logic path where pyObj_exc is decremented later
+                Py_DECREF(pyObj_exc);
+            } else {
+                barrier->set_value(pyObj_exc);
+            }
         } else {
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
@@ -496,7 +613,18 @@ create_result_from_mutation_operation_response(const char* key,
             set_exception = true;
         } else {
             if (pyObj_callback == nullptr) {
-                barrier->set_value(reinterpret_cast<PyObject*>(res));
+                if (multi_result != nullptr) {
+                    Py_INCREF(Py_True);
+                    barrier->set_value(Py_True);
+                    if (-1 == PyDict_SetItemString(multi_result->dict, key, reinterpret_cast<PyObject*>(res))) {
+                        // TODO:  not much we can do here...maybe?
+                        PyErr_Print();
+                        PyErr_Clear();
+                    }
+                    Py_DECREF(reinterpret_cast<PyObject*>(res));
+                } else {
+                    barrier->set_value(reinterpret_cast<PyObject*>(res));
+                }
             } else {
                 pyObj_func = pyObj_callback;
                 pyObj_args = PyTuple_New(1);
@@ -508,7 +636,19 @@ create_result_from_mutation_operation_response(const char* key,
     if (set_exception) {
         pyObj_exc = pycbc_build_exception(PycbcError::UnableToBuildResult, __FILE__, __LINE__, "KV mutation operation error.");
         if (pyObj_errback == nullptr) {
-            barrier->set_value(pyObj_exc);
+            if (multi_result != nullptr) {
+                Py_INCREF(Py_False);
+                barrier->set_value(Py_False);
+                if (-1 == PyDict_SetItemString(multi_result->dict, key, pyObj_exc)) {
+                    // TODO:  not much we can do here...maybe?
+                    PyErr_Print();
+                    PyErr_Clear();
+                }
+                // won't fall into logic path where pyObj_exc is decremented later
+                Py_DECREF(pyObj_exc);
+            } else {
+                barrier->set_value(pyObj_exc);
+            }
         } else {
             pyObj_func = pyObj_errback;
             pyObj_args = PyTuple_New(1);
@@ -539,22 +679,24 @@ do_mutation(connection& conn,
             Request& req,
             PyObject* pyObj_callback,
             PyObject* pyObj_errback,
-            std::shared_ptr<std::promise<PyObject*>> barrier)
+            std::shared_ptr<std::promise<PyObject*>> barrier,
+            result* multi_result = nullptr)
 {
     using response_type = typename Request::response_type;
-    Py_BEGIN_ALLOW_THREADS conn.cluster_->execute(req, [key = req.id.key(), pyObj_callback, pyObj_errback, barrier](response_type resp) {
-        create_result_from_mutation_operation_response(key.c_str(), resp, pyObj_callback, pyObj_errback, barrier);
-    });
+    Py_BEGIN_ALLOW_THREADS conn.cluster_->execute(
+      req, [key = req.id.key(), pyObj_callback, pyObj_errback, barrier, multi_result](response_type resp) {
+          create_result_from_mutation_operation_response(key.c_str(), resp, pyObj_callback, pyObj_errback, barrier, multi_result);
+      });
     Py_END_ALLOW_THREADS
 }
 
 PyObject*
-prepare_and_execute_mutation_op(struct mutation_options* options, PyObject* pyObj_callback, PyObject* pyObj_errback)
+prepare_and_execute_mutation_op(struct mutation_options* options,
+                                PyObject* pyObj_callback,
+                                PyObject* pyObj_errback,
+                                std::shared_ptr<std::promise<PyObject*>> barrier,
+                                result* multi_result = nullptr)
 {
-    // auto value = !options->value ? std::string() : json_encode(options->value);
-    // auto encoded =
-    //   !options->value ? std::tuple<std::string, uint32_t>{ std::string(), 0 } : encode_value(pyObj_transcoder, options->value);
-
     // **DO NOT DECREF** these -- things from tuples are borrowed references!!
     PyObject* pyObj_value = nullptr;
     PyObject* pyObj_flags = nullptr;
@@ -578,9 +720,6 @@ prepare_and_execute_mutation_op(struct mutation_options* options, PyObject* pyOb
         durability_level = static_cast<couchbase::protocol::durability_level>(options->durability);
     }
 
-    auto barrier = std::make_shared<std::promise<PyObject*>>();
-    auto f = barrier->get_future();
-
     switch (options->op_type) {
         case Operations::INSERT: {
             couchbase::operations::insert_request req{ options->id, value };
@@ -588,7 +727,7 @@ prepare_and_execute_mutation_op(struct mutation_options* options, PyObject* pyOb
             req.timeout = options->timeout_ms;
             req.expiry = options->expiry;
             req.durability_level = durability_level;
-            do_mutation<couchbase::operations::insert_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
+            do_mutation<couchbase::operations::insert_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         case Operations::UPSERT: {
@@ -602,7 +741,7 @@ prepare_and_execute_mutation_op(struct mutation_options* options, PyObject* pyOb
             if (options->preserve_expiry) {
                 req.preserve_expiry = options->preserve_expiry;
             }
-            do_mutation<couchbase::operations::upsert_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
+            do_mutation<couchbase::operations::upsert_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         case Operations::REPLACE: {
@@ -617,7 +756,8 @@ prepare_and_execute_mutation_op(struct mutation_options* options, PyObject* pyOb
             if (options->preserve_expiry) {
                 req.preserve_expiry = options->preserve_expiry;
             }
-            do_mutation<couchbase::operations::replace_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
+            do_mutation<couchbase::operations::replace_request>(
+              *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         case Operations::REMOVE: {
@@ -625,21 +765,30 @@ prepare_and_execute_mutation_op(struct mutation_options* options, PyObject* pyOb
             req.timeout = options->timeout_ms;
             req.cas = options->cas;
             req.durability_level = durability_level;
-            do_mutation<couchbase::operations::remove_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
+            do_mutation<couchbase::operations::remove_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         default: {
-            pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized mutation operation passed in.");
+            if (multi_result != nullptr) {
+                PyObject* pyObj_exc =
+                  pycbc_build_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized mutation operation passed in.");
+                if (-1 == PyDict_SetItemString(multi_result->dict, options->id.key().c_str(), pyObj_exc)) {
+                    // TODO:  not much we can do here...maybe?
+                    PyErr_Print();
+                    PyErr_Clear();
+                }
+                Py_DECREF(pyObj_exc);
+                Py_INCREF(Py_False);
+                barrier->set_value(Py_False);
+                break;
+            }
+
             barrier->set_value(nullptr);
+            pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized mutation operation passed in.");
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
             return nullptr;
         }
-    }
-    if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
-        PyObject* ret = nullptr;
-        Py_BEGIN_ALLOW_THREADS ret = f.get();
-        Py_END_ALLOW_THREADS return ret;
     }
     Py_RETURN_NONE;
 }
@@ -707,7 +856,6 @@ handle_kv_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
         return nullptr;
     }
 
-    PyObject* pyObj_result = nullptr;
     connection* conn = nullptr;
     std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::key_value_timeout;
 
@@ -732,6 +880,10 @@ handle_kv_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
     // struct callback_context callback_ctx = { pyObj_callback, pyObj_errback, pyObj_transcoder };
     Py_XINCREF(pyObj_callback);
     Py_XINCREF(pyObj_errback);
+
+    PyObject* pyObj_op_response = nullptr;
+    auto barrier = std::make_shared<std::promise<PyObject*>>();
+    auto f = barrier->get_future();
 
     switch (op_type) {
         case Operations::INSERT:
@@ -759,7 +911,7 @@ handle_kv_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
             }
             struct mutation_options opts = { conn,       id,     op_type,    pyObj_value, durability, replicate_to,
                                              persist_to, expiry, timeout_ms, pyObj_span,  cas,        preserve_expiry == 1 };
-            pyObj_result = prepare_and_execute_mutation_op(&opts, pyObj_callback, pyObj_errback);
+            pyObj_op_response = prepare_and_execute_mutation_op(&opts, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case Operations::GET:
@@ -775,16 +927,284 @@ handle_kv_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
             struct read_options opts = {
                 conn, id, op_type, timeout_ms, with_expiry == 1, expiry, lock_time, cas, pyObj_span, pyObj_project
             };
-            pyObj_result = prepare_and_execute_read_op(&opts, pyObj_callback, pyObj_errback);
+            pyObj_op_response = prepare_and_execute_read_op(&opts, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         default: {
             pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized KV operation passed in.");
+            barrier->set_value(nullptr);
             Py_XDECREF(pyObj_callback);
             Py_XDECREF(pyObj_errback);
-            return nullptr;
+            break;
         }
     };
 
-    return pyObj_result;
+    if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
+        PyObject* ret = nullptr;
+        Py_BEGIN_ALLOW_THREADS ret = f.get();
+        Py_END_ALLOW_THREADS return ret;
+    }
+    return pyObj_op_response;
+}
+
+struct read_options
+get_read_options(PyObject* op_args)
+{
+
+    struct read_options opts {
+    };
+
+    PyObject* pyObj_span = PyDict_GetItemString(op_args, "span");
+    if (pyObj_span != nullptr) {
+        opts.span = pyObj_span;
+    }
+
+    PyObject* pyObj_expiry = PyDict_GetItemString(op_args, "expiry");
+    if (pyObj_expiry != nullptr) {
+        auto expiry = static_cast<uint32_t>(PyLong_AsUnsignedLong(pyObj_expiry));
+        opts.expiry = expiry;
+    }
+
+    PyObject* pyObj_cas = PyDict_GetItemString(op_args, "cas");
+    couchbase::cas cas = couchbase::cas{ 0 };
+    if (pyObj_cas != nullptr) {
+        auto cas_int = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_cas));
+        if (cas_int != 0) {
+            cas = couchbase::cas{ cas_int };
+        }
+    }
+    opts.cas = cas;
+
+    PyObject* pyObj_lock_time = PyDict_GetItemString(op_args, "lock_time");
+    if (pyObj_lock_time != nullptr) {
+        auto lock_time = static_cast<uint32_t>(PyLong_AsUnsignedLong(pyObj_lock_time));
+        opts.lock_time = lock_time;
+    }
+
+    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::key_value_timeout;
+    PyObject* pyObj_timeout = PyDict_GetItemString(op_args, "timeout");
+    if (pyObj_timeout != nullptr) {
+        auto timeout = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_timeout));
+        auto timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
+        if (0 < timeout) {
+            opts.timeout_ms = timeout_ms;
+        }
+    }
+
+    return opts;
+}
+
+struct mutation_options
+get_mutation_options(PyObject* op_args)
+{
+
+    struct mutation_options opts {
+    };
+
+    PyObject* pyObj_span = PyDict_GetItemString(op_args, "span");
+    if (pyObj_span != nullptr) {
+        opts.span = pyObj_span;
+    }
+
+    PyObject* pyObj_expiry = PyDict_GetItemString(op_args, "expiry");
+    if (pyObj_expiry != nullptr) {
+        auto expiry = static_cast<uint32_t>(PyLong_AsUnsignedLong(pyObj_expiry));
+        opts.expiry = expiry;
+    }
+
+    PyObject* pyObj_cas = PyDict_GetItemString(op_args, "cas");
+    couchbase::cas cas = couchbase::cas{ 0 };
+    if (pyObj_cas != nullptr) {
+        auto cas_int = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_cas));
+        if (cas_int != 0) {
+            cas = couchbase::cas{ cas_int };
+        }
+    }
+    opts.cas = cas;
+
+    PyObject* pyObj_preserve_expiry = PyDict_GetItemString(op_args, "preserve_expiry");
+    if (pyObj_preserve_expiry != nullptr) {
+        if (pyObj_preserve_expiry == Py_True) {
+            opts.preserve_expiry = true;
+        } else {
+            opts.preserve_expiry = false;
+        }
+    }
+
+    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::key_value_timeout;
+    PyObject* pyObj_timeout = PyDict_GetItemString(op_args, "timeout");
+    if (pyObj_timeout != nullptr) {
+        auto timeout = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_timeout));
+        auto timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
+        if (0 < timeout) {
+            opts.timeout_ms = timeout_ms;
+        }
+    }
+
+    uint8_t durability = 0;
+    PyObject* pyObj_durability = PyDict_GetItemString(op_args, "durability");
+    if (pyObj_durability) {
+        if (PyDict_Check(pyObj_durability)) {
+            PyObject* pyObj_replicate_to = PyDict_GetItemString(pyObj_durability, "replicate_to");
+            if (pyObj_replicate_to) {
+                auto replicate_to = static_cast<uint8_t>(PyLong_AsLong(pyObj_replicate_to));
+                opts.replicate_to = replicate_to;
+            }
+            PyObject* pyObj_persist_to = PyDict_GetItemString(pyObj_durability, "persist_to");
+            if (pyObj_persist_to) {
+                auto persist_to = static_cast<uint8_t>(PyLong_AsLong(pyObj_persist_to));
+                opts.persist_to = persist_to;
+            }
+        } else if (PyLong_Check(pyObj_durability)) {
+            durability = static_cast<uint8_t>(PyLong_AsLong(pyObj_durability));
+            opts.durability = durability;
+        }
+    }
+
+    return opts;
+}
+
+PyObject*
+handle_kv_multi_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
+{
+    PyObject* pyObj_conn = nullptr;
+    char* bucket = nullptr;
+    char* scope = nullptr;
+    char* collection = nullptr;
+    Operations::OperationType op_type = Operations::UNKNOWN;
+    PyObject* pyObj_op_args = nullptr;
+
+    static const char* kw_list[] = { "conn", "bucket", "scope", "collection_name", "op_type", "op_args", nullptr };
+
+    const char* kw_format = "O!sssIO";
+    int ret = PyArg_ParseTupleAndKeywords(args,
+                                          kwargs,
+                                          kw_format,
+                                          const_cast<char**>(kw_list),
+                                          &PyCapsule_Type,
+                                          &pyObj_conn,
+                                          &bucket,
+                                          &scope,
+                                          &collection,
+                                          &op_type,
+                                          &pyObj_op_args);
+    if (!ret) {
+        pycbc_set_python_exception(
+          PycbcError::InvalidArgument, __FILE__, __LINE__, "Cannot perform kv multi operation.  Unable to parse args/kwargs.");
+        return nullptr;
+    }
+
+    connection* conn = nullptr;
+
+    conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
+    if (nullptr == conn) {
+        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, NULL_CONN_OBJECT);
+        return nullptr;
+    }
+
+    std::vector<std::future<PyObject*>> op_results{};
+
+    PyObject* pyObj_multi_result = create_result_obj();
+    result* multi_result = reinterpret_cast<result*>(pyObj_multi_result);
+
+    if (pyObj_op_args && PyDict_Check(pyObj_op_args)) {
+        PyObject *pyObj_doc_key, *pyObj_op_dict;
+        Py_ssize_t pos = 0;
+
+        // PyObj_key and pyObj_value are borrowed references
+        while (PyDict_Next(pyObj_op_args, &pos, &pyObj_doc_key, &pyObj_op_dict)) {
+            std::string k;
+            PyObject* pyObj_op_response = nullptr;
+            if (PyUnicode_Check(pyObj_doc_key)) {
+                k = std::string(PyUnicode_AsUTF8(pyObj_doc_key));
+            }
+            auto barrier = std::make_shared<std::promise<PyObject*>>();
+            auto f = barrier->get_future();
+            if (PyDict_Check(pyObj_op_dict) && !k.empty()) {
+                PyObject* pyObj_value = PyDict_GetItemString(pyObj_op_dict, "value");
+
+                switch (op_type) {
+                    case Operations::INSERT:
+                    case Operations::UPSERT:
+                    case Operations::REPLACE:
+                    case Operations::REMOVE: {
+                        auto opts = get_mutation_options(pyObj_op_dict);
+                        opts.op_type = op_type;
+                        if (pyObj_value != nullptr) {
+                            opts.value = pyObj_value;
+                        }
+
+                        couchbase::document_id id{ bucket, scope, collection, k };
+                        opts.conn = conn;
+                        opts.id = id;
+
+                        pyObj_op_response = prepare_and_execute_mutation_op(&opts, nullptr, nullptr, barrier, multi_result);
+                        break;
+                    }
+                    case Operations::GET:
+                    case Operations::GET_PROJECTED:
+                    case Operations::GET_AND_LOCK:
+                    case Operations::GET_AND_TOUCH:
+                    case Operations::TOUCH:
+                    case Operations::EXISTS:
+                    case Operations::UNLOCK: {
+                        auto opts = get_read_options(pyObj_op_dict);
+                        opts.op_type = op_type;
+
+                        auto with_expiry = false;
+                        PyObject* pyObj_with_expiry = PyDict_GetItemString(pyObj_op_dict, "with_expiry");
+                        if (pyObj_with_expiry != nullptr) {
+                            if (pyObj_with_expiry == Py_True) {
+                                with_expiry = true;
+                            } else {
+                                with_expiry = false;
+                            }
+                        }
+                        opts.with_expiry = with_expiry;
+
+                        PyObject* pyObj_project = PyDict_GetItemString(pyObj_op_dict, "project");
+                        if (pyObj_project != nullptr || with_expiry) {
+                            op_type = Operations::GET_PROJECTED;
+                            opts.project = pyObj_project;
+                        }
+
+                        couchbase::document_id id{ bucket, scope, collection, k };
+                        opts.conn = conn;
+                        opts.id = id;
+
+                        pyObj_op_response = prepare_and_execute_read_op(&opts, nullptr, nullptr, barrier, multi_result);
+                        break;
+                    }
+                    default: {
+                        PyObject* pyObj_exc =
+                          pycbc_build_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unrecognized KV operation passed in.");
+                        barrier->set_value(pyObj_exc);
+                        break;
+                    }
+                };
+            }
+
+            Py_XDECREF(pyObj_op_response);
+            op_results.emplace_back(std::move(f));
+        }
+    }
+
+    auto all_okay = true;
+    for (auto i = 0; i < op_results.size(); i++) {
+        PyObject* res = nullptr;
+        Py_BEGIN_ALLOW_THREADS res = op_results[i].get();
+        Py_END_ALLOW_THREADS if (res == Py_False)
+        {
+            all_okay = false;
+        }
+        Py_XDECREF(res);
+    }
+
+    if (all_okay) {
+        PyDict_SetItemString(multi_result->dict, "all_okay", Py_True);
+    } else {
+        PyDict_SetItemString(multi_result->dict, "all_okay", Py_False);
+    }
+
+    return reinterpret_cast<PyObject*>(multi_result);
 }

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from copy import copy
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
                     Iterable,
+                    List,
                     Optional,
+                    Tuple,
                     Union,
                     overload)
 
@@ -14,16 +17,39 @@ from couchbase.datastructures import (CouchbaseList,
                                       CouchbaseQueue,
                                       CouchbaseSet)
 from couchbase.exceptions import (DocumentExistsException,
+                                  ErrorMapperNew,
                                   InvalidArgumentException,
                                   PathExistsException,
                                   QueueEmpty)
-from couchbase.logic import BlockingWrapper
+from couchbase.exceptions import exception as CouchbaseBaseException
+from couchbase.logic import BlockingWrapper, decode_value
 from couchbase.logic.collection import CollectionLogic
-from couchbase.options import forward_args
+from couchbase.options import (AppendMultiOptions,
+                               DecrementMultiOptions,
+                               ExistsMultiOptions,
+                               GetMultiOptions,
+                               IncrementMultiOptions,
+                               InsertMultiOptions,
+                               LockMultiOptions,
+                               PrependMultiOptions,
+                               RemoveMultiOptions,
+                               ReplaceMultiOptions,
+                               TouchMultiOptions,
+                               UnlockMultiOptions,
+                               UpsertMultiOptions,
+                               forward_args,
+                               get_valid_multi_args)
+from couchbase.pycbc_core import (binary_multi_operation,
+                                  kv_multi_operation,
+                                  operations)
 from couchbase.result import (CounterResult,
                               ExistsResult,
                               GetResult,
                               LookupInResult,
+                              MultiCounterResult,
+                              MultiExistsResult,
+                              MultiGetResult,
+                              MultiMutationResult,
                               MutateInResult,
                               MutationResult,
                               OperationResult)
@@ -35,6 +61,7 @@ from couchbase.subdocument import get as subdoc_get
 from couchbase.subdocument import remove as subdoc_remove
 from couchbase.subdocument import replace
 from couchbase.subdocument import upsert as subdoc_upsert
+from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
     from datetime import timedelta
@@ -52,14 +79,16 @@ if TYPE_CHECKING:
                                    InsertOptions,
                                    LookupInOptions,
                                    MutateInOptions,
+                                   MutationMultiOptions,
+                                   NoValueMultiOptions,
                                    PrependOptions,
                                    RemoveOptions,
                                    ReplaceOptions,
                                    TouchOptions,
                                    UnlockOptions,
                                    UpsertOptions)
+    from couchbase.result import MultiResultType
     from couchbase.subdocument import Spec, StoreSemantics
-    from couchbase.transcoder import Transcoder
 
 
 class Collection(CollectionLogic):
@@ -654,6 +683,449 @@ class Collection(CollectionLogic):
         :raise: :cb_exc:`DocumentNotFoundException` if the queue does not exist.
         """
         return self.list_size(key)
+
+    def _get_multi_mutation_transcoded_op_args(
+        self,
+        keys_and_docs,  # type: Dict[str, JSONType]
+        *opts,  # type: MutationMultiOptions
+        **kwargs,  # type: Any
+    ) -> Tuple[Dict[str, Any], bool]:
+
+        if not isinstance(keys_and_docs, dict):
+            raise InvalidArgumentException(message='Expected keys_and_docs to be a dict.')
+
+        opts_type = kwargs.pop('opts_type', None)
+        if not opts_type:
+            raise InvalidArgumentException(message='Expected options type is missing.')
+
+        final_args = get_valid_multi_args(opts_type, kwargs, *opts)
+        per_key_args = final_args.pop('per_key_options', None)
+        op_transcoder = final_args.pop('transcoder', self.transcoder)
+        op_args = {}
+        for key, value in keys_and_docs.items():
+            op_args[key] = copy(final_args)
+            # per key args override global args
+            if per_key_args and key in per_key_args:
+                key_transcoder = per_key_args.pop('transcoder', op_transcoder)
+                op_args[key].update(per_key_args[key])
+                transcoded_value = key_transcoder.encode_value(value)
+            else:
+                transcoded_value = op_transcoder.encode_value(value)
+            op_args[key]['value'] = transcoded_value
+
+        if isinstance(opts_type, ReplaceMultiOptions):
+            for k, v in op_args.items():
+                expiry = v.get('expiry', None)
+                preserve_expiry = v.get('preserve_expiry', False)
+                if expiry and preserve_expiry is True:
+                    raise InvalidArgumentException(
+                        message=("The expiry and preserve_expiry options cannot "
+                                 f"both be set for replace operations.  Multi-op key: {k}.")
+                    )
+
+        return_exceptions = final_args.pop('return_exceptions', True)
+        return op_args, return_exceptions
+
+    def _get_multi_op_args(
+        self,
+        keys,  # type: List[str]
+        *opts,  # type: NoValueMultiOptions
+        **kwargs,  # type: Any
+    ) -> Tuple[Dict[str, Any], bool, Dict[str, Transcoder]]:
+        if not isinstance(keys, list):
+            raise InvalidArgumentException(message='Expected keys to be a list.')
+
+        opts_type = kwargs.pop('opts_type', None)
+        if not opts_type:
+            raise InvalidArgumentException(message='Expected options type is missing.')
+
+        final_args = get_valid_multi_args(opts_type, kwargs, *opts)
+        op_transcoder = final_args.pop('transcoder', self.transcoder)
+        per_key_args = final_args.pop('per_key_options', None)
+        op_args = {}
+        key_transcoders = {}
+        for key in keys:
+            op_args[key] = copy(final_args)
+            # per key args override global args
+            if per_key_args and key in per_key_args:
+                key_transcoder = per_key_args.pop('transcoder', op_transcoder)
+                key_transcoders[key] = key_transcoder
+                op_args[key].update(per_key_args[key])
+            else:
+                key_transcoders[key] = op_transcoder
+
+        return_exceptions = final_args.pop('return_exceptions', True)
+        return op_args, return_exceptions, key_transcoders
+
+    def get_multi(
+        self,
+        keys,  # type: List[str]
+        *opts,  # type: GetMultiOptions
+        **kwargs,  # type: Any
+    ) -> MultiGetResult:
+        op_args, return_exceptions, transcoders = self._get_multi_op_args(keys,
+                                                                          *opts,
+                                                                          opts_type=GetMultiOptions,
+                                                                          **kwargs)
+        op_type = operations.GET.value
+        res = kv_multi_operation(
+            **self._get_connection_args(),
+            op_type=op_type,
+            op_args=op_args
+        )
+        for k, v in res.raw_result.items():
+            if k == 'all_okay':
+                continue
+            if isinstance(v, CouchbaseBaseException):
+                continue
+            value = v.raw_result.get('value', None)
+            flags = v.raw_result.get('flags', None)
+            tc = transcoders[k]
+            v.raw_result['value'] = decode_value(tc, value, flags)
+
+        return MultiGetResult(res, return_exceptions)
+
+    def lock_multi(
+        self,
+        keys,  # type: List[str]
+        lock_time,  # type: timedelta
+        *opts,  # type: LockMultiOptions
+        **kwargs,  # type: Any
+    ) -> MultiGetResult:
+        kwargs["lock_time"] = lock_time
+        op_args, return_exceptions, transcoders = self._get_multi_op_args(keys,
+                                                                          *opts,
+                                                                          opts_type=LockMultiOptions,
+                                                                          **kwargs)
+        op_type = operations.GET_AND_LOCK.value
+        res = kv_multi_operation(
+            **self._get_connection_args(),
+            op_type=op_type,
+            op_args=op_args
+        )
+        for k, v in res.raw_result.items():
+            if k == 'all_okay':
+                continue
+            if isinstance(v, CouchbaseBaseException):
+                continue
+            value = v.raw_result.get('value', None)
+            flags = v.raw_result.get('flags', None)
+            tc = transcoders[k]
+            v.raw_result['value'] = decode_value(tc, value, flags)
+
+        return MultiGetResult(res, return_exceptions)
+
+    def exists_multi(
+        self,
+        keys,  # type: List[str]
+        *opts,  # type: ExistsMultiOptions
+        **kwargs,  # type: Any
+    ) -> MultiExistsResult:
+        op_args, return_exceptions, _ = self._get_multi_op_args(keys,
+                                                                *opts,
+                                                                opts_type=ExistsMultiOptions,
+                                                                **kwargs)
+        op_type = operations.EXISTS.value
+        res = kv_multi_operation(
+            **self._get_connection_args(),
+            op_type=op_type,
+            op_args=op_args
+        )
+        return MultiExistsResult(res, return_exceptions)
+
+    def insert_multi(
+        self,
+        keys_and_docs,  # type: Dict[str, JSONType]
+        *opts,  # type: InsertMultiOptions
+        **kwargs,  # type: Any
+    ) -> MultiMutationResult:
+        op_args, return_exceptions = self._get_multi_mutation_transcoded_op_args(keys_and_docs,
+                                                                                 *opts,
+                                                                                 opts_type=InsertMultiOptions,
+                                                                                 **kwargs)
+        op_type = operations.INSERT.value
+        res = kv_multi_operation(
+            **self._get_connection_args(),
+            op_type=op_type,
+            op_args=op_args
+        )
+        return MultiMutationResult(res, return_exceptions)
+
+    def upsert_multi(
+        self,
+        keys_and_docs,  # type: Dict[str, JSONType]
+        *opts,  # type: UpsertMultiOptions
+        **kwargs,  # type: Any
+    ) -> MultiMutationResult:
+        op_args, return_exceptions = self._get_multi_mutation_transcoded_op_args(keys_and_docs,
+                                                                                 *opts,
+                                                                                 opts_type=UpsertMultiOptions,
+                                                                                 **kwargs)
+        op_type = operations.UPSERT.value
+        res = kv_multi_operation(
+            **self._get_connection_args(),
+            op_type=op_type,
+            op_args=op_args
+        )
+        return MultiMutationResult(res, return_exceptions)
+
+    def replace_multi(
+        self,
+        keys_and_docs,  # type: Dict[str, JSONType]
+        *opts,  # type: ReplaceMultiOptions
+        **kwargs,  # type: Any
+    ) -> MultiMutationResult:
+        op_args, return_exceptions = self._get_multi_mutation_transcoded_op_args(keys_and_docs,
+                                                                                 *opts,
+                                                                                 opts_type=ReplaceMultiOptions,
+                                                                                 **kwargs)
+        op_type = operations.REPLACE.value
+        res = kv_multi_operation(
+            **self._get_connection_args(),
+            op_type=op_type,
+            op_args=op_args
+        )
+        return MultiMutationResult(res, return_exceptions)
+
+    def remove_multi(
+        self,
+        keys,  # type: List[str]
+        *opts,  # type: RemoveMultiOptions
+        **kwargs,  # type: Any
+    ) -> MultiMutationResult:
+        op_args, return_exceptions, _ = self._get_multi_op_args(keys,
+                                                                *opts,
+                                                                opts_type=RemoveMultiOptions,
+                                                                **kwargs)
+        op_type = operations.REMOVE.value
+        res = kv_multi_operation(
+            **self._get_connection_args(),
+            op_type=op_type,
+            op_args=op_args
+        )
+        return MultiMutationResult(res, return_exceptions)
+
+    def touch_multi(
+        self,
+        keys,  # type: List[str]
+        expiry,  # type: timedelta
+        *opts,  # type: TouchMultiOptions
+        **kwargs,  # type: Any
+    ) -> MultiMutationResult:
+        kwargs['expiry'] = expiry
+        op_args, return_exceptions, _ = self._get_multi_op_args(keys,
+                                                                *opts,
+                                                                opts_type=TouchMultiOptions,
+                                                                **kwargs)
+        op_type = operations.TOUCH.value
+        res = kv_multi_operation(
+            **self._get_connection_args(),
+            op_type=op_type,
+            op_args=op_args
+        )
+        return MultiMutationResult(res, return_exceptions)
+
+    def unlock_multi(  # noqa: C901
+        self,
+        keys,  # type: Union[MultiResultType, Dict[str, int]]
+        *opts,  # type: UnlockMultiOptions
+        **kwargs,  # type: Any
+    ) -> Dict[str, Union[None, CouchbaseBaseException]]:
+
+        op_keys_cas = {}
+        if isinstance(keys, dict):
+            if not all(map(lambda k: isinstance(k, str), keys.keys())):
+                raise InvalidArgumentException('If providing keys of type dict, all values must be type int.')
+            if not all(map(lambda v: isinstance(v, int), keys.values())):
+                raise InvalidArgumentException('If providing keys of type dict, all values must be type int.')
+            op_keys_cas = copy(keys)
+        elif isinstance(keys, (MultiGetResult, MultiMutationResult)):
+            for k, v in keys.results.items():
+                op_keys_cas[k] = v.cas
+        else:
+            raise InvalidArgumentException(
+                'keys type must be Union[MultiGetResult, MultiMutationResult, Dict[str, int].')
+
+        op_args, return_exceptions, _ = self._get_multi_op_args(list(op_keys_cas.keys()),
+                                                                *opts,
+                                                                opts_type=UnlockMultiOptions,
+                                                                **kwargs)
+
+        for k, v in op_args.items():
+            v['cas'] = op_keys_cas[k]
+
+        op_type = operations.UNLOCK.value
+        res = kv_multi_operation(
+            **self._get_connection_args(),
+            op_type=op_type,
+            op_args=op_args
+        )
+        output = {}
+        for k, v in res.raw_result.items():
+            if k == 'all_okay':
+                continue
+            if isinstance(v, CouchbaseBaseException):
+                if not return_exceptions:
+                    raise ErrorMapperNew.build_exception(v)
+                else:
+                    output[k] = ErrorMapperNew.build_exception(v)
+            else:
+                output[k] = None
+
+        return output
+
+    def _get_multi_counter_op_args(
+        self,
+        keys,  # type: List[str]
+        *opts,  # type: Union[IncrementMultiOptions, DecrementMultiOptions]
+        **kwargs,  # type: Any
+    ) -> Tuple[Dict[str, Any], bool]:
+        if not isinstance(keys, list):
+            raise InvalidArgumentException(message='Expected keys to be a list.')
+
+        opts_type = kwargs.pop('opts_type', None)
+        if not opts_type:
+            raise InvalidArgumentException(message='Expected options type is missing.')
+
+        final_args = get_valid_multi_args(opts_type, kwargs, *opts)
+
+        global_delta, global_initial = self._get_and_validate_delta_initial(final_args)
+        final_args['delta'] = int(global_delta)
+        final_args['initial'] = int(global_initial)
+
+        per_key_args = final_args.pop('per_key_options', None)
+        op_args = {}
+        for key in keys:
+            op_args[key] = copy(final_args)
+            # per key args override global args
+            if per_key_args and key in per_key_args:
+                # need to validate delta/initial if provided per key
+                delta = per_key_args[key].get('delta', None)
+                initial = per_key_args[key].get('initial', None)
+                self._validate_delta_initial(delta=delta, initial=initial)
+                if delta:
+                    per_key_args[key]['delta'] = int(delta)
+                if initial:
+                    per_key_args[key]['initial'] = int(initial)
+                op_args[key].update(per_key_args[key])
+
+        return_exceptions = final_args.pop('return_exceptions', True)
+        return op_args, return_exceptions
+
+    def _get_multi_binary_mutation_op_args(
+        self,
+        keys_and_docs,  # type: Dict[str, Union[str, bytes, bytearray]]
+        *opts,  # type: Union[AppendMultiOptions, PrependMultiOptions]
+        **kwargs,  # type: Any
+    ) -> Tuple[Dict[str, Any], bool]:
+
+        if not isinstance(keys_and_docs, dict):
+            raise InvalidArgumentException(message='Expected keys_and_docs to be a dict.')
+
+        opts_type = kwargs.pop('opts_type', None)
+        if not opts_type:
+            raise InvalidArgumentException(message='Expected options type is missing.')
+
+        parsed_keys_and_docs = {}
+        for k, v in keys_and_docs.items():
+            if isinstance(v, str):
+                value = v.encode("utf-8")
+            elif isinstance(v, bytearray):
+                value = bytes(v)
+            else:
+                value = v
+
+            if not isinstance(value, bytes):
+                raise ValueError(
+                    "The value provided must of type str, bytes or bytearray.")
+
+            parsed_keys_and_docs[k] = value
+
+        final_args = get_valid_multi_args(opts_type, kwargs, *opts)
+        per_key_args = final_args.pop('per_key_options', None)
+        op_args = {}
+        for key, value in parsed_keys_and_docs.items():
+            op_args[key] = copy(final_args)
+            # per key args override global args
+            if per_key_args and key in per_key_args:
+                op_args[key].update(per_key_args[key])
+            op_args[key]['value'] = value
+
+        return_exceptions = final_args.pop('return_exceptions', True)
+        return op_args, return_exceptions
+
+    def _append_multi(
+        self,
+        keys_and_values,  # type: Dict[str, Union[str,bytes,bytearray]]
+        *opts,  # type: AppendMultiOptions
+        **kwargs,  # type: Dict[str, Any]
+    ) -> MultiMutationResult:
+        op_args, return_exceptions = self._get_multi_binary_mutation_op_args(keys_and_values,
+                                                                             *opts,
+                                                                             opts_type=AppendMultiOptions,
+                                                                             **kwargs)
+        op_type = operations.APPEND.value
+        res = binary_multi_operation(
+            **self._get_connection_args(),
+            op_type=op_type,
+            op_args=op_args
+        )
+        return MultiMutationResult(res, return_exceptions)
+
+    def _prepend_multi(
+        self,
+        keys_and_values,  # type: Dict[str, Union[str,bytes,bytearray]]
+        *opts,  # type: PrependMultiOptions
+        **kwargs,  # type: Dict[str, Any]
+    ) -> MultiMutationResult:
+        op_args, return_exceptions = self._get_multi_binary_mutation_op_args(keys_and_values,
+                                                                             *opts,
+                                                                             opts_type=PrependMultiOptions,
+                                                                             **kwargs)
+        op_type = operations.PREPEND.value
+        res = binary_multi_operation(
+            **self._get_connection_args(),
+            op_type=op_type,
+            op_args=op_args
+        )
+        return MultiMutationResult(res, return_exceptions)
+
+    def _increment_multi(
+        self,
+        keys,  # type: List[str]
+        *opts,  # type: IncrementMultiOptions
+        **kwargs,  # type: Dict[str, Any]
+    ) -> MultiCounterResult:
+        op_args, return_exceptions = self._get_multi_counter_op_args(keys,
+                                                                     *opts,
+                                                                     opts_type=IncrementMultiOptions,
+                                                                     **kwargs)
+        op_type = operations.INCREMENT.value
+        print(f'incr multi kwargs: {op_args}')
+        res = binary_multi_operation(
+            **self._get_connection_args(),
+            op_type=op_type,
+            op_args=op_args
+        )
+        return MultiCounterResult(res, return_exceptions)
+
+    def _decrement_multi(
+        self,
+        keys,  # type: List[str]
+        *opts,  # type: DecrementMultiOptions
+        **kwargs,  # type: Dict[str, Any]
+    ) -> MultiCounterResult:
+        op_args, return_exceptions = self._get_multi_counter_op_args(keys,
+                                                                     *opts,
+                                                                     opts_type=DecrementMultiOptions,
+                                                                     **kwargs)
+        op_type = operations.DECREMENT.value
+        res = binary_multi_operation(
+            **self._get_connection_args(),
+            op_type=op_type,
+            op_args=op_args
+        )
+        return MultiCounterResult(res, return_exceptions)
 
     @staticmethod
     def default_name():

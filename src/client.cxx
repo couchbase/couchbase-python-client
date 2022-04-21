@@ -353,11 +353,31 @@ binary_operation(PyObject* self, PyObject* args, PyObject* kwargs)
 }
 
 static PyObject*
+binary_multi_operation(PyObject* self, PyObject* args, PyObject* kwargs)
+{
+    PyObject* res = handle_binary_multi_op(self, args, kwargs);
+    if (res == nullptr && PyErr_Occurred() == nullptr) {
+        pycbc_set_python_exception(PycbcError::UnsuccessfulOperation, __FILE__, __LINE__, "Unable to perform binary multi operation.");
+    }
+    return res;
+}
+
+static PyObject*
 kv_operation(PyObject* self, PyObject* args, PyObject* kwargs)
 {
     PyObject* res = handle_kv_op(self, args, kwargs);
     if (res == nullptr && PyErr_Occurred() == nullptr) {
         pycbc_set_python_exception(PycbcError::UnsuccessfulOperation, __FILE__, __LINE__, "Unable to perform KV operation.");
+    }
+    return res;
+}
+
+static PyObject*
+kv_multi_operation(PyObject* self, PyObject* args, PyObject* kwargs)
+{
+    PyObject* res = handle_kv_multi_op(self, args, kwargs);
+    if (res == nullptr && PyErr_Occurred() == nullptr) {
+        pycbc_set_python_exception(PycbcError::UnsuccessfulOperation, __FILE__, __LINE__, "Unable to perform KV multi operation.");
     }
     return res;
 }
@@ -479,8 +499,10 @@ static struct PyMethodDef methods[] = {
     { "open_or_close_bucket", (PyCFunction)open_or_close_bucket, METH_VARARGS | METH_KEYWORDS, "Open or close a bucket" },
     { "close_connection", (PyCFunction)close_connection, METH_VARARGS | METH_KEYWORDS, "Close a connection" },
     { "kv_operation", (PyCFunction)kv_operation, METH_VARARGS | METH_KEYWORDS, "Handle all key/value operations" },
+    { "kv_multi_operation", (PyCFunction)kv_multi_operation, METH_VARARGS | METH_KEYWORDS, "Handle all key/value multi operations" },
     { "subdoc_operation", (PyCFunction)subdoc_operation, METH_VARARGS | METH_KEYWORDS, "Handle all subdoc operations" },
     { "binary_operation", (PyCFunction)binary_operation, METH_VARARGS | METH_KEYWORDS, "Handle all binary operations" },
+    { "binary_multi_operation", (PyCFunction)binary_multi_operation, METH_VARARGS | METH_KEYWORDS, "Handle all binary multi operations" },
     { "diagnostics_operation", (PyCFunction)diagnostics_operation, METH_VARARGS | METH_KEYWORDS, "Handle all diagnostics operations" },
     { "n1ql_query", (PyCFunction)n1ql_query, METH_VARARGS | METH_KEYWORDS, "Execute N1QL Query" },
     { "analytics_query", (PyCFunction)analytics_query, METH_VARARGS | METH_KEYWORDS, "Execute analytics Query" },

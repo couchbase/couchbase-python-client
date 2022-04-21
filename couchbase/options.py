@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import copy
 import ctypes
-import time
 from abc import ABCMeta, abstractmethod
 from datetime import timedelta
 from enum import Enum, IntEnum
@@ -19,6 +18,7 @@ from typing import (TYPE_CHECKING,
                     overload)
 
 from couchbase._utils import (timedelta_as_microseconds,
+                              timedelta_as_timestamp,
                               validate_bool,
                               validate_int,
                               validate_str)
@@ -53,10 +53,25 @@ OptionsBase = dict
 
 T = TypeVar("T", bound=OptionsBase)
 
-
 """
 @TODO(jc): CouchbaseSpan types
 """
+
+
+def _get_temp_opts(
+    arg_vars,  # type: Optional[Dict[str,Any]]
+    *options  # type: OptionsBase
+) -> Dict[str, Any]:
+    arg_vars = copy.copy(arg_vars) if arg_vars else {}
+    temp_options = (
+        copy.copy(
+            options[0]) if (
+            options and options[0]) else dict())
+    kwargs = arg_vars.pop("kwargs", {})
+    temp_options.update(kwargs)
+    temp_options.update(arg_vars)
+
+    return temp_options
 
 
 def get_valid_args(
@@ -85,6 +100,87 @@ def get_valid_args(
                 final_options[final_key] = converted
 
     return final_options
+
+
+VALID_MULTI_OPTS = {
+    'timeout': timedelta_as_microseconds,
+    'expiry': timedelta_as_timestamp,
+    'preserve_expiry': validate_bool,
+    'with_expiry': validate_bool,
+    'cas': validate_int,
+    'durability': lambda x: x,
+    'transcoder': lambda x: x,
+    'span': lambda x: x,
+    'project': lambda x: x,
+    'delta': lambda x: x,
+    'initial': lambda x: x,
+    'per_key_options': lambda x: x,
+    'return_exceptions': validate_bool
+}
+
+
+def _get_valid_global_multi_opts(
+    temp_options,  # type: Dict[str, Any]
+    valid_opt_keys  # type: List[str]
+):
+    final_opts = {}
+    if not temp_options:
+        return final_opts
+
+    for opt_key, opt_value in temp_options.items():
+        if opt_key not in valid_opt_keys:
+            continue
+        transform = VALID_MULTI_OPTS.get(opt_key, None)
+        if transform:
+            final_opts[opt_key] = transform(opt_value)
+
+    return final_opts
+
+
+def _get_per_key_opts(
+    per_key_opts,  # type: Dict[str, Any]
+    opt_type,  # type: OptionsBase
+    valid_opt_keys  # type: List[str]
+) -> Dict[str, Any]:
+    final_key_opts = {}
+    for key, opts in per_key_opts.items():
+        if not isinstance(opts, (opt_type, dict)):
+            raise InvalidArgumentException(message=f'Expected options to be of type Union[{opt_type.__name__}, dict]')
+        key_opts = {}
+        for opt_key, opt_value in opts.items():
+            if opt_key not in valid_opt_keys:
+                continue
+            transform = VALID_MULTI_OPTS.get(opt_key, None)
+            if transform:
+                key_opts[opt_key] = transform(opt_value)
+
+        final_key_opts[key] = key_opts
+
+    return final_key_opts
+
+
+def get_valid_multi_args(
+    opt_type,  # type: OptionsBase
+    arg_vars,  # type: Optional[Dict[str,Any]]
+    *options  # type: OptionsBase
+) -> Dict[str, Any]:
+
+    temp_options = _get_temp_opts(arg_vars, *options)
+    valid_opt_keys = opt_type.get_valid_keys()
+
+    final_opts = _get_valid_global_multi_opts(temp_options, valid_opt_keys)
+
+    if not temp_options:
+        return final_opts
+
+    per_key_opts = temp_options.pop('per_key_options', None)
+    if not per_key_opts:
+        return final_opts
+
+    final_key_opts = _get_per_key_opts(per_key_opts, opt_type, valid_opt_keys)
+
+    final_opts['per_key_options'] = final_key_opts
+    return final_opts
 
 
 class OptionsTimeout(OptionsBase):
@@ -967,6 +1063,307 @@ class PrependOptions(DurabilityOptionBlock):
         super().__init__(**kwargs)
 
 
+"""
+
+Multi-operations Options
+
+"""
+
+
+class GetMultiOptions(dict):
+    @overload
+    def __init__(
+        self,
+        timeout=None,  # type: timedelta
+        with_expiry=None,  # type: bool
+        project=None,  # type: Iterable[str]
+        transcoder=None,  # type: Transcoder
+        per_key_options=None,       # type: Dict[str, GetOptions]
+        return_exceptions=None      # type: Optional[bool]
+    ):
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+    @classmethod
+    def get_valid_keys(cls):
+        return ['timeout', 'with_expiry', 'project', 'transcoder',
+                'per_key_options', 'return_exceptions']
+
+
+class ExistsMultiOptions(dict):
+    @overload
+    def __init__(
+        self,
+        timeout=None,  # type: timedelta
+        per_key_options=None,       # type: Dict[str, ExistsOptions]
+        return_exceptions=None      # type: Optional[bool]
+    ):
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+    @classmethod
+    def get_valid_keys(cls):
+        return ['timeout', 'per_key_options', 'return_exceptions']
+
+
+class UpsertMultiOptions(dict):
+    @overload
+    def __init__(
+        self,
+        timeout=None,  # type: timedelta
+        expiry=None,  # type: timedelta
+        preserve_expiry=False,  # type: bool
+        durability=None,  # type: DurabilityType
+        transcoder=None,  # type: Transcoder
+        per_key_options=None,       # type: Dict[str, UpsertOptions]
+        return_exceptions=None      # type: Optional[bool]
+    ):
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+    @classmethod
+    def get_valid_keys(cls):
+        return ['timeout', 'expiry', 'preserve_expiry', 'durability',
+                'transcoder', 'per_key_options', 'return_exceptions']
+
+
+class InsertMultiOptions(dict):
+    @overload
+    def __init__(
+        self,
+        timeout=None,  # type: timedelta
+        expiry=None,  # type: timedelta
+        durability=None,  # type: DurabilityType
+        transcoder=None,  # type: Transcoder
+        per_key_options=None,       # type: Dict[str, InsertOptions]
+        return_exceptions=None      # type: Optional[bool]
+    ):
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+    @classmethod
+    def get_valid_keys(cls):
+        return ['timeout', 'expiry', 'durability', 'transcoder', 'per_key_options', 'return_exceptions']
+
+
+class ReplaceMultiOptions(dict):
+    @overload
+    def __init__(
+        self,
+        timeout=None,  # type: timedelta
+        expiry=None,  # type: timedelta
+        cas=0,  # type: int
+        preserve_expiry=False,  # type: bool
+        durability=None,  # type: DurabilityType
+        transcoder=None,  # type: Transcoder
+        per_key_options=None,       # type: Dict[str, ReplaceOptions]
+        return_exceptions=None      # type: Optional[bool]
+    ):
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+    @classmethod
+    def get_valid_keys(cls):
+        return ['timeout', 'expiry', 'cas', 'preserve_expiry',
+                'durability', 'transcoder', 'per_key_options', 'return_exceptions']
+
+
+class RemoveMultiOptions(dict):
+    @overload
+    def __init__(
+        self,
+        timeout=None,  # type: timedelta
+        cas=0,  # type: int
+        durability=None,  # type: DurabilityType
+        transcoder=None,  # type: Transcoder
+        per_key_options=None,       # type: Dict[str, RemoveOptions]
+        return_exceptions=None      # type: Optional[bool]
+    ):
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+    @classmethod
+    def get_valid_keys(cls):
+        return ['timeout', 'cas', 'durability', 'transcoder', 'per_key_options', 'return_exceptions']
+
+
+class TouchMultiOptions(dict):
+    @overload
+    def __init__(
+        self,
+        timeout=None,  # type: timedelta
+        per_key_options=None,       # type: Dict[str, TouchOptions]
+        return_exceptions=None      # type: Optional[bool]
+    ):
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+    @classmethod
+    def get_valid_keys(cls):
+        return ['timeout', 'expiry', 'per_key_options', 'return_exceptions']
+
+
+class LockMultiOptions(dict):
+    @overload
+    def __init__(
+        self,
+        timeout=None,  # type: timedelta
+        transcoder=None,  # type: Transcoder
+        per_key_options=None,       # type: Dict[str, GetAndLockOptions]
+        return_exceptions=None      # type: Optional[bool]
+    ):
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+    @classmethod
+    def get_valid_keys(cls):
+        return ['timeout', 'transcoder', 'per_key_options', 'return_exceptions']
+
+
+class UnlockMultiOptions(dict):
+    @overload
+    def __init__(
+        self,
+        timeout=None,  # type: timedelta
+        per_key_options=None,       # type: Dict[str, ExistsOptions]
+        return_exceptions=None      # type: Optional[bool]
+    ):
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+    @classmethod
+    def get_valid_keys(cls):
+        return ['timeout', 'per_key_options', 'return_exceptions']
+
+
+class IncrementMultiOptions(dict):
+    @overload
+    def __init__(
+        self,
+        timeout=None,      # type: Optional[timedelta]
+        expiry=None,       # type: Optional[timedelta]
+        durability=None,   # type: Optional[DurabilityType]
+        delta=None,         # type: Optional[DeltaValue]
+        initial=None,      # type: Optional[SignedInt64]
+        span=None,         # type: Optional[Any]
+        per_key_options=None,       # type: Optional[Dict[str, IncrementOptions]]
+        return_exceptions=None      # type: Optional[bool]
+    ):
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+    @classmethod
+    def get_valid_keys(cls):
+        return ['timeout', 'expiry', 'durability', 'delta',
+                'initial', 'span', 'per_key_options', 'return_exceptions']
+
+
+class DecrementMultiOptions(dict):
+    @overload
+    def __init__(
+        self,
+        timeout=None,      # type: Optional[timedelta]
+        expiry=None,       # type: Optional[timedelta]
+        durability=None,   # type: Optional[DurabilityType]
+        delta=None,         # type: Optional[DeltaValue]
+        initial=None,      # type: Optional[SignedInt64]
+        span=None,         # type: Optional[Any]
+        per_key_options=None,       # type: Optional[Dict[str, DecrementOptions]]
+        return_exceptions=None      # type: Optional[bool]
+    ):
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+    @classmethod
+    def get_valid_keys(cls):
+        return ['timeout', 'expiry', 'durability', 'delta',
+                'initial', 'span', 'per_key_options', 'return_exceptions']
+
+
+class AppendMultiOptions(DurabilityOptionBlock):
+    @overload
+    def __init__(
+        self,
+        timeout=None,      # type: Optional[timedelta]
+        durability=None,   # type: Optional[DurabilityType]
+        cas=None,          # type: Optional[int]
+        span=None,         # type: Optional[Any]
+        per_key_options=None,       # type: Optional[Dict[str, AppendOptions]]
+        return_exceptions=None      # type: Optional[bool]
+    ):
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+    @classmethod
+    def get_valid_keys(cls):
+        return ['timeout', 'durability', 'cas',
+                'span', 'per_key_options', 'return_exceptions']
+
+
+class PrependMultiOptions(DurabilityOptionBlock):
+    @overload
+    def __init__(
+        self,
+        timeout=None,      # type: Optional[timedelta]
+        durability=None,   # type: Optional[DurabilityType]
+        cas=None,          # type: Optional[int]
+        span=None,         # type: Optional[Any]
+        per_key_options=None,       # type: Optional[Dict[str, PrependOptions]]
+        return_exceptions=None      # type: Optional[bool]
+    ):
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+    @classmethod
+    def get_valid_keys(cls):
+        return ['timeout', 'durability', 'cas',
+                'span', 'per_key_options', 'return_exceptions']
+
+
+NoValueMultiOptions = Union[GetMultiOptions, ExistsMultiOptions,
+                            RemoveMultiOptions, TouchMultiOptions, LockMultiOptions, UnlockMultiOptions]
+MutationMultiOptions = Union[InsertMultiOptions, UpsertMultiOptions, ReplaceMultiOptions]
+
+
 class QueryOptions(dict):
 
     # @TODO: span
@@ -1138,28 +1535,6 @@ class Forwarder(metaclass=ABCMeta):
     @abstractmethod
     def arg_mapping(self):
         pass
-
-
-THIRTY_DAYS_IN_SECONDS = 30 * 24 * 60 * 60
-
-
-def timedelta_as_timestamp(
-    duration,  # type: timedelta
-) -> int:
-    if not isinstance(duration, timedelta):
-        raise InvalidArgumentException(
-            "Expected timedelta instead of {}".format(duration))
-
-    # PYCBC-1177 remove deprecated heuristic from PYCBC-948:
-    #   if (duration > 50 years):
-    #     log.warn(“suspicious duration; don’t do this”)
-    #     return duration in seconds;
-    #
-    seconds = int(duration.total_seconds())
-    if seconds < THIRTY_DAYS_IN_SECONDS:
-        return seconds
-
-    return seconds + int(time.time())
 
 
 class DefaultForwarder(Forwarder):

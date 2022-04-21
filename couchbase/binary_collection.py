@@ -1,14 +1,23 @@
 
 from typing import (TYPE_CHECKING,
                     Any,
+                    Dict,
+                    List,
                     Union)
 
-from couchbase.result import CounterResult, MutationResult
+from couchbase.result import (CounterResult,
+                              MultiCounterResult,
+                              MultiMutationResult,
+                              MutationResult)
 
 if TYPE_CHECKING:
-    from couchbase.options import (AppendOptions,
+    from couchbase.options import (AppendMultiOptions,
+                                   AppendOptions,
+                                   DecrementMultiOptions,
                                    DecrementOptions,
+                                   IncrementMultiOptions,
                                    IncrementOptions,
+                                   PrependMultiOptions,
                                    PrependOptions)
 
 
@@ -50,3 +59,35 @@ class BinaryCollection:
         **kwargs,  # type: Any
     ) -> MutationResult:
         return self._collection._prepend(key, value, *opts, **kwargs)
+
+    def append_multi(
+        self,
+        keys_and_values,  # type: Dict[str, Union[str,bytes,bytearray]]
+        *opts,  # type: AppendMultiOptions
+        **kwargs,  # type: Dict[str, Any]
+    ) -> MultiMutationResult:
+        return self._collection._append_multi(keys_and_values, *opts, **kwargs)
+
+    def prepend_multi(
+        self,
+        keys_and_values,  # type: Dict[str, Union[str,bytes,bytearray]]
+        *opts,  # type: PrependMultiOptions
+        **kwargs,  # type: Dict[str, Any]
+    ) -> MultiMutationResult:
+        return self._collection._prepend_multi(keys_and_values, *opts, **kwargs)
+
+    def increment_multi(
+        self,
+        keys,  # type: List[str]
+        *opts,  # type: IncrementMultiOptions
+        **kwargs,  # type: Dict[str, Any]
+    ) -> MultiCounterResult:
+        return self._collection._increment_multi(keys, *opts, **kwargs)
+
+    def decrement_multi(
+        self,
+        keys,  # type: List[str]
+        *opts,  # type: DecrementMultiOptions
+        **kwargs,  # type: Dict[str, Any]
+    ) -> MultiCounterResult:
+        return self._collection._decrement_multi(keys, *opts, **kwargs)

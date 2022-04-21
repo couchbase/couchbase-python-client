@@ -1,4 +1,5 @@
 import re
+import time
 from datetime import timedelta
 from enum import Enum
 from typing import (Any,
@@ -99,6 +100,28 @@ def timedelta_as_microseconds(
             message="Expected timedelta instead of {}".format(duration)
         )
     return int(duration.total_seconds() * 1e6 if duration else 0)
+
+
+THIRTY_DAYS_IN_SECONDS = 30 * 24 * 60 * 60
+
+
+def timedelta_as_timestamp(
+    duration,  # type: timedelta
+) -> int:
+    if not isinstance(duration, timedelta):
+        raise InvalidArgumentException(
+            "Expected timedelta instead of {}".format(duration))
+
+    # PYCBC-1177 remove deprecated heuristic from PYCBC-948:
+    #   if (duration > 50 years):
+    #     log.warn(“suspicious duration; don’t do this”)
+    #     return duration in seconds;
+    #
+    seconds = int(duration.total_seconds())
+    if seconds < THIRTY_DAYS_IN_SECONDS:
+        return seconds
+
+    return seconds + int(time.time())
 
 
 def validate_int(value  # type: int

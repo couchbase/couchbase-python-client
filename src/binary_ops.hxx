@@ -31,9 +31,12 @@ struct binary_mutation_options {
     uint8_t replicate_to;
     uint8_t persist_to;
     couchbase::protocol::durability_level durability;
-    uint64_t cas;
+    couchbase::cas cas;
     PyObject* pyObj_span;
 };
 
 PyObject*
 handle_binary_op(PyObject* self, PyObject* args, PyObject* kwargs);
+
+PyObject*
+handle_binary_multi_op(PyObject* self, PyObject* args, PyObject* kwargs);

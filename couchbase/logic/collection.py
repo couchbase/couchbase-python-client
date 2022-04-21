@@ -341,6 +341,18 @@ class CollectionLogic:
             if not (SignedInt64.is_valid(initial) or SignedInt64Deprecated.is_valid(initial)):
                 raise InvalidArgumentException("Argument is not valid SignedInt64")
 
+    def _get_and_validate_delta_initial(self, final_args):
+        initial = final_args.get('initial', None)
+        delta = final_args.get('delta', None)
+        if not initial:
+            initial = SignedInt64(0)
+        if not delta:
+            delta = DeltaValue(1)
+
+        self._validate_delta_initial(delta=delta, initial=initial)
+
+        return delta, initial
+
     def increment(
         self,
         key,  # type: str

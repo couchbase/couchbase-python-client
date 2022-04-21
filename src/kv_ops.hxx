@@ -61,4 +61,10 @@ struct mutation_options {
 PyObject*
 handle_kv_op(PyObject* self, PyObject* args, PyObject* kwargs);
 
+PyObject*
+handle_kv_multi_op(PyObject* self, PyObject* args, PyObject* kwargs);
+
+PyObject*
+handle_kv_blocking_result(std::future<PyObject*>&& fut);
+
 #endif

@@ -9,6 +9,10 @@ cmake-build-*/
 # Distribution / packaging
 build/
 couchbase/_version.py
+couchbase/*.so
+couchbase/*.dylib*.*
+couchbase/*.dll
+couchbase/*.pyd
 
 # VS Code
 .vscode/

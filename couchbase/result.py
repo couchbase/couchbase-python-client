@@ -20,11 +20,13 @@ from couchbase.diagnostics import (ClusterState,
 from couchbase.exceptions import (CLIENT_ERROR_MAP,
                                   CouchbaseException,
                                   DocumentNotFoundException,
+                                  ErrorMapperNew,
                                   InvalidIndexException,
                                   PathExistsException,
                                   PathMismatchException,
                                   PathNotFoundException,
                                   SubdocCantInsertValueException)
+from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.pycbc_core import exception, result
 from couchbase.subdocument import SubDocStatus
 
@@ -43,20 +45,24 @@ class Result:
         self._orig = orig
 
     @property
-    def value(self):
+    def value(self) -> Optional[Any]:
         return self._orig.raw_result.get("value", None)
 
     @property
-    def cas(self):
+    def cas(self) -> Optional[int]:
         return self._orig.raw_result.get("cas", 0)
 
     @property
-    def flags(self):
+    def flags(self) -> Optional[int]:
         return self._orig.raw_result.get("flags", 0)
 
     @property
-    def key(self):
+    def key(self) -> Optional[str]:
         return self._orig.raw_result.get("key", None)
+
+    @property
+    def success(self) -> bool:
+        return self.value is not None
 
 
 class ContentProxy:
@@ -274,6 +280,52 @@ class GetResult(Result):
         return "GetResult:{}".format(self._orig)
 
 
+class MultiGetResult:
+    def __init__(self,
+                 orig,  # type: result
+                 return_exceptions  # type: bool
+                 ):
+
+        self._orig = orig
+        self._all_ok = self._orig.raw_result.pop('all_okay', False)
+        self._results = {}
+        for k, v in self._orig.raw_result.items():
+            if isinstance(v, CouchbaseBaseException):
+                if not return_exceptions:
+                    raise ErrorMapperNew.build_exception(v)
+                else:
+                    self._results[k] = ErrorMapperNew.build_exception(v)
+            else:
+                self._results[k] = GetResult(v)
+
+    @property
+    def all_ok(self) -> bool:
+        return self._all_ok
+
+    @property
+    def exceptions(self) -> Dict[str, CouchbaseBaseException]:
+        exc = {}
+        for k, v in self._results.items():
+            if not isinstance(v, GetResult):
+                exc[k] = v
+        return exc
+
+    @property
+    def results(self) -> Dict[str, MutationResult]:
+        res = {}
+        for k, v in self._results.items():
+            if isinstance(v, GetResult):
+                res[k] = v
+        return res
+
+    def __repr__(self):
+        output_results = []
+        for k, v in self._results.items():
+            output_results.append(f'{k}:{v}')
+
+        return f'MultiGetResult( {", ".join(output_results)} )'
+
+
 class ExistsResult(Result):
 
     def __init__(
@@ -293,6 +345,52 @@ class ExistsResult(Result):
         return "ExistsResult:{}".format(self._orig)
 
 
+class MultiExistsResult:
+    def __init__(self,
+                 orig,  # type: result
+                 return_exceptions  # type: bool
+                 ):
+
+        self._orig = orig
+        self._all_ok = self._orig.raw_result.pop('all_okay', False)
+        self._results = {}
+        for k, v in self._orig.raw_result.items():
+            if isinstance(v, CouchbaseBaseException):
+                if not return_exceptions:
+                    raise ErrorMapperNew.build_exception(v)
+                else:
+                    self._results[k] = ErrorMapperNew.build_exception(v)
+            else:
+                self._results[k] = ExistsResult(v)
+
+    @property
+    def all_ok(self) -> bool:
+        return self._all_ok
+
+    @property
+    def exceptions(self) -> Dict[str, CouchbaseBaseException]:
+        exc = {}
+        for k, v in self._results.items():
+            if not isinstance(v, ExistsResult):
+                exc[k] = v
+        return exc
+
+    @property
+    def results(self) -> Dict[str, MutationResult]:
+        res = {}
+        for k, v in self._results.items():
+            if isinstance(v, ExistsResult):
+                res[k] = v
+        return res
+
+    def __repr__(self):
+        output_results = []
+        for k, v in self._results.items():
+            output_results.append(f'{k}:{v}')
+
+        return f'MultiExistsResult( {", ".join(output_results)} )'
+
+
 class MutationResult(Result):
     def __init__(self,
                  orig,  # type: result
@@ -308,6 +406,55 @@ class MutationResult(Result):
 
     def __repr__(self):
         return "MutationResult:{}".format(self._orig)
+
+
+class MultiMutationResult:
+    def __init__(self,
+                 orig,  # type: result
+                 return_exceptions  # type: bool
+                 ):
+
+        self._orig = orig
+        self._all_ok = self._orig.raw_result.pop('all_okay', False)
+        self._results = {}
+        for k, v in self._orig.raw_result.items():
+            if isinstance(v, CouchbaseBaseException):
+                if not return_exceptions:
+                    raise ErrorMapperNew.build_exception(v)
+                else:
+                    self._results[k] = ErrorMapperNew.build_exception(v)
+            else:
+                self._results[k] = MutationResult(v)
+
+    @property
+    def all_ok(self) -> bool:
+        return self._all_ok
+
+    @property
+    def exceptions(self) -> Dict[str, CouchbaseBaseException]:
+        exc = {}
+        for k, v in self._results.items():
+            if not isinstance(v, MutationResult):
+                exc[k] = v
+        return exc
+
+    @property
+    def results(self) -> Dict[str, MutationResult]:
+        res = {}
+        for k, v in self._results.items():
+            if isinstance(v, MutationResult):
+                res[k] = v
+        return res
+
+    def __repr__(self):
+        output_results = []
+        for k, v in self._results.items():
+            output_results.append(f'{k}:{v}')
+
+        return f'MultiMutationResult( {", ".join(output_results)} )'
+
+
+MultiResultType = Union[MultiGetResult, MultiMutationResult]
 
 
 class MutationToken:
@@ -388,11 +535,57 @@ class MutateInResult(MutationResult):
 class CounterResult(MutationResult):
 
     @property
-    def content(self) -> int:
-        return self._orig.raw_result.get("content", False)
+    def content(self) -> Optional[int]:
+        return self._orig.raw_result.get("content", None)
 
     def __repr__(self):
         return "CounterResult:{}".format(self._orig)
+
+
+class MultiCounterResult:
+    def __init__(self,
+                 orig,  # type: result
+                 return_exceptions  # type: bool
+                 ):
+
+        self._orig = orig
+        self._all_ok = self._orig.raw_result.pop('all_okay', False)
+        self._results = {}
+        for k, v in self._orig.raw_result.items():
+            if isinstance(v, CouchbaseBaseException):
+                if not return_exceptions:
+                    raise ErrorMapperNew.build_exception(v)
+                else:
+                    self._results[k] = ErrorMapperNew.build_exception(v)
+            else:
+                self._results[k] = CounterResult(v)
+
+    @property
+    def all_ok(self) -> bool:
+        return self._all_ok
+
+    @property
+    def exceptions(self) -> Dict[str, CouchbaseBaseException]:
+        exc = {}
+        for k, v in self._results.items():
+            if not isinstance(v, CounterResult):
+                exc[k] = v
+        return exc
+
+    @property
+    def results(self) -> Dict[str, CounterResult]:
+        res = {}
+        for k, v in self._results.items():
+            if isinstance(v, CounterResult):
+                res[k] = v
+        return res
+
+    def __repr__(self):
+        output_results = []
+        for k, v in self._results.items():
+            output_results.append(f'{k}:{v}')
+
+        return f'MultiCounterResult( {", ".join(output_results)} )'
 
 
 class ClusterInfoResult:
