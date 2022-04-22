@@ -473,7 +473,6 @@ pycbc_txns::create_transactions([[maybe_unused]] PyObject* self, PyObject* args,
 {
     // we expect it to be called like:
     // create_transactions(conn, config)
-    tx::set_transactions_log_level(tx::log_level::TRACE);
     PyObject* pyObj_conn = nullptr;
     PyObject* pyObj_config = nullptr;
     const char* kw_list[] = { "conn", "config", nullptr };

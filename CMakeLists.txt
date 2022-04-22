@@ -79,10 +79,10 @@ else()
             endif()
         endif()
     else()
-        message("OpenSSL not found.  OpenSSL >= 1.1.1 required.")
+        message("Not mac or windows, so assuming OpenSSL v1.1 is installed and findable...")
     endif()
+    find_package(OpenSSL REQUIRED)
 endif()
-
 # @TODO:  I think this is only for debug...couchnode did this recently
 # Set up some build requirements for Windows.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -94,7 +94,6 @@ endif()
 set(COUCHBASE_CXX_CLIENT_PYTHON_WARNINGS ON CACHE INTERNAL "")
 set(COUCHBASE_CXX_CLIENT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(COUCHBASE_CXX_CLIENT_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-#set(COUCHBASE_CXX_CLIENT_POST_LINKED_OPENSSL ON CACHE BOOL "" FORCE)
 set(COUCHBASE_CXX_CLIENT_STATIC_STDLIB ON CACHE BOOL "" FORCE)
 add_subdirectory(deps/couchbase-cxx-client)
 

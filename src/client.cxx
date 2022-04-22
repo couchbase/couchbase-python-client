@@ -15,6 +15,7 @@
  */
 #include "client.hxx"
 #include <structmember.h>
+#include <cstdlib>
 
 #include "connection.hxx"
 #include "exceptions.hxx"
@@ -515,10 +516,13 @@ PyMODINIT_FUNC
 PyInit_pycbc_core(void)
 {
     Py_Initialize();
-    // spdlog::set_level(spdlog::level::trace);
-    // spdlog::set_pattern("[%Y-%m-%d %T.%e] [%P,%t] [%^%l%$] %oms, %v");
+    auto log_level_str = std::getenv("PYCBC_LOG_LEVEL");
+    couchbase::logger::level level = couchbase::logger::level::off;
     couchbase::logger::create_console_logger();
-    couchbase::logger::set_log_levels(couchbase::logger::level::info);
+    if (nullptr != log_level_str) {
+        level = couchbase::logger::level_from_str(log_level_str);
+    }
+    couchbase::logger::set_log_levels(level);
     PyObject* m = nullptr;
 
     PyObject* result_type;
