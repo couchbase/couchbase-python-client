@@ -200,7 +200,8 @@ class AsyncCluster(ClusterLogic):
             statement, *options, **kwargs)
         return QueryResult(AsyncN1QLRequest.generate_n1ql_request(self.connection,
                                                                   self.loop,
-                                                                  query.params))
+                                                                  query.params,
+                                                                  default_serializer=self.default_serializer))
 
     def analytics_query(
         self,  # type: Cluster
@@ -210,9 +211,11 @@ class AsyncCluster(ClusterLogic):
     ) -> AnalyticsResult:
         query = AnalyticsQuery.create_query_object(
             statement, *options, **kwargs)
-        return AnalyticsResult(AsyncAnalyticsRequest.generate_analytics_request(self.connection,
-                                                                                self.loop,
-                                                                                query.params))
+        return AnalyticsResult(AsyncAnalyticsRequest.generate_analytics_request(
+            self.connection,
+            self.loop,
+            query.params,
+            default_serializer=self.default_serializer))
 
     def search_query(
         self,
@@ -226,7 +229,8 @@ class AsyncCluster(ClusterLogic):
         )
         return SearchResult(AsyncSearchRequest.generate_search_request(self.connection,
                                                                        self.loop,
-                                                                       query.as_encodable()))
+                                                                       query.as_encodable(),
+                                                                       default_serializer=self.default_serializer))
 
     def buckets(self) -> BucketManager:
         """

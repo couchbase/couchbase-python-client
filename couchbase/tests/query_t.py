@@ -6,18 +6,22 @@ import couchbase.subdocument as SD
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.exceptions import (CouchbaseException,
+                                  InvalidArgumentException,
                                   ParsingFailedException,
                                   QueryErrorContext)
-from couchbase.n1ql import (QueryMetaData,
+from couchbase.mutation_state import MutationState
+from couchbase.n1ql import (N1QLQuery,
+                            QueryMetaData,
                             QueryMetrics,
                             QueryProfile,
+                            QueryScanConsistency,
                             QueryStatus,
                             QueryWarning)
 from couchbase.options import (ClusterOptions,
                                QueryOptions,
                                UnsignedInt64,
                                UpsertOptions)
-from couchbase.result import QueryResult
+from couchbase.result import MutationToken, QueryResult
 
 from ._test_utils import TestEnvironment
 
@@ -50,9 +54,10 @@ class QueryTests:
         # let it load a bit...
         for _ in range(5):
             row_count_good = self._check_row_count(cb_env, 5)
-            if not row_count_good:
-                print('Waiting for index to load, sleeping a bit...')
-                cb_env.sleep(5)
+            if row_count_good:
+                break
+            print('Waiting for index to load, sleeping a bit...')
+            cb_env.sleep(5)
         yield cb_env
         cb_env.purge_data()
         cb_env.ixm.drop_primary_index(bucket.name,
@@ -246,6 +251,8 @@ class QueryTests:
 
 
 class QueryCollectionTests:
+    TEST_SCOPE = "test-scope"
+    TEST_COLLECTION = "test-collection"
 
     @pytest.fixture(scope="class", name="cb_env")
     def couchbase_test_environment(self, couchbase_config):
@@ -267,13 +274,39 @@ class QueryCollectionTests:
                                  manage_query_indexes=True)
         cb_env.setup_named_collections()
 
-        cb_env.cluster.query(f"CREATE PRIMARY INDEX ON `default`:{cb_env.fqdn}").execute()
+        cb_env.ixm.create_primary_index(bucket.name,
+                                        scope_name=self.TEST_SCOPE,
+                                        collection_name=self.TEST_COLLECTION,
+                                        timeout=timedelta(seconds=60))
 
         cb_env.load_data()
+        # let it load a bit...
+        for _ in range(5):
+            row_count_good = self._check_row_count(cb_env, 5)
+            if row_count_good:
+                break
+            print('Waiting for index to load, sleeping a bit...')
+            cb_env.sleep(5)
+
         yield cb_env
         cb_env.purge_data()
+
+        cb_env.ixm.drop_primary_index(bucket.name,
+                                      scope_name=self.TEST_SCOPE,
+                                      collection_name=self.TEST_COLLECTION)
+
         cb_env.teardown_named_collections()
         cluster.close()
+
+    def _check_row_count(self, cb_env,
+                         min_count  # type: int
+                         ) -> bool:
+
+        result = cb_env.cluster.query(f"SELECT * FROM {cb_env.fqdn} WHERE country LIKE 'United%' LIMIT 5")
+        count = 0
+        for _ in result.rows():
+            count += 1
+        return count >= min_count
 
     @pytest.fixture(scope="class")
     def check_preserve_expiry_supported(self, cb_env):
@@ -395,3 +428,109 @@ class QueryCollectionTests:
             assert isinstance(warning, QueryWarning)
             assert isinstance(warning.message(), str)
             assert isinstance(warning.code(), int)
+
+
+class QueryParamTests:
+
+    def test_encoded_consistency(self):
+        q_str = 'SELECT * FROM default'
+        q_opts = QueryOptions(scan_consistency=QueryScanConsistency.REQUEST_PLUS)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        assert query.params.get('scan_consistency', None) == QueryScanConsistency.REQUEST_PLUS.value
+        assert query.consistency == QueryScanConsistency.REQUEST_PLUS
+
+        q_opts = QueryOptions(scan_consistency=QueryScanConsistency.NOT_BOUNDED)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        assert query.params.get('scan_consistency', None) == QueryScanConsistency.NOT_BOUNDED.value
+        assert query.consistency == QueryScanConsistency.NOT_BOUNDED
+
+        # cannot set scan_consistency to AT_PLUS, need to use consistent_with to do that
+        with pytest.raises(InvalidArgumentException):
+            q_opts = QueryOptions(scan_consistency=QueryScanConsistency.AT_PLUS)
+            query = N1QLQuery.create_query_object(q_str, q_opts)
+
+    def test_consistent_with(self):
+
+        q_str = 'SELECT * FROM default'
+        ms = MutationState()
+        mt = MutationToken(token={
+            'partition_id': 42,
+            'partition_uuid': 3004,
+            'sequence_number': 3,
+            'bucket_name': 'default'
+        })
+        ms._add_scanvec(mt)
+        q_opts = QueryOptions(consistent_with=ms)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        # couchbase++ will set scan_consistency, so params should be
+        # None, but the prop should return AT_PLUS
+        assert query.params.get('scan_consistency', None) is None
+        assert query.consistency == QueryScanConsistency.AT_PLUS
+
+        q_mt = query.params.get('mutation_state', None)
+        assert isinstance(q_mt, list)
+        assert len(q_mt) == 1
+        assert q_mt[0] == mt
+
+        # Ensure no dups
+        ms = MutationState()
+        mt1 = MutationToken(token={
+            'partition_id': 42,
+            'partition_uuid': 3004,
+            'sequence_number': 3,
+            'bucket_name': 'default'
+        })
+        ms._add_scanvec(mt)
+        ms._add_scanvec(mt1)
+        q_opts = QueryOptions(consistent_with=ms)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        assert query.params.get('scan_consistency', None) is None
+        assert query.consistency == QueryScanConsistency.AT_PLUS
+
+        q_mt = query.params.get('mutation_state', None)
+        assert isinstance(q_mt, list)
+        assert len(q_mt) == 1
+        assert q_mt[0] == mt
+
+        # Try with a second bucket
+        ms = MutationState()
+        mt2 = MutationToken(token={
+            'partition_id': 42,
+            'partition_uuid': 3004,
+            'sequence_number': 3,
+            'bucket_name': 'default1'
+        })
+        ms._add_scanvec(mt)
+        ms._add_scanvec(mt2)
+        q_opts = QueryOptions(consistent_with=ms)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        assert query.params.get('scan_consistency', None) is None
+        assert query.consistency == QueryScanConsistency.AT_PLUS
+
+        q_mt = query.params.get('mutation_state', None)
+        assert isinstance(q_mt, list)
+        assert len(q_mt) == 2
+        assert next((m for m in q_mt if m == mt2), None) is not None
+
+    def test_preserve_expiry(self):
+        q_str = 'SELECT * FROM default'
+        q_opts = QueryOptions(preserve_expiry=True)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+        assert query.params.get('preserve_expiry', None) is True
+        assert query.preserve_expiry is True
+
+        q_opts = QueryOptions(preserve_expiry=False)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+        assert query.params.get('preserve_expiry', None) is False
+        assert query.preserve_expiry is False
+
+        # if not set, the prop will return False, but preserve_expiry should
+        # not be in the params
+        query = N1QLQuery.create_query_object(q_str)
+        assert query.params.get('preserve_expiry', None) is None
+        assert query.preserve_expiry is False

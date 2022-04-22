@@ -106,8 +106,6 @@ class QueryIndexManagerLogic:
             op_args['deferred'] = kwargs.get('deferred')
         if kwargs.get("num_replicas", None) is not None:
             op_args['num_replicas'] = kwargs.get('num_replicas')
-        if kwargs.get("timeout", None) is not None:
-            op_args["timeout"] = kwargs.get("timeout")
 
         return op_args
 
@@ -129,14 +127,17 @@ class QueryIndexManagerLogic:
         if index_name:
             op_args['index_name'] = index_name
 
+        if kwargs.get("scope_name", None) is not None:
+            op_args['scope_name'] = kwargs.get('scope_name')
+
+        if kwargs.get("collection_name", None) is not None:
+            op_args['collection_name'] = kwargs.get('collection_name')
+
         if ignore_if_not_exists is True or ignore_missing is True:
             op_args['ignore_if_does_not_exist'] = True
 
         if kwargs.get("primary", False) is True:
             op_args['is_primary'] = kwargs.get('primary')
-
-        if kwargs.get("timeout", None) is not None:
-            op_args["timeout"] = kwargs.get("timeout")
 
         mgmt_kwargs = {
             "conn": self._connection,
@@ -244,8 +245,11 @@ class QueryIndexManagerLogic:
         }
         final_args = forward_args(kwargs, *options)
 
-        if final_args.get("timeout", None) is not None:
-            op_args["timeout"] = final_args.get("timeout")
+        if final_args.get("scope_name", None) is not None:
+            op_args['scope_name'] = final_args.get('scope_name')
+
+        if final_args.get("collection_name", None) is not None:
+            op_args['collection_name'] = final_args.get('collection_name')
 
         mgmt_kwargs = {
             "conn": self._connection,
@@ -286,8 +290,11 @@ class QueryIndexManagerLogic:
         }
         final_args = forward_args(kwargs, *options)
 
-        if final_args.get("timeout", None) is not None:
-            op_args["timeout"] = final_args.get("timeout")
+        if final_args.get("scope_name", None) is not None:
+            op_args['scope_name'] = final_args.get('scope_name')
+
+        if final_args.get("collection_name", None) is not None:
+            op_args['collection_name'] = final_args.get('collection_name')
 
         mgmt_kwargs = {
             "conn": self._connection,
@@ -307,6 +314,7 @@ class QueryIndexManagerLogic:
         if final_args.get("timeout", None) is not None:
             mgmt_kwargs["timeout"] = final_args.get("timeout")
 
+        print(f'build deferred idx: {mgmt_kwargs}')
         return management_operation(**mgmt_kwargs)
 
 

@@ -106,7 +106,8 @@ class AsyncBucket(BucketLogic):
         )
         return ViewResult(AsyncViewRequest.generate_view_request(self.connection,
                                                                  self.loop,
-                                                                 query.as_encodable()))
+                                                                 query.as_encodable(),
+                                                                 default_serializer=self.default_serializer))
 
     def collections(self) -> CollectionManager:
         """

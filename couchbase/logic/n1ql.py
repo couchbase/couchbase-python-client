@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import queue
 from datetime import timedelta
 from enum import Enum
 from typing import (TYPE_CHECKING,
@@ -12,12 +11,9 @@ from typing import (TYPE_CHECKING,
                     Optional,
                     Union)
 
-from couchbase._utils import JSONType
-from couchbase.exceptions import (PYCBC_ERROR_MAP,
-                                  CouchbaseException,
-                                  ErrorMapper,
-                                  ExceptionMap,
-                                  InvalidArgumentException)
+from couchbase._utils import JSONType, timedelta_as_microseconds
+from couchbase.exceptions import ErrorMapper, InvalidArgumentException
+from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.options import QueryOptions, UnsignedInt64
 from couchbase.pycbc_core import n1ql_query
 from couchbase.serializer import DefaultJsonSerializer, Serializer
@@ -174,7 +170,7 @@ class N1QLQuery:
     # empty transform will skip updating the attribute when creating an
     # N1QLQuery object
     _VALID_OPTS = {
-        "timeout": {"timeout": timedelta.total_seconds},
+        "timeout": {"timeout": timedelta_as_microseconds},
         "read_only": {"readonly": lambda x: x},
         "scan_consistency": {"consistency": lambda x: x},
         "consistent_with": {"consistent_with": lambda x: x},
@@ -187,12 +183,13 @@ class N1QLQuery:
         "query_context": {"query_context": lambda x: x},
         "raw": {"raw": lambda x: x},
         "scap_cap": {"raw": lambda x: x},
-        "scap_wait": {"scap_wait": timedelta.total_seconds},
+        "scap_wait": {"scap_wait": timedelta_as_microseconds},
         "metrics": {"metrics": lambda x: x},
         "flex_index": {"flex_index": lambda x: x},
         "preserve_expiry": {"preserve_expiry": lambda x: x},
+        "serializer": {"serializer": lambda x: x},
         "positional_parameters": {},
-        "named_parameters": {},
+        "named_parameters": {}
     }
 
     def __init__(self, query, *args, **kwargs):
@@ -567,13 +564,11 @@ class QueryRequestLogic:
         self._query_params = query_params
         self.row_factory = row_factory
         self._rows = asyncio.Queue()
-        self._raw_rows = queue.Queue()
-        self._query_request_ftr = None
-        self._ROWS_STOP = object()
         self._streaming_result = None
         self._started_streaming = False
         self._done_streaming = False
         self._metadata = None
+        self._default_serializer = kwargs.pop('default_serializer', DefaultJsonSerializer())
         self._serializer = None
 
     @property
@@ -587,7 +582,7 @@ class QueryRequestLogic:
 
         serializer = self.params.get('serializer', None)
         if not serializer:
-            serializer = DefaultJsonSerializer()
+            serializer = self._default_serializer
 
         self._serializer = serializer
         return self._serializer
@@ -604,100 +599,29 @@ class QueryRequestLogic:
         # @TODO:  raise if query isn't complete?
         return self._metadata
 
-    def _handle_query_result_exc(self, query_response):
-        base_exc = query_response.raw_result.get('exc', None)
-        exc_info = query_response.raw_result.get('exc_info', None)
-
-        excptn = None
-        if base_exc is None and exc_info:
-            exc_cls = PYCBC_ERROR_MAP.get(exc_info.get('error_code', None), CouchbaseException)
-            new_exc_info = {k: v for k, v in exc_info if k in ['cinfo', 'inner_cause']}
-            excptn = exc_cls(message=exc_info.get('message', None), exc_info=new_exc_info)
-        else:
-            err_ctx = base_exc.error_context()
-            if err_ctx is not None:
-                print(base_exc.err())
-                print(f'err context: {err_ctx}')
-                print(f'err info: {exc_info}')
-                excptn = ErrorMapper.parse_error_context(base_exc)
-            else:
-                exc_cls = PYCBC_ERROR_MAP.get(base_exc.err(), CouchbaseException)
-                excptn = exc_cls(message=base_exc.strerror())
-
-        if excptn is None:
-            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-            excptn = exc_cls(message='Unknown error.')
-
-        raise excptn
-
     def _set_metadata(self, query_response):
-        has_exception = query_response.raw_result.get('has_exception', None)
-        if has_exception:
-            self._handle_query_result_exc(query_response)
+        if isinstance(query_response, CouchbaseBaseException):
+            raise ErrorMapper.build_exception(query_response)
 
         self._metadata = QueryMetaData(query_response.raw_result.get('value', None))
-        # metadata = query_response.get('metadata', None)
-        # if metadata:
-        #     #print(f'metadata: {metadata}')
-        #     md = metadata.raw_result.get('value', None)
-        #     print(f'metadata: {md}')
-        #     self._metadata = QueryMetaData(md)
 
-    # async def handle_query_row(self, row):
-    #     print(f'row: {row}')
-    #     await self._rows.put(row)
-    #     return row
-
-    def _submit_query(self):
+    def _submit_query(self, **kwargs):
         if self.done_streaming:
             return
 
         self._started_streaming = True
-        kwargs = {
+        n1ql_kwargs = {
             'conn': self._connection,
         }
-        kwargs.update(self.params)
-        self._streaming_result = n1ql_query(**kwargs)
-    # def _submit_query(self):
-    #     # print(f'submitting query from thread: {current_thread()}')
-    #     if self._query_request_ftr is not None:
-    #         return
+        n1ql_kwargs.update(self.params)
 
-    #     if self.params.get('serializer', None) is None:
-    #         self.params['serializer'] = DefaultJsonSerializer()
+        # this is for txcouchbase...
+        callback = kwargs.pop('callback', None)
+        if callback:
+            n1ql_kwargs['callback'] = callback
 
-    #     kwargs = {
-    #         'conn': self._connection,
-    #         'callback': self._on_query_complete,
-    #         'errback': self._on_query_exception,
-    #         **self.params
-    #     }
-    #     print(f'kwargs: {kwargs}')
-    #     self._query_request_ftr = self._loop.create_future()
-    #     self._streaming_result = n1ql_query(**kwargs)
-    #     # self.params.pop('serializer')
-    #     # print('removed serializer from params')
+        errback = kwargs.pop('errback', None)
+        if errback:
+            n1ql_kwargs['errback'] = errback
 
-    def _on_query_complete(self, result):
-        print(f'_on_query_callback: {result}')
-        self._loop.call_soon_threadsafe(self._query_request_ftr.set_result, result)
-
-    def _on_query_exception(self, exc):
-        err_ctx = exc.error_context()
-        print(f"error context: {err_ctx}")
-        if err_ctx is not None:
-            excptn = ErrorMapper.parse_error_context(exc)
-        else:
-            exc_cls = PYCBC_ERROR_MAP.get(exc.err(), CouchbaseException)
-            excptn = exc_cls(exc)
-        self._loop.call_soon_threadsafe(self._query_request_ftr.set_exception, excptn)
-
-    def __iter__(self):
-        raise NotImplementedError(
-            'Cannot use synchronous iterator, are you using `async for`?'
-        )
-
-    def __aiter__(self):
-        raise NotImplementedError(
-            'Cannot use asynchronous iterator.'
-        )
+        self._streaming_result = n1ql_query(**n1ql_kwargs)

@@ -164,7 +164,13 @@ class TestEnvironment(CouchbaseTestEnvironment):
                     _ = self.collection.upsert(key, r)
                     self._loaded_keys.append(key)
 
-        print("done loading keys")
+    def get_json_data_by_type(self, json_type):
+        _, sample_json = self.load_data_from_file()
+        data = sample_json.get(json_type, None)
+        if data and 'results' in data:
+            return data['results']
+
+        return None
 
     def purge_data(self):
         for k in self._loaded_keys:

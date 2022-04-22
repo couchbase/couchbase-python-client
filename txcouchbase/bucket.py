@@ -118,7 +118,8 @@ class Bucket(BucketLogic):
         )
         request = ViewRequest.generate_view_request(self.connection,
                                                     self.loop,
-                                                    query.as_encodable())
+                                                    query.as_encodable(),
+                                                    default_serializer=self.default_serializer)
 
         d = Deferred()
 
@@ -128,7 +129,7 @@ class Bucket(BucketLogic):
         def _on_err(exc):
             d.errback(exc)
 
-        query_d = request.execute_query()
+        query_d = request.execute_view_query()
         query_d.addCallback(_on_ok)
         query_d.addErrback(_on_err)
         return d

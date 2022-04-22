@@ -41,8 +41,7 @@ class ViewTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(
-            conn_string, opts)
+        cluster = Cluster(conn_string, opts)
         cluster.cluster_info()
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
 
@@ -87,7 +86,7 @@ class ViewTests:
                                                limit=min_count,
                                                namespace=DesignDocumentNamespace.DEVELOPMENT)
         count = 0
-        for _ in view_result.rows():
+        for _ in view_result:
             count += 1
         return count >= min_count
 

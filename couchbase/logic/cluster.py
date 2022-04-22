@@ -28,7 +28,7 @@ from couchbase.pycbc_core import (close_connection,
 from couchbase.result import (ClusterInfoResult,
                               DiagnosticsResult,
                               PingResult)
-from couchbase.serializer import DefaultJsonSerializer
+from couchbase.serializer import DefaultJsonSerializer, Serializer
 from couchbase.transcoder import JSONTranscoder
 
 if TYPE_CHECKING:
@@ -105,13 +105,13 @@ class ClusterLogic:
         if tracing_opts:
             cluster_opts['tracing_options'] = tracing_opts
 
-        self._serializer = cluster_opts.pop("serializer", None)
-        if not self._serializer:
-            self._serializer = DefaultJsonSerializer()
+        self._default_serializer = cluster_opts.pop("serializer", None)
+        if not self._default_serializer:
+            self._default_serializer = DefaultJsonSerializer()
 
-        self._transcoder = cluster_opts.pop("transcoder", None)
-        if not self._transcoder:
-            self._transcoder = JSONTranscoder()
+        self._default_transcoder = cluster_opts.pop("transcoder", None)
+        if not self._default_transcoder:
+            self._default_transcoder = JSONTranscoder()
 
         self._cluster_opts = cluster_opts
         self._connection = None
@@ -128,11 +128,15 @@ class ClusterLogic:
         return self._connection
 
     @property
-    def transcoder(self) -> Transcoder:
+    def default_transcoder(self) -> Optional[Transcoder]:
         """
         **INTERNAL**
         """
-        return self._transcoder
+        return self._default_transcoder
+
+    @property
+    def default_serializer(self) -> Optional[Serializer]:
+        return self._default_serializer
 
     @property
     def connected(self) -> bool:

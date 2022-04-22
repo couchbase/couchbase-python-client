@@ -9,7 +9,7 @@ from typing import (TYPE_CHECKING,
 from couchbase.analytics import AnalyticsQuery, AnalyticsRequest
 from couchbase.bucket import Bucket
 from couchbase.diagnostics import ClusterState, ServiceType
-from couchbase.exceptions import ErrorMapperNew, UnAmbiguousTimeoutException
+from couchbase.exceptions import ErrorMapper, UnAmbiguousTimeoutException
 from couchbase.exceptions import exception as BaseCouchbaseException
 from couchbase.logic import BlockingWrapper
 from couchbase.logic.cluster import ClusterLogic
@@ -56,7 +56,7 @@ class Cluster(ClusterLogic):
     def _connect(self, **kwargs):
         ret = super()._connect_cluster(**kwargs)
         if isinstance(ret, BaseCouchbaseException):
-            raise ErrorMapperNew.build_exception(ret)
+            raise ErrorMapper.build_exception(ret)
         self._set_connection(ret)
 
     @BlockingWrapper.block(True)
@@ -160,9 +160,12 @@ class Cluster(ClusterLogic):
         **kwargs  # type: Any
     ) -> QueryResult:
 
-        query = N1QLQuery.create_query_object(
-            statement, *options, **kwargs)
-        return QueryResult(N1QLRequest.generate_n1ql_request(self.connection, query.params))
+        query = N1QLQuery.create_query_object(statement,
+                                              *options,
+                                              **kwargs)
+        return QueryResult(N1QLRequest.generate_n1ql_request(self.connection,
+                                                             query.params,
+                                                             default_serializer=self.default_serializer))
 
     def analytics_query(
         self,  # type: Cluster
@@ -171,10 +174,13 @@ class Cluster(ClusterLogic):
         **kwargs
     ) -> AnalyticsResult:
 
-        query = AnalyticsQuery.create_query_object(
-            statement, *options, **kwargs)
-        return AnalyticsResult(AnalyticsRequest.generate_analytics_request(self.connection,
-                                                                           query.params))
+        query = AnalyticsQuery.create_query_object(statement,
+                                                   *options,
+                                                   **kwargs)
+        return AnalyticsResult(AnalyticsRequest.generate_analytics_request(
+            self.connection,
+            query.params,
+            default_serializer=self.default_serializer))
 
     def search_query(
         self,
@@ -187,7 +193,8 @@ class Cluster(ClusterLogic):
             index, query, *options, **kwargs
         )
         return SearchResult(SearchRequest.generate_search_request(self.connection,
-                                                                  query.as_encodable()))
+                                                                  query.as_encodable(),
+                                                                  default_serializer=self.default_serializer))
 
     def buckets(self) -> BucketManager:
         """

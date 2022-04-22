@@ -8,7 +8,7 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   CouchbaseException,
                                   DocumentExistsException,
                                   DocumentNotFoundException,
-                                  ErrorMapperNew,
+                                  ErrorMapper,
                                   ExceptionMap,
                                   InternalSDKException,
                                   PathNotFoundException)
@@ -46,7 +46,7 @@ class BlockingWrapper:
                 try:
                     ret = fn(self, *args, **kwargs)
                     if isinstance(ret, BaseCouchbaseException):
-                        raise ErrorMapperNew.build_exception(ret)
+                        raise ErrorMapper.build_exception(ret)
                     if return_cls is None:
                         return None
                     elif return_cls is True:
@@ -77,7 +77,7 @@ class BlockingWrapper:
                     transcoder = kwargs.pop('transcoder')
                     ret = fn(self, *args, **kwargs)
                     if isinstance(ret, BaseCouchbaseException):
-                        raise ErrorMapperNew.build_exception(ret)
+                        raise ErrorMapper.build_exception(ret)
                     value = ret.raw_result.get('value', None)
                     flags = ret.raw_result.get('flags', None)
 

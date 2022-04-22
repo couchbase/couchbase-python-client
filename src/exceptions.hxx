@@ -81,24 +81,6 @@ make_error_code(PycbcError ec);
 PyObject*
 build_kv_error_map_info(couchbase::error_map::error_info error_info);
 
-// @TODO:  these are going way, replace w/ build_exception_from_* methods
-template<typename T>
-PyObject*
-build_exception(const T& ec)
-{
-    exception_base* exc = create_exception_base_obj();
-    return reinterpret_cast<PyObject*>(exc);
-}
-
-template<>
-inline PyObject*
-build_exception(const std::error_code& ec)
-{
-    exception_base* exc = create_exception_base_obj();
-    exc->ec = ec;
-    return reinterpret_cast<PyObject*>(exc);
-}
-
 /*
 
 Build exceptions via error context
@@ -454,6 +436,27 @@ build_exception_from_context(const couchbase::error_context::query& ctx,
     exc->error_context = pyObj_error_context;
     Py_INCREF(exc->error_context);
 
+    PyObject* pyObj_exc_info = PyDict_New();
+
+    PyObject* pyObj_cinfo = Py_BuildValue("(s,i)", file, line);
+    if (-1 == PyDict_SetItemString(pyObj_exc_info, "cinfo", pyObj_cinfo)) {
+        PyErr_Print();
+        Py_XDECREF(pyObj_cinfo);
+    }
+    Py_DECREF(pyObj_cinfo);
+
+    if (!error_msg.empty()) {
+        PyObject* pyObj_error_msg = PyUnicode_FromString(error_msg.c_str());
+        if (-1 == PyDict_SetItemString(pyObj_exc_info, "error_message", pyObj_error_msg)) {
+            PyErr_Print();
+            Py_XDECREF(pyObj_error_msg);
+        }
+        Py_DECREF(pyObj_error_msg);
+    }
+
+    exc->exc_info = pyObj_exc_info;
+    Py_INCREF(exc->exc_info);
+
     return reinterpret_cast<PyObject*>(exc);
 }
 
@@ -512,6 +515,27 @@ build_exception_from_context(const couchbase::error_context::analytics& ctx,
     exc->error_context = pyObj_error_context;
     Py_INCREF(exc->error_context);
 
+    PyObject* pyObj_exc_info = PyDict_New();
+
+    PyObject* pyObj_cinfo = Py_BuildValue("(s,i)", file, line);
+    if (-1 == PyDict_SetItemString(pyObj_exc_info, "cinfo", pyObj_cinfo)) {
+        PyErr_Print();
+        Py_XDECREF(pyObj_cinfo);
+    }
+    Py_DECREF(pyObj_cinfo);
+
+    if (!error_msg.empty()) {
+        PyObject* pyObj_error_msg = PyUnicode_FromString(error_msg.c_str());
+        if (-1 == PyDict_SetItemString(pyObj_exc_info, "error_message", pyObj_error_msg)) {
+            PyErr_Print();
+            Py_XDECREF(pyObj_error_msg);
+        }
+        Py_DECREF(pyObj_error_msg);
+    }
+
+    exc->exc_info = pyObj_exc_info;
+    Py_INCREF(exc->exc_info);
+
     return reinterpret_cast<PyObject*>(exc);
 }
 
@@ -564,6 +588,27 @@ build_exception_from_context(const couchbase::error_context::search& ctx,
 
     exc->error_context = pyObj_error_context;
     Py_INCREF(exc->error_context);
+
+    PyObject* pyObj_exc_info = PyDict_New();
+
+    PyObject* pyObj_cinfo = Py_BuildValue("(s,i)", file, line);
+    if (-1 == PyDict_SetItemString(pyObj_exc_info, "cinfo", pyObj_cinfo)) {
+        PyErr_Print();
+        Py_XDECREF(pyObj_cinfo);
+    }
+    Py_DECREF(pyObj_cinfo);
+
+    if (!error_msg.empty()) {
+        PyObject* pyObj_error_msg = PyUnicode_FromString(error_msg.c_str());
+        if (-1 == PyDict_SetItemString(pyObj_exc_info, "error_message", pyObj_error_msg)) {
+            PyErr_Print();
+            Py_XDECREF(pyObj_error_msg);
+        }
+        Py_DECREF(pyObj_error_msg);
+    }
+
+    exc->exc_info = pyObj_exc_info;
+    Py_INCREF(exc->exc_info);
 
     return reinterpret_cast<PyObject*>(exc);
 }
@@ -623,87 +668,32 @@ build_exception_from_context(const couchbase::error_context::view& ctx,
     exc->error_context = pyObj_error_context;
     Py_INCREF(exc->error_context);
 
+    PyObject* pyObj_exc_info = PyDict_New();
+
+    PyObject* pyObj_cinfo = Py_BuildValue("(s,i)", file, line);
+    if (-1 == PyDict_SetItemString(pyObj_exc_info, "cinfo", pyObj_cinfo)) {
+        PyErr_Print();
+        Py_XDECREF(pyObj_cinfo);
+    }
+    Py_DECREF(pyObj_cinfo);
+
+    if (!error_msg.empty()) {
+        PyObject* pyObj_error_msg = PyUnicode_FromString(error_msg.c_str());
+        if (-1 == PyDict_SetItemString(pyObj_exc_info, "error_message", pyObj_error_msg)) {
+            PyErr_Print();
+            Py_XDECREF(pyObj_error_msg);
+        }
+        Py_DECREF(pyObj_error_msg);
+    }
+
+    exc->exc_info = pyObj_exc_info;
+    Py_INCREF(exc->exc_info);
+
     return reinterpret_cast<PyObject*>(exc);
 }
 
-// @TODO:  remove once streaming cleaned up
-class PycbcException : public std::exception
-{
-  public:
-    PycbcException(std::string msg_, const char* file_, int line_, std::error_code ec_)
-      : msg{ msg_ }
-      , file{ file_ }
-      , line{ line_ }
-      , ec{ ec_ }
-    {
-    }
-
-    ~PycbcException() throw()
-    {
-    }
-
-    const char* get_file() const
-    {
-        return file;
-    }
-    int get_line() const
-    {
-        return line;
-    }
-    std::error_code get_error_code() const
-    {
-        return ec;
-    }
-    std::string get_error_code_category() const
-    {
-        return std::string(ec.category().name());
-    }
-
-    const char* what() const throw()
-    {
-        return msg.c_str();
-    }
-
-  protected:
-    std::string msg;
-    const char* file;
-    int line;
-    std::error_code ec;
-};
-
-class PycbcHttpException : public PycbcException
-{
-  public:
-    PycbcHttpException(std::string msg_, const char* file_, int line_, couchbase::error_context::http ctx_)
-      : PycbcException(msg_, file_, line_, ctx_.ec)
-      , ctx{ ctx_ }
-    {
-    }
-    PycbcHttpException(std::string msg_, const char* file_, int line_, couchbase::error_context::http ctx_, std::error_code ec_)
-      : PycbcException(msg_, file_, line_, ec_)
-      , ctx{ ctx_ }
-    {
-    }
-
-    couchbase::error_context::http get_context() const
-    {
-        return ctx;
-    }
-
-  protected:
-    couchbase::error_context::http ctx;
-};
-
 void
-pycbc_set_python_exception(std::error_code ec, const char* file, int line, const char* msg, PyObject* pyObj_base_exc = nullptr);
-
-// @TODO:  remove once streaming cleaned up
-PyObject*
-pycbc_core_get_exception_kwargs(std::string msg, std::error_code ec, const char* file, int line);
-
-// @TODO:  remove once streaming cleaned up
-PyObject*
-pycbc_get_exception_kwargs(std::string msg, const char* file, int line);
+pycbc_set_python_exception(std::error_code ec, const char* file, int line, const char* msg);
 
 PyObject*
 pycbc_build_exception(std::error_code ec, const char* file, int line, std::string msg);

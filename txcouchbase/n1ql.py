@@ -1,10 +1,11 @@
-import asyncio
-
 from twisted.internet.defer import Deferred
 
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
+                                  AlreadyQueriedException,
                                   CouchbaseException,
+                                  ErrorMapper,
                                   ExceptionMap)
+from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.n1ql import QueryRequestLogic
 
 
@@ -16,35 +17,59 @@ class N1QLRequest(QueryRequestLogic):
                  row_factory=lambda x: x,
                  **kwargs
                  ):
-        super().__init__(connection, loop, query_params, row_factory=row_factory, **kwargs)
+        super().__init__(connection, query_params, row_factory=row_factory, **kwargs)
+        self._query_request_ftr = None
         self._query_d = None
+        self._loop = loop
+
+    @property
+    def loop(self):
+        """
+        **INTERNAL**
+        """
+        return self._loop
 
     @classmethod
-    def generate_n1ql_request(cls, connection, loop, query_params, row_factory=lambda x: x):
-        return cls(connection, loop, query_params, row_factory=row_factory)
+    def generate_n1ql_request(cls, connection, loop, query_params, row_factory=lambda x: x, **kwargs):
+        return cls(connection, loop, query_params, row_factory=row_factory, **kwargs)
 
     def execute_query(self):
-        if self._query_request_ftr is not None and self._query_request_ftr.done():
-            # @TODO(jc): better exception
-            raise Exception("Previously iterated over results.")
+        # if self._query_request_ftr is not None and self._query_request_ftr.done():
+        if self.done_streaming:
+            raise AlreadyQueriedException()
 
         if self._query_request_ftr is None:
-            self._submit_query()
+            self._query_request_ftr = self.loop.create_future()
+            self._submit_query(callback=self._on_query_complete)
+            self._query_d = Deferred.fromFuture(self._query_request_ftr)
 
-        self._query_d = Deferred.fromFuture(self._query_request_ftr)
         return self._query_d
 
+    def _on_query_complete(self, result):
+        print(f'_on_query_callback: {result}')
+        self._loop.call_soon_threadsafe(self._query_request_ftr.set_result, result)
+
     def _get_metadata(self):
-        if self._query_request_ftr.done():
-            if self._query_request_ftr.exception():
-                print('raising exception')
-                raise self._query_request_ftr.exception()
-            else:
-                self._set_metadata()
-        else:
-            # @TODO:  don't think this is reachable...
-            self._loop.run_until_complete(self._query_request_ftr)
-            self._set_metadata()
+        try:
+            query_response = next(self._streaming_result)
+            self._set_metadata(query_response)
+        except CouchbaseException as ex:
+            raise ex
+        except Exception as ex:
+            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
+            excptn = exc_cls(str(ex))
+            raise excptn
+
+    # def _get_metadata(self):
+    #     if self._query_request_ftr.done():
+    #         if self._query_request_ftr.exception():
+    #             print('raising exception')
+    #             raise self._query_request_ftr.exception()
+    #         else:
+    #             self._set_metadata()
+    #     else:
+    #         self._loop.run_until_complete(self._query_request_ftr)
+    #         self._set_metadata()
 
     def __iter__(self):
         return self
@@ -53,27 +78,25 @@ class N1QLRequest(QueryRequestLogic):
         if self._done_streaming is True:
             return
 
-        try:
-            row = next(self._streaming_result)
-            self._rows.put_nowait(row)
-        except StopIteration:
-            self._done_streaming = True
+        row = next(self._streaming_result)
+        if isinstance(row, CouchbaseBaseException):
+            raise ErrorMapper.build_exception(row)
+        # should only be None one query request is complete and _no_ errors found
+        if row is None:
+            raise StopIteration
+
+        return self.serializer.deserialize(row)
 
     def __next__(self):
         try:
-            if self._query_request_ftr.done() and self._query_request_ftr.exception():
-                raise self._query_request_ftr.exception()
-
-            self._get_next_row()
-            return self._rows.get_nowait()
-        except asyncio.QueueEmpty:
+            return self._get_next_row()
+        except StopIteration:
+            self._done_streaming = True
             self._get_metadata()
-            raise StopIteration
+            raise
         except CouchbaseException as ex:
             raise ex
         except Exception as ex:
-            print(f'base exception: {ex}')
             exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-            print(exc_cls.__name__)
             excptn = exc_cls(str(ex))
             raise excptn

@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, Any
+from typing import (TYPE_CHECKING,
+                    Any,
+                    Optional)
 
 from couchbase.analytics import AnalyticsQuery, AnalyticsRequest
 from couchbase.collection import Collection
@@ -10,6 +12,7 @@ from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
 from couchbase.search import SearchQueryBuilder, SearchRequest
+from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
     from couchbase.search import SearchQuery
@@ -28,11 +31,8 @@ class Scope:
         return self._bucket.connection
 
     @property
-    def transcoder(self):
-        """
-        **INTERNAL**
-        """
-        return self._bucket.transcoder
+    def default_transcoder(self) -> Optional[Transcoder]:
+        return self._bucket.default_transcoder
 
     @property
     def name(self):
@@ -68,7 +68,6 @@ class Scope:
         query = N1QLQuery.create_query_object(
             statement, opt, **kwargs)
         return QueryResult(N1QLRequest.generate_n1ql_request(self.connection,
-                                                             self.loop,
                                                              query.params))
 
     def analytics_query(
@@ -87,12 +86,11 @@ class Scope:
 
         # set the query context as this bucket and scope if not provided
         if not ('query_context' in opt or 'query_context' in kwargs):
-            kwargs['query_context'] = '`{}`.`{}`'.format(self.bucket_name, self.name)
+            kwargs['query_context'] = 'default:`{}`.`{}`'.format(self.bucket_name, self.name)
 
         query = AnalyticsQuery.create_query_object(
             statement, *options, **kwargs)
         return AnalyticsResult(AnalyticsRequest.generate_analytics_request(self.connection,
-                                                                           self.loop,
                                                                            query.params))
 
     def search_query(
@@ -118,7 +116,6 @@ class Scope:
             index, query, *options, **kwargs
         )
         return SearchResult(SearchRequest.generate_search_request(self.connection,
-                                                                  self.loop,
                                                                   query.as_encodable()))
 
     @staticmethod

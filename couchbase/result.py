@@ -20,7 +20,7 @@ from couchbase.diagnostics import (ClusterState,
 from couchbase.exceptions import (CLIENT_ERROR_MAP,
                                   CouchbaseException,
                                   DocumentNotFoundException,
-                                  ErrorMapperNew,
+                                  ErrorMapper,
                                   InvalidIndexException,
                                   PathExistsException,
                                   PathMismatchException,
@@ -292,9 +292,9 @@ class MultiGetResult:
         for k, v in self._orig.raw_result.items():
             if isinstance(v, CouchbaseBaseException):
                 if not return_exceptions:
-                    raise ErrorMapperNew.build_exception(v)
+                    raise ErrorMapper.build_exception(v)
                 else:
-                    self._results[k] = ErrorMapperNew.build_exception(v)
+                    self._results[k] = ErrorMapper.build_exception(v)
             else:
                 self._results[k] = GetResult(v)
 
@@ -357,9 +357,9 @@ class MultiExistsResult:
         for k, v in self._orig.raw_result.items():
             if isinstance(v, CouchbaseBaseException):
                 if not return_exceptions:
-                    raise ErrorMapperNew.build_exception(v)
+                    raise ErrorMapper.build_exception(v)
                 else:
-                    self._results[k] = ErrorMapperNew.build_exception(v)
+                    self._results[k] = ErrorMapper.build_exception(v)
             else:
                 self._results[k] = ExistsResult(v)
 
@@ -420,9 +420,9 @@ class MultiMutationResult:
         for k, v in self._orig.raw_result.items():
             if isinstance(v, CouchbaseBaseException):
                 if not return_exceptions:
-                    raise ErrorMapperNew.build_exception(v)
+                    raise ErrorMapper.build_exception(v)
                 else:
-                    self._results[k] = ErrorMapperNew.build_exception(v)
+                    self._results[k] = ErrorMapper.build_exception(v)
             else:
                 self._results[k] = MutationResult(v)
 
@@ -554,9 +554,9 @@ class MultiCounterResult:
         for k, v in self._orig.raw_result.items():
             if isinstance(v, CouchbaseBaseException):
                 if not return_exceptions:
-                    raise ErrorMapperNew.build_exception(v)
+                    raise ErrorMapper.build_exception(v)
                 else:
-                    self._results[k] = ErrorMapperNew.build_exception(v)
+                    self._results[k] = ErrorMapper.build_exception(v)
             else:
                 self._results[k] = CounterResult(v)
 

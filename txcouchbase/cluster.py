@@ -13,6 +13,7 @@ from twisted.internet.defer import Deferred, inlineCallbacks
 from acouchbase import get_event_loop
 from couchbase.diagnostics import ClusterState, ServiceType
 from couchbase.exceptions import UnAmbiguousTimeoutException
+from couchbase.logic.analytics import AnalyticsQuery
 from couchbase.logic.cluster import ClusterLogic
 from couchbase.logic.n1ql import N1QLQuery
 from couchbase.logic.search import SearchQueryBuilder
@@ -20,11 +21,13 @@ from couchbase.options import (DiagnosticsOptions,
                                PingOptions,
                                WaitUntilReadyOptions,
                                forward_args)
-from couchbase.result import (ClusterInfoResult,
+from couchbase.result import (AnalyticsResult,
+                              ClusterInfoResult,
                               DiagnosticsResult,
                               PingResult,
                               QueryResult,
                               SearchResult)
+from txcouchbase.analytics import AnalyticsRequest
 from txcouchbase.bucket import Bucket
 from txcouchbase.logic import TxWrapper
 from txcouchbase.management.analytics import AnalyticsIndexManager
@@ -38,7 +41,8 @@ from txcouchbase.search import SearchRequest
 if TYPE_CHECKING:
     from datetime import timedelta
 
-    from couchbase.options import (ClusterOptions,
+    from couchbase.options import (AnalyticsOptions,
+                                   ClusterOptions,
                                    QueryOptions,
                                    SearchOptions)
     from couchbase.search import SearchQuery
@@ -213,12 +217,15 @@ class Cluster(ClusterLogic):
         self,
         statement,  # type: str
         *options,  # type: QueryOptions
-        **kwargs  # type: Any
+        **kwargs  # type: Dict[str, Any]
     ) -> Deferred[QueryResult]:
 
         query = N1QLQuery.create_query_object(
             statement, *options, **kwargs)
-        request = N1QLRequest.generate_n1ql_request(self.connection, self.loop, query.params)
+        request = N1QLRequest.generate_n1ql_request(self.connection,
+                                                    self.loop,
+                                                    query.params,
+                                                    default_serializer=self.default_serializer)
         d = Deferred()
 
         def _on_ok(_):
@@ -232,19 +239,46 @@ class Cluster(ClusterLogic):
         query_d.addErrback(_on_err)
         return d
 
+    def analytics_query(
+        self,
+        statement,  # type: str
+        *options,  # type: AnalyticsOptions
+        **kwargs  # type: Dict[str, Any]
+    ) -> Deferred[AnalyticsResult]:
+
+        query = AnalyticsQuery.create_query_object(
+            statement, *options, **kwargs)
+        request = AnalyticsRequest.generate_analytics_request(self.connection,
+                                                              self.loop,
+                                                              query.params,
+                                                              default_serializer=self.default_serializer)
+        d = Deferred()
+
+        def _on_ok(_):
+            d.callback(AnalyticsResult(request))
+
+        def _on_err(exc):
+            d.errback(exc)
+
+        query_d = request.execute_analytics_query()
+        query_d.addCallback(_on_ok)
+        query_d.addErrback(_on_err)
+        return d
+
     def search_query(
         self,
         index,  # type: str
         query,  # type: SearchQuery
         *options,  # type: SearchOptions
-        **kwargs
+        **kwargs  # type: Dict[str, Any]
     ) -> Deferred[SearchResult]:
         query = SearchQueryBuilder.create_search_query_object(
             index, query, *options, **kwargs
         )
         request = SearchRequest.generate_search_request(self.connection,
                                                         self.loop,
-                                                        query.as_encodable())
+                                                        query.as_encodable(),
+                                                        default_serializer=self.default_serializer)
         d = Deferred()
 
         def _on_ok(_):
@@ -253,7 +287,7 @@ class Cluster(ClusterLogic):
         def _on_err(exc):
             d.errback(exc)
 
-        query_d = request.execute_query()
+        query_d = request.execute_search_query()
         query_d.addCallback(_on_ok)
         query_d.addErrback(_on_err)
         return d

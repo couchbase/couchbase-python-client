@@ -2,8 +2,11 @@ import asyncio
 from typing import Awaitable
 
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
+                                  AlreadyQueriedException,
                                   CouchbaseException,
+                                  ErrorMapper,
                                   ExceptionMap)
+from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.search import SearchQueryBuilder  # noqa: F401
 from couchbase.logic.search import (SearchRequestLogic,
                                     SearchRow,
@@ -35,20 +38,12 @@ class AsyncSearchRequest(SearchRequestLogic):
         try:
             query_response = next(self._streaming_result)
             self._set_metadata(query_response)
-        except StopAsyncIteration:
-            pass
-
-    # async def _get_metadata(self):
-    #     # print('setting metadata')
-    #     if self._query_request_ftr.done():
-    #         if self._query_request_ftr.exception():
-    #             print('raising exception')
-    #             raise self._query_request_ftr.exception()
-    #         else:
-    #             self._set_metadata()
-    #     else:
-    #         await self._query_request_ftr
-    #         self._set_metadata()
+        except CouchbaseException as ex:
+            raise ex
+        except Exception as ex:
+            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
+            excptn = exc_cls(str(ex))
+            raise excptn
 
     def execute(self) -> Awaitable[None]:
         async def _execute():
@@ -58,8 +53,7 @@ class AsyncSearchRequest(SearchRequestLogic):
 
     def __aiter__(self):
         if self.done_streaming:
-            # @TODO(jc): better exception
-            raise Exception("Previously iterated over results.")
+            raise AlreadyQueriedException()
 
         if not self.started_streaming:
             self._submit_query()
@@ -71,6 +65,9 @@ class AsyncSearchRequest(SearchRequestLogic):
             return
 
         row = next(self._streaming_result)
+        if isinstance(row, CouchbaseBaseException):
+            raise ErrorMapper.build_exception(row)
+        # should only be None one query request is complete and _no_ errors found
         if row is None:
             raise StopAsyncIteration
 
@@ -89,9 +86,9 @@ class AsyncSearchRequest(SearchRequestLogic):
             await self._get_next_row()
             return self._rows.get_nowait()
         except asyncio.QueueEmpty:
-            self._done_streaming = True
-            self._get_metadata()
-            raise StopAsyncIteration
+            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
+            excptn = exc_cls('Unexpected QueueEmpty exception caught when doing Search query.')
+            raise excptn
         except StopAsyncIteration:
             self._done_streaming = True
             self._get_metadata()
@@ -99,8 +96,6 @@ class AsyncSearchRequest(SearchRequestLogic):
         except CouchbaseException as ex:
             raise ex
         except Exception as ex:
-            print(f'base exception: {ex}')
             exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-            print(exc_cls.__name__)
             excptn = exc_cls(str(ex))
             raise excptn

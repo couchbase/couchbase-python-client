@@ -5,7 +5,7 @@ from functools import partial, wraps
 from twisted.internet.defer import Deferred
 
 from acouchbase.logic import call_async_fn
-from couchbase.exceptions import ErrorMapperNew, MissingConnectionException
+from couchbase.exceptions import ErrorMapper, MissingConnectionException
 from couchbase.logic import decode_value
 
 
@@ -24,7 +24,7 @@ class TxWrapper:
                     self.loop.call_soon_threadsafe(ft.set_result, True)
 
                 def on_err(exc):
-                    excptn = ErrorMapperNew.build_exception(exc)
+                    excptn = ErrorMapper.build_exception(exc)
                     self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok
@@ -49,7 +49,7 @@ class TxWrapper:
                     self.loop.call_soon_threadsafe(ft.set_result, True)
 
                 def on_err(exc):
-                    excptn = ErrorMapperNew.build_exception(exc)
+                    excptn = ErrorMapper.build_exception(exc)
                     self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok
@@ -92,7 +92,7 @@ class TxWrapper:
                     self.loop.call_soon_threadsafe(ft.set_result, True)
 
                 def on_err(exc):
-                    excptn = ErrorMapperNew.build_exception(exc)
+                    excptn = ErrorMapper.build_exception(exc)
                     self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok
@@ -155,7 +155,7 @@ class TxWrapper:
                     self.loop.call_soon_threadsafe(ft.set_result, retval)
 
                 def on_err(exc):
-                    excptn = ErrorMapperNew.build_exception(exc)
+                    excptn = ErrorMapper.build_exception(exc)
                     self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok
@@ -202,7 +202,7 @@ class TxWrapper:
                     self.loop.call_soon_threadsafe(ft.set_result, retval)
 
                 def on_err(exc):
-                    excptn = ErrorMapperNew.build_exception(exc)
+                    excptn = ErrorMapper.build_exception(exc)
                     self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok
@@ -253,7 +253,7 @@ class TxWrapper:
                     self.loop.call_soon_threadsafe(ft.set_result, retval)
 
                 def on_err(exc):
-                    excptn = ErrorMapperNew.build_exception(exc)
+                    excptn = ErrorMapper.build_exception(exc)
                     self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok

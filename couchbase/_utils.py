@@ -1,4 +1,3 @@
-import re
 import time
 from datetime import timedelta
 from enum import Enum
@@ -14,57 +13,6 @@ from urllib.parse import quote
 
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.pycbc_core import exception
-
-
-class DurationParser:
-
-    _BASE_UNIT = 1
-    _SECOND = _BASE_UNIT * 1000 * 1000 * 1000 * 1000
-
-    _UNIT_CONVERSION = {
-        "ns": 1,
-        "us": 1 * 1000,
-        "µs": 1 * 1000 * 1000,  # micro sign: unicode - 0xB5
-        "μs": 1 * 1000 * 1000,  # greek small letter mu: unicode - 0x3BC
-        "ms": 1 * 1000 * 1000 * 1000,
-        "s": 1 * 1000 * 1000 * 1000 * 1000,
-        "m": _SECOND * 60,
-        "h": _SECOND * 60 * 60,
-        "d": _SECOND * 60 * 60 * 24,
-        "w": _SECOND * 60 * 60 * 24 * 7,
-        "mm": _SECOND * 60 * 60 * 24 * 30,
-        "y": _SECOND * 60 * 60 * 24 * 365,
-    }
-
-    @classmethod
-    def from_str(cls, duration  # type: str
-                 ) -> timedelta:
-        """Parse GoLang duration string to a timedelta"""
-
-        if duration in ("0", "+0", "-0"):
-            return timedelta()
-
-        pattern = re.compile(r'([\d\.]+)([a-zµμ]+)')
-        total = 0
-        sign = -1 if duration[0] == '-' else 1
-        matches = pattern.findall(duration)
-
-        if not len(matches):
-            raise ValueError("Invalid duration {}".format(duration))
-
-        for (value, unit) in matches:
-            if unit not in cls._UNIT_CONVERSION:
-                raise TypeError(
-                    "Unknown unit {} in duration {}".format(unit, duration))
-            try:
-                total += float(value) * cls._UNIT_CONVERSION[unit]
-            except Exception:
-                raise ValueError(
-                    "Invalid value {} in duration {}".format(value, duration))
-
-        microseconds = total / cls._UNIT_CONVERSION["µs"]
-        return timedelta(microseconds=sign * microseconds)
-
 
 JSONType = Union[str, int, float, bool,
                  None, Dict[str, Any], List[Any]]

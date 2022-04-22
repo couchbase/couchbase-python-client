@@ -30,7 +30,7 @@ build_design_doc(couchbase::management::views::design_document dd)
     }
 
     pyObj_tmp = PyUnicode_FromString(ns.c_str());
-    if (-1 == PyDict_SetItemString(pyObj_dd, "name_space", pyObj_tmp)) {
+    if (-1 == PyDict_SetItemString(pyObj_dd, "namespace", pyObj_tmp)) {
         Py_DECREF(pyObj_dd);
         Py_XDECREF(pyObj_tmp);
         return nullptr;
@@ -218,11 +218,11 @@ get_design_doc(PyObject* pyObj_dd)
     PyObject* pyObj_name = PyDict_GetItemString(pyObj_dd, "name");
     auto name = std::string(PyUnicode_AsUTF8(pyObj_name));
 
-    PyObject* pyObj_name_space = PyDict_GetItemString(pyObj_dd, "name_space");
-    auto name_space = std::string(PyUnicode_AsUTF8(pyObj_name_space));
+    PyObject* pyObj_namespace = PyDict_GetItemString(pyObj_dd, "namespace");
+    auto namespace_ = std::string(PyUnicode_AsUTF8(pyObj_namespace));
 
     auto ns = couchbase::design_document_namespace::development;
-    if (name_space.compare("production") == 0) {
+    if (namespace_.compare("production") == 0) {
         ns = couchbase::design_document_namespace::production;
     }
 
@@ -297,11 +297,11 @@ get_view_index_get_all_req(PyObject* op_args)
 {
     auto req = get_view_mgmt_req_base<couchbase::operations::management::view_index_get_all_request>(op_args);
 
-    PyObject* pyObj_name_space = PyDict_GetItemString(op_args, "name_space");
-    auto name_space = std::string(PyUnicode_AsUTF8(pyObj_name_space));
+    PyObject* pyObj_namespace = PyDict_GetItemString(op_args, "namespace");
+    auto namespace_ = std::string(PyUnicode_AsUTF8(pyObj_namespace));
 
     auto ns = couchbase::design_document_namespace::development;
-    if (name_space.compare("production") == 0) {
+    if (namespace_.compare("production") == 0) {
         ns = couchbase::design_document_namespace::production;
     }
     req.ns = ns;
@@ -317,11 +317,11 @@ get_view_index_get_req(PyObject* op_args)
     auto document_name = std::string(PyUnicode_AsUTF8(pyObj_document_name));
     req.document_name = document_name;
 
-    PyObject* pyObj_name_space = PyDict_GetItemString(op_args, "name_space");
-    auto name_space = std::string(PyUnicode_AsUTF8(pyObj_name_space));
+    PyObject* pyObj_namespace = PyDict_GetItemString(op_args, "namespace");
+    auto namespace_ = std::string(PyUnicode_AsUTF8(pyObj_namespace));
 
     auto ns = couchbase::design_document_namespace::development;
-    if (name_space.compare("production") == 0) {
+    if (namespace_.compare("production") == 0) {
         ns = couchbase::design_document_namespace::production;
     }
     req.ns = ns;
@@ -337,11 +337,11 @@ get_view_index_drop_req(PyObject* op_args)
     auto document_name = std::string(PyUnicode_AsUTF8(pyObj_document_name));
     req.document_name = document_name;
 
-    PyObject* pyObj_name_space = PyDict_GetItemString(op_args, "name_space");
-    auto name_space = std::string(PyUnicode_AsUTF8(pyObj_name_space));
+    PyObject* pyObj_namespace = PyDict_GetItemString(op_args, "namespace");
+    auto namespace_ = std::string(PyUnicode_AsUTF8(pyObj_namespace));
 
     auto ns = couchbase::design_document_namespace::development;
-    if (name_space.compare("production") == 0) {
+    if (namespace_.compare("production") == 0) {
         ns = couchbase::design_document_namespace::production;
     }
     req.ns = ns;

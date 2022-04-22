@@ -1,7 +1,7 @@
 import asyncio
 import json
 import pathlib
-from datetime import timedelta
+from copy import copy
 from os import path
 from typing import (List,
                     Optional,
@@ -14,12 +14,11 @@ import couchbase.search as search
 from acouchbase.cluster import Cluster
 from couchbase.auth import PasswordAuthenticator
 from couchbase.exceptions import InvalidArgumentException, SearchIndexNotFoundException
+from couchbase.management.collections import CollectionSpec
 from couchbase.management.search import SearchIndex
-from couchbase.mutation_state import MutationState
 from couchbase.options import ClusterOptions
-from couchbase.result import MutationToken, SearchResult
+from couchbase.result import SearchResult
 from couchbase.search import (HighlightStyle,
-                              MatchOperator,
                               SearchDateRangeFacet,
                               SearchFacetResult,
                               SearchNumericRangeFacet,
@@ -27,7 +26,7 @@ from couchbase.search import (HighlightStyle,
                               SearchRow,
                               SearchTermFacet)
 
-from ._test_utils import TestEnvironment
+from ._test_utils import CouchbaseTestEnvironmentException, TestEnvironment
 
 
 class SearchTests:
@@ -448,27 +447,25 @@ class SearchTests:
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, limit=10)
         await self.assert_rows(res, 1)
 
-    # @TODO:  couchbase++ doesn't seem to do the raw sort correctly
     @pytest.mark.asyncio
     async def test_cluster_sort_str(self, cb_env):
         q = search.TermQuery('home')
         # score - ascending
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10, sort=['_score']))
-        _ = await self.assert_rows(res, 1, return_rows=True)
-        # print(rows)
-        # score = rows[0].score
-        # for row in rows[1:]:
-        #     assert row.score >= score
-        #     score = row.score
+        rows = await self.assert_rows(res, 1, return_rows=True)
+        score = rows[0].score
+        for row in rows[1:]:
+            assert row.score >= score
+            score = row.score
 
         # score - descending
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10, sort=['-_score']))
-        _ = await self.assert_rows(res, 1, return_rows=True)
-        # print(rows)
-        # score = rows[0].score
-        # for row in rows[1:]:
-        #     assert score >= row.score
-        #     score = row.score
+        rows = await self.assert_rows(res, 1, return_rows=True)
+        print(rows)
+        score = rows[0].score
+        for row in rows[1:]:
+            assert score >= row.score
+            score = row.score
 
     @pytest.mark.asyncio
     async def test_cluster_sort_score(self, cb_env):
@@ -594,6 +591,7 @@ class SearchCollectionTests:
                                 'tests',
                                 'test_cases',
                                 f'{TEST_INDEX_NAME}-params.json')
+    OTHER_COLLECTION = 'other-collection'
 
     @pytest_asyncio.fixture(scope="class")
     def event_loop(self):
@@ -624,12 +622,37 @@ class SearchCollectionTests:
         await cb_env.setup_named_collections()
 
         await cb_env.load_data()
+        # lets add another collection and load data there
+        await self._create_and_load_other_collection(cb_env)
+
         await self._load_search_index(cb_env)
         yield cb_env
         await cb_env.purge_data()
         await cb_env.teardown_named_collections()
         await self._drop_search_index(cb_env)
         await cluster.close()
+
+    async def _create_and_load_other_collection(self, cb_env):
+        # lets add another collection and load data there
+        collection_spec = CollectionSpec(self.OTHER_COLLECTION, cb_env.TEST_SCOPE)
+        await cb_env.cm.create_collection(collection_spec)
+        collection = None
+        for i in range(5):
+            collection = await cb_env.get_collection(cb_env.TEST_SCOPE,
+                                                     self.OTHER_COLLECTION,
+                                                     bucket_name=cb_env.bucket.name)
+            if collection:
+                break
+            cb_env.sleep(5)
+
+        if not collection:
+            raise CouchbaseTestEnvironmentException("Unabled to create other-collection for FTS collection testing")
+
+        coll = cb_env.scope.collection(self.OTHER_COLLECTION)
+        data = cb_env.get_json_data_by_type('landmarks')
+        for d in data:
+            key = f"{d['type']}_{d['id']}"
+            await coll.upsert(key, d)
 
     async def _load_search_index(self, cb_env):
         with open(self.TEST_INDEX_PATH) as params_file:
@@ -689,723 +712,94 @@ class SearchCollectionTests:
         if return_rows is True:
             return rows
 
-    # @TODO:  maybe need multiple collections...
     @pytest.mark.asyncio
     async def test_cluster_query_collections(self, cb_env):
         q = search.TermQuery('home')
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10, scope_name=cb_env.scope.name, collections=[cb_env.collection.name]))
-        _ = await self.assert_rows(res, 2, return_rows=True)
+        rows = await self.assert_rows(res, 2, return_rows=True)
 
-        # rows = x.rows()
-        # collections = list(map(lambda r: r.fields['_$c'], rows))
-        # self.assertTrue(all([c for c in collections if c == 'breweries']))
-        # SearchResultTest._check_search_result(self, initial, 1, x)
+        collections = list(map(lambda r: r.fields['_$c'], rows))
+        assert all([c for c in collections if c == cb_env.collection.name]) is True
 
     @pytest.mark.asyncio
     async def test_scope_query_collections(self, cb_env):
         q = search.TermQuery('home')
         res = cb_env.scope.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10, collections=[cb_env.collection.name]))
-        await self.assert_rows(res, 2)
-
-
-class SearchStringTests:
-    IDX_NAME = 'test-idx'
-
-    def get_encoded_query(self, search_query):
-        encoded_q = search_query.as_encodable()
-        encoded_q['query'] = json.loads(encoded_q['query'])
-        if 'facets' in encoded_q:
-            encoded_q['facets'] = json.loads(encoded_q['facets'])
-        if 'sort_specs' in encoded_q:
-            encoded_q['sort'] = json.loads(encoded_q['sort_specs'])
-
-        return encoded_q
-
-    def test_params(self):
-        q = search.TermQuery('someterm')
-        # no opts - metrics will default to True
-        opts = SearchOptions()
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        base_opts = {'metrics': True}
-        assert search_query.params == base_opts
-
-        # limit
-        opts = SearchOptions(limit=10)
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        exp_opts = base_opts.copy()
-        exp_opts['limit'] = 10
-        assert search_query.params == exp_opts
-
-        # skip
-        opts = SearchOptions(skip=10)
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        exp_opts = base_opts.copy()
-        exp_opts['skip'] = 10
-        assert search_query.params == exp_opts
-
-        # explain
-        opts = SearchOptions(explain=True)
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        exp_opts = base_opts.copy()
-        exp_opts['explain'] = True
-        assert search_query.params == exp_opts
-
-        # include_locations
-        opts = SearchOptions(include_locations=True)
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        exp_opts = base_opts.copy()
-        exp_opts['include_locations'] = True
-        assert search_query.params == exp_opts
-
-        # disable_scoring
-        opts = SearchOptions(disable_scoring=True)
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        exp_opts = base_opts.copy()
-        exp_opts['disable_scoring'] = True
-        assert search_query.params == exp_opts
-
-        # highlight_style
-        opts = SearchOptions(highlight_style=HighlightStyle.Html)
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        exp_opts = base_opts.copy()
-        exp_opts['highlight_style'] = HighlightStyle.Html.value
-        assert search_query.params == exp_opts
-
-        # highlight_style + highlight_fields
-        opts = SearchOptions(highlight_style=HighlightStyle.Ansi, highlight_fields=['foo', 'bar', 'baz'])
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        exp_opts = base_opts.copy()
-        exp_opts['highlight_style'] = HighlightStyle.Ansi.value
-        exp_opts['highlight_fields'] = ['foo', 'bar', 'baz']
-        assert search_query.params == exp_opts
-
-        # fields
-        opts = SearchOptions(fields=['foo', 'bar', 'baz'])
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        exp_opts = base_opts.copy()
-        exp_opts['fields'] = ['foo', 'bar', 'baz']
-        assert search_query.params == exp_opts
-
-        # sort
-        opts = SearchOptions(sort=['f1', 'f2', '-_score'])
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        exp_opts = base_opts.copy()
-        exp_opts['sort'] = ['f1', 'f2', '-_score']
-        params = search_query.params
-        params['sort'] = search_query.sort
-        assert params == exp_opts
-
-        # scan_consistency
-        opts = SearchOptions(scan_consistency=search.SearchScanConsistency.REQUEST_PLUS)
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        exp_opts = base_opts.copy()
-        exp_opts['scan_consistency'] = search.SearchScanConsistency.REQUEST_PLUS.value
-        assert search_query.params == exp_opts
-
-        # scope/collections
-        opts = SearchOptions(scope_name='test-scope', collections=['test-collection-1', 'test-collection-2'])
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        exp_opts = base_opts.copy()
-        exp_opts['scope_name'] = 'test-scope'
-        exp_opts['collections'] = ['test-collection-1', 'test-collection-2']
-        assert search_query.params == exp_opts
-
-        # client_context_id
-        opts = SearchOptions(client_context_id='test-id')
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        exp_opts = base_opts.copy()
-        exp_opts['client_context_id'] = 'test-id'
-        assert search_query.params == exp_opts
-
-        # timeout
-        opts = SearchOptions(timeout=timedelta(seconds=20))
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        exp_opts = base_opts.copy()
-        exp_opts['timeout'] = float(timedelta(seconds=20).total_seconds())
-        assert search_query.params == exp_opts
-
-        # facets
-        opts = SearchOptions(facets={
-            'term': search.TermFacet('somefield', limit=10),
-            'dr': search.DateFacet('datefield').add_range('name', 'start', 'end'),
-            'nr': search.NumericFacet('numfield').add_range('name2', 0.0, 99.99)
-        })
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        exp_opts = base_opts.copy()
-        exp_opts['facets'] = {
-            'term': {
-                'field': 'somefield',
-                'size': 10
-            },
-            'dr': {
-                'field': 'datefield',
-                'date_ranges': [{
-                    'name': 'name',
-                    'start': 'start',
-                    'end': 'end'
-                }]
-            },
-            'nr': {
-                'field': 'numfield',
-                'numeric_ranges': [{
-                    'name': 'name2',
-                    'min': 0.0,
-                    'max': 99.99
-                }]
-            },
-        }
-
-        params = search_query.params
-        # handle encoded here
-        encoded_facets = {}
-        for name, facet in search_query.facets.items():
-            encoded_facets[name] = facet.encodable
-        params['facets'] = encoded_facets
-        assert params == exp_opts
-
-    def test_consistent_with(self):
-        q = search.TermQuery('someterm')
-
-        ms = MutationState()
-        mt = MutationToken(token={
-            'partition_id': 42,
-            'partition_uuid': 3004,
-            'sequence_number': 3,
-            'bucket_name': 'default'
-        })
-        ms._add_scanvec(mt)
-        opts = SearchOptions(consistent_with=ms)
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-
-        # couchbase++ will set scan_consistency, so params should be
-        # None, but the prop should return AT_PLUS
-        assert search_query.params.get('scan_consistency', None) is None
-        assert search_query.consistency == search.SearchScanConsistency.AT_PLUS
-
-        q_mt = search_query.params.get('mutation_state', None)
-        assert isinstance(q_mt, list)
-        assert len(q_mt) == 1
-        assert q_mt[0] == mt
-
-    def test_facets(self):
-        q = search.TermQuery('someterm')
-
-        f = search.NumericFacet('numfield')
-        with pytest.raises(InvalidArgumentException):
-            f.add_range('range1')
-
-        opts = SearchOptions()
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        with pytest.raises(InvalidArgumentException):
-            search_query.facets['facetName'] = f
-
-        search_query.facets['facetName'] = f.add_range('range1', min=123, max=321)
-        assert 'facetName' in search_query.facets
-
-        f = search.DateFacet('datefield')
-        f.add_range('r1', start='2012', end='2013')
-        f.add_range('r2', start='2014')
-        f.add_range('r3', end='2015')
-        opts = SearchOptions(facets={'facetName': f})
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-
-        exp = {
-            'field': 'datefield',
-            'date_ranges': [
-                {'name': 'r1', 'start': '2012', 'end': '2013'},
-                {'name': 'r2', 'start': '2014'},
-                {'name': 'r3', 'end': '2015'}
-            ]
-        }
-        encoded_facets = {}
-        for name, facet in search_query.facets.items():
-            encoded_facets[name] = facet.encodable
-
-        assert encoded_facets['facetName'] == exp
-        # self.assertEqual(exp, f.encodable)
-
-        f = search.TermFacet('termfield')
-        f.limit = 10
-        opts = SearchOptions(facets={'facetName': f})
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        encoded_facets = {}
-        for name, facet in search_query.facets.items():
-            encoded_facets[name] = facet.encodable
-
-        assert encoded_facets['facetName'] == {'field': 'termfield', 'size': 10}
-
-    def test_term_search(self):
-        q = search.TermQuery('someterm', field='field', boost=1.5,
-                             prefix_length=23, fuzziness=12)
-        opts = search.SearchOptions(explain=True)
-
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-
-        encoded_q = self.get_encoded_query(search_query)
-
-        exp_json = {
-            'query': {
-                'term': 'someterm',
-                'boost': 1.5,
-                'fuzziness': 12,
-                'prefix_length': 23,
-                'field': 'field'
-            },
-            'index_name': self.IDX_NAME,
-            'explain': True
-        }
-
-        assert exp_json == encoded_q
-
-    def test_match_phrase(self):
-        exp_json = {
-            'query': {
-                'match_phrase': 'salty beers',
-                'analyzer': 'analyzer',
-                'boost': 1.5,
-                'field': 'field'
-            },
-            'limit': 10,
-            'index_name': self.IDX_NAME
-        }
-
-        q = search.MatchPhraseQuery('salty beers', boost=1.5, analyzer='analyzer',
-                                    field='field')
-        opts = search.SearchOptions(limit=10)
-
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-
-        encoded_q = self.get_encoded_query(search_query)
-
-        assert exp_json == encoded_q
-
-    def test_match_query(self):
-        exp_json = {
-            'query': {
-                'match': 'salty beers',
-                'analyzer': 'analyzer',
-                'boost': 1.5,
-                'field': 'field',
-                'fuzziness': 1234,
-                'prefix_length': 4,
-                'operator': 'or'
-            },
-            'limit': 10,
-            'index_name': self.IDX_NAME
-        }
-
-        q = search.MatchQuery('salty beers', boost=1.5, analyzer='analyzer',
-                              field='field', fuzziness=1234, prefix_length=4, match_operator=MatchOperator.OR)
-        opts = search.SearchOptions(limit=10)
-
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert exp_json == encoded_q
-
-        exp_json["query"]["operator"] = "and"
-
-        q = search.MatchQuery('salty beers', boost=1.5, analyzer='analyzer',
-                              field='field', fuzziness=1234, prefix_length=4, match_operator=MatchOperator.AND)
-        opts = search.SearchOptions(limit=10)
-
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert exp_json == encoded_q
-
-    def test_string_query(self):
-        exp_json = {
-            'query': {
-                'query': 'q*ry',
-                'boost': 2.0,
-            },
-            'explain': True,
-            'limit': 10,
-            'index_name': self.IDX_NAME
-        }
-        q = search.QueryStringQuery('q*ry', boost=2.0)
-        opts = search.SearchOptions(limit=10, explain=True)
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q, opts
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert exp_json == encoded_q
-
-    def test_raw_query(self):
-        exp_json = {
-            'query': {
-                'foo': 'bar'
-            },
-            'index_name': self.IDX_NAME
-        }
-        q = search.RawQuery({'foo': 'bar'})
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert exp_json == encoded_q
-
-    def test_wildcard_query(self):
-        exp_json = {
-            'query': {
-                'wildcard': 'f*o',
-                'field': 'wc',
-            },
-            'index_name': self.IDX_NAME
-        }
-        q = search.WildcardQuery('f*o', field='wc')
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert exp_json == encoded_q
-
-    def test_docid_query(self):
-        q = search.DocIdQuery([])
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        with pytest.raises(search.NoChildrenException):
-            _ = self.get_encoded_query(search_query)
-
-        exp_json = {
-            'query': {
-                'ids': ['foo', 'bar', 'baz']
-            },
-            'index_name': self.IDX_NAME
-        }
-
-        q.ids = ['foo', 'bar', 'baz']
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert exp_json == encoded_q
-
-    def test_match_all_query(self):
-        exp_json = {
-            'query': {
-                'match_all': None
-            },
-            'index_name': self.IDX_NAME
-        }
-        q = search.MatchAllQuery()
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert exp_json == encoded_q
-
-    def test_match_none_query(self):
-        exp_json = {
-            'query': {
-                'match_none': None
-            },
-            'index_name': self.IDX_NAME
-        }
-        q = search.MatchNoneQuery()
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert exp_json == encoded_q
-
-    def test_phrase_query(self):
-        exp_json = {
-            'query': {
-                'terms': ['salty', 'beers']
-            },
-            'index_name': self.IDX_NAME
-        }
-        q = search.PhraseQuery('salty', 'beers')
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert exp_json == encoded_q
-
-        q = search.PhraseQuery()
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        with pytest.raises(search.NoChildrenException):
-            _ = self.get_encoded_query(search_query)
-
-        q.terms.append('salty')
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        exp_json['query']['terms'] = ['salty']
-        assert exp_json == encoded_q
-
-    def test_prefix_query(self):
-        exp_json = {
-            'query': {
-                'prefix': 'someterm',
-                'boost': 1.5
-            },
-            'index_name': self.IDX_NAME
-        }
-        q = search.PrefixQuery('someterm', boost=1.5)
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert exp_json == encoded_q
-
-    def test_regexp_query(self):
-        exp_json = {
-            'query': {
-                'regex': 'some?regex'
-            },
-            'index_name': self.IDX_NAME
-        }
-        q = search.RegexQuery('some?regex')
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert exp_json == encoded_q
-
-    def test_booleanfield_query(self):
-        exp_json = {
-            'query': {
-                'bool': True
-            },
-            'index_name': self.IDX_NAME
-        }
-        q = search.BooleanFieldQuery(True)
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert exp_json == encoded_q
-
-    def test_daterange_query(self):
-        with pytest.raises(TypeError):
-            q = search.DateRangeQuery()
-
-        q = search.DateRangeQuery(end='theEnd')
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert encoded_q['query'] == {'end': 'theEnd'}
-
-        q = search.DateRangeQuery(start='theStart')
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert encoded_q['query'] == {'start': 'theStart'}
-
-        q = search.DateRangeQuery(start='theStart', end='theEnd')
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert encoded_q['query'] == {'start': 'theStart', 'end': 'theEnd'}
-
-        q = search.DateRangeQuery('', '')  # Empty strings should be ok
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert encoded_q['query'] == {'start': '', 'end': ''}
-
-    def test_numrange_query(self):
-        with pytest.raises(TypeError):
-            q = search.NumericRangeQuery()
-
-        q = search.NumericRangeQuery(0, 0)  # Should be OK
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert encoded_q['query'] == {'min': 0, 'max': 0}
-
-        q = search.NumericRangeQuery(0.1, 0.9)
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert encoded_q['query'] == {'min': 0.1, 'max': 0.9}
-
-        q = search.NumericRangeQuery(max=0.9)
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert encoded_q['query'] == {'max': 0.9}
-
-        q = search.NumericRangeQuery(min=0.1)
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert encoded_q['query'] == {'min': 0.1}
-
-    def test_termrange_query(self):
-        with pytest.raises(TypeError):
-            q = search.TermRangeQuery()
-
-        q = search.TermRangeQuery('', '')  # Should be OK
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert encoded_q['query'] == {'start': '', 'end': ''}
-
-        q = search.TermRangeQuery('startTerm', 'endTerm')
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert encoded_q['query'] == {'start': 'startTerm', 'end': 'endTerm'}
-
-        q = search.TermRangeQuery(end='endTerm')
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert encoded_q['query'] == {'end': 'endTerm'}
-
-        q = search.TermRangeQuery(start='startTerm')
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert encoded_q['query'] == {'start': 'startTerm'}
-
-    def test_boolean_query(self):
-        prefix_q = search.PrefixQuery('someterm', boost=2)
-        bool_q = search.BooleanQuery(
-            must=prefix_q, must_not=prefix_q, should=prefix_q)
-        exp = {'prefix': 'someterm', 'boost': 2.0}
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, bool_q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-
-        conjuncts = {
-            'conjuncts': [exp]
-        }
-        disjuncts = {
-            'disjuncts': [exp],
-            'min': 1
-        }
-        assert encoded_q['query']['must'] == conjuncts
-        assert encoded_q['query']['must_not'] == disjuncts
-        assert encoded_q['query']['should'] == disjuncts
-
-        # Test multiple criteria in must and must_not
-        pq_1 = search.PrefixQuery('someterm', boost=2)
-        pq_2 = search.PrefixQuery('otherterm')
-        bool_q = search.BooleanQuery(must=[pq_1, pq_2])
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, bool_q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        conjuncts = {
-            'conjuncts': [
-                {'prefix': 'someterm', 'boost': 2.0},
-                {'prefix': 'otherterm'}
-            ]
-        }
-        assert encoded_q['query']['must'] == conjuncts
-
-    def test_disjunction_query(self):
-        q = search.DisjunctionQuery()
-        assert q.min == 1
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        with pytest.raises(search.NoChildrenException):
-            _ = self.get_encoded_query(search_query)
-
-        disjuncts = {
-            'disjuncts': [{'prefix': 'somePrefix'}],
-            'min': 1
-        }
-        q.disjuncts.append(search.PrefixQuery('somePrefix'))
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert encoded_q['query'] == disjuncts
-
-        with pytest.raises(InvalidArgumentException):
-            q.min = 0
-
-        q.min = 2
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        with pytest.raises(InvalidArgumentException):
-            _ = self.get_encoded_query(search_query)
-
-    def test_conjunction_query(self):
-        q = search.ConjunctionQuery()
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        with pytest.raises(search.NoChildrenException):
-            _ = self.get_encoded_query(search_query)
-
-        conjuncts = {
-            'conjuncts': [{'prefix': 'somePrefix'}],
-        }
-        q.conjuncts.append(search.PrefixQuery('somePrefix'))
-        search_query = search.SearchQueryBuilder.create_search_query_object(
-            self.IDX_NAME, q
-        )
-        encoded_q = self.get_encoded_query(search_query)
-        assert encoded_q['query'] == conjuncts
+        rows = await self.assert_rows(res, 2, return_rows=True)
+
+        collections = list(map(lambda r: r.fields['_$c'], rows))
+        assert all([c for c in collections if c == cb_env.collection.name]) is True
+
+        res = cb_env.scope.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10))
+        rows = await self.assert_rows(res, 2, return_rows=True)
+
+        collections = list(map(lambda r: r.fields['_$c'], rows))
+        assert all([c for c in collections if c in [cb_env.collection.name, self.OTHER_COLLECTION]]) is True
+
+    @pytest.mark.asyncio
+    async def test_scope_search_fields(self, cb_env):
+        test_fields = ['name', 'activity']
+        q = search.TermQuery('home')
+        # verify fields works w/in kwargs
+        res = cb_env.scope.search_query(self.TEST_INDEX_NAME,
+                                        q,
+                                        SearchOptions(limit=10),
+                                        fields=test_fields,
+                                        collections=[cb_env.collection.name])
+
+        fields_with_col = copy(test_fields)
+        fields_with_col.append('_$c')
+        rows = await self.assert_rows(res, 1, return_rows=True)
+        first_entry = rows[0]
+        assert isinstance(first_entry, SearchRow)
+        assert isinstance(first_entry.fields, dict)
+        assert first_entry.fields != {}
+        assert all(map(lambda f: f in fields_with_col, first_entry.fields.keys())) is True
+        collections = list(map(lambda r: r.fields['_$c'], rows))
+        assert all([c for c in collections if c == cb_env.collection.name]) is True
+
+        # verify fields works w/in options
+        res = cb_env.scope.search_query(self.TEST_INDEX_NAME,
+                                        q,
+                                        SearchOptions(limit=10,
+                                                      fields=test_fields,
+                                                      collections=[cb_env.collection.name]))
+
+        rows = await self.assert_rows(res, 1, return_rows=True)
+        first_entry = rows[0]
+        assert isinstance(first_entry, SearchRow)
+        assert isinstance(first_entry.fields, dict)
+        assert first_entry.fields != {}
+        assert all(map(lambda f: f in fields_with_col, first_entry.fields.keys())) is True
+        collections = list(map(lambda r: r.fields['_$c'], rows))
+        assert all([c for c in collections if c == cb_env.collection.name]) is True
+
+    @pytest.mark.asyncio
+    async def test_scope_search_highlight(self, cb_env):
+
+        q = search.TermQuery('home')
+        # check w/in options
+        res = cb_env.scope.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
+            limit=10, highlight_style=HighlightStyle.Html))
+        rows = await self.assert_rows(res, 1, return_rows=True)
+        locations = rows[0].locations
+        fragments = rows[0].fragments
+        assert isinstance(locations, search.SearchRowLocations)
+        assert isinstance(fragments, dict)
+        assert all(map(lambda l: isinstance(l, search.SearchRowLocation), locations.get_all())) is True
+        collections = list(map(lambda r: r.fields['_$c'], rows))
+        assert all([c for c in collections if c == cb_env.collection.name]) is True
+
+        # check w/in kwargs
+        res = cb_env.scope.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
+            limit=10), highlight_style=HighlightStyle.Html, collections=[cb_env.collection.name])
+        rows = await self.assert_rows(res, 1, return_rows=True)
+        locations = rows[0].locations
+        fragments = rows[0].fragments
+        assert isinstance(locations, search.SearchRowLocations)
+        assert isinstance(fragments, dict)
+        assert all(map(lambda l: isinstance(l, search.SearchRowLocation), locations.get_all())) is True
+        collections = list(map(lambda r: r.fields['_$c'], rows))
+        assert all([c for c in collections if c == cb_env.collection.name]) is True

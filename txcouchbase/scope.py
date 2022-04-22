@@ -1,4 +1,28 @@
+from typing import (TYPE_CHECKING,
+                    Any,
+                    Dict,
+                    Optional)
+
+from twisted.internet.defer import Deferred
+
+from couchbase.logic.analytics import AnalyticsQuery
+from couchbase.logic.n1ql import N1QLQuery
+from couchbase.logic.search import SearchQueryBuilder
+from couchbase.result import (AnalyticsResult,
+                              QueryResult,
+                              SearchResult)
+from couchbase.transcoder import Transcoder
+from txcouchbase.analytics import AnalyticsRequest
 from txcouchbase.collection import Collection
+from txcouchbase.n1ql import N1QLRequest
+from txcouchbase.search import SearchRequest
+
+if TYPE_CHECKING:
+
+    from couchbase.options import (AnalyticsOptions,
+                                   QueryOptions,
+                                   SearchOptions)
+    from couchbase.search import SearchQuery
 
 
 class Scope:
@@ -23,11 +47,8 @@ class Scope:
         return self._loop
 
     @property
-    def transcoder(self):
-        """
-        **INTERNAL**
-        """
-        return self._bucket.transcoder
+    def default_transcoder(self) -> Optional[Transcoder]:
+        return self._bucket.default_transcoder
 
     @property
     def name(self):
@@ -41,6 +62,119 @@ class Scope:
                    ) -> Collection:
 
         return Collection(self, name)
+
+    def query(
+        self,
+        statement,  # type: str
+        *options,  # type: QueryOptions
+        **kwargs  # type: Dict[str, Any]
+    ) -> Deferred[QueryResult]:
+
+        opt = QueryOptions()
+        opts = list(options)
+        for o in opts:
+            if isinstance(o, QueryOptions):
+                opt = o
+                opts.remove(o)
+
+        # set the query context as this bucket and scope if not provided
+        if not ('query_context' in opt or 'query_context' in kwargs):
+            kwargs['query_context'] = '`{}`.`{}`'.format(self.bucket_name, self.name)
+
+        query = N1QLQuery.create_query_object(
+            statement, *options, **kwargs)
+        request = N1QLRequest.generate_n1ql_request(self.connection,
+                                                    self.loop,
+                                                    query.params,
+                                                    default_serializer=self.default_serializer)
+        d = Deferred()
+
+        def _on_ok(_):
+            d.callback(QueryResult(request))
+
+        def _on_err(exc):
+            d.errback(exc)
+
+        query_d = request.execute_query()
+        query_d.addCallback(_on_ok)
+        query_d.addErrback(_on_err)
+        return d
+
+    def analytics_query(
+        self,
+        statement,  # type: str
+        *options,  # type: AnalyticsOptions
+        **kwargs  # type: Dict[str, Any]
+    ) -> Deferred[AnalyticsResult]:
+
+        opt = AnalyticsOptions()
+        opts = list(options)
+        for o in opts:
+            if isinstance(o, AnalyticsOptions):
+                opt = o
+                opts.remove(o)
+
+        # set the query context as this bucket and scope if not provided
+        if not ('query_context' in opt or 'query_context' in kwargs):
+            kwargs['query_context'] = 'default:`{}`.`{}`'.format(self.bucket_name, self.name)
+
+        query = AnalyticsQuery.execute_analytics_query(
+            statement, *options, **kwargs)
+        request = AnalyticsRequest.generate_analytics_request(self.connection,
+                                                              self.loop,
+                                                              query.params,
+                                                              default_serializer=self.default_serializer)
+        d = Deferred()
+
+        def _on_ok(_):
+            d.callback(AnalyticsResult(request))
+
+        def _on_err(exc):
+            d.errback(exc)
+
+        query_d = request.execute_analytics_query()
+        query_d.addCallback(_on_ok)
+        query_d.addErrback(_on_err)
+        return d
+
+    def search_query(
+        self,
+        index,  # type: str
+        query,  # type: SearchQuery
+        *options,  # type: SearchOptions
+        **kwargs  # type: Dict[str, Any]
+    ) -> Deferred[SearchResult]:
+
+        opt = SearchOptions()
+        opts = list(options)
+        for o in opts:
+            if isinstance(o, SearchOptions):
+                opt = o
+                opts.remove(o)
+
+        # set the scope_name as this scope if not provided
+        if not ('scope_name' in opt or 'scope_name' in kwargs):
+            kwargs['scope_name'] = f'{self.name}'
+
+        query = SearchQueryBuilder.create_search_query_object(
+            index, query, *options, **kwargs
+        )
+        request = SearchRequest.generate_search_request(self.connection,
+                                                        self.loop,
+                                                        query.as_encodable(),
+                                                        default_serializer=self.default_serializer)
+        d = Deferred()
+
+        def _on_ok(_):
+            d.callback(SearchResult(request))
+
+        def _on_err(exc):
+            d.errback(exc)
+
+        query_d = request.execute_search_query()
+        query_d.addCallback(_on_ok)
+        query_d.addErrback(_on_err)
+        return d
 
     def _connect_bucket(self):
         """

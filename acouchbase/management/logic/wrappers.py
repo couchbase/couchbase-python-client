@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import wraps
 
 from acouchbase.logic import call_async_fn
-from couchbase.exceptions import ErrorMapperNew, MissingConnectionException
+from couchbase.exceptions import ErrorMapper, MissingConnectionException
 from couchbase.management.logic import (ManagementType,
                                         handle_analytics_index_mgmt_response,
                                         handle_bucket_mgmt_response,
@@ -16,7 +16,7 @@ from couchbase.management.logic import (ManagementType,
 
 
 def build_mgmt_exception(exc, mgmt_type, error_map):
-    return ErrorMapperNew.build_exception(exc, mapping=error_map)
+    return ErrorMapper.build_exception(exc, mapping=error_map)
 
 
 class AsyncMgmtWrapper:

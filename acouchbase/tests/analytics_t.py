@@ -186,12 +186,11 @@ class AnalyticsCollectionTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(
-            conn_string, opts)
+        cluster = Cluster(conn_string, opts)
         await cluster.on_connect()
         await cluster.cluster_info()
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        await cluster.on_connect()
+        await bucket.on_connect()
 
         coll = bucket.default_collection()
         cb_env = TestEnvironment(cluster,
@@ -211,44 +210,66 @@ class AnalyticsCollectionTests:
 
         # teardown
         await cb_env.purge_data()
-        await self.tear_down_analytics_collections(cb_env)
-        await cb_env.teardown_named_collections()
+        # await self.tear_down_analytics_collections(cb_env)
+        # await cb_env.teardown_named_collections()
         await cluster.close()
 
+    """
+        Setup queries:
+            Create dataverse:
+                CREATE DATAVERSE `default`.`test-scope` IF NOT EXISTS;
+
+            Create dataset:
+                USE `default`.`test-scope`;
+                CREATE DATASET IF NOT EXISTS `test-collection` ON `default`.`test-scope`.`test-collection`;
+
+            Connect Link:
+                USE `default`.`test-scope`; CONNECT LINK Local;
+    """
     async def create_analytics_collections(self, cb_env):
+        dv_fqdn = f'default:`{cb_env.bucket.name}`.`{cb_env.scope.name}`'
+        # q_str = f'CREATE DATAVERSE {dv_fqdn} IF NOT EXISTS;'
+        # #res = cb_env.cluster.analytics_query(q_str, query_context=dv_fqdn)
+        # [_ async for _ in res.rows()]
+        # # await cb_env.am.create_dataverse(dv_fqdn, ignore_if_exists=True)
 
-        dv_fqdn = f'`{cb_env.bucket.name}`.`{cb_env.scope.name}`'
-        q_str = f'CREATE DATAVERSE {dv_fqdn} IF NOT EXISTS;'
-        res = cb_env.cluster.analytics_query(q_str)
-        [_ async for _ in res.rows()]
-        # await cb_env.am.create_dataverse(dv_fqdn, ignore_if_exists=True)
+        # q_str = f'USE {dv_fqdn}; CREATE DATASET IF NOT EXISTS `{self.DATASET_NAME}` ON {cb_env.fqdn}'
+        # res = cb_env.cluster.analytics_query(q_str)
+        # [_ async for _ in res.rows()]
 
-        q_str = f'USE {dv_fqdn}; CREATE DATASET `{cb_env.collection.name}` IF NOT EXISTS ON {cb_env.fqdn}'
-        res = cb_env.cluster.analytics_query(q_str)
-        [_ async for _ in res.rows()]
+        # q_str = f'USE {dv_fqdn}; CONNECT LINK Local;'
+        # res = cb_env.cluster.analytics_query(q_str)
+        # [_ async for _ in res.rows()]
 
-        q_str = f'USE {dv_fqdn}; CONNECT LINK Local;'
-        res = cb_env.cluster.analytics_query(q_str)
-        [_ async for _ in res.rows()]
-
-        q_str = f'SELECT COUNT(1) AS doc_count FROM `{self.DATASET_NAME}`;'
+        q_str = f'SELECT COUNT(1) AS doc_count FROM `{cb_env.collection.name}`;'
 
         for _ in range(10):
-            res = cb_env.cluster.analytics_query(q_str)
+            res = cb_env.cluster.analytics_query(q_str, query_context=dv_fqdn)
             rows = [r async for r in res.rows()]
-            print(rows)
             if len(rows) > 0 and rows[0].get('doc_count', 0) > 10:
                 break
-            print(f'Found {len(res)} records, waiting a bit...')
+            print(f'Found {len(rows)} records, waiting a bit...')
             await asyncio.sleep(5)
+
+    """
+        Tear-down queries:
+            Disconnect Link:
+                USE `default`.`test-scope`; DISCONNECT LINK Local;
+
+            Droo dataset:
+                USE `default`.`test-scope`; DROP DATASET `test-collection` IF EXISTS;
+
+            Drop dataverse:
+                DROP DATAVERSE `default`.`test-scope` IF EXISTS;
+    """
 
     async def tear_down_analytics_collections(self, cb_env):
         dv_fqdn = f'`{cb_env.bucket.name}`.`{cb_env.scope.name}`'
         q_str = f'USE {dv_fqdn}; DISCONNECT LINK Local;'
-        res = cb_env.cluster.analytics_query(q_str)
+        res = cb_env.cluster.analytics_query(q_str, query_context=dv_fqdn)
         [_ async for _ in res.rows()]
 
-        q_str = f'USE {dv_fqdn}; DROP DATASET `{cb_env.collection.name}` IF EXISTS; ON {cb_env.fqdn}'
+        q_str = f'USE {dv_fqdn}; DROP DATASET `{cb_env.collection.name}` IF EXISTS;'
         res = cb_env.cluster.analytics_query(q_str)
         [_ async for _ in res.rows()]
 
@@ -295,7 +316,7 @@ class AnalyticsCollectionTests:
 
         # test w/ bad scope
         q_context = f'default:`{cb_env.bucket.name}`.`fake-scope`'
-        result = self.cluster.analytics_query(
+        result = cb_env.cluster.analytics_query(
             f'SELECT * FROM `{cb_env.collection.name}` LIMIT 2', AnalyticsOptions(query_context=q_context))
         # @TODO: DataverseNotFoundException
         with pytest.raises(ParsingFailedException):
@@ -317,17 +338,16 @@ class AnalyticsCollectionTests:
 
     @pytest.mark.asyncio
     async def test_bad_scope_query(self, cb_env):
-        scope = self.bucket.scope(self.beer_sample_collections.scope)
         q_context = f'default:`{cb_env.bucket.name}`.`fake-scope`'
-        result = scope.analytics_query(f'SELECT * FROM {cb_env.fqdn} LIMIT 2',
-                                       AnalyticsOptions(query_context=q_context))
+        result = cb_env.scope.analytics_query(f'SELECT * FROM {cb_env.fqdn} LIMIT 2',
+                                              AnalyticsOptions(query_context=q_context))
         # @TODO: DataverseNotFoundException
         with pytest.raises(ParsingFailedException):
             await self.assert_rows(result, 2)
 
         q_context = f'default:`fake-bucket`.`{cb_env.scope.name}`'
-        result = scope.analytics_query(f'SELECT * FROM {cb_env.fqdn} LIMIT 2',
-                                       query_context=q_context)
+        result = cb_env.scope.analytics_query(f'SELECT * FROM {cb_env.fqdn} LIMIT 2',
+                                              query_context=q_context)
         # @TODO: DataverseNotFoundException
         with pytest.raises(ParsingFailedException):
             await self.assert_rows(result, 2)
@@ -340,9 +360,9 @@ class AnalyticsCollectionTests:
 
     @pytest.mark.asyncio
     async def test_scope_query_with_named_params_in_options(self, cb_env):
-        scope = self.bucket.scope(self.beer_sample_collections.scope)
-        result = scope.analytics_query(f'SELECT * FROM `{cb_env.collection.name}` WHERE country LIKE $country LIMIT 1',
-                                       AnalyticsOptions(named_parameters={'country': 'United%'}))
+        q_str = f'SELECT * FROM `{cb_env.collection.name}` WHERE country LIKE $country LIMIT 1'
+        result = cb_env.scope.analytics_query(q_str,
+                                              AnalyticsOptions(named_parameters={'country': 'United%'}))
         await self.assert_rows(result, 1)
 
     @pytest.mark.asyncio

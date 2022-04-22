@@ -113,39 +113,6 @@ create_result_from_view_response(couchbase::operations::document_view_response r
     return res;
 }
 
-// void
-// create_view_result(couchbase::operations::document_view_response resp, PyObject* pyObj_callback, PyObject* pyObj_errback)
-// {
-//     PyGILState_STATE state = PyGILState_Ensure();
-//     PyObject* pyObj_args = NULL;
-//     PyObject* pyObj_func = NULL;
-
-//     if (resp.ctx.ec.value()) {
-//         PyObject* pyObj_exc = build_exception(resp.ctx);
-//         pyObj_func = pyObj_errback;
-//         pyObj_args = PyTuple_New(1);
-//         PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
-//     } else {
-//         auto res = create_result_from_view_response(resp);
-//         // TODO:  check if PyErr_Occurred() != nullptr and raise error accordingly
-//         pyObj_func = pyObj_callback;
-//         pyObj_args = PyTuple_New(1);
-//         PyTuple_SET_ITEM(pyObj_args, 0, reinterpret_cast<PyObject*>(res));
-//     }
-
-//     PyObject* pyObj_callback_res = PyObject_CallObject(const_cast<PyObject*>(pyObj_func), pyObj_args);
-//     if (pyObj_callback_res) {
-//         Py_XDECREF(pyObj_callback_res);
-//     } else {
-//         PyErr_Print();
-//     }
-
-//     Py_DECREF(pyObj_args);
-//     Py_DECREF(pyObj_errback);
-//     Py_DECREF(pyObj_callback);
-//     PyGILState_Release(state);
-// }
-
 void
 create_view_result(couchbase::operations::document_view_response resp,
                    std::shared_ptr<rows_queue<PyObject*>> rows,
@@ -154,68 +121,55 @@ create_view_result(couchbase::operations::document_view_response resp,
 {
 
     auto set_exception = false;
+    PyObject* pyObj_exc = nullptr;
+    PyObject* pyObj_args = NULL;
+    PyObject* pyObj_func = NULL;
+    PyObject* pyObj_callback_res = nullptr;
 
     PyGILState_STATE state = PyGILState_Ensure();
-    Py_INCREF(Py_None);
-    rows->put(Py_None);
 
     if (resp.ctx.ec.value()) {
-        PyObject* pyObj_result = create_result_obj();
-        result* res = reinterpret_cast<result*>(pyObj_result);
-        res->ec = resp.ctx.ec;
-
-        PyObject* pyObj_exc = build_exception_from_context(resp.ctx);
-        if (-1 == PyDict_SetItemString(res->dict, "exc", pyObj_exc)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        Py_DECREF(pyObj_exc);
-
-        PyObject* pyObj_exc_details = pycbc_get_exception_kwargs("Error doing views operation.", __FILE__, __LINE__);
-        if (-1 == PyDict_SetItemString(res->dict, "exc_details", pyObj_exc_details)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        Py_DECREF(pyObj_exc_details);
-
-        if (-1 == PyDict_SetItemString(res->dict, "has_exception", Py_True)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-
+        pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "Error doing views operation.");
         // lets clear any errors
         PyErr_Clear();
-        rows->put(reinterpret_cast<PyObject*>(res));
+        rows->put(pyObj_exc);
     } else {
         auto res = create_result_from_view_response(resp);
 
         if (res == nullptr || PyErr_Occurred() != nullptr) {
             set_exception = true;
         } else {
+            // None indicates done (i.e. raise StopIteration)
+            Py_INCREF(Py_None);
+            rows->put(Py_None);
             rows->put(reinterpret_cast<PyObject*>(res));
         }
     }
 
     if (set_exception) {
-        PyObject* pyObj_result = create_result_obj();
-        result* res = reinterpret_cast<result*>(pyObj_result);
-
-        PyObject* pyObj_exc_details =
-          pycbc_core_get_exception_kwargs("Views operation error.", PycbcError::UnableToBuildResult, __FILE__, __LINE__);
-        if (-1 == PyDict_SetItemString(res->dict, "exc_details", pyObj_exc_details)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        Py_DECREF(pyObj_exc_details);
-
-        if (-1 == PyDict_SetItemString(res->dict, "has_exception", Py_True)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        rows->put(reinterpret_cast<PyObject*>(res));
+        pyObj_exc = pycbc_build_exception(PycbcError::UnableToBuildResult, __FILE__, __LINE__, "Views operation error.");
+        rows->put(pyObj_exc);
     }
-    Py_XDECREF(pyObj_errback);
-    Py_XDECREF(pyObj_callback);
+
+    // This is for txcouchbase -- let it knows we're done w/ the query request
+    if (pyObj_callback != nullptr) {
+        pyObj_func = pyObj_callback;
+        pyObj_args = PyTuple_New(1);
+        PyTuple_SET_ITEM(pyObj_args, 0, PyBool_FromLong(static_cast<long>(1)));
+    }
+
+    if (pyObj_func != nullptr) {
+        pyObj_callback_res = PyObject_CallObject(pyObj_func, pyObj_args);
+        if (pyObj_callback_res) {
+            Py_DECREF(pyObj_callback_res);
+        } else {
+            pycbc_set_python_exception(PycbcError::InternalSDKError, __FILE__, __LINE__, "Views complete callback failed.");
+        }
+        Py_DECREF(pyObj_args);
+        Py_XDECREF(pyObj_callback);
+        Py_XDECREF(pyObj_errback);
+    }
+
     PyGILState_Release(state);
 }
 
@@ -233,10 +187,10 @@ get_view_request(PyObject* op_args)
 
     couchbase::operations::document_view_request req{ bucket_name, document_name, view_name };
 
-    PyObject* pyObj_name_space = PyDict_GetItemString(op_args, "name_space");
-    if (pyObj_name_space != nullptr) {
+    PyObject* pyObj_namespace = PyDict_GetItemString(op_args, "namespace");
+    if (pyObj_namespace != nullptr) {
         auto ns = couchbase::design_document_namespace::development;
-        if (pyObj_name_space == Py_False) {
+        if (pyObj_namespace == Py_False) {
             ns = couchbase::design_document_namespace::production;
         }
         req.ns = ns;
@@ -453,9 +407,12 @@ handle_view_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     Py_XINCREF(pyObj_errback);
     Py_XINCREF(pyObj_callback);
 
-    Py_BEGIN_ALLOW_THREADS conn->cluster_->execute(
-      req, [rows = streamed_res->rows, pyObj_callback, pyObj_errback](couchbase::operations::document_view_response resp) {
-          create_view_result(resp, rows, pyObj_callback, pyObj_errback);
-      });
-    Py_END_ALLOW_THREADS return streamed_res;
+    {
+        Py_BEGIN_ALLOW_THREADS conn->cluster_->execute(
+          req, [rows = streamed_res->rows, pyObj_callback, pyObj_errback](couchbase::operations::document_view_response resp) {
+              create_view_result(resp, rows, pyObj_callback, pyObj_errback);
+          });
+        Py_END_ALLOW_THREADS
+    }
+    return streamed_res;
 }

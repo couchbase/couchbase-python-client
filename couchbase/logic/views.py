@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import queue
+from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
 from typing import (Any,
@@ -11,11 +11,9 @@ from typing import (Any,
                     Tuple,
                     Union)
 
-from couchbase.exceptions import (PYCBC_ERROR_MAP,
-                                  CouchbaseException,
-                                  ErrorMapper,
-                                  ExceptionMap,
-                                  InvalidArgumentException)
+from couchbase._utils import timedelta_as_microseconds
+from couchbase.exceptions import ErrorMapper, InvalidArgumentException
+from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.management.views import DesignDocumentNamespace
 from couchbase.options import UnsignedInt64, ViewOptions
 from couchbase.pycbc_core import view_query
@@ -56,12 +54,20 @@ class ViewMetaData:
         return f'ViewMetaData({self._raw})'
 
 
+@dataclass
+class ViewRow(object):
+    key: str = None
+    id: str = None
+    value: object = None
+    document: object = None
+
+
 class ViewQuery:
 
     # empty transform will skip updating the attribute when creating an
     # N1QLQuery object
     _VALID_OPTS = {
-        "timeout": {"timeout": timedelta.total_seconds},
+        "timeout": {"timeout": timedelta_as_microseconds},
         "skip": {"skip": lambda x: x},
         "limit": {"limit": lambda x: x},
         "scan_consistency": {"consistency": lambda x: x},
@@ -81,7 +87,8 @@ class ViewQuery:
         "debug": {"debug": lambda x: x},
         "client_context_id": {"client_context_id": lambda x: x},
         "raw": {"raw": lambda x: x},
-        "query_string": {"query_string": lambda x: x}
+        "query_string": {"query_string": lambda x: x},
+        "serializer": {"serializer": lambda x: x}
     }
 
     def __init__(self,
@@ -324,7 +331,7 @@ class ViewQuery:
     @property
     def namespace(self) -> DesignDocumentNamespace:
         value = self._params.get(
-            'name_space', None
+            'namespace', None
         )
         if value is None:
             return DesignDocumentNamespace.DEVELOPMENT
@@ -338,9 +345,9 @@ class ViewQuery:
     def namespace(self, value  # type: Union[DesignDocumentNamespace, str]
                   ) -> None:
         if isinstance(value, DesignDocumentNamespace):
-            self.set_option('name_space', value.value)
+            self.set_option('namespace', value.value)
         elif isinstance(value, str) and value in [sc.value for sc in DesignDocumentNamespace]:
-            self.set_option('name_space', value)
+            self.set_option('namespace', value)
         else:
             raise InvalidArgumentException(message=("Excepted namespace to be either of type "
                                                     "DesignDocumentNamespace or str representation "
@@ -428,7 +435,7 @@ class ViewRequestLogic:
     def __init__(self,
                  connection,
                  encoded_query,
-                 row_factory=lambda x: x,
+                 row_factory=ViewRow,
                  **kwargs
                  ):
 
@@ -436,10 +443,8 @@ class ViewRequestLogic:
         self._encoded_query = encoded_query
         self.row_factory = row_factory
         self._rows = asyncio.Queue()
-        self._raw_rows = queue.Queue()
-        self._query_request_ftr = None
-        self._ROWS_STOP = object()
         self._streaming_result = None
+        self._default_serializer = kwargs.pop('default_serializer', DefaultJsonSerializer())
         self._serializer = None
         self._started_streaming = False
         self._done_streaming = False
@@ -456,7 +461,7 @@ class ViewRequestLogic:
 
         serializer = self.encoded_query.get('serializer', None)
         if not serializer:
-            serializer = DefaultJsonSerializer()
+            serializer = self._default_serializer
 
         self._serializer = serializer
         return self._serializer
@@ -473,92 +478,32 @@ class ViewRequestLogic:
         # @TODO:  raise if query isn't complete?
         return self._metadata
 
-    def _handle_query_result_exc(self, analytics_response):
-        base_exc = analytics_response.raw_result.get('exc', None)
-        exc_info = analytics_response.raw_result.get('exc_info', None)
+    def _set_metadata(self, views_response):
+        if isinstance(views_response, CouchbaseBaseException):
+            raise ErrorMapper.build_exception(views_response)
 
-        excptn = None
-        if base_exc is None and exc_info:
-            exc_cls = PYCBC_ERROR_MAP.get(exc_info.get('error_code', None), CouchbaseException)
-            new_exc_info = {k: v for k, v in exc_info if k in ['cinfo', 'inner_cause']}
-            excptn = exc_cls(message=exc_info.get('message', None), exc_info=new_exc_info)
-        else:
-            err_ctx = base_exc.error_context()
-            if err_ctx is not None:
-                excptn = ErrorMapper.parse_error_context(base_exc)
-            else:
-                exc_cls = PYCBC_ERROR_MAP.get(base_exc.err(), CouchbaseException)
-                excptn = exc_cls(message=base_exc.strerror())
+        self._metadata = ViewMetaData(views_response.raw_result.get('value', None))
 
-        if excptn is None:
-            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-            excptn = exc_cls(message='Unknown error.')
-
-        raise excptn
-
-    def _set_metadata(self, analytics_response):
-        has_exception = analytics_response.raw_result.get('has_exception', None)
-        if has_exception:
-            self._handle_query_result_exc(analytics_response)
-
-        self._metadata = ViewMetaData(analytics_response.raw_result.get('value', None))
-
-    def _submit_query(self):
+    def _submit_query(self, **kwargs):
         if self.done_streaming:
             return
 
         self._started_streaming = True
-        kwargs = {
+        view_kwargs = {
             'conn': self._connection,
             'op_args': self.encoded_query
         }
-        self._streaming_result = view_query(**kwargs)
 
-    # def _set_metadata(self):
-    #     if self._query_request_ftr.exception():
-    #         print('raising exception')
-    #         raise self._query_request_ftr.exception()
-    #     result = self._query_request_ftr.result()
-    #     self._metadata = ViewMetaData(result.raw_result.get('value', None))
+        # this is for txcouchbase...
+        callback = kwargs.pop('callback', None)
+        if callback:
+            view_kwargs['callback'] = callback
 
-    # async def handle_query_row(self, row):
-    #     print(f'row: {row}')
-    #     await self._rows.put(row)
-    #     return row
+        errback = kwargs.pop('errback', None)
+        if errback:
+            view_kwargs['errback'] = errback
 
-    # def _submit_query(self):
-    #     # print(f'submitting query from thread: {current_thread()}')
-    #     if self._query_request_ftr is not None:
-    #         return
-
-    #     serializer = self.encoded_query.pop('serializer', None)
-    #     if serializer is None:
-    #         serializer = DefaultJsonSerializer()
-
-    #     kwargs = {
-    #         'conn': self._connection,
-    #         'op_args': self.encoded_query,
-    #         'callback': self._on_query_complete,
-    #         'errback': self._on_query_exception,
-    #         'serializer': serializer,
-    #     }
-    #     print(f'kwargs: {kwargs}')
-    #     self._query_request_ftr = self._loop.create_future()
-    #     self._streaming_result = view_query(**kwargs)
-
-    def _on_query_complete(self, result):
-        print(f'_on_query_callback: {result}')
-        self._loop.call_soon_threadsafe(self._query_request_ftr.set_result, result)
-
-    def _on_query_exception(self, exc):
-        err_ctx = exc.error_context()
-        print(f"error context: {err_ctx}")
-        if err_ctx is not None:
-            excptn = ErrorMapper.parse_error_context(exc)
-        else:
-            exc_cls = PYCBC_ERROR_MAP.get(exc.err(), CouchbaseException)
-            excptn = exc_cls(exc)
-        self._loop.call_soon_threadsafe(self._query_request_ftr.set_exception, excptn)
+        self._streaming_result = view_query(**view_kwargs)
 
     def __iter__(self):
         raise NotImplementedError(

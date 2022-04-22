@@ -162,6 +162,14 @@ class TestEnvironment(CouchbaseTestEnvironment):
                 self._loaded_keys.extend(
                     [f"{r['type']}_{r['id']}" for r in data["results"]])
 
+    def get_json_data_by_type(self, json_type):
+        _, sample_json = self.load_data_from_file()
+        data = sample_json.get(json_type, None)
+        if data and 'results' in data:
+            return data['results']
+
+        return None
+
     async def purge_data(self):
         await asyncio.gather(*[self.collection.remove(key) for key in self._loaded_keys])
 

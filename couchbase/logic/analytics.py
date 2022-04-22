@@ -1,6 +1,5 @@
 import asyncio
 import json
-import queue
 from datetime import timedelta
 from enum import Enum
 from typing import (Any,
@@ -8,11 +7,8 @@ from typing import (Any,
                     List,
                     Optional)
 
-from couchbase.exceptions import (PYCBC_ERROR_MAP,
-                                  CouchbaseException,
-                                  ErrorMapper,
-                                  ExceptionMap,
-                                  InvalidArgumentException)
+from couchbase.exceptions import ErrorMapper, InvalidArgumentException
+from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.options import AnalyticsOptions, UnsignedInt64
 from couchbase.pycbc_core import analytics_query
 from couchbase.serializer import DefaultJsonSerializer, Serializer
@@ -152,11 +148,11 @@ class AnalyticsQuery:
         'scan_consistency': {'consistency': lambda x: x.value},
         'client_context_id': {'client_context_id': lambda x: x},
         'priority': {'priority': lambda x: x},
-        'positional_parameters': {},
-        'named_parameters': {},
         'query_context': {'query_context': lambda x: x},
-        'raw': {},
-        'serializer': {},
+        'serializer': {'serializer': lambda x: x},
+        'raw': {'raw': lambda x: x},
+        'positional_parameters': {},
+        'named_parameters': {}
     }
 
     def __init__(self, query, *args, **kwargs):
@@ -224,6 +220,14 @@ class AnalyticsQuery:
         self.set_option("metrics", value)
 
     @property
+    def priority(self):
+        return self._params.get("priority", False)
+
+    @priority.setter
+    def priority(self, value):
+        self.set_option("priority", value)
+
+    @property
     def statement(self):
         return self._params["statement"]
 
@@ -247,6 +251,15 @@ class AnalyticsQuery:
         self._params["readonly"] = value
 
     @property
+    def query_context(self) -> Optional[str]:
+        return self._params.get('scope_qualifier', None)
+
+    @query_context.setter
+    def query_context(self, value  # type: str
+                      ) -> None:
+        self.set_option('scope_qualifier', value)
+
+    @property
     def serializer(self):
         return self._params.get("serializer", None)
 
@@ -255,6 +268,21 @@ class AnalyticsQuery:
         if not issubclass(value, Serializer):
             raise InvalidArgumentException('Serializer should implement Serializer interface.')
         self._params["serializer"] = value
+
+    @property
+    def raw(self) -> Optional[Dict[str, Any]]:
+        return self._params.get('raw', None)
+
+    @raw.setter
+    def raw(self, value  # type: Dict[str, Any]
+            ) -> None:
+        if not isinstance(value, dict):
+            raise TypeError("Raw option must be of type Dict[str, Any].")
+        for k in value.keys():
+            if not isinstance(k, str):
+                raise TypeError("key for raw value must be str")
+        raw_params = {f'{k}': json.dumps(v) for k, v in value.items()}
+        self.set_option('raw', raw_params)
 
     @classmethod
     def create_query_object(cls, statement, *options, **kwargs):
@@ -310,10 +338,8 @@ class AnalyticsRequestLogic:
         self._query_params = query_params
         self.row_factory = row_factory
         self._rows = asyncio.Queue()
-        self._raw_rows = queue.Queue()
-        self._query_request_ftr = None
-        self._ROWS_STOP = object()
         self._streaming_result = None
+        self._default_serializer = kwargs.pop('default_serializer', DefaultJsonSerializer())
         self._serializer = None
         self._started_streaming = False
         self._done_streaming = False
@@ -330,7 +356,7 @@ class AnalyticsRequestLogic:
 
         serializer = self.params.get('serializer', None)
         if not serializer:
-            serializer = DefaultJsonSerializer()
+            serializer = self._default_serializer
 
         self._serializer = serializer
         return self._serializer
@@ -347,87 +373,33 @@ class AnalyticsRequestLogic:
         # @TODO:  raise if query isn't complete?
         return self._metadata
 
-    def _handle_query_result_exc(self, analytics_response):
-        base_exc = analytics_response.raw_result.get('exc', None)
-        exc_info = analytics_response.raw_result.get('exc_info', None)
-
-        excptn = None
-        if base_exc is None and exc_info:
-            exc_cls = PYCBC_ERROR_MAP.get(exc_info.get('error_code', None), CouchbaseException)
-            new_exc_info = {k: v for k, v in exc_info if k in ['cinfo', 'inner_cause']}
-            excptn = exc_cls(message=exc_info.get('message', None), exc_info=new_exc_info)
-        else:
-            err_ctx = base_exc.error_context()
-            if err_ctx is not None:
-                excptn = ErrorMapper.parse_error_context(base_exc)
-            else:
-                exc_cls = PYCBC_ERROR_MAP.get(base_exc.err(), CouchbaseException)
-                excptn = exc_cls(message=base_exc.strerror())
-
-        if excptn is None:
-            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-            excptn = exc_cls(message='Unknown error.')
-
-        raise excptn
-
     def _set_metadata(self, analytics_response):
-        has_exception = analytics_response.raw_result.get('has_exception', None)
-        if has_exception:
-            self._handle_query_result_exc(analytics_response)
+        if isinstance(analytics_response, CouchbaseBaseException):
+            raise ErrorMapper.build_exception(analytics_response)
 
         self._metadata = AnalyticsMetaData(analytics_response.raw_result.get('value', None))
 
-    def _submit_query(self):
+    def _submit_query(self, **kwargs):
         if self.done_streaming:
             return
 
         self._started_streaming = True
-        kwargs = {
+        analytics_kwargs = {
             'conn': self._connection,
         }
-        kwargs.update(self.params)
-        self._streaming_result = analytics_query(**kwargs)
+        analytics_kwargs.update(self.params)
 
-    # def _set_metadata(self):
-    #     result = self._query_request_ftr.result()
-    #     self._metadata = AnalyticsMetaData(result.raw_result.get('value', None))
+        # this is for txcouchbase...
+        callback = kwargs.pop('callback', None)
+        if callback:
+            analytics_kwargs['callback'] = callback
 
-    # async def handle_query_row(self, row):
-    #     print(f'row: {row}')
-    #     await self._rows.put(row)
-    #     return row
+        errback = kwargs.pop('errback', None)
+        if errback:
+            analytics_kwargs['errback'] = errback
 
-    # def _submit_query(self):
-    #     # print(f'submitting query from thread: {current_thread()}')
-    #     if self._query_request_ftr is not None:
-    #         return
-
-    #     if self.params.get('serializer', None) is None:
-    #         self.params['serializer'] = DefaultJsonSerializer()
-
-    #     kwargs = {
-    #         'conn': self._connection,
-    #         'callback': self._on_query_complete,
-    #         'errback': self._on_query_exception,
-    #         **self.params
-    #     }
-    #     print(f'kwargs: {kwargs}')
-    #     self._query_request_ftr = self._loop.create_future()
-    #     self._streaming_result = analytics_query(**kwargs)
-
-    def _on_query_complete(self, result):
-        print(f'_on_query_callback: {result}')
-        self._loop.call_soon_threadsafe(self._query_request_ftr.set_result, result)
-
-    def _on_query_exception(self, exc):
-        err_ctx = exc.error_context()
-        print(f"error context: {err_ctx}")
-        if err_ctx is not None:
-            excptn = ErrorMapper.parse_error_context(exc)
-        else:
-            exc_cls = PYCBC_ERROR_MAP.get(exc.err(), CouchbaseException)
-            excptn = exc_cls(exc)
-        self._loop.call_soon_threadsafe(self._query_request_ftr.set_exception, excptn)
+        print(analytics_kwargs)
+        self._streaming_result = analytics_query(**analytics_kwargs)
 
     def __iter__(self):
         raise NotImplementedError(

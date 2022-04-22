@@ -10,6 +10,8 @@ from couchbase.pycbc_core import (diagnostics_operation,
                                   open_or_close_bucket,
                                   operations)
 from couchbase.result import PingResult
+from couchbase.serializer import Serializer
+from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
     from couchbase.options import PingOptions
@@ -30,11 +32,12 @@ class BucketLogic:
         return self._connection
 
     @property
-    def transcoder(self):
-        """
-        **INTERNAL**
-        """
-        return self._cluster.transcoder
+    def default_transcoder(self) -> Optional[Transcoder]:
+        return self._cluster.default_transcoder
+
+    @property
+    def default_serializer(self) -> Optional[Serializer]:
+        return self._cluster.default_serializer
 
     @property
     def connected(self):

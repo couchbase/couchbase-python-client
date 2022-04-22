@@ -410,51 +410,6 @@ do_query_index_mgmt_op(connection& conn,
 }
 
 PyObject*
-handle_query_mgmt_blocking_result(std::future<PyObject*>&& fut)
-{
-    PyObject* ret = nullptr;
-    bool http_ex = false;
-    std::string file;
-    int line;
-    couchbase::error_context::http ctx{};
-    std::error_code ec;
-    std::string msg;
-
-    Py_BEGIN_ALLOW_THREADS
-    try {
-        ret = fut.get();
-    } catch (PycbcHttpException e) {
-        http_ex = true;
-        msg = e.what();
-        file = e.get_file();
-        line = e.get_line();
-        ec = e.get_error_code();
-        ctx = e.get_context();
-    } catch (PycbcException e) {
-        msg = e.what();
-        file = e.get_file();
-        line = e.get_line();
-        ec = e.get_error_code();
-    } catch (const std::exception& e) {
-        ec = PycbcError::InternalSDKError;
-        msg = e.what();
-    }
-    Py_END_ALLOW_THREADS
-
-      std::string ec_category = std::string(ec.category().name());
-    if (http_ex) {
-        PyObject* pyObj_base_exc = build_exception_from_context(ctx);
-        pycbc_set_python_exception(ec, file.c_str(), line, msg.c_str(), pyObj_base_exc);
-        Py_DECREF(pyObj_base_exc);
-    } else if (!file.empty()) {
-        pycbc_set_python_exception(ec, file.c_str(), line, msg.c_str());
-    } else if (ec_category.compare("pycbc") == 0) {
-        pycbc_set_python_exception(ec, __FILE__, __LINE__, msg.c_str());
-    }
-    return ret;
-}
-
-PyObject*
 handle_query_index_mgmt_op(connection* conn, struct query_index_mgmt_options* options, PyObject* pyObj_callback, PyObject* pyObj_errback)
 {
     PyObject* res = nullptr;
@@ -462,11 +417,28 @@ handle_query_index_mgmt_op(connection* conn, struct query_index_mgmt_options* op
     auto f = barrier->get_future();
     PyObject* pyObj_bucket_name = PyDict_GetItemString(options->op_args, "bucket_name");
     auto bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
+    std::string scope_name{};
+    PyObject* pyObj_scope_name = PyDict_GetItemString(options->op_args, "scope_name");
+    if (pyObj_scope_name != nullptr) {
+        scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));
+    }
+    std::string collection_name{};
+    PyObject* pyObj_collection_name = PyDict_GetItemString(options->op_args, "collection_name");
+    if (pyObj_collection_name != nullptr) {
+        collection_name = std::string(PyUnicode_AsUTF8(pyObj_collection_name));
+    }
+
     switch (options->op_type) {
         case QueryIndexManagementOperations::CREATE_INDEX: {
             auto req = get_create_query_index_req(options->op_args);
             req.bucket_name = bucket_name;
             req.timeout = options->timeout_ms;
+            if (!scope_name.empty()) {
+                req.scope_name = scope_name;
+            }
+            if (!collection_name.empty()) {
+                req.collection_name = collection_name;
+            }
 
             res = do_query_index_mgmt_op<couchbase::operations::management::query_index_create_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
@@ -476,6 +448,12 @@ handle_query_index_mgmt_op(connection* conn, struct query_index_mgmt_options* op
             auto req = get_drop_query_index_req(options->op_args);
             req.bucket_name = bucket_name;
             req.timeout = options->timeout_ms;
+            if (!scope_name.empty()) {
+                req.scope_name = scope_name;
+            }
+            if (!collection_name.empty()) {
+                req.collection_name = collection_name;
+            }
 
             res = do_query_index_mgmt_op<couchbase::operations::management::query_index_drop_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
@@ -485,6 +463,12 @@ handle_query_index_mgmt_op(connection* conn, struct query_index_mgmt_options* op
             couchbase::operations::management::query_index_get_all_request req{};
             req.bucket_name = bucket_name;
             req.timeout = options->timeout_ms;
+            if (!scope_name.empty()) {
+                req.scope_name = scope_name;
+            }
+            if (!collection_name.empty()) {
+                req.collection_name = collection_name;
+            }
 
             res = do_query_index_mgmt_op<couchbase::operations::management::query_index_get_all_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
@@ -494,6 +478,12 @@ handle_query_index_mgmt_op(connection* conn, struct query_index_mgmt_options* op
             couchbase::operations::management::query_index_build_deferred_request req{};
             req.bucket_name = bucket_name;
             req.timeout = options->timeout_ms;
+            if (!scope_name.empty()) {
+                req.scope_name = scope_name;
+            }
+            if (!collection_name.empty()) {
+                req.collection_name = collection_name;
+            }
 
             res = do_query_index_mgmt_op<couchbase::operations::management::query_index_build_deferred_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);

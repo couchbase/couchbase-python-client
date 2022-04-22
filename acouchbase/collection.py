@@ -66,7 +66,7 @@ class AsyncCollection(CollectionLogic):
         final_args = forward_args(kwargs, *opts)
         transcoder = final_args.get('transcoder', None)
         if not transcoder:
-            transcoder = self.transcoder
+            transcoder = self.default_transcoder
         final_args['transcoder'] = transcoder
 
         return self._get_internal(key, **final_args)
@@ -146,7 +146,7 @@ class AsyncCollection(CollectionLogic):
         final_args = forward_args(kwargs, *opts)
         transcoder = final_args.get('transcoder', None)
         if not transcoder:
-            transcoder = self.transcoder
+            transcoder = self.default_transcoder
         final_args['transcoder'] = transcoder
 
         return self._get_and_touch_internal(key, **final_args)
@@ -170,7 +170,7 @@ class AsyncCollection(CollectionLogic):
         final_args = forward_args(kwargs, *opts)
         transcoder = final_args.get('transcoder', None)
         if not transcoder:
-            transcoder = self.transcoder
+            transcoder = self.default_transcoder
         final_args['transcoder'] = transcoder
 
         return self._get_and_lock_internal(key, **final_args)
@@ -201,7 +201,7 @@ class AsyncCollection(CollectionLogic):
         final_args = forward_args(kwargs, *opts)
         transcoder = final_args.get('transcoder', None)
         if not transcoder:
-            transcoder = self.transcoder
+            transcoder = self.default_transcoder
         final_args['transcoder'] = transcoder
         print(f'lookup in kwargs: {final_args}')
         return self._lookup_in_internal(key, spec, **final_args)

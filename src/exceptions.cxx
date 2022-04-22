@@ -236,13 +236,8 @@ make_error_code(PycbcError ec)
 }
 
 PyObject*
-get_pycbc_exception_class(PyObject* pyObj_exc_module, std::error_code ec, PyObject* pyObj_base_exc = nullptr)
+get_pycbc_exception_class(PyObject* pyObj_exc_module, std::error_code ec)
 {
-    auto err_cat = std::string(ec.category().name());
-    if (pyObj_base_exc != nullptr || err_cat.compare("pycbc") != 0) {
-        return PyObject_GetAttrString(pyObj_exc_module, "PycbcException");
-    }
-
     switch (static_cast<PycbcError>(ec.value())) {
         case PycbcError::InvalidArgument:
             return PyObject_GetAttrString(pyObj_exc_module, "InvalidArgumentException");
@@ -259,25 +254,8 @@ get_pycbc_exception_class(PyObject* pyObj_exc_module, std::error_code ec, PyObje
     return PyObject_GetAttrString(pyObj_exc_module, "InternalSDKException");
 }
 
-PyObject*
-get_pycbc_exception_class_enum_value(std::error_code ec)
-{
-    switch (static_cast<PycbcError>(ec.value())) {
-        case PycbcError::InvalidArgument:
-            return PyLong_FromLong(static_cast<int>(2));
-        case PycbcError::HTTPError:
-            return PyLong_FromLong(static_cast<int>(5001));
-        case PycbcError::UnsuccessfulOperation:
-        case PycbcError::UnableToBuildResult:
-        case PycbcError::CallbackUnsuccessful:
-        case PycbcError::InternalSDKError:
-        default:
-            return PyLong_FromLong(static_cast<int>(5000));
-    }
-}
-
 void
-pycbc_set_python_exception(std::error_code ec, const char* file, int line, const char* msg, PyObject* pyObj_base_exc)
+pycbc_set_python_exception(std::error_code ec, const char* file, int line, const char* msg)
 {
     PyObject *pyObj_type = nullptr, *pyObj_value = nullptr, *pyObj_traceback = nullptr;
     PyObject* pyObj_exc_class = nullptr;
@@ -302,12 +280,6 @@ pycbc_set_python_exception(std::error_code ec, const char* file, int line, const
         Py_XDECREF(pyObj_value);
     }
 
-    if (PyGILState_Check()) {
-        LOG_INFO("{}: we have the GIL!", "PYCBC");
-    } else {
-        LOG_INFO("{}: we DONT have the GIL!", "PYCBC");
-    }
-
     PyObject* pyObj_cinfo = Py_BuildValue("(s,i)", file, line);
     if (-1 == PyDict_SetItemString(pyObj_exc_params, "cinfo", pyObj_cinfo)) {
         PyErr_Print();
@@ -324,7 +296,7 @@ pycbc_set_python_exception(std::error_code ec, const char* file, int line, const
         return;
     }
 
-    pyObj_exc_class = get_pycbc_exception_class(pyObj_exc_module, ec, pyObj_base_exc);
+    pyObj_exc_class = get_pycbc_exception_class(pyObj_exc_module, ec);
     if (pyObj_exc_class == nullptr) {
         PyErr_Print();
         Py_XDECREF(pyObj_exc_params);
@@ -359,23 +331,6 @@ pycbc_set_python_exception(std::error_code ec, const char* file, int line, const
     }
     Py_DECREF(pyObj_tmp);
 
-    exception_base* exc = nullptr;
-    if (pyObj_base_exc != nullptr) {
-        exc = reinterpret_cast<exception_base*>(pyObj_base_exc);
-    }
-
-    if (exc != nullptr && exc->error_context != nullptr) {
-        if (-1 == PyDict_SetItemString(pyObj_kwargs, "context", exc->error_context)) {
-            PyErr_Print();
-            Py_DECREF(pyObj_args);
-            Py_DECREF(pyObj_kwargs);
-            Py_DECREF(pyObj_exc_params);
-            Py_DECREF(pyObj_exc_class);
-            return;
-        }
-        Py_DECREF(exc->error_context);
-    }
-
     if (-1 == PyDict_SetItemString(pyObj_kwargs, "exc_info", pyObj_exc_params)) {
         PyErr_Print();
         Py_DECREF(pyObj_args);
@@ -398,116 +353,6 @@ pycbc_set_python_exception(std::error_code ec, const char* file, int line, const
 
     Py_INCREF(Py_TYPE(pyObj_exc_instance));
     PyErr_Restore((PyObject*)Py_TYPE(pyObj_exc_instance), pyObj_exc_instance, pyObj_traceback);
-}
-// @TODO:  remove once streaming cleaned up
-PyObject*
-pycbc_core_get_exception_kwargs(std::string msg, std::error_code ec, const char* file, int line)
-{
-    PyObject *pyObj_type = nullptr, *pyObj_value = nullptr, *pyObj_traceback = nullptr;
-    PyObject* pyObj_exc_class = nullptr;
-    PyObject* pyObj_exc_instance = nullptr;
-
-    PyErr_Fetch(&pyObj_type, &pyObj_value, &pyObj_traceback);
-    PyErr_Clear();
-
-    PyObject* pyObj_exc_params = PyDict_New();
-
-    if (pyObj_type != nullptr) {
-        PyErr_NormalizeException(&pyObj_type, &pyObj_value, &pyObj_traceback);
-        if (-1 == PyDict_SetItemString(pyObj_exc_params, "inner_cause", pyObj_value)) {
-            PyErr_Print();
-            Py_DECREF(pyObj_type);
-            Py_XDECREF(pyObj_value);
-            Py_XDECREF(pyObj_traceback);
-            Py_DECREF(pyObj_exc_params);
-            return nullptr;
-        }
-        Py_XDECREF(pyObj_type);
-        Py_XDECREF(pyObj_value);
-    }
-
-    if (PyGILState_Check()) {
-        LOG_INFO("{}: we have the GIL!", "PYCBC");
-    } else {
-        LOG_INFO("{}: we DONT have the GIL!", "PYCBC");
-    }
-
-    PyObject* pyObj_cinfo = Py_BuildValue("(s,i)", file, line);
-    if (-1 == PyDict_SetItemString(pyObj_exc_params, "cinfo", pyObj_cinfo)) {
-        PyErr_Print();
-        Py_XDECREF(pyObj_cinfo);
-        Py_DECREF(pyObj_exc_params);
-        return nullptr;
-    }
-    Py_DECREF(pyObj_cinfo);
-
-    PyObject* pyObj_tmp = PyUnicode_FromString(msg.c_str());
-    if (-1 == PyDict_SetItemString(pyObj_exc_params, "message", pyObj_tmp)) {
-        PyErr_Print();
-        Py_XDECREF(pyObj_tmp);
-        Py_DECREF(pyObj_exc_params);
-        return nullptr;
-    }
-    Py_DECREF(pyObj_tmp);
-
-    pyObj_tmp = get_pycbc_exception_class_enum_value(ec);
-    if (-1 == PyDict_SetItemString(pyObj_exc_params, "error_code", pyObj_tmp)) {
-        PyErr_Print();
-        Py_XDECREF(pyObj_tmp);
-        Py_DECREF(pyObj_exc_params);
-        return nullptr;
-    }
-    Py_DECREF(pyObj_tmp);
-
-    PyObject* pyObj_kwargs = PyDict_New();
-    if (-1 == PyDict_SetItemString(pyObj_kwargs, "exc_info", pyObj_exc_params)) {
-        PyErr_Print();
-        Py_XDECREF(pyObj_kwargs);
-        Py_XDECREF(pyObj_exc_params);
-        return nullptr;
-    }
-    Py_DECREF(pyObj_exc_params);
-
-    return pyObj_kwargs;
-}
-
-// @TODO:  remove once streaming cleaned up
-PyObject*
-pycbc_get_exception_kwargs(std::string msg, const char* file, int line)
-{
-    PyObject* pyObj_kwargs = PyDict_New();
-    PyObject* pyObj_exc_params = PyDict_New();
-
-    PyObject* pyObj_cinfo = Py_BuildValue("(s,i)", file, line);
-    if (-1 == PyDict_SetItemString(pyObj_exc_params, "cinfo", pyObj_cinfo)) {
-        PyErr_Print();
-        Py_XDECREF(pyObj_cinfo);
-        Py_XDECREF(pyObj_kwargs);
-        Py_XDECREF(pyObj_exc_params);
-        return nullptr;
-    }
-    Py_DECREF(pyObj_cinfo);
-
-    if (-1 == PyDict_SetItemString(pyObj_kwargs, "exc_info", pyObj_exc_params)) {
-        PyErr_Print();
-        Py_XDECREF(pyObj_kwargs);
-        Py_XDECREF(pyObj_exc_params);
-        return nullptr;
-    }
-    Py_DECREF(pyObj_exc_params);
-
-    if (!msg.empty()) {
-        PyObject* pyObj_msg = PyUnicode_FromString(msg.c_str());
-        if (-1 == PyDict_SetItemString(pyObj_kwargs, "error_msg", pyObj_msg)) {
-            PyErr_Print();
-            Py_DECREF(pyObj_kwargs);
-            Py_XDECREF(pyObj_msg);
-            return nullptr;
-        }
-        Py_DECREF(pyObj_msg);
-    }
-
-    return pyObj_kwargs;
 }
 
 PyObject*
@@ -532,7 +377,7 @@ pycbc_build_exception(std::error_code ec, const char* file, int line, std::strin
         }
         Py_DECREF(pyObj_type);
         Py_XDECREF(pyObj_value);
-        Py_XDECREF(pyObj_traceback);
+        // Py_XDECREF(pyObj_traceback);
     }
 
     PyObject* pyObj_cinfo = Py_BuildValue("(s,i)", file, line);

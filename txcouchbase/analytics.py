@@ -1,39 +1,57 @@
+from twisted.internet.defer import Deferred
+
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   AlreadyQueriedException,
                                   CouchbaseException,
                                   ErrorMapper,
                                   ExceptionMap)
 from couchbase.exceptions import exception as CouchbaseBaseException
-from couchbase.logic.analytics import AnalyticsError  # noqa: F401
-from couchbase.logic.analytics import AnalyticsMetaData  # noqa: F401
-from couchbase.logic.analytics import AnalyticsMetrics  # noqa: F401
-from couchbase.logic.analytics import AnalyticsQuery  # noqa: F401
-from couchbase.logic.analytics import AnalyticsScanConsistency  # noqa: F401
-from couchbase.logic.analytics import AnalyticsStatus  # noqa: F401
-from couchbase.logic.analytics import AnalyticsWarning  # noqa: F401
 from couchbase.logic.analytics import AnalyticsRequestLogic
-
 
 class AnalyticsRequest(AnalyticsRequestLogic):
     def __init__(self,
                  connection,
+                 loop,
                  query_params,
                  row_factory=lambda x: x,
                  **kwargs
                  ):
         super().__init__(connection, query_params, row_factory=row_factory, **kwargs)
+        self._query_request_ftr = None
+        self._query_d = None
+        self._loop = loop
+
+    @property
+    def loop(self):
+        """
+        **INTERNAL**
+        """
+        return self._loop
 
     @classmethod
-    def generate_analytics_request(cls, connection, query_params, row_factory=lambda x: x, **kwargs):
-        return cls(connection, query_params, row_factory=row_factory, **kwargs)
+    def generate_analytics_request(cls, connection, loop, query_params, row_factory=lambda x: x, **kwargs):
+        return cls(connection, loop, query_params, row_factory=row_factory, **kwargs)
 
-    def execute(self):
-        return [r for r in list(self)]
+    def execute_analytics_query(self):
+        #if self._query_request_ftr is not None and self._query_request_ftr.done():
+        if self.done_streaming:
+            raise AlreadyQueriedException()
+
+        if self._query_request_ftr is None:
+            self._query_request_ftr = self.loop.create_future()
+            self._submit_query(callback=self._on_query_complete)
+            self._query_d = Deferred.fromFuture(self._query_request_ftr)
+
+        return self._query_d
+
+    def _on_query_complete(self, result):
+        print(f'_on_query_callback: {result}')
+        self._loop.call_soon_threadsafe(self._query_request_ftr.set_result, result)
 
     def _get_metadata(self):
         try:
-            analytics_response = next(self._streaming_result)
-            self._set_metadata(analytics_response)
+            query_response = next(self._streaming_result)
+            self._set_metadata(query_response)
         except CouchbaseException as ex:
             raise ex
         except Exception as ex:
@@ -41,17 +59,22 @@ class AnalyticsRequest(AnalyticsRequestLogic):
             excptn = exc_cls(str(ex))
             raise excptn
 
+    # def _get_metadata(self):
+    #     if self._query_request_ftr.done():
+    #         if self._query_request_ftr.exception():
+    #             print('raising exception')
+    #             raise self._query_request_ftr.exception()
+    #         else:
+    #             self._set_metadata()
+    #     else:
+    #         self._loop.run_until_complete(self._query_request_ftr)
+    #         self._set_metadata()
+
     def __iter__(self):
-        if self.done_streaming:
-            raise AlreadyQueriedException()
-
-        if not self.started_streaming:
-            self._submit_query()
-
         return self
 
     def _get_next_row(self):
-        if self.done_streaming is True:
+        if self._done_streaming is True:
             return
 
         row = next(self._streaming_result)

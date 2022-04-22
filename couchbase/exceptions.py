@@ -498,10 +498,19 @@ SubdocPathMismatchException = PathMismatchException
 
 
 class ParsingFailedException(CouchbaseException):
-    pass
+    """
+    Raised when the query service is unable to parse a N1QL query
+    """
 
 
+class AlreadyQueriedException(CouchbaseException):
+    """
+    Raised when query (N1QL, Search, Analytics or Views) results
+    have already been iterated over.
+    """
 
+    def __init__(self, message='Previously iterated over results.'):
+        super().__init__(message=message)
 # Search Exceptions
 
 
@@ -561,16 +570,31 @@ class UserNotFoundException(CouchbaseException):
 class QueryIndexAlreadyExistsException(CouchbaseException):
     """ The query index already exists"""
 
+    def __init__(self, msg=None, **kwargs):
+        if msg:
+            kwargs['message'] = msg
+        super().__init__(**kwargs)
+
 
 class QueryIndexNotFoundException(CouchbaseException):
     """ The query index was not found"""
+
+    def __init__(self, msg=None, **kwargs):
+        if msg:
+            kwargs['message'] = msg
+        super().__init__(**kwargs)
 
 
 class WatchQueryIndexTimeoutException(CouchbaseException):
     """Unable to find all requested indexes online within specified timeout"""
 
+    def __init__(self, msg=None, **kwargs):
+        if msg:
+            kwargs['message'] = msg
+        super().__init__(**kwargs)
 
-# Search Index mgmt
+
+# Search Index mgmttest_bad_scope_query
 
 class SearchIndexNotFoundException(CouchbaseException):
     pass
@@ -821,165 +845,6 @@ KV_ERROR_CONTEXT_MAPPING = {'kv_locked': DocumentLockedException,
 
 class ErrorMapper:
     @staticmethod
-    def _process_mapping(pycbc_excptn,  # type: exception
-                         compiled_map,  # type: Dict[str, CouchbaseException]
-                         msg  # type: str
-                         ) -> Optional[CouchbaseException]:
-        matches = None
-        for pattern, ex in compiled_map.items():
-            try:
-                matches = pattern.match(msg)
-            except Exception:  # nosec
-                pass
-            if matches:
-                print(f"found match: {ex}")
-                return ex(pycbc_excptn)
-
-        return None
-
-    @staticmethod   # noqa: C901
-    def _parse_http_response_body(pycbc_excptn,  # type: exception   # noqa: C901
-                                  compiled_map,  # type: Dict[str, CouchbaseException]
-                                  response_body  # type: str
-                                  ) -> Optional[CouchbaseException]:
-        err_text = None
-        matches = None
-        try:
-            http_body = json.loads(response_body)
-            if isinstance(http_body, str):
-                exc = ErrorMapper._process_mapping(pycbc_excptn, compiled_map, http_body)
-                if exc is not None:
-                    return exc
-            elif isinstance(http_body, dict) and http_body.get("errors", None) is not None:
-                errors = http_body.get("errors")
-                if isinstance(errors, list):
-                    for err in errors:
-                        err_code = err.get('code', None)
-                        err_text = err.get('msg', None)
-                        if err_text:
-                            if err_code:
-                                err_text = f'{err_code} {err_text}'
-                            exc = ErrorMapper._process_mapping(pycbc_excptn, compiled_map, err_text)
-                            if exc is not None:
-                                return exc
-                            err_text = None
-                else:
-                    err_text = errors.get("name", None)
-            # eventing function mgmt cases
-            elif isinstance(http_body, dict) and http_body.get('name', None) is not None:
-                exc = ErrorMapper._process_mapping(pycbc_excptn, compiled_map, http_body.get('name', None))
-                if exc is not None:
-                    return exc
-
-            # TODO:  This doesn't seem good: re: test_bucket_flush_fail
-            #   Currently the regex matches w/ the previous string check in the
-            #   http_body, but parsing JSON _might_ be better?  Odd that the
-            #   key is "_" though...
-            if err_text is None:
-                err_text = http_body.get("_", None)
-        except json.decoder.JSONDecodeError:
-            pass
-
-        for pattern, ex in compiled_map.items():
-            try:
-                matches = pattern.match(err_text)
-            except Exception:  # nosec
-                pass
-            if matches:
-                return ex(pycbc_excptn)
-
-        return None
-
-    @staticmethod
-    def _parse_http_context(pycbc_excptn,  # type: exception
-                            err_ctx,  # type: HTTPErrorContext
-                            mapping=None,  # type: Dict[str, CouchbaseException]
-                            excptn_msg=None  # type: str
-                            ) -> Optional[CouchbaseException]:
-        from couchbase._utils import is_null_or_empty
-
-        compiled_map = {}
-        if mapping:
-            compiled_map = {{str: re.compile}.get(
-                type(k), lambda x: x)(k): v for k, v in mapping.items()}
-
-        if not is_null_or_empty(excptn_msg):
-            excptn = ErrorMapper._process_mapping(pycbc_excptn, compiled_map, excptn_msg)
-            if excptn is not None:
-                return excptn
-
-        if not is_null_or_empty(err_ctx.response_body):
-            err_text = err_ctx.response_body
-            excptn = ErrorMapper._process_mapping(pycbc_excptn, compiled_map, err_text)
-            if excptn is not None:
-                return excptn
-
-            excptn = ErrorMapper._parse_http_response_body(pycbc_excptn, compiled_map, err_text)
-            if excptn is not None:
-                return excptn
-
-        return None
-
-    @staticmethod
-    def _parse_kv_context(pycbc_excptn,  # type: exception
-                          err_ctx,  # type: HTTPErrorContext
-                          mapping,  # type: Dict[str, CouchbaseException]
-                          excptn_msg=None  # type: str
-                          ) -> Optional[CouchbaseException]:
-        from couchbase._utils import is_null_or_empty
-
-        compiled_map = {{str: re.compile}.get(
-            type(k), lambda x: x)(k): v for k, v in mapping.items()}
-
-        if not is_null_or_empty(excptn_msg):
-            excptn = ErrorMapper._process_mapping(pycbc_excptn, compiled_map, excptn_msg)
-            if excptn is not None:
-                return excptn
-
-        if err_ctx.retry_reasons is not None:
-            for rr in err_ctx.retry_reasons:
-                excptn = ErrorMapper._process_mapping(pycbc_excptn, compiled_map, rr)
-                if excptn is not None:
-                    return excptn
-
-        return None
-
-    @classmethod
-    def parse_error_context(cls,
-                            pycbc_excptn,  # type: exception
-                            mapping=None,  # type: Dict[str, CouchbaseException]
-                            excptn_msg=None  # type: str
-                            ) -> CouchbaseException:
-        excptn = None
-        if hasattr(pycbc_excptn, 'context'):
-            err_ctx = ErrorContext.from_dict(**pycbc_excptn.context)
-        else:
-            err_ctx = ErrorContext.from_dict(**pycbc_excptn.error_context())
-
-        if isinstance(err_ctx, HTTPErrorContext):
-            excptn = ErrorMapper._parse_http_context(pycbc_excptn, err_ctx, mapping, excptn_msg=excptn_msg)
-
-        if isinstance(err_ctx, KeyValueErrorContext):
-            if mapping is None:
-                mapping = KV_ERROR_CONTEXT_MAPPING
-            # err_ctx = ErrorContext.from_dict(**pycbc_excptn.error_context())
-            excptn = ErrorMapper._parse_kv_context(pycbc_excptn, err_ctx, mapping)
-
-        if excptn is not None:
-            print("exception found")
-            return excptn
-
-        print("exception not found")
-        if hasattr(pycbc_excptn, 'error_code'):
-            excptn_cls = PYCBC_ERROR_MAP.get(pycbc_excptn.error_code, CouchbaseException)
-        else:
-            excptn_cls = PYCBC_ERROR_MAP.get(pycbc_excptn.err(), CouchbaseException)
-        excptn = excptn_cls(pycbc_excptn, context=err_ctx)
-        return excptn
-
-
-class ErrorMapperNew:
-    @staticmethod
     def _process_mapping(compiled_map,  # type: Dict[str, CouchbaseException]
                          err_content  # type: str
                          ) -> Optional[CouchbaseException]:
@@ -1007,7 +872,7 @@ class ErrorMapperNew:
             return None
 
         if isinstance(http_body, str):
-            exc_class = ErrorMapperNew._process_mapping(compiled_map, http_body)
+            exc_class = ErrorMapper._process_mapping(compiled_map, http_body)
             if exc_class is not None:
                 return exc_class
         elif isinstance(http_body, dict) and http_body.get("errors", None) is not None:
@@ -1016,7 +881,7 @@ class ErrorMapperNew:
                 for err in errors:
                     err_text = f"{err.get('code', None)} {err.get('msg', None)}"
                     if err_text:
-                        exc_class = ErrorMapperNew._process_mapping(compiled_map, err_text)
+                        exc_class = ErrorMapper._process_mapping(compiled_map, err_text)
                         if exc_class is not None:
                             return exc_class
                         err_text = None
@@ -1024,12 +889,12 @@ class ErrorMapperNew:
                 err_text = errors.get("name", None)
         # eventing function mgmt cases
         elif isinstance(http_body, dict) and http_body.get('name', None) is not None:
-            exc = ErrorMapperNew._process_mapping(compiled_map, http_body.get('name', None))
+            exc = ErrorMapper._process_mapping(compiled_map, http_body.get('name', None))
             if exc is not None:
                 return exc
 
         if err_text is not None:
-            exc_class = ErrorMapperNew._process_mapping(compiled_map, err_text)
+            exc_class = ErrorMapper._process_mapping(compiled_map, err_text)
             return exc_class
 
         return None
@@ -1048,17 +913,17 @@ class ErrorMapperNew:
 
         exc_msg = err_info.get('error_message', None)
         if not is_null_or_empty(exc_msg):
-            exc_class = ErrorMapperNew._process_mapping(compiled_map, exc_msg)
+            exc_class = ErrorMapper._process_mapping(compiled_map, exc_msg)
             if exc_class is not None:
                 return exc_class
 
         if not is_null_or_empty(err_ctx.response_body):
             err_text = err_ctx.response_body
-            exc_class = ErrorMapperNew._process_mapping(compiled_map, err_text)
+            exc_class = ErrorMapper._process_mapping(compiled_map, err_text)
             if exc_class is not None:
                 return exc_class
 
-            exc_class = ErrorMapperNew._parse_http_response_body(compiled_map, err_text)
+            exc_class = ErrorMapper._parse_http_response_body(compiled_map, err_text)
             if exc_class is not None:
                 return exc_class
 
@@ -1075,13 +940,13 @@ class ErrorMapperNew:
             type(k), lambda x: x)(k): v for k, v in mapping.items()}
 
         if not is_null_or_empty(err_content):
-            exc_class = ErrorMapperNew._process_mapping(compiled_map, err_content)
+            exc_class = ErrorMapper._process_mapping(compiled_map, err_content)
             if exc_class is not None:
                 return exc_class
 
         if err_ctx.retry_reasons is not None:
             for rr in err_ctx.retry_reasons:
-                exc_class = ErrorMapperNew._process_mapping(compiled_map, rr)
+                exc_class = ErrorMapper._process_mapping(compiled_map, rr)
                 if exc_class is not None:
                     return exc_class
 
@@ -1094,6 +959,7 @@ class ErrorMapperNew:
                         ) -> CouchbaseException:
 
         exc_class = None
+        err_ctx = None
         if base_exc.error_context() is None:
             exc_class = PYCBC_ERROR_MAP.get(base_exc.err(), CouchbaseException)
             err_info = base_exc.error_info()
@@ -1102,16 +968,15 @@ class ErrorMapperNew:
             err_info = base_exc.error_info()
 
             if isinstance(err_ctx, HTTPErrorContext):
-                exc_class = ErrorMapperNew._parse_http_context(err_ctx, mapping, err_info=err_info)
+                exc_class = ErrorMapper._parse_http_context(err_ctx, mapping, err_info=err_info)
 
             if isinstance(err_ctx, KeyValueErrorContext):
                 if mapping is None:
                     mapping = KV_ERROR_CONTEXT_MAPPING
-                exc_class = ErrorMapperNew._parse_kv_context(err_ctx, mapping)
+                exc_class = ErrorMapper._parse_kv_context(err_ctx, mapping)
 
         if exc_class is None:
-            print("exception not found")
             exc_class = PYCBC_ERROR_MAP.get(base_exc.err(), CouchbaseException)
 
-        exc = exc_class(base=base_exc, exc_info=err_info)
+        exc = exc_class(base=base_exc, exc_info=err_info, context=err_ctx)
         return exc

@@ -147,6 +147,9 @@ class QueryIndexManager(QueryIndexManagerLogic):
 
         final_args = forward_args(kwargs, *options)
 
+        scope_name = final_args.get("scope_name", None)
+        collection_name = final_args.get("collection_name", None)
+
         if final_args.get("watch_primary", False):
             index_names.append("#primary")
 
@@ -174,6 +177,9 @@ class QueryIndexManager(QueryIndexManagerLogic):
 
             opts = GetAllQueryIndexOptions(
                 timeout=timedelta(milliseconds=time_left))
+            if scope_name:
+                opts["scope_name"] = scope_name
+                opts["collection_name"] = collection_name
 
             indexes = await self.get_all_indexes(bucket_name, opts)
 

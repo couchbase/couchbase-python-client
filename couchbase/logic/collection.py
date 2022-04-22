@@ -53,11 +53,8 @@ class CollectionLogic:
         self._connection = scope.connection
 
     @property
-    def transcoder(self) -> Optional[Transcoder]:
-        """
-        **INTERNAL**
-        """
-        return self._scope.transcoder
+    def default_transcoder(self) -> Optional[Transcoder]:
+        return self._scope.default_transcoder
 
     @property
     def name(self) -> str:
@@ -128,7 +125,7 @@ class CollectionLogic:
         **kwargs,  # type: Any
     ) -> Optional[MutationResult]:
         final_args = forward_args(kwargs, *opts)
-        transcoder = final_args.pop('transcoder', self.transcoder)
+        transcoder = final_args.pop('transcoder', self.default_transcoder)
         transcoded_value = transcoder.encode_value(value)
         op_type = operations.INSERT.value
         return kv_operation(
@@ -147,7 +144,7 @@ class CollectionLogic:
         **kwargs,  # type: Any
     ) -> Optional[MutationResult]:
         final_args = forward_args(kwargs, *opts)
-        transcoder = final_args.pop('transcoder', self.transcoder)
+        transcoder = final_args.pop('transcoder', self.default_transcoder)
         transcoded_value = transcoder.encode_value(value)
 
         pring_kwargs = kwargs.pop('print_kwargs', False)
@@ -177,7 +174,7 @@ class CollectionLogic:
                 "The expiry and preserve_expiry options cannot both be set for replace operations."
             )
 
-        transcoder = final_args.pop('transcoder', self.transcoder)
+        transcoder = final_args.pop('transcoder', self.default_transcoder)
         transcoded_value = transcoder.encode_value(value)
 
         op_type = operations.REPLACE.value
@@ -272,7 +269,7 @@ class CollectionLogic:
     ) -> Optional[MutateInResult]:
         # no tc for sub-doc, use default JSON
         final_args = forward_args(kwargs, *opts)
-        transcoder = final_args.pop('transcoder', self.transcoder)
+        transcoder = final_args.pop('transcoder', self.default_transcoder)
 
         expiry = final_args.get('expiry', None)
         preserve_expiry = final_args.get('preserve_expiry', False)

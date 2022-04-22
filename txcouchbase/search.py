@@ -1,10 +1,11 @@
-import asyncio
-
 from twisted.internet.defer import Deferred
 
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
+                                  AlreadyQueriedException,
                                   CouchbaseException,
+                                  ErrorMapper,
                                   ExceptionMap)
+from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.search import (SearchRequestLogic,
                                     SearchRow,
                                     SearchRowLocations)
@@ -23,65 +24,67 @@ class SearchRequest(SearchRequestLogic):
     def generate_search_request(cls, connection, loop, encoded_query, **kwargs):
         return cls(connection, loop, encoded_query, **kwargs)
 
-    def execute_query(self) -> Deferred:
-        if self._query_request_ftr is not None and self._query_request_ftr.done():
-            # @TODO(jc): better exception
-            raise Exception("Previously iterated over results.")
+    def execute_search_query(self) -> Deferred:
+        # if self._query_request_ftr is not None and self._query_request_ftr.done():
+        if self.done_streaming:
+            raise AlreadyQueriedException()
 
         if self._query_request_ftr is None:
-            self._submit_query()
+            self._query_request_ftr = self.loop.create_future()
+            self._submit_query(callback=self._on_query_complete)
+            self._query_d = Deferred.fromFuture(self._query_request_ftr)
 
-        self._query_d = Deferred.fromFuture(self._query_request_ftr)
         return self._query_d
 
+    def _on_query_complete(self, result):
+        print(f'_on_query_callback: {result}')
+        self._loop.call_soon_threadsafe(self._query_request_ftr.set_result, result)
+
     def _get_metadata(self):
-        if self._query_request_ftr.done():
-            if self._query_request_ftr.exception():
-                print('raising exception')
-                raise self._query_request_ftr.exception()
-            else:
-                self._set_metadata()
-        else:
-            self._loop.run_until_complete(self._query_request_ftr)
-            self._set_metadata()
-            # print(self._query_request_result)
+        try:
+            search_response = next(self._streaming_result)
+            self._set_metadata(search_response)
+        except CouchbaseException as ex:
+            raise ex
+        except Exception as ex:
+            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
+            excptn = exc_cls(str(ex))
+            raise excptn
 
     def __iter__(self):
         return self
 
     def _get_next_row(self):
-        if self._done_streaming is True:
+        if self.done_streaming is True:
             return
 
-        try:
-            row = next(self._streaming_result)
-            if issubclass(self.row_factory, SearchRow):
-                locations = row.get('locations', None)
-                if locations:
-                    locations = SearchRowLocations(locations)
-                row['locations'] = locations
-                search_row = self.row_factory(**row)
-            else:
-                search_row = row
-            self._rows.put_nowait(search_row)
-        except StopIteration:
-            self._done_streaming = True
+        row = next(self._streaming_result)
+        if isinstance(row, CouchbaseBaseException):
+            raise ErrorMapper.build_exception(row)
+        # should only be None one query request is complete and _no_ errors found
+        if row is None:
+            raise StopIteration
+
+        deserialized_row = self.serializer.deserialize(row)
+        if issubclass(self.row_factory, SearchRow):
+            locations = deserialized_row.get('locations', None)
+            if locations:
+                locations = SearchRowLocations(locations)
+            deserialized_row['locations'] = locations
+            return self.row_factory(**deserialized_row)
+        else:
+            return deserialized_row
 
     def __next__(self):
         try:
-            if self._query_request_ftr.done() and self._query_request_ftr.exception():
-                raise self._query_request_ftr.exception()
-
-            self._get_next_row()
-            return self._rows.get_nowait()
-        except asyncio.QueueEmpty:
+            return self._get_next_row()
+        except StopIteration:
+            self._done_streaming = True
             self._get_metadata()
-            raise StopIteration
+            raise
         except CouchbaseException as ex:
             raise ex
         except Exception as ex:
-            print(f'base exception: {ex}')
             exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-            print(exc_cls.__name__)
             excptn = exc_cls(str(ex))
             raise excptn

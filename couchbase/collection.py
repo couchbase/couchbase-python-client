@@ -17,7 +17,7 @@ from couchbase.datastructures import (CouchbaseList,
                                       CouchbaseQueue,
                                       CouchbaseSet)
 from couchbase.exceptions import (DocumentExistsException,
-                                  ErrorMapperNew,
+                                  ErrorMapper,
                                   InvalidArgumentException,
                                   PathExistsException,
                                   QueueEmpty)
@@ -104,7 +104,7 @@ class Collection(CollectionLogic):
         final_args = forward_args(kwargs, *opts)
         transcoder = final_args.get('transcoder', None)
         if not transcoder:
-            transcoder = self.transcoder
+            transcoder = self.default_transcoder
         final_args['transcoder'] = transcoder
 
         return self._get_internal(key, **final_args)
@@ -183,7 +183,7 @@ class Collection(CollectionLogic):
         final_args = forward_args(kwargs, *opts)
         transcoder = final_args.get('transcoder', None)
         if not transcoder:
-            transcoder = self.transcoder
+            transcoder = self.default_transcoder
         final_args['transcoder'] = transcoder
 
         return self._get_and_touch_internal(key, **final_args)
@@ -207,7 +207,7 @@ class Collection(CollectionLogic):
         final_args = forward_args(kwargs, *opts)
         transcoder = final_args.get('transcoder', None)
         if not transcoder:
-            transcoder = self.transcoder
+            transcoder = self.default_transcoder
         final_args['transcoder'] = transcoder
 
         return self._get_and_lock_internal(key, **final_args)
@@ -238,7 +238,7 @@ class Collection(CollectionLogic):
         final_args = forward_args(kwargs, *opts)
         transcoder = final_args.get('transcoder', None)
         if not transcoder:
-            transcoder = self.transcoder
+            transcoder = self.default_transcoder
         final_args['transcoder'] = transcoder
         print(f'lookup in kwargs: {final_args}')
         return self._lookup_in_internal(key, spec, **final_args)
@@ -700,7 +700,7 @@ class Collection(CollectionLogic):
 
         final_args = get_valid_multi_args(opts_type, kwargs, *opts)
         per_key_args = final_args.pop('per_key_options', None)
-        op_transcoder = final_args.pop('transcoder', self.transcoder)
+        op_transcoder = final_args.pop('transcoder', self.default_transcoder)
         op_args = {}
         for key, value in keys_and_docs.items():
             op_args[key] = copy(final_args)
@@ -740,7 +740,7 @@ class Collection(CollectionLogic):
             raise InvalidArgumentException(message='Expected options type is missing.')
 
         final_args = get_valid_multi_args(opts_type, kwargs, *opts)
-        op_transcoder = final_args.pop('transcoder', self.transcoder)
+        op_transcoder = final_args.pop('transcoder', self.default_transcoder)
         per_key_args = final_args.pop('per_key_options', None)
         op_args = {}
         key_transcoders = {}
@@ -966,9 +966,9 @@ class Collection(CollectionLogic):
                 continue
             if isinstance(v, CouchbaseBaseException):
                 if not return_exceptions:
-                    raise ErrorMapperNew.build_exception(v)
+                    raise ErrorMapper.build_exception(v)
                 else:
-                    output[k] = ErrorMapperNew.build_exception(v)
+                    output[k] = ErrorMapper.build_exception(v)
             else:
                 output[k] = None
 

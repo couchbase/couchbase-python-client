@@ -1,48 +1,34 @@
-import tracemalloc
-from datetime import datetime, timedelta
-from time import time
-import py
+from datetime import timedelta
 
 import pytest
 
-import couchbase.subdocument as SD
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
-from couchbase.diagnostics import ServiceType
-from couchbase.durability import DurabilityLevel, ServerDurability
-from couchbase.exceptions import (AmbiguousTimeoutException,
-                                  CasMismatchException, CouchbaseException,
+from couchbase.exceptions import (CouchbaseException,
                                   DocumentExistsException,
-                                  DocumentLockedException,
                                   DocumentNotFoundException,
-                                  DurabilityImpossibleException,
-                                  InvalidArgumentException,
-                                  PathNotFoundException,
-                                  TemporaryFailException)
+                                  InvalidArgumentException)
 from couchbase.options import (ClusterOptions,
-                                GetMultiOptions,
-                               GetOptions,
-                               InsertOptions,
+                               GetMultiOptions,
                                InsertMultiOptions,
-                               RemoveMultiOptions,
-                               RemoveOptions,
+                               InsertOptions,
                                ReplaceMultiOptions,
-                               ReplaceOptions,
                                TouchMultiOptions,
                                UpsertMultiOptions,
                                UpsertOptions)
-from couchbase.result import (ExistsResult,MultiExistsResult,
-                              GetResult, MultiGetResult, MultiMutationResult,
+from couchbase.result import (ExistsResult,
+                              GetResult,
+                              MultiExistsResult,
+                              MultiGetResult,
+                              MultiMutationResult,
                               MutationResult)
 
-from ._test_utils import (CollectionType,
-                          KVPair,
-                          TestEnvironment)
+from ._test_utils import CollectionType, TestEnvironment
 
 
 class CollectionMultiTests:
 
-    @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT])
+    @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     def couchbase_test_environment(self, couchbase_config, request):
         conn_string = couchbase_config.get_connection_string()
         opts = ClusterOptions(PasswordAuthenticator(
@@ -54,7 +40,8 @@ class CollectionMultiTests:
         if request.param == CollectionType.DEFAULT:
             cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True)
         elif request.param == CollectionType.NAMED:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True, manage_collections=True)
+            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config,
+                                     manage_buckets=True, manage_collections=True)
             cb_env.setup_named_collections()
 
         cb_env.load_data()
@@ -188,7 +175,8 @@ class CollectionMultiTests:
     def test_multi_upsert_key_opts(self, cb_env, kds):
         keys_and_docs = kds
         key1 = list(keys_and_docs.keys())[0]
-        opts = UpsertMultiOptions(expiry=timedelta(seconds=2), per_key_options={key1:UpsertOptions(expiry=timedelta(seconds=0))})
+        opts = UpsertMultiOptions(expiry=timedelta(seconds=2), per_key_options={
+                                  key1: UpsertOptions(expiry=timedelta(seconds=0))})
         res = cb_env.collection.upsert_multi(keys_and_docs, opts)
         assert isinstance(res, MultiMutationResult)
         assert res.all_ok is True
@@ -209,7 +197,7 @@ class CollectionMultiTests:
         keys = ['test-key1', 'test-key2', 'test-key3', 'test-key4']
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.upsert_multi(keys)
-            
+
     def test_multi_insert_simple(self, cb_env, kds):
         keys_and_docs = kds
         res = cb_env.collection.insert_multi(keys_and_docs)
@@ -237,7 +225,8 @@ class CollectionMultiTests:
     def test_multi_insert_key_opts(self, cb_env, kds):
         keys_and_docs = kds
         key1 = list(keys_and_docs.keys())[0]
-        opts = InsertMultiOptions(expiry=timedelta(seconds=2), per_key_options={key1:InsertOptions(expiry=timedelta(seconds=0))})
+        opts = InsertMultiOptions(expiry=timedelta(seconds=2), per_key_options={
+                                  key1: InsertOptions(expiry=timedelta(seconds=0))})
         res = cb_env.collection.insert_multi(keys_and_docs, opts)
         assert isinstance(res, MultiMutationResult)
         assert res.all_ok is True
@@ -284,7 +273,7 @@ class CollectionMultiTests:
     def test_multi_replace_simple(self, cb_env, kds):
         keys_and_docs = kds
         res = cb_env.collection.upsert_multi(keys_and_docs)
-        for _,v in keys_and_docs.items():
+        for _, v in keys_and_docs.items():
             v['what'] = 'An updated doc!'
         res = cb_env.collection.replace_multi(keys_and_docs)
         assert isinstance(res, MultiMutationResult)
@@ -292,7 +281,7 @@ class CollectionMultiTests:
         assert isinstance(res.results, dict)
         assert res.exceptions == {}
         assert all(map(lambda r: isinstance(r, MutationResult), res.results.values())) is True
-        for k,v in keys_and_docs.items():
+        for k, v in keys_and_docs.items():
             r = cb_env.collection.get(k)
             assert r.content_as[dict] == v
 
@@ -300,7 +289,7 @@ class CollectionMultiTests:
         keys_and_docs = kds
         res = cb_env.collection.upsert_multi(keys_and_docs)
         opts = ReplaceMultiOptions(expiry=timedelta(seconds=2))
-        for _,v in keys_and_docs.items():
+        for _, v in keys_and_docs.items():
             v['what'] = 'An updated doc!'
         res = cb_env.collection.replace_multi(keys_and_docs, opts)
         assert isinstance(res, MultiMutationResult)
@@ -317,10 +306,11 @@ class CollectionMultiTests:
     def test_multi_replace_key_opts(self, cb_env, kds):
         keys_and_docs = kds
         res = cb_env.collection.upsert_multi(keys_and_docs)
-        for _,v in keys_and_docs.items():
+        for _, v in keys_and_docs.items():
             v['what'] = 'An updated doc!'
         key1 = list(keys_and_docs.keys())[0]
-        opts = ReplaceMultiOptions(expiry=timedelta(seconds=2), per_key_options={key1:UpsertOptions(expiry=timedelta(seconds=0))})
+        opts = ReplaceMultiOptions(expiry=timedelta(seconds=2), per_key_options={
+                                   key1: UpsertOptions(expiry=timedelta(seconds=0))})
         res = cb_env.collection.replace_multi(keys_and_docs, opts)
         assert isinstance(res, MultiMutationResult)
         assert res.all_ok is True
@@ -439,7 +429,6 @@ class CollectionMultiTests:
         with pytest.raises(DocumentNotFoundException):
             cb_env.collection.touch_multi(keys, timedelta(seconds=2), TouchMultiOptions(return_exceptions=False))
 
-
     def test_multi_lock_and_unlock_simple(self, cb_env, kds):
         keys_and_docs = kds
         res = cb_env.collection.upsert_multi(keys_and_docs)
@@ -450,7 +439,7 @@ class CollectionMultiTests:
         assert isinstance(res.results, dict)
         assert res.exceptions == {}
         assert all(map(lambda r: isinstance(r, GetResult), res.results.values())) is True
-        
+
         res = cb_env.collection.unlock_multi(res)
         assert isinstance(res, dict)
 
@@ -464,7 +453,6 @@ class CollectionMultiTests:
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.lock_multi(keys_and_docs, timedelta(seconds=5))
 
-
     def test_multi_unlock_invalid_input(self, cb_env):
         keys_and_docs = {
             'test-key1': {'what': 'a test doc!', 'id': 'test-key1'},
@@ -477,4 +465,3 @@ class CollectionMultiTests:
 
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.unlock_multi(list(keys_and_docs.keys()))
-        

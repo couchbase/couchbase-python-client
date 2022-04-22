@@ -6,7 +6,7 @@ from functools import wraps
 
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   CouchbaseException,
-                                  ErrorMapperNew,
+                                  ErrorMapper,
                                   ExceptionMap,
                                   HTTPException)
 from couchbase.exceptions import exception as BaseCouchbaseException
@@ -300,7 +300,7 @@ def get_eventing_functions_status(res, return_cls):
 
 
 def handle_mgmt_exception(exc, mgmt_type, error_map):
-    raise ErrorMapperNew.build_exception(exc, mapping=error_map)
+    raise ErrorMapper.build_exception(exc, mapping=error_map)
 
 
 def handle_bucket_mgmt_response(ret, fn_name, return_cls):

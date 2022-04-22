@@ -48,7 +48,7 @@ class ViewIndexManagerLogic:
         op_args = {
             'bucket_name': self._bucket_name,
             'document_name': design_doc_name,
-            'name_space': namespace.to_str()
+            'namespace': namespace.to_str()
         }
 
         if final_args.get("client_context_id", None) is not None:
@@ -84,7 +84,7 @@ class ViewIndexManagerLogic:
         final_args = forward_args(kwargs, *options)
         op_args = {
             'bucket_name': self._bucket_name,
-            'name_space': namespace.to_str()
+            'namespace': namespace.to_str()
         }
 
         if final_args.get("client_context_id", None) is not None:
@@ -165,7 +165,7 @@ class ViewIndexManagerLogic:
         op_args = {
             'bucket_name': self._bucket_name,
             'document_name': design_doc_name,
-            'name_space': namespace.to_str()
+            'namespace': namespace.to_str()
         }
 
         if final_args.get("client_context_id", None) is not None:
@@ -281,7 +281,7 @@ class DesignDocument(object):
             'name': self._name
         }
         if namespace is not None:
-            output['name_space'] = namespace.to_str()
+            output['namespace'] = namespace.to_str()
         output['views'] = dict({key: value.as_dict() for key, value in self.views.items()})
 
         if self.rev:
@@ -306,7 +306,7 @@ class DesignDocument(object):
                   ) -> DesignDocument:
         name = raw_json.get('name')
         rev = raw_json.get('rev', None)
-        ns = DesignDocumentNamespace.from_str(raw_json.get('name_space', None))
+        ns = DesignDocumentNamespace.from_str(raw_json.get('namespace', None))
         views = raw_json.get('views', dict())
         views = dict({key: View(**value) for key, value in views.items()})
         return cls(name, views, namespace=ns, rev=rev)

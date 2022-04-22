@@ -6,30 +6,10 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   CouchbaseException,
                                   DocumentExistsException,
                                   DocumentNotFoundException,
-                                  ErrorMapperNew,
+                                  ErrorMapper,
                                   ExceptionMap,
                                   MissingConnectionException)
 from couchbase.logic import decode_value
-
-# def build_exception(exc, exc_info=None, error_map=None, error_msg=None):
-#     excptn = None
-#     if exc is None and exc_info:
-#         exc_cls = PYCBC_ERROR_MAP.get(exc_info.get('error_code', None), CouchbaseException)
-#         new_exc_info = {k: v for k, v in exc_info if k in ['cinfo', 'inner_cause']}
-#         excptn = exc_cls(message=exc_info.get('message', None), exc_info=new_exc_info)
-#     else:
-#         err_ctx = exc.error_context()
-#         if err_ctx is not None:
-#             excptn = ErrorMapper.parse_error_context(exc, mapping=error_map, excptn_msg=error_msg)
-#         else:
-#             exc_cls = PYCBC_ERROR_MAP.get(exc.err(), CouchbaseException)
-#             excptn = exc_cls(message=exc.strerror())
-
-#     if excptn is None:
-#         exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-#         excptn = exc_cls(message='Unknown error.')
-
-#     return excptn
 
 
 def call_async_fn(ft, self, fn, *args, **kwargs):
@@ -63,7 +43,7 @@ class AsyncWrapper:
                     self.loop.call_soon_threadsafe(ft.set_result, True)
 
                 def on_err(exc):
-                    excptn = ErrorMapperNew.build_exception(exc)
+                    excptn = ErrorMapper.build_exception(exc)
                     self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok
@@ -88,7 +68,7 @@ class AsyncWrapper:
                     self.loop.call_soon_threadsafe(ft.set_result, True)
 
                 def on_err(exc):
-                    excptn = ErrorMapperNew.build_exception(exc)
+                    excptn = ErrorMapper.build_exception(exc)
                     self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok
@@ -131,7 +111,7 @@ class AsyncWrapper:
                     self.loop.call_soon_threadsafe(ft.set_result, True)
 
                 def on_err(exc):
-                    excptn = ErrorMapperNew.build_exception(exc)
+                    excptn = ErrorMapper.build_exception(exc)
                     self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok
@@ -194,7 +174,7 @@ class AsyncWrapper:
                     self.loop.call_soon_threadsafe(ft.set_result, retval)
 
                 def on_err(exc):
-                    excptn = ErrorMapperNew.build_exception(exc)
+                    excptn = ErrorMapper.build_exception(exc)
                     self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok
@@ -241,7 +221,7 @@ class AsyncWrapper:
                     self.loop.call_soon_threadsafe(ft.set_result, retval)
 
                 def on_err(exc):
-                    excptn = ErrorMapperNew.build_exception(exc)
+                    excptn = ErrorMapper.build_exception(exc)
                     self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok
@@ -292,7 +272,7 @@ class AsyncWrapper:
                     self.loop.call_soon_threadsafe(ft.set_result, retval)
 
                 def on_err(exc):
-                    excptn = ErrorMapperNew.build_exception(exc)
+                    excptn = ErrorMapper.build_exception(exc)
                     self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok

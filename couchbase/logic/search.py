@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import queue
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
@@ -16,11 +15,9 @@ from typing import (TYPE_CHECKING,
                     Tuple,
                     Union)
 
-from couchbase.exceptions import (PYCBC_ERROR_MAP,
-                                  CouchbaseException,
-                                  ErrorMapper,
-                                  ExceptionMap,
-                                  InvalidArgumentException)
+from couchbase._utils import timedelta_as_microseconds
+from couchbase.exceptions import ErrorMapper, InvalidArgumentException
+from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.options import (SearchOptions,
                                UnsignedInt32,
                                UnsignedInt64)
@@ -884,7 +881,7 @@ class SearchQueryBuilder:
     # empty transform will skip updating the attribute when creating an
     # SearchQueryBuilder object
     _VALID_OPTS = {
-        "timeout": {"timeout": timedelta.total_seconds},
+        "timeout": {"timeout": timedelta_as_microseconds},
         "limit": {"limit": lambda x: x},
         "skip": {"skip": lambda x: x},
         "explain": {"explain": lambda x: x},
@@ -947,14 +944,17 @@ class SearchQueryBuilder:
             params['facets'] = encoded_facets
 
         if self.sort:
+            sort_specs = []
             if all(map(lambda s: isinstance(s, str), self.sort)):
-                params['sort_specs'] = json.dumps(self.sort)
+                for s in self.sort:
+                    encoded = json.dumps(s)
+                    sort_specs.append(encoded)
             else:
-                sort_specs = []
                 for s in self.sort:
                     encoded = json.dumps(s.as_encodable())
                     sort_specs.append(encoded)
-                params['sort_specs'] = sort_specs
+
+            params['sort_specs'] = sort_specs
 
         return params
 
@@ -971,15 +971,15 @@ class SearchQueryBuilder:
         return float(value)
 
     @timeout.setter
-    def timeout(self, value  # type: Union[timedelta,float]
+    def timeout(self, value  # type: Union[timedelta,float,int]
                 ) -> None:
         if not value:
             self._params.pop('timeout', 0)
         else:
-            if not isinstance(value, (timedelta, float)):
-                raise InvalidArgumentException(message="Excepted timeout to be a timedelta | float")
+            if not isinstance(value, (timedelta, float, int)):
+                raise InvalidArgumentException(message="Excepted timeout to be of type Union[timedelta,float,int].")
             if isinstance(value, timedelta):
-                self.set_option('timeout', value.total_seconds())
+                self.set_option('timeout', int(value.total_seconds() * 1e6))
             else:
                 self.set_option('timeout', value)
 
@@ -1190,28 +1190,6 @@ class SearchQueryBuilder:
         else:
             InvalidArgumentException(message='sort option must be either List[str] | List[Sort] | List[Sort | str]')
 
-    # @property
-    # def facets(self) -> Optional[Dict[str, Facet]]:
-    #     return self._facets
-
-    # @facets.setter
-    # def facets(self, value # type: Dict[str, Facet]
-    #     ) -> None:
-    #     if not isinstance(value, dict):
-    #         raise InvalidArgumentException(message="facets option must be of type Dict[str, Facet].")
-    #     for k, v in value.items():
-    #         if not isinstance(k, str):
-    #             raise InvalidArgumentException(message="key for facets value must be str.")
-    #         if not issubclass(type(v), Facet):
-    #             raise InvalidArgumentException(message="facet values must be a Facet.")
-    #         if hasattr(value, 'date_ranges') and not getattr(value, 'date_ranges'):
-    #             raise InvalidArgumentException(message=(f'{v.__class__.__name__} object must have at '
-    #                                         'least one range. Use add_range()'))
-    #         if hasattr(value, 'numeric_ranges') and not getattr(value, 'numeric_ranges'):
-    #             raise InvalidArgumentException(message=(f'{v.__class__.__name__} object must have at '
-    #                                         'least one range. Use add_range()'))
-    #     self._facets = value
-
     @property
     def raw(self) -> Optional[Dict[str, Any]]:
         return self._params.get('raw', None)
@@ -1278,10 +1256,8 @@ class SearchRequestLogic:
         self._encoded_query = encoded_query
         self.row_factory = row_factory
         self._rows = asyncio.Queue()
-        self._raw_rows = queue.Queue()
-        self._query_request_ftr = None
-        self._ROWS_STOP = object()
         self._streaming_result = None
+        self._default_serializer = kwargs.pop('default_serializer', DefaultJsonSerializer())
         self._serializer = None
         self._started_streaming = False
         self._done_streaming = False
@@ -1300,7 +1276,7 @@ class SearchRequestLogic:
 
         serializer = self.encoded_query.get('serializer', None)
         if not serializer:
-            serializer = DefaultJsonSerializer()
+            serializer = self._default_serializer
 
         self._serializer = serializer
         return self._serializer
@@ -1352,87 +1328,35 @@ class SearchRequestLogic:
 
             self._result_facets[new_facet.name] = new_facet
 
-    def _handle_query_result_exc(self, query_response):
-        base_exc = query_response.raw_result.get('exc', None)
-        exc_info = query_response.raw_result.get('exc_info', None)
-
-        excptn = None
-        if base_exc is None and exc_info:
-            exc_cls = PYCBC_ERROR_MAP.get(exc_info.get('error_code', None), CouchbaseException)
-            new_exc_info = {k: v for k, v in exc_info if k in ['cinfo', 'inner_cause']}
-            excptn = exc_cls(message=exc_info.get('message', None), exc_info=new_exc_info)
-        else:
-            err_ctx = base_exc.error_context()
-            if err_ctx is not None:
-                excptn = ErrorMapper.parse_error_context(base_exc)
-            else:
-                exc_cls = PYCBC_ERROR_MAP.get(base_exc.err(), CouchbaseException)
-                excptn = exc_cls(message=base_exc.strerror())
-
-        if excptn is None:
-            exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-            excptn = exc_cls(message='Unknown error.')
-
-        raise excptn
-
     def _set_metadata(self, search_response):
-        has_exception = search_response.raw_result.get('has_exception', None)
-        if has_exception:
-            self._handle_query_result_exc(search_response)
+        if isinstance(search_response, CouchbaseBaseException):
+            raise ErrorMapper.build_exception(search_response)
+
         result = search_response.raw_result.get('value', None)
         if result:
             self._metadata = SearchMetaData(result)
             self._set_facets(result.get('facets', None))
 
-    # async def handle_query_row(self, row):
-    #     print(f'row: {row}')
-    #     await self._rows.put(row)
-    #     return row
-
-    def _submit_query(self):
+    def _submit_query(self, **kwargs):
         if self.done_streaming:
             return
 
         self._started_streaming = True
-        kwargs = {
+        search_kwargs = {
             'conn': self._connection,
             'op_args': self.encoded_query
         }
-        self._streaming_result = search_query(**kwargs)
 
-    # def _submit_query(self):
-    #     # print(f'submitting query from thread: {current_thread()}')
-    #     if self._query_request_ftr is not None:
-    #         return
+        # this is for txcouchbase...
+        callback = kwargs.pop('callback', None)
+        if callback:
+            search_kwargs['callback'] = callback
 
-    #     serializer = self.encoded_query.pop('serializer', None)
-    #     if serializer is None:
-    #         serializer = DefaultJsonSerializer()
+        errback = kwargs.pop('errback', None)
+        if errback:
+            search_kwargs['errback'] = errback
 
-    #     kwargs = {
-    #         'conn': self._connection,
-    #         'op_args': self.encoded_query,
-    #         'callback': self._on_query_complete,
-    #         'errback': self._on_query_exception,
-    #         'serializer': serializer,
-    #     }
-    #     print(f'kwargs: {kwargs}')
-    #     self._query_request_ftr = self._loop.create_future()
-    #     self._streaming_result = search_query(**kwargs)
-
-    def _on_query_complete(self, result):
-        print(f'_on_query_callback: {result}')
-        self._loop.call_soon_threadsafe(self._query_request_ftr.set_result, result)
-
-    def _on_query_exception(self, exc):
-        err_ctx = exc.error_context()
-        print(f"error context: {err_ctx}")
-        if err_ctx is not None:
-            excptn = ErrorMapper.parse_error_context(exc)
-        else:
-            exc_cls = PYCBC_ERROR_MAP.get(exc.err(), CouchbaseException)
-            excptn = exc_cls(exc)
-        self._loop.call_soon_threadsafe(self._query_request_ftr.set_exception, excptn)
+        self._streaming_result = search_query(**search_kwargs)
 
     def __iter__(self):
         raise NotImplementedError(

@@ -1,6 +1,7 @@
 from typing import (TYPE_CHECKING,
                     Any,
-                    Awaitable)
+                    Awaitable,
+                    Optional)
 
 from acouchbase.analytics import AnalyticsQuery, AsyncAnalyticsRequest
 from acouchbase.collection import Collection
@@ -12,6 +13,7 @@ from couchbase.options import (AnalyticsOptions,
 from couchbase.result import (AnalyticsResult,
                               QueryResult,
                               SearchResult)
+from couchbase.transcoder import Transcoder
 
 if TYPE_CHECKING:
     from acouchbase.search import SearchQuery
@@ -38,11 +40,8 @@ class AsyncScope:
         return self._bucket.loop
 
     @property
-    def transcoder(self):
-        """
-        **INTERNAL**
-        """
-        return self._bucket.transcoder
+    def default_transcoder(self) -> Optional[Transcoder]:
+        return self._bucket.default_transcoder
 
     @property
     def name(self):
@@ -109,7 +108,7 @@ class AsyncScope:
 
         # set the query context as this bucket and scope if not provided
         if not ('query_context' in opt or 'query_context' in kwargs):
-            kwargs['query_context'] = '`{}`.`{}`'.format(self.bucket_name, self.name)
+            kwargs['query_context'] = 'default:`{}`.`{}`'.format(self.bucket_name, self.name)
 
         query = AnalyticsQuery.create_query_object(
             statement, *options, **kwargs)
