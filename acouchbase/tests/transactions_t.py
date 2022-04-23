@@ -190,7 +190,7 @@ class AsyncTransactionsTests:
 
     @pytest.mark.usefixtures("check_txn_queries_supported")
     @pytest.mark.asyncio
-    async def test_query(self, cb_env):
+    async def test_bad_query(self, cb_env):
 
         async def txn_logic(ctx):
             try:
