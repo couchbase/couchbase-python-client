@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Callable
 
 from couchbase.exceptions import CouchbaseException, TransactionsErrorContext
 from couchbase.transactions.logic import AttemptContextLogic, TransactionsLogic
@@ -11,6 +11,8 @@ from .transaction_result import TransactionResult
 
 if TYPE_CHECKING:
     from couchbase._utils import PyCapsuleType
+    from couchbase.transactions import PerTransactionConfig
+    from couchbase.serializer import Serializer
 
 
 class BlockingWrapper:
@@ -26,7 +28,10 @@ class BlockingWrapper:
                         raise ret
                     if return_cls is None:
                         return None
-                    retval = return_cls(ret)
+                    if return_cls is TransactionGetResult:
+                        retval = return_cls(ret, self._serializer)
+                    else:
+                        retval = return_cls(ret)
                     print(f'{fn.__name__} returning {retval}')
                     return retval
                 except CouchbaseException as cb_exc:
@@ -40,11 +45,19 @@ class BlockingWrapper:
 
 class Transactions(TransactionsLogic):
 
-    def run(self, txn_logic, per_txn_config=None):
+    def run(self,
+            txn_logic,  # type: Callable[[AttemptContext], None]
+            per_txn_config=None,  # type: Optional[PerTransactionConfig]
+            **kwargs
+            ):
 
         def wrapped_txn_logic(c):
             try:
-                ctx = AttemptContext(c)
+                if per_txn_config and per_txn_config.serializer:
+                    serializer_to_use = per_txn_config.serializer
+                else:
+                    serializer_to_use = self._serializer
+                ctx = AttemptContext(c, serializer_to_use)
                 print(f'wrapped_txn_logic got {ctx}, calling transaction logic')
                 return txn_logic(ctx)
             except Exception as e:
@@ -57,9 +70,10 @@ class Transactions(TransactionsLogic):
 class AttemptContext(AttemptContextLogic):
 
     def __init__(self,
-                 ctx  # type: PyCapsuleType
+                 ctx,  # type: PyCapsuleType
+                 serializer  # type: Serializer
                  ):
-        super().__init__(ctx, loop=None)
+        super().__init__(ctx, None, serializer)
 
     @BlockingWrapper.block(TransactionGetResult)
     def get(self, coll, key):

@@ -1,10 +1,10 @@
 import asyncio
 from functools import wraps
 from typing import (TYPE_CHECKING,
-                    Awaitable,
+                    Callable,
+                    Optional,
                     Dict)
 
-from couchbase.exceptions import CouchbaseException, TransactionsErrorContext
 from couchbase.transactions import (TransactionGetResult,
                                     TransactionQueryOptions,
                                     TransactionQueryResults,
@@ -16,7 +16,9 @@ if TYPE_CHECKING:
     from acouchbase.cluster import AsyncCluster
     from acouchbase.collection import AsyncCollection
     from couchbase._utils import JSONType, PyCapsuleType
-    from couchbase.transactions import TransactionConfig
+    from couchbase.options import TransactionConfig
+    from couchbase.transactions import PerTransactionConfig
+    from couchbase.serializer import Serializer
 
 
 class AsyncWrapper:
@@ -30,7 +32,10 @@ class AsyncWrapper:
                 def on_ok(res):
                     print(f'{fn.__name__} completed, with {res}')
                     try:
-                        result = return_cls(res) if return_cls is not None else None
+                        if return_cls is TransactionGetResult:
+                            result = return_cls(res, self._serializer)
+                        else:
+                            result = return_cls(res) if return_cls is not None else None
                         self._loop.call_soon_threadsafe(ftr.set_result, result)
                     except Exception as e:
                         print(f'on_ok raised {e}, {e.__cause__}')
@@ -70,10 +75,17 @@ class Transactions(TransactionsLogic):
         super().__init__(cluster, config)
 
     @AsyncWrapper.inject_callbacks(TransactionResult)
-    def run(self, txn_logic, per_txn_config=None, **kwargs) -> Awaitable[TransactionResult]:
+    def run(self,
+            txn_logic,  # type:  Callable[[AttemptContextLogic], None]
+            per_txn_config=None,  # type: Optional[PerTransactionConfig]
+            **kwargs) -> None:
         def wrapped_logic(c):
             try:
-                ctx = AttemptContext(c, self._loop)
+                if per_txn_config and per_txn_config.serializer:
+                    serializer_to_use = per_txn_config.serializer
+                else:
+                    serializer_to_use = self._serializer
+                ctx = AttemptContext(c, self._loop, serializer_to_use)
                 asyncio.run_coroutine_threadsafe(txn_logic(ctx), self._loop).result()
                 print('wrapped logic completed')
             except Exception as e:
@@ -91,11 +103,10 @@ class Transactions(TransactionsLogic):
 class AttemptContext(AttemptContextLogic):
     def __init__(self,
                  ctx,    # type: PyCapsuleType
-                 loop    # type: AbstractEventLoop
+                 loop,    # type: AbstractEventLoop
+                 serializer  # type: Serializer
                  ):
-        print(f'creating new attempt context with context {ctx} and loop {loop}')
-        self._ctx = ctx
-        self._loop = loop
+        super().__init__(ctx, loop, serializer)
 
     @AsyncWrapper.inject_callbacks(TransactionGetResult)
     def get(self,

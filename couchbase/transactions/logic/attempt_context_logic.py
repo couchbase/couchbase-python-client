@@ -1,12 +1,12 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from couchbase.pycbc_core import (transaction_op,
                                   transaction_operations,
                                   transaction_query_op)
-from couchbase.transcoder import JSONTranscoder
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
+    from couchbase.serializer import Serializer
 
     from couchbase._utils import PyCapsuleType
 
@@ -14,11 +14,13 @@ if TYPE_CHECKING:
 class AttemptContextLogic:
     def __init__(self,
                  ctx,    # type: PyCapsuleType
-                 loop    # type: AbstractEventLoop
+                 loop,    # type: Optional[AbstractEventLoop]
+                 serializer  # type: Serializer
                  ):
-        print(f'creating new attempt context with context {ctx} and loop {loop}')
+        print(f'creating new attempt context with context {ctx} and loop {loop}, and serializer {serializer}')
         self._ctx = ctx
         self._loop = loop
+        self._serializer = serializer
 
     def get(self, coll, key, **kwargs):
         kwargs.update(coll._get_connection_args())
@@ -35,13 +37,13 @@ class AttemptContextLogic:
         kwargs["key"] = key
         kwargs["ctx"] = self._ctx
         kwargs["op"] = transaction_operations.INSERT.value
-        kwargs["value"] = JSONTranscoder().encode_value(value)[0]
+        kwargs["value"] = self._serializer.serialize(value)
         print(f'insert calling transaction op with {kwargs}')
         return transaction_op(**kwargs)
 
     def replace(self, txn_get_result, value, **kwargs):
         kwargs.update({"ctx": self._ctx, "op": transaction_operations.REPLACE.value,
-                       "value": JSONTranscoder().encode_value(value)[0],
+                       "value": self._serializer.serialize(value),
                        "txn_get_result": txn_get_result._res})
         print(f'replace calling transaction op with {kwargs}')
         return transaction_op(**kwargs)

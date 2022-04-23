@@ -34,6 +34,7 @@ from couchbase.transcoder import JSONTranscoder
 if TYPE_CHECKING:
     from couchbase.options import DiagnosticsOptions, PingOptions
     from couchbase.transcoder import Transcoder
+    from couchbase.serializer import Serializer
 
 
 class ClusterLogic:
@@ -137,6 +138,10 @@ class ClusterLogic:
     @property
     def default_serializer(self) -> Optional[Serializer]:
         return self._default_serializer
+
+    @property
+    def serializer(self) -> Serializer:
+        return self._serializer
 
     @property
     def connected(self) -> bool:

@@ -1,8 +1,7 @@
 from typing import TYPE_CHECKING
 
-from couchbase.constants import FMT_JSON
 from couchbase.result import ContentProxy
-from couchbase.transcoder import JSONTranscoder
+from couchbase.serializer import Serializer
 
 if TYPE_CHECKING:
     from couchbase.pycbc_core import transaction_get_result
@@ -10,9 +9,11 @@ if TYPE_CHECKING:
 
 class TransactionGetResult:
     def __init__(self,
-                 res    # type: transaction_get_result
+                 res,    # type: transaction_get_result
+                 serializer  # type: Serializer
                  ):
         self._res = res
+        self._serializer = serializer
         self._decoded_value = None
 
     @property
@@ -27,7 +28,7 @@ class TransactionGetResult:
     def content_as(self):
         if not self._decoded_value:
             print(f'res.get("value") returns {self._res.get("value")}')
-            self._decoded_value = JSONTranscoder().decode_value(self._res.get("value"), FMT_JSON)
+            self._decoded_value = self._serializer.deserialize(self._res.get("value"))
         return ContentProxy(self._decoded_value)
 
     def __str__(self):

@@ -13,10 +13,11 @@ if TYPE_CHECKING:
     from couchbase.collection import Collection
     from couchbase.durability import ServerDurability
     from couchbase.logic.n1ql import QueryScanConsistency
+    from couchbase.serializer import Serializer
 
 
 class PerTransactionConfig:
-    _TXN_ALLOWED_KEYS = {"durability_level", "kv_timeout", "expiration_time", "scan_consistency"}
+    _TXN_ALLOWED_KEYS = {"durability_level", "kv_timeout", "expiration_time", "scan_consistency", "serializer"}
 
     @overload
     def __init__(self,
@@ -27,7 +28,8 @@ class PerTransactionConfig:
                  cleanup_lost_attempts=None,  # type: Optional[bool]
                  cleanup_client_attempts=None,  # type: Optional[bool]
                  custom_metadata_collection=None,  # type: Optional[Collection]
-                 scan_consistency=None  # type: Optional[QueryScanConsistency]
+                 scan_consistency=None,  # type: Optional[QueryScanConsistency]
+                 serializer=None  # type: Optional[Serializer]
                  ):
         pass
 
@@ -42,7 +44,7 @@ class PerTransactionConfig:
         for k in ["kv_timeout", "expiration_time"]:
             if kwargs.get(k, None):
                 kwargs[k] = int(kwargs[k].total_seconds() * 1000000)
-
+        self._serializer = kwargs.pop("serializer", None)
         # don't pass None
         for key in [k for k, v in kwargs.items() if v is None]:
             del(kwargs[key])
@@ -53,3 +55,7 @@ class PerTransactionConfig:
 
     def __str__(self):
         return f'PerTransactionConfig(base_:{self._base}'
+
+    @property
+    def serializer(self):
+        return self._serializer
