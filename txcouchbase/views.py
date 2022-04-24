@@ -6,7 +6,7 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   ErrorMapper,
                                   ExceptionMap)
 from couchbase.exceptions import exception as CouchbaseBaseException
-from couchbase.logic.views import ViewRequestLogic
+from couchbase.logic.views import ViewRequestLogic, ViewRow
 
 
 class ViewRequest(ViewRequestLogic):
@@ -73,7 +73,13 @@ class ViewRequest(ViewRequestLogic):
         if row is None:
             raise StopIteration
 
-        return self.serializer.deserialize(row)
+        # TODO:  until streaming, a dict is returned, no deserializing...
+        # deserialized_row = self.serializer.deserialize(row)
+        deserialized_row = row
+        if issubclass(self.row_factory, ViewRow):
+            return self.row_factory(**deserialized_row)
+        else:
+            return deserialized_row
 
     def __next__(self):
         try:

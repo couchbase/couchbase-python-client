@@ -511,6 +511,12 @@ class AlreadyQueriedException(CouchbaseException):
 
     def __init__(self, message='Previously iterated over results.'):
         super().__init__(message=message)
+
+
+class KeyspaceNotFoundException(CouchbaseException):
+    """Keyspace not found (collection or bucket does not exist)"""
+
+
 # Search Exceptions
 
 
@@ -818,6 +824,7 @@ class ExceptionMap(Enum):
     BucketNotFoundException = 10
     AmbiguousTimeoutException = 13
     UnAmbiguousTimeoutException = 14
+    ScopeNotFoundException = 16
     QueryIndexNotFoundException = 17
     QueryIndexAlreadyExistsException = 18
     RateLimitedException = 21
@@ -846,6 +853,10 @@ PYCBC_ERROR_MAP = {e.value: getattr(sys.modules[__name__], e.name) for e in Exce
 
 KV_ERROR_CONTEXT_MAPPING = {'kv_locked': DocumentLockedException,
                             'kv_temporary_failure': TemporaryFailException}
+
+QUERY_ERROR_MAPPING = {r'.*Keyspace not found.*': KeyspaceNotFoundException,
+                       r'.*Scope not found.*': ScopeNotFoundException,
+                       r'.*No index available.*': QueryIndexNotFoundException}
 
 
 class ErrorMapper:
@@ -916,7 +927,7 @@ class ErrorMapper:
             compiled_map = {{str: re.compile}.get(
                 type(k), lambda x: x)(k): v for k, v in mapping.items()}
 
-        exc_msg = err_info.get('error_message', None)
+        exc_msg = err_info.get('error_message', None) if err_info else None
         if not is_null_or_empty(exc_msg):
             exc_class = ErrorMapper._process_mapping(compiled_map, exc_msg)
             if exc_class is not None:
@@ -979,6 +990,11 @@ class ErrorMapper:
                 if mapping is None:
                     mapping = KV_ERROR_CONTEXT_MAPPING
                 exc_class = ErrorMapper._parse_kv_context(err_ctx, mapping)
+
+            if isinstance(err_ctx, QueryErrorContext):
+                if mapping is None:
+                    mapping = QUERY_ERROR_MAPPING
+                exc_class = ErrorMapper._parse_http_context(err_ctx, mapping)
 
         if exc_class is None:
             exc_class = PYCBC_ERROR_MAP.get(base_exc.err(), CouchbaseException)

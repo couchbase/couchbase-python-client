@@ -6,15 +6,15 @@ from couchbase.exceptions import InvalidArgumentException, SearchIndexNotFoundEx
 from couchbase.management.search import SearchIndex
 from couchbase.options import ClusterOptions
 
-from ._test_utils import CollectionType, TestEnvironment
+from ._test_utils import TestEnvironment
 
 
 class SearchIndexManagementTests:
 
     IDX_NAME = 'test-fts-index'
 
-    @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT])
-    def couchbase_test_environment(self, couchbase_config, request):
+    @pytest.fixture(scope="class", name="cb_env")
+    def couchbase_test_environment(self, couchbase_config):
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
@@ -24,19 +24,10 @@ class SearchIndexManagementTests:
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
 
         coll = bucket.default_collection()
-        if request.param == CollectionType.DEFAULT:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config,
-                                     manage_buckets=True, manage_search_indexes=True)
-        elif request.param == CollectionType.NAMED:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True,
-                                     manage_collections=True, manage_search_indexes=True)
-            cb_env.setup_named_collections()
+        cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config,
+                                 manage_buckets=True, manage_search_indexes=True)
 
-        # await cb_env.load_data()
         yield cb_env
-        # await cb_env.purge_data()
-        if request.param == CollectionType.NAMED:
-            cb_env.teardown_named_collections()
         cluster.close()
 
     @pytest.fixture(scope="class")

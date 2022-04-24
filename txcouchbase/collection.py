@@ -75,7 +75,6 @@ class Collection(CollectionLogic):
         key,  # type: str
         **kwargs,  # type: Dict[str, Any]
     ) -> Deferred[GetResult]:
-        print(f'_get kwargs: {kwargs}')
         super().get(key, **kwargs)
 
     @TxWrapper.inject_callbacks(ExistsResult)
@@ -201,7 +200,6 @@ class Collection(CollectionLogic):
         if not transcoder:
             transcoder = self.default_transcoder
         final_args['transcoder'] = transcoder
-        print(f'lookup in kwargs: {final_args}')
         return self._lookup_in_internal(key, spec, **final_args)
 
     @TxWrapper.inject_callbacks_and_decode(LookupInResult)

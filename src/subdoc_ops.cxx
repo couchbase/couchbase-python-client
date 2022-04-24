@@ -260,7 +260,6 @@ create_result_from_subdoc_op_response(const char* key,
             // @TODO:  how to handle this situation?
         }
         Py_DECREF(pyObj_args);
-        Py_XDECREF(pyObj_exc);
         Py_XDECREF(pyObj_kwargs);
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);

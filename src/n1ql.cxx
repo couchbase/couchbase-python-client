@@ -293,8 +293,12 @@ create_query_result(couchbase::operations::query_response resp,
         PyErr_Clear();
         rows->put(pyObj_exc);
     } else {
-        auto res = create_result_from_query_response(resp, include_metrics);
+        for (auto const& row : resp.rows) {
+            PyObject* pyObj_row = PyBytes_FromStringAndSize(row.c_str(), row.length());
+            rows->put(pyObj_row);
+        }
 
+        auto res = create_result_from_query_response(resp, include_metrics);
         if (res == nullptr || PyErr_Occurred() != nullptr) {
             set_exception = true;
         } else {
@@ -575,15 +579,17 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     Py_XINCREF(pyObj_errback);
     Py_XINCREF(pyObj_callback);
 
-    streamed_result* streamed_res = create_streamed_result_obj();
+    // timeout is always set either to default, or timeout provided in options
+    streamed_result* streamed_res = create_streamed_result_obj(req.timeout.value());
 
-    req.row_callback = [rows = streamed_res->rows](std::string&& row) {
-        PyGILState_STATE state = PyGILState_Ensure();
-        PyObject* pyObj_row = PyBytes_FromStringAndSize(row.c_str(), row.length());
-        rows->put(pyObj_row);
-        PyGILState_Release(state);
-        return couchbase::utils::json::stream_control::next_row;
-    };
+    // TODO:  let the couchbase++ streaming stabilize a bit more...
+    // req.row_callback = [rows = streamed_res->rows](std::string&& row) {
+    //     PyGILState_STATE state = PyGILState_Ensure();
+    //     PyObject* pyObj_row = PyBytes_FromStringAndSize(row.c_str(), row.length());
+    //     rows->put(pyObj_row);
+    //     PyGILState_Release(state);
+    //     return couchbase::utils::json::stream_control::next_row;
+    // };
 
     {
         Py_BEGIN_ALLOW_THREADS conn->cluster_->execute(

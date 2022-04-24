@@ -24,11 +24,16 @@ class rows_queue
         _cond.notify_one();
     }
 
-    T get()
+    T get(std::chrono::milliseconds timeout_ms)
     {
         std::unique_lock<std::mutex> lock(_mut);
+
         while (_rows.empty()) {
-            _cond.wait(lock);
+            auto now = std::chrono::system_clock::now();
+            if (_cond.wait_until(lock, now + timeout_ms) == std::cv_status::timeout) {
+                // this will cause iternext to return nullptr, which stops iteration
+                return nullptr;
+            }
         }
         auto row = _rows.front();
         _rows.pop();
@@ -70,10 +75,11 @@ create_mutation_token_obj(struct couchbase::mutation_token mt);
 struct streamed_result {
     PyObject_HEAD std::error_code ec;
     std::shared_ptr<rows_queue<PyObject*>> rows;
+    std::chrono::milliseconds timeout_ms{};
 };
 
 int
 pycbc_streamed_result_type_init(PyObject** ptr);
 
 streamed_result*
-create_streamed_result_obj();
+create_streamed_result_obj(std::chrono::milliseconds timeout_ms);

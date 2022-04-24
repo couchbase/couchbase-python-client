@@ -78,6 +78,7 @@ result_dealloc([[maybe_unused]] result* self)
             }
         }
         Py_XDECREF(pyObj_token_key);
+        Py_DECREF(self->dict);
     }
     // LOG_INFO("{}: result_dealloc completed", "PYCBC");
 }
@@ -256,14 +257,14 @@ streamed_result_iternext(PyObject* self)
     streamed_result* s_res = reinterpret_cast<streamed_result*>(self);
     PyObject* row;
     {
-        Py_BEGIN_ALLOW_THREADS row = s_res->rows->get();
+        Py_BEGIN_ALLOW_THREADS row = s_res->rows->get(s_res->timeout_ms);
         Py_END_ALLOW_THREADS
     }
 
     if (row != nullptr) {
         return row;
     } else {
-        PyErr_SetNone(PyExc_StopIteration);
+        PyErr_SetString(PyExc_StopIteration, "Timeout occurred waiting for next item in queue.");
         return nullptr;
     }
 }
@@ -292,9 +293,10 @@ pycbc_streamed_result_type_init(PyObject** ptr)
 }
 
 streamed_result*
-create_streamed_result_obj()
+create_streamed_result_obj(std::chrono::milliseconds timeout_ms)
 {
     PyObject* pyObj_res = PyObject_CallObject(reinterpret_cast<PyObject*>(&streamed_result_type), nullptr);
     streamed_result* streamed_res = reinterpret_cast<streamed_result*>(pyObj_res);
+    streamed_res->timeout_ms = timeout_ms;
     return streamed_res;
 }

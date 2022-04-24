@@ -37,11 +37,13 @@ class MutationTokensEnabledTests:
             cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True)
         elif request.param == CollectionType.NAMED:
             cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True, manage_collections=True)
-            await cb_env.setup_named_collections()
+            await cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
         yield cb_env
         if request.param == CollectionType.NAMED:
-            await cb_env.teardown_named_collections()
+            await cb_env.try_n_times_till_exception(5, 3,
+                                                    cb_env.teardown_named_collections,
+                                                    raise_if_no_exception=False)
         await c.close()
 
     @pytest_asyncio.fixture(name="new_kvp")

@@ -16,13 +16,13 @@ from couchbase.management.options import (CreatePrimaryQueryIndexOptions,
                                           WatchQueryIndexOptions)
 from couchbase.options import ClusterOptions
 
-from ._test_utils import CollectionType, TestEnvironment
+from ._test_utils import TestEnvironment
 
 
 class QueryIndexManagementTests:
 
-    @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT])
-    def couchbase_test_environment(self, couchbase_config, request):
+    @pytest.fixture(scope="class", name="cb_env")
+    def couchbase_test_environment(self, couchbase_config):
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
@@ -32,25 +32,14 @@ class QueryIndexManagementTests:
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
 
         coll = bucket.default_collection()
-        if request.param == CollectionType.DEFAULT:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config,
-                                     manage_buckets=True, manage_query_indexes=True)
-        elif request.param == CollectionType.NAMED:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True,
-                                     manage_collections=True, manage_query_indexes=True)
-            cb_env.setup_named_collections()
+        cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config,
+                                 manage_buckets=True, manage_query_indexes=True)
 
         yield cb_env
-        if request.param == CollectionType.NAMED:
-            cb_env.teardown_named_collections()
+        cb_env.try_n_times(5, 3, self._clear_all_indexes, cb_env, ignore_fail=True)
         cluster.close()
 
-    @pytest.fixture(scope="class")
-    def check_query_index_mgmt_supported(self, cb_env):
-        cb_env.check_if_feature_supported('query_index_mgmt')
-
-    @pytest.fixture()
-    def clear_all_indexes(self, cb_env):
+    def _clear_all_indexes(self, cb_env, ignore_fail=False):
         # Drop all indexes!
         bucket_name = cb_env.bucket.name
         ixm = cb_env.ixm
@@ -66,8 +55,20 @@ class QueryIndexManagementTests:
             if 0 == len(indexes):
                 return
             cb_env.sleep(2)
+
+        if ignore_fail is True:
+            return
+
         pytest.xfail(
             "Indexes were not dropped after {} waits of {} seconds each".format(10, 3))
+
+    @pytest.fixture(scope="class")
+    def check_query_index_mgmt_supported(self, cb_env):
+        cb_env.check_if_feature_supported('query_index_mgmt')
+
+    @pytest.fixture()
+    def clear_all_indexes(self, cb_env):
+        self._clear_all_indexes(cb_env)
 
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
     @pytest.mark.usefixtures("clear_all_indexes")
@@ -84,7 +85,7 @@ class QueryIndexManagementTests:
         # Drop the primary index
         ixm.drop_primary_index(bucket_name)
         # Ensure we get an error when executing the query
-        with pytest.raises(ParsingFailedException):
+        with pytest.raises(QueryIndexNotFoundException):
             cb_env.cluster.query(n1ql).execute()
 
     # @TODO: couchbase++ does not handle named primary
@@ -199,7 +200,7 @@ class QueryIndexManagementTests:
         # Drop the index
         ixm.drop_index(bucket_name, ixname)
         # Issue the query again
-        with pytest.raises(ParsingFailedException):
+        with pytest.raises((QueryIndexNotFoundException, ParsingFailedException)):
             cb_env.cluster.query(n1ql).execute()
 
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
@@ -336,7 +337,7 @@ class QueryIndexCollectionManagementTests:
     TEST_COLLECTION = "test-collection"
 
     @pytest.fixture(scope="class", name="cb_env")
-    def couchbase_test_environment(self, couchbase_config, request):
+    def couchbase_test_environment(self, couchbase_config):
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
@@ -354,22 +355,16 @@ class QueryIndexCollectionManagementTests:
                                  manage_collections=True,
                                  manage_query_indexes=True)
 
-        cb_env.setup_named_collections()
+        cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
         yield cb_env
-        cb_env.teardown_named_collections()
+        cb_env.try_n_times(5, 3, self._clear_all_indexes, cb_env, ignore_fail=True)
+        cb_env.try_n_times_till_exception(5, 3,
+                                          cb_env.teardown_named_collections,
+                                          raise_if_no_exception=False)
         cluster.close()
 
-    @pytest.fixture(scope="class")
-    def check_query_index_mgmt_supported(self, cb_env):
-        cb_env.check_if_feature_supported('query_index_mgmt')
-
-    @pytest.fixture(scope="class", name="fqdn")
-    def get_fqdn(self, cb_env):
-        return f'`{cb_env.bucket.name}`.`{self.TEST_SCOPE}`.`{self.TEST_COLLECTION}`'
-
-    @pytest.fixture()
-    def clear_all_indexes(self, cb_env):
+    def _clear_all_indexes(self, cb_env, ignore_fail=False):
         # Drop all indexes!
         bucket_name = cb_env.bucket.name
         ixm = cb_env.ixm
@@ -394,8 +389,24 @@ class QueryIndexCollectionManagementTests:
             if 0 == len(indexes):
                 return
             cb_env.sleep(2)
+
+        if ignore_fail is True:
+            return
+
         pytest.xfail(
             "Indexes were not dropped after {} waits of {} seconds each".format(10, 3))
+
+    @pytest.fixture(scope="class")
+    def check_query_index_mgmt_supported(self, cb_env):
+        cb_env.check_if_feature_supported('query_index_mgmt')
+
+    @pytest.fixture(scope="class", name="fqdn")
+    def get_fqdn(self, cb_env):
+        return f'`{cb_env.bucket.name}`.`{self.TEST_SCOPE}`.`{self.TEST_COLLECTION}`'
+
+    @pytest.fixture()
+    def clear_all_indexes(self, cb_env):
+        self._clear_all_indexes(cb_env)
 
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
     @pytest.mark.usefixtures("clear_all_indexes")
@@ -416,7 +427,7 @@ class QueryIndexCollectionManagementTests:
                                DropPrimaryQueryIndexOptions(scope_name=self.TEST_SCOPE,
                                                             collection_name=self.TEST_COLLECTION))
         # Ensure we get an error when executing the query
-        with pytest.raises(ParsingFailedException):
+        with pytest.raises(QueryIndexNotFoundException):
             cb_env.cluster.query(n1ql).execute()
 
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
@@ -586,7 +597,7 @@ class QueryIndexCollectionManagementTests:
                        scope_name=self.TEST_SCOPE,
                        collection_name=self.TEST_COLLECTION)
         # Issue the query again
-        with pytest.raises(ParsingFailedException):
+        with pytest.raises((QueryIndexNotFoundException, ParsingFailedException)):
             cb_env.cluster.query(n1ql).execute()
 
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")

@@ -26,7 +26,8 @@ static PyObject*
 exception_base__context__(exception_base* self, [[maybe_unused]] PyObject* args)
 {
     if (self->error_context) {
-        return self->error_context;
+        PyObject* pyObj_error_context = PyDict_Copy(self->error_context);
+        return pyObj_error_context;
     }
     Py_RETURN_NONE;
 }
@@ -35,7 +36,8 @@ static PyObject*
 exception_base__info__(exception_base* self, [[maybe_unused]] PyObject* args)
 {
     if (self->exc_info) {
-        return self->exc_info;
+        PyObject* pyObj_exc_info = PyDict_Copy(self->exc_info);
+        return pyObj_exc_info;
     }
     Py_RETURN_NONE;
 }
@@ -44,10 +46,10 @@ static void
 exception_base_dealloc(exception_base* self)
 {
     if (self->error_context) {
-        Py_XDECREF(self->error_context);
+        Py_DECREF(self->error_context);
     }
     if (self->exc_info) {
-        Py_XDECREF(self->exc_info);
+        Py_DECREF(self->exc_info);
     }
     LOG_INFO("{}: exception_base_dealloc completed", "PYCBC");
 }

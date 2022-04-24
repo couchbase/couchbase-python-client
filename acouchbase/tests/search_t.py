@@ -11,7 +11,7 @@ import pytest
 import pytest_asyncio
 
 import couchbase.search as search
-from acouchbase.cluster import Cluster
+from acouchbase.cluster import Cluster, get_event_loop
 from couchbase.auth import PasswordAuthenticator
 from couchbase.exceptions import InvalidArgumentException, SearchIndexNotFoundException
 from couchbase.management.collections import CollectionSpec
@@ -38,7 +38,7 @@ class SearchTests:
 
     @pytest_asyncio.fixture(scope="class")
     def event_loop(self):
-        loop = asyncio.get_event_loop()
+        loop = get_event_loop()
         yield loop
         loop.close()
 
@@ -62,10 +62,12 @@ class SearchTests:
                                  manage_buckets=True,
                                  manage_search_indexes=True)
 
-        await cb_env.load_data()
+        await cb_env.try_n_times(3, 5, cb_env.load_data)
         await self._load_search_index(cb_env)
         yield cb_env
-        await cb_env.purge_data()
+        await cb_env.try_n_times_till_exception(3, 5,
+                                                cb_env.purge_data,
+                                                raise_if_no_exception=False)
         await self._drop_search_index(cb_env)
         await cluster.close()
 
@@ -78,13 +80,13 @@ class SearchTests:
                 # wait at least 5 minutes
                 await self._check_indexed_docs(cb_env, retries=30, delay=10)
             except Exception:
-                await cb_env.sixm.upsert_index(
-                    SearchIndex(name=self.TEST_INDEX_NAME,
-                                idx_type='fulltext-index',
-                                source_name='default',
-                                source_type='couchbase',
-                                params=params_json)
-                )
+                await cb_env.try_n_times(10, 3,
+                                         cb_env.sixm.upsert_index,
+                                         SearchIndex(name=self.TEST_INDEX_NAME,
+                                                     idx_type='fulltext-index',
+                                                     source_name='default',
+                                                     source_type='couchbase',
+                                                     params=params_json))
                 # make sure the index loads...
                 await self._check_indexed_docs(cb_env, retries=30, delay=10)
 
@@ -595,7 +597,7 @@ class SearchCollectionTests:
 
     @pytest_asyncio.fixture(scope="class")
     def event_loop(self):
-        loop = asyncio.get_event_loop()
+        loop = get_event_loop()
         yield loop
         loop.close()
 
@@ -619,16 +621,20 @@ class SearchCollectionTests:
                                  manage_buckets=True,
                                  manage_collections=True,
                                  manage_search_indexes=True)
-        await cb_env.setup_named_collections()
+        await cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
-        await cb_env.load_data()
+        await cb_env.try_n_times(5, 3, cb_env.load_data)
         # lets add another collection and load data there
         await self._create_and_load_other_collection(cb_env)
 
         await self._load_search_index(cb_env)
         yield cb_env
-        await cb_env.purge_data()
-        await cb_env.teardown_named_collections()
+        await cb_env.try_n_times_till_exception(3, 5,
+                                                cb_env.purge_data,
+                                                raise_if_no_exception=False)
+        await cb_env.try_n_times_till_exception(5, 3,
+                                                cb_env.teardown_named_collections,
+                                                raise_if_no_exception=False)
         await self._drop_search_index(cb_env)
         await cluster.close()
 
@@ -663,13 +669,13 @@ class SearchCollectionTests:
                 # wait at least 5 minutes
                 await self._check_indexed_docs(cb_env, retries=30, delay=10)
             except Exception:
-                await cb_env.sixm.upsert_index(
-                    SearchIndex(name=self.TEST_INDEX_NAME,
-                                idx_type='fulltext-index',
-                                source_name='default',
-                                source_type='couchbase',
-                                params=params_json)
-                )
+                await cb_env.try_n_times(10, 3,
+                                         cb_env.sixm.upsert_index,
+                                         SearchIndex(name=self.TEST_INDEX_NAME,
+                                                     idx_type='fulltext-index',
+                                                     source_name='default',
+                                                     source_type='couchbase',
+                                                     params=params_json))
                 # make sure the index loads...
                 await self._check_indexed_docs(cb_env, retries=30, delay=10)
 

@@ -58,14 +58,14 @@ get_result_row_locations(std::vector<couchbase::operations::search_response::sea
         Py_DECREF(pyObj_tmp);
 
         pyObj_tmp = PyLong_FromUnsignedLongLong(location.start_offset);
-        if (-1 == PyDict_SetItemString(pyObj_row_location, "start_offset", pyObj_tmp)) {
+        if (-1 == PyDict_SetItemString(pyObj_row_location, "start", pyObj_tmp)) {
             PyErr_Print();
             PyErr_Clear();
         }
         Py_DECREF(pyObj_tmp);
 
         pyObj_tmp = PyLong_FromUnsignedLongLong(location.end_offset);
-        if (-1 == PyDict_SetItemString(pyObj_row_location, "end_offset", pyObj_tmp)) {
+        if (-1 == PyDict_SetItemString(pyObj_row_location, "end", pyObj_tmp)) {
             PyErr_Print();
             PyErr_Clear();
         }
@@ -99,71 +99,63 @@ get_result_row_locations(std::vector<couchbase::operations::search_response::sea
 }
 
 PyObject*
-get_result_rows(std::vector<couchbase::operations::search_response::search_row> rows)
+get_result_row(couchbase::operations::search_response::search_row row)
 {
-    PyObject* pyObj_rows = PyList_New(static_cast<Py_ssize_t>(0));
-    for (auto const& row : rows) {
-        PyObject* pyObj_row = PyDict_New();
-        PyObject* pyObj_tmp = PyUnicode_FromString(row.index.c_str());
-        if (-1 == PyDict_SetItemString(pyObj_row, "index", pyObj_tmp)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        Py_DECREF(pyObj_tmp);
-
-        pyObj_tmp = PyUnicode_FromString(row.id.c_str());
-        if (-1 == PyDict_SetItemString(pyObj_row, "id", pyObj_tmp)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        Py_DECREF(pyObj_tmp);
-
-        pyObj_tmp = PyFloat_FromDouble(row.score);
-        if (-1 == PyDict_SetItemString(pyObj_row, "score", pyObj_tmp)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        Py_DECREF(pyObj_tmp);
-
-        if (row.locations.size() > 0) {
-            pyObj_tmp = get_result_row_locations(row.locations);
-            if (-1 == PyDict_SetItemString(pyObj_row, "locations", pyObj_tmp)) {
-                PyErr_Print();
-                PyErr_Clear();
-            }
-            Py_DECREF(pyObj_tmp);
-        }
-
-        if (row.fragments.size() > 0) {
-            pyObj_tmp = get_result_row_fragments(row.fragments);
-            if (-1 == PyDict_SetItemString(pyObj_row, "fragments", pyObj_tmp)) {
-                PyErr_Print();
-                PyErr_Clear();
-            }
-            Py_DECREF(pyObj_tmp);
-        }
-
-        pyObj_tmp = PyUnicode_FromString(row.fields.c_str());
-        if (-1 == PyDict_SetItemString(pyObj_row, "fields", pyObj_tmp)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        Py_DECREF(pyObj_tmp);
-
-        pyObj_tmp = PyUnicode_FromString(row.explanation.c_str());
-        if (-1 == PyDict_SetItemString(pyObj_row, "explanation", pyObj_tmp)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        Py_DECREF(pyObj_tmp);
-
-        if (-1 == PyList_Append(pyObj_rows, pyObj_row)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        Py_DECREF(pyObj_row);
+    PyObject* pyObj_row = PyDict_New();
+    PyObject* pyObj_tmp = PyUnicode_FromString(row.index.c_str());
+    if (-1 == PyDict_SetItemString(pyObj_row, "index", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
     }
-    return pyObj_rows;
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyUnicode_FromString(row.id.c_str());
+    if (-1 == PyDict_SetItemString(pyObj_row, "id", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyFloat_FromDouble(row.score);
+    if (-1 == PyDict_SetItemString(pyObj_row, "score", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_DECREF(pyObj_tmp);
+
+    if (row.locations.size() > 0) {
+        pyObj_tmp = get_result_row_locations(row.locations);
+        if (-1 == PyDict_SetItemString(pyObj_row, "locations", pyObj_tmp)) {
+            PyErr_Print();
+            PyErr_Clear();
+        }
+        Py_DECREF(pyObj_tmp);
+    }
+
+    if (row.fragments.size() > 0) {
+        pyObj_tmp = get_result_row_fragments(row.fragments);
+        if (-1 == PyDict_SetItemString(pyObj_row, "fragments", pyObj_tmp)) {
+            PyErr_Print();
+            PyErr_Clear();
+        }
+        Py_DECREF(pyObj_tmp);
+    }
+
+    pyObj_tmp = PyUnicode_FromString(row.fields.c_str());
+    if (-1 == PyDict_SetItemString(pyObj_row, "fields", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyUnicode_FromString(row.explanation.c_str());
+    if (-1 == PyDict_SetItemString(pyObj_row, "explanation", pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_DECREF(pyObj_tmp);
+
+    return pyObj_row;
 }
 
 PyObject*
@@ -504,14 +496,14 @@ create_result_from_search_response(couchbase::operations::search_response resp, 
         Py_DECREF(pyObj_tmp);
     }
 
-    if (resp.rows.size() > 0) {
-        pyObj_tmp = get_result_rows(resp.rows);
-        if (-1 == PyDict_SetItemString(pyObj_payload, "rows", pyObj_tmp)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        Py_DECREF(pyObj_tmp);
-    }
+    // if (resp.rows.size() > 0) {
+    //     pyObj_tmp = get_result_rows(resp.rows);
+    //     if (-1 == PyDict_SetItemString(pyObj_payload, "rows", pyObj_tmp)) {
+    //         PyErr_Print();
+    //         PyErr_Clear();
+    //     }
+    //     Py_DECREF(pyObj_tmp);
+    // }
 
     if (-1 == PyDict_SetItemString(res->dict, RESULT_VALUE, pyObj_payload)) {
         PyErr_Print();
@@ -542,8 +534,12 @@ create_search_result(couchbase::operations::search_response resp,
         PyErr_Clear();
         rows->put(pyObj_exc);
     } else {
-        auto res = create_result_from_search_response(resp, include_metrics);
+        for (auto const& row : resp.rows) {
+            PyObject* pyObj_row = get_result_row(row);
+            rows->put(pyObj_row);
+        }
 
+        auto res = create_result_from_search_response(resp, include_metrics);
         if (res == nullptr || PyErr_Occurred() != nullptr) {
             set_exception = true;
         } else {
@@ -840,15 +836,17 @@ handle_search_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* k
         include_metrics = false;
     }
 
-    streamed_result* streamed_res = create_streamed_result_obj();
+    // timeout is always set either to default, or timeout provided in options
+    streamed_result* streamed_res = create_streamed_result_obj(req.timeout.value());
 
-    req.row_callback = [rows = streamed_res->rows](std::string&& row) {
-        PyGILState_STATE state = PyGILState_Ensure();
-        PyObject* pyObj_row = PyBytes_FromStringAndSize(row.c_str(), row.length());
-        rows->put(pyObj_row);
-        PyGILState_Release(state);
-        return couchbase::utils::json::stream_control::next_row;
-    };
+    // TODO:  let the couchbase++ streaming stabilize a bit more...
+    // req.row_callback = [rows = streamed_res->rows](std::string&& row) {
+    //     PyGILState_STATE state = PyGILState_Ensure();
+    //     PyObject* pyObj_row = PyBytes_FromStringAndSize(row.c_str(), row.length());
+    //     rows->put(pyObj_row);
+    //     PyGILState_Release(state);
+    //     return couchbase::utils::json::stream_control::next_row;
+    // };
 
     // we need the callback, errback, and logic to all stick around, so...
     // use XINCREF b/c they _could_ be NULL

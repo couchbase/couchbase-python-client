@@ -45,6 +45,8 @@ class RateLimitTests:
 
     @pytest_asyncio.fixture(scope="class", name="cb_env")
     async def couchbase_test_environment(self, couchbase_config):
+        if couchbase_config.is_mock_server:
+            pytest.skip('Mocker server does not support rate limit testing.')
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))

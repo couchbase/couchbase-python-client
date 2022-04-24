@@ -10,8 +10,7 @@ from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import (BucketAlreadyExistsException,
                                   BucketDoesNotExistException,
                                   BucketNotFlushableException,
-                                  FeatureUnavailableException,
-                                  InvalidArgumentException)
+                                  FeatureUnavailableException)
 from couchbase.management.buckets import (BucketSettings,
                                           BucketType,
                                           ConflictResolutionType,
@@ -22,6 +21,7 @@ from couchbase.options import ClusterOptions
 from ._test_utils import TestEnvironment
 
 
+@pytest.mark.flaky(reruns=5)
 class BucketManagementTests:
 
     @pytest_asyncio.fixture(scope="class")
@@ -133,10 +133,6 @@ class BucketManagementTests:
     @pytest.mark.usefixtures("purge_buckets")
     @pytest.mark.asyncio
     async def test_bucket_create_durability(self, cb_env, test_bucket):
-        # if cb_env.server_version_short < 6.6:
-        #     pytest.skip(
-        #         "Bucket minimum durability not available on server version < 6.6")
-
         min_durability = DurabilityLevel.MAJORITY_AND_PERSIST_TO_ACTIVE
         await cb_env.bm.create_bucket(CreateBucketSettings(name=test_bucket,
                                                            bucket_type=BucketType.COUCHBASE,
@@ -256,10 +252,6 @@ class BucketManagementTests:
     @pytest.mark.usefixtures("purge_buckets")
     @pytest.mark.asyncio
     async def test_bucket_backend_default(self, cb_env, test_bucket):
-        # if cb_env.server_version_short < 7.1:
-        #     pytest.skip(
-        #         "Bucket storage backend testing only available on server versions >= 7.1")
-
         # Create the bucket
         await cb_env.bm.create_bucket(
             CreateBucketSettings(
@@ -273,29 +265,20 @@ class BucketManagementTests:
     @pytest.mark.usefixtures("purge_buckets")
     @pytest.mark.asyncio
     async def test_bucket_backend_magma(self, cb_env, test_bucket):
-        # if cb_env.server_version_short < 7.1:
-        #     pytest.skip(
-        #         "Bucket storage backend testing only available on server versions >= 7.1")
-
-        # @TODO:  couchbase++ raises Ram quota for magma must be at least 1024 MiB, this correct?
-        with pytest.raises(InvalidArgumentException):
-            await cb_env.bm.create_bucket(
-                CreateBucketSettings(
-                    name=test_bucket,
-                    ram_quota_mb=256,
-                    flush_enabled=False,
-                    storage_backend=StorageBackend.MAGMA))
-            bucket = await cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
-            assert bucket.storage_backend == StorageBackend.MAGMA
+        # Create the bucket
+        await cb_env.bm.create_bucket(
+            CreateBucketSettings(
+                name=test_bucket,
+                ram_quota_mb=256,
+                flush_enabled=False,
+                storage_backend=StorageBackend.MAGMA))
+        bucket = await cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
+        assert bucket.storage_backend == StorageBackend.MAGMA
 
     @pytest.mark.usefixtures("check_bucket_storage_backend_supported")
     @pytest.mark.usefixtures("purge_buckets")
     @pytest.mark.asyncio
     async def test_bucket_backend_ephemeral(self, cb_env, test_bucket):
-        # if cb_env.server_version_short < 7.1:
-        #     pytest.skip(
-        #         "Bucket storage backend testing only available on server versions >= 7.1")
-
         # Create the bucket
         await cb_env.bm.create_bucket(
             CreateBucketSettings(
@@ -310,11 +293,6 @@ class BucketManagementTests:
     @pytest.mark.usefixtures("purge_buckets")
     @pytest.mark.asyncio
     async def test_bucket_custom_conflict_resolution(self, cb_env, test_bucket):
-        # if cb_env.server_version_short < 7.1:
-        #     pytest.skip(
-        #         "Custom conflict resolution testing only available on server "
-        #         "versions >= 7.1 with developer preview enabled")
-
         if cb_env.is_developer_preview:
             # Create the bucket
             await cb_env.bm.create_bucket(

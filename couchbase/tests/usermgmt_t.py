@@ -1,12 +1,10 @@
 import re
-from datetime import timedelta
 
 import pytest
 
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
-from couchbase.exceptions import (AmbiguousTimeoutException,
-                                  CouchbaseException,
+from couchbase.exceptions import (CouchbaseException,
                                   FeatureUnavailableException,
                                   GroupNotFoundException,
                                   InvalidArgumentException,
@@ -610,10 +608,11 @@ class UserManagementTests:
         cb_env.um.drop_group('admin-test-group')
         assert found is True
 
-    @pytest.mark.usefixtures("check_user_groups_supported")
-    def test_timeout(self, cb_env):
-        with pytest.raises(AmbiguousTimeoutException):
-            cb_env.um.get_all_groups(timeout=timedelta(seconds=0.1))
+    # @TODO: is this test useful?
+    # @pytest.mark.usefixtures("check_user_groups_supported")
+    # def test_timeout(self, cb_env):
+    #     with pytest.raises(AmbiguousTimeoutException):
+    #         cb_env.um.get_all_groups(timeout=timedelta(seconds=0.1))
 
     def test_get_roles(self, cb_env):
         roles = cb_env.um.get_roles()

@@ -63,46 +63,46 @@ create_result_from_view_response(couchbase::operations::document_view_response r
     }
     Py_DECREF(pyObj_meta);
 
-    if (resp.rows.size() > 0) {
-        PyObject* pyObj_rows = PyList_New(static_cast<Py_ssize_t>(0));
-        for (auto const& row : resp.rows) {
-            PyObject* pyObj_row = PyDict_New();
+    // if (resp.rows.size() > 0) {
+    //     PyObject* pyObj_rows = PyList_New(static_cast<Py_ssize_t>(0));
+    //     for (auto const& row : resp.rows) {
+    //         PyObject* pyObj_row = PyDict_New();
 
-            if (row.id.has_value()) {
-                pyObj_tmp = PyUnicode_FromString(row.id.value().c_str());
-                if (-1 == PyDict_SetItemString(pyObj_row, "id", pyObj_tmp)) {
-                    PyErr_Print();
-                    PyErr_Clear();
-                }
-                Py_DECREF(pyObj_tmp);
-            }
+    //         if (row.id.has_value()) {
+    //             pyObj_tmp = PyUnicode_FromString(row.id.value().c_str());
+    //             if (-1 == PyDict_SetItemString(pyObj_row, "id", pyObj_tmp)) {
+    //                 PyErr_Print();
+    //                 PyErr_Clear();
+    //             }
+    //             Py_DECREF(pyObj_tmp);
+    //         }
 
-            pyObj_tmp = PyUnicode_FromString(row.key.c_str());
-            if (-1 == PyDict_SetItemString(pyObj_row, "key", pyObj_tmp)) {
-                PyErr_Print();
-                PyErr_Clear();
-            }
-            Py_DECREF(pyObj_tmp);
+    //         pyObj_tmp = PyUnicode_FromString(row.key.c_str());
+    //         if (-1 == PyDict_SetItemString(pyObj_row, "key", pyObj_tmp)) {
+    //             PyErr_Print();
+    //             PyErr_Clear();
+    //         }
+    //         Py_DECREF(pyObj_tmp);
 
-            pyObj_tmp = PyUnicode_FromString(row.value.c_str());
-            if (-1 == PyDict_SetItemString(pyObj_row, "value", pyObj_tmp)) {
-                PyErr_Print();
-                PyErr_Clear();
-            }
-            Py_DECREF(pyObj_tmp);
+    //         pyObj_tmp = PyUnicode_FromString(row.value.c_str());
+    //         if (-1 == PyDict_SetItemString(pyObj_row, "value", pyObj_tmp)) {
+    //             PyErr_Print();
+    //             PyErr_Clear();
+    //         }
+    //         Py_DECREF(pyObj_tmp);
 
-            if (-1 == PyList_Append(pyObj_rows, pyObj_row)) {
-                PyErr_Print();
-                PyErr_Clear();
-            }
-        }
+    //         if (-1 == PyList_Append(pyObj_rows, pyObj_row)) {
+    //             PyErr_Print();
+    //             PyErr_Clear();
+    //         }
+    //     }
 
-        if (-1 == PyDict_SetItemString(pyObj_payload, "rows", pyObj_rows)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        Py_DECREF(pyObj_rows);
-    }
+    //     if (-1 == PyDict_SetItemString(pyObj_payload, "rows", pyObj_rows)) {
+    //         PyErr_Print();
+    //         PyErr_Clear();
+    //     }
+    //     Py_DECREF(pyObj_rows);
+    // }
 
     if (-1 == PyDict_SetItemString(res->dict, RESULT_VALUE, pyObj_payload)) {
         PyErr_Print();
@@ -134,8 +134,37 @@ create_view_result(couchbase::operations::document_view_response resp,
         PyErr_Clear();
         rows->put(pyObj_exc);
     } else {
-        auto res = create_result_from_view_response(resp);
+        for (auto const& row : resp.rows) {
+            PyObject* pyObj_row = PyDict_New();
+            PyObject* pyObj_tmp = nullptr;
 
+            if (row.id.has_value()) {
+                pyObj_tmp = PyUnicode_FromString(row.id.value().c_str());
+                if (-1 == PyDict_SetItemString(pyObj_row, "id", pyObj_tmp)) {
+                    PyErr_Print();
+                    PyErr_Clear();
+                }
+                Py_DECREF(pyObj_tmp);
+            }
+
+            pyObj_tmp = PyUnicode_FromString(row.key.c_str());
+            if (-1 == PyDict_SetItemString(pyObj_row, "key", pyObj_tmp)) {
+                PyErr_Print();
+                PyErr_Clear();
+            }
+            Py_DECREF(pyObj_tmp);
+
+            pyObj_tmp = PyUnicode_FromString(row.value.c_str());
+            if (-1 == PyDict_SetItemString(pyObj_row, "value", pyObj_tmp)) {
+                PyErr_Print();
+                PyErr_Clear();
+            }
+            Py_DECREF(pyObj_tmp);
+
+            rows->put(pyObj_row);
+        }
+
+        auto res = create_result_from_view_response(resp);
         if (res == nullptr || PyErr_Occurred() != nullptr) {
             set_exception = true;
         } else {
@@ -336,7 +365,7 @@ get_view_request(PyObject* op_args)
         req.client_context_id = client_context_id;
     }
 
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::search_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::view_timeout;
     PyObject* pyObj_timeout = PyDict_GetItemString(op_args, "timeout");
     if (pyObj_timeout != nullptr) {
         auto timeout = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_timeout));
@@ -391,16 +420,17 @@ handle_view_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
 
     auto req = get_view_request(pyObj_op_args);
 
-    // serializer increment w/ creation of streamed result
-    streamed_result* streamed_res = create_streamed_result_obj();
+    // timeout is always set either to default, or timeout provided in options
+    streamed_result* streamed_res = create_streamed_result_obj(req.timeout.value());
 
-    req.row_callback = [rows = streamed_res->rows](std::string&& row) {
-        PyGILState_STATE state = PyGILState_Ensure();
-        PyObject* pyObj_row = PyBytes_FromStringAndSize(row.c_str(), row.length());
-        rows->put(pyObj_row);
-        PyGILState_Release(state);
-        return couchbase::utils::json::stream_control::next_row;
-    };
+    // TODO:  let the couchbase++ streaming stabilize a bit more...
+    // req.row_callback = [rows = streamed_res->rows](std::string&& row) {
+    //     PyGILState_STATE state = PyGILState_Ensure();
+    //     PyObject* pyObj_row = PyBytes_FromStringAndSize(row.c_str(), row.length());
+    //     rows->put(pyObj_row);
+    //     PyGILState_Release(state);
+    //     return couchbase::utils::json::stream_control::next_row;
+    // };
 
     // we need the callback, errback, and logic to all stick around, so...
     // use XINCREF b/c they _could_ be NULL

@@ -5,11 +5,13 @@ import pytest
 import pytest_asyncio
 
 import couchbase.subdocument as SD
-from acouchbase.cluster import Cluster
+from acouchbase.cluster import Cluster, get_event_loop
 from couchbase.auth import PasswordAuthenticator
 from couchbase.exceptions import (CouchbaseException,
-                                  ParsingFailedException,
-                                  QueryErrorContext)
+                                  KeyspaceNotFoundException,
+                                  QueryErrorContext,
+                                  QueryIndexNotFoundException,
+                                  ScopeNotFoundException)
 from couchbase.n1ql import (QueryMetaData,
                             QueryMetrics,
                             QueryProfile,
@@ -28,7 +30,7 @@ class QueryTests:
 
     @pytest_asyncio.fixture(scope="class")
     def event_loop(self):
-        loop = asyncio.get_event_loop()
+        loop = get_event_loop()
         yield loop
         loop.close()
 
@@ -52,11 +54,12 @@ class QueryTests:
                                  manage_buckets=True,
                                  manage_query_indexes=True)
 
-        await cb_env.ixm.create_primary_index(
-            bucket.name,
-            timeout=timedelta(seconds=60),
-            ignore_if_exists=True)
-        await cb_env.load_data()
+        await cb_env.try_n_times(10, 3, cb_env.ixm.create_primary_index,
+                                 bucket.name,
+                                 timeout=timedelta(seconds=60),
+                                 ignore_if_exists=True)
+
+        await cb_env.try_n_times(3, 5, cb_env.load_data)
         # let it load a bit...
         for _ in range(5):
             row_count_good = await self._check_row_count(cb_env, 5)
@@ -64,10 +67,16 @@ class QueryTests:
                 break
             print('Waiting for index to load, sleeping a bit...')
             await asyncio.sleep(5)
+
         yield cb_env
-        await cb_env.purge_data()
-        await cb_env.ixm.drop_primary_index(bucket.name,
-                                            ignore_if_not_exists=True)
+        await cb_env.try_n_times_till_exception(3, 5,
+                                                cb_env.purge_data,
+                                                raise_if_no_exception=False)
+
+        await cb_env.try_n_times_till_exception(10, 3,
+                                                cb_env.ixm.drop_primary_index,
+                                                bucket.name,
+                                                expected_exceptions=(QueryIndexNotFoundException))
         await cluster.close()
 
     @pytest.fixture(scope="class")
@@ -278,7 +287,7 @@ class QueryCollectionTests:
 
     @pytest_asyncio.fixture(scope="class")
     def event_loop(self):
-        loop = asyncio.get_event_loop()
+        loop = get_event_loop()
         yield loop
         loop.close()
 
@@ -302,13 +311,15 @@ class QueryCollectionTests:
                                  manage_buckets=True,
                                  manage_collections=True,
                                  manage_query_indexes=True)
-        await cb_env.setup_named_collections()
 
-        await cb_env.ixm.create_primary_index(bucket.name,
-                                              scope_name=self.TEST_SCOPE,
-                                              collection_name=self.TEST_COLLECTION)
+        await cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
+        await cb_env.try_n_times(10, 3, cb_env.ixm.create_primary_index,
+                                 bucket.name,
+                                 scope_name=self.TEST_SCOPE,
+                                 collection_name=self.TEST_COLLECTION,
+                                 timeout=timedelta(seconds=60))
 
-        await cb_env.load_data()
+        await cb_env.try_n_times(5, 3, cb_env.load_data)
         # let it load a bit...
         for _ in range(5):
             row_count_good = await self._check_row_count(cb_env, 5)
@@ -318,12 +329,19 @@ class QueryCollectionTests:
             await asyncio.sleep(5)
 
         yield cb_env
-        await cb_env.purge_data()
-        await cb_env.ixm.drop_primary_index(bucket.name,
-                                            scope_name=self.TEST_SCOPE,
-                                            collection_name=self.TEST_COLLECTION)
+        await cb_env.try_n_times_till_exception(3, 5,
+                                                cb_env.purge_data,
+                                                raise_if_no_exception=False)
+        await cb_env.try_n_times_till_exception(10, 3,
+                                                cb_env.ixm.drop_primary_index,
+                                                bucket.name,
+                                                scope_name=self.TEST_SCOPE,
+                                                collection_name=self.TEST_COLLECTION,
+                                                expected_exceptions=(QueryIndexNotFoundException,))
 
-        await cb_env.teardown_named_collections()
+        await cb_env.try_n_times_till_exception(5, 3,
+                                                cb_env.teardown_named_collections,
+                                                raise_if_no_exception=False)
         await cluster.close()
 
     async def _check_row_count(self, cb_env,
@@ -375,30 +393,33 @@ class QueryCollectionTests:
     async def test_bad_query_context(self, cb_env):
         # test w/ no context
         # @TODO:  what about KeyspaceNotFoundException?
-        # with pytest.raises(ParsingFailedException):
-        correct_exc = False
-        try:
-            await cb_env.cluster.query(f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2").execute()
-        except ParsingFailedException:
-            correct_exc = True
-        except Exception:
-            pytest.fail('Expected ParsingFailedException')
 
-        assert correct_exc is True
-        correct_exc = False
+        # correct_exc = False
+        # try:
+        with pytest.raises(KeyspaceNotFoundException):
+            await cb_env.cluster.query(f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2").execute()
+        # except ParsingFailedException:
+        #     correct_exc = True
+        # except Exception:
+        #     pytest.fail('Expected ParsingFailedException')
+
+        # assert correct_exc is True
+        # correct_exc = False
         # test w/ bad scope
         # @TODO:  what about ScopeNotFoundException?
         q_context = f'{cb_env.bucket.name}.`fake-scope`'
-        # with pytest.raises(ParsingFailedException):
-        try:
-            await cb_env.cluster.query(
-                f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2", QueryOptions(query_context=q_context)).execute()
-        except ParsingFailedException:
-            correct_exc = True
-        except Exception:
-            pytest.fail('Expected ParsingFailedException')
 
-        assert correct_exc is True
+        # try:
+        with pytest.raises(ScopeNotFoundException):
+            await cb_env.cluster.query(
+                f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2",
+                QueryOptions(query_context=q_context)).execute()
+        # except ParsingFailedException:
+        #     correct_exc = True
+        # except Exception:
+        #     pytest.fail('Expected ParsingFailedException')
+
+        # assert correct_exc is True
 
     @pytest.mark.asyncio
     async def test_scope_query(self, cb_env):
@@ -409,29 +430,27 @@ class QueryCollectionTests:
     @pytest.mark.asyncio
     async def test_bad_scope_query(self, cb_env):
         q_context = f'{cb_env.bucket.name}.`fake-scope`'
-        # @TODO:  ScopeNotFoundException
-        # with pytest.raises(ParsingFailedException):
-        try:
+        # try:
+        with pytest.raises(ScopeNotFoundException):
             await cb_env.scope.query(f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2",
                                      QueryOptions(query_context=q_context)).execute()
-        except ParsingFailedException:
-            correct_exc = True
-        except Exception:
-            pytest.fail('Expected ParsingFailedException')
+        # except ParsingFailedException:
+        #     correct_exc = True
+        # except Exception:
+        #     pytest.fail('Expected ParsingFailedException')
 
-        assert correct_exc is True
-        correct_exc = False
+        # assert correct_exc is True
+        # correct_exc = False
 
-        # @TODO:  KeyspaceNotFoundException
         q_context = f'`fake-bucket`.`{cb_env.scope.name}`'
-        # with pytest.raises(ParsingFailedException):
-        try:
+        # try:
+        with pytest.raises(KeyspaceNotFoundException):
             await cb_env.scope.query(f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2",
                                      query_context=q_context).execute()
-        except ParsingFailedException:
-            correct_exc = True
-        except Exception:
-            pytest.fail('Expected ParsingFailedException')
+        # except ParsingFailedException:
+        #     correct_exc = True
+        # except Exception:
+        #     pytest.fail('Expected ParsingFailedException')
 
     @pytest.mark.asyncio
     async def test_scope_query_with_positional_params_in_options(self, cb_env):

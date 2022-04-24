@@ -1,15 +1,12 @@
-# import pytest
 import asyncio
 import re
-from datetime import timedelta
 
 import pytest
 import pytest_asyncio
 
-from acouchbase.cluster import Cluster
+from acouchbase.cluster import Cluster, get_event_loop
 from couchbase.auth import PasswordAuthenticator
-from couchbase.exceptions import (AmbiguousTimeoutException,
-                                  CouchbaseException,
+from couchbase.exceptions import (CouchbaseException,
                                   FeatureUnavailableException,
                                   GroupNotFoundException,
                                   InvalidArgumentException,
@@ -30,7 +27,7 @@ class UserManagementTests:
 
     @pytest_asyncio.fixture(scope="class")
     def event_loop(self):
-        loop = asyncio.get_event_loop()
+        loop = get_event_loop()
         yield loop
         loop.close()
 
@@ -636,11 +633,12 @@ class UserManagementTests:
         await cb_env.um.drop_group('admin-test-group')
         assert found is True
 
-    @pytest.mark.usefixtures("check_user_groups_supported")
-    @pytest.mark.asyncio
-    async def test_timeout(self, cb_env):
-        with pytest.raises(AmbiguousTimeoutException):
-            await cb_env.um.get_all_groups(timeout=timedelta(seconds=0.1))
+    # @TODO: is this test useful?
+    # @pytest.mark.usefixtures("check_user_groups_supported")
+    # @pytest.mark.asyncio
+    # async def test_timeout(self, cb_env):
+    #     with pytest.raises(AmbiguousTimeoutException):
+    #         await cb_env.um.get_all_groups(timeout=timedelta(seconds=0.1))
 
     @pytest.mark.asyncio
     async def test_get_roles(self, cb_env):

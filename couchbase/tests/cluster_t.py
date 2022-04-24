@@ -11,7 +11,9 @@ from couchbase.diagnostics import (ClusterState,
                                    EndpointState,
                                    PingState,
                                    ServiceType)
-from couchbase.exceptions import InvalidArgumentException, ParsingFailedException
+from couchbase.exceptions import (InvalidArgumentException,
+                                  ParsingFailedException,
+                                  QueryIndexNotFoundException)
 from couchbase.options import (ClusterOptions,
                                DiagnosticsOptions,
                                PingOptions)
@@ -148,12 +150,12 @@ class ClusterDiagnosticsTests:
         cb_env.collection.upsert(key, value)
         bucket_name = cb_env.bucket.name
         report_id = str(uuid4())
-        # the mock will fail on query, but diagnostics should
+        # query should fail, but diagnostics should
         # still return a query service type
         try:
             rows = cluster.query(f'SELECT * FROM `{bucket_name}` LIMIT 1').execute()
             assert len(rows) > 0
-        except ParsingFailedException:
+        except (ParsingFailedException, QueryIndexNotFoundException):
             pass
 
         result = cluster.diagnostics(

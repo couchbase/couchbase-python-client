@@ -71,13 +71,13 @@ class SearchTests:
                 # wait at least 5 minutes
                 self._check_indexed_docs(cb_env, retries=30, delay=10)
             except Exception:
-                cb_env.sixm.upsert_index(
-                    SearchIndex(name=self.TEST_INDEX_NAME,
-                                idx_type='fulltext-index',
-                                source_name='default',
-                                source_type='couchbase',
-                                params=params_json)
-                )
+                cb_env.try_n_times(10, 3,
+                                   cb_env.sixm.upsert_index,
+                                   SearchIndex(name=self.TEST_INDEX_NAME,
+                                               idx_type='fulltext-index',
+                                               source_name='default',
+                                               source_type='couchbase',
+                                               params=params_json))
                 # make sure the index loads...
                 self._check_indexed_docs(cb_env, retries=30, delay=10)
 
@@ -583,7 +583,7 @@ class SearchCollectionTests:
                                  manage_buckets=True,
                                  manage_collections=True,
                                  manage_search_indexes=True)
-        cb_env.setup_named_collections()
+        cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
         cb_env.load_data()
         # lets add another collection and load data there
         self._create_and_load_other_collection(cb_env)
@@ -591,7 +591,9 @@ class SearchCollectionTests:
         self._load_search_index(cb_env)
         yield cb_env
         cb_env.purge_data()
-        cb_env.teardown_named_collections()
+        cb_env.try_n_times_till_exception(5, 3,
+                                          cb_env.teardown_named_collections,
+                                          raise_if_no_exception=False)
         self._drop_search_index(cb_env)
         cluster.close()
 
@@ -623,13 +625,13 @@ class SearchCollectionTests:
                 # wait at least 5 minutes
                 self._check_indexed_docs(cb_env, retries=30, delay=10)
             except Exception:
-                cb_env.sixm.upsert_index(
-                    SearchIndex(name=self.TEST_INDEX_NAME,
-                                idx_type='fulltext-index',
-                                source_name='default',
-                                source_type='couchbase',
-                                params=params_json)
-                )
+                cb_env.try_n_times(10, 3,
+                                   cb_env.sixm.upsert_index,
+                                   SearchIndex(name=self.TEST_INDEX_NAME,
+                                               idx_type='fulltext-index',
+                                               source_name='default',
+                                               source_type='couchbase',
+                                               params=params_json))
                 # make sure the index loads...
                 self._check_indexed_docs(cb_env, retries=30, delay=10)
 

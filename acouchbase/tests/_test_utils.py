@@ -1,6 +1,7 @@
 import asyncio
 from typing import (Any,
                     Callable,
+                    Dict,
                     Optional,
                     Tuple,
                     Type,
@@ -317,9 +318,7 @@ class TestEnvironment(CouchbaseTestEnvironment):
                           seconds_between,  # type: Union[int, float]
                           func,  # type: Callable
                           *args,  # type: Any
-                          #   expected_exceptions=(
-                          #       Exception,),  # type: Tuple[Type[Exception]]
-                          **kwargs  # type: Any
+                          **kwargs  # type: Dict[str,Any]
                           ) -> Any:
 
         for _ in range(num_times):
@@ -340,6 +339,7 @@ class TestEnvironment(CouchbaseTestEnvironment):
                                          func,  # type: Callable
                                          *args,  # type: Any
                                          expected_exceptions=(Exception,),  # type: Tuple[Type[Exception],...]
+                                         raise_if_no_exception=True,  # type: Optional[bool]
                                          **kwargs  # type: Any
                                          ):
         # type: (...) -> Any
@@ -354,6 +354,9 @@ class TestEnvironment(CouchbaseTestEnvironment):
                 raise
 
         # TODO: option to restart mock server?
+
+        if raise_if_no_exception is False:
+            return
 
         raise CouchbaseTestEnvironmentException(
             f"successful {func} after {num_times} times waiting {seconds_between} seconds between calls.")

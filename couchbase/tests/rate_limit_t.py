@@ -37,6 +37,8 @@ class RateLimitTests:
 
     @pytest.fixture(scope="class", name="cb_env")
     def couchbase_test_environment(self, couchbase_config):
+        if couchbase_config.is_mock_server:
+            pytest.skip('Mocker server does not support rate limit testing.')
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
@@ -385,6 +387,7 @@ class RateLimitTests:
             if cluster1 and cluster1.connected:
                 cluster1.close()
 
+    @pytest.mark.flaky(reruns=5)
     def test_rate_limits_query(self, couchbase_config, cb_env):
         self._create_rate_limit_user(cb_env,
                                      self.USERNAME, {
@@ -416,6 +419,7 @@ class RateLimitTests:
             if cluster and cluster.connected:
                 cluster.close()
 
+    @pytest.mark.flaky(reruns=5)
     def test_rate_limits_fts(self, couchbase_config, cb_env):
         self._create_rate_limit_user(cb_env,
                                      self.USERNAME, {
@@ -451,6 +455,7 @@ class RateLimitTests:
             if cluster and cluster.connected:
                 cluster.close()
 
+    @pytest.mark.flaky(reruns=5)
     def test_rate_limits_kv_scopes_data_size(self, cb_env):
         scope_name = self.RATE_LIMIT_SCOPE_NAME
         self._create_rate_limit_scope(cb_env, scope_name, {
@@ -487,6 +492,7 @@ class RateLimitTests:
             if not res:
                 break
 
+    @pytest.mark.flaky(reruns=5)  # noqa: C901
     def test_rate_limits_index_scopes(self, cb_env):  # noqa: C901
         scope_name = self.RATE_LIMIT_SCOPE_NAME
         self._create_rate_limit_scope(cb_env, scope_name, {
@@ -576,6 +582,7 @@ class RateLimitTests:
             if not res:
                 break
 
+    @pytest.mark.flaky(reruns=5)  # noqa: C901
     def test_rate_limits_fts_scopes(self, cb_env):  # noqa: C901
         scope_name = self.RATE_LIMIT_SCOPE_NAME
         self._create_rate_limit_scope(cb_env, scope_name, {
@@ -673,6 +680,7 @@ class RateLimitTests:
             if not res:
                 break
 
+    @pytest.mark.flaky(reruns=5)
     def test_rate_limits_collections_scopes_limits(self, cb_env):
         scope_name = self.RATE_LIMIT_SCOPE_NAME
         self._create_rate_limit_scope(cb_env, scope_name, {

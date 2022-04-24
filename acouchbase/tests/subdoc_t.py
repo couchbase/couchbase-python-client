@@ -5,7 +5,7 @@ import pytest
 import pytest_asyncio
 
 import couchbase.subdocument as SD
-from acouchbase.cluster import Cluster
+from acouchbase.cluster import Cluster, get_event_loop
 from couchbase.auth import PasswordAuthenticator
 from couchbase.durability import DurabilityLevel, ServerDurability
 from couchbase.exceptions import (DocumentExistsException,
@@ -32,7 +32,7 @@ class SubDocumentTests:
 
     @pytest.fixture(scope="class")
     def event_loop(self):
-        loop = asyncio.get_event_loop()
+        loop = get_event_loop()
         yield loop
         loop.close()
 
@@ -53,13 +53,17 @@ class SubDocumentTests:
             cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True)
         elif request.param == CollectionType.NAMED:
             cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True, manage_collections=True)
-            await cb_env.setup_named_collections()
+            await cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
-        await cb_env.load_data()
+        await cb_env.try_n_times(3, 5, cb_env.load_data)
         yield cb_env
-        await cb_env.purge_data()
+        await cb_env.try_n_times_till_exception(3, 5,
+                                                cb_env.purge_data,
+                                                raise_if_no_exception=False)
         if request.param == CollectionType.NAMED:
-            await cb_env.teardown_named_collections()
+            await cb_env.try_n_times_till_exception(5, 3,
+                                                    cb_env.teardown_named_collections,
+                                                    raise_if_no_exception=False)
         await c.close()
 
     @pytest.fixture(scope="class")
@@ -71,6 +75,11 @@ class SubDocumentTests:
     def skip_if_less_than_alice(self, cb_env):
         if cb_env.cluster.server_version_short < 6.5:
             pytest.skip("Feature only available on CBS >= 6.5")
+
+    @pytest.fixture(scope="class")
+    def skip_mock_mutate_in(self, cb_env):
+        if cb_env.is_mock_server:
+            pytest.skip("CAVES + couchbase++ not playing nice...")
 
     @pytest_asyncio.fixture(scope="class")
     async def num_replicas(self, cb_env):
@@ -195,6 +204,7 @@ class SubDocumentTests:
         assert isinstance(result, LookupInResult)
         assert result.content_as[int](0) == 5
 
+    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
     async def test_mutate_in_simple(self, cb_env, new_kvp):
         cb = cb_env.collection
@@ -221,6 +231,7 @@ class SubDocumentTests:
         result = await cb.get(key)
         assert value == result.content_as[dict]
 
+    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
     async def test_mutate_in_simple_spec_as_list(self, cb_env, new_kvp):
         cb = cb_env.collection
@@ -279,10 +290,9 @@ class SubDocumentTests:
         # when running local, this can be be up to 1050, so just make sure > 0
         assert expires_in > 0
 
+    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
     async def test_mutate_in_remove(self, cb_env, new_kvp):
-        if cb_env.is_mock_server:
-            pytest.skip("Mock will not return expiry in the xaddrs.")
 
         cb = cb_env.collection
         key = new_kvp.key
@@ -396,12 +406,14 @@ class SubDocumentTests:
                                MutateInOptions(durability=ServerDurability(
                                    level=DurabilityLevel.PERSIST_TO_MAJORITY)))
         else:
-            with pytest.raises(DurabilityImpossibleException):
+            try:
                 await cb.mutate_in(key,
                                    (SD.upsert("city", "New City"),
                                     SD.replace("faa", "CTY")),
                                    MutateInOptions(durability=ServerDurability(
                                        level=DurabilityLevel.PERSIST_TO_MAJORITY)))
+            except DurabilityImpossibleException:
+                pass  # this is okay -- server not setup correctly
 
     @pytest.mark.usefixtures("skip_if_less_than_alice")
     @pytest.mark.asyncio
@@ -420,6 +432,7 @@ class SubDocumentTests:
 
     """
 
+    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
     async def test_mutate_in_upsert_semantics(self, cb_env, new_kvp):
         cb = cb_env.collection
@@ -435,6 +448,7 @@ class SubDocumentTests:
         res = await cb_env.try_n_times(10, 3, cb.get, key)
         assert res.content_as[dict] == {'new_path': 'im new'}
 
+    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
     async def test_mutate_in_upsert_semantics_kwargs(self, cb_env, new_kvp):
         cb = cb_env.collection
@@ -450,6 +464,7 @@ class SubDocumentTests:
         res = await cb_env.try_n_times(10, 3, cb.get, key)
         assert res.content_as[dict] == {'new_path': 'im new'}
 
+    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
     async def test_mutate_in_insert_semantics(self, cb_env, new_kvp):
         cb = cb_env.collection
@@ -465,6 +480,7 @@ class SubDocumentTests:
         res = await cb_env.try_n_times(10, 3, cb.get, key)
         assert res.content_as[dict] == {'new_path': 'im new'}
 
+    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
     async def test_mutate_in_insert_semantics_kwargs(self, cb_env, new_kvp):
         cb = cb_env.collection
@@ -544,6 +560,7 @@ class SubDocumentTests:
                                (SD.upsert('new_path', 'im new'),),
                                upsert_doc=True, replace_doc=True)
 
+    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
     async def test_array_append(self, cb_env, new_kvp):
         cb = cb_env.collection
@@ -560,6 +577,7 @@ class SubDocumentTests:
         assert len(val["array"]) == 5
         assert val["array"][4] == 5
 
+    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
     async def test_array_prepend(self, cb_env, new_kvp):
         cb = cb_env.collection
@@ -576,6 +594,7 @@ class SubDocumentTests:
         assert len(val["array"]) == 5
         assert val["array"][0] == 0
 
+    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
     async def test_array_insert(self, cb_env, new_kvp):
         cb = cb_env.collection
@@ -624,6 +643,7 @@ class SubDocumentTests:
         assert val[1] == 1
         assert val[2] == 2
 
+    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
     async def test_array_append_multi_insert(self, cb_env, new_kvp):
         cb = cb_env.collection
@@ -658,6 +678,7 @@ class SubDocumentTests:
         assert len(pre_res) == 3
         assert pre_res == [1, 2, 3]
 
+    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
     async def test_array_insert_multi_insert(self, cb_env, new_kvp):
         cb = cb_env.collection
@@ -675,6 +696,7 @@ class SubDocumentTests:
         assert len(ins_res) == 3
         assert ins_res == [5, 6, 7]
 
+    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
     async def test_array_add_unique_fail(self, cb_env):
         cb = cb_env.collection
@@ -781,6 +803,7 @@ class SubDocumentTests:
         assert result.content_as[dict]["new"]["array"] == [
             "Hello,", "World!"]
 
+    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
     async def test_array_add_unique_create_parents(self, cb_env, new_kvp):
         cb = cb_env.collection
@@ -800,6 +823,7 @@ class SubDocumentTests:
         assert "unique" in new_set
         assert "set" in new_set
 
+    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
     async def test_increment_create_parents(self, cb_env, new_kvp):
         cb = cb_env.collection
@@ -812,6 +836,7 @@ class SubDocumentTests:
         result = await cb.get(key)
         assert result.content_as[dict]["new"]["counter"] == 100
 
+    @pytest.mark.usefixtures('skip_mock_mutate_in')
     @pytest.mark.asyncio
     async def test_decrement_create_parents(self, cb_env, new_kvp):
         cb = cb_env.collection

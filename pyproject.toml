@@ -11,13 +11,25 @@ minversion = "6.0"
 #addopts = "-ra -q"
 testpaths = [
     "tests",
-    "acouchbase/tests"
+    "acouchbase/tests",
+    "couchbase/tests",
 ]
 python_classes = [
     "*Tests"
 ]
 python_files = [
     "*_t.py"
+]
+markers = [
+    "pycbc_couchbase: marks a test for the couchbase API (deselect with '-m \"not pycbc_couchbase\"')",
+    "pycbc_acouchbase: marks a test for the acouchbase API (deselect with '-m \"not pycbc_couchbase\"')",
+    "pycbc_diag: marks a test as a diagnostic API test",
+    "pycbc_kv: marks a test as a Key-Value API test",
+    "pycbc_streaming: marks a test as a streaming (query, search, analytics, or views) API test",
+    "pycbc_mgmt: marks a test as a management API test",
+    "pycbc_misc: marks a test as a miscellaneous (connect, rate_limit) API test",
+    "pycbc_txn: marks a test as a transactions API test",
+    "pycbc_slow_mgmt: marks a test as a management API test that is slow",
 ]
 
 [tool.autopep8]

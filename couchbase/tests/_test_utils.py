@@ -347,6 +347,7 @@ class TestEnvironment(CouchbaseTestEnvironment):
                                    *args,  # type: Any
                                    expected_exceptions=(Exception,),  # type: Tuple[Type[Exception],...]
                                    raise_exception=False,  # type: Optional[bool]
+                                   raise_if_no_exception=True,  # type: Optional[bool]
                                    **kwargs  # type: Any
                                    ):
         # type: (...) -> Any
@@ -363,6 +364,9 @@ class TestEnvironment(CouchbaseTestEnvironment):
                 raise
 
         # TODO: option to restart mock server?
+
+        if raise_if_no_exception is False:
+            return
 
         raise CouchbaseTestEnvironmentException(
             f"successful {func} after {num_times} times waiting {seconds_between} seconds between calls.")

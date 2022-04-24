@@ -1,15 +1,13 @@
-import asyncio
-
 import pytest
 import pytest_asyncio
 
-from acouchbase.cluster import Cluster
+from acouchbase.cluster import Cluster, get_event_loop
 from couchbase.auth import PasswordAuthenticator
 from couchbase.exceptions import InvalidArgumentException, SearchIndexNotFoundException
 from couchbase.management.search import SearchIndex
 from couchbase.options import ClusterOptions
 
-from ._test_utils import CollectionType, TestEnvironment
+from ._test_utils import TestEnvironment
 
 
 class SearchIndexManagementTests:
@@ -18,12 +16,12 @@ class SearchIndexManagementTests:
 
     @pytest_asyncio.fixture(scope="class")
     def event_loop(self):
-        loop = asyncio.get_event_loop()
+        loop = get_event_loop()
         yield loop
         loop.close()
 
-    @pytest_asyncio.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT])
-    async def couchbase_test_environment(self, couchbase_config, request):
+    @pytest_asyncio.fixture(scope="class", name="cb_env")
+    async def couchbase_test_environment(self, couchbase_config):
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
@@ -35,18 +33,9 @@ class SearchIndexManagementTests:
         await b.on_connect()
 
         coll = b.default_collection()
-        if request.param == CollectionType.DEFAULT:
-            cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True, manage_search_indexes=True)
-        elif request.param == CollectionType.NAMED:
-            cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True,
-                                     manage_collections=True, manage_search_indexes=True)
-            await cb_env.setup_named_collections()
+        cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True, manage_search_indexes=True)
 
-        # await cb_env.load_data()
         yield cb_env
-        # await cb_env.purge_data()
-        if request.param == CollectionType.NAMED:
-            await cb_env.teardown_named_collections()
         await c.close()
 
     @pytest.fixture(scope="class")

@@ -5,8 +5,8 @@ import pytest
 
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
-from couchbase.exceptions import CollectionAlreadyExistsException  # EventingFunctionCompilationFailureException,
-from couchbase.exceptions import (EventingFunctionAlreadyDeployedException,
+from couchbase.exceptions import (CollectionAlreadyExistsException,
+                                  EventingFunctionAlreadyDeployedException,
                                   EventingFunctionCollectionNotFoundException,
                                   EventingFunctionNotBootstrappedException,
                                   EventingFunctionNotDeployedException,
@@ -37,6 +37,7 @@ from couchbase.options import ClusterOptions
 from ._test_utils import EventingFunctionManagementTestStatusException, TestEnvironment
 
 
+@pytest.mark.flaky(reruns=5)
 class EventingManagementTests:
 
     EVT_SRC_BUCKET_NAME = "beer-sample"
@@ -79,11 +80,13 @@ class EventingManagementTests:
 
         if cb_env.is_feature_supported('collections'):
             cb_env._cm = cb_env.bucket.collections()
-            cb_env.setup_named_collections()
+            cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
         yield cb_env
         if cb_env.is_feature_supported('collections'):
-            cb_env.teardown_named_collections()
+            cb_env.try_n_times_till_exception(5, 3,
+                                              cb_env.teardown_named_collections,
+                                              raise_if_no_exception=False)
         cluster.close()
 
     @pytest.fixture(scope="class", name='evt_version')

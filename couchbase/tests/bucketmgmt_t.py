@@ -9,8 +9,7 @@ from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import (BucketAlreadyExistsException,
                                   BucketDoesNotExistException,
                                   BucketNotFlushableException,
-                                  FeatureUnavailableException,
-                                  InvalidArgumentException)
+                                  FeatureUnavailableException)
 from couchbase.management.buckets import (BucketSettings,
                                           BucketType,
                                           ConflictResolutionType,
@@ -21,6 +20,7 @@ from couchbase.options import ClusterOptions
 from ._test_utils import TestEnvironment
 
 
+@pytest.mark.flaky(reruns=5)
 class BucketManagementTests:
 
     @pytest.fixture(scope="class")
@@ -235,16 +235,14 @@ class BucketManagementTests:
     @pytest.mark.usefixtures("purge_buckets")
     def test_bucket_backend_magma(self, cb_env, test_bucket):
         # Create the bucket
-        # @TODO:  couchbase++ raises Ram quota for magma must be at least 1024 MiB, this correct?
-        with pytest.raises(InvalidArgumentException):
-            cb_env.bm.create_bucket(
-                CreateBucketSettings(
-                    name=test_bucket,
-                    ram_quota_mb=256,
-                    flush_enabled=False,
-                    storage_backend=StorageBackend.MAGMA))
-            bucket = cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
-            assert bucket.storage_backend == StorageBackend.MAGMA
+        cb_env.bm.create_bucket(
+            CreateBucketSettings(
+                name=test_bucket,
+                ram_quota_mb=256,
+                flush_enabled=False,
+                storage_backend=StorageBackend.MAGMA))
+        bucket = cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
+        assert bucket.storage_backend == StorageBackend.MAGMA
 
     @pytest.mark.usefixtures("check_bucket_storage_backend_supported")
     @pytest.mark.usefixtures("purge_buckets")

@@ -240,7 +240,6 @@ class Collection(CollectionLogic):
         if not transcoder:
             transcoder = self.default_transcoder
         final_args['transcoder'] = transcoder
-        print(f'lookup in kwargs: {final_args}')
         return self._lookup_in_internal(key, spec, **final_args)
 
     @BlockingWrapper.block_and_decode(LookupInResult)
@@ -1101,7 +1100,6 @@ class Collection(CollectionLogic):
                                                                      opts_type=IncrementMultiOptions,
                                                                      **kwargs)
         op_type = operations.INCREMENT.value
-        print(f'incr multi kwargs: {op_args}')
         res = binary_multi_operation(
             **self._get_connection_args(),
             op_type=op_type,

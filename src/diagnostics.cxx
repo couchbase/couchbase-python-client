@@ -267,7 +267,6 @@ create_diagnostics_op_response(const T& resp,
             // @TODO: how to catch exception here?
         }
         Py_DECREF(pyObj_args);
-        Py_XDECREF(pyObj_exc);
         Py_XDECREF(pyObj_kwargs);
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);

@@ -296,7 +296,6 @@ build_exception_from_context(const couchbase::error_context::key_value& ctx,
     Py_DECREF(pyObj_tmp);
 
     exc->error_context = pyObj_error_context;
-    Py_INCREF(exc->error_context);
 
     PyObject* pyObj_exc_info = PyDict_New();
 
@@ -317,7 +316,6 @@ build_exception_from_context(const couchbase::error_context::key_value& ctx,
     }
 
     exc->exc_info = pyObj_exc_info;
-    Py_INCREF(exc->exc_info);
 
     return reinterpret_cast<PyObject*>(exc);
 }
@@ -355,7 +353,6 @@ build_exception_from_context(const couchbase::error_context::http& ctx,
     }
 
     exc->error_context = pyObj_error_context;
-    Py_INCREF(exc->error_context);
 
     PyObject* pyObj_exc_info = PyDict_New();
 
@@ -376,7 +373,6 @@ build_exception_from_context(const couchbase::error_context::http& ctx,
     }
 
     exc->exc_info = pyObj_exc_info;
-    Py_INCREF(exc->exc_info);
 
     return reinterpret_cast<PyObject*>(exc);
 }
@@ -434,7 +430,6 @@ build_exception_from_context(const couchbase::error_context::query& ctx,
     Py_DECREF(pyObj_tmp);
 
     exc->error_context = pyObj_error_context;
-    Py_INCREF(exc->error_context);
 
     PyObject* pyObj_exc_info = PyDict_New();
 
@@ -455,7 +450,6 @@ build_exception_from_context(const couchbase::error_context::query& ctx,
     }
 
     exc->exc_info = pyObj_exc_info;
-    Py_INCREF(exc->exc_info);
 
     return reinterpret_cast<PyObject*>(exc);
 }
@@ -513,7 +507,6 @@ build_exception_from_context(const couchbase::error_context::analytics& ctx,
     Py_DECREF(pyObj_tmp);
 
     exc->error_context = pyObj_error_context;
-    Py_INCREF(exc->error_context);
 
     PyObject* pyObj_exc_info = PyDict_New();
 
@@ -534,7 +527,6 @@ build_exception_from_context(const couchbase::error_context::analytics& ctx,
     }
 
     exc->exc_info = pyObj_exc_info;
-    Py_INCREF(exc->exc_info);
 
     return reinterpret_cast<PyObject*>(exc);
 }
@@ -587,7 +579,6 @@ build_exception_from_context(const couchbase::error_context::search& ctx,
     Py_DECREF(pyObj_tmp);
 
     exc->error_context = pyObj_error_context;
-    Py_INCREF(exc->error_context);
 
     PyObject* pyObj_exc_info = PyDict_New();
 
@@ -608,7 +599,6 @@ build_exception_from_context(const couchbase::error_context::search& ctx,
     }
 
     exc->exc_info = pyObj_exc_info;
-    Py_INCREF(exc->exc_info);
 
     return reinterpret_cast<PyObject*>(exc);
 }
@@ -666,7 +656,6 @@ build_exception_from_context(const couchbase::error_context::view& ctx,
     Py_DECREF(pyObj_tmp);
 
     exc->error_context = pyObj_error_context;
-    Py_INCREF(exc->error_context);
 
     PyObject* pyObj_exc_info = PyDict_New();
 
@@ -687,7 +676,6 @@ build_exception_from_context(const couchbase::error_context::view& ctx,
     }
 
     exc->exc_info = pyObj_exc_info;
-    Py_INCREF(exc->exc_info);
 
     return reinterpret_cast<PyObject*>(exc);
 }

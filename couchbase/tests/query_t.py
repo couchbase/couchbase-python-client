@@ -7,8 +7,10 @@ from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.exceptions import (CouchbaseException,
                                   InvalidArgumentException,
-                                  ParsingFailedException,
-                                  QueryErrorContext)
+                                  KeyspaceNotFoundException,
+                                  QueryErrorContext,
+                                  QueryIndexNotFoundException,
+                                  ScopeNotFoundException)
 from couchbase.mutation_state import MutationState
 from couchbase.n1ql import (N1QLQuery,
                             QueryMetaData,
@@ -46,10 +48,11 @@ class QueryTests:
                                  manage_buckets=True,
                                  manage_query_indexes=True)
 
-        cb_env.ixm.create_primary_index(
-            bucket.name,
-            timeout=timedelta(seconds=60),
-            ignore_if_exists=True)
+        cb_env.try_n_times(10, 3, cb_env.ixm.create_primary_index,
+                           bucket.name,
+                           timeout=timedelta(seconds=60),
+                           ignore_if_exists=True)
+
         cb_env.load_data()
         # let it load a bit...
         for _ in range(5):
@@ -60,8 +63,11 @@ class QueryTests:
             cb_env.sleep(5)
         yield cb_env
         cb_env.purge_data()
-        cb_env.ixm.drop_primary_index(bucket.name,
-                                      ignore_if_not_exists=True)
+
+        cb_env.try_n_times_till_exception(10, 3,
+                                          cb_env.ixm.drop_primary_index,
+                                          bucket.name,
+                                          expected_exceptions=(QueryIndexNotFoundException))
         cluster.close()
 
     @pytest.fixture(scope="class")
@@ -272,12 +278,13 @@ class QueryCollectionTests:
                                  manage_buckets=True,
                                  manage_collections=True,
                                  manage_query_indexes=True)
-        cb_env.setup_named_collections()
+        cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
-        cb_env.ixm.create_primary_index(bucket.name,
-                                        scope_name=self.TEST_SCOPE,
-                                        collection_name=self.TEST_COLLECTION,
-                                        timeout=timedelta(seconds=60))
+        cb_env.try_n_times(10, 3, cb_env.ixm.create_primary_index,
+                           bucket.name,
+                           scope_name=self.TEST_SCOPE,
+                           collection_name=self.TEST_COLLECTION,
+                           timeout=timedelta(seconds=60))
 
         cb_env.load_data()
         # let it load a bit...
@@ -291,11 +298,15 @@ class QueryCollectionTests:
         yield cb_env
         cb_env.purge_data()
 
-        cb_env.ixm.drop_primary_index(bucket.name,
-                                      scope_name=self.TEST_SCOPE,
-                                      collection_name=self.TEST_COLLECTION)
+        cb_env.try_n_times_till_exception(10, 3, cb_env.ixm.drop_primary_index,
+                                          bucket.name,
+                                          scope_name=self.TEST_SCOPE,
+                                          collection_name=self.TEST_COLLECTION,
+                                          expected_exceptions=(QueryIndexNotFoundException,))
 
-        cb_env.teardown_named_collections()
+        cb_env.try_n_times_till_exception(5, 3,
+                                          cb_env.teardown_named_collections,
+                                          raise_if_no_exception=False)
         cluster.close()
 
     def _check_row_count(self, cb_env,
@@ -343,14 +354,12 @@ class QueryCollectionTests:
 
     def test_bad_query_context(self, cb_env):
         # test w/ no context
-        # @TODO:  what about KeyspaceNotFoundException?
-        with pytest.raises(ParsingFailedException):
+        with pytest.raises(KeyspaceNotFoundException):
             cb_env.cluster.query(f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2").execute()
 
         # test w/ bad scope
-        # @TODO:  what about ScopeNotFoundException?
         q_context = f'{cb_env.bucket.name}.`fake-scope`'
-        with pytest.raises(ParsingFailedException):
+        with pytest.raises(ScopeNotFoundException):
             cb_env.cluster.query(
                 f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2", QueryOptions(query_context=q_context)).execute()
 
@@ -361,14 +370,12 @@ class QueryCollectionTests:
 
     def test_bad_scope_query(self, cb_env):
         q_context = f'{cb_env.bucket.name}.`fake-scope`'
-        # @TODO:  ScopeNotFoundException
-        with pytest.raises(ParsingFailedException):
+        with pytest.raises(ScopeNotFoundException):
             cb_env.scope.query(f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2",
                                QueryOptions(query_context=q_context)).execute()
 
-        # @TODO:  KeyspaceNotFoundException
         q_context = f'`fake-bucket`.`{cb_env.scope.name}`'
-        with pytest.raises(ParsingFailedException):
+        with pytest.raises(KeyspaceNotFoundException):
             cb_env.scope.query(f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2",
                                query_context=q_context).execute()
 

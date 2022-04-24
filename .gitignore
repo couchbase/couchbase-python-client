@@ -18,7 +18,7 @@ couchbase/*.pyd
 .vscode/
 
 # tests
-tests/test_*/
+tests/test_logs/
 CouchbaseMock*.jar
 gocaves*
 .pytest_cache/

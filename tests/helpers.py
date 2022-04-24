@@ -589,6 +589,7 @@ class ClusterInformation():
         self.real_server_enabled = False
         self.mock_server_enabled = False
         self.mock_server = None
+        self.analytics_host = None
         # self.mock_path = ""
         # self.mock_url = None
         # self.mock_server = None
@@ -693,6 +694,7 @@ def load_config():  # noqa: C901
             cluster_info.bucket_name = config.get('realserver', 'bucket_name')
             cluster_info.bucket_password = config.get(
                 'realserver', 'bucket_password')
+            cluster_info.analytics_host = config.get('realserver', 'analytics_host', fallback=None)
 
         mock_path = ''
         mock_url = ''

@@ -1,4 +1,3 @@
-import asyncio
 import pathlib
 from datetime import timedelta
 from os import path
@@ -6,7 +5,7 @@ from os import path
 import pytest
 import pytest_asyncio
 
-from acouchbase.cluster import Cluster
+from acouchbase.cluster import Cluster, get_event_loop
 from couchbase.auth import PasswordAuthenticator
 from couchbase.exceptions import DesignDocumentNotFoundException
 from couchbase.management.options import (GetAllDesignDocumentsOptions,
@@ -32,7 +31,7 @@ class ViewIndexManagementTests:
 
     @pytest_asyncio.fixture(scope="class")
     def event_loop(self):
-        loop = asyncio.get_event_loop()
+        loop = get_event_loop()
         yield loop
         loop.close()
 

@@ -12,7 +12,9 @@ from couchbase.diagnostics import (ClusterState,
                                    EndpointState,
                                    PingState,
                                    ServiceType)
-from couchbase.exceptions import InvalidArgumentException, ParsingFailedException
+from couchbase.exceptions import (InvalidArgumentException,
+                                  ParsingFailedException,
+                                  QueryIndexNotFoundException)
 from couchbase.options import (ClusterOptions,
                                DiagnosticsOptions,
                                PingOptions)
@@ -171,7 +173,7 @@ class ClusterDiagnosticsTests:
         try:
             rows = await cluster.query(f'SELECT * FROM `{bucket_name}` LIMIT 1').execute()
             assert len(rows) > 0
-        except ParsingFailedException:
+        except (ParsingFailedException, QueryIndexNotFoundException):
             pass
 
         result = await cluster.diagnostics(

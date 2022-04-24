@@ -68,7 +68,6 @@ bucket_op_callback(std::error_code ec,
             pycbc_set_python_exception(PycbcError::InternalSDKError, __FILE__, __LINE__, msg.c_str());
         }
         Py_DECREF(pyObj_args);
-        Py_XDECREF(pyObj_exc);
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }
@@ -151,7 +150,6 @@ create_connection_callback(PyObject* pyObj_conn,
             pycbc_set_python_exception(PycbcError::InternalSDKError, __FILE__, __LINE__, "Create connection callback failed.");
         }
         Py_DECREF(pyObj_args);
-        Py_XDECREF(pyObj_exc);
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }

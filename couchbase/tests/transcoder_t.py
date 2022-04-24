@@ -30,13 +30,15 @@ class DefaultTranscoderTests:
         elif request.param == CollectionType.NAMED:
             cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config,
                                      manage_buckets=True, manage_collections=True)
-            cb_env.setup_named_collections()
+            cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
-        cb_env.load_data()
+        cb_env.try_n_times(3, 5, cb_env.load_data)
         yield cb_env
-        cb_env.purge_data()
+        cb_env.try_n_times(3, 5, cb_env.purge_data)
         if request.param == CollectionType.NAMED:
-            cb_env.teardown_named_collections()
+            cb_env.try_n_times_till_exception(5, 3,
+                                              cb_env.teardown_named_collections,
+                                              raise_if_no_exception=False)
         cluster.close()
 
     @pytest.fixture(name="new_kvp")

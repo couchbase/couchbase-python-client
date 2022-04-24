@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 import pytest_asyncio
 
-from acouchbase.cluster import Cluster
+from acouchbase.cluster import Cluster, get_event_loop
 from couchbase.auth import PasswordAuthenticator
 from couchbase.exceptions import (CouchbaseException,
                                   ParsingFailedException,
@@ -23,7 +23,7 @@ from ._test_utils import (CollectionType,
 class AsyncTransactionsTests:
     @pytest_asyncio.fixture(scope="class")
     def event_loop(self):
-        loop = asyncio.get_event_loop()
+        loop = get_event_loop()
         yield loop
         loop.close()
 
@@ -49,13 +49,17 @@ class AsyncTransactionsTests:
             cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True)
         elif request.param == CollectionType.NAMED:
             cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True, manage_collections=True)
-            await cb_env.setup_named_collections()
+            await cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
-        await cb_env.load_data()
+        await cb_env.try_n_times(5, 3, cb_env.load_data)
         yield cb_env
-        await cb_env.purge_data()
+        await cb_env.try_n_times_till_exception(3, 5,
+                                                cb_env.purge_data,
+                                                raise_if_no_exception=False)
         if request.param == CollectionType.NAMED:
-            await cb_env.teardown_named_collections()
+            await cb_env.try_n_times_till_exception(5, 3,
+                                                    cb_env.teardown_named_collections,
+                                                    raise_if_no_exception=False)
         await c.close()
 
     @pytest.fixture(scope="class")

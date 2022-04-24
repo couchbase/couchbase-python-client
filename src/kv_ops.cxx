@@ -274,7 +274,6 @@ create_result_from_get_operation_response(const char* key,
         }
         Py_DECREF(pyObj_args);
         Py_XDECREF(pyObj_kwargs);
-        Py_XDECREF(pyObj_exc);
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }
@@ -383,7 +382,6 @@ create_result_from_get_operation_response<couchbase::operations::exists_response
             pycbc_set_python_exception(PycbcError::InternalSDKError, __FILE__, __LINE__, "KV read operation callback failed.");
         }
         Py_DECREF(pyObj_args);
-        Py_XDECREF(pyObj_exc);
         Py_XDECREF(pyObj_kwargs);
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
@@ -664,7 +662,6 @@ create_result_from_mutation_operation_response(const char* key,
             pycbc_set_python_exception(PycbcError::InternalSDKError, __FILE__, __LINE__, "Mutation operation callback failed.");
         }
         Py_DECREF(pyObj_args);
-        Py_XDECREF(pyObj_exc);
         Py_XDECREF(pyObj_kwargs);
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);

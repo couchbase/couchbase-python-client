@@ -792,9 +792,14 @@ class SearchRowLocations:
     def get_all(self) -> List[SearchRowLocation]:
         """list all locations (any field, any term)"""
         locations = []
-        for loc_field, terms in self._raw_locations.items():
-            for term in terms.keys():
-                locations.extend(self.get(loc_field, term))
+        for location in self._raw_locations:
+            locations.append(SearchRowLocation(**location))
+
+        # TODO:  maybe needed when using couchbase++ streaming
+        # for loc_field, terms in self._raw_locations.items():
+        #     for term in terms.keys():
+        #         locations.extend(self.get(loc_field, term))
+
         return locations
 
     def get(self,

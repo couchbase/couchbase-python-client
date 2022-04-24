@@ -77,7 +77,6 @@ class AsyncCollection(CollectionLogic):
         key,  # type: str
         **kwargs,  # type: Dict[str, Any]
     ) -> Awaitable[GetResult]:
-        print(f'_get kwargs: {kwargs}')
         super().get(key, **kwargs)
 
     @AsyncWrapper.inject_callbacks(ExistsResult)
@@ -203,7 +202,6 @@ class AsyncCollection(CollectionLogic):
         if not transcoder:
             transcoder = self.default_transcoder
         final_args['transcoder'] = transcoder
-        print(f'lookup in kwargs: {final_args}')
         return self._lookup_in_internal(key, spec, **final_args)
 
     @AsyncWrapper.inject_callbacks_and_decode(LookupInResult)

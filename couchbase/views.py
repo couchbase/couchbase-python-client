@@ -58,7 +58,9 @@ class ViewRequest(ViewRequestLogic):
         if row is None:
             raise StopIteration
 
-        deserialized_row = self.serializer.deserialize(row)
+        # TODO:  until streaming, a dict is returned, no deserializing...
+        # deserialized_row = self.serializer.deserialize(row)
+        deserialized_row = row
         if issubclass(self.row_factory, ViewRow):
             return self.row_factory(**deserialized_row)
         else:

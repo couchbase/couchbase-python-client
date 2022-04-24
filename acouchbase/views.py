@@ -8,7 +8,7 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   ExceptionMap)
 from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.views import ViewQuery  # noqa: F401
-from couchbase.logic.views import ViewRequestLogic
+from couchbase.logic.views import ViewRequestLogic, ViewRow
 
 
 class AsyncViewRequest(ViewRequestLogic):
@@ -68,8 +68,14 @@ class AsyncViewRequest(ViewRequestLogic):
         # should only be None one query request is complete and _no_ errors found
         if row is None:
             raise StopAsyncIteration
-        # this should allow the event loop to pick up something else
-        await self._rows.put(self.serializer.deserialize(row))
+
+        # TODO:  until streaming, a dict is returned, no deserializing...
+        # deserialized_row = self.serializer.deserialize(row)
+        deserialized_row = row
+        if issubclass(self.row_factory, ViewRow):
+            await self._rows.put(self.row_factory(**deserialized_row))
+        else:
+            await self._rows.put(deserialized_row)
 
     async def __anext__(self):
         try:

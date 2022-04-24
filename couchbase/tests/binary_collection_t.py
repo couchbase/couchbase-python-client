@@ -33,45 +33,45 @@ class BinaryCollectionTests:
         elif request.param == CollectionType.NAMED:
             cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config,
                                      manage_buckets=True, manage_collections=True)
-            cb_env.setup_named_collections()
+            cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
         yield cb_env
 
-        # teardown
-        # cb_env.purge_binary_data()
         if request.param == CollectionType.NAMED:
-            cb_env.teardown_named_collections()
+            cb_env.try_n_times_till_exception(5, 3,
+                                              cb_env.teardown_named_collections,
+                                              raise_if_no_exception=False)
         cluster.close()
 
     # key/value fixtures
 
     @pytest.fixture(name='utf8_empty_kvp')
     def utf8_key_and_empty_value(self, cb_env) -> KVPair:
-        key, value = cb_env.load_utf8_binary_data()
+        key, value = cb_env.try_n_times(5, 3, cb_env.load_utf8_binary_data)
         yield KVPair(key, value)
         cb_env.collection.upsert(key, '', transcoder=RawStringTranscoder())
 
     @pytest.fixture(name='utf8_kvp')
     def utf8_key_and_value(self, cb_env) -> KVPair:
-        key, value = cb_env.load_utf8_binary_data(start_value='XXXX')
+        key, value = cb_env.try_n_times(5, 3, cb_env.load_utf8_binary_data, start_value='XXXX')
         yield KVPair(key, value)
         cb_env.collection.upsert(key, '', transcoder=RawStringTranscoder())
 
     @pytest.fixture(name='bytes_empty_kvp')
     def bytes_key_and_empty_value(self, cb_env) -> KVPair:
-        key, value = cb_env.load_bytes_binary_data()
+        key, value = cb_env.try_n_times(5, 3, cb_env.load_bytes_binary_data)
         yield KVPair(key, value)
         cb_env.collection.upsert(key, b'', transcoder=RawBinaryTranscoder())
 
     @pytest.fixture(name='bytes_kvp')
     def bytes_key_and_value(self, cb_env) -> KVPair:
-        key, value = cb_env.load_bytes_binary_data(start_value=b'XXXX')
+        key, value = cb_env.try_n_times(5, 3, cb_env.load_bytes_binary_data, start_value=b'XXXX')
         yield KVPair(key, value)
         cb_env.collection.upsert(key, b'', transcoder=RawBinaryTranscoder())
 
     @pytest.fixture(name='counter_empty_kvp')
     def counter_key_and_empty_value(self, cb_env) -> KVPair:
-        key, value = cb_env.load_counter_binary_data()
+        key, value = cb_env.try_n_times(5, 3, cb_env.load_counter_binary_data)
         yield KVPair(key, value)
         cb_env.try_n_times_till_exception(10,
                                           1,
@@ -81,7 +81,7 @@ class BinaryCollectionTests:
 
     @pytest.fixture(name='counter_kvp')
     def counter_key_and_value(self, cb_env) -> KVPair:
-        key, value = cb_env.load_counter_binary_data(start_value=100)
+        key, value = cb_env.try_n_times(5, 3, cb_env.load_counter_binary_data, start_value=100)
         yield KVPair(key, value)
         cb_env.try_n_times_till_exception(10,
                                           1,

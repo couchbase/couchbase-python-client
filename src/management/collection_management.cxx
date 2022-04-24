@@ -142,7 +142,6 @@ create_result_from_collection_mgmt_op_response(const T& resp,
         }
         Py_DECREF(pyObj_args);
         Py_XDECREF(pyObj_kwargs);
-        Py_XDECREF(pyObj_exc);
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }

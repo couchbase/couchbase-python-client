@@ -1,0 +1,29 @@
+function(doc, meta) {
+  switch (doc.type) {
+    case "landmark":
+      if (doc.name) {
+        emit([doc.name, meta.id]);
+      }
+      break;
+    case "hotel":
+      if (doc.name) {
+        emit([doc.name, meta.id]);
+      }
+      break;
+    case "airport":
+      if (doc.city) {
+        emit([doc.city, meta.id]);
+      }
+      break;
+    case "airline":
+      if (doc.callsign) {
+        emit([doc.callsign, meta.id]);
+      }
+      break;
+    case "route":
+      if (doc.airlineid) {
+        emit([doc.airlineid, meta.id]);
+      }
+      break;
+  }
+}
