@@ -119,9 +119,10 @@ class EnumToStr:
     def __call__(self, value  # type:  Enum
                  ) -> str:
         # TODO:  maybe?
-        # if isinstance(value, str) and value in map(lambda x: x.value, self._type):
-        #     warn("Using deprecated string parameter {}".format(value))
-        #     return value
+        if isinstance(value, str) and value in map(lambda x: x.value, self._type):
+            # TODO: use warning?
+            # warn("Using deprecated string parameter {}".format(value))
+            return value
         if not isinstance(value, self._type):
             exc = InvalidArgumentException.pycbc_create_exception(
                 exception(),

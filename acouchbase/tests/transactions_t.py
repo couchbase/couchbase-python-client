@@ -8,16 +8,12 @@ import pytest_asyncio
 
 from acouchbase.cluster import Cluster
 from couchbase.auth import PasswordAuthenticator
-from couchbase.exceptions import (
-    CouchbaseException,
-    TransactionExpired,
-    TransactionFailed,
-    TransactionOperationFailed,
-    ParsingFailedException)
+from couchbase.exceptions import (CouchbaseException,
+                                  ParsingFailedException,
+                                  TransactionExpired,
+                                  TransactionFailed)
 from couchbase.options import ClusterOptions
-from couchbase.transactions import (PerTransactionConfig,
-                                    TransactionQueryOptions,
-                                    TransactionResult)
+from couchbase.transactions import PerTransactionConfig, TransactionResult
 
 from ._test_utils import (CollectionType,
                           KVPair,

@@ -701,7 +701,6 @@ class QueueEmpty(Exception):
 
 class RateLimitedException(CouchbaseException):
     """
-    **UNCOMMITTED**
     Rate limited exceptions are an uncommitted API that is unlikely to change,
     but may still change as final consensus on its behavior has not yet been reached.
 
@@ -711,7 +710,6 @@ class RateLimitedException(CouchbaseException):
 
 class QuotaLimitedException(CouchbaseException):
     """
-    **UNCOMMITTED**
     Quota limited exceptions are an uncommitted API that is unlikely to change,
     but may still change as final consensus on its behavior has not yet been reached.
 
@@ -725,6 +723,7 @@ class TransactionException(CouchbaseException):
     """
     Base class for any transaction-related exception
     """
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -735,6 +734,7 @@ class TransactionOperationFailed(TransactionException):
 
     The transaction will be rolled back no matter what, but this error can give some context as to why it failed.
     """
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -760,6 +760,7 @@ class TransactionExpired(TransactionException):
     It is in an undefined state, but it unambiguously did not reach the commit point.  No actors will be able to see the
     contents of this transaction.The transaction exceeded the expiry set in the TransactionConfig, and was rolled back.
     """
+
     def __str__(self):
         return f'TransactionExpired{{{super().__str__()}}}'
 
@@ -781,6 +782,7 @@ class TransactionCommitAmbiguous(TransactionException):
     The asynchronous cleanup process will try to complete the transaction: roll it back if it didn't commit, roll it
     forwards if it did.
     """
+
     def __str__(self):
         return f'TransactionCommitAmbiguous{{{super().__str__()}}}'
 
@@ -816,7 +818,10 @@ class ExceptionMap(Enum):
     BucketNotFoundException = 10
     AmbiguousTimeoutException = 13
     UnAmbiguousTimeoutException = 14
+    QueryIndexNotFoundException = 17
     QueryIndexAlreadyExistsException = 18
+    RateLimitedException = 21
+    QuotaLimitedException = 22
     DocumentNotFoundException = 101
     DocumentLockedException = 103
     DocumentExistsException = 105

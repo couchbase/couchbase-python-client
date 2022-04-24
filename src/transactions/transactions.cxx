@@ -521,7 +521,8 @@ pycbc_txns::destroy_transactions([[maybe_unused]] PyObject* self, PyObject* args
     Py_END_ALLOW_THREADS Py_RETURN_NONE;
 }
 
-PyObject* init_transaction_exception_type(const char* klass)
+PyObject*
+init_transaction_exception_type(const char* klass)
 {
     static PyObject* couchbase_exceptions = PyImport_ImportModule("couchbase.exceptions");
     assert(nullptr != couchbase_exceptions);
@@ -529,7 +530,7 @@ PyObject* init_transaction_exception_type(const char* klass)
 }
 
 PyObject*
-convert_to_python_exc_type(std::exception_ptr err, bool set_exception=false)
+convert_to_python_exc_type(std::exception_ptr err, bool set_exception = false)
 {
     static PyObject* pyObj_txn_failed = init_transaction_exception_type("TransactionFailed");
     static PyObject* pyObj_txn_expired = init_transaction_exception_type("TransactionExpired");
@@ -561,19 +562,19 @@ convert_to_python_exc_type(std::exception_ptr err, bool set_exception=false)
                 break;
         }
         message = e.what();
-    } catch(const tx::transaction_operation_failed& e) {
+    } catch (const tx::transaction_operation_failed& e) {
         pyObj_exc_type = pyObj_txn_op_failed;
         message = e.what();
-    } catch(const tx::query_parsing_failure& e) {
+    } catch (const tx::query_parsing_failure& e) {
         pyObj_exc_type = pyObj_query_parsing_failure;
         message = e.what();
-    } catch(const tx::query_exception& e) {
+    } catch (const tx::query_exception& e) {
         pyObj_exc_type = pyObj_couchbase_error;
         message = e.what();
-    } catch(const std::exception& e) {
+    } catch (const std::exception& e) {
         pyObj_exc_type = pyObj_couchbase_error;
         message = e.what();
-    } catch(...) {
+    } catch (...) {
         pyObj_exc_type = pyObj_couchbase_error;
         message = "Unknown error";
     }
@@ -581,7 +582,7 @@ convert_to_python_exc_type(std::exception_ptr err, bool set_exception=false)
     PyDict_SetItemString(pyObj_error_ctx, "message", tmp);
     Py_DECREF(tmp);
     PyObject* pyObj_args = PyTuple_New(0);
-    pyObj_final_error = PyObject_Call(pyObj_exc_type, pyObj_args, pyObj_error_ctx );
+    pyObj_final_error = PyObject_Call(pyObj_exc_type, pyObj_args, pyObj_error_ctx);
     if (set_exception) {
         PyErr_SetObject(pyObj_exc_type, pyObj_final_error);
         return nullptr;
@@ -1045,7 +1046,9 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
         Py_END_ALLOW_THREADS if (err)
         {
             return convert_to_python_exc_type(err, true);
-        } else {
+        }
+        else
+        {
             return retval;
         }
     }

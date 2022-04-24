@@ -8,6 +8,7 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
 from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.analytics import AnalyticsRequestLogic
 
+
 class AnalyticsRequest(AnalyticsRequestLogic):
     def __init__(self,
                  connection,
@@ -33,7 +34,7 @@ class AnalyticsRequest(AnalyticsRequestLogic):
         return cls(connection, loop, query_params, row_factory=row_factory, **kwargs)
 
     def execute_analytics_query(self):
-        #if self._query_request_ftr is not None and self._query_request_ftr.done():
+        # if self._query_request_ftr is not None and self._query_request_ftr.done():
         if self.done_streaming:
             raise AlreadyQueriedException()
 

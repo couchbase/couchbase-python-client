@@ -28,7 +28,9 @@ from couchbase.transcoder import RawBinaryTranscoder, RawStringTranscoder
 from tests.helpers import CollectionType  # noqa: F401
 from tests.helpers import EventingFunctionManagementTestStatusException  # noqa: F401
 from tests.helpers import KVPair  # noqa: F401
-from tests.helpers import CouchbaseTestEnvironment, CouchbaseTestEnvironmentException
+from tests.helpers import (CouchbaseTestEnvironment,
+                           CouchbaseTestEnvironmentException,
+                           RateLimitData)
 
 
 class TestEnvironment(CouchbaseTestEnvironment):
@@ -69,6 +71,11 @@ class TestEnvironment(CouchbaseTestEnvironment):
         if kwargs.get('manage_eventing_functions', False) is True:
             self.check_if_feature_supported('eventing_function_mgmt')
             self._efm = self.cluster.eventing_functions()
+
+        rl_params = kwargs.get('rate_limit_params', None)
+        if rl_params is not None:
+            self.check_if_feature_supported('rate_limiting')
+            self._rate_limit_params = rl_params
 
         self._test_bucket = None
         self._test_bucket_cm = None
@@ -139,6 +146,11 @@ class TestEnvironment(CouchbaseTestEnvironment):
     def test_bucket_cm(self) -> Optional[CollectionManager]:
         """Returns the test bucket's CollectionManager"""
         return self._test_bucket_cm if hasattr(self, '_test_bucket_cm') else None
+
+    @property
+    def rate_limit_params(self) -> Optional[RateLimitData]:
+        """Returns the rate limit testing data"""
+        return self._rate_limit_params if hasattr(self, '_rate_limit_params') else None
 
     async def get_new_key_value(self, reset=True):
         if reset is True:

@@ -5,7 +5,7 @@ import pathlib
 import time
 from collections import namedtuple
 from configparser import ConfigParser
-from dataclasses import fields
+from dataclasses import dataclass, fields
 from datetime import datetime
 from enum import Enum, IntEnum
 from typing import (List,
@@ -665,6 +665,14 @@ def restart_mock(mock) -> None:
         import traceback
         traceback.print_exc()
         raise CouchbaseTestEnvironmentException('Error trying to restart mock')
+
+
+@dataclass
+class RateLimitData:
+    url: str = None
+    username: str = None
+    pw: str = None
+    fts_indexes: List[str] = None
 
 
 def load_config():  # noqa: C901

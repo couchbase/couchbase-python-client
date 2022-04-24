@@ -7,11 +7,10 @@ import pytest
 
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
-from couchbase.exceptions import (
-    TransactionFailed,
-    TransactionOperationFailed,
-    TransactionExpired,
-    ParsingFailedException)
+from couchbase.exceptions import (ParsingFailedException,
+                                  TransactionExpired,
+                                  TransactionFailed,
+                                  TransactionOperationFailed)
 from couchbase.options import ClusterOptions
 from couchbase.transactions import (PerTransactionConfig,
                                     TransactionQueryOptions,

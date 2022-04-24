@@ -387,7 +387,8 @@ class BucketSettings(dict):
         """BucketSettings provides a means of mapping bucket settings into an object.
 
         """
-
+        if kwargs.get('bucket_type', None) == "couchbase":
+            kwargs['bucket_type'] = BucketType.COUCHBASE
         super(BucketSettings, self).__init__(**kwargs)
 
     @property
@@ -459,9 +460,6 @@ class BucketSettings(dict):
     def storage_backend(self):
         # type: (...) -> StorageBackend
         """
-        **UNCOMMITTED**
-        StorageBackend is part of an uncommitted API that is unlikely to change,
-        but may still change as final consensus on its behavior has not yet been reached.
         {couchstore | magma | undefined} - The storage backend to use.
         """
         return self.get('storage_backend')

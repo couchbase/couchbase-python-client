@@ -513,6 +513,29 @@ class QueryIndexCollectionManagementTests:
 
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
     @pytest.mark.usefixtures("clear_all_indexes")
+    def test_create_secondary_index_default_coll(self, cb_env):
+        bucket_name = cb_env.bucket.name
+        ixm = cb_env.ixm
+        ixname = 'ix2'
+        fields = ('fld1', 'fld2')
+        ixm.create_index(bucket_name, ixname,
+                         fields=fields,
+                         timeout=timedelta(seconds=120),
+                         ignore_if_exists=True)
+
+        def check_index():
+            indexes = ixm.get_all_indexes(bucket_name,
+                                          scope_name='_default')
+            result = next((idx for idx in indexes if idx.name == ixname), None)
+            assert result is not None
+            return result
+        cb_env.try_n_times(10, 5, check_index)
+        ixm.drop_index(bucket_name,
+                       ixname,
+                       timeout=timedelta(seconds=120))
+
+    @pytest.mark.usefixtures("check_query_index_mgmt_supported")
+    @pytest.mark.usefixtures("clear_all_indexes")
     def test_create_secondary_indexes_condition(self, cb_env):
         bucket_name = cb_env.bucket.name
         ixm = cb_env.ixm

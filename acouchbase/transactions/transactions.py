@@ -10,6 +10,7 @@ from couchbase.transactions import (TransactionGetResult,
                                     TransactionQueryResults,
                                     TransactionResult)
 from couchbase.transactions.logic import AttemptContextLogic, TransactionsLogic
+
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
 
