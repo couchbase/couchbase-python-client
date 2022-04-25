@@ -11,7 +11,8 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   ErrorMapper,
                                   ExceptionMap,
                                   InternalSDKException,
-                                  PathNotFoundException)
+                                  PathNotFoundException,
+                                  ServiceUnavailableException)
 from couchbase.exceptions import exception as BaseCouchbaseException
 
 
@@ -57,6 +58,9 @@ class BlockingWrapper:
                         retval = return_cls(ret)
                     return retval
                 except CouchbaseException as e:
+                    if isinstance(e, ServiceUnavailableException) and fn.__name__ == '_get_cluster_info':
+                        e._message = ('If using Couchbase Server < 6.6, '
+                                      'a bucket needs to be opened prior to cluster level operations')
                     raise e
                 except Exception as ex:
                     print(f'base exception: {ex}')

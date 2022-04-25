@@ -8,7 +8,8 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   DocumentNotFoundException,
                                   ErrorMapper,
                                   ExceptionMap,
-                                  MissingConnectionException)
+                                  MissingConnectionException,
+                                  ServiceUnavailableException)
 from couchbase.logic import decode_value
 
 
@@ -175,6 +176,9 @@ class AsyncWrapper:
 
                 def on_err(exc):
                     excptn = ErrorMapper.build_exception(exc)
+                    if isinstance(excptn, ServiceUnavailableException) and fn.__name__ == '_get_cluster_info':
+                        excptn._message = ('If using Couchbase Server < 6.6, '
+                                           'a bucket needs to be opened prior to cluster level operations')
                     self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok

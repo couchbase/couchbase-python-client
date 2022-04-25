@@ -25,7 +25,6 @@ from couchbase._utils import (timedelta_as_microseconds,
 from couchbase.durability import DurabilityParser
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.pycbc_core import transaction_config
-from couchbase.transcoder import DefaultJsonSerializer
 
 # allows for imports only during type checking and not during runtime -- :)
 if TYPE_CHECKING:
@@ -38,7 +37,6 @@ if TYPE_CHECKING:
     from couchbase.management.views import DesignDocumentNamespace
     from couchbase.mutation_state import MutationState
     from couchbase.n1ql import QueryProfile, QueryScanConsistency
-    from couchbase.transcoder import Serializer
     from couchbase.search import (Facet,
                                   HighlightStyle,
                                   SearchScanConsistency,
@@ -1732,7 +1730,7 @@ class TransactionConfig:
                  cleanup_client_attempts=None,  # type: Optional[bool]
                  custom_metadata_collection=None,  # type: Optional[Collection]
                  scan_consistency=None,  # type: Optional[QueryScanConsistency]
-                 serializer=None  # type: Optional[JSONSerializer]
+                 serializer=None  # type: Optional[Serializer]
                  ):
         pass
 

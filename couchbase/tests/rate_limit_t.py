@@ -12,7 +12,8 @@ from couchbase.cluster import Cluster
 from couchbase.exceptions import (CouchbaseException,
                                   DocumentNotFoundException,
                                   QuotaLimitedException,
-                                  RateLimitedException)
+                                  RateLimitedException,
+                                  ScopeNotFoundException)
 from couchbase.management.collections import CollectionSpec
 from couchbase.management.options import GetUserOptions
 from couchbase.management.search import SearchIndex
@@ -23,6 +24,7 @@ from tests.helpers import CouchbaseTestEnvironmentException
 from ._test_utils import RateLimitData, TestEnvironment
 
 
+@pytest.mark.flaky(reruns=5)
 class RateLimitTests:
     """
     These tests should just test the collection interface, as simply
@@ -38,13 +40,13 @@ class RateLimitTests:
     @pytest.fixture(scope="class", name="cb_env")
     def couchbase_test_environment(self, couchbase_config):
         if couchbase_config.is_mock_server:
-            pytest.skip('Mocker server does not support rate limit testing.')
+            pytest.skip('Mock server does not support feature: rate limit testing.')
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(conn_string, opts)
-        cluster.cluster_info()
+        cluster = Cluster.connect(conn_string, opts)
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        cluster.cluster_info()
 
         coll = bucket.default_collection()
 
@@ -116,7 +118,17 @@ class RateLimitTests:
         except CouchbaseException:
             pass
 
-        print('done!')
+    @pytest.fixture()
+    def cleanup_scope_and_collection(self, cb_env):
+        cb_env.try_n_times_till_exception(5, 1,
+                                          cb_env.cm.drop_scope,
+                                          self.RATE_LIMIT_SCOPE_NAME,
+                                          expected_exceptions=(ScopeNotFoundException,))
+        yield
+        cb_env.try_n_times_till_exception(5, 1,
+                                          cb_env.cm.drop_scope,
+                                          self.RATE_LIMIT_SCOPE_NAME,
+                                          expected_exceptions=(ScopeNotFoundException,))
 
     def _create_rate_limit_user(self, cb_env, username, limits):
         params = {
@@ -258,7 +270,6 @@ class RateLimitTests:
 
             time.sleep(interval_ms)
 
-    @pytest.mark.flaky(reruns=5)
     def test_rate_limits(self, couchbase_config, cb_env):
         self._create_rate_limit_user(cb_env,
                                      self.USERNAME, {
@@ -288,7 +299,6 @@ class RateLimitTests:
                 cluster.close()
 
     @pytest.mark.usefixtures('remove_docs')
-    @pytest.mark.flaky(reruns=5)
     def test_rate_limits_ingress(self, couchbase_config, cb_env):
         self._create_rate_limit_user(cb_env,
                                      self.USERNAME, {
@@ -302,8 +312,8 @@ class RateLimitTests:
         conn_string = couchbase_config.get_connection_string()
         cluster = None
         try:
-            cluster = Cluster(conn_string,
-                              ClusterOptions(PasswordAuthenticator(self.USERNAME, "password")))
+            cluster = Cluster.connect(conn_string,
+                                      ClusterOptions(PasswordAuthenticator(self.USERNAME, "password")))
             bucket = cluster.bucket("default")
             collection = bucket.default_collection()
 
@@ -320,7 +330,6 @@ class RateLimitTests:
                 cluster.close()
 
     @pytest.mark.usefixtures('remove_docs')
-    @pytest.mark.flaky(reruns=5)
     def test_rate_limits_egress(self, couchbase_config, cb_env):
         self._create_rate_limit_user(cb_env,
                                      self.USERNAME, {"kv_limits": {
@@ -333,8 +342,8 @@ class RateLimitTests:
         conn_string = couchbase_config.get_connection_string()
         cluster = None
         try:
-            cluster = Cluster(conn_string,
-                              ClusterOptions(PasswordAuthenticator(self.USERNAME, "password")))
+            cluster = Cluster.connect(conn_string,
+                                      ClusterOptions(PasswordAuthenticator(self.USERNAME, "password")))
             bucket = cluster.bucket("default")
             collection = bucket.default_collection()
 
@@ -351,7 +360,6 @@ class RateLimitTests:
             if cluster and cluster.connected:
                 cluster.close()
 
-    @pytest.mark.flaky(reruns=5)
     def test_rate_limits_max_conns(self, couchbase_config, cb_env):
         self._create_rate_limit_user(cb_env,
                                      self.USERNAME, {
@@ -366,8 +374,8 @@ class RateLimitTests:
         cluster1 = None
         conn_string = couchbase_config.get_connection_string()
         try:
-            cluster = Cluster(conn_string,
-                              ClusterOptions(PasswordAuthenticator(self.USERNAME, "password")))
+            cluster = Cluster.connect(conn_string,
+                                      ClusterOptions(PasswordAuthenticator(self.USERNAME, "password")))
             bucket = cluster.bucket("default")
             collection = bucket.default_collection()
             collection.exists("some-key")
@@ -387,7 +395,6 @@ class RateLimitTests:
             if cluster1 and cluster1.connected:
                 cluster1.close()
 
-    @pytest.mark.flaky(reruns=5)
     def test_rate_limits_query(self, couchbase_config, cb_env):
         self._create_rate_limit_user(cb_env,
                                      self.USERNAME, {
@@ -403,8 +410,8 @@ class RateLimitTests:
         cluster = None
         qm = None
         try:
-            cluster = Cluster(conn_string,
-                              ClusterOptions(PasswordAuthenticator(self.USERNAME, "password")))
+            cluster = Cluster.connect(conn_string,
+                                      ClusterOptions(PasswordAuthenticator(self.USERNAME, "password")))
 
             qm = cluster.query_indexes()
             qm.create_primary_index("default", ignore_if_exists=True)
@@ -419,7 +426,6 @@ class RateLimitTests:
             if cluster and cluster.connected:
                 cluster.close()
 
-    @pytest.mark.flaky(reruns=5)
     def test_rate_limits_fts(self, couchbase_config, cb_env):
         self._create_rate_limit_user(cb_env,
                                      self.USERNAME, {
@@ -440,8 +446,8 @@ class RateLimitTests:
         cb_env.rate_limit_params.fts_indexes.append("ratelimit-idx")
 
         try:
-            cluster = Cluster(conn_string,
-                              ClusterOptions(PasswordAuthenticator(self.USERNAME, "password")))
+            cluster = Cluster.connect(conn_string,
+                                      ClusterOptions(PasswordAuthenticator(self.USERNAME, "password")))
 
             self._try_until_timeout(
                 5, 50, cluster.search_query, "ratelimit-idx", TermQuery("north"), SearchOptions(limit=1), fts=True)
@@ -455,7 +461,7 @@ class RateLimitTests:
             if cluster and cluster.connected:
                 cluster.close()
 
-    @pytest.mark.flaky(reruns=5)
+    @pytest.mark.usefixtures('cleanup_scope_and_collection')
     def test_rate_limits_kv_scopes_data_size(self, cb_env):
         scope_name = self.RATE_LIMIT_SCOPE_NAME
         self._create_rate_limit_scope(cb_env, scope_name, {
@@ -479,20 +485,7 @@ class RateLimitTests:
             for _ in range(5):
                 collection.upsert("ratelimit-datasize", doc)
 
-        cb_env.cm.drop_collection(collection_spec)
-        for _ in range(5):
-            res = cb_env.get_collection(scope_name,
-                                        collection_spec.name,
-                                        cb_env.bucket.name)
-            if not res:
-                break
-        cb_env.cm.drop_scope(scope_name)
-        for _ in range(5):
-            res = cb_env.get_scope(scope_name, cb_env.bucket.name)
-            if not res:
-                break
-
-    @pytest.mark.flaky(reruns=5)  # noqa: C901
+    @pytest.mark.usefixtures('cleanup_scope_and_collection')  # noqa: C901
     def test_rate_limits_index_scopes(self, cb_env):  # noqa: C901
         scope_name = self.RATE_LIMIT_SCOPE_NAME
         self._create_rate_limit_scope(cb_env, scope_name, {
@@ -568,21 +561,7 @@ class RateLimitTests:
             scope.query("CREATE INDEX `{}` ON `{}`(testField)".format(
                 idx_name, collection_spec.name)).execute()
 
-        cb_env.cm.drop_collection(collection_spec)
-        for _ in range(5):
-            res = cb_env.get_collection(scope_name,
-                                        collection_spec.name,
-                                        cb_env.bucket.name)
-            if not res:
-                break
-
-        cb_env.cm.drop_scope(scope_name)
-        for _ in range(5):
-            res = cb_env.get_scope(scope_name, cb_env.bucket.name)
-            if not res:
-                break
-
-    @pytest.mark.flaky(reruns=5)  # noqa: C901
+    @pytest.mark.usefixtures('cleanup_scope_and_collection')  # noqa: C901
     def test_rate_limits_fts_scopes(self, cb_env):  # noqa: C901
         scope_name = self.RATE_LIMIT_SCOPE_NAME
         self._create_rate_limit_scope(cb_env, scope_name, {
@@ -666,21 +645,7 @@ class RateLimitTests:
             cb_env.rate_limit_params.fts_indexes.append(new_idx.name)
             ixm.upsert_index(new_idx)
 
-        cb_env.cm.drop_collection(collection_spec)
-        for _ in range(5):
-            res = cb_env.get_collection(scope_name,
-                                        collection_spec.name,
-                                        cb_env.bucket.name)
-            if not res:
-                break
-
-        cb_env.cm.drop_scope(scope_name)
-        for _ in range(5):
-            res = cb_env.get_scope(scope_name, cb_env.bucket.name)
-            if not res:
-                break
-
-    @pytest.mark.flaky(reruns=5)
+    @pytest.mark.usefixtures('cleanup_scope_and_collection')
     def test_rate_limits_collections_scopes_limits(self, cb_env):
         scope_name = self.RATE_LIMIT_SCOPE_NAME
         self._create_rate_limit_scope(cb_env, scope_name, {

@@ -36,18 +36,13 @@ class UserManagementTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(
-            conn_string, opts)
-        await cluster.on_connect()
-        await cluster.cluster_info()
+        cluster = await Cluster.connect(conn_string, opts)
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
         await bucket.on_connect()
+        await cluster.cluster_info()
         coll = bucket.default_collection()
         cb_env = TestEnvironment(
             cluster, bucket, coll, couchbase_config, manage_users=True)
-
-        # if cb_env.is_feature_supported('user_group_mgmt'):
-        #     await cb_env.um.upsert_group(Group('test-group', roles={Role(name='admin')}))
 
         yield cb_env
         await cluster.close()
@@ -474,7 +469,7 @@ class UserManagementTests:
     @pytest.mark.asyncio
     async def test_group_feature_not_found(self, cb_env):
         if cb_env.is_feature_supported('user_group_mgmt'):
-            pytest.skip("Only test on Server Versions < 6.5")
+            pytest.skip(f'Only test on server versions < 6.5. Using server version: {cb_env.server_version}')
 
         roles = Role(name='admin')
         test_group = Group(name='my-test-group',
@@ -482,13 +477,13 @@ class UserManagementTests:
                            description="test group description")
 
         with pytest.raises(FeatureUnavailableException):
-            await self.um.upsert_group(test_group)
+            await cb_env.um.upsert_group(test_group)
         with pytest.raises(FeatureUnavailableException):
-            await self.um.get_all_groups()
+            await cb_env.um.get_all_groups()
         with pytest.raises(FeatureUnavailableException):
-            await self.um.get_group(test_group.name)
+            await cb_env.um.get_group(test_group.name)
         with pytest.raises(FeatureUnavailableException):
-            await self.um.drop_group(test_group.name)
+            await cb_env.um.drop_group(test_group.name)
 
     @pytest.mark.usefixtures("check_user_groups_supported")
     @pytest.mark.asyncio
@@ -605,6 +600,7 @@ class UserManagementTests:
         for group in groups:
             await cb_env.um.drop_group(group.name)
 
+    @pytest.mark.flaky(reruns=5)
     @pytest.mark.usefixtures("check_user_groups_supported")
     @pytest.mark.asyncio
     async def test_get_all_groups(self, cb_env):

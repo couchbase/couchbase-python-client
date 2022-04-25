@@ -6,9 +6,9 @@ from couchbase.pycbc_core import (transaction_op,
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
-    from couchbase.serializer import Serializer
 
     from couchbase._utils import PyCapsuleType
+    from couchbase.serializer import Serializer
 
 
 class AttemptContextLogic:

@@ -25,18 +25,19 @@ class MutationTokensEnabledTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        c = Cluster(
-            conn_string, opts)
-        await c.on_connect()
-        await c.cluster_info()
-        b = c.bucket(f"{couchbase_config.bucket_name}")
-        await b.on_connect()
+        cluster = await Cluster.connect(conn_string, opts)
+        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        await bucket.on_connect()
+        await cluster.cluster_info()
 
-        coll = b.default_collection()
+        coll = bucket.default_collection()
         if request.param == CollectionType.DEFAULT:
-            cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True)
+            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True)
         elif request.param == CollectionType.NAMED:
-            cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True, manage_collections=True)
+            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config,
+                                     manage_buckets=True, manage_collections=True)
+            if cb_env.is_mock_server:
+                pytest.skip('Jenkins + GoCAVES not playing nice...')
             await cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
         yield cb_env
@@ -44,7 +45,7 @@ class MutationTokensEnabledTests:
             await cb_env.try_n_times_till_exception(5, 3,
                                                     cb_env.teardown_named_collections,
                                                     raise_if_no_exception=False)
-        await c.close()
+        await cluster.close()
 
     @pytest_asyncio.fixture(name="new_kvp")
     async def new_key_and_value_with_reset(self, cb_env) -> KVPair:
@@ -54,7 +55,9 @@ class MutationTokensEnabledTests:
                                                 1,
                                                 cb_env.collection.remove,
                                                 key,
-                                                expected_exceptions=(DocumentNotFoundException,))
+                                                expected_exceptions=(DocumentNotFoundException,),
+                                                reset_on_timeout=True,
+                                                reset_num_times=3)
 
     def verify_mutation_tokens(self, bucket_name, result):
         mutation_token = result.mutation_token()
@@ -70,7 +73,7 @@ class MutationTokensEnabledTests:
         cb = cb_env.collection
         key = new_kvp.key
         value = new_kvp.value
-        result = await cb.upsert(key, value)
+        result = await cb_env.try_n_times(5, 3, cb.upsert, key, value)
         self.verify_mutation_tokens(cb_env.bucket.name, result)
 
     @pytest.mark.asyncio
@@ -78,7 +81,7 @@ class MutationTokensEnabledTests:
         cb = cb_env.collection
         key = new_kvp.key
         value = new_kvp.value
-        result = await cb.insert(key, value)
+        result = await cb_env.try_n_times(5, 3, cb.insert, key, value)
         self.verify_mutation_tokens(cb_env.bucket.name, result)
 
     @pytest.mark.asyncio
@@ -86,8 +89,8 @@ class MutationTokensEnabledTests:
         cb = cb_env.collection
         key = new_kvp.key
         value = new_kvp.value
-        await cb.upsert(key, value)
-        result = await cb.replace(key, value)
+        await cb_env.try_n_times(5, 3, cb.upsert, key, value)
+        result = await cb_env.try_n_times(5, 3, cb.replace, key, value)
         self.verify_mutation_tokens(cb_env.bucket.name, result)
 
     @pytest.mark.asyncio
@@ -95,8 +98,8 @@ class MutationTokensEnabledTests:
         cb = cb_env.collection
         key = new_kvp.key
         value = new_kvp.value
-        await cb.upsert(key, value)
-        result = await cb.remove(key)
+        await cb_env.try_n_times(5, 3, cb.upsert, key, value)
+        result = await cb_env.try_n_times(5, 3, cb.remove, key)
         self.verify_mutation_tokens(cb_env.bucket.name, result)
 
     # @TODO: c++ client does not provide mutation token for touch
@@ -120,10 +123,10 @@ class MutationTokensEnabledTests:
                 return result
             raise Exception("nope")
 
-        res = await cb.upsert(key, {"a": "aaa", "b": {"c": {"d": "yo!"}}})
+        res = await cb_env.try_n_times(5, 3, cb.upsert, key, {"a": "aaa", "b": {"c": {"d": "yo!"}}})
         cas = res.cas
         await cb_env.try_n_times(10, 3, cas_matches, key, cas)
-        result = await cb.mutate_in(key, (SD.upsert("c", "ccc"), SD.replace("b", "XXX"),))
+        result = await cb_env.try_n_times(5, 3, cb.mutate_in, key, (SD.upsert("c", "ccc"), SD.replace("b", "XXX"),))
         self.verify_mutation_tokens(cb_env.bucket.name, result)
 
 

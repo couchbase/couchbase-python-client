@@ -1,12 +1,9 @@
-import tracemalloc
 from datetime import datetime, timedelta
 from time import time
 
 import pytest
 
 import couchbase.subdocument as SD
-from couchbase.auth import PasswordAuthenticator
-from couchbase.cluster import Cluster
 from couchbase.diagnostics import ServiceType
 from couchbase.durability import DurabilityLevel, ServerDurability
 from couchbase.exceptions import (AmbiguousTimeoutException,
@@ -18,8 +15,7 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   InvalidArgumentException,
                                   PathNotFoundException,
                                   TemporaryFailException)
-from couchbase.options import (ClusterOptions,
-                               GetOptions,
+from couchbase.options import (GetOptions,
                                InsertOptions,
                                RemoveOptions,
                                ReplaceOptions,
@@ -40,18 +36,9 @@ class CollectionTests:
 
     @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     def couchbase_test_environment(self, couchbase_config, request):
-        conn_string = couchbase_config.get_connection_string()
-        opts = ClusterOptions(PasswordAuthenticator(
-            couchbase_config.admin_username, couchbase_config.admin_password))
-        c = Cluster(
-            conn_string, opts)
-        c.cluster_info()
-        b = c.bucket(f"{couchbase_config.bucket_name}")
-        coll = b.default_collection()
-        if request.param == CollectionType.DEFAULT:
-            cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True)
-        elif request.param == CollectionType.NAMED:
-            cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True, manage_collections=True)
+        cb_env = TestEnvironment.get_environment(couchbase_config, request.param)
+
+        if request.param == CollectionType.NAMED:
             cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
         cb_env.try_n_times(3, 5, cb_env.load_data)
@@ -61,7 +48,7 @@ class CollectionTests:
             cb_env.try_n_times_till_exception(5, 3,
                                               cb_env.teardown_named_collections,
                                               raise_if_no_exception=False)
-        c.close()
+        cb_env.cluster.close()
 
     @pytest.fixture(scope="class")
     def check_preserve_expiry_supported(self, cb_env):
@@ -77,24 +64,29 @@ class CollectionTests:
 
     @pytest.fixture(name="new_kvp")
     def new_key_and_value_with_reset(self, cb_env) -> KVPair:
+        cb_env.check_if_mock_unstable()
         key, value = cb_env.get_new_key_value()
         yield KVPair(key, value)
         cb_env.try_n_times_till_exception(10,
                                           1,
                                           cb_env.collection.remove,
                                           key,
-                                          expected_exceptions=(DocumentNotFoundException,))
+                                          expected_exceptions=(DocumentNotFoundException,),
+                                          reset_on_timeout=True,
+                                          reset_num_times=3)
 
     @pytest.fixture(name="default_kvp")
     def default_key_and_value(self, cb_env) -> KVPair:
+        cb_env.check_if_mock_unstable()
         key, value = cb_env.get_default_key_value()
         yield KVPair(key, value)
 
     @pytest.fixture(name="default_kvp_and_reset")
     def default_key_and_value_with_reset(self, cb_env) -> KVPair:
+        cb_env.check_if_mock_unstable()
         key, value = cb_env.get_default_key_value()
         yield KVPair(key, value)
-        cb_env.collection.upsert(key, value)
+        cb_env.try_n_times(5, 3, cb_env.collection.upsert, key, value)
 
     @pytest.fixture(scope="class")
     def check_replicas(self, cb_env):
@@ -111,6 +103,7 @@ class CollectionTests:
         num_replicas = bucket_settings.get("num_replicas")
         return num_replicas
 
+    @pytest.mark.flaky(reruns=5)
     def test_exists(self, cb_env, default_kvp):
         cb = cb_env.collection
         key = default_kvp.key
@@ -119,6 +112,7 @@ class CollectionTests:
         assert result.exists is True
 
     def test_does_not_exists(self, cb_env):
+        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         result = cb.exists(self.NO_KEY)
         assert isinstance(result, ExistsResult)
@@ -148,7 +142,7 @@ class CollectionTests:
         assert result.content_as[dict] == value
 
     def test_get_fails(self, cb_env):
-        tracemalloc.start()
+        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         with pytest.raises(DocumentNotFoundException):
             cb.get(self.NO_KEY)
@@ -333,6 +327,7 @@ class CollectionTests:
             cb.replace(key, value1, ReplaceOptions(cas=old_cas))
 
     def test_replace_fail(self, cb_env):
+        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         with pytest.raises(DocumentNotFoundException):
             cb.replace(self.NO_KEY, {"some": "content"})
@@ -352,6 +347,7 @@ class CollectionTests:
                                               raise_exception=True)
 
     def test_remove_fail(self, cb_env):
+        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         with pytest.raises(DocumentNotFoundException):
             cb.remove(self.NO_KEY)

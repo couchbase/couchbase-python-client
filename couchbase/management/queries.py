@@ -6,7 +6,8 @@ from typing import (TYPE_CHECKING,
                     Iterable,
                     overload)
 
-from couchbase.exceptions import (InvalidArgumentException,
+from couchbase.exceptions import (AmbiguousTimeoutException,
+                                  InvalidArgumentException,
                                   QueryIndexNotFoundException,
                                   WatchQueryIndexTimeoutException)
 from couchbase.management.logic.query_index_logic import QueryIndex, QueryIndexManagerLogic
@@ -171,7 +172,10 @@ class QueryIndexManager(QueryIndexManagerLogic):
                 opts["scope_name"] = scope_name
                 opts["collection_name"] = collection_name
 
-            indexes = self.get_all_indexes(bucket_name, opts)
+            try:
+                indexes = self.get_all_indexes(bucket_name, opts)
+            except AmbiguousTimeoutException:
+                pass  # go ahead and move on, raise WatchQueryIndexTimeoutException later if needed
 
             all_online = check_indexes(index_names, indexes)
             if all_online:

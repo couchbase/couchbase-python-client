@@ -23,7 +23,7 @@ _KV_TESTS = [
     "couchbase/tests/subdoc_t.py::SubDocumentTests",
     "couchbase/tests/mutation_tokens_t.py::MutationTokensEnabledTests",
     "couchbase/tests/binary_collection_t.py::BinaryCollectionTests",
-    "couchbase/tests/binary_collection_t.py::BinaryCollectionTests",
+    "couchbase/tests/binary_collection_multi_t.py::BinaryCollectionMultiTests",
     "couchbase/tests/datastructures_t.py::DatastructuresTests",
     "couchbase/tests/datastructures_t.py::LegacyDatastructuresTests",
     "couchbase/tests/transcoder_t.py::DefaultTranscoderTests"

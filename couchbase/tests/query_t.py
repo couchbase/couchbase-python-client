@@ -35,10 +35,9 @@ class QueryTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(
-            conn_string, opts)
-        cluster.cluster_info()
+        cluster = Cluster.connect(conn_string, opts)
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        cluster.cluster_info()
 
         coll = bucket.default_collection()
         cb_env = TestEnvironment(cluster,
@@ -102,6 +101,9 @@ class QueryTests:
         assert result._request.params.get('adhoc', None) is None
 
     def test_simple_query_prepared(self, cb_env):
+        # @TODO(CXXCBC-174)
+        if cb_env.server_version_short < 6.5:
+            pytest.skip(f'Skipped on server versions < 6.5 (using {cb_env.server_version_short}). Pending CXXCBC-174')
         result = cb_env.cluster.query(f"SELECT * FROM `{cb_env.bucket.name}` LIMIT 2",
                                       QueryOptions(adhoc=False, metrics=True))
         self.assert_rows(result, 2)
@@ -265,10 +267,9 @@ class QueryCollectionTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(
-            conn_string, opts)
-        cluster.cluster_info()
+        cluster = Cluster.connect(conn_string, opts)
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        cluster.cluster_info()
 
         coll = bucket.default_collection()
         cb_env = TestEnvironment(cluster,

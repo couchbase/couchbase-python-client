@@ -1,5 +1,7 @@
 from functools import wraps
-from typing import TYPE_CHECKING, Optional, Callable
+from typing import (TYPE_CHECKING,
+                    Callable,
+                    Optional)
 
 from couchbase.exceptions import CouchbaseException, TransactionsErrorContext
 from couchbase.transactions.logic import AttemptContextLogic, TransactionsLogic
@@ -11,8 +13,8 @@ from .transaction_result import TransactionResult
 
 if TYPE_CHECKING:
     from couchbase._utils import PyCapsuleType
-    from couchbase.transactions import PerTransactionConfig
     from couchbase.serializer import Serializer
+    from couchbase.transactions import PerTransactionConfig
 
 
 class BlockingWrapper:

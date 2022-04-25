@@ -14,7 +14,8 @@ from couchbase.auth import PasswordAuthenticator
 from couchbase.exceptions import (CouchbaseException,
                                   DocumentNotFoundException,
                                   QuotaLimitedException,
-                                  RateLimitedException)
+                                  RateLimitedException,
+                                  ScopeNotFoundException)
 from couchbase.management.buckets import CreateBucketSettings
 from couchbase.management.collections import CollectionSpec
 from couchbase.management.options import GetUserOptions
@@ -25,6 +26,7 @@ from tests.helpers import CouchbaseTestEnvironmentException
 from ._test_utils import RateLimitData, TestEnvironment
 
 
+@pytest.mark.flaky(reruns=5)
 class RateLimitTests:
     """
     These tests should just test the collection interface, as simply
@@ -46,14 +48,14 @@ class RateLimitTests:
     @pytest_asyncio.fixture(scope="class", name="cb_env")
     async def couchbase_test_environment(self, couchbase_config):
         if couchbase_config.is_mock_server:
-            pytest.skip('Mocker server does not support rate limit testing.')
+            pytest.skip('Mock server does not support feature: rate limit testing.')
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
         cluster = await Cluster.connect(conn_string, opts)
-        await cluster.cluster_info()
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
         await bucket.on_connect()
+        await cluster.cluster_info()
 
         coll = bucket.default_collection()
 
@@ -127,6 +129,18 @@ class RateLimitTests:
                                                     'ratelimit-egress', (DocumentNotFoundException,))
         except CouchbaseException:
             pass
+
+    @pytest_asyncio.fixture()
+    async def cleanup_scope_and_collection(self, cb_env):
+        await cb_env.try_n_times_till_exception(5, 1,
+                                                cb_env.cm.drop_scope,
+                                                self.RATE_LIMIT_SCOPE_NAME,
+                                                expected_exceptions=(ScopeNotFoundException,))
+        yield
+        await cb_env.try_n_times_till_exception(5, 1,
+                                                cb_env.cm.drop_scope,
+                                                self.RATE_LIMIT_SCOPE_NAME,
+                                                expected_exceptions=(ScopeNotFoundException,))
 
     async def _create_rate_limit_user(self, cb_env, username, limits):
         params = {
@@ -268,7 +282,6 @@ class RateLimitTests:
 
             await asyncio.sleep(interval_ms)
 
-    @pytest.mark.flaky(reruns=5)
     @pytest.mark.asyncio
     async def test_rate_limits(self, couchbase_config, cb_env):
         await self._create_rate_limit_user(cb_env,
@@ -300,7 +313,6 @@ class RateLimitTests:
                 await cluster.close()
 
     @pytest.mark.usefixtures('remove_docs')
-    @pytest.mark.flaky(reruns=5)
     @pytest.mark.asyncio
     async def test_rate_limits_ingress(self, couchbase_config, cb_env):
         await self._create_rate_limit_user(cb_env,
@@ -334,7 +346,6 @@ class RateLimitTests:
                 await cluster.close()
 
     @pytest.mark.usefixtures('remove_docs')
-    @pytest.mark.flaky(reruns=5)
     @pytest.mark.asyncio
     async def test_rate_limits_egress(self, couchbase_config, cb_env):
         await self._create_rate_limit_user(cb_env,
@@ -367,7 +378,6 @@ class RateLimitTests:
             if cluster and cluster.connected:
                 await cluster.close()
 
-    @pytest.mark.flaky(reruns=5)
     @pytest.mark.asyncio
     async def test_rate_limits_max_conns(self, couchbase_config, cb_env):
         await self._create_rate_limit_user(cb_env,
@@ -406,6 +416,7 @@ class RateLimitTests:
             if cluster1 and cluster1.connected:
                 await cluster1.close()
 
+    @pytest.mark.usefixtures('cleanup_scope_and_collection')
     @pytest.mark.asyncio
     async def test_rate_limits_kv_scopes_data_size(self, cb_env):
         scope_name = self.RATE_LIMIT_SCOPE_NAME
@@ -430,19 +441,20 @@ class RateLimitTests:
             for _ in range(5):
                 await collection.upsert("ratelimit-datasize", doc)
 
-        await cb_env.cm.drop_collection(collection_spec)
-        for _ in range(5):
-            res = await cb_env.get_collection(scope_name,
-                                              collection_spec.name,
-                                              cb_env.bucket.name)
-            if not res:
-                break
-        await cb_env.cm.drop_scope(scope_name)
-        for _ in range(5):
-            res = await cb_env.get_scope(scope_name, cb_env.bucket.name)
-            if not res:
-                break
+        # await cb_env.cm.drop_collection(collection_spec)
+        # for _ in range(5):
+        #     res = await cb_env.get_collection(scope_name,
+        #                                       collection_spec.name,
+        #                                       cb_env.bucket.name)
+        #     if not res:
+        #         break
+        # await cb_env.cm.drop_scope(scope_name)
+        # for _ in range(5):
+        #     res = await cb_env.get_scope(scope_name, cb_env.bucket.name)
+        #     if not res:
+        #         break
 
+    @pytest.mark.usefixtures('cleanup_scope_and_collection')
     @pytest.mark.asyncio
     async def test_rate_limits_collections_scopes_limits(self, cb_env):
         scope_name = self.RATE_LIMIT_SCOPE_NAME

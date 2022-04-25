@@ -1,3 +1,4 @@
+import warnings
 from copy import copy
 from datetime import timedelta
 
@@ -35,8 +36,20 @@ class ConnectionTests:
     def test_valid_connection_strings(self, conn_str):
         expected_opts = {'timeout_options': {'bootstrap_timeout': 1000000}}
         try:
-            cl = ClusterLogic(conn_str, authenticator=PasswordAuthenticator(
-                'Administrator', 'password'), bootstrap_timeout=timedelta(seconds=1))
+            if conn_str == '10.0.0.1:8091':
+                with warnings.catch_warnings(record=True) as w:
+                    # Cause all warnings to always be triggered.
+                    warnings.simplefilter("always")
+
+                    cl = ClusterLogic(conn_str, authenticator=PasswordAuthenticator(
+                        'Administrator', 'password'), bootstrap_timeout=timedelta(seconds=1))
+                    assert len(w) == 1
+                    assert issubclass(w[-1].category, DeprecationWarning)
+                    assert "deprecated" in str(w[-1].message)
+            else:
+                cl = ClusterLogic(conn_str, authenticator=PasswordAuthenticator(
+                    'Administrator', 'password'), bootstrap_timeout=timedelta(seconds=1))
+
             assert expected_opts == cl._cluster_opts
             expected_conn_str = conn_str.split('?')[0]
             assert expected_conn_str == cl._connstr

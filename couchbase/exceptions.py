@@ -366,6 +366,15 @@ class CouchbaseException(Exception):
 
 
 # common errors
+class InternalServerFailureException(CouchbaseException):
+    """ Raised when the server service provides error w/in below ranges.
+        Query: Error range 5xxx
+        Analytics: Error range 25xxx
+        KV: error code ERR_INTERNAL (0x84)
+        Search: HTTP 500
+    """
+
+
 class TimeoutException(CouchbaseException):
     pass
 
@@ -422,6 +431,18 @@ class ValueFormatException(CouchbaseException):
 
 class HTTPException(CouchbaseException):
     """HTTP error"""
+
+
+class ServiceUnavailableException(CouchbaseException):
+    """ Raised if tt can be determined from the config unambiguously that a
+        given service is not available.
+        I.e. no query node in the config, or a memcached bucket is accessed
+        and views or n1ql queries should be performed
+    """
+
+
+class FeatureUnavailableException(CouchbaseException):
+    """Raised when feature that is not available with the current server version is used."""
 
 
 class InternalSDKException(CouchbaseException):
@@ -689,10 +710,6 @@ class InvalidIndexException(CouchbaseException):
     pass
 
 
-class FeatureUnavailableException(CouchbaseException):
-    pass
-
-
 class MissingTokenException(CouchbaseException):
     pass
 
@@ -817,6 +834,8 @@ CLIENT_ERROR_MAP = dict(
 class ExceptionMap(Enum):
     RequestCanceledException = 2
     InvalidArgumentException = 3
+    ServiceUnavailableException = 4
+    InternalServerFailureException = 5
     AuthenticationException = 6
     TemporaryFailException = 7
     ParsingFailedException = 8
@@ -824,6 +843,7 @@ class ExceptionMap(Enum):
     BucketNotFoundException = 10
     AmbiguousTimeoutException = 13
     UnAmbiguousTimeoutException = 14
+    FeatureUnavailableException = 15
     ScopeNotFoundException = 16
     QueryIndexNotFoundException = 17
     QueryIndexAlreadyExistsException = 18

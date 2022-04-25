@@ -28,10 +28,9 @@ class UserManagementTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(
-            conn_string, opts)
-        cluster.cluster_info()
+        cluster = Cluster.connect(conn_string, opts)
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        cluster.cluster_info()
         coll = bucket.default_collection()
         cb_env = TestEnvironment(
             cluster, bucket, coll, couchbase_config, manage_users=True)
@@ -104,13 +103,11 @@ class UserManagementTests:
 
         # remove user
         cb_env.um.drop_user(username, DropUserOptions(domain_name="local"))
-        cb_env.try_n_times_till_exception(
-            5,
-            1,
-            cb_env.um.get_user,
-            username,
-            domain_name="local",
-            expected_exceptions=(UserNotFoundException,))
+        cb_env.try_n_times_till_exception(5, 1,
+                                          cb_env.um.get_user,
+                                          username,
+                                          domain_name="local",
+                                          expected_exceptions=(UserNotFoundException,))
 
     def test_internal_user_kwargs(self, cb_env):
         """
@@ -452,7 +449,7 @@ class UserManagementTests:
 
     def test_group_feature_not_found(self, cb_env):
         if cb_env.is_feature_supported('user_group_mgmt'):
-            pytest.skip("Only test on Server Versions < 6.5")
+            pytest.skip(f'Only test on server versions < 6.5. Using server version: {cb_env.server_version}')
 
         roles = Role(name='admin')
         test_group = Group(name='my-test-group',
@@ -460,13 +457,13 @@ class UserManagementTests:
                            description="test group description")
 
         with pytest.raises(FeatureUnavailableException):
-            self.um.upsert_group(test_group)
+            cb_env.um.upsert_group(test_group)
         with pytest.raises(FeatureUnavailableException):
-            self.um.get_all_groups()
+            cb_env.um.get_all_groups()
         with pytest.raises(FeatureUnavailableException):
-            self.um.get_group(test_group.name)
+            cb_env.um.get_group(test_group.name)
         with pytest.raises(FeatureUnavailableException):
-            self.um.drop_group(test_group.name)
+            cb_env.um.drop_group(test_group.name)
 
     @pytest.mark.usefixtures("check_user_groups_supported")
     def test_group(self, cb_env):
@@ -581,6 +578,7 @@ class UserManagementTests:
         for group in groups:
             cb_env.um.drop_group(group.name)
 
+    @pytest.mark.flaky(reruns=5)
     @pytest.mark.usefixtures("check_user_groups_supported")
     def test_get_all_groups(self, cb_env):
         roles = [

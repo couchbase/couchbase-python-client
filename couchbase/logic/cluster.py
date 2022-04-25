@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import (TYPE_CHECKING,
                     Any,
                     Dict,
@@ -34,7 +35,6 @@ from couchbase.transcoder import JSONTranscoder
 if TYPE_CHECKING:
     from couchbase.options import DiagnosticsOptions, PingOptions
     from couchbase.transcoder import Transcoder
-    from couchbase.serializer import Serializer
 
 
 class ClusterLogic:
@@ -189,6 +189,12 @@ class ClusterLogic:
             Tuple[str, Dict[str, Any], Dict[str, Any]]: The parsed connection string,
                 current options and legacy options.
         """
+        # handle possible lack of URL scheme
+        if '//' not in connection_str:
+            warning_msg = 'Connection string has deprecated format. Start connection string with: couchbase://'
+            warnings.warn(warning_msg, DeprecationWarning, stacklevel=2)
+            connection_str = f'//{connection_str}'
+
         parsed_conn = urlparse(connection_str)
         conn_str = ''
         if parsed_conn.scheme:

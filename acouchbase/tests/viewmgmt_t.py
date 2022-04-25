@@ -19,6 +19,7 @@ from couchbase.options import ClusterOptions
 from ._test_utils import TestEnvironment
 
 
+@pytest.mark.flaky(reruns=5, reruns_delay=2)
 class ViewIndexManagementTests:
 
     TEST_VIEW_NAME = 'test-view'
@@ -40,18 +41,21 @@ class ViewIndexManagementTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        c = Cluster(
-            conn_string, opts)
-        await c.on_connect()
-        await c.cluster_info()
-        b = c.bucket(f"{couchbase_config.bucket_name}")
-        await b.on_connect()
+        cluster = await Cluster.connect(conn_string, opts)
+        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        await bucket.on_connect()
+        await cluster.cluster_info()
 
-        coll = b.default_collection()
-        cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True, manage_view_indexes=True)
+        coll = bucket.default_collection()
+        cb_env = TestEnvironment(cluster,
+                                 bucket,
+                                 coll,
+                                 couchbase_config,
+                                 manage_buckets=True,
+                                 manage_view_indexes=True)
 
         yield cb_env
-        await c.close()
+        await cluster.close()
 
     @pytest.fixture(scope='class')
     def test_ddoc(self):
@@ -66,17 +70,21 @@ class ViewIndexManagementTests:
 
     @pytest_asyncio.fixture()
     async def create_test_view(self, cb_env, test_ddoc):
-        await cb_env.vixm.upsert_design_document(test_ddoc, DesignDocumentNamespace.DEVELOPMENT)
+        await cb_env.try_n_times(3, 5,
+                                 cb_env.vixm.upsert_design_document,
+                                 test_ddoc,
+                                 DesignDocumentNamespace.DEVELOPMENT)
 
     @pytest_asyncio.fixture()
     async def drop_test_view(self, cb_env, test_ddoc):
         yield
-        try:
-            await cb_env.vixm.drop_design_document(test_ddoc.name, DesignDocumentNamespace.DEVELOPMENT)
-        except DesignDocumentNotFoundException:
-            pass
-        except Exception as ex:
-            raise ex
+        await cb_env.try_n_times_till_exception(10, 1,
+                                                cb_env.vixm.drop_design_document,
+                                                test_ddoc.name,
+                                                DesignDocumentNamespace.DEVELOPMENT,
+                                                expected_exceptions=(DesignDocumentNotFoundException,),
+                                                reset_on_timeout=True,
+                                                reset_num_times=3)
 
     @pytest_asyncio.fixture()
     async def drop_test_view_from_prod(self, cb_env, test_ddoc):
@@ -126,9 +134,11 @@ class ViewIndexManagementTests:
     @pytest.mark.usefixtures("drop_test_view")
     @pytest.mark.asyncio
     async def test_get_design_document(self, cb_env, test_ddoc):
-        ddoc = await cb_env.vixm.get_design_document(test_ddoc.name,
-                                                     DesignDocumentNamespace.DEVELOPMENT,
-                                                     GetDesignDocumentOptions(timeout=timedelta(seconds=5)))
+        ddoc = await cb_env.try_n_times(10, 3,
+                                        cb_env.vixm.get_design_document,
+                                        test_ddoc.name,
+                                        DesignDocumentNamespace.DEVELOPMENT,
+                                        GetDesignDocumentOptions(timeout=timedelta(seconds=5)))
         assert ddoc is not None
         assert ddoc.name == test_ddoc.name
 
@@ -139,6 +149,14 @@ class ViewIndexManagementTests:
         # should start out in _some_ state.  Since we don't know for sure, but we
         # do know it does have self.DOCNAME in it in development ONLY, lets assert on that and that
         # it succeeds, meaning we didn't get an exception.
+        # make sure it is there
+        ddoc = await cb_env.try_n_times(10, 3,
+                                        cb_env.vixm.get_design_document,
+                                        test_ddoc.name,
+                                        DesignDocumentNamespace.DEVELOPMENT,
+                                        GetDesignDocumentOptions(timeout=timedelta(seconds=5)))
+        assert ddoc is not None
+        # should also be in the get_all response
         result = await cb_env.vixm.get_all_design_documents(DesignDocumentNamespace.DEVELOPMENT,
                                                             GetAllDesignDocumentsOptions(timeout=timedelta(seconds=10)))
         names = [doc.name for doc in result if doc.name == test_ddoc.name]
@@ -157,6 +175,13 @@ class ViewIndexManagementTests:
     @pytest.mark.usefixtures("drop_test_view_from_prod")
     @pytest.mark.asyncio
     async def test_publish_design_doc(self, cb_env, test_ddoc):
+        # make sure we have the ddoc
+        ddoc = await cb_env.try_n_times(10, 3,
+                                        cb_env.vixm.get_design_document,
+                                        test_ddoc.name,
+                                        DesignDocumentNamespace.DEVELOPMENT,
+                                        GetDesignDocumentOptions(timeout=timedelta(seconds=5)))
+        assert ddoc is not None
         # starts off not in prod
         with pytest.raises(DesignDocumentNotFoundException):
             await cb_env.vixm.get_design_document(test_ddoc.name, DesignDocumentNamespace.PRODUCTION)

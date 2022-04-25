@@ -8,7 +8,8 @@ from typing import (TYPE_CHECKING,
                     Iterable)
 
 from acouchbase.management.logic.wrappers import AsyncMgmtWrapper
-from couchbase.exceptions import (InvalidArgumentException,
+from couchbase.exceptions import (AmbiguousTimeoutException,
+                                  InvalidArgumentException,
                                   QueryIndexNotFoundException,
                                   WatchQueryIndexTimeoutException)
 from couchbase.management.logic import ManagementType
@@ -181,7 +182,10 @@ class QueryIndexManager(QueryIndexManagerLogic):
                 opts["scope_name"] = scope_name
                 opts["collection_name"] = collection_name
 
-            indexes = await self.get_all_indexes(bucket_name, opts)
+            try:
+                indexes = await self.get_all_indexes(bucket_name, opts)
+            except AmbiguousTimeoutException:
+                pass  # go ahead and move on, raise WatchQueryIndexTimeoutException later if needed
 
             all_online = check_indexes(index_names, indexes)
             if all_online:

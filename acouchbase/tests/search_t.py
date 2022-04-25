@@ -47,12 +47,10 @@ class SearchTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(
-            conn_string, opts)
-        await cluster.on_connect()
-        await cluster.cluster_info()
+        cluster = await Cluster.connect(conn_string, opts)
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        await cluster.on_connect()
+        await bucket.on_connect()
+        await cluster.cluster_info()
 
         coll = bucket.default_collection()
         cb_env = TestEnvironment(cluster,
@@ -63,7 +61,10 @@ class SearchTests:
                                  manage_search_indexes=True)
 
         await cb_env.try_n_times(3, 5, cb_env.load_data)
-        await self._load_search_index(cb_env)
+        try:
+            await cb_env.try_n_times(3, 5, self._load_search_index, cb_env)
+        except CouchbaseTestEnvironmentException:
+            pytest.skip('Search index would not load.')
         yield cb_env
         await cb_env.try_n_times_till_exception(3, 5,
                                                 cb_env.purge_data,
@@ -72,23 +73,24 @@ class SearchTests:
         await cluster.close()
 
     async def _load_search_index(self, cb_env):
+        await cb_env.try_n_times_till_exception(10, 3,
+                                                cb_env.sixm.drop_index,
+                                                self.TEST_INDEX_NAME,
+                                                expected_exceptions=(SearchIndexNotFoundException, ))
         with open(self.TEST_INDEX_PATH) as params_file:
             input = params_file.read()
             params_json = json.loads(input)
-            try:
-                await cb_env.sixm.get_index(self.TEST_INDEX_NAME)
-                # wait at least 5 minutes
-                await self._check_indexed_docs(cb_env, retries=30, delay=10)
-            except Exception:
-                await cb_env.try_n_times(10, 3,
-                                         cb_env.sixm.upsert_index,
-                                         SearchIndex(name=self.TEST_INDEX_NAME,
-                                                     idx_type='fulltext-index',
-                                                     source_name='default',
-                                                     source_type='couchbase',
-                                                     params=params_json))
-                # make sure the index loads...
-                await self._check_indexed_docs(cb_env, retries=30, delay=10)
+            await cb_env.try_n_times(10, 3,
+                                     cb_env.sixm.upsert_index,
+                                     SearchIndex(name=self.TEST_INDEX_NAME,
+                                                 idx_type='fulltext-index',
+                                                 source_name='default',
+                                                 source_type='couchbase',
+                                                 params=params_json))
+            # make sure the index loads...
+            num_docs = await self._check_indexed_docs(cb_env, retries=30, delay=10)
+            if num_docs == 0:
+                raise CouchbaseTestEnvironmentException('No docs loaded into the index')
 
     async def _check_indexed_docs(self, cb_env, retries=20, delay=30, num_docs=20, idx='test-search-index'):
         indexed_docs = 0
@@ -606,12 +608,10 @@ class SearchCollectionTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(
-            conn_string, opts)
-        await cluster.on_connect()
-        await cluster.cluster_info()
+        cluster = await Cluster.connect(conn_string, opts)
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        await cluster.on_connect()
+        await bucket.on_connect()
+        await cluster.cluster_info()
 
         coll = bucket.default_collection()
         cb_env = TestEnvironment(cluster,
@@ -627,7 +627,10 @@ class SearchCollectionTests:
         # lets add another collection and load data there
         await self._create_and_load_other_collection(cb_env)
 
-        await self._load_search_index(cb_env)
+        try:
+            await cb_env.try_n_times(3, 5, self._load_search_index, cb_env)
+        except CouchbaseTestEnvironmentException:
+            pytest.skip('Search index would not load.')
         yield cb_env
         await cb_env.try_n_times_till_exception(3, 5,
                                                 cb_env.purge_data,
@@ -661,23 +664,25 @@ class SearchCollectionTests:
             await coll.upsert(key, d)
 
     async def _load_search_index(self, cb_env):
+        await cb_env.try_n_times_till_exception(10, 3,
+                                                cb_env.sixm.drop_index,
+                                                self.TEST_INDEX_NAME,
+                                                expected_exceptions=(SearchIndexNotFoundException, ))
         with open(self.TEST_INDEX_PATH) as params_file:
             input = params_file.read()
             params_json = json.loads(input)
-            try:
-                await cb_env.sixm.get_index(self.TEST_INDEX_NAME)
-                # wait at least 5 minutes
-                await self._check_indexed_docs(cb_env, retries=30, delay=10)
-            except Exception:
-                await cb_env.try_n_times(10, 3,
-                                         cb_env.sixm.upsert_index,
-                                         SearchIndex(name=self.TEST_INDEX_NAME,
-                                                     idx_type='fulltext-index',
-                                                     source_name='default',
-                                                     source_type='couchbase',
-                                                     params=params_json))
-                # make sure the index loads...
-                await self._check_indexed_docs(cb_env, retries=30, delay=10)
+
+            await cb_env.try_n_times(10, 3,
+                                     cb_env.sixm.upsert_index,
+                                     SearchIndex(name=self.TEST_INDEX_NAME,
+                                                 idx_type='fulltext-index',
+                                                 source_name='default',
+                                                 source_type='couchbase',
+                                                 params=params_json))
+            # make sure the index loads...
+            num_docs = await self._check_indexed_docs(cb_env, retries=30, delay=10)
+            if num_docs == 0:
+                raise CouchbaseTestEnvironmentException('No docs loaded into the index')
 
     async def _check_indexed_docs(self, cb_env, retries=20, delay=30, num_docs=20, idx='test-search-coll-index'):
         indexed_docs = 0

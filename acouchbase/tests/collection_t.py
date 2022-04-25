@@ -50,18 +50,22 @@ class CollectionTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        c = Cluster(
-            conn_string, opts)
-        await c.on_connect()
-        await c.cluster_info()
-        b = c.bucket(f"{couchbase_config.bucket_name}")
-        await b.on_connect()
+        cluster = await Cluster.connect(conn_string, opts)
 
-        coll = b.default_collection()
+        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        await bucket.on_connect()
+        await cluster.cluster_info()
+
+        coll = bucket.default_collection()
         if request.param == CollectionType.DEFAULT:
-            cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True)
+            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True)
         elif request.param == CollectionType.NAMED:
-            cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True, manage_collections=True)
+            cb_env = TestEnvironment(cluster,
+                                     bucket,
+                                     coll,
+                                     couchbase_config,
+                                     manage_buckets=True,
+                                     manage_collections=True)
             await cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
         await cb_env.try_n_times(3, 5, cb_env.load_data)
@@ -73,7 +77,7 @@ class CollectionTests:
             await cb_env.try_n_times_till_exception(5, 3,
                                                     cb_env.teardown_named_collections,
                                                     raise_if_no_exception=False)
-        await c.close()
+        await cluster.close()
 
     @pytest.fixture(scope="class")
     def check_preserve_expiry_supported(self, cb_env):
@@ -95,7 +99,9 @@ class CollectionTests:
                                                 1,
                                                 cb_env.collection.remove,
                                                 key,
-                                                expected_exceptions=(DocumentNotFoundException,))
+                                                expected_exceptions=(DocumentNotFoundException,),
+                                                reset_on_timeout=True,
+                                                reset_num_times=3)
 
     @pytest.fixture(name="default_kvp")
     def default_key_and_value(self, cb_env) -> KVPair:
@@ -106,7 +112,7 @@ class CollectionTests:
     async def default_key_and_value_with_reset(self, cb_env) -> KVPair:
         key, value = cb_env.get_default_key_value()
         yield KVPair(key, value)
-        await cb_env.collection.upsert(key, value)
+        await cb_env.try_n_times(5, 3, cb_env.collection.upsert, key, value)
 
     @pytest_asyncio.fixture(scope="class")
     async def check_replicas(self, cb_env):

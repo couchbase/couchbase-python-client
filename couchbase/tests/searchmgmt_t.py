@@ -2,13 +2,16 @@ import pytest
 
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
-from couchbase.exceptions import InvalidArgumentException, SearchIndexNotFoundException
+from couchbase.exceptions import (InvalidArgumentException,
+                                  QueryIndexAlreadyExistsException,
+                                  SearchIndexNotFoundException)
 from couchbase.management.search import SearchIndex
 from couchbase.options import ClusterOptions
 
 from ._test_utils import TestEnvironment
 
 
+@pytest.mark.flaky(reruns=5)
 class SearchIndexManagementTests:
 
     IDX_NAME = 'test-fts-index'
@@ -18,10 +21,9 @@ class SearchIndexManagementTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(
-            conn_string, opts)
-        cluster.cluster_info()
+        cluster = Cluster.connect(conn_string, opts)
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        cluster.cluster_info()
 
         coll = bucket.default_collection()
         cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config,
@@ -40,17 +42,18 @@ class SearchIndexManagementTests:
 
     @pytest.fixture()
     def create_test_index(self, cb_env, test_idx):
-        cb_env.sixm.upsert_index(test_idx)
+        cb_env.try_n_times_till_exception(10, 3,
+                                          cb_env.sixm.upsert_index,
+                                          test_idx,
+                                          expected_exceptions=(QueryIndexAlreadyExistsException, ))
 
     @pytest.fixture()
     def drop_test_index(self, cb_env, test_idx):
         yield
-        try:
-            cb_env.sixm.drop_index(test_idx.name)
-        except SearchIndexNotFoundException:
-            pass
-        except Exception as ex:
-            raise ex
+        cb_env.try_n_times_till_exception(10, 3,
+                                          cb_env.sixm.drop_index,
+                                          test_idx.name,
+                                          expected_exceptions=(SearchIndexNotFoundException, ))
 
     @pytest.mark.usefixtures("drop_test_index")
     def test_upsert_index(self, cb_env, test_idx):
@@ -115,12 +118,14 @@ class SearchIndexManagementTests:
     @pytest.mark.usefixtures("create_test_index")
     @pytest.mark.usefixtures("drop_test_index")
     def test_analyze_doc(self, cb_env, test_idx):
+        if cb_env.server_version_short < 6.5:
+            pytest.skip((f'FTS analyzeDoc only supported on server versions >= 6.5. '
+                        f'Using server version: {cb_env.server_version}.'))
         # like getting the doc count, this can fail immediately after index
         # creation
         doc = {"field": "I got text in here"}
         analysis = cb_env.try_n_times(
             5, 2, cb_env.sixm.analyze_document, test_idx.name, doc)
-        # analysis = cb_env.sixm.analyze_document(test_idx.name, doc)
 
         assert analysis.get('analysis', None) is not None
         assert isinstance(analysis.get('analysis'), (list, dict))

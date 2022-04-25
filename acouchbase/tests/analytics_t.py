@@ -1,10 +1,8 @@
 import asyncio
-import json
 from datetime import datetime, timedelta
 
 import pytest
 import pytest_asyncio
-import requests
 
 from acouchbase.cluster import Cluster, get_event_loop
 from couchbase.analytics import (AnalyticsMetaData,
@@ -13,7 +11,6 @@ from couchbase.analytics import (AnalyticsMetaData,
                                  AnalyticsWarning)
 from couchbase.auth import PasswordAuthenticator
 from couchbase.exceptions import DatasetNotFoundException, DataverseNotFoundException
-from couchbase.management.options import ConnectLinkOptions, DisconnectLinkOptions
 from couchbase.options import (AnalyticsOptions,
                                ClusterOptions,
                                UnsignedInt64)
@@ -37,27 +34,33 @@ class AnalyticsTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(
-            conn_string, opts)
-        await cluster.on_connect()
-        await cluster.cluster_info()
+        cluster = await Cluster.connect(conn_string, opts)
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        await cluster.on_connect()
+        await bucket.on_connect()
+        await cluster.cluster_info()
 
         coll = bucket.default_collection()
         cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_analytics=True)
 
         # setup
         await cb_env.try_n_times(5, 3, cb_env.load_data)
-        dv_name = 'test/dataverse' if cb_env.server_version_short >= 7.0 else 'test_dataverse'
-        await cb_env.am.create_dataverse(dv_name, ignore_if_exists=True)
-        await cb_env.am.create_dataset(self.DATASET_NAME, cb_env.bucket.name, ignore_if_exists=True)
-        await cb_env.am.connect_link(ConnectLinkOptions(dataverse_name=dv_name))
+        await cb_env.try_n_times(3, 5, self._setup_analytics, cb_env)
+
+        yield cb_env
+        # teardown
+        await cb_env.try_n_times(3, 5, self._teardown_analytics, cb_env)
+        await cluster.close()
+
+    async def _setup_analytics(self, cb_env):
+        await cb_env.am.create_dataset(self.DATASET_NAME,
+                                       cb_env.bucket.name,
+                                       ignore_if_exists=True)
+        await cb_env.am.connect_link()
 
         q_str = f'SELECT COUNT(1) AS doc_count FROM `{self.DATASET_NAME}`;'
 
         for _ in range(10):
-            res = cluster.analytics_query(q_str)
+            res = cb_env.cluster.analytics_query(q_str)
             rows = [r async for r in res.rows()]
             print(rows)
             if len(rows) > 0 and rows[0].get('doc_count', 0) > 10:
@@ -65,20 +68,12 @@ class AnalyticsTests:
             print(f'Found {len(rows)} records, waiting a bit...')
             await asyncio.sleep(5)
 
-        yield cb_env
-
-        # teardown
-        await cb_env.try_n_times(3, 5, self.teardown_analytics, cb_env, dv_name)
-
-        await cluster.close()
-
-    async def teardown_analytics(self, cb_env, dv_name):
+    async def _teardown_analytics(self, cb_env):
         await cb_env.try_n_times_till_exception(3, 5,
                                                 cb_env.purge_data,
                                                 raise_if_no_exception=False)
-        await cb_env.am.disconnect_link(DisconnectLinkOptions(dataverse_name=dv_name))
+        await cb_env.am.disconnect_link()
         await cb_env.am.drop_dataset(self.DATASET_NAME, ignore_if_not_exists=True)
-        await cb_env.am.drop_dataverse(dv_name, ignore_if_not_exists=True)
 
     async def assert_rows(self,
                           result,  # type: AnalyticsResult
@@ -115,8 +110,8 @@ class AnalyticsTests:
 
     @pytest.mark.asyncio
     async def test_query_named_parameters(self, cb_env):
-        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{self.DATASET_NAME}` WHERE `type` = $type LIMIT 1',
-                                                AnalyticsOptions(named_parameters={'type': 'airline'}))
+        result = cb_env.cluster.analytics_query(f'SELECT * FROM `{self.DATASET_NAME}` WHERE `type` = $atype LIMIT 1',
+                                                AnalyticsOptions(named_parameters={'atype': 'airline'}))
         await self.assert_rows(result, 1)
 
     @pytest.mark.asyncio
@@ -191,20 +186,13 @@ class AnalyticsCollectionTests:
 
     @pytest_asyncio.fixture(scope="class", name="cb_env")
     async def couchbase_test_environment(self, couchbase_config):
-        # see tests/test_config.ini
-        if not couchbase_config.analytics_host:
-            pytest.skip('Unable to determine analytics host, cannot setup tests.')
-
-        analytics_url = f'http://{couchbase_config.analytics_host}:8095/analytics/service'
-
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(conn_string, opts)
-        await cluster.on_connect()
-        await cluster.cluster_info()
+        cluster = await Cluster.connect(conn_string, opts)
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
         await bucket.on_connect()
+        await cluster.cluster_info()
 
         coll = bucket.default_collection()
         cb_env = TestEnvironment(cluster,
@@ -218,7 +206,7 @@ class AnalyticsCollectionTests:
 
         # setup
         await cb_env.try_n_times(5, 3, cb_env.load_data)
-        await self.create_analytics_collections(cb_env, analytics_url, username, pw)
+        await self.create_analytics_collections(cb_env)
 
         yield cb_env
 
@@ -226,7 +214,7 @@ class AnalyticsCollectionTests:
         await cb_env.try_n_times_till_exception(3, 5,
                                                 cb_env.purge_data,
                                                 raise_if_no_exception=False)
-        await self.tear_down_analytics_collections(cb_env, analytics_url, username, pw)
+        await self.tear_down_analytics_collections(cb_env)
         await cb_env.try_n_times_till_exception(5, 3,
                                                 cb_env.teardown_named_collections,
                                                 raise_if_no_exception=False)
@@ -245,64 +233,25 @@ class AnalyticsCollectionTests:
                 USE `default`.`test-scope`; CONNECT LINK Local;
     """
 
-    def _setup_analytics_collections(self, cb_env, analytics_url, username, pw):
-        headers = {'Content-Type': 'application/json'}
-        payload = {}
-
+    async def create_analytics_collections(self, cb_env):
         dv_fqdn = f'`{cb_env.bucket.name}`.`{cb_env.scope.name}`'
-        statement = f'CREATE DATAVERSE {dv_fqdn} IF NOT EXISTS;'
+        q_str = f'CREATE DATAVERSE {dv_fqdn} IF NOT EXISTS;'
+        res = cb_env.cluster.analytics_query(q_str)
+        [_ async for _ in res.rows()]
 
-        payload['statement'] = statement
-        r = requests.post(analytics_url,
-                          headers=headers,
-                          data=json.dumps(payload),
-                          auth=(username, pw))
+        q_str = f'USE {dv_fqdn}; CREATE DATASET IF NOT EXISTS `{cb_env.collection.name}` ON {cb_env.fqdn}'
+        res = cb_env.cluster.analytics_query(q_str)
+        [_ async for _ in res.rows()]
 
-        if r.status_code != 200:
-            pytest.skip(f'Unabled to setup analytics collections -- statement {statement} failed.')
+        q_str = f'USE {dv_fqdn}; CONNECT LINK Local;'
+        res = cb_env.cluster.analytics_query(q_str)
+        [_ async for _ in res.rows()]
 
-        statement = f'USE {dv_fqdn}; CREATE DATASET IF NOT EXISTS `{cb_env.collection.name}` ON {cb_env.fqdn}'
-        payload['statement'] = statement
-        r = requests.post(analytics_url,
-                          headers=headers,
-                          data=json.dumps(payload),
-                          auth=(username, pw))
-
-        if r.status_code != 200:
-            pytest.skip(f'Unabled to setup analytics collections -- statement {statement} failed.')
-
-        statement = f'USE {dv_fqdn}; CONNECT LINK Local;'
-        payload['statement'] = statement
-        r = requests.post(analytics_url,
-                          headers=headers,
-                          data=json.dumps(payload),
-                          auth=(username, pw))
-
-        if r.status_code != 200:
-            pytest.skip(f'Unabled to setup analytics collections -- statement {statement} failed.')
-
-    async def create_analytics_collections(self, cb_env, analytics_url, username, pw):
-        self._setup_analytics_collections(cb_env, analytics_url, username, pw)
-
-        # @TODO:  utilize HTTP requests until couchbase++ sorted out...
-        # q_str = f'CREATE DATAVERSE {dv_fqdn} IF NOT EXISTS;'
-        # #res = cb_env.cluster.analytics_query(q_str, query_context=dv_fqdn)
-        # [_ async for _ in res.rows()]
-        # # await cb_env.am.create_dataverse(dv_fqdn, ignore_if_exists=True)
-
-        # q_str = f'USE {dv_fqdn}; CREATE DATASET IF NOT EXISTS `{self.DATASET_NAME}` ON {cb_env.fqdn}'
-        # res = cb_env.cluster.analytics_query(q_str)
-        # [_ async for _ in res.rows()]
-
-        # q_str = f'USE {dv_fqdn}; CONNECT LINK Local;'
-        # res = cb_env.cluster.analytics_query(q_str)
-        # [_ async for _ in res.rows()]
-
-        dv_fqdn = f'default:`{cb_env.bucket.name}`.`{cb_env.scope.name}`'
+        context_fqdn = f'default:`{cb_env.bucket.name}`.`{cb_env.scope.name}`'
         q_str = f'SELECT COUNT(1) AS doc_count FROM `{cb_env.collection.name}`;'
 
         for _ in range(10):
-            res = cb_env.cluster.analytics_query(q_str, query_context=dv_fqdn)
+            res = cb_env.cluster.analytics_query(q_str, query_context=context_fqdn)
             rows = [r async for r in res.rows()]
             if len(rows) > 0 and rows[0].get('doc_count', 0) > 10:
                 break
@@ -321,55 +270,19 @@ class AnalyticsCollectionTests:
                 DROP DATAVERSE `default`.`test-scope` IF EXISTS;
     """
 
-    def _teardown_analytics_collections(self, cb_env, analytics_url, username, pw):
-        headers = {'Content-Type': 'application/json'}
-        payload = {}
-
+    async def tear_down_analytics_collections(self, cb_env):
         dv_fqdn = f'`{cb_env.bucket.name}`.`{cb_env.scope.name}`'
-        statement = f'USE {dv_fqdn}; DISCONNECT LINK Local;'
-        payload['statement'] = statement
-        r = requests.post(analytics_url,
-                          headers=headers,
-                          data=json.dumps(payload),
-                          auth=(username, pw))
+        q_str = f'USE {dv_fqdn}; DISCONNECT LINK Local;'
+        res = cb_env.cluster.analytics_query(q_str)
+        [_ async for _ in res.rows()]
 
-        if r.status_code != 200:
-            print(f'Unabled to teardown analytics collections -- statement {statement} failed.')
+        q_str = f'USE {dv_fqdn}; DROP DATASET `{cb_env.collection.name}` IF EXISTS;'
+        res = cb_env.cluster.analytics_query(q_str)
+        [_ async for _ in res.rows()]
 
-        statement = f'USE {dv_fqdn}; DROP DATASET `{cb_env.collection.name}` IF EXISTS;'
-        payload['statement'] = statement
-        r = requests.post(analytics_url,
-                          headers=headers,
-                          data=json.dumps(payload),
-                          auth=(username, pw))
-
-        if r.status_code != 200:
-            print(f'Unabled to teardown analytics collections -- statement {statement} failed.')
-
-        statement = f'DROP DATAVERSE {dv_fqdn} IF EXISTS;'
-        payload['statement'] = statement
-        r = requests.post(analytics_url,
-                          headers=headers,
-                          data=json.dumps(payload),
-                          auth=(username, pw))
-
-        if r.status_code != 200:
-            print(f'Unabled to teardown analytics collections -- statement {statement} failed.')
-
-    async def tear_down_analytics_collections(self, cb_env, analytics_url, username, pw):
-        self._teardown_analytics_collections(cb_env, analytics_url, username, pw)
-        # dv_fqdn = f'`{cb_env.bucket.name}`.`{cb_env.scope.name}`'
-        # q_str = f'USE {dv_fqdn}; DISCONNECT LINK Local;'
-        # res = cb_env.cluster.analytics_query(q_str, query_context=dv_fqdn)
-        # [_ async for _ in res.rows()]
-
-        # q_str = f'USE {dv_fqdn}; DROP DATASET `{cb_env.collection.name}` IF EXISTS;'
-        # res = cb_env.cluster.analytics_query(q_str)
-        # [_ async for _ in res.rows()]
-
-        # q_str = f'DROP DATAVERSE {dv_fqdn} IF EXISTS;'
-        # res = cb_env.cluster.analytics_query(q_str)
-        # [_ async for _ in res.rows()]
+        q_str = f'DROP DATAVERSE {dv_fqdn} IF EXISTS;'
+        res = cb_env.cluster.analytics_query(q_str)
+        [_ async for _ in res.rows()]
 
     async def assert_rows(self,
                           result,  # type: AnalyticsResult

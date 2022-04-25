@@ -29,10 +29,9 @@ class ClusterDiagnosticsTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(
-            conn_string, opts)
-        cluster.cluster_info()
+        cluster = Cluster.connect(conn_string, opts)
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        cluster.cluster_info()
 
         coll = bucket.default_collection()
         cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True)
@@ -142,6 +141,7 @@ class ClusterDiagnosticsTests:
         assert kv_endpoints[0].state == EndpointState.Connected
         assert kv_endpoints[0].service_type == ServiceType.KeyValue
 
+    @pytest.mark.flaky(reruns=5)
     @pytest.mark.usefixtures("check_diagnostics_supported")
     def test_diagnostics_after_query(self, cb_env):
         cluster = cb_env.cluster

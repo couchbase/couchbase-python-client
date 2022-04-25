@@ -106,27 +106,41 @@ class ServerFeatures(Enum):
     Eventing = 'eventing'
     EventingFunctionManagement = 'eventing_function_mgmt'
     RateLimiting = 'rate_limiting'
+    Txns = 'txns'
     TxnQueries = 'txn_queries'
 
 
-BASIC_FEATURES = [ServerFeatures.KeyValue, ServerFeatures.SSL, ServerFeatures.SpatialViews,
-                  ServerFeatures.Subdoc, ServerFeatures.Views, ServerFeatures.Replicas]
-
-FEATURES_EXCEPT_MOCK = [ServerFeatures.Query, ServerFeatures.Search,
-                        ServerFeatures.GetMeta, ServerFeatures.BucketManagement,
-                        ServerFeatures.QueryIndexManagement, ServerFeatures.TxnQueries,
-                        ServerFeatures.SearchIndexManagement, ServerFeatures.ViewIndexManagement,
-                        ServerFeatures.EventingFunctionManagement]
-AT_LEAST_V6_0_0_FEATURES = [ServerFeatures.Analytics, ServerFeatures.UserManagement]
+BASIC_FEATURES = [ServerFeatures.KeyValue,
+                  ServerFeatures.SSL,
+                  ServerFeatures.SpatialViews,
+                  ServerFeatures.Subdoc,
+                  ServerFeatures.Views,
+                  ServerFeatures.Replicas]
+BASIC_FEATURES_EXCEPT_MOCK = [ServerFeatures.Query,
+                              ServerFeatures.Search,
+                              ServerFeatures.GetMeta,
+                              ServerFeatures.BucketManagement,
+                              ServerFeatures.QueryIndexManagement,
+                              ServerFeatures.SearchIndexManagement,
+                              ServerFeatures.ViewIndexManagement]
+FEATURES_NOT_IN_MOCK = [ServerFeatures.TxnQueries]
+FEATURES_IN_MOCK = [ServerFeatures.Txns]
+AT_LEAST_V6_0_0_FEATURES = [ServerFeatures.Analytics,
+                            ServerFeatures.UserManagement]
 AT_LEAST_V6_5_0_FEATURES = [ServerFeatures.AnalyticsPendingMutations,
-                            ServerFeatures.UserGroupManagement, ServerFeatures.SynchronousDurability,
-                            ServerFeatures.SearchDisableScoring]
+                            ServerFeatures.UserGroupManagement,
+                            ServerFeatures.SynchronousDurability,
+                            ServerFeatures.SearchDisableScoring,
+                            ServerFeatures.Txns]
 AT_LEAST_V6_6_0_FEATURES = [ServerFeatures.BucketMinDurability]
 AT_LEAST_V7_0_0_FEATURES = [ServerFeatures.Collections,
-                            ServerFeatures.PreserveExpiry, ServerFeatures.AnalyticsLinkManagement]
+                            ServerFeatures.AnalyticsLinkManagement,
+                            ServerFeatures.TxnQueries]
 AT_LEAST_V7_1_0_FEATURES = [ServerFeatures.RateLimiting,
-                            ServerFeatures.BucketStorageBackend, ServerFeatures.CustomConflictResolution,
-                            ServerFeatures.EventingFunctionManagement]
+                            ServerFeatures.BucketStorageBackend,
+                            ServerFeatures.CustomConflictResolution,
+                            ServerFeatures.EventingFunctionManagement,
+                            ServerFeatures.PreserveExpiry]
 
 
 class CouchbaseTestEnvironment():
@@ -277,8 +291,16 @@ class CouchbaseTestEnvironment():
         if feature in map(lambda f: f.value, BASIC_FEATURES):
             return True
 
-        if feature in map(lambda f: f.value, FEATURES_EXCEPT_MOCK):
+        not_mock = BASIC_FEATURES_EXCEPT_MOCK + FEATURES_NOT_IN_MOCK
+
+        if self.is_mock_server and feature in map(lambda f: f.value, not_mock):
             return not self.is_mock_server
+
+        if self.is_mock_server and feature in map(lambda f: f.value, FEATURES_IN_MOCK):
+            return True
+
+        if self.is_real_server and feature in map(lambda f: f.value, BASIC_FEATURES_EXCEPT_MOCK):
+            return True
 
         if feature == ServerFeatures.Diagnostics.value:
             if self.is_real_server:
@@ -333,7 +355,8 @@ class CouchbaseTestEnvironment():
     def feature_not_supported_text(self, feature  # type: str  # noqa: C901
                                    ) -> str:
 
-        if feature in map(lambda f: f.value, FEATURES_EXCEPT_MOCK):
+        not_mock = BASIC_FEATURES_EXCEPT_MOCK + FEATURES_NOT_IN_MOCK
+        if self.is_mock_server and feature in map(lambda f: f.value, not_mock):
             return f'Mock server does not support feature: {feature}'
 
         if feature == ServerFeatures.Diagnostics.value:
@@ -350,31 +373,31 @@ class CouchbaseTestEnvironment():
 
         if feature in map(lambda f: f.value, AT_LEAST_V6_0_0_FEATURES):
             if self.is_real_server:
-                return (f'Feature: {feature} only support on server versions >= 6.0.'
+                return (f'Feature: {feature} only supported on server versions >= 6.0. '
                         f'Using server version: {self.server_version}.')
             return f'Mock server does not support feature: {feature}'
 
         if feature in map(lambda f: f.value, AT_LEAST_V6_5_0_FEATURES):
             if self.is_real_server:
-                return (f'Feature: {feature} only support on server versions >= 6.5.'
+                return (f'Feature: {feature} only supported on server versions >= 6.5. '
                         f'Using server version: {self.server_version}.')
             return f'Mock server does not support feature: {feature}'
 
         if feature in map(lambda f: f.value, AT_LEAST_V6_6_0_FEATURES):
             if self.is_real_server:
-                return (f'Feature: {feature} only support on server versions >= 6.6.'
+                return (f'Feature: {feature} only supported on server versions >= 6.6. '
                         f'Using server version: {self.server_version}.')
             return f'Mock server does not support feature: {feature}'
 
         if feature in map(lambda f: f.value, AT_LEAST_V7_0_0_FEATURES):
             if self.is_real_server:
-                return (f'Feature: {feature} only support on server versions >= 7.0.'
+                return (f'Feature: {feature} only supported on server versions >= 7.0. '
                         f'Using server version: {self.server_version}.')
             return f'Mock server does not support feature: {feature}'
 
         if feature in map(lambda f: f.value, AT_LEAST_V7_1_0_FEATURES):
             if self.is_real_server:
-                return (f'Feature: {feature} only support on server versions >= 7.1.'
+                return (f'Feature: {feature} only supported on server versions >= 7.1. '
                         f'Using server version: {self.server_version}.')
             return f'Mock server does not support feature: {feature}'
 
@@ -589,7 +612,6 @@ class ClusterInformation():
         self.real_server_enabled = False
         self.mock_server_enabled = False
         self.mock_server = None
-        self.analytics_host = None
         # self.mock_path = ""
         # self.mock_url = None
         # self.mock_server = None
@@ -694,7 +716,6 @@ def load_config():  # noqa: C901
             cluster_info.bucket_name = config.get('realserver', 'bucket_name')
             cluster_info.bucket_password = config.get(
                 'realserver', 'bucket_password')
-            cluster_info.analytics_host = config.get('realserver', 'analytics_host', fallback=None)
 
         mock_path = ''
         mock_url = ''

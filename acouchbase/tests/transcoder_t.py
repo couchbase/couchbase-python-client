@@ -26,12 +26,10 @@ class DefaultTranscoderTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(
-            conn_string, opts)
-        await cluster.on_connect()
-        cluster.cluster_info()
+        cluster = await Cluster.connect(conn_string, opts)
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
         await bucket.on_connect()
+        await cluster.cluster_info()
 
         coll = bucket.default_collection()
         if request.param == CollectionType.DEFAULT:
@@ -39,6 +37,8 @@ class DefaultTranscoderTests:
         elif request.param == CollectionType.NAMED:
             cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config,
                                      manage_buckets=True, manage_collections=True)
+            if cb_env.is_mock_server:
+                pytest.skip('Jenkins + GoCAVES not playing nice...')
             await cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
         await cb_env.try_n_times(5, 3, cb_env.load_data)
@@ -60,8 +60,11 @@ class DefaultTranscoderTests:
                                                 1,
                                                 cb_env.collection.remove,
                                                 key,
-                                                expected_exceptions=(DocumentNotFoundException,))
+                                                expected_exceptions=(DocumentNotFoundException,),
+                                                reset_on_timeout=True,
+                                                reset_num_times=3)
 
+    @pytest.mark.flaky(reruns=5)
     @pytest.mark.asyncio
     async def test_default_tc_json_upsert(self, cb_env, new_kvp):
         cb = cb_env.collection

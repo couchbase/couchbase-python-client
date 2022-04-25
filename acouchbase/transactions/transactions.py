@@ -2,8 +2,8 @@ import asyncio
 from functools import wraps
 from typing import (TYPE_CHECKING,
                     Callable,
-                    Optional,
-                    Dict)
+                    Dict,
+                    Optional)
 
 from couchbase.transactions import (TransactionGetResult,
                                     TransactionQueryOptions,
@@ -18,8 +18,8 @@ if TYPE_CHECKING:
     from acouchbase.collection import AsyncCollection
     from couchbase._utils import JSONType, PyCapsuleType
     from couchbase.options import TransactionConfig
-    from couchbase.transactions import PerTransactionConfig
     from couchbase.serializer import Serializer
+    from couchbase.transactions import PerTransactionConfig
 
 
 class AsyncWrapper:

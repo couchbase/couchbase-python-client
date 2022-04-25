@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import (TYPE_CHECKING,
+                    Callable,
+                    Optional)
 
 from couchbase.pycbc_core import (create_transactions,
                                   destroy_transactions,

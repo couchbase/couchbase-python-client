@@ -2,14 +2,11 @@ from datetime import timedelta
 
 import pytest
 
-from couchbase.auth import PasswordAuthenticator
-from couchbase.cluster import Cluster
 from couchbase.exceptions import (CouchbaseException,
                                   DocumentExistsException,
                                   DocumentNotFoundException,
                                   InvalidArgumentException)
-from couchbase.options import (ClusterOptions,
-                               GetMultiOptions,
+from couchbase.options import (GetMultiOptions,
                                InsertMultiOptions,
                                InsertOptions,
                                ReplaceMultiOptions,
@@ -30,18 +27,9 @@ class CollectionMultiTests:
 
     @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     def couchbase_test_environment(self, couchbase_config, request):
-        conn_string = couchbase_config.get_connection_string()
-        opts = ClusterOptions(PasswordAuthenticator(
-            couchbase_config.admin_username, couchbase_config.admin_password))
-        cluster = Cluster(conn_string, opts)
-        cluster.cluster_info()
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        coll = bucket.default_collection()
-        if request.param == CollectionType.DEFAULT:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True)
-        elif request.param == CollectionType.NAMED:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config,
-                                     manage_buckets=True, manage_collections=True)
+        cb_env = TestEnvironment.get_environment(couchbase_config, request.param)
+
+        if request.param == CollectionType.NAMED:
             cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
         yield cb_env
@@ -49,10 +37,11 @@ class CollectionMultiTests:
             cb_env.try_n_times_till_exception(5, 3,
                                               cb_env.teardown_named_collections,
                                               raise_if_no_exception=False)
-        cluster.close()
+        cb_env.cluster.close()
 
     @pytest.fixture(name='kds')
     def get_keys_and_docs(self, cb_env):
+        cb_env.check_if_mock_unstable()
         keys_and_docs = {
             'test-key1': {'what': 'a test doc!', 'id': 'test-key1'},
             'test-key2': {'what': 'a test doc!', 'id': 'test-key2'},
@@ -60,10 +49,19 @@ class CollectionMultiTests:
             'test-key4': {'what': 'a test doc!', 'id': 'test-key4'}
         }
         yield keys_and_docs
-        cb_env.collection.remove_multi(list(keys_and_docs.keys()))
+        keys = list(keys_and_docs.keys())
+        cb_env.try_n_times_till_exception(10,
+                                          1,
+                                          cb_env.collection.remove_multi,
+                                          keys,
+                                          expected_exceptions=(DocumentNotFoundException,),
+                                          reset_on_timeout=True,
+                                          reset_num_times=3,
+                                          return_exceptions=False)
 
     @pytest.fixture(name='fake_kds')
     def get_fake_keys_and_docs(self, cb_env):
+        cb_env.check_if_mock_unstable()
         keys_and_docs = {
             'not-a-key1': {'what': 'a fake test doc!', 'id': 'not-a-key1'},
             'not-a-key2': {'what': 'a fake test doc!', 'id': 'not-a-key2'},
@@ -71,12 +69,45 @@ class CollectionMultiTests:
             'not-a-key4': {'what': 'a fake test doc!', 'id': 'not-a-key4'}
         }
         yield keys_and_docs
-        cb_env.collection.remove_multi(list(keys_and_docs.keys()))
+        keys = list(keys_and_docs.keys())
+        cb_env.try_n_times_till_exception(10,
+                                          1,
+                                          cb_env.collection.remove_multi,
+                                          keys,
+                                          expected_exceptions=(DocumentNotFoundException,),
+                                          reset_on_timeout=True,
+                                          reset_num_times=3,
+                                          return_exceptions=False)
 
+    def _make_sure_docs_exists(self, cb_env, keys):
+        found = 0
+        for k in keys:
+            doc = cb_env.try_n_times(10, 3, cb_env.collection.get, k)
+            if isinstance(doc, GetResult):
+                found += 1
+
+        if len(keys) != found:
+            raise Exception('Unable to find all docs.')
+
+    def _check_all_not_found(self, cb_env, keys, okay_key=None):
+        not_found = 0
+        for k in keys:
+            try:
+                cb_env.collection.get(k)
+                if okay_key and k == okay_key:
+                    not_found += 1  # this is okay, it shouldn't have expired
+            except DocumentNotFoundException:
+                not_found += 1
+
+        if not_found != len(keys):
+            raise Exception('Not all docs were expired')
+
+    @pytest.mark.flaky(reruns=5)
     def test_multi_exists_simple(self, cb_env, kds):
         keys_and_docs = kds
         res = cb_env.collection.upsert_multi(keys_and_docs)
         keys = list(keys_and_docs.keys())
+        cb_env.try_n_times(5, 3, self._make_sure_docs_exists, cb_env, keys)
         res = cb_env.collection.exists_multi(keys)
         assert isinstance(res, MultiExistsResult)
         assert res.all_ok is True
@@ -99,6 +130,7 @@ class CollectionMultiTests:
             assert r.exists is False
 
     def test_multi_exists_invalid_input(self, cb_env):
+        cb_env.check_if_mock_unstable()
         keys_and_docs = {
             'test-key1': {'what': 'a test doc!', 'id': 'test-key1'},
             'test-key2': {'what': 'a test doc!', 'id': 'test-key2'},
@@ -112,6 +144,7 @@ class CollectionMultiTests:
         keys_and_docs = kds
         res = cb_env.collection.upsert_multi(keys_and_docs)
         keys = list(keys_and_docs.keys())
+        cb_env.try_n_times(5, 3, self._make_sure_docs_exists, cb_env, keys)
         res = cb_env.collection.get_multi(keys)
         assert isinstance(res, MultiGetResult)
         assert res.all_ok is True
@@ -123,6 +156,7 @@ class CollectionMultiTests:
             assert r.content_as[dict] == keys_and_docs[k]
 
     def test_multi_get_invalid_input(self, cb_env):
+        cb_env.check_if_mock_unstable()
         keys_and_docs = {
             'test-key1': {'what': 'a test doc!', 'id': 'test-key1'},
             'test-key2': {'what': 'a test doc!', 'id': 'test-key2'},
@@ -167,10 +201,7 @@ class CollectionMultiTests:
         assert res.exceptions == {}
         assert all(map(lambda r: isinstance(r, MutationResult), res.results.values())) is True
         # lets verify they all expired...
-        cb_env.sleep(3.0)
-        for k in keys_and_docs.keys():
-            with pytest.raises(DocumentNotFoundException):
-                cb_env.collection.get(k)
+        cb_env.try_n_times(5, 3, self._check_all_not_found, cb_env, list(keys_and_docs.keys()))
 
     def test_multi_upsert_key_opts(self, cb_env, kds):
         keys_and_docs = kds
@@ -183,17 +214,12 @@ class CollectionMultiTests:
         assert isinstance(res.results, dict)
         assert res.exceptions == {}
         assert all(map(lambda r: isinstance(r, MutationResult), res.results.values())) is True
+
         # lets verify they all expired...
-        cb_env.sleep(3.0)
-        for k in keys_and_docs.keys():
-            if k == key1:
-                r = cb_env.collection.get(k)
-                assert isinstance(r, GetResult)
-            else:
-                with pytest.raises(DocumentNotFoundException):
-                    cb_env.collection.get(k)
+        cb_env.try_n_times(5, 3, self._check_all_not_found, cb_env, list(keys_and_docs.keys()), okay_key=key1)
 
     def test_multi_upsert_invalid_input(self, cb_env):
+        cb_env.check_if_mock_unstable()
         keys = ['test-key1', 'test-key2', 'test-key3', 'test-key4']
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.upsert_multi(keys)
@@ -217,10 +243,7 @@ class CollectionMultiTests:
         assert res.exceptions == {}
         assert all(map(lambda r: isinstance(r, MutationResult), res.results.values())) is True
         # lets verify they all expired...
-        cb_env.sleep(3.0)
-        for k in keys_and_docs.keys():
-            with pytest.raises(DocumentNotFoundException):
-                cb_env.collection.get(k)
+        cb_env.try_n_times(5, 3, self._check_all_not_found, cb_env, list(keys_and_docs.keys()))
 
     def test_multi_insert_key_opts(self, cb_env, kds):
         keys_and_docs = kds
@@ -234,16 +257,10 @@ class CollectionMultiTests:
         assert res.exceptions == {}
         assert all(map(lambda r: isinstance(r, MutationResult), res.results.values())) is True
         # lets verify they all expired...
-        cb_env.sleep(3.0)
-        for k in keys_and_docs.keys():
-            if k == key1:
-                r = cb_env.collection.get(k)
-                assert isinstance(r, GetResult)
-            else:
-                with pytest.raises(DocumentNotFoundException):
-                    cb_env.collection.get(k)
+        cb_env.try_n_times(5, 3, self._check_all_not_found, cb_env, list(keys_and_docs.keys()), okay_key=key1)
 
     def test_multi_insert_invalid_input(self, cb_env):
+        cb_env.check_if_mock_unstable()
         keys = ['test-key1', 'test-key2', 'test-key3', 'test-key4']
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.insert_multi(keys)
@@ -273,6 +290,7 @@ class CollectionMultiTests:
     def test_multi_replace_simple(self, cb_env, kds):
         keys_and_docs = kds
         res = cb_env.collection.upsert_multi(keys_and_docs)
+        cb_env.try_n_times(5, 3, self._make_sure_docs_exists, cb_env, list(keys_and_docs.keys()))
         for _, v in keys_and_docs.items():
             v['what'] = 'An updated doc!'
         res = cb_env.collection.replace_multi(keys_and_docs)
@@ -288,6 +306,7 @@ class CollectionMultiTests:
     def test_multi_replace_global_opts(self, cb_env, kds):
         keys_and_docs = kds
         res = cb_env.collection.upsert_multi(keys_and_docs)
+        cb_env.try_n_times(5, 3, self._make_sure_docs_exists, cb_env, list(keys_and_docs.keys()))
         opts = ReplaceMultiOptions(expiry=timedelta(seconds=2))
         for _, v in keys_and_docs.items():
             v['what'] = 'An updated doc!'
@@ -298,14 +317,12 @@ class CollectionMultiTests:
         assert res.exceptions == {}
         assert all(map(lambda r: isinstance(r, MutationResult), res.results.values())) is True
         # lets verify they all expired...
-        cb_env.sleep(3.0)
-        for k in keys_and_docs.keys():
-            with pytest.raises(DocumentNotFoundException):
-                cb_env.collection.get(k)
+        cb_env.try_n_times(5, 3, self._check_all_not_found, cb_env, list(keys_and_docs.keys()))
 
     def test_multi_replace_key_opts(self, cb_env, kds):
         keys_and_docs = kds
         res = cb_env.collection.upsert_multi(keys_and_docs)
+        cb_env.try_n_times(5, 3, self._make_sure_docs_exists, cb_env, list(keys_and_docs.keys()))
         for _, v in keys_and_docs.items():
             v['what'] = 'An updated doc!'
         key1 = list(keys_and_docs.keys())[0]
@@ -318,16 +335,10 @@ class CollectionMultiTests:
         assert res.exceptions == {}
         assert all(map(lambda r: isinstance(r, MutationResult), res.results.values())) is True
         # lets verify they all expired...
-        cb_env.sleep(3.0)
-        for k in keys_and_docs.keys():
-            if k == key1:
-                r = cb_env.collection.get(k)
-                assert isinstance(r, GetResult)
-            else:
-                with pytest.raises(DocumentNotFoundException):
-                    cb_env.collection.get(k)
+        cb_env.try_n_times(5, 3, self._check_all_not_found, cb_env, list(keys_and_docs.keys()), okay_key=key1)
 
     def test_multi_replace_invalid_input(self, cb_env):
+        cb_env.check_if_mock_unstable()
         keys = ['test-key1', 'test-key2', 'test-key3', 'test-key4']
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.replace_multi(keys)
@@ -351,17 +362,18 @@ class CollectionMultiTests:
         keys_and_docs = kds
         res = cb_env.collection.upsert_multi(keys_and_docs)
         keys = list(keys_and_docs.keys())
+        cb_env.try_n_times(5, 3, self._make_sure_docs_exists, cb_env, keys)
         res = cb_env.collection.remove_multi(keys)
         assert isinstance(res, MultiMutationResult)
         assert res.all_ok is True
         assert isinstance(res.results, dict)
         assert res.exceptions == {}
         assert all(map(lambda r: isinstance(r, MutationResult), res.results.values())) is True
-        for k in keys:
-            with pytest.raises(DocumentNotFoundException):
-                cb_env.collection.get(k)
+        # lets verify they all expired...
+        cb_env.try_n_times(5, 3, self._check_all_not_found, cb_env, list(keys_and_docs.keys()))
 
     def test_multi_remove_invalid_input(self, cb_env):
+        cb_env.check_if_mock_unstable()
         keys_and_docs = {
             'test-key1': {'what': 'a test doc!', 'id': 'test-key1'},
             'test-key2': {'what': 'a test doc!', 'id': 'test-key2'},
@@ -391,19 +403,18 @@ class CollectionMultiTests:
         keys_and_docs = kds
         res = cb_env.collection.upsert_multi(keys_and_docs)
         keys = list(keys_and_docs.keys())
+        cb_env.try_n_times(5, 3, self._make_sure_docs_exists, cb_env, keys)
         res = cb_env.collection.touch_multi(keys, timedelta(seconds=2))
         assert isinstance(res, MultiMutationResult)
         assert res.all_ok is True
         assert isinstance(res.results, dict)
         assert res.exceptions == {}
         assert all(map(lambda r: isinstance(r, MutationResult), res.results.values())) is True
-        # let the docs expire...
-        cb_env.sleep(3.0)
-        for k in keys:
-            with pytest.raises(DocumentNotFoundException):
-                cb_env.collection.get(k)
+        # lets verify they all expired...
+        cb_env.try_n_times(5, 3, self._check_all_not_found, cb_env, list(keys_and_docs.keys()))
 
     def test_multi_touch_invalid_input(self, cb_env):
+        cb_env.check_if_mock_unstable()
         keys_and_docs = {
             'test-key1': {'what': 'a test doc!', 'id': 'test-key1'},
             'test-key2': {'what': 'a test doc!', 'id': 'test-key2'},
@@ -433,6 +444,7 @@ class CollectionMultiTests:
         keys_and_docs = kds
         res = cb_env.collection.upsert_multi(keys_and_docs)
         keys = list(keys_and_docs.keys())
+        cb_env.try_n_times(5, 3, self._make_sure_docs_exists, cb_env, keys)
         res = cb_env.collection.lock_multi(keys, timedelta(seconds=5))
         assert isinstance(res, MultiGetResult)
         assert res.all_ok is True
@@ -444,6 +456,7 @@ class CollectionMultiTests:
         assert isinstance(res, dict)
 
     def test_multi_lock_invalid_input(self, cb_env):
+        cb_env.check_if_mock_unstable()
         keys_and_docs = {
             'test-key1': {'what': 'a test doc!', 'id': 'test-key1'},
             'test-key2': {'what': 'a test doc!', 'id': 'test-key2'},
@@ -454,6 +467,7 @@ class CollectionMultiTests:
             cb_env.collection.lock_multi(keys_and_docs, timedelta(seconds=5))
 
     def test_multi_unlock_invalid_input(self, cb_env):
+        cb_env.check_if_mock_unstable()
         keys_and_docs = {
             'test-key1': {'what': 'a test doc!', 'id': 'test-key1'},
             'test-key2': {'what': 'a test doc!', 'id': 'test-key2'},

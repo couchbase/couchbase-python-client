@@ -1,17 +1,26 @@
 import time
 from typing import (Any,
                     Callable,
+                    Dict,
                     Optional,
                     Tuple,
                     Type,
                     Union)
 
+import pytest
+
+from couchbase.auth import PasswordAuthenticator
 from couchbase.bucket import Bucket
-from couchbase.exceptions import (BucketDoesNotExistException,
+from couchbase.cluster import Cluster
+from couchbase.exceptions import (AmbiguousTimeoutException,
+                                  BucketAlreadyExistsException,
+                                  BucketDoesNotExistException,
                                   CollectionAlreadyExistsException,
                                   CouchbaseException,
+                                  DocumentNotFoundException,
                                   ScopeAlreadyExistsException,
-                                  ScopeNotFoundException)
+                                  ScopeNotFoundException,
+                                  UnAmbiguousTimeoutException)
 from couchbase.management.analytics import AnalyticsIndexManager
 from couchbase.management.buckets import (BucketManager,
                                           BucketType,
@@ -22,6 +31,7 @@ from couchbase.management.queries import QueryIndexManager
 from couchbase.management.search import SearchIndexManager
 from couchbase.management.users import UserManager
 from couchbase.management.views import ViewIndexManager
+from couchbase.options import ClusterOptions
 from couchbase.scope import Scope
 from couchbase.transcoder import RawBinaryTranscoder, RawStringTranscoder
 from tests.helpers import CollectionType  # noqa: F401
@@ -151,6 +161,79 @@ class TestEnvironment(CouchbaseTestEnvironment):
         """Returns the rate limit testing data"""
         return self._rate_limit_params if hasattr(self, '_rate_limit_params') else None
 
+    @classmethod
+    def get_environment(cls, couchbase_config, coll_type):
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+        opts = ClusterOptions(PasswordAuthenticator(username, pw))
+        okay = False
+        for _ in range(3):
+            try:
+                cluster = Cluster.connect(conn_string, opts)
+                bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+                cluster.cluster_info()
+                okay = True
+                break
+            except (UnAmbiguousTimeoutException, AmbiguousTimeoutException):
+                continue
+
+        if not okay and couchbase_config.is_mock_server:
+            pytest.skip(('CAVES does not seem to be happy. Skipping tests as failure is not'
+                        ' an accurate representation of the state of the test, but rather'
+                         ' there is an environment issue.'))
+
+        coll = bucket.default_collection()
+        if coll_type == CollectionType.DEFAULT:
+            cb_env = cls(cluster, bucket, coll, couchbase_config, manage_buckets=True)
+        elif coll_type == CollectionType.NAMED:
+            cb_env = cls(cluster, bucket, coll, couchbase_config,
+                         manage_buckets=True, manage_collections=True)
+
+        return cb_env
+
+    def skip_if_mock_unstable(self, stable):
+        if not stable and self.is_mock_server:
+            pytest.skip(('CAVES does not seem to be happy. Skipping tests as failure is not'
+                        ' an accurate representation of the state of the test, but rather'
+                         ' there is an environment issue.'))
+
+    def check_if_mock_unstable(self):  # noqa: C901
+        if not self.is_mock_server:
+            return
+
+        key = 'is-mock-stable-key'
+        doc = {'what': 'test doc for mock stability'}
+        stable = False
+        for _ in range(3):
+            try:
+                self.collection.upsert(key, doc)
+                stable = True
+                break
+            except (AmbiguousTimeoutException, UnAmbiguousTimeoutException):
+                time.sleep(3)
+                continue
+            except Exception:
+                raise
+
+        self.skip_if_mock_unstable(stable)
+
+        stable = False
+        # now remove
+        for _ in range(3):
+            try:
+                self.collection.remove(key)
+                stable = True
+                break
+            except (AmbiguousTimeoutException, UnAmbiguousTimeoutException):
+                time.sleep(3)
+                continue
+            except DocumentNotFoundException:
+                break  # this is okay
+            except Exception:
+                raise
+
+        self.skip_if_mock_unstable(stable)
+
     def get_new_key_value(self, reset=True, debug_log=False):
         if reset is True:
             try:
@@ -169,12 +252,25 @@ class TestEnvironment(CouchbaseTestEnvironment):
         data_types, sample_json = self.load_data_from_file()
         for dt in data_types:
             data = sample_json.get(dt, None)
+
             if data and "results" in data:
-                # single path
-                for idx, r in enumerate(data["results"]):
-                    key = f"{r['type']}_{r['id']}"
-                    _ = self.collection.upsert(key, r)
-                    self._loaded_keys.append(key)
+                stable = False
+                for _ in range(3):
+                    try:
+                        for idx, r in enumerate(data["results"]):
+                            key = f"{r['type']}_{r['id']}"
+                            _ = self.collection.upsert(key, r)
+                            self._loaded_keys.append(key)
+
+                        stable = True
+                        break
+                    except (AmbiguousTimeoutException, UnAmbiguousTimeoutException):
+                        time.sleep(3)
+                        continue
+                    except Exception:
+                        raise
+
+                self.skip_if_mock_unstable(stable)
 
     def get_json_data_by_type(self, json_type):
         _, sample_json = self.load_data_from_file()
@@ -227,13 +323,8 @@ class TestEnvironment(CouchbaseTestEnvironment):
     # Collection MGMT
 
     def setup_collection_mgmt(self, bucket_name):
-        self.bm.create_bucket(
-            CreateBucketSettings(
-                name=bucket_name,
-                bucket_type=BucketType.COUCHBASE,
-                ram_quota_mb=100))
-        self.try_n_times(10, 1, self.bm.get_bucket, bucket_name)
-        self._test_bucket = self.cluster.bucket(bucket_name)
+        self.create_bucket(bucket_name)
+        self._test_bucket = self.try_n_times(3, 5, self.cluster.bucket, bucket_name)
         self._test_bucket_cm = self._test_bucket.collections()
 
     def setup_named_collections(self):
@@ -299,12 +390,23 @@ class TestEnvironment(CouchbaseTestEnvironment):
 
     # Bucket MGMT
 
+    def create_bucket(self, bucket_name):
+        try:
+            self.bm.create_bucket(
+                CreateBucketSettings(
+                    name=bucket_name,
+                    bucket_type=BucketType.COUCHBASE,
+                    ram_quota_mb=100))
+        except BucketAlreadyExistsException:
+            pass
+        self.try_n_times(10, 1, self.bm.get_bucket, bucket_name)
+
     def purge_buckets(self, buckets):
         for bucket in buckets:
             try:
                 self.bm.drop_bucket(bucket)
             except BucketDoesNotExistException:
-                continue
+                pass
             except Exception:
                 raise
 
@@ -321,14 +423,13 @@ class TestEnvironment(CouchbaseTestEnvironment):
               ) -> None:
         time.sleep(sleep_seconds)
 
-    def try_n_times(self,
-                    num_times,  # type: int
-                    seconds_between,  # type: Union[int, float]
-                    func,  # type: Callable
-                    *args,  # type: Any
-                    **kwargs  # type: Any
-                    ) -> Any:
-
+    def _try_n_times(self,
+                     num_times,  # type: int
+                     seconds_between,  # type: Union[int, float]
+                     func,  # type: Callable
+                     *args,  # type: Any
+                     **kwargs  # type: Dict[str, Any]
+                     ) -> Any:
         for _ in range(num_times):
             try:
                 return func(*args, **kwargs)
@@ -336,21 +437,48 @@ class TestEnvironment(CouchbaseTestEnvironment):
                 print(f'trying {func} failed, sleeping for {seconds_between} seconds...')
                 self.sleep(seconds_between)
 
-        raise CouchbaseTestEnvironmentException(
-            f"Unsuccessful execution of {func} after {num_times} times, "
-            "waiting {seconds_between} seconds between calls.")
+    def try_n_times(self,
+                    num_times,  # type: int
+                    seconds_between,  # type: Union[int, float]
+                    func,  # type: Callable
+                    *args,  # type: Any
+                    reset_on_timeout=False,  # type: Optional[bool]
+                    reset_num_times=None,  # type: Optional[int]
+                    **kwargs  # type: Dict[str, Any]
+                    ) -> Any:
+        if reset_on_timeout:
+            reset_times = reset_num_times or num_times
+            for _ in range(reset_times):
+                try:
+                    return self._try_n_times(num_times,
+                                             seconds_between,
+                                             func,
+                                             *args,
+                                             **kwargs)
+                except (AmbiguousTimeoutException, UnAmbiguousTimeoutException):
+                    continue
+                except Exception:
+                    raise
+        else:
+            return self._try_n_times(num_times,
+                                     seconds_between,
+                                     func,
+                                     *args,
+                                     **kwargs)
 
-    def try_n_times_till_exception(self,
-                                   num_times,  # type: int
-                                   seconds_between,  # type: Union[int, float]
-                                   func,  # type: Callable
-                                   *args,  # type: Any
-                                   expected_exceptions=(Exception,),  # type: Tuple[Type[Exception],...]
-                                   raise_exception=False,  # type: Optional[bool]
-                                   raise_if_no_exception=True,  # type: Optional[bool]
-                                   **kwargs  # type: Any
-                                   ):
-        # type: (...) -> Any
+        raise CouchbaseTestEnvironmentException(
+            f"Unsuccessful execution of {func.__name__} after {num_times} times, "
+            f"waiting {seconds_between} seconds between calls.")
+
+    def _try_n_times_until_exception(self,
+                                     num_times,  # type: int
+                                     seconds_between,  # type: Union[int, float]
+                                     func,  # type: Callable
+                                     *args,  # type: Any
+                                     expected_exceptions=(Exception,),  # type: Tuple[Type[Exception],...]
+                                     raise_exception=False,  # type: Optional[bool]
+                                     **kwargs  # type: Dict[str, Any]
+                                     ) -> None:
         for _ in range(num_times):
             try:
                 func(*args, **kwargs)
@@ -363,10 +491,47 @@ class TestEnvironment(CouchbaseTestEnvironment):
             except Exception:
                 raise
 
-        # TODO: option to restart mock server?
+    def try_n_times_till_exception(self,
+                                   num_times,  # type: int
+                                   seconds_between,  # type: Union[int, float]
+                                   func,  # type: Callable
+                                   *args,  # type: Any
+                                   expected_exceptions=(Exception,),  # type: Tuple[Type[Exception],...]
+                                   raise_exception=False,  # type: Optional[bool]
+                                   raise_if_no_exception=True,  # type: Optional[bool]
+                                   reset_on_timeout=False,  # type: Optional[bool]
+                                   reset_num_times=None,  # type: Optional[int]
+                                   **kwargs  # type: Dict[str, Any]
+                                   ) -> None:
+        if reset_on_timeout:
+            reset_times = reset_num_times or num_times
+            for _ in range(reset_times):
+                try:
+                    self._try_n_times_until_exception(num_times,
+                                                      seconds_between,
+                                                      func,
+                                                      *args,
+                                                      expected_exceptions=expected_exceptions,
+                                                      raise_exception=raise_exception,
+                                                      **kwargs)
+                    return
+                except (AmbiguousTimeoutException, UnAmbiguousTimeoutException):
+                    continue
+                except Exception:
+                    raise
+        else:
+            self._try_n_times_until_exception(num_times,
+                                              seconds_between,
+                                              func,
+                                              *args,
+                                              expected_exceptions=expected_exceptions,
+                                              raise_exception=raise_exception,
+                                              **kwargs)
+            return  # success -- return now
 
+        # TODO: option to restart mock server?
         if raise_if_no_exception is False:
             return
 
-        raise CouchbaseTestEnvironmentException(
-            f"successful {func} after {num_times} times waiting {seconds_between} seconds between calls.")
+        raise CouchbaseTestEnvironmentException((f"Exception not raised calling {func.__name__} {num_times} times "
+                                                 f"waiting {seconds_between} seconds between calls."))

@@ -1,7 +1,5 @@
 import pytest
 
-from couchbase.auth import PasswordAuthenticator
-from couchbase.cluster import Cluster
 from couchbase.datastructures import (CouchbaseList,
                                       CouchbaseMap,
                                       CouchbaseQueue,
@@ -9,32 +7,20 @@ from couchbase.datastructures import (CouchbaseList,
 from couchbase.exceptions import (DocumentNotFoundException,
                                   InvalidArgumentException,
                                   QueueEmpty)
-from couchbase.options import ClusterOptions
 from couchbase.result import OperationResult
 
-from ._test_utils import (CollectionType,
-                          KVPair,
-                          TestEnvironment)
+from ._test_utils import CollectionType, TestEnvironment
 
 
 class LegacyDatastructuresTests:
 
     TEST_DS_KEY = 'ds-key'
 
-    @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT])
+    @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     def couchbase_test_environment(self, couchbase_config, request):
-        conn_string = couchbase_config.get_connection_string()
-        opts = ClusterOptions(PasswordAuthenticator(
-            couchbase_config.admin_username, couchbase_config.admin_password))
-        cluster = Cluster(
-            conn_string, opts)
-        cluster.cluster_info()
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        coll = bucket.default_collection()
-        if request.param == CollectionType.DEFAULT:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config)
-        elif request.param == CollectionType.NAMED:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_collections=True)
+        cb_env = TestEnvironment.get_environment(couchbase_config, request.param)
+
+        if request.param == CollectionType.NAMED:
             cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
         yield cb_env
@@ -42,16 +28,18 @@ class LegacyDatastructuresTests:
             cb_env.try_n_times_till_exception(5, 3,
                                               cb_env.teardown_named_collections,
                                               raise_if_no_exception=False)
-        cluster.close()
+        cb_env.cluster.close()
 
     @pytest.fixture()
     def remove_ds(self, cb_env) -> None:
+        cb_env.check_if_mock_unstable()
         yield
         try:
             cb_env.collection.remove(self.TEST_DS_KEY)
         except DocumentNotFoundException:
             pass
 
+    @pytest.mark.flaky(reruns=5)
     @pytest.mark.usefixtures("remove_ds")
     def test_list(self, cb_env):
         cb = cb_env.collection
@@ -151,37 +139,28 @@ class DatastructuresTests:
 
     @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT])
     def couchbase_test_environment(self, couchbase_config, request):
-        conn_string = couchbase_config.get_connection_string()
-        opts = ClusterOptions(PasswordAuthenticator(
-            couchbase_config.admin_username, couchbase_config.admin_password))
-        cluster = Cluster(
-            conn_string, opts)
-        cluster.cluster_info()
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        coll = bucket.default_collection()
-        if request.param == CollectionType.DEFAULT:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config)
-        elif request.param == CollectionType.NAMED:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_collections=True)
+        cb_env = TestEnvironment.get_environment(couchbase_config, request.param)
+
+        if request.param == CollectionType.NAMED:
             cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
-        # cb_env.load_data()
         yield cb_env
-        # cb_env.purge_data()
         if request.param == CollectionType.NAMED:
             cb_env.try_n_times_till_exception(5, 3,
                                               cb_env.teardown_named_collections,
                                               raise_if_no_exception=False)
-        cluster.close()
+        cb_env.cluster.close()
 
     @pytest.fixture()
-    def remove_ds(self, cb_env) -> KVPair:
+    def remove_ds(self, cb_env) -> None:
+        cb_env.check_if_mock_unstable()
         yield
         try:
             cb_env.collection.remove(self.TEST_DS_KEY)
         except DocumentNotFoundException:
             pass
 
+    @pytest.mark.flaky(reruns=5)
     @pytest.mark.usefixtures("remove_ds")
     def test_list(self, cb_env):
 

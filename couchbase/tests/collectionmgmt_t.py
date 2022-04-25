@@ -26,15 +26,14 @@ class CollectionManagementTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(
-            conn_string, opts)
-        cluster.cluster_info()
+        cluster = Cluster.connect(conn_string, opts)
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        cluster.cluster_info()
         coll = bucket.default_collection()
         cb_env = TestEnvironment(
             cluster, bucket, coll, couchbase_config, manage_buckets=True, manage_collections=True)
         # will create a new bucket w/ name test-bucket
-        cb_env.setup_collection_mgmt(self.TEST_BUCKET)
+        cb_env.try_n_times(3, 5, cb_env.setup_collection_mgmt, self.TEST_BUCKET)
         yield cb_env
         if cb_env.is_feature_supported('bucket_mgmt'):
             cb_env.purge_buckets([self.TEST_BUCKET])
@@ -42,17 +41,27 @@ class CollectionManagementTests:
 
     @pytest.fixture()
     def cleanup_scope(self, cb_env):
+        cb_env.try_n_times_till_exception(5, 1,
+                                          cb_env.test_bucket_cm.drop_scope,
+                                          self.TEST_SCOPE,
+                                          expected_exceptions=(ScopeNotFoundException,))
         yield
-        cb_env.try_n_times_till_exception(
-            5, 1, cb_env.test_bucket_cm.drop_scope, self.TEST_SCOPE, expected_exceptions=(
-                ScopeNotFoundException,))
+        cb_env.try_n_times_till_exception(5, 1,
+                                          cb_env.test_bucket_cm.drop_scope,
+                                          self.TEST_SCOPE,
+                                          expected_exceptions=(ScopeNotFoundException,))
 
     @pytest.fixture()
     def cleanup_collection(self, cb_env):
+        cb_env.try_n_times_till_exception(5, 1,
+                                          cb_env.test_bucket_cm.drop_collection,
+                                          CollectionSpec(self.TEST_COLLECTION),
+                                          expected_exceptions=(CollectionNotFoundException,))
         yield
-        cb_env.try_n_times_till_exception(
-            5, 1, cb_env.test_bucket_cm.drop_collection, CollectionSpec(self.TEST_COLLECTION), expected_exceptions=(
-                CollectionNotFoundException,))
+        cb_env.try_n_times_till_exception(5, 1,
+                                          cb_env.test_bucket_cm.drop_collection,
+                                          CollectionSpec(self.TEST_COLLECTION),
+                                          expected_exceptions=(CollectionNotFoundException,))
 
     @pytest.mark.usefixtures("cleanup_scope")
     def test_create_scope(self, cb_env):

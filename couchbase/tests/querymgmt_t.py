@@ -26,10 +26,9 @@ class QueryIndexManagementTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(
-            conn_string, opts)
-        cluster.cluster_info()
+        cluster = Cluster.connect(conn_string, opts)
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        cluster.cluster_info()
 
         coll = bucket.default_collection()
         cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config,
@@ -274,6 +273,7 @@ class QueryIndexManagementTests:
         assert idx.partition is not None
         assert idx.partition == 'HASH(`fld1`)'
 
+    @pytest.mark.flaky(reruns=5, reruns_delay=2)
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
     @pytest.mark.usefixtures("clear_all_indexes")
     def test_watch(self, cb_env):
@@ -299,9 +299,13 @@ class QueryIndexManagementTests:
         with pytest.raises(WatchQueryIndexTimeoutException):
             ixm.watch_indexes(bucket_name, [i.name for i in ixs], WatchQueryIndexOptions(timeout=timedelta(seconds=5)))
 
+    @pytest.mark.flaky(reruns=5, reruns_delay=2)
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
     @pytest.mark.usefixtures("clear_all_indexes")
     def test_deferred(self, cb_env):
+        if cb_env.server_version_short < 6.5:
+            pytest.skip(
+                f'Skipped on server versions < 6.5 (using {cb_env.server_version_short}). Pending CXX updates...')
         bucket_name = cb_env.bucket.name
         ixm = cb_env.ixm
         # Create primary index
@@ -341,9 +345,9 @@ class QueryIndexCollectionManagementTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(conn_string, opts)
-        cluster.cluster_info()
+        cluster = Cluster.connect(conn_string, opts)
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        cluster.cluster_info()
 
         coll = bucket.default_collection()
 
@@ -715,6 +719,7 @@ class QueryIndexCollectionManagementTests:
         assert idx.partition is not None
         assert idx.partition == 'HASH(`fld1`)'
 
+    @pytest.mark.flaky(reruns=5, reruns_delay=2)
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
     @pytest.mark.usefixtures("clear_all_indexes")
     def test_watch(self, cb_env):
@@ -755,6 +760,7 @@ class QueryIndexCollectionManagementTests:
                                                      scope_name=self.TEST_SCOPE,
                                                      collection_name=self.TEST_COLLECTION))
 
+    @pytest.mark.flaky(reruns=5, reruns_delay=2)
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
     @pytest.mark.usefixtures("clear_all_indexes")
     def test_deferred(self, cb_env):

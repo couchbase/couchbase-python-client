@@ -282,11 +282,7 @@ class BidirectionalMapping:
                     key = k
                 converted[key] = transform(v)
             except InvalidArgumentException as e:
-                print("problem w/ key: {}".format(k))
                 raise e
-                # raise InvalidArgumentException(
-                #     "Problem processing argument {}".format(
-                #         k))
         return converted
 
     @staticmethod
@@ -297,17 +293,11 @@ class BidirectionalMapping:
         for k, param_transform in mapping.items():
             key, transform = param_transform.from_dest_components()
             if key not in raw_info:
-                exc = InvalidArgumentException.pycbc_create_exception(
-                    exception(), "Unable to find {} in destination data".format(key))
-                raise exc
+                continue
             try:
                 converted[k] = transform(raw_info[key])
             except InvalidArgumentException as e:
-                print("problem w/ key: {}".format(k))
                 raise e
-                # raise InvalidArgumentException(
-                #     "Problem processing argument {}".format(
-                #         k))
         return converted
 
     def transform_to_dest(self,
@@ -321,8 +311,4 @@ class BidirectionalMapping:
         return self.convert_to_dest(self._mapping, data)
 
     def transform_from_dest(self, data):
-        # set the defaults
-        # for k in self._mapping.keys():
-        #     if k not in data.keys() and self._mapping[k].default is not None:
-        #         data[k] = self._mapping[k].default
         return self.convert_from_dest(self._mapping, data)

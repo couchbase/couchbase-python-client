@@ -34,19 +34,22 @@ class QueryIndexManagementTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        c = Cluster(
-            conn_string, opts)
-        await c.on_connect()
-        await c.cluster_info()
-        b = c.bucket(f"{couchbase_config.bucket_name}")
-        await b.on_connect()
+        cluster = await Cluster.connect(conn_string, opts)
+        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        await bucket.on_connect()
+        await cluster.cluster_info()
 
-        coll = b.default_collection()
-        cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True, manage_query_indexes=True)
+        coll = bucket.default_collection()
+        cb_env = TestEnvironment(cluster,
+                                 bucket,
+                                 coll,
+                                 couchbase_config,
+                                 manage_buckets=True,
+                                 manage_query_indexes=True)
 
         yield cb_env
         await cb_env.try_n_times(5, 3, self._clear_all_indexes, cb_env, ignore_fail=True)
-        await c.close()
+        await cluster.close()
 
     async def _clear_all_indexes(self, cb_env, ignore_fail=False):
         # Drop all indexes!
@@ -296,6 +299,7 @@ class QueryIndexManagementTests:
         assert idx.partition is not None
         assert idx.partition == 'HASH(`fld1`)'
 
+    @pytest.mark.flaky(reruns=5, reruns_delay=2)
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
     @pytest.mark.usefixtures("clear_all_indexes")
     @pytest.mark.asyncio
@@ -324,10 +328,14 @@ class QueryIndexManagementTests:
                                     [i.name for i in ixs],
                                     WatchQueryIndexOptions(timeout=timedelta(seconds=5)))
 
+    @pytest.mark.flaky(reruns=5, reruns_delay=2)
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
     @pytest.mark.usefixtures("clear_all_indexes")
     @pytest.mark.asyncio
     async def test_deferred(self, cb_env):
+        if cb_env.server_version_short < 6.5:
+            pytest.skip(
+                f'Skipped on server versions < 6.5 (using {cb_env.server_version_short}). Pending CXX updates...')
         bucket_name = cb_env.bucket.name
         ixm = cb_env.ixm
         # Create primary index
@@ -374,16 +382,14 @@ class QueryIndexCollectionManagementTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        c = Cluster(
-            conn_string, opts)
-        await c.on_connect()
-        await c.cluster_info()
-        b = c.bucket(f"{couchbase_config.bucket_name}")
-        await b.on_connect()
+        cluster = await Cluster.connect(conn_string, opts)
+        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        await bucket.on_connect()
+        await cluster.cluster_info()
 
-        coll = b.default_collection()
-        cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True,
-                                    manage_collections=True, manage_query_indexes=True)
+        coll = bucket.default_collection()
+        cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True,
+                                 manage_collections=True, manage_query_indexes=True)
         await cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
         yield cb_env
@@ -391,7 +397,7 @@ class QueryIndexCollectionManagementTests:
         await cb_env.try_n_times_till_exception(5, 3,
                                                 cb_env.teardown_named_collections,
                                                 raise_if_no_exception=False)
-        await c.close()
+        await cluster.close()
 
     async def _clear_all_indexes(self, cb_env, ignore_fail=False):
         # Drop all indexes!
@@ -733,6 +739,7 @@ class QueryIndexCollectionManagementTests:
         assert idx.partition is not None
         assert idx.partition == 'HASH(`fld1`)'
 
+    @pytest.mark.flaky(reruns=5, reruns_delay=2)
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
     @pytest.mark.usefixtures("clear_all_indexes")
     @pytest.mark.asyncio
@@ -774,6 +781,7 @@ class QueryIndexCollectionManagementTests:
                                                            scope_name=self.TEST_SCOPE,
                                                            collection_name=self.TEST_COLLECTION))
 
+    @pytest.mark.flaky(reruns=5, reruns_delay=2)
     @pytest.mark.usefixtures("check_query_index_mgmt_supported")
     @pytest.mark.usefixtures("clear_all_indexes")
     @pytest.mark.asyncio

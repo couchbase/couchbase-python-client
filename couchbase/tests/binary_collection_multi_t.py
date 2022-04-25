@@ -1,9 +1,7 @@
 import pytest
 
-from couchbase.auth import PasswordAuthenticator
-from couchbase.cluster import Cluster
-from couchbase.options import (ClusterOptions,
-                               DecrementMultiOptions,
+from couchbase.exceptions import DocumentNotFoundException
+from couchbase.options import (DecrementMultiOptions,
                                DecrementOptions,
                                IncrementMultiOptions,
                                IncrementOptions,
@@ -21,18 +19,9 @@ class BinaryCollectionMultiTests:
 
     @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     def couchbase_test_environment(self, couchbase_config, request):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(conn_string, opts)
-        cluster.cluster_info()
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        coll = bucket.default_collection()
-        if request.param == CollectionType.DEFAULT:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True)
-        elif request.param == CollectionType.NAMED:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config,
-                                     manage_buckets=True, manage_collections=True)
+        cb_env = TestEnvironment.get_environment(couchbase_config, request.param)
+
+        if request.param == CollectionType.NAMED:
             cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
         yield cb_env
@@ -41,38 +30,69 @@ class BinaryCollectionMultiTests:
             cb_env.try_n_times_till_exception(5, 3,
                                               cb_env.teardown_named_collections,
                                               raise_if_no_exception=False)
-        cluster.close()
+        cb_env.cluster.close()
 
     @pytest.fixture(name='utf8_keys')
     def get_utf8_keys(self, cb_env):
+        cb_env.check_if_mock_unstable()
         keys = ['test-key1', 'test-key2', 'test-key3', 'test-key4']
 
         tc = RawStringTranscoder()
-        for k in keys:
-            cb_env.collection.upsert(k, '', transcoder=tc)
-            cb_env.try_n_times(10, 1, cb_env.collection.get, k, transcoder=tc)
 
+        def setup():
+            for k in keys:
+                cb_env.try_n_times(10, 1, cb_env.collection.upsert, k, '', transcoder=tc)
+                cb_env.try_n_times(10, 1, cb_env.collection.get, k, transcoder=tc)
+
+        cb_env.try_n_times(3, 5, setup)
         yield keys
-        cb_env.collection.remove_multi(keys)
+        cb_env.try_n_times_till_exception(10,
+                                          1,
+                                          cb_env.collection.remove_multi,
+                                          keys,
+                                          expected_exceptions=(DocumentNotFoundException,),
+                                          reset_on_timeout=True,
+                                          reset_num_times=3,
+                                          return_exceptions=False)
 
     @pytest.fixture(name='byte_keys')
     def get_byte_keys(self, cb_env):
+        cb_env.check_if_mock_unstable()
         keys = ['test-key1', 'test-key2', 'test-key3', 'test-key4']
 
         tc = RawBinaryTranscoder()
-        for k in keys:
-            cb_env.collection.upsert(k, b'', transcoder=tc)
-            cb_env.try_n_times(10, 1, cb_env.collection.get, k, transcoder=tc)
 
+        def setup():
+            for k in keys:
+                cb_env.try_n_times(10, 1, cb_env.collection.upsert, k, b'', transcoder=tc)
+                cb_env.try_n_times(10, 1, cb_env.collection.get, k, transcoder=tc)
+
+        cb_env.try_n_times(3, 5, setup)
         yield keys
-        cb_env.collection.remove_multi(keys)
+        cb_env.try_n_times_till_exception(10,
+                                          1,
+                                          cb_env.collection.remove_multi,
+                                          keys,
+                                          expected_exceptions=(DocumentNotFoundException,),
+                                          reset_on_timeout=True,
+                                          reset_num_times=3,
+                                          return_exceptions=False)
 
     @pytest.fixture(name='counter_keys')
     def get_counter_keys(self, cb_env):
+        cb_env.check_if_mock_unstable()
         keys = ['test-key1', 'test-key2', 'test-key3', 'test-key4']
         yield keys
-        cb_env.collection.remove_multi(keys)
+        cb_env.try_n_times_till_exception(10,
+                                          1,
+                                          cb_env.collection.remove_multi,
+                                          keys,
+                                          expected_exceptions=(DocumentNotFoundException,),
+                                          reset_on_timeout=True,
+                                          reset_num_times=3,
+                                          return_exceptions=False)
 
+    @pytest.mark.flaky(reruns=5)
     def test_append_multi_string(self, cb_env, utf8_keys):
         keys = utf8_keys
         values = ['foo', 'bar', 'baz', 'qux']

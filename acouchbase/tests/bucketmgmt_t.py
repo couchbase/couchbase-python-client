@@ -39,15 +39,13 @@ class BucketManagementTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(
-            conn_string, opts)
-        await cluster.on_connect()
+        cluster = await Cluster.connect(conn_string, opts)
+        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        await bucket.on_connect()
         await cluster.cluster_info()
-        b = cluster.bucket(f"{couchbase_config.bucket_name}")
-        await b.on_connect()
-        coll = b.default_collection()
+        coll = bucket.default_collection()
         cb_env = TestEnvironment(
-            cluster, b, coll, couchbase_config, manage_buckets=True)
+            cluster, bucket, coll, couchbase_config, manage_buckets=True)
 
         yield cb_env
         if cb_env.is_feature_supported('bucket_mgmt'):

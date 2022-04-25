@@ -9,8 +9,8 @@ from couchbase.exceptions import (AnalyticsLinkExistsException,
                                   DatasetNotFoundException,
                                   DataverseAlreadyExistsException,
                                   DataverseNotFoundException,
-                                  InvalidArgumentException,
-                                  ParsingFailedException)
+                                  InternalServerFailureException,
+                                  InvalidArgumentException)
 from couchbase.management.analytics import (AnalyticsDataType,
                                             AnalyticsEncryptionLevel,
                                             AnalyticsLinkType,
@@ -40,10 +40,9 @@ class AnalyticsManagementTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(
-            conn_string, opts)
-        cluster.cluster_info()
+        cluster = Cluster.connect(conn_string, opts)
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        cluster.cluster_info()
 
         coll = bucket.default_collection()
         cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_analytics=True)
@@ -241,7 +240,7 @@ class AnalyticsManagementTests:
         if cb_env.server_version_short >= 7.0:
             pytest.skip("Test only for 6.x versions")
 
-        # wish the analytics service was consistent here :/
+        # test.test_dataverse, valid format which is valid >= 6.0, but not on 6.6...weird
         if cb_env.server_version_short >= 6.6:
             with pytest.raises(CouchbaseException):
                 cb_env.am.create_dataverse(
@@ -250,10 +249,10 @@ class AnalyticsManagementTests:
             cb_env.am.create_dataverse(
                 "test.test_dataverse", CreateDataverseOptions(ignore_if_exists=True))
 
-        # wish the analytics service was consistent here also :/
-        with pytest.raises(ParsingFailedException):
-            # test/beer_sample => `test`.`beer_sample` which is not valid prior
-            # to 7.0
+        cb_env.am.drop_dataverse("test.test_dataverse", ignore_if_not_exists=True)
+
+        # test/test_dataverse, invalid format < 7.0
+        with pytest.raises((InternalServerFailureException, CouchbaseException)):
             cb_env.am.create_dataverse(
                 "test/test_dataverse", CreateDataverseOptions(ignore_if_exists=True))
 
@@ -261,23 +260,14 @@ class AnalyticsManagementTests:
         if cb_env.server_version_short < 7.0:
             pytest.skip("Test only for 7.x versions")
 
-        # test.beer_sample => `test.beer_sample` which is valid >= 7.0
+        # test.test_dataverse, valid format which is valid >= 6.6
         cb_env.am.create_dataverse(
             "test.test_dataverse", CreateDataverseOptions(ignore_if_exists=True))
-
-        # statement = 'SELECT * FROM Metadata.`Dataverse` WHERE DataverseName="test.beer_sample";'.format(
-        #     self.dataverse_name)
-        # result = self.cluster.analytics_query(statement)
-        # self.assertEqual(1, len(result.rows()))
         cb_env.am.drop_dataverse("test.test_dataverse")
 
-        # test/beer_sample => `test`.`beer_sample` which is valid >= 7.0
+        # test/test_dataverse, valideformat which is valid >= 7.0
         cb_env.am.create_dataverse(
             "test/test_dataverse", CreateDataverseOptions(ignore_if_exists=True))
-        # statement = 'SELECT * FROM Metadata.`Dataverse` WHERE DataverseName="test/beer_sample";'.format(
-        #     self.dataverse_name)
-        # result = self.cluster.analytics_query(statement)
-        # self.assertEqual(1, len(result.rows()))
         cb_env.am.drop_dataverse("test/test_dataverse")
 
 
@@ -289,13 +279,13 @@ class AnalyticsManagementLinksTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(
-            conn_string, opts)
-        cluster.cluster_info()
+        cluster = Cluster.connect(conn_string, opts)
         bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        cluster.cluster_info()
 
         coll = bucket.default_collection()
         cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_analytics=True)
+        cb_env.check_if_feature_supported('analytics_link_mgmt')
         yield cb_env
         cluster.close()
 
@@ -313,6 +303,7 @@ class AnalyticsManagementLinksTests:
         yield
         cb_env.am.drop_dataverse(empty_dataverse_name, ignore_if_not_exists=True)
 
+    @pytest.mark.usefixtures('cb_env')
     def test_couchbase_remote_link_encode(self):
         link = CouchbaseRemoteAnalyticsLink("test_dataverse",
                                             "cbremote",

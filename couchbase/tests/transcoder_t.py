@@ -2,10 +2,7 @@ import json
 
 import pytest
 
-from couchbase.auth import PasswordAuthenticator
-from couchbase.cluster import Cluster
 from couchbase.exceptions import DocumentNotFoundException, ValueFormatException
-from couchbase.options import ClusterOptions
 
 from ._test_utils import (CollectionType,
                           KVPair,
@@ -16,41 +13,32 @@ class DefaultTranscoderTests:
 
     @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     def couchbase_test_environment(self, couchbase_config, request):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(
-            conn_string, opts)
-        cluster.cluster_info()
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        cb_env = TestEnvironment.get_environment(couchbase_config, request.param)
 
-        coll = bucket.default_collection()
-        if request.param == CollectionType.DEFAULT:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True)
-        elif request.param == CollectionType.NAMED:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config,
-                                     manage_buckets=True, manage_collections=True)
+        if request.param == CollectionType.NAMED:
             cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
-        cb_env.try_n_times(3, 5, cb_env.load_data)
         yield cb_env
-        cb_env.try_n_times(3, 5, cb_env.purge_data)
         if request.param == CollectionType.NAMED:
             cb_env.try_n_times_till_exception(5, 3,
                                               cb_env.teardown_named_collections,
                                               raise_if_no_exception=False)
-        cluster.close()
+        cb_env.cluster.close()
 
     @pytest.fixture(name="new_kvp")
     def new_key_and_value_with_reset(self, cb_env) -> KVPair:
+        cb_env.check_if_mock_unstable()
         key, value = cb_env.get_new_key_value()
         yield KVPair(key, value)
         cb_env.try_n_times_till_exception(10,
                                           1,
                                           cb_env.collection.remove,
                                           key,
-                                          expected_exceptions=(DocumentNotFoundException,))
+                                          expected_exceptions=(DocumentNotFoundException,),
+                                          reset_on_timeout=True,
+                                          reset_num_times=3)
 
+    @pytest.mark.flaky(reruns=5)
     def test_default_tc_json_upsert(self, cb_env, new_kvp):
         cb = cb_env.collection
         key = new_kvp.key
@@ -127,18 +115,21 @@ class DefaultTranscoderTests:
         assert result == new_content
 
     def test_default_tc_binary_upsert(self, cb_env):
+        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         content = bytes(json.dumps("Here are some bytes"), "utf-8")
         with pytest.raises(ValueFormatException):
             cb.upsert('some-test-bytes', content)
 
     def test_default_tc_bytearray_upsert(self, cb_env):
+        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         content = bytearray(json.dumps("Here are some bytes"), "utf-8")
         with pytest.raises(ValueFormatException):
             cb.upsert('some-test-bytes', content)
 
     def test_default_tc_binary_insert(self, cb_env):
+        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         content = bytes(json.dumps("Here are some bytes"), "utf-8")
         with pytest.raises(ValueFormatException):

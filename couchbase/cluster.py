@@ -86,8 +86,11 @@ class Cluster(ClusterLogic):
             # @TODO(jc):  chain??
             raise RuntimeError(
                 "Cluster is not connected, cannot get cluster info.")
-
+        cluster_info = None
+        # try:
         cluster_info = self._get_cluster_info()
+        # except ServiceUnavailableException:
+        #     pass
         self._cluster_info = cluster_info
         return cluster_info
 

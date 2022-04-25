@@ -18,11 +18,14 @@ from acouchbase.management.search import SearchIndexManager
 from acouchbase.management.users import UserManager
 from acouchbase.management.views import ViewIndexManager
 from acouchbase.scope import Scope
-from couchbase.exceptions import (BucketDoesNotExistException,
+from couchbase.exceptions import (AmbiguousTimeoutException,
+                                  BucketAlreadyExistsException,
+                                  BucketDoesNotExistException,
                                   CollectionAlreadyExistsException,
                                   CouchbaseException,
                                   ScopeAlreadyExistsException,
-                                  ScopeNotFoundException)
+                                  ScopeNotFoundException,
+                                  UnAmbiguousTimeoutException)
 from couchbase.management.buckets import BucketType, CreateBucketSettings
 from couchbase.management.collections import CollectionSpec
 from couchbase.transcoder import RawBinaryTranscoder, RawStringTranscoder
@@ -222,14 +225,9 @@ class TestEnvironment(CouchbaseTestEnvironment):
     # Collection MGMT
 
     async def setup_collection_mgmt(self, bucket_name):
-        await self.bm.create_bucket(
-            CreateBucketSettings(
-                name=bucket_name,
-                bucket_type=BucketType.COUCHBASE,
-                ram_quota_mb=100))
-        await self.try_n_times(10, 1, self.bm.get_bucket, bucket_name)
+        await self.create_bucket(bucket_name)
         self._test_bucket = self.cluster.bucket(bucket_name)
-        await self.try_n_times(10, 1, self._test_bucket.on_connect)
+        await self.try_n_times(3, 5, self._test_bucket.on_connect)
         self._test_bucket_cm = self._test_bucket.collections()
 
     async def setup_named_collections(self):
@@ -295,6 +293,17 @@ class TestEnvironment(CouchbaseTestEnvironment):
 
     # Bucket MGMT
 
+    async def create_bucket(self, bucket_name):
+        try:
+            await self.bm.create_bucket(
+                CreateBucketSettings(
+                    name=bucket_name,
+                    bucket_type=BucketType.COUCHBASE,
+                    ram_quota_mb=100))
+        except BucketAlreadyExistsException:
+            pass
+        await self.try_n_times(10, 1, self.bm.get_bucket, bucket_name)
+
     async def purge_buckets(self, buckets):
         for bucket in buckets:
             try:
@@ -313,13 +322,13 @@ class TestEnvironment(CouchbaseTestEnvironment):
 
     # helper methods
 
-    async def try_n_times(self,
-                          num_times,  # type: int
-                          seconds_between,  # type: Union[int, float]
-                          func,  # type: Callable
-                          *args,  # type: Any
-                          **kwargs  # type: Dict[str,Any]
-                          ) -> Any:
+    async def _try_n_times(self,
+                           num_times,  # type: int
+                           seconds_between,  # type: Union[int, float]
+                           func,  # type: Callable
+                           *args,  # type: Any
+                           **kwargs  # type: Dict[str,Any]
+                           ) -> Any:
 
         for _ in range(num_times):
             try:
@@ -327,11 +336,61 @@ class TestEnvironment(CouchbaseTestEnvironment):
             except Exception:
                 await asyncio.sleep(float(seconds_between))
 
-        # TODO: option to restart mock server?
+    async def try_n_times(self,
+                          num_times,  # type: int
+                          seconds_between,  # type: Union[int, float]
+                          func,  # type: Callable
+                          *args,  # type: Any
+                          reset_on_timeout=False,  # type: Optional[bool]
+                          reset_num_times=None,  # type: Optional[int]
+                          **kwargs  # type: Dict[str,Any]
+                          ) -> Any:
+
+        if reset_on_timeout:
+            reset_times = reset_num_times or num_times
+            for _ in range(reset_times):
+                try:
+                    return await self._try_n_times(num_times,
+                                                   seconds_between,
+                                                   func,
+                                                   *args,
+                                                   **kwargs)
+                except (AmbiguousTimeoutException, UnAmbiguousTimeoutException):
+                    continue
+                except Exception:
+                    raise
+        else:
+            return await self._try_n_times(num_times,
+                                           seconds_between,
+                                           func,
+                                           *args,
+                                           **kwargs)
 
         raise CouchbaseTestEnvironmentException(
-            f"Unsuccessful execution of {func} after {num_times} times, "
-            "waiting {seconds_between} seconds between calls.")
+            f"Unsuccessful execution of {func.__name__} after {num_times} times, "
+            f"waiting {seconds_between} seconds between calls.")
+
+    async def _try_n_times_until_exception(self,
+                                           num_times,  # type: int
+                                           seconds_between,  # type: Union[int, float]
+                                           func,  # type: Callable
+                                           *args,  # type: Any
+                                           expected_exceptions=(Exception,),  # type: Tuple[Type[Exception],...]
+                                           raise_exception=False,  # type: Optional[bool]
+                                           **kwargs  # type: Dict[str, Any]
+                                           ):
+        # type: (...) -> Any
+        for _ in range(num_times):
+            try:
+                await func(*args, **kwargs)
+                await asyncio.sleep(float(seconds_between))
+            except expected_exceptions:
+                if raise_exception:
+                    raise
+                # helpful to have this print statement when tests fail
+                return
+            except Exception:
+                raise
 
     async def try_n_times_till_exception(self,
                                          num_times,  # type: int
@@ -339,24 +398,41 @@ class TestEnvironment(CouchbaseTestEnvironment):
                                          func,  # type: Callable
                                          *args,  # type: Any
                                          expected_exceptions=(Exception,),  # type: Tuple[Type[Exception],...]
+                                         raise_exception=False,  # type: Optional[bool]
                                          raise_if_no_exception=True,  # type: Optional[bool]
-                                         **kwargs  # type: Any
-                                         ):
-        # type: (...) -> Any
-        for _ in range(num_times):
-            try:
-                await func(*args, **kwargs)
-                await asyncio.sleep(float(seconds_between))
-            except expected_exceptions:
-                # helpful to have this print statement when tests fail
-                return
-            except Exception:
-                raise
+                                         reset_on_timeout=False,  # type: Optional[bool]
+                                         reset_num_times=None,  # type: Optional[int]
+                                         **kwargs  # type: Dict[str, Any]
+                                         ) -> None:
+        if reset_on_timeout:
+            reset_times = reset_num_times or num_times
+            for _ in range(reset_times):
+                try:
+                    await self._try_n_times_until_exception(num_times,
+                                                            seconds_between,
+                                                            func,
+                                                            *args,
+                                                            expected_exceptions=expected_exceptions,
+                                                            raise_exception=raise_exception,
+                                                            **kwargs)
+                    return
+                except (AmbiguousTimeoutException, UnAmbiguousTimeoutException):
+                    continue
+                except Exception:
+                    raise
+        else:
+            await self._try_n_times_until_exception(num_times,
+                                                    seconds_between,
+                                                    func,
+                                                    *args,
+                                                    expected_exceptions=expected_exceptions,
+                                                    raise_exception=raise_exception,
+                                                    **kwargs)
+            return  # success -- return now
 
         # TODO: option to restart mock server?
-
         if raise_if_no_exception is False:
             return
 
-        raise CouchbaseTestEnvironmentException(
-            f"successful {func} after {num_times} times waiting {seconds_between} seconds between calls.")
+        raise CouchbaseTestEnvironmentException((f"Exception not raised calling {func.__name__} {num_times} times "
+                                                 f"waiting {seconds_between} seconds between calls."))

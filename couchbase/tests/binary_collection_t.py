@@ -1,10 +1,7 @@
 import pytest
 
-from couchbase.auth import PasswordAuthenticator
-from couchbase.cluster import Cluster
 from couchbase.exceptions import DocumentNotFoundException, InvalidArgumentException
-from couchbase.options import (ClusterOptions,
-                               DecrementOptions,
+from couchbase.options import (DecrementOptions,
                                DeltaValue,
                                IncrementOptions,
                                SignedInt64)
@@ -20,19 +17,9 @@ class BinaryCollectionTests:
 
     @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     def couchbase_test_environment(self, couchbase_config, request):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster(
-            conn_string, opts)
-        cluster.cluster_info()
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        coll = bucket.default_collection()
-        if request.param == CollectionType.DEFAULT:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True)
-        elif request.param == CollectionType.NAMED:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config,
-                                     manage_buckets=True, manage_collections=True)
+        cb_env = TestEnvironment.get_environment(couchbase_config, request.param)
+
+        if request.param == CollectionType.NAMED:
             cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
         yield cb_env
@@ -41,36 +28,41 @@ class BinaryCollectionTests:
             cb_env.try_n_times_till_exception(5, 3,
                                               cb_env.teardown_named_collections,
                                               raise_if_no_exception=False)
-        cluster.close()
+        cb_env.cluster.close()
 
     # key/value fixtures
 
     @pytest.fixture(name='utf8_empty_kvp')
     def utf8_key_and_empty_value(self, cb_env) -> KVPair:
+        cb_env.check_if_mock_unstable()
         key, value = cb_env.try_n_times(5, 3, cb_env.load_utf8_binary_data)
         yield KVPair(key, value)
         cb_env.collection.upsert(key, '', transcoder=RawStringTranscoder())
 
     @pytest.fixture(name='utf8_kvp')
     def utf8_key_and_value(self, cb_env) -> KVPair:
+        cb_env.check_if_mock_unstable()
         key, value = cb_env.try_n_times(5, 3, cb_env.load_utf8_binary_data, start_value='XXXX')
         yield KVPair(key, value)
         cb_env.collection.upsert(key, '', transcoder=RawStringTranscoder())
 
     @pytest.fixture(name='bytes_empty_kvp')
     def bytes_key_and_empty_value(self, cb_env) -> KVPair:
+        cb_env.check_if_mock_unstable()
         key, value = cb_env.try_n_times(5, 3, cb_env.load_bytes_binary_data)
         yield KVPair(key, value)
         cb_env.collection.upsert(key, b'', transcoder=RawBinaryTranscoder())
 
     @pytest.fixture(name='bytes_kvp')
     def bytes_key_and_value(self, cb_env) -> KVPair:
+        cb_env.check_if_mock_unstable()
         key, value = cb_env.try_n_times(5, 3, cb_env.load_bytes_binary_data, start_value=b'XXXX')
         yield KVPair(key, value)
         cb_env.collection.upsert(key, b'', transcoder=RawBinaryTranscoder())
 
     @pytest.fixture(name='counter_empty_kvp')
     def counter_key_and_empty_value(self, cb_env) -> KVPair:
+        cb_env.check_if_mock_unstable()
         key, value = cb_env.try_n_times(5, 3, cb_env.load_counter_binary_data)
         yield KVPair(key, value)
         cb_env.try_n_times_till_exception(10,
@@ -81,6 +73,7 @@ class BinaryCollectionTests:
 
     @pytest.fixture(name='counter_kvp')
     def counter_key_and_value(self, cb_env) -> KVPair:
+        cb_env.check_if_mock_unstable()
         key, value = cb_env.try_n_times(5, 3, cb_env.load_counter_binary_data, start_value=100)
         yield KVPair(key, value)
         cb_env.try_n_times_till_exception(10,
@@ -91,6 +84,7 @@ class BinaryCollectionTests:
 
     # tests
 
+    @pytest.mark.flaky(reruns=5)
     def test_append_string(self, cb_env, utf8_empty_kvp):
         cb = cb_env.collection
         key = utf8_empty_kvp.key

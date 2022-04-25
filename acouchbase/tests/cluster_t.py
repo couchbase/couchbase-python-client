@@ -36,18 +36,16 @@ class ClusterDiagnosticsTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        c = Cluster(
-            conn_string, opts)
-        await c.on_connect()
-        await c.cluster_info()
-        b = c.bucket(f"{couchbase_config.bucket_name}")
-        await b.on_connect()
+        cluster = await Cluster.connect(conn_string, opts)
+        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        await bucket.on_connect()
+        await cluster.cluster_info()
 
-        coll = b.default_collection()
-        cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True)
+        coll = bucket.default_collection()
+        cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True)
 
         yield cb_env
-        await c.close()
+        await cluster.close()
 
     @pytest.fixture(scope="class")
     def check_diagnostics_supported(self, cb_env):

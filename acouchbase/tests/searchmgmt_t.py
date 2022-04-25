@@ -3,13 +3,16 @@ import pytest_asyncio
 
 from acouchbase.cluster import Cluster, get_event_loop
 from couchbase.auth import PasswordAuthenticator
-from couchbase.exceptions import InvalidArgumentException, SearchIndexNotFoundException
+from couchbase.exceptions import (InvalidArgumentException,
+                                  QueryIndexAlreadyExistsException,
+                                  SearchIndexNotFoundException)
 from couchbase.management.search import SearchIndex
 from couchbase.options import ClusterOptions
 
 from ._test_utils import TestEnvironment
 
 
+@pytest.mark.flaky(reruns=5)
 class SearchIndexManagementTests:
 
     IDX_NAME = 'test-fts-index'
@@ -25,18 +28,21 @@ class SearchIndexManagementTests:
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        c = Cluster(
-            conn_string, opts)
-        await c.on_connect()
-        await c.cluster_info()
-        b = c.bucket(f"{couchbase_config.bucket_name}")
-        await b.on_connect()
+        cluster = await Cluster.connect(conn_string, opts)
+        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+        await bucket.on_connect()
+        await cluster.cluster_info()
 
-        coll = b.default_collection()
-        cb_env = TestEnvironment(c, b, coll, couchbase_config, manage_buckets=True, manage_search_indexes=True)
+        coll = bucket.default_collection()
+        cb_env = TestEnvironment(cluster,
+                                 bucket,
+                                 coll,
+                                 couchbase_config,
+                                 manage_buckets=True,
+                                 manage_search_indexes=True)
 
         yield cb_env
-        await c.close()
+        await cluster.close()
 
     @pytest.fixture(scope="class")
     def check_search_index_mgmt_supported(self, cb_env):
@@ -48,17 +54,18 @@ class SearchIndexManagementTests:
 
     @pytest_asyncio.fixture()
     async def create_test_index(self, cb_env, test_idx):
-        await cb_env.sixm.upsert_index(test_idx)
+        await cb_env.try_n_times_till_exception(10, 3,
+                                                cb_env.sixm.upsert_index,
+                                                test_idx,
+                                                expected_exceptions=(QueryIndexAlreadyExistsException, ))
 
     @pytest_asyncio.fixture()
     async def drop_test_index(self, cb_env, test_idx):
         yield
-        try:
-            await cb_env.sixm.drop_index(test_idx.name)
-        except SearchIndexNotFoundException:
-            pass
-        except Exception as ex:
-            raise ex
+        await cb_env.try_n_times_till_exception(10, 3,
+                                                cb_env.sixm.drop_index,
+                                                test_idx.name,
+                                                expected_exceptions=(SearchIndexNotFoundException, ))
 
     @pytest.mark.usefixtures("drop_test_index")
     @pytest.mark.asyncio
@@ -131,6 +138,9 @@ class SearchIndexManagementTests:
     @pytest.mark.usefixtures("drop_test_index")
     @pytest.mark.asyncio
     async def test_analyze_doc(self, cb_env, test_idx):
+        if cb_env.server_version_short < 6.5:
+            pytest.skip((f'FTS analyzeDoc only supported on server versions >= 6.5. '
+                        f'Using server version: {cb_env.server_version}.'))
         # like getting the doc count, this can fail immediately after index
         # creation
         doc = {"field": "I got text in here"}
