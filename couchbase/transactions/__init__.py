@@ -1,4 +1,3 @@
-from .transaction_config import PerTransactionConfig  # noqa: F401
 from .transaction_get_result import TransactionGetResult  # noqa: F401
 from .transaction_query_options import TransactionQueryOptions  # noqa: F401
 from .transaction_query_results import TransactionQueryResults  # noqa: F401

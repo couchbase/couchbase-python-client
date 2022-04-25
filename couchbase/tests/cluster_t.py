@@ -37,7 +37,6 @@ class ClusterDiagnosticsTests:
         cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True)
 
         yield cb_env
-        cluster.close()
 
     @pytest.fixture(scope="class")
     def check_diagnostics_supported(self, cb_env):
@@ -121,6 +120,7 @@ class ClusterDiagnosticsTests:
                 assert data[0]['state'] is not None
 
     @pytest.mark.usefixtures("check_diagnostics_supported")
+    @pytest.mark.flaky(reruns=5)
     def test_diagnostics(self, cb_env):
         cluster = cb_env.cluster
         report_id = str(uuid4())

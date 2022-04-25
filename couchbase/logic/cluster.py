@@ -119,6 +119,10 @@ class ClusterLogic:
         self._cluster_info = None
         self._server_version = None
 
+    def __del__(self):
+        if hasattr(self, '_transactions') and self._transactions is not None:
+            self._transactions.close()
+
     @property
     def connection(self):
         """
@@ -272,6 +276,7 @@ class ClusterLogic:
         # first close the transactions object, if any
         if self._transactions:
             self._transactions.close()
+            del self._transactions
 
         close_kwargs = {}
 

@@ -36,7 +36,6 @@ class UserManagementTests:
             cluster, bucket, coll, couchbase_config, manage_users=True)
 
         yield cb_env
-        cluster.close()
 
     @pytest.fixture(scope="class")
     def check_collections_supported(self, cb_env):

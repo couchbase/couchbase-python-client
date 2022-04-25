@@ -64,7 +64,6 @@ class ViewTests:
         yield cb_env
         cb_env.purge_data()
         self.drop_ddoc(cb_env, test_ddoc)
-        cluster.close()
 
     def create_ddoc(self, cb_env, test_ddoc):
         cb_env.vixm.upsert_design_document(test_ddoc, DesignDocumentNamespace.DEVELOPMENT)

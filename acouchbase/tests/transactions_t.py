@@ -12,8 +12,8 @@ from couchbase.exceptions import (CouchbaseException,
                                   ParsingFailedException,
                                   TransactionExpired,
                                   TransactionFailed)
-from couchbase.options import ClusterOptions
-from couchbase.transactions import PerTransactionConfig, TransactionResult
+from couchbase.options import ClusterOptions, TransactionOptions
+from couchbase.transactions import TransactionResult
 
 from ._test_utils import (CollectionType,
                           KVPair,
@@ -219,7 +219,7 @@ class AsyncTransactionsTests:
             await asyncio.sleep(0.001)
             await ctx.get(coll, key)
 
-        cfg = PerTransactionConfig(expiration_time=timedelta(microseconds=1))
+        cfg = TransactionOptions(expiration_time=timedelta(microseconds=1))
         with pytest.raises(TransactionExpired):
             await cb_env.cluster.transactions.run(txn_logic, cfg)
         result = await coll.exists(key)

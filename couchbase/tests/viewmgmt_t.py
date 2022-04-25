@@ -42,7 +42,6 @@ class ViewIndexManagementTests:
         cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True, manage_view_indexes=True)
 
         yield cb_env
-        cluster.close()
 
     @pytest.fixture(scope='class')
     def test_ddoc(self):

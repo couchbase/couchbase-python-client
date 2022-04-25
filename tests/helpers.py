@@ -130,9 +130,9 @@ AT_LEAST_V6_0_0_FEATURES = [ServerFeatures.Analytics,
 AT_LEAST_V6_5_0_FEATURES = [ServerFeatures.AnalyticsPendingMutations,
                             ServerFeatures.UserGroupManagement,
                             ServerFeatures.SynchronousDurability,
-                            ServerFeatures.SearchDisableScoring,
+                            ServerFeatures.SearchDisableScoring]
+AT_LEAST_V6_6_0_FEATURES = [ServerFeatures.BucketMinDurability,
                             ServerFeatures.Txns]
-AT_LEAST_V6_6_0_FEATURES = [ServerFeatures.BucketMinDurability]
 AT_LEAST_V7_0_0_FEATURES = [ServerFeatures.Collections,
                             ServerFeatures.AnalyticsLinkManagement,
                             ServerFeatures.TxnQueries]

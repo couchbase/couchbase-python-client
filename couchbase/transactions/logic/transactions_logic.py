@@ -7,9 +7,8 @@ from couchbase.pycbc_core import (create_transactions,
                                   run_transaction)
 
 if TYPE_CHECKING:
-    from couchbase.logic.cluster_logic import ClusterLogic
-    from couchbase.options import TransactionConfig
-    from couchbase.transactions import PerTransactionConfig
+    from couchbase.logic.cluster import ClusterLogic
+    from couchbase.options import TransactionConfig, TransactionOptions
     from couchbase.transactions.logic.attempt_context_logic import AttemptContextLogic
 
 
@@ -18,21 +17,17 @@ class TransactionsLogic:
                  cluster,  # type: ClusterLogic
                  config   # type: TransactionConfig
                  ):
-        self._conn = cluster.connection
         self._config = config
         self._loop = None
-        if config.serializer:
-            self._serializer = config.serializer
-        else:
-            # cluster always has a default (DefaultJSONSerializer)
-            self._serializer = cluster._default_serializer
+        # cluster always has a default (DefaultJSONSerializer)
+        self._serializer = cluster._default_serializer
         if hasattr(cluster, "loop"):
             self._loop = cluster.loop
-        self._txns = create_transactions(self._conn, self._config._base)
+        self._txns = create_transactions(cluster.connection, self._config._base)
 
     def run(self,
             logic,  # type: Callable[[AttemptContextLogic], None]
-            per_txn_config=None,  # type: Optional[PerTransactionConfig],
+            per_txn_config=None,  # type: Optional[TransactionOptions],
             **kwargs
             ):
         if per_txn_config:

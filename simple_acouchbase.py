@@ -15,7 +15,7 @@ from couchbase.options import (ClusterOptions,
                                QueryOptions,
                                UpsertOptions,
                                WaitUntilReadyOptions)
-from couchbase.transactions.transaction_config import TransactionConfig
+from couchbase.options import TransactionConfig
 
 
 async def do_query(cluster):

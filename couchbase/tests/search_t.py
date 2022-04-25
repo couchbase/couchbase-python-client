@@ -62,7 +62,6 @@ class SearchTests:
         yield cb_env
         cb_env.try_n_times(3, 5, cb_env.purge_data)
         self._drop_search_index(cb_env)
-        cluster.close()
 
     def _load_search_index(self, cb_env):
         cb_env.try_n_times_till_exception(10, 3,
@@ -600,7 +599,6 @@ class SearchCollectionTests:
                                           cb_env.teardown_named_collections,
                                           raise_if_no_exception=False)
         self._drop_search_index(cb_env)
-        cluster.close()
 
     def _create_and_load_other_collection(self, cb_env):
         collection_spec = CollectionSpec(self.OTHER_COLLECTION, cb_env.TEST_SCOPE)

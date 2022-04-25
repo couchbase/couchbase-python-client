@@ -67,7 +67,6 @@ class QueryTests:
                                           cb_env.ixm.drop_primary_index,
                                           bucket.name,
                                           expected_exceptions=(QueryIndexNotFoundException))
-        cluster.close()
 
     @pytest.fixture(scope="class")
     def check_preserve_expiry_supported(self, cb_env):
@@ -308,7 +307,6 @@ class QueryCollectionTests:
         cb_env.try_n_times_till_exception(5, 3,
                                           cb_env.teardown_named_collections,
                                           raise_if_no_exception=False)
-        cluster.close()
 
     def _check_row_count(self, cb_env,
                          min_count  # type: int

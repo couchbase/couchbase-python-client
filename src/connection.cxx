@@ -6,20 +6,19 @@ static void
 dealloc_conn(PyObject* obj)
 {
     auto conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(obj, "conn_"));
-    {
+    if (conn) {
         auto barrier = std::make_shared<std::promise<void>>();
         auto f = barrier->get_future();
         conn->cluster_->close([barrier]() { barrier->set_value(); });
         f.get();
-    }
-    conn->io_.stop();
-    for (auto& t : conn->io_threads_) {
-        if (t.joinable()) {
-            t.join();
+        conn->io_.stop();
+        for (auto& t : conn->io_threads_) {
+            if (t.joinable()) {
+                t.join();
+            }
         }
     }
     LOG_INFO("{}: dealloc_conn completed", "PYCBC");
-    // LOG_INFO_RAW("dealloc_conn completed");
     delete conn;
 }
 
@@ -76,7 +75,7 @@ bucket_op_callback(std::error_code ec,
 }
 
 void
-close_connection_callback(PyObject* pyObj_callback, PyObject* pyObj_errback, std::shared_ptr<std::promise<PyObject*>> barrier)
+close_connection_callback(PyObject* pyObj_conn, PyObject* pyObj_callback, PyObject* pyObj_errback, std::shared_ptr<std::promise<PyObject*>> barrier)
 {
     PyObject* pyObj_args = NULL;
     PyObject* pyObj_func = NULL;
@@ -104,8 +103,11 @@ close_connection_callback(PyObject* pyObj_callback, PyObject* pyObj_errback, std
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }
-    LOG_INFO("{}: close conn callback completed", "PYCBC");
 
+    LOG_INFO("{}: close conn callback completed", "PYCBC");
+    auto conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
+    conn->io_.stop();
+    Py_DECREF(pyObj_conn);
     PyGILState_Release(state);
 }
 
@@ -647,9 +649,9 @@ handle_close_connection([[maybe_unused]] PyObject* self, PyObject* args, PyObjec
     auto f = barrier->get_future();
     {
         int callback_count = 0;
-        Py_BEGIN_ALLOW_THREADS conn->cluster_->close([pyObj_callback, pyObj_errback, callback_count, barrier]() mutable {
+        Py_BEGIN_ALLOW_THREADS conn->cluster_->close([pyObj_conn, pyObj_callback, pyObj_errback, callback_count, barrier]() mutable {
             if (callback_count == 0) {
-                close_connection_callback(pyObj_callback, pyObj_errback, barrier);
+                close_connection_callback(pyObj_conn, pyObj_callback, pyObj_errback, barrier);
             }
             callback_count++;
         });

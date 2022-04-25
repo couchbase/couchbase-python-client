@@ -86,7 +86,6 @@ class EventingManagementTests:
             cb_env.try_n_times_till_exception(5, 3,
                                               cb_env.teardown_named_collections,
                                               raise_if_no_exception=False)
-        cluster.close()
 
     @pytest.fixture(scope="class", name='evt_version')
     def get_eventing_function_version(self, cb_env):

@@ -22,7 +22,6 @@ class MutationTokensEnabledTests:
             cb_env.try_n_times_till_exception(5, 3,
                                               cb_env.teardown_named_collections,
                                               raise_if_no_exception=False)
-        cb_env.cluster.close()
 
     @pytest.fixture(name="new_kvp")
     def new_key_and_value_with_reset(self, cb_env) -> KVPair:

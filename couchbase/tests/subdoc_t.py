@@ -53,7 +53,6 @@ class SubDocumentTests:
             cb_env.try_n_times_till_exception(5, 3,
                                               cb_env.teardown_named_collections,
                                               raise_if_no_exception=False)
-        cluster.close()
 
     @pytest.fixture(scope="class")
     def skip_if_less_than_cheshire_cat(self, cb_env):

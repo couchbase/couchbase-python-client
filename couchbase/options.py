@@ -24,7 +24,8 @@ from couchbase._utils import (timedelta_as_microseconds,
                               validate_str)
 from couchbase.durability import DurabilityParser
 from couchbase.exceptions import InvalidArgumentException
-from couchbase.pycbc_core import transaction_config
+from couchbase.pycbc_core import transaction_config, per_transaction_config
+from couchbase.transcoder import DefaultJsonSerializer
 
 # allows for imports only during type checking and not during runtime -- :)
 if TYPE_CHECKING:
@@ -1718,7 +1719,7 @@ class DeltaValue(ConstrainedInt):
 class TransactionConfig:
     _TXN_ALLOWED_KEYS = {"durability_level", "cleanup_window", "kv_timeout",
                          "expiration_time", "cleanup_lost_attempts", "cleanup_client_attempts",
-                         "custom_metadata_collection", "scan_consistency", "serializer"}
+                         "metadata_collection", "scan_consistency"}
 
     @overload
     def __init__(self,
@@ -1728,9 +1729,8 @@ class TransactionConfig:
                  expiration_time=None,  # type: Optional[timedelta]
                  cleanup_lost_attempts=None,  # type: Optional[bool]
                  cleanup_client_attempts=None,  # type: Optional[bool]
-                 custom_metadata_collection=None,  # type: Optional[Collection]
-                 scan_consistency=None,  # type: Optional[QueryScanConsistency]
-                 serializer=None  # type: Optional[Serializer]
+                 metadata_collection=None,  # type: Optional[Collection]
+                 scan_consistency=None  # type: Optional[QueryScanConsistency]
                  ):
         pass
 
@@ -1744,23 +1744,57 @@ class TransactionConfig:
         for k in ["cleanup_window", "kv_timeout", "expiration_time"]:
             if kwargs.get(k, None):
                 kwargs[k] = int(kwargs[k].total_seconds() * 1000000)
-        coll = kwargs.pop("custom_metadata_collection", None)
+        coll = kwargs.pop("metadata_collection", None)
         if coll:
             kwargs["metadata_bucket"] = coll._scope.bucket.name
             kwargs["metadata_scope"] = coll._scope.name
-            kwargs["metadata_colleciton"] = coll.name
-        self._serializer = kwargs.pop("serializer", None)
+            kwargs["metadata_collection"] = coll.name
         # don't pass None
         for key in [k for k, v in kwargs.items() if v is None]:
             del(kwargs[key])
 
-        # TODO: handle scan consistency
         print(f'creating transaction_config with {kwargs}')
         self._base = transaction_config(**kwargs)
 
     def __str__(self):
         return f'TransactionConfig{{{self._base}}}'
 
-    @property
-    def serializer(self):
-        return self._serializer
+
+class TransactionOptions:
+    _TXN_ALLOWED_KEYS = {"durability_level", "kv_timeout", "expiration_time", "scan_consistency"}
+
+    @overload
+    def __init__(self,
+                 durability=None,   # type: Optional[ServerDurability]
+                 cleanup_window=None,  # type: Optional[timedelta]
+                 kv_timeout=None,  # type: Optional[timedelta]
+                 expiration_time=None,  # type: Optional[timedelta]
+                 cleanup_lost_attempts=None,  # type: Optional[bool]
+                 cleanup_client_attempts=None,  # type: Optional[bool]
+                 custom_metadata_collection=None,  # type: Optional[Collection]
+                 scan_consistency=None  # type: Optional[QueryScanConsistency]
+                 ):
+        pass
+
+    def __init__(self,
+                 **kwargs  # type: Dict[str, Any]
+                 ):
+        print(f'creating new TransactionOptions from {kwargs}')
+        kwargs = {k: v for k, v in kwargs.items() if k in TransactionOptions._TXN_ALLOWED_KEYS}
+        # convert everything here...
+        if kwargs.get("durability_level", None):
+            kwargs["durability_level"] = kwargs["durability_level"].level.value
+        for k in ["kv_timeout", "expiration_time"]:
+            if kwargs.get(k, None):
+                kwargs[k] = int(kwargs[k].total_seconds() * 1000000)
+        # don't pass None
+        for key in [k for k, v in kwargs.items() if v is None]:
+            del(kwargs[key])
+
+        # TODO: handle scan consistency
+        print(f'creating per_transaction_config with {kwargs}')
+        self._base = per_transaction_config(**kwargs)
+
+    def __str__(self):
+        return f'TransactionOptions(base_:{self._base}'
+

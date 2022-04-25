@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from acouchbase.cluster import AsyncCluster
     from acouchbase.collection import AsyncCollection
     from couchbase._utils import JSONType, PyCapsuleType
-    from couchbase.options import TransactionConfig
+    from couchbase.options import TransactionConfig, TransactionOptions
     from couchbase.serializer import Serializer
     from couchbase.transactions import PerTransactionConfig
 
@@ -78,15 +78,11 @@ class Transactions(TransactionsLogic):
     @AsyncWrapper.inject_callbacks(TransactionResult)
     def run(self,
             txn_logic,  # type:  Callable[[AttemptContextLogic], None]
-            per_txn_config=None,  # type: Optional[PerTransactionConfig]
+            per_txn_config=None,  # type: Optional[TransactionOptions]
             **kwargs) -> None:
         def wrapped_logic(c):
             try:
-                if per_txn_config and per_txn_config.serializer:
-                    serializer_to_use = per_txn_config.serializer
-                else:
-                    serializer_to_use = self._serializer
-                ctx = AttemptContext(c, self._loop, serializer_to_use)
+                ctx = AttemptContext(c, self._loop, self._serializer)
                 asyncio.run_coroutine_threadsafe(txn_logic(ctx), self._loop).result()
                 print('wrapped logic completed')
             except Exception as e:

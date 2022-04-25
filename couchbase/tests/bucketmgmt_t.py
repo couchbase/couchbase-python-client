@@ -42,7 +42,6 @@ class BucketManagementTests:
         yield cb_env
         if cb_env.is_feature_supported('bucket_mgmt'):
             cb_env.purge_buckets(test_buckets)
-        cluster.close()
 
     @pytest.fixture(scope="class")
     def check_bucket_mgmt_supported(self, cb_env):

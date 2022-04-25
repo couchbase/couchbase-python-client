@@ -13,6 +13,7 @@ from .transaction_result import TransactionResult
 
 if TYPE_CHECKING:
     from couchbase._utils import PyCapsuleType
+    from couchbase.options import TransactionOptions
     from couchbase.serializer import Serializer
     from couchbase.transactions import PerTransactionConfig
 
@@ -49,17 +50,13 @@ class Transactions(TransactionsLogic):
 
     def run(self,
             txn_logic,  # type: Callable[[AttemptContext], None]
-            per_txn_config=None,  # type: Optional[PerTransactionConfig]
+            per_txn_config=None,  # type: Optional[TransactionOptions]
             **kwargs
             ):
 
         def wrapped_txn_logic(c):
             try:
-                if per_txn_config and per_txn_config.serializer:
-                    serializer_to_use = per_txn_config.serializer
-                else:
-                    serializer_to_use = self._serializer
-                ctx = AttemptContext(c, serializer_to_use)
+                ctx = AttemptContext(c, self._serializer)
                 print(f'wrapped_txn_logic got {ctx}, calling transaction logic')
                 return txn_logic(ctx)
             except Exception as e:

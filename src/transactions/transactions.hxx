@@ -73,14 +73,11 @@ static PyObject*
 per_transaction_config__str__(PyObject*);
 
 struct transactions {
-    PyObject* conn;
     couchbase::transactions::transactions* txns;
 
     explicit transactions(PyObject* pyObj_conn, tx::transaction_config& cfg)
-      : conn(pyObj_conn)
-      , txns(nullptr)
+      : txns(nullptr)
     {
-        Py_INCREF(conn);
         connection* c = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
         txns = new tx::transactions(*c->cluster_, cfg);
     }

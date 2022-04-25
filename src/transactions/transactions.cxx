@@ -12,10 +12,8 @@ void
 pycbc_txns::dealloc_transactions(PyObject* obj)
 {
     auto txns = reinterpret_cast<pycbc_txns::transactions*>(PyCapsule_GetPointer(obj, "txns_"));
-    Py_XDECREF(txns->conn);
     txns->txns->close();
     delete txns->txns;
-    delete txns;
     LOG_INFO("dealloc transactions");
 }
 

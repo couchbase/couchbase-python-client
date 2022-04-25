@@ -28,7 +28,6 @@ class LegacyDatastructuresTests:
             cb_env.try_n_times_till_exception(5, 3,
                                               cb_env.teardown_named_collections,
                                               raise_if_no_exception=False)
-        cb_env.cluster.close()
 
     @pytest.fixture()
     def remove_ds(self, cb_env) -> None:
@@ -149,7 +148,6 @@ class DatastructuresTests:
             cb_env.try_n_times_till_exception(5, 3,
                                               cb_env.teardown_named_collections,
                                               raise_if_no_exception=False)
-        cb_env.cluster.close()
 
     @pytest.fixture()
     def remove_ds(self, cb_env) -> None:

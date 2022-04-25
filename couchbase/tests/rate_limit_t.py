@@ -68,7 +68,6 @@ class RateLimitTests:
 
         yield cb_env
         self.tear_down(cb_env)
-        cluster.close()
 
     def _enforce_rate_limits(self, cb_env, enforce=True):
         url = f'{cb_env.rate_limit_params.url}/internalSettings'
@@ -294,9 +293,6 @@ class RateLimitTests:
             pass
         except Exception:
             pytest.fail('Expected RateLimitedException')
-        finally:
-            if cluster and cluster.connected:
-                cluster.close()
 
     @pytest.mark.usefixtures('remove_docs')
     def test_rate_limits_ingress(self, couchbase_config, cb_env):
@@ -325,9 +321,6 @@ class RateLimitTests:
             pass
         except Exception:
             pytest.fail('Expected RateLimitedException')
-        finally:
-            if cluster and cluster.connected:
-                cluster.close()
 
     @pytest.mark.usefixtures('remove_docs')
     def test_rate_limits_egress(self, couchbase_config, cb_env):
@@ -356,9 +349,6 @@ class RateLimitTests:
             pass
         except Exception:
             pytest.fail('Expected RateLimitedException')
-        finally:
-            if cluster and cluster.connected:
-                cluster.close()
 
     def test_rate_limits_max_conns(self, couchbase_config, cb_env):
         self._create_rate_limit_user(cb_env,
@@ -389,11 +379,6 @@ class RateLimitTests:
             pass
         except Exception:
             pytest.fail('Expected RateLimitedException')
-        finally:
-            if cluster and cluster.connected:
-                cluster.close()
-            if cluster1 and cluster1.connected:
-                cluster1.close()
 
     def test_rate_limits_query(self, couchbase_config, cb_env):
         self._create_rate_limit_user(cb_env,
@@ -422,9 +407,6 @@ class RateLimitTests:
             pass
         except Exception:
             pytest.fail('Expected RateLimitedException')
-        finally:
-            if cluster and cluster.connected:
-                cluster.close()
 
     def test_rate_limits_fts(self, couchbase_config, cb_env):
         self._create_rate_limit_user(cb_env,
@@ -458,8 +440,6 @@ class RateLimitTests:
             pytest.fail('Expected RateLimitedException')
         finally:
             sixm.drop_index("ratelimit-idx")
-            if cluster and cluster.connected:
-                cluster.close()
 
     @pytest.mark.usefixtures('cleanup_scope_and_collection')
     def test_rate_limits_kv_scopes_data_size(self, cb_env):

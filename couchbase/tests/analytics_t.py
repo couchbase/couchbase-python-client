@@ -40,7 +40,6 @@ class AnalyticsTests:
         yield cb_env
         # teardown
         cb_env.try_n_times(3, 5, self._teardown_analytics, cb_env)
-        cluster.close()
 
     def _setup_analytics(self, cb_env):
         cb_env.try_n_times(10, 3,
@@ -195,7 +194,6 @@ class AnalyticsCollectionTests:
         cb_env.try_n_times_till_exception(5, 3,
                                           cb_env.teardown_named_collections,
                                           raise_if_no_exception=False)
-        cluster.close()
 
     """
         Setup queries:

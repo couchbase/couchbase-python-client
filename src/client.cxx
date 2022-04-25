@@ -164,22 +164,6 @@ static PyObject* json_module = nullptr;
 static PyObject* json_dumps = nullptr;
 static PyObject* json_loads = nullptr;
 
-static void
-dealloc_conn(PyObject* obj)
-{
-    auto conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(obj, "conn_"));
-    conn->cluster_->close([conn] {
-        conn->io_.stop();
-        for (auto& t : conn->io_threads_) {
-            if (t.joinable()) {
-                t.join();
-            }
-        }
-    });
-    LOG_INFO("{}: dealloc_conn completed", "PYCBC");
-    delete conn;
-}
-
 // json encode an object using python's json module
 std::string
 json_encode(PyObject* obj)

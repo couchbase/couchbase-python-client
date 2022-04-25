@@ -11,9 +11,8 @@ from couchbase.exceptions import (ParsingFailedException,
                                   TransactionExpired,
                                   TransactionFailed,
                                   TransactionOperationFailed)
-from couchbase.options import ClusterOptions
-from couchbase.transactions import (PerTransactionConfig,
-                                    TransactionQueryOptions,
+from couchbase.options import ClusterOptions, TransactionOptions
+from couchbase.transactions import (TransactionQueryOptions,
                                     TransactionResult)
 
 from ._test_utils import (CollectionType,
@@ -49,7 +48,6 @@ class TransactionTests:
             cb_env.try_n_times_till_exception(5, 3,
                                               cb_env.teardown_named_collections,
                                               raise_if_no_exception=False)
-        cluster.close()
 
     @pytest.fixture(name="default_kvp")
     def default_key_and_value(self, cb_env) -> KVPair:
@@ -200,7 +198,7 @@ class TransactionTests:
             ctx.get(coll, key)
 
         with pytest.raises(TransactionExpired):
-            cb_env.cluster.transactions.run(txn_logic, PerTransactionConfig(expiration_time=timedelta(microseconds=1)))
+            cb_env.cluster.transactions.run(txn_logic, TransactionOptions(expiration_time=timedelta(microseconds=1)))
         assert coll.exists(key).exists is False
 
     def test_transaction_result(self, cb_env):
