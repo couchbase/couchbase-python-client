@@ -342,7 +342,7 @@ PyObject*
 pycbc_txns::transaction_get_result__new__(PyTypeObject* type, PyObject*, PyObject*)
 {
     auto self = reinterpret_cast<pycbc_txns::transaction_get_result*>(type->tp_alloc(type, 0));
-    self->res = tx::transaction_get_result();
+    self->res = new tx::transaction_get_result();
     return reinterpret_cast<PyObject*>(self);
 }
 
@@ -351,12 +351,13 @@ pycbc_txns::transaction_get_result__str__(pycbc_txns::transaction_get_result* re
 {
     const char* format_string = "transaction_get_result:{key=%s, cas=%llu, value=%s}";
     return PyUnicode_FromFormat(
-      format_string, result->res.id().key().c_str(), result->res.cas(), result->res.content<std::string>().c_str());
+      format_string, result->res->id().key().c_str(), result->res->cas(), result->res->content<std::string>().c_str());
 }
 
 void
 pycbc_txns::transaction_get_result__dealloc__(pycbc_txns::transaction_get_result* result)
 {
+    delete result->res;
     LOG_INFO("dealloc transaction_get_result");
 }
 
@@ -375,13 +376,13 @@ pycbc_txns::transaction_get_result__get__(pycbc_txns::transaction_get_result* re
         Py_RETURN_NONE;
     }
     if (ID == field_name) {
-        return PyUnicode_FromString(result->res.id().key().c_str());
+        return PyUnicode_FromString(result->res->id().key().c_str());
     }
     if (CAS == field_name) {
-        return PyLong_FromUnsignedLongLong(result->res.cas());
+        return PyLong_FromUnsignedLongLong(result->res->cas());
     }
     if (VALUE == field_name) {
-        return PyBytes_FromString(result->res.content<std::string>().c_str());
+        return PyBytes_FromString(result->res->content<std::string>().c_str());
     }
     PyErr_SetString(PyExc_ValueError, fmt::format("unknown field_name {}", field_name).c_str());
     Py_RETURN_NONE;
@@ -647,7 +648,7 @@ handle_returning_transaction_get_result(PyObject* pyObj_callback,
         auto result = reinterpret_cast<pycbc_txns::transaction_get_result*>(transaction_get_result_obj);
         // now lets copy it in
         // TODO: ideally we'd have a move constructor for transaction_get_result, but for now...
-        result->res = res.value();
+        result->res = new tx::transaction_get_result(res.value());
         if (nullptr == pyObj_callback) {
             barrier->set_value(transaction_get_result_obj);
         } else {
@@ -858,7 +859,7 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
             }
             auto tx_get_result = reinterpret_cast<pycbc_txns::transaction_get_result*>(pyObj_txn_get_result);
             Py_BEGIN_ALLOW_THREADS ctx->ctx.replace(
-              tx_get_result->res,
+              *tx_get_result->res,
               value,
               [pyObj_callback, pyObj_errback, barrier](std::exception_ptr err, std::optional<tx::transaction_get_result> res) {
                   handle_returning_transaction_get_result(pyObj_callback, pyObj_errback, barrier, err, res);
@@ -871,7 +872,7 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
                 Py_RETURN_NONE;
             }
             auto tx_get_result = reinterpret_cast<pycbc_txns::transaction_get_result*>(pyObj_txn_get_result);
-            Py_BEGIN_ALLOW_THREADS ctx->ctx.remove(tx_get_result->res, [pyObj_callback, pyObj_errback, barrier](std::exception_ptr err) {
+            Py_BEGIN_ALLOW_THREADS ctx->ctx.remove(*tx_get_result->res, [pyObj_callback, pyObj_errback, barrier](std::exception_ptr err) {
                 handle_returning_void(pyObj_callback, pyObj_errback, barrier, err);
             });
             Py_END_ALLOW_THREADS break;

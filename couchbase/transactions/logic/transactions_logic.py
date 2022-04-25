@@ -23,7 +23,7 @@ class TransactionsLogic:
             self._serializer = config.serializer
         else:
             # cluster always has a default (DefaultJSONSerializer)
-            self._serializer = cluster._serializer
+            self._serializer = cluster._default_serializer
         if hasattr(cluster, "loop"):
             self._loop = cluster.loop
         self._txns = create_transactions(self._conn, self._config._base)
