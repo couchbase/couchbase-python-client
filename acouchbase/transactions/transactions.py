@@ -10,6 +10,7 @@ from couchbase.transactions import (TransactionGetResult,
                                     TransactionQueryResults,
                                     TransactionResult)
 from couchbase.transactions.logic import AttemptContextLogic, TransactionsLogic
+import logging
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
@@ -19,6 +20,8 @@ if TYPE_CHECKING:
     from couchbase._utils import JSONType, PyCapsuleType
     from couchbase.options import TransactionConfig, TransactionOptions
     from couchbase.serializer import Serializer
+
+log = logging.getLogger(__name__)
 
 
 class AsyncWrapper:
@@ -30,7 +33,7 @@ class AsyncWrapper:
                 ftr = self._loop.create_future()
 
                 def on_ok(res):
-                    print(f'{fn.__name__} completed, with {res}')
+                    log.debug('%s completed, with %s', fn.__name__, res)
                     try:
                         if return_cls is TransactionGetResult:
                             result = return_cls(res, self._serializer)
@@ -38,11 +41,11 @@ class AsyncWrapper:
                             result = return_cls(res) if return_cls is not None else None
                         self._loop.call_soon_threadsafe(ftr.set_result, result)
                     except Exception as e:
-                        print(f'on_ok raised {e}, {e.__cause__}')
+                        log.error('on_ok raised %s, %s', e, e.__cause__)
                         self._loop.call_soon_threadsafe(ftr.set_exception, e)
 
                 def on_err(exc):
-                    print(f'{fn.__name__} got on_err called with {exc}')
+                    log.error('%s got on_err called with %s',fn.__name__, exc)
                     try:
                         if not exc:
                             raise RuntimeError(f'unknown error calling {fn.__name__}')
@@ -83,9 +86,9 @@ class Transactions(TransactionsLogic):
             try:
                 ctx = AttemptContext(c, self._loop, self._serializer)
                 asyncio.run_coroutine_threadsafe(txn_logic(ctx), self._loop).result()
-                print('wrapped logic completed')
+                log.debug('wrapped logic completed')
             except Exception as e:
-                print(f'wrapped_logic got {e}')
+                log.debug('wrapped_logic raised %s', e)
                 raise e
 
         super().run(wrapped_logic, per_txn_config, **kwargs)
@@ -94,6 +97,7 @@ class Transactions(TransactionsLogic):
     def close(self):
         # stop transactions object -- ideally this is done before closing the cluster.
         super().close()
+        log.info("transactions closed")
 
 
 class AttemptContext(AttemptContextLogic):
@@ -111,25 +115,20 @@ class AttemptContext(AttemptContextLogic):
             **kwargs  # type: Dict[str, JSONType]
             ):
 
-        print(f'get called with collection={coll}, key={key}')
         super().get(coll, key, **kwargs)
 
     @AsyncWrapper.inject_callbacks(TransactionGetResult)
     def insert(self, coll, key, value, **kwargs):
-        print(f'insert called with collection={coll}, key={key}, value={value}')
         super().insert(coll, key, value, **kwargs)
 
     @AsyncWrapper.inject_callbacks(TransactionGetResult)
     def replace(self, txn_get_result, value, **kwargs):
-        print(f'replace called with txn_get_result={txn_get_result}')
         super().replace(txn_get_result, value, **kwargs)
 
     @AsyncWrapper.inject_callbacks(None)
     def remove(self, txn_get_result, **kwargs):
-        print(f'remove called with txn_get_result={txn_get_result}')
         super().remove(txn_get_result, **kwargs)
 
     @AsyncWrapper.inject_callbacks(TransactionQueryResults)
     def query(self, query, options=TransactionQueryOptions(), **kwargs) -> TransactionQueryResults:
-        print(f'query called with query={query}, options={options}')
         super().query(query, options, **kwargs)

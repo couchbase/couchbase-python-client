@@ -1,6 +1,8 @@
 import asyncio
+import logging
 
 from couchbase.transcoder import DefaultJsonSerializer
+log = logging.getLogger(__name__)
 
 
 class TransactionQueryResults:
@@ -21,7 +23,7 @@ class TransactionQueryResults:
 
         async def __anext__(self):
             if self._queue.empty():
-                print('done iterating over rows')
+                log.debug('done iterating over rows')
                 raise StopAsyncIteration
             row = await self._queue.get()
             return row

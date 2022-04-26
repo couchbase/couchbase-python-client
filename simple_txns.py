@@ -7,8 +7,13 @@ from couchbase.cluster import Cluster
 from couchbase.exceptions import TransactionFailed
 from couchbase.options import ClusterOptions, TransactionConfig
 
+from sys import stdout
+import logging
+
 if TYPE_CHECKING:
     from couchbase.transactions import AttemptContext
+
+logging.basicConfig(stream=stdout, level=logging.DEBUG, format='%(asctime)s|%(levelname)s|%(name)s| %(message)s')
 
 opts = ClusterOptions(authenticator=PasswordAuthenticator("Administrator", "password"),
                       transaction_config=TransactionConfig(expiration_time=timedelta(seconds=2)))
@@ -40,14 +45,14 @@ def txn_logic(ctx  # type: AttemptContext
 
 
 ok = True
-print(f'doc 1 starts off as: {coll.get(key1).content_as[dict]}')
-print(f'doc 2 starts off as: {coll.get(key2).content_as[dict]}')
+logging.info(f'doc 1 starts off as: {coll.get(key1).content_as[dict]}')
+logging.info(f'doc 2 starts off as: {coll.get(key2).content_as[dict]}')
 while ok:
     try:
-        print(f'txn_result: {my_cluster.transactions.run(txn_logic)}')
+        logging.info(f'txn_result: {my_cluster.transactions.run(txn_logic)}')
     except TransactionFailed as e:
-        print(f'got {e}')
+        logging.info(f'got {e}')
         ok = False
 
-print(f'doc 1 is now: {coll.get(key1).content_as[dict]}')
-print(f'doc 2 is now: {coll.get(key2).content_as[dict]}')
+logging.info(f'doc 1 is now: {coll.get(key1).content_as[dict]}')
+logging.info(f'doc 2 is now: {coll.get(key2).content_as[dict]}')

@@ -130,11 +130,7 @@ async def write_and_read(key, value):
                 quoted_ids = ",".join(map(lambda x: f'"{x}"', ids))
 
                 query_result = await ctx.query(f"SELECT * FROM `default` USE KEYS [{quoted_ids}]")
-                rows = []
-                async for row in query_result.rows():
-                    print(f'got row {row}')
-                    rows.append(row)
-                return rows
+                return query_result.rows
 
             for k in ids:
                 futures.append(get_and_replace(k))

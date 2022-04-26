@@ -5,6 +5,7 @@ from typing import (TYPE_CHECKING,
 
 from couchbase.exceptions import CouchbaseException, TransactionsErrorContext
 from couchbase.transactions.logic import AttemptContextLogic, TransactionsLogic
+import logging
 
 from .transaction_get_result import TransactionGetResult
 from .transaction_query_options import TransactionQueryOptions
@@ -16,6 +17,8 @@ if TYPE_CHECKING:
     from couchbase.options import TransactionOptions
     from couchbase.serializer import Serializer
 
+log = logging.getLogger(__name__)
+
 
 class BlockingWrapper:
     @classmethod
@@ -25,7 +28,7 @@ class BlockingWrapper:
             def wrapped_fn(self, *args, **kwargs):
                 try:
                     ret = fn(self, *args, **kwargs)
-                    print(f'{fn.__name__} got {ret}')
+                    log.debug('%s returned %s', fn.__name__, ret)
                     if isinstance(ret, Exception):
                         raise ret
                     if return_cls is None:
@@ -34,7 +37,6 @@ class BlockingWrapper:
                         retval = return_cls(ret, self._serializer)
                     else:
                         retval = return_cls(ret)
-                    print(f'{fn.__name__} returning {retval}')
                     return retval
                 except CouchbaseException as cb_exc:
                     raise cb_exc
@@ -56,13 +58,16 @@ class Transactions(TransactionsLogic):
         def wrapped_txn_logic(c):
             try:
                 ctx = AttemptContext(c, self._serializer)
-                print(f'wrapped_txn_logic got {ctx}, calling transaction logic')
                 return txn_logic(ctx)
             except Exception as e:
-                print(f'wrapped_txn_logic got {e.__class__.__name__}, {e}, re-raising')
+                log.debug('wrapped_txn_logic got %s:%s, re-raising it', e.__class__.__name__, e)
                 raise e
 
         return TransactionResult(**super().run(wrapped_txn_logic, per_txn_config))
+
+    def close(self):
+        super().close()
+        log.info("transactions closed")
 
 
 class AttemptContext(AttemptContextLogic):

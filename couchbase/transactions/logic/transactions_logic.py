@@ -5,11 +5,13 @@ from typing import (TYPE_CHECKING,
 from couchbase.pycbc_core import (create_transactions,
                                   destroy_transactions,
                                   run_transaction)
-
+import logging
 if TYPE_CHECKING:
     from couchbase.logic.cluster import ClusterLogic
     from couchbase.options import TransactionConfig, TransactionOptions
     from couchbase.transactions.logic.attempt_context_logic import AttemptContextLogic
+
+log = logging.getLogger(__name__)
 
 
 class TransactionsLogic:
@@ -24,6 +26,7 @@ class TransactionsLogic:
         if hasattr(cluster, "loop"):
             self._loop = cluster.loop
         self._txns = create_transactions(cluster.connection, self._config._base)
+        log.info('created transactions object using config=%s, serializer=%s', self._config, self._serializer)
 
     def run(self,
             logic,  # type: Callable[[AttemptContextLogic], None]
@@ -35,4 +38,6 @@ class TransactionsLogic:
         return run_transaction(txns=self._txns, logic=logic, **kwargs)
 
     def close(self, **kwargs):
+        log.info('shutting down transactions...')
         return destroy_transactions(txns=self._txns, **kwargs)
+
