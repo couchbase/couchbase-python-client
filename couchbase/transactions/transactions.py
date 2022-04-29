@@ -15,7 +15,6 @@ if TYPE_CHECKING:
     from couchbase._utils import PyCapsuleType
     from couchbase.options import TransactionOptions
     from couchbase.serializer import Serializer
-    from couchbase.transactions import PerTransactionConfig
 
 
 class BlockingWrapper:

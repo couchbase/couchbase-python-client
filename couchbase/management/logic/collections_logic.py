@@ -213,14 +213,23 @@ class CollectionSpec(object):
 
     @property
     def name(self) -> str:
+        """
+            str: The name of the collection
+        """
         return self._name
 
     @property
     def scope_name(self) -> str:
+        """
+            str: The name of the collection's scope
+        """
         return self._scope_name
 
     @property
     def max_ttl(self) -> Optional[timedelta]:
+        """
+            Optional[timedelta]: The expiry for documents in the collection.
+        """
         return self._max_ttl
 
 
@@ -233,8 +242,14 @@ class ScopeSpec(object):
 
     @property
     def name(self) -> str:
+        """
+            str: The name of the scope
+        """
         return self._name
 
     @property
     def collections(self) -> Iterable[CollectionSpec]:
+        """
+            List[:class:`.CollectionSpec`]: A list of the scope's collections.
+        """
         return self._collections

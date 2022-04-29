@@ -1,6 +1,4 @@
-from typing import (TYPE_CHECKING,
-                    Any,
-                    Iterable)
+from typing import Any, Iterable
 
 from couchbase.management.logic.users_logic import Origin  # noqa: F401
 from couchbase.management.logic.users_logic import Role  # noqa: F401
@@ -12,16 +10,16 @@ from couchbase.management.logic.users_logic import (Group,
                                                     UserManagerLogic)
 from couchbase.management.logic.wrappers import BlockingMgmtWrapper, ManagementType
 
-if TYPE_CHECKING:
-    from couchbase.management.options import (DropGroupOptions,
-                                              DropUserOptions,
-                                              GetAllGroupsOptions,
-                                              GetAllUsersOptions,
-                                              GetGroupOptions,
-                                              GetRolesOptions,
-                                              GetUserOptions,
-                                              UpsertGroupOptions,
-                                              UpsertUserOptions)
+# @TODO:  lets deprecate import of options from couchbase.management.users
+from couchbase.management.options import (DropGroupOptions,
+                                          DropUserOptions,
+                                          GetAllGroupsOptions,
+                                          GetAllUsersOptions,
+                                          GetGroupOptions,
+                                          GetRolesOptions,
+                                          GetUserOptions,
+                                          UpsertGroupOptions,
+                                          UpsertUserOptions)
 
 
 class UserManager(UserManagerLogic):
@@ -35,6 +33,21 @@ class UserManager(UserManagerLogic):
                  *options,  # type: GetUserOptions
                  **kwargs   # type: Any
                  ) -> UserAndMetadata:
+        """Returns a user by it's username.
+
+        Args:
+            username (str): The name of the user to retrieve.
+            options (:class:`~couchbase.management.options.GetUserOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            :class:`UserAndMetadata`: A :class:`UserAndMetadata` instance.
+
+        Raises:
+            :class:`~couchbase.exceptions.UserNotFoundException`: If the user does not exist.
+        """
         return super().get_user(username, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(UserAndMetadata, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
@@ -42,6 +55,17 @@ class UserManager(UserManagerLogic):
                       *options,  # type: GetAllUsersOptions
                       **kwargs  # type: Any
                       ) -> Iterable[UserAndMetadata]:
+        """Returns a list of all existing users.
+
+        Args:
+            options (:class:`~couchbase.management.options.GetAllUsersOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            Iterable[:class:`UserAndMetadata`]: A list of existing users.
+        """
         return super().get_all_users(*options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
@@ -50,7 +74,19 @@ class UserManager(UserManagerLogic):
                     *options,  # type: UpsertUserOptions
                     **kwargs  # type: Any
                     ) -> None:
+        """Creates a new user or updates an existing user.
 
+        Args:
+            user (:class:`.User`): The user to create or update.
+            options (:class:`~couchbase.management.options.UpsertUserOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the provided user argument contains an
+                invalid value or type.
+        """
         return super().upsert_user(user, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
@@ -59,6 +95,18 @@ class UserManager(UserManagerLogic):
                   *options,  # type: DropUserOptions
                   **kwargs   # type: Any
                   ) -> None:
+        """Drops an existing user.
+
+        Args:
+            username (str): The name of the user to drop.
+            options (:class:`~couchbase.management.options.DropUserOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.UserNotFoundException`: If the user does not exist.
+        """
         return super().drop_user(username, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(RoleAndDescription, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
@@ -66,6 +114,17 @@ class UserManager(UserManagerLogic):
                   *options,  # type: GetRolesOptions
                   **kwargs   # type: Any
                   ) -> Iterable[RoleAndDescription]:
+        """Returns a list of roles available on the server.
+
+        Args:
+            options (:class:`~couchbase.management.options.GetRolesOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            Iterable[:class:`RoleAndDescription`]: A list of roles available on the server.
+        """
         return super().get_roles(*options, **kwargs)
 
     @BlockingMgmtWrapper.block(Group, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
@@ -74,6 +133,21 @@ class UserManager(UserManagerLogic):
                   *options,     # type: GetGroupOptions
                   **kwargs      # type: Any
                   ) -> Group:
+        """Returns a group by it's name.
+
+        Args:
+            group_name (str): The name of the group to retrieve.
+            options (:class:`~couchbase.management.options.GetGroupOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            :class:`Group`: A :class:`Group` instance.
+
+        Raises:
+            :class:`~couchbase.exceptions.GroupNotFoundException`: If the group does not exist.
+        """
         return super().get_group(group_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(Group, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
@@ -81,6 +155,17 @@ class UserManager(UserManagerLogic):
                        *options,    # type: GetAllGroupsOptions
                        **kwargs     # type: Any
                        ) -> Iterable[Group]:
+        """Returns a list of all existing groups.
+
+        Args:
+            options (:class:`~couchbase.management.options.GetAllGroupsOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            Iterable[:class:`Group`]: A list of existing groups.
+        """
         return super().get_all_groups(*options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
@@ -89,6 +174,19 @@ class UserManager(UserManagerLogic):
                      *options,  # type: UpsertGroupOptions
                      **kwargs   # type: Any
                      ) -> None:
+        """Creates a new group or updates an existing group.
+
+        Args:
+            group (:class:`.Group`): The group to create or update.
+            options (:class:`~couchbase.management.options.UpsertGroupOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the provided group argument contains an
+                invalid value or type.
+        """
         return super().upsert_group(group, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.UserMgmt, UserManagerLogic._ERROR_MAPPING)
@@ -97,4 +195,16 @@ class UserManager(UserManagerLogic):
                    *options,    # type: DropGroupOptions
                    **kwargs     # type: Any
                    ) -> None:
+        """Drops an existing group.
+
+        Args:
+            group_name (str): The name of the group to drop.
+            options (:class:`~couchbase.management.options.DropGroupOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.GroupNotFoundException`: If the group does not exist.
+        """
         return super().drop_group(group_name, *options, **kwargs)

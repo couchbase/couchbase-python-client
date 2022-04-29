@@ -9,6 +9,7 @@ from typing import (Any,
 
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
 from couchbase.exceptions import exception as CouchbaseBaseException
+from couchbase.logic.options import AnalyticsOptionsBase
 from couchbase.options import AnalyticsOptions, UnsignedInt64
 from couchbase.pycbc_core import analytics_query
 from couchbase.serializer import DefaultJsonSerializer, Serializer
@@ -288,11 +289,11 @@ class AnalyticsQuery:
     def create_query_object(cls, statement, *options, **kwargs):
         # lets make a copy of the options, and update with kwargs...
         opt = AnalyticsOptions()
-        # TODO: is it possible that we could have [QueryOptions, QueryOptions, ...]??
+        # TODO: is it possible that we could have [AnalyticsOptions, AnalyticsOptions, ...]??
         #       If so, why???
         opts = list(options)
         for o in opts:
-            if isinstance(o, AnalyticsOptions):
+            if isinstance(o, (AnalyticsOptions, AnalyticsOptionsBase)):
                 opt = o
                 opts.remove(o)
         args = opt.copy()

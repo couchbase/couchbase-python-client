@@ -50,7 +50,7 @@ from couchbase.logic.search_queries import SearchQuery  # noqa: F401
 from couchbase.logic.search_queries import TermQuery  # noqa: F401
 from couchbase.logic.search_queries import TermRangeQuery  # noqa: F401
 from couchbase.logic.search_queries import WildcardQuery  # noqa: F401
-from couchbase.options import SearchOptions  # noqa: F401
+from couchbase.logic.supportability import Supportability
 
 
 class SearchRequest(SearchRequestLogic):
@@ -135,3 +135,20 @@ class SearchRequest(SearchRequestLogic):
             exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
             excptn = exc_cls(str(ex))
             raise excptn
+
+
+"""
+** DEPRECATION NOTICE **
+
+The classes below are deprecated for 3.x compatibility.  They should not be used.
+Instead use:
+    * All options should be imported from `couchbase.options`.
+
+"""
+
+from couchbase.logic.options import SearchOptionsBase  # nopep8 # isort:skip # noqa: E402
+
+
+@Supportability.import_deprecated('couchbase.search', 'couchbase.options')
+class SearchOptions(SearchOptionsBase):  # noqa: F811
+    pass

@@ -14,6 +14,7 @@ from typing import (Any,
 from couchbase._utils import timedelta_as_microseconds
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
 from couchbase.exceptions import exception as CouchbaseBaseException
+from couchbase.logic.options import ViewOptionsBase
 from couchbase.management.views import DesignDocumentNamespace
 from couchbase.options import UnsignedInt64, ViewOptions
 from couchbase.pycbc_core import view_query
@@ -417,7 +418,7 @@ class ViewQuery:
         #       If so, why???
         opts = list(options)
         for o in opts:
-            if isinstance(o, ViewOptions):
+            if isinstance(o, (ViewOptions, ViewOptionsBase)):
                 opt = o
                 opts.remove(o)
         args = opt.copy()

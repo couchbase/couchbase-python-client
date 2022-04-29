@@ -13,9 +13,9 @@ from couchbase.durability import DurabilityLevel, ServerDurability
 from couchbase.exceptions import CouchbaseException, ParsingFailedException
 from couchbase.options import (ClusterOptions,
                                QueryOptions,
+                               TransactionConfig,
                                UpsertOptions,
                                WaitUntilReadyOptions)
-from couchbase.options import TransactionConfig
 
 
 async def do_query(cluster):

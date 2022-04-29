@@ -40,11 +40,17 @@ class BucketLogic:
         return self._cluster.default_serializer
 
     @property
-    def connected(self):
+    def connected(self) -> bool:
+        """
+            bool: Indicator on if the bucket has been connected or not.
+        """
         return self._connected
 
     @property
     def name(self):
+        """
+            str: The name of this :class:`~.Bucket` instance.
+        """
         return self._bucket_name
 
     def _open_or_close_bucket(self, open_bucket=True, **kwargs):

@@ -18,6 +18,7 @@ from typing import (TYPE_CHECKING,
 from couchbase._utils import timedelta_as_microseconds
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
 from couchbase.exceptions import exception as CouchbaseBaseException
+from couchbase.logic.options import SearchOptionsBase
 from couchbase.options import (SearchOptions,
                                UnsignedInt32,
                                UnsignedInt64)
@@ -1229,7 +1230,7 @@ class SearchQueryBuilder:
         #       If so, why???
         opts = list(options)
         for o in opts:
-            if isinstance(o, SearchOptions):
+            if isinstance(o, (SearchOptions, SearchOptionsBase)):
                 opt = o
                 opts.remove(o)
         args = opt.copy()

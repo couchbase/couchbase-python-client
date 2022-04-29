@@ -264,36 +264,6 @@ ErrorContextType = Union[ErrorContext,
                          ViewErrorContext]
 
 
-class PycbcException(Exception):
-    def __init__(self,
-                 message=None,     # type: Optional[str]
-                 error_code=None,  # type: Optional[int]
-                 context=None,      # type: Optional[Dict[str, Any]]
-                 exc_info=None      # type: Optional[Dict[str, Any]]
-                 ):
-        self._message = message
-        self._error_code = error_code
-        self._context = context
-        self._exc_info = exc_info
-        super().__init__(message)
-
-    @property
-    def context(self) -> Optional[Dict[str, Any]]:
-        return self._context
-
-    @property
-    def exc_info(self) -> Optional[Dict[str, Any]]:
-        return self._exc_info
-
-    @property
-    def error_code(self) -> Optional[int]:
-        return self._error_code
-
-    @property
-    def message(self) -> Optional[int]:
-        return self._message
-
-
 class CouchbaseException(Exception):
     def __init__(self,
                  base=None,  # type: Optional[exception]
@@ -303,16 +273,10 @@ class CouchbaseException(Exception):
                  exc_info=None      # type: Optional[Dict[str, Any]]
                  ):
         self._base = base
-        if isinstance(base, PycbcException):
-            self._context = base.context
-            self._message = base.message
-            self._error_code = base.error_code
-            self._exc_info = base.exc_info
-        else:
-            self._context = context
-            self._message = message
-            self._error_code = error_code
-            self._exc_info = exc_info
+        self._context = context
+        self._message = message
+        self._error_code = error_code
+        self._exc_info = exc_info
         super().__init__(message)
 
     @property
@@ -346,7 +310,7 @@ class CouchbaseException(Exception):
     def __str__(self):
         from couchbase._utils import is_null_or_empty
         details = []
-        if self._base and not isinstance(self._base, PycbcException):
+        if self._base:
             details.append(
                 "ec={}, category={}".format(
                     self._base.err(),
@@ -384,7 +348,7 @@ class MissingConnectionException(CouchbaseException):
 
 
 class AmbiguousTimeoutException(CouchbaseException):
-    pass
+    """ AmbiguousTimeoutException """
 
 
 class TemporaryFailException(CouchbaseException):
@@ -392,7 +356,7 @@ class TemporaryFailException(CouchbaseException):
 
 
 class UnAmbiguousTimeoutException(CouchbaseException):
-    pass
+    """ UnAmbiguousTimeoutException """
 
 
 class RequestCanceledException(CouchbaseException):
@@ -400,6 +364,10 @@ class RequestCanceledException(CouchbaseException):
 
 
 class InvalidArgumentException(CouchbaseException):
+    """ Raised when a provided argmument has an invalid value
+        and/or invalid type.
+    """
+
     def __init__(self, msg=None, **kwargs):
         if msg:
             kwargs['message'] = msg
@@ -407,11 +375,7 @@ class InvalidArgumentException(CouchbaseException):
 
 
 class AuthenticationException(CouchbaseException):
-    """An authorization failure is returned by the server for given resource and credentials.
-    Message
-    "An authorization error has occurred"
-    Properties
-    TBD"""
+    """Indicates that an error occurred authenticating the user to the cluster."""
 
 
 class CasMismatchException(CouchbaseException):
@@ -422,7 +386,7 @@ CASMismatchException = CasMismatchException
 
 
 class BucketNotFoundException(CouchbaseException):
-    pass
+    """Indicates that the bucket being referenced does not exist."""
 
 
 class ValueFormatException(CouchbaseException):
@@ -461,15 +425,16 @@ class InternalSDKException(CouchbaseException):
 
 
 class DocumentNotFoundException(CouchbaseException):
-    pass
+    """Indicates that the referenced document does not exist."""
 
 
 class DocumentLockedException(CouchbaseException):
-    pass
+    """Indicates that the referenced document could not be used as it is currently locked,
+    likely by another actor in the system."""
 
 
 class DocumentExistsException(CouchbaseException):
-    pass
+    """Indicates that the referenced document exists already, but the operation was not expecting it to exist."""
 
 
 class DurabilityInvalidLevelException(CouchbaseException):
@@ -493,21 +458,20 @@ class DurabilitySyncWriteAmbiguousException(CouchbaseException):
 
 
 class PathNotFoundException(CouchbaseException):
-    pass
+    """Indicates that the reference path was not found."""
 
 
 class PathExistsException(CouchbaseException):
-    pass
+    """Indicates that the reference path already existed, but the operation expected that it did not."""
 
 
 class PathMismatchException(CouchbaseException):
-    pass
+    """Indicates that the referenced path made incorrect assumptions about the structure of a document,
+    for instance attempting to access a field as an object when in fact it is an array."""
 
 
 class InvalidValueException(CouchbaseException):
-    pass
-
-# Subdocument Exceptions
+    """Indicates the provided value was invalid for the operation."""
 
 # @TODO:  How to Deprecate??
 

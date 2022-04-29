@@ -9,9 +9,19 @@ if TYPE_CHECKING:
 
 
 class CreateBucketOptions(dict):
+    """Available options for a :class:`~couchbase.management.buckets.BucketManager`'s create bucket operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            key-value operation timeout.
+    """
+
     def __init__(
         self,
-        timeout=None  # type: timedelta
+        timeout=None  # type: Optional[timedelta]
     ):
         kwargs = {}
         if timeout:
@@ -21,9 +31,19 @@ class CreateBucketOptions(dict):
 
 
 class UpdateBucketOptions(dict):
+    """Available options to for a :class:`~couchbase.management.buckets.BucketManager`'s update bucket operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     def __init__(
         self,
-        timeout=None  # type: timedelta
+        timeout=None  # type: Optional[timedelta]
     ):
         kwargs = {}
         if timeout:
@@ -33,9 +53,19 @@ class UpdateBucketOptions(dict):
 
 
 class DropBucketOptions(dict):
+    """Available options to for a :class:`~couchbase.management.buckets.BucketManager`'s update bucket operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     def __init__(
         self,
-        timeout=None  # type: timedelta
+        timeout=None  # type: Optional[timedelta]
     ):
         kwargs = {}
         if timeout:
@@ -47,7 +77,7 @@ class DropBucketOptions(dict):
 class GetAllBucketOptions(dict):
     def __init__(
         self,
-        timeout=None  # type: timedelta
+        timeout=None  # type: Optional[timedelta]
     ):
         kwargs = {}
         if timeout:
@@ -57,9 +87,19 @@ class GetAllBucketOptions(dict):
 
 
 class GetBucketOptions(dict):
+    """Available options to for a :class:`~couchbase.management.buckets.BucketManager`'s get bucket operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     def __init__(
         self,
-        timeout=None  # type: timedelta
+        timeout=None  # type: Optional[timedelta]
     ):
         kwargs = {}
         if timeout:
@@ -69,9 +109,19 @@ class GetBucketOptions(dict):
 
 
 class FlushBucketOptions(dict):
+    """Available options to for a :class:`~couchbase.management.buckets.BucketManager`'s flush bucket operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     def __init__(
         self,
-        timeout=None  # type: timedelta
+        timeout=None  # type: Optional[timedelta]
     ):
         kwargs = {}
         if timeout:
@@ -83,6 +133,17 @@ class FlushBucketOptions(dict):
 
 
 class GetAllScopesOptions(dict):
+    """Available options to for a :class:`~couchbase.management.collections.CollectionManager`'s get all
+    scopes operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     def __init__(
         self,
         timeout=None  # type: timedelta
@@ -95,6 +156,17 @@ class GetAllScopesOptions(dict):
 
 
 class CreateCollectionOptions(dict):
+    """Available options to for a :class:`~couchbase.management.collections.CollectionManager`'s create collection
+    operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     def __init__(
         self,
         timeout=None  # type: timedelta
@@ -107,6 +179,17 @@ class CreateCollectionOptions(dict):
 
 
 class DropCollectionOptions(dict):
+    """Available options to for a :class:`~couchbase.management.collections.CollectionManager`'s drop collection
+    operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     def __init__(
         self,
         timeout=None  # type: timedelta
@@ -119,6 +202,17 @@ class DropCollectionOptions(dict):
 
 
 class CreateScopeOptions(dict):
+    """Available options to for a :class:`~couchbase.management.collections.CollectionManager`'s create scope
+    operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     def __init__(
         self,
         timeout=None  # type: timedelta
@@ -131,6 +225,17 @@ class CreateScopeOptions(dict):
 
 
 class DropScopeOptions(dict):
+    """Available options to for a :class:`~couchbase.management.collections.CollectionManager`'s drop scope
+    operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     def __init__(
         self,
         timeout=None  # type: timedelta
@@ -145,17 +250,15 @@ class DropScopeOptions(dict):
 
 
 class UserOptions(dict):
+    """
+    Base class User Management API options
+    """
 
     def __init__(self,
-                 domain_name="local",     # type: str
-                 timeout=None            # type: timedelta
+                 domain_name="local",     # type: Optional[str]
+                 timeout=None            # type: Optional[timedelta]
                  ):
-        """
-        Base class for options used w/in the User Management API
 
-        :param str domain_name: name of the user domain (local | external). Defaults to local.
-        :param timedelta timeout: the time allowed for the operation to be terminated. This is controlled by the client.
-        """
         kwargs = {"domain_name": domain_name}
         if timeout:
             kwargs["timeout"] = timeout
@@ -164,29 +267,84 @@ class UserOptions(dict):
 
 
 class GetUserOptions(UserOptions):
+    """Available options to for a :class:`~couchbase.management.users.UserManager`'s get user
+    operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        domain_name (str, optional): The user's domain name (either ``local`` or ``external``). Defaults
+            to ``local``.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     def __init__(self, **kwargs):
-        """Get User Options
-        """
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         super().__init__(**kwargs)
 
 
 class GetAllUsersOptions(UserOptions):
-    pass
+    """Available options to for a :class:`~couchbase.management.users.UserManager`'s get all users
+    operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        domain_name (str, optional): The user's domain name (either ``local`` or ``external``). Defaults
+            to ``local``.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
 
 
 class UpsertUserOptions(UserOptions):
-    pass
+    """Available options to for a :class:`~couchbase.management.users.UserManager`'s upsert user
+    operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        domain_name (str, optional): The user's domain name (either ``local`` or ``external``). Defaults
+            to ``local``.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
 
 
 class DropUserOptions(UserOptions):
-    pass
+    """Available options to for a :class:`~couchbase.management.users.UserManager`'s drop user
+    operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        domain_name (str, optional): The user's domain name (either ``local`` or ``external``). Defaults
+            to ``local``.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
 
 
 class GetRolesOptions(dict):
+    """Available options to for a :class:`~couchbase.management.users.UserManager`'s get roles
+    operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     def __init__(
         self,
-        timeout=None  # type: timedelta
+        timeout=None  # type: Optional[timedelta]
     ):
         kwargs = {}
         if timeout:
@@ -196,9 +354,20 @@ class GetRolesOptions(dict):
 
 
 class DropGroupOptions(dict):
+    """Available options to for a :class:`~couchbase.management.users.UserManager`'s drop group
+    operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     def __init__(
         self,
-        timeout=None  # type: timedelta
+        timeout=None  # type: Optional[timedelta]
     ):
         kwargs = {}
         if timeout:
@@ -208,9 +377,20 @@ class DropGroupOptions(dict):
 
 
 class GetGroupOptions(dict):
+    """Available options to for a :class:`~couchbase.management.users.UserManager`'s get group
+    operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     def __init__(
         self,
-        timeout=None  # type: timedelta
+        timeout=None  # type: Optional[timedelta]
     ):
         kwargs = {}
         if timeout:
@@ -220,9 +400,20 @@ class GetGroupOptions(dict):
 
 
 class GetAllGroupsOptions(dict):
+    """Available options to for a :class:`~couchbase.management.users.UserManager`'s get all
+    groups operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     def __init__(
         self,
-        timeout=None  # type: timedelta
+        timeout=None  # type: Optional[timedelta]
     ):
         kwargs = {}
         if timeout:
@@ -232,9 +423,20 @@ class GetAllGroupsOptions(dict):
 
 
 class UpsertGroupOptions(dict):
+    """Available options to for a :class:`~couchbase.management.users.UserManager`'s upsert group
+    operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
+
     def __init__(
         self,
-        timeout=None  # type: timedelta
+        timeout=None  # type: Optional[timedelta]
     ):
         kwargs = {}
         if timeout:
@@ -246,73 +448,63 @@ class UpsertGroupOptions(dict):
 # Query Index Management
 
 class GetAllQueryIndexOptions(dict):
+    """Available options to for a :class:`~couchbase.management.queries.QueryIndexManager`'s get
+    all indexes operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        collection_name (str, optional): Specifies the collection of the indexes.
+        scope_name (str, optional): Specifies the scope of the indexes.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
     @overload
     def __init__(self,
-                 timeout=None,          # type: timedelta
-                 scope_name=None,       # type: str
-                 collection_name=None   # type: str
+                 timeout=None,          # type: Optional[timedelta]
+                 scope_name=None,       # type: Optional[str]
+                 collection_name=None   # type: Optional[str]
                  ):
         pass
 
     def __init__(self, **kwargs):
-        """
-        Get all query indexes options
-
-        :param timeout: operation timeout in seconds
-        :param scope_name:
-            **UNCOMMITTED**
-            scope_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Nme of the scope where the index belongs
-        :param collection_name:
-            **UNCOMMITTED**
-            collection_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Name of the collection where the index belongs
-
-        """
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         super().__init__(**kwargs)
 
 
 class CreateQueryIndexOptions(dict):
+    """Available options to for a :class:`~couchbase.management.queries.QueryIndexManager`'s create
+    index operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        collection_name (str, optional): Specifies the collection of the index.
+        condition (str, optional): Specifies the 'where' condition for partial index creation.
+        deferred (bool, optional): Specifies whether this index creation should be deferred until
+            a later point in time when they can be explicitly built together.
+        ignore_if_exists (bool, optional): Whether or not the call should ignore the
+            index already existing when determining whether the call was successful.
+        num_replicas (int, optional): The number of replicas of this index that should be created.
+        scope_name (str, optional): Specifies the scope of the index.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
     @overload
     def __init__(self,
-                 timeout=None,          # type: timedelta
-                 ignore_if_exists=None,  # type: bool
-                 num_replicas=None,     # type: int
-                 deferred=None,         # type: bool
-                 condition=None,        # type: str
-                 scope_name=None,       # type: str
-                 collection_name=None   # type: str
+                 timeout=None,          # type: Optional[timedelta]
+                 ignore_if_exists=None,  # type: Optional[bool]
+                 num_replicas=None,     # type: Optional[int]
+                 deferred=None,         # type: Optional[bool]
+                 condition=None,        # type: Optional[str]
+                 scope_name=None,       # type: Optional[str]
+                 collection_name=None   # type: Optional[str]
                  ):
         pass
 
     def __init__(self, **kwargs):
-        """
-        Query Index creation options
-
-        :param timeout: operation timeout in seconds
-        :param ignore_if_exists: don't throw an exception if index already exists
-        :param num_replicas: number of replicas
-        :param deferred: whether the index creation should be deferred
-        :param condition: 'where' condition for partial index creation
-        :param scope_name:
-            **UNCOMMITTED**
-            scope_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Nme of the scope where the index belongs
-        :param collection_name:
-            **UNCOMMITTED**
-            collection_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Name of the collection where the index belongs
-
-        """
         if 'ignore_if_exists' not in kwargs:
             kwargs['ignore_if_exists'] = False
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
@@ -320,42 +512,39 @@ class CreateQueryIndexOptions(dict):
 
 
 class CreatePrimaryQueryIndexOptions(dict):
+    """Available options to for a :class:`~couchbase.management.queries.QueryIndexManager`'s create
+    primary index operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        collection_name (str, optional): Specifies the collection of the index.
+        condition (str, optional): Specifies the 'where' condition for partial index creation.
+        deferred (bool, optional): Specifies whether this index creation should be deferred until
+            a later point in time when they can be explicitly built together.
+        ignore_if_exists (bool, optional): Whether or not the call should ignore the
+            index already existing when determining whether the call was successful.
+        index_name (str, optional): Specifies the name of the primary index.
+        num_replicas (int, optional): The number of replicas of this index that should be created.
+        scope_name (str, optional): Specifies the scope of the index.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
     @overload
     def __init__(self,
-                 index_name=None,        # type: str
-                 timeout=None,           # type: timedelta
-                 ignore_if_exists=None,  # type: bool
-                 num_replicas=None,      # type: int
-                 deferred=None,          # type: bool
-                 condition=None,         # type: str
-                 scope_name=None,        # type: str
-                 collection_name=None    # type: str
+                 index_name=None,        # type: Optional[str]
+                 timeout=None,           # type: Optional[timedelta]
+                 ignore_if_exists=None,  # type: Optional[bool]
+                 num_replicas=None,      # type: Optional[int]
+                 deferred=None,          # type: Optional[bool]
+                 condition=None,         # type: Optional[str]
+                 scope_name=None,        # type: Optional[str]
+                 collection_name=None    # type: Optional[str]
                  ):
         pass
 
     def __init__(self, **kwargs):
-        """
-        Query Primary Index creation options
-
-        :param index_name: name of primary index
-        :param timeout: operation timeout in seconds
-        :param ignore_if_exists: don't throw an exception if index already exists
-        :param num_replicas: number of replicas
-        :param deferred: whether the index creation should be deferred
-        :param scope_name:
-            **UNCOMMITTED**
-            scope_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Nme of the scope where the index belongs
-        :param collection_name:
-            **UNCOMMITTED**
-            collection_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Name of the collection where the index belongs
-
-        """
         if 'ignore_if_exists' not in kwargs:
             kwargs['ignore_if_exists'] = False
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
@@ -363,137 +552,116 @@ class CreatePrimaryQueryIndexOptions(dict):
 
 
 class DropQueryIndexOptions(dict):
+    """Available options to for a :class:`~couchbase.management.queries.QueryIndexManager`'s drop
+    index operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        collection_name (str, optional): Specifies the collection of the index.
+        ignore_if_not_exists (bool, optional): Whether or not the call should ignore the
+            index not existing when determining whether the call was successful.
+        scope_name (str, optional): Specifies the scope of the index.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
     @overload
     def __init__(self,
-                 ignore_if_not_exists=None,   # type: bool
-                 timeout=None,                # type: timedelta
-                 scope_name=None,             # type: str
-                 collection_name=None         # type: str
+                 ignore_if_not_exists=None,   # type: Optional[bool]
+                 timeout=None,                # type: Optional[timedelta]
+                 scope_name=None,             # type: Optional[str]
+                 collection_name=None         # type: Optional[str]
                  ):
         pass
 
     def __init__(self, **kwargs):
-        """
-        Drop query index options
-
-        :param ignore_if_exists: don't throw an exception if index already exists
-        :param timeout: operation timeout in seconds
-        :param scope_name:
-            **UNCOMMITTED**
-            scope_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Nme of the scope where the index belongs
-        :param collection_name:
-            **UNCOMMITTED**
-            collection_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Name of the collection where the index belongs
-
-        """
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         super(DropQueryIndexOptions, self).__init__(**kwargs)
 
 
 class DropPrimaryQueryIndexOptions(dict):
+    """Available options to for a :class:`~couchbase.management.queries.QueryIndexManager`'s drop
+    primary index operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        collection_name (str, optional): Specifies the collection of the index.
+        ignore_if_not_exists (bool, optional): Whether or not the call should ignore the
+            index not existing when determining whether the call was successful.
+        index_name (str, optional): Specifies the name of the primary index.
+        scope_name (str, optional): Specifies the scope of the index.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
     @overload
     def __init__(self,
-                 index_name=None,            # str
-                 ignore_if_not_exists=None,  # type: bool
-                 timeout=None,               # type: timedelta
-                 scope_name=None,            # type: str
-                 collection_name=None        # type: str
+                 index_name=None,            # type: Optional[str]
+                 ignore_if_not_exists=None,  # type: Optional[bool]
+                 timeout=None,               # type: Optional[timedelta]
+                 scope_name=None,            # type: Optional[str]
+                 collection_name=None        # type: Optional[str]
                  ):
         pass
 
     def __init__(self, **kwargs):
-        """
-        Drop primary index options
-
-        :param index_name: name of primary index
-        :param timeout: operation timeout in seconds
-        :param ignore_if_exists: don't throw an exception if index already exists
-        :param scope_name:
-            **UNCOMMITTED**
-            scope_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Nme of the scope where the index belongs
-        :param collection_name:
-            **UNCOMMITTED**
-            collection_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Name of the collection where the index belongs
-
-        """
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         super(DropPrimaryQueryIndexOptions, self).__init__(**kwargs)
 
 
 class WatchQueryIndexOptions(dict):
+    """Available options to for a :class:`~couchbase.management.queries.QueryIndexManager`'s watch
+    indexes operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        collection_name (str, optional): Specifies the collection of the index.
+        scope_name (str, optional): Specifies the scope of the index.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+        watch_primary (bool, optional): Specifies whether the primary indexes should
+            be watched as well.
+    """
     @overload
     def __init__(self,
-                 watch_primary=None,      # type: bool
-                 timeout=None,            # type: timedelta
-                 scope_name=None,         # type: str
-                 collection_name=None     # type: str
+                 watch_primary=None,      # type: Optional[bool]
+                 timeout=None,            # type: Optional[timedelta]
+                 scope_name=None,         # type: Optional[str]
+                 collection_name=None     # type: Optional[str]
                  ):
         pass
 
     def __init__(self, **kwargs):
-        """
-        Watch query index options
-
-        :param watch_primary: If True, watch primary indexes
-        :param timeout: operation timeout in seconds
-        :param scope_name:
-            **UNCOMMITTED**
-            scope_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Nme of the scope where the index belongs
-        :param collection_name:
-            **UNCOMMITTED**
-            collection_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Name of the collection where the index belongs
-
-        """
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         super().__init__(**kwargs)
 
 
 class BuildDeferredQueryIndexOptions(dict):
+    """Available options to for a :class:`~couchbase.management.queries.QueryIndexManager`'s build
+    deferred indexes operation.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
+        collection_name (str, optional): Specifies the collection of the index.
+        scope_name (str, optional): Specifies the scope of the index.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            management operation timeout.
+    """
     @overload
     def __init__(self,
-                 timeout=None,          # type: timedelta
-                 scope_name=None,       # type: str
-                 collection_name=None   # type: str
+                 timeout=None,          # type: Optional[timedelta]
+                 scope_name=None,       # type: Optional[str]
+                 collection_name=None   # type: Optional[str]
                  ):
         pass
 
     def __init__(self, **kwargs):
-        """
-        Build deferred query indexes options
-
-        :param timeout: operation timeout in seconds
-        :param scope_name:
-            **UNCOMMITTED**
-            scope_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Nme of the scope where the index belongs
-        :param collection_name:
-            **UNCOMMITTED**
-            collection_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Name of the collection where the index belongs
-
-        """
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         super(BuildDeferredQueryIndexOptions, self).__init__(**kwargs)
 

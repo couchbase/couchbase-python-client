@@ -1,10 +1,15 @@
 from enum import IntEnum
-from typing import (Any,
+from typing import (TYPE_CHECKING,
+                    Any,
                     Dict,
                     Iterable,
                     Optional)
 
 from couchbase.exceptions import InvalidArgumentException
+from couchbase.logic.supportability import Supportability
+
+if TYPE_CHECKING:
+    from couchbase._utils import JSONType
 
 """
 couchbase++ couchbase/protocol/client_opcode.hxx
@@ -96,12 +101,16 @@ class SubDocStatus(IntEnum):
 
 
 class StoreSemantics(IntEnum):
+    """Define subdocument mutation operation store semantics.
+    """
     REPLACE = 0
     UPSERT = 1
     INSERT = 2
 
 
 class Spec(tuple):
+    """Represents a sub-operation to perform."""
+
     def __new__(cls, *args, **kwargs):
         return super().__new__(cls, tuple(args))
 
@@ -125,12 +134,16 @@ def exists(
     path,  # type: str
     xattr=False  # type: Optional[bool]
 ) -> Spec:
-    """
-    Checks for the existence of a field given a path.
+    """Creates a :class:`.Spec` that returns whether a specific field exists in the document.
 
-    :param str path: path to the element
-    :param xattr: operation is done on an Extended Attribute.
-    :return: Spec
+    Args:
+        path (str): The path to the field.
+        xattr (bool, optional): Whether this operation should reference the document body or the
+            extended attributes data for the document.
+
+    Returns:
+        :class:`.Spec`: An instance of :class:`.Spec`.
+
     """
 
     return Spec(SubDocOp.EXISTS, path, xattr)
@@ -139,12 +152,16 @@ def exists(
 def get(path,  # type: str
         xattr=False  # type: Optional[bool]
         ) -> Spec:
-    """
-    Fetches an element's value given a path.
+    """Creates a :class:`.Spec` for retrieving an element's value given a path.
 
-    :param str path: String path - path to the element
-    :param bool xattr: operation is done on an Extended Attribute.
-    :return: Spec
+    Args:
+        path (str): The path to the field.
+        xattr (bool, optional): Whether this operation should reference the document body or the
+            extended attributes data for the document.
+
+    Returns:
+        :class:`.Spec`: An instance of :class:`.Spec`.
+
     """
     return Spec(SubDocOp.GET, path, xattr)
 
@@ -152,31 +169,40 @@ def get(path,  # type: str
 def count(path,  # type: str
           xattr=False  # type: Optional[bool]
           ) -> Spec:
-    """
-    Gets the count of a list or dictionary element given a path
+    """Creates a :class:`.Spec` that returns the number of elements in the array referenced by the path.
 
-    :param path: String path - path to the element
-    :param bool xattr: operation is done on an Extended Attribute.
-    :return: Spec
+    Args:
+        path (str): The path to the field.
+        xattr (bool, optional): Whether this operation should reference the document body or the
+            extended attributes data for the document.
+
+    Returns:
+        :class:`.Spec`: An instance of :class:`.Spec`.
+
     """
     return Spec(SubDocOp.GET_COUNT, path, xattr)
 
 
 def insert(path,                     # type: str
-           value,                    # type: Dict[str, Any]
+           value,                    # type: JSONType
            create_parents=False,     # type: Optional[bool]
            xattr=False,               # type: Optional[bool]
            **kwargs                 # type: Dict[str, Any]
            ) -> Spec:
-    """
-    Insert a value at a given path in a document.
+    """Creates a :class:`.Spec` for inserting a field into the document. Failing if the field already
+    exists at the specified path.
 
-    :param str path:  Path to insert into document.
-    :param JSON value: Value to insert at this path.
-    :param create_parents: Whether or not to create the parents in the path,
-        if they don't already exist.
-    :param xattr: whether this is an xattr path
-    :return: Spec
+    Args:
+        path (str): The path to the field.
+        value (JSONType): The value to insert.
+        create_parents (bool, optional): Whether or not the path to the field should be created
+            if it does not already exist.
+        xattr (bool, optional): Whether this operation should reference the document body or the
+            extended attributes data for the document.
+
+    Returns:
+        :class:`.Spec`: An instance of :class:`.Spec`.
+
     """
     return Spec(
         SubDocOp.DICT_ADD,
@@ -190,19 +216,24 @@ def insert(path,                     # type: str
 
 
 def upsert(path,                     # type: str
-           value,                    # type: Dict[str, Any]
+           value,                    # type: JSONType
            create_parents=False,     # type: Optional[bool]
            xattr=False               # type: Optional[bool]
            ) -> Spec:
-    """
-    Upsert a value at a given path in a document.
+    """Creates a :class:`.Spec` for upserting a field into the document. This updates the value of the specified field,
+    or creates the field if it does not exits.
 
-    :param str path:  Path to upsert into document.
-    :param JSON value: Value to upsert at this path.
-    :param create_parents: Whether or not to create the parents in the path,
-        if they don't already exist.
-    :param xattr: whether this is an xattr path
-    :return: Spec
+    Args:
+        path (str): The path to the field.
+        value (JSONType): The value to upsert.
+        create_parents (bool, optional): Whether or not the path to the field should be created
+            if it does not already exist.
+        xattr (bool, optional): Whether this operation should reference the document body or the
+            extended attributes data for the document.
+
+    Returns:
+        :class:`.Spec`: An instance of :class:`.Spec`.
+
     """
     return Spec(
         SubDocOp.DICT_UPSERT,
@@ -214,16 +245,21 @@ def upsert(path,                     # type: str
 
 
 def replace(path,                     # type: str
-            value,                    # type: Dict[str, Any]
+            value,                    # type: JSONType
             xattr=False,              # type: Optional[bool]
             ) -> Spec:
-    """
-    Upsert a value at a given path in a document.
+    """Creates a :class:`.Spec` for replacing a field into the document. Failing if the field already
+    exists at the specified path.
 
-    :param str path:  Path to upsert into document.
-    :param JSON value: Value to upsert at this path.
-    :param xattr: whether this is an xattr path
-    :return: Spec
+    Args:
+        path (str): The path to the field.
+        value (JSONType): The value to write.
+        xattr (bool, optional): Whether this operation should reference the document body or the
+            extended attributes data for the document.
+
+    Returns:
+        :class:`.Spec`: An instance of :class:`.Spec`.
+
     """
     return Spec(SubDocOp.REPLACE, path, False, xattr, False, value)
 
@@ -231,12 +267,16 @@ def replace(path,                     # type: str
 def remove(path,                     # type: str
            xattr=False,              # type: Optional[bool]
            ) -> Spec:
-    """
-    Remove a path from a document.
+    """Creates a :class:`.Spec` for removing a field from a document.
 
-    :param str path: Path to remove from document.
-    :param xattr: whether this is an xattr path
-    :return: Spec
+    Args:
+        path (str): The path to the field.
+        xattr (bool, optional): Whether this operation should reference the document body or the
+            extended attributes data for the document.
+
+    Returns:
+        :class:`.Spec`: An instance of :class:`.Spec`.
+
     """
     return Spec(SubDocOp.REMOVE, path, False, xattr, False)
 
@@ -246,13 +286,19 @@ def array_append(path,              # type: str
                  create_parents=False,     # type: Optional[bool]
                  xattr=False               # type: Optional[bool]
                  ) -> Spec:
-    """
-    Add new values to the end of an array.
+    """Creates a :class:`.Spec` for adding a value to the end of an array in a document.
 
-    :param path: Path to the array. The path should contain the *array itself*
-        and not an element *within* the array
-    :param values: one or more values to append
-    :param create_parents: Create the array if it does not exist
+    Args:
+        path (str): The path to an element of an array.
+        *values (Iterable[Any]): The values to add.
+        create_parents (bool, optional): Whether or not the path to the field should be created
+            if it does not already exist.
+        xattr (bool, optional): Whether this operation should reference the document body or the
+            extended attributes data for the document.
+
+    Returns:
+        :class:`.Spec`: An instance of :class:`.Spec`.
+
     """
     return Spec(
         SubDocOp.ARRAY_PUSH_LAST,
@@ -269,17 +315,19 @@ def array_prepend(path,              # type: str
                   create_parents=False,     # type: Optional[bool]
                   xattr=False               # type: Optional[bool]
                   ) -> Spec:
-    """
-    Add new values to the beginning of an array.
+    """Creates a :class:`.Spec` for adding a value to the beginning of an array in a document.
 
-    :param path: Path to the array. The path should contain the *array itself*
-        and not an element *within* the array
-    :param values: one or more values to append
-    :param create_parents: Create the array if it does not exist
+    Args:
+        path (str): The path to an element of an array.
+        *values (Iterable[Any]): The values to add.
+        create_parents (bool, optional): Whether or not the path to the field should be created
+            if it does not already exist.
+        xattr (bool, optional): Whether this operation should reference the document body or the
+            extended attributes data for the document.
 
-    This operation is only valid in :cb_bmeth:`mutate_in`.
+    Returns:
+        :class:`.Spec`: An instance of :class:`.Spec`.
 
-    .. seealso:: :func:`array_append`, :func:`upsert`
     """
 
     return Spec(
@@ -297,16 +345,20 @@ def array_insert(path,              # type: str
                  create_parents=False,     # type: Optional[bool]
                  xattr=False               # type: Optional[bool]
                  ) -> Spec:
-    """
-    Insert values at into an array in a document at the position
-    given in the path.
+    """Creates a :class:`.Spec` for adding a value to a specified location in an array in a document.
+    The path should specify a specific index in the array and the new values are inserted at this location.
 
-    :param str path: Path to the spot in the array where the values
-        should be inserted.  Note in this case, the path is a path
-        to a specific location in an array.
-    :param values: Value(s) to insert.
-    :param xattr: whether this is an xattr path
-    :return: Spec
+    Args:
+        path (str): The path to an element of an array.
+        *values (Iterable[Any]): The values to add.
+        create_parents (bool, optional): Whether or not the path to the field should be created
+            if it does not already exist.
+        xattr (bool, optional): Whether this operation should reference the document body or the
+            extended attributes data for the document.
+
+    Returns:
+        :class:`.Spec`: An instance of :class:`.Spec`.
+
     """
     return Spec(
         SubDocOp.ARRAY_INSERT,
@@ -323,15 +375,20 @@ def array_addunique(path,              # type: str
                     create_parents=False,     # type: Optional[bool]
                     xattr=False               # type: Optional[bool]
                     ) -> Spec:
-    """
-    Add a value to an existing array, if it doesn't currently exist in the array.  Note the
-    position is unspecified -- it is up to the server to place it where it wants.
-    :param str path: Path to an array in a document. Note this is the path *to*
-        the array, not to the path to a specific element.
-    :param value: Value to add, if it does not already exist in the array.
-    :param xattr: whether this is an xattr path
-    :param bool create_parents: If True, create the array if it does not already exist.
-    :return: Spec
+    """Creates a :class:`.Spec` for adding unique values to an array in a document. This operation will only
+    add values if they do not already exist elsewhere in the array.
+
+    Args:
+        path (str): The path to an element of an array.
+        *values (Iterable[Any]): The values to add.
+        create_parents (bool, optional): Whether or not the path to the field should be created
+            if it does not already exist.
+        xattr (bool, optional): Whether this operation should reference the document body or the
+            extended attributes data for the document.
+
+    Returns:
+        :class:`.Spec`: An instance of :class:`.Spec`.
+
     """
     return Spec(
         SubDocOp.ARRAY_ADD_UNIQUE,
@@ -348,17 +405,23 @@ def counter(path,                   # type: str
             xattr=False,            # type: Optional[bool]
             create_parents=False    # type: Optional[bool]
             ) -> Spec:
-    """
-    **DEPRECATED** use increment() or decrement()
+    """Creates a :class:`.Spec` for incrementing or decrementing the value of a field in a document. If
+    the provided delta is >= 0 :meth:`~couchbase.subdocument.increment` is called, otherwise
+    :meth:`~couchbase.subdocument.decrement` is called.
 
-    Increment/Decrement a counter in a document.
+    .. warning::
+        This method is **deprecated** use :meth:`~.subdocument.increment` or :meth:`~couchbase.subdocument.decrement`
 
-    :param str path: Path to the counter
-    :param int delta: Amount to change the counter.   Cannot be 0, and must be and integer.
-    :param xattr: whether this is an xattr path
-    :param bool create_parents: Create the counter if it doesn't exist.  Will be initialized
-        to the value of delta.
-    :return: Spec
+    Args:
+        path (str): The path to the field.
+        delta (int): The value to increment or decrement from the document.
+        xattr (bool, optional): Whether this operation should reference the document body or the
+            extended attributes data for the document.
+        create_parents (bool, optional): Whether or not the path to the field should be created
+            if it does not already exist.
+
+    Returns:
+        :class:`.Spec`: An instance of :class:`.Spec`.
     """
     if delta >= 0:
         return increment(path, delta, xattr=xattr, create_parents=create_parents)
@@ -371,15 +434,23 @@ def increment(path,                   # type: str
               xattr=False,            # type: Optional[bool]
               create_parents=False    # type: Optional[bool]
               ) -> Spec:
-    """
-    Increment a counter in a document.
+    """Creates a :class:`.Spec` for incrementing the value of a field in a document.
 
-    :param str path: Path to the counter
-    :param int delta: Amount to change the counter.   Cannot be 0, and must be and integer.
-    :param xattr: whether this is an xattr path
-    :param bool create_parents: Create the counter if it doesn't exist.  Will be initialized
-        to the value of delta.
-    :return: Spec
+    Args:
+        path (str): The path to the field.
+        delta (int): The value to increment from the document.
+        xattr (bool, optional): Whether this operation should reference the document body or the
+            extended attributes data for the document.
+        create_parents (bool, optional): Whether or not the path to the field should be created
+            if it does not already exist.
+
+    Returns:
+        :class:`.Spec`: An instance of :class:`.Spec`.
+
+
+    Raises:
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If the delta arugment is not >= 0 or not
+            of type int.
     """
     if not isinstance(delta, int):
         raise InvalidArgumentException("Delta must be integer")
@@ -395,15 +466,23 @@ def decrement(path,                   # type: str
               xattr=False,            # type: Optional[bool]
               create_parents=False    # type: Optional[bool]
               ) -> Spec:
-    """
-    Increment a counter in a document.
+    """Creates a :class:`.Spec` for decrementing the value of a field in a document.
 
-    :param str path: Path to the counter
-    :param int delta: Amount to change the counter.   Cannot be 0, and must be and integer.
-    :param xattr: whether this is an xattr path
-    :param bool create_parents: Create the counter if it doesn't exist.  Will be initialized
-        to the value of delta.
-    :return: Spec
+    Args:
+        path (str): The path to the field.
+        delta (int): The value to decrement from the document.
+        xattr (bool, optional): Whether this operation should reference the document body or the
+            extended attributes data for the document.
+        create_parents (bool, optional): Whether or not the path to the field should be created
+            if it does not already exist.
+
+    Returns:
+        :class:`.Spec`: An instance of :class:`.Spec`.
+
+
+    Raises:
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If the delta arugment is not >= 0 or not
+            of type int.
     """
     if not isinstance(delta, int):
         raise InvalidArgumentException("Delta must be integer")
@@ -431,3 +510,21 @@ def with_expiry() -> Spec:
     :return: Spec
     """
     return Spec(SubDocOp.GET, '$document.exptime', True)
+
+
+"""
+** DEPRECATION NOTICE **
+
+The classes below are deprecated for 3.x compatibility.  They should not be used.
+Instead use:
+    * All options should be imported from `couchbase.options`.
+    * Scope object should be imported from `couchbase.scope`.
+
+"""
+
+from couchbase.logic.options import MutateInOptionsBase  # nopep8 # isort:skip # noqa: E402
+
+
+@Supportability.import_deprecated('couchbase.subdocument', 'couchbase.options')
+class MutateInOptions(MutateInOptionsBase):
+    pass

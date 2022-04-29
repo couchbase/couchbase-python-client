@@ -14,6 +14,9 @@ couchbase/*.dylib*.*
 couchbase/*.dll
 couchbase/*.pyd
 
+# Sphinx
+docs/_build/
+
 # VS Code
 .vscode/
 

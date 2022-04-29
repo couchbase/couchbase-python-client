@@ -75,7 +75,10 @@ bucket_op_callback(std::error_code ec,
 }
 
 void
-close_connection_callback(PyObject* pyObj_conn, PyObject* pyObj_callback, PyObject* pyObj_errback, std::shared_ptr<std::promise<PyObject*>> barrier)
+close_connection_callback(PyObject* pyObj_conn,
+                          PyObject* pyObj_callback,
+                          PyObject* pyObj_errback,
+                          std::shared_ptr<std::promise<PyObject*>> barrier)
 {
     PyObject* pyObj_args = NULL;
     PyObject* pyObj_func = NULL;

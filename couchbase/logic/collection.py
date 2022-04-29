@@ -6,9 +6,8 @@ from typing import (TYPE_CHECKING,
                     Union)
 
 from couchbase.exceptions import InvalidArgumentException
-from couchbase.options import (DeltaValue,
-                               SignedInt64,
-                               forward_args)
+from couchbase.logic.options import DeltaValueBase, SignedInt64Base
+from couchbase.options import forward_args
 from couchbase.pycbc_core import (binary_operation,
                                   kv_operation,
                                   operations,
@@ -58,6 +57,9 @@ class CollectionLogic:
 
     @property
     def name(self) -> str:
+        """
+            str: The name of this :class:`~.Collection` instance.
+        """
         return self._collection_name
 
     def _set_connection(self):
@@ -81,19 +83,20 @@ class CollectionLogic:
     ) -> Optional[GetResult]:
         """**INTERNAL**
 
-        Key-Value _get_ operation.  Should only be called by classes that inherit from the base
-            class :class:`CollectionLogic`.
+        Key-Value *get* operation.  Should only be called by classes that inherit from the base
+            class :class:`~couchbase.logic.CollectionLogic`.
 
         Args:
             key (str): document key
-            opts (:class:`~couchbase.options.GetOptions`): options to provide
+            opts (:class:`~.options.GetOptions`): options to provide
                 for _get_ KV operation
             kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
-                overrride provided :class:`~couchbase.options.GetOptions`
+                overrride provided :class:`~.options.GetOptions`
 
         Raises:
-            :class:`~couchbase.exceptions.InvalidArgumentException`: When attempting a get projection
+            :class:`~.exceptions.InvalidArgumentException`: When attempting a get projection
                 operation with more than 16 projections.
+            :class:`~.exceptions.DocumentNotFoundException`: If the provided document key does not exist.
         """
         projections = kwargs.get("project")
         if isinstance(projections, list) and len(projections) > 16:
@@ -330,21 +333,21 @@ class CollectionLogic:
 
     def _validate_delta_initial(self, delta=None, initial=None) -> None:
         # @TODO: remove deprecation next .minor
-        from couchbase.collection import DeltaValueDeprecated, SignedInt64Deprecated
+        # from couchbase.collection import DeltaValueDeprecated, SignedInt64Deprecated
         if delta is not None:
-            if not (DeltaValue.is_valid(delta) or DeltaValueDeprecated.is_valid(delta)):
+            if not DeltaValueBase.is_valid(delta):
                 raise InvalidArgumentException("Argument is not valid DeltaValue")
         if initial is not None:
-            if not (SignedInt64.is_valid(initial) or SignedInt64Deprecated.is_valid(initial)):
+            if not SignedInt64Base.is_valid(initial):
                 raise InvalidArgumentException("Argument is not valid SignedInt64")
 
     def _get_and_validate_delta_initial(self, final_args):
         initial = final_args.get('initial', None)
         delta = final_args.get('delta', None)
         if not initial:
-            initial = SignedInt64(0)
+            initial = SignedInt64Base(0)
         if not delta:
-            delta = DeltaValue(1)
+            delta = DeltaValueBase(1)
 
         self._validate_delta_initial(delta=delta, initial=initial)
 
@@ -358,9 +361,9 @@ class CollectionLogic:
     ) -> Optional[CounterResult]:
         final_args = forward_args(kwargs, *opts)
         if not final_args.get('initial', None):
-            final_args['initial'] = SignedInt64(0)
+            final_args['initial'] = SignedInt64Base(0)
         if not final_args.get('delta', None):
-            final_args['delta'] = DeltaValue(1)
+            final_args['delta'] = DeltaValueBase(1)
 
         self._validate_delta_initial(delta=final_args['delta'],
                                      initial=final_args['initial'])
@@ -379,9 +382,9 @@ class CollectionLogic:
     ) -> Optional[CounterResult]:
         final_args = forward_args(kwargs, *opts)
         if not final_args.get('initial', None):
-            final_args['initial'] = SignedInt64(0)
+            final_args['initial'] = SignedInt64Base(0)
         if not final_args.get('delta', None):
-            final_args['delta'] = DeltaValue(1)
+            final_args['delta'] = DeltaValueBase(1)
 
         self._validate_delta_initial(delta=final_args['delta'],
                                      initial=final_args['initial'])

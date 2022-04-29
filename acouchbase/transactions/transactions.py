@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from couchbase._utils import JSONType, PyCapsuleType
     from couchbase.options import TransactionConfig, TransactionOptions
     from couchbase.serializer import Serializer
-    from couchbase.transactions import PerTransactionConfig
 
 
 class AsyncWrapper:

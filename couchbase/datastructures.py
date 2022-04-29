@@ -2,6 +2,7 @@ import time
 from datetime import timedelta
 from typing import (TYPE_CHECKING,
                     Any,
+                    Dict,
                     Generator,
                     List,
                     Optional)
@@ -31,6 +32,16 @@ if TYPE_CHECKING:
 
 
 class CouchbaseList:
+    """
+    CouchbaseList provides a simplified interface for storing lists within a Couchbase document.
+
+    Args:
+        key (str): Document key to use for the list.
+        collection (:class:`~.collection.Collection`): The :class:`~.collection.Collection` where the
+            list belongs
+
+    """
+
     def __init__(self, key,  # type: str
                  collection  # type: Collection
                  ) -> None:
@@ -49,20 +60,11 @@ class CouchbaseList:
     @BlockingWrapper.datastructure_op(create_type=list)
     def append(self, value  # type: JSONType
                ) -> None:
-        """
-        Add an item to the end of a list.
+        """Add an item to the end of the list.
 
-        :param value: The value to append
-        :return: None
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
-            and `create` was not specified.
+        Args:
+            value (JSONType): The value to add.
 
-        example::
-
-            cb.list_append('a_list', 'hello')
-            cb.list_append('a_list', 'world')
-
-        .. seealso:: :meth:`map_add`
         """
         op = array_append('', value)
         self._collection.mutate_in(self._key, (op,))
@@ -70,18 +72,11 @@ class CouchbaseList:
     @BlockingWrapper.datastructure_op(create_type=list)
     def prepend(self, value  # type: JSONType
                 ) -> None:
-        """
-        Add an item to the beginning of a list.
+        """Add an item to the beginning of the list.
 
-        :param value: Value to prepend
-        :return: :class:`OperationResult`.
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
-            and `create` was not specified.
+        Args:
+            value (JSONType): The value to add.
 
-        This function is identical to :meth:`list_append`, except for prepending
-        rather than appending the item
-
-        .. seealso:: :meth:`list_append`, :meth:`map_add`
         """
         op = array_prepend('', value)
         self._collection.mutate_in(self._key, (op,))
@@ -89,21 +84,15 @@ class CouchbaseList:
     def set_at(self, index,  # type: int
                value  # type: JSONType
                ) -> None:
-        """
-        Sets an item within a list at a given position.
+        """Sets an item within a list at a specified index.
 
-        :param index: The position to replace
-        :param value: The value to be inserted
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
-        :raise: :exc:`IndexError` if the index is out of bounds
+        Args:
+            index (int): The index to retrieve.
+            value (JSONType): The value to set.
 
-        example::
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the index is out of range.
 
-            cb.upsert('a_list', ['hello', 'world'])
-            cb.list_set('a_list', 1, 'good')
-            cb.get('a_list').value # => ['hello', 'good']
-
-        .. seealso:: :meth:`map_add`, :meth:`list_append`
         """
         try:
             op = replace(f'[{index}]', value)
@@ -114,13 +103,17 @@ class CouchbaseList:
     @BlockingWrapper.datastructure_op(create_type=list)
     def get_at(self, index  # type: int
                ) -> Any:
-        """
-        Get a specific element within a list.
+        """Retrieves the item at a specific index in the list.
 
-        :param index: The index to retrieve
-        :return: value for the element
-        :raise: :exc:`IndexError` if the index does not exist
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
+        Args:
+            index (int): The index to retrieve.
+
+        Returns:
+            Any: The value of the element at the specified index.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the index is out of range.
+
         """
         try:
             op = subdoc_get(f'[{index}]')
@@ -131,14 +124,14 @@ class CouchbaseList:
 
     def remove_at(self, index  # type: int
                   ) -> None:
-        """
-        Remove the element at a specific index from a list.
+        """Removes an item at a specific index from the list.
 
-        :param index: The index to remove
-        :param kwargs: Arguments to :meth:`mutate_in`
-        :return: :class:`OperationResult`
-        :raise: :exc:`IndexError` if the index does not exist
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
+        Args:
+            index (int): The index to remove.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the index is out of range.
+
         """
         try:
             op = remove(f'[{index}]')
@@ -148,27 +141,28 @@ class CouchbaseList:
 
     @BlockingWrapper.datastructure_op(create_type=list)
     def size(self) -> int:
-        """
-        Retrieve the number of elements in the list.
+        """Returns the number of items in the list.
 
-        :return: The number of elements within the list
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
+        Returns:
+            int: The number of items in the list.
+
         """
         op = count('')
         sdres = self._collection.lookup_in(self._key, (op,))
         return sdres.value[0].get("value", None)
 
     @BlockingWrapper.datastructure_op(create_type=list)
-    def index_of(self, value  # type: Any
+    def index_of(self, value  # type: JSONType
                  ) -> int:
-        """
-        Retrieve the index of the specified value in the list.
+        """Returns the index of a specific value from the list.
 
-        :param value: the value to look-up
-        :return: The index of the specified value, -1 if not found
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
-        """
+        Args:
+            value (JSONType): The value to search for.
 
+        Returns:
+            int: The index of the value in the list. Returns -1 if value is not found.
+
+        """
         list_ = self._get()
         for idx, val in enumerate(list_.content_as[list]):
             if val == value:
@@ -177,22 +171,21 @@ class CouchbaseList:
         return -1
 
     def get_all(self) -> List[Any]:
-        """
-        Retrieves the entire list.
+        """Returns the entire list of items in this list.
 
-        :return: The entire CouchbaseList
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
+        Returns:
+            int: The entire list.
+
         """
 
         list_ = self._get()
         return list_.content_as[list]
 
     def clear(self) -> None:
-        """
-        Clears the list.
+        """Clears the list.
 
-        :return: clears the CouchbaseList
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the list does not already exist.
         """
         try:
             self._collection.remove(self._key)
@@ -209,6 +202,16 @@ class CouchbaseList:
 
 
 class CouchbaseMap:
+    """
+    CouchbaseMap provides a simplified interface for storing a map within a Couchbase document.
+
+    Args:
+        key (str): Document key to use for the map.
+        collection (:class:`~.collection.Collection`): The :class:`~.collection.Collection` where the
+            map belongs
+
+    """
+
     def __init__(self, key,  # type: str
                  collection  # type: Collection
                  ) -> None:
@@ -217,72 +220,55 @@ class CouchbaseMap:
         self._full_map = None
 
     @BlockingWrapper.datastructure_op(create_type=dict)
-    def _get(self) -> List:
+    def _get(self) -> Dict[str, Any]:
         """
-        Get the entire list.
+        Get the entire map.
         """
         return self._collection.get(self._key)
 
     @BlockingWrapper.datastructure_op(create_type=dict)
-    def add(self, mapkey,  # type: str
+    def add(self,
+            mapkey,  # type: str
             value  # type: Any
             ) -> None:
-        """
-        Set a value for a key in a map.
+        """Sets a specific key to the specified value in the map.
 
-        These functions are all wrappers around the :meth:`mutate_in` or
-        :meth:`lookup_in` methods.
-
-        :param mapkey: The key in the map to set
-        :param value: The value to use (anything serializable to JSON)
-        :raise: :cb_exc:`Document.DocumentNotFoundException` if the document does not exist.
-            and `create` was not specified
-
-        .. Initialize a map and add a value
-
-            cb.upsert('a_map', {})
-            cb.map_add('a_map', 'some_key', 'some_value')
-            cb.map_get('a_map', 'some_key').value  # => 'some_value'
-            cb.get('a_map').value  # => {'some_key': 'some_value'}
+        Args:
+            mapkey (str): The key to set.
+            value (JSONType): The value to set.
 
         """
         op = upsert(mapkey, value)
         self._collection.mutate_in(self._key, (op,))
 
     @BlockingWrapper.datastructure_op(create_type=dict)
-    def get(self, mapkey,  # type: str
+    def get(self,
+            mapkey,  # type: str
             ) -> Any:
-        """
-        Retrieve a value from a map.
+        """Fetches a specific key from the map.
 
-        :param key: The document ID
-        :param mapkey: Key within the map to retrieve
-        :return: :class:`~.ValueResult`
-        :raise: :exc:`IndexError` if the mapkey does not exist
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
+        Args:
+            mapkey (str): The key to fetch.
 
-        .. seealso:: :meth:`map_add` for an example
+        Returns:
+            Any: The value of the specified key.
+
         """
         op = subdoc_get(mapkey)
         sd_res = self._collection.lookup_in(self._key, (op,))
         return sd_res.value[0].get("value", None)
 
-    def remove(self, mapkey  # type: str
+    def remove(self,
+               mapkey  # type: str
                ) -> None:
-        """
-        Remove an item from a map.
+        """Removes a specific key from the map.
 
-        :param key: The document ID
-        :param mapkey: The key in the map
-        :param See:meth:`mutate_in` for options
-        :raise: :exc:`IndexError` if the mapkey does not exist
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
+        Args:
+            mapkey (str): The key in the map to remove.
 
-        .. Remove a map key-value pair:
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the key is not in the map.
 
-            cb.map_remove('a_map', 'some_key')
-
-        .. seealso:: :meth:`map_add`
         """
         try:
             op = remove(mapkey)
@@ -292,74 +278,64 @@ class CouchbaseMap:
 
     @BlockingWrapper.datastructure_op(create_type=dict)
     def size(self) -> int:
-        """
-        Get the number of items in the map.
+        """Returns the number of items in the map.
 
-        :param key: The document ID of the map
-        :return int: The number of items in the map
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
+        Returns:
+            int: The number of items in the map.
 
-        .. seealso:: :meth:`map_add`
         """
         op = count('')
         sd_res = self._collection.lookup_in(self._key, (op,))
         return sd_res.value[0].get("value", None)
 
     @BlockingWrapper.datastructure_op(create_type=dict)
-    def exists(self, key  # type: Any
+    def exists(self,
+               key  # type: str
                ) -> bool:
-        """
-        hecks whether a specific key exists in the map.
+        """Checks whether a specific key exists in the map.
 
-        :param key: The key to check
-        :return bool: If the key exists in the map or not
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
+        Args:
+            key (str): The key to set.
 
-        .. seealso:: :meth:`map_add`
+        Returns:
+            bool: True if the key exists in the map, False otherwise.
+
         """
         op = subdoc_exists(key)
         sd_res = self._collection.lookup_in(self._key, (op,))
         return sd_res.exists(0)
 
     def keys(self) -> List[str]:
-        """
-        Returns a list of all the keys which exist in the map.
+        """Returns a list of all the keys which exist in the map.
 
-        :return: The keys in CouchbaseMap
-        :raise: :cb_exc:`DocumentNotFoundException` if the map does not exist
+        Returns:
+            List[str]: A list of all the keys that exist in the map.
         """
 
         map_ = self._get()
         return list(map_.content_as[dict].keys())
 
-    def values(self) -> List[str]:
-        """
-        Returns a list of all the values which exist in the map.
+    def values(self) -> List[Any]:
+        """Returns a list of all the values which exist in the map.
 
-        :return: The keys in CouchbaseMap
-        :raise: :cb_exc:`DocumentNotFoundException` if the map does not exist
+        Returns:
+            List[Any]: A list of all the values that exist in the map.
         """
 
         map_ = self._get()
         return list(map_.content_as[dict].values())
 
-    def get_all(self) -> List[Any]:
-        """
-        Retrieves the entire map.
+    def get_all(self) -> Dict[str, Any]:
+        """Retrieves the entire map.
 
-        :return: The entire CouchbaseMap
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
+        Returns:
+            Dict[str, Any]: The entire CouchbaseMap.
         """
-
         map_ = self._get()
         return map_.content_as[dict]
 
     def clear(self) -> None:
-        """
-        Clears the map.
-
-        :return: clears the CouchbaseMap
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
+        """Clears the map.
         """
         try:
             self._collection.remove(self._key)
@@ -367,11 +343,10 @@ class CouchbaseMap:
             pass
 
     def items(self) -> Generator:
-        """
-        Provide mechanism to loop over the entire map.
+        """Provides mechanism to loop over the entire map.
 
-        :return: Generator expression for CouchbaseMap
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
+        Returns:
+            Generator:  A generator expression for the map
         """
 
         map_ = self._get()
@@ -379,7 +354,18 @@ class CouchbaseMap:
 
 
 class CouchbaseSet:
-    def __init__(self, key,  # type: str
+    """
+    CouchbaseSet provides a simplified interface for storing a set within a Couchbase document.
+
+    Args:
+        key (str): Document key to use for the set.
+        collection (:class:`~.collection.Collection`): The :class:`~.collection.Collection` where the
+            set belongs.
+
+    """
+
+    def __init__(self,
+                 key,  # type: str
                  collection  # type: Collection
                  ) -> None:
         self._key = key
@@ -393,13 +379,18 @@ class CouchbaseSet:
         return self._collection.get(self._key)
 
     @BlockingWrapper.datastructure_op(create_type=list)
-    def add(self, value  # type: Any
-            ) -> None:
-        """
-        Add an item to a set if the item does not yet exist.
+    def add(self,
+            value  # type: Any
+            ) -> bool:
+        """Adds a new item to the set. Returning whether the item already existed in the set or not.
 
-        :param value: Value to add
-        .. seealso:: :meth:`map_add`
+        Args:
+            value (Any):
+
+        Returns:
+            bool:  True if the value was added, False otherwise (meaning the value already
+                exists in the set).
+
         """
         try:
             op = array_addunique('', value)
@@ -408,17 +399,17 @@ class CouchbaseSet:
         except PathExistsException:
             return False
 
-    def remove(self, value,  # type: Any  # noqa: C901
+    def remove(self,   # noqa: C901
+               value,  # type: Any
                timeout=None  # type: Optional[timedelta]
                ) -> None:
-        """
-        Remove an item from a set.
+        """Removes a specific value from the set.
 
-        :param value: Value to remove
-        :param kwargs: Arguments to :meth:`mutate_in`
-        :raise: :cb_exc:`DocumentNotFoundException` if the set does not exist.
+        Args:
+            value (Any): The value to remove
+            timeout (timedelta, optional): Amount of time allowed when attempting
+                to remove the value.  Defaults to 10 seconds.
 
-        .. seealso:: :meth:`set_add`, :meth:`map_add`
         """
 
         if timeout is None:
@@ -462,39 +453,35 @@ class CouchbaseSet:
             time.sleep(interval_millis / 1000)
 
     @BlockingWrapper.datastructure_op(create_type=list)
-    def contains(self, value  # type: Any
-                 ) -> None:
-        """
-        Check whether or not the CouchbaseSet contains a value
+    def contains(self,
+                 value  # type: Any
+                 ) -> bool:
+        """Returns whether a specific value already exists in the set.
 
-        :param value: Value to remove
-        :return: True if `value` exists in the set, False otherwise
-        :raise: :cb_exc:`DocumentNotFoundException` if the set does not exist.
+        Args:
+            value (Any): The value to check for existence.
 
-        .. seealso:: :meth:`set_add`, :meth:`map_add`
+        Returns:
+            bool:  True if the specified value exists in the set.  False otherwise.
+
         """
         list_ = self._get().content_as[list]
         return value in list_
 
     @BlockingWrapper.datastructure_op(create_type=list)
     def size(self) -> int:
-        """
-        Get the number of items in the set.
+        """Returns the number of items in the set.
 
-        :return int: The number of items in the map
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
+        Returns:
+            int: The number of items in the set.
 
-        .. seealso:: :meth:`map_add`
         """
         op = count('')
         sd_res = self._collection.lookup_in(self._key, (op,))
         return sd_res.value[0].get("value", None)
 
     def clear(self) -> None:
-        """
-        Clears the set.
-
-        :return: clears the CouchbaseSet
+        """Clears the set.
         """
         try:
             self._collection.remove(self._key)
@@ -503,11 +490,10 @@ class CouchbaseSet:
 
     @BlockingWrapper.datastructure_op(create_type=list)
     def values(self) -> List[Any]:
-        """
-        Returns a list of all the values which exist in the set.
+        """Returns a list of all the values which exist in the set.
 
-        :return: The keys in CouchbaseSet
-        :raise: :cb_exc:`DocumentNotFoundException` if the map does not exist
+        Returns:
+            List[Any]: The values that exist in the set.
         """
 
         list_ = self._get()
@@ -515,7 +501,18 @@ class CouchbaseSet:
 
 
 class CouchbaseQueue:
-    def __init__(self, key,  # type: str
+    """
+    CouchbaseQueue provides a simplified interface for storing a queue within a Couchbase document.
+
+    Args:
+        key (str): Document key to use for the queue.
+        collection (:class:`~.collection.Collection`): The :class:`~.collection.Collection` where the
+            queue belongs.
+
+    """
+
+    def __init__(self,
+                 key,  # type: str
                  collection  # type: Collection
                  ) -> None:
         self._key = key
@@ -530,25 +527,30 @@ class CouchbaseQueue:
         return self._collection.get(self._key)
 
     @BlockingWrapper.datastructure_op(create_type=list)
-    def push(self, value  # type: JSONType
+    def push(self,
+             value  # type: JSONType
              ) -> None:
-        """
-        Add an item to the queue.
+        """Adds a new item to the back of the queue.
 
-        :param value: Value to push onto queue
+        Args:
+            value (JSONType): The value to push onto the queue.
+
         """
         op = array_prepend('', value)
         self._collection.mutate_in(self._key, (op,))
 
-    def pop(self, timeout=None  # type: Optional[timedelta]
-            ) -> None:
-        """
-        Pop an item from the queue.
+    def pop(self,
+            timeout=None  # type: Optional[timedelta]
+            ) -> Any:
+        """Removes an item from the front of the queue.
 
-        :param value: Value to remove
-        :raise: :cb_exc:`DocumentNotFoundException` if the set does not exist.
+        Args:
+            timeout (timedelta, optional): Amount of time allowed when attempting
+                to remove the value.  Defaults to 10 seconds.
 
-        .. seealso:: :meth:`set_add`, :meth:`map_add`
+
+        Returns:
+            Any: The value that was removed from the front of the queue.
         """
 
         if timeout is None:
@@ -589,24 +591,18 @@ class CouchbaseQueue:
 
     @BlockingWrapper.datastructure_op(create_type=list)
     def size(self) -> int:
-        """
-        Get the number of items in the queue.
+        """Returns the number of items in the queue.
 
-        :return int: The number of items in the queue
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
+        Returns:
+            int: The number of items in the queue.
 
-        .. seealso:: :meth:`map_add`
         """
         op = count('')
         sd_res = self._collection.lookup_in(self._key, (op,))
         return sd_res.value[0].get("value", None)
 
     def clear(self) -> None:
-        """
-        Clears the queue.
-
-        :return: clears the CouchbaseQueue
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
+        """Clears the queue.
         """
         try:
             self._collection.remove(self._key)

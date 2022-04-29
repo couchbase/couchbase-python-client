@@ -1,26 +1,25 @@
-from typing import (TYPE_CHECKING,
-                    Any,
+from typing import (Any,
                     Dict,
                     Iterable)
 
 from couchbase.management.logic.search_index_logic import SearchIndex, SearchIndexManagerLogic
 from couchbase.management.logic.wrappers import BlockingMgmtWrapper, ManagementType
 
-if TYPE_CHECKING:
-    from couchbase.management.options import (AllowQueryingSearchIndexOptions,
-                                              AnalyzeDocumentSearchIndexOptions,
-                                              DisallowQueryingSearchIndexOptions,
-                                              DropSearchIndexOptions,
-                                              FreezePlanSearchIndexOptions,
-                                              GetAllSearchIndexesOptions,
-                                              GetAllSearchIndexStatsOptions,
-                                              GetSearchIndexedDocumentsCountOptions,
-                                              GetSearchIndexOptions,
-                                              GetSearchIndexStatsOptions,
-                                              PauseIngestSearchIndexOptions,
-                                              ResumeIngestSearchIndexOptions,
-                                              UnfreezePlanSearchIndexOptions,
-                                              UpsertSearchIndexOptions)
+# @TODO:  lets deprecate import of options from couchbase.management.search
+from couchbase.management.options import (AllowQueryingSearchIndexOptions,
+                                          AnalyzeDocumentSearchIndexOptions,
+                                          DisallowQueryingSearchIndexOptions,
+                                          DropSearchIndexOptions,
+                                          FreezePlanSearchIndexOptions,
+                                          GetAllSearchIndexesOptions,
+                                          GetAllSearchIndexStatsOptions,
+                                          GetSearchIndexedDocumentsCountOptions,
+                                          GetSearchIndexOptions,
+                                          GetSearchIndexStatsOptions,
+                                          PauseIngestSearchIndexOptions,
+                                          ResumeIngestSearchIndexOptions,
+                                          UnfreezePlanSearchIndexOptions,
+                                          UpsertSearchIndexOptions)
 
 
 class SearchIndexManager(SearchIndexManagerLogic):

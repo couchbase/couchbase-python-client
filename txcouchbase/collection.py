@@ -265,3 +265,5 @@ class Collection(CollectionLogic):
     @staticmethod
     def default_name():
         return "_default"
+
+TxCollection = Collection

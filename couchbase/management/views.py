@@ -1,5 +1,4 @@
-from typing import (TYPE_CHECKING,
-                    Any,
+from typing import (Any,
                     Dict,
                     Iterable)
 
@@ -9,12 +8,12 @@ from couchbase.management.logic.view_index_logic import (DesignDocument,
                                                          ViewIndexManagerLogic)
 from couchbase.management.logic.wrappers import BlockingMgmtWrapper, ManagementType
 
-if TYPE_CHECKING:
-    from couchbase.management.options import (DropDesignDocumentOptions,
-                                              GetAllDesignDocumentsOptions,
-                                              GetDesignDocumentOptions,
-                                              PublishDesignDocumentOptions,
-                                              UpsertDesignDocumentOptions)
+# @TODO:  lets deprecate import of options from couchbase.management.views
+from couchbase.management.options import (DropDesignDocumentOptions,
+                                          GetAllDesignDocumentsOptions,
+                                          GetDesignDocumentOptions,
+                                          PublishDesignDocumentOptions,
+                                          UpsertDesignDocumentOptions)
 
 
 class ViewIndexManager(ViewIndexManagerLogic):

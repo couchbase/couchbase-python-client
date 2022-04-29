@@ -14,6 +14,7 @@ from typing import (TYPE_CHECKING,
 from couchbase._utils import JSONType, timedelta_as_microseconds
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
 from couchbase.exceptions import exception as CouchbaseBaseException
+from couchbase.logic.options import QueryOptionsBase
 from couchbase.options import QueryOptions, UnsignedInt64
 from couchbase.pycbc_core import n1ql_query
 from couchbase.serializer import DefaultJsonSerializer, Serializer
@@ -24,9 +25,12 @@ if TYPE_CHECKING:
 
 class QueryScanConsistency(Enum):
     """
-    For use with :attr:`~._N1QLQuery.consistency`, will allow cached
-    values to be returned. This will improve performance but may not
-    reflect the latest data in the server.
+    Represents the various scan consistency options that are available when querying against the query service.
+
+    .. warning::
+        Importing :class:`.QueryScanConsistency` from ``couchbase.cluster`` is deprecated.
+        :class:`.QueryScanConsistency` should be imported from ``couchbase.n1ql``.
+
     """
 
     NOT_BOUNDED = "not_bounded"
@@ -35,22 +39,61 @@ class QueryScanConsistency(Enum):
 
 
 class QueryProfile(Enum):
+    """
+    Specifies the profiling mode for a query.
+
+    .. warning::
+        Importing :class:`.QueryScanConsistency` from ``couchbase.cluster`` is deprecated.
+        :class:`.QueryScanConsistency` should be imported from ``couchbase.n1ql``.
+
+    """
+
     OFF = "off"
     PHASES = "phases"
     TIMINGS = "timings"
 
 
 class QueryStatus(Enum):
-    RUNNING = ()
-    SUCCESS = ()
-    ERRORS = ()
-    COMPLETED = ()
-    STOPPED = ()
-    TIMEOUT = ()
-    CLOSED = ()
-    FATAL = ()
-    ABORTED = ()
-    UNKNOWN = ()
+    """
+    Represents the status of a query.
+    """
+    RUNNING = "running"
+    SUCCESS = "success"
+    ERRORS = "errors"
+    COMPLETED = "completed"
+    STOPPED = "stopped"
+    TIMEOUT = "timeout"
+    CLOSED = "closed"
+    FATAL = "fatal"
+    ABORTED = "aborted"
+    UNKNOWN = "unknown"
+
+    @classmethod   # noqa: C901
+    def from_str(cls, value  # type: str   # noqa: C901
+                 ) -> str:
+        if isinstance(value, str):
+            if value == cls.RUNNING.value:
+                return cls.RUNNING
+            elif value == cls.SUCCESS.value:
+                return cls.SUCCESS
+            elif value == cls.ERRORS.value:
+                return cls.ERRORS
+            elif value == cls.COMPLETED.value:
+                return cls.COMPLETED
+            elif value == cls.STOPPED.value:
+                return cls.STOPPED
+            elif value == cls.TIMEOUT.value:
+                return cls.TIMEOUT
+            elif value == cls.CLOSED.value:
+                return cls.CLOSED
+            elif value == cls.FATAL.value:
+                return cls.FATAL
+            elif value == cls.ABORTED.value:
+                return cls.ABORTED
+            elif value == cls.UNKNOWN.value:
+                return cls.UNKNOWN
+        raise InvalidArgumentException(message=(f"{value} is not a valid QueryStatus option. "
+                                                "Excepted str representation of type QueryStatus."))
 
 
 class QueryProblem(object):
@@ -92,29 +135,73 @@ class QueryMetrics(object):
         return self._raw
 
     def elapsed_time(self) -> timedelta:
+        """Get the total amount of time spent running the query.
+
+        Returns:
+            timedelta: The total amount of time spent running the query.
+        """
         us = self._raw.get("elapsed_time") / 1000
         return timedelta(microseconds=us)
 
     def execution_time(self) -> timedelta:
+        """Get the total amount of time spent executing the query.
+
+        Returns:
+            timedelta: The total amount of time spent executing the query.
+        """
         us = self._raw.get("execution_time") / 1000
         return timedelta(microseconds=us)
 
     def sort_count(self) -> UnsignedInt64:
+        """Get the total number of rows which were part of the sorting for the query.
+
+        Returns:
+            :class:`~couchbase.options.UnsignedInt64`: The total number of rows which were part of the
+            sorting for the query.
+        """
         return UnsignedInt64(self._raw.get("sort_count", 0))
 
     def result_count(self) -> UnsignedInt64:
+        """Get the total number of rows which were part of the result set.
+
+        Returns:
+            :class:`~couchbase.options.UnsignedInt64`: The total number of rows which were part of the result set.
+        """
         return UnsignedInt64(self._raw.get("result_count", 0))
 
     def result_size(self) -> UnsignedInt64:
+        """Get the total number of bytes which were generated as part of the result set.
+
+        Returns:
+            :class:`~couchbase.options.UnsignedInt64`: The total number of bytes which were generated as
+            part of the result set.
+        """
         return UnsignedInt64(self._raw.get("result_size", 0))
 
     def mutation_count(self) -> UnsignedInt64:
+        """Get the total number of rows which were altered by the query.
+
+        Returns:
+            :class:`~couchbase.options.UnsignedInt64`: The total number of rows which were altered by the query.
+        """
         return UnsignedInt64(self._raw.get("mutation_count", 0))
 
     def error_count(self) -> UnsignedInt64:
+        """Get the total number of errors which were encountered during the execution of the query.
+
+        Returns:
+            :class:`~couchbase.options.UnsignedInt64`: The total number of errors which were encountered during
+            the execution of the query.
+        """
         return UnsignedInt64(self._raw.get("error_count", 0))
 
     def warning_count(self) -> UnsignedInt64:
+        """Get the total number of warnings which were encountered during the execution of the query.
+
+        Returns:
+            :class:`~couchbase.options.UnsignedInt64`: The total number of warnings which were encountered during
+            the execution of the query.
+        """
         return UnsignedInt64(self._raw.get("warning_count", 0))
 
     def __repr__(self):
@@ -130,39 +217,78 @@ class QueryMetaData:
             self._raw = None
 
     def request_id(self) -> str:
+        """Get the request ID which is associated with the executed query.
+
+        Returns:
+            str: The request ID which is associated with the executed query.
+        """
         return self._raw.get("request_id", None)
 
     def client_context_id(self) -> str:
+        """Get the client context id which is assoicated with the executed query.
+
+        Returns:
+            str: The client context id which is assoicated with the executed query.
+        """
         return self._raw.get("client_context_id", None)
 
     def status(self) -> QueryStatus:
-        return QueryStatus[self._raw.get("status", "unknown").upper()]
+        """Get the status of the query at the time the query meta-data was generated.
+
+        Returns:
+            :class:`.QueryStatus`: The status of the query at the time the query meta-data was generated.
+        """
+        return QueryStatus.from_str(self._raw.get("status", "unknown"))
 
     def signature(self) -> Optional[JSONType]:
+        """Provides the signature of the query.
+
+        Returns:
+            Optional[JSONType]:  The signature of the query.
+        """
         return self._raw.get("signature", None)
 
     def warnings(self) -> List[QueryWarning]:
+        """Get warnings that occurred during the execution of the query.
+
+        Returns:
+            List[:class:`.QueryWarning`]: Any warnings that occurred during the execution of the query.
+        """
         return list(
             map(QueryWarning, self._raw.get("warnings", []))
         )
 
     def errors(self) -> List[QueryError]:
+        """Get errors that occurred during the execution of the query.
+
+        Returns:
+            List[:class:`.QueryWarning`]: Any errors that occurred during the execution of the query.
+        """
         return list(
             map(QueryError, self._raw.get("errors", []))
         )
 
     def metrics(self) -> Optional[QueryMetrics]:
-        print(f'get metrics: {self._raw}')
+        """Get the various metrics which are made available by the query engine.
+
+        Returns:
+            Optional[:class:`.QueryMetrics`]: A :class:`.QueryMetrics` instance.
+        """
         if "metrics" in self._raw:
             print(f'getting metrics: {self._raw}')
             return QueryMetrics(self._raw.get("metrics", {}))
         return None
 
     def profile(self) -> Optional[JSONType]:
+        """Get the various profiling details that were generated during execution of the query.
+
+        Returns:
+            Optional[JSONType]: Profiling details.
+        """
         return self._raw.get("profile", None)
 
     def __repr__(self):
-        return "QueryMetadata:{}".format(self._raw)
+        return "QueryMetaData:{}".format(self._raw)
 
 
 class N1QLQuery:
@@ -518,7 +644,7 @@ class N1QLQuery:
         #       If so, why???
         opts = list(options)
         for o in opts:
-            if isinstance(o, QueryOptions):
+            if isinstance(o, (QueryOptions, QueryOptionsBase)):
                 opt = o
                 opts.remove(o)
         args = opt.copy()

@@ -141,3 +141,5 @@ class Bucket(BucketLogic):
         :return: the :class:`.management.collections.CollectionManager` for this bucket.
         """
         return CollectionManager(self.connection, self.loop, self.name)
+
+TxBucket = Bucket

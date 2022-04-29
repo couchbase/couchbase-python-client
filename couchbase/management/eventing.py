@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING,
-                    Any,
+from typing import (Any,
                     Dict,
                     List)
 
@@ -27,16 +26,16 @@ from couchbase.management.logic.eventing_logic import (EventingFunction,
                                                        EventingFunctionsStatus)
 from couchbase.management.logic.wrappers import BlockingMgmtWrapper, ManagementType
 
-if TYPE_CHECKING:
-    from couchbase.management.options import (DeployFunctionOptions,
-                                              DropFunctionOptions,
-                                              FunctionsStatusOptions,
-                                              GetAllFunctionOptions,
-                                              GetFunctionOptions,
-                                              PauseFunctionOptions,
-                                              ResumeFunctionOptions,
-                                              UndeployFunctionOptions,
-                                              UpsertFunctionOptions)
+# @TODO:  lets deprecate import of options from couchbase.management.eventing
+from couchbase.management.options import (DeployFunctionOptions,
+                                          DropFunctionOptions,
+                                          FunctionsStatusOptions,
+                                          GetAllFunctionOptions,
+                                          GetFunctionOptions,
+                                          PauseFunctionOptions,
+                                          ResumeFunctionOptions,
+                                          UndeployFunctionOptions,
+                                          UpsertFunctionOptions)
 
 
 class EventingFunctionManager(EventingFunctionManagerLogic):

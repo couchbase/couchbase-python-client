@@ -1,5 +1,4 @@
-from typing import (TYPE_CHECKING,
-                    Any,
+from typing import (Any,
                     Dict,
                     Iterable)
 
@@ -8,12 +7,12 @@ from couchbase.management.logic.collections_logic import (CollectionManagerLogic
                                                           ScopeSpec)
 from couchbase.management.logic.wrappers import BlockingMgmtWrapper, ManagementType
 
-if TYPE_CHECKING:
-    from couchbase.management.options import (CreateCollectionOptions,
-                                              CreateScopeOptions,
-                                              DropCollectionOptions,
-                                              DropScopeOptions,
-                                              GetAllScopesOptions)
+# @TODO:  lets deprecate import of options from couchbase.management.collections
+from couchbase.management.options import (CreateCollectionOptions,
+                                          CreateScopeOptions,
+                                          DropCollectionOptions,
+                                          DropScopeOptions,
+                                          GetAllScopesOptions)
 
 
 class CollectionManager(CollectionManagerLogic):
@@ -27,6 +26,18 @@ class CollectionManager(CollectionManagerLogic):
                      *options,        # type: CreateScopeOptions
                      **kwargs         # type: Dict[str, Any]
                      ) -> None:
+        """Creates a new scope.
+
+        Args:
+            scope_name (str): The name of the scope.
+            options (:class:`~couchbase.management.options.CreateScopeOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.ScopeAlreadyExistsException`: If the scope already exists.
+        """
         return super().create_scope(scope_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.CollectionMgmt, CollectionManagerLogic._ERROR_MAPPING)
@@ -35,6 +46,18 @@ class CollectionManager(CollectionManagerLogic):
                    *options,        # type: DropScopeOptions
                    **kwargs         # type: Dict[str, Any]
                    ) -> None:
+        """Drops an existing scope.
+
+        Args:
+            scope_name (str): The name of the scope.
+            options (:class:`~couchbase.management.options.DropScopeOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.ScopeNotFoundException`: If the scope does not exist.
+        """
         return super().drop_scope(scope_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block((ScopeSpec, CollectionSpec), ManagementType.CollectionMgmt,
@@ -43,6 +66,18 @@ class CollectionManager(CollectionManagerLogic):
                        *options,        # type: GetAllScopesOptions
                        **kwargs         # type: Dict[str, Any]
                        ) -> Iterable[ScopeSpec]:
+        """Returns all configured scopes along with their collections.
+
+        Args:
+            scope_name (str): The name of the scope.
+            options (:class:`~couchbase.management.options.GetAllScopesOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            Iterable[:class:`.ScopeSpec`]: A list of all configured scopes.
+        """
         return super().get_all_scopes(*options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.CollectionMgmt, CollectionManagerLogic._ERROR_MAPPING)
@@ -51,6 +86,19 @@ class CollectionManager(CollectionManagerLogic):
                           *options,       # type: CreateCollectionOptions
                           **kwargs        # type: Dict[str, Any]
                           ) -> None:
+        """Creates a new collection in a specified scope.
+
+        Args:
+            collection (:class:`.CollectionSpec`): The collection details.
+            options (:class:`~couchbase.management.options.CreateCollectionOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.CollectionAlreadyExistsException`: If the collection already exists.
+            :class:`~couchbase.exceptions.ScopeNotFoundException`: If the scope does not exist.
+        """
         return super().create_collection(collection, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.CollectionMgmt, CollectionManagerLogic._ERROR_MAPPING)
@@ -59,4 +107,16 @@ class CollectionManager(CollectionManagerLogic):
                         *options,       # type: DropCollectionOptions
                         **kwargs        # type: Dict[str, Any]
                         ) -> None:
+        """Drops a collection from a scope.
+
+        Args:
+            collection (:class:`.CollectionSpec`): The collection details.
+            options (:class:`~couchbase.management.options.DropCollectionOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.CollectionNotFoundException`: If the collection does not exist.
+        """
         return super().drop_collection(collection, *options, **kwargs)

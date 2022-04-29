@@ -149,6 +149,9 @@ class ClusterLogic:
 
     @property
     def connected(self) -> bool:
+        """
+            bool: Indicator on if the cluster has been connected or not.
+        """
         return hasattr(self, "_connection") and self._connection is not None
 
     @property

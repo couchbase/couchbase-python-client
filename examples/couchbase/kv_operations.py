@@ -3,7 +3,6 @@ from datetime import timedelta
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 
-# **DEPRECATED**, use: from couchbase.options import DeltaValue, SignedInt64
 # **DEPRECATED**, import ALL options from `couchbase.options`
 from couchbase.collection import (DecrementOptions,
                                   DeltaValue,
@@ -30,11 +29,11 @@ bucket = cluster.bucket("default")
 collection = bucket.default_collection()
 
 # setup
-try:
-    result = collection.remove("document-key")
-    result = collection.remove("document-key-opts")
-except CouchbaseException as ex:
-    pass  # may not exist in this example
+for key in ['document-key', 'document-key-opts']:
+    try:
+        result = collection.remove(key)
+    except CouchbaseException as ex:
+        pass  # may not exist in this example
 
 # Insert document
 document = {"foo": "bar", "bar": "foo"}

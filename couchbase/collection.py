@@ -8,8 +8,7 @@ from typing import (TYPE_CHECKING,
                     List,
                     Optional,
                     Tuple,
-                    Union,
-                    overload)
+                    Union)
 
 from couchbase.binary_collection import BinaryCollection
 from couchbase.datastructures import (CouchbaseList,
@@ -24,6 +23,7 @@ from couchbase.exceptions import (DocumentExistsException,
 from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic import BlockingWrapper, decode_value
 from couchbase.logic.collection import CollectionLogic
+from couchbase.logic.supportability import Supportability
 from couchbase.options import (AppendMultiOptions,
                                DecrementMultiOptions,
                                ExistsMultiOptions,
@@ -67,9 +67,7 @@ if TYPE_CHECKING:
     from datetime import timedelta
 
     from couchbase._utils import JSONType
-    from couchbase.durability import DurabilityType
-    from couchbase.options import (AcceptableInts,
-                                   AppendOptions,
+    from couchbase.options import (AppendOptions,
                                    DecrementOptions,
                                    ExistsOptions,
                                    GetAndLockOptions,
@@ -88,7 +86,7 @@ if TYPE_CHECKING:
                                    UnlockOptions,
                                    UpsertOptions)
     from couchbase.result import MultiResultType
-    from couchbase.subdocument import Spec, StoreSemantics
+    from couchbase.subdocument import Spec
 
 
 class Collection(CollectionLogic):
@@ -99,8 +97,46 @@ class Collection(CollectionLogic):
     def get(self,
             key,  # type: str
             *opts,  # type: GetOptions
-            **kwargs,  # type: Any
+            **kwargs,  # type: Dict[str, Any]
             ) -> GetResult:
+        """Retrieves the value of a document from the collection.
+
+        Args:
+            key (str): The key for the document to retrieve.
+            opts (:class:`~couchbase.options.GetOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.GetOptions`
+
+        Returns:
+            :class:`~couchbase.result.GetResult`: An instance of :class:`~couchbase.result.GetResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
+        Examples:
+
+            Simple get operation::
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                res = collection.get('airline_10')
+                print(f'Document value: {res.content_as[dict]}')
+
+
+            Simple get operation with options::
+
+                from datetime import timedelta
+                from couchbase.options import GetOptions
+
+                # ... other code ...
+
+                res = collection.get('airline_10', GetOptions(timeout=timedelta(seconds=2)))
+                print(f'Document value: {res.content_as[dict]}')
+
+        """
+
         final_args = forward_args(kwargs, *opts)
         transcoder = final_args.get('transcoder', None)
         if not transcoder:
@@ -113,8 +149,12 @@ class Collection(CollectionLogic):
     def _get_internal(
         self,
         key,  # type: str
-        **kwargs,  # type: Any
+        **kwargs,  # type: Dict[str, Any]
     ) -> GetResult:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`Collection.get` instead.
+        """
         return super().get(key, **kwargs)
 
     @BlockingWrapper.block(ExistsResult)
@@ -122,8 +162,43 @@ class Collection(CollectionLogic):
         self,
         key,  # type: str
         *opts,  # type: ExistsOptions
-        **kwargs,  # type: Any
+        **kwargs,  # type: Dict[str, Any]
     ) -> ExistsResult:
+        """Checks whether a specific document exists or not.
+
+        Args:
+            key (str): The key for the document to check existence.
+            opts (:class:`~couchbase.options.ExistsOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.ExistsOptions`
+
+        Returns:
+            :class:`~couchbase.result.GetResult`: An instance of :class:`~couchbase.result.GetResult`.
+
+        Examples:
+
+            Simple exists operation::
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                key = 'airline_10'
+                res = collection.exists(key)
+                print(f'Document w/ key - {key} {"exists" if res.exists else "does not exist"}')
+
+
+            Simple exists operation with options::
+
+                from datetime import timedelta
+                from couchbase.options import ExistsOptions
+
+                # ... other code ...
+
+                key = 'airline_10'
+                res = collection.get(key, ExistsOptions(timeout=timedelta(seconds=2)))
+                print(f'Document w/ key - {key} {"exists" if res.exists else "does not exist"}')
+
+        """
         return super().exists(key, *opts, **kwargs)
 
     @BlockingWrapper.block(MutationResult)
@@ -132,8 +207,63 @@ class Collection(CollectionLogic):
         key,  # type: str
         value,  # type: JSONType
         *opts,  # type: InsertOptions
-        **kwargs,  # type: Any
+        **kwargs,  # type: Dict[str, Any]
     ) -> MutationResult:
+        """Inserts a new document to the collection, failing if the document already exists.
+
+        Args:
+            key (str): Document key to insert.
+            value (JSONType): The value of the document to insert.
+            opts (:class:`~couchbase.options.InsertOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.InsertOptions`
+
+        Returns:
+            :class:`~couchbase.result.MutationResult`: An instance of :class:`~couchbase.result.MutationResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentExistsException`: If the document already exists on the
+                server.
+
+        Examples:
+
+            Simple insert operation::
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                key = 'airline_8091'
+                airline = {
+                    "type": "airline",
+                    "id": 8091,
+                    "callsign": "CBS",
+                    "iata": None,
+                    "icao": None,
+                    "name": "Couchbase Airways",
+                }
+                res = collection.insert(key, doc)
+
+
+            Simple insert operation with options::
+
+                from couchbase.durability import DurabilityLevel, ServerDurability
+                from couchbase.options import InsertOptions
+
+                # ... other code ...
+
+                key = 'airline_8091'
+                airline = {
+                    "type": "airline",
+                    "id": 8091,
+                    "callsign": "CBS",
+                    "iata": None,
+                    "icao": None,
+                    "name": "Couchbase Airways",
+                }
+                durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
+                res = collection.insert(key, doc, InsertOptions(durability=durability))
+
+        """
         return super().insert(key, value, *opts, **kwargs)
 
     @BlockingWrapper.block(MutationResult)
@@ -142,8 +272,59 @@ class Collection(CollectionLogic):
         key,  # type: str
         value,  # type: JSONType
         *opts,  # type: UpsertOptions
-        **kwargs,  # type: Any
+        **kwargs,  # type: Dict[str, Any]
     ) -> MutationResult:
+        """Upserts a document to the collection. This operation succeeds whether or not the document already exists.
+
+        Args:
+            key (str): Document key to upsert.
+            value (JSONType): The value of the document to upsert.
+            opts (:class:`~couchbase.options.UpsertOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.UpsertOptions`
+
+        Returns:
+            :class:`~couchbase.result.MutationResult`: An instance of :class:`~couchbase.result.MutationResult`.
+
+        Examples:
+
+            Simple upsert operation::
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                key = 'airline_8091'
+                airline = {
+                    "type": "airline",
+                    "id": 8091,
+                    "callsign": "CBS",
+                    "iata": None,
+                    "icao": None,
+                    "name": "Couchbase Airways",
+                }
+                res = collection.upsert(key, doc)
+
+
+            Simple upsert operation with options::
+
+                from couchbase.durability import DurabilityLevel, ServerDurability
+                from couchbase.options import UpsertOptions
+
+                # ... other code ...
+
+                key = 'airline_8091'
+                airline = {
+                    "type": "airline",
+                    "id": 8091,
+                    "callsign": "CBS",
+                    "iata": None,
+                    "icao": None,
+                    "name": "Couchbase Airways",
+                }
+                durability = ServerDurability(level=DurabilityLevel.MAJORITY)
+                res = collection.upsert(key, doc, InsertOptions(durability=durability))
+
+        """
         return super().upsert(key, value, *opts, **kwargs)
 
     @BlockingWrapper.block(MutationResult)
@@ -151,16 +332,97 @@ class Collection(CollectionLogic):
                 key,  # type: str
                 value,  # type: JSONType
                 *opts,  # type: ReplaceOptions
-                **kwargs,  # type: Any
+                **kwargs,  # type: Dict[str, Any]
                 ) -> MutationResult:
+        """Replaces the value of an existing document. Failing if the document does not exist.
+
+        Args:
+            key (str): Document key to replace.
+            value (JSONType): The value of the document to replace.
+            opts (:class:`~couchbase.options.ReplaceOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.ReplaceOptions`
+
+        Returns:
+            :class:`~couchbase.result.MutationResult`: An instance of :class:`~couchbase.result.MutationResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the document does not exist on the
+                server.
+
+        Examples:
+
+            Simple replace operation::
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                key = 'airline_8091'
+                res = collection.get(key)
+                content = res.content_as[dict]
+                airline["name"] = "Couchbase Airways!!"
+                res = collection.replace(key, doc)
+
+
+            Simple replace operation with options::
+
+                from couchbase.durability import DurabilityLevel, ServerDurability
+                from couchbase.options import ReplaceOptions
+
+                # ... other code ...
+
+                key = 'airline_8091'
+                res = collection.get(key)
+                content = res.content_as[dict]
+                airline["name"] = "Couchbase Airways!!"
+                durability = ServerDurability(level=DurabilityLevel.MAJORITY)
+                res = collection.replace(key, doc, InsertOptions(durability=durability))
+
+        """
         return super().replace(key, value, *opts, **kwargs)
 
     @BlockingWrapper.block(MutationResult)
     def remove(self,
                key,  # type: str
                *opts,  # type: RemoveOptions
-               **kwargs,  # type: Any
+               **kwargs,  # type: Dict[str, Any]
                ) -> MutationResult:
+        """Removes an existing document. Failing if the document does not exist.
+
+        Args:
+            key (str): Key for the document to remove.
+            opts (:class:`~couchbase.options.RemoveOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.RemoveOptions`
+
+        Returns:
+            :class:`~couchbase.result.MutationResult`: An instance of :class:`~couchbase.result.MutationResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the document does not exist on the
+                server.
+
+        Examples:
+
+            Simple remove operation::
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                res = collection.remove('airline_10')
+
+
+            Simple remove operation with options::
+
+                from couchbase.durability import DurabilityLevel, ServerDurability
+                from couchbase.options import RemoveOptions
+
+                # ... other code ...
+
+                durability = ServerDurability(level=DurabilityLevel.MAJORITY)
+                res = collection.remove('airline_10', RemoveOptions(durability=durability))
+
+        """
         return super().remove(key, *opts, **kwargs)
 
     @BlockingWrapper.block(MutationResult)
@@ -168,16 +430,105 @@ class Collection(CollectionLogic):
               key,  # type: str
               expiry,  # type: timedelta
               *opts,  # type: TouchOptions
-              **kwargs,  # type: Any
+              **kwargs,  # type: Dict[str, Any]
               ) -> MutationResult:
+        """Updates the expiry on an existing document.
+
+        Args:
+            key (str): Key for the document to touch.
+            expiry (timedelta): The new expiry for the document.
+            opts (:class:`~couchbase.options.TouchOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.TouchOptions`
+
+        Returns:
+            :class:`~couchbase.result.MutationResult`: An instance of :class:`~couchbase.result.MutationResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the document does not exist on the
+                server.
+
+        Examples:
+
+            Simple touch operation::
+
+                from datetime import timedelta
+
+                # ... other code ...
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                res = collection.touch('airline_10', timedelta(seconds=300))
+
+
+            Simple touch operation with options::
+
+                from datetime import timedelta
+
+                from couchbase.options import TouchOptions
+
+                # ... other code ...
+
+                res = collection.touch('airline_10',
+                                        timedelta(seconds=300),
+                                        TouchOptions(timeout=timedelta(seconds=2)))
+
+        """
         return super().touch(key, expiry, *opts, **kwargs)
 
     def get_and_touch(self,
                       key,  # type: str
                       expiry,  # type: timedelta
                       *opts,  # type: GetAndTouchOptions
-                      **kwargs,  # type: Any
+                      **kwargs,  # type: Dict[str, Any]
                       ) -> GetResult:
+        """Retrieves the value of the document and simultanously updates the expiry time for the same document.
+
+        Args:
+            key (str): The key for the document retrieve and set expiry time.
+            expiry (timedelta):  The new expiry to apply to the document.
+            opts (:class:`~couchbase.options.GetAndTouchOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.GetAndTouchOptions`
+
+        Returns:
+            :class:`~couchbase.result.GetResult`: An instance of :class:`~couchbase.result.GetResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
+        Examples:
+
+            Simple get and touch operation::
+
+                from datetime import timedelta
+
+                # ... other code ...
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                key = 'airline_10'
+                res = collection.get_and_touch(key, timedelta(seconds=20))
+                print(f'Document w/ updated expiry: {res.content_as[dict]}')
+
+
+            Simple get and touch operation with options::
+
+                from datetime import timedelta
+                from couchbase.options import GetAndTouchOptions
+
+                # ... other code ...
+
+                key = 'airline_10'
+                res = collection.get_and_touch(key,
+                                            timedelta(seconds=20),
+                                            GetAndTouchOptions(timeout=timedelta(seconds=2)))
+                print(f'Document w/ updated expiry: {res.content_as[dict]}')
+
+        """
         # add to kwargs for conversion to int
         kwargs["expiry"] = expiry
         final_args = forward_args(kwargs, *opts)
@@ -191,8 +542,13 @@ class Collection(CollectionLogic):
     @BlockingWrapper.block_and_decode(GetResult)
     def _get_and_touch_internal(self,
                                 key,  # type: str
-                                **kwargs,  # type: Any
+                                **kwargs,  # type: Dict[str, Any]
                                 ) -> GetResult:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`Collection.get_and_touch` instead.
+
+        """
         return super().get_and_touch(key, **kwargs)
 
     def get_and_lock(
@@ -200,8 +556,54 @@ class Collection(CollectionLogic):
         key,  # type: str
         lock_time,  # type: timedelta
         *opts,  # type: GetAndLockOptions
-        **kwargs,  # type: Any
+        **kwargs,  # type: Dict[str, Any]
     ) -> GetResult:
+        """Locks a document and retrieves the value of that document at the time it is locked.
+
+        Args:
+            key (str): The key for the document to lock and retrieve.
+            lock_time (timedelta):  The amount of time to lock the document.
+            opts (:class:`~couchbase.options.GetAndLockOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.GetAndLockOptions`
+
+        Returns:
+            :class:`~couchbase.result.GetResult`: An instance of :class:`~couchbase.result.GetResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
+        Examples:
+
+            Simple get and lock operation::
+
+                from datetime import timedelta
+
+                # ... other code ...
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                key = 'airline_10'
+                res = collection.get_and_lock(key, timedelta(seconds=20))
+                print(f'Locked document: {res.content_as[dict]}')
+
+
+            Simple get and lock operation with options::
+
+                from datetime import timedelta
+                from couchbase.options import GetAndLockOptions
+
+                # ... other code ...
+
+                key = 'airline_10'
+                res = collection.get_and_lock(key,
+                                            timedelta(seconds=20),
+                                            GetAndLockOptions(timeout=timedelta(seconds=2)))
+                print(f'Locked document: {res.content_as[dict]}')
+
+        """
         # add to kwargs for conversion to int
         kwargs["lock_time"] = lock_time
         final_args = forward_args(kwargs, *opts)
@@ -215,8 +617,13 @@ class Collection(CollectionLogic):
     @BlockingWrapper.block_and_decode(GetResult)
     def _get_and_lock_internal(self,
                                key,  # type: str
-                               **kwargs,  # type: Any
+                               **kwargs,  # type: Dict[str, Any]
                                ) -> GetResult:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`Collection.get_and_lock` instead.
+
+        """
         return super().get_and_lock(key, **kwargs)
 
     @BlockingWrapper.block(None)
@@ -224,8 +631,41 @@ class Collection(CollectionLogic):
                key,  # type: str
                cas,  # type: int
                *opts,  # type: UnlockOptions
-               **kwargs,  # type: Any
+               **kwargs,  # type: Dict[str, Any]
                ) -> None:
+        """Unlocks a previously locked document.
+
+        Args:
+            key (str): The key for the document to unlock.
+            cas (int): The CAS of the document, used to validate lock ownership.
+            opts (:class:`couchbaseoptions.UnlockOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.UnlockOptions`
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
+            :class:`~couchbase.exceptions.DocumentLockedException`: If the provided cas is invalid.
+
+        Examples:
+
+            Simple unlock operation::
+
+                from datetime import timedelta
+
+                # ... other code ...
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                key = 'airline_10'
+                res = collection.get_and_lock(key, timedelta(seconds=5))
+                collection.unlock(key, res.cas)
+                # this should be okay once document is unlocked
+                collection.upsert(key, res.content_as[dict])
+
+        """
         return super().unlock(key, cas, *opts, **kwargs)
 
     def lookup_in(
@@ -233,8 +673,58 @@ class Collection(CollectionLogic):
         key,  # type: str
         spec,  # type: Iterable[Spec]
         *opts,  # type: LookupInOptions
-        **kwargs,  # type: Any
+        **kwargs,  # type: Dict[str, Any]
     ) -> LookupInResult:
+        """Performs a lookup-in operation against a document, fetching individual fields or information
+        about specific fields inside the document value.
+
+        Args:
+            key (str): The key for the document look in.
+            spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the data to fetch
+                from the document.
+            opts (:class:`~couchbase.options.LookupInOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.LookupInOptions`
+
+        Returns:
+            :class:`~couchbase.result.LookupInResult`: An instance of :class:`~couchbase.result.LookupInResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
+        Examples:
+
+            Simple look-up in operation::
+
+                import couchbase.subdocument as SD
+
+                # ... other code ...
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('hotel')
+
+                key = 'hotel_10025'
+                res = collection.lookup_in(key, (SD.get("geo"),))
+                print(f'Hotel {key} coordinates: {res.content_as[dict](0)}')
+
+
+            Simple look-up in operation with options::
+
+                from datetime import timedelta
+
+                import couchbase.subdocument as SD
+                from couchbase.options import LookupInOptions
+
+                # ... other code ...
+
+                key = 'hotel_10025'
+                res = collection.lookup_in(key,
+                                            (SD.get("geo"),),
+                                            LookupInOptions(timeout=timedelta(seconds=2)))
+                print(f'Hotel {key} coordinates: {res.content_as[dict](0)}')
+
+        """
         final_args = forward_args(kwargs, *opts)
         transcoder = final_args.get('transcoder', None)
         if not transcoder:
@@ -247,8 +737,13 @@ class Collection(CollectionLogic):
         self,
         key,  # type: str
         spec,  # type: Iterable[Spec]
-        **kwargs,  # type: Any
+        **kwargs,  # type: Dict[str, Any]
     ) -> LookupInResult:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`Collection.lookup_in` instead.
+
+        """
         return super().lookup_in(key, spec, **kwargs)
 
     @BlockingWrapper.block(MutateInResult)
@@ -257,11 +752,69 @@ class Collection(CollectionLogic):
         key,  # type: str
         spec,  # type: Iterable[Spec]
         *opts,  # type: MutateInOptions
-        **kwargs,  # type: Any
+        **kwargs,  # type: Dict[str, Any]
     ) -> MutateInResult:
+        """Performs a mutate-in operation against a document. Allowing atomic modification of specific fields
+        within a document. Also enables access to document extended-attributes (i.e. xattrs).
+
+        Args:
+            key (str): The key for the document look in.
+            spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the operations to
+                perform on the document.
+            opts (:class:`~couchbase.options.MutateInOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.MutateInOptions`
+
+        Returns:
+            :class:`~couchbase.result.MutateInResult`: An instance of :class:`~couchbase.result.MutateInResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
+        Examples:
+
+            Simple mutate-in operation::
+
+                import couchbase.subdocument as SD
+
+                # ... other code ...
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('hotel')
+
+                key = 'hotel_10025'
+                res = collection.mutate_in(key, (SD.replace("city", "New City"),))
+
+
+            Simple mutate-in operation with options::
+
+                from datetime import timedelta
+
+                import couchbase.subdocument as SD
+                from couchbase.options import MutateInOptions
+
+                # ... other code ...
+
+                key = 'hotel_10025'
+                res = collection.mutate_in(key,
+                                            (SD.replace("city", "New City"),),
+                                            MutateInOptions(timeout=timedelta(seconds=2)))
+
+        """
         return super().mutate_in(key, spec, *opts, **kwargs)
 
     def binary(self) -> BinaryCollection:
+        """Creates a BinaryCollection instance, allowing access to various binary operations
+        possible against a collection.
+
+        .. seealso::
+            :class:`.binary_collection.BinaryCollection`
+
+        Returns:
+            :class:`~.binary_collection.BinaryCollection`: A BinaryCollection instance.
+
+        """
         return BinaryCollection(self)
 
     @BlockingWrapper.block(MutationResult)
@@ -270,8 +823,13 @@ class Collection(CollectionLogic):
         key,  # type: str
         value,  # type: Union[str,bytes,bytearray]
         *opts,  # type: AppendOptions
-        **kwargs,  # type: Any
+        **kwargs,  # type: Dict[str, Any]
     ) -> MutationResult:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`.BinaryCollection.append` instead.
+
+        """
         return super().append(key, value, *opts, **kwargs)
 
     @BlockingWrapper.block(MutationResult)
@@ -280,8 +838,13 @@ class Collection(CollectionLogic):
         key,  # type: str
         value,  # type: Union[str,bytes,bytearray]
         *opts,  # type: PrependOptions
-        **kwargs,  # type: Any
+        **kwargs,  # type: Dict[str, Any]
     ) -> MutationResult:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`.BinaryCollection.prepend` instead.
+
+        """
         return super().prepend(key, value, *opts, **kwargs)
 
     @BlockingWrapper.block(CounterResult)
@@ -289,8 +852,13 @@ class Collection(CollectionLogic):
         self,
         key,  # type: str
         *opts,  # type: IncrementOptions
-        **kwargs,  # type: Any
+        **kwargs,  # type: Dict[str, Any]
     ) -> CounterResult:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`.BinaryCollection.increment` instead.
+
+        """
         return super().increment(key, *opts, **kwargs)
 
     @BlockingWrapper.block(CounterResult)
@@ -298,12 +866,26 @@ class Collection(CollectionLogic):
         self,
         key,  # type: str
         *opts,  # type: DecrementOptions
-        **kwargs,  # type: Any
+        **kwargs,  # type: Dict[str, Any]
     ) -> CounterResult:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`.BinaryCollection.decrement` instead.
+
+        """
         return super().decrement(key, *opts, **kwargs)
 
     def couchbase_list(self, key  # type: str
                        ) -> CouchbaseList:
+        """Returns a CouchbaseList permitting simple list storage in a document.
+
+        .. seealso::
+            :class:`~couchbase..datastructures.CouchbaseList`
+
+        Returns:
+            :class:`~couchbase.datastructures.CouchbaseList`: A CouchbaseList instance.
+
+        """
         return CouchbaseList(key, self)
 
     @BlockingWrapper._dsop(create_type='list')
@@ -312,24 +894,26 @@ class Collection(CollectionLogic):
                     create=False,  # type: Optional[bool]
                     **kwargs,  # type: Dict[str, Any]
                     ) -> OperationResult:
-        """
-        Add an item to the end of a list.
+        """Add an item to the end of a list.
 
-        :param key: The document ID of the list
-        :param value: The value to append
-        :param create: Whether the list should be created if it does not
-               exist. Note that this option only works on servers >= 4.6
-        :param kwargs: Additional arguments to :meth:`mutate_in`
-        :return: :class:`OperationResult`.
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
-            and `create` was not specified.
+        .. warning::
+            This method is deprecated and will be removed in a future version.  Use :meth:`.CouchbaseList.append`
+            instead.
 
-        example::
+        Args:
+            key (str): The key for the list document.
+            value (JSONType): The value to append to the list.
+            create (bool, optional): Whether the list should be created if it does not exist.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
 
-            cb.list_append('a_list', 'hello')
-            cb.list_append('a_list', 'world')
+        Returns:
+            :class:`couchbase~.result.OperationResult`: An instance of :class:`~couchbase.result.OperationResult`.
 
-        .. seealso:: :meth:`map_add`
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
         """
         op = array_append('', value)
         sd_res = self.mutate_in(key, (op,), **kwargs)
@@ -341,22 +925,26 @@ class Collection(CollectionLogic):
                      create=False,  # type: Optional[bool]
                      **kwargs,  # type: Dict[str, Any]
                      ) -> OperationResult:
-        """
-        Add an item to the beginning of a list.
+        """ Add an item to the beginning of a list.
 
-        :param key: Document ID
-        :param value: Value to prepend
-        :param create:
-            Whether the list should be created if it does not exist
-        :param kwargs: Additional arguments to :meth:`mutate_in`.
-        :return: :class:`OperationResult`.
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
-            and `create` was not specified.
+        .. warning::
+            This method is deprecated and will be removed in a future version.  Use :meth:`.CouchbaseList.prepend`
+            instead.
 
-        This function is identical to :meth:`list_append`, except for prepending
-        rather than appending the item
+        Args:
+            key (str): The key for the list document.
+            value (JSONType): The value to prepend to the list.
+            create (bool, optional): Whether the list should be created if it does not exist.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
 
-        .. seealso:: :meth:`list_append`, :meth:`map_add`
+        Returns:
+            :class:`~couchbase.result.OperationResult`: An instance of :class:`~couchbase.result.OperationResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
         """
         op = array_prepend('', value)
         sd_res = self.mutate_in(key, (op,), **kwargs)
@@ -368,24 +956,27 @@ class Collection(CollectionLogic):
                  value,  # type: JSONType
                  **kwargs  # type: Dict[str, Any]
                  ) -> OperationResult:
-        """
-        Sets an item within a list at a given position.
+        """Sets an item within a list at a given position.
 
-        :param key: The key of the document
-        :param index: The position to replace
-        :param value: The value to be inserted
-        :param kwargs: Additional arguments to :meth:`mutate_in`
-        :return: :class:`OperationResult`
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
-        :raise: :exc:`IndexError` if the index is out of bounds
+        .. warning::
+            This method is deprecated and will be removed in a future version.  Use :meth:`.CouchbaseList.set_at`
+            instead.
 
-        example::
+        Args:
+            key (str): The key for the list document.
+            index (int): The position to replace.
+            value (JSONType): The value to prepend to the list.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
 
-            cb.upsert('a_list', ['hello', 'world'])
-            cb.list_set('a_list', 1, 'good')
-            cb.get('a_list').value # => ['hello', 'good']
+        Returns:
+            :class:`~couchbase.result.OperationResult`: An instance of :class:`~couchbase.result.OperationResult`.
 
-        .. seealso:: :meth:`map_add`, :meth:`list_append`
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+            IndexError: If the index is out of bounds.
+
         """
 
         op = replace(f'[{index}]', value)
@@ -397,14 +988,26 @@ class Collection(CollectionLogic):
                  index,  # type: int
                  **kwargs  # type: Dict[str, Any]
                  ) -> Any:
-        """
-        Get a specific element within a list.
+        """Get a specific element within a list.
 
-        :param key: The document ID
-        :param index: The index to retrieve
-        :return: value for the element
-        :raise: :exc:`IndexError` if the index does not exist
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
+        .. warning::
+            This method is deprecated and will be removed in a future version.  Use :meth:`.CouchbaseList.get_at`
+            instead.
+
+        Args:
+            key (str): The key for the list document.
+            index (int): The position to retrieve.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            Any: The value of the element at the specified index.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+            IndexError: If the index is out of bounds.
+
         """
         op = subdoc_get(f'[{index}]')
         sd_res = self.lookup_in(key, (op,), **kwargs)
@@ -415,15 +1018,26 @@ class Collection(CollectionLogic):
                     index,  # type: int
                     **kwargs  # type: Dict[str, Any]
                     ) -> OperationResult:
-        """
-        Remove the element at a specific index from a list.
+        """Remove the element at a specific index from a list.
 
-        :param key: The document ID of the list
-        :param index: The index to remove
-        :param kwargs: Arguments to :meth:`mutate_in`
-        :return: :class:`OperationResult`
-        :raise: :exc:`IndexError` if the index does not exist
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
+        .. warning::
+            This method is deprecated and will be removed in a future version.  Use :meth:`.CouchbaseList.remove_at`
+            instead.
+
+        Args:
+            key (str): The key for the list document.
+            index (int): The position to remove.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            :class:`~couchbase.result.OperationResult`: An instance of :class:`~couchbase.result.OperationResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+            IndexError: If the index is out of bounds.
+
         """
 
         op = subdoc_remove(f'[{index}]')
@@ -434,50 +1048,71 @@ class Collection(CollectionLogic):
     def list_size(self, key,  # type: str
                   **kwargs  # type: Dict[str, Any]
                   ) -> int:
-        """
-        Get a specific element within a list.
+        """Returns the number of items in the list.
 
-        :param key: The document ID
-        :param index: The index to retrieve
-        :return: value for the element
-        :raise: :exc:`IndexError` if the index does not exist
-        :raise: :cb_exc:`DocumentNotFoundException` if the list does not exist
+        .. warning::
+            This method is deprecated and will be removed in a future version.  Use :meth:`.CouchbaseList.size`
+            instead.
+
+        Args:
+            key (str): The key for the list document.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            int: The number of items in the list.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
         """
+
         op = count('')
         sd_res = self.lookup_in(key, (op,), **kwargs)
         return sd_res.value[0].get("value", None)
 
     def couchbase_map(self, key  # type: str
                       ) -> CouchbaseMap:
+        """Returns a CouchbaseMap permitting simple map storage in a document.
+
+        .. seealso::
+            :class:`~couchbase.datastructures.CouchbaseMap`
+
+        Returns:
+            :class:`~couchbase.datastructures.CouchbaseMap`: A CouchbaseMap instance.
+
+        """
         return CouchbaseMap(key, self)
 
     @BlockingWrapper._dsop(create_type='dict')
-    def map_add(self, key,  # type: str
+    def map_add(self,
+                key,  # type: str
                 mapkey,  # type: str
                 value,  # type: Any
                 create=False,  # type: Optional[bool]
                 **kwargs  # type: Dict[str, Any]
                 ) -> OperationResult:
-        """
-        Set a value for a key in a map.
+        """Set a value for a key in a map.
 
-        These functions are all wrappers around the :meth:`mutate_in` or
-        :meth:`lookup_in` methods.
+        .. warning::
+            This method is deprecated and will be removed in a future version.  Use :meth:`.CouchbaseMap.add`
+            instead.
 
-        :param key: The document ID of the map
-        :param mapkey: The key in the map to set
-        :param value: The value to use (anything serializable to JSON)
-        :param create: Whether the map should be created if it does not exist
-        :param kwargs: Additional arguments passed to :meth:`mutate_in`
-        :raise: :cb_exc:`Document.DocumentNotFoundException` if the document does not exist.
-            and `create` was not specified
+        Args:
+            key (str): The key for the map document.
+            mapkey (str): The key in the map to set.
+            value (Any): The value to use.
+            create (bool, optional): Whether the map should be created if it does not exist.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
 
-        .. Initialize a map and add a value
+        Returns:
+            :class:`~couchbase.result.OperationResult`: An instance of :class:`~couchbase.result.OperationResult`.
 
-            cb.upsert('a_map', {})
-            cb.map_add('a_map', 'some_key', 'some_value')
-            cb.map_get('a_map', 'some_key').value  # => 'some_value'
-            cb.get('a_map').value  # => {'some_key': 'some_value'}
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
 
         """
         op = subdoc_upsert(mapkey, value)
@@ -485,61 +1120,88 @@ class Collection(CollectionLogic):
         return OperationResult(sd_res.cas, sd_res.mutation_token())
 
     @BlockingWrapper._dsop()
-    def map_get(self, key,  # type: str
+    def map_get(self,
+                key,  # type: str
                 mapkey,  # type: str
                 **kwargs  # type: Dict[str, Any]
                 ) -> Any:
-        """
-        Retrieve a value from a map.
+        """Retrieve a value from a map.
 
-        :param key: The document ID
-        :param mapkey: Key within the map to retrieve
-        :return: :class:`~.ValueResult`
-        :raise: :exc:`IndexError` if the mapkey does not exist
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
+        .. warning::
+            This method is deprecated and will be removed in a future version.  Use :meth:`.CouchbaseMap.get`
+            instead.
 
-        .. seealso:: :meth:`map_add` for an example
+        Args:
+            key (str): The key for the map document.
+            mapkey (str): The key in the map to set.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            Any: The value of the specified key.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
         """
         op = subdoc_get(mapkey)
         sd_res = self.lookup_in(key, (op,), **kwargs)
         return sd_res.value[0].get("value", None)
 
     @BlockingWrapper._dsop()
-    def map_remove(self, key,  # type: str
+    def map_remove(self,
+                   key,  # type: str
                    mapkey,  # type: str
                    **kwargs  # type: Dict[str, Any]
                    ) -> OperationResult:
-        """
-        Remove an item from a map.
+        """Remove an item from a map.
 
-        :param key: The document ID
-        :param mapkey: The key in the map
-        :param See:meth:`mutate_in` for options
-        :raise: :exc:`IndexError` if the mapkey does not exist
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
+        .. warning::
+            This method is deprecated and will be removed in a future version.  Use :meth:`.CouchbaseMap.remove`
+            instead.
 
-        .. Remove a map key-value pair:
+        Args:
+            key (str): The key for the map document.
+            mapkey (str): The key in the map to set.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
 
-            cb.map_remove('a_map', 'some_key')
+        Returns:
+            :class:`~couchbase.result.OperationResult`: An instance of :class:`~couchbase.result.OperationResult`.
 
-        .. seealso:: :meth:`map_add`
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
         """
         op = subdoc_remove(mapkey)
         sd_res = self.mutate_in(key, (op,), **kwargs)
         return OperationResult(sd_res.cas, sd_res.mutation_token())
 
     @BlockingWrapper._dsop()
-    def map_size(self, key,  # type: str
+    def map_size(self,
+                 key,  # type: str
                  **kwargs  # type: Dict[str, Any]
                  ) -> int:
-        """
-        Get the number of items in the map.
+        """Get the number of items in the map.
 
-        :param key: The document ID of the map
-        :return int: The number of items in the map
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist.
+        .. warning::
+            This method is deprecated and will be removed in a future version.  Use :meth:`.CouchbaseMap.remove`
+            instead.
 
-        .. seealso:: :meth:`map_add`
+        Args:
+            key (str): The key for the map document.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            int: The number of items in the map.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
         """
         op = count('')
         sd_res = self.lookup_in(key, (op,), **kwargs)
@@ -547,22 +1209,43 @@ class Collection(CollectionLogic):
 
     def couchbase_set(self, key  # type: str
                       ) -> CouchbaseSet:
+        """Returns a CouchbaseSet permitting simple map storage in a document.
+
+        .. seealso::
+            :class:`~couchbase.datastructures.CouchbaseSet`
+
+        Returns:
+            :class:`~couchbase.datastructures.CouchbaseSet`: A CouchbaseSet instance.
+
+        """
         return CouchbaseSet(key, self)
 
     @BlockingWrapper._dsop(create_type='list')
-    def set_add(self, key, value, create=False, **kwargs):
-        """
-        Add an item to a set if the item does not yet exist.
+    def set_add(self,
+                key,            # type: str
+                value,          # type: Any
+                create=False,   # type: Optional[bool]
+                **kwargs        # type: Dict[str, Any]
+                ) -> Optional[OperationResult]:
+        """Add an item to a set if the item does not yet exist.
 
-        :param key: The document ID
-        :param value: Value to add
-        :param create: Create the set if it does not exist
-        :param kwargs: Arguments to :meth:`mutate_in`
-        :return: A :class:`~.OperationResult` if the item was added,
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist
-            and `create` was not specified.
+        .. warning::
+            This method is deprecated and will be removed in a future version.  Use :meth:`.CouchbaseSet.add`
+            instead.
 
-        .. seealso:: :meth:`map_add`
+        Args:
+            key (str): The key for the set document.
+            value (Any): The value to add to the set.
+            create (bool, optional): Whether the set should be created if it does not exist.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            :class:`~couchbase.result.OperationResult`: An instance of :class:`~couchbase.result.OperationResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
         """
         op = array_addunique('', value)
         try:
@@ -572,18 +1255,29 @@ class Collection(CollectionLogic):
             pass
 
     @BlockingWrapper._dsop()
-    def set_remove(self, key, value, **kwargs):
-        """
-        Remove an item from a set.
+    def set_remove(self,
+                   key,        # type: str
+                   value,      # type: Any
+                   **kwargs    # type: Dict[str, Any]
+                   ) -> Optional[OperationResult]:
+        """Remove an item from a set.
 
-        :param key: The docuent ID
-        :param value: Value to remove
-        :param kwargs: Arguments to :meth:`mutate_in`
-        :return: A :class:`OperationResult` if the item was removed, false
-                 otherwise
-        :raise: :cb_exc:`DocumentNotFoundException` if the set does not exist.
+        .. warning::
+            This method is deprecated and will be removed in a future version.  Use :meth:`.CouchbaseSet.remove`
+            instead.
 
-        .. seealso:: :meth:`set_add`, :meth:`map_add`
+        Args:
+            key (str): The key for the set document.
+            value (Any): The value to remove from the set.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            :class:`~couchbase.result.OperationResult`: An instance of :class:`~couchbase.result.OperationResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
         """
         while True:
             rv = self.get(key, **kwargs)
@@ -596,65 +1290,121 @@ class Collection(CollectionLogic):
             except ValueError:
                 return
 
-    def set_size(self, key, **kwargs):
-        """
-        Get the length of a set.
+    def set_size(self,
+                 key,        # type: str
+                 **kwargs    # type: Dict[str, Any]
+                 ) -> int:
+        """Get the length of a set.
 
-        :param key: The document ID of the set
-        :return: The length of the set
-        :raise: :cb_exc:`DocumentNotFoundException` if the set does not exist.
+        .. warning::
+            This method is deprecated and will be removed in a future version.  Use :meth:`.CouchbaseSet.size`
+            instead.
 
+        Args:
+            key (str): The key for the set document.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            int: The length of a set.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
         """
         return self.list_size(key, **kwargs)
 
-    def set_contains(self, key, value, **kwargs):
-        """
-        Determine if an item exists in a set
-        :param key: The document ID of the set
-        :param value: The value to check for
-        :return: True if `value` exists in the set
-        :raise: :cb_exc:`DocumentNotFoundException` if the document does not exist
+    def set_contains(self,
+                     key,        # type: str
+                     value,      # type: Any
+                     **kwargs    # type: Dict[str, Any]
+                     ) -> bool:
+        """Determine if an item exists in a set
+
+        .. warning::
+            This method is deprecated and will be removed in a future version.  Use :meth:`.CouchbaseSet.contains`
+            instead.
+
+        Args:
+            key (str): The key for the set document.
+            value (Any):  The value to check for.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            bool: True if the set contains the specified value.  False othwerwise.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
         """
         rv = self.get(key, **kwargs)
         return value in rv.value
 
     def couchbase_queue(self, key  # type: str
                         ) -> CouchbaseQueue:
+        """Returns a CouchbaseQueue permitting simple map storage in a document.
+
+        .. seealso::
+            :class:`~couchbase.datastructures.CouchbaseQueue`
+
+        Returns:
+            :class:`~couchbase.datastructures.CouchbaseQueue`: A CouchbaseQueue instance.
+
+        """
         return CouchbaseQueue(key, self)
 
     @BlockingWrapper._dsop(create_type='list')
-    def queue_push(self, key, value, create=False, **kwargs):
-        """
-        Add an item to the end of a queue.
+    def queue_push(self,
+                   key,            # type: str
+                   value,          # type: Any
+                   create=False,   # type: Optional[bool]
+                   **kwargs        # type: Dict[str, Any]
+                   ) -> OperationResult:
+        """Add an item to the end of a queue.
 
-        :param key: The document ID of the queue
-        :param value: The item to add to the queue
-        :param create: Whether the queue should be created if it does not exist
-        :param kwargs: Arguments to pass to :meth:`mutate_in`
-        :return: :class:`OperationResult`
-        :raise: :cb_exc:`DocumentNotFoundException` if the queue does not exist and
-            `create` was not specified.
+        .. warning::
+            This method is deprecated and will be removed in a future version.  Use :meth:`.CouchbaseQueue.push`
+            instead.
 
-        example::
+        Args:
+            key (str): The key for the queue document.
+            value (Any):  The value to add.
+            create (bool, optional): Whether the queue should be created if it does not exist.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
 
-            # Ensure it's removed first
+        Returns:
+            :class:`~couchbase.result.OperationResult`: An instance of :class:`~couchbase.result.OperationResult`.
 
-            cb.remove('a_queue')
-            cb.queue_push('a_queue', 'job9999', create=True)
-            cb.queue_pop('a_queue').value  # => job9999
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
         """
         return self.list_prepend(key, value, **kwargs)
 
     @BlockingWrapper._dsop()
-    def queue_pop(self, key, **kwargs):
-        """
-        Remove and return the first item queue.
+    def queue_pop(self,
+                  key,        # type: str
+                  **kwargs    # type: Dict[str, Any]
+                  ) -> OperationResult:
+        """Remove and return the first item queue.
 
-        :param key: The document ID
-        :param kwargs: Arguments passed to :meth:`mutate_in`
-        :return: A :class:`ValueResult`
-        :raise: :cb_exc:`QueueEmpty` if there are no items in the queue.
-        :raise: :cb_exc:`DocumentNotFoundException` if the queue does not exist.
+        .. warning::
+            This method is deprecated and will be removed in a future version.  Use :meth:`.CouchbaseQueue.pop`
+            instead.
+
+        Args:
+            key (str): The key for the queue document.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            :class:`~couchbase.result.OperationResult`: An instance of :class:`~couchbase.result.OperationResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
         """
         while True:
             try:
@@ -673,13 +1423,24 @@ class Collection(CollectionLogic):
                 raise QueueEmpty
 
     @BlockingWrapper._dsop()
-    def queue_size(self, key):
-        """
-        Get the length of the queue.
+    def queue_size(self,
+                   key     # type: str
+                   ) -> int:
+        """Get the length of a queue.
 
-        :param key: The document ID of the queue
-        :return: The length of the queue
-        :raise: :cb_exc:`DocumentNotFoundException` if the queue does not exist.
+        .. warning::
+            This method is deprecated and will be removed in a future version.  Use :meth:`.CouchbaseQueue.size`
+            instead.
+
+        Args:
+            key (str): The key for the queue document.
+
+        Returns:
+            int: The length of the queue.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
         """
         return self.list_size(key)
 
@@ -762,6 +1523,68 @@ class Collection(CollectionLogic):
         *opts,  # type: GetMultiOptions
         **kwargs,  # type: Any
     ) -> MultiGetResult:
+        """For each key in the provided list, retrieve the document associated with the key.
+
+        .. note::
+            This method is part of an **uncommitted** API that is unlikely to change,
+            but may still change as final consensus on its behavior has not yet been reached.
+
+        Args:
+            keys (List[str]): The keys to use for the multiple get operations.
+            opts (:class:`~couchbase.options.GetMultiOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.GetMultiOptions`
+
+        Returns:
+            :class:`~couchbase.result.MultiGetResult`: An instance of
+            :class:`~couchbase.result.MultiGetResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist on the
+                server and the return_exceptions options is False.  Otherwise the exception is returned as a
+                match to the key, but is not raised.
+
+        Examples:
+
+            Simple get-multi operation::
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                res = collection.get_multi(keys)
+                for k, v in res.results.items():
+                    print(f'Doc {k} has value: {v.content_as[dict]}')
+
+            Simple get-multi operation, raise an Exception if an Exception occurs::
+
+                from couchbase.options import GetMultiOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                res = collection.get_multi(keys,
+                                            GetMultiOptions(return_exceptions=False))
+                for k, v in res.results.items():
+                    print(f'Doc {k} has value: {v.content_as[dict]}')
+
+            Simple get-multi operation, individual key options::
+
+                from datetime import timedelta
+
+                from couchbase.options import GetMultiOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                per_key_opts = {'doc1': GetOptions(timeout=timedelta(seconds=10))}
+                res = collection.get_multi(keys,
+                                            GetMultiOptions(per_key_options=per_key_opts))
+                for k, v in res.results.items():
+                    print(f'Doc {k} has value: {v.content_as[dict]}')
+
+
+        """
         op_args, return_exceptions, transcoders = self._get_multi_op_args(keys,
                                                                           *opts,
                                                                           opts_type=GetMultiOptions,
@@ -791,6 +1614,29 @@ class Collection(CollectionLogic):
         *opts,  # type: LockMultiOptions
         **kwargs,  # type: Any
     ) -> MultiGetResult:
+        """For each key in the provided list, lock the document associated with the key.
+
+        .. note::
+            This method is part of an **uncommitted** API that is unlikely to change,
+            but may still change as final consensus on its behavior has not yet been reached.
+
+        Args:
+            keys (List[str]): The keys to use for the multiple lock operations.
+            lock_time (timedelta):  The amount of time to lock the documents.
+            opts (:class:`~couchbase.options.LockMultiOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.LockMultiOptions`
+
+        Returns:
+            :class:`~couchbase.result.MultiGetResult`: An instance of
+            :class:`~couchbase.result.MultiGetResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist on the
+                server and the return_exceptions options is False.  Otherwise the exception is returned as a
+                match to the key, but is not raised.
+
+        """
         kwargs["lock_time"] = lock_time
         op_args, return_exceptions, transcoders = self._get_multi_op_args(keys,
                                                                           *opts,
@@ -820,6 +1666,24 @@ class Collection(CollectionLogic):
         *opts,  # type: ExistsMultiOptions
         **kwargs,  # type: Any
     ) -> MultiExistsResult:
+        """For each key in the provided list, check if the document associated with the key exists.
+
+        .. note::
+            This method is part of an **uncommitted** API that is unlikely to change,
+            but may still change as final consensus on its behavior has not yet been reached.
+
+        Args:
+            keys (List[str]): The keys to use for the multiple exists operations.
+            lock_time (timedelta):  The amount of time to lock the documents.
+            opts (:class:`~couchbase.options.ExistsMultiOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.ExistsMultiOptions`
+
+        Returns:
+            :class:`~couchbase.result.MultiExistsResult`: An instance of
+            :class:`~couchbase.result.MultiExistsResult`.
+
+        """
         op_args, return_exceptions, _ = self._get_multi_op_args(keys,
                                                                 *opts,
                                                                 opts_type=ExistsMultiOptions,
@@ -838,6 +1702,29 @@ class Collection(CollectionLogic):
         *opts,  # type: InsertMultiOptions
         **kwargs,  # type: Any
     ) -> MultiMutationResult:
+        """For each key, value pair in the provided dict, inserts a new document to the collection,
+        failing if the document already exists.
+
+        .. note::
+            This method is part of an **uncommitted** API that is unlikely to change,
+            but may still change as final consensus on its behavior has not yet been reached.
+
+        Args:
+            keys_and_docs (Dict[str, JSONType]): The keys and values/docs to use for the multiple insert operations.
+            opts (:class:`~couchbase.options.InsertMultiOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.InsertMultiOptions`
+
+        Returns:
+            :class:`~couchbase.result.MultiMutationResult`: An instance of
+            :class:`~couchbase.result.MultiMutationResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentExistsException`: If the key provided already exists on the
+                server and the return_exceptions options is False.  Otherwise the exception is returned as a
+                match to the key, but is not raised.
+
+        """
         op_args, return_exceptions = self._get_multi_mutation_transcoded_op_args(keys_and_docs,
                                                                                  *opts,
                                                                                  opts_type=InsertMultiOptions,
@@ -856,6 +1743,24 @@ class Collection(CollectionLogic):
         *opts,  # type: UpsertMultiOptions
         **kwargs,  # type: Any
     ) -> MultiMutationResult:
+        """For each key, value pair in the provided dict, upserts a document to the collection. This operation
+        succeeds whether or not the document already exists.
+
+        .. note::
+            This method is part of an **uncommitted** API that is unlikely to change,
+            but may still change as final consensus on its behavior has not yet been reached.
+
+        Args:
+            keys_and_docs (Dict[str, JSONType]): The keys and values/docs to use for the multiple upsert operations.
+            opts (:class:`~couchbase.options.UpsertMultiOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.UpsertMultiOptions`
+
+        Returns:
+            :class:`~couchbase.result.MultiMutationResult`: An instance of
+            :class:`~couchbase.result.MultiMutationResult`.
+
+        """
         op_args, return_exceptions = self._get_multi_mutation_transcoded_op_args(keys_and_docs,
                                                                                  *opts,
                                                                                  opts_type=UpsertMultiOptions,
@@ -874,6 +1779,29 @@ class Collection(CollectionLogic):
         *opts,  # type: ReplaceMultiOptions
         **kwargs,  # type: Any
     ) -> MultiMutationResult:
+        """For each key, value pair in the provided dict, replaces the value of a document in the collection.
+        This operation fails if the document does not exist.
+
+        .. note::
+            This method is part of an **uncommitted** API that is unlikely to change,
+            but may still change as final consensus on its behavior has not yet been reached.
+
+        Args:
+            keys_and_docs (Dict[str, JSONType]): The keys and values/docs to use for the multiple replace operations.
+            opts (:class:`~couchbase.options.ReplaceMultiOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.ReplaceMultiOptions`
+
+        Returns:
+            :class:`~couchbase.result.MultiMutationResult`: An instance of
+            :class:`~couchbase.result.MultiMutationResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist on the
+                server and the return_exceptions options is False.  Otherwise the exception is returned as a
+                match to the key, but is not raised.
+
+        """
         op_args, return_exceptions = self._get_multi_mutation_transcoded_op_args(keys_and_docs,
                                                                                  *opts,
                                                                                  opts_type=ReplaceMultiOptions,
@@ -892,6 +1820,29 @@ class Collection(CollectionLogic):
         *opts,  # type: RemoveMultiOptions
         **kwargs,  # type: Any
     ) -> MultiMutationResult:
+        """For each key in the provided list, remove the existing document.  This operation fails
+        if the document does not exist.
+
+        .. note::
+            This method is part of an **uncommitted** API that is unlikely to change,
+            but may still change as final consensus on its behavior has not yet been reached.
+
+        Args:
+            keys (List[str]): The keys to use for the multiple remove operations.
+            opts (:class:`~couchbase.options.RemoveMultiOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.RemoveMultiOptions`
+
+        Returns:
+            :class:`~couchbase.result.MultiMutationResult`: An instance of
+            :class:`~couchbase.result.MultiMutationResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist on the
+                server and the return_exceptions options is False.  Otherwise the exception is returned as a
+                match to the key, but is not raised.
+
+        """
         op_args, return_exceptions, _ = self._get_multi_op_args(keys,
                                                                 *opts,
                                                                 opts_type=RemoveMultiOptions,
@@ -911,6 +1862,30 @@ class Collection(CollectionLogic):
         *opts,  # type: TouchMultiOptions
         **kwargs,  # type: Any
     ) -> MultiMutationResult:
+        """For each key in the provided list, update the expiry on an existing document. This operation fails
+        if the document does not exist.
+
+        .. note::
+            This method is part of an **uncommitted** API that is unlikely to change,
+            but may still change as final consensus on its behavior has not yet been reached.
+
+        Args:
+            keys (List[str]): The keys to use for the multiple touch operations.
+            expiry (timedelta): The new expiry for the document.
+            opts (:class:`~couchbase.options.TouchMultiOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.TouchMultiOptions`
+
+        Returns:
+            :class:`~couchbase.result.MultiMutationResult`: An instance of
+            :class:`~couchbase.result.MultiMutationResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist on the
+                server and the return_exceptions options is False.  Otherwise the exception is returned as a
+                match to the key, but is not raised.
+
+        """
         kwargs['expiry'] = expiry
         op_args, return_exceptions, _ = self._get_multi_op_args(keys,
                                                                 *opts,
@@ -930,7 +1905,33 @@ class Collection(CollectionLogic):
         *opts,  # type: UnlockMultiOptions
         **kwargs,  # type: Any
     ) -> Dict[str, Union[None, CouchbaseBaseException]]:
+        """For each result in the provided :class:`~couchbase.result.MultiResultType` in the provided list,
+        unlocks a previously locked document. This operation fails if the document does not exist.
 
+        .. note::
+            This method is part of an **uncommitted** API that is unlikely to change,
+            but may still change as final consensus on its behavior has not yet been reached.
+
+        Args:
+            keys (Union[MultiResultType, Dict[str, int]]): The result from a previous multi operation.
+            opts (:class:`~couchbase.options.UnlockMultiOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.UnlockMultiOptions`
+
+        Returns:
+            Dict[str, Union[None, CouchbaseBaseException]]: Either None if operation successful or an Exception
+            if the operation was unsuccessful
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist on the
+                server and the return_exceptions options is False.  Otherwise the exception is returned as a
+                match to the key, but is not raised.
+
+            :class:`~couchbase.exceptions.DocumentLockedException`: If the provided cas is invalid and the
+                return_exceptions options is False.  Otherwise the exception is returned as a match to the key,
+                but is not raised.
+
+        """
         op_keys_cas = {}
         if isinstance(keys, dict):
             if not all(map(lambda k: isinstance(k, str), keys.keys())):
@@ -1131,489 +2132,136 @@ class Collection(CollectionLogic):
 
 
 """
-@TODO:  remove the code below for the 4.1 release
+** DEPRECATION NOTICE **
 
-Everything below should be removed in the 4.1 release.
-All options should come from couchbase.options, or couchbase.management.options
+The classes below are deprecated for 3.x compatibility.  They should not be used.
+Instead use:
+    * All options should be imported from `couchbase.options`.
+    * All constrained int classes should be imported from `couchbase.options`.
+    * Scope object should be imported from `couchbase.scope`.
+    * Do not use the `CBCollection` class, use Collection instead.
 
 """
 
+from couchbase.logic.options import AppendOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import DecrementOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import DeltaValueBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import DurabilityOptionBlockBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import ExistsOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import GetAndLockOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import GetAndTouchOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import GetOptionsBase    # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import IncrementOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import InsertOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import LookupInOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import OptionsTimeoutBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import PrependOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import RemoveOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import ReplaceOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import TouchOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import UnlockOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import UpsertOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.scope import ScopeLogic  # nopep8 # isort:skip # noqa: E402
 
-class OptionsTimeoutDeprecated(dict):
-    def __init__(
-        self,
-        timeout=None,  # type: timedelta
-        span=None,  # type: Any
-        **kwargs  # type: Any
-    ):
-        """
-        Base options with timeout and span options
-        :param timeout: Timeout for this operation
-        :param span: Parent tracing span to use for this operation
-        """
-        if timeout:
-            kwargs["timeout"] = timeout
-
-        if span:
-            kwargs["span"] = span
-        super().__init__(**kwargs)
-
-    def timeout(
-        self,
-        timeout,  # type: timedelta
-    ):
-        self["timeout"] = timeout
-        return self
-
-    def span(
-        self,
-        span,  # type: Any
-    ):
-        self["span"] = span
-        return self
-
-
-class DurabilityOptionBlockDeprecated(OptionsTimeoutDeprecated):
-    @overload
-    def __init__(
-        self,
-        timeout=None,  # type: timedelta
-        durability=None,  # type: DurabilityType
-        expiry=None,  # type: timedelta
-    ):
-        # type: (...) -> None
-        """
-        Options for operations with any type of durability
-
-        :param durability: Durability setting
-        :param expiry: When any mutation should expire
-        :param timeout: Timeout for operation
-        """
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-    @property
-    def expiry(self):
-        return self.get("expiry", None)
-
-
-class InsertOptionsDeprecated(DurabilityOptionBlockDeprecated):
-    @overload
-    def __init__(
-        self,
-        timeout=None,  # type: timedelta
-        expiry=None,  # type: timedelta
-        durability=None,  # type: DurabilityType
-        transcoder=None  # type: Transcoder
-    ):
-        pass
-
-    def __init__(self, **kwargs):
-        """Insert Options
-
-        **DEPRECATED** User `couchbase.options.InsertOptions`
-        """
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class UpsertOptionsDeprecated(DurabilityOptionBlockDeprecated):
-    @overload
-    def __init__(
-        self,
-        timeout=None,  # type: timedelta
-        expiry=None,  # type: timedelta
-        preserve_expiry=False,  # type: bool
-        durability=None,  # type: DurabilityType
-        transcoder=None  # type: Transcoder
-    ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class ReplaceOptionsDeprecated(DurabilityOptionBlockDeprecated):
-    @overload
-    def __init__(
-        self,
-        timeout=None,  # type: timedelta
-        expiry=None,  # type: timedelta
-        cas=0,  # type: int
-        preserve_expiry=False,  # type: bool
-        durability=None,  # type: DurabilityType
-        transcoder=None  # type: Transcoder
-    ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class RemoveOptionsDeprecated(DurabilityOptionBlockDeprecated):
-    @overload
-    def __init__(
-        self,
-        timeout=None,  # type: timedelta
-        cas=0,  # type: int
-        durability=None,  # type: DurabilityType
-        transcoder=None  # type: Transcoder
-    ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class GetOptionsDeprecated(OptionsTimeoutDeprecated):
-    @overload
-    def __init__(
-        self,
-        timeout=None,  # type: timedelta
-        with_expiry=None,  # type: bool
-        project=None,  # type: Iterable[str]
-        transcoder=None  # type: Transcoder
-    ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-    @property
-    def with_expiry(self):
-        # type: (...) -> bool
-        return self.get("with_expiry", False)
-
-    @property
-    def project(self):
-        # type: (...) -> Iterable[str]
-        return self.get("project", [])
-
-
-class ExistsOptionsDeprecated(OptionsTimeoutDeprecated):
-    @overload
-    def __init__(
-        self,
-        timeout=None  # type: timedelta
-    ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class TouchOptionsDeprecated(OptionsTimeoutDeprecated):
-    @overload
-    def __init__(
-        self,
-        timeout=None  # type: timedelta
-    ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class GetAndTouchOptionsDeprecated(OptionsTimeoutDeprecated):
-    @overload
-    def __init__(
-        self,
-        timeout=None,  # type: timedelta
-        transcoder=None  # type: Transcoder
-    ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class GetAndLockOptionsDeprecated(OptionsTimeoutDeprecated):
-    @overload
-    def __init__(
-        self,
-        timeout=None,  # type: timedelta
-        transcoder=None  # type: Transcoder
-    ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class UnlockOptionsDeprecated(OptionsTimeoutDeprecated):
-    @overload
-    def __init__(
-        self,
-        timeout=None  # type: timedelta
-    ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class LookupInOptionsDeprecated(DurabilityOptionBlockDeprecated):
-    @overload
-    def __init__(
-        self,  # type: LookupInOptions
-        timeout=None,  # type: timedelta
-        access_deleted=None  # type: bool
-    ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class MutateInOptionsDeprecated(DurabilityOptionBlockDeprecated):
-    @overload
-    def __init__(
-        self,  # type: MutateInOptions
-        timeout=None,  # type: timedelta
-        expiry=None,  # type: timedelta
-        cas=0,          # type: int
-        durability=None,  # type: DurabilityType
-        store_semantics=None,  # type: StoreSemantics
-        access_deleted=None,  # type: bool
-        preserve_expiry=None  # type: bool
-    ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class IncrementOptionsDeprecated(DurabilityOptionBlockDeprecated):
-    @overload
-    def __init__(
-        self,
-        timeout=None,      # type: timedelta
-        expiry=None,       # type: timedelta
-        durability=None,   # type: DurabilityType
-        delta=None,         # type: DeltaValue
-        initial=None,      # type: SignedInt64
-        span=None         # type: Any
-
-    ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class DecrementOptionsDeprecated(DurabilityOptionBlockDeprecated):
-    @overload
-    def __init__(
-        self,
-        timeout=None,      # type: timedelta
-        expiry=None,       # type: timedelta
-        durability=None,   # type: DurabilityType
-        delta=None,         # type: DeltaValue
-        initial=None,      # type: SignedInt64
-        span=None         # type: Any
-    ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class AppendOptionsDeprecated(DurabilityOptionBlockDeprecated):
-    @overload
-    def __init__(
-        self,
-        timeout=None,      # type: timedelta
-        durability=None,   # type: DurabilityType
-        cas=None,          # type: int
-        span=None         # type: Any
-    ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class PrependOptionsDeprecated(DurabilityOptionBlockDeprecated):
-    @overload
-    def __init__(
-        self,
-        timeout=None,      # type: timedelta
-        durability=None,   # type: DurabilityType
-        cas=None,          # type: int
-        span=None         # type: Any
-    ):
-        pass
-
-    def __init__(self, **kwargs):
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class ConstrainedIntDeprecated():
-    def __init__(self, value):
-        """
-        A signed integer between cls.min() and cls.max() inclusive
-
-        :param couchbase.options.AcceptableInts value: the value to initialise this with.
-        :raise: :exc:`~couchbase.exceptions.InvalidArgumentException` if not in range
-        """
-        self.value = type(self).verify_value(value)
-
-    @classmethod
-    def verify_value(cls, item  # type: AcceptableInts
-                     ):
-        # type: (...) -> int
-        value = getattr(item, 'value', item)
-        if not isinstance(value, int) or not (cls.min() <= value <= cls.max()):
-            raise InvalidArgumentException(
-                "Integer in range {} and {} inclusiverequired".format(cls.min(), cls.max()))
-        return value
-
-    @classmethod
-    def is_valid(cls,
-                 item  # type: AcceptableInts
-                 ):
-        return isinstance(item, cls)
-
-    def __neg__(self):
-        return -self.value
-
-    # Python 3.8 deprecated the implicit conversion to integers using __int__
-    # use __index__ instead
-    # still needed for Python 3.7
-    def __int__(self):
-        return self.value
-
-    # __int__ falls back to __index__
-    def __index__(self):
-        return self.value
-
-    def __add__(self, other):
-        if not (self.min() <= (self.value + int(other)) <= self.max()):
-            raise InvalidArgumentException(
-                "{} + {} would be out of range {}-{}".format(self.value, other, self.min(), self.min()))
-
-    @classmethod
-    def max(cls):
-        raise NotImplementedError()
-
-    @classmethod
-    def min(cls):
-        raise NotImplementedError()
-
-    def __str__(self):
-        return "{cls_name} with value {value}".format(
-            cls_name=type(self), value=self.value)
-
-    def __repr__(self):
-        return str(self)
-
-    def __eq__(self, other):
-        return isinstance(self, type(other)) and self.value == other.value
-
-    def __gt__(self, other):
-        return self.value > other.value
-
-    def __lt__(self, other):
-        return self.value < other.value
-
-
-class SignedInt64Deprecated(ConstrainedIntDeprecated):
-    def __init__(self, value):
-        """
-        A signed integer between -0x8000000000000000 and +0x7FFFFFFFFFFFFFFF inclusive.
-
-        :param couchbase.options.AcceptableInts value: the value to initialise this with.
-        :raise: :exc:`~couchbase.exceptions.InvalidArgumentException` if not in range
-        """
-        super().__init__(value)
-
-    @classmethod
-    def max(cls):
-        return 0x7FFFFFFFFFFFFFFF
-
-    @classmethod
-    def min(cls):
-        return -0x8000000000000000
-
-
-class UnsignedInt64Deprecated(ConstrainedIntDeprecated):
-    def __init__(self, value):
-        """
-        An unsigned integer between 0x0000000000000000 and +0x8000000000000000 inclusive.
-
-        :param couchbase.options.AcceptableInts value: the value to initialise this with.
-        :raise: :exc:`~couchbase.exceptions.ArgumentError` if not in range
-        """
-        super().__init__(value)
-
-    @classmethod
-    def min(cls):
-        return 0x0000000000000000
-
-    @classmethod
-    def max(cls):
-        return 0x8000000000000000
-
-
-class DeltaValueDeprecated(ConstrainedIntDeprecated):
-    def __init__(self,
-                 value  # type: AcceptableInts
-                 ):
-        # type: (...) -> None
-        """
-        A non-negative integer between 0 and +0x7FFFFFFFFFFFFFFF inclusive.
-        Used as an argument for :meth:`Collection.increment` and :meth:`Collection.decrement`
-
-        :param value: the value to initialise this with.
-
-        :raise: :exc:`~couchbase.exceptions.InvalidArgumentException` if not in range
-        """
-        super().__init__(value)
-
-    @ classmethod
-    def max(cls):
-        return 0x7FFFFFFFFFFFFFFF
-
-    @ classmethod
-    def min(cls):
-        return 0
-
-
-InsertOptions = InsertOptionsDeprecated  # noqa: F811
-UpsertOptions = UpsertOptionsDeprecated  # noqa: F811
-ReplaceOptions = RemoveOptionsDeprecated  # noqa: F811
-RemoveOptions = RemoveOptionsDeprecated  # noqa: F811
-GetOptions = GetOptionsDeprecated  # noqa: F811
-ExistsOptions = ExistsOptionsDeprecated  # noqa: F811
-TouchOptions = TouchOptionsDeprecated  # noqa: F811
-GetAndTouchOptions = GetAndTouchOptionsDeprecated  # noqa: F811
-GetAndLockOptions = GetAndLockOptionsDeprecated  # noqa: F811
-UnlockOptions = UnlockOptionsDeprecated  # noqa: F811
-IncrementOptions = IncrementOptionsDeprecated  # noqa: F811
-DecrementOptions = DecrementOptionsDeprecated  # noqa: F811
-PrependOptions = PrependOptionsDeprecated  # noqa: F811
-AppendOptions = AppendOptionsDeprecated  # noqa: F811
-LookupInOptions = LookupInOptionsDeprecated  # noqa: F811
-MutateInOptions = MutateInOptionsDeprecated  # noqa: F811
-
-SignedInt64 = SignedInt64Deprecated  # noqa: F811
-UnsignedInt64 = UnsignedInt64Deprecated  # noqa: F811
-DeltaValue = DeltaValueDeprecated  # noqa: F811
+from couchbase.options import ConstrainedInt  # nopep8 # isort:skip # noqa: E402, F401
+from couchbase.options import SignedInt64  # nopep8 # isort:skip # noqa: E402, F401
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.scope')
+class Scope(ScopeLogic):
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+class AppendOptions(AppendOptionsBase):  # noqa: F811
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+class DecrementOptions(DecrementOptionsBase):  # noqa: F811
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+class DeltaValue(DeltaValueBase):  # noqa: F811
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+class DurabilityOptionBlock(DurabilityOptionBlockBase):  # noqa: F811
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+class ExistsOptions(ExistsOptionsBase):  # noqa: F811
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+class GetAndTouchOptions(GetAndTouchOptionsBase):  # noqa: F811
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+class GetAndLockOptions(GetAndLockOptionsBase):  # noqa: F811
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+class GetOptions(GetOptionsBase):  # noqa: F811
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+class IncrementOptions(IncrementOptionsBase):  # noqa: F811
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+class InsertOptions(InsertOptionsBase):  # noqa: F811
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+class LookupInOptions(LookupInOptionsBase):  # noqa: F811
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+class OptionsTimeout(OptionsTimeoutBase):  # noqa: F811
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+class PrependOptions(PrependOptionsBase):  # noqa: F811
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+class RemoveOptions(RemoveOptionsBase):  # noqa: F811
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+class ReplaceOptions(ReplaceOptionsBase):  # noqa: F811
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+class TouchOptions(TouchOptionsBase):  # noqa: F811
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+class UnlockOptions(UnlockOptionsBase):  # noqa: F811
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+class UpsertOptions(UpsertOptionsBase):  # noqa: F811
+    pass
+
+
+@Supportability.class_deprecated('couchbase.collection.Collection')
+class CBCollection(Collection):
+    pass

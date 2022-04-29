@@ -12,6 +12,7 @@ from couchbase.logic.analytics import AnalyticsScanConsistency  # noqa: F401
 from couchbase.logic.analytics import AnalyticsStatus  # noqa: F401
 from couchbase.logic.analytics import AnalyticsWarning  # noqa: F401
 from couchbase.logic.analytics import AnalyticsRequestLogic
+from couchbase.logic.supportability import Supportability
 
 
 class AnalyticsRequest(AnalyticsRequestLogic):
@@ -76,3 +77,20 @@ class AnalyticsRequest(AnalyticsRequestLogic):
             exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
             excptn = exc_cls(str(ex))
             raise excptn
+
+
+"""
+** DEPRECATION NOTICE **
+
+The classes below are deprecated for 3.x compatibility.  They should not be used.
+Instead use:
+    * All options should be imported from `couchbase.options`.
+
+"""
+
+from couchbase.logic.options import AnalyticsOptionsBase  # nopep8 # isort:skip # noqa: E402
+
+
+@Supportability.import_deprecated('couchbase.analytics', 'couchbase.options')
+class AnalyticsOptions(AnalyticsOptionsBase):  # noqa: F811
+    pass

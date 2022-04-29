@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import (TYPE_CHECKING,
-                    Any,
+from typing import (Any,
                     Dict,
                     Iterable,
                     Optional)
@@ -20,22 +19,22 @@ from couchbase.management.logic.analytics_logic import (AnalyticsDataset,
                                                         AnalyticsManagerLogic)
 from couchbase.management.logic.wrappers import BlockingMgmtWrapper, ManagementType
 
-if TYPE_CHECKING:
-    from couchbase.management.options import (ConnectLinkOptions,
-                                              CreateAnalyticsIndexOptions,
-                                              CreateDatasetOptions,
-                                              CreateDataverseOptions,
-                                              CreateLinkAnalyticsOptions,
-                                              DisconnectLinkOptions,
-                                              DropAnalyticsIndexOptions,
-                                              DropDatasetOptions,
-                                              DropDataverseOptions,
-                                              DropLinkAnalyticsOptions,
-                                              GetAllAnalyticsIndexesOptions,
-                                              GetAllDatasetOptions,
-                                              GetLinksAnalyticsOptions,
-                                              GetPendingMutationsOptions,
-                                              ReplaceLinkAnalyticsOptions)
+# @TODO:  lets deprecate import of options from couchbase.management.analytics
+from couchbase.management.options import (ConnectLinkOptions,
+                                          CreateAnalyticsIndexOptions,
+                                          CreateDatasetOptions,
+                                          CreateDataverseOptions,
+                                          CreateLinkAnalyticsOptions,
+                                          DisconnectLinkOptions,
+                                          DropAnalyticsIndexOptions,
+                                          DropDatasetOptions,
+                                          DropDataverseOptions,
+                                          DropLinkAnalyticsOptions,
+                                          GetAllAnalyticsIndexesOptions,
+                                          GetAllDatasetOptions,
+                                          GetLinksAnalyticsOptions,
+                                          GetPendingMutationsOptions,
+                                          ReplaceLinkAnalyticsOptions)
 
 
 class AnalyticsIndexManager(AnalyticsManagerLogic):

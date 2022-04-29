@@ -1,10 +1,8 @@
 from datetime import timedelta
 from time import perf_counter, sleep
-from typing import (TYPE_CHECKING,
-                    Any,
+from typing import (Any,
                     Dict,
-                    Iterable,
-                    overload)
+                    Iterable)
 
 from couchbase.exceptions import (AmbiguousTimeoutException,
                                   InvalidArgumentException,
@@ -12,16 +10,16 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   WatchQueryIndexTimeoutException)
 from couchbase.management.logic.query_index_logic import QueryIndex, QueryIndexManagerLogic
 from couchbase.management.logic.wrappers import BlockingMgmtWrapper, ManagementType
-from couchbase.management.options import GetAllQueryIndexOptions
-from couchbase.options import forward_args
 
-if TYPE_CHECKING:
-    from couchbase.management.options import (BuildDeferredQueryIndexOptions,
-                                              CreatePrimaryQueryIndexOptions,
-                                              CreateQueryIndexOptions,
-                                              DropPrimaryQueryIndexOptions,
-                                              DropQueryIndexOptions,
-                                              WatchQueryIndexOptions)
+# @TODO:  lets deprecate import of options from couchbase.management.queries
+from couchbase.management.options import (BuildDeferredQueryIndexOptions,
+                                          CreatePrimaryQueryIndexOptions,
+                                          CreateQueryIndexOptions,
+                                          DropPrimaryQueryIndexOptions,
+                                          DropQueryIndexOptions,
+                                          GetAllQueryIndexOptions,
+                                          WatchQueryIndexOptions)
+from couchbase.options import forward_args
 
 
 class QueryIndexManager(QueryIndexManagerLogic):
@@ -34,8 +32,24 @@ class QueryIndexManager(QueryIndexManagerLogic):
                      index_name,    # type: str
                      fields,        # type: Iterable[str]
                      *options,      # type: CreateQueryIndexOptions
-                     **kwargs
+                     **kwargs       # type: Dict[str, Any]
                      ) -> None:
+        """Creates a new query index.
+
+        Args:
+            bucket_name (str): The name of the bucket this index is for.
+            index_name (str): The name of the index.
+            fields (Iterable[str]): The fields which this index should cover.
+            options (:class:`~couchbase.management.options.CreateQueryIndexOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name, index_name or fields
+                are invalid types.
+            :class:`~couchbase.exceptions.QueryIndexAlreadyExistsException`: If the index already exists.
+        """
 
         if not isinstance(bucket_name, str):
             raise InvalidArgumentException("bucket_name must be provided when creating a secondary index.")
@@ -50,9 +64,21 @@ class QueryIndexManager(QueryIndexManagerLogic):
     def create_primary_index(self,
                              bucket_name,   # type: str
                              *options,      # type: CreatePrimaryQueryIndexOptions
-                             **kwargs
+                             **kwargs       # type: Dict[str, Any]
                              ) -> None:
+        """Creates a new primary query index.
 
+        Args:
+            bucket_name (str): The name of the bucket this index is for.
+            options (:class:`~couchbase.management.options.CreatePrimaryQueryIndexOptions`): Optional parameters for
+                this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name is an invalid type.
+            :class:`~couchbase.exceptions.QueryIndexAlreadyExistsException`: If the index already exists.
+        """
         if not isinstance(bucket_name, str):
             raise InvalidArgumentException("bucket_name must be provided when creating a primary index.")
 
@@ -63,8 +89,23 @@ class QueryIndexManager(QueryIndexManagerLogic):
                    bucket_name,     # type: str
                    index_name,      # type: str
                    *options,        # type: DropQueryIndexOptions
-                   **kwargs) -> None:
+                   **kwargs         # type: Dict[str, Any]
+                   ) -> None:
+        """Drops an existing query index.
 
+        Args:
+            bucket_name (str): The name of the bucket containing the index to drop.
+            index_name (str): The name of the index to drop.
+            options (:class:`~couchbase.management.options.DropQueryIndexOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name or index_name are
+                invalid types.
+            :class:`~couchbase.exceptions.QueryIndexNotFoundException`: If the index does not exists.
+        """
         if not isinstance(bucket_name, str):
             raise InvalidArgumentException("bucket_name must be provided when dropping a secondary index.")
         if not isinstance(index_name, str):
@@ -76,7 +117,21 @@ class QueryIndexManager(QueryIndexManagerLogic):
     def drop_primary_index(self,
                            bucket_name,     # type: str
                            *options,        # type: DropPrimaryQueryIndexOptions
-                           **kwargs) -> None:
+                           **kwargs         # type: Dict[str, Any]
+                           ) -> None:
+        """Drops an existing primary query index.
+
+        Args:
+            bucket_name (str): The name of the bucket this index to drop.
+            options (:class:`~couchbase.management.options.DropPrimaryQueryIndexOptions`): Optional parameters for
+                this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name is an invalid type.
+            :class:`~couchbase.exceptions.QueryIndexNotFoundException`: If the index does not exists.
+        """
 
         if not isinstance(bucket_name, str):
             raise InvalidArgumentException("bucket_name must be provided when dropping a primary index.")
@@ -89,7 +144,21 @@ class QueryIndexManager(QueryIndexManagerLogic):
                         *options,       # type: GetAllQueryIndexOptions
                         **kwargs        # type: Dict[str,Any]
                         ) -> Iterable[QueryIndex]:
+        """Returns a list of indexes for a specific bucket.
 
+        Args:
+            bucket_name (str): The name of the bucket to fetch indexes for.
+            options (:class:`~couchbase.management.options.GetAllQueryIndexOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            Iterable[:class:`.QueryIndex`]: A list of indexes for a specific bucket.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name is an invalid type.
+        """
         if not isinstance(bucket_name, str):
             raise InvalidArgumentException("bucket_name must be provided when dropping a secondary index.")
 
@@ -99,16 +168,19 @@ class QueryIndexManager(QueryIndexManagerLogic):
     def build_deferred_indexes(self,
                                bucket_name,     # type: str
                                *options,        # type: BuildDeferredQueryIndexOptions
-                               **kwargs
+                               **kwargs         # type: Dict[str, Any]
                                ) -> None:
-        """
-        Build Deferred builds all indexes which are currently in deferred state.
+        """Starts building any indexes which were previously created with ``deferred=True``.
 
-        :param str bucket_name: name of the bucket.
-        :param BuildDeferredQueryIndexOptions options: Options for building deferred indexes.
-        :param Any kwargs: Override corresponding value in options.
-        :raise: InvalidArgumentsException
+        Args:
+            bucket_name (str): The name of the bucket to perform build on.
+            options (:class:`~couchbase.management.options.BuildDeferredQueryIndexOptions`): Optional parameters
+                for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
 
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name is an invalid type.
         """
         if not isinstance(bucket_name, str):
             raise InvalidArgumentException("bucket_name must be provided when building deferred indexes.")
@@ -121,16 +193,23 @@ class QueryIndexManager(QueryIndexManagerLogic):
                       *options,     # type: WatchQueryIndexOptions
                       **kwargs      # type: Dict[str,Any]
                       ) -> None:
-        """
-        Watch polls indexes until they are online.
+        """Waits for a number of indexes to finish creation and be ready to use.
 
-        :param str bucket_name: name of the bucket.
-        :param Iterable[str] index_names: name(s) of the index(es).
-        :param WatchQueryIndexOptions options: Options for request to watch indexes.
-        :param Any kwargs: Override corresponding valud in options.
-        :raises: QueryIndexNotFoundException
-        :raises: WatchQueryIndexTimeoutException
+        Args:
+            bucket_name (str): The name of the bucket to watch for indexes on.
+            index_names (Iterable[str]): The names of the indexes to watch.
+            options (:class:`~couchbase.management.options.WatchQueryIndexOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the bucket_name or index_names are
+                invalid types.
+            :class:`~couchbase.exceptions.WatchQueryIndexTimeoutException`: If the specified timeout is reached
+                before all the specified indexes are ready to use.
         """
+
         if not isinstance(bucket_name, str):
             raise InvalidArgumentException("bucket_name must be provided when watching indexes.")
         if not isinstance(index_names, (list, tuple)):
@@ -194,274 +273,3 @@ class QueryIndexManager(QueryIndexManagerLogic):
                     "Failed to find all indexes online within the alloted time.")
 
             sleep(interval_millis / 1000)
-
-
-"""
-** DEPRECATION NOTICE **
-
-The classes below are deprecated for 3.x compatibility.  They should not be used.
-Instead all options should be imported from couchbase.management.options.
-
-"""
-
-
-class GetAllQueryIndexOptionsDeprecated(dict):
-    @overload
-    def __init__(self,
-                 timeout=None,          # type: timedelta
-                 scope_name=None,       # type: str
-                 collection_name=None   # type: str
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        """
-        Get all query indexes options
-
-        :param timeout: operation timeout in seconds
-        :param scope_name:
-            **UNCOMMITTED**
-            scope_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Nme of the scope where the index belongs
-        :param collection_name:
-            **UNCOMMITTED**
-            collection_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Name of the collection where the index belongs
-
-        """
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class CreateQueryIndexOptionsDeprecated(dict):
-    @overload
-    def __init__(self,
-                 timeout=None,          # type: timedelta
-                 ignore_if_exists=None,  # type: bool
-                 num_replicas=None,     # type: int
-                 deferred=None,         # type: bool
-                 condition=None,        # type: str
-                 scope_name=None,       # type: str
-                 collection_name=None   # type: str
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        """
-        Query Index creation options
-
-        :param timeout: operation timeout in seconds
-        :param ignore_if_exists: don't throw an exception if index already exists
-        :param num_replicas: number of replicas
-        :param deferred: whether the index creation should be deferred
-        :param condition: 'where' condition for partial index creation
-        :param scope_name:
-            **UNCOMMITTED**
-            scope_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Nme of the scope where the index belongs
-        :param collection_name:
-            **UNCOMMITTED**
-            collection_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Name of the collection where the index belongs
-
-        """
-        if 'ignore_if_exists' not in kwargs:
-            kwargs['ignore_if_exists'] = False
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class CreatePrimaryQueryIndexOptionsDeprecated(dict):
-    @overload
-    def __init__(self,
-                 index_name=None,        # type: str
-                 timeout=None,           # type: timedelta
-                 ignore_if_exists=None,  # type: bool
-                 num_replicas=None,      # type: int
-                 deferred=None,          # type: bool
-                 condition=None,         # type: str
-                 scope_name=None,        # type: str
-                 collection_name=None    # type: str
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        """
-        Query Primary Index creation options
-
-        :param index_name: name of primary index
-        :param timeout: operation timeout in seconds
-        :param ignore_if_exists: don't throw an exception if index already exists
-        :param num_replicas: number of replicas
-        :param deferred: whether the index creation should be deferred
-        :param scope_name:
-            **UNCOMMITTED**
-            scope_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Nme of the scope where the index belongs
-        :param collection_name:
-            **UNCOMMITTED**
-            collection_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Name of the collection where the index belongs
-
-        """
-        if 'ignore_if_exists' not in kwargs:
-            kwargs['ignore_if_exists'] = False
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class DropQueryIndexOptionsDeprecated(dict):
-    @overload
-    def __init__(self,
-                 ignore_if_not_exists=None,   # type: bool
-                 timeout=None,                # type: timedelta
-                 scope_name=None,             # type: str
-                 collection_name=None         # type: str
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        """
-        Drop query index options
-
-        :param ignore_if_exists: don't throw an exception if index already exists
-        :param timeout: operation timeout in seconds
-        :param scope_name:
-            **UNCOMMITTED**
-            scope_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Nme of the scope where the index belongs
-        :param collection_name:
-            **UNCOMMITTED**
-            collection_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Name of the collection where the index belongs
-
-        """
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super(DropQueryIndexOptions, self).__init__(**kwargs)
-
-
-class DropPrimaryQueryIndexOptionsDeprecated(dict):
-    @overload
-    def __init__(self,
-                 index_name=None,            # str
-                 ignore_if_not_exists=None,  # type: bool
-                 timeout=None,               # type: timedelta
-                 scope_name=None,            # type: str
-                 collection_name=None        # type: str
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        """
-        Drop primary index options
-
-        :param index_name: name of primary index
-        :param timeout: operation timeout in seconds
-        :param ignore_if_exists: don't throw an exception if index already exists
-        :param scope_name:
-            **UNCOMMITTED**
-            scope_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Nme of the scope where the index belongs
-        :param collection_name:
-            **UNCOMMITTED**
-            collection_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Name of the collection where the index belongs
-
-        """
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super(DropPrimaryQueryIndexOptions, self).__init__(**kwargs)
-
-
-class WatchQueryIndexOptionsDeprecated(dict):
-    @overload
-    def __init__(self,
-                 watch_primary=None,      # type: bool
-                 timeout=None,            # type: timedelta
-                 scope_name=None,         # type: str
-                 collection_name=None     # type: str
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        """
-        Watch query index options
-
-        :param watch_primary: If True, watch primary indexes
-        :param timeout: operation timeout in seconds
-        :param scope_name:
-            **UNCOMMITTED**
-            scope_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Nme of the scope where the index belongs
-        :param collection_name:
-            **UNCOMMITTED**
-            collection_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Name of the collection where the index belongs
-
-        """
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super().__init__(**kwargs)
-
-
-class BuildDeferredQueryIndexOptionsDeprecated(dict):
-    @overload
-    def __init__(self,
-                 timeout=None,          # type: timedelta
-                 scope_name=None,       # type: str
-                 collection_name=None   # type: str
-                 ):
-        pass
-
-    def __init__(self, **kwargs):
-        """
-        Build deferred query indexes options
-
-        :param timeout: operation timeout in seconds
-        :param scope_name:
-            **UNCOMMITTED**
-            scope_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Nme of the scope where the index belongs
-        :param collection_name:
-            **UNCOMMITTED**
-            collection_name is an uncommitted API that is unlikely to change,
-            but may still change as final consensus on its behavior has not yet been reached.
-
-            Name of the collection where the index belongs
-
-        """
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-        super(BuildDeferredQueryIndexOptions, self).__init__(**kwargs)
-
-
-GetAllQueryIndexOptions = GetAllQueryIndexOptionsDeprecated  # noqa: F811
-CreateQueryIndexOptions = CreateQueryIndexOptionsDeprecated  # noqa: F811
-CreatePrimaryQueryIndexOptions = CreatePrimaryQueryIndexOptionsDeprecated  # noqa: F811
-DropQueryIndexOptions = DropQueryIndexOptionsDeprecated  # noqa: F811
-DropPrimaryQueryIndexOptions = DropPrimaryQueryIndexOptionsDeprecated  # noqa: F811
-WatchQueryIndexOptions = WatchQueryIndexOptionsDeprecated  # noqa: F811
-BuildDeferredQueryIndexOptions = BuildDeferredQueryIndexOptionsDeprecated  # noqa: F811

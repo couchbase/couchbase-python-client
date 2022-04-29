@@ -1,5 +1,4 @@
-from typing import (TYPE_CHECKING,
-                    Any,
+from typing import (Any,
                     Dict,
                     List)
 
@@ -14,13 +13,13 @@ from couchbase.management.logic.buckets_logic import (BucketManagerLogic,
                                                       CreateBucketSettings)
 from couchbase.management.logic.wrappers import BlockingMgmtWrapper, ManagementType
 
-if TYPE_CHECKING:
-    from couchbase.management.options import (CreateBucketOptions,
-                                              DropBucketOptions,
-                                              FlushBucketOptions,
-                                              GetAllBucketOptions,
-                                              GetBucketOptions,
-                                              UpdateBucketOptions)
+# @TODO:  lets deprecate import of options from couchbase.management.buckets
+from couchbase.management.options import (CreateBucketOptions,
+                                          DropBucketOptions,
+                                          FlushBucketOptions,
+                                          GetAllBucketOptions,
+                                          GetBucketOptions,
+                                          UpdateBucketOptions)
 
 
 class BucketManager(BucketManagerLogic):
@@ -33,15 +32,19 @@ class BucketManager(BucketManagerLogic):
                       *options,  # type: CreateBucketOptions
                       **kwargs   # type: Dict[str, Any]
                       ) -> None:
-        """
-        Creates a new bucket.
+        """Creates a new bucket.
 
-        :param: CreateBucketSettings settings: settings for the bucket.
-        :param: CreateBucketOptions options: options for setting the bucket.
-        :param: Any kwargs: override corresponding values in the options.
+        Args:
+            settings (:class:`.CreateBucketSettings`): The settings to use for the new bucket.
+            options (:class:`~couchbase.management.options.CreateBucketOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
 
-        :raises: BucketAlreadyExistsException
-        :raises: InvalidArgumentsException
+        Raises:
+            :class:`~couchbase.exceptions.BucketAlreadyExistsException`: If the bucket already exists.
+            :class:`~couchbase.exceptions.InvalidArgumentsException`: If an invalid type or value is provided for the
+                settings argument.
         """
         return super().create_bucket(settings, *options, **kwargs)
 
@@ -51,7 +54,19 @@ class BucketManager(BucketManagerLogic):
                       *options,  # type: UpdateBucketOptions
                       **kwargs  # type: Dict[str, Any]
                       ) -> None:
+        """Update the settings for an existing bucket.
 
+        Args:
+            settings (:class:`.BucketSettings`): The settings to use for the new bucket.
+            options (:class:`~couchbase.management.options.UpdateBucketOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentsException`: If an invalid type or value is provided for the
+                settings argument.
+        """
         return super().update_bucket(settings, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
@@ -60,7 +75,18 @@ class BucketManager(BucketManagerLogic):
                     *options,     # type: DropBucketOptions
                     **kwargs      # type: Dict[str, Any]
                     ) -> None:
+        """Drops an existing bucket.
 
+        Args:
+            bucket_name (str): The name of the bucket to drop.
+            options (:class:`~couchbase.management.options.DropBucketOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.BucketDoesNotExistException`: If the bucket does not exist.
+        """
         return super().drop_bucket(bucket_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(BucketSettings, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
@@ -69,7 +95,21 @@ class BucketManager(BucketManagerLogic):
                    *options,      # type: GetBucketOptions
                    **kwargs       # type: Dict[str, Any]
                    ) -> BucketSettings:
+        """Fetches the settings in use for a specified bucket.
 
+        Args:
+            bucket_name (str): The name of the bucket to fetch.
+            options (:class:`~couchbase.management.options.GetBucketOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            :class:`.BucketSettings`: The settings of the specified bucket.
+
+        Raises:
+            :class:`~couchbase.exceptions.BucketDoesNotExistException`: If the bucket does not exist.
+        """
         return super().get_bucket(bucket_name, *options, **kwargs)
 
     @BlockingMgmtWrapper.block(BucketSettings, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
@@ -77,7 +117,17 @@ class BucketManager(BucketManagerLogic):
                         *options,  # type: GetAllBucketOptions
                         **kwargs  # type: Dict[str, Any]
                         ) -> List[BucketSettings]:
+        """Returns a list of existing buckets in the cluster.
 
+        Args:
+            options (:class:`~couchbase.management.options.GetAllBucketOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            List[:class:`.BucketSettings`]: A list of existing buckets in the cluster.
+        """
         return super().get_all_buckets(*options, **kwargs)
 
     @BlockingMgmtWrapper.block(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
@@ -86,5 +136,18 @@ class BucketManager(BucketManagerLogic):
                      *options,      # type: FlushBucketOptions
                      **kwargs       # type: Dict[str, Any]
                      ) -> None:
+        """Flushes the bucket, deleting all the existing data that is stored in it.
 
+        Args:
+            bucket_name (str): The name of the bucket to flush.
+            options (:class:`~couchbase.management.options.FlushBucketOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Raises:
+            :class:`~couchbase.exceptions.BucketDoesNotExistException`: If the bucket does not exist.
+            :class:`~couchbase.exceptions.BucketNotFlushableException`: If the bucket's settings have
+                flushing disabled.
+        """
         return super().flush_bucket(bucket_name, *options, **kwargs)

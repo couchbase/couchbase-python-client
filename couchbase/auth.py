@@ -7,19 +7,21 @@ class Authenticator(dict):
 
 
 class PasswordAuthenticator(Authenticator):
+    """
+    Password authentication mechanism.
+
+    Args:
+        username (str): Username to use for authentication.
+        password (str): Password to use for authentication.
+        cert_path (str, optional): Path of the certificate trust store. Defaults to None.
+    """
+
     def __init__(self,
                  username,          # type: str
                  password,          # type: str
                  cert_path=None     # type: Optional[str]
                  ):
-        """
-        Password authentication mechanism.
-
-        Args:
-            username (str): Username to use for authentication.
-            password (str): Password to use for authentication.
-            cert_path (str, optional): Path of the certificate trust store. Defaults to None.
-        """
+        """PasswordAuthenticator instance."""
         self._username = username
         self._password = password
         self._cert_path = cert_path
@@ -42,20 +44,21 @@ class PasswordAuthenticator(Authenticator):
 
 
 class CertificateAuthenticator(Authenticator):
+    """
+    Certificate authentication mechanism.
+
+    Args:
+        cert_path (str): Path to the client certificate. Defaults to None.
+        key_path (str): Path to the client key. Defaults to None.
+        trust_store_path (str, optional): Path of the certificate trust store. Defaults to None.
+    """
+
     def __init__(self,
                  cert_path=None,            # type: str
                  key_path=None,             # type: str
                  trust_store_path=None     # type: Optional[str]
                  ):
-        """
-        Certificate authentication mechanism.
-
-        Args:
-            cert_path (str): Path to the client certificate. Defaults to None.
-            key_path (str): Path to the client key. Defaults to None.
-            trust_store_path (str, optional): Path of the certificate trust store. Defaults to None.
-        """
-
+        """CertificateAuthenticator instance."""
         self._trust_store_path = trust_store_path
         self._cert_path = cert_path
         self._key_path = key_path

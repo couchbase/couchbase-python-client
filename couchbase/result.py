@@ -46,23 +46,38 @@ class Result:
 
     @property
     def value(self) -> Optional[Any]:
+        """
+            Optional[Any]: The content of the document, if it exists.
+        """
         return self._orig.raw_result.get("value", None)
 
     @property
     def cas(self) -> Optional[int]:
+        """
+            Optional[int]: The CAS of the document, if it exists
+        """
         return self._orig.raw_result.get("cas", 0)
 
     @property
     def flags(self) -> Optional[int]:
+        """
+            Optional[int]: Flags associated with the document.  Used for transcoding.
+        """
         return self._orig.raw_result.get("flags", 0)
 
     @property
     def key(self) -> Optional[str]:
+        """
+            Optional[str]: Key for the operation, if it exists.
+        """
         return self._orig.raw_result.get("key", None)
 
     @property
     def success(self) -> bool:
-        return self.value is not None
+        """
+            bool: Indicates if the operation was successful or not.
+        """
+        return self.cas != 0
 
 
 class ContentProxy:
@@ -154,22 +169,37 @@ class DiagnosticsResult(Result):
 
     @property
     def id(self) -> str:
+        """
+            str: The unique identifier for this report.
+        """
         return self._orig.raw_result.get("id", None)
 
     @property
     def version(self) -> int:
+        """
+            int: The version number of this report.
+        """
         return self._orig.raw_result.get("version", None)
 
     @property
     def sdk(self) -> str:
+        """
+            str: The name of the SDK which generated this report.
+        """
         return self._orig.raw_result.get("sdk", None)
 
     @property
     def endpoints(self) -> Dict[str, Any]:
+        """
+            Dict[str, Any]: A map of service endpoints and their diagnostic status.
+        """
         return self._endpoints
 
     @property
     def state(self) -> ClusterState:
+        """
+            :class:`~couchbase.diagnostics.ClusterState`: The cluster state.
+        """
         num_found = 0
         num_connected = 0
         for endpoints in self._endpoints.values():
@@ -185,7 +215,11 @@ class DiagnosticsResult(Result):
         return ClusterState.Offline
 
     def as_json(self) -> str:
+        """Returns a JSON formatted diagnostics report.
 
+        Returns:
+            str: JSON formatted diagnostics report.
+        """
         return_val = {
             'version': self.version,
             'id': self.id,
@@ -218,22 +252,38 @@ class PingResult(Result):
 
     @property
     def id(self) -> str:
+        """
+            str: The unique identifier for this report.
+        """
         return self._orig.raw_result.get("id", None)
 
     @property
     def version(self) -> int:
+        """
+            int: The version number of this report.
+        """
         return self._orig.raw_result.get("version", None)
 
     @property
     def sdk(self) -> str:
+        """
+            str: The name of the SDK which generated this report.
+        """
         return self._orig.raw_result.get("sdk", None)
 
     @property
     def endpoints(self) -> Dict[str, Any]:
+        """
+            Dict[str, Any]: A map of service endpoints and their ping status.
+        """
         return self._endpoints
 
     def as_json(self) -> str:
+        """Returns a JSON formatted diagnostics report.
 
+        Returns:
+            str: JSON formatted diagnostics report.
+        """
         return_val = {
             'version': self.version,
             'id': self.id,
@@ -248,22 +298,23 @@ class PingResult(Result):
 
 
 class GetResult(Result):
+
     @property
-    def expiry_time(self):
-        # make this a datetime!
+    def expiry_time(self) -> Optional[datetime]:
+        """
+            Optional[datetime]: The expiry of the document, if it was requested.
+        """
         time_ms = self._orig.raw_result.get("expiry", None)
         if time_ms:
             return datetime.fromtimestamp(time_ms)
         return None
 
     @property
-    def expiryTime(self) -> datetime:
-        """Document expiry
-
+    def expiryTime(self) -> Optional[datetime]:
+        """
         ** DEPRECATED ** use expiry_time
 
-        Returns:
-            datetime: Document expiry as datetime
+        Optional[datetime]: The expiry of the document, if it was requested.
         """
         # make this a datetime!
         time_ms = self._orig.raw_result.get("expiry", None)
@@ -272,8 +323,16 @@ class GetResult(Result):
         return None
 
     @property
-    def content_as(self  # type: GetResult
-                   ) -> Any:
+    def content_as(self) -> Any:
+        """
+            Any: The contents of the document.
+
+            Get the value as a dict::
+
+                res = collection.get(key)
+                value = res.content_as[dict]
+
+        """
         return ContentProxy(self.value)
 
     def __repr__(self):
@@ -300,10 +359,17 @@ class MultiGetResult:
 
     @property
     def all_ok(self) -> bool:
+        """
+            bool: True if all operations succeeded, false otherwise.
+        """
         return self._all_ok
 
     @property
     def exceptions(self) -> Dict[str, CouchbaseBaseException]:
+        """
+            Dict[str, Exception]: Map of keys to their respective exceptions, if the
+                operation had an exception.
+        """
         exc = {}
         for k, v in self._results.items():
             if not isinstance(v, GetResult):
@@ -311,7 +377,11 @@ class MultiGetResult:
         return exc
 
     @property
-    def results(self) -> Dict[str, MutationResult]:
+    def results(self) -> Dict[str, GetResult]:
+        """
+            Dict[str, :class:`.GetResult`]: Map of keys to their respective :class:`.GetResult`, if the
+                operation has a result.
+        """
         res = {}
         for k, v in self._results.items():
             if isinstance(v, GetResult):
@@ -338,7 +408,10 @@ class ExistsResult(Result):
         super().__init__(orig, should_raise=should_raise)
 
     @property
-    def exists(self):
+    def exists(self) -> bool:
+        """
+            bool: True if the document exists, false otherwise.
+        """
         return self._orig.raw_result.get("exists", False)
 
     def __repr__(self):
@@ -365,10 +438,17 @@ class MultiExistsResult:
 
     @property
     def all_ok(self) -> bool:
+        """
+            bool: True if all operations succeeded, false otherwise.
+        """
         return self._all_ok
 
     @property
     def exceptions(self) -> Dict[str, CouchbaseBaseException]:
+        """
+            Dict[str, Exception]: Map of keys to their respective exceptions, if the
+                operation had an exception.
+        """
         exc = {}
         for k, v in self._results.items():
             if not isinstance(v, ExistsResult):
@@ -376,7 +456,11 @@ class MultiExistsResult:
         return exc
 
     @property
-    def results(self) -> Dict[str, MutationResult]:
+    def results(self) -> Dict[str, ExistsResult]:
+        """
+            Dict[str, :class:`.MutationResult`]: Map of keys to their respective :class:`.MutationResult`, if the
+                operation has a result.
+        """
         res = {}
         for k, v in self._results.items():
             if isinstance(v, ExistsResult):
@@ -400,6 +484,11 @@ class MutationResult(Result):
         self._mutation_token = None
 
     def mutation_token(self) -> Optional[MutationToken]:
+        """Get the operation's mutation token, if it exists.
+
+        Returns:
+            Optional[:class:`.MutationToken`]: The operation's mutation token.
+        """
         if self._raw_mutation_token is not None and self._mutation_token is None:
             self._mutation_token = MutationToken(self._raw_mutation_token.get())
         return self._mutation_token
@@ -428,10 +517,17 @@ class MultiMutationResult:
 
     @property
     def all_ok(self) -> bool:
+        """
+            bool: True if all operations succeeded, false otherwise.
+        """
         return self._all_ok
 
     @property
     def exceptions(self) -> Dict[str, CouchbaseBaseException]:
+        """
+            Dict[str, Exception]: Map of keys to their respective exceptions, if the
+                operation had an exception.
+        """
         exc = {}
         for k, v in self._results.items():
             if not isinstance(v, MutationResult):
@@ -440,6 +536,10 @@ class MultiMutationResult:
 
     @property
     def results(self) -> Dict[str, MutationResult]:
+        """
+            Dict[str, :class:`.MutationResult`]: Map of keys to their respective :class:`.MutationResult`, if the
+                operation has a result.
+        """
         res = {}
         for k, v in self._results.items():
             if isinstance(v, MutationResult):
@@ -464,18 +564,30 @@ class MutationToken:
 
     @property
     def partition_id(self) -> int:
+        """
+            int:  The token's partition id.
+        """
         return self._token['partition_id']
 
     @property
     def partition_uuid(self) -> int:
+        """
+            int:  The token's partition uuid.
+        """
         return self._token['partition_uuid']
 
     @property
     def sequence_number(self) -> int:
+        """
+            int:  The token's sequence number.
+        """
         return self._token['sequence_number']
 
     @property
     def bucket_name(self) -> str:
+        """
+            str:  The token's bucket name.
+        """
         return self._token['bucket_name']
 
     def as_tuple(self) -> Tuple(int, int, int, str):
@@ -504,6 +616,14 @@ class LookupInResult(Result):
     def exists(self,  # type: LookupInResult
                index  # type: int
                ) -> bool:
+        """Check if the subdocument path exists.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidIndexException`: If the provided index is out of range.
+
+        Returns:
+            bool: True if the path exists.  False if the path does not exist.
+        """
 
         if index > len(self.value) - 1 or index < 0:
             raise InvalidIndexException(
@@ -514,7 +634,14 @@ class LookupInResult(Result):
 
     @property
     def content_as(self) -> ContentSubdocProxy:
+        """
+            :class:`.ContentSubdocProxy`: A proxy to return the value at the specified index.
 
+            Get first value as a dict::
+
+                res = collection.lookup_in(key, (SD.get("geo"), SD.exists("city")))
+                value = res.content_as[dict](0)
+        """
         return ContentSubdocProxy(self.value, self.key)
 
     def __repr__(self):
@@ -525,7 +652,15 @@ class MutateInResult(MutationResult):
 
     @property
     def content_as(self) -> ContentSubdocProxy:
+        """
+            :class:`.ContentSubdocProxy`: A proxy to return the value at the specified index.
 
+            Get first value as a str::
+
+                res = collection.mutate_in(key, (SD.upsert("city", "New City"),
+                                                SD.replace("faa", "CTY")))
+                value = res.content_as[str](0)
+        """
         return ContentSubdocProxy(self.value, self.key)
 
     def __repr__(self):
@@ -536,6 +671,9 @@ class CounterResult(MutationResult):
 
     @property
     def content(self) -> Optional[int]:
+        """
+            Optional[int]: The value of the document after the operation completed.
+        """
         return self._orig.raw_result.get("content", None)
 
     def __repr__(self):
@@ -562,10 +700,17 @@ class MultiCounterResult:
 
     @property
     def all_ok(self) -> bool:
+        """
+            bool: True if all operations succeeded, false otherwise.
+        """
         return self._all_ok
 
     @property
     def exceptions(self) -> Dict[str, CouchbaseBaseException]:
+        """
+            Dict[str, Exception]: Map of keys to their respective exceptions, if the
+                operation had an exception.
+        """
         exc = {}
         for k, v in self._results.items():
             if not isinstance(v, CounterResult):
@@ -574,6 +719,10 @@ class MultiCounterResult:
 
     @property
     def results(self) -> Dict[str, CounterResult]:
+        """
+            Dict[str, :class:`.MutationResult`]: Map of keys to their respective :class:`.MutationResult`, if the
+                operation has a result.
+        """
         res = {}
         for k, v in self._results.items():
             if isinstance(v, CounterResult):
@@ -700,21 +849,37 @@ class QueryResult:
     ):
         self._request = n1ql_request
 
-    def __repr__(self):
-        return "QueryResult:{}".format(self._request)
-
     def rows(self):
+        """The rows which have been returned by the query.
+
+        .. note::
+            If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
+
+        Returns:
+            Iterable: Either an iterable or async iterable.
+        """
         if isinstance(self._request, AsyncN1QLRequest):
             return self.__aiter__()
         return self.__iter__()
 
     def execute(self):
-        """
-        Convenience method
+        """Convenience method to execute the query.
+
+        Returns:
+            List[Any]:  A list of query results.
+
+        Example:
+            q_rows = cluster.query('SELECT * FROM `travel-sample` WHERE country LIKE 'United%' LIMIT 2;').execute()
+
         """
         return self._request.execute()
 
     def metadata(self):
+        """The meta-data which has been returned by the query.
+
+        Returns:
+            :class:`~couchbase.n1ql.QueryMetaData`: An instance of :class:`~couchbase.n1ql.QueryMetaData`.
+        """
         return self._request.metadata()
 
     def __iter__(self):
@@ -722,6 +887,9 @@ class QueryResult:
 
     def __aiter__(self):
         return self._request.__aiter__()
+
+    def __repr__(self):
+        return "QueryResult:{}".format(self._request)
 
 
 class AnalyticsResult:
@@ -735,11 +903,25 @@ class AnalyticsResult:
         return "AnalyticsResult:{}".format(self._request)
 
     def rows(self):
+        """The rows which have been returned by the analytics query.
+
+        .. note::
+            If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
+
+        Returns:
+            Iterable: Either an iterable or async iterable.
+        """
         if isinstance(self._request, AsyncAnalyticsRequest):
             return self.__aiter__()
         return self.__iter__()
 
     def metadata(self):
+        """The meta-data which has been returned by the analytics query.
+
+        Returns:
+            :class:`~couchbase.analytics.AnalyticsMetaData`: An instance of
+            :class:`~couchbase.analytics.AnalyticsMetaData`.
+        """
         return self._request.metadata()
 
     def __iter__(self):
@@ -760,11 +942,25 @@ class SearchResult:
         return "SearchResult:{}".format(self._request)
 
     def rows(self):
+        """The rows which have been returned by the search query.
+
+        .. note::
+            If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
+
+        Returns:
+            Iterable: Either an iterable or async iterable.
+        """
         if isinstance(self._request, AsyncSearchRequest):
             return self.__aiter__()
         return self.__iter__()
 
     def metadata(self):
+        """The meta-data which has been returned by the search query.
+
+        Returns:
+            :class:`~couchbase.search.SearchMetaData`: An instance of
+            :class:`~couchbase.search.SearchMetaData`.
+        """
         return self._request.metadata()
 
     def result_rows(self):
@@ -791,11 +987,25 @@ class ViewResult:
         return "ViewResult:{}".format(self._request)
 
     def rows(self):
+        """The rows which have been returned by the view query.
+
+        .. note::
+            If using the *acouchbase* API be sure to use ``async for`` when looping over rows.
+
+        Returns:
+            Iterable: Either an iterable or async iterable.
+        """
         if isinstance(self._request, AsyncViewRequest):
             return self.__aiter__()
         return self.__iter__()
 
     def metadata(self):
+        """The meta-data which has been returned by the view query.
+
+        Returns:
+            :class:`~couchbase.views.ViewMetaData`: An instance of
+            :class:`~couchbase.views.ViewMetaData`.
+        """
         return self._request.metadata()
 
     def __iter__(self):
