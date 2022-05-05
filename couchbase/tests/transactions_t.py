@@ -26,8 +26,8 @@ from couchbase.exceptions import (ParsingFailedException,
                                   TransactionExpired,
                                   TransactionFailed,
                                   TransactionOperationFailed)
-from couchbase.options import ClusterOptions, TransactionOptions
-from couchbase.transactions import TransactionQueryOptions, TransactionResult
+from couchbase.options import ClusterOptions, TransactionOptions, TransactionQueryOptions
+from couchbase.transactions import TransactionResult
 
 from ._test_utils import (CollectionType,
                           KVPair,

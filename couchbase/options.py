@@ -30,6 +30,7 @@ from typing import (TYPE_CHECKING,
 
 from couchbase._utils import timedelta_as_microseconds, timedelta_as_timestamp
 from couchbase.durability import DurabilityParser
+from couchbase.pycbc_core import transaction_config, per_transaction_config, transaction_query_options
 from couchbase.logic.options import AcceptableInts  # noqa: F401
 from couchbase.logic.options import Compression  # noqa: F401
 from couchbase.logic.options import IpProtocol  # noqa: F401
@@ -995,7 +996,7 @@ class QueryOptions(QueryOptionsBase):
             be scoped to a scope or a collection within the dataset. Defaults to None.
         scap_cap (int, optional):  This is an advanced option, see the query service reference for more
             information on the proper use and tuning of this option. Defaults to None.
-        scap_wait (timedelta, optional):  This is an advanced option, see the query service reference for more
+        scan_wait (timedelta, optional):  This is an advanced option, see the query service reference for more
             information on the proper use and tuning of this option. Defaults to None.
         metrics (bool, optional): Specifies whether metrics should be captured as part of the execution of the query.
             Defaults to False.
@@ -1169,6 +1170,22 @@ class TransactionConfig:
                  metadata_collection=None,  # type: Optional[Collection]
                  scan_consistency=None  # type: Optional[QueryScanConsistency]
                  ):
+        """
+        Configuration for Transactions.
+
+        Args:
+            durability (:class:`ServerDurability`, optional): Desired durability level for all transaction operations.
+            cleanup_window (timedelta, optional): The query metadata is cleaned up over a the cleanup_window.
+              Longer windows mean less background activity, shorter intervals will clean things faster.
+            kv_timeout: (timedelta, optional): KV operation timeout.
+            expiration_time: (timedelta, optional): Maximum amount of time a transaction can take before rolling back.
+            cleanup_lost_attempts: (bool, optional): If False, then we don't do any background cleanup.
+            cleanup_client_attempts: (bool, optional): if False, we don't do any cleanup as a transaction finishes.
+            metadata_collection: (:class:`couchbase.collection.Collection, optional): All transaction metadata uses the
+              specified collection.
+            scan_consistency: (:class:`QueryScanConsistency`, optional): Scan consistency to use for all transactional
+              queries.
+        """
         pass
 
     def __init__(self,
@@ -1199,14 +1216,18 @@ class TransactionOptions:
     @overload
     def __init__(self,
                  durability=None,   # type: Optional[ServerDurability]
-                 cleanup_window=None,  # type: Optional[timedelta]
                  kv_timeout=None,  # type: Optional[timedelta]
                  expiration_time=None,  # type: Optional[timedelta]
-                 cleanup_lost_attempts=None,  # type: Optional[bool]
-                 cleanup_client_attempts=None,  # type: Optional[bool]
-                 custom_metadata_collection=None,  # type: Optional[Collection]
                  scan_consistency=None  # type: Optional[QueryScanConsistency]
                  ):
+        """
+        Overrides a subset of the ``TransactionConfig`` parameters for a single query.
+        Args:
+            durability (:class:`ServerDurability`, optional): Desired durability level for all operations in this transaction.
+            kv_timeout: (timedelta, optional): KV timeout to use for this transaction.
+            expiration_time: (timedelta, optional): Expiry for this transaction.
+            scan_consistency: (:class:`QueryScanConsistency`, optional): Scan consistency for queries in this transaction.
+        """
         pass
 
     def __init__(self,
@@ -1290,3 +1311,84 @@ class DefaultForwarder(Forwarder):
 
 
 forward_args = DefaultForwarder().forward_args
+
+
+class TransactionQueryOptions:
+    ALLOWED_KEYS = {"raw", "adhoc", "scan_consistency", "profile", "client_context_id",
+                    "scan_wait", "read_only", "scan_cap", "pipeline_batch", "pipeline_cap",
+                    "scope", "metrics", "max_parallelism"}
+
+    @overload
+    def __init__(self,
+                 raw=None,  # type: Optional[Dict[str, JSONType]]
+                 adhoc=None,  # type: Optional[bool]
+                 scan_consistency=None,  # type: Optional[QueryScanConsistency]
+                 profile=None,  # type: Optional[Any]
+                 client_context_id=None,  # type: Optional[str]
+                 scan_wait=None,  # type: Optional[timedelta]
+                 read_only=None,  # type: Optional[bool]
+                 scan_cap=None,  # type: Optional[int]
+                 pipeline_batch=None,  # type: Optional[int]
+                 pipeline_cap=None,  # type: Optional[int]
+                 positional_parameters=None,  # type: Optional[Iterable[JSONType]]
+                 named_parameters=None,  # type: Optional[Dict[str, JSONType]]
+                 scope=None,  # type: Optional[Scope]
+                 metrics=None,  # type: Optional[bool]
+                 max_parallelism=None  # type: Optional[int]
+                 ):
+        """
+        QueryOptions for transactions.
+
+        Args:
+            raw (Dict[str, Any], optional): Specifies any additional parameters which should be passed to the query
+                engine when executing the query. Defaults to None.
+            adhoc (bool, optional): Specifies whether this is an ad-hoc query, or if it should be prepared for
+                faster execution in the future. Default to True.
+            scan_consistency (:class:`~couchbase.analytics.AnalyticsScanConsistency`, optional): Specifies the consistency
+                requirements when executing the transactional query.
+            profile (:class:`~couchbase.n1ql.QueryProfile`, optional): Specifies the level of profiling that should
+                be used for the transactional query. Defaults to `Off`.
+            client_context_id (str, optional): Specifies an client id for this query.  This is returned with the response, and can be
+                helpful when debugging.
+            scan_cap (int, optional):  This is an advanced option, see the query service reference for more
+                information on the proper use and tuning of this option. Defaults to None.
+            scan_wait (timedelta, optional):  This is an advanced option, see the query service reference for more
+                information on the proper use and tuning of this option. Defaults to None.
+            metrics (bool, optional): Specifies whether metrics should be captured as part of the execution of the query.
+                Defaults to False.
+            read_only: (bool, optional): Specifies that the query should be considered read-only, and not allowed to
+                mutate documents on the server-side.  See query service reference for more details.
+            pipeline_batch (int, optional): This is an advanced option, see the query service reference for more
+                information on the proper use and tuning of this option. Defaults to None.
+            pipeline_cap (int, optional):  This is an advanced option, see the query service reference for more
+                information on the proper use and tuning of this option. Defaults to None.
+            positional_parameters (Iterable[JSONType], optional): Positional values to be used for the placeholders
+                within the query. Defaults to None.
+            named_parameters (Iterable[Dict[str, JSONType]], optional): Named values to be used for the placeholders
+                within the query. Defaults to None.
+            scope (:class:`~couchbase.scope.Scope`, optional): Specify the scope of the query. Defaults to None.
+            max_parallelism (int, optional): This is an advanced option, see the query service reference for more
+                information on the proper use and tuning of this option. Defaults to None.
+        """
+        pass
+
+    def __init__(self,
+                 **kwargs  # type: Dict[str, JSONType]
+                 ):
+        kwargs = {k: v for k, v in kwargs.items() if k in TransactionQueryOptions.ALLOWED_KEYS}
+        # TODO: mapping similar to the options elsewhere.
+        scope = kwargs.pop("scope", None)
+        if scope:
+            kwargs["bucket"] = scope.bucket.name
+            kwargs["scope"] = scope.name
+        if kwargs.get("scan_wait", None):
+            kwargs["scan_wait"] = kwargs["scan_wait"].total_seconds/1000
+        if kwargs.get("scan_consistency", None):
+            kwargs["scan_consistency"] = kwargs["scan_consistency"].value
+        adhoc = kwargs.pop("adhoc", False)
+        if adhoc:
+            kwargs["ad_hoc"] = True
+        profile = kwargs.pop("profile", None)
+        if profile:
+            kwargs["profile_mode"] = profile
+        self._base = transaction_query_options(**kwargs)

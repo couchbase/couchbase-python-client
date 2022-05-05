@@ -19,13 +19,15 @@ from functools import wraps
 from typing import (TYPE_CHECKING,
                     Callable,
                     Dict,
-                    Optional)
+                    Optional,
+                    Awaitable)
 
 from couchbase.transactions import (TransactionGetResult,
-                                    TransactionQueryOptions,
                                     TransactionQueryResults,
                                     TransactionResult)
 from couchbase.transactions.logic import AttemptContextLogic, TransactionsLogic
+from couchbase.options import TransactionQueryOptions
+import logging
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
@@ -96,7 +98,7 @@ class Transactions(TransactionsLogic):
     def run(self,
             txn_logic,  # type:  Callable[[AttemptContextLogic], None]
             per_txn_config=None,  # type: Optional[TransactionOptions]
-            **kwargs) -> None:
+            **kwargs) -> Awaitable[TransactionResult]:
         def wrapped_logic(c):
             try:
                 ctx = AttemptContext(c, self._loop, self._serializer)
@@ -106,10 +108,17 @@ class Transactions(TransactionsLogic):
                 log.debug('wrapped_logic raised %s', e)
                 raise e
 
-        super().run(wrapped_logic, per_txn_config, **kwargs)
+        return super().run(wrapped_logic, per_txn_config, **kwargs)
 
     # TODO: make async?
     def close(self):
+        """
+        Close the transactions.   No transactions can be performed on this instance after this is called.  There
+        is no need to call this, as the transactions close automatically when the transactions object goes out of scope.
+
+        Returns:
+            None
+        """
         # stop transactions object -- ideally this is done before closing the cluster.
         super().close()
         log.info("transactions closed")
@@ -128,22 +137,114 @@ class AttemptContext(AttemptContextLogic):
             coll,  # type: AsyncCollection
             key,   # type: JSONType
             **kwargs  # type: Dict[str, JSONType]
-            ):
+            ) -> Awaitable[TransactionGetResult]:
+        """
+        Get a document within this transaction.
 
-        super().get(coll, key, **kwargs)
+        Args:
+            coll (:class:`couchbase.collection.Collection`): Collection to use to find the document.
+            key (str): document key.
+            **kwargs (Dict[str, JSONType]): currently unused.
+
+        Returns:
+            Awaitable[:class:`couchbase.transactions.TransactionGetResult`]: Document in collection, in a form useful
+            for passing to other transaction operations. Or `None` if the document was not found.
+        Raises:
+            :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
+            no need to handle the exception, as the transaction will rollback regardless.
+
+        """
+        return super().get(coll, key, **kwargs)
 
     @AsyncWrapper.inject_callbacks(TransactionGetResult)
-    def insert(self, coll, key, value, **kwargs):
-        super().insert(coll, key, value, **kwargs)
+    def insert(self,
+               coll,    # type: AsyncCollection
+               key,     # type: str
+               value,   # type: JSONType
+               **kwargs  # type: Dict[str, Any]
+               ) -> Awaitable[TransactionGetResult]:
+        """
+        Insert a new document within a transaction.
+
+        Args:
+            coll (:class:`couchbase.collection.Collection`): Collection to use to find the document.
+            key (str): document key.
+            value (:class:`couchbase._utils.JSONType):  Contents of the document.
+            **kwargs (Dict[str, Any]): currently unused.
+
+        Returns:
+           Awaitable[:class:`couchbase.transactions.TransactionGetResult`]: Document in collection, in a form useful for passing
+                to other transaction operations.
+        Raises:
+            :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
+                no need to handle the exception, as the transaction will rollback regardless.
+
+        """
+        return super().insert(coll, key, value, **kwargs)
 
     @AsyncWrapper.inject_callbacks(TransactionGetResult)
-    def replace(self, txn_get_result, value, **kwargs):
-        super().replace(txn_get_result, value, **kwargs)
+    def replace(self,
+                txn_get_result,  # type: TransactionGetResult
+                value,  # type: JSONType
+                **kwargs  # type: Dict[str, Any]
+                ) -> Awaitable[TransactionGetResult]:
+        """
+        Replace the contents of a document within a transaction.
+
+        Args:
+            txn_get_result (:class:`couchbase.transactions.TransactionGetResult`): Document to replace, gotten from a
+              previous call to another transaction operation.
+            value (:class:`couchbase._utils.JSONType):  The new contents of the document.
+            **kwargs (Dict[str, Any]): currently unused.
+
+        Returns:
+           Awaitable[:class:`couchbase.transactions.TransactionGetResult`]: Document in collection, in a form useful for passing
+                to other transaction operations.
+        Raises:
+            :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
+                no need to handle the exception, as the transaction will rollback regardless.
+        """
+        return super().replace(txn_get_result, value, **kwargs)
 
     @AsyncWrapper.inject_callbacks(None)
-    def remove(self, txn_get_result, **kwargs):
-        super().remove(txn_get_result, **kwargs)
+    def remove(self,
+               txn_get_result,
+               **kwargs
+               ):
+        """
+        Remove a document in a transaction.
+
+        Args:
+            txn_get_result (:class:`couchbase.transactions.TransactionGetResult`): Document to delete.
+            **kwargs (Dict[str, Any]): currently unused.
+        Returns:
+            Awaitable[None]
+        Raises:
+            :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
+                no need to handle the exception, as the transaction will rollback regardless.
+        """
+        return super().remove(txn_get_result, **kwargs)
 
     @AsyncWrapper.inject_callbacks(TransactionQueryResults)
-    def query(self, query, options=TransactionQueryOptions(), **kwargs) -> TransactionQueryResults:
-        super().query(query, options, **kwargs)
+    def query(self,
+              query,
+              options=TransactionQueryOptions(),
+              **kwargs) -> TransactionQueryResults:
+        """
+        Perform a query within a transaction.
+
+        Args:
+            query (str): Query to perform.
+            options (:class:`couchbase.transactions.TransactionQueryOptions`): Query options to use, if any.
+            **kwargs (Dict[str, Any]): currently unused.
+
+        Returns:
+            Awaitable[:class:`couchbase.transactions.TransactionQueryResult`]
+        Raises:
+            :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
+                no need to handle the exception, as the transaction will rollback regardless.
+            :class:`couchbase.exceptions.CouchbaseException`: If the operation failed, but the transaction will not
+                necessarily be rolled back, a CouchbaseException other than TransactionOperationFailed will be raised.
+                If handled, the transaction will not rollback.
+        """
+        return super().query(query, options, **kwargs)

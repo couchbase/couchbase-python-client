@@ -53,5 +53,8 @@ class TransactionQueryResults:
     def rows(self):
         return self._res.get("results")
 
+    def execute(self):
+        return
+
     def __str__(self):
         return f'TransactionQueryResult{{res={self._res}}}'
