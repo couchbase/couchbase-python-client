@@ -492,9 +492,9 @@ class QueryParamTests:
         assert query.consistency == QueryScanConsistency.AT_PLUS
 
         q_mt = query.params.get('mutation_state', None)
-        assert isinstance(q_mt, list)
+        assert isinstance(q_mt, set)
         assert len(q_mt) == 1
-        assert q_mt[0] == mt
+        assert q_mt.pop() == mt
 
         # Ensure no dups
         ms = MutationState()
@@ -513,9 +513,9 @@ class QueryParamTests:
         assert query.consistency == QueryScanConsistency.AT_PLUS
 
         q_mt = query.params.get('mutation_state', None)
-        assert isinstance(q_mt, list)
+        assert isinstance(q_mt, set)
         assert len(q_mt) == 1
-        assert q_mt[0] == mt
+        assert q_mt.pop() == mt
 
         # Try with a second bucket
         ms = MutationState()
@@ -534,7 +534,7 @@ class QueryParamTests:
         assert query.consistency == QueryScanConsistency.AT_PLUS
 
         q_mt = query.params.get('mutation_state', None)
-        assert isinstance(q_mt, list)
+        assert isinstance(q_mt, set)
         assert len(q_mt) == 2
         assert next((m for m in q_mt if m == mt2), None) is not None
 
