@@ -683,7 +683,7 @@ create_result_from_mutation_operation_response(const char* key,
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }
-    // LOG_INFO("{}: create mutation callback completed", "PYCBC");
+    // LOG_DEBUG("{}: create mutation callback completed", "PYCBC");
     PyGILState_Release(state);
 }
 

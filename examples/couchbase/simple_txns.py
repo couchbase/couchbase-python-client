@@ -1,4 +1,6 @@
+import logging
 from datetime import timedelta
+from sys import stdout
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -6,9 +8,6 @@ from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.exceptions import TransactionFailed
 from couchbase.options import ClusterOptions, TransactionConfig
-
-from sys import stdout
-import logging
 
 if TYPE_CHECKING:
     from couchbase.transactions import AttemptContext

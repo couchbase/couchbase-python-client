@@ -69,7 +69,6 @@ class AnalyticsTests:
         for _ in range(10):
             res = cb_env.cluster.analytics_query(q_str)
             rows = [r for r in res.rows()]
-            print(rows)
             if len(rows) > 0 and rows[0].get('doc_count', 0) > 10:
                 break
             print(f'Found {len(rows)} records, waiting a bit...')

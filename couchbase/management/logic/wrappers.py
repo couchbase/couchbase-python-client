@@ -464,9 +464,7 @@ class BlockingMgmtWrapper:
                 except Exception as ex:
                     if isinstance(ex, (TypeError, ValueError)):
                         raise ex
-                    print(f'base exception: {ex}')
                     exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-                    print(exc_cls.__name__)
                     excptn = exc_cls(message=str(ex))
                     raise excptn
 

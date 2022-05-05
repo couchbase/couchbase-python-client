@@ -290,7 +290,6 @@ class QueryMetaData:
             Optional[:class:`.QueryMetrics`]: A :class:`.QueryMetrics` instance.
         """
         if "metrics" in self._raw:
-            print(f'getting metrics: {self._raw}')
             return QueryMetrics(self._raw.get("metrics", {}))
         return None
 

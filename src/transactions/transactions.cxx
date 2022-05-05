@@ -31,7 +31,7 @@ pycbc_txns::dealloc_transactions(PyObject* obj)
     auto txns = reinterpret_cast<pycbc_txns::transactions*>(PyCapsule_GetPointer(obj, "txns_"));
     txns->txns->close();
     delete txns->txns;
-    LOG_INFO("dealloc transactions");
+    LOG_DEBUG("dealloc transactions");
 }
 
 void
@@ -39,21 +39,21 @@ pycbc_txns::dealloc_attempt_context(PyObject* obj)
 {
     auto ctx = reinterpret_cast<pycbc_txns::attempt_context*>(PyCapsule_GetPointer(obj, "ctx_"));
     delete ctx;
-    LOG_INFO("dealloc attempt_context");
+    LOG_DEBUG("dealloc attempt_context");
 }
 
 void
 pycbc_txns::transaction_config__dealloc__(pycbc_txns::transaction_config* cfg)
 {
     delete cfg->cfg;
-    LOG_INFO("dealloc transaction_config");
+    LOG_DEBUG("dealloc transaction_config");
 }
 
 void
 pycbc_txns::per_transaction_config__dealloc__(pycbc_txns::per_transaction_config* cfg)
 {
     delete cfg->cfg;
-    LOG_INFO("dealloc per_transaction_config");
+    LOG_DEBUG("dealloc per_transaction_config");
 }
 
 PyObject*
@@ -143,7 +143,7 @@ pycbc_txns::per_transaction_config__new__(PyTypeObject* type, PyObject* args, Py
     auto self = reinterpret_cast<pycbc_txns::per_transaction_config*>(type->tp_alloc(type, 0));
 
     self->cfg = new tx::per_transaction_config();
-    LOG_INFO("per_transaction_config__new__ called");
+    LOG_DEBUG("per_transaction_config__new__ called");
     if (!PyArg_ParseTupleAndKeywords(
           args, kwargs, kw_format, const_cast<char**>(kw_list), &durability_level, &kv_timeout, &expiration_time, &scan_consistency)) {
         PyErr_SetString(PyExc_ValueError, "couldn't parse args");
@@ -335,7 +335,7 @@ void
 pycbc_txns::transaction_query_options__dealloc__(pycbc_txns::transaction_query_options* opts)
 {
     delete opts->opts;
-    LOG_INFO("dealloc transaction_query_options");
+    LOG_DEBUG("dealloc transaction_query_options");
 }
 
 static PyTypeObject
@@ -373,7 +373,7 @@ void
 pycbc_txns::transaction_get_result__dealloc__(pycbc_txns::transaction_get_result* result)
 {
     delete result->res;
-    LOG_INFO("dealloc transaction_get_result");
+    LOG_DEBUG("dealloc transaction_get_result");
 }
 
 // TODO: a better way later, perhaps an exposed enum like operations
@@ -817,7 +817,7 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
     }
     if (nullptr != pyObj_value) {
         value = PyBytes_AsString(pyObj_value);
-        LOG_INFO("value is {}", value);
+        LOG_DEBUG("value is {}", value);
     }
     if (nullptr == pyObj_ctx) {
         PyErr_SetString(PyExc_ValueError, "no attempt_context passed in");
@@ -894,7 +894,7 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
         }
         default:
             // return error!
-            LOG_INFO("unknown op {}", op_type);
+            LOG_DEBUG("unknown op {}", op_type);
             PyErr_SetString(PyExc_ValueError, "unknown txn operation");
     }
     if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
@@ -1046,7 +1046,7 @@ pycbc_txns::run_transactions([[maybe_unused]] PyObject* self, PyObject* args, Py
     else
     {
         auto expiry = cfg->expiration_time();
-        LOG_INFO("calling transactions.run with expiry {}ms", expiry.has_value() ? expiry->count() : 0);
+        LOG_DEBUG("calling transactions.run with expiry {}ms", expiry.has_value() ? expiry->count() : 0);
         txns->txns->run(*cfg, logic, cb);
     }
     Py_END_ALLOW_THREADS if (nullptr == pyObj_callback || nullptr == pyObj_errback)

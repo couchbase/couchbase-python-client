@@ -13,12 +13,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
 from typing import TYPE_CHECKING, Optional
 
 from couchbase.pycbc_core import (transaction_op,
                                   transaction_operations,
                                   transaction_query_op)
-import logging
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
@@ -35,7 +35,7 @@ class AttemptContextLogic:
                  loop,    # type: Optional[AbstractEventLoop]
                  serializer  # type: Serializer
                  ):
-        log.debug('creating new attempt context with context=%s, loop=%s, and serializer=%s',ctx, loop, serializer)
+        log.debug('creating new attempt context with context=%s, loop=%s, and serializer=%s', ctx, loop, serializer)
         self._ctx = ctx
         self._loop = loop
         self._serializer = serializer

@@ -480,7 +480,6 @@ class SearchTests:
         # score - descending
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10, sort=['-_score']))
         rows = await self.assert_rows(res, 1, return_rows=True)
-        print(rows)
         score = rows[0].score
         for row in rows[1:]:
             assert score >= row.score

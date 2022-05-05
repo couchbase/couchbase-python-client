@@ -165,10 +165,6 @@ class CollectionLogic:
         transcoder = final_args.pop('transcoder', self.default_transcoder)
         transcoded_value = transcoder.encode_value(value)
 
-        pring_kwargs = kwargs.pop('print_kwargs', False)
-        if pring_kwargs is True:
-            kw = dict(**self._get_connection_args(), **final_args, key=key, value=transcoded_value)
-            print("upsert args: {}".format(kw))
         op_type = operations.UPSERT.value
         return kv_operation(
             **self._get_connection_args(),
@@ -209,11 +205,6 @@ class CollectionLogic:
                *opts,  # type: RemoveOptions
                **kwargs,  # type: Any
                ) -> Optional[MutationResult]:
-        pring_kwargs = kwargs.pop('print_kwargs', False)
-        if pring_kwargs is True:
-            kw = dict(**self._get_connection_args(), **forward_args(kwargs, *opts), key=key)
-            print("remove args: {}".format(kw))
-
         op_type = operations.REMOVE.value
         return kv_operation(
             **self._get_connection_args(), **forward_args(kwargs, *opts), key=key, op_type=op_type

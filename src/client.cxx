@@ -189,7 +189,7 @@ json_encode(PyObject* obj)
         res = std::string(PyUnicode_AsUTF8(encoded));
     }
     Py_XDECREF(encoded);
-    // LOG_INFO("encoded document: {}", res);
+    // LOG_DEBUG("encoded document: {}", res);
     return res;
 }
 

@@ -97,7 +97,7 @@ result_dealloc([[maybe_unused]] result* self)
         Py_XDECREF(pyObj_token_key);
         Py_DECREF(self->dict);
     }
-    // LOG_INFO("{}: result_dealloc completed", "PYCBC");
+    // LOG_DEBUG("{}: result_dealloc completed", "PYCBC");
 }
 
 static PyObject*
@@ -157,7 +157,7 @@ static void
 mutation_token_dealloc([[maybe_unused]] mutation_token* self)
 {
     delete self->token;
-    // LOG_INFO("{}: mutation_token_dealloc completed", "PYCBC");
+    // LOG_DEBUG("{}: mutation_token_dealloc completed", "PYCBC");
 }
 
 static PyObject*
@@ -247,7 +247,7 @@ PyTypeObject streamed_result_type = { PyObject_HEAD_INIT(NULL) 0 };
 static void
 streamed_result_dealloc([[maybe_unused]] streamed_result* self)
 {
-    LOG_INFO("{}: streamed_result_dealloc completed", "PYCBC");
+    LOG_DEBUG("{}: streamed_result_dealloc completed", "PYCBC");
 }
 
 static PyObject*

@@ -62,7 +62,6 @@ class CollectionTests:
         # wait_for_deferred(cb_env.load_data())
         cb_env.load_data()
         return cb_env
-        # print("done")
         # cb_env.purge_data()
         # wait_for_deferred(cb_env.purge_data())
         # wait_for_deferred(c.close())

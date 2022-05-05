@@ -163,10 +163,6 @@ class ClusterLogic:
         return self._serializer
 
     @property
-    def serializer(self) -> Serializer:
-        return self._serializer
-
-    @property
     def connected(self) -> bool:
         """
             bool: Indicator on if the cluster has been connected or not.

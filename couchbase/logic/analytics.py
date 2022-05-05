@@ -414,7 +414,6 @@ class AnalyticsRequestLogic:
         if errback:
             analytics_kwargs['errback'] = errback
 
-        print(analytics_kwargs)
         self._streaming_result = analytics_query(**analytics_kwargs)
 
     def __iter__(self):

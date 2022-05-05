@@ -78,9 +78,7 @@ class BlockingWrapper:
                                       'a bucket needs to be opened prior to cluster level operations')
                     raise e
                 except Exception as ex:
-                    print(f'base exception: {ex}')
                     exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-                    print(exc_cls.__name__)
                     excptn = exc_cls(message=str(ex))
                     raise excptn from None
 
@@ -112,9 +110,7 @@ class BlockingWrapper:
                 except CouchbaseException as e:
                     raise e
                 except Exception as ex:
-                    print(f'base exception: {ex}')
                     exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-                    print(exc_cls.__name__)
                     excptn = exc_cls(message=str(ex))
                     raise excptn
 

@@ -78,7 +78,6 @@ class ViewIndexManagementTests:
         with open(self.TEST_VIEW_PATH) as view_file:
             view_data = view_file.read()
 
-        # print(view_data)
         view = View(map=view_data)
         ddoc = DesignDocument(name=self.DOCNAME, views={self.TEST_VIEW_NAME: view})
         return ddoc

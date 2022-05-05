@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
 from functools import wraps
 from typing import (TYPE_CHECKING,
                     Callable,
@@ -20,7 +21,6 @@ from typing import (TYPE_CHECKING,
 
 from couchbase.exceptions import CouchbaseException, TransactionsErrorContext
 from couchbase.transactions.logic import AttemptContextLogic, TransactionsLogic
-import logging
 
 from .transaction_get_result import TransactionGetResult
 from .transaction_query_options import TransactionQueryOptions

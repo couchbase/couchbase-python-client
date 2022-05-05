@@ -54,7 +54,6 @@ class SearchRequest(SearchRequestLogic):
         return self._query_d
 
     def _on_query_complete(self, result):
-        print(f'_on_query_callback: {result}')
         self._loop.call_soon_threadsafe(self._query_request_ftr.set_result, result)
 
     def _get_metadata(self):

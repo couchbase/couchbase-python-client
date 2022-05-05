@@ -13,11 +13,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
 from typing import TYPE_CHECKING
 
 from couchbase.result import ContentProxy
 from couchbase.serializer import Serializer
-import logging
 
 if TYPE_CHECKING:
     from couchbase.pycbc_core import transaction_get_result

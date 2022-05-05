@@ -80,7 +80,6 @@ class ClusterDiagnosticsTests:
         for ping_reports in result.endpoints.values():
             for report in ping_reports:
                 assert isinstance(report, EndpointPingReport)
-                print(report)
                 if report.state == PingState.OK:
                     assert report.id is not None
                     assert report.latency is not None

@@ -105,7 +105,6 @@ class BucketManagementTests:
     @pytest.mark.usefixtures("purge_buckets")
     @pytest.mark.asyncio
     async def test_bucket_create(self, cb_env, test_bucket):
-        print(f"test_bucket_create bucket: {test_bucket}")
         await cb_env.bm.create_bucket(
             CreateBucketSettings(
                 name=test_bucket,
@@ -132,7 +131,6 @@ class BucketManagementTests:
     @pytest.mark.usefixtures("purge_buckets")
     @pytest.mark.asyncio
     async def test_bucket_create_replica_index_false(self, cb_env, test_bucket):
-        print(f"test_bucket_create_replica_index_false bucket: {test_bucket}")
         await cb_env.bm.create_bucket(
             CreateBucketSettings(
                 name=test_bucket,

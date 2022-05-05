@@ -46,7 +46,7 @@ repos:
           (?x)^(
               deps/|
               src/|
-              simple_txcouchbase.py
+              examples/txcouchbase/
           )
         args:
           [

@@ -200,7 +200,6 @@ class AnalyticsManagementTests:
         async def check_for_idx(idx):
             indexes = await cb_env.am.get_all_indexes()
             for index in indexes:
-                print(index)
                 if index.name == idx:
                     return
             raise Exception(
@@ -224,7 +223,6 @@ class AnalyticsManagementTests:
         async def check_for_idx(idx):
             indexes = await cb_env.am.get_all_indexes()
             for index in indexes:
-                print(index)
                 if index.name == idx:
                     return
             raise Exception(

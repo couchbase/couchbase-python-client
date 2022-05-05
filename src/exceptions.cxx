@@ -68,7 +68,7 @@ exception_base_dealloc(exception_base* self)
     if (self->exc_info) {
         Py_DECREF(self->exc_info);
     }
-    LOG_INFO("{}: exception_base_dealloc completed", "PYCBC");
+    LOG_DEBUG("{}: exception_base_dealloc completed", "PYCBC");
 }
 
 static PyObject*

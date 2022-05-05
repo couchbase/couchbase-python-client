@@ -255,7 +255,6 @@ class PhraseQuery(SearchQuery):
     def __init__(self, *phrases,  # type: str
                  **kwargs  # type: Dict[str, Any]
                  ) -> None:
-        print(phrases)
         super().__init__()
         if self._TERMPROP not in kwargs:
             kwargs[self._TERMPROP] = phrases

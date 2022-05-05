@@ -962,7 +962,6 @@ class ErrorMapper:
             except Exception:  # nosec
                 pass
             if matches:
-                print(f"found match: {exc_class.__name__}")
                 return exc_class
 
         return None

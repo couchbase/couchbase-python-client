@@ -329,7 +329,6 @@ class QueryIndexManagerLogic:
         if final_args.get("timeout", None) is not None:
             mgmt_kwargs["timeout"] = final_args.get("timeout")
 
-        print(f'build deferred idx: {mgmt_kwargs}')
         return management_operation(**mgmt_kwargs)
 
 

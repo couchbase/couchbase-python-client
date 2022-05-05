@@ -1190,7 +1190,6 @@ class TransactionConfig:
         for key in [k for k, v in kwargs.items() if v is None]:
             del(kwargs[key])
 
-        print(f'creating transaction_config with {kwargs}')
         self._base = transaction_config(**kwargs)
 
 
@@ -1213,7 +1212,6 @@ class TransactionOptions:
     def __init__(self,
                  **kwargs  # type: Dict[str, Any]
                  ):
-        print(f'creating new TransactionOptions from {kwargs}')
         kwargs = {k: v for k, v in kwargs.items() if k in TransactionOptions._TXN_ALLOWED_KEYS}
         # convert everything here...
         if kwargs.get("durability_level", None):
@@ -1226,7 +1224,6 @@ class TransactionOptions:
             del(kwargs[key])
 
         # TODO: handle scan consistency
-        print(f'creating per_transaction_config with {kwargs}')
         self._base = per_transaction_config(**kwargs)
 
     def __str__(self):

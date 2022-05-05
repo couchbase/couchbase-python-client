@@ -1,15 +1,14 @@
+from datetime import timedelta
+
 # this is new with Python SDK 4.0, it needs to be imported prior to
 # importing the twisted reactor
-from datetime import timedelta
+import txcouchbase  # nopep8 # isort:skip # noqa: E402, F401
 
 from twisted.internet import defer, reactor
 
-# @TODO: change back to subdocument to match 3.x???
 import couchbase.subdocument as SD
-import txcouchbase
 from couchbase.auth import PasswordAuthenticator
 
-#import couchbase.subdocument as SD
 # **DEPRECATED**, use from couchbase.options import MutateInOptions
 from couchbase.collection import MutateInOptions
 from couchbase.durability import (ClientDurability,
@@ -25,6 +24,7 @@ from couchbase.exceptions import (CASMismatchException,
                                   SubdocCantInsertValueException,
                                   SubdocPathMismatchException)
 from txcouchbase.cluster import Cluster
+
 
 JSON_DOC = {
     "name": "Douglas Reynholm",

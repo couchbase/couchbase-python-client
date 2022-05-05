@@ -17,6 +17,7 @@ import asyncio
 import logging
 
 from couchbase.transcoder import DefaultJsonSerializer
+
 log = logging.getLogger(__name__)
 
 

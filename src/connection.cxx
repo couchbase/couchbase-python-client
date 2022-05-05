@@ -35,7 +35,7 @@ dealloc_conn(PyObject* obj)
             }
         }
     }
-    LOG_INFO("{}: dealloc_conn completed", "PYCBC");
+    LOG_DEBUG("{}: dealloc_conn completed", "PYCBC");
     delete conn;
 }
 
@@ -87,7 +87,7 @@ bucket_op_callback(std::error_code ec,
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
     }
-    LOG_INFO("{}: open/close bucket callback completed", "PYCBC");
+    LOG_DEBUG("{}: open/close bucket callback completed", "PYCBC");
     PyGILState_Release(state);
 }
 
@@ -113,7 +113,7 @@ close_connection_callback(PyObject* pyObj_conn,
 
     if (pyObj_func != nullptr) {
         pyObj_callback_res = PyObject_CallObject(pyObj_func, pyObj_args);
-        LOG_INFO("{}: return from close conn callback.", "PYCBC");
+        LOG_DEBUG("{}: return from close conn callback.", "PYCBC");
         if (pyObj_callback_res) {
             Py_DECREF(pyObj_callback_res);
         } else {
@@ -124,7 +124,7 @@ close_connection_callback(PyObject* pyObj_conn,
         Py_XDECREF(pyObj_errback);
     }
 
-    LOG_INFO("{}: close conn callback completed", "PYCBC");
+    LOG_DEBUG("{}: close conn callback completed", "PYCBC");
     auto conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
     conn->io_.stop();
     Py_DECREF(pyObj_conn);
@@ -176,7 +176,7 @@ create_connection_callback(PyObject* pyObj_conn,
         Py_XDECREF(pyObj_errback);
     }
     Py_DECREF(pyObj_conn);
-    LOG_INFO("{}: create conn callback completed", "PYCBC");
+    LOG_DEBUG("{}: create conn callback completed", "PYCBC");
     PyGILState_Release(state);
 }
 

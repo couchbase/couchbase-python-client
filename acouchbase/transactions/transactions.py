@@ -14,6 +14,7 @@
 #  limitations under the License.
 
 import asyncio
+import logging
 from functools import wraps
 from typing import (TYPE_CHECKING,
                     Callable,
@@ -25,7 +26,6 @@ from couchbase.transactions import (TransactionGetResult,
                                     TransactionQueryResults,
                                     TransactionResult)
 from couchbase.transactions.logic import AttemptContextLogic, TransactionsLogic
-import logging
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
@@ -60,7 +60,7 @@ class AsyncWrapper:
                         self._loop.call_soon_threadsafe(ftr.set_exception, e)
 
                 def on_err(exc):
-                    log.error('%s got on_err called with %s',fn.__name__, exc)
+                    log.error('%s got on_err called with %s', fn.__name__, exc)
                     try:
                         if not exc:
                             raise RuntimeError(f'unknown error calling {fn.__name__}')

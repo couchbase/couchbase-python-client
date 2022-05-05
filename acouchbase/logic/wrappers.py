@@ -37,9 +37,7 @@ def call_async_fn(ft, self, fn, *args, **kwargs):
         if isinstance(e, (TypeError, ValueError)):
             ft.set_exception(e)
         else:
-            print(f'base exception: {e}')
             exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
-            print(exc_cls.__name__)
             excptn = exc_cls(str(e))
             ft.set_exception(excptn)
 

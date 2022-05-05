@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
 from typing import (TYPE_CHECKING,
                     Callable,
                     Optional)
@@ -20,7 +21,7 @@ from typing import (TYPE_CHECKING,
 from couchbase.pycbc_core import (create_transactions,
                                   destroy_transactions,
                                   run_transaction)
-import logging
+
 if TYPE_CHECKING:
     from couchbase.logic.cluster import ClusterLogic
     from couchbase.options import TransactionConfig, TransactionOptions
@@ -55,4 +56,3 @@ class TransactionsLogic:
     def close(self, **kwargs):
         log.info('shutting down transactions...')
         return destroy_transactions(txns=self._txns, **kwargs)
-

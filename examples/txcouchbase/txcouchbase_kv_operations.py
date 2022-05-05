@@ -1,10 +1,11 @@
+from datetime import timedelta
+
 # this is new with Python SDK 4.0, it needs to be imported prior to
 # importing the twisted reactor
-from datetime import timedelta
+import txcouchbase  # nopep8 # isort:skip # noqa: E402, F401
 
 from twisted.internet import defer, reactor
 
-import txcouchbase
 from couchbase.auth import PasswordAuthenticator
 
 # **DEPRECATED**, use: from couchbase.options import DeltaValue, SignedInt64
