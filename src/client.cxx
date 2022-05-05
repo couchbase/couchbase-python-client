@@ -1,5 +1,6 @@
 /*
- *   Copyright 2021 Couchbase, Inc.
+ *   Copyright 2016-2022. Couchbase, Inc.
+ *   All Rights Reserved.
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -13,6 +14,7 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
+
 #include "client.hxx"
 #include <structmember.h>
 #include <cstdlib>
