@@ -266,4 +266,5 @@ class Collection(CollectionLogic):
     def default_name():
         return "_default"
 
+
 TxCollection = Collection

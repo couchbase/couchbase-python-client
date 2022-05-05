@@ -1,7 +1,9 @@
 import json
 import re
 import sys
+from collections import defaultdict
 from enum import Enum
+from string import Template
 from typing import (Any,
                     Dict,
                     Optional,
@@ -473,7 +475,7 @@ class PathMismatchException(CouchbaseException):
 class InvalidValueException(CouchbaseException):
     """Indicates the provided value was invalid for the operation."""
 
-# @TODO:  How to Deprecate??
+# @TODO:  How to Deprecate?
 
 
 SubdocCantInsertValueException = InvalidValueException
@@ -772,6 +774,96 @@ class TransactionCommitAmbiguous(TransactionException):
 
     def __str__(self):
         return f'TransactionCommitAmbiguous{{{super().__str__()}}}'
+
+# Field Level Encryption Exceptions
+
+
+class CryptoException(CouchbaseException):
+    def __init__(self, params=None,
+                 message="Generic Cryptography exception", **kwargs):
+        params = params or {}
+        param_dict = params.get("objextra") or defaultdict(lambda: "unknown")
+        params["message"] = Template(message).safe_substitute(**param_dict)
+        super(CryptoException, self).__init__(params=params, **kwargs)
+
+
+class EncryptionFailureException(CryptoException):
+    def __init__(self, params=None,
+                 message="Generic encryption failure.", **kwargs):
+        super(EncryptionFailureException, self).__init__(
+            params=params, message=message, **kwargs
+        )
+
+
+class DecryptionFailureException(CryptoException):
+    def __init__(self, params=None,
+                 message="Generic decryption failure.", **kwargs):
+        super(DecryptionFailureException, self).__init__(
+            params=params, message=message, **kwargs
+        )
+
+
+class CryptoKeyNotFoundException(CryptoException):
+    def __init__(self, message):
+        self._message = message
+        super(CryptoKeyNotFoundException, self).__init__(message=message)
+
+    def __str__(self):
+        return "{}: {}".format(self.__class__.__name__, self._message)
+
+
+class InvalidCryptoKeyException(CryptoException):
+    def __init__(self, message):
+        self._message = message
+        super(InvalidCryptoKeyException, self).__init__(message=message)
+
+    def __str__(self):
+        return "{}: {}".format(self.__class__.__name__, self._message)
+
+
+class EncrypterNotFoundException(CryptoException):
+    def __init__(self, message):
+        self._message = message
+        super(EncrypterNotFoundException, self).__init__(message=message)
+
+    def __str__(self):
+        return "{}: {}".format(self.__class__.__name__, self._message)
+
+
+class DecrypterNotFoundException(CryptoException):
+    def __init__(self, message):
+        self._message = message
+        super(DecrypterNotFoundException, self).__init__(message=message)
+
+    def __str__(self):
+        return "{}: {}".format(self.__class__.__name__, self._message)
+
+
+class EncrypterAlreadyExistsException(CryptoException):
+    def __init__(self, message):
+        self._message = message
+        super(EncrypterAlreadyExistsException, self).__init__(message=message)
+
+    def __str__(self):
+        return "{}: {}".format(self.__class__.__name__, self._message)
+
+
+class DecrypterAlreadyExistsException(CryptoException):
+    def __init__(self, message):
+        self._message = message
+        super(DecrypterAlreadyExistsException, self).__init__(message=message)
+
+    def __str__(self):
+        return "{}: {}".format(self.__class__.__name__, self._message)
+
+
+class InvalidCipherTextException(CryptoException):
+    def __init__(self, message):
+        self._message = message
+        super(InvalidCipherTextException, self).__init__(message=message)
+
+    def __str__(self):
+        return "{}: {}".format(self.__class__.__name__, self._message)
 
 
 # CXX Error Map

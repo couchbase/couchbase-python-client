@@ -142,4 +142,5 @@ class Bucket(BucketLogic):
         """
         return CollectionManager(self.connection, self.loop, self.name)
 
+
 TxBucket = Bucket

@@ -341,4 +341,5 @@ class Cluster(ClusterLogic):
         # TODO:  AlreadyShutdownException?
         return SearchIndexManager(self.connection, self.loop)
 
+
 TxCluster = Cluster
