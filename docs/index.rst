@@ -7,8 +7,11 @@
 Welcome to the Couchbase Python SDK documentation!
 ===================================================
 
-Using the Python SDK
---------------------
+Getting Started with the Python SDK
+-------------------------------------
+
+:doc:`using_the_python_sdk`
+   Useful information for getting started and using the Python SDK.
 
 Synchronous API
 ---------------
@@ -73,6 +76,13 @@ Indices and tables
 * :ref:`search`
 
 .. Hidden TOCs
+
+.. toctree::
+   :caption: Using the Couchbase Python SDK
+   :maxdepth: 2
+   :hidden:
+
+   using_the_python_sdk
 
 .. toctree::
    :caption: Synchronous API

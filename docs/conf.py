@@ -89,5 +89,26 @@ html_static_path = []
 
 extlinks = {
     'analytics_intro': ('https://docs.couchbase.com/server/current/analytics/introduction.html', None),
-    'search_create_idx': ('https://docs.couchbase.com/server/current/fts/fts-creating-indexes.html', None)
+    'search_create_idx': ('https://docs.couchbase.com/server/current/fts/fts-creating-indexes.html', None),
+    'couchbase_dev_portal': ('https://developer.couchbase.com/', None),
+    'couchbase_discord': ('https://discord.com/invite/sQ5qbPZuTh', None),
+    'python_sdk_github': ('https://github.com/couchbase/couchbase-python-client', None),
+    'acouchbase_examples':
+        ('https://github.com/couchbase/couchbase-python-client/tree/master/examples/acouchbase', None),
+    'couchbase_examples':
+        ('https://github.com/couchbase/couchbase-python-client/tree/master/examples/couchbase', None),
+    'txcouchbase_examples':
+        ('https://github.com/couchbase/couchbase-python-client/tree/master/examples/txcouchbase', None),
+    'txns_examples':
+        ('https://docs.couchbase.com/python-sdk/current/howtos/distributed-acid-transactions-from-the-sdk.html', None),
+    'python_sdk_jira': ('https://issues.couchbase.com/projects/PYCBC/issues/', None),
+    'python_sdk_docs': ('https://docs.couchbase.com/python-sdk/current/hello-world/overview.html', None),
+    'python_sdk_release_notes':
+        ('https://docs.couchbase.com/python-sdk/current/project-docs/sdk-release-notes.html', None),
+    'python_sdk_compatibility':
+        ('https://docs.couchbase.com/python-sdk/current/project-docs/compatibility.html', None),
+    'python_sdk_forums': ('https://forums.couchbase.com/c/python-sdk/10', None),
+    'python_sdk_license': ('https://github.com/couchbase/couchbase-python-client/blob/master/LICENSE', None),
+    'python_sdk_contribute':
+        ('https://github.com/couchbase/couchbase-python-client/blob/master/CONTRIBUTING.md', None),
 }
