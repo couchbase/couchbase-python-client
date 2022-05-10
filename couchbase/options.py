@@ -1379,7 +1379,7 @@ class TransactionQueryOptions:
         # TODO: mapping similar to the options elsewhere.
         scope = kwargs.pop("scope", None)
         if scope:
-            kwargs["bucket"] = scope.bucket.name
+            kwargs["bucket"] = scope.bucket_name
             kwargs["scope"] = scope.name
         if kwargs.get("scan_wait", None):
             kwargs["scan_wait"] = kwargs["scan_wait"].total_seconds/1000
