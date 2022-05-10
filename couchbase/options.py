@@ -30,7 +30,6 @@ from typing import (TYPE_CHECKING,
 
 from couchbase._utils import timedelta_as_microseconds, timedelta_as_timestamp
 from couchbase.durability import DurabilityParser
-from couchbase.pycbc_core import transaction_config, per_transaction_config, transaction_query_options
 from couchbase.logic.options import AcceptableInts  # noqa: F401
 from couchbase.logic.options import Compression  # noqa: F401
 from couchbase.logic.options import IpProtocol  # noqa: F401
@@ -71,7 +70,9 @@ from couchbase.logic.options import (AnalyticsOptionsBase,
                                      UpsertOptionsBase,
                                      ViewOptionsBase,
                                      WaitUntilReadyOptionsBase)
-from couchbase.pycbc_core import per_transaction_config, transaction_config
+from couchbase.pycbc_core import (per_transaction_config,
+                                  transaction_config,
+                                  transaction_query_options)
 
 # allows for imports only during type checking and not during runtime -- :)
 if TYPE_CHECKING:
@@ -994,7 +995,7 @@ class QueryOptions(QueryOptionsBase):
             be used for the query. Defaults to `Off`.
         query_context (str, optional): Specifies the context within which this query should be executed. This can
             be scoped to a scope or a collection within the dataset. Defaults to None.
-        scap_cap (int, optional):  This is an advanced option, see the query service reference for more
+        scan_cap (int, optional):  This is an advanced option, see the query service reference for more
             information on the proper use and tuning of this option. Defaults to None.
         scan_wait (timedelta, optional):  This is an advanced option, see the query service reference for more
             information on the proper use and tuning of this option. Defaults to None.

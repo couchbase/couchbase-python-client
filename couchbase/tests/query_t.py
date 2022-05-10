@@ -555,3 +555,51 @@ class QueryParamTests:
         query = N1QLQuery.create_query_object(q_str)
         assert query.params.get('preserve_expiry', None) is None
         assert query.preserve_expiry is False
+
+    def test_params(self):
+        """
+
+        TODO:
+            timeout
+            read_only
+            scan_consistency
+            consistent_with
+            adhoc
+            client_context_id
+            max_parallelism
+            pipeline_batch
+            pipeline_cap
+            profile
+            query_context
+            raw
+            metrics
+            flex_index
+            preserve_expiry
+            serializer
+            positional_parameters
+            named_parameters
+
+        """
+
+        # no opts - metrics will default to False + statement
+        q_str = 'SELECT * FROM default'
+        q_opts = QueryOptions()
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+        base_opts = {'statement': q_str, 'metrics': False}
+        assert query.params == base_opts
+
+        # scan_cap
+        q_opts = QueryOptions(scan_cap=5)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['scan_cap'] = 5
+        assert query.params == exp_opts
+
+        # scan_wait - converted to microseconds
+        q_opts = QueryOptions(scan_wait=timedelta(seconds=30))
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['scan_wait'] = 30000000
+        assert query.params == exp_opts

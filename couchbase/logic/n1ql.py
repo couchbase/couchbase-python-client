@@ -322,8 +322,8 @@ class N1QLQuery:
         "profile": {"profile": lambda x: x},
         "query_context": {"query_context": lambda x: x},
         "raw": {"raw": lambda x: x},
-        "scap_cap": {"raw": lambda x: x},
-        "scap_wait": {"scap_wait": timedelta_as_microseconds},
+        "scan_cap": {"scan_cap": lambda x: x},
+        "scan_wait": {"scan_wait": timedelta_as_microseconds},
         "metrics": {"metrics": lambda x: x},
         "flex_index": {"flex_index": lambda x: x},
         "preserve_expiry": {"preserve_expiry": lambda x: x},
@@ -579,13 +579,13 @@ class N1QLQuery:
         self.set_option('send_to_node', value)
 
     @property
-    def scap_cap(self) -> Optional[int]:
-        return self._params.get('scap_cap', None)
+    def scan_cap(self) -> Optional[int]:
+        return self._params.get('scan_cap', None)
 
-    @scap_cap.setter
-    def scap_cap(self, value  # type: int
+    @scan_cap.setter
+    def scan_cap(self, value  # type: int
                  ) -> None:
-        self.set_option('scap_cap', value)
+        self.set_option('scan_cap', value)
 
     @property
     def scan_wait(self) -> Optional[float]:
@@ -601,10 +601,11 @@ class N1QLQuery:
         if not value:
             self._params.pop('scan_wait', 0)
         else:
-            if not isinstance(value, timedelta):
-                raise InvalidArgumentException(message="Excepted scan_wait to be a timedelta")
+            # if using the setter, need to validate/transform timedelta, otherwise, just add the value
+            if 'scan_wait' in self._params:
+                value = timedelta_as_microseconds(value)
 
-            self.set_option('scan_wait', value.total_seconds())
+            self.set_option('scan_wait', value)
 
     @property
     def flex_index(self) -> bool:
