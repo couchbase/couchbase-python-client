@@ -83,9 +83,14 @@ transaction_config__new__(PyTypeObject*, PyObject*, PyObject*);
 static void
 transaction_config__dealloc__(pycbc_txns::transaction_config*);
 static PyObject*
+transaction_config__to_dict__(PyObject*);
+
+static PyObject*
 per_transaction_config__new__(PyTypeObject*, PyObject*, PyObject*);
 static void
 per_transaction_config__dealloc__(pycbc_txns::per_transaction_config*);
+static PyObject*
+per_transaction_config__to_dict__(PyObject*);
 static PyObject*
 per_transaction_config__str__(PyObject*);
 
@@ -121,6 +126,8 @@ static PyObject*
 transaction_query_options__new__(PyTypeObject*, PyObject*, PyObject*);
 static void
 transaction_query_options__dealloc__(pycbc_txns::transaction_query_options*);
+static PyObject*
+transaction_query_options__to_dict__(PyObject*);
 
 static PyObject*
 transaction_get_result__new__(PyTypeObject*, PyObject*, PyObject*);

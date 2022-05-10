@@ -49,6 +49,45 @@ pycbc_txns::transaction_config__dealloc__(pycbc_txns::transaction_config* cfg)
     LOG_DEBUG("dealloc transaction_config");
 }
 
+void add_to_dict(PyObject* dict, std::string key, std::string value)
+{
+    PyObject* pyObj_value = PyUnicode_FromString(value.c_str());
+    PyDict_SetItemString(dict, key.c_str(), pyObj_value);
+    Py_DECREF(pyObj_value);
+}
+
+void add_to_dict(PyObject* dict, std::string key, int64_t value)
+{
+    PyObject* pyObj_val = PyLong_FromLongLong(value);
+    PyDict_SetItemString(dict, key.c_str(), pyObj_val);
+    Py_DECREF(pyObj_val);
+}
+
+void add_to_dict(PyObject* dict, std::string key, bool value)
+{
+    PyDict_SetItemString(dict, key.c_str(), value ? Py_True : Py_False);
+}
+
+PyObject*
+pycbc_txns::transaction_config__to_dict__(PyObject* self)
+{
+    auto conf = reinterpret_cast<pycbc_txns::transaction_config*>(self);
+    PyObject* retval = PyDict_New();
+    add_to_dict(retval, "durability_level", static_cast<int64_t>(conf->cfg->durability_level()));
+    add_to_dict(retval, "cleanup_window", static_cast<int64_t>(conf->cfg->cleanup_window().count()));
+    if (conf->cfg->kv_timeout()) {
+        add_to_dict(retval, "kv_timeout", static_cast<int64_t>(conf->cfg->kv_timeout()->count()));
+    }
+    add_to_dict(retval, "expiration_time", static_cast<int64_t>(conf->cfg->expiration_time().count()));
+    add_to_dict(retval, "cleanup_lost_attempts", conf->cfg->cleanup_lost_attempts());
+    add_to_dict(retval, "cleanup_client_attempts", conf->cfg->cleanup_client_attempts());
+    add_to_dict(retval, "scan_consistency", scan_consistency_type_to_string(conf->cfg->scan_consistency()));
+    if (conf->cfg->custom_metadata_collection()) {
+        add_to_dict(retval, "metadata_collection", conf->cfg->custom_metadata_collection()->collection_path());
+    }
+    return retval;
+}
+
 void
 pycbc_txns::per_transaction_config__dealloc__(pycbc_txns::per_transaction_config* cfg)
 {
@@ -81,7 +120,7 @@ pycbc_txns::transaction_config__new__(PyTypeObject* type, PyObject* args, PyObje
                               "metadata_collection",
                               "scan_consistency",
                               nullptr };
-    const char* kw_format = "|OOOOOOsssss";
+    const char* kw_format = "|OOOOOOssss";
     auto self = reinterpret_cast<pycbc_txns::transaction_config*>(type->tp_alloc(type, 0));
 
     self->cfg = new tx::transaction_config();
@@ -165,6 +204,26 @@ pycbc_txns::per_transaction_config__new__(PyTypeObject* type, PyObject* args, Py
 }
 
 PyObject*
+pycbc_txns::per_transaction_config__to_dict__(PyObject* self)
+{
+    auto conf = reinterpret_cast<pycbc_txns::per_transaction_config*>(self);
+    PyObject* retval = PyDict_New();
+    if (conf->cfg->kv_timeout()) {
+        add_to_dict(retval, "kv_timeout", static_cast<int64_t>(conf->cfg->kv_timeout()->count()));
+    }
+    if (conf->cfg->expiration_time()) {
+        add_to_dict(retval, "expiration_time", static_cast<int64_t>(conf->cfg->expiration_time()->count()));
+    }
+    if (conf->cfg->durability_level()) {
+        add_to_dict(retval, "durability_level", static_cast<int64_t>(conf->cfg->durability_level().value()));
+    }
+    if (conf->cfg->scan_consistency()) {
+        add_to_dict(retval, "scan_consistency", scan_consistency_type_to_string(*conf->cfg->scan_consistency()));
+    }
+    return retval;
+}
+
+PyObject*
 pycbc_txns::per_transaction_config__str__(PyObject* self)
 {
     auto cfg = reinterpret_cast<pycbc_txns::per_transaction_config*>(self)->cfg;
@@ -188,6 +247,16 @@ pycbc_txns::per_transaction_config__str__(PyObject* self)
     return PyUnicode_FromString(stream.str().c_str());
 }
 
+static PyMethodDef transaction_config_methods[] = {
+  { "to_dict", (PyCFunction)pycbc_txns::transaction_config__to_dict__, METH_NOARGS, PyDoc_STR("transaction_config as a dict") },
+  { NULL, NULL, 0, NULL }
+};
+
+static PyMethodDef per_transaction_config_methods[] = {
+  { "to_dict", (PyCFunction)pycbc_txns::per_transaction_config__to_dict__, METH_NOARGS, PyDoc_STR("per_transaction_config as a dict") },
+  { NULL, NULL, 0, NULL }
+};
+
 static PyTypeObject
 init_transaction_config_type()
 {
@@ -198,6 +267,7 @@ init_transaction_config_type()
     r.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
     r.tp_new = pycbc_txns::transaction_config__new__;
     r.tp_dealloc = (destructor)pycbc_txns::transaction_config__dealloc__;
+    r.tp_methods = transaction_config_methods;
     return r;
 }
 
@@ -214,6 +284,7 @@ init_per_transaction_config_type()
     r.tp_new = pycbc_txns::per_transaction_config__new__;
     r.tp_str = (reprfunc)pycbc_txns::per_transaction_config__str__;
     r.tp_dealloc = (destructor)pycbc_txns::per_transaction_config__dealloc__;
+    r.tp_methods = per_transaction_config_methods;
     return r;
 }
 
@@ -225,7 +296,7 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
     PyObject* pyObj_raw = nullptr;
     PyObject* pyObj_ad_hoc = nullptr;
     char* scan_consistency = nullptr;
-    PyObject* pyObj_profile_mode = nullptr;
+    char* profile_mode = nullptr;
     char* client_context_id = nullptr;
     PyObject* pyObj_scan_wait = nullptr;
     PyObject* pyObj_read_only = nullptr;
@@ -240,7 +311,7 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
     const char* kw_list[] = { "raw",       "ad_hoc",    "scan_consistency", "profile_mode",    "client_context_id",
                               "scan_wait", "read_only", "scan_cap",         "pipeline_batch",  "pipeline_cap",
                               "scope",     "bucket",    "metrics",          "max_parallelism", nullptr };
-    const char* kw_format = "|OOsOsOOOOOssOO";
+    const char* kw_format = "|OOsssOOOOOssOO";
 
     auto self = reinterpret_cast<pycbc_txns::transaction_query_options*>(type->tp_alloc(type, 0));
     self->opts = new tx::transaction_query_options();
@@ -251,7 +322,7 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
                                      &pyObj_raw,
                                      &pyObj_ad_hoc,
                                      &scan_consistency,
-                                     &pyObj_profile_mode,
+                                     &profile_mode,
                                      &client_context_id,
                                      &pyObj_scan_wait,
                                      &pyObj_read_only,
@@ -266,7 +337,6 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
         Py_RETURN_NONE;
     }
     auto opts = reinterpret_cast<pycbc_txns::transaction_query_options*>(self)->opts;
-    // TODO: actually set them
     if (nullptr != pyObj_max_parallelism) {
         self->opts->max_parallelism(PyLong_AsUnsignedLongLong(pyObj_max_parallelism));
     }
@@ -292,8 +362,8 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
     if (nullptr != client_context_id) {
         self->opts->client_context_id(client_context_id);
     }
-    if (nullptr != pyObj_profile_mode) {
-        // TODO: look at profile mode enum, and then put it in here.
+    if (nullptr != profile_mode) {
+       self->opts->profile(str_to_profile_mode(profile_mode));
     }
     if (nullptr != scan_consistency) {
         self->opts->scan_consistency(str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
@@ -301,10 +371,13 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
     if (nullptr != pyObj_ad_hoc) {
         self->opts->ad_hoc(!!PyObject_IsTrue(pyObj_ad_hoc));
     }
+    if (nullptr != pyObj_metrics) {
+        self->opts->metrics(!!PyObject_IsTrue(pyObj_metrics));
+    }
     if (nullptr != pyObj_raw) {
         if (!PyDict_Check(pyObj_raw)) {
-            PyErr_SetString(PyExc_ValueError, "raw options should be a dict[str, str], where the values are json strings");
-            Py_RETURN_NONE;
+            PyErr_SetString(PyExc_ValueError, "raw option isn't a dict!  The raw option should be a dict[str, JSONString].");
+            return nullptr;
         }
         PyObject *pyObj_key, *pyObj_value;
         Py_ssize_t pos = 0;
@@ -314,15 +387,19 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
             if (PyUnicode_Check(pyObj_key)) {
                 k = std::string(PyUnicode_AsUTF8(pyObj_key));
             } else {
-                PyErr_SetString(PyExc_ValueError, "raw options should be a dict[str, str], where the values are json strings");
-                Py_RETURN_NONE;
+                PyErr_SetString(PyExc_ValueError, "Raw option key not a string!  The raw option should be a dict[str, JSONString].");
+                return nullptr;
             }
-            if (PyUnicode_Check(pyObj_value) && !k.empty()) {
-                couchbase::json_string val{ std::string(PyUnicode_AsUTF8(pyObj_value)) };
+            if (k.empty()) {
+                PyErr_SetString(PyExc_ValueError, "Key is empty!  The raw option should be a dict[str, JSONString].");
+                return nullptr;
+            }
+            if (PyBytes_Check(pyObj_value)) {
+                couchbase::json_string val(std::string(PyBytes_AsString(pyObj_value)));
                 self->opts->raw(k, val);
             } else {
-                PyErr_SetString(PyExc_ValueError, "raw options should be a dict[str, str], where the values are json strings");
-                Py_RETURN_NONE;
+                PyErr_SetString(PyExc_ValueError, "Raw option value not a string!  The raw option should be a dict[str, JSONString].");
+                return nullptr;
             }
         }
         pyObj_key = nullptr;
@@ -331,12 +408,63 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
     return reinterpret_cast<PyObject*>(self);
 }
 
+PyObject*
+pycbc_txns::transaction_query_options__to_dict__(PyObject* self)
+{
+    auto opts = reinterpret_cast<pycbc_txns::transaction_query_options*>(self);
+    PyObject* retval = PyDict_New();
+    auto req = opts->opts->query_request();
+    PyObject* raw = PyDict_New();
+    for (auto const&[key, val] : req.raw) {
+        add_to_dict(raw, key, val.str());
+    }
+    PyDict_SetItemString(retval, "raw", raw);
+    Py_DECREF(raw);
+    add_to_dict(retval, "adhoc", req.adhoc);
+    if (req.scan_consistency) {
+        add_to_dict(retval, "scan_consistency", scan_consistency_type_to_string(req.scan_consistency.value()));
+    }
+    add_to_dict(retval, "profile", profile_mode_to_str(req.profile));
+    if (req.client_context_id) {
+        add_to_dict(retval, "client_context_id", req.client_context_id.value());
+    }
+    if (req.scan_wait) {
+        add_to_dict(retval, "scan_wait", static_cast<int64_t>(req.scan_wait->count()));
+    }
+    add_to_dict(retval, "read_only", req.readonly);
+    if (req.scan_cap) {
+        add_to_dict(retval, "scan_cap", static_cast<int64_t>(req.scan_cap.value()));
+    }
+    if (req.pipeline_batch) {
+        add_to_dict(retval, "pipeline_batch", static_cast<int64_t>(req.pipeline_batch.value()));
+    }
+    if (req.pipeline_cap) {
+        add_to_dict(retval, "pipeline_cap", static_cast<int64_t>(req.pipeline_cap.value()));
+    }
+    if (req.scope_name) {
+        add_to_dict(retval, "scope", req.scope_name.value());
+    }
+    if (req.bucket_name) {
+        add_to_dict(retval, "bucket", req.bucket_name.value());
+    }
+    add_to_dict(retval, "metrics", req.metrics);
+    if (req.max_parallelism) {
+        add_to_dict(retval, "max_parallelism", static_cast<int64_t>(req.max_parallelism.value()));
+    }
+    return retval;
+}
+
 void
 pycbc_txns::transaction_query_options__dealloc__(pycbc_txns::transaction_query_options* opts)
 {
     delete opts->opts;
     LOG_DEBUG("dealloc transaction_query_options");
 }
+
+static PyMethodDef transaction_query_options_methods[] = {
+  { "to_dict", (PyCFunction)pycbc_txns::transaction_query_options__to_dict__, METH_NOARGS, PyDoc_STR("transaction_query_options as a dict") },
+  { NULL, NULL, 0, NULL }
+};
 
 static PyTypeObject
 init_transaction_query_options_type()
@@ -348,6 +476,7 @@ init_transaction_query_options_type()
     r.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE;
     r.tp_new = pycbc_txns::transaction_query_options__new__;
     r.tp_dealloc = (destructor)pycbc_txns::transaction_query_options__dealloc__;
+    r.tp_methods = transaction_query_options_methods;
     return r;
 }
 

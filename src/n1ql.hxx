@@ -35,7 +35,7 @@ str_to_scan_consistency_type(std::string consistency)
     }
 
     // TODO: better exception
-    PyErr_SetString(PyExc_ValueError, "Invalid Scan Consistency type.");
+    PyErr_SetString(PyExc_ValueError, fmt::format("Invalid Scan Consistency type {}", consistency).c_str());
     return {};
 }
 
@@ -44,3 +44,9 @@ scan_consistency_type_to_string(couchbase::query_scan_consistency consistency);
 
 std::vector<couchbase::mutation_token>
 get_mutation_state(PyObject* pyObj_mutation_state);
+
+std::string
+profile_mode_to_str(couchbase::query_profile_mode profile_mode);
+
+couchbase::query_profile_mode
+str_to_profile_mode(std::string profile_mode);

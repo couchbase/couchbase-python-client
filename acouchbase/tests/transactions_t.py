@@ -199,13 +199,11 @@ class AsyncTransactionsTests:
 
         async def txn_logic(ctx):
             location = f"default:`{coll._scope.bucket_name}`.`{coll._scope.name}`.`{coll.name}`"
-            res = await ctx.query(f'INSERT INTO {location} VALUES("{key}", {json.dumps(value)}) RETURNING *')
-            for r in res.rows():
-                rows.append(r)
+            await ctx.query(f'INSERT INTO {location} VALUES("{key}", {json.dumps(value)})')
 
         await cb_env.cluster.transactions.run(txn_logic)
-        assert len(rows) == 1
-        assert list(rows[0].items())[0][1] == value
+        res = await cb_env.collection.exists(key)
+        assert res.exists
 
     @pytest.mark.usefixtures("check_txn_queries_supported")
     @pytest.mark.asyncio

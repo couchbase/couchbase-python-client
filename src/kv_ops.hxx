@@ -84,4 +84,10 @@ handle_kv_multi_op(PyObject* self, PyObject* args, PyObject* kwargs);
 PyObject*
 handle_kv_blocking_result(std::future<PyObject*>&& fut);
 
+couchbase::query_profile_mode
+str_to_profile_mode(std::string profile_mode);
+
+std::string
+profile_mode_to_str(couchbase::query_profile_mode profile_mode);
+
 #endif

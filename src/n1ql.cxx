@@ -51,6 +51,20 @@ str_to_profile_mode(std::string profile_mode)
     return {};
 }
 
+std::string
+profile_mode_to_str(couchbase::query_profile_mode profile_mode)
+{
+    switch(profile_mode) {
+        case couchbase::query_profile_mode::off:
+            return "off";
+        case couchbase::query_profile_mode::phases:
+            return "phases";
+        case couchbase::query_profile_mode::timings:
+            return "timings";
+    }
+    return "unknown profile_mode";
+}
+
 std::vector<couchbase::mutation_token>
 get_mutation_state(PyObject* pyObj_mutation_state)
 {

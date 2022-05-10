@@ -73,6 +73,7 @@ from couchbase.logic.options import (AnalyticsOptionsBase,
 from couchbase.pycbc_core import (per_transaction_config,
                                   transaction_config,
                                   transaction_query_options)
+from couchbase.serializer import DefaultJsonSerializer
 
 # allows for imports only during type checking and not during runtime -- :)
 if TYPE_CHECKING:
@@ -1156,7 +1157,7 @@ class DeltaValue(DeltaValueBase):
 
 
 class TransactionConfig:
-    _TXN_ALLOWED_KEYS = {"durability_level", "cleanup_window", "kv_timeout",
+    _TXN_ALLOWED_KEYS = {"durability", "cleanup_window", "kv_timeout",
                          "expiration_time", "cleanup_lost_attempts", "cleanup_client_attempts",
                          "metadata_collection", "scan_consistency"}
 
@@ -1194,25 +1195,27 @@ class TransactionConfig:
                  ):
         kwargs = {k: v for k, v in kwargs.items() if k in TransactionConfig._TXN_ALLOWED_KEYS}
         # convert everything here...
-        if kwargs.get("durability_level", None):
-            kwargs["durability_level"] = kwargs["durability_level"].level.value
+        durability = kwargs.pop("durability", None)
+        if durability:
+            kwargs["durability_level"] = durability.level.value
         for k in ["cleanup_window", "kv_timeout", "expiration_time"]:
             if kwargs.get(k, None):
                 kwargs[k] = int(kwargs[k].total_seconds() * 1000000)
         coll = kwargs.pop("metadata_collection", None)
         if coll:
-            kwargs["metadata_bucket"] = coll._scope.bucket.name
+            kwargs["metadata_bucket"] = coll._scope.bucket_name
             kwargs["metadata_scope"] = coll._scope.name
             kwargs["metadata_collection"] = coll.name
         # don't pass None
+        if kwargs.get('scan_consistency', None):
+            kwargs['scan_consistency'] = kwargs['scan_consistency'].value
         for key in [k for k, v in kwargs.items() if v is None]:
             del(kwargs[key])
-
         self._base = transaction_config(**kwargs)
 
 
 class TransactionOptions:
-    _TXN_ALLOWED_KEYS = {"durability_level", "kv_timeout", "expiration_time", "scan_consistency"}
+    _TXN_ALLOWED_KEYS = {"durability", "kv_timeout", "expiration_time", "scan_consistency"}
 
     @overload
     def __init__(self,
@@ -1236,16 +1239,17 @@ class TransactionOptions:
                  ):
         kwargs = {k: v for k, v in kwargs.items() if k in TransactionOptions._TXN_ALLOWED_KEYS}
         # convert everything here...
-        if kwargs.get("durability_level", None):
-            kwargs["durability_level"] = kwargs["durability_level"].level.value
+        durability = kwargs.pop("durability", None)
+        if durability:
+            kwargs["durability_level"] = durability.level.value
         for k in ["kv_timeout", "expiration_time"]:
             if kwargs.get(k, None):
                 kwargs[k] = int(kwargs[k].total_seconds() * 1000000)
+        if kwargs.get('scan_consistency', None):
+            kwargs['scan_consistency'] = kwargs['scan_consistency'].value
         # don't pass None
         for key in [k for k, v in kwargs.items() if v is None]:
             del(kwargs[key])
-
-        # TODO: handle scan consistency
         self._base = per_transaction_config(**kwargs)
 
     def __str__(self):
@@ -1386,10 +1390,15 @@ class TransactionQueryOptions:
             kwargs["scan_wait"] = kwargs["scan_wait"].total_seconds/1000
         if kwargs.get("scan_consistency", None):
             kwargs["scan_consistency"] = kwargs["scan_consistency"].value
-        adhoc = kwargs.pop("adhoc", False)
-        if adhoc:
-            kwargs["ad_hoc"] = True
+        raw = kwargs.pop('raw', None)
+        if raw:
+            kwargs['raw'] = dict()
+            for k, v in raw.items():
+                kwargs['raw'][k] = DefaultJsonSerializer().serialize(v)
+        adhoc = kwargs.pop("adhoc", None)
+        if adhoc is not None:
+            kwargs["ad_hoc"] = adhoc
         profile = kwargs.pop("profile", None)
         if profile:
-            kwargs["profile_mode"] = profile
+            kwargs["profile_mode"] = profile.value
         self._base = transaction_query_options(**kwargs)
