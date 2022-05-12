@@ -25,13 +25,10 @@ from typing import (List,
 import pytest
 
 import couchbase.search as search
-from couchbase.auth import PasswordAuthenticator
-from couchbase.cluster import Cluster
 from couchbase.exceptions import InvalidArgumentException, SearchIndexNotFoundException
 from couchbase.management.collections import CollectionSpec
 from couchbase.management.search import SearchIndex
 from couchbase.mutation_state import MutationState
-from couchbase.options import ClusterOptions
 from couchbase.result import MutationToken, SearchResult
 from couchbase.search import (HighlightStyle,
                               MatchOperator,
@@ -54,20 +51,9 @@ class SearchTests:
 
     @pytest.fixture(scope="class", name="cb_env")
     def couchbase_test_environment(self, couchbase_config):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        cluster.cluster_info()
-
-        coll = bucket.default_collection()
-        cb_env = TestEnvironment(cluster,
-                                 bucket,
-                                 coll,
-                                 couchbase_config,
-                                 manage_buckets=True,
-                                 manage_search_indexes=True)
+        cb_env = TestEnvironment.get_environment(__name__,
+                                                 couchbase_config,
+                                                 manage_search_indexes=True)
 
         cb_env.try_n_times(3, 5, cb_env.load_data)
         try:
@@ -584,21 +570,11 @@ class SearchCollectionTests:
 
     @pytest.fixture(scope="class", name="cb_env")
     def couchbase_test_environment(self, couchbase_config):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        cluster.cluster_info()
+        cb_env = TestEnvironment.get_environment(__name__,
+                                                 couchbase_config,
+                                                 manage_collections=True,
+                                                 manage_search_indexes=True)
 
-        coll = bucket.default_collection()
-        cb_env = TestEnvironment(cluster,
-                                 bucket,
-                                 coll,
-                                 couchbase_config,
-                                 manage_buckets=True,
-                                 manage_collections=True,
-                                 manage_search_indexes=True)
         cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
         cb_env.try_n_times(3, 5, cb_env.load_data)
         # lets add another collection and load data there

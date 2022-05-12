@@ -42,7 +42,7 @@ class CollectionMultiTests:
 
     @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     def couchbase_test_environment(self, couchbase_config, request):
-        cb_env = TestEnvironment.get_environment(couchbase_config, request.param)
+        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param)
 
         if request.param == CollectionType.NAMED:
             cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
@@ -55,7 +55,6 @@ class CollectionMultiTests:
 
     @pytest.fixture(name='kds')
     def get_keys_and_docs(self, cb_env):
-        cb_env.check_if_mock_unstable()
         keys_and_docs = {
             'test-key1': {'what': 'a test doc!', 'id': 'test-key1'},
             'test-key2': {'what': 'a test doc!', 'id': 'test-key2'},
@@ -75,7 +74,6 @@ class CollectionMultiTests:
 
     @pytest.fixture(name='fake_kds')
     def get_fake_keys_and_docs(self, cb_env):
-        cb_env.check_if_mock_unstable()
         keys_and_docs = {
             'not-a-key1': {'what': 'a fake test doc!', 'id': 'not-a-key1'},
             'not-a-key2': {'what': 'a fake test doc!', 'id': 'not-a-key2'},
@@ -116,7 +114,7 @@ class CollectionMultiTests:
         if not_found != len(keys):
             raise Exception('Not all docs were expired')
 
-    @pytest.mark.flaky(reruns=5)
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
     def test_multi_exists_simple(self, cb_env, kds):
         keys_and_docs = kds
         res = cb_env.collection.upsert_multi(keys_and_docs)
@@ -144,7 +142,6 @@ class CollectionMultiTests:
             assert r.exists is False
 
     def test_multi_exists_invalid_input(self, cb_env):
-        cb_env.check_if_mock_unstable()
         keys_and_docs = {
             'test-key1': {'what': 'a test doc!', 'id': 'test-key1'},
             'test-key2': {'what': 'a test doc!', 'id': 'test-key2'},
@@ -170,7 +167,6 @@ class CollectionMultiTests:
             assert r.content_as[dict] == keys_and_docs[k]
 
     def test_multi_get_invalid_input(self, cb_env):
-        cb_env.check_if_mock_unstable()
         keys_and_docs = {
             'test-key1': {'what': 'a test doc!', 'id': 'test-key1'},
             'test-key2': {'what': 'a test doc!', 'id': 'test-key2'},
@@ -233,7 +229,6 @@ class CollectionMultiTests:
         cb_env.try_n_times(5, 3, self._check_all_not_found, cb_env, list(keys_and_docs.keys()), okay_key=key1)
 
     def test_multi_upsert_invalid_input(self, cb_env):
-        cb_env.check_if_mock_unstable()
         keys = ['test-key1', 'test-key2', 'test-key3', 'test-key4']
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.upsert_multi(keys)
@@ -274,7 +269,6 @@ class CollectionMultiTests:
         cb_env.try_n_times(5, 3, self._check_all_not_found, cb_env, list(keys_and_docs.keys()), okay_key=key1)
 
     def test_multi_insert_invalid_input(self, cb_env):
-        cb_env.check_if_mock_unstable()
         keys = ['test-key1', 'test-key2', 'test-key3', 'test-key4']
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.insert_multi(keys)
@@ -352,7 +346,6 @@ class CollectionMultiTests:
         cb_env.try_n_times(5, 3, self._check_all_not_found, cb_env, list(keys_and_docs.keys()), okay_key=key1)
 
     def test_multi_replace_invalid_input(self, cb_env):
-        cb_env.check_if_mock_unstable()
         keys = ['test-key1', 'test-key2', 'test-key3', 'test-key4']
         with pytest.raises(InvalidArgumentException):
             cb_env.collection.replace_multi(keys)
@@ -387,7 +380,6 @@ class CollectionMultiTests:
         cb_env.try_n_times(5, 3, self._check_all_not_found, cb_env, list(keys_and_docs.keys()))
 
     def test_multi_remove_invalid_input(self, cb_env):
-        cb_env.check_if_mock_unstable()
         keys_and_docs = {
             'test-key1': {'what': 'a test doc!', 'id': 'test-key1'},
             'test-key2': {'what': 'a test doc!', 'id': 'test-key2'},
@@ -428,7 +420,6 @@ class CollectionMultiTests:
         cb_env.try_n_times(5, 3, self._check_all_not_found, cb_env, list(keys_and_docs.keys()))
 
     def test_multi_touch_invalid_input(self, cb_env):
-        cb_env.check_if_mock_unstable()
         keys_and_docs = {
             'test-key1': {'what': 'a test doc!', 'id': 'test-key1'},
             'test-key2': {'what': 'a test doc!', 'id': 'test-key2'},
@@ -470,7 +461,6 @@ class CollectionMultiTests:
         assert isinstance(res, dict)
 
     def test_multi_lock_invalid_input(self, cb_env):
-        cb_env.check_if_mock_unstable()
         keys_and_docs = {
             'test-key1': {'what': 'a test doc!', 'id': 'test-key1'},
             'test-key2': {'what': 'a test doc!', 'id': 'test-key2'},
@@ -481,7 +471,6 @@ class CollectionMultiTests:
             cb_env.collection.lock_multi(keys_and_docs, timedelta(seconds=5))
 
     def test_multi_unlock_invalid_input(self, cb_env):
-        cb_env.check_if_mock_unstable()
         keys_and_docs = {
             'test-key1': {'what': 'a test doc!', 'id': 'test-key1'},
             'test-key2': {'what': 'a test doc!', 'id': 'test-key2'},

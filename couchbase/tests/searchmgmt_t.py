@@ -15,35 +15,24 @@
 
 import pytest
 
-from couchbase.auth import PasswordAuthenticator
-from couchbase.cluster import Cluster
 from couchbase.exceptions import (InvalidArgumentException,
                                   QueryIndexAlreadyExistsException,
                                   SearchIndexNotFoundException)
 from couchbase.management.search import SearchIndex
-from couchbase.options import ClusterOptions
 
 from ._test_utils import TestEnvironment
 
 
-@pytest.mark.flaky(reruns=5)
+@pytest.mark.flaky(reruns=5, reruns_delay=1)
 class SearchIndexManagementTests:
 
     IDX_NAME = 'test-fts-index'
 
     @pytest.fixture(scope="class", name="cb_env")
     def couchbase_test_environment(self, couchbase_config):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        cluster.cluster_info()
-
-        coll = bucket.default_collection()
-        cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config,
-                                 manage_buckets=True, manage_search_indexes=True)
-
+        cb_env = TestEnvironment.get_environment(__name__,
+                                                 couchbase_config,
+                                                 manage_search_indexes=True)
         yield cb_env
 
     @pytest.fixture(scope="class")

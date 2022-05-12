@@ -18,8 +18,6 @@ from random import choice
 
 import pytest
 
-from couchbase.auth import PasswordAuthenticator
-from couchbase.cluster import Cluster
 from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import (BucketAlreadyExistsException,
                                   BucketDoesNotExistException,
@@ -30,12 +28,11 @@ from couchbase.management.buckets import (BucketSettings,
                                           ConflictResolutionType,
                                           CreateBucketSettings,
                                           StorageBackend)
-from couchbase.options import ClusterOptions
 
 from ._test_utils import TestEnvironment
 
 
-@pytest.mark.flaky(reruns=5)
+@pytest.mark.flaky(reruns=5, reruns_delay=1)
 class BucketManagementTests:
 
     @pytest.fixture(scope="class")
@@ -44,19 +41,9 @@ class BucketManagementTests:
 
     @pytest.fixture(scope="class", name="cb_env")
     def couchbase_test_environment(self, couchbase_config, test_buckets):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        cluster.cluster_info()
-        coll = bucket.default_collection()
-        cb_env = TestEnvironment(
-            cluster, bucket, coll, couchbase_config, manage_buckets=True)
-
+        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, manage_buckets=True)
         yield cb_env
-        if cb_env.is_feature_supported('bucket_mgmt'):
-            cb_env.purge_buckets(test_buckets)
+        cb_env.purge_buckets(test_buckets)
 
     @pytest.fixture(scope="class")
     def check_bucket_mgmt_supported(self, cb_env):
@@ -251,7 +238,7 @@ class BucketManagementTests:
         cb_env.bm.create_bucket(
             CreateBucketSettings(
                 name=test_bucket,
-                ram_quota_mb=256,
+                ram_quota_mb=1024,
                 flush_enabled=False,
                 storage_backend=StorageBackend.MAGMA))
         bucket = cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)

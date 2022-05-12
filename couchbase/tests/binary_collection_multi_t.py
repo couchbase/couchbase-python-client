@@ -34,7 +34,7 @@ class BinaryCollectionMultiTests:
 
     @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     def couchbase_test_environment(self, couchbase_config, request):
-        cb_env = TestEnvironment.get_environment(couchbase_config, request.param)
+        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param)
 
         if request.param == CollectionType.NAMED:
             cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
@@ -48,7 +48,6 @@ class BinaryCollectionMultiTests:
 
     @pytest.fixture(name='utf8_keys')
     def get_utf8_keys(self, cb_env):
-        cb_env.check_if_mock_unstable()
         keys = ['test-key1', 'test-key2', 'test-key3', 'test-key4']
 
         tc = RawStringTranscoder()
@@ -71,7 +70,6 @@ class BinaryCollectionMultiTests:
 
     @pytest.fixture(name='byte_keys')
     def get_byte_keys(self, cb_env):
-        cb_env.check_if_mock_unstable()
         keys = ['test-key1', 'test-key2', 'test-key3', 'test-key4']
 
         tc = RawBinaryTranscoder()
@@ -94,7 +92,6 @@ class BinaryCollectionMultiTests:
 
     @pytest.fixture(name='counter_keys')
     def get_counter_keys(self, cb_env):
-        cb_env.check_if_mock_unstable()
         keys = ['test-key1', 'test-key2', 'test-key3', 'test-key4']
         yield keys
         cb_env.try_n_times_till_exception(10,
@@ -106,7 +103,7 @@ class BinaryCollectionMultiTests:
                                           reset_num_times=3,
                                           return_exceptions=False)
 
-    @pytest.mark.flaky(reruns=5)
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
     def test_append_multi_string(self, cb_env, utf8_keys):
         keys = utf8_keys
         values = ['foo', 'bar', 'baz', 'qux']

@@ -15,8 +15,6 @@
 
 import pytest
 
-from couchbase.auth import PasswordAuthenticator
-from couchbase.cluster import Cluster
 from couchbase.exceptions import (AnalyticsLinkExistsException,
                                   AnalyticsLinkNotFoundException,
                                   CouchbaseException,
@@ -42,7 +40,6 @@ from couchbase.management.options import (ConnectLinkOptions,
                                           DropDatasetOptions,
                                           DropDataverseOptions,
                                           GetLinksAnalyticsOptions)
-from couchbase.options import ClusterOptions
 
 from ._test_utils import TestEnvironment
 
@@ -52,15 +49,7 @@ class AnalyticsManagementTests:
 
     @pytest.fixture(scope="class", name="cb_env")
     def couchbase_test_environment(self, couchbase_config):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        cluster.cluster_info()
-
-        coll = bucket.default_collection()
-        cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_analytics=True)
+        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, manage_analytics=True)
         yield cb_env
 
     @pytest.fixture(scope="class")
@@ -288,15 +277,7 @@ class AnalyticsManagementLinksTests:
 
     @pytest.fixture(scope="class", name="cb_env")
     def couchbase_test_environment(self, couchbase_config):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        cluster.cluster_info()
-
-        coll = bucket.default_collection()
-        cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_analytics=True)
+        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, manage_analytics=True)
         cb_env.check_if_feature_supported('analytics_link_mgmt')
         yield cb_env
 

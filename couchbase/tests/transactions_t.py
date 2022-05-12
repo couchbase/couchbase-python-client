@@ -20,13 +20,11 @@ from uuid import uuid4
 
 import pytest
 
-from couchbase.auth import PasswordAuthenticator
-from couchbase.cluster import Cluster
 from couchbase.exceptions import (ParsingFailedException,
                                   TransactionExpired,
                                   TransactionFailed,
                                   TransactionOperationFailed)
-from couchbase.options import ClusterOptions, TransactionOptions, TransactionQueryOptions
+from couchbase.options import TransactionOptions, TransactionQueryOptions
 from couchbase.transactions import TransactionResult
 
 from ._test_utils import (CollectionType,
@@ -38,19 +36,8 @@ class TransactionTests:
 
     @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     def couchbase_test_environment(self, couchbase_config, request):
-        conn_string = couchbase_config.get_connection_string()
-        opts = ClusterOptions(PasswordAuthenticator(
-            couchbase_config.admin_username, couchbase_config.admin_password))
-        cluster = Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        cluster.cluster_info()
-
-        coll = bucket.default_collection()
-        if request.param == CollectionType.DEFAULT:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True)
-        elif request.param == CollectionType.NAMED:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True,
-                                     manage_collections=True)
+        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param)
+        if request.param == CollectionType.NAMED:
             cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
         cb_env.check_if_feature_supported('txns')

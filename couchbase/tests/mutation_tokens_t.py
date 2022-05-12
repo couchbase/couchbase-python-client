@@ -27,7 +27,7 @@ class MutationTokensEnabledTests:
 
     @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     def couchbase_test_environment(self, couchbase_config, request):
-        cb_env = TestEnvironment.get_environment(couchbase_config, request.param)
+        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param)
 
         if request.param == CollectionType.NAMED:
             cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
@@ -60,7 +60,6 @@ class MutationTokensEnabledTests:
         assert bucket_name == mt_bucket_name
 
     def test_mutation_tokens_upsert(self, cb_env, new_kvp):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key = new_kvp.key
         value = new_kvp.value
@@ -68,7 +67,6 @@ class MutationTokensEnabledTests:
         self.verify_mutation_tokens(cb_env.bucket.name, result)
 
     def test_mutation_tokens_insert(self, cb_env, new_kvp):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key = new_kvp.key
         value = new_kvp.value
@@ -76,7 +74,6 @@ class MutationTokensEnabledTests:
         self.verify_mutation_tokens(cb_env.bucket.name, result)
 
     def test_mutation_tokens_replace(self, cb_env, new_kvp):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key = new_kvp.key
         value = new_kvp.value
@@ -85,7 +82,6 @@ class MutationTokensEnabledTests:
         self.verify_mutation_tokens(cb_env.bucket.name, result)
 
     def test_mutation_tokens_remove(self, cb_env, new_kvp):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key = new_kvp.key
         value = new_kvp.value
@@ -103,7 +99,6 @@ class MutationTokensEnabledTests:
     #     self.verify_mutation_tokens(cb_env.bucket.name, result)
 
     def test_mutation_tokens_mutate_in(self, cb_env, new_kvp):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key = new_kvp.key
 

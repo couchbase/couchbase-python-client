@@ -33,7 +33,7 @@ class LegacyDatastructuresTests:
 
     @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     def couchbase_test_environment(self, couchbase_config, request):
-        cb_env = TestEnvironment.get_environment(couchbase_config, request.param)
+        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param)
 
         if request.param == CollectionType.NAMED:
             cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
@@ -46,14 +46,13 @@ class LegacyDatastructuresTests:
 
     @pytest.fixture()
     def remove_ds(self, cb_env) -> None:
-        cb_env.check_if_mock_unstable()
         yield
         try:
             cb_env.collection.remove(self.TEST_DS_KEY)
         except DocumentNotFoundException:
             pass
 
-    @pytest.mark.flaky(reruns=5)
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
     @pytest.mark.usefixtures("remove_ds")
     def test_list(self, cb_env):
         cb = cb_env.collection
@@ -153,7 +152,7 @@ class DatastructuresTests:
 
     @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT])
     def couchbase_test_environment(self, couchbase_config, request):
-        cb_env = TestEnvironment.get_environment(couchbase_config, request.param)
+        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param)
 
         if request.param == CollectionType.NAMED:
             cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
@@ -166,14 +165,13 @@ class DatastructuresTests:
 
     @pytest.fixture()
     def remove_ds(self, cb_env) -> None:
-        cb_env.check_if_mock_unstable()
         yield
         try:
             cb_env.collection.remove(self.TEST_DS_KEY)
         except DocumentNotFoundException:
             pass
 
-    @pytest.mark.flaky(reruns=5)
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
     @pytest.mark.usefixtures("remove_ds")
     def test_list(self, cb_env):
 

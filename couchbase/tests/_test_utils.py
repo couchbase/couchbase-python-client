@@ -21,6 +21,7 @@ from typing import (Any,
                     Tuple,
                     Type,
                     Union)
+from urllib.parse import urlparse
 
 import pytest
 
@@ -32,7 +33,6 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   BucketDoesNotExistException,
                                   CollectionAlreadyExistsException,
                                   CouchbaseException,
-                                  DocumentNotFoundException,
                                   ScopeAlreadyExistsException,
                                   ScopeNotFoundException,
                                   UnAmbiguousTimeoutException)
@@ -96,10 +96,12 @@ class TestEnvironment(CouchbaseTestEnvironment):
             self.check_if_feature_supported('eventing_function_mgmt')
             self._efm = self.cluster.eventing_functions()
 
-        rl_params = kwargs.get('rate_limit_params', None)
-        if rl_params is not None:
+        if kwargs.get('manage_rate_limit', False) is True:
             self.check_if_feature_supported('rate_limiting')
-            self._rate_limit_params = rl_params
+            parsed_conn = urlparse(cluster_config.get_connection_string())
+            url = f'http://{parsed_conn.netloc}:8091'
+            u, p = cluster_config.get_username_and_pw()
+            self._rate_limit_params = RateLimitData(url, u, p)
 
         self._test_bucket = None
         self._test_bucket_cm = None
@@ -177,7 +179,14 @@ class TestEnvironment(CouchbaseTestEnvironment):
         return self._rate_limit_params if hasattr(self, '_rate_limit_params') else None
 
     @classmethod
-    def get_environment(cls, couchbase_config, coll_type):
+    def get_environment(cls, test_suite, couchbase_config, coll_type=CollectionType.DEFAULT, **kwargs):
+
+        # this will only return False _if_ using the mock server
+        mock_supports = CouchbaseTestEnvironment.mock_supports_feature(test_suite.split('.')[-1],
+                                                                       couchbase_config.is_mock_server)
+        if not mock_supports:
+            pytest.skip(f'Mock server does not support feature(s) required for test suite: {test_suite}')
+
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
@@ -199,10 +208,15 @@ class TestEnvironment(CouchbaseTestEnvironment):
 
         coll = bucket.default_collection()
         if coll_type == CollectionType.DEFAULT:
-            cb_env = cls(cluster, bucket, coll, couchbase_config, manage_buckets=True)
+            cb_env = cls(cluster, bucket, coll, couchbase_config, **kwargs)
         elif coll_type == CollectionType.NAMED:
-            cb_env = cls(cluster, bucket, coll, couchbase_config,
-                         manage_buckets=True, manage_collections=True)
+            if 'manage_collections' not in kwargs:
+                kwargs['manage_collections'] = True
+            cb_env = cls(cluster,
+                         bucket,
+                         coll,
+                         couchbase_config,
+                         **kwargs)
 
         return cb_env
 
@@ -211,43 +225,6 @@ class TestEnvironment(CouchbaseTestEnvironment):
             pytest.skip(('CAVES does not seem to be happy. Skipping tests as failure is not'
                         ' an accurate representation of the state of the test, but rather'
                          ' there is an environment issue.'))
-
-    def check_if_mock_unstable(self):  # noqa: C901
-        if not self.is_mock_server:
-            return
-
-        key = 'is-mock-stable-key'
-        doc = {'what': 'test doc for mock stability'}
-        stable = False
-        for _ in range(3):
-            try:
-                self.collection.upsert(key, doc)
-                stable = True
-                break
-            except (AmbiguousTimeoutException, UnAmbiguousTimeoutException):
-                time.sleep(3)
-                continue
-            except Exception:
-                raise
-
-        self.skip_if_mock_unstable(stable)
-
-        stable = False
-        # now remove
-        for _ in range(3):
-            try:
-                self.collection.remove(key)
-                stable = True
-                break
-            except (AmbiguousTimeoutException, UnAmbiguousTimeoutException):
-                time.sleep(3)
-                continue
-            except DocumentNotFoundException:
-                break  # this is okay
-            except Exception:
-                raise
-
-        self.skip_if_mock_unstable(stable)
 
     def get_new_key_value(self, reset=True, debug_log=False):
         if reset is True:

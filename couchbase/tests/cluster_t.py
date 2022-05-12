@@ -19,8 +19,6 @@ from uuid import uuid4
 
 import pytest
 
-from couchbase.auth import PasswordAuthenticator
-from couchbase.cluster import Cluster
 from couchbase.diagnostics import (ClusterState,
                                    EndpointPingReport,
                                    EndpointState,
@@ -29,9 +27,7 @@ from couchbase.diagnostics import (ClusterState,
 from couchbase.exceptions import (InvalidArgumentException,
                                   ParsingFailedException,
                                   QueryIndexNotFoundException)
-from couchbase.options import (ClusterOptions,
-                               DiagnosticsOptions,
-                               PingOptions)
+from couchbase.options import DiagnosticsOptions, PingOptions
 from couchbase.result import DiagnosticsResult, PingResult
 
 from ._test_utils import TestEnvironment
@@ -41,16 +37,7 @@ class ClusterDiagnosticsTests:
 
     @pytest.fixture(scope="class", name="cb_env")
     def couchbase_test_environment(self, couchbase_config):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        cluster.cluster_info()
-
-        coll = bucket.default_collection()
-        cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True)
-
+        cb_env = TestEnvironment.get_environment(__name__, couchbase_config)
         yield cb_env
 
     @pytest.fixture(scope="class")
@@ -134,7 +121,7 @@ class ClusterDiagnosticsTests:
                 assert data[0]['state'] is not None
 
     @pytest.mark.usefixtures("check_diagnostics_supported")
-    @pytest.mark.flaky(reruns=5)
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
     def test_diagnostics(self, cb_env):
         cluster = cb_env.cluster
         report_id = str(uuid4())
@@ -155,7 +142,7 @@ class ClusterDiagnosticsTests:
         assert kv_endpoints[0].state == EndpointState.Connected
         assert kv_endpoints[0].service_type == ServiceType.KeyValue
 
-    @pytest.mark.flaky(reruns=5)
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
     @pytest.mark.usefixtures("check_diagnostics_supported")
     def test_diagnostics_after_query(self, cb_env):
         cluster = cb_env.cluster

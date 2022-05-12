@@ -125,37 +125,93 @@ class ServerFeatures(Enum):
     TxnQueries = 'txn_queries'
 
 
+# mock and real server (all versions) should have these features
 BASIC_FEATURES = [ServerFeatures.KeyValue,
+                  ServerFeatures.Diagnostics,
                   ServerFeatures.SSL,
                   ServerFeatures.SpatialViews,
                   ServerFeatures.Subdoc,
                   ServerFeatures.Views,
                   ServerFeatures.Replicas]
-BASIC_FEATURES_EXCEPT_MOCK = [ServerFeatures.Query,
-                              ServerFeatures.Search,
-                              ServerFeatures.GetMeta,
-                              ServerFeatures.BucketManagement,
-                              ServerFeatures.QueryIndexManagement,
-                              ServerFeatures.SearchIndexManagement,
-                              ServerFeatures.ViewIndexManagement]
-FEATURES_NOT_IN_MOCK = [ServerFeatures.TxnQueries]
+
+# mock related feature lists
+FEATURES_NOT_IN_MOCK = [ServerFeatures.Analytics,
+                        ServerFeatures.BucketManagement,
+                        ServerFeatures.EventingFunctionManagement,
+                        ServerFeatures.GetMeta,
+                        ServerFeatures.Query,
+                        ServerFeatures.QueryIndexManagement,
+                        ServerFeatures.RateLimiting,
+                        ServerFeatures.Search,
+                        ServerFeatures.SearchIndexManagement,
+                        ServerFeatures.TxnQueries,
+                        ServerFeatures.UserGroupManagement,
+                        ServerFeatures.UserManagement,
+                        ServerFeatures.ViewIndexManagement]
+
 FEATURES_IN_MOCK = [ServerFeatures.Txns]
+
+# separate features into CBS versions, lets make 5.5 the earliest
+AT_LEAST_V5_5_0_FEATURES = [ServerFeatures.BucketManagement,
+                            ServerFeatures.GetMeta,
+                            ServerFeatures.Query,
+                            ServerFeatures.QueryIndexManagement,
+                            ServerFeatures.Search,
+                            ServerFeatures.SearchIndexManagement,
+                            ServerFeatures.ViewIndexManagement]
+
 AT_LEAST_V6_0_0_FEATURES = [ServerFeatures.Analytics,
                             ServerFeatures.UserManagement]
+
 AT_LEAST_V6_5_0_FEATURES = [ServerFeatures.AnalyticsPendingMutations,
                             ServerFeatures.UserGroupManagement,
                             ServerFeatures.SynchronousDurability,
                             ServerFeatures.SearchDisableScoring]
+
 AT_LEAST_V6_6_0_FEATURES = [ServerFeatures.BucketMinDurability,
                             ServerFeatures.Txns]
+
 AT_LEAST_V7_0_0_FEATURES = [ServerFeatures.Collections,
                             ServerFeatures.AnalyticsLinkManagement,
                             ServerFeatures.TxnQueries]
+
 AT_LEAST_V7_1_0_FEATURES = [ServerFeatures.RateLimiting,
                             ServerFeatures.BucketStorageBackend,
                             ServerFeatures.CustomConflictResolution,
                             ServerFeatures.EventingFunctionManagement,
                             ServerFeatures.PreserveExpiry]
+
+# Only set the baseline needed
+TEST_SUITE_MAP = {
+    'analytics_t': [ServerFeatures.Analytics],
+    'analyticsmgmt_t': [ServerFeatures.Analytics],
+    'binary_collection_multi_t': [ServerFeatures.KeyValue],
+    'binary_collection_t': [ServerFeatures.KeyValue],
+    'bucket_t': [ServerFeatures.Diagnostics],
+    'bucketmgmt_t': [ServerFeatures.BucketManagement],
+    'cluster_t': [ServerFeatures.Diagnostics],
+    'collection_multi_t': [ServerFeatures.KeyValue],
+    'collection_t': [ServerFeatures.KeyValue],
+    'collectionmgmt_t': [ServerFeatures.Collections],
+    'connection_t': [ServerFeatures.Diagnostics],
+    'datastructures_t': [ServerFeatures.Subdoc],
+    'eventingmgmt_t': [ServerFeatures.EventingFunctionManagement],
+    'mutation_tokens_t': [ServerFeatures.KeyValue],
+    'query_t': [ServerFeatures.Query, ServerFeatures.QueryIndexManagement],
+    'querymgmt_t': [ServerFeatures.QueryIndexManagement],
+    'rate_limit_t': [ServerFeatures.RateLimiting,
+                     ServerFeatures.BucketManagement,
+                     ServerFeatures.UserManagement,
+                     ServerFeatures.Collections],
+    'search_t': [ServerFeatures.Search, ServerFeatures.SearchIndexManagement],
+    'searchmgmt_t': [ServerFeatures.SearchIndexManagement],
+    'subdoc_t': [ServerFeatures.Subdoc],
+    'transactions_t': [ServerFeatures.Txns],
+    'transcoder_t': [ServerFeatures.KeyValue],
+    'usermgmt_t': [ServerFeatures.UserManagement],
+    'viewmgmt_t': [ServerFeatures.ViewIndexManagement],
+    'views_t': [ServerFeatures.Views, ServerFeatures.ViewIndexManagement]
+}
 
 
 class CouchbaseTestEnvironment():
@@ -306,15 +362,10 @@ class CouchbaseTestEnvironment():
         if feature in map(lambda f: f.value, BASIC_FEATURES):
             return True
 
-        not_mock = BASIC_FEATURES_EXCEPT_MOCK + FEATURES_NOT_IN_MOCK
-
-        if self.is_mock_server and feature in map(lambda f: f.value, not_mock):
-            return not self.is_mock_server
+        if self.is_mock_server and feature in map(lambda f: f.value, FEATURES_NOT_IN_MOCK):
+            return False
 
         if self.is_mock_server and feature in map(lambda f: f.value, FEATURES_IN_MOCK):
-            return True
-
-        if self.is_real_server and feature in map(lambda f: f.value, BASIC_FEATURES_EXCEPT_MOCK):
             return True
 
         if feature == ServerFeatures.Diagnostics.value:
@@ -334,6 +385,11 @@ class CouchbaseTestEnvironment():
                 return True
 
             return self.mock_server_type == MockServerType.GoCAVES
+
+        if feature in map(lambda f: f.value, AT_LEAST_V5_5_0_FEATURES):
+            if self.is_real_server:
+                return self.server_version_short >= 5.5
+            return not self.is_mock_server
 
         if feature in map(lambda f: f.value, AT_LEAST_V6_0_0_FEATURES):
             if self.is_real_server:
@@ -370,8 +426,7 @@ class CouchbaseTestEnvironment():
     def feature_not_supported_text(self, feature  # type: str  # noqa: C901
                                    ) -> str:
 
-        not_mock = BASIC_FEATURES_EXCEPT_MOCK + FEATURES_NOT_IN_MOCK
-        if self.is_mock_server and feature in map(lambda f: f.value, not_mock):
+        if self.is_mock_server and feature in map(lambda f: f.value, FEATURES_NOT_IN_MOCK):
             return f'Mock server does not support feature: {feature}'
 
         if feature == ServerFeatures.Diagnostics.value:
@@ -385,6 +440,12 @@ class CouchbaseTestEnvironment():
         if feature == ServerFeatures.BucketManagement.value:
             if self.mock_server_type == MockServerType.Legacy:
                 return f'LegacyMockServer does not support feature: {feature}'
+
+        if feature in map(lambda f: f.value, AT_LEAST_V5_5_0_FEATURES):
+            if self.is_real_server:
+                return (f'Feature: {feature} only supported on server versions >= 5.5. '
+                        f'Using server version: {self.server_version}.')
+            return f'Mock server does not support feature: {feature}'
 
         if feature in map(lambda f: f.value, AT_LEAST_V6_0_0_FEATURES):
             if self.is_real_server:
@@ -416,7 +477,25 @@ class CouchbaseTestEnvironment():
                         f'Using server version: {self.server_version}.')
             return f'Mock server does not support feature: {feature}'
 
+    @staticmethod
+    def mock_supports_feature(test_suite,  # type: str
+                              is_mock  # type: bool
+                              ) -> bool:
+        if not is_mock:
+            return True
+
+        test_suite_features = TEST_SUITE_MAP.get(test_suite, None)
+        if not test_suite_features:
+            raise CouchbaseTestEnvironmentException(f"Unable to determine features for test suite: {test_suite}")
+
+        for feature in test_suite_features:
+            if feature.value in map(lambda f: f.value, FEATURES_NOT_IN_MOCK):
+                return False
+
+        return True
+
     # common User mgmt validation
+
     def validate_user(self, user, user_roles=None):
         # password is write-only
         property_list = ['username', 'groups', 'roles']

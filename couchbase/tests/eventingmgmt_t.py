@@ -18,8 +18,6 @@ from datetime import timedelta
 
 import pytest
 
-from couchbase.auth import PasswordAuthenticator
-from couchbase.cluster import Cluster
 from couchbase.exceptions import (CollectionAlreadyExistsException,
                                   EventingFunctionAlreadyDeployedException,
                                   EventingFunctionCollectionNotFoundException,
@@ -47,12 +45,11 @@ from couchbase.management.eventing import (EventingFunction,
                                            EventingFunctionUrlBinding,
                                            EventingFunctionUrlNoAuth)
 from couchbase.management.options import GetFunctionOptions, UpsertFunctionOptions
-from couchbase.options import ClusterOptions
 
 from ._test_utils import EventingFunctionManagementTestStatusException, TestEnvironment
 
 
-@pytest.mark.flaky(reruns=5)
+@pytest.mark.flaky(reruns=5, reruns_delay=1)
 class EventingManagementTests:
 
     EVT_SRC_BUCKET_NAME = "beer-sample"
@@ -82,15 +79,7 @@ class EventingManagementTests:
 
     @pytest.fixture(scope="class", name="cb_env")
     def couchbase_test_environment(self, couchbase_config):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        cluster.cluster_info()
-
-        coll = bucket.default_collection()
-        cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_eventing_functions=True)
+        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, manage_eventing_functions=True)
 
         if cb_env.is_feature_supported('collections'):
             cb_env._cm = cb_env.bucket.collections()

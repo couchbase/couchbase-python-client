@@ -28,7 +28,7 @@ class DefaultTranscoderTests:
 
     @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     def couchbase_test_environment(self, couchbase_config, request):
-        cb_env = TestEnvironment.get_environment(couchbase_config, request.param)
+        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param)
 
         if request.param == CollectionType.NAMED:
             cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
@@ -41,7 +41,6 @@ class DefaultTranscoderTests:
 
     @pytest.fixture(name="new_kvp")
     def new_key_and_value_with_reset(self, cb_env) -> KVPair:
-        cb_env.check_if_mock_unstable()
         key, value = cb_env.get_new_key_value()
         yield KVPair(key, value)
         cb_env.try_n_times_till_exception(10,
@@ -52,7 +51,7 @@ class DefaultTranscoderTests:
                                           reset_on_timeout=True,
                                           reset_num_times=3)
 
-    @pytest.mark.flaky(reruns=5)
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
     def test_default_tc_json_upsert(self, cb_env, new_kvp):
         cb = cb_env.collection
         key = new_kvp.key
@@ -129,21 +128,18 @@ class DefaultTranscoderTests:
         assert result == new_content
 
     def test_default_tc_binary_upsert(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         content = bytes(json.dumps("Here are some bytes"), "utf-8")
         with pytest.raises(ValueFormatException):
             cb.upsert('some-test-bytes', content)
 
     def test_default_tc_bytearray_upsert(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         content = bytearray(json.dumps("Here are some bytes"), "utf-8")
         with pytest.raises(ValueFormatException):
             cb.upsert('some-test-bytes', content)
 
     def test_default_tc_binary_insert(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         content = bytes(json.dumps("Here are some bytes"), "utf-8")
         with pytest.raises(ValueFormatException):

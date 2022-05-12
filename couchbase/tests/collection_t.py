@@ -51,7 +51,7 @@ class CollectionTests:
 
     @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     def couchbase_test_environment(self, couchbase_config, request):
-        cb_env = TestEnvironment.get_environment(couchbase_config, request.param)
+        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param, manage_buckets=True)
 
         if request.param == CollectionType.NAMED:
             cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
@@ -78,7 +78,6 @@ class CollectionTests:
 
     @pytest.fixture(name="new_kvp")
     def new_key_and_value_with_reset(self, cb_env) -> KVPair:
-        cb_env.check_if_mock_unstable()
         key, value = cb_env.get_new_key_value()
         yield KVPair(key, value)
         cb_env.try_n_times_till_exception(10,
@@ -91,13 +90,11 @@ class CollectionTests:
 
     @pytest.fixture(name="default_kvp")
     def default_key_and_value(self, cb_env) -> KVPair:
-        cb_env.check_if_mock_unstable()
         key, value = cb_env.get_default_key_value()
         yield KVPair(key, value)
 
     @pytest.fixture(name="default_kvp_and_reset")
     def default_key_and_value_with_reset(self, cb_env) -> KVPair:
-        cb_env.check_if_mock_unstable()
         key, value = cb_env.get_default_key_value()
         yield KVPair(key, value)
         cb_env.try_n_times(5, 3, cb_env.collection.upsert, key, value)
@@ -117,7 +114,7 @@ class CollectionTests:
         num_replicas = bucket_settings.get("num_replicas")
         return num_replicas
 
-    @pytest.mark.flaky(reruns=5)
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
     def test_exists(self, cb_env, default_kvp):
         cb = cb_env.collection
         key = default_kvp.key
@@ -126,7 +123,6 @@ class CollectionTests:
         assert result.exists is True
 
     def test_does_not_exists(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         result = cb.exists(self.NO_KEY)
         assert isinstance(result, ExistsResult)
@@ -156,7 +152,6 @@ class CollectionTests:
         assert result.content_as[dict] == value
 
     def test_get_fails(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         with pytest.raises(DocumentNotFoundException):
             cb.get(self.NO_KEY)
@@ -341,7 +336,6 @@ class CollectionTests:
             cb.replace(key, value1, ReplaceOptions(cas=old_cas))
 
     def test_replace_fail(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         with pytest.raises(DocumentNotFoundException):
             cb.replace(self.NO_KEY, {"some": "content"})
@@ -361,7 +355,6 @@ class CollectionTests:
                                               raise_exception=True)
 
     def test_remove_fail(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         with pytest.raises(DocumentNotFoundException):
             cb.remove(self.NO_KEY)

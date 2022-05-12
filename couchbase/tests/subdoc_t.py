@@ -18,8 +18,6 @@ from datetime import datetime, timedelta
 import pytest
 
 import couchbase.subdocument as SD
-from couchbase.auth import PasswordAuthenticator
-from couchbase.cluster import Cluster
 from couchbase.durability import DurabilityLevel, ServerDurability
 from couchbase.exceptions import (DocumentExistsException,
                                   DocumentNotFoundException,
@@ -29,9 +27,7 @@ from couchbase.exceptions import (DocumentExistsException,
                                   PathExistsException,
                                   PathMismatchException,
                                   PathNotFoundException)
-from couchbase.options import (ClusterOptions,
-                               GetOptions,
-                               MutateInOptions)
+from couchbase.options import GetOptions, MutateInOptions
 from couchbase.result import (GetResult,
                               LookupInResult,
                               MutateInResult)
@@ -46,19 +42,8 @@ class SubDocumentTests:
 
     @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     def couchbase_test_environment(self, couchbase_config, request):
-        conn_string = couchbase_config.get_connection_string()
-        opts = ClusterOptions(PasswordAuthenticator(
-            couchbase_config.admin_username, couchbase_config.admin_password))
-        cluster = Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        cluster.cluster_info()
-
-        coll = bucket.default_collection()
-        if request.param == CollectionType.DEFAULT:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True)
-        elif request.param == CollectionType.NAMED:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config,
-                                     manage_buckets=True, manage_collections=True)
+        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param, manage_buckets=True)
+        if request.param == CollectionType.NAMED:
             cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
         cb_env.try_n_times(3, 5, cb_env.load_data)
@@ -87,7 +72,6 @@ class SubDocumentTests:
 
     @pytest.fixture(name="new_kvp")
     def new_key_and_value_with_reset(self, cb_env) -> KVPair:
-        cb_env.check_if_mock_unstable()
         key, value = cb_env.get_new_key_value()
         yield KVPair(key, value)
         cb_env.try_n_times_till_exception(10,
@@ -100,13 +84,11 @@ class SubDocumentTests:
 
     @pytest.fixture(name="default_kvp")
     def default_key_and_value(self, cb_env) -> KVPair:
-        cb_env.check_if_mock_unstable()
         key, value = cb_env.get_default_key_value()
         yield KVPair(key, value)
 
     @pytest.fixture(name="default_kvp_and_reset")
     def default_key_and_value_with_reset(self, cb_env) -> KVPair:
-        cb_env.check_if_mock_unstable()
         key, value = cb_env.get_default_key_value()
         yield KVPair(key, value)
         cb_env.try_n_times(5, 3, cb_env.collection.upsert, key, value)
@@ -116,9 +98,8 @@ class SubDocumentTests:
         if cb_env.is_mock_server:
             pytest.skip("CAVES + couchbase++ not playing nice...")
 
-    @pytest.mark.flaky(reruns=5)
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
     def test_lookup_in_simple_get(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key, value = cb_env.get_default_key_value()
         result = cb.lookup_in(key, (SD.get("geo"),))
@@ -134,7 +115,6 @@ class SubDocumentTests:
         assert result.content_as[dict](0) == value["geo"]
 
     def test_lookup_in_simple_exists(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key, _ = cb_env.get_default_key_value()
         result = cb.lookup_in(key, (SD.exists("geo"),))
@@ -145,7 +125,6 @@ class SubDocumentTests:
             result.content_as[bool](0)
 
     def test_lookup_in_simple_exists_bad_path(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key, _ = cb_env.get_default_key_value()
         result = cb.lookup_in(key, (SD.exists("qzzxy"),))
@@ -155,7 +134,6 @@ class SubDocumentTests:
             result.content_as[bool](0)
 
     def test_lookup_in_one_path_not_found(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key, _ = cb_env.get_default_key_value()
         result = cb.lookup_in(
@@ -169,7 +147,6 @@ class SubDocumentTests:
             result.content_as[bool](1)
 
     def test_lookup_in_simple_long_path(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key, value = cb_env.get_new_key_value()
         # add longer path to doc
@@ -184,7 +161,6 @@ class SubDocumentTests:
         cb.remove(key)
 
     def test_lookup_in_multiple_specs(self, cb_env):
-        cb_env.check_if_mock_unstable()
         if cb_env.is_mock_server:
             pytest.skip("Mock will not return expiry in the xaddrs.")
 
@@ -199,7 +175,6 @@ class SubDocumentTests:
         assert result.content_as[int](3) == value["geo"]["alt"]
 
     def test_count(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key, value = cb_env.get_new_key_value()
         value["count"] = [1, 2, 3, 4, 5]
@@ -211,7 +186,6 @@ class SubDocumentTests:
 
     @pytest.mark.usefixtures('skip_mock_mutate_in')
     def test_mutate_in_simple(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key, value = cb_env.get_new_key_value()
         cb.upsert(key, value)
@@ -593,7 +567,6 @@ class SubDocumentTests:
         assert val["array"][2] == 3
 
     def test_array_add_unique(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key, value = cb_env.get_new_key_value()
         value["array"] = [0, 1, 2, 3]
@@ -609,7 +582,6 @@ class SubDocumentTests:
         assert 4 in val["array"]
 
     def test_array_as_document(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key = "simple-key"
         cb.upsert(key, [])
@@ -646,7 +618,6 @@ class SubDocumentTests:
         assert app_res == [8, 9, 10]
 
     def test_array_prepend_multi_insert(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key, value = cb_env.get_new_key_value()
         value["array"] = [4, 5, 6, 7, 8, 9, 10]
@@ -716,7 +687,6 @@ class SubDocumentTests:
         assert result.content_as[dict]["count"] == 150
 
     def test_decrement(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key, value = cb_env.get_new_key_value()
         value["count"] = 100
@@ -729,7 +699,6 @@ class SubDocumentTests:
         assert result.content_as[dict]["count"] == 50
 
     def test_insert_create_parents(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key, value = cb_env.get_new_key_value()
         cb.upsert(key, value)
@@ -741,7 +710,6 @@ class SubDocumentTests:
         assert result.content_as[dict]["new"]["path"] == "parents created"
 
     def test_upsert_create_parents(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key, value = cb_env.get_new_key_value()
         cb.upsert(key, value)
@@ -753,7 +721,6 @@ class SubDocumentTests:
         assert result.content_as[dict]["new"]["path"] == "parents created"
 
     def test_array_append_create_parents(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key, value = cb_env.get_new_key_value()
         cb.upsert(key, value)
@@ -767,7 +734,6 @@ class SubDocumentTests:
             "Hello,", "World!"]
 
     def test_array_prepend_create_parents(self, cb_env):
-        cb_env.check_if_mock_unstable()
         cb = cb_env.collection
         key, value = cb_env.get_new_key_value()
         cb.upsert(key, value)

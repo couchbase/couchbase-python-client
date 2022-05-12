@@ -32,7 +32,7 @@ class BinaryCollectionTests:
 
     @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     def couchbase_test_environment(self, couchbase_config, request):
-        cb_env = TestEnvironment.get_environment(couchbase_config, request.param)
+        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param)
 
         if request.param == CollectionType.NAMED:
             cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
@@ -48,35 +48,30 @@ class BinaryCollectionTests:
 
     @pytest.fixture(name='utf8_empty_kvp')
     def utf8_key_and_empty_value(self, cb_env) -> KVPair:
-        cb_env.check_if_mock_unstable()
         key, value = cb_env.try_n_times(5, 3, cb_env.load_utf8_binary_data)
         yield KVPair(key, value)
         cb_env.collection.upsert(key, '', transcoder=RawStringTranscoder())
 
     @pytest.fixture(name='utf8_kvp')
     def utf8_key_and_value(self, cb_env) -> KVPair:
-        cb_env.check_if_mock_unstable()
         key, value = cb_env.try_n_times(5, 3, cb_env.load_utf8_binary_data, start_value='XXXX')
         yield KVPair(key, value)
         cb_env.collection.upsert(key, '', transcoder=RawStringTranscoder())
 
     @pytest.fixture(name='bytes_empty_kvp')
     def bytes_key_and_empty_value(self, cb_env) -> KVPair:
-        cb_env.check_if_mock_unstable()
         key, value = cb_env.try_n_times(5, 3, cb_env.load_bytes_binary_data)
         yield KVPair(key, value)
         cb_env.collection.upsert(key, b'', transcoder=RawBinaryTranscoder())
 
     @pytest.fixture(name='bytes_kvp')
     def bytes_key_and_value(self, cb_env) -> KVPair:
-        cb_env.check_if_mock_unstable()
         key, value = cb_env.try_n_times(5, 3, cb_env.load_bytes_binary_data, start_value=b'XXXX')
         yield KVPair(key, value)
         cb_env.collection.upsert(key, b'', transcoder=RawBinaryTranscoder())
 
     @pytest.fixture(name='counter_empty_kvp')
     def counter_key_and_empty_value(self, cb_env) -> KVPair:
-        cb_env.check_if_mock_unstable()
         key, value = cb_env.try_n_times(5, 3, cb_env.load_counter_binary_data)
         yield KVPair(key, value)
         cb_env.try_n_times_till_exception(10,
@@ -87,7 +82,6 @@ class BinaryCollectionTests:
 
     @pytest.fixture(name='counter_kvp')
     def counter_key_and_value(self, cb_env) -> KVPair:
-        cb_env.check_if_mock_unstable()
         key, value = cb_env.try_n_times(5, 3, cb_env.load_counter_binary_data, start_value=100)
         yield KVPair(key, value)
         cb_env.try_n_times_till_exception(10,
@@ -98,7 +92,7 @@ class BinaryCollectionTests:
 
     # tests
 
-    @pytest.mark.flaky(reruns=5)
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
     def test_append_string(self, cb_env, utf8_empty_kvp):
         cb = cb_env.collection
         key = utf8_empty_kvp.key

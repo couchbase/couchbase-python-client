@@ -17,8 +17,6 @@ from datetime import timedelta
 
 import pytest
 
-from couchbase.auth import PasswordAuthenticator
-from couchbase.cluster import Cluster
 from couchbase.exceptions import (ParsingFailedException,
                                   QueryIndexAlreadyExistsException,
                                   QueryIndexNotFoundException,
@@ -29,7 +27,6 @@ from couchbase.management.options import (CreatePrimaryQueryIndexOptions,
                                           DropQueryIndexOptions,
                                           GetAllQueryIndexOptions,
                                           WatchQueryIndexOptions)
-from couchbase.options import ClusterOptions
 
 from ._test_utils import TestEnvironment
 
@@ -38,16 +35,9 @@ class QueryIndexManagementTests:
 
     @pytest.fixture(scope="class", name="cb_env")
     def couchbase_test_environment(self, couchbase_config):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        cluster.cluster_info()
-
-        coll = bucket.default_collection()
-        cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config,
-                                 manage_buckets=True, manage_query_indexes=True)
+        cb_env = TestEnvironment.get_environment(__name__,
+                                                 couchbase_config,
+                                                 manage_query_indexes=True)
 
         yield cb_env
         cb_env.try_n_times(5, 3, self._clear_all_indexes, cb_env, ignore_fail=True)
@@ -356,22 +346,10 @@ class QueryIndexCollectionManagementTests:
 
     @pytest.fixture(scope="class", name="cb_env")
     def couchbase_test_environment(self, couchbase_config):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        cluster.cluster_info()
-
-        coll = bucket.default_collection()
-
-        cb_env = TestEnvironment(cluster,
-                                 bucket,
-                                 coll,
-                                 couchbase_config,
-                                 manage_buckets=True,
-                                 manage_collections=True,
-                                 manage_query_indexes=True)
+        cb_env = TestEnvironment.get_environment(__name__,
+                                                 couchbase_config,
+                                                 manage_collections=True,
+                                                 manage_query_indexes=True)
 
         cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
