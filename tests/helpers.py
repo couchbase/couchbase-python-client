@@ -494,6 +494,12 @@ class CouchbaseTestEnvironment():
 
         return True
 
+    def skip_if_mock_unstable(self, stable):
+        if not stable and self.is_mock_server:
+            pytest.skip(('CAVES does not seem to be happy. Skipping tests as failure is not'
+                        ' an accurate representation of the state of the test, but rather'
+                         ' there is an environment issue.'))
+
     # common User mgmt validation
 
     def validate_user(self, user, user_roles=None):

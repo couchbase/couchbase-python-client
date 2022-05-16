@@ -65,6 +65,10 @@ class SubDocumentTests:
             pytest.skip("Feature only available on CBS >= 6.5")
 
     @pytest.fixture(scope="class")
+    def check_xattr_supported(self, cb_env):
+        cb_env.check_if_feature_supported('xattr')
+
+    @pytest.fixture(scope="class")
     def num_replicas(self, cb_env):
         bucket_settings = cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, cb_env.bucket.name)
         num_replicas = bucket_settings.get("num_replicas")
@@ -160,10 +164,8 @@ class SubDocumentTests:
         # reset to norm
         cb.remove(key)
 
+    @pytest.mark.usefixtures("check_xattr_supported")
     def test_lookup_in_multiple_specs(self, cb_env):
-        if cb_env.is_mock_server:
-            pytest.skip("Mock will not return expiry in the xaddrs.")
-
         cb = cb_env.collection
         key, value = cb_env.get_default_key_value()
         result = cb.lookup_in(key, (SD.get(
@@ -235,10 +237,9 @@ class SubDocumentTests:
         result = cb.get(key)
         assert value == result.content_as[dict]
 
+    @pytest.mark.usefixtures("check_xattr_supported")
+    @pytest.mark.usefixtures('skip_mock_mutate_in')
     def test_mutate_in_expiry(self, cb_env):
-        if cb_env.is_mock_server:
-            pytest.skip("Mock will not return expiry in the xaddrs.")
-
         cb = cb_env.collection
         key, value = cb_env.get_new_key_value()
         cb.upsert(key, value)

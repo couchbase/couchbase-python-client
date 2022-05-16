@@ -15,225 +15,273 @@
 
 import pytest
 
-from couchbase.auth import PasswordAuthenticator
-from couchbase.exceptions import (CouchbaseException,
-                                  DocumentNotFoundException,
-                                  InvalidArgumentException)
-from couchbase.options import (ClusterOptions,
-                               DecrementOptions,
+from couchbase.exceptions import DocumentNotFoundException, InvalidArgumentException
+from couchbase.options import (DecrementOptions,
                                DeltaValue,
                                IncrementOptions,
                                SignedInt64)
-from couchbase.result import CounterResult
+from couchbase.result import CounterResult, MutationResult
 from couchbase.transcoder import RawBinaryTranscoder, RawStringTranscoder
-from txcouchbase.cluster import Cluster
 
-from ._test_utils import TestEnvironment, wait_for_deferred
+from ._test_utils import (CollectionType,
+                          KVPair,
+                          TestEnvironment,
+                          run_in_reactor_thread)
 
 
 class BinaryCollectionTests:
 
-    @pytest.fixture(scope="class", name="cb_env")
-    def couchbase_test_environment(self, couchbase_config):
-        conn_string = couchbase_config.get_connection_string()
-        opts = ClusterOptions(PasswordAuthenticator(
-            couchbase_config.admin_username, couchbase_config.admin_password))
-        c = Cluster(
-            conn_string, opts)
-        b = c.bucket(f"{couchbase_config.bucket_name}")
-        wait_for_deferred(b.on_connect())
-        coll = b.default_collection()
-        cb_env = TestEnvironment(c, b, coll, couchbase_config)
-        # wait_for_deferred(cb_env.load_binary_data())
-        cb_env.load_binary_data()
+    @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT])
+    def couchbase_test_environment(self, couchbase_config, request):
+        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param)
+
+        # if request.param == CollectionType.NAMED:
+        #     cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
+
         yield cb_env
-        wait_for_deferred(cb_env.purge_binary_data())
-        wait_for_deferred(c.close())
 
-    def test_append_string(self, cb_env):
+        # if request.param == CollectionType.NAMED:
+        #     cb_env.try_n_times_till_exception(5, 3,
+        #                                       cb_env.teardown_named_collections,
+        #                                       raise_if_no_exception=False)
+
+    # key/value fixtures
+
+    @pytest.fixture(name='utf8_empty_kvp')
+    def utf8_key_and_empty_value(self, cb_env) -> KVPair:
+        key, value = cb_env.try_n_times(5, 3, cb_env.load_utf8_binary_data, is_deferred=False)
+        yield KVPair(key, value)
+        run_in_reactor_thread(cb_env.collection.upsert, key, '', transcoder=RawStringTranscoder())
+
+    @pytest.fixture(name='utf8_kvp')
+    def utf8_key_and_value(self, cb_env) -> KVPair:
+        key, value = cb_env.try_n_times(5, 3, cb_env.load_utf8_binary_data, start_value='XXXX', is_deferred=False)
+        yield KVPair(key, value)
+        run_in_reactor_thread(cb_env.collection.upsert, key, '', transcoder=RawStringTranscoder())
+
+    @pytest.fixture(name='bytes_empty_kvp')
+    def bytes_key_and_empty_value(self, cb_env) -> KVPair:
+        key, value = cb_env.try_n_times(5, 3, cb_env.load_bytes_binary_data, is_deferred=False)
+        yield KVPair(key, value)
+        run_in_reactor_thread(cb_env.collection.upsert, key, b'', transcoder=RawBinaryTranscoder())
+
+    @pytest.fixture(name='bytes_kvp')
+    def bytes_key_and_value(self, cb_env) -> KVPair:
+        key, value = cb_env.try_n_times(5, 3, cb_env.load_bytes_binary_data, start_value=b'XXXX', is_deferred=False)
+        yield KVPair(key, value)
+        run_in_reactor_thread(cb_env.collection.upsert, key, b'', transcoder=RawBinaryTranscoder())
+
+    @pytest.fixture(name='counter_empty_kvp')
+    def counter_key_and_empty_value(self, cb_env) -> KVPair:
+        key, value = cb_env.try_n_times(5, 3, cb_env.load_counter_binary_data, is_deferred=False)
+        yield KVPair(key, value)
+        cb_env.try_n_times_till_exception(10,
+                                          1,
+                                          cb_env.collection.remove,
+                                          key,
+                                          expected_exceptions=(DocumentNotFoundException,))
+
+    @pytest.fixture(name='counter_kvp')
+    def counter_key_and_value(self, cb_env) -> KVPair:
+        key, value = cb_env.try_n_times(5, 3, cb_env.load_counter_binary_data, start_value=100, is_deferred=False)
+        yield KVPair(key, value)
+        cb_env.try_n_times_till_exception(10,
+                                          1,
+                                          cb_env.collection.remove,
+                                          key,
+                                          expected_exceptions=(DocumentNotFoundException,))
+
+    # tests
+
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    def test_append_string(self, cb_env, utf8_empty_kvp):
         cb = cb_env.collection
-        key = cb_env.get_binary_key("UTF8")
-        result = wait_for_deferred(cb.binary().append(key, "foo"))
+        key = utf8_empty_kvp.key
+        result = run_in_reactor_thread(cb.binary().append, key, 'foo')
+        assert isinstance(result, MutationResult)
         assert result.cas is not None
         # make sure it really worked
-        result = wait_for_deferred(
-            cb.get(key, transcoder=RawStringTranscoder()))
-        assert result.content_as[str] == "foo"
+        result = run_in_reactor_thread(cb.get, key, transcoder=RawStringTranscoder())
+        assert result.content_as[str] == 'foo'
 
-    def test_append_string_not_empty(self, cb_env):
+    def test_append_string_not_empty(self, cb_env, utf8_kvp):
         cb = cb_env.collection
-        key = cb_env.get_binary_key("UTF8")
-
-        tc = RawStringTranscoder()
-        wait_for_deferred(cb.upsert(key, "XXXX", transcoder=tc))
-        result = wait_for_deferred(cb.binary().append(key, "foo"))
+        key = utf8_kvp.key
+        value = utf8_kvp.value
+        result = run_in_reactor_thread(cb.binary().append, key, 'foo')
+        assert isinstance(result, MutationResult)
         assert result.cas is not None
-        result = wait_for_deferred(
-            cb.get(key, transcoder=RawStringTranscoder()))
-        assert result.content_as[str] == "XXXXfoo"
+        result = run_in_reactor_thread(cb.get, key, transcoder=RawStringTranscoder())
+        assert result.content_as[str] == value + 'foo'
 
-    def test_append_string_nokey(self, cb_env):
+    def test_append_string_nokey(self, cb_env, utf8_empty_kvp):
         cb = cb_env.collection
-        key = cb_env.get_binary_key("UTF8")
-        wait_for_deferred(cb.remove(key))
-        try:
-            cb_env.try_n_times(10, 1, cb.get, key)
-        except CouchbaseException:
-            pass
+        key = utf8_empty_kvp.key
+        run_in_reactor_thread(cb.remove, key)
+        cb_env.try_n_times_till_exception(10,
+                                          1,
+                                          cb.get,
+                                          key,
+                                          expected_exceptions=(DocumentNotFoundException,))
 
-        # TODO:  NotStoredException?
+        # @TODO(jc):  3.2.x SDK tests for NotStoredException
         with pytest.raises(DocumentNotFoundException):
-            wait_for_deferred(cb.binary().append(key, "foo"))
+            run_in_reactor_thread(cb.binary().append, key, 'foo')
 
-        # reset
-        cb_env.load_binary_data()
-
-    def test_append_bytes(self, cb_env):
+    def test_append_bytes(self, cb_env, bytes_empty_kvp):
         cb = cb_env.collection
-        key = cb_env.get_binary_key("BYTES")
-        result = wait_for_deferred(cb.binary().append(key, b"XXX"))
+        key = bytes_empty_kvp.key
+        result = run_in_reactor_thread(cb.binary().append, key, b'XXX')
+        assert isinstance(result, MutationResult)
         assert result.cas is not None
         # make sure it really worked
-        result = wait_for_deferred(
-            cb.get(key, transcoder=RawBinaryTranscoder()))
-        assert result.content_as[bytes] == b"XXX"
+        result = run_in_reactor_thread(cb.get, key, transcoder=RawBinaryTranscoder())
+        assert result.content_as[bytes] == b'XXX'
 
-    def test_append_bytes_not_empty(self, cb_env):
+    def test_append_bytes_not_empty(self, cb_env, bytes_kvp):
         cb = cb_env.collection
-        key = cb_env.get_binary_key("BYTES")
+        key = bytes_kvp.key
+        value = bytes_kvp.value
 
-        tc = RawBinaryTranscoder()
-        wait_for_deferred(cb.upsert(key, b"XXXX", transcoder=tc))
-        result = wait_for_deferred(cb.binary().append(key, "foo"))
+        result = run_in_reactor_thread(cb.binary().append, key, 'foo')
+        assert isinstance(result, MutationResult)
         assert result.cas is not None
-        result = wait_for_deferred(cb.get(key, transcoder=tc))
-        assert result.content_as[bytes] == b"XXXXfoo"
+        result = run_in_reactor_thread(cb.get, key, transcoder=RawBinaryTranscoder())
+        assert result.content_as[bytes] == value + b'foo'
 
-    def test_prepend_string(self, cb_env):
+    def test_prepend_string(self, cb_env, utf8_empty_kvp):
         cb = cb_env.collection
-        key = cb_env.get_binary_key("UTF8")
-        result = wait_for_deferred(cb.binary().prepend(key, "foo"))
+        key = utf8_empty_kvp.key
+        result = run_in_reactor_thread(cb.binary().prepend, key, 'foo')
+        assert isinstance(result, MutationResult)
         assert result.cas is not None
         # make sure it really worked
-        result = wait_for_deferred(
-            cb.get(key, transcoder=RawStringTranscoder()))
-        assert result.content_as[str] == "foo"
+        result = run_in_reactor_thread(cb.get, key, transcoder=RawStringTranscoder())
+        assert result.content_as[str] == 'foo'
 
-    def test_prepend_string_not_empty(self, cb_env):
+    def test_prepend_string_not_empty(self, cb_env, utf8_kvp):
         cb = cb_env.collection
-        key = cb_env.get_binary_key("UTF8")
+        key = utf8_kvp.key
+        value = utf8_kvp.value
 
-        tc = RawStringTranscoder()
-        wait_for_deferred(cb.upsert(key, "XXXX", transcoder=tc))
-        result = wait_for_deferred(cb.binary().prepend(key, "foo"))
+        result = run_in_reactor_thread(cb.binary().prepend, key, 'foo')
+        assert isinstance(result, MutationResult)
         assert result.cas is not None
-        result = wait_for_deferred(cb.get(key, transcoder=tc))
-        assert result.content_as[str] == "fooXXXX"
+        result = run_in_reactor_thread(cb.get, key, transcoder=RawStringTranscoder())
+        assert result.content_as[str] == 'foo' + value
 
-    def test_prepend_string_nokey(self, cb_env):
+    def test_prepend_string_nokey(self, cb_env, utf8_empty_kvp):
         cb = cb_env.collection
-        key = cb_env.get_binary_key("UTF8")
-        wait_for_deferred(cb.remove(key))
-        try:
-            cb_env.try_n_times(10, 1, cb.get, key)
-        except CouchbaseException:
-            pass
+        key = utf8_empty_kvp.key
+        run_in_reactor_thread(cb.remove, key)
+        cb_env.try_n_times_till_exception(10,
+                                          1,
+                                          cb.get,
+                                          key,
+                                          expected_exceptions=(DocumentNotFoundException,))
 
-        # TODO:  NotStoredException?
+        # @TODO(jc):  3.2.x SDK tests for NotStoredException
         with pytest.raises(DocumentNotFoundException):
-            wait_for_deferred(cb.binary().prepend(key, "foo"))
+            run_in_reactor_thread(cb.binary().prepend, key, 'foo')
 
-        # reset
-        cb_env.load_binary_data()
-
-    def test_prepend_bytes(self, cb_env):
+    def test_prepend_bytes(self, cb_env, bytes_empty_kvp):
         cb = cb_env.collection
-        key = cb_env.get_binary_key("BYTES")
-        result = wait_for_deferred(cb.binary().prepend(key, b"XXX"))
+        key = bytes_empty_kvp.key
+        result = run_in_reactor_thread(cb.binary().prepend, key, b'XXX')
+        assert isinstance(result, MutationResult)
         assert result.cas is not None
         # make sure it really worked
-        result = wait_for_deferred(
-            cb.get(key, transcoder=RawBinaryTranscoder()))
-        assert result.content_as[bytes] == b"XXX"
+        result = run_in_reactor_thread(cb.get, key, transcoder=RawBinaryTranscoder())
+        assert result.content_as[bytes] == b'XXX'
 
-    def test_prepend_bytes_not_empty(self, cb_env):
+    def test_prepend_bytes_not_empty(self, cb_env, bytes_kvp):
         cb = cb_env.collection
-        key = cb_env.get_binary_key("BYTES")
+        key = bytes_kvp.key
+        value = bytes_kvp.value
 
-        tc = RawBinaryTranscoder()
-        wait_for_deferred(cb.upsert(key, b"XXXX", transcoder=tc))
-        result = wait_for_deferred(cb.binary().prepend(key, "foo"))
+        result = run_in_reactor_thread(cb.binary().prepend, key, b'foo')
+        assert isinstance(result, MutationResult)
         assert result.cas is not None
-        result = wait_for_deferred(cb.get(key, transcoder=tc))
-        assert result.content_as[bytes] == b"fooXXXX"
+        result = run_in_reactor_thread(cb.get, key, transcoder=RawBinaryTranscoder())
+        assert result.content_as[bytes] == b'foo' + value
 
-    def test_counter_increment_initial_value(self, cb_env):
+    def test_counter_increment_initial_value(self, cb_env, counter_empty_kvp):
         cb = cb_env.collection
-        key = cb_env.get_binary_key("COUNTER")
+        key = counter_empty_kvp.key
 
-        result = wait_for_deferred(cb.binary().increment(
-            key, IncrementOptions(initial=SignedInt64(100))))
+        result = run_in_reactor_thread(cb.binary().increment, key, IncrementOptions(initial=SignedInt64(100)))
         assert isinstance(result, CounterResult)
         assert result.cas is not None
-        result = wait_for_deferred(cb.get(key))
+        assert result.content == 100
 
-        assert result.content_as[int] == 100
-
-        # reset
-        cb_env.load_binary_data()
-
-    def test_counter_decrement_initial_value(self, cb_env):
+    def test_counter_decrement_initial_value(self, cb_env, counter_empty_kvp):
         cb = cb_env.collection
-        key = cb_env.get_binary_key("COUNTER")
+        key = counter_empty_kvp.key
 
-        result = wait_for_deferred(cb.binary().decrement(
-            key, DecrementOptions(initial=SignedInt64(100))))
+        result = run_in_reactor_thread(cb.binary().decrement, key, DecrementOptions(initial=SignedInt64(100)))
         assert isinstance(result, CounterResult)
         assert result.cas is not None
-        result = wait_for_deferred(cb.get(key))
+        assert result.content == 100
 
-        assert result.content_as[int] == 100
-
-        # reset
-        cb_env.load_binary_data()
-
-    def test_counter_increment(self, cb_env):
+    def test_counter_increment(self, cb_env, counter_kvp):
         cb = cb_env.collection
-        key = cb_env.get_binary_key("COUNTER")
+        key = counter_kvp.key
+        value = counter_kvp.value
 
-        wait_for_deferred(cb.upsert(key, 100))
-        wait_for_deferred(cb.binary().increment(key))
-        result = wait_for_deferred(cb.get(key))
-        assert 101 == result.content_as[int]
+        result = run_in_reactor_thread(cb.binary().increment, key)
+        assert isinstance(result, CounterResult)
+        assert result.cas is not None
+        assert result.content == value + 1
 
-    def test_counter_decrement(self, cb_env):
+    def test_counter_decrement(self, cb_env, counter_kvp):
         cb = cb_env.collection
-        key = cb_env.get_binary_key("COUNTER")
+        key = counter_kvp.key
+        value = counter_kvp.value
 
-        wait_for_deferred(cb.upsert(key, 100))
-        wait_for_deferred(cb.binary().decrement(key))
-        result = wait_for_deferred(cb.get(key))
-        assert 99 == result.content_as[int]
+        result = run_in_reactor_thread(cb.binary().decrement, key)
+        assert isinstance(result, CounterResult)
+        assert result.cas is not None
+        assert result.content == value - 1
 
-    def test_counter_increment_non_default(self, cb_env):
+    def test_counter_increment_non_default(self, cb_env, counter_kvp):
         cb = cb_env.collection
-        key = cb_env.get_binary_key("COUNTER")
+        key = counter_kvp.key
+        value = counter_kvp.value
 
-        wait_for_deferred(cb.upsert(key, 100))
-        wait_for_deferred(cb.binary().increment(
-            key, IncrementOptions(delta=DeltaValue(3))))
-        result = wait_for_deferred(cb.get(key))
-        assert 103 == result.content_as[int]
+        result = run_in_reactor_thread(cb.binary().increment, key, IncrementOptions(delta=DeltaValue(3)))
+        assert isinstance(result, CounterResult)
+        assert result.cas is not None
+        assert result.content == value + 3
 
-    def test_counter_decrement_non_default(self, cb_env):
+    def test_counter_decrement_non_default(self, cb_env, counter_kvp):
         cb = cb_env.collection
-        key = cb_env.get_binary_key("COUNTER")
+        key = counter_kvp.key
+        value = counter_kvp.value
 
-        wait_for_deferred(cb.upsert(key, 100))
-        wait_for_deferred(cb.binary().decrement(
-            key, DecrementOptions(delta=DeltaValue(3))))
-        result = wait_for_deferred(cb.get(key))
-        assert 97 == result.content_as[int]
+        result = run_in_reactor_thread(cb.binary().decrement, key, DecrementOptions(delta=DeltaValue(3)))
+        assert isinstance(result, CounterResult)
+        assert result.cas is not None
+        assert result.content == value - 3
+
+    def test_counter_bad_initial_value(self, cb_env, counter_empty_kvp):
+        cb = cb_env.collection
+        key = counter_empty_kvp.key
+
+        with pytest.raises(InvalidArgumentException):
+            run_in_reactor_thread(cb.binary().increment, key, initial=100)
+
+        with pytest.raises(InvalidArgumentException):
+            run_in_reactor_thread(cb.binary().decrement, key, initial=100)
+
+    def test_counter_bad_delta_value(self, cb_env, counter_empty_kvp):
+        cb = cb_env.collection
+        key = counter_empty_kvp.key
+
+        with pytest.raises(InvalidArgumentException):
+            run_in_reactor_thread(cb.binary().increment, key, delta=5)
+
+        with pytest.raises(InvalidArgumentException):
+            run_in_reactor_thread(cb.binary().decrement, key, delta=5)
 
     def test_unsigned_int(self):
         with pytest.raises(InvalidArgumentException):

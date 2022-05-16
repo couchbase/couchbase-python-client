@@ -220,12 +220,6 @@ class TestEnvironment(CouchbaseTestEnvironment):
 
         return cb_env
 
-    def skip_if_mock_unstable(self, stable):
-        if not stable and self.is_mock_server:
-            pytest.skip(('CAVES does not seem to be happy. Skipping tests as failure is not'
-                        ' an accurate representation of the state of the test, but rather'
-                         ' there is an environment issue.'))
-
     def get_new_key_value(self, reset=True, debug_log=False):
         if reset is True:
             try:
