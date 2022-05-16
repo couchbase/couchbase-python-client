@@ -379,3 +379,20 @@ class TransactionTests:
         assert cfg_max is not None
         assert cfg_max == max
 
+    @pytest.mark.parametrize('params', [["a", "b", "c"]]) #, [[1, 2, 3], ["a", "b", "c"]]])
+    def test_positional_params(self, params):
+        cfg = TransactionQueryOptions(positional_parameters=params)
+        cfg_params = cfg._base.to_dict().get('positional_parameters', None)
+        assert cfg_params is not None
+        assert isinstance(cfg_params, list)
+        for idx, p in enumerate(cfg_params):
+            assert params[idx] == json.loads(p)
+
+    @pytest.mark.parametrize('params', [{"key1": "thing"}, {"key1": ['an', 'array']},{'key1': 10, 'key2': 'something else'}])
+    def test_named_params(self, params):
+        cfg = TransactionQueryOptions(named_parameters=params)
+        cfg_params = cfg._base.to_dict().get('named_parameters', None)
+        assert cfg_params is not None
+        assert isinstance(cfg_params, dict)
+        for k, v in params.items():
+            assert json.loads(cfg_params[k]) == v

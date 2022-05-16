@@ -307,11 +307,14 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
     char* bucket = nullptr;
     PyObject* pyObj_metrics = nullptr;
     PyObject* pyObj_max_parallelism = nullptr;
+    PyObject* pyObj_positional_params = nullptr;
+    PyObject* pyObj_named_params = nullptr;
 
     const char* kw_list[] = { "raw",       "ad_hoc",    "scan_consistency", "profile_mode",    "client_context_id",
                               "scan_wait", "read_only", "scan_cap",         "pipeline_batch",  "pipeline_cap",
-                              "scope",     "bucket",    "metrics",          "max_parallelism", nullptr };
-    const char* kw_format = "|OOsssOOOOOssOO";
+                              "scope",     "bucket",    "metrics",          "max_parallelism", "positional_parameters",
+                              "named_parameters", nullptr };
+    const char* kw_format = "|OOsssOOOOOssOOOO";
 
     auto self = reinterpret_cast<pycbc_txns::transaction_query_options*>(type->tp_alloc(type, 0));
     self->opts = new tx::transaction_query_options();
@@ -332,7 +335,9 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
                                      &scope,
                                      &bucket,
                                      &pyObj_metrics,
-                                     &pyObj_max_parallelism)) {
+                                     &pyObj_max_parallelism,
+                                     &pyObj_positional_params,
+                                     &pyObj_named_params)) {
         PyErr_SetString(PyExc_ValueError, "couldn't parse args");
         Py_RETURN_NONE;
     }
@@ -367,6 +372,9 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
     }
     if (nullptr != scan_consistency) {
         self->opts->scan_consistency(str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
+        if (PyErr_Occurred()) {
+            return nullptr;
+        }
     }
     if (nullptr != pyObj_ad_hoc) {
         self->opts->ad_hoc(!!PyObject_IsTrue(pyObj_ad_hoc));
@@ -404,6 +412,38 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
         }
         pyObj_key = nullptr;
         pyObj_value = nullptr;
+    }
+
+    if (nullptr != pyObj_positional_params) {
+        if (!PyList_Check(pyObj_positional_params)) {
+            PyErr_SetString(PyExc_ValueError, "Positional parameters options must be a list.");
+            return nullptr;
+        }
+        std::vector<couchbase::json_string> pos_opts {};
+        for(size_t i=0; i<PyList_Size(pyObj_positional_params); i++) {
+            PyObject* pyObj_value = PyList_GetItem(pyObj_positional_params, i);
+            if (PyBytes_Check(pyObj_value)) {
+                pos_opts.emplace_back(PyBytes_AsString(pyObj_value));
+            } else {
+                PyErr_SetString(PyExc_ValueError, "Positional parameter options must all be json strings");
+                return nullptr;
+            }
+        }
+        self->opts->positional_parameters(pos_opts);
+    }
+    if (nullptr != pyObj_named_params) {
+        if (!PyDict_Check(pyObj_named_params)) {
+            PyErr_SetString(PyExc_ValueError, "Named parameter options must be a dict[str, JSONType]");
+            return nullptr;
+        }
+        PyObject* pyObj_key = nullptr;
+        PyObject* pyObj_value = nullptr;
+        Py_ssize_t pos = 0;
+        std::map<std::string, couchbase::json_string> params {};
+        while(PyDict_Next(pyObj_named_params, &pos, &pyObj_key, &pyObj_value)) {
+            params[PyUnicode_AsUTF8(pyObj_key)] = couchbase::json_string(PyBytes_AsString(pyObj_value));
+        }
+        self->opts->named_parameters(params);
     }
     return reinterpret_cast<PyObject*>(self);
 }
@@ -450,6 +490,24 @@ pycbc_txns::transaction_query_options__to_dict__(PyObject* self)
     add_to_dict(retval, "metrics", req.metrics);
     if (req.max_parallelism) {
         add_to_dict(retval, "max_parallelism", static_cast<int64_t>(req.max_parallelism.value()));
+    }
+    if (!req.positional_parameters.empty()) {
+        PyObject* pyObj_pos = PyList_New(0);
+        for (auto& val: req.positional_parameters) {
+            PyObject* pyObj_val = PyUnicode_FromString(val.str().c_str());
+            PyList_Append(pyObj_pos, pyObj_val);
+            Py_DECREF(pyObj_val);
+        }
+        PyDict_SetItemString(retval, "positional_parameters", pyObj_pos);
+        Py_DECREF(pyObj_pos);
+    }
+    if (!req.named_parameters.empty()) {
+        PyObject* pyObj_named = PyDict_New();
+        for(auto& [key, value]: req.named_parameters) {
+            add_to_dict(pyObj_named, key, value.str());
+        }
+        PyDict_SetItemString(retval, "named_parameters", pyObj_named);
+        Py_DECREF(pyObj_named);
     }
     return retval;
 }

@@ -30,6 +30,7 @@ from typing import (TYPE_CHECKING,
 
 from couchbase._utils import timedelta_as_microseconds, timedelta_as_timestamp
 from couchbase.durability import DurabilityParser
+from couchbase.exceptions import InvalidArgumentException
 from couchbase.logic.options import AcceptableInts  # noqa: F401
 from couchbase.logic.options import Compression  # noqa: F401
 from couchbase.logic.options import IpProtocol  # noqa: F401
@@ -1209,6 +1210,8 @@ class TransactionConfig:
         # don't pass None
         if kwargs.get('scan_consistency', None):
             kwargs['scan_consistency'] = kwargs['scan_consistency'].value
+            if kwargs["scan_consistency"] == "at_plus":
+                raise InvalidArgumentException("QueryScanConsistency.AT_PLUS not valid for transactions")
         for key in [k for k, v in kwargs.items() if v is None]:
             del(kwargs[key])
         self._base = transaction_config(**kwargs)
@@ -1247,6 +1250,8 @@ class TransactionOptions:
                 kwargs[k] = int(kwargs[k].total_seconds() * 1000000)
         if kwargs.get('scan_consistency', None):
             kwargs['scan_consistency'] = kwargs['scan_consistency'].value
+            if kwargs["scan_consistency"] == "at_plus":
+                raise InvalidArgumentException("QueryScanConsistency.AT_PLUS not valid for transactions")
         # don't pass None
         for key in [k for k, v in kwargs.items() if v is None]:
             del(kwargs[key])
@@ -1321,7 +1326,7 @@ forward_args = DefaultForwarder().forward_args
 class TransactionQueryOptions:
     ALLOWED_KEYS = {"raw", "adhoc", "scan_consistency", "profile", "client_context_id",
                     "scan_wait", "read_only", "scan_cap", "pipeline_batch", "pipeline_cap",
-                    "scope", "metrics", "max_parallelism"}
+                    "scope", "metrics", "max_parallelism", "positional_parameters", "named_parameters"}
 
     @overload
     def __init__(self,
@@ -1369,7 +1374,7 @@ class TransactionQueryOptions:
                 information on the proper use and tuning of this option. Defaults to None.
             positional_parameters (Iterable[JSONType], optional): Positional values to be used for the placeholders
                 within the query. Defaults to None.
-            named_parameters (Iterable[Dict[str, JSONType]], optional): Named values to be used for the placeholders
+            named_parameters (Dict[str, JSONType], optional): Named values to be used for the placeholders
                 within the query. Defaults to None.
             scope (:class:`~couchbase.scope.Scope`, optional): Specify the scope of the query. Defaults to None.
             max_parallelism (int, optional): This is an advanced option, see the query service reference for more
@@ -1390,6 +1395,8 @@ class TransactionQueryOptions:
             kwargs["scan_wait"] = kwargs["scan_wait"].total_seconds/1000
         if kwargs.get("scan_consistency", None):
             kwargs["scan_consistency"] = kwargs["scan_consistency"].value
+            if kwargs["scan_consistency"] == "at_plus":
+                raise InvalidArgumentException("QueryScanConsistency.AT_PLUS not valid for transactions")
         raw = kwargs.pop('raw', None)
         if raw:
             kwargs['raw'] = dict()
@@ -1401,4 +1408,11 @@ class TransactionQueryOptions:
         profile = kwargs.pop("profile", None)
         if profile:
             kwargs["profile_mode"] = profile.value
+        positional = kwargs.pop("positional_parameters", None)
+        if positional:
+            kwargs["positional_parameters"] = list(map(lambda param: DefaultJsonSerializer().serialize(param), positional))
+        named = kwargs.pop("named_parameters", None)
+        if named:
+            kwargs["named_parameters"] = {key: DefaultJsonSerializer().serialize(val) for key, val in named.items()}
+
         self._base = transaction_query_options(**kwargs)
