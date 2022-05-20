@@ -19,8 +19,7 @@ from datetime import timedelta
 import pytest
 import pytest_asyncio
 
-from acouchbase.cluster import Cluster, get_event_loop
-from couchbase.auth import PasswordAuthenticator
+from acouchbase.cluster import get_event_loop
 from couchbase.exceptions import (ParsingFailedException,
                                   QueryIndexAlreadyExistsException,
                                   QueryIndexNotFoundException,
@@ -31,7 +30,6 @@ from couchbase.management.options import (CreatePrimaryQueryIndexOptions,
                                           DropQueryIndexOptions,
                                           GetAllQueryIndexOptions,
                                           WatchQueryIndexOptions)
-from couchbase.options import ClusterOptions
 
 from ._test_utils import TestEnvironment
 
@@ -46,21 +44,10 @@ class QueryIndexManagementTests:
 
     @pytest_asyncio.fixture(scope="class", name="cb_env")
     async def couchbase_test_environment(self, couchbase_config):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = await Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        await bucket.on_connect()
-        await cluster.cluster_info()
-
-        coll = bucket.default_collection()
-        cb_env = TestEnvironment(cluster,
-                                 bucket,
-                                 coll,
-                                 couchbase_config,
-                                 manage_buckets=True,
-                                 manage_query_indexes=True)
+        cb_env = await TestEnvironment.get_environment(__name__,
+                                                       couchbase_config,
+                                                       manage_buckets=True,
+                                                       manage_query_indexes=True)
 
         yield cb_env
         await cb_env.try_n_times(5, 3, self._clear_all_indexes, cb_env, ignore_fail=True)
@@ -393,17 +380,12 @@ class QueryIndexCollectionManagementTests:
 
     @pytest_asyncio.fixture(scope="class", name="cb_env")
     async def couchbase_test_environment(self, couchbase_config):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = await Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        await bucket.on_connect()
-        await cluster.cluster_info()
+        cb_env = await TestEnvironment.get_environment(__name__,
+                                                       couchbase_config,
+                                                       manage_buckets=True,
+                                                       manage_collections=True,
+                                                       manage_query_indexes=True)
 
-        coll = bucket.default_collection()
-        cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True,
-                                 manage_collections=True, manage_query_indexes=True)
         await cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
         yield cb_env

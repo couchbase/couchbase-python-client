@@ -19,8 +19,7 @@ from random import choice
 import pytest
 import pytest_asyncio
 
-from acouchbase.cluster import Cluster, get_event_loop
-from couchbase.auth import PasswordAuthenticator
+from acouchbase.cluster import get_event_loop
 from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import (BucketAlreadyExistsException,
                                   BucketDoesNotExistException,
@@ -31,7 +30,6 @@ from couchbase.management.buckets import (BucketSettings,
                                           ConflictResolutionType,
                                           CreateBucketSettings,
                                           StorageBackend)
-from couchbase.options import ClusterOptions
 
 from ._test_utils import TestEnvironment
 
@@ -51,16 +49,9 @@ class BucketManagementTests:
 
     @pytest_asyncio.fixture(scope="class", name="cb_env")
     async def couchbase_test_environment(self, couchbase_config, test_buckets):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = await Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        await bucket.on_connect()
-        await cluster.cluster_info()
-        coll = bucket.default_collection()
-        cb_env = TestEnvironment(
-            cluster, bucket, coll, couchbase_config, manage_buckets=True)
+        cb_env = await TestEnvironment.get_environment(__name__,
+                                                       couchbase_config,
+                                                       manage_buckets=True)
 
         yield cb_env
         if cb_env.is_feature_supported('bucket_mgmt'):

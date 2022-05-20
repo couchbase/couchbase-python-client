@@ -25,18 +25,13 @@ from couchbase.exceptions import (ParsingFailedException,
                                   TransactionExpired,
                                   TransactionFailed,
                                   TransactionOperationFailed)
-from couchbase.n1ql import QueryScanConsistency, QueryProfile
-from couchbase.options import (ClusterOptions,
+from couchbase.n1ql import QueryProfile, QueryScanConsistency
+from couchbase.options import (TransactionConfig,
                                TransactionOptions,
-                               TransactionQueryOptions,
-                               TransactionConfig)
+                               TransactionQueryOptions)
 from couchbase.transactions import TransactionResult
 
 from . import wrap_in_thread
-
-from ._test_utils import (CollectionType,
-                          KVPair,
-                          TestEnvironment)
 
 from ._test_utils import (CollectionType,
                           KVPair,
@@ -300,7 +295,6 @@ class TransactionTests:
         assert isinstance(cfg_raw, dict)
         for k, v in cfg_raw.items():
             assert json.loads(cfg_raw[k]) == raw[k]
-
 
     @pytest.mark.parametrize('adhoc', [True, False])
     def test_adhoc(self, adhoc):

@@ -41,7 +41,12 @@ _KV_TESTS = [
     "couchbase/tests/binary_collection_multi_t.py::BinaryCollectionMultiTests",
     "couchbase/tests/datastructures_t.py::DatastructuresTests",
     "couchbase/tests/datastructures_t.py::LegacyDatastructuresTests",
-    "couchbase/tests/transcoder_t.py::DefaultTranscoderTests"
+    "couchbase/tests/transcoder_t.py::DefaultTranscoderTests",
+    "txcouchbase/tests/collection_t.py::CollectionTests",
+    "txcouchbase/tests/subdoc_t.py::SubDocumentTests",
+    "txcouchbase/tests/mutation_tokens_t.py::MutationTokensEnabledTests",
+    "txcouchbase/tests/binary_collection_t.py::BinaryCollectionTests",
+    "txcouchbase/tests/transcoder_t.py::DefaultTranscoderTests",
 ]
 
 _STREAMING_TESTS = [

@@ -20,13 +20,11 @@ from os import path
 import pytest
 import pytest_asyncio
 
-from acouchbase.cluster import Cluster, get_event_loop
-from couchbase.auth import PasswordAuthenticator
+from acouchbase.cluster import get_event_loop
 from couchbase.exceptions import DesignDocumentNotFoundException
 from couchbase.management.views import (DesignDocument,
                                         DesignDocumentNamespace,
                                         View)
-from couchbase.options import ClusterOptions
 from couchbase.result import ViewResult
 from couchbase.views import ViewMetaData
 
@@ -61,21 +59,10 @@ class ViewTests:
 
     @pytest_asyncio.fixture(scope="class", name="cb_env")
     async def couchbase_test_environment(self, couchbase_config, test_ddoc):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = await Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        await bucket.on_connect()
-        await cluster.cluster_info()
-
-        coll = bucket.default_collection()
-        cb_env = TestEnvironment(cluster,
-                                 bucket,
-                                 coll,
-                                 couchbase_config,
-                                 manage_buckets=True,
-                                 manage_view_indexes=True)
+        cb_env = await TestEnvironment.get_environment(__name__,
+                                                       couchbase_config,
+                                                       manage_buckets=True,
+                                                       manage_view_indexes=True)
 
         await self.create_ddoc(cb_env, test_ddoc)
         await cb_env.try_n_times(5, 3, cb_env.load_data)

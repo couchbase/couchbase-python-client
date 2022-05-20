@@ -21,13 +21,12 @@ from uuid import uuid4
 import pytest
 import pytest_asyncio
 
-from acouchbase.cluster import Cluster, get_event_loop
-from couchbase.auth import PasswordAuthenticator
+from acouchbase.cluster import get_event_loop
 from couchbase.exceptions import (CouchbaseException,
                                   ParsingFailedException,
                                   TransactionExpired,
                                   TransactionFailed)
-from couchbase.options import ClusterOptions, TransactionOptions
+from couchbase.options import TransactionOptions
 from couchbase.transactions import TransactionResult
 
 from ._test_utils import (CollectionType,
@@ -49,24 +48,10 @@ class AsyncTransactionsTests:
 
     @pytest_asyncio.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     async def couchbase_test_environment(self, couchbase_config, request):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = await Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        await bucket.on_connect()
-        await cluster.cluster_info()
-
-        coll = bucket.default_collection()
-        if request.param == CollectionType.DEFAULT:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True)
-        elif request.param == CollectionType.NAMED:
-            cb_env = TestEnvironment(cluster,
-                                     bucket,
-                                     coll,
-                                     couchbase_config,
-                                     manage_buckets=True,
-                                     manage_collections=True)
+        cb_env = await TestEnvironment.get_environment(__name__,
+                                                       couchbase_config,
+                                                       manage_buckets=True)
+        if request.param == CollectionType.NAMED:
             await cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
         cb_env.check_if_feature_supported('txns')
@@ -195,7 +180,6 @@ class AsyncTransactionsTests:
         coll = cb_env.collection
         key = str(uuid4())
         value = default_kvp.value
-        rows = []
 
         async def txn_logic(ctx):
             location = f"default:`{coll._scope.bucket_name}`.`{coll._scope.name}`.`{coll.name}`"
@@ -227,7 +211,7 @@ class AsyncTransactionsTests:
         value = default_kvp.value
 
         async def txn_logic(ctx):
-            ctx.insert(coll, key, value)
+            await ctx.insert(coll, key, value)
             await asyncio.sleep(0.001)
             await ctx.get(coll, key)
 

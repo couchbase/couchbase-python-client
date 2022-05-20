@@ -21,8 +21,12 @@ from typing import (Any,
                     Tuple,
                     Type,
                     Union)
+from urllib.parse import urlparse
+
+import pytest
 
 from acouchbase.bucket import Bucket
+from acouchbase.cluster import Cluster
 from acouchbase.collection import Collection
 from acouchbase.management.analytics import AnalyticsIndexManager
 from acouchbase.management.buckets import BucketManager
@@ -33,6 +37,7 @@ from acouchbase.management.search import SearchIndexManager
 from acouchbase.management.users import UserManager
 from acouchbase.management.views import ViewIndexManager
 from acouchbase.scope import Scope
+from couchbase.auth import PasswordAuthenticator
 from couchbase.exceptions import (AmbiguousTimeoutException,
                                   BucketAlreadyExistsException,
                                   BucketDoesNotExistException,
@@ -43,6 +48,7 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   UnAmbiguousTimeoutException)
 from couchbase.management.buckets import BucketType, CreateBucketSettings
 from couchbase.management.collections import CollectionSpec
+from couchbase.options import ClusterOptions
 from couchbase.transcoder import RawBinaryTranscoder, RawStringTranscoder
 from tests.helpers import CollectionType  # noqa: F401
 from tests.helpers import EventingFunctionManagementTestStatusException  # noqa: F401
@@ -91,10 +97,12 @@ class TestEnvironment(CouchbaseTestEnvironment):
             self.check_if_feature_supported('eventing_function_mgmt')
             self._efm = self.cluster.eventing_functions()
 
-        rl_params = kwargs.get('rate_limit_params', None)
-        if rl_params is not None:
+        if kwargs.get('manage_rate_limit', False) is True:
             self.check_if_feature_supported('rate_limiting')
-            self._rate_limit_params = rl_params
+            parsed_conn = urlparse(cluster_config.get_connection_string())
+            url = f'http://{parsed_conn.netloc}:8091'
+            u, p = cluster_config.get_username_and_pw()
+            self._rate_limit_params = RateLimitData(url, u, p)
 
         self._test_bucket = None
         self._test_bucket_cm = None
@@ -170,6 +178,59 @@ class TestEnvironment(CouchbaseTestEnvironment):
     def rate_limit_params(self) -> Optional[RateLimitData]:
         """Returns the rate limit testing data"""
         return self._rate_limit_params if hasattr(self, '_rate_limit_params') else None
+
+    @classmethod  # noqa: C901
+    async def get_environment(cls,  # noqa: C901
+                              test_suite,
+                              couchbase_config,
+                              coll_type=CollectionType.DEFAULT,
+                              **kwargs):
+
+        # this will only return False _if_ using the mock server
+        mock_supports = CouchbaseTestEnvironment.mock_supports_feature(test_suite.split('.')[-1],
+                                                                       couchbase_config.is_mock_server)
+        if not mock_supports:
+            pytest.skip(f'Mock server does not support feature(s) required for test suite: {test_suite}')
+
+        conn_string = couchbase_config.get_connection_string()
+        username, pw = couchbase_config.get_username_and_pw()
+        opts = ClusterOptions(PasswordAuthenticator(username, pw))
+        okay = False
+        cluster = None
+        bucket = None
+        for _ in range(3):
+            try:
+                cluster = await Cluster.connect(conn_string, opts)
+                bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+                await cluster.cluster_info()
+                okay = True
+                break
+            except (UnAmbiguousTimeoutException, AmbiguousTimeoutException):
+                continue
+
+        if not okay:
+            if couchbase_config.is_mock_server:
+                pytest.skip(('CAVES does not seem to be happy. Skipping tests as failure is not'
+                            ' an accurate representation of the state of the test, but rather'
+                             ' there is an environment issue.'))
+            elif not cluster or not bucket:
+                pytest.skip(('Skipping tests as failure is not'
+                            ' an accurate representation of the state of the test, but rather'
+                             ' there is an environment issue.'))
+
+        coll = bucket.default_collection()
+        if coll_type == CollectionType.DEFAULT:
+            cb_env = cls(cluster, bucket, coll, couchbase_config, **kwargs)
+        elif coll_type == CollectionType.NAMED:
+            if 'manage_collections' not in kwargs:
+                kwargs['manage_collections'] = True
+            cb_env = cls(cluster,
+                         bucket,
+                         coll,
+                         couchbase_config,
+                         **kwargs)
+
+        return cb_env
 
     async def get_new_key_value(self, reset=True):
         if reset is True:

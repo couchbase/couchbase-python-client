@@ -20,8 +20,7 @@ import pytest
 import pytest_asyncio
 
 import couchbase.subdocument as SD
-from acouchbase.cluster import Cluster, get_event_loop
-from couchbase.auth import PasswordAuthenticator
+from acouchbase.cluster import get_event_loop
 from couchbase.durability import DurabilityLevel, ServerDurability
 from couchbase.exceptions import (DocumentExistsException,
                                   DocumentNotFoundException,
@@ -31,7 +30,7 @@ from couchbase.exceptions import (DocumentExistsException,
                                   PathExistsException,
                                   PathMismatchException,
                                   PathNotFoundException)
-from couchbase.options import ClusterOptions, MutateInOptions
+from couchbase.options import MutateInOptions
 from couchbase.result import (GetResult,
                               LookupInResult,
                               MutateInResult)
@@ -53,24 +52,11 @@ class SubDocumentTests:
 
     @pytest_asyncio.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     async def couchbase_test_environment(self, couchbase_config, request):
-        conn_string = couchbase_config.get_connection_string()
-        opts = ClusterOptions(PasswordAuthenticator(
-            couchbase_config.admin_username, couchbase_config.admin_password))
-        cluster = await Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        await bucket.on_connect()
-        await cluster.cluster_info()
-
-        coll = bucket.default_collection()
-        if request.param == CollectionType.DEFAULT:
-            cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True)
-        elif request.param == CollectionType.NAMED:
-            cb_env = TestEnvironment(cluster,
-                                     bucket,
-                                     coll,
-                                     couchbase_config,
-                                     manage_buckets=True,
-                                     manage_collections=True)
+        cb_env = await TestEnvironment.get_environment(__name__,
+                                                       couchbase_config,
+                                                       request.param,
+                                                       manage_buckets=True)
+        if request.param == CollectionType.NAMED:
             await cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
 
         await cb_env.try_n_times(3, 5, cb_env.load_data)

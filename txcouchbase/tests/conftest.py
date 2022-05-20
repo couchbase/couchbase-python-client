@@ -25,8 +25,10 @@ class TwistedObjects:
     _TWISTED_THREAD = None
 
 
-def pytest_configure():
-    init_reactor()
+def pytest_configure(config):
+    if config and config.option and config.option.markexpr:
+        if 'txcouchbase' in config.option.markexpr:
+            init_reactor()
 
 
 def run_in_reactor_thread(fn, *args, **kwargs):
@@ -64,6 +66,6 @@ def init_reactor():
 
 
 def pytest_unconfigure():
-
-    threads.blockingCallFromThread(TwistedObjects._REACTOR, TwistedObjects._REACTOR.stop)
-    TwistedObjects._TWISTED_THREAD.join()
+    if TwistedObjects._TWISTED_THREAD:
+        threads.blockingCallFromThread(TwistedObjects._REACTOR, TwistedObjects._REACTOR.stop)
+        TwistedObjects._TWISTED_THREAD.join()

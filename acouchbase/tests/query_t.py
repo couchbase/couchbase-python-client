@@ -20,8 +20,7 @@ import pytest
 import pytest_asyncio
 
 import couchbase.subdocument as SD
-from acouchbase.cluster import Cluster, get_event_loop
-from couchbase.auth import PasswordAuthenticator
+from acouchbase.cluster import get_event_loop
 from couchbase.exceptions import (CouchbaseException,
                                   KeyspaceNotFoundException,
                                   QueryErrorContext,
@@ -32,8 +31,7 @@ from couchbase.n1ql import (QueryMetaData,
                             QueryProfile,
                             QueryStatus,
                             QueryWarning)
-from couchbase.options import (ClusterOptions,
-                               QueryOptions,
+from couchbase.options import (QueryOptions,
                                UnsignedInt64,
                                UpsertOptions)
 from couchbase.result import QueryResult
@@ -51,24 +49,13 @@ class QueryTests:
 
     @pytest_asyncio.fixture(scope="class", name="cb_env")
     async def couchbase_test_environment(self, couchbase_config):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = await Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        await bucket.on_connect()
-        await cluster.cluster_info()
-
-        coll = bucket.default_collection()
-        cb_env = TestEnvironment(cluster,
-                                 bucket,
-                                 coll,
-                                 couchbase_config,
-                                 manage_buckets=True,
-                                 manage_query_indexes=True)
+        cb_env = await TestEnvironment.get_environment(__name__,
+                                                       couchbase_config,
+                                                       manage_buckets=True,
+                                                       manage_query_indexes=True)
 
         await cb_env.try_n_times(10, 3, cb_env.ixm.create_primary_index,
-                                 bucket.name,
+                                 cb_env.bucket.name,
                                  timeout=timedelta(seconds=60),
                                  ignore_if_exists=True)
 
@@ -88,7 +75,7 @@ class QueryTests:
 
         await cb_env.try_n_times_till_exception(10, 3,
                                                 cb_env.ixm.drop_primary_index,
-                                                bucket.name,
+                                                cb_env.bucket.name,
                                                 expected_exceptions=(QueryIndexNotFoundException))
 
     @pytest.fixture(scope="class")
@@ -308,26 +295,15 @@ class QueryCollectionTests:
 
     @pytest_asyncio.fixture(scope="class", name="cb_env")
     async def couchbase_test_environment(self, couchbase_config):
-        conn_string = couchbase_config.get_connection_string()
-        username, pw = couchbase_config.get_username_and_pw()
-        opts = ClusterOptions(PasswordAuthenticator(username, pw))
-        cluster = await Cluster.connect(conn_string, opts)
-        bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
-        await bucket.on_connect()
-        await cluster.cluster_info()
-
-        coll = bucket.default_collection()
-        cb_env = TestEnvironment(cluster,
-                                 bucket,
-                                 coll,
-                                 couchbase_config,
-                                 manage_buckets=True,
-                                 manage_collections=True,
-                                 manage_query_indexes=True)
+        cb_env = await TestEnvironment.get_environment(__name__,
+                                                       couchbase_config,
+                                                       manage_buckets=True,
+                                                       manage_collections=True,
+                                                       manage_query_indexes=True)
 
         await cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
         await cb_env.try_n_times(10, 3, cb_env.ixm.create_primary_index,
-                                 bucket.name,
+                                 cb_env.bucket.name,
                                  scope_name=self.TEST_SCOPE,
                                  collection_name=self.TEST_COLLECTION,
                                  timeout=timedelta(seconds=60))
@@ -347,7 +323,7 @@ class QueryCollectionTests:
                                                 raise_if_no_exception=False)
         await cb_env.try_n_times_till_exception(10, 3,
                                                 cb_env.ixm.drop_primary_index,
-                                                bucket.name,
+                                                cb_env.bucket.name,
                                                 scope_name=self.TEST_SCOPE,
                                                 collection_name=self.TEST_COLLECTION,
                                                 expected_exceptions=(QueryIndexNotFoundException,))
