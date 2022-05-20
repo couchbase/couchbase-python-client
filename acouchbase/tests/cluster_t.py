@@ -60,7 +60,6 @@ class ClusterDiagnosticsTests:
         cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_buckets=True)
 
         yield cb_env
-        await cluster.close()
 
     @pytest.fixture(scope="class")
     def check_diagnostics_supported(self, cb_env):

@@ -69,7 +69,6 @@ async def run():
     tasks = [coll.get(key1), coll.get(key2)]
     results = await wait_for_all(tasks)
     print(f'after txns, we have {results}')
-    await my_cluster.close()
 
 
 loop = asyncio.get_event_loop()

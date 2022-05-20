@@ -74,4 +74,3 @@ except BucketDoesNotExistException:
     print("{} bucket dropped.".format("hello"))
 
 
-cluster.close()

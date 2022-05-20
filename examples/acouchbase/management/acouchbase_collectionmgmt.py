@@ -82,7 +82,6 @@ async def main():
     except ScopeNotFoundException as ex:
         print(ex)
 
-    await cluster.close()
 
 if __name__ == "__main__":
     loop = get_event_loop()

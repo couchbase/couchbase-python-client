@@ -90,7 +90,6 @@ class ViewTests:
                                                 cb_env.purge_data,
                                                 raise_if_no_exception=False)
         await self.drop_ddoc(cb_env, test_ddoc)
-        await cluster.close()
 
     async def create_ddoc(self, cb_env, test_ddoc):
         await cb_env.vixm.upsert_design_document(test_ddoc, DesignDocumentNamespace.DEVELOPMENT)

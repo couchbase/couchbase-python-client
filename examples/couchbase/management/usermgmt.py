@@ -77,5 +77,3 @@ for row in query_res.rows():
 # drop the user
 user_manager.drop_user(user.username)
 
-adm_cluster.close()
-user_cluster.close()

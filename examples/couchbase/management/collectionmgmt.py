@@ -79,4 +79,3 @@ try:
 except ScopeNotFoundException as ex:
     print(ex)
 
-cluster.close()

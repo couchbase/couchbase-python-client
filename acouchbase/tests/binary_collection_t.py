@@ -65,8 +65,6 @@ class BinaryCollectionTests:
             await cb_env.try_n_times_till_exception(5, 3,
                                                     cb_env.teardown_named_collections,
                                                     raise_if_no_exception=False)
-        await cluster.close()
-
     # key/value fixtures
 
     @pytest_asyncio.fixture(name='utf8_empty_kvp')

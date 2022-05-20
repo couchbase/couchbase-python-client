@@ -65,7 +65,6 @@ class DefaultTranscoderTests:
             await cb_env.try_n_times_till_exception(5, 3,
                                                     cb_env.teardown_named_collections,
                                                     raise_if_no_exception=False)
-        await cluster.close()
 
     @pytest_asyncio.fixture(name="new_kvp")
     async def new_key_and_value_with_reset(self, cb_env) -> KVPair:

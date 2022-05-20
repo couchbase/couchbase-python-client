@@ -57,7 +57,6 @@ class SearchIndexManagementTests:
                                  manage_search_indexes=True)
 
         yield cb_env
-        await cluster.close()
 
     @pytest.fixture(scope="class")
     def check_search_index_mgmt_supported(self, cb_env):

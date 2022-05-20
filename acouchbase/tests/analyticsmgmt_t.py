@@ -72,7 +72,6 @@ class AnalyticsManagementTests:
         coll = bucket.default_collection()
         cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_analytics=True)
         yield cb_env
-        await cluster.close()
 
     @pytest.fixture(scope="class")
     def empty_dataverse_name(self, cb_env):
@@ -330,7 +329,6 @@ class AnalyticsManagementLinksTests:
         cb_env = TestEnvironment(cluster, bucket, coll, couchbase_config, manage_analytics=True)
         cb_env.check_if_feature_supported('analytics_link_mgmt')
         yield cb_env
-        await cluster.close()
 
     @pytest.fixture(scope="class")
     def empty_dataverse_name(self, cb_env):

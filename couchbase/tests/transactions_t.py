@@ -32,6 +32,8 @@ from couchbase.options import (ClusterOptions,
                                TransactionConfig)
 from couchbase.transactions import TransactionResult
 
+from . import wrap_in_thread
+
 from ._test_utils import (CollectionType,
                           KVPair,
                           TestEnvironment)

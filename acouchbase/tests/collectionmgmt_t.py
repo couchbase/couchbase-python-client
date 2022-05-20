@@ -60,7 +60,6 @@ class CollectionManagementTests:
         yield cb_env
         if cb_env.is_feature_supported('bucket_mgmt'):
             await cb_env.purge_buckets([self.TEST_BUCKET])
-        await cluster.close()
 
     @pytest_asyncio.fixture()
     async def cleanup_scope(self, cb_env):

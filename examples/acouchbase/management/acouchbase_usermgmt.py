@@ -84,9 +84,6 @@ async def main():
     # drop the user
     await user_manager.drop_user(user.username)
 
-    await adm_cluster.close()
-    await user_cluster.close()
-
 
 if __name__ == "__main__":
     loop = get_event_loop()

@@ -64,7 +64,6 @@ class QueryIndexManagementTests:
 
         yield cb_env
         await cb_env.try_n_times(5, 3, self._clear_all_indexes, cb_env, ignore_fail=True)
-        await cluster.close()
 
     async def _clear_all_indexes(self, cb_env, ignore_fail=False):
         # Drop all indexes!
@@ -412,7 +411,6 @@ class QueryIndexCollectionManagementTests:
         await cb_env.try_n_times_till_exception(5, 3,
                                                 cb_env.teardown_named_collections,
                                                 raise_if_no_exception=False)
-        await cluster.close()
 
     async def _clear_all_indexes(self, cb_env, ignore_fail=False):
         # Drop all indexes!

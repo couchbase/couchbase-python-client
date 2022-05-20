@@ -70,7 +70,6 @@ class ViewIndexManagementTests:
                                  manage_view_indexes=True)
 
         yield cb_env
-        await cluster.close()
 
     @pytest.fixture(scope='class')
     def test_ddoc(self):

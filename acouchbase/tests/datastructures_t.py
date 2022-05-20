@@ -63,7 +63,6 @@ class DatastructuresTests:
             await cb_env.try_n_times_till_exception(5, 3,
                                                     cb_env.teardown_named_collections,
                                                     raise_if_no_exception=False)
-        await cluster.close()
 
     @pytest_asyncio.fixture()
     async def remove_ds(self, cb_env) -> None:

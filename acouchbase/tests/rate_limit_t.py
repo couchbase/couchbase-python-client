@@ -92,7 +92,6 @@ class RateLimitTests:
 
         yield cb_env
         await self.tear_down(cb_env)
-        await cluster.close()
 
     def _enforce_rate_limits(self, cb_env, enforce=True):
         url = f'{cb_env.rate_limit_params.url}/internalSettings'
@@ -323,9 +322,6 @@ class RateLimitTests:
             pass
         except Exception:
             pytest.fail('Expected RateLimitedException')
-        finally:
-            if cluster and cluster.connected:
-                await cluster.close()
 
     @pytest.mark.usefixtures('remove_docs')
     @pytest.mark.asyncio
@@ -356,9 +352,6 @@ class RateLimitTests:
             pass
         except Exception:
             pytest.fail('Expected RateLimitedException')
-        finally:
-            if cluster and cluster.connected:
-                await cluster.close()
 
     @pytest.mark.usefixtures('remove_docs')
     @pytest.mark.asyncio
@@ -389,9 +382,6 @@ class RateLimitTests:
             pass
         except Exception:
             pytest.fail('Expected RateLimitedException')
-        finally:
-            if cluster and cluster.connected:
-                await cluster.close()
 
     @pytest.mark.asyncio
     async def test_rate_limits_max_conns(self, couchbase_config, cb_env):
@@ -425,11 +415,6 @@ class RateLimitTests:
             pass
         except Exception:
             pytest.fail('Expected RateLimitedException')
-        finally:
-            if cluster and cluster.connected:
-                await cluster.close()
-            if cluster1 and cluster1.connected:
-                await cluster1.close()
 
     @pytest.mark.usefixtures('cleanup_scope_and_collection')
     @pytest.mark.asyncio
@@ -551,4 +536,3 @@ class RateLimitTests:
         with pytest.raises(RateLimitedException):
             await asyncio.gather(*[create_user(u) for u in user_list])
 
-        await cluster.close()

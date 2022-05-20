@@ -704,7 +704,6 @@ class QueryRequestLogic:
         self._connection = connection
         self._query_params = query_params
         self.row_factory = row_factory
-        self._rows = asyncio.Queue()
         self._streaming_result = None
         self._started_streaming = False
         self._done_streaming = False

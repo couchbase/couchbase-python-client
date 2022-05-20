@@ -12,3 +12,14 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
+
+def wrap_in_thread(func):
+    import threading
+    
+    def wrap(*args, **kwargs):
+        t = threading.Thread(target=func, args=args, **kwargs)
+        t.start()
+        t.join()
+
+    return wrap(func)

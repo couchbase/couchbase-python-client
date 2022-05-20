@@ -100,4 +100,3 @@ except QueryIndexNotFoundException:
 # can drop an index, and ignore if it doesn't exists
 ixm.drop_index(bucket_name, beer_sample_brewery_id_idx, DropQueryIndexOptions(ignore_if_not_exists=True))
 
-cluster.close()

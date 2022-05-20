@@ -64,7 +64,6 @@ class AnalyticsTests:
         yield cb_env
         # teardown
         await cb_env.try_n_times(3, 5, self._teardown_analytics, cb_env)
-        await cluster.close()
 
     async def _setup_analytics(self, cb_env):
         await cb_env.am.create_dataset(self.DATASET_NAME,
@@ -232,7 +231,6 @@ class AnalyticsCollectionTests:
         await cb_env.try_n_times_till_exception(5, 3,
                                                 cb_env.teardown_named_collections,
                                                 raise_if_no_exception=False)
-        await cluster.close()
 
     """
         Setup queries:
