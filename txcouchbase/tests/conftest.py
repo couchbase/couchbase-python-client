@@ -26,9 +26,14 @@ class TwistedObjects:
 
 
 def pytest_configure(config):
+    run_tx = config.getoption('--txcouchbase')
     if config and config.option and config.option.markexpr:
+        run_tx = config.getoption('--txcouchbase')
         if 'txcouchbase' in config.option.markexpr:
-            init_reactor()
+            run_tx = True
+
+    if run_tx is True:
+        init_reactor()
 
 
 def run_in_reactor_thread(fn, *args, **kwargs):

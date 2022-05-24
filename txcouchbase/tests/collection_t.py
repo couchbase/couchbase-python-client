@@ -101,20 +101,17 @@ class CollectionTests:
         yield KVPair(key, value)
         cb_env.try_n_times(5, 3, cb_env.collection.upsert, key, value)
 
-    # @TODO:  pending txcouchbase mgmt updates
     @pytest.fixture(scope="class")
     def check_replicas(self, cb_env):
-        pytest.skip('num_replicas not supported, pending txcouchbase mgmt updates.')
         bucket_settings = cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, cb_env.bucket.name)
         num_replicas = bucket_settings.get("num_replicas")
-        ping_res = cb_env.bucket.ping()
+        ping_res = run_in_reactor_thread(cb_env.bucket.ping)
         kv_endpoints = ping_res.endpoints.get(ServiceType.KeyValue, None)
         if kv_endpoints is None or len(kv_endpoints) < (num_replicas + 1):
             pytest.skip("Not all replicas are online")
 
     @pytest.fixture(scope="class")
     def num_replicas(self, cb_env):
-        pytest.skip('num_replicas not supported, pending txcouchbase mgmt updates.')
         bucket_settings = cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, cb_env.bucket.name)
         num_replicas = bucket_settings.get("num_replicas")
         return num_replicas

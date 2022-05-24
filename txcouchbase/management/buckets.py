@@ -15,13 +15,16 @@
 
 from typing import (TYPE_CHECKING,
                     Any,
+                    Dict,
                     List)
 
 from twisted.internet.defer import Deferred
 
+from couchbase.management.logic import ManagementType
 from couchbase.management.logic.buckets_logic import (BucketManagerLogic,
                                                       BucketSettings,
                                                       CreateBucketSettings)
+from txcouchbase.management.logic.wrappers import TxMgmtWrapper
 
 if TYPE_CHECKING:
     from couchbase.management.options import (CreateBucketOptions,
@@ -44,58 +47,140 @@ class BucketManager(BucketManagerLogic):
         """
         return self._loop
 
+    @TxMgmtWrapper.inject_callbacks(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def create_bucket(self,
                       settings,  # type: CreateBucketSettings
                       *options,  # type: CreateBucketOptions
-                      **kwargs   # type: Any
+                      **kwargs   # type: Dict[str, Any]
                       ) -> Deferred[None]:
+        """Creates a new bucket.
+
+        Args:
+            settings (:class:`.CreateBucketSettings`): The settings to use for the new bucket.
+            options (:class:`~couchbase.management.options.CreateBucketOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            `Deferred`: An empty `Deferred` instance.
+
+        Raises:
+            :class:`~couchbase.exceptions.BucketAlreadyExistsException`: If the bucket already exists.
+            :class:`~couchbase.exceptions.InvalidArgumentsException`: If an invalid type or value is provided for the
+                settings argument.
         """
-        Creates a new bucket.
+        super().create_bucket(settings, *options, **kwargs)
 
-        :param: CreateBucketSettings settings: settings for the bucket.
-        :param: CreateBucketOptions options: options for setting the bucket.
-        :param: Any kwargs: override corresponding values in the options.
-
-        :raises: BucketAlreadyExistsException
-        :raises: InvalidArgumentsException
-        """
-        return Deferred.fromFuture(super().create_bucket(settings, *options, **kwargs))
-
+    @TxMgmtWrapper.inject_callbacks(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def update_bucket(self,
                       settings,  # type: BucketSettings
                       *options,  # type: UpdateBucketOptions
-                      **kwargs  # type: Any
+                      **kwargs  # type: Dict[str, Any]
                       ) -> Deferred[None]:
+        """Update the settings for an existing bucket.
 
-        return Deferred.fromFuture(super().update_bucket(settings, *options, **kwargs))
+        Args:
+            settings (:class:`.BucketSettings`): The settings to use for the new bucket.
+            options (:class:`~couchbase.management.options.UpdateBucketOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
 
+        Returns:
+            `Deferred`: An empty `Deferred` instance.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentsException`: If an invalid type or value is provided for the
+                settings argument.
+        """
+        super().update_bucket(settings, *options, **kwargs)
+
+    @TxMgmtWrapper.inject_callbacks(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def drop_bucket(self,
                     bucket_name,  # type: str
                     *options,     # type: DropBucketOptions
-                    **kwargs      # type: Any
+                    **kwargs      # type: Dict[str, Any]
                     ) -> Deferred[None]:
+        """Drops an existing bucket.
 
-        return Deferred.fromFuture(super().drop_bucket(bucket_name, *options, **kwargs))
+        Args:
+            bucket_name (str): The name of the bucket to drop.
+            options (:class:`~couchbase.management.options.DropBucketOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
 
+        Returns:
+            `Deferred`: An empty `Deferred` instance.
+
+        Raises:
+            :class:`~couchbase.exceptions.BucketDoesNotExistException`: If the bucket does not exist.
+        """
+        super().drop_bucket(bucket_name, *options, **kwargs)
+
+    @TxMgmtWrapper.inject_callbacks(BucketSettings, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def get_bucket(self,
                    bucket_name,   # type: str
                    *options,      # type: GetBucketOptions
-                   **kwargs       # type: Any
+                   **kwargs       # type: Dict[str, Any]
                    ) -> Deferred[BucketSettings]:
+        """Fetches the settings in use for a specified bucket.
 
-        return Deferred.fromFuture(super().get_bucket(bucket_name, *options, **kwargs))
+        Args:
+            bucket_name (str): The name of the bucket to fetch.
+            options (:class:`~couchbase.management.options.GetBucketOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
 
+        Returns:
+            Deferred[:class:`.BucketSettings`]: The settings of the specified bucket.
+
+        Raises:
+            :class:`~couchbase.exceptions.BucketDoesNotExistException`: If the bucket does not exist.
+        """
+        super().get_bucket(bucket_name, *options, **kwargs)
+
+    @TxMgmtWrapper.inject_callbacks(BucketSettings, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def get_all_buckets(self,
                         *options,  # type: GetAllBucketOptions
-                        **kwargs  # type: Any
+                        **kwargs  # type: Dict[str, Any]
                         ) -> Deferred[List[BucketSettings]]:
+        """Returns a list of existing buckets in the cluster.
 
-        return Deferred.fromFuture(super().get_all_buckets(*options, **kwargs))
+        Args:
+            options (:class:`~couchbase.management.options.GetAllBucketOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
 
+        Returns:
+            Deferred[List[:class:`.BucketSettings`]]: A list of existing buckets in the cluster.
+        """
+        super().get_all_buckets(*options, **kwargs)
+
+    @TxMgmtWrapper.inject_callbacks(None, ManagementType.BucketMgmt, BucketManagerLogic._ERROR_MAPPING)
     def flush_bucket(self,
                      bucket_name,   # type: str
                      *options,      # type: FlushBucketOptions
-                     **kwargs       # type: Any
+                     **kwargs       # type: Dict[str, Any]
                      ) -> Deferred[None]:
+        """Flushes the bucket, deleting all the existing data that is stored in it.
 
-        return Deferred.fromFuture(super().flush_bucket(bucket_name, *options, **kwargs))
+        Args:
+            bucket_name (str): The name of the bucket to flush.
+            options (:class:`~couchbase.management.options.FlushBucketOptions`): Optional parameters for this
+                operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used as optional parameters
+                for this operation.
+
+        Returns:
+            `Deferred`: An empty `Deferred` instance.
+
+        Raises:
+            :class:`~couchbase.exceptions.BucketDoesNotExistException`: If the bucket does not exist.
+            :class:`~couchbase.exceptions.BucketNotFlushableException`: If the bucket's settings have
+                flushing disabled.
+        """
+        super().flush_bucket(bucket_name, *options, **kwargs)

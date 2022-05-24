@@ -118,6 +118,12 @@ def get_config(couchbase_test_config):
     return couchbase_test_config
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--txcouchbase", action="store_true", default=False, help="run txcouchbase tests"
+    )
+
+
 def pytest_collection_modifyitems(items):  # noqa: C901
     for item in items:
         item_details = item.nodeid.split('::')

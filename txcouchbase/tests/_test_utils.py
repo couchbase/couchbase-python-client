@@ -26,8 +26,12 @@ from twisted.internet import defer, reactor
 
 from couchbase.auth import PasswordAuthenticator
 from couchbase.exceptions import (AmbiguousTimeoutException,
+                                  BucketAlreadyExistsException,
+                                  BucketDoesNotExistException,
                                   CouchbaseException,
                                   UnAmbiguousTimeoutException)
+from couchbase.management.buckets import (BucketType,
+                                          CreateBucketSettings)
 from couchbase.options import ClusterOptions
 from couchbase.transcoder import RawBinaryTranscoder, RawStringTranscoder
 from tests.helpers import CollectionType  # noqa: F401
@@ -36,6 +40,7 @@ from tests.helpers import CouchbaseTestEnvironment, CouchbaseTestEnvironmentExce
 
 # from txcouchbase.bucket import Bucket
 from txcouchbase.cluster import Cluster
+from txcouchbase.management.buckets import BucketManager
 
 from .conftest import run_in_reactor_thread
 
@@ -43,9 +48,15 @@ from .conftest import run_in_reactor_thread
 class TestEnvironment(CouchbaseTestEnvironment):
     def __init__(self, cluster, bucket, collection, cluster_config, **kwargs):
         super().__init__(cluster, bucket, collection, cluster_config)
-        self._retry_count = 0
-        self._retry_loop = None
-        self._retry_result = None
+
+        if kwargs.get("manage_buckets", False) is True:
+            self.check_if_feature_supported('basic_bucket_mgmt')
+            self._bm = self.cluster.buckets()
+
+    @property
+    def bm(self) -> Optional[BucketManager]:
+        """Returns the default bucket's BucketManager"""
+        return self._bm if hasattr(self, '_bm') else None
 
     @classmethod
     def get_environment(cls, test_suite, couchbase_config, coll_type=CollectionType.DEFAULT, **kwargs):
@@ -167,6 +178,35 @@ class TestEnvironment(CouchbaseTestEnvironment):
                 run_in_reactor_thread(self.collection.remove, k)
             except CouchbaseException:
                 pass
+
+    # Bucket MGMT
+
+    def create_bucket(self, bucket_name):
+        try:
+            run_in_reactor_thread(self.bm.create_bucket,
+                                  CreateBucketSettings(
+                                      name=bucket_name,
+                                      bucket_type=BucketType.COUCHBASE,
+                                      ram_quota_mb=100))
+        except BucketAlreadyExistsException:
+            pass
+        self.try_n_times(10, 1, self.bm.get_bucket, bucket_name)
+
+    def purge_buckets(self, buckets):
+        for bucket in buckets:
+            try:
+                run_in_reactor_thread(self.bm.drop_bucket, bucket)
+            except BucketDoesNotExistException:
+                pass
+            except Exception:
+                raise
+
+            # now be sure it is really gone
+            self.try_n_times_till_exception(10,
+                                            3,
+                                            self.bm.get_bucket,
+                                            bucket,
+                                            expected_exceptions=(BucketDoesNotExistException))
 
     # helper methods
 
