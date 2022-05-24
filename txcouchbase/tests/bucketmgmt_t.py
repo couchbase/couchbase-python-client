@@ -74,10 +74,10 @@ class BucketManagementTests:
     @pytest.mark.usefixtures("purge_buckets")
     def test_bucket_create(self, cb_env, test_bucket):
         run_in_reactor_thread(cb_env.bm.create_bucket,
-                                CreateBucketSettings(
-                                    name=test_bucket,
-                                    bucket_type=BucketType.COUCHBASE,
-                                    ram_quota_mb=100))
+                              CreateBucketSettings(
+                                  name=test_bucket,
+                                  bucket_type=BucketType.COUCHBASE,
+                                  ram_quota_mb=100))
         bucket = cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, test_bucket)
         if cb_env.server_version_short >= 6.6:
             assert bucket["minimum_durability_level"] == DurabilityLevel.NONE
@@ -86,11 +86,11 @@ class BucketManagementTests:
     @pytest.mark.usefixtures("purge_buckets")
     def test_bucket_create_replica_index_true(self, cb_env, test_bucket):
         run_in_reactor_thread(cb_env.bm.create_bucket,
-                                CreateBucketSettings(
-                                    name=test_bucket,
-                                    bucket_type=BucketType.COUCHBASE,
-                                    ram_quota_mb=100,
-                                    replica_index=True))
+                              CreateBucketSettings(
+                                  name=test_bucket,
+                                  bucket_type=BucketType.COUCHBASE,
+                                  ram_quota_mb=100,
+                                  replica_index=True))
         bucket = cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, test_bucket)
         assert bucket.replica_index is True
 
@@ -98,11 +98,11 @@ class BucketManagementTests:
     @pytest.mark.usefixtures("purge_buckets")
     def test_bucket_create_replica_index_false(self, cb_env, test_bucket):
         run_in_reactor_thread(cb_env.bm.create_bucket,
-                                CreateBucketSettings(
-                                    name=test_bucket,
-                                    bucket_type=BucketType.COUCHBASE,
-                                    ram_quota_mb=100,
-                                    replica_index=False))
+                              CreateBucketSettings(
+                                  name=test_bucket,
+                                  bucket_type=BucketType.COUCHBASE,
+                                  ram_quota_mb=100,
+                                  replica_index=False))
         bucket = cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, test_bucket)
         assert bucket.replica_index is False
 
@@ -112,10 +112,10 @@ class BucketManagementTests:
 
         min_durability = DurabilityLevel.MAJORITY_AND_PERSIST_TO_ACTIVE
         run_in_reactor_thread(cb_env.bm.create_bucket,
-                                CreateBucketSettings(name=test_bucket,
-                                                    bucket_type=BucketType.COUCHBASE,
-                                                    ram_quota_mb=100,
-                                                    minimum_durability_level=min_durability))
+                              CreateBucketSettings(name=test_bucket,
+                                                   bucket_type=BucketType.COUCHBASE,
+                                                   ram_quota_mb=100,
+                                                   minimum_durability_level=min_durability))
         bucket = cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, test_bucket)
         assert bucket["minimum_durability_level"] == min_durability
 
@@ -146,9 +146,9 @@ class BucketManagementTests:
     def test_bucket_list(self, cb_env, test_buckets):
         for bucket in test_buckets:
             run_in_reactor_thread(cb_env.bm.create_bucket,
-                                    CreateBucketSettings(
-                                        name=bucket,
-                                        ram_quota_mb=100))
+                                  CreateBucketSettings(
+                                      name=bucket,
+                                      ram_quota_mb=100))
             cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, bucket)
 
         buckets = run_in_reactor_thread(cb_env.bm.get_all_buckets)
@@ -160,9 +160,9 @@ class BucketManagementTests:
     def test_cluster_sees_bucket(self, cb_env, test_bucket):
         # Create the bucket
         run_in_reactor_thread(cb_env.bm.create_bucket,
-                                CreateBucketSettings(
-                                    name=test_bucket,
-                                    ram_quota_mb=100))
+                              CreateBucketSettings(
+                                  name=test_bucket,
+                                  ram_quota_mb=100))
         cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, test_bucket)
         # cluster should be able to return it (though, not right away)
         cb_env.try_n_times(10, 2, cb_env.cluster.bucket, test_bucket)
@@ -174,9 +174,9 @@ class BucketManagementTests:
     def test_change_expiry(self, cb_env, test_bucket):
         # Create the bucket
         run_in_reactor_thread(cb_env.bm.create_bucket,
-                                CreateBucketSettings(
-                                    name=test_bucket,
-                                    ram_quota_mb=100))
+                              CreateBucketSettings(
+                                  name=test_bucket,
+                                  ram_quota_mb=100))
         cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
 
         # change bucket TTL
@@ -196,10 +196,10 @@ class BucketManagementTests:
     def test_bucket_flush(self, cb_env, test_bucket):
         # Create the bucket
         run_in_reactor_thread(cb_env.bm.create_bucket,
-                                CreateBucketSettings(
-                                    name=test_bucket,
-                                    ram_quota_mb=100,
-                                    flush_enabled=True))
+                              CreateBucketSettings(
+                                  name=test_bucket,
+                                  ram_quota_mb=100,
+                                  flush_enabled=True))
         bucket = cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
         assert bucket.flush_enabled is True
         # flush the bucket
@@ -210,10 +210,10 @@ class BucketManagementTests:
     def test_bucket_flush_fail(self, cb_env, test_bucket):
         # Create the bucket
         run_in_reactor_thread(cb_env.bm.create_bucket,
-                                CreateBucketSettings(
-                                    name=test_bucket,
-                                    ram_quota_mb=100,
-                                    flush_enabled=False))
+                              CreateBucketSettings(
+                                  name=test_bucket,
+                                  ram_quota_mb=100,
+                                  flush_enabled=False))
         bucket = cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
         assert bucket.flush_enabled is False
 
@@ -225,10 +225,10 @@ class BucketManagementTests:
     def test_bucket_backend_default(self, cb_env, test_bucket):
         # Create the bucket
         run_in_reactor_thread(cb_env.bm.create_bucket,
-                                CreateBucketSettings(
-                                    name=test_bucket,
-                                    ram_quota_mb=100,
-                                    flush_enabled=False))
+                              CreateBucketSettings(
+                                  name=test_bucket,
+                                  ram_quota_mb=100,
+                                  flush_enabled=False))
         bucket = cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
         assert bucket.storage_backend == StorageBackend.COUCHSTORE
 
@@ -237,11 +237,11 @@ class BucketManagementTests:
     def test_bucket_backend_magma(self, cb_env, test_bucket):
         # Create the bucket
         run_in_reactor_thread(cb_env.bm.create_bucket,
-                                CreateBucketSettings(
-                                    name=test_bucket,
-                                    ram_quota_mb=1024,
-                                    flush_enabled=False,
-                                    storage_backend=StorageBackend.MAGMA))
+                              CreateBucketSettings(
+                                  name=test_bucket,
+                                  ram_quota_mb=1024,
+                                  flush_enabled=False,
+                                  storage_backend=StorageBackend.MAGMA))
         bucket = cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
         assert bucket.storage_backend == StorageBackend.MAGMA
 
@@ -250,11 +250,11 @@ class BucketManagementTests:
     def test_bucket_backend_ephemeral(self, cb_env, test_bucket):
         # Create the bucket
         run_in_reactor_thread(cb_env.bm.create_bucket,
-                                CreateBucketSettings(
-                                    name=test_bucket,
-                                    ram_quota_mb=100,
-                                    bucket_type=BucketType.EPHEMERAL,
-                                    flush_enabled=False))
+                              CreateBucketSettings(
+                                  name=test_bucket,
+                                  ram_quota_mb=100,
+                                  bucket_type=BucketType.EPHEMERAL,
+                                  flush_enabled=False))
         bucket = cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
         assert bucket.storage_backend == StorageBackend.UNDEFINED
 
@@ -265,19 +265,18 @@ class BucketManagementTests:
         if cb_env.is_developer_preview:
             # Create the bucket
             run_in_reactor_thread(cb_env.bm.create_bucket,
-                                    CreateBucketSettings(
-                                        name=test_bucket,
-                                        ram_quota_mb=100,
-                                        conflict_resolution_type=ConflictResolutionType.CUSTOM,
-                                        flush_enabled=False))
+                                  CreateBucketSettings(
+                                      name=test_bucket,
+                                      ram_quota_mb=100,
+                                      conflict_resolution_type=ConflictResolutionType.CUSTOM,
+                                      flush_enabled=False))
             bucket = cb_env.try_n_times(10, 3, cb_env.bm.get_bucket, test_bucket)
             assert bucket.conflict_resolution_type == ConflictResolutionType.CUSTOM
         else:
             with pytest.raises(FeatureUnavailableException):
                 run_in_reactor_thread(cb_env.bm.create_bucket,
-                                        CreateBucketSettings(
-                                            name=test_bucket,
-                                            ram_quota_mb=100,
-                                            conflict_resolution_type=ConflictResolutionType.CUSTOM,
-                                            flush_enabled=False))
-
+                                      CreateBucketSettings(
+                                          name=test_bucket,
+                                          ram_quota_mb=100,
+                                          conflict_resolution_type=ConflictResolutionType.CUSTOM,
+                                          flush_enabled=False))

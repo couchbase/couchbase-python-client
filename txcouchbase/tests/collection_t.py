@@ -51,20 +51,21 @@ class CollectionTests:
     FIFTY_YEARS = 50 * 365 * 24 * 60 * 60
     THIRTY_DAYS = 30 * 24 * 60 * 60
 
-    @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT])
+    @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     def couchbase_test_environment(self, couchbase_config, request):
         cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param, manage_buckets=True)
 
-        # if request.param == CollectionType.NAMED:
-        #     cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
+        if request.param == CollectionType.NAMED:
+            cb_env.try_n_times(5, 3, cb_env.setup_named_collections, is_deferred=False)
 
         cb_env.try_n_times(3, 5, cb_env.load_data, is_deferred=False)
         yield cb_env
         cb_env.try_n_times(3, 5, cb_env.purge_data, is_deferred=False)
-        # if request.param == CollectionType.NAMED:
-        #     cb_env.try_n_times_till_exception(5, 3,
-        #                                       cb_env.teardown_named_collections,
-        #                                       raise_if_no_exception=False)
+        if request.param == CollectionType.NAMED:
+            cb_env.try_n_times_till_exception(5, 3,
+                                              cb_env.teardown_named_collections,
+                                              raise_if_no_exception=False,
+                                              is_deferred=False)
 
     @pytest.fixture(scope="class")
     def check_preserve_expiry_supported(self, cb_env):
