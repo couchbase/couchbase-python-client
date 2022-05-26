@@ -15,7 +15,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 from datetime import timedelta
 from enum import Enum
@@ -26,7 +25,9 @@ from typing import (TYPE_CHECKING,
                     Optional,
                     Union)
 
-from couchbase._utils import JSONType, timedelta_as_microseconds
+from couchbase._utils import (JSONType,
+                              timedelta_as_microseconds,
+                              to_microseconds)
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
 from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.options import QueryOptionsBase
@@ -310,7 +311,7 @@ class N1QLQuery:
     # empty transform will skip updating the attribute when creating an
     # N1QLQuery object
     _VALID_OPTS = {
-        "timeout": {"timeout": timedelta_as_microseconds},
+        "timeout": {"timeout": lambda x: x},
         "read_only": {"readonly": lambda x: x},
         "scan_consistency": {"consistency": lambda x: x},
         "consistent_with": {"consistent_with": lambda x: x},
@@ -410,17 +411,13 @@ class N1QLQuery:
         return float(value)
 
     @timeout.setter
-    def timeout(self, value  # type: Union[timedelta,float]
+    def timeout(self, value  # type: Union[timedelta,float,int]
                 ) -> None:
         if not value:
             self._params.pop('timeout', 0)
         else:
-            if not isinstance(value, (timedelta, float)):
-                raise InvalidArgumentException(message="Excepted timeout to be a timedelta | float")
-            if isinstance(value, timedelta):
-                self.set_option('timeout', value.total_seconds())
-            else:
-                self.set_option('timeout', value)
+            total_us = to_microseconds(value)
+            self.set_option('timeout', total_us)
 
     @property
     def readonly(self) -> bool:
@@ -545,9 +542,19 @@ class N1QLQuery:
 
     @property
     def profile(self) -> QueryProfile:
-        return self._params.get(
-            'profile_mode', QueryProfile.OFF
+        value = self._params.get(
+            'profile_mode', None
         )
+
+        if value is None:
+            return QueryProfile.OFF
+        if isinstance(value, str):
+            if value == 'off':
+                return QueryProfile.OFF
+            elif value == 'phases':
+                return QueryProfile.PHASES
+            else:
+                return QueryProfile.TIMINGS
 
     @profile.setter
     def profile(self, value  # type: Union[QueryProfile, str]
@@ -647,7 +654,7 @@ class N1QLQuery:
     @serializer.setter
     def serializer(self, value  # type: Serializer
                    ):
-        if not issubclass(value, Serializer):
+        if not issubclass(value.__class__, Serializer):
             raise InvalidArgumentException(message='Serializer should implement Serializer interface.')
         self.set_option('serializer', value)
 

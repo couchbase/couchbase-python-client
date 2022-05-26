@@ -532,39 +532,125 @@ class QueryParamTests:
         assert query.params.get('preserve_expiry', None) is None
         assert query.preserve_expiry is False
 
-    def test_params(self):
-        """
+    @pytest.fixture(scope='class')
+    def base_opts(self):
+        return {'statement': 'SELECT * FROM default',
+                'metrics': False}
 
-        TODO:
-            timeout
-            read_only
-            scan_consistency
-            consistent_with
-            adhoc
-            client_context_id
-            max_parallelism
-            pipeline_batch
-            pipeline_cap
-            profile
-            query_context
-            raw
-            metrics
-            flex_index
-            preserve_expiry
-            serializer
-            positional_parameters
-            named_parameters
-
-        """
-
-        # no opts - metrics will default to False + statement
+    def test_params_base(self, base_opts):
         q_str = 'SELECT * FROM default'
         q_opts = QueryOptions()
         query = N1QLQuery.create_query_object(q_str, q_opts)
-        base_opts = {'statement': q_str, 'metrics': False}
         assert query.params == base_opts
 
-        # scan_cap
+    def test_params_timeout(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = QueryOptions(timeout=timedelta(seconds=20))
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['timeout'] = 20000000
+        assert query.params == exp_opts
+
+        q_opts = QueryOptions(timeout=20)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['timeout'] = 20000000
+        assert query.params == exp_opts
+
+        q_opts = QueryOptions(timeout=25.5)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['timeout'] = 25500000
+        assert query.params == exp_opts
+
+    def test_params_readonly(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = QueryOptions(read_only=True)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['readonly'] = True
+        assert query.params == exp_opts
+
+    def test_params_scan_consistency(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = QueryOptions(scan_consistency=QueryScanConsistency.REQUEST_PLUS)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['scan_consistency'] = QueryScanConsistency.REQUEST_PLUS.value
+        assert query.params == exp_opts
+        assert query.consistency == QueryScanConsistency.REQUEST_PLUS
+
+    def test_params_adhoc(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = QueryOptions(adhoc=False)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['adhoc'] = False
+        assert query.params == exp_opts
+
+    def test_params_client_context_id(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = QueryOptions(client_context_id='test-string-id')
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['client_context_id'] = 'test-string-id'
+        assert query.params == exp_opts
+
+    def test_params_max_parallelism(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = QueryOptions(max_parallelism=5)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['max_parallelism'] = 5
+        assert query.params == exp_opts
+
+    def test_params_pipeline_batch(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = QueryOptions(pipeline_batch=5)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['pipeline_batch'] = 5
+        assert query.params == exp_opts
+
+    def test_params_pipeline_cap(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = QueryOptions(pipeline_cap=5)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['pipeline_cap'] = 5
+        assert query.params == exp_opts
+
+    def test_params_profile(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = QueryOptions(profile=QueryProfile.PHASES)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['profile_mode'] = QueryProfile.PHASES.value
+        assert query.params == exp_opts
+        assert query.profile == QueryProfile.PHASES
+
+    def test_params_query_context(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = QueryOptions(query_context='bucket.scope')
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['scope_qualifier'] = 'bucket.scope'
+        assert query.params == exp_opts
+
+    def test_params_scan_cap(self, base_opts):
+        q_str = 'SELECT * FROM default'
         q_opts = QueryOptions(scan_cap=5)
         query = N1QLQuery.create_query_object(q_str, q_opts)
 
@@ -572,10 +658,51 @@ class QueryParamTests:
         exp_opts['scan_cap'] = 5
         assert query.params == exp_opts
 
-        # scan_wait - converted to microseconds
+    def test_params_scan_wait(self, base_opts):
+        q_str = 'SELECT * FROM default'
         q_opts = QueryOptions(scan_wait=timedelta(seconds=30))
         query = N1QLQuery.create_query_object(q_str, q_opts)
 
         exp_opts = base_opts.copy()
         exp_opts['scan_wait'] = 30000000
+        assert query.params == exp_opts
+
+    def test_params_metrics(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = QueryOptions(metrics=True)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['metrics'] = True
+        assert query.params == exp_opts
+
+    def test_params_flex_index(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = QueryOptions(flex_index=True)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['flex_index'] = True
+        assert query.params == exp_opts
+
+    def test_params_preserve_expiry(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = QueryOptions(preserve_expiry=True)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['preserve_expiry'] = True
+        assert query.params == exp_opts
+
+    def test_params_serializer(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        from couchbase.serializer import DefaultJsonSerializer
+
+        # serializer
+        serializer = DefaultJsonSerializer()
+        q_opts = QueryOptions(serializer=serializer)
+        query = N1QLQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['serializer'] = serializer
         assert query.params == exp_opts

@@ -30,7 +30,7 @@ from typing import (TYPE_CHECKING,
                     Tuple,
                     Union)
 
-from couchbase._utils import timedelta_as_microseconds
+from couchbase._utils import to_microseconds
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
 from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.options import SearchOptionsBase
@@ -902,7 +902,7 @@ class SearchQueryBuilder:
     # empty transform will skip updating the attribute when creating an
     # SearchQueryBuilder object
     _VALID_OPTS = {
-        "timeout": {"timeout": timedelta_as_microseconds},
+        "timeout": {"timeout": lambda x: x},
         "limit": {"limit": lambda x: x},
         "skip": {"skip": lambda x: x},
         "explain": {"explain": lambda x: x},
@@ -997,12 +997,8 @@ class SearchQueryBuilder:
         if not value:
             self._params.pop('timeout', 0)
         else:
-            if not isinstance(value, (timedelta, float, int)):
-                raise InvalidArgumentException(message="Excepted timeout to be of type Union[timedelta,float,int].")
-            if isinstance(value, timedelta):
-                self.set_option('timeout', int(value.total_seconds() * 1e6))
-            else:
-                self.set_option('timeout', value)
+            total_us = to_microseconds(value)
+            self.set_option('timeout', total_us)
 
     @property
     def metrics(self) -> bool:
@@ -1233,7 +1229,7 @@ class SearchQueryBuilder:
     @serializer.setter
     def serializer(self, value  # type: Serializer
                    ):
-        if not issubclass(value, Serializer):
+        if not issubclass(value.__class__, Serializer):
             raise InvalidArgumentException(message='Serializer should implement Serializer interface.')
         self.set_option('serializer', value)
 

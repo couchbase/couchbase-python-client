@@ -771,17 +771,21 @@ class SearchStringTests:
 
         return encoded_q
 
-    def test_params(self):
-        q = search.TermQuery('someterm')
-        # no opts - metrics will default to True
+    @pytest.fixture(scope='class')
+    def base_query_opts(self):
+        return search.TermQuery('someterm'), {'metrics': True}
+
+    def test_params_base(self, base_query_opts):
+        q, base_opts = base_query_opts
         opts = SearchOptions()
         search_query = search.SearchQueryBuilder.create_search_query_object(
             self.IDX_NAME, q, opts
         )
-        base_opts = {'metrics': True}
+
         assert search_query.params == base_opts
 
-        # limit
+    def test_params_limit(self, base_query_opts):
+        q, base_opts = base_query_opts
         opts = SearchOptions(limit=10)
         search_query = search.SearchQueryBuilder.create_search_query_object(
             self.IDX_NAME, q, opts
@@ -790,7 +794,8 @@ class SearchStringTests:
         exp_opts['limit'] = 10
         assert search_query.params == exp_opts
 
-        # skip
+    def test_params_skip(self, base_query_opts):
+        q, base_opts = base_query_opts
         opts = SearchOptions(skip=10)
         search_query = search.SearchQueryBuilder.create_search_query_object(
             self.IDX_NAME, q, opts
@@ -799,7 +804,8 @@ class SearchStringTests:
         exp_opts['skip'] = 10
         assert search_query.params == exp_opts
 
-        # explain
+    def test_params_explain(self, base_query_opts):
+        q, base_opts = base_query_opts
         opts = SearchOptions(explain=True)
         search_query = search.SearchQueryBuilder.create_search_query_object(
             self.IDX_NAME, q, opts
@@ -808,7 +814,8 @@ class SearchStringTests:
         exp_opts['explain'] = True
         assert search_query.params == exp_opts
 
-        # include_locations
+    def test_params_include_locations(self, base_query_opts):
+        q, base_opts = base_query_opts
         opts = SearchOptions(include_locations=True)
         search_query = search.SearchQueryBuilder.create_search_query_object(
             self.IDX_NAME, q, opts
@@ -817,7 +824,8 @@ class SearchStringTests:
         exp_opts['include_locations'] = True
         assert search_query.params == exp_opts
 
-        # disable_scoring
+    def test_params_disable_scoring(self, base_query_opts):
+        q, base_opts = base_query_opts
         opts = SearchOptions(disable_scoring=True)
         search_query = search.SearchQueryBuilder.create_search_query_object(
             self.IDX_NAME, q, opts
@@ -826,7 +834,8 @@ class SearchStringTests:
         exp_opts['disable_scoring'] = True
         assert search_query.params == exp_opts
 
-        # highlight_style
+    def test_params_highlight_style(self, base_query_opts):
+        q, base_opts = base_query_opts
         opts = SearchOptions(highlight_style=HighlightStyle.Html)
         search_query = search.SearchQueryBuilder.create_search_query_object(
             self.IDX_NAME, q, opts
@@ -834,8 +843,10 @@ class SearchStringTests:
         exp_opts = base_opts.copy()
         exp_opts['highlight_style'] = HighlightStyle.Html.value
         assert search_query.params == exp_opts
+        assert search_query.highlight_style == HighlightStyle.Html
 
-        # highlight_style + highlight_fields
+    def test_params_highlight_style_fields(self, base_query_opts):
+        q, base_opts = base_query_opts
         opts = SearchOptions(highlight_style=HighlightStyle.Ansi, highlight_fields=['foo', 'bar', 'baz'])
         search_query = search.SearchQueryBuilder.create_search_query_object(
             self.IDX_NAME, q, opts
@@ -844,8 +855,10 @@ class SearchStringTests:
         exp_opts['highlight_style'] = HighlightStyle.Ansi.value
         exp_opts['highlight_fields'] = ['foo', 'bar', 'baz']
         assert search_query.params == exp_opts
+        assert search_query.highlight_style == HighlightStyle.Ansi
 
-        # fields
+    def test_params_fields(self, base_query_opts):
+        q, base_opts = base_query_opts
         opts = SearchOptions(fields=['foo', 'bar', 'baz'])
         search_query = search.SearchQueryBuilder.create_search_query_object(
             self.IDX_NAME, q, opts
@@ -854,7 +867,8 @@ class SearchStringTests:
         exp_opts['fields'] = ['foo', 'bar', 'baz']
         assert search_query.params == exp_opts
 
-        # sort
+    def test_params_sort(self, base_query_opts):
+        q, base_opts = base_query_opts
         opts = SearchOptions(sort=['f1', 'f2', '-_score'])
         search_query = search.SearchQueryBuilder.create_search_query_object(
             self.IDX_NAME, q, opts
@@ -865,7 +879,8 @@ class SearchStringTests:
         params['sort'] = search_query.sort
         assert params == exp_opts
 
-        # scan_consistency
+    def test_params_scan_consistency(self, base_query_opts):
+        q, base_opts = base_query_opts
         opts = SearchOptions(scan_consistency=search.SearchScanConsistency.REQUEST_PLUS)
         search_query = search.SearchQueryBuilder.create_search_query_object(
             self.IDX_NAME, q, opts
@@ -873,8 +888,10 @@ class SearchStringTests:
         exp_opts = base_opts.copy()
         exp_opts['scan_consistency'] = search.SearchScanConsistency.REQUEST_PLUS.value
         assert search_query.params == exp_opts
+        assert search_query.consistency == search.SearchScanConsistency.REQUEST_PLUS
 
-        # scope/collections
+    def test_params_scope_collections(self, base_query_opts):
+        q, base_opts = base_query_opts
         opts = SearchOptions(scope_name='test-scope', collections=['test-collection-1', 'test-collection-2'])
         search_query = search.SearchQueryBuilder.create_search_query_object(
             self.IDX_NAME, q, opts
@@ -884,7 +901,8 @@ class SearchStringTests:
         exp_opts['collections'] = ['test-collection-1', 'test-collection-2']
         assert search_query.params == exp_opts
 
-        # client_context_id
+    def test_params_client_context_id(self, base_query_opts):
+        q, base_opts = base_query_opts
         opts = SearchOptions(client_context_id='test-id')
         search_query = search.SearchQueryBuilder.create_search_query_object(
             self.IDX_NAME, q, opts
@@ -893,7 +911,8 @@ class SearchStringTests:
         exp_opts['client_context_id'] = 'test-id'
         assert search_query.params == exp_opts
 
-        # timeout
+    def test_params_timeout(self, base_query_opts):
+        q, base_opts = base_query_opts
         opts = SearchOptions(timeout=timedelta(seconds=20))
         search_query = search.SearchQueryBuilder.create_search_query_object(
             self.IDX_NAME, q, opts
@@ -902,7 +921,26 @@ class SearchStringTests:
         exp_opts['timeout'] = int(timedelta(seconds=20).total_seconds() * 1e6)
         assert search_query.params == exp_opts
 
-        # facets
+        opts = SearchOptions(timeout=20)
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            self.IDX_NAME, q, opts
+        )
+
+        exp_opts = base_opts.copy()
+        exp_opts['timeout'] = 20000000
+        assert search_query.params == exp_opts
+
+        opts = SearchOptions(timeout=25.5)
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            self.IDX_NAME, q, opts
+        )
+
+        exp_opts = base_opts.copy()
+        exp_opts['timeout'] = 25500000
+        assert search_query.params == exp_opts
+
+    def test_params_facets(self, base_query_opts):
+        q, base_opts = base_query_opts
         opts = SearchOptions(facets={
             'term': search.TermFacet('somefield', limit=10),
             'dr': search.DateFacet('datefield').add_range('name', 'start', 'end'),
@@ -942,6 +980,59 @@ class SearchStringTests:
             encoded_facets[name] = facet.encodable
         params['facets'] = encoded_facets
         assert params == exp_opts
+
+    def test_params_serializer(self, base_query_opts):
+        q, base_opts = base_query_opts
+        from couchbase.serializer import DefaultJsonSerializer
+
+        # serializer
+        serializer = DefaultJsonSerializer()
+        opts = SearchOptions(serializer=serializer)
+        search_query = search.SearchQueryBuilder.create_search_query_object(
+            self.IDX_NAME, q, opts
+        )
+
+        exp_opts = base_opts.copy()
+        exp_opts['serializer'] = serializer
+        assert search_query.params == exp_opts
+
+    # def test_params(self):
+    #     q = search.TermQuery('someterm')
+    #     # no opts - metrics will default to True
+    #     opts = SearchOptions()
+    #     search_query = search.SearchQueryBuilder.create_search_query_object(
+    #         self.IDX_NAME, q, opts
+    #     )
+    #     base_opts = {'metrics': True}
+    #     assert search_query.params == base_opts
+
+    #     # limit
+
+    #     # skip
+
+    #     # explain
+
+    #     # include_locations
+
+    #     # disable_scoring
+
+    #     # highlight_style
+
+    #     # highlight_style + highlight_fields
+
+    #     # fields
+
+    #     # sort
+
+    #     # scan_consistency
+
+    #     # scope/collections
+
+    #     # client_context_id
+
+    #     # timeout
+
+    #     # facets
 
     def test_consistent_with(self):
         q = search.TermQuery('someterm')

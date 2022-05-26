@@ -20,8 +20,10 @@ from enum import Enum
 from typing import (Any,
                     Dict,
                     List,
-                    Optional)
+                    Optional,
+                    Union)
 
+from couchbase._utils import to_microseconds
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
 from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.options import AnalyticsOptionsBase
@@ -159,7 +161,7 @@ class AnalyticsMetaData:
 class AnalyticsQuery:
 
     _VALID_OPTS = {
-        'timeout': {'timeout': timedelta.seconds},
+        'timeout': {'timeout': lambda x: x},
         'read_only': {'readonly': lambda x: x},
         'scan_consistency': {'consistency': lambda x: x.value},
         'client_context_id': {'client_context_id': lambda x: x},
@@ -228,6 +230,23 @@ class AnalyticsQuery:
         return self._params
 
     @property
+    def timeout(self) -> Optional[float]:
+        value = self._params.get('timeout', None)
+        if not value:
+            return None
+        value = value[:-1]
+        return float(value)
+
+    @timeout.setter
+    def timeout(self, value  # type: Union[timedelta,float,int]
+                ) -> None:
+        if not value:
+            self._params.pop('timeout', 0)
+        else:
+            total_us = to_microseconds(value)
+            self.set_option('timeout', total_us)
+
+    @property
     def metrics(self):
         return self._params.get("metrics", True)
 
@@ -258,6 +277,15 @@ class AnalyticsQuery:
         self._params["scan_consistency"] = value
 
     @property
+    def client_context_id(self) -> Optional[str]:
+        return self._params.get('client_context_id', None)
+
+    @client_context_id.setter
+    def client_context_id(self, value  # type: str
+                          ) -> None:
+        self.set_option('client_context_id', value)
+
+    @property
     def readonly(self):
         value = self._params.get("readonly", False)
         return value
@@ -281,7 +309,7 @@ class AnalyticsQuery:
 
     @serializer.setter
     def serializer(self, value):
-        if not issubclass(value, Serializer):
+        if not issubclass(value.__class__, Serializer):
             raise InvalidArgumentException('Serializer should implement Serializer interface.')
         self._params["serializer"] = value
 
@@ -333,7 +361,7 @@ class AnalyticsQuery:
         # but for now we will use the existing N1QLQuery.  Could be we can
         # add to it, etc...
 
-        # default to false on metrics
+        # default to True on analytics metrics
         query.metrics = args.get("metrics", True)
 
         for k, v in ((k, args[k]) for k in (args.keys() & cls._VALID_OPTS)):

@@ -19,6 +19,8 @@ import pytest
 
 from couchbase.analytics import (AnalyticsMetaData,
                                  AnalyticsMetrics,
+                                 AnalyticsQuery,
+                                 AnalyticsScanConsistency,
                                  AnalyticsStatus,
                                  AnalyticsWarning)
 from couchbase.exceptions import DatasetNotFoundException, DataverseNotFoundException
@@ -113,6 +115,19 @@ class AnalyticsTests:
         result = cb_env.cluster.analytics_query(f'SELECT * FROM `{self.DATASET_NAME}` WHERE `type` = $atype LIMIT 1',
                                                 AnalyticsOptions(named_parameters={'atype': 'abcdefg'}),
                                                 atype='airline')
+        self.assert_rows(result, 1)
+
+    def test_query_raw_options(self, cb_env):
+        # via raw, we should be able to pass any option
+        # if using named params, need to match full name param in query
+        # which is different for when we pass in name_parameters via their specific
+        # query option (i.e. include the $ when using raw)
+        result = cb_env.cluster.analytics_query(f"SELECT * FROM `{self.DATASET_NAME}` WHERE `type` = $atype LIMIT $1",
+                                                AnalyticsOptions(raw={"$atype": "airline", "args": [1]}))
+        self.assert_rows(result, 1)
+
+        result = cb_env.cluster.analytics_query(f"SELECT * FROM `{self.DATASET_NAME}` WHERE `type` = $1 LIMIT 1",
+                                                AnalyticsOptions(raw={"args": ['airline']}))
         self.assert_rows(result, 1)
 
     def test_analytics_with_metrics(self, cb_env):
@@ -371,3 +386,123 @@ class AnalyticsCollectionTests:
             assert isinstance(warning, AnalyticsWarning)
             assert isinstance(warning.message(), str)
             assert isinstance(warning.code(), int)
+
+
+class AnalyticsParamTests:
+    def test_encoded_consistency(self):
+        q_str = 'SELECT * FROM default'
+        q_opts = AnalyticsOptions(scan_consistency=AnalyticsScanConsistency.REQUEST_PLUS)
+        query = AnalyticsQuery.create_query_object(q_str, q_opts)
+
+        assert query.params.get('scan_consistency', None) == AnalyticsScanConsistency.REQUEST_PLUS.value
+        assert query.consistency == AnalyticsScanConsistency.REQUEST_PLUS.value
+
+        q_opts = AnalyticsOptions(scan_consistency=AnalyticsScanConsistency.NOT_BOUNDED)
+        query = AnalyticsQuery.create_query_object(q_str, q_opts)
+
+        assert query.params.get('scan_consistency', None) == AnalyticsScanConsistency.NOT_BOUNDED.value
+        assert query.consistency == AnalyticsScanConsistency.NOT_BOUNDED.value
+
+    @pytest.fixture(scope='class')
+    def base_opts(self):
+        return {'statement': 'SELECT * FROM default',
+                'metrics': True}
+
+    def test_params_base(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = AnalyticsOptions()
+        query = AnalyticsQuery.create_query_object(q_str, q_opts)
+        assert query.params == base_opts
+
+    def test_params_timeout(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = AnalyticsOptions(timeout=timedelta(seconds=120))
+        query = AnalyticsQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['timeout'] = 120000000
+        assert query.params == exp_opts
+
+        q_opts = AnalyticsOptions(timeout=20)
+        query = AnalyticsQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['timeout'] = 20000000
+        assert query.params == exp_opts
+
+        q_opts = AnalyticsOptions(timeout=25.5)
+        query = AnalyticsQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['timeout'] = 25500000
+        assert query.params == exp_opts
+
+    def test_params_read_only(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = AnalyticsOptions(read_only=True)
+        query = AnalyticsQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['readonly'] = True
+        assert query.params == exp_opts
+
+    def test_params_priority(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = AnalyticsOptions(priority=True)
+        query = AnalyticsQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['priority'] = True
+        assert query.params == exp_opts
+
+    def test_params_client_context_id(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = AnalyticsOptions(client_context_id='test-string-id')
+        query = AnalyticsQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['client_context_id'] = 'test-string-id'
+        assert query.params == exp_opts
+
+    def test_params_query_context(self, base_opts):
+        q_str = 'SELECT * FROM default'
+        q_opts = AnalyticsOptions(query_context='bucket.scope')
+        query = AnalyticsQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['scope_qualifier'] = 'bucket.scope'
+        assert query.params == exp_opts
+
+    def test_params_serializer(self, base_opts):
+        from couchbase.serializer import DefaultJsonSerializer
+
+        # serializer
+        serializer = DefaultJsonSerializer()
+        q_str = 'SELECT * FROM default'
+        q_opts = AnalyticsOptions(serializer=serializer)
+        query = AnalyticsQuery.create_query_object(q_str, q_opts)
+
+        exp_opts = base_opts.copy()
+        exp_opts['serializer'] = serializer
+        assert query.params == exp_opts
+
+    # def test_params(self):
+
+    #     # no opts - metrics will default to False + statement
+    #     q_str = 'SELECT * FROM default'
+    #     q_opts = AnalyticsOptions()
+    #     query = AnalyticsQuery.create_query_object(q_str, q_opts)
+    #     base_opts = {'statement': q_str, 'metrics': True}
+    #     assert query.params == base_opts
+
+    #     # timeout
+
+    #     # readonly
+
+    #     # priority
+
+    #     # client_context_id
+
+    #     # query_context
+
+    #     # raw:  SEE test_query_raw_options
