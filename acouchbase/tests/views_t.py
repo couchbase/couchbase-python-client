@@ -25,6 +25,7 @@ from couchbase.exceptions import DesignDocumentNotFoundException
 from couchbase.management.views import (DesignDocument,
                                         DesignDocumentNamespace,
                                         View)
+from couchbase.options import ViewOptions
 from couchbase.result import ViewResult
 from couchbase.views import ViewMetaData
 
@@ -120,6 +121,113 @@ class ViewTests:
                                                self.TEST_VIEW_NAME,
                                                limit=expected_count,
                                                namespace=DesignDocumentNamespace.DEVELOPMENT)
+
+        await self.assert_rows(view_result, expected_count)
+
+        metadata = view_result.metadata()
+        assert isinstance(metadata, ViewMetaData)
+        assert metadata.total_rows() >= expected_count
+
+    @pytest.mark.asyncio
+    async def test_view_query_key(self, cb_env):
+
+        expected_count = 1
+        opts = ViewOptions(limit=expected_count,
+                           namespace=DesignDocumentNamespace.DEVELOPMENT,
+                           key=["101 Coffee Shop", "landmark_11769"])
+        view_result = cb_env.bucket.view_query(self.DOCNAME,
+                                               self.TEST_VIEW_NAME,
+                                               opts)
+
+        await self.assert_rows(view_result, expected_count)
+
+        metadata = view_result.metadata()
+        assert isinstance(metadata, ViewMetaData)
+        assert metadata.total_rows() >= expected_count
+
+    @pytest.mark.asyncio
+    async def test_view_query_keys(self, cb_env):
+
+        expected_count = 5
+        keys = [["101 Coffee Shop", "landmark_11769"],
+                ["Ace Hotel DTLA", "hotel_16630"],
+                ["airline_1316", "route_25068"],
+                ["airline_1355", "route_14484"],
+                ["airline_1355", "route_14817"]]
+        opts = ViewOptions(limit=expected_count,
+                           namespace=DesignDocumentNamespace.DEVELOPMENT,
+                           keys=keys)
+        view_result = cb_env.bucket.view_query(self.DOCNAME,
+                                               self.TEST_VIEW_NAME,
+                                               opts)
+
+        await self.assert_rows(view_result, expected_count)
+
+        metadata = view_result.metadata()
+        assert isinstance(metadata, ViewMetaData)
+        assert metadata.total_rows() >= expected_count
+
+    @pytest.mark.asyncio
+    async def test_view_query_startkey(self, cb_env):
+
+        expected_count = 5
+        opts = ViewOptions(limit=expected_count,
+                           namespace=DesignDocumentNamespace.DEVELOPMENT,
+                           startkey=["101 Coffee Shop", "landmark_11769"])
+        view_result = cb_env.bucket.view_query(self.DOCNAME,
+                                               self.TEST_VIEW_NAME,
+                                               opts)
+
+        await self.assert_rows(view_result, expected_count)
+
+        metadata = view_result.metadata()
+        assert isinstance(metadata, ViewMetaData)
+        assert metadata.total_rows() >= expected_count
+
+    @pytest.mark.asyncio
+    async def test_view_query_endkey(self, cb_env):
+
+        expected_count = 5
+        opts = ViewOptions(limit=expected_count,
+                           namespace=DesignDocumentNamespace.DEVELOPMENT,
+                           endkey=["airline_1355", "route_14817"])
+        view_result = cb_env.bucket.view_query(self.DOCNAME,
+                                               self.TEST_VIEW_NAME,
+                                               opts)
+
+        await self.assert_rows(view_result, expected_count)
+
+        metadata = view_result.metadata()
+        assert isinstance(metadata, ViewMetaData)
+        assert metadata.total_rows() >= expected_count
+
+    @pytest.mark.asyncio
+    async def test_view_query_startkey_docid(self, cb_env):
+
+        expected_count = 5
+        opts = ViewOptions(limit=expected_count,
+                           namespace=DesignDocumentNamespace.DEVELOPMENT,
+                           startkey_docid="landmark_11769")
+        view_result = cb_env.bucket.view_query(self.DOCNAME,
+                                               self.TEST_VIEW_NAME,
+                                               opts)
+
+        await self.assert_rows(view_result, expected_count)
+
+        metadata = view_result.metadata()
+        assert isinstance(metadata, ViewMetaData)
+        assert metadata.total_rows() >= expected_count
+
+    @pytest.mark.asyncio
+    async def test_view_query_endkey_docid(self, cb_env):
+
+        expected_count = 5
+        opts = ViewOptions(limit=expected_count,
+                           namespace=DesignDocumentNamespace.DEVELOPMENT,
+                           endkey_docid="route_14817")
+        view_result = cb_env.bucket.view_query(self.DOCNAME,
+                                               self.TEST_VIEW_NAME,
+                                               opts)
 
         await self.assert_rows(view_result, expected_count)
 

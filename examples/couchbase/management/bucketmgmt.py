@@ -72,5 +72,3 @@ try:
     bucket_manager.get_bucket("hello")
 except BucketDoesNotExistException:
     print("{} bucket dropped.".format("hello"))
-
-

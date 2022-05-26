@@ -291,25 +291,25 @@ get_view_request(PyObject* op_args)
     PyObject* pyObj_start_key = PyDict_GetItemString(op_args, "start_key");
     if (pyObj_start_key != nullptr) {
         auto start_key = std::string(PyUnicode_AsUTF8(pyObj_start_key));
-        req.key = start_key;
+        req.start_key = start_key;
     }
 
     PyObject* pyObj_end_key = PyDict_GetItemString(op_args, "end_key");
     if (pyObj_end_key != nullptr) {
         auto end_key = std::string(PyUnicode_AsUTF8(pyObj_end_key));
-        req.key = end_key;
+        req.end_key = end_key;
     }
 
     PyObject* pyObj_start_key_doc_id = PyDict_GetItemString(op_args, "start_key_doc_id");
     if (pyObj_start_key_doc_id != nullptr) {
         auto start_key_doc_id = std::string(PyUnicode_AsUTF8(pyObj_start_key_doc_id));
-        req.key = start_key_doc_id;
+        req.start_key_doc_id = start_key_doc_id;
     }
 
     PyObject* pyObj_end_key_doc_id = PyDict_GetItemString(op_args, "end_key_doc_id");
     if (pyObj_end_key_doc_id != nullptr) {
         auto end_key_doc_id = std::string(PyUnicode_AsUTF8(pyObj_end_key_doc_id));
-        req.key = end_key_doc_id;
+        req.end_key_doc_id = end_key_doc_id;
     }
 
     PyObject* pyObj_inclusive_end = PyDict_GetItemString(op_args, "inclusive_end");

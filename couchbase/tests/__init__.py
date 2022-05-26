@@ -16,7 +16,7 @@
 
 def wrap_in_thread(func):
     import threading
-    
+
     def wrap(*args, **kwargs):
         t = threading.Thread(target=func, args=args, **kwargs)
         t.start()

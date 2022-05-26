@@ -16,17 +16,19 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
-from typing import (Any,
+from typing import (TYPE_CHECKING,
+                    Any,
                     Dict,
                     List,
                     Optional,
                     Tuple,
                     Union)
 
-from couchbase._utils import timedelta_as_microseconds
+from couchbase._utils import to_microseconds
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
 from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.options import ViewOptionsBase
@@ -34,6 +36,9 @@ from couchbase.management.views import DesignDocumentNamespace
 from couchbase.options import UnsignedInt64, ViewOptions
 from couchbase.pycbc_core import view_query
 from couchbase.serializer import DefaultJsonSerializer, Serializer
+
+if TYPE_CHECKING:
+    from couchbase._utils import JSONType
 
 
 class ViewScanConsistency(Enum):
@@ -83,7 +88,7 @@ class ViewQuery:
     # empty transform will skip updating the attribute when creating an
     # N1QLQuery object
     _VALID_OPTS = {
-        "timeout": {"timeout": timedelta_as_microseconds},
+        "timeout": {"timeout": lambda x: x},
         "skip": {"skip": lambda x: x},
         "limit": {"limit": lambda x: x},
         "scan_consistency": {"consistency": lambda x: x},
@@ -145,17 +150,13 @@ class ViewQuery:
         return float(value)
 
     @timeout.setter
-    def timeout(self, value  # type: Union[timedelta,float]
+    def timeout(self, value  # type: Union[timedelta,float,int]
                 ) -> None:
         if not value:
             self._params.pop('timeout', 0)
         else:
-            if not isinstance(value, (timedelta, float)):
-                raise InvalidArgumentException(message="Excepted timeout to be a timedelta | float")
-            if isinstance(value, timedelta):
-                self.set_option('timeout', value.total_seconds())
-            else:
-                self.set_option('timeout', value)
+            total_us = to_microseconds(value)
+            self.set_option('timeout', total_us)
 
     @property
     def limit(self) -> Optional[int]:
@@ -207,18 +208,18 @@ class ViewQuery:
         return self._params.get('start_key', None)
 
     @startkey.setter
-    def startkey(self, value  # type: str
+    def startkey(self, value  # type: JSONType
                  ) -> None:
-        self.set_option('start_key', value)
+        self.set_option('start_key', json.dumps(value))
 
     @property
     def endkey(self) -> Optional[str]:
         return self._params.get('end_key', None)
 
     @endkey.setter
-    def endkey(self, value  # type: str
+    def endkey(self, value  # type: JSONType
                ) -> None:
-        self.set_option('end_key', value)
+        self.set_option('end_key', json.dumps(value))
 
     @property
     def startkey_docid(self) -> Optional[str]:
@@ -270,20 +271,21 @@ class ViewQuery:
         return self._params.get('key', None)
 
     @key.setter
-    def key(self, value  # type: str
+    def key(self, value  # type: JSONType
             ) -> None:
-        self.set_option('key', value)
+        self.set_option('key', json.dumps(value))
 
     @property
     def keys(self) -> Optional[List[str]]:
         return self._params.get('keys', None)
 
     @keys.setter
-    def keys(self, value  # type: str
+    def keys(self, value  # type: JSONType
              ) -> None:
         if not isinstance(value, list):
             raise InvalidArgumentException('keys must be a list.')
-        self.set_option('keys', value)
+        # couchbase++ wants a list of JSONified strings
+        self.set_option('keys', list(map(lambda k: json.dumps(k), value)))
 
     @property
     def reduce(self) -> Optional[bool]:
@@ -351,11 +353,17 @@ class ViewQuery:
         )
         if value is None:
             return DesignDocumentNamespace.DEVELOPMENT
+
         if isinstance(value, str):
             if value == 'production':
                 return DesignDocumentNamespace.PRODUCTION
             else:
                 return DesignDocumentNamespace.DEVELOPMENT
+        if isinstance(value, bool):
+            if not value:
+                return DesignDocumentNamespace.PRODUCTION
+
+        return DesignDocumentNamespace.DEVELOPMENT
 
     @namespace.setter
     def namespace(self, value  # type: Union[DesignDocumentNamespace, str]
@@ -414,7 +422,7 @@ class ViewQuery:
     @serializer.setter
     def serializer(self, value  # type: Serializer
                    ):
-        if not issubclass(value, Serializer):
+        if not issubclass(value.__class__, Serializer):
             raise InvalidArgumentException(message='Serializer should implement Serializer interface.')
         self.set_option('serializer', value)
 

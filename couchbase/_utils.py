@@ -65,6 +65,22 @@ def timedelta_as_microseconds(
     return int(duration.total_seconds() * 1e6 if duration else 0)
 
 
+def to_microseconds(
+    timeout  # type: Union[timedelta, float, int]
+) -> int:
+    if timeout and not isinstance(timeout, (timedelta, float, int)):
+        raise InvalidArgumentException(message=("Excepted timeout to be of type "
+                                                f"Union[timedelta, float, int] instead of {timeout}"))
+    if not timeout:
+        total_us = 0
+    elif isinstance(timeout, timedelta):
+        total_us = int(timeout.total_seconds() * 1e6)
+    else:
+        total_us = int(timeout * 1e6)
+
+    return total_us
+
+
 THIRTY_DAYS_IN_SECONDS = 30 * 24 * 60 * 60
 
 

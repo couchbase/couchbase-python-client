@@ -78,4 +78,3 @@ try:
     coll_manager.drop_scope("example-scope")
 except ScopeNotFoundException as ex:
     print(ex)
-

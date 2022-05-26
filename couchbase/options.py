@@ -78,6 +78,7 @@ from couchbase.serializer import DefaultJsonSerializer
 
 # allows for imports only during type checking and not during runtime -- :)
 if TYPE_CHECKING:
+    from couchbase._utils import JSONType
     from couchbase.collection import Collection
     from couchbase.durability import DurabilityType, ServerDurability
     from couchbase.n1ql import QueryScanConsistency
@@ -1110,20 +1111,27 @@ class ViewOptions(ViewOptionsBase):
             Defaults to None.
         skip (int, optional): Specifies the number of results to skip from the index before returning
             results. Defaults to None.
-        startkey (str, optional): Specifies the first key that should be included in the results. Defaults to None.
-        endkey (str, optional): Specifies the last key that should be included in the results. Defaults to None.
+        startkey (JSONType, optional): Specifies the first key that should be included in the results.
+            Defaults to None.
+        endkey (JSONType, optional): Specifies the last key that should be included in the results.
+            Defaults to None.
+        startkey_docid (str, optional): Specifies the first document ID that should be included in the results.
+            Defaults to None.
+        endkey_docid (str, optional): Specifies the last document ID that should be included in the results.
+            Defaults to None.
         inclusive_end (bool, optional): Specifies whether the end key should be considered inclusive or exclusive.
             Defaults to None.
         group (bool, optional): Specifies whether the results should be grouped together. Defaults to None.
         group_level (int, optional): Specifies the level to which results should be group. Defaults to None.
-        key (str, optional): Specifies a specific key which should be fetched from the index. Defaults to None.
-        keys (List[str], optional): Specifies a list of keys which should be fetched from the index. Defaults to None.
+        key (JSONType, optional): Specifies a specific key which should be fetched from the index. Defaults to None.
+        keys (List[JSONType], optional): Specifies a list of keys which should be fetched from the index.
+            Defaults to None.
         order (:class:`~couchbase.views.ViewOrdering`, optional): Specifies the ordering that should be used when
             returning results. Defaults to None.
         reduce (bool, optional): Specifies whether reduction should be performed as part of the view query.
             Defaults to None.
-        on_error (:class:`~couchbase.views.ViewErrorMode`, optional): Specifies the error-handling behaviour that should
-            be used when an error occurs. Defaults to None.
+        on_error (:class:`~couchbase.views.ViewErrorMode`, optional): Specifies the error-handling behaviour
+            that should be used when an error occurs. Defaults to None.
         namespace(:class:`~couchbase.management.views.DesignDocumentNamespace`, optional): Specifies the namespace
             for the design document.  Defaults to ``Development``.
         client_context_id (str, optional): The returned client context id for this view query. Defaults to None.
@@ -1230,10 +1238,12 @@ class TransactionOptions:
         """
         Overrides a subset of the ``TransactionConfig`` parameters for a single query.
         Args:
-            durability (:class:`ServerDurability`, optional): Desired durability level for all operations in this transaction.
+            durability (:class:`ServerDurability`, optional): Desired durability level for all operations
+                in this transaction.
             kv_timeout: (timedelta, optional): KV timeout to use for this transaction.
             expiration_time: (timedelta, optional): Expiry for this transaction.
-            scan_consistency: (:class:`QueryScanConsistency`, optional): Scan consistency for queries in this transaction.
+            scan_consistency: (:class:`QueryScanConsistency`, optional): Scan consistency for queries in
+                this transaction.
         """
         pass
 
@@ -1342,7 +1352,7 @@ class TransactionQueryOptions:
                  pipeline_cap=None,  # type: Optional[int]
                  positional_parameters=None,  # type: Optional[Iterable[JSONType]]
                  named_parameters=None,  # type: Optional[Dict[str, JSONType]]
-                 scope=None,  # type: Optional[Scope]
+                 scope=None,  # type: Optional[Any]
                  metrics=None,  # type: Optional[bool]
                  max_parallelism=None  # type: Optional[int]
                  ):
@@ -1354,18 +1364,18 @@ class TransactionQueryOptions:
                 engine when executing the query. Defaults to None.
             adhoc (bool, optional): Specifies whether this is an ad-hoc query, or if it should be prepared for
                 faster execution in the future. Default to True.
-            scan_consistency (:class:`~couchbase.analytics.AnalyticsScanConsistency`, optional): Specifies the consistency
-                requirements when executing the transactional query.
+            scan_consistency (:class:`~couchbase.analytics.AnalyticsScanConsistency`, optional): Specifies
+                the consistency requirements when executing the transactional query.
             profile (:class:`~couchbase.n1ql.QueryProfile`, optional): Specifies the level of profiling that should
                 be used for the transactional query. Defaults to `Off`.
-            client_context_id (str, optional): Specifies an client id for this query.  This is returned with the response, and can be
-                helpful when debugging.
+            client_context_id (str, optional): Specifies an client id for this query.  This is returned with the
+                response, and can be helpful when debugging.
             scan_cap (int, optional):  This is an advanced option, see the query service reference for more
                 information on the proper use and tuning of this option. Defaults to None.
             scan_wait (timedelta, optional):  This is an advanced option, see the query service reference for more
                 information on the proper use and tuning of this option. Defaults to None.
-            metrics (bool, optional): Specifies whether metrics should be captured as part of the execution of the query.
-                Defaults to False.
+            metrics (bool, optional): Specifies whether metrics should be captured as part of the execution of the
+                query. Defaults to False.
             read_only: (bool, optional): Specifies that the query should be considered read-only, and not allowed to
                 mutate documents on the server-side.  See query service reference for more details.
             pipeline_batch (int, optional): This is an advanced option, see the query service reference for more
@@ -1376,13 +1386,14 @@ class TransactionQueryOptions:
                 within the query. Defaults to None.
             named_parameters (Dict[str, JSONType], optional): Named values to be used for the placeholders
                 within the query. Defaults to None.
-            scope (:class:`~couchbase.scope.Scope`, optional): Specify the scope of the query. Defaults to None.
+            scope (Union[:class:`~acouchbase.scope.Scope`,:class:`~couchbase.scope.Scope`], optional): Specify the
+                scope of the query. Defaults to None.
             max_parallelism (int, optional): This is an advanced option, see the query service reference for more
                 information on the proper use and tuning of this option. Defaults to None.
         """
         pass
 
-    def __init__(self,
+    def __init__(self,   # noqa: C901
                  **kwargs  # type: Dict[str, JSONType]
                  ):
         kwargs = {k: v for k, v in kwargs.items() if k in TransactionQueryOptions.ALLOWED_KEYS}
@@ -1410,7 +1421,8 @@ class TransactionQueryOptions:
             kwargs["profile_mode"] = profile.value
         positional = kwargs.pop("positional_parameters", None)
         if positional:
-            kwargs["positional_parameters"] = list(map(lambda param: DefaultJsonSerializer().serialize(param), positional))
+            kwargs["positional_parameters"] = list(
+                map(lambda param: DefaultJsonSerializer().serialize(param), positional))
         named = kwargs.pop("named_parameters", None)
         if named:
             kwargs["named_parameters"] = {key: DefaultJsonSerializer().serialize(val) for key, val in named.items()}
