@@ -178,7 +178,7 @@ os.environ['CMAKE_COMMON_VARIABLES'] = ' '.join(cmake_extra_args)
 package_data = {}
 # some more Windows tomfoolery...
 if platform.system() == 'Windows':
-    package_data = {'couchbase': ['libssl-1_1*.dll', 'libcrypto-1_1*.dll', 'pycbc_core.pyd']}
+    package_data = {'couchbase': ['pycbc_core.pyd']}
 
 print(f'Python SDK version: {COUCHBASE_VERSION}')
 

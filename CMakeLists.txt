@@ -14,12 +14,23 @@
 #  limitations under the License.
 
 cmake_minimum_required(VERSION 3.17)
-project(couchbase_client)
+# needed for CMAKE_MSVC_RUNTIME_LIBRARY 
+cmake_policy(SET CMP0091 NEW)
 include(FetchContent)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# MultiThreaded$<$<CONFIG:Debug>:Debug>DLL for /MD compile flag
+# MultiThreaded$<$<CONFIG:Debug>:Debug> for /MT compile flag
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+if(WIN32)
+  add_definitions(/bigobj)
+  add_definitions(-D_WIN32_WINNT=0x0601)
+endif()
+
+project(couchbase_client)
 
 if (PYTHON_VERSION_EXACT)
     set(Python_FIND_VIRTUALENV FIRST)
@@ -64,7 +75,6 @@ else()
             FetchContent_Populate(openssl)
             message("Downloaded OpenSSL: ${openssl_SOURCE_DIR}/${PKGARCH}")
             set(OPENSSL_ROOT_DIR ${openssl_SOURCE_DIR}/${PKGARCH})
-            file(GLOB_RECURSE OPENSSL_DLLS "${OPENSSL_ROOT_DIR}/libcrypto-1_1*.dll"  "${OPENSSL_ROOT_DIR}/libssl-1_1*.dll")
         endif()
     elseif(APPLE)
         # we were not supplied an OPENSSL_ROOT_DIR, so for macos assume brew is how it is installed, if it is...
@@ -83,17 +93,14 @@ else()
     endif()
     find_package(OpenSSL REQUIRED)
 endif()
-# @TODO:  I think this is only for debug...couchnode did this recently
-# Set up some build requirements for Windows.
-set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-if(WIN32)
-  add_definitions(/bigobj)
-  add_definitions(-D_WIN32_WINNT=0x0601)
-endif()
+
+message("Adding ${OPENSSL_INCLUDE_DIR} to include dirs...")
+include_directories(${OPENSSL_INCLUDE_DIR})
 
 set(COUCHBASE_CXX_CLIENT_PYTHON_WARNINGS ON CACHE INTERNAL "")
 set(COUCHBASE_CXX_CLIENT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(COUCHBASE_CXX_CLIENT_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(COUCHBASE_CXX_CLIENT_POST_LINKED_OPENSSL ON CACHE BOOL "" FORCE)
 set(COUCHBASE_CXX_CLIENT_STATIC_STDLIB ON CACHE BOOL "" FORCE)
 add_subdirectory(deps/couchbase-cxx-client)
 
@@ -122,15 +129,9 @@ file(GLOB SOURCE_FILES "src/*.cxx" "src/management/*.cxx" "src/transactions/*.cx
 add_library(pycbc_core SHARED ${SOURCE_FILES})
 
 if(WIN32)
-    target_link_libraries(pycbc_core couchbase_cxx_client transactions_cxx ${Python3_LIBRARIES})
-    foreach(DLL IN LISTS OPENSSL_DLLS)
-        add_custom_command(
-            TARGET pycbc_core POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy ${DLL} "${PROJECT_SOURCE_DIR}/couchbase"
-            COMMENT "Copy ${DLL} to ${PROJECT_SOURCE_DIR}/couchbase directory")
-    endforeach()
+    target_link_libraries(pycbc_core couchbase_cxx_client transactions_cxx ${Python3_LIBRARIES} ${OPENSSL_LIBRARIES})
 else()
-    target_link_libraries(pycbc_core couchbase_cxx_client transactions_cxx)
+    target_link_libraries(pycbc_core couchbase_cxx_client transactions_cxx ${OPENSSL_LIBRARIES})
     if(APPLE)
         target_link_options(pycbc_core PRIVATE -undefined dynamic_lookup)
     endif()
