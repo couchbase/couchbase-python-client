@@ -781,6 +781,9 @@ class ClusterInfoResult:
 
     @property
     def server_version_short(self) -> Optional[float]:
+        """
+            Optional[float]: The version of the connected Couchbase Server in Major.Minor form.
+        """
         if not self._server_version_short:
             self._set_server_version()
 
@@ -791,6 +794,9 @@ class ClusterInfoResult:
 
     @property
     def server_version_full(self) -> Optional[str]:
+        """
+            Optional[str]: The full version details of the connected Couchbase Server.
+        """
         if not self._server_version_raw:
             self._set_server_version()
 
@@ -798,6 +804,9 @@ class ClusterInfoResult:
 
     @property
     def server_version_build(self) -> Optional[int]:
+        """
+            Optional[int]: The build version of the connected Couchbase Server.
+        """
         if not self._server_build:
             self._set_server_version()
 
@@ -810,6 +819,9 @@ class ClusterInfoResult:
 
     @property
     def is_enterprise(self) -> Optional[bool]:
+        """
+            bool: True if connected Couchbase Server is Enterprise edition, false otherwise.
+        """
         if not self._is_enterprise:
             self._set_server_version()
 
@@ -822,6 +834,9 @@ class ClusterInfoResult:
 
     @property
     def is_community(self) -> Optional[bool]:
+        """
+            bool: True if connected Couchbase Server is Community edition, false otherwise.
+        """
         if not self._is_community:
             self._set_server_version()
 

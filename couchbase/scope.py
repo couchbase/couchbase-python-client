@@ -32,7 +32,7 @@ class Scope(ScopeLogic):
     to Collections for performing operations.
 
     Args:
-        bucket (:class:`~.Bucket`): A :class:`~.Bucket` instance.
+        bucket (:class:`~couchbase.bucket.Bucket`): A :class:`~couchbase.bucket.Bucket` instance.
         scope_name (str): Name of the scope.
 
     """

@@ -22,12 +22,12 @@ from typing import (TYPE_CHECKING,
                     Iterable,
                     Union)
 
+from acouchbase.binary_collection import BinaryCollection
 from acouchbase.datastructures import (CouchbaseList,
                                        CouchbaseMap,
                                        CouchbaseQueue,
                                        CouchbaseSet)
 from acouchbase.logic import AsyncWrapper
-from couchbase.binary_collection import BinaryCollection
 from couchbase.logic.collection import CollectionLogic
 from couchbase.options import forward_args
 from couchbase.result import (CounterResult,
@@ -78,6 +78,44 @@ class AsyncCollection(CollectionLogic):
             *opts,  # type: GetOptions
             **kwargs,  # type: Any
             ) -> Awaitable[GetResult]:
+        """Retrieves the value of a document from the collection.
+
+        Args:
+            key (str): The key for the document to retrieve.
+            opts (:class:`~couchbase.options.GetOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.GetOptions`
+
+        Returns:
+            Awaitable[:class:`~couchbase.result.GetResult`]: A future that contains an instance
+            of :class:`~couchbase.result.GetResult` if successful.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
+        Examples:
+
+            Simple get operation::
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                res = await collection.get('airline_10')
+                print(f'Document value: {res.content_as[dict]}')
+
+
+            Simple get operation with options::
+
+                from datetime import timedelta
+                from couchbase.options import GetOptions
+
+                # ... other code ...
+
+                res = await collection.get('airline_10', GetOptions(timeout=timedelta(seconds=2)))
+                print(f'Document value: {res.content_as[dict]}')
+
+        """
         final_args = forward_args(kwargs, *opts)
         transcoder = final_args.get('transcoder', None)
         if not transcoder:
@@ -92,6 +130,10 @@ class AsyncCollection(CollectionLogic):
         key,  # type: str
         **kwargs,  # type: Dict[str, Any]
     ) -> Awaitable[GetResult]:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`AsyncCollection.get` instead.
+        """
         super().get(key, **kwargs)
 
     @AsyncWrapper.inject_callbacks(ExistsResult)
@@ -101,6 +143,42 @@ class AsyncCollection(CollectionLogic):
         *opts,  # type: ExistsOptions
         **kwargs,  # type: Any
     ) -> Awaitable[ExistsResult]:
+        """Checks whether a specific document exists or not.
+
+        Args:
+            key (str): The key for the document to check existence.
+            opts (:class:`~couchbase.options.ExistsOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.ExistsOptions`
+
+        Returns:
+            Awaitable[:class:`~couchbase.result.ExistsResult`]: A future that contains an instance
+            of :class:`~couchbase.result.ExistsResult` if successful.
+
+        Examples:
+
+            Simple exists operation::
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                key = 'airline_10'
+                res = await collection.exists(key)
+                print(f'Document w/ key - {key} {"exists" if res.exists else "does not exist"}')
+
+
+            Simple exists operation with options::
+
+                from datetime import timedelta
+                from couchbase.options import ExistsOptions
+
+                # ... other code ...
+
+                key = 'airline_10'
+                res = await collection.get(key, ExistsOptions(timeout=timedelta(seconds=2)))
+                print(f'Document w/ key - {key} {"exists" if res.exists else "does not exist"}')
+
+        """
         super().exists(key, *opts, **kwargs)
 
     @AsyncWrapper.inject_callbacks(MutationResult)
@@ -111,6 +189,62 @@ class AsyncCollection(CollectionLogic):
         *opts,  # type: InsertOptions
         **kwargs,  # type: Any
     ) -> Awaitable[MutationResult]:
+        """Inserts a new document to the collection, failing if the document already exists.
+
+        Args:
+            key (str): Document key to insert.
+            value (JSONType): The value of the document to insert.
+            opts (:class:`~couchbase.options.InsertOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.InsertOptions`
+
+        Returns:
+            Awaitable[:class:`~couchbase.result.MutationResult`]: A future that contains an instance
+            of :class:`~couchbase.result.MutationResult` if successful.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentExistsException`: If the document already exists on the
+                server.
+
+        Examples:
+
+            Simple insert operation::
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                key = 'airline_8091'
+                airline = {
+                    "type": "airline",
+                    "id": 8091,
+                    "callsign": "CBS",
+                    "iata": None,
+                    "icao": None,
+                    "name": "Couchbase Airways",
+                }
+                res = await collection.insert(key, doc)
+
+
+            Simple insert operation with options::
+
+                from couchbase.durability import DurabilityLevel, ServerDurability
+                from couchbase.options import InsertOptions
+
+                # ... other code ...
+
+                key = 'airline_8091'
+                airline = {
+                    "type": "airline",
+                    "id": 8091,
+                    "callsign": "CBS",
+                    "iata": None,
+                    "icao": None,
+                    "name": "Couchbase Airways",
+                }
+                durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
+                res = await collection.insert(key, doc, InsertOptions(durability=durability))
+
+        """
         super().insert(key, value, *opts, **kwargs)
 
     @AsyncWrapper.inject_callbacks(MutationResult)
@@ -121,6 +255,58 @@ class AsyncCollection(CollectionLogic):
         *opts,  # type: UpsertOptions
         **kwargs,  # type: Any
     ) -> Awaitable[MutationResult]:
+        """Upserts a document to the collection. This operation succeeds whether or not the document already exists.
+
+        Args:
+            key (str): Document key to upsert.
+            value (JSONType): The value of the document to upsert.
+            opts (:class:`~couchbase.options.UpsertOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.UpsertOptions`
+
+        Returns:
+            Awaitable[:class:`~couchbase.result.MutationResult`]: A future that contains an instance
+            of :class:`~couchbase.result.MutationResult` if successful.
+
+        Examples:
+
+            Simple upsert operation::
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                key = 'airline_8091'
+                airline = {
+                    "type": "airline",
+                    "id": 8091,
+                    "callsign": "CBS",
+                    "iata": None,
+                    "icao": None,
+                    "name": "Couchbase Airways",
+                }
+                res = await collection.upsert(key, doc)
+
+
+            Simple upsert operation with options::
+
+                from couchbase.durability import DurabilityLevel, ServerDurability
+                from couchbase.options import UpsertOptions
+
+                # ... other code ...
+
+                key = 'airline_8091'
+                airline = {
+                    "type": "airline",
+                    "id": 8091,
+                    "callsign": "CBS",
+                    "iata": None,
+                    "icao": None,
+                    "name": "Couchbase Airways",
+                }
+                durability = ServerDurability(level=DurabilityLevel.MAJORITY)
+                res = await collection.upsert(key, doc, InsertOptions(durability=durability))
+
+        """
         super().upsert(key, value, *opts, **kwargs)
 
     @AsyncWrapper.inject_callbacks(MutationResult)
@@ -129,7 +315,53 @@ class AsyncCollection(CollectionLogic):
                 value,  # type: JSONType
                 *opts,  # type: ReplaceOptions
                 **kwargs,  # type: Any
-                ) -> MutationResult:
+                ) -> Awaitable[MutationResult]:
+        """Replaces the value of an existing document. Failing if the document does not exist.
+
+        Args:
+            key (str): Document key to replace.
+            value (JSONType): The value of the document to replace.
+            opts (:class:`~couchbase.options.ReplaceOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.ReplaceOptions`
+
+        Returns:
+            Awaitable[:class:`~couchbase.result.MutationResult`]: A future that contains an instance
+            of :class:`~couchbase.result.MutationResult` if successful.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the document does not exist on the
+                server.
+
+        Examples:
+
+            Simple replace operation::
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                key = 'airline_8091'
+                res = await collection.get(key)
+                content = res.content_as[dict]
+                airline["name"] = "Couchbase Airways!!"
+                res = await collection.replace(key, doc)
+
+
+            Simple replace operation with options::
+
+                from couchbase.durability import DurabilityLevel, ServerDurability
+                from couchbase.options import ReplaceOptions
+
+                # ... other code ...
+
+                key = 'airline_8091'
+                res = await collection.get(key)
+                content = res.content_as[dict]
+                airline["name"] = "Couchbase Airways!!"
+                durability = ServerDurability(level=DurabilityLevel.MAJORITY)
+                res = await collection.replace(key, doc, InsertOptions(durability=durability))
+
+        """
         super().replace(key, value, *opts, **kwargs)
 
     @AsyncWrapper.inject_callbacks(MutationResult)
@@ -137,7 +369,44 @@ class AsyncCollection(CollectionLogic):
                key,  # type: str
                *opts,  # type: RemoveOptions
                **kwargs,  # type: Any
-               ) -> MutationResult:
+               ) -> Awaitable[MutationResult]:
+        """Removes an existing document. Failing if the document does not exist.
+
+        Args:
+            key (str): Key for the document to remove.
+            opts (:class:`~couchbase.options.RemoveOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.RemoveOptions`
+
+        Returns:
+            Awaitable[:class:`~couchbase.result.MutationResult`]: A future that contains an instance
+            of :class:`~couchbase.result.MutationResult` if successful.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the document does not exist on the
+                server.
+
+        Examples:
+
+            Simple remove operation::
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                res = collection.remove('airline_10')
+
+
+            Simple remove operation with options::
+
+                from couchbase.durability import DurabilityLevel, ServerDurability
+                from couchbase.options import RemoveOptions
+
+                # ... other code ...
+
+                durability = ServerDurability(level=DurabilityLevel.MAJORITY)
+                res = collection.remove('airline_10', RemoveOptions(durability=durability))
+
+        """
         super().remove(key, *opts, **kwargs)
 
     @AsyncWrapper.inject_callbacks(MutationResult)
@@ -146,7 +415,51 @@ class AsyncCollection(CollectionLogic):
               expiry,  # type: timedelta
               *opts,  # type: TouchOptions
               **kwargs,  # type: Any
-              ) -> MutationResult:
+              ) -> Awaitable[MutationResult]:
+        """Updates the expiry on an existing document.
+
+        Args:
+            key (str): Key for the document to touch.
+            expiry (timedelta): The new expiry for the document.
+            opts (:class:`~couchbase.options.TouchOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.TouchOptions`
+
+        Returns:
+            Awaitable[:class:`~couchbase.result.MutationResult`]: A future that contains an instance
+            of :class:`~couchbase.result.MutationResult` if successful.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the document does not exist on the
+                server.
+
+        Examples:
+
+            Simple touch operation::
+
+                from datetime import timedelta
+
+                # ... other code ...
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                res = await collection.touch('airline_10', timedelta(seconds=300))
+
+
+            Simple touch operation with options::
+
+                from datetime import timedelta
+
+                from couchbase.options import TouchOptions
+
+                # ... other code ...
+
+                res = await collection.touch('airline_10',
+                                        timedelta(seconds=300),
+                                        TouchOptions(timeout=timedelta(seconds=2)))
+
+        """
         super().touch(key, expiry, *opts, **kwargs)
 
     def get_and_touch(self,
@@ -154,7 +467,54 @@ class AsyncCollection(CollectionLogic):
                       expiry,  # type: timedelta
                       *opts,  # type: GetAndTouchOptions
                       **kwargs,  # type: Any
-                      ) -> GetResult:
+                      ) -> Awaitable[GetResult]:
+        """Retrieves the value of the document and simultanously updates the expiry time for the same document.
+
+        Args:
+            key (str): The key for the document retrieve and set expiry time.
+            expiry (timedelta):  The new expiry to apply to the document.
+            opts (:class:`~couchbase.options.GetAndTouchOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.GetAndTouchOptions`
+
+        Returns:
+            Awaitable[:class:`~couchbase.result.GetResult`]: A future that contains an instance
+            of :class:`~couchbase.result.GetResult` if successful.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
+        Examples:
+
+            Simple get and touch operation::
+
+                from datetime import timedelta
+
+                # ... other code ...
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                key = 'airline_10'
+                res = await collection.get_and_touch(key, timedelta(seconds=20))
+                print(f'Document w/ updated expiry: {res.content_as[dict]}')
+
+
+            Simple get and touch operation with options::
+
+                from datetime import timedelta
+                from couchbase.options import GetAndTouchOptions
+
+                # ... other code ...
+
+                key = 'airline_10'
+                res = await collection.get_and_touch(key,
+                                            timedelta(seconds=20),
+                                            GetAndTouchOptions(timeout=timedelta(seconds=2)))
+                print(f'Document w/ updated expiry: {res.content_as[dict]}')
+
+        """
         # add to kwargs for conversion to int
         kwargs["expiry"] = expiry
         final_args = forward_args(kwargs, *opts)
@@ -169,7 +529,11 @@ class AsyncCollection(CollectionLogic):
     def _get_and_touch_internal(self,
                                 key,  # type: str
                                 **kwargs,  # type: Any
-                                ) -> GetResult:
+                                ) -> Awaitable[GetResult]:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`AsyncCollection.get_and_touch` instead.
+        """
         super().get_and_touch(key, **kwargs)
 
     def get_and_lock(
@@ -178,7 +542,54 @@ class AsyncCollection(CollectionLogic):
         lock_time,  # type: timedelta
         *opts,  # type: GetAndLockOptions
         **kwargs,  # type: Any
-    ) -> GetResult:
+    ) -> Awaitable[GetResult]:
+        """Locks a document and retrieves the value of that document at the time it is locked.
+
+        Args:
+            key (str): The key for the document to lock and retrieve.
+            lock_time (timedelta):  The amount of time to lock the document.
+            opts (:class:`~couchbase.options.GetAndLockOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.GetAndLockOptions`
+
+        Returns:
+            Awaitable[:class:`~couchbase.result.GetResult`]: A future that contains an instance
+            of :class:`~couchbase.result.GetResult` if successful.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
+        Examples:
+
+            Simple get and lock operation::
+
+                from datetime import timedelta
+
+                # ... other code ...
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                key = 'airline_10'
+                res = await collection.get_and_lock(key, timedelta(seconds=20))
+                print(f'Locked document: {res.content_as[dict]}')
+
+
+            Simple get and lock operation with options::
+
+                from datetime import timedelta
+                from couchbase.options import GetAndLockOptions
+
+                # ... other code ...
+
+                key = 'airline_10'
+                res = await collection.get_and_lock(key,
+                                            timedelta(seconds=20),
+                                            GetAndLockOptions(timeout=timedelta(seconds=2)))
+                print(f'Locked document: {res.content_as[dict]}')
+
+        """
         # add to kwargs for conversion to int
         kwargs["lock_time"] = lock_time
         final_args = forward_args(kwargs, *opts)
@@ -193,7 +604,11 @@ class AsyncCollection(CollectionLogic):
     def _get_and_lock_internal(self,
                                key,  # type: str
                                **kwargs,  # type: Any
-                               ) -> GetResult:
+                               ) -> Awaitable[GetResult]:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`AsyncCollection.get_and_lock` instead.
+        """
         super().get_and_lock(key, **kwargs)
 
     @AsyncWrapper.inject_callbacks(None)
@@ -202,7 +617,43 @@ class AsyncCollection(CollectionLogic):
                cas,  # type: int
                *opts,  # type: UnlockOptions
                **kwargs,  # type: Any
-               ) -> None:
+               ) -> Awaitable[None]:
+        """Unlocks a previously locked document.
+
+        Args:
+            key (str): The key for the document to unlock.
+            cas (int): The CAS of the document, used to validate lock ownership.
+            opts (:class:`couchbaseoptions.UnlockOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.UnlockOptions`
+
+        Returns:
+            Awaitable[None]: A future that contains an empty result if successful.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
+            :class:`~couchbase.exceptions.DocumentLockedException`: If the provided cas is invalid.
+
+        Examples:
+
+            Simple unlock operation::
+
+                from datetime import timedelta
+
+                # ... other code ...
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                key = 'airline_10'
+                res = await collection.get_and_lock(key, timedelta(seconds=5))
+                await collection.unlock(key, res.cas)
+                # this should be okay once document is unlocked
+                await collection.upsert(key, res.content_as[dict])
+
+        """
         super().unlock(key, cas, *opts, **kwargs)
 
     def lookup_in(
@@ -211,7 +662,58 @@ class AsyncCollection(CollectionLogic):
         spec,  # type: Iterable[Spec]
         *opts,  # type: LookupInOptions
         **kwargs,  # type: Any
-    ) -> LookupInResult:
+    ) -> Awaitable[LookupInResult]:
+        """Performs a lookup-in operation against a document, fetching individual fields or information
+        about specific fields inside the document value.
+
+        Args:
+            key (str): The key for the document look in.
+            spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the data to fetch
+                from the document.
+            opts (:class:`~couchbase.options.LookupInOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.LookupInOptions`
+
+        Returns:
+            Awaitable[:class:`~couchbase.result.LookupInResult`]: A future that contains an instance
+            of :class:`~couchbase.result.LookupInResult` if successful.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
+        Examples:
+
+            Simple look-up in operation::
+
+                import couchbase.subdocument as SD
+
+                # ... other code ...
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('hotel')
+
+                key = 'hotel_10025'
+                res = await collection.lookup_in(key, (SD.get("geo"),))
+                print(f'Hotel {key} coordinates: {res.content_as[dict](0)}')
+
+
+            Simple look-up in operation with options::
+
+                from datetime import timedelta
+
+                import couchbase.subdocument as SD
+                from couchbase.options import LookupInOptions
+
+                # ... other code ...
+
+                key = 'hotel_10025'
+                res = await collection.lookup_in(key,
+                                            (SD.get("geo"),),
+                                            LookupInOptions(timeout=timedelta(seconds=2)))
+                print(f'Hotel {key} coordinates: {res.content_as[dict](0)}')
+
+        """
         final_args = forward_args(kwargs, *opts)
         transcoder = final_args.get('transcoder', None)
         if not transcoder:
@@ -225,7 +727,12 @@ class AsyncCollection(CollectionLogic):
         key,  # type: str
         spec,  # type: Iterable[Spec]
         **kwargs,  # type: Any
-    ) -> LookupInResult:
+    ) -> Awaitable[LookupInResult]:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`AsyncCollection.lookup_in` instead.
+
+        """
         super().lookup_in(key, spec, **kwargs)
 
     @AsyncWrapper.inject_callbacks(MutateInResult)
@@ -235,10 +742,69 @@ class AsyncCollection(CollectionLogic):
         spec,  # type: Iterable[Spec]
         *opts,  # type: MutateInOptions
         **kwargs,  # type: Any
-    ) -> MutateInResult:
+    ) -> Awaitable[MutateInResult]:
+        """Performs a mutate-in operation against a document. Allowing atomic modification of specific fields
+        within a document. Also enables access to document extended-attributes (i.e. xattrs).
+
+        Args:
+            key (str): The key for the document look in.
+            spec (Iterable[:class:`~couchbase.subdocument.Spec`]):  A list of specs describing the operations to
+                perform on the document.
+            opts (:class:`~couchbase.options.MutateInOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.MutateInOptions`
+
+        Returns:
+            Awaitable[:class:`~couchbase.result.MutateInResult`]: A future that contains an instance
+            of :class:`~couchbase.result.MutateInResult` if successful.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
+        Examples:
+
+            Simple mutate-in operation::
+
+                import couchbase.subdocument as SD
+
+                # ... other code ...
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('hotel')
+
+                key = 'hotel_10025'
+                res = await collection.mutate_in(key, (SD.replace("city", "New City"),))
+
+
+            Simple mutate-in operation with options::
+
+                from datetime import timedelta
+
+                import couchbase.subdocument as SD
+                from couchbase.options import MutateInOptions
+
+                # ... other code ...
+
+                key = 'hotel_10025'
+                res = await collection.mutate_in(key,
+                                            (SD.replace("city", "New City"),),
+                                            MutateInOptions(timeout=timedelta(seconds=2)))
+
+        """
         super().mutate_in(key, spec, *opts, **kwargs)
 
     def binary(self) -> BinaryCollection:
+        """Creates a BinaryCollection instance, allowing access to various binary operations
+        possible against a collection.
+
+        .. seealso::
+            :class:`~acouchbase.binary_collection.BinaryCollection`
+
+        Returns:
+            :class:`~acouchbase.binary_collection.BinaryCollection`: A BinaryCollection instance.
+
+        """
         return BinaryCollection(self)
 
     @AsyncWrapper.inject_callbacks(MutationResult)
@@ -249,6 +815,11 @@ class AsyncCollection(CollectionLogic):
         *opts,  # type: AppendOptions
         **kwargs,  # type: Any
     ) -> Awaitable[MutationResult]:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`acouchbase.BinaryCollection.append` instead.
+
+        """
         super().append(key, value, *opts, **kwargs)
 
     @AsyncWrapper.inject_callbacks(MutationResult)
@@ -259,6 +830,11 @@ class AsyncCollection(CollectionLogic):
         *opts,  # type: PrependOptions
         **kwargs,  # type: Any
     ) -> Awaitable[MutationResult]:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`acouchbase.BinaryCollection.prepend` instead.
+
+        """
         super().prepend(key, value, *opts, **kwargs)
 
     @AsyncWrapper.inject_callbacks(CounterResult)
@@ -268,6 +844,11 @@ class AsyncCollection(CollectionLogic):
         *opts,  # type: IncrementOptions
         **kwargs,  # type: Any
     ) -> Awaitable[CounterResult]:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`acouchbase.BinaryCollection.increment` instead.
+
+        """
         super().increment(key, *opts, **kwargs)
 
     @AsyncWrapper.inject_callbacks(CounterResult)
@@ -277,22 +858,63 @@ class AsyncCollection(CollectionLogic):
         *opts,  # type: DecrementOptions
         **kwargs,  # type: Any
     ) -> Awaitable[CounterResult]:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`acouchbase.BinaryCollection.decrement` instead.
+
+        """
         super().decrement(key, *opts, **kwargs)
 
     def couchbase_list(self, key  # type: str
                        ) -> CouchbaseList:
+        """Returns a CouchbaseList permitting simple list storage in a document.
+
+        .. seealso::
+            :class:`~acouchbase.datastructures.CouchbaseList`
+
+        Returns:
+            :class:`~acouchbase.datastructures.CouchbaseList`: A CouchbaseList instance.
+
+        """
         return CouchbaseList(key, self)
 
     def couchbase_map(self, key  # type: str
                       ) -> CouchbaseMap:
+        """Returns a CouchbaseMap permitting simple map storage in a document.
+
+        .. seealso::
+            :class:`~acouchbase.datastructures.CouchbaseMap`
+
+        Returns:
+            :class:`~acouchbase.datastructures.CouchbaseMap`: A CouchbaseMap instance.
+
+        """
         return CouchbaseMap(key, self)
 
     def couchbase_set(self, key  # type: str
                       ) -> CouchbaseSet:
+        """Returns a CouchbaseSet permitting simple map storage in a document.
+
+        .. seealso::
+            :class:`~acouchbase.datastructures.CouchbaseSet`
+
+        Returns:
+            :class:`~acouchbase.datastructures.CouchbaseSet`: A CouchbaseSet instance.
+
+        """
         return CouchbaseSet(key, self)
 
     def couchbase_queue(self, key  # type: str
                         ) -> CouchbaseQueue:
+        """Returns a CouchbaseQueue permitting simple map storage in a document.
+
+        .. seealso::
+            :class:`~acouchbase.datastructures.CouchbaseQueue`
+
+        Returns:
+            :class:`~acouchbase.datastructures.CouchbaseQueue`: A CouchbaseQueue instance.
+
+        """
         return CouchbaseQueue(key, self)
 
     @staticmethod

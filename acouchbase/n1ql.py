@@ -38,7 +38,6 @@ class AsyncN1QLRequest(QueryRequestLogic):
         self._loop = loop
         self._rows = asyncio.Queue()
 
-
     @property
     def loop(self):
         """

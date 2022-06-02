@@ -39,6 +39,46 @@ class BinaryCollection:
         *opts,  # type: IncrementOptions
         **kwargs,  # type: Any
     ) -> Awaitable[CounterResult]:
+        """Increments the ASCII value of the document, specified by the key, by the amount indicated in the delta
+        option (defaults to 1).
+
+        Args:
+            key (str): The key of the document to increment.
+            opts (:class:`~couchbase.options.IncrementOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.IncrementOptions`
+
+        Returns:
+            Awaitable[:class:`~couchbase.result.CounterResult`]: A future that contains an instance
+            of :class:`~couchbase.result.CounterResult` if successful.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
+        Examples:
+
+            Simple increment operation::
+
+                from couchbase.options import IncrementOptions, SignedInt64
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                res = await collection.binary().increment('counter-doc', IncrementOptions(initial=SignedInt64(100))
+                print(f'Counter value: {res.content}')
+
+            Simple increment operation, change default delta::
+
+                from couchbase.options import IncrementOptions, DeltaValue
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                res = await collection.binary().increment('counter-doc', IncrementOptions(delta=DeltaValue(5))
+                print(f'Counter value: {res.content}')
+
+        """
         return self._collection._increment(key, *opts, **kwargs)
 
     def decrement(
@@ -47,6 +87,46 @@ class BinaryCollection:
         *opts,  # type: DecrementOptions
         **kwargs,  # type: Any
     ) -> Awaitable[CounterResult]:
+        """Decrements the ASCII value of the document, specified by the key, by the amount indicated in the delta
+        option (defaults to 1).
+
+        Args:
+            key (str): The key of the document to decrement.
+            opts (:class:`~couchbase.options.DecrementOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.DecrementOptions`
+
+        Returns:
+            Awaitable[:class:`~couchbase.result.CounterResult`]: A future that contains an instance
+            of :class:`~couchbase.result.CounterResult` if successful.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
+        Examples:
+
+            Simple decrement operation::
+
+                from couchbase.options import DecrementOptions, SignedInt64
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                res = await collection.binary().decrement('counter-doc', DecrementOptions(initial=SignedInt64(100))
+                print(f'Counter value: {res.content}')
+
+            Simple decrement operation, change default delta::
+
+                from couchbase.options import DecrementOptions, DeltaValue
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                res = await collection.binary().decrement('counter-doc', DecrementOptions(delta=DeltaValue(5))
+                print(f'Counter value: {res.content}')
+
+        """
         return self._collection._decrement(key, *opts, **kwargs)
 
     def append(
@@ -56,6 +136,53 @@ class BinaryCollection:
         *opts,  # type: AppendOptions
         **kwargs,  # type: Any
     ) -> Awaitable[MutationResult]:
+        """Appends the specified value to the beginning of document of the specified key.
+
+        Args:
+            key (str): The key of the document to append to.
+            value (Union[str, bytes, bytearray]): The value to append to the document.
+            opts (:class:`~couchbase.options.AppendOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.AppendOptions`
+
+        Returns:
+            Awaitable[:class:`~couchbase.result.MutationResult`]: A future that contains an instance
+            of :class:`~couchbase.result.MutationResult` if successful.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
+        Examples:
+
+            Simple append string operation::
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                res = await collection.binary().append('string-doc', 'XYZ')
+
+            Simple append binary operation::
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                res = await collection.binary().append('binary-doc', b'XYZ')
+
+            Simple append operation with options::
+
+                from datetime import timedelta
+
+                from couchbase.options import AppendOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                res = await collection.binary().append('string-doc',
+                                                        'XYZ',
+                                                        AppendOptions(timeout=timedelta(seconds=2)))
+
+        """
         return self._collection._append(key, value, *opts, **kwargs)
 
     def prepend(
@@ -65,4 +192,51 @@ class BinaryCollection:
         *opts,  # type: PrependOptions
         **kwargs,  # type: Any
     ) -> Awaitable[MutationResult]:
+        """Prepends the specified value to the beginning of document of the specified key.
+
+        Args:
+            key (str): The key of the document to prepend to.
+            value (Union[str, bytes, bytearray]): The value to prepend to the document.
+            opts (:class:`~couchbase.options.PrependOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.PrependOptions`
+
+        Returns:
+            Awaitable[:class:`~couchbase.result.MutationResult`]: A future that contains an instance
+            of :class:`~couchbase.result.MutationResult` if successful.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
+        Examples:
+
+            Simple prepend string operation::
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                res = await collection.binary().prepend('string-doc', 'ABC')
+
+            Simple prepend binary operation::
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                res = await collection.binary().prepend('binary-doc', b'ABC')
+
+            Simple prepend operation with options::
+
+                from datetime import timedelta
+
+                from couchbase.options import PrependOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                res = await collection.binary().prepend('string-doc',
+                                                        'ABC',
+                                                        PrependOptions(timeout=timedelta(seconds=2)))
+
+        """
         return self._collection._prepend(key, value, *opts, **kwargs)

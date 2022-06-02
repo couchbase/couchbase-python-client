@@ -188,7 +188,7 @@ class Collection(CollectionLogic):
                 override provided :class:`~couchbase.options.ExistsOptions`
 
         Returns:
-            :class:`~couchbase.result.GetResult`: An instance of :class:`~couchbase.result.GetResult`.
+            :class:`~couchbase.result.ExistsResult`: An instance of :class:`~couchbase.result.ExistsResult`.
 
         Examples:
 
@@ -824,10 +824,10 @@ class Collection(CollectionLogic):
         possible against a collection.
 
         .. seealso::
-            :class:`.binary_collection.BinaryCollection`
+            :class:`~couchbase.binary_collection.BinaryCollection`
 
         Returns:
-            :class:`~.binary_collection.BinaryCollection`: A BinaryCollection instance.
+            :class:`~couchbase.binary_collection.BinaryCollection`: A BinaryCollection instance.
 
         """
         return BinaryCollection(self)
@@ -895,7 +895,7 @@ class Collection(CollectionLogic):
         """Returns a CouchbaseList permitting simple list storage in a document.
 
         .. seealso::
-            :class:`~couchbase..datastructures.CouchbaseList`
+            :class:`~couchbase.datastructures.CouchbaseList`
 
         Returns:
             :class:`~couchbase.datastructures.CouchbaseList`: A CouchbaseList instance.

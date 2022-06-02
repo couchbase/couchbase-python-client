@@ -85,23 +85,23 @@ class ScopeLogic:
 
         .. note::
             The query is executed lazily in that it is executed once iteration over the
-            :class:`~.result.QueryResult` begins.
+            :class:`~couchbase.result.QueryResult` begins.
 
         .. note::
             Scope-level queries are only supported on Couchbase Server versions that support scopes and collections.
 
         .. seealso::
-            * :class:`~.management.QueryIndexManager`: For how to manage query indexes.
-            * :meth:`.Cluster.query`: For how to execute cluster-level queries.
+            * :class:`~couchbase.management.queries.QueryIndexManager`: For how to manage query indexes.
+            * :meth:`~couchbase.cluster.Cluster.query`: For how to execute cluster-level queries.
 
         Args:
             statement (str): The N1QL statement to execute.
-            options (:class:`~.options.QueryOptions`): Optional parameters for the query operation.
+            options (:class:`~couchbase.options.QueryOptions`): Optional parameters for the query operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
-                override provided :class:`~.options.QueryOptions`
+                override provided :class:`~couchbase.options.QueryOptions`
 
         Returns:
-            :class:`~.result.QueryResult`: An instance of a :class:`~.result.QueryResult` which
+            :class:`~couchbase.result.QueryResult`: An instance of a :class:`~couchbase.result.QueryResult` which
             provides access to iterate over the query results and access metadata and metrics about the query.
 
         Examples:
@@ -174,23 +174,21 @@ class ScopeLogic:
 
         .. note::
             The analytics query is executed lazily in that it is executed once iteration over the
-            :class:`~.result.AnalyticsResult` begins.
+            :class:`~couchbase.result.AnalyticsResult` begins.
 
         .. seealso::
-            * :class:`~.management.AnalyticsIndexManager`: for how to manage analytics dataverses,
-                datasets, indexes and links.
-            * :meth:`.Cluster.analytics_query`: for how to execute cluster-level analytics queries
+            * :class:`~couchbase.management.analytics.AnalyticsIndexManager`: for how to manage analytics dataverses, datasets, indexes and links.
+            * :meth:`~couchbase.cluster.Cluster.analytics_query`: for how to execute cluster-level analytics queries
 
         Args:
             statement (str): The analytics SQL++ statement to execute.
-            options (:class:`~.options.AnalyticsOptions`): Optional parameters for the analytics query
+            options (:class:`~couchbase.options.AnalyticsOptions`): Optional parameters for the analytics query
                 operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
-                override provided :class:`~.options.AnalyticsOptions`
+                override provided :class:`~couchbase.options.AnalyticsOptions`
 
         Returns:
-            :class:`~.result.AnalyticsResult`: An instance of a
-            :class:`~.result.AnalyticsResult` which provides access to iterate over the analytics
+            :class:`~couchbase.result.AnalyticsResult`: An instance of a :class:`~couchbase.result.AnalyticsResult` which provides access to iterate over the analytics
             query results and access metadata and metrics about the analytics query.
 
         Examples:
@@ -238,7 +236,7 @@ class ScopeLogic:
                 print(f'Analytics query metadata: {q_res.metadata()}')
                 print(f'Analytics query metrics: {q_res.metadata().metrics()}')
 
-        """
+        """  # noqa: E501
         opt = AnalyticsOptions()
         opts = list(options)
         for o in opts:
@@ -266,23 +264,23 @@ class ScopeLogic:
 
         .. note::
             The search query is executed lazily in that it is executed once iteration over the
-            :class:`~.result.SearchResult` begins.
+            :class:`~couchbase.result.SearchResult` begins.
 
         .. seealso::
-            * :class:`~.management.SearchIndexManager`: for how to manage search indexes.
-            * :meth:`.Cluster.search_query`: for how to execute cluster-level search queries
+            * :class:`~couchbase.management.search.SearchIndexManager`: for how to manage search indexes.
+            * :meth:`~couchbase.cluster.Cluster.search_query`: for how to execute cluster-level search queries
 
         Args:
             index (str): Name of the search query to use.
-            query (:class:`~.search.SearchQuery`): Type of search query to perform.
-            options (:class:`~.options.SearchOptions`): Optional parameters for the search query
+            query (:class:`~couchbase.search.SearchQuery`): Type of search query to perform.
+            options (:class:`~couchbase.options.SearchOptions`): Optional parameters for the search query
                 operation.
             **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
-                override provided :class:`~.options.SearchOptions`
+                override provided :class:`~couchbase.options.SearchOptions`
 
         Returns:
-            :class:`~.result.SearchResult`: An instance of a
-            :class:`~.result.SearchResult` which provides access to iterate over the search
+            :class:`~couchbase.result.SearchResult`: An instance of a
+            :class:`~couchbase.result.SearchResult` which provides access to iterate over the search
             query results and access metadata and metrics about the search query.
 
         Examples:

@@ -12,6 +12,17 @@ AnalyticsResult
     .. automethod:: rows
     .. automethod:: metadata
 
+ClusterInfoResult
+=================
+
+.. class:: ClusterInfoResult
+
+    .. autoproperty:: is_community
+    .. autoproperty:: is_enterprise
+    .. autoproperty:: server_version
+    .. autoproperty:: server_version_full
+    .. autoproperty:: server_version_short
+
 CounterResult
 =================
 

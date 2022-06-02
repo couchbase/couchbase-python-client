@@ -401,8 +401,8 @@ class Cluster(ClusterLogic):
             :class:`~couchbase.result.AnalyticsResult` begins.
 
         .. seealso::
-            * :class:`~couchbase.management.analyticsAnalyticsIndexManager`: for how to manage analytics dataverses,
-                datasets, indexes and links.
+
+            * :class:`~couchbase.management.analytics.AnalyticsIndexManager`: for how to manage analytics dataverses, datasets, indexes and links.
             * :meth:`.Scope.analytics_query`: for how to execute scope-level analytics queries
 
         Args:
@@ -462,7 +462,7 @@ class Cluster(ClusterLogic):
                 print(f'Analytics query metadata: {q_res.metadata()}')
                 print(f'Analytics query metrics: {q_res.metadata().metrics()}')
 
-        """
+        """  # noqa: E501
         query = AnalyticsQuery.create_query_object(statement,
                                                    *options,
                                                    **kwargs)
@@ -579,9 +579,8 @@ class Cluster(ClusterLogic):
         of this cluster.
 
         Returns:
-            :class:`~couchbase.management.buckets.BucketManager`: A
-                :class:`~couchbase.management.buckets.BucketManager` instance.
-        """
+            :class:`~couchbase.management.buckets.BucketManager`: A :class:`~couchbase.management.buckets.BucketManager` instance.
+        """  # noqa: E501
         # TODO:  AlreadyShutdownException?
         return BucketManager(self.connection)
 
@@ -591,9 +590,8 @@ class Cluster(ClusterLogic):
         of this cluster.
 
         Returns:
-            :class:`~couchbase.management.users.UserManager`: A :class:`~couchbase.management.users.UserManager`
-                instance.
-        """
+            :class:`~couchbase.management.users.UserManager`: A :class:`~couchbase.management.users.UserManager` instance.
+        """  # noqa: E501
         # TODO:  AlreadyShutdownException?
         return UserManager(self.connection)
 
@@ -603,9 +601,8 @@ class Cluster(ClusterLogic):
         indexes of this cluster.
 
         Returns:
-            :class:`~couchbase.management.queries.QueryIndexManager`: A
-                :class:`~couchbase.management.queries.QueryIndexManager` instance.
-        """
+            :class:`~couchbase.management.queries.QueryIndexManager`: A :class:`~couchbase.management.queries.QueryIndexManager` instance.
+        """  # noqa: E501
         # TODO:  AlreadyShutdownException?
         return QueryIndexManager(self.connection)
 
@@ -615,9 +612,8 @@ class Cluster(ClusterLogic):
         dataverses, dataset, indexes and links of this cluster.
 
         Returns:
-            :class:`~couchbase.management.analytics.AnalyticsIndexManager`: An
-                :class:`~couchbase.management.analytics.AnalyticsIndexManager` instance.
-        """
+            :class:`~couchbase.management.analytics.AnalyticsIndexManager`: An :class:`~couchbase.management.analytics.AnalyticsIndexManager` instance.
+        """  # noqa: E501
         # TODO:  AlreadyShutdownException?
         return AnalyticsIndexManager(self.connection)
 
@@ -627,10 +623,9 @@ class Cluster(ClusterLogic):
         indexes of this cluster.
 
         Returns:
-            :class:`~couchbase.management.search.SearchIndexManager`: A
-                :class:`~couchbase.management.search.SearchIndexManager` instance.
+            :class:`~couchbase.management.search.SearchIndexManager`: A :class:`~couchbase.management.search.SearchIndexManager` instance.
 
-        """
+        """  # noqa: E501
         # TODO:  AlreadyShutdownException?
         return SearchIndexManager(self.connection)
 
@@ -644,10 +639,9 @@ class Cluster(ClusterLogic):
             but may still change as final consensus on its behavior has not yet been reached.
 
         Returns:
-            :class:`~couchbase.management.eventing.EventingFunctionManager`: An
-                :class:`~couchbase.management.eventing.EventingFunctionManager` instance.
+            :class:`~couchbase.management.eventing.EventingFunctionManager`: An :class:`~couchbase.management.eventing.EventingFunctionManager` instance.
 
-        """
+        """  # noqa: E501
         # TODO:  AlreadyShutdownException?
         return EventingFunctionManager(self.connection)
 

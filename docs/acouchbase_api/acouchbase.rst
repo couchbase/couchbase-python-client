@@ -10,3 +10,4 @@ acouchbase
    :maxdepth: 2
 
    acouchbase_core
+   acouchbase_binary_collection

@@ -30,16 +30,10 @@ Cluster
     .. automethod:: eventing_functions
     .. automethod:: close
 
-
-
 Authentication
 ================
 
-.. module:: couchbase.auth
-.. autoclass:: PasswordAuthenticator
-
-.. autoclass:: CertificateAuthenticator
-
+See :ref:`Global API Authentication<authentication-ref>`
 
 Bucket
 ==============

@@ -45,7 +45,7 @@ class Bucket(BucketLogic):
         bucket_name (str): Name of the bucket.
 
     Raises:
-        :class:`~.exceptions.BucketNotFoundException`: If provided `bucket_name` cannot be found.
+        :class:`~couchbase.exceptions.BucketNotFoundException`: If provided `bucket_name` cannot be found.
 
     """
 
@@ -92,37 +92,37 @@ class Bucket(BucketLogic):
 
     def scope(self, name  # type: str
               ) -> Scope:
-        """Creates a :class:`~.scope.Scope` instance of the specified scope.
+        """Creates a :class:`~couchbase.scope.Scope` instance of the specified scope.
 
         Args:
             name (str): Name of the scope to reference.
 
         Returns:
-            :class:`~.scope.Scope`: A :class:`~.scope.Scope` instance of the specified scope.
+            :class:`~couchbase.scope.Scope`: A :class:`~couchbase.scope.Scope` instance of the specified scope.
 
         """
         return Scope(self, name)
 
     def collection(self, collection_name  # type: str
                    ) -> Collection:
-        """Creates a :class:`~.collection.Collection` instance of the specified collection.
+        """Creates a :class:`~couchbase.collection.Collection` instance of the specified collection.
 
         Args:
             collection_name (str): Name of the collection to reference.
 
         Returns:
-            :class:`~.collection.Collection`: A :class:`~.collection.Collection` instance of the specified collection.
+            :class:`~couchbase.collection.Collection`: A :class:`~couchbase.collection.Collection` instance of the specified collection.
 
-        """
+        """  # noqa: E501
         scope = self.default_scope()
         return scope.collection(collection_name)
 
     def default_collection(self) -> Collection:
-        """Creates a :class:`~.collection.Collection` instance of the default collection.
+        """Creates a :class:`~couchbase.collection.Collection` instance of the default collection.
 
         Returns:
-            :class:`~.collection.Collection`: A :class:`~.collection.Collection` instance of the default collection.
-        """
+            :class:`~couchbase.collection.Collection`: A :class:`~couchbase.collection.Collection` instance of the default collection.
+        """  # noqa: E501
         scope = self.default_scope()
         return scope.collection(Collection.default_name())
 
@@ -138,10 +138,10 @@ class Bucket(BucketLogic):
         the ping operations which were performed.
 
         Args:
-            opts (:class:`~.options.PingOptions`): Optional parameters for this operation.
+            opts (:class:`~couchbase.options.PingOptions`): Optional parameters for this operation.
 
         Returns:
-            :class:`~.result.PingResult`: A report which describes the outcome of the ping operations
+            :class:`~couchbase.result.PingResult`: A report which describes the outcome of the ping operations
             which were performed.
 
         """
@@ -200,22 +200,22 @@ class Bucket(BucketLogic):
 
     def collections(self) -> CollectionManager:
         """
-        Get a :class:`.~.CollectionManager` which can be used to manage the scopes and collections
+        Get a :class:`~couchbase.management.collections.CollectionManager` which can be used to manage the scopes and collections
         of this bucket.
 
         Returns:
-            :class:`~.CollectionManager`: A :class:`~.CollectionManager` instance.
-        """
+            :class:`~couchbase.management.collections.CollectionManager`: A :class:`~couchbase.management.collections.CollectionManager` instance.
+        """  # noqa: E501
         return CollectionManager(self.connection, self.name)
 
     def view_indexes(self) -> ViewIndexManager:
         """
-        Get a :class:`~.ViewIndexManager` which can be used to manage the view design documents
+        Get a :class:`~couchbase.management.views.ViewIndexManager` which can be used to manage the view design documents
         and views of this bucket.
 
         Returns:
-            :class:`~.ViewIndexManager`: A :class:`~.ViewIndexManager` instance.
-        """
+            :class:`~couchbase.management.views.ViewIndexManager`: A :class:`~couchbase.management.views.ViewIndexManager` instance.
+        """  # noqa: E501
         return ViewIndexManager(self.connection, self.name)
 
 

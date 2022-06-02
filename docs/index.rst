@@ -45,6 +45,12 @@ Synchronous API
 
 Global API
 -----------------
+:doc:`couchbase_api/authentication`
+   API reference for Authentication.
+
+:doc:`couchbase_api/exceptions`
+   API reference for Exceptions.
+
 :doc:`couchbase_api/exceptions`
    API reference for Exceptions.
 
@@ -105,6 +111,7 @@ Indices and tables
    :maxdepth: 2
    :hidden:
 
+   couchbase_api/authentication
    couchbase_api/exceptions
    couchbase_api/management_options
    couchbase_api/options

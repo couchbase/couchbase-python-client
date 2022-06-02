@@ -33,6 +33,19 @@ if TYPE_CHECKING:
 
 
 class AsyncBucket(BucketLogic):
+    """Create a Couchbase Bucket instance.
+
+    Exposes the operations which are available to be performed against a bucket. Namely the ability to
+    access to Collections as well as performing management operations against the bucket.
+
+    Args:
+        cluster (:class:`~acouchbase.cluster.Cluster`): A :class:`~acouchbase.cluster.Cluster` instance.
+        bucket_name (str): Name of the bucket.
+
+    Raises:
+        :class:`~couchbase.exceptions.BucketNotFoundException`: If provided `bucket_name` cannot be found.
+
+    """
 
     def __init__(self, cluster,  # type: Cluster
                  bucket_name  # type: str
@@ -72,6 +85,15 @@ class AsyncBucket(BucketLogic):
         super()._open_or_close_bucket(open_bucket=False, **kwargs)
 
     def on_connect(self) -> Awaitable:
+        """Returns an awaitable future that indicates connecting to the Couchbase bucket has completed.
+
+        Returns:
+            Awaitable: An empty future.  If a result is provided, connecting to the Couchbase bucket is complete.
+                Otherwise an exception is raised.
+
+        Raises:
+            :class:`~couchbase.exceptions.UnAmbiguousTimeoutException`: If an error occured while trying to connect.
+        """
         if not (self._connect_ftr or self.connected):
             self._connect_ftr = self._open_bucket()
             self._close_ftr = None
@@ -79,6 +101,14 @@ class AsyncBucket(BucketLogic):
         return self._connect_ftr
 
     async def close(self) -> None:
+        """Shuts down this bucket instance. Cleaning up all resources associated with it.
+
+        .. warning::
+            Use of this method is almost *always* unnecessary.  Bucket resources should be cleaned
+            up once the bucket instance falls out of scope.  However, in some applications tuning resources
+            is necessary and in those types of applications, this method might be beneficial.
+
+        """
         if self.connected and not self._close_ftr:
             self._close_ftr = self._close_bucket()
             self._connect_ftr = None
@@ -88,17 +118,46 @@ class AsyncBucket(BucketLogic):
 
     def default_scope(self
                       ) -> Scope:
+        """Creates a :class:`~acouchbase.scope.Scope` instance of the default scope.
+
+        Returns:
+            :class:`~acouchbase.scope.Scope`: A :class:`~acouchbase.scope.Scope` instance of the default scope.
+
+        """
         return self.scope(Scope.default_name())
 
     def scope(self, name  # type: str
               ) -> Scope:
+        """Creates a :class:`~acouchbase.scope.Scope` instance of the specified scope.
+
+        Args:
+            name (str): Name of the scope to reference.
+
+        Returns:
+            :class:`~acouchbase.scope.Scope`: A :class:`~couchbase.scope.Scope` instance of the specified scope.
+
+        """
         return Scope(self, name)
 
     def collection(self, collection_name):
+        """Creates a :class:`~acouchbase.collection.Collection` instance of the specified collection.
+
+        Args:
+            collection_name (str): Name of the collection to reference.
+
+        Returns:
+            :class:`~acouchbase.collection.Collection`: A :class:`~acouchbase.collection.Collection` instance of the specified collection.
+
+        """  # noqa: E501
         scope = self.default_scope()
         return scope.collection(collection_name)
 
     def default_collection(self):
+        """Creates a :class:`~acouchbase.collection.Collection` instance of the default collection.
+
+        Returns:
+            :class:`~acouchbase.collection.Collection`: A :class:`~acouchbase.collection.Collection` instance of the default collection.
+        """  # noqa: E501
         scope = self.default_scope()
         return scope.collection(Collection.default_name())
 
@@ -106,7 +165,21 @@ class AsyncBucket(BucketLogic):
     def ping(self,
              *opts,  # type: PingOptions
              **kwargs  # type: Dict[str, Any]
-             ) -> PingResult:
+             ) -> Awaitable[PingResult]:
+        """Performs a ping operation against the bucket.
+
+        The ping operation pings the services which are specified
+        (or all services if none are specified). Returns a report which describes the outcome of
+        the ping operations which were performed.
+
+        Args:
+            opts (:class:`~couchbase.options.PingOptions`): Optional parameters for this operation.
+
+        Returns:
+            Awaitable[:class:`~couchbase.result.PingResult`]: A report which describes the outcome of the ping
+            operations which were performed.
+
+        """
         return super().ping(*opts, **kwargs)
 
     def view_query(self,
@@ -115,7 +188,43 @@ class AsyncBucket(BucketLogic):
                    *view_options,   # type: ViewOptions
                    **kwargs
                    ) -> ViewResult:
+        """Executes a View query against the bucket.
 
+        .. note::
+
+            The query is executed lazily in that it is executed once iteration over the
+            :class:`~.result.ViewResult` begins.
+
+        .. seealso::
+            * :class:`~.management.ViewIndexManager`: for how to manage query indexes
+
+        Args:
+            design_doc (str): The name of the design document containing the view to execute.
+            view_name (str): The name of the view to execute.
+            view_options (:class:`~.options.ViewOptions`): Optional parameters for the view query operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~.options.ViewOptions`
+
+        Returns:
+            :class:`~.result.ViewResult`: An instance of a :class:`~.result.ViewResult` which
+            provides access to iterate over the query results and access metadata about the query.
+
+        Examples:
+            Simple view query::
+
+                from couchbase.management.views import DesignDocumentNamespace
+
+                # ... other code ...
+
+                view_result = bucket.view_query('ddoc-name',
+                                                'view-name',
+                                                limit=10,
+                                                namespace=DesignDocumentNamespace.DEVELOPMENT)
+
+                async for row in view_result.rows():
+                    print(f'Found row: {row}')
+
+        """
         query = ViewQuery.create_view_query_object(
             self.name, design_doc, view_name, *view_options, **kwargs
         )
@@ -126,18 +235,22 @@ class AsyncBucket(BucketLogic):
 
     def collections(self) -> CollectionManager:
         """
-        Get the CollectionManager.
+        Get a :class:`~acouchbase.management.collections.CollectionManager` which can be used to manage the scopes and collections
+        of this bucket.
 
-        :return: the :class:`.management.collections.CollectionManager` for this bucket.
-        """
+        Returns:
+            :class:`~acouchbase.management.collections.CollectionManager`: A :class:`~couchbase.management.collections.CollectionManager` instance.
+        """  # noqa: E501
         return CollectionManager(self.connection, self.loop, self.name)
 
     def view_indexes(self) -> ViewIndexManager:
         """
-        Get the ViewIndexManager for this bucket.
+        Get a :class:`~acouchbase.management.views.ViewIndexManager` which can be used to manage the view design documents
+        and views of this bucket.
 
-        :return: The :class:`.management.ViewIndexManager` for this bucket.
-        """
+        Returns:
+            :class:`~acouchbase.management.views.ViewIndexManager`: A :class:`~couchbase.management.views.ViewIndexManager` instance.
+        """  # noqa: E501
         return ViewIndexManager(self.connection, self.loop, self.name)
 
 
