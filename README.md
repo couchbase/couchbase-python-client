@@ -19,10 +19,11 @@ Python client for [Couchbase](https://couchbase.com)
 
 - [Couchbase Server](http://couchbase.com/download)
 - You may need a C++ compiler supporting C++ 17 and Python development files, unless a
-  binary wheel is available for your platform. Currently, wheels are only available on Windows for Python 3.7, 3.8, 3.9 and 3.10. We will endeavor to add more wheels for other platforms in the near future.
-- cmake (version >= 3.17), unless a binary wheel is available for your platform.
+  binary wheel is available for your platform. Currently, wheels are available on Windows and MacOS for Python 3.7, 3.8, 3.9 and 3.10. We are working on providing manylinux wheels in the near future.
+- CMake (version >= 3.17), unless a binary wheel is available for your platform.
 - Git, unless a binary wheel is available for your platform.
 - OpenSSL is now required for the 4.x Python SDK.
+- If using the Twisted Framework and the txcouchbase API, Twisted >= 21.7.0 is required.
 
 ## Debian and Ubuntu<a id="pre-deb-ubuntu"></a>
 
@@ -40,9 +41,11 @@ First-time setup:
 $ sudo yum install git-all gcc gcc-c++ python3-devel python3-pip python3-setuptools cmake openssl-devel
 ```
 
->**NOTE:** The minimum version of CMake support is 3.17.  Check out the steps [here](https://idroot.us/install-cmake-centos-8/) to update CMake.
-
->**NOTE:** The mininum version of OpenSSL support by Python 3.10 is 1.1.1.  If using CentOS 7, OpenSSL will need to be updated.
+>:exclamation:**IMPORTANT**:exclamation:<br>Some of the defaults for older operating systems like Centos/RHEL 7 and 8 have defaults to do not meet the 4.x Python SDK [minimum requirements](prerequisites). Be sure to update to the minimum requirements prior to installing the SDK.  Most notably be sure to check the following:
+>- The default Python version might be less than 3.7.  If so, the Python version _will_ need to be udpated.
+>- The default OpenSSL version might be less than 1.1.1.  If so, the OpenSSL version _will_ need to be updated.
+>- The gcc version must provide C++17 support.  If the installed gcc version does not support C++17, gcc _will_ need to be updated.
+>- The installed CMake version might be less than 3.17.  If so, the CMake version _will_ need to be updated.  Check out the steps [here](https://idroot.us/install-cmake-centos-8/) to update CMake.
 
 See [RHEL and Centos](#install-rhel-centos) install section to install SDK.
 
@@ -127,7 +130,7 @@ You can always get the latest supported release version from [pypi](https://pypi
 >pip install git+https://github.com/couchbase/couchbase-python-client.git
 >```
 
->**NOTE:** Currently the Python Client source distribution requires the OpenSSL headers and libraries that the Python client itself was built against to be installed prior to the client itself for TLS support to be provided. Additionally the installer relies on PEP517 which older versions of PIP do not support. If you experience issues installing it is advised to upgrade your PIP/setuptools installation as follows:<br>
+>**NOTE:** The Python Client installer relies on PEP517 which older versions of PIP do not support. If you experience issues installing it is advised to upgrade your PIP/setuptools installation as follows:<br>
 >```console
 >python3 -m pip install --upgrade pip setuptools wheel
 >```
@@ -193,16 +196,18 @@ First, ensure all the [requirements](#building-windows) for a build system are m
 
 Clone this Python SDK repository:
 ```console
-git clone --depth 1 --branch <tag_name> https://github.com/couchbase/couchbase-python-client.git
+git clone --depth 1 --branch <tag_name> --recurse-submodules https://github.com/couchbase/couchbase-python-client.git
 ```
 
 >Where tag_name is equal to the latest release.<br>
-Example: ```git clone --depth 1 --branch 4.0.0 https://github.com/couchbase/couchbase-python-client.git```
+Example: ```git clone --depth 1 --branch 4.0.0 --recurse-submodules https://github.com/couchbase/couchbase-python-client.git```
 
 Move into the directory created after cloning the Python SDK repository:
 ```console
 cd couchbase-python-client
 ```
+
+>**NOTE:** If the ```--recurse-submodules``` option was not used when cloning the Python SDK repository, run (after moving into the cloned repository directory) ```git submodule update --init --recursive``` to recursively update and initialize the submodules.
 
 Install the SDK from source:
 ```console
@@ -389,6 +394,11 @@ print(rv.content_as[str])
 ### Twisted
 
 To use with Twisted, import ```txcouchbase.cluster``` instead of ```couchbase.cluster```.  The ```txcouchbase``` API offers an API similar to the ```couchbase``` API.
+
+>**NOTE:** The minimum required Twisted version is 21.7.0.
+
+>:exclamation:**WARNING:** The 4.x SDK introduced a breaking change where the txcouchbase package must be imported _prior_ to importing the reactor (see example below).  This is so that the asyncio reactor can be installed.
+
 
 ```python
 # IMPORTANT -- the txcouchbase import must occur PRIOR to importing the reactor

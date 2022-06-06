@@ -36,17 +36,22 @@ Installing the SDK
 
 
 .. note::
-    Wheels are currently only available on Windows for Python 3.7 - 3.10. We will endeavor to add more in the near future.
+    Wheels are currently available on Windows and MacOS for Python 3.7 - 3.10. We are working on providing manylinux wheels in the near future..
 
 Prereqs
 ++++++++++
 
 If not on platform that has a binary wheel availble, the following is needed:
 
+* Python version 3.7 - 3.10
 * A C++ compiler supporting C++ 17
-* cmake (version >= 3.17)
-* Git
-* OpenSSL
+* CMake (version >= 3.17)
+* Git (if not on a platform that offers wheels)
+* OpenSSL 1.1.1
+* If using the Twisted Framework and the txcouchbase API, Twisted >= 21.7.0 is required.
+
+.. warning::
+    Some older linux platforms to not provide defaults (Python version, OpenSSL, C++ 17 support, etc.) that meet the Python SDK's minimum requirements.  Be sure to update to the minimum requirements prior to installing the SDK.
 
 After the above have been installed, pip install ``setuptools`` and ``wheel`` (see command below).
 
