@@ -13,7 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-cmake_minimum_required(VERSION 3.17)
+cmake_minimum_required(VERSION 3.18)
 # needed for CMAKE_MSVC_RUNTIME_LIBRARY
 cmake_policy(SET CMP0091 NEW)
 include(FetchContent)
@@ -39,7 +39,7 @@ if (PYTHON_VERSION_EXACT)
 else()
     set(PYTHON_VERSION_EXACT 3.6)
 endif()
-find_package(Python3 ${PYTHON_VERSION_EXACT} COMPONENTS Interpreter Development)
+find_package(Python3 ${PYTHON_VERSION_EXACT} COMPONENTS Interpreter Development.Module)
 
 if(WIN32)
     set(PYCBC_C_MOD_SUFFIX ".pyd")

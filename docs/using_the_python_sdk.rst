@@ -45,7 +45,7 @@ If not on platform that has a binary wheel availble, the following is needed:
 
 * Python version 3.7 - 3.10
 * A C++ compiler supporting C++ 17
-* CMake (version >= 3.17)
+* CMake (version >= 3.18)
 * Git (if not on a platform that offers wheels)
 * OpenSSL 1.1.1
 * If using the Twisted Framework and the txcouchbase API, Twisted >= 21.7.0 is required.

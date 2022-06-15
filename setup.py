@@ -94,13 +94,20 @@ class CMakeBuildExt(build_ext):
                                  ext.sourcedir,
                                  f'-DCMAKE_BUILD_TYPE={build_type}',
                                  f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={output_dir}',
-                                 f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{build_type.upper()}={output_dir}',
-                                 f'-DPYTHON_EXECUTABLE={sys.executable}']
+                                 f'-DCMAKE_LIBRARY_OUTPUT_DIRECTORY_{build_type.upper()}={output_dir}']
 
             cmake_config_args.extend(
                 [x for x in
                     os.environ.get('CMAKE_COMMON_VARIABLES', '').split(' ')
                     if x])
+
+            python3_executable = env.pop('PYCBC_PYTHON3_EXECUTABLE', None)
+            if python3_executable:
+                cmake_config_args += [f'-DPython3_EXECUTABLE={python3_executable}']
+
+            python3_include = env.pop('PYCBC_PYTHON3_INCLUDE_DIR', None)
+            if python3_include:
+                cmake_config_args += [f'-DPython3_INCLUDE_DIR={python3_include}']
 
             if platform.system() == "Windows":
                 cmake_config_args += [f'-DCMAKE_RUNTIME_OUTPUT_DIRECTORY_{build_type.upper()}={output_dir}']
