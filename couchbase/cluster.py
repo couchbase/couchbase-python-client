@@ -731,27 +731,27 @@ from couchbase.logic.options import DiagnosticsOptionsBase  # nopep8 # isort:ski
 from couchbase.logic.options import QueryOptionsBase  # nopep8 # isort:skip # noqa: E402
 
 
-@Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')  # noqa: F811
 class ClusterOptions(ClusterOptionsBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')  # noqa: F811
 class ClusterTimeoutOptions(ClusterTimeoutOptionsBase):
     pass
 
 
-@Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')  # noqa: F811
 class ClusterTracingOptions(ClusterTracingOptionsBase):
     pass
 
 
-@Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')  # noqa: F811
 class DiagnosticsOptions(DiagnosticsOptionsBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')  # noqa: F811
 class QueryOptions(QueryOptionsBase):  # noqa: F811
     pass
 

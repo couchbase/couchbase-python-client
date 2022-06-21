@@ -233,12 +233,12 @@ from couchbase.logic.options import PingOptionsBase  # nopep8 # isort:skip # noq
 from couchbase.logic.options import ViewOptionsBase  # nopep8 # isort:skip # noqa: E402
 
 
-@Supportability.import_deprecated('couchbase.bucket', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.bucket', 'couchbase.options')  # noqa: F811
 class PingOptions(PingOptionsBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.bucket', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.bucket', 'couchbase.options')  # noqa: F811
 class ViewOptions(ViewOptionsBase):  # noqa: F811
     pass
 

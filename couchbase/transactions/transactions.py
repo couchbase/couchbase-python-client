@@ -16,24 +16,24 @@
 import logging
 from functools import wraps
 from typing import (TYPE_CHECKING,
+                    Any,
                     Callable,
-                    Optional,
                     Dict,
-                    Any)
+                    Optional)
 
 from couchbase.exceptions import CouchbaseException, TransactionsErrorContext
+from couchbase.options import TransactionQueryOptions
 from couchbase.transactions.logic import AttemptContextLogic, TransactionsLogic
 
 from .transaction_get_result import TransactionGetResult
 from .transaction_query_results import TransactionQueryResults
 from .transaction_result import TransactionResult
-from couchbase.options import TransactionQueryOptions
+
 if TYPE_CHECKING:
-    from couchbase._utils import PyCapsuleType
+    from couchbase._utils import JSONType, PyCapsuleType
+    from couchbase.collection import Collection
     from couchbase.options import TransactionOptions
     from couchbase.serializer import Serializer
-    from couchbase.collection import Collection
-    from couchbase._utils import JSONType
 
 log = logging.getLogger(__name__)
 
@@ -149,7 +149,7 @@ class AttemptContext(AttemptContextLogic):
         Raises:
             :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
                 no need to handle the exception, as the transaction will rollback regardless.
-        """ 
+        """
         return super().get(coll, key)
 
     @BlockingWrapper.block(TransactionGetResult)
@@ -181,7 +181,7 @@ class AttemptContext(AttemptContextLogic):
     def replace(self,
                 txn_get_result,  # type: TransactionGetResult
                 value,  # type: JSONType
-                **kwargs, # type: Dict[str, Any]
+                **kwargs,  # type: Dict[str, Any]
                 ) -> TransactionGetResult:
         """
         Replace the contents of a document within a transaction.
@@ -225,9 +225,8 @@ class AttemptContext(AttemptContextLogic):
     def query(self,
               query,    # type: str
               options=TransactionQueryOptions(),    # type: TransactionQueryOptions
-              **kwargs # type: Dict[str, Any]
+              **kwargs  # type: Dict[str, Any]
               ) -> TransactionQueryResults:
-
         """
         Perform a query within a transaction.
 

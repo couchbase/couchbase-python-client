@@ -14,7 +14,7 @@
 #  limitations under the License.
 
 cmake_minimum_required(VERSION 3.17)
-# needed for CMAKE_MSVC_RUNTIME_LIBRARY 
+# needed for CMAKE_MSVC_RUNTIME_LIBRARY
 cmake_policy(SET CMP0091 NEW)
 include(FetchContent)
 

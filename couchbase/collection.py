@@ -2187,92 +2187,92 @@ class Scope(ScopeLogic):
     pass
 
 
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')   # noqa: F811
 class AppendOptions(AppendOptionsBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')   # noqa: F811
 class DecrementOptions(DecrementOptionsBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')   # noqa: F811
 class DeltaValue(DeltaValueBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
 class DurabilityOptionBlock(DurabilityOptionBlockBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
 class ExistsOptions(ExistsOptionsBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
 class GetAndTouchOptions(GetAndTouchOptionsBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
 class GetAndLockOptions(GetAndLockOptionsBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
 class GetOptions(GetOptionsBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
 class IncrementOptions(IncrementOptionsBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
 class InsertOptions(InsertOptionsBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
 class LookupInOptions(LookupInOptionsBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
 class OptionsTimeout(OptionsTimeoutBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
 class PrependOptions(PrependOptionsBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
 class RemoveOptions(RemoveOptionsBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
 class ReplaceOptions(ReplaceOptionsBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
 class TouchOptions(TouchOptionsBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
 class UnlockOptions(UnlockOptionsBase):  # noqa: F811
     pass
 
 
-@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
 class UpsertOptions(UpsertOptionsBase):  # noqa: F811
     pass
 

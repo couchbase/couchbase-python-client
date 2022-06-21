@@ -54,7 +54,7 @@ str_to_profile_mode(std::string profile_mode)
 std::string
 profile_mode_to_str(couchbase::query_profile_mode profile_mode)
 {
-    switch(profile_mode) {
+    switch (profile_mode) {
         case couchbase::query_profile_mode::off:
             return "off";
         case couchbase::query_profile_mode::phases:

@@ -31,8 +31,6 @@ from couchbase.options import (TransactionConfig,
                                TransactionQueryOptions)
 from couchbase.transactions import TransactionResult
 
-from . import wrap_in_thread
-
 from ._test_utils import (CollectionType,
                           KVPair,
                           TestEnvironment)
@@ -272,7 +270,7 @@ class TransactionTests:
         cfg = None
         try:
             cfg = cls(scan_consistency=consistency)
-        except Exception as e:
+        except Exception:
             if consistency != QueryScanConsistency.AT_PLUS:
                 pytest.fail("got unexpected exception creating TransactionConfig", True)
         if cfg:
@@ -375,7 +373,7 @@ class TransactionTests:
         assert cfg_max is not None
         assert cfg_max == max
 
-    @pytest.mark.parametrize('params', [["a", "b", "c"]]) #, [[1, 2, 3], ["a", "b", "c"]]])
+    @pytest.mark.parametrize('params', [["a", "b", "c"]])  # , [[1, 2, 3], ["a", "b", "c"]]])
     def test_positional_params(self, params):
         cfg = TransactionQueryOptions(positional_parameters=params)
         cfg_params = cfg._base.to_dict().get('positional_parameters', None)
@@ -384,7 +382,9 @@ class TransactionTests:
         for idx, p in enumerate(cfg_params):
             assert params[idx] == json.loads(p)
 
-    @pytest.mark.parametrize('params', [{"key1": "thing"}, {"key1": ['an', 'array']},{'key1': 10, 'key2': 'something else'}])
+    @pytest.mark.parametrize('params', [{"key1": "thing"},
+                                        {"key1": ['an', 'array']},
+                                        {'key1': 10, 'key2': 'something else'}])
     def test_named_params(self, params):
         cfg = TransactionQueryOptions(named_parameters=params)
         cfg_params = cfg._base.to_dict().get('named_parameters', None)

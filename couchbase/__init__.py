@@ -14,12 +14,13 @@
 #  limitations under the License.
 
 try:
-    import couchbase.pycbc_core
-except ImportError as ex:
-    import sys
+    import couchbase.pycbc_core  # noqa: F401
+except ImportError:
     import os
+    import sys
+
     # should only need to do this on Windows w/ Python >= 3.8 due to the changes made for how DLLs are resolved
-    if sys.platform.startswith('win32') and (3,8) <= sys.version_info:
+    if sys.platform.startswith('win32') and (3, 8) <= sys.version_info:
         open_ssl_dir = os.getenv('PYCBC_OPENSSL_DIR')
         # if not set by environment, try to use libcrypto and libssl that comes w/ Windows Python install
         if not open_ssl_dir:
@@ -27,10 +28,10 @@ except ImportError as ex:
                 if os.path.split(p)[-1] == 'DLLs':
                     open_ssl_dir = p
                     break
-                
+
         if open_ssl_dir:
             os.add_dll_directory(open_ssl_dir)
         else:
             print(('PYCBC: Caught import error. '
-                    'Most likely due to not finding OpenSSL libraries. '
-                    'Set PYCBC_OPENSSL_DIR to location where OpenSSL libraries can be found.'))
+                   'Most likely due to not finding OpenSSL libraries. '
+                   'Set PYCBC_OPENSSL_DIR to location where OpenSSL libraries can be found.'))

@@ -499,7 +499,7 @@ class BucketSettings(dict):
 
 class CreateBucketSettings(BucketSettings):
     @overload  # nosec
-    def __init__(self,
+    def __init__(self,  # nosec
                  name=None,  # type: str
                  flush_enabled=False,  # type: bool
                  ram_quota_mb=None,  # type: int

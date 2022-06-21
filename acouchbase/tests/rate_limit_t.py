@@ -540,4 +540,3 @@ class RateLimitTests:
 
         with pytest.raises(RateLimitedException):
             await asyncio.gather(*[create_user(u) for u in user_list])
-

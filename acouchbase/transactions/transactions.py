@@ -17,17 +17,17 @@ import asyncio
 import logging
 from functools import wraps
 from typing import (TYPE_CHECKING,
+                    Any,
+                    Awaitable,
                     Callable,
                     Dict,
-                    Optional,
-                    Awaitable)
+                    Optional)
 
+from couchbase.options import TransactionQueryOptions
 from couchbase.transactions import (TransactionGetResult,
                                     TransactionQueryResults,
                                     TransactionResult)
 from couchbase.transactions.logic import AttemptContextLogic, TransactionsLogic
-from couchbase.options import TransactionQueryOptions
-import logging
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
@@ -173,8 +173,8 @@ class AttemptContext(AttemptContextLogic):
             **kwargs (Dict[str, Any]): currently unused.
 
         Returns:
-           Awaitable[:class:`couchbase.transactions.TransactionGetResult`]: Document in collection, in a form useful for passing
-                to other transaction operations.
+           Awaitable[:class:`couchbase.transactions.TransactionGetResult`]: Document in collection, in a form
+            useful for passing to other transaction operations.
         Raises:
             :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
                 no need to handle the exception, as the transaction will rollback regardless.
@@ -198,8 +198,8 @@ class AttemptContext(AttemptContextLogic):
             **kwargs (Dict[str, Any]): currently unused.
 
         Returns:
-           Awaitable[:class:`couchbase.transactions.TransactionGetResult`]: Document in collection, in a form useful for passing
-                to other transaction operations.
+           Awaitable[:class:`couchbase.transactions.TransactionGetResult`]: Document in collection, in a form useful
+            for passing to other transaction operations.
         Raises:
             :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
                 no need to handle the exception, as the transaction will rollback regardless.

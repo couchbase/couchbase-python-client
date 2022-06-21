@@ -33,15 +33,13 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   ScopeAlreadyExistsException,
                                   ScopeNotFoundException,
                                   UnAmbiguousTimeoutException)
-from couchbase.management.buckets import (BucketType,
-                                          CreateBucketSettings)
+from couchbase.management.buckets import BucketType, CreateBucketSettings
 from couchbase.management.collections import CollectionSpec
 from couchbase.options import ClusterOptions
 from couchbase.transcoder import RawBinaryTranscoder, RawStringTranscoder
 from tests.helpers import CollectionType  # noqa: F401
 from tests.helpers import KVPair  # noqa: F401
 from tests.helpers import CouchbaseTestEnvironment, CouchbaseTestEnvironmentException
-
 from txcouchbase.bucket import Bucket
 from txcouchbase.cluster import Cluster
 from txcouchbase.management.buckets import BucketManager
