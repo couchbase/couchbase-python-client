@@ -82,6 +82,7 @@ if TYPE_CHECKING:
     from couchbase.collection import Collection
     from couchbase.durability import DurabilityType, ServerDurability
     from couchbase.n1ql import QueryScanConsistency
+    from couchbase.transactions import TransactionKeyspace
     from couchbase.transcoder import Transcoder
 
 
@@ -1178,7 +1179,7 @@ class TransactionConfig:
                  expiration_time=None,  # type: Optional[timedelta]
                  cleanup_lost_attempts=None,  # type: Optional[bool]
                  cleanup_client_attempts=None,  # type: Optional[bool]
-                 metadata_collection=None,  # type: Optional[Collection]
+                 metadata_collection=None,  # type: Optional[TransactionKeyspace]
                  scan_consistency=None  # type: Optional[QueryScanConsistency]
                  ):
         """
@@ -1192,8 +1193,8 @@ class TransactionConfig:
             expiration_time: (timedelta, optional): Maximum amount of time a transaction can take before rolling back.
             cleanup_lost_attempts: (bool, optional): If False, then we don't do any background cleanup.
             cleanup_client_attempts: (bool, optional): if False, we don't do any cleanup as a transaction finishes.
-            metadata_collection: (:class:`couchbase.collection.Collection, optional): All transaction metadata uses the
-              specified collection.
+            metadata_collection: (:class:`couchbase.transactions.TransactionKeyspace, optional): All transaction
+              metadata uses the specified bucket/scope/collection.
             scan_consistency: (:class:`QueryScanConsistency`, optional): Scan consistency to use for all transactional
               queries.
         """
@@ -1202,6 +1203,7 @@ class TransactionConfig:
     def __init__(self,
                  **kwargs  # type: dict[str, Any]
                  ):
+
         kwargs = {k: v for k, v in kwargs.items() if k in TransactionConfig._TXN_ALLOWED_KEYS}
         # convert everything here...
         durability = kwargs.pop("durability", None)
@@ -1212,9 +1214,9 @@ class TransactionConfig:
                 kwargs[k] = int(kwargs[k].total_seconds() * 1000000)
         coll = kwargs.pop("metadata_collection", None)
         if coll:
-            kwargs["metadata_bucket"] = coll._scope.bucket_name
-            kwargs["metadata_scope"] = coll._scope.name
-            kwargs["metadata_collection"] = coll.name
+            kwargs["metadata_bucket"] = coll.bucket
+            kwargs["metadata_scope"] = coll.scope
+            kwargs["metadata_collection"] = coll.collection
         # don't pass None
         if kwargs.get('scan_consistency', None):
             kwargs['scan_consistency'] = kwargs['scan_consistency'].value
@@ -1226,14 +1228,15 @@ class TransactionConfig:
 
 
 class TransactionOptions:
-    _TXN_ALLOWED_KEYS = {"durability", "kv_timeout", "expiration_time", "scan_consistency"}
+    _TXN_ALLOWED_KEYS = {"durability", "kv_timeout", "expiration_time", "scan_consistency", "metadata_collection"}
 
     @overload
     def __init__(self,
                  durability=None,   # type: Optional[ServerDurability]
                  kv_timeout=None,  # type: Optional[timedelta]
                  expiration_time=None,  # type: Optional[timedelta]
-                 scan_consistency=None  # type: Optional[QueryScanConsistency]
+                 scan_consistency=None,  # type: Optional[QueryScanConsistency]
+                 metadata_collection=None  # type: Optional[Collection]
                  ):
         """
         Overrides a subset of the ``TransactionConfig`` parameters for a single query.
@@ -1243,7 +1246,9 @@ class TransactionOptions:
             kv_timeout: (timedelta, optional): KV timeout to use for this transaction.
             expiration_time: (timedelta, optional): Expiry for this transaction.
             scan_consistency: (:class:`QueryScanConsistency`, optional): Scan consistency for queries in
-                this transaction.
+              this transaction.
+            metadata_collection: (:class: `couchbase.collection.Collection, optional): This transaction will
+              put all metadata in the specified bucket/scope/collection.
         """
         pass
 
@@ -1262,6 +1267,11 @@ class TransactionOptions:
             kwargs['scan_consistency'] = kwargs['scan_consistency'].value
             if kwargs["scan_consistency"] == "at_plus":
                 raise InvalidArgumentException("QueryScanConsistency.AT_PLUS not valid for transactions")
+        coll = kwargs.pop('metadata_collection', None)
+        if coll:
+            kwargs['metadata_bucket'] = coll.bucket
+            kwargs['metadata_scope'] = coll.scope
+            kwargs['metadata_collection'] = coll.collection
         # don't pass None
         for key in [k for k, v in kwargs.items() if v is None]:
             del(kwargs[key])

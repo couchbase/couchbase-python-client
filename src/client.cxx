@@ -25,6 +25,7 @@
 #include "subdoc_ops.hxx"
 #include "diagnostics.hxx"
 #include "binary_ops.hxx"
+#include "logger.hxx"
 #include "n1ql.hxx"
 #include "analytics.hxx"
 #include "search.hxx"
@@ -507,6 +508,10 @@ static struct PyMethodDef methods[] = {
       (PyCFunction)pycbc_txns::destroy_transactions,
       METH_VARARGS | METH_KEYWORDS,
       "shut down transactions object" },
+    { "configure_logging",
+      (PyCFunction)configure_logging,
+      METH_VARARGS | METH_KEYWORDS,
+      "configure logging to use specific python logger" },
     { nullptr, nullptr, 0, nullptr }
 };
 
@@ -524,13 +529,6 @@ PyMODINIT_FUNC
 PyInit_pycbc_core(void)
 {
     Py_Initialize();
-    auto log_level_str = std::getenv("PYCBC_LOG_LEVEL");
-    couchbase::logger::level level = couchbase::logger::level::off;
-    couchbase::logger::create_console_logger();
-    if (nullptr != log_level_str) {
-        level = couchbase::logger::level_from_str(log_level_str);
-    }
-    couchbase::logger::set_log_levels(level);
     PyObject* m = nullptr;
 
     PyObject* result_type;

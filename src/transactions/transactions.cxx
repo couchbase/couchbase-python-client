@@ -86,7 +86,11 @@ pycbc_txns::transaction_config__to_dict__(PyObject* self)
     add_to_dict(retval, "cleanup_client_attempts", conf->cfg->cleanup_client_attempts());
     add_to_dict(retval, "scan_consistency", scan_consistency_type_to_string(conf->cfg->scan_consistency()));
     if (conf->cfg->custom_metadata_collection()) {
-        add_to_dict(retval, "metadata_collection", conf->cfg->custom_metadata_collection()->collection_path());
+        std::string meta = fmt::format("{}.{}.{}",
+                                       conf->cfg->custom_metadata_collection()->bucket,
+                                       conf->cfg->custom_metadata_collection()->scope,
+                                       conf->cfg->custom_metadata_collection()->collection);
+        add_to_dict(retval, "metadata_collection", meta);
     }
     return retval;
 }
@@ -179,15 +183,28 @@ pycbc_txns::per_transaction_config__new__(PyTypeObject* type, PyObject* args, Py
     PyObject* kv_timeout = nullptr;
     PyObject* expiration_time = nullptr;
     char* scan_consistency = nullptr;
+    char* metadata_bucket = nullptr;
+    char* metadata_scope = nullptr;
+    char* metadata_collection = nullptr;
 
-    const char* kw_list[] = { "durability_level", "kv_timeout", "expiration_time", "scan_consistency", nullptr };
-    const char* kw_format = "|OOOs";
+    const char* kw_list[] = { "durability_level", "kv_timeout",     "expiration_time",     "scan_consistency",
+                              "metadata_bucket",  "metadata_scope", "metadata_collection", nullptr };
+    const char* kw_format = "|OOOssss";
     auto self = reinterpret_cast<pycbc_txns::per_transaction_config*>(type->tp_alloc(type, 0));
 
     self->cfg = new tx::per_transaction_config();
     LOG_DEBUG("per_transaction_config__new__ called");
-    if (!PyArg_ParseTupleAndKeywords(
-          args, kwargs, kw_format, const_cast<char**>(kw_list), &durability_level, &kv_timeout, &expiration_time, &scan_consistency)) {
+    if (!PyArg_ParseTupleAndKeywords(args,
+                                     kwargs,
+                                     kw_format,
+                                     const_cast<char**>(kw_list),
+                                     &durability_level,
+                                     &kv_timeout,
+                                     &expiration_time,
+                                     &scan_consistency,
+                                     &metadata_bucket,
+                                     &metadata_scope,
+                                     &metadata_collection)) {
         PyErr_SetString(PyExc_ValueError, "couldn't parse args");
         Py_RETURN_NONE;
     }
@@ -203,6 +220,10 @@ pycbc_txns::per_transaction_config__new__(PyTypeObject* type, PyObject* args, Py
     if (nullptr != scan_consistency) {
         self->cfg->scan_consistency(str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
     }
+    if (nullptr != metadata_bucket && nullptr != metadata_scope && nullptr != metadata_collection) {
+        self->cfg->custom_metadata_collection({ metadata_bucket, metadata_scope, metadata_collection });
+    }
+
     return reinterpret_cast<PyObject*>(self);
 }
 
@@ -222,6 +243,13 @@ pycbc_txns::per_transaction_config__to_dict__(PyObject* self)
     }
     if (conf->cfg->scan_consistency()) {
         add_to_dict(retval, "scan_consistency", scan_consistency_type_to_string(*conf->cfg->scan_consistency()));
+    }
+    if (conf->cfg->custom_metadata_collection()) {
+        std::string meta = fmt::format("{}.{}.{}",
+                                       conf->cfg->custom_metadata_collection()->bucket,
+                                       conf->cfg->custom_metadata_collection()->scope,
+                                       conf->cfg->custom_metadata_collection()->collection);
+        add_to_dict(retval, "metadata_collection", meta);
     }
     return retval;
 }
@@ -713,8 +741,10 @@ pycbc_txns::create_transactions([[maybe_unused]] PyObject* self, PyObject* args,
         Py_RETURN_NONE;
     }
 
-    auto txns = new pycbc_txns::transactions(pyObj_conn, *reinterpret_cast<pycbc_txns::transaction_config*>(pyObj_config)->cfg);
-    PyObject* pyObj_txns = PyCapsule_New(txns, "txns_", dealloc_transactions);
+    pycbc_txns::transactions* txns;
+    Py_BEGIN_ALLOW_THREADS txns =
+      new pycbc_txns::transactions(pyObj_conn, *reinterpret_cast<pycbc_txns::transaction_config*>(pyObj_config)->cfg);
+    Py_END_ALLOW_THREADS PyObject* pyObj_txns = PyCapsule_New(txns, "txns_", dealloc_transactions);
     return pyObj_txns;
 }
 
@@ -803,6 +833,7 @@ convert_to_python_exc_type(std::exception_ptr err, bool set_exception = false)
     Py_DECREF(tmp);
     PyObject* pyObj_args = PyTuple_New(0);
     pyObj_final_error = PyObject_Call(pyObj_exc_type, pyObj_args, pyObj_error_ctx);
+    Py_DECREF(pyObj_args);
     if (set_exception) {
         PyErr_SetObject(pyObj_exc_type, pyObj_final_error);
         return nullptr;

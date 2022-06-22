@@ -35,3 +35,15 @@ except ImportError:
             print(('PYCBC: Caught import error. '
                    'Most likely due to not finding OpenSSL libraries. '
                    'Set PYCBC_OPENSSL_DIR to location where OpenSSL libraries can be found.'))
+
+
+import logging
+
+
+def configure_logging(name, level=logging.INFO, parent_logger=None):
+    from couchbase.pycbc_core import configure_logging
+    if parent_logger:
+        name = f'{parent_logger.name}.{name}'
+    print(name)
+    configure_logging(logging.getLogger(name), level)
+    logging.info("created child logger %s", name)

@@ -29,7 +29,7 @@ from couchbase.n1ql import QueryProfile, QueryScanConsistency
 from couchbase.options import (TransactionConfig,
                                TransactionOptions,
                                TransactionQueryOptions)
-from couchbase.transactions import TransactionResult
+from couchbase.transactions import TransactionKeyspace, TransactionResult
 
 from ._test_utils import (CollectionType,
                           KVPair,
@@ -278,12 +278,13 @@ class TransactionTests:
             assert cfg_consistency is not None
             assert cfg_consistency == consistency.value
 
-    def test_metadata_collection(self, cb_env):
+    @pytest.mark.parametrize('cls', [TransactionOptions, TransactionConfig])
+    def test_metadata_collection(self, cls, cb_env):
         coll = cb_env.collection
-        cfg = TransactionConfig(metadata_collection=coll)
+        cfg = cls(metadata_collection=TransactionKeyspace(coll=coll))
         cfg_coll = cfg._base.to_dict().get('metadata_collection', None)
         assert cfg_coll is not None
-        assert cfg_coll == f'{coll._scope.name}.{coll.name}'
+        assert cfg_coll == f'{coll._scope.bucket_name}.{coll._scope.name}.{coll.name}'
 
     @pytest.mark.parametrize('raw', [{"key1": "yo"}, {"key1": 5, "key2": "foo"}, {"key": [1, 2, 3]}])
     def test_raw(self, raw):
