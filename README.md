@@ -19,8 +19,8 @@ Python client for [Couchbase](https://couchbase.com)
 
 - [Couchbase Server](http://couchbase.com/download)
 - You may need a C++ compiler supporting C++ 17 and Python development files, unless a
-  binary wheel is available for your platform. Currently, wheels are available on Windows and MacOS for Python 3.7, 3.8, 3.9 and 3.10. We are working on providing manylinux wheels in the near future.
-- CMake (version >= 3.17), unless a binary wheel is available for your platform.
+  binary wheel is available for your platform. With the 4.0.2 release, wheels are available on Windows, MacOS and Linux (via manylinux) for Python 3.7 - 3.10.
+- CMake (version >= 3.18), unless a binary wheel is available for your platform.
 - Git, unless a binary wheel is available for your platform.
 - OpenSSL is now required for the 4.x Python SDK.
 - If using the Twisted Framework and the txcouchbase API, Twisted >= 21.7.0 is required.
@@ -31,6 +31,8 @@ First-time setup:
 ```console
 $ sudo apt install git-all python3-dev python3-pip python3-setuptools cmake build-essential libssl-dev
 ```
+
+>**NOTE:** We have provided *Dockerfiles* to demonstrate steps to achieve a working setup for various linux platforms. See the [dockerfiles folder](https://github.com/couchbase/couchbase-python-client/tree/master/examples/dockerfiles) in the Python SDK examples folder for details.
 
 See [Debian and Ubuntu](#install-deb-ubuntu) install section to install SDK.
 
@@ -46,6 +48,8 @@ $ sudo yum install git-all gcc gcc-c++ python3-devel python3-pip python3-setupto
 >- The default OpenSSL version might be less than 1.1.1.  If so, the OpenSSL version _will_ need to be updated.
 >- The gcc version must provide C++17 support.  If the installed gcc version does not support C++17, gcc _will_ need to be updated.
 >- The installed CMake version might be less than 3.17.  If so, the CMake version _will_ need to be updated.  Check out the steps [here](https://idroot.us/install-cmake-centos-8/) to update CMake.
+
+>**NOTE:** We have provided *Dockerfiles* to demonstrate steps to achieve a working setup for various linux platforms. See the [dockerfiles folder](https://github.com/couchbase/couchbase-python-client/tree/master/examples/dockerfiles) in the Python SDK examples folder for details.
 
 See [RHEL and Centos](#install-rhel-centos) install section to install SDK.
 
@@ -276,7 +280,7 @@ $ python -m pip install setuptools
 - Download and install [Git](https://git-scm.com/downloads)
 - Download and install [Visual Studio 2019](https://visualstudio.microsoft.com/downloads/)
     + Check *Desktop development with C++* prior to installing
-- Download and install [CMake](https://cmake.org/download/) >= v 3.17
+- Download and install [CMake](https://cmake.org/download/) >= v 3.18
 - Download and install [Python](https://www.python.org/downloads/)
 
 #### VS2019 Notes

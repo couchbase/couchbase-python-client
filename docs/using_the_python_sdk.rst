@@ -36,7 +36,7 @@ Installing the SDK
 
 
 .. note::
-    Wheels are currently available on Windows and MacOS for Python 3.7 - 3.10. We are working on providing manylinux wheels in the near future..
+    The 4.0.2 release provides wheels for Windows, MacOS and Linux platforms (via manylinux) for Python 3.7 - 3.10.
 
 Prereqs
 ++++++++++
@@ -52,6 +52,7 @@ If not on platform that has a binary wheel availble, the following is needed:
 
 .. warning::
     Some older linux platforms to not provide defaults (Python version, OpenSSL, C++ 17 support, etc.) that meet the Python SDK's minimum requirements.  Be sure to update to the minimum requirements prior to installing the SDK.
+    See the `dockerfiles folder <https://github.com/couchbase/couchbase-python-client/tree/master/examples/dockerfiles>`_ in the Python SDK examples folder for references to working setups for various linux platforms.
 
 After the above have been installed, pip install ``setuptools`` and ``wheel`` (see command below).
 
