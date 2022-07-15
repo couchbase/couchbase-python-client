@@ -86,18 +86,11 @@ static void
 result_dealloc([[maybe_unused]] result* self)
 {
     if (self->dict) {
-        PyObject* pyObj_token_key = PyUnicode_FromString(RESULT_MUTATION_TOKEN);
-        int contains = PyDict_Contains(self->dict, pyObj_token_key);
-        if (contains > 0) {
-            if (-1 == PyDict_DelItemString(self->dict, RESULT_MUTATION_TOKEN)) {
-                PyErr_Print();
-                PyErr_Clear();
-            }
-        }
-        Py_XDECREF(pyObj_token_key);
+        PyDict_Clear(self->dict);
         Py_DECREF(self->dict);
     }
-    // LOG_DEBUG("{}: result_dealloc completed", "PYCBC");
+    // LOG_DEBUG("pycbc - dealloc result: result->refcnt: {}, result->dict->refcnt: {}", Py_REFCNT(self), Py_REFCNT(self->dict));
+    Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 static PyObject*
@@ -157,7 +150,8 @@ static void
 mutation_token_dealloc([[maybe_unused]] mutation_token* self)
 {
     delete self->token;
-    // LOG_DEBUG("{}: mutation_token_dealloc completed", "PYCBC");
+    // LOG_DEBUG("pycbc - dealloc mutation_token: token->refcnt: {}", Py_REFCNT(self));
+    Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 static PyObject*
@@ -247,7 +241,8 @@ PyTypeObject streamed_result_type = { PyObject_HEAD_INIT(NULL) 0 };
 static void
 streamed_result_dealloc([[maybe_unused]] streamed_result* self)
 {
-    LOG_DEBUG("{}: streamed_result_dealloc completed", "PYCBC");
+    // LOG_DEBUG("pycbc - dealloc streamed_result: result->refcnt: {}", Py_REFCNT(self));
+    Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 static PyObject*

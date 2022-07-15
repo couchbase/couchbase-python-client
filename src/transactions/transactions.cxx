@@ -46,6 +46,7 @@ void
 pycbc_txns::transaction_config__dealloc__(pycbc_txns::transaction_config* cfg)
 {
     delete cfg->cfg;
+    Py_TYPE(cfg)->tp_free((PyObject*)cfg);
     LOG_DEBUG("dealloc transaction_config");
 }
 
@@ -99,6 +100,7 @@ void
 pycbc_txns::per_transaction_config__dealloc__(pycbc_txns::per_transaction_config* cfg)
 {
     delete cfg->cfg;
+    Py_TYPE(cfg)->tp_free((PyObject*)cfg);
     LOG_DEBUG("dealloc per_transaction_config");
 }
 
@@ -560,6 +562,7 @@ void
 pycbc_txns::transaction_query_options__dealloc__(pycbc_txns::transaction_query_options* opts)
 {
     delete opts->opts;
+    Py_TYPE(opts)->tp_free((PyObject*)opts);
     LOG_DEBUG("dealloc transaction_query_options");
 }
 
@@ -605,6 +608,7 @@ void
 pycbc_txns::transaction_get_result__dealloc__(pycbc_txns::transaction_get_result* result)
 {
     delete result->res;
+    Py_TYPE(result)->tp_free((PyObject*)result);
     LOG_DEBUG("dealloc transaction_get_result");
 }
 
