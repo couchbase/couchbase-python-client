@@ -63,11 +63,18 @@ static void
 exception_base_dealloc(exception_base* self)
 {
     if (self->error_context) {
+        if (PyDict_Check(self->error_context)) {
+            PyDict_Clear(self->error_context);
+        }
         Py_DECREF(self->error_context);
     }
     if (self->exc_info) {
+        if (PyDict_Check(self->exc_info)) {
+            PyDict_Clear(self->exc_info);
+        }
         Py_DECREF(self->exc_info);
     }
+    Py_TYPE(self)->tp_free((PyObject*)self);
     LOG_DEBUG("{}: exception_base_dealloc completed", "PYCBC");
 }
 
@@ -83,6 +90,7 @@ exception_base__new__(PyTypeObject* type, PyObject* args, PyObject* kwargs)
         if (PyObject_IsInstance(result_obj, reinterpret_cast<PyObject*>(&result_type))) {
             self->ec = reinterpret_cast<result*>(result_obj)->ec;
         }
+        Py_DECREF(result_obj);
     } else {
         self->ec = std::error_code();
     }
@@ -182,18 +190,26 @@ PyObject*
 build_kv_error_map_info(couchbase::error_map::error_info error_info)
 {
     PyObject* err_info = PyDict_New();
-    if (-1 == PyDict_SetItemString(err_info, "code", PyLong_FromLong(static_cast<uint16_t>(error_info.code)))) {
+    PyObject* pyObj_tmp = PyLong_FromLong(static_cast<uint16_t>(error_info.code));
+    if (-1 == PyDict_SetItemString(err_info, "code", pyObj_tmp)) {
         PyErr_Print();
         PyErr_Clear();
     }
-    if (-1 == PyDict_SetItemString(err_info, "name", PyUnicode_FromString(error_info.name.c_str()))) {
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyUnicode_FromString(error_info.name.c_str());
+    if (-1 == PyDict_SetItemString(err_info, "name", pyObj_tmp)) {
         PyErr_Print();
         PyErr_Clear();
     }
-    if (-1 == PyDict_SetItemString(err_info, "description", PyUnicode_FromString(error_info.description.c_str()))) {
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyUnicode_FromString(error_info.description.c_str());
+    if (-1 == PyDict_SetItemString(err_info, "description", pyObj_tmp)) {
         PyErr_Print();
         PyErr_Clear();
     }
+    Py_DECREF(pyObj_tmp);
 
     PyObject* attr_set = PySet_New(nullptr);
     for (auto attr : error_info.attributes) {

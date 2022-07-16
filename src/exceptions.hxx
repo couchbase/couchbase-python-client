@@ -210,7 +210,6 @@ build_exception_from_context(const T& ctx,
     exception_base* exc = create_exception_base_obj();
     exc->ec = ctx.ec;
     exc->error_context = build_base_error_context(ctx);
-    Py_INCREF(exc->error_context);
 
     return reinterpret_cast<PyObject*>(exc);
 }
@@ -254,7 +253,7 @@ build_exception_from_context(const couchbase::error_context::key_value& ctx,
         PyErr_Print();
         PyErr_Clear();
     }
-    Py_XDECREF(pyObj_tmp);
+    Py_DECREF(pyObj_tmp);
 
     pyObj_tmp = PyLong_FromLong(ctx.opaque);
     if (-1 == PyDict_SetItemString(pyObj_error_context, KV_OPAQUE, pyObj_tmp)) {
