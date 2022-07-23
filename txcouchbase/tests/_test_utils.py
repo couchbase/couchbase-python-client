@@ -38,6 +38,7 @@ from couchbase.management.collections import CollectionSpec
 from couchbase.options import ClusterOptions
 from couchbase.transcoder import RawBinaryTranscoder, RawStringTranscoder
 from tests.helpers import CollectionType  # noqa: F401
+from tests.helpers import FakeTestObj  # noqa: F401
 from tests.helpers import KVPair  # noqa: F401
 from tests.helpers import CouchbaseTestEnvironment, CouchbaseTestEnvironmentException
 from txcouchbase.bucket import Bucket
@@ -105,8 +106,8 @@ class TestEnvironment(CouchbaseTestEnvironment):
         """Returns the test bucket's CollectionManager"""
         return self._test_bucket_cm if hasattr(self, '_test_bucket_cm') else None
 
-    @classmethod
-    def get_environment(cls, test_suite, couchbase_config, coll_type=CollectionType.DEFAULT, **kwargs):
+    @classmethod  # noqa: C901
+    def get_environment(cls, test_suite, couchbase_config, coll_type=CollectionType.DEFAULT, **kwargs):  # noqa: C901
 
         # this will only return False _if_ using the mock server
         tmp_name = test_suite.split('.')[-1]
@@ -120,6 +121,9 @@ class TestEnvironment(CouchbaseTestEnvironment):
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
+        transcoder = kwargs.pop('transcoder', None)
+        if transcoder:
+            opts['transcoder'] = transcoder
         okay = False
         for _ in range(3):
             try:

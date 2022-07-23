@@ -20,7 +20,11 @@ from functools import partial, wraps
 from twisted.internet.defer import Deferred
 
 from acouchbase.logic import call_async_fn
-from couchbase.exceptions import ErrorMapper, MissingConnectionException
+from couchbase.exceptions import (PYCBC_ERROR_MAP,
+                                  CouchbaseException,
+                                  ErrorMapper,
+                                  ExceptionMap,
+                                  MissingConnectionException)
 from couchbase.logic import decode_value
 
 
@@ -252,20 +256,26 @@ class TxWrapper:
                 transcoder = kwargs.pop('transcoder')
 
                 def on_ok(res):
-                    value = res.raw_result.get('value', None)
-                    flags = res.raw_result.get('flags', None)
+                    try:
+                        value = res.raw_result.get('value', None)
+                        flags = res.raw_result.get('flags', None)
 
-                    is_suboc = fn.__name__ == '_lookup_in_internal'
-                    res.raw_result['value'] = decode_value(transcoder, value, flags, is_subdoc=is_suboc)
+                        is_suboc = fn.__name__ == '_lookup_in_internal'
+                        res.raw_result['value'] = decode_value(transcoder, value, flags, is_subdoc=is_suboc)
 
-                    if return_cls is None:
-                        retval = None
-                    elif return_cls is True:
-                        retval = res
-                    else:
-                        retval = return_cls(res)
-
-                    self.loop.call_soon_threadsafe(ft.set_result, retval)
+                        if return_cls is None:
+                            retval = None
+                        elif return_cls is True:
+                            retval = res
+                        else:
+                            retval = return_cls(res)
+                        self.loop.call_soon_threadsafe(ft.set_result, retval)
+                    except CouchbaseException as e:
+                        self.loop.call_soon_threadsafe(ft.set_exception, e)
+                    except Exception as ex:
+                        exc_cls = PYCBC_ERROR_MAP.get(ExceptionMap.InternalSDKException.value, CouchbaseException)
+                        excptn = exc_cls(message=str(ex))
+                        self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 def on_err(exc):
                     excptn = ErrorMapper.build_exception(exc)

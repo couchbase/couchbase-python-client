@@ -18,6 +18,7 @@
 #include "binary_ops.hxx"
 #include "exceptions.hxx"
 #include "result.hxx"
+#include "utils.hxx"
 
 template<typename T>
 result*
@@ -261,10 +262,12 @@ prepare_and_execute_binary_mutation_op(struct binary_mutation_options* options,
         return nullptr;
     }
 
-    PyObject* pyObj_unicode = PyUnicode_FromEncodedObject(options->pyObj_value, "utf-8", "strict");
-    if (!pyObj_unicode) {
+    couchbase::utils::binary value;
+    try {
+        value = PyObject_to_binary(options->pyObj_value);
+    } catch (const std::exception& e) {
         if (multi_result != nullptr) {
-            PyObject* pyObj_exc = pycbc_build_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unable to encode value.");
+            PyObject* pyObj_exc = pycbc_build_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, e.what());
             if (-1 == PyDict_SetItemString(multi_result->dict, options->id.key().c_str(), pyObj_exc)) {
                 // TODO:  not much we can do here...maybe?
                 PyErr_Print();
@@ -276,13 +279,11 @@ prepare_and_execute_binary_mutation_op(struct binary_mutation_options* options,
             Py_RETURN_NONE;
         }
         barrier->set_value(nullptr);
-        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, "Unable to encode value.");
+        pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, e.what());
         Py_XDECREF(pyObj_callback);
         Py_XDECREF(pyObj_errback);
         return nullptr;
     }
-    std::string value = std::string(PyUnicode_AsUTF8(pyObj_unicode));
-    Py_XDECREF(pyObj_unicode);
 
     if (options->op_type == Operations::APPEND) {
         couchbase::operations::append_request req{ options->id };

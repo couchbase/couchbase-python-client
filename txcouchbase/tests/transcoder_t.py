@@ -35,7 +35,8 @@ from couchbase.transcoder import (LegacyTranscoder,
 from ._test_utils import (CollectionType,
                           FakeTestObj,
                           KVPair,
-                          TestEnvironment)
+                          TestEnvironment,
+                          run_in_reactor_thread)
 
 
 class DefaultTranscoderTests:
@@ -45,13 +46,14 @@ class DefaultTranscoderTests:
         cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param)
 
         if request.param == CollectionType.NAMED:
-            cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
+            cb_env.try_n_times(5, 3, cb_env.setup_named_collections, is_deferred=False)
 
         yield cb_env
         if request.param == CollectionType.NAMED:
             cb_env.try_n_times_till_exception(5, 3,
                                               cb_env.teardown_named_collections,
-                                              raise_if_no_exception=False)
+                                              raise_if_no_exception=False,
+                                              is_deferred=False)
 
     @pytest.fixture(name="new_kvp")
     def new_key_and_value_with_reset(self, cb_env) -> KVPair:
@@ -104,8 +106,8 @@ class DefaultTranscoderTests:
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
     def test_default_tc_json_upsert(self, cb_env, json_kvp):
         key, value = json_kvp
-        cb_env.collection.upsert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         result = res.content_as[dict]
         assert result is not None
         assert isinstance(result, dict)
@@ -113,9 +115,9 @@ class DefaultTranscoderTests:
 
     def test_default_tc_json_insert(self, cb_env, json_kvp):
         key, value = json_kvp
-        cb_env.collection.insert(key, value)
+        run_in_reactor_thread(cb_env.collection.insert, key, value)
 
-        res = cb_env.collection.get(key)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         result = res.content_as[dict]
         assert result is not None
         assert isinstance(result, dict)
@@ -123,10 +125,10 @@ class DefaultTranscoderTests:
 
     def test_default_tc_json_replace(self, cb_env, json_kvp):
         key, value = json_kvp
-        cb_env.collection.upsert(key, value)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
         value['new_content'] = 'new content!'
-        cb_env.collection.replace(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.replace, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         result = res.content_as[dict]
         assert result is not None
         assert isinstance(result, dict)
@@ -136,8 +138,8 @@ class DefaultTranscoderTests:
 
     def test_default_tc_string_upsert(self, cb_env, str_kvp):
         key, value = str_kvp
-        cb_env.collection.upsert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         result = res.content_as[str]
         assert result is not None
         assert isinstance(result, str)
@@ -145,8 +147,8 @@ class DefaultTranscoderTests:
 
     def test_default_tc_string_insert(self, cb_env, str_kvp):
         key, value = str_kvp
-        cb_env.collection.insert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.insert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         result = res.content_as[str]
         assert result is not None
         assert isinstance(result, str)
@@ -154,10 +156,10 @@ class DefaultTranscoderTests:
 
     def test_default_tc_string_replace(self, cb_env, str_kvp):
         key, value = str_kvp
-        cb_env.collection.upsert(key, value)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
         new_content = "new string content"
-        cb_env.collection.replace(key, new_content)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.replace, key, new_content)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         result = res.content_as[str]
         assert result is not None
         assert isinstance(result, str)
@@ -166,23 +168,23 @@ class DefaultTranscoderTests:
     def test_default_tc_binary_upsert(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
         with pytest.raises(ValueFormatException):
-            cb_env.collection.upsert(key, value)
+            run_in_reactor_thread(cb_env.collection.upsert, key, value)
 
     def test_default_tc_bytearray_upsert(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
         with pytest.raises(ValueFormatException):
-            cb_env.collection.upsert(key, bytearray(value))
+            run_in_reactor_thread(cb_env.collection.upsert, key, bytearray(value))
 
     def test_default_tc_binary_insert(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
         with pytest.raises(ValueFormatException):
-            cb_env.collection.insert(key, value)
+            run_in_reactor_thread(cb_env.collection.insert, key, value)
 
     def test_default_tc_binary_replace(self, cb_env, str_kvp, bytes_kvp):
         key, value = str_kvp
-        cb_env.collection.upsert(key, value)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
         with pytest.raises(ValueFormatException):
-            cb_env.collection.replace(key, bytes_kvp.value)
+            run_in_reactor_thread(cb_env.collection.replace, key, bytes_kvp.value)
 
 
 class RawJsonTranscoderTests:
@@ -193,13 +195,14 @@ class RawJsonTranscoderTests:
             __name__, couchbase_config, request.param, transcoder=RawJSONTranscoder())
 
         if request.param == CollectionType.NAMED:
-            cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
+            cb_env.try_n_times(5, 3, cb_env.setup_named_collections, is_deferred=False)
 
         yield cb_env
         if request.param == CollectionType.NAMED:
             cb_env.try_n_times_till_exception(5, 3,
                                               cb_env.teardown_named_collections,
-                                              raise_if_no_exception=False)
+                                              raise_if_no_exception=False,
+                                              is_deferred=False)
 
     @pytest.fixture(name="str_kvp")
     def str_value_with_reset(self, cb_env) -> KVPair:
@@ -240,55 +243,55 @@ class RawJsonTranscoderTests:
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
     def test_raw_json_tc_string_upsert(self, cb_env, str_kvp):
         key, value = str_kvp
-        cb_env.collection.upsert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, bytes)
         assert value == res.content_as[bytes].decode('utf-8')
 
     def test_raw_json_tc_string_insert(self, cb_env, str_kvp):
         key, value = str_kvp
-        cb_env.collection.insert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.insert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, bytes)
         assert value == res.content_as[bytes].decode('utf-8')
 
     def test_raw_json_tc_string_replace(self, cb_env, str_kvp):
         key, value = str_kvp
-        cb_env.collection.upsert(key, value)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
         new_content = "new string content"
-        cb_env.collection.replace(key, new_content)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.replace, key, new_content)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, bytes)
         assert new_content == res.content_as[bytes].decode('utf-8')
 
     def test_raw_json_tc_bytes_upsert(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
-        cb_env.collection.upsert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, bytes)
         assert value == res.content_as[bytes]
 
     def test_raw_json_tc_bytes_insert(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
-        cb_env.collection.insert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.insert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, bytes)
         assert value == res.content_as[bytes]
 
     def test_raw_json_tc_bytes_replace(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
-        cb_env.collection.upsert(key, value)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
         new_content = 'new string content'.encode('utf-8')
-        cb_env.collection.replace(key, new_content)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.replace, key, new_content)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, bytes)
         assert new_content == res.content_as[bytes]
 
     def test_pass_through(self, cb_env, json_kvp):
         key, value = json_kvp
         json_str = json.dumps(value)
-        cb_env.collection.upsert(key, json_str)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.upsert, key, json_str)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, bytes)
         assert res.content_as[bytes] != value
 
@@ -298,18 +301,18 @@ class RawJsonTranscoderTests:
     def test_raw_json_tc_json_upsert(self, cb_env, json_kvp):
         key, value = json_kvp
         with pytest.raises(ValueFormatException):
-            cb_env.collection.upsert(key, value)
+            run_in_reactor_thread(cb_env.collection.upsert, key, value)
 
     def test_raw_json_tc_json_insert(self, cb_env, json_kvp):
         key, value = json_kvp
         with pytest.raises(ValueFormatException):
-            cb_env.collection.insert(key, value)
+            run_in_reactor_thread(cb_env.collection.insert, key, value)
 
     def test_raw_json_tc_json_replace(self, cb_env, str_kvp, json_kvp):
         key, value = str_kvp
-        cb_env.collection.upsert(key, value)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
         with pytest.raises(ValueFormatException):
-            cb_env.collection.replace(key, json_kvp.value)
+            run_in_reactor_thread(cb_env.collection.replace, key, json_kvp.value)
 
 
 class RawStringTranscoderTests:
@@ -320,13 +323,14 @@ class RawStringTranscoderTests:
             __name__, couchbase_config, request.param, transcoder=RawStringTranscoder())
 
         if request.param == CollectionType.NAMED:
-            cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
+            cb_env.try_n_times(5, 3, cb_env.setup_named_collections, is_deferred=False)
 
         yield cb_env
         if request.param == CollectionType.NAMED:
             cb_env.try_n_times_till_exception(5, 3,
                                               cb_env.teardown_named_collections,
-                                              raise_if_no_exception=False)
+                                              raise_if_no_exception=False,
+                                              is_deferred=False)
 
     @pytest.fixture(name="str_kvp")
     def str_value_with_reset(self, cb_env) -> KVPair:
@@ -367,59 +371,59 @@ class RawStringTranscoderTests:
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
     def test_raw_string_tc_string_upsert(self, cb_env, str_kvp):
         key, value = str_kvp
-        cb_env.collection.upsert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, str)
         assert value == res.content_as[str]
 
     def test_raw_string_tc_string_insert(self, cb_env, str_kvp):
         key, value = str_kvp
-        cb_env.collection.insert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.insert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, str)
         assert value == res.content_as[str]
 
     def test_raw_string_tc_string_replace(self, cb_env, str_kvp):
         key, value = str_kvp
-        cb_env.collection.upsert(key, value)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
         new_content = "new string content"
-        cb_env.collection.replace(key, new_content)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.replace, key, new_content)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, str)
         assert new_content == res.content_as[str]
 
     def test_raw_string_tc_bytes_upsert(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
         with pytest.raises(ValueFormatException):
-            cb_env.collection.upsert(key, value)
+            run_in_reactor_thread(cb_env.collection.upsert, key, value)
 
     def test_raw_string_tc_bytes_insert(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
         with pytest.raises(ValueFormatException):
-            cb_env.collection.insert(key, value)
+            run_in_reactor_thread(cb_env.collection.insert, key, value)
 
     def test_raw_string_tc_bytes_replace(self, cb_env, str_kvp, bytes_kvp):
         key, value = str_kvp
-        cb_env.collection.upsert(key, value)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
         with pytest.raises(ValueFormatException):
-            cb_env.collection.replace(key, bytes_kvp.value)
+            run_in_reactor_thread(cb_env.collection.replace, key, bytes_kvp.value)
 
     def test_raw_string_tc_json_upsert(self, cb_env, json_kvp):
         key = json_kvp.key
         value = json_kvp.value
         with pytest.raises(ValueFormatException):
-            cb_env.collection.upsert(key, value)
+            run_in_reactor_thread(cb_env.collection.upsert, key, value)
 
     def test_raw_string_tc_json_insert(self, cb_env, json_kvp):
         key, value = json_kvp
         with pytest.raises(ValueFormatException):
-            cb_env.collection.insert(key, value)
+            run_in_reactor_thread(cb_env.collection.insert, key, value)
 
     def test_raw_string_tc_json_replace(self, cb_env, str_kvp, json_kvp):
         key, value = str_kvp
-        cb_env.collection.upsert(key, value)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
         with pytest.raises(ValueFormatException):
-            cb_env.collection.replace(key, json_kvp.value)
+            run_in_reactor_thread(cb_env.collection.replace, key, json_kvp.value)
 
 
 class RawBinaryTranscoderTests:
@@ -430,13 +434,14 @@ class RawBinaryTranscoderTests:
             __name__, couchbase_config, request.param, transcoder=RawBinaryTranscoder())
 
         if request.param == CollectionType.NAMED:
-            cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
+            cb_env.try_n_times(5, 3, cb_env.setup_named_collections, is_deferred=False)
 
         yield cb_env
         if request.param == CollectionType.NAMED:
             cb_env.try_n_times_till_exception(5, 3,
                                               cb_env.teardown_named_collections,
-                                              raise_if_no_exception=False)
+                                              raise_if_no_exception=False,
+                                              is_deferred=False)
 
     @pytest.fixture(name="str_kvp")
     def str_value_with_reset(self, cb_env) -> KVPair:
@@ -494,81 +499,81 @@ class RawBinaryTranscoderTests:
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
     def test_raw_binary_tc_bytes_upsert(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
-        cb_env.collection.upsert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, bytes)
         assert value == res.content_as[bytes]
 
     def test_raw_binary_tc_bytes_insert(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
-        cb_env.collection.insert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.insert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, bytes)
         assert value == res.content_as[bytes]
 
     def test_raw_binary_tc_bytes_replace(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
-        cb_env.collection.upsert(key, value)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
         new_content = 'new string content'.encode('utf-8')
-        cb_env.collection.replace(key, new_content)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.replace, key, new_content)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, bytes)
         assert new_content == res.content_as[bytes]
 
     def test_raw_binary_tc_hex_upsert(self, cb_env, hex_kvp):
         key, value = hex_kvp
-        cb_env.collection.upsert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, bytes)
         assert value == res.content_as[bytes]
 
     def test_raw_binary_tc_hex_insert(self, cb_env, hex_kvp):
         key, value = hex_kvp
-        cb_env.collection.upsert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, bytes)
         assert value == res.content_as[bytes]
 
     def test_raw_binary_tc_hex_replace(self, cb_env, hex_kvp):
         key, value = hex_kvp
-        cb_env.collection.upsert(key, value)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
         new_content = b'\xFF'
-        cb_env.collection.replace(key, new_content)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.replace, key, new_content)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, bytes)
         assert new_content == res.content_as[bytes]
 
     def test_raw_binary_tc_string_upsert(self, cb_env, str_kvp):
         key, value = str_kvp
         with pytest.raises(ValueFormatException):
-            cb_env.collection.upsert(key, value)
+            run_in_reactor_thread(cb_env.collection.upsert, key, value)
 
     def test_raw_binary_tc_string_insert(self, cb_env, str_kvp):
         key, value = str_kvp
         with pytest.raises(ValueFormatException):
-            cb_env.collection.insert(key, value)
+            run_in_reactor_thread(cb_env.collection.insert, key, value)
 
     def test_raw_binary_tc_string_replace(self, cb_env, bytes_kvp, str_kvp):
         key, value = bytes_kvp
-        cb_env.collection.upsert(key, value)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
         with pytest.raises(ValueFormatException):
-            cb_env.collection.replace(key, str_kvp.value)
+            run_in_reactor_thread(cb_env.collection.replace, key, str_kvp.value)
 
     def test_raw_binary_tc_json_upsert(self, cb_env, json_kvp):
         key, value = json_kvp
         with pytest.raises(ValueFormatException):
-            cb_env.collection.upsert(key, value)
+            run_in_reactor_thread(cb_env.collection.upsert, key, value)
 
     def test_raw_binary_tc_json_insert(self, cb_env, json_kvp):
         key, value = json_kvp
         with pytest.raises(ValueFormatException):
-            cb_env.collection.insert(key, value)
+            run_in_reactor_thread(cb_env.collection.insert, key, value)
 
     def test_raw_binary_tc_json_replace(self, cb_env, bytes_kvp, json_kvp):
         key, value = bytes_kvp
-        cb_env.collection.upsert(key, value)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
         with pytest.raises(ValueFormatException):
-            cb_env.collection.replace(key, json_kvp.value)
+            run_in_reactor_thread(cb_env.collection.replace, key, json_kvp.value)
 
 
 class LegacyTranscoderTests:
@@ -579,13 +584,14 @@ class LegacyTranscoderTests:
             __name__, couchbase_config, request.param, transcoder=LegacyTranscoder())
 
         if request.param == CollectionType.NAMED:
-            cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
+            cb_env.try_n_times(5, 3, cb_env.setup_named_collections, is_deferred=False)
 
         yield cb_env
         if request.param == CollectionType.NAMED:
             cb_env.try_n_times_till_exception(5, 3,
                                               cb_env.teardown_named_collections,
-                                              raise_if_no_exception=False)
+                                              raise_if_no_exception=False,
+                                              is_deferred=False)
 
     @pytest.fixture(name="str_kvp")
     def str_value_with_reset(self, cb_env) -> KVPair:
@@ -638,93 +644,93 @@ class LegacyTranscoderTests:
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
     def test_legacy_tc_bytes_upsert(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
-        cb_env.collection.upsert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, bytes)
         assert value == res.content_as[bytes]
 
     def test_legacy_tc_bytes_insert(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
-        cb_env.collection.insert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.insert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, bytes)
         assert value == res.content_as[bytes]
 
     def test_legacy_tc_bytes_replace(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
-        cb_env.collection.upsert(key, value)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
         new_content = 'new string content'.encode('utf-8')
-        cb_env.collection.replace(key, new_content)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.replace, key, new_content)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, bytes)
         assert new_content == res.content_as[bytes]
 
     def test_legacy_tc_obj_upsert(self, cb_env, obj_kvp):
         key, value = obj_kvp
-        cb_env.collection.upsert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, FakeTestObj)
         assert value.PROP == res.value.PROP
         assert value.PROP1 == res.value.PROP1
 
     def test_legacy_tc_obj_insert(self, cb_env, obj_kvp):
         key, value = obj_kvp
-        cb_env.collection.insert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.insert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, FakeTestObj)
         assert value.PROP == res.value.PROP
         assert value.PROP1 == res.value.PROP1
 
     def test_legacy_tc_obj_replace(self, cb_env, bytes_kvp, obj_kvp):
         key, value = bytes_kvp
-        cb_env.collection.upsert(key, value)
-        cb_env.collection.replace(key, obj_kvp.value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
+        run_in_reactor_thread(cb_env.collection.replace, key, obj_kvp.value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, FakeTestObj)
         assert obj_kvp.value.PROP == res.value.PROP
         assert obj_kvp.value.PROP1 == res.value.PROP1
 
     def test_legacy_tc_string_upsert(self, cb_env, str_kvp):
         key, value = str_kvp
-        cb_env.collection.upsert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, str)
         assert value == res.content_as[str]
 
     def test_legacy_tc_string_insert(self, cb_env, str_kvp):
         key, value = str_kvp
-        cb_env.collection.insert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.insert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, str)
         assert value == res.content_as[str]
 
     def test_legacy_tc_string_replace(self, cb_env, bytes_kvp, str_kvp):
         key, value = bytes_kvp
-        cb_env.collection.upsert(key, value)
-        cb_env.collection.replace(key, str_kvp.value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
+        run_in_reactor_thread(cb_env.collection.replace, key, str_kvp.value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, str)
         assert str_kvp.value == res.content_as[str]
 
     def test_legacy_tc_json_upsert(self, cb_env, json_kvp):
         key, value = json_kvp
-        cb_env.collection.upsert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, dict)
         assert value == res.content_as[dict]
 
     def test_legacy_tc_json_insert(self, cb_env, json_kvp):
         key, value = json_kvp
-        cb_env.collection.insert(key, value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.insert, key, value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, dict)
         assert value == res.content_as[dict]
 
     def test_legacy_tc_json_replace(self, cb_env, bytes_kvp, json_kvp):
         key, value = bytes_kvp
-        cb_env.collection.upsert(key, value)
-        cb_env.collection.replace(key, json_kvp.value)
-        res = cb_env.collection.get(key)
+        run_in_reactor_thread(cb_env.collection.upsert, key, value)
+        run_in_reactor_thread(cb_env.collection.replace, key, json_kvp.value)
+        res = run_in_reactor_thread(cb_env.collection.get, key)
         assert isinstance(res.value, dict)
         assert json_kvp.value == res.content_as[dict]
 
@@ -736,13 +742,14 @@ class KeyValueOpTranscoderTests:
         cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param)
 
         if request.param == CollectionType.NAMED:
-            cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
+            cb_env.try_n_times(5, 3, cb_env.setup_named_collections, is_deferred=False)
 
         yield cb_env
         if request.param == CollectionType.NAMED:
             cb_env.try_n_times_till_exception(5, 3,
                                               cb_env.teardown_named_collections,
-                                              raise_if_no_exception=False)
+                                              raise_if_no_exception=False,
+                                              is_deferred=False)
 
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
     @pytest.fixture(name="str_kvp")
@@ -773,49 +780,53 @@ class KeyValueOpTranscoderTests:
         key, value = bytes_kvp
         # use RawBinaryTranscoder() so that get() fails as expected
         # since get() w/o passing in transcoder uses the default JSONTranscoder()
-        cb_env.collection.upsert(key, value, UpsertOptions(
-            transcoder=RawBinaryTranscoder()))
+        run_in_reactor_thread(cb_env.collection.upsert,
+                              key,
+                              value,
+                              UpsertOptions(transcoder=RawBinaryTranscoder()))
         with pytest.raises(ValueFormatException):
-            cb_env.collection.get(key)
+            run_in_reactor_thread(cb_env.collection.get, key)
 
     def test_insert(self, cb_env, str_kvp):
         key, value = str_kvp
         # use RawStringTranscoder() so that get() fails as expected
         # since get() w/o passing in transcoder uses the default JSONTranscoder()
-        cb_env.collection.upsert(key, value, InsertOptions(transcoder=RawStringTranscoder()))
+        run_in_reactor_thread(cb_env.collection.upsert, key, value, InsertOptions(transcoder=RawStringTranscoder()))
         with pytest.raises(ValueFormatException):
-            cb_env.collection.get(key)
+            run_in_reactor_thread(cb_env.collection.get, key)
 
     def test_replace(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
         # use RawBinaryTranscoder() so that get() fails as expected
         # since get() w/o passing in transcoder uses the default JSONTranscoder()
         tc = RawBinaryTranscoder()
-        cb_env.collection.upsert(key, value, UpsertOptions(transcoder=tc))
+        run_in_reactor_thread(cb_env.collection.upsert, key, value, UpsertOptions(transcoder=tc))
         new_content = 'some new bytes content'.encode('utf-8')
-        cb_env.collection.replace(key, new_content, ReplaceOptions(transcoder=tc))
+        run_in_reactor_thread(cb_env.collection.replace, key, new_content, ReplaceOptions(transcoder=tc))
         with pytest.raises(ValueFormatException):
-            cb_env.collection.get(key)
+            run_in_reactor_thread(cb_env.collection.get, key)
 
     def test_get(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
         tc = RawBinaryTranscoder()
-        cb_env.collection.upsert(key, value, UpsertOptions(transcoder=tc))
+        run_in_reactor_thread(cb_env.collection.upsert, key, value, UpsertOptions(transcoder=tc))
         with pytest.raises(ValueFormatException):
-            cb_env.collection.get(key)
-        res = cb_env.collection.get(key, GetOptions(transcoder=tc))
+            run_in_reactor_thread(cb_env.collection.get, key)
+        res = run_in_reactor_thread(cb_env.collection.get, key, GetOptions(transcoder=tc))
         assert isinstance(res.value, bytes)
         assert res.content_as[bytes] == value
 
     def test_get_and_touch(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
         tc = RawBinaryTranscoder()
-        cb_env.collection.upsert(key, value, UpsertOptions(transcoder=tc))
+        run_in_reactor_thread(cb_env.collection.upsert, key, value, UpsertOptions(transcoder=tc))
         with pytest.raises(ValueFormatException):
-            cb_env.collection.get_and_touch(key, timedelta(seconds=30))
+            run_in_reactor_thread(cb_env.collection.get_and_touch, key, timedelta(seconds=30))
 
-        res = cb_env.collection.get_and_touch(key, timedelta(
-            seconds=3), GetAndTouchOptions(transcoder=tc))
+        res = run_in_reactor_thread(cb_env.collection.get_and_touch,
+                                    key,
+                                    timedelta(seconds=3),
+                                    GetAndTouchOptions(transcoder=tc))
         assert isinstance(res.value, bytes)
         assert res.content_as[bytes] == value
         cb_env.try_n_times_till_exception(
@@ -824,18 +835,20 @@ class KeyValueOpTranscoderTests:
     def test_get_and_lock(self, cb_env, bytes_kvp):
         key, value = bytes_kvp
         tc = RawBinaryTranscoder()
-        cb_env.collection.upsert(key, value, UpsertOptions(transcoder=tc))
+        run_in_reactor_thread(cb_env.collection.upsert, key, value, UpsertOptions(transcoder=tc))
         with pytest.raises(ValueFormatException):
-            cb_env.collection.get_and_lock(key, timedelta(seconds=1))
+            run_in_reactor_thread(cb_env.collection.get_and_lock, key, timedelta(seconds=1))
 
         cb_env.try_n_times(10, 1, cb_env.collection.upsert, key,
                            value, UpsertOptions(transcoder=tc))
-        res = cb_env.collection.get_and_lock(key, timedelta(
-            seconds=3), GetAndLockOptions(transcoder=tc))
+        res = run_in_reactor_thread(cb_env.collection.get_and_lock,
+                                    key,
+                                    timedelta(seconds=3),
+                                    GetAndLockOptions(transcoder=tc))
         assert isinstance(res.value, bytes)
         assert res.content_as[bytes] == value
         # upsert should definitely fail
         with pytest.raises(DocumentLockedException):
-            cb_env.collection.upsert(key, value, transcoder=tc)
+            run_in_reactor_thread(cb_env.collection.upsert, key, value, transcoder=tc)
         # but succeed eventually
         cb_env.try_n_times(10, 1, cb_env.collection.upsert, key, value, transcoder=tc)

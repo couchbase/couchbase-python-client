@@ -18,6 +18,7 @@
 #include "kv_ops.hxx"
 #include "exceptions.hxx"
 #include "result.hxx"
+#include "utils.hxx"
 
 template<typename T>
 result*
@@ -89,7 +90,12 @@ create_base_result_from_get_operation_response(const char* key, const T& resp)
     }
 
     if (!res->ec) {
-        pyObj_tmp = PyBytes_FromStringAndSize(resp.value.c_str(), resp.value.length());
+        try {
+            pyObj_tmp = binary_to_PyObject(resp.value);
+        } catch (const std::exception& e) {
+            PyErr_SetString(PyExc_TypeError, e.what());
+            return nullptr;
+        }
         if (-1 == PyDict_SetItemString(res->dict, RESULT_VALUE, pyObj_tmp)) {
             Py_XDECREF(pyObj_result);
             Py_XDECREF(pyObj_tmp);
@@ -711,21 +717,34 @@ prepare_and_execute_mutation_op(struct mutation_options* options,
                                 std::shared_ptr<std::promise<PyObject*>> barrier,
                                 result* multi_result = nullptr)
 {
-    // **DO NOT DECREF** these -- things from tuples are borrowed references!!
-    PyObject* pyObj_value = nullptr;
+    // **DO NOT DECREF** these -- content from tuples are borrowed references!!
     PyObject* pyObj_flags = nullptr;
-    std::string value = std::string();
+    PyObject* pyObj_value = nullptr;
+    couchbase::utils::binary value;
 
     if (options->value) {
         pyObj_value = PyTuple_GET_ITEM(options->value, 0);
         pyObj_flags = PyTuple_GET_ITEM(options->value, 1);
-
-        if (PyUnicode_Check(pyObj_value)) {
-            value = std::string(PyUnicode_AsUTF8(pyObj_value));
-        } else {
-            PyObject* pyObj_unicode = PyUnicode_FromEncodedObject(pyObj_value, "utf-8", "strict");
-            value = std::string(PyUnicode_AsUTF8(pyObj_unicode));
-            Py_DECREF(pyObj_unicode);
+        try {
+            value = PyObject_to_binary(pyObj_value);
+        } catch (const std::exception& e) {
+            if (multi_result != nullptr) {
+                PyObject* pyObj_exc = pycbc_build_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, e.what());
+                if (-1 == PyDict_SetItemString(multi_result->dict, options->id.key().c_str(), pyObj_exc)) {
+                    // TODO:  not much we can do here...maybe?
+                    PyErr_Print();
+                    PyErr_Clear();
+                }
+                Py_DECREF(pyObj_exc);
+                Py_INCREF(Py_False);
+                barrier->set_value(Py_False);
+                Py_RETURN_NONE;
+            }
+            barrier->set_value(nullptr);
+            pycbc_set_python_exception(PycbcError::InvalidArgument, __FILE__, __LINE__, e.what());
+            Py_XDECREF(pyObj_callback);
+            Py_XDECREF(pyObj_errback);
+            return nullptr;
         }
     }
 

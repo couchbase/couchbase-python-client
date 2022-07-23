@@ -214,6 +214,11 @@ TEST_SUITE_MAP = {
 }
 
 
+class FakeTestObj:
+    PROP = "fake prop"
+    PROP1 = 12345
+
+
 class CouchbaseTestEnvironment():
     KEY = "airport_3830"
     CONTENT = {

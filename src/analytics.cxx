@@ -36,6 +36,57 @@ str_to_scan_consistency_type(std::string consistency)
 }
 
 PyObject*
+analytics_status_to_string(couchbase::operations::analytics_response::analytics_status status)
+{
+    std::string status_str;
+    switch (status) {
+        case couchbase::operations::analytics_response::analytics_status::running: {
+            status_str = "running";
+            break;
+        }
+        case couchbase::operations::analytics_response::analytics_status::success: {
+            status_str = "success";
+            break;
+        }
+        case couchbase::operations::analytics_response::analytics_status::errors: {
+            status_str = "errors";
+            break;
+        }
+        case couchbase::operations::analytics_response::analytics_status::completed: {
+            status_str = "completed";
+            break;
+        }
+        case couchbase::operations::analytics_response::analytics_status::stopped: {
+            status_str = "stopped";
+            break;
+        }
+        case couchbase::operations::analytics_response::analytics_status::timedout: {
+            status_str = "timeout";
+            break;
+        }
+        case couchbase::operations::analytics_response::analytics_status::closed: {
+            status_str = "closed";
+            break;
+        }
+        case couchbase::operations::analytics_response::analytics_status::fatal: {
+            status_str = "fatal";
+            break;
+        }
+        case couchbase::operations::analytics_response::analytics_status::aborted: {
+            status_str = "aborted";
+            break;
+        }
+        case couchbase::operations::analytics_response::analytics_status::unknown:
+        default: {
+            status_str = "unknown";
+            break;
+        }
+    }
+    // should not be able to reach here, since this is an enum class
+    return PyUnicode_FromString(status_str.c_str());
+}
+
+PyObject*
 get_result_metrics(couchbase::operations::analytics_response::analytics_metrics metrics)
 {
     PyObject* pyObj_metrics = PyDict_New();
@@ -111,7 +162,7 @@ get_result_metadata(couchbase::operations::analytics_response::analytics_meta_da
     }
     Py_XDECREF(pyObj_tmp);
 
-    pyObj_tmp = PyUnicode_FromString(metadata.status.c_str());
+    pyObj_tmp = analytics_status_to_string(metadata.status);
     if (-1 == PyDict_SetItemString(pyObj_metadata, "status", pyObj_tmp)) {
         PyErr_Print();
         PyErr_Clear();

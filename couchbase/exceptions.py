@@ -409,6 +409,11 @@ class BucketNotFoundException(CouchbaseException):
 class ValueFormatException(CouchbaseException):
     """Failed to decode or encode value"""
 
+    def __init__(self, msg=None, **kwargs):
+        if msg:
+            kwargs['message'] = msg
+        super().__init__(**kwargs)
+
 
 class HTTPException(CouchbaseException):
     """HTTP error"""

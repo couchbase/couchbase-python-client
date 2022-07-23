@@ -51,6 +51,7 @@ from couchbase.scope import Scope
 from couchbase.transcoder import RawBinaryTranscoder, RawStringTranscoder
 from tests.helpers import CollectionType  # noqa: F401
 from tests.helpers import EventingFunctionManagementTestStatusException  # noqa: F401
+from tests.helpers import FakeTestObj  # noqa: F401
 from tests.helpers import KVPair  # noqa: F401
 from tests.helpers import (CouchbaseTestEnvironment,
                            CouchbaseTestEnvironmentException,
@@ -190,6 +191,9 @@ class TestEnvironment(CouchbaseTestEnvironment):
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
+        transcoder = kwargs.pop('transcoder', None)
+        if transcoder:
+            opts['transcoder'] = transcoder
         okay = False
         for _ in range(3):
             try:

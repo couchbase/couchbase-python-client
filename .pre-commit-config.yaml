@@ -14,6 +14,11 @@ repos:
       - id: clang-format
         files: src/.*\.(cxx|hxx)$
         exclude: ^deps/
+  - repo: https://github.com/pre-commit/mirrors-autopep8
+    rev: v1.6.0
+    hooks:
+      - id: autopep8
+        exclude: ^(deps/|src/)
   - repo: https://github.com/pycqa/flake8
     rev: 4.0.1
     hooks:
@@ -33,11 +38,6 @@ repos:
             --max-line-length=120,
             --max-complexity=10
           ]
-  - repo: https://github.com/pre-commit/mirrors-autopep8
-    rev: v1.6.0
-    hooks:
-      - id: autopep8
-        exclude: ^(deps/|src/)
   - repo: https://github.com/PyCQA/isort
     rev: 5.10.1
     hooks:

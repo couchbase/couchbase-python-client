@@ -26,7 +26,8 @@ from couchbase.diagnostics import (ClusterState,
                                    EndpointState,
                                    PingState,
                                    ServiceType)
-from couchbase.exceptions import (InvalidArgumentException,
+from couchbase.exceptions import (InternalServerFailureException,
+                                  InvalidArgumentException,
                                   ParsingFailedException,
                                   QueryIndexNotFoundException)
 from couchbase.options import DiagnosticsOptions, PingOptions
@@ -174,21 +175,25 @@ class ClusterDiagnosticsTests:
         try:
             rows = await cluster.query(f'SELECT * FROM `{bucket_name}` LIMIT 1').execute()
             assert len(rows) > 0
-        except (ParsingFailedException, QueryIndexNotFoundException):
+        except (InternalServerFailureException, ParsingFailedException, QueryIndexNotFoundException):
             pass
+        except Exception as e:
+            print(f'exception: {e.__class__.__name__}, {e}')
+            raise e
 
         result = await cluster.diagnostics(
             DiagnosticsOptions(report_id=report_id))
         assert result.id == report_id
 
-        q = result.endpoints[ServiceType.Query]
-        assert len(q) >= 1
-        assert q[0].id is not None
-        assert q[0].local is not None
-        assert q[0].remote is not None
-        assert isinstance(q[0].last_activity_us, timedelta)
-        assert q[0].state == EndpointState.Connected
-        assert q[0].service_type == ServiceType.Query
+        query_diag_result = result.endpoints[ServiceType.Query]
+        assert len(query_diag_result) >= 1
+        for q in query_diag_result:
+            assert q.id is not None
+            assert q.local is not None
+            assert q.remote is not None
+            assert isinstance(q.last_activity_us, timedelta)
+            assert q.state == EndpointState.Connected
+            assert q.service_type == ServiceType.Query
 
     @pytest.mark.usefixtures("check_diagnostics_supported")
     @pytest.mark.asyncio
