@@ -27,8 +27,10 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   ExceptionMap,
                                   InternalSDKException,
                                   PathNotFoundException,
-                                  ServiceUnavailableException)
+                                  ServiceUnavailableException,
+                                  UnAmbiguousTimeoutException)
 from couchbase.exceptions import exception as BaseCouchbaseException
+from couchbase.exceptions import exception as CouchbaseBaseException
 
 
 def decode_value(transcoder, value, flags, is_subdoc=False):
@@ -51,6 +53,26 @@ def decode_value(transcoder, value, flags, is_subdoc=False):
             final_value.append(f)
 
     return final_value
+
+
+def decode_replicas(transcoder, result, return_cls):
+    while True:
+        try:
+            res = next(result)
+        except StopIteration:
+            # this is a timeout from pulling a result from the queue, kill the generator
+            raise UnAmbiguousTimeoutException('Timeout reached waiting for result in queue.') from None
+        else:
+            if isinstance(res, CouchbaseBaseException):
+                raise ErrorMapper.build_exception(res)
+            # should only be None once all replicas have been retrieved
+            if res is None:
+                return
+
+            value = res.raw_result.get('value', None)
+            flags = res.raw_result.get('flags', None)
+            res.raw_result['value'] = decode_value(transcoder, value, flags)
+            yield return_cls(res)
 
 
 class BlockingWrapper:
@@ -95,6 +117,11 @@ class BlockingWrapper:
                     ret = fn(self, *args, **kwargs)
                     if isinstance(ret, BaseCouchbaseException):
                         raise ErrorMapper.build_exception(ret)
+
+                    # special case for get_all_replicas
+                    if fn.__name__ == '_get_all_replicas_internal':
+                        return decode_replicas(transcoder, ret, return_cls)
+
                     value = ret.raw_result.get('value', None)
                     flags = ret.raw_result.get('flags', None)
 

@@ -450,6 +450,10 @@ class DocumentNotFoundException(CouchbaseException):
     """Indicates that the referenced document does not exist."""
 
 
+class DocumentUnretrievableException(CouchbaseException):
+    """Indicates that the referenced document does not exist and therefore no replicas are found."""
+
+
 class DocumentLockedException(CouchbaseException):
     """Indicates that the referenced document could not be used as it is currently locked,
     likely by another actor in the system."""
@@ -926,6 +930,7 @@ class ExceptionMap(Enum):
     RateLimitedException = 21
     QuotaLimitedException = 22
     DocumentNotFoundException = 101
+    DocumentUnretrievableException = 102
     DocumentLockedException = 103
     DocumentExistsException = 105
     DurabilityInvalidLevelException = 107

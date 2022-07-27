@@ -36,12 +36,16 @@ from couchbase.exceptions import (DocumentExistsException,
                                   PathExistsException,
                                   QueueEmpty)
 from couchbase.exceptions import exception as CouchbaseBaseException
-from couchbase.logic import BlockingWrapper, decode_value
+from couchbase.logic import (BlockingWrapper,
+                             decode_replicas,
+                             decode_value)
 from couchbase.logic.collection import CollectionLogic
 from couchbase.logic.supportability import Supportability
 from couchbase.options import (AppendMultiOptions,
                                DecrementMultiOptions,
                                ExistsMultiOptions,
+                               GetAllReplicasMultiOptions,
+                               GetAnyReplicaMultiOptions,
                                GetMultiOptions,
                                IncrementMultiOptions,
                                InsertMultiOptions,
@@ -56,13 +60,16 @@ from couchbase.options import (AppendMultiOptions,
                                get_valid_multi_args)
 from couchbase.pycbc_core import (binary_multi_operation,
                                   kv_multi_operation,
-                                  operations)
+                                  operations,
+                                  replica_read_multi_operation)
 from couchbase.result import (CounterResult,
                               ExistsResult,
+                              GetReplicaResult,
                               GetResult,
                               LookupInResult,
                               MultiCounterResult,
                               MultiExistsResult,
+                              MultiGetReplicaResult,
                               MultiGetResult,
                               MultiMutationResult,
                               MutateInResult,
@@ -87,6 +94,7 @@ if TYPE_CHECKING:
                                    ExistsOptions,
                                    GetAndLockOptions,
                                    GetAndTouchOptions,
+                                   GetAnyReplicaOptions,
                                    GetOptions,
                                    IncrementOptions,
                                    InsertOptions,
@@ -172,6 +180,157 @@ class Collection(CollectionLogic):
         """
         return super().get(key, **kwargs)
 
+    def get_any_replica(self,
+                        key,  # type: str
+                        *opts,  # type: GetAnyReplicaOptions
+                        **kwargs,  # type: Dict[str, Any]
+                        ) -> GetReplicaResult:
+        """Retrieves the value of a document from the collection leveraging both active and all available replicas returning
+        the first available.
+
+        Args:
+            key (str): The key for the document to retrieve.
+            opts (:class:`~couchbase.options.GetAnyReplicaOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.GetAnyReplicaOptions`
+
+        Returns:
+            :class:`~couchbase.result.GetReplicaResult`: An instance of :class:`~couchbase.result.GetReplicaResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentUnretrievableException`: If the key provided does not exist
+                on the server.
+
+        Examples:
+
+            Simple get_any_replica operation::
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                res = collection.get_any_replica('airline_10')
+                print(f'Document is replica: {res.is_replica}')
+                print(f'Document value: {res.content_as[dict]}')
+
+
+            Simple get_any_replica operation with options::
+
+                from datetime import timedelta
+                from couchbase.options import GetAnyReplicaOptions
+
+                # ... other code ...
+
+                res = collection.get_any_replica('airline_10', GetAnyReplicaOptions(timeout=timedelta(seconds=5)))
+                print(f'Document is replica: {res.is_replica}')
+                print(f'Document value: {res.content_as[dict]}')
+
+        """
+
+        final_args = forward_args(kwargs, *opts)
+        transcoder = final_args.get('transcoder', None)
+        if not transcoder:
+            transcoder = self.default_transcoder
+        final_args['transcoder'] = transcoder
+
+        return self._get_any_replica_internal(key, **final_args)
+
+    @BlockingWrapper.block_and_decode(GetReplicaResult)
+    def _get_any_replica_internal(
+        self,
+        key,  # type: str
+        **kwargs,  # type: Dict[str, Any]
+    ) -> GetReplicaResult:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`Collection.get_any_replica` instead.
+        """
+        return super().get_any_replica(key, **kwargs)
+
+    def get_all_replicas(self,
+                         key,  # type: str
+                         *opts,  # type: GetAllReplicasOptions
+                         **kwargs,  # type: Dict[str, Any]
+                         ) -> Iterable[GetReplicaResult]:
+        """Retrieves the value of a document from the collection returning both active and all available replicas.
+
+        Args:
+            key (str): The key for the document to retrieve.
+            opts (:class:`~couchbase.options.GetAllReplicasOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.GetAllReplicasOptions`
+
+        Returns:
+            Iterable[:class:`~couchbase.result.GetReplicaResult`]: A stream of
+            :class:`~couchbase.result.GetReplicaResult` representing both active and replicas of the document retrieved.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+            on the server.
+
+        Examples:
+
+            Simple get_all_replicas operation::
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                result = collection.get_all_replicas('airline_10')
+                for res in results:
+                    print(f'Document is replica: {res.is_replica}')
+                    print(f'Document value: {res.content_as[dict]}')
+
+
+            Simple get_all_replicas operation with options::
+
+                from datetime import timedelta
+                from couchbase.options import GetAllReplicasOptions
+
+                # ... other code ...
+
+                result = collection.get_all_replicas('airline_10', GetAllReplicasOptions(timeout=timedelta(seconds=10)))
+                for res in result:
+                    print(f'Document is replica: {res.is_replica}')
+                    print(f'Document value: {res.content_as[dict]}')
+
+            Stream get_all_replicas results::
+
+                from datetime import timedelta
+                from couchbase.options import GetAllReplicasOptions
+
+                # ... other code ...
+
+                result = collection.get_all_replicas('airline_10', GetAllReplicasOptions(timeout=timedelta(seconds=10)))
+                while True:
+                    try:
+                        res = next(result)
+                        print(f'Document is replica: {res.is_replica}')
+                        print(f'Document value: {res.content_as[dict]}')
+                    except StopIteration:
+                        print('Done streaming replicas.')
+                        break
+
+        """
+
+        final_args = forward_args(kwargs, *opts)
+        transcoder = final_args.get('transcoder', None)
+        if not transcoder:
+            transcoder = self.default_transcoder
+        final_args['transcoder'] = transcoder
+
+        return self._get_all_replicas_internal(key, **final_args)
+
+    @BlockingWrapper.block_and_decode(GetReplicaResult)
+    def _get_all_replicas_internal(
+        self,
+        key,  # type: str
+        **kwargs,  # type: Dict[str, Any]
+    ) -> Iterable[GetReplicaResult]:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`Collection.get_all_replicas` instead.
+        """
+        return super().get_all_replicas(key, **kwargs)
+
     @BlockingWrapper.block(ExistsResult)
     def exists(
         self,
@@ -210,7 +369,7 @@ class Collection(CollectionLogic):
                 # ... other code ...
 
                 key = 'airline_10'
-                res = collection.get(key, ExistsOptions(timeout=timedelta(seconds=2)))
+                res = collection.exists(key, ExistsOptions(timeout=timedelta(seconds=2)))
                 print(f'Document w/ key - {key} {"exists" if res.exists else "does not exist"}')
 
         """
@@ -1586,7 +1745,7 @@ class Collection(CollectionLogic):
 
                 from datetime import timedelta
 
-                from couchbase.options import GetMultiOptions
+                from couchbase.options import GetMultiOptions, GetOptions
 
                 # ... other code ...
 
@@ -1621,6 +1780,212 @@ class Collection(CollectionLogic):
             v.raw_result['value'] = decode_value(tc, value, flags)
 
         return MultiGetResult(res, return_exceptions)
+
+    def get_any_replica_multi(
+        self,
+        keys,  # type: List[str]
+        *opts,  # type: GetAnyReplicaMultiOptions
+        **kwargs,  # type: Any
+    ) -> MultiGetReplicaResult:
+        """For each key in the provided list, retrieve the document associated with the key from the collection
+        leveraging both active and all available replicas returning the first available.
+
+        .. note::
+            This method is part of an **uncommitted** API that is unlikely to change,
+            but may still change as final consensus on its behavior has not yet been reached.
+
+        Args:
+            keys (List[str]): The keys to use for the multiple get operations.
+            opts (:class:`~couchbase.options.GetAnyReplicaMultiOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.GetAnyReplicaMultiOptions`
+
+        Returns:
+            :class:`~couchbase.result.MultiGetReplicaResult`: An instance of
+            :class:`~couchbase.result.MultiGetReplicaResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentUnretrievableException`: If the key provided does not exist on the
+                server and the return_exceptions options is False.  Otherwise the exception is returned as a
+                match to the key, but is not raised.
+
+        Examples:
+
+            Simple get_any_replica_multi operation::
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                res = collection.get_any_replica_multi(keys)
+                for k, v in res.results.items():
+                    if v.is_replica:
+                        print(f'Replica doc {k} has value: {v.content_as[dict]}')
+                    else:
+                        print(f'Active doc {k} has value: {v.content_as[dict]}')
+
+            Simple get_any_replica_multi operation, raise an Exception if an Exception occurs::
+
+                from couchbase.options import GetAnyReplicaMultiOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                res = collection.get_any_replica_multi(keys,
+                                            GetAnyReplicaMultiOptions(return_exceptions=False))
+                for k, v in res.results.items():
+                    if v.is_replica:
+                        print(f'Replica doc {k} has value: {v.content_as[dict]}')
+                    else:
+                        print(f'Active doc {k} has value: {v.content_as[dict]}')
+
+            Simple get_any_replica_multi operation, individual key options::
+
+                from datetime import timedelta
+
+                from couchbase.options import GetAnyReplicaMultiOptions, GetAnyReplicaOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                per_key_opts = {'doc1': GetAnyReplicaOptions(timeout=timedelta(seconds=10))}
+                res = collection.get_any_replica_multi(keys,
+                                            GetAnyReplicaMultiOptions(per_key_options=per_key_opts))
+                for k, v in res.results.items():
+                    if v.is_replica:
+                        print(f'Replica doc {k} has value: {v.content_as[dict]}')
+                    else:
+                        print(f'Active doc {k} has value: {v.content_as[dict]}')
+
+        """
+        op_args, return_exceptions, transcoders = self._get_multi_op_args(keys,
+                                                                          *opts,
+                                                                          opts_type=GetAnyReplicaMultiOptions,
+                                                                          **kwargs)
+        op_type = operations.GET_ANY_REPLICA.value
+        res = replica_read_multi_operation(
+            **self._get_connection_args(),
+            op_type=op_type,
+            op_args=op_args
+        )
+        for k, v in res.raw_result.items():
+            if k == 'all_okay':
+                continue
+            if isinstance(v, CouchbaseBaseException):
+                continue
+            value = v.raw_result.get('value', None)
+            flags = v.raw_result.get('flags', None)
+            tc = transcoders[k]
+            v.raw_result['value'] = decode_value(tc, value, flags)
+
+        return MultiGetReplicaResult(res, return_exceptions)
+
+    def get_all_replicas_multi(
+        self,
+        keys,  # type: List[str]
+        *opts,  # type: GetAllReplicasMultiOptions
+        **kwargs,  # type: Any
+    ) -> MultiGetReplicaResult:
+        """For each key in the provided list, retrieve the document from the collection returning both
+        active and all available replicas.
+
+        .. note::
+            This method is part of an **uncommitted** API that is unlikely to change,
+            but may still change as final consensus on its behavior has not yet been reached.
+
+        Args:
+            keys (List[str]): The keys to use for the multiple get operations.
+            opts (:class:`~couchbase.options.GetAllReplicasMultiOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.GetAllReplicasMultiOptions`
+
+        Returns:
+            :class:`~couchbase.result.MultiGetReplicaResult`: An instance of
+            :class:`~couchbase.result.MultiGetReplicaResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist on the
+                server and the return_exceptions options is False.  Otherwise the exception is returned as a
+                match to the key, but is not raised.
+
+        Examples:
+
+            Simple get_all_replicas_multi operation::
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                res = collection.get_all_replicas_multi(keys)
+                for k, docs in res.results.items():
+                    for doc in docs:
+                        if doc.is_replica:
+                            print(f'Replica doc {k} has value: {doc.content_as[dict]}')
+                        else:
+                            print(f'Active doc {k} has value: {doc.content_as[dict]}')
+
+            Simple get_all_replicas_multi operation, raise an Exception if an Exception occurs::
+
+                from couchbase.options import GetAllReplicasMultiOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                res = collection.get_all_replicas_multi(keys,
+                                            GetAllReplicasMultiOptions(return_exceptions=False))
+                for k, docs in res.results.items():
+                    for doc in docs:
+                        if doc.is_replica:
+                            print(f'Replica doc {k} has value: {doc.content_as[dict]}')
+                        else:
+                            print(f'Active doc {k} has value: {doc.content_as[dict]}')
+
+            Simple get_all_replicas_multi operation, individual key options::
+
+                from datetime import timedelta
+
+                from couchbase.options import GetAllReplicasMultiOptions, GetAllReplicasOptions
+
+                # ... other code ...
+
+                collection = bucket.default_collection()
+                keys = ['doc1', 'doc2', 'doc3']
+                per_key_opts = {'doc1': GetAllReplicasOptions(timeout=timedelta(seconds=10))}
+                res = collection.get_all_replicas_multi(keys,
+                                            GetAllReplicasMultiOptions(per_key_options=per_key_opts))
+                for k, docs in res.results.items():
+                    for doc in docs:
+                        if doc.is_replica:
+                            print(f'Replica doc {k} has value: {doc.content_as[dict]}')
+                        else:
+                            print(f'Active doc {k} has value: {doc.content_as[dict]}')
+
+        """
+        op_args, return_exceptions, transcoders = self._get_multi_op_args(keys,
+                                                                          *opts,
+                                                                          opts_type=GetAllReplicasMultiOptions,
+                                                                          **kwargs)
+        op_type = operations.GET_ALL_REPLICAS.value
+        res = replica_read_multi_operation(
+            **self._get_connection_args(),
+            op_type=op_type,
+            op_args=op_args
+        )
+
+        # all the successful results will be streamed_results, so lets
+        # pop those off the main result dict and re-add the key back
+        # transformed into a List[GetReplicaResult]
+        result_keys = []
+        for k, v in res.raw_result.items():
+            if k == 'all_okay' or isinstance(v, CouchbaseBaseException):
+                continue
+            result_keys.append(k)
+
+        for k in result_keys:
+            value = res.raw_result.pop(k)
+            tc = transcoders[k]
+            res.raw_result[k] = list(r for r in decode_replicas(tc, value, GetReplicaResult))
+
+        return MultiGetReplicaResult(res, return_exceptions)
 
     def lock_multi(
         self,
@@ -2163,8 +2528,10 @@ from couchbase.logic.options import DecrementOptionsBase  # nopep8 # isort:skip 
 from couchbase.logic.options import DeltaValueBase  # nopep8 # isort:skip # noqa: E402
 from couchbase.logic.options import DurabilityOptionBlockBase  # nopep8 # isort:skip # noqa: E402
 from couchbase.logic.options import ExistsOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import GetAllReplicasOptionsBase  # nopep8 # isort:skip # noqa: E402
 from couchbase.logic.options import GetAndLockOptionsBase  # nopep8 # isort:skip # noqa: E402
 from couchbase.logic.options import GetAndTouchOptionsBase  # nopep8 # isort:skip # noqa: E402
+from couchbase.logic.options import GetAnyReplicaOptionsBase  # nopep8 # isort:skip # noqa: E402
 from couchbase.logic.options import GetOptionsBase    # nopep8 # isort:skip # noqa: E402
 from couchbase.logic.options import IncrementOptionsBase  # nopep8 # isort:skip # noqa: E402
 from couchbase.logic.options import InsertOptionsBase  # nopep8 # isort:skip # noqa: E402
@@ -2213,12 +2580,22 @@ class ExistsOptions(ExistsOptionsBase):  # noqa: F811
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
+class GetAllReplicasOptions(GetAllReplicasOptionsBase):  # noqa: F811
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
 class GetAndTouchOptions(GetAndTouchOptionsBase):  # noqa: F811
     pass
 
 
 @Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
 class GetAndLockOptions(GetAndLockOptionsBase):  # noqa: F811
+    pass
+
+
+@Supportability.import_deprecated('couchbase.collection', 'couchbase.options')  # noqa: F811
+class GetAnyReplicaOptions(GetAnyReplicaOptionsBase):  # noqa: F811
     pass
 
 

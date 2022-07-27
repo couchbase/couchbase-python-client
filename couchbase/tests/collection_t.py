@@ -26,6 +26,7 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   DocumentExistsException,
                                   DocumentLockedException,
                                   DocumentNotFoundException,
+                                  DocumentUnretrievableException,
                                   DurabilityImpossibleException,
                                   InvalidArgumentException,
                                   PathNotFoundException,
@@ -36,6 +37,7 @@ from couchbase.options import (GetOptions,
                                ReplaceOptions,
                                UpsertOptions)
 from couchbase.result import (ExistsResult,
+                              GetReplicaResult,
                               GetResult,
                               MutationResult)
 
@@ -547,46 +549,51 @@ class CollectionTests:
                                           expected_exceptions=(TemporaryFailException,))
 
     @pytest.mark.usefixtures("check_replicas")
-    def test_get_any_replica(self, cb_env):
-        pytest.skip("C++ client has not implemented replica operations.")
-        # self._check_replicas(False)
-        # self.coll.upsert('imakey100', self.CONTENT)
-        # result = self.try_n_times(
-        #     10, 3, self.coll.get_any_replica, 'imakey100')
-        # self.assertDictEqual(self.CONTENT, result.content_as[dict])
+    def test_get_any_replica(self, cb_env, default_kvp):
+        result = cb_env.try_n_times(10, 3, cb_env.collection.get_any_replica, default_kvp.key)
+        assert isinstance(result, GetReplicaResult)
+        assert isinstance(result.is_replica, bool)
+        assert default_kvp.value == result.content_as[dict]
 
     @pytest.mark.usefixtures("check_replicas")
-    def test_get_all_replicas(self, cb_env):
-        pytest.skip("C++ client has not implemented replica operations.")
-        # self._check_replicas()
-        # self.coll.upsert(self.KEY, self.CONTENT)
-        # # wait till it it there...
-        # result = self.try_n_times(10, 3, self.coll.get_all_replicas, self.KEY)
-        # if not hasattr(result, '__iter__'):
-        #     result = [result]
-        # for r in result:
-        #     self.assertDictEqual(self.CONTENT, r.content_as[dict])
+    def test_get_any_replica_fail(self, cb_env):
+        with pytest.raises(DocumentUnretrievableException):
+            cb_env.collection.get_any_replica('not-a-key')
 
     @pytest.mark.usefixtures("check_replicas")
-    def test_get_all_replicas_returns_master(self, cb_env):
-        pytest.skip("C++ client has not implemented replica operations.")
-        # self._check_replicas()
-        # self.coll.upsert('imakey100', self.CONTENT)
-        # result = self.try_n_times(
-        #     10, 3, self.coll.get_all_replicas, 'imakey100')
-        # if not hasattr(result, '__iter__'):
-        #     result = [result]
-        # active_cnt = 0
-        # replica_cnt = 0
-        # for r in result:
-        #     self.assertDictEqual(self.CONTENT, r.content_as[dict])
-        #     if r.is_active:
-        #         active_cnt += 1
-        #     else:
-        #         replica_cnt += 1
+    def test_get_all_replicas(self, cb_env, default_kvp):
+        result = cb_env.try_n_times(10, 3, cb_env.collection.get_all_replicas, default_kvp.key)
+        # make sure we can iterate over results
+        while True:
+            try:
+                res = next(result)
+                assert isinstance(res, GetReplicaResult)
+                assert isinstance(res.is_replica, bool)
+                assert default_kvp.value == res.content_as[dict]
+            except StopIteration:
+                break
 
-        # self.assertEqual(active_cnt, 1)
-        # self.assertGreaterEqual(replica_cnt, active_cnt)
+    @pytest.mark.usefixtures("check_replicas")
+    def test_get_all_replicas_fail(self, cb_env):
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.get_all_replicas('not-a-key')
+
+    @pytest.mark.usefixtures("check_replicas")
+    def test_get_all_replicas_results(self, cb_env, default_kvp):
+        result = cb_env.try_n_times(10, 3, cb_env.collection.get_all_replicas, default_kvp.key)
+        active_cnt = 0
+        replica_cnt = 0
+        for res in result:
+            assert isinstance(res, GetReplicaResult)
+            assert isinstance(res.is_replica, bool)
+            assert default_kvp.value == res.content_as[dict]
+            if res.is_replica:
+                replica_cnt += 1
+            else:
+                active_cnt += 1
+
+        assert active_cnt == 1
+        assert replica_cnt >= active_cnt
 
     @pytest.mark.usefixtures("check_sync_durability_supported")
     def test_server_durable_upsert(self, cb_env, default_kvp_and_reset, num_replicas):

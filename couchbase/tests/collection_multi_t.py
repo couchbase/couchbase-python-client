@@ -17,11 +17,14 @@ from datetime import timedelta
 
 import pytest
 
+from couchbase.diagnostics import ServiceType
 from couchbase.exceptions import (CouchbaseException,
                                   DocumentExistsException,
                                   DocumentNotFoundException,
+                                  DocumentUnretrievableException,
                                   InvalidArgumentException)
-from couchbase.options import (GetMultiOptions,
+from couchbase.options import (GetAnyReplicaMultiOptions,
+                               GetMultiOptions,
                                InsertMultiOptions,
                                InsertOptions,
                                ReplaceMultiOptions,
@@ -29,8 +32,10 @@ from couchbase.options import (GetMultiOptions,
                                UpsertMultiOptions,
                                UpsertOptions)
 from couchbase.result import (ExistsResult,
+                              GetReplicaResult,
                               GetResult,
                               MultiExistsResult,
+                              MultiGetReplicaResult,
                               MultiGetResult,
                               MultiMutationResult,
                               MutationResult)
@@ -42,7 +47,7 @@ class CollectionMultiTests:
 
     @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     def couchbase_test_environment(self, couchbase_config, request):
-        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param)
+        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param, manage_buckets=True)
 
         if request.param == CollectionType.NAMED:
             cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
@@ -90,6 +95,15 @@ class CollectionMultiTests:
                                           reset_on_timeout=True,
                                           reset_num_times=3,
                                           return_exceptions=False)
+
+    @pytest.fixture(scope="class")
+    def check_replicas(self, cb_env):
+        bucket_settings = cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, cb_env.bucket.name)
+        num_replicas = bucket_settings.get("num_replicas")
+        ping_res = cb_env.bucket.ping()
+        kv_endpoints = ping_res.endpoints.get(ServiceType.KeyValue, None)
+        if kv_endpoints is None or len(kv_endpoints) < (num_replicas + 1):
+            pytest.skip("Not all replicas are online")
 
     def _make_sure_docs_exists(self, cb_env, keys):
         found = 0
@@ -162,9 +176,8 @@ class CollectionMultiTests:
         assert isinstance(res.results, dict)
         assert res.exceptions == {}
         assert all(map(lambda r: isinstance(r, GetResult), res.results.values())) is True
-        for k in keys:
-            r = cb_env.collection.get(k)
-            assert r.content_as[dict] == keys_and_docs[k]
+        for k, v in res.results.items():
+            assert v.content_as[dict] == keys_and_docs[k]
 
     def test_multi_get_invalid_input(self, cb_env):
         keys_and_docs = {
@@ -191,6 +204,98 @@ class CollectionMultiTests:
 
         with pytest.raises(DocumentNotFoundException):
             cb_env.collection.get_multi(keys, GetMultiOptions(return_exceptions=False))
+
+    @pytest.mark.usefixtures("check_replicas")
+    def test_multi_get_any_replica_simple(self, cb_env, kds):
+        keys_and_docs = kds
+        res = cb_env.collection.upsert_multi(keys_and_docs)
+        keys = list(keys_and_docs.keys())
+        cb_env.try_n_times(5, 3, self._make_sure_docs_exists, cb_env, keys)
+        res = cb_env.collection.get_any_replica_multi(keys)
+        assert isinstance(res, MultiGetReplicaResult)
+        assert res.all_ok is True
+        assert isinstance(res.results, dict)
+        assert res.exceptions == {}
+        assert all(map(lambda r: isinstance(r, GetReplicaResult), res.results.values())) is True
+        for k, v in res.results.items():
+            assert isinstance(v.is_replica, bool)
+            assert v.content_as[dict] == keys_and_docs[k]
+
+    @pytest.mark.usefixtures("check_replicas")
+    def test_multi_get_any_replica_invalid_input(self, cb_env):
+        keys_and_docs = {
+            'test-key1': {'what': 'a test doc!', 'id': 'test-key1'},
+            'test-key2': {'what': 'a test doc!', 'id': 'test-key2'},
+            'test-key3': {'what': 'a test doc!', 'id': 'test-key3'},
+            'test-key4': {'what': 'a test doc!', 'id': 'test-key4'}
+        }
+        with pytest.raises(InvalidArgumentException):
+            cb_env.collection.get_any_replica_multi(keys_and_docs)
+
+    @pytest.mark.usefixtures("check_replicas")
+    def test_multi_get_any_replica_fail(self, cb_env, fake_kds):
+        keys_and_docs = fake_kds
+        keys = list(keys_and_docs.keys())
+        res = cb_env.collection.get_any_replica_multi(keys)
+        assert isinstance(res, MultiGetReplicaResult)
+        assert res.all_ok is False
+        assert res.results == {}
+        assert isinstance(res.exceptions, dict)
+        assert all(map(lambda e: issubclass(type(e), CouchbaseException), res.exceptions.values())) is True
+
+        with pytest.raises(DocumentUnretrievableException):
+            cb_env.collection.get_any_replica_multi(keys, return_exceptions=False)
+
+        with pytest.raises(DocumentUnretrievableException):
+            cb_env.collection.get_any_replica_multi(keys, GetAnyReplicaMultiOptions(return_exceptions=False))
+
+    @pytest.mark.usefixtures("check_replicas")
+    def test_multi_get_all_replicas_simple(self, cb_env, kds):
+        keys_and_docs = kds
+        res = cb_env.collection.upsert_multi(keys_and_docs)
+        keys = list(keys_and_docs.keys())
+        # sleep a bit so that we give replicas a chance to exist...
+        cb_env.sleep(5)
+        cb_env.try_n_times(5, 3, self._make_sure_docs_exists, cb_env, keys)
+        res = cb_env.collection.get_all_replicas_multi(keys)
+        assert isinstance(res, MultiGetReplicaResult)
+        assert res.all_ok is True
+        assert isinstance(res.results, dict)
+        assert res.exceptions == {}
+        assert all(map(lambda r: isinstance(r, list), res.results.values())) is True
+        for k, v in res.results.items():
+            for replica in v:
+                assert isinstance(replica, GetReplicaResult)
+                assert isinstance(replica.is_replica, bool)
+                assert replica.content_as[dict] == keys_and_docs[k]
+
+    @pytest.mark.usefixtures("check_replicas")
+    def test_multi_get_all_replicas_invalid_input(self, cb_env):
+        keys_and_docs = {
+            'test-key1': {'what': 'a test doc!', 'id': 'test-key1'},
+            'test-key2': {'what': 'a test doc!', 'id': 'test-key2'},
+            'test-key3': {'what': 'a test doc!', 'id': 'test-key3'},
+            'test-key4': {'what': 'a test doc!', 'id': 'test-key4'}
+        }
+        with pytest.raises(InvalidArgumentException):
+            cb_env.collection.get_all_replicas_multi(keys_and_docs)
+
+    @pytest.mark.usefixtures("check_replicas")
+    def test_multi_get_all_replicas_fail(self, cb_env, fake_kds):
+        keys_and_docs = fake_kds
+        keys = list(keys_and_docs.keys())
+        res = cb_env.collection.get_all_replicas_multi(keys)
+        assert isinstance(res, MultiGetReplicaResult)
+        assert res.all_ok is False
+        assert res.results == {}
+        assert isinstance(res.exceptions, dict)
+        assert all(map(lambda e: issubclass(type(e), CouchbaseException), res.exceptions.values())) is True
+
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.get_all_replicas_multi(keys, return_exceptions=False)
+
+        with pytest.raises(DocumentNotFoundException):
+            cb_env.collection.get_all_replicas_multi(keys, GetAnyReplicaMultiOptions(return_exceptions=False))
 
     def test_multi_upsert_simple(self, cb_env, kds):
         keys_and_docs = kds

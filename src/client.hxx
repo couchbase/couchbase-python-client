@@ -39,6 +39,8 @@ class Operations
         GET_PROJECTED,
         GET_AND_LOCK,
         GET_AND_TOUCH,
+        GET_ANY_REPLICA,
+        GET_ALL_REPLICAS,
         EXISTS,
         TOUCH,
         UNLOCK,
@@ -88,6 +90,8 @@ class Operations
                           "GET_PROJECTED "
                           "GET_AND_LOCK "
                           "GET_AND_TOUCH "
+                          "GET_ANY_REPLICA "
+                          "GET_ALL_REPLICAS "
                           "EXISTS "
                           "TOUCH "
                           "UNLOCK "

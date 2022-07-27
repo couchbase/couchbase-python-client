@@ -26,9 +26,11 @@ from couchbase.options import forward_args
 from couchbase.pycbc_core import (binary_operation,
                                   kv_operation,
                                   operations,
+                                  replica_read_operation,
                                   subdoc_operation)
 from couchbase.result import (CounterResult,
                               ExistsResult,
+                              GetReplicaResult,
                               GetResult,
                               LookupInResult,
                               MutateInResult,
@@ -103,8 +105,6 @@ class CollectionLogic:
 
         Args:
             key (str): document key
-            opts (:class:`~.options.GetOptions`): options to provide
-                for _get_ KV operation
             kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
                 overrride provided :class:`~.options.GetOptions`
 
@@ -123,6 +123,54 @@ class CollectionLogic:
                             **kwargs,
                             key=key,
                             op_type=op_type)
+
+    def get_any_replica(
+        self,
+        key,  # type: str
+        **kwargs,  # type: Dict[str, Any]
+    ) -> Optional[GetReplicaResult]:
+        """**INTERNAL**
+
+        Key-Value *get_any_replica* operation.  Should only be called by classes that inherit from the base
+            class :class:`~couchbase.logic.CollectionLogic`.
+
+        Args:
+            key (str): document key
+            kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                overrride provided :class:`~.options.GetAnyReplicaOptions`
+
+        Raises:
+            :class:`~.exceptions.DocumentNotFoundException`: If the provided document key does not exist.
+        """
+        op_type = operations.GET_ANY_REPLICA.value
+        return replica_read_operation(**self._get_connection_args(),
+                                      **kwargs,
+                                      key=key,
+                                      op_type=op_type)
+
+    def get_all_replicas(
+        self,
+        key,  # type: str
+        **kwargs,  # type: Dict[str, Any]
+    ) -> Optional[Iterable[GetReplicaResult]]:
+        """**INTERNAL**
+
+        Key-Value *get_all_replicas* operation.  Should only be called by classes that inherit from the base
+            class :class:`~couchbase.logic.CollectionLogic`.
+
+        Args:
+            key (str): document key
+            kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                overrride provided :class:`~.options.GetAllReplicasOptions`
+
+        Raises:
+            :class:`~.exceptions.DocumentNotFoundException`: If the provided document key does not exist.
+        """
+        op_type = operations.GET_ALL_REPLICAS.value
+        return replica_read_operation(**self._get_connection_args(),
+                                      **kwargs,
+                                      key=key,
+                                      op_type=op_type)
 
     def exists(
         self,

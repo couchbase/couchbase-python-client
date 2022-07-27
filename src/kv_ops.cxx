@@ -1028,7 +1028,7 @@ get_read_options(PyObject* op_args)
     PyObject* pyObj_timeout = PyDict_GetItemString(op_args, "timeout");
     if (pyObj_timeout != nullptr) {
         auto timeout = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_timeout));
-        auto timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
+        timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
         if (0 < timeout) {
             opts.timeout_ms = timeout_ms;
         }
@@ -1078,7 +1078,7 @@ get_mutation_options(PyObject* op_args)
     PyObject* pyObj_timeout = PyDict_GetItemString(op_args, "timeout");
     if (pyObj_timeout != nullptr) {
         auto timeout = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_timeout));
-        auto timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
+        timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
         if (0 < timeout) {
             opts.timeout_ms = timeout_ms;
         }

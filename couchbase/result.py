@@ -312,6 +312,41 @@ class PingResult(Result):
         return "PingResult:{}".format(self._orig)
 
 
+class GetReplicaResult(Result):
+
+    @property
+    def is_active(self) -> bool:
+        """
+        ** DEPRECATED ** use is_replica
+
+        bool: True if the result is the active document, False otherwise.
+        """
+        return not self._orig.raw_result.get('is_replica')
+
+    @property
+    def is_replica(self) -> bool:
+        """
+            bool: True if the result is a replica, False otherwise.
+        """
+        return self._orig.raw_result.get('is_replica')
+
+    @property
+    def content_as(self) -> Any:
+        """
+            Any: The contents of the document.
+
+            Get the value as a dict::
+
+                res = collection.get_replica(key)
+                value = res.content_as[dict]
+
+        """
+        return ContentProxy(self.value)
+
+    def __repr__(self):
+        return "GetReplicaResult:{}".format(self._orig)
+
+
 class GetResult(Result):
 
     @property
@@ -354,15 +389,16 @@ class GetResult(Result):
         return "GetResult:{}".format(self._orig)
 
 
-class MultiGetResult:
+class MultiResult:
     def __init__(self,
                  orig,  # type: result
+                 result_type,  # type: Union[GetReplicaResult, GetResult]
                  return_exceptions  # type: bool
                  ):
-
         self._orig = orig
         self._all_ok = self._orig.raw_result.pop('all_okay', False)
         self._results = {}
+        self._result_type = result_type
         for k, v in self._orig.raw_result.items():
             if isinstance(v, CouchbaseBaseException):
                 if not return_exceptions:
@@ -370,7 +406,10 @@ class MultiGetResult:
                 else:
                     self._results[k] = ErrorMapper.build_exception(v)
             else:
-                self._results[k] = GetResult(v)
+                if isinstance(v, list):
+                    self._results[k] = v
+                else:
+                    self._results[k] = result_type(v)
 
     @property
     def all_ok(self) -> bool:
@@ -387,9 +426,46 @@ class MultiGetResult:
         """
         exc = {}
         for k, v in self._results.items():
-            if not isinstance(v, GetResult):
+            if not isinstance(v, self._result_type) and not isinstance(v, list):
                 exc[k] = v
         return exc
+
+
+class MultiGetReplicaResult(MultiResult):
+    def __init__(self,
+                 orig,  # type: result
+                 return_exceptions  # type: bool
+                 ):
+        super().__init__(orig, GetReplicaResult, return_exceptions)
+
+    @property
+    def results(self) -> Dict[str, GetReplicaResult]:
+        """
+            Dict[str, :class:`.GetReplicaResult`]: Map of keys to their respective :class:`.GetReplicaResult`, if the
+                operation has a result.
+        """
+        res = {}
+        for k, v in self._results.items():
+            okay = (isinstance(v, GetReplicaResult) or
+                    isinstance(v, list) and all(map(lambda r: isinstance(r, GetReplicaResult), v)))
+            if okay:
+                res[k] = v
+        return res
+
+    def __repr__(self):
+        output_results = []
+        for k, v in self._results.items():
+            output_results.append(f'{k}:{v}')
+
+        return f'MultiGetReplicaResult( {", ".join(output_results)} )'
+
+
+class MultiGetResult(MultiResult):
+    def __init__(self,
+                 orig,  # type: result
+                 return_exceptions  # type: bool
+                 ):
+        super().__init__(orig, GetResult, return_exceptions)
 
     @property
     def results(self) -> Dict[str, GetResult]:

@@ -49,8 +49,10 @@ from couchbase.logic.options import (AnalyticsOptionsBase,
                                      DiagnosticsOptionsBase,
                                      DurabilityOptionBlockBase,
                                      ExistsOptionsBase,
+                                     GetAllReplicasOptionsBase,
                                      GetAndLockOptionsBase,
                                      GetAndTouchOptionsBase,
+                                     GetAnyReplicaOptionsBase,
                                      GetOptionsBase,
                                      IncrementOptionsBase,
                                      InsertOptionsBase,
@@ -287,6 +289,21 @@ class GetOptions(GetOptionsBase):
     """
 
 
+class GetAllReplicasOptions(GetAllReplicasOptionsBase):
+    """Available options to for a key-value get and touch operation.
+
+    .. warning::
+        Importing options from ``couchbase.collection`` is deprecated.
+        All options should be imported from ``couchbase.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            key-value operation timeout.
+        transcoder (:class:`~.transcoder.Transcoder`, optional): Specifies an explicit transcoder
+            to use for this specific operation. Defaults to :class:`~.transcoder.JsonTranscoder`.
+    """
+
+
 class GetAndLockOptions(GetAndLockOptionsBase):
     """Available options to for a key-value get and lock operation.
 
@@ -303,6 +320,21 @@ class GetAndLockOptions(GetAndLockOptionsBase):
 
 
 class GetAndTouchOptions(GetAndTouchOptionsBase):
+    """Available options to for a key-value get and touch operation.
+
+    .. warning::
+        Importing options from ``couchbase.collection`` is deprecated.
+        All options should be imported from ``couchbase.options``.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            key-value operation timeout.
+        transcoder (:class:`~.transcoder.Transcoder`, optional): Specifies an explicit transcoder
+            to use for this specific operation. Defaults to :class:`~.transcoder.JsonTranscoder`.
+    """
+
+
+class GetAnyReplicaOptions(GetAnyReplicaOptionsBase):
     """Available options to for a key-value get and touch operation.
 
     .. warning::
@@ -532,11 +564,79 @@ Multi-operations Options
 """
 
 
+class GetAllReplicasMultiOptions(dict):
+    """Available options to for a key-value multi-get-all-replicas operation.
+
+    Options can be set at a global level (i.e. for all get operations handled with this multi-get-all-replicas
+    operation). Use *per_key_options* to set specific :class:`.GetAllReplicasOptions` for specific keys.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            key-value operation timeout.
+        transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder
+            to use for this specific operation. Defaults to :class:`~.transcoder.JsonTranscoder`.
+        per_key_options (Dict[str, :class:`.GetAllReplicasOptions`], optional): Specify
+            :class:`.GetAllReplicasOptions` per key.
+        return_exceptions(bool, optional): If False, raise an Exception when encountered.  If True return the
+            Exception without raising.  Default to True.
+    """
+    @overload
+    def __init__(
+        self,
+        transcoder=None,  # type: Transcoder
+        per_key_options=None,       # type: Dict[str, GetAllReplicasOptions]
+        return_exceptions=None      # type: Optional[bool]
+    ):
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+    @classmethod
+    def get_valid_keys(cls):
+        return ['timeout', 'transcoder', 'per_key_options', 'return_exceptions']
+
+
+class GetAnyReplicaMultiOptions(dict):
+    """Available options to for a key-value multi-get-any-replica operation.
+
+    Options can be set at a global level (i.e. for all get operations handled with this multi-get-any-replica
+    operation). Use *per_key_options* to set specific :class:`.GetAnyReplicaOptions` for specific keys.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to global
+            key-value operation timeout.
+        transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder
+            to use for this specific operation. Defaults to :class:`~.transcoder.JsonTranscoder`.
+        per_key_options (Dict[str, :class:`.GetAnyReplicaOptions`], optional): Specify
+            :class:`.GetAnyReplicaOptions` per key.
+        return_exceptions(bool, optional): If False, raise an Exception when encountered.  If True return the
+            Exception without raising.  Default to True.
+    """
+    @overload
+    def __init__(
+        self,
+        transcoder=None,  # type: Transcoder
+        per_key_options=None,       # type: Dict[str, GetAnyReplicaOptions]
+        return_exceptions=None      # type: Optional[bool]
+    ):
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+    @classmethod
+    def get_valid_keys(cls):
+        return ['timeout', 'transcoder', 'per_key_options', 'return_exceptions']
+
+
 class GetMultiOptions(dict):
     """Available options to for a key-value multi-get operation.
 
     Options can be set at a global level (i.e. for all get operations handled with this multi-get operation).
-    Use *per_key_optionss* to set specific :class:`.GetOptions` for specific keys.
+    Use *per_key_options* to set specific :class:`.GetOptions` for specific keys.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
@@ -578,7 +678,7 @@ class ExistsMultiOptions(dict):
     """Available options to for a key-value multi-exists operation.
 
     Options can be set at a global level (i.e. for all exists operations handled with this multi-exists operation).
-    Use *per_key_optionss* to set specific :class:`.ExistsOptions` for specific keys.
+    Use *per_key_options* to set specific :class:`.ExistsOptions` for specific keys.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
@@ -609,7 +709,7 @@ class UpsertMultiOptions(dict):
     """Available options to for a key-value multi-upsert operation.
 
     Options can be set at a global level (i.e. for all upsert operations handled with this multi-upsert operation).
-    Use *per_key_optionss* to set specific :class:`.UpsertOptions` for specific keys.
+    Use *per_key_options* to set specific :class:`.UpsertOptions` for specific keys.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
@@ -651,7 +751,7 @@ class InsertMultiOptions(dict):
     """Available options to for a key-value multi-insert operation.
 
     Options can be set at a global level (i.e. for all insert operations handled with this multi-insert operation).
-    Use *per_key_optionss* to set specific :class:`.InsertOptions` for specific keys.
+    Use *per_key_options* to set specific :class:`.InsertOptions` for specific keys.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
@@ -690,7 +790,7 @@ class ReplaceMultiOptions(dict):
     """Available options to for a key-value multi-replace operation.
 
     Options can be set at a global level (i.e. for all replace operations handled with this multi-replace operation).
-    Use *per_key_optionss* to set specific :class:`.ReplaceOptions` for specific keys.
+    Use *per_key_options* to set specific :class:`.ReplaceOptions` for specific keys.
 
     Args:
         cas (int, optional): If specified, indicates that operation should be failed if the CAS has changed from
@@ -735,7 +835,7 @@ class RemoveMultiOptions(dict):
     """Available options to for a key-value multi-remove operation.
 
     Options can be set at a global level (i.e. for all remove operations handled with this multi-remove operation).
-    Use *per_key_optionss* to set specific :class:`.RemoveOptions` for specific keys.
+    Use *per_key_options* to set specific :class:`.RemoveOptions` for specific keys.
 
     Args:
         cas (int, optional): If specified, indicates that operation should be failed if the CAS has changed from
@@ -775,7 +875,7 @@ class TouchMultiOptions(dict):
     """Available options to for a key-value multi-touch operation.
 
     Options can be set at a global level (i.e. for all touch operations handled with this multi-touch operation).
-    Use *per_key_optionss* to set specific :class:`.TouchOptions` for specific keys.
+    Use *per_key_options* to set specific :class:`.TouchOptions` for specific keys.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
@@ -806,7 +906,7 @@ class LockMultiOptions(dict):
     """Available options to for a key-value multi-lock operation.
 
     Options can be set at a global level (i.e. for all lock operations handled with this multi-lock operation).
-    Use *per_key_optionss* to set specific :class:`.GetAndLockOptions` for specific keys.
+    Use *per_key_options* to set specific :class:`.GetAndLockOptions` for specific keys.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to global
@@ -839,7 +939,7 @@ class UnlockMultiOptions(dict):
     """Available options to for a key-value multi-unlock operation.
 
     Options can be set at a global level (i.e. for all unlock operations handled with this multi-unlock operation).
-    Use *per_key_optionss* to set specific :class:`.UnlockOptions` for specific keys.
+    Use *per_key_options* to set specific :class:`.UnlockOptions` for specific keys.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to global

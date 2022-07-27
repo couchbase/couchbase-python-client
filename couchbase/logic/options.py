@@ -822,6 +822,19 @@ class TouchOptionsBase(OptionsTimeoutBase):
         super().__init__(**kwargs)
 
 
+class GetAllReplicasOptionsBase(OptionsTimeoutBase):
+    @overload
+    def __init__(self,
+                 timeout=None,  # type: Optional[timedelta]
+                 transcoder=None  # type: Optional[Transcoder]
+                 ):
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+
 class GetAndTouchOptionsBase(OptionsTimeoutBase):
     @overload
     def __init__(self,
@@ -848,6 +861,19 @@ class GetAndLockOptionsBase(OptionsTimeoutBase):
         super().__init__(**kwargs)
 
 
+class GetAnyReplicaOptionsBase(OptionsTimeoutBase):
+    @overload
+    def __init__(self,
+                 timeout=None,  # type: Optional[timedelta]
+                 transcoder=None  # type: Optional[Transcoder]
+                 ):
+        pass
+
+    def __init__(self, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**kwargs)
+
+
 class UnlockOptionsBase(OptionsTimeoutBase):
     @overload
     def __init__(self,
@@ -858,6 +884,7 @@ class UnlockOptionsBase(OptionsTimeoutBase):
     def __init__(self, **kwargs):
         kwargs = {k: v for k, v in kwargs.items() if v is not None}
         super().__init__(**kwargs)
+
 
 # Sub-document Operations
 

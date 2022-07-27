@@ -32,6 +32,7 @@ from couchbase.logic.collection import CollectionLogic
 from couchbase.options import forward_args
 from couchbase.result import (CounterResult,
                               ExistsResult,
+                              GetReplicaResult,
                               GetResult,
                               LookupInResult,
                               MutateInResult,
@@ -44,8 +45,10 @@ if TYPE_CHECKING:
     from couchbase.options import (AppendOptions,
                                    DecrementOptions,
                                    ExistsOptions,
+                                   GetAllReplicasOptions,
                                    GetAndLockOptions,
                                    GetAndTouchOptions,
+                                   GetAnyReplicaOptions,
                                    GetOptions,
                                    IncrementOptions,
                                    InsertOptions,
@@ -136,6 +139,161 @@ class AsyncCollection(CollectionLogic):
         """
         super().get(key, **kwargs)
 
+    def get_any_replica(self,
+                        key,  # type: str
+                        *opts,  # type: GetAnyReplicaOptions
+                        **kwargs,  # type: Dict[str, Any]
+                        ) -> Awaitable[GetReplicaResult]:
+        """Retrieves the value of a document from the collection leveraging both active and all available replicas returning
+        the first available.
+
+        Args:
+            key (str): The key for the document to retrieve.
+            opts (:class:`~couchbase.options.GetAnyReplicaOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.GetAnyReplicaOptions`
+
+        Returns:
+            :class:`~couchbase.result.GetReplicaResult`: An instance of :class:`~couchbase.result.GetReplicaResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentUnretrievableException`: If the key provided does not exist
+                on the server.
+
+        Examples:
+
+            Simple get_any_replica operation::
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                res = await collection.get_any_replica('airline_10')
+                print(f'Document is replica: {res.is_replica}')
+                print(f'Document value: {res.content_as[dict]}')
+
+
+            Simple get_any_replica operation with options::
+
+                from datetime import timedelta
+                from couchbase.options import GetAnyReplicaOptions
+
+                # ... other code ...
+
+                res = await collection.get_any_replica('airline_10',
+                                                        GetAnyReplicaOptions(timeout=timedelta(seconds=5)))
+                print(f'Document is replica: {res.is_replica}')
+                print(f'Document value: {res.content_as[dict]}')
+
+        """
+
+        final_args = forward_args(kwargs, *opts)
+        transcoder = final_args.get('transcoder', None)
+        if not transcoder:
+            transcoder = self.default_transcoder
+        final_args['transcoder'] = transcoder
+
+        return self._get_any_replica_internal(key, **final_args)
+
+    @AsyncWrapper.inject_callbacks_and_decode(GetReplicaResult)
+    def _get_any_replica_internal(
+        self,
+        key,  # type: str
+        **kwargs,  # type: Dict[str, Any]
+    ) -> Awaitable[GetReplicaResult]:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`AsyncCollection.get_any_replica` instead.
+        """
+        super().get_any_replica(key, **kwargs)
+
+    def get_all_replicas(self,
+                         key,  # type: str
+                         *opts,  # type: GetAllReplicasOptions
+                         **kwargs,  # type: Dict[str, Any]
+                         ) -> Awaitable[Iterable[GetReplicaResult]]:
+        """Retrieves the value of a document from the collection returning both active and all available replicas.
+
+        Args:
+            key (str): The key for the document to retrieve.
+            opts (:class:`~couchbase.options.GetAllReplicasOptions`): Optional parameters for this operation.
+            **kwargs (Dict[str, Any]): keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.GetAllReplicasOptions`
+
+        Returns:
+            Iterable[:class:`~couchbase.result.GetReplicaResult`]: A stream of
+            :class:`~couchbase.result.GetReplicaResult` representing both active and replicas of the document retrieved.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist
+                on the server.
+
+        Examples:
+
+            Simple get_all_replicas operation::
+
+                bucket = cluster.bucket('travel-sample')
+                collection = bucket.scope('inventory').collection('airline')
+
+                result = await collection.get_all_replicas('airline_10')
+                for res in results:
+                    print(f'Document is replica: {res.is_replica}')
+                    print(f'Document value: {res.content_as[dict]}')
+
+
+            Simple get_all_replicas operation with options::
+
+                from datetime import timedelta
+                from couchbase.options import GetAllReplicasOptions
+
+                # ... other code ...
+
+                result = await collection.get_all_replicas('airline_10',
+                                                            GetAllReplicasOptions(timeout=timedelta(seconds=10)))
+                for res in result:
+                    print(f'Document is replica: {res.is_replica}')
+                    print(f'Document value: {res.content_as[dict]}')
+
+            Stream get_all_replicas results::
+
+                from datetime import timedelta
+                from couchbase.options import GetAllReplicasOptions
+
+                # ... other code ...
+
+                result = await collection.get_all_replicas('airline_10',
+                                                            GetAllReplicasOptions(timeout=timedelta(seconds=10)))
+                while True:
+                    try:
+                        res = next(result)
+                        print(f'Document is replica: {res.is_replica}')
+                        print(f'Document value: {res.content_as[dict]}')
+                    except StopIteration:
+                        print('Done streaming replicas.')
+                        break
+
+        """
+
+        final_args = forward_args(kwargs, *opts)
+        transcoder = final_args.get('transcoder', None)
+        if not transcoder:
+            transcoder = self.default_transcoder
+        final_args['transcoder'] = transcoder
+
+        return self._get_all_replicas_internal(key, **final_args)
+
+    @AsyncWrapper.inject_callbacks_and_decode(GetReplicaResult)
+    def _get_all_replicas_internal(
+        self,
+        key,  # type: str
+        **kwargs,  # type: Dict[str, Any]
+    ) -> Awaitable[Iterable[GetReplicaResult]]:
+        """ **Internal Operation**
+
+        Internal use only.  Use :meth:`AsyncCollection.get_all_replicas` instead.
+        """
+        # return super().get_all_replicas(key, **kwargs)
+        super().get_all_replicas(key, **kwargs)
+
     @AsyncWrapper.inject_callbacks(ExistsResult)
     def exists(
         self,
@@ -175,7 +333,7 @@ class AsyncCollection(CollectionLogic):
                 # ... other code ...
 
                 key = 'airline_10'
-                res = await collection.get(key, ExistsOptions(timeout=timedelta(seconds=2)))
+                res = await collection.exists(key, ExistsOptions(timeout=timedelta(seconds=2)))
                 print(f'Document w/ key - {key} {"exists" if res.exists else "does not exist"}')
 
         """

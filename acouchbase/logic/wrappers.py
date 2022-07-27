@@ -25,7 +25,7 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   ExceptionMap,
                                   MissingConnectionException,
                                   ServiceUnavailableException)
-from couchbase.logic import decode_value
+from couchbase.logic import decode_replicas, decode_value
 
 
 def call_async_fn(ft, self, fn, *args, **kwargs):
@@ -274,6 +274,12 @@ class AsyncWrapper:
 
                 def on_ok(res):
                     try:
+                        # special case for get_all_replicas
+                        if fn.__name__ == '_get_all_replicas_internal':
+                            self.loop.call_soon_threadsafe(ft.set_result,
+                                                           decode_replicas(transcoder, res, return_cls))
+                            return
+
                         value = res.raw_result.get('value', None)
                         flags = res.raw_result.get('flags', None)
 

@@ -28,6 +28,7 @@ from couchbase.logic.collection import CollectionLogic
 from couchbase.options import forward_args
 from couchbase.result import (CounterResult,
                               ExistsResult,
+                              GetReplicaResult,
                               GetResult,
                               LookupInResult,
                               MutateInResult,
@@ -42,8 +43,10 @@ if TYPE_CHECKING:
     from couchbase.options import (AppendOptions,
                                    DecrementOptions,
                                    ExistsOptions,
+                                   GetAllReplicasOptions,
                                    GetAndLockOptions,
                                    GetAndTouchOptions,
+                                   GetAnyReplicaOptions,
                                    GetOptions,
                                    IncrementOptions,
                                    InsertOptions,
@@ -91,6 +94,48 @@ class Collection(CollectionLogic):
         **kwargs,  # type: Dict[str, Any]
     ) -> Deferred[GetResult]:
         super().get(key, **kwargs)
+
+    def get_any_replica(self,
+                        key,  # type: str
+                        *opts,  # type: GetAnyReplicaOptions
+                        **kwargs,  # type: Dict[str, Any]
+                        ) -> Deferred[GetResult]:
+        final_args = forward_args(kwargs, *opts)
+        transcoder = final_args.get('transcoder', None)
+        if not transcoder:
+            transcoder = self.default_transcoder
+        final_args['transcoder'] = transcoder
+
+        return self._get_any_replica_internal(key, **final_args)
+
+    @TxWrapper.inject_callbacks_and_decode(GetReplicaResult)
+    def _get_any_replica_internal(
+        self,
+        key,  # type: str
+        **kwargs,  # type: Dict[str, Any]
+    ) -> Deferred[GetReplicaResult]:
+        super().get_any_replica(key, **kwargs)
+
+    def get_all_replicas(self,
+                         key,  # type: str
+                         *opts,  # type: GetAllReplicasOptions
+                         **kwargs,  # type: Dict[str, Any]
+                         ) -> Deferred[Iterable[GetReplicaResult]]:
+        final_args = forward_args(kwargs, *opts)
+        transcoder = final_args.get('transcoder', None)
+        if not transcoder:
+            transcoder = self.default_transcoder
+        final_args['transcoder'] = transcoder
+
+        return self._get_all_replicas_internal(key, **final_args)
+
+    @TxWrapper.inject_callbacks_and_decode(GetReplicaResult)
+    def _get_all_replicas_internal(
+        self,
+        key,  # type: str
+        **kwargs,  # type: Dict[str, Any]
+    ) -> Deferred[Iterable[GetReplicaResult]]:
+        super().get_all_replicas(key, **kwargs)
 
     @TxWrapper.inject_callbacks(ExistsResult)
     def exists(
