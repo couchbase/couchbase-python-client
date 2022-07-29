@@ -104,28 +104,28 @@ add_constants(PyObject* module)
 }
 
 std::string
-service_type_to_str(couchbase::service_type t)
+service_type_to_str(couchbase::core::service_type t)
 {
     switch (t) {
-        case couchbase::service_type::key_value: {
+        case couchbase::core::service_type::key_value: {
             return "kv";
         }
-        case couchbase::service_type::query: {
+        case couchbase::core::service_type::query: {
             return "query";
         }
-        case couchbase::service_type::analytics: {
+        case couchbase::core::service_type::analytics: {
             return "analytics";
         }
-        case couchbase::service_type::search: {
+        case couchbase::core::service_type::search: {
             return "search";
         }
-        case couchbase::service_type::management: {
+        case couchbase::core::service_type::management: {
             return "mgmt";
         }
-        case couchbase::service_type::view: {
+        case couchbase::core::service_type::view: {
             return "views";
         }
-        case couchbase::service_type::eventing: {
+        case couchbase::core::service_type::eventing: {
             return "eventing";
         }
         default: {
@@ -136,26 +136,26 @@ service_type_to_str(couchbase::service_type t)
     }
 }
 
-couchbase::service_type
+couchbase::core::service_type
 str_to_service_type(std::string svc)
 {
     if (svc.compare("kv") == 0) {
-        return couchbase::service_type::key_value;
+        return couchbase::core::service_type::key_value;
     }
     if (svc.compare("query") == 0) {
-        return couchbase::service_type::query;
+        return couchbase::core::service_type::query;
     }
     if (svc.compare("analytics") == 0) {
-        return couchbase::service_type::analytics;
+        return couchbase::core::service_type::analytics;
     }
     if (svc.compare("search") == 0) {
-        return couchbase::service_type::search;
+        return couchbase::core::service_type::search;
     }
     if (svc.compare("mgmt") == 0) {
-        return couchbase::service_type::management;
+        return couchbase::core::service_type::management;
     }
     if (svc.compare("views") == 0) {
-        return couchbase::service_type::view;
+        return couchbase::core::service_type::view;
     }
 
     // TODO: better exception

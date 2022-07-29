@@ -29,7 +29,8 @@ add_extras_to_result([[maybe_unused]] const T& t, result* res)
 
 template<>
 result*
-add_extras_to_result<couchbase::operations::lookup_in_response>(const couchbase::operations::lookup_in_response& resp, result* res)
+add_extras_to_result<couchbase::core::operations::lookup_in_response>(const couchbase::core::operations::lookup_in_response& resp,
+                                                                      result* res)
 {
     if (!res->ec) {
         PyObject* pyObj_fields = PyList_New(static_cast<Py_ssize_t>(0));
@@ -106,7 +107,8 @@ add_extras_to_result<couchbase::operations::lookup_in_response>(const couchbase:
 
 template<>
 result*
-add_extras_to_result<couchbase::operations::mutate_in_response>(const couchbase::operations::mutate_in_response& resp, result* res)
+add_extras_to_result<couchbase::core::operations::mutate_in_response>(const couchbase::core::operations::mutate_in_response& resp,
+                                                                      result* res)
 {
     PyObject* pyObj_mutation_token = create_mutation_token_obj(resp.token);
     if (-1 == PyDict_SetItemString(res->dict, RESULT_MUTATION_TOKEN, pyObj_mutation_token)) {
@@ -184,8 +186,8 @@ create_base_result_from_subdoc_op_response(const char* key, const T& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
-    res->ec = resp.ctx.ec;
-    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value);
+    res->ec = resp.ctx.ec();
+    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value());
     if (-1 == PyDict_SetItemString(res->dict, RESULT_CAS, pyObj_tmp)) {
         Py_XDECREF(pyObj_result);
         Py_XDECREF(pyObj_tmp);
@@ -227,7 +229,7 @@ create_result_from_subdoc_op_response(const char* key,
     PyObject* pyObj_callback_res = nullptr;
     auto set_exception = false;
 
-    if (resp.ctx.ec.value()) {
+    if (resp.ctx.ec().value()) {
         pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "Subdoc operation error.");
         if (pyObj_errback == nullptr) {
             barrier->set_value(pyObj_exc);
@@ -307,7 +309,8 @@ prepare_and_execute_lookup_in_op(struct lookup_in_options* options,
                                  std::shared_ptr<std::promise<PyObject*>> barrier)
 {
     size_t ii;
-    couchbase::protocol::lookup_in_request_body::lookup_in_specs specs = couchbase::protocol::lookup_in_request_body::lookup_in_specs{};
+    couchbase::core::protocol::lookup_in_request_body::lookup_in_specs specs =
+      couchbase::core::protocol::lookup_in_request_body::lookup_in_specs{};
     for (ii = 0; ii < nspecs; ++ii) {
 
         struct lookup_in_spec new_spec = {};
@@ -334,10 +337,10 @@ prepare_and_execute_lookup_in_op(struct lookup_in_options* options,
         specs.add_spec(new_spec.op, new_spec.xattr ? specs.path_flag_xattr : 0, new_spec.path);
     }
 
-    couchbase::operations::lookup_in_request req{ options->id };
+    couchbase::core::operations::lookup_in_request req{ options->id };
     req.timeout = options->timeout_ms;
     req.specs = specs;
-    do_subdoc_op<couchbase::operations::lookup_in_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
+    do_subdoc_op<couchbase::core::operations::lookup_in_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
     Py_RETURN_NONE;
 }
 
@@ -349,7 +352,8 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
                                  std::shared_ptr<std::promise<PyObject*>> barrier)
 {
     size_t ii;
-    couchbase::protocol::mutate_in_request_body::mutate_in_specs specs = couchbase::protocol::mutate_in_request_body::mutate_in_specs{};
+    couchbase::core::protocol::mutate_in_request_body::mutate_in_specs specs =
+      couchbase::core::protocol::mutate_in_request_body::mutate_in_specs{};
     for (ii = 0; ii < nspecs; ++ii) {
 
         struct mutate_in_spec new_spec = {};
@@ -396,11 +400,11 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
             }
         }
 
-        switch (couchbase::protocol::subdoc_opcode(new_spec.op)) {
-            case couchbase::protocol::subdoc_opcode::array_push_last:
-            case couchbase::protocol::subdoc_opcode::array_push_first:
-            case couchbase::protocol::subdoc_opcode::array_insert:
-            case couchbase::protocol::subdoc_opcode::array_add_unique: {
+        switch (couchbase::core::protocol::subdoc_opcode(new_spec.op)) {
+            case couchbase::core::protocol::subdoc_opcode::array_push_last:
+            case couchbase::core::protocol::subdoc_opcode::array_push_first:
+            case couchbase::core::protocol::subdoc_opcode::array_insert:
+            case couchbase::core::protocol::subdoc_opcode::array_add_unique: {
                 if (!value.empty()) {
                     value = value.substr(1, value.length() - 2);
                 }
@@ -415,9 +419,9 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
         specs.add_spec(new_spec.op, new_spec.flags, new_spec.path, new_spec.value);
     }
 
-    couchbase::protocol::durability_level durability_level = couchbase::protocol::durability_level::none;
+    couchbase::core::protocol::durability_level durability_level = couchbase::core::protocol::durability_level::none;
     if (options->durability != 0) {
-        durability_level = static_cast<couchbase::protocol::durability_level>(options->durability);
+        durability_level = static_cast<couchbase::core::protocol::durability_level>(options->durability);
     }
 
     couchbase::cas cas = couchbase::cas{ 0 };
@@ -425,23 +429,23 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
         cas = couchbase::cas{ options->cas };
     }
 
-    couchbase::protocol::mutate_in_request_body::store_semantics_type store_semantics;
+    couchbase::core::protocol::mutate_in_request_body::store_semantics_type store_semantics;
     switch (options->semantics) {
         case 1: {
-            store_semantics = couchbase::protocol::mutate_in_request_body::store_semantics_type::upsert;
+            store_semantics = couchbase::core::protocol::mutate_in_request_body::store_semantics_type::upsert;
             break;
         }
         case 2: {
-            store_semantics = couchbase::protocol::mutate_in_request_body::store_semantics_type::insert;
+            store_semantics = couchbase::core::protocol::mutate_in_request_body::store_semantics_type::insert;
             break;
         }
         default: {
-            store_semantics = couchbase::protocol::mutate_in_request_body::store_semantics_type::replace;
+            store_semantics = couchbase::core::protocol::mutate_in_request_body::store_semantics_type::replace;
             break;
         }
     };
 
-    couchbase::operations::mutate_in_request req{ options->id };
+    couchbase::core::operations::mutate_in_request req{ options->id };
     req.cas = cas;
     req.timeout = options->timeout_ms;
     if (0 < options->expiry) {
@@ -454,7 +458,7 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
         req.preserve_expiry = options->preserve_expiry;
     }
 
-    do_subdoc_op<couchbase::operations::mutate_in_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
+    do_subdoc_op<couchbase::core::operations::mutate_in_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier);
     Py_RETURN_NONE;
 }
 
@@ -546,9 +550,9 @@ handle_subdoc_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwar
         return nullptr;
     }
 
-    couchbase::document_id id{ bucket, scope, collection, key };
+    couchbase::core::document_id id{ bucket, scope, collection, key };
 
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::key_value_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
     if (0 < timeout) {
         timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
     }

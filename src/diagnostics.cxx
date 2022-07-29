@@ -25,7 +25,8 @@ add_extras_to_service_endpoint([[maybe_unused]] const T& t, [[maybe_unused]] PyO
 
 template<>
 void
-add_extras_to_service_endpoint<couchbase::diag::endpoint_ping_info>(const couchbase::diag::endpoint_ping_info& e, PyObject* pyObj_dict)
+add_extras_to_service_endpoint<couchbase::core::diag::endpoint_ping_info>(const couchbase::core::diag::endpoint_ping_info& e,
+                                                                          PyObject* pyObj_dict)
 {
 
     long duration = e.latency.count();
@@ -38,15 +39,15 @@ add_extras_to_service_endpoint<couchbase::diag::endpoint_ping_info>(const couchb
 
     std::string ping_state = std::string();
     switch (e.state) {
-        case couchbase::diag::ping_state::ok: {
+        case couchbase::core::diag::ping_state::ok: {
             ping_state = "ok";
             break;
         }
-        case couchbase::diag::ping_state::timeout: {
+        case couchbase::core::diag::ping_state::timeout: {
             ping_state = "timeout";
             break;
         }
-        case couchbase::diag::ping_state::error: {
+        case couchbase::core::diag::ping_state::error: {
             ping_state = "error";
             break;
         }
@@ -76,7 +77,8 @@ add_extras_to_service_endpoint<couchbase::diag::endpoint_ping_info>(const couchb
 
 template<>
 void
-add_extras_to_service_endpoint<couchbase::diag::endpoint_diag_info>(const couchbase::diag::endpoint_diag_info& e, PyObject* pyObj_dict)
+add_extras_to_service_endpoint<couchbase::core::diag::endpoint_diag_info>(const couchbase::core::diag::endpoint_diag_info& e,
+                                                                          PyObject* pyObj_dict)
 {
     PyObject* pyObj_tmp = nullptr;
 
@@ -92,19 +94,19 @@ add_extras_to_service_endpoint<couchbase::diag::endpoint_diag_info>(const couchb
 
     std::string endpoint_state = std::string();
     switch (e.state) {
-        case couchbase::diag::endpoint_state::disconnected: {
+        case couchbase::core::diag::endpoint_state::disconnected: {
             endpoint_state = "disconnected";
             break;
         }
-        case couchbase::diag::endpoint_state::connecting: {
+        case couchbase::core::diag::endpoint_state::connecting: {
             endpoint_state = "connecting";
             break;
         }
-        case couchbase::diag::endpoint_state::connected: {
+        case couchbase::core::diag::endpoint_state::connected: {
             endpoint_state = "connected";
             break;
         }
-        case couchbase::diag::endpoint_state::disconnecting: {
+        case couchbase::core::diag::endpoint_state::disconnecting: {
             endpoint_state = "disconnecting";
             break;
         }
@@ -328,7 +330,7 @@ handle_diagnostics_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject*
     }
 
     connection* conn = nullptr;
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::key_value_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
 
     conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
     if (nullptr == conn) {
@@ -342,7 +344,7 @@ handle_diagnostics_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject*
 
     auto reportId = report_id ? std::optional<std::string>{ report_id } : std::nullopt;
     auto bucketName = bucket ? std::optional<std::string>{ bucket } : std::nullopt;
-    std::set<couchbase::service_type> services;
+    std::set<couchbase::core::service_type> services;
     if (pyObj_service_types && PyList_Check(pyObj_service_types)) {
         for (Py_ssize_t i = 0; i < PyList_Size(pyObj_service_types); i++) {
             PyObject* pyObj_svc = PyList_GetItem(pyObj_service_types, i);
@@ -368,15 +370,15 @@ handle_diagnostics_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject*
     auto f = barrier->get_future();
 
     if (op_type == Operations::DIAGNOSTICS) {
-        Py_BEGIN_ALLOW_THREADS conn->cluster_->diagnostics(reportId,
-                                                           [pyObj_callback, pyObj_errback, barrier](couchbase::diag::diagnostics_result r) {
-                                                               create_diagnostics_op_response(r, pyObj_callback, pyObj_errback, barrier);
-                                                           });
+        Py_BEGIN_ALLOW_THREADS conn->cluster_->diagnostics(
+          reportId, [pyObj_callback, pyObj_errback, barrier](couchbase::core::diag::diagnostics_result r) {
+              create_diagnostics_op_response(r, pyObj_callback, pyObj_errback, barrier);
+          });
         Py_END_ALLOW_THREADS
     } else {
-        couchbase::diag::ping_result resp;
+        couchbase::core::diag::ping_result resp;
         Py_BEGIN_ALLOW_THREADS conn->cluster_->ping(
-          reportId, bucketName, services, [pyObj_callback, pyObj_errback, barrier](couchbase::diag::ping_result r) {
+          reportId, bucketName, services, [pyObj_callback, pyObj_errback, barrier](couchbase::core::diag::ping_result r) {
               create_diagnostics_op_response(r, pyObj_callback, pyObj_errback, barrier);
           });
         Py_END_ALLOW_THREADS

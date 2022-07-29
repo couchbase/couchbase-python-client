@@ -19,8 +19,8 @@
 #include "exceptions.hxx"
 #include "result.hxx"
 #include "n1ql.hxx"
-#include <couchbase/search_highlight_style.hxx>
-#include <couchbase/search_scan_consistency.hxx>
+#include <core/search_highlight_style.hxx>
+#include <core/search_scan_consistency.hxx>
 
 PyObject*
 get_result_row_fragments(std::map<std::string, std::vector<std::string>> fragments)
@@ -48,7 +48,7 @@ get_result_row_fragments(std::map<std::string, std::vector<std::string>> fragmen
 }
 
 PyObject*
-get_result_row_locations(std::vector<couchbase::operations::search_response::search_location> locations)
+get_result_row_locations(std::vector<couchbase::core::operations::search_response::search_location> locations)
 {
     PyObject* pyObj_row_locations = PyList_New(static_cast<Py_ssize_t>(0));
     for (auto const& location : locations) {
@@ -116,7 +116,7 @@ get_result_row_locations(std::vector<couchbase::operations::search_response::sea
 }
 
 PyObject*
-get_result_row(couchbase::operations::search_response::search_row row)
+get_result_row(couchbase::core::operations::search_response::search_row row)
 {
     PyObject* pyObj_row = PyDict_New();
     PyObject* pyObj_tmp = PyUnicode_FromString(row.index.c_str());
@@ -176,7 +176,8 @@ get_result_row(couchbase::operations::search_response::search_row row)
 }
 
 PyObject*
-get_result_numeric_range_facets(std::vector<couchbase::operations::search_response::search_facet::numeric_range_facet> numeric_range_facets)
+get_result_numeric_range_facets(
+  std::vector<couchbase::core::operations::search_response::search_facet::numeric_range_facet> numeric_range_facets)
 {
     PyObject* pyObj_numeric_range_facets = PyList_New(static_cast<Py_ssize_t>(0));
     for (auto const& numeric_range_facet : numeric_range_facets) {
@@ -238,7 +239,7 @@ get_result_numeric_range_facets(std::vector<couchbase::operations::search_respon
 }
 
 PyObject*
-get_result_date_range_facets(std::vector<couchbase::operations::search_response::search_facet::date_range_facet> date_range_facets)
+get_result_date_range_facets(std::vector<couchbase::core::operations::search_response::search_facet::date_range_facet> date_range_facets)
 {
     PyObject* pyObj_date_range_facets = PyList_New(static_cast<Py_ssize_t>(0));
     for (auto const& date_range_facet : date_range_facets) {
@@ -286,7 +287,7 @@ get_result_date_range_facets(std::vector<couchbase::operations::search_response:
 }
 
 PyObject*
-get_result_term_facets(std::vector<couchbase::operations::search_response::search_facet::term_facet> term_facets)
+get_result_term_facets(std::vector<couchbase::core::operations::search_response::search_facet::term_facet> term_facets)
 {
     PyObject* pyObj_term_facets = PyList_New(static_cast<Py_ssize_t>(0));
     for (auto const& term_facet : term_facets) {
@@ -316,7 +317,7 @@ get_result_term_facets(std::vector<couchbase::operations::search_response::searc
 }
 
 PyObject*
-get_result_facets(std::vector<couchbase::operations::search_response::search_facet> facets)
+get_result_facets(std::vector<couchbase::core::operations::search_response::search_facet> facets)
 {
     PyObject* pyObj_facets = PyList_New(static_cast<Py_ssize_t>(0));
     for (auto const& facet : facets) {
@@ -394,7 +395,7 @@ get_result_facets(std::vector<couchbase::operations::search_response::search_fac
 }
 
 PyObject*
-get_result_metrics(couchbase::operations::search_response::search_metrics metrics)
+get_result_metrics(couchbase::core::operations::search_response::search_metrics metrics)
 {
     PyObject* pyObj_metrics = PyDict_New();
     std::chrono::duration<unsigned long long, std::nano> int_nsec = metrics.took;
@@ -437,7 +438,7 @@ get_result_metrics(couchbase::operations::search_response::search_metrics metric
 }
 
 PyObject*
-get_result_metadata(couchbase::operations::search_response::search_meta_data metadata, bool include_metrics)
+get_result_metadata(couchbase::core::operations::search_response::search_meta_data metadata, bool include_metrics)
 {
     PyObject* pyObj_metadata = PyDict_New();
     PyObject* pyObj_tmp = PyUnicode_FromString(metadata.client_context_id.c_str());
@@ -475,7 +476,7 @@ get_result_metadata(couchbase::operations::search_response::search_meta_data met
 }
 
 result*
-create_result_from_search_response(couchbase::operations::search_response resp, bool include_metrics)
+create_result_from_search_response(couchbase::core::operations::search_response resp, bool include_metrics)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -532,7 +533,7 @@ create_result_from_search_response(couchbase::operations::search_response resp, 
 }
 
 void
-create_search_result(couchbase::operations::search_response resp,
+create_search_result(couchbase::core::operations::search_response resp,
                      std::shared_ptr<rows_queue<PyObject*>> rows,
                      PyObject* pyObj_callback,
                      PyObject* pyObj_errback,
@@ -617,10 +618,10 @@ get_facets(PyObject* pyObj_facets)
     return facets;
 }
 
-std::map<std::string, couchbase::json_string>
+std::map<std::string, couchbase::core::json_string>
 get_raw_options(PyObject* pyObj_raw)
 {
-    std::map<std::string, couchbase::json_string> raw_options{};
+    std::map<std::string, couchbase::core::json_string> raw_options{};
     if (pyObj_raw && PyDict_Check(pyObj_raw)) {
         PyObject *pyObj_key, *pyObj_value;
         Py_ssize_t pos = 0;
@@ -633,14 +634,14 @@ get_raw_options(PyObject* pyObj_raw)
             }
             if (PyUnicode_Check(pyObj_value) && !k.empty()) {
                 auto res = std::string(PyUnicode_AsUTF8(pyObj_value));
-                raw_options.emplace(k, couchbase::json_string{ std::move(res) });
+                raw_options.emplace(k, couchbase::core::json_string{ std::move(res) });
             }
         }
     }
     return raw_options;
 }
 
-couchbase::operations::search_request
+couchbase::core::operations::search_request
 get_search_request(PyObject* op_args)
 {
     PyObject* pyObj_index_name = PyDict_GetItemString(op_args, "index_name");
@@ -649,7 +650,7 @@ get_search_request(PyObject* op_args)
     PyObject* pyObj_query = PyDict_GetItemString(op_args, "query");
     auto query = std::string(PyUnicode_AsUTF8(pyObj_query));
 
-    couchbase::operations::search_request req{ index_name, couchbase::json_string{ std::move(query) } };
+    couchbase::core::operations::search_request req{ index_name, couchbase::core::json_string{ std::move(query) } };
 
     PyObject* pyObj_limit = PyDict_GetItemString(op_args, "limit");
     if (pyObj_limit != nullptr) {
@@ -682,9 +683,9 @@ get_search_request(PyObject* op_args)
     if (pyObj_highlight_style != nullptr) {
         auto highlight_style = std::string(PyUnicode_AsUTF8(pyObj_highlight_style));
         if (highlight_style.compare("html") == 0) {
-            req.highlight_style = couchbase::search_highlight_style::html;
+            req.highlight_style = couchbase::core::search_highlight_style::html;
         } else if (highlight_style.compare("ansi") == 0) {
-            req.highlight_style = couchbase::search_highlight_style::ansi;
+            req.highlight_style = couchbase::core::search_highlight_style::ansi;
         }
     }
 
@@ -746,7 +747,7 @@ get_search_request(PyObject* op_args)
     if (pyObj_scan_consistency != nullptr) {
         auto scan_consistency = std::string(PyUnicode_AsUTF8(pyObj_scan_consistency));
         if (scan_consistency.compare("not_bounded") == 0) {
-            req.scan_consistency = couchbase::search_scan_consistency::not_bounded;
+            req.scan_consistency = couchbase::core::search_scan_consistency::not_bounded;
         }
     }
 
@@ -793,7 +794,7 @@ get_search_request(PyObject* op_args)
         req.client_context_id = client_context_id;
     }
 
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::search_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::search_timeout;
     PyObject* pyObj_timeout = PyDict_GetItemString(op_args, "timeout");
     if (pyObj_timeout != nullptr) {
         auto timeout = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_timeout));
@@ -862,7 +863,7 @@ handle_search_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* k
     //     PyObject* pyObj_row = PyBytes_FromStringAndSize(row.c_str(), row.length());
     //     rows->put(pyObj_row);
     //     PyGILState_Release(state);
-    //     return couchbase::utils::json::stream_control::next_row;
+    //     return couchbase::core::utils::json::stream_control::next_row;
     // };
 
     // we need the callback, errback, and logic to all stick around, so...
@@ -871,7 +872,7 @@ handle_search_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* k
     Py_XINCREF(pyObj_callback);
 
     Py_BEGIN_ALLOW_THREADS conn->cluster_->execute(
-      req, [rows = streamed_res->rows, pyObj_callback, pyObj_errback, include_metrics](couchbase::operations::search_response resp) {
+      req, [rows = streamed_res->rows, pyObj_callback, pyObj_errback, include_metrics](couchbase::core::operations::search_response resp) {
           create_search_result(resp, rows, pyObj_callback, pyObj_errback, include_metrics);
       });
     Py_END_ALLOW_THREADS return streamed_res;

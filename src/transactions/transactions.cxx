@@ -21,8 +21,8 @@
 #include <couchbase/cluster.hxx>
 #include <couchbase/transactions/transaction_get_result.hxx>
 #include <couchbase/transactions/internal/exceptions_internal.hxx>
-#include <couchbase/operations.hxx>
-#include <couchbase/query_scan_consistency.hxx>
+#include <core/operations.hxx>
+#include <core/query_scan_consistency.hxx>
 #include <sstream>
 
 void
@@ -173,7 +173,7 @@ pycbc_txns::transaction_config__new__(PyTypeObject* type, PyObject* args, PyObje
         self->cfg->custom_metadata_collection(metadata_bucket, metadata_scope, metadata_collection);
     }
     if (nullptr != scan_consistency) {
-        self->cfg->scan_consistency(str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
+        self->cfg->scan_consistency(str_to_scan_consistency_type<couchbase::core::query_scan_consistency>(scan_consistency));
     }
     return reinterpret_cast<PyObject*>(self);
 }
@@ -220,7 +220,7 @@ pycbc_txns::per_transaction_config__new__(PyTypeObject* type, PyObject* args, Py
         self->cfg->expiration_time(std::chrono::microseconds(PyLong_AsUnsignedLongLong(expiration_time)));
     }
     if (nullptr != scan_consistency) {
-        self->cfg->scan_consistency(str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
+        self->cfg->scan_consistency(str_to_scan_consistency_type<couchbase::core::query_scan_consistency>(scan_consistency));
     }
     if (nullptr != metadata_bucket && nullptr != metadata_scope && nullptr != metadata_collection) {
         self->cfg->custom_metadata_collection({ metadata_bucket, metadata_scope, metadata_collection });
@@ -417,7 +417,7 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
         self->opts->profile(str_to_profile_mode(profile_mode));
     }
     if (nullptr != scan_consistency) {
-        self->opts->scan_consistency(str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency));
+        self->opts->scan_consistency(str_to_scan_consistency_type<couchbase::core::query_scan_consistency>(scan_consistency));
         if (PyErr_Occurred()) {
             return nullptr;
         }
@@ -449,7 +449,7 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
                 return nullptr;
             }
             if (PyBytes_Check(pyObj_value)) {
-                couchbase::json_string val(std::string(PyBytes_AsString(pyObj_value)));
+                couchbase::core::json_string val(std::string(PyBytes_AsString(pyObj_value)));
                 self->opts->raw(k, val);
             } else {
                 PyErr_SetString(PyExc_ValueError, "Raw option value not a string!  The raw option should be a dict[str, JSONString].");
@@ -465,7 +465,7 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
             PyErr_SetString(PyExc_ValueError, "Positional parameters options must be a list.");
             return nullptr;
         }
-        std::vector<couchbase::json_string> pos_opts{};
+        std::vector<couchbase::core::json_string> pos_opts{};
         for (size_t i = 0; i < PyList_Size(pyObj_positional_params); i++) {
             PyObject* pyObj_value = PyList_GetItem(pyObj_positional_params, i);
             if (PyBytes_Check(pyObj_value)) {
@@ -485,9 +485,9 @@ pycbc_txns::transaction_query_options__new__(PyTypeObject* type, PyObject* args,
         PyObject* pyObj_key = nullptr;
         PyObject* pyObj_value = nullptr;
         Py_ssize_t pos = 0;
-        std::map<std::string, couchbase::json_string> params{};
+        std::map<std::string, couchbase::core::json_string> params{};
         while (PyDict_Next(pyObj_named_params, &pos, &pyObj_key, &pyObj_value)) {
-            params[PyUnicode_AsUTF8(pyObj_key)] = couchbase::json_string(PyBytes_AsString(pyObj_value));
+            params[PyUnicode_AsUTF8(pyObj_key)] = couchbase::core::json_string(PyBytes_AsString(pyObj_value));
         }
         self->opts->named_parameters(params);
     }
@@ -967,7 +967,7 @@ pycbc_txns::transaction_query_op([[maybe_unused]] PyObject* self, PyObject* args
     Py_BEGIN_ALLOW_THREADS ctx->ctx.query(statement,
                                           *opt->opts,
                                           [pyObj_options, pyObj_callback, pyObj_errback, barrier](
-                                            std::exception_ptr err, std::optional<couchbase::operations::query_response> resp) {
+                                            std::exception_ptr err, std::optional<couchbase::core::operations::query_response> resp) {
                                               auto state = PyGILState_Ensure();
                                               PyObject* args = nullptr;
                                               PyObject* func = nullptr;
@@ -1079,7 +1079,7 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
                 PyErr_SetString(PyExc_ValueError, "couldn't create document id for get");
                 Py_RETURN_NONE;
             }
-            couchbase::document_id id{ bucket, scope, collection, key };
+            couchbase::core::document_id id{ bucket, scope, collection, key };
             Py_BEGIN_ALLOW_THREADS ctx->ctx.get_optional(
               id, [barrier, pyObj_callback, pyObj_errback](std::exception_ptr err, std::optional<tx::transaction_get_result> res) {
                   handle_returning_transaction_get_result(pyObj_callback, pyObj_errback, barrier, err, res);
@@ -1091,7 +1091,7 @@ pycbc_txns::transaction_op([[maybe_unused]] PyObject* self, PyObject* args, PyOb
                 PyErr_SetString(PyExc_ValueError, "couldn't create document id for insert");
                 Py_RETURN_NONE;
             }
-            couchbase::document_id id{ bucket, scope, collection, key };
+            couchbase::core::document_id id{ bucket, scope, collection, key };
             if (nullptr == pyObj_value) {
                 PyErr_SetString(PyExc_ValueError, fmt::format("no value given for an insert of key {}", id.key()).c_str());
                 Py_RETURN_NONE;

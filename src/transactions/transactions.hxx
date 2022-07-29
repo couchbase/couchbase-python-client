@@ -19,7 +19,7 @@
 
 #include "../client.hxx"
 #include <couchbase/transactions.hxx>
-#include <couchbase/operations/document_query.hxx>
+#include <core/operations/document_query.hxx>
 
 namespace tx = couchbase::transactions;
 

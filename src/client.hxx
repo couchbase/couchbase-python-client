@@ -21,8 +21,8 @@
 // NOLINTNEXTLINE
 #include "Python.h" // NOLINT
 #include "structmember.h"
-#include <couchbase/cluster.hxx>
-#include <couchbase/logger/logger.hxx>
+#include <core/cluster.hxx>
+#include <core/logger/logger.hxx>
 #include <list>
 #include <thread>
 #include "result.hxx"
@@ -231,12 +231,12 @@ struct callback_context {
 
 struct connection {
     asio::io_context io_;
-    std::shared_ptr<couchbase::cluster> cluster_;
+    std::shared_ptr<couchbase::core::cluster> cluster_;
     std::list<std::thread> io_threads_;
 
     connection(int num_io_threads)
     {
-        cluster_ = couchbase::cluster::create(io_);
+        cluster_ = couchbase::core::cluster::create(io_);
         for (int i = 0; i < num_io_threads; i++) {
             // TODO: consider maybe catching exceptions and running run() again?  For now, lets
             // log the exception and rethrow (which will lead to a crash)
@@ -264,9 +264,9 @@ PyObject*
 json_decode(const char* value, size_t nvalue);
 
 std::string
-service_type_to_str(couchbase::service_type t);
+service_type_to_str(couchbase::core::service_type t);
 
-couchbase::service_type
+couchbase::core::service_type
 str_to_service_type(std::string svc);
 
 extern PyTypeObject result_type;

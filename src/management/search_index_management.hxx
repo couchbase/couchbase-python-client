@@ -19,7 +19,7 @@
 
 #include "../client.hxx"
 
-#include <couchbase/operations/management/search.hxx>
+#include <core/operations/management/search.hxx>
 
 class SearchIndexManagementOperations
 {
@@ -87,7 +87,7 @@ class SearchIndexManagementOperations
 struct search_index_mgmt_options {
     PyObject* op_args;
     SearchIndexManagementOperations::OperationType op_type = SearchIndexManagementOperations::UNKNOWN;
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::management_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::management_timeout;
 };
 
 PyObject*

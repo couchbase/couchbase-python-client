@@ -17,7 +17,7 @@
 
 #include "utils.hxx"
 
-couchbase::utils::binary
+couchbase::core::utils::binary
 PyObject_to_binary(PyObject* pyObj_value)
 {
     char* buf;
@@ -26,11 +26,11 @@ PyObject_to_binary(PyObject* pyObj_value)
         throw std::invalid_argument("Unable to determine bytes object from provided value.");
     }
     auto size = py_ssize_t_to_size_t(nbuf);
-    return couchbase::utils::to_binary(reinterpret_cast<const char*>(buf), size);
+    return couchbase::core::utils::to_binary(reinterpret_cast<const char*>(buf), size);
 }
 
 PyObject*
-binary_to_PyObject(couchbase::utils::binary value)
+binary_to_PyObject(couchbase::core::utils::binary value)
 {
     auto buf = reinterpret_cast<const char*>(value.data());
     auto nbuf = size_t_to_py_ssize_t(value.size());

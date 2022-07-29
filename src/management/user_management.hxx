@@ -18,7 +18,7 @@
 #pragma once
 
 #include "../client.hxx"
-#include <couchbase/operations/management/user.hxx>
+#include <core/operations/management/user.hxx>
 
 class UserManagementOperations
 {
@@ -82,7 +82,7 @@ class UserManagementOperations
 struct user_mgmt_options {
     PyObject* op_args;
     UserManagementOperations::OperationType op_type = UserManagementOperations::UNKNOWN;
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::management_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::management_timeout;
 };
 
 PyObject*

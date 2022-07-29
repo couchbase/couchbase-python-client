@@ -17,10 +17,10 @@
 
 #include "query_index_management.hxx"
 #include "../exceptions.hxx"
-#include <couchbase/management/query_index.hxx>
+#include <core/management/query_index.hxx>
 
 PyObject*
-build_query_index(const couchbase::management::query::index& index)
+build_query_index(const couchbase::core::management::query::index& index)
 {
     PyObject* pyObj_index = PyDict_New();
     if (index.is_primary) {
@@ -184,7 +184,7 @@ create_result_from_query_index_mgmt_response(const T& resp)
 
 template<>
 result*
-create_result_from_query_index_mgmt_response(const couchbase::operations::management::query_index_get_all_response& resp)
+create_result_from_query_index_mgmt_response(const couchbase::core::operations::management::query_index_get_all_response& resp)
 {
     PyObject* result_obj = create_result_obj();
     result* res = reinterpret_cast<result*>(result_obj);
@@ -287,10 +287,10 @@ create_result_from_query_index_mgmt_op_response(const Response& resp,
     PyGILState_Release(state);
 }
 
-couchbase::operations::management::query_index_create_request
+couchbase::core::operations::management::query_index_create_request
 get_create_query_index_req(PyObject* op_args)
 {
-    couchbase::operations::management::query_index_create_request req{};
+    couchbase::core::operations::management::query_index_create_request req{};
 
     PyObject* pyObj_scope_name = PyDict_GetItemString(op_args, "scope_name");
     if (pyObj_scope_name != nullptr) {
@@ -366,10 +366,10 @@ get_create_query_index_req(PyObject* op_args)
     return req;
 }
 
-couchbase::operations::management::query_index_drop_request
+couchbase::core::operations::management::query_index_drop_request
 get_drop_query_index_req(PyObject* op_args)
 {
-    couchbase::operations::management::query_index_drop_request req{};
+    couchbase::core::operations::management::query_index_drop_request req{};
 
     PyObject* pyObj_scope_name = PyDict_GetItemString(op_args, "scope_name");
     if (pyObj_scope_name != nullptr) {
@@ -456,7 +456,7 @@ handle_query_index_mgmt_op(connection* conn, struct query_index_mgmt_options* op
                 req.collection_name = collection_name;
             }
 
-            res = do_query_index_mgmt_op<couchbase::operations::management::query_index_create_request>(
+            res = do_query_index_mgmt_op<couchbase::core::operations::management::query_index_create_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
@@ -471,12 +471,12 @@ handle_query_index_mgmt_op(connection* conn, struct query_index_mgmt_options* op
                 req.collection_name = collection_name;
             }
 
-            res = do_query_index_mgmt_op<couchbase::operations::management::query_index_drop_request>(
+            res = do_query_index_mgmt_op<couchbase::core::operations::management::query_index_drop_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case QueryIndexManagementOperations::GET_ALL_INDEXES: {
-            couchbase::operations::management::query_index_get_all_request req{};
+            couchbase::core::operations::management::query_index_get_all_request req{};
             req.bucket_name = bucket_name;
             req.timeout = options->timeout_ms;
             if (!scope_name.empty()) {
@@ -486,12 +486,12 @@ handle_query_index_mgmt_op(connection* conn, struct query_index_mgmt_options* op
                 req.collection_name = collection_name;
             }
 
-            res = do_query_index_mgmt_op<couchbase::operations::management::query_index_get_all_request>(
+            res = do_query_index_mgmt_op<couchbase::core::operations::management::query_index_get_all_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case QueryIndexManagementOperations::BUILD_DEFERRED_INDEXES: {
-            couchbase::operations::management::query_index_build_deferred_request req{};
+            couchbase::core::operations::management::query_index_build_deferred_request req{};
             req.bucket_name = bucket_name;
             req.timeout = options->timeout_ms;
             if (!scope_name.empty()) {
@@ -501,7 +501,7 @@ handle_query_index_mgmt_op(connection* conn, struct query_index_mgmt_options* op
                 req.collection_name = collection_name;
             }
 
-            res = do_query_index_mgmt_op<couchbase::operations::management::query_index_build_deferred_request>(
+            res = do_query_index_mgmt_op<couchbase::core::operations::management::query_index_build_deferred_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }

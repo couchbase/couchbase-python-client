@@ -28,11 +28,11 @@
 struct read_options {
     // common - required
     connection* conn;
-    couchbase::document_id id;
+    couchbase::core::document_id id;
     Operations::OperationType op_type = Operations::UNKNOWN;
 
     // common - options
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::key_value_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
 
     // optional
     bool with_expiry;
@@ -53,7 +53,7 @@ struct read_options {
 struct mutation_options {
     // common - required
     connection* conn;
-    couchbase::document_id id;
+    couchbase::core::document_id id;
     Operations::OperationType op_type = Operations::UNKNOWN;
     PyObject* value; // not for REMOVE
 
@@ -62,7 +62,7 @@ struct mutation_options {
     uint8_t replicate_to;
     uint8_t persist_to;
     uint32_t expiry;
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::key_value_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
     PyObject* span;
 
     // optional: REPLACE
@@ -84,10 +84,10 @@ handle_kv_multi_op(PyObject* self, PyObject* args, PyObject* kwargs);
 PyObject*
 handle_kv_blocking_result(std::future<PyObject*>&& fut);
 
-couchbase::query_profile_mode
+couchbase::core::query_profile_mode
 str_to_profile_mode(std::string profile_mode);
 
 std::string
-profile_mode_to_str(couchbase::query_profile_mode profile_mode);
+profile_mode_to_str(couchbase::core::query_profile_mode profile_mode);
 
 #endif

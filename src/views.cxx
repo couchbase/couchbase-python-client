@@ -18,13 +18,13 @@
 #include "views.hxx"
 #include "exceptions.hxx"
 #include "result.hxx"
-#include <couchbase/view_scan_consistency.hxx>
-#include <couchbase/view_sort_order.hxx>
-#include <couchbase/management/design_document.hxx>
-#include <couchbase/design_document_namespace.hxx>
+#include <core/view_scan_consistency.hxx>
+#include <core/view_sort_order.hxx>
+#include <core/management/design_document.hxx>
+#include <core/design_document_namespace.hxx>
 
 result*
-create_result_from_view_response(couchbase::operations::document_view_response resp)
+create_result_from_view_response(couchbase::core::operations::document_view_response resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -131,7 +131,7 @@ create_result_from_view_response(couchbase::operations::document_view_response r
 }
 
 void
-create_view_result(couchbase::operations::document_view_response resp,
+create_view_result(couchbase::core::operations::document_view_response resp,
                    std::shared_ptr<rows_queue<PyObject*>> rows,
                    PyObject* pyObj_callback,
                    PyObject* pyObj_errback)
@@ -219,7 +219,7 @@ create_view_result(couchbase::operations::document_view_response resp,
     PyGILState_Release(state);
 }
 
-couchbase::operations::document_view_request
+couchbase::core::operations::document_view_request
 get_view_request(PyObject* op_args)
 {
     PyObject* pyObj_bucket_name = PyDict_GetItemString(op_args, "bucket_name");
@@ -231,13 +231,13 @@ get_view_request(PyObject* op_args)
     PyObject* pyObj_view_name = PyDict_GetItemString(op_args, "view_name");
     auto view_name = std::string(PyUnicode_AsUTF8(pyObj_view_name));
 
-    couchbase::operations::document_view_request req{ bucket_name, document_name, view_name };
+    couchbase::core::operations::document_view_request req{ bucket_name, document_name, view_name };
 
     PyObject* pyObj_namespace = PyDict_GetItemString(op_args, "namespace");
     if (pyObj_namespace != nullptr) {
-        auto ns = couchbase::design_document_namespace::development;
+        auto ns = couchbase::core::design_document_namespace::development;
         if (pyObj_namespace == Py_False) {
-            ns = couchbase::design_document_namespace::production;
+            ns = couchbase::core::design_document_namespace::production;
         }
         req.ns = ns;
     }
@@ -258,11 +258,11 @@ get_view_request(PyObject* op_args)
     if (pyObj_scan_consistency != nullptr) {
         auto scan_consistency = std::string(PyUnicode_AsUTF8(pyObj_scan_consistency));
         if (scan_consistency.compare("ok") == 0) {
-            req.consistency = couchbase::view_scan_consistency::not_bounded;
+            req.consistency = couchbase::core::view_scan_consistency::not_bounded;
         } else if (scan_consistency.compare("update_after") == 0) {
-            req.consistency = couchbase::view_scan_consistency::update_after;
+            req.consistency = couchbase::core::view_scan_consistency::update_after;
         } else if (scan_consistency.compare("false") == 0) {
-            req.consistency = couchbase::view_scan_consistency::request_plus;
+            req.consistency = couchbase::core::view_scan_consistency::request_plus;
         }
     }
 
@@ -354,9 +354,9 @@ get_view_request(PyObject* op_args)
     if (pyObj_order != nullptr) {
         auto order = std::string(PyUnicode_AsUTF8(pyObj_order));
         if (order.compare("ascending") == 0) {
-            req.order = couchbase::view_sort_order::ascending;
+            req.order = couchbase::core::view_sort_order::ascending;
         } else if (order.compare("descending") == 0) {
-            req.order = couchbase::view_sort_order::descending;
+            req.order = couchbase::core::view_sort_order::descending;
         }
     }
 
@@ -382,7 +382,7 @@ get_view_request(PyObject* op_args)
         req.client_context_id = client_context_id;
     }
 
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::view_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::view_timeout;
     PyObject* pyObj_timeout = PyDict_GetItemString(op_args, "timeout");
     if (pyObj_timeout != nullptr) {
         auto timeout = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_timeout));
@@ -446,7 +446,7 @@ handle_view_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     //     PyObject* pyObj_row = PyBytes_FromStringAndSize(row.c_str(), row.length());
     //     rows->put(pyObj_row);
     //     PyGILState_Release(state);
-    //     return couchbase::utils::json::stream_control::next_row;
+    //     return couchbase::core::utils::json::stream_control::next_row;
     // };
 
     // we need the callback, errback, and logic to all stick around, so...
@@ -456,7 +456,7 @@ handle_view_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
 
     {
         Py_BEGIN_ALLOW_THREADS conn->cluster_->execute(
-          req, [rows = streamed_res->rows, pyObj_callback, pyObj_errback](couchbase::operations::document_view_response resp) {
+          req, [rows = streamed_res->rows, pyObj_callback, pyObj_errback](couchbase::core::operations::document_view_response resp) {
               create_view_result(resp, rows, pyObj_callback, pyObj_errback);
           });
         Py_END_ALLOW_THREADS

@@ -19,7 +19,7 @@
 
 #include "../client.hxx"
 
-#include <couchbase/operations/management/eventing.hxx>
+#include <core/operations/management/eventing.hxx>
 // #include <couchbase/operations/management/eventing_upsert_function.hxx>
 // #include <couchbase/operations/management/eventing_deploy_function.hxx>
 // #include <couchbase/operations/management/eventing_get_function.hxx>
@@ -92,7 +92,7 @@ class EventingFunctionManagementOperations
 struct eventing_function_mgmt_options {
     PyObject* op_args;
     EventingFunctionManagementOperations::OperationType op_type = EventingFunctionManagementOperations::UNKNOWN;
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::management_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::management_timeout;
 };
 
 PyObject*

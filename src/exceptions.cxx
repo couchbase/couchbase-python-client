@@ -136,50 +136,50 @@ create_exception_base_obj()
 }
 
 std::string
-retry_reason_to_string(couchbase::io::retry_reason reason)
+retry_reason_to_string(couchbase::retry_reason reason)
 {
     switch (reason) {
-        case couchbase::io::retry_reason::socket_not_available:
+        case couchbase::retry_reason::socket_not_available:
             return "socket_not_available";
-        case couchbase::io::retry_reason::service_not_available:
+        case couchbase::retry_reason::service_not_available:
             return "service_not_available";
-        case couchbase::io::retry_reason::node_not_available:
+        case couchbase::retry_reason::node_not_available:
             return "node_not_available";
-        case couchbase::io::retry_reason::kv_not_my_vbucket:
+        case couchbase::retry_reason::kv_not_my_vbucket:
             return "kv_not_my_vbucket";
-        case couchbase::io::retry_reason::kv_collection_outdated:
+        case couchbase::retry_reason::kv_collection_outdated:
             return "kv_collection_outdated";
-        case couchbase::io::retry_reason::kv_error_map_retry_indicated:
+        case couchbase::retry_reason::kv_error_map_retry_indicated:
             return "kv_error_map_retry_indicated";
-        case couchbase::io::retry_reason::kv_locked:
+        case couchbase::retry_reason::kv_locked:
             return "kv_locked";
-        case couchbase::io::retry_reason::kv_temporary_failure:
+        case couchbase::retry_reason::kv_temporary_failure:
             return "kv_temporary_failure";
-        case couchbase::io::retry_reason::kv_sync_write_in_progress:
+        case couchbase::retry_reason::kv_sync_write_in_progress:
             return "kv_sync_write_in_progress";
-        case couchbase::io::retry_reason::kv_sync_write_re_commit_in_progress:
+        case couchbase::retry_reason::kv_sync_write_re_commit_in_progress:
             return "kv_sync_write_re_commit_in_progress";
-        case couchbase::io::retry_reason::service_response_code_indicated:
+        case couchbase::retry_reason::service_response_code_indicated:
             return "service_response_code_indicated";
-        case couchbase::io::retry_reason::circuit_breaker_open:
+        case couchbase::retry_reason::circuit_breaker_open:
             return "circuit_breaker_open";
-        case couchbase::io::retry_reason::query_prepared_statement_failure:
+        case couchbase::retry_reason::query_prepared_statement_failure:
             return "query_prepared_statement_failure";
-        case couchbase::io::retry_reason::query_index_not_found:
+        case couchbase::retry_reason::query_index_not_found:
             return "query_index_not_found";
-        case couchbase::io::retry_reason::analytics_temporary_failure:
+        case couchbase::retry_reason::analytics_temporary_failure:
             return "analytics_temporary_failure";
-        case couchbase::io::retry_reason::search_too_many_requests:
+        case couchbase::retry_reason::search_too_many_requests:
             return "search_too_many_requests";
-        case couchbase::io::retry_reason::views_temporary_failure:
+        case couchbase::retry_reason::views_temporary_failure:
             return "views_temporary_failure";
-        case couchbase::io::retry_reason::views_no_active_partition:
+        case couchbase::retry_reason::views_no_active_partition:
             return "views_no_active_partition";
-        case couchbase::io::retry_reason::do_not_retry:
+        case couchbase::retry_reason::do_not_retry:
             return "do_not_retry";
-        case couchbase::io::retry_reason::socket_closed_while_in_flight:
+        case couchbase::retry_reason::socket_closed_while_in_flight:
             return "socket_closed_while_in_flight";
-        case couchbase::io::retry_reason::unknown:
+        case couchbase::retry_reason::unknown:
             return "unknown";
         default:
             return "unknown";
@@ -187,24 +187,24 @@ retry_reason_to_string(couchbase::io::retry_reason reason)
 }
 
 PyObject*
-build_kv_error_map_info(couchbase::error_map::error_info error_info)
+build_kv_error_map_info(couchbase::key_value_error_map_info error_info)
 {
     PyObject* err_info = PyDict_New();
-    PyObject* pyObj_tmp = PyLong_FromLong(static_cast<uint16_t>(error_info.code));
+    PyObject* pyObj_tmp = PyLong_FromLong(static_cast<uint16_t>(error_info.code()));
     if (-1 == PyDict_SetItemString(err_info, "code", pyObj_tmp)) {
         PyErr_Print();
         PyErr_Clear();
     }
     Py_DECREF(pyObj_tmp);
 
-    pyObj_tmp = PyUnicode_FromString(error_info.name.c_str());
+    pyObj_tmp = PyUnicode_FromString(error_info.name().c_str());
     if (-1 == PyDict_SetItemString(err_info, "name", pyObj_tmp)) {
         PyErr_Print();
         PyErr_Clear();
     }
     Py_DECREF(pyObj_tmp);
 
-    pyObj_tmp = PyUnicode_FromString(error_info.description.c_str());
+    pyObj_tmp = PyUnicode_FromString(error_info.description().c_str());
     if (-1 == PyDict_SetItemString(err_info, "description", pyObj_tmp)) {
         PyErr_Print();
         PyErr_Clear();
@@ -212,7 +212,7 @@ build_kv_error_map_info(couchbase::error_map::error_info error_info)
     Py_DECREF(pyObj_tmp);
 
     PyObject* attr_set = PySet_New(nullptr);
-    for (auto attr : error_info.attributes) {
+    for (auto attr : error_info.attributes()) {
         if (-1 == PySet_Add(attr_set, PyLong_FromLong(static_cast<uint16_t>(attr)))) {
             PyErr_Print();
             PyErr_Clear();

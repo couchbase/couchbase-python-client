@@ -18,15 +18,15 @@
 #pragma once
 
 #include "analytics_management.hxx"
-#include <couchbase/management/analytics_link_couchbase_remote.hxx>
+#include <core/management/analytics_link_couchbase_remote.hxx>
 
 PyObject*
-build_couchbase_remote_link_encryption_settings(couchbase::management::analytics::couchbase_link_encryption_settings settings)
+build_couchbase_remote_link_encryption_settings(couchbase::core::management::analytics::couchbase_link_encryption_settings settings)
 {
     PyObject* pyObj_encryption = PyDict_New();
     PyObject* pyObj_tmp = nullptr;
 
-    auto level = couchbase::management::analytics::to_string(settings.level);
+    auto level = couchbase::core::management::analytics::to_string(settings.level);
     pyObj_tmp = PyUnicode_FromString(level.c_str());
     if (-1 == PyDict_SetItemString(pyObj_encryption, "encryption_level", pyObj_tmp)) {
         Py_XDECREF(pyObj_encryption);
@@ -61,7 +61,7 @@ build_couchbase_remote_link_encryption_settings(couchbase::management::analytics
 }
 
 PyObject*
-build_couchbase_remote_link(couchbase::management::analytics::couchbase_remote_link link)
+build_couchbase_remote_link(couchbase::core::management::analytics::couchbase_remote_link link)
 {
     PyObject* pyObj_link = PyDict_New();
     PyObject* pyObj_tmp = nullptr;
@@ -126,7 +126,7 @@ build_couchbase_remote_link(couchbase::management::analytics::couchbase_remote_l
 }
 
 PyObject*
-build_s3_link(couchbase::management::analytics::s3_external_link link)
+build_s3_link(couchbase::core::management::analytics::s3_external_link link)
 {
     PyObject* pyObj_link = PyDict_New();
     PyObject* pyObj_tmp = nullptr;
@@ -177,7 +177,7 @@ build_s3_link(couchbase::management::analytics::s3_external_link link)
 }
 
 PyObject*
-build_azure_blob_link(couchbase::management::analytics::azure_blob_external_link link)
+build_azure_blob_link(couchbase::core::management::analytics::azure_blob_external_link link)
 {
     PyObject* pyObj_link = PyDict_New();
     PyObject* pyObj_tmp = nullptr;
@@ -231,28 +231,28 @@ build_azure_blob_link(couchbase::management::analytics::azure_blob_external_link
     return pyObj_link;
 }
 
-couchbase::management::analytics::couchbase_link_encryption_level
+couchbase::core::management::analytics::couchbase_link_encryption_level
 str_to_encryption_level(PyObject* pyObj_level)
 {
     auto level = std::string(PyUnicode_AsUTF8(pyObj_level));
     if (level.compare("none") == 0) {
-        return couchbase::management::analytics::couchbase_link_encryption_level::none;
+        return couchbase::core::management::analytics::couchbase_link_encryption_level::none;
     }
     if (level.compare("half") == 0) {
-        return couchbase::management::analytics::couchbase_link_encryption_level::half;
+        return couchbase::core::management::analytics::couchbase_link_encryption_level::half;
     }
     if (level.compare("full") == 0) {
-        return couchbase::management::analytics::couchbase_link_encryption_level::full;
+        return couchbase::core::management::analytics::couchbase_link_encryption_level::full;
     }
     // TODO: better exception
     PyErr_SetString(PyExc_ValueError, "Invalid couchbase remote link encryption level.");
     return {};
 }
 
-couchbase::management::analytics::couchbase_link_encryption_settings
+couchbase::core::management::analytics::couchbase_link_encryption_settings
 get_couchbase_remote_link_encryption_settings(PyObject* pyObj_settings)
 {
-    couchbase::management::analytics::couchbase_link_encryption_settings settings{};
+    couchbase::core::management::analytics::couchbase_link_encryption_settings settings{};
 
     PyObject* pyObj_encryption_level = PyDict_GetItemString(pyObj_settings, "encryption_level");
     auto encryption_level = str_to_encryption_level(pyObj_encryption_level);
@@ -288,10 +288,10 @@ get_link([[maybe_unused]] PyObject* pyObj_link)
 }
 
 template<>
-couchbase::management::analytics::couchbase_remote_link
+couchbase::core::management::analytics::couchbase_remote_link
 get_link([[maybe_unused]] PyObject* pyObj_link)
 {
-    couchbase::management::analytics::couchbase_remote_link link{};
+    couchbase::core::management::analytics::couchbase_remote_link link{};
     PyObject* pyObj_link_name = PyDict_GetItemString(pyObj_link, "link_name");
     auto link_name = std::string(PyUnicode_AsUTF8(pyObj_link_name));
     link.link_name = link_name;
@@ -323,10 +323,10 @@ get_link([[maybe_unused]] PyObject* pyObj_link)
 }
 
 template<>
-couchbase::management::analytics::s3_external_link
+couchbase::core::management::analytics::s3_external_link
 get_link([[maybe_unused]] PyObject* pyObj_link)
 {
-    couchbase::management::analytics::s3_external_link link{};
+    couchbase::core::management::analytics::s3_external_link link{};
     PyObject* pyObj_link_name = PyDict_GetItemString(pyObj_link, "link_name");
     auto link_name = std::string(PyUnicode_AsUTF8(pyObj_link_name));
     link.link_name = link_name;
@@ -363,10 +363,10 @@ get_link([[maybe_unused]] PyObject* pyObj_link)
 }
 
 template<>
-couchbase::management::analytics::azure_blob_external_link
+couchbase::core::management::analytics::azure_blob_external_link
 get_link([[maybe_unused]] PyObject* pyObj_link)
 {
-    couchbase::management::analytics::azure_blob_external_link link{};
+    couchbase::core::management::analytics::azure_blob_external_link link{};
     PyObject* pyObj_link_name = PyDict_GetItemString(pyObj_link, "link_name");
     auto link_name = std::string(PyUnicode_AsUTF8(pyObj_link_name));
     link.link_name = link_name;
@@ -415,10 +415,10 @@ get_link([[maybe_unused]] PyObject* pyObj_link)
 }
 
 template<typename analytics_link_type>
-couchbase::operations::management::analytics_link_create_request<analytics_link_type>
+couchbase::core::operations::management::analytics_link_create_request<analytics_link_type>
 get_analytics_link_create_request(struct analytics_mgmt_options* options)
 {
-    couchbase::operations::management::analytics_link_create_request<analytics_link_type> req{};
+    couchbase::core::operations::management::analytics_link_create_request<analytics_link_type> req{};
 
     PyObject* pyObj_link = PyDict_GetItemString(options->op_args, "link");
     req.link = get_link<analytics_link_type>(pyObj_link);
@@ -435,10 +435,10 @@ get_analytics_link_create_request(struct analytics_mgmt_options* options)
 }
 
 template<typename analytics_link_type>
-couchbase::operations::management::analytics_link_replace_request<analytics_link_type>
+couchbase::core::operations::management::analytics_link_replace_request<analytics_link_type>
 get_analytics_link_replace_request(struct analytics_mgmt_options* options)
 {
-    couchbase::operations::management::analytics_link_replace_request<analytics_link_type> req{};
+    couchbase::core::operations::management::analytics_link_replace_request<analytics_link_type> req{};
 
     PyObject* pyObj_link = PyDict_GetItemString(options->op_args, "link");
     req.link = get_link<analytics_link_type>(pyObj_link);
@@ -454,10 +454,10 @@ get_analytics_link_replace_request(struct analytics_mgmt_options* options)
     return req;
 }
 
-couchbase::operations::management::analytics_link_get_all_request
+couchbase::core::operations::management::analytics_link_get_all_request
 get_link_get_all_request(struct analytics_mgmt_options* options)
 {
-    couchbase::operations::management::analytics_link_get_all_request req{};
+    couchbase::core::operations::management::analytics_link_get_all_request req{};
 
     PyObject* pyObj_link_type = PyDict_GetItemString(options->op_args, "link_type");
     if (pyObj_link_type != nullptr) {
@@ -488,10 +488,10 @@ get_link_get_all_request(struct analytics_mgmt_options* options)
     return req;
 }
 
-couchbase::operations::management::analytics_link_drop_request
+couchbase::core::operations::management::analytics_link_drop_request
 get_link_drop_request(struct analytics_mgmt_options* options)
 {
-    couchbase::operations::management::analytics_link_drop_request req{};
+    couchbase::core::operations::management::analytics_link_drop_request req{};
 
     PyObject* pyObj_link_name = PyDict_GetItemString(options->op_args, "link_name");
     auto link_name = std::string(PyUnicode_AsUTF8(pyObj_link_name));
@@ -512,10 +512,10 @@ get_link_drop_request(struct analytics_mgmt_options* options)
     return req;
 }
 
-couchbase::operations::management::analytics_link_disconnect_request
+couchbase::core::operations::management::analytics_link_disconnect_request
 get_link_disconnect_request(struct analytics_mgmt_options* options)
 {
-    couchbase::operations::management::analytics_link_disconnect_request req{};
+    couchbase::core::operations::management::analytics_link_disconnect_request req{};
 
     PyObject* pyObj_dataverse_name = PyDict_GetItemString(options->op_args, "dataverse_name");
     if (pyObj_dataverse_name != nullptr) {
@@ -540,10 +540,10 @@ get_link_disconnect_request(struct analytics_mgmt_options* options)
     return req;
 }
 
-couchbase::operations::management::analytics_link_connect_request
+couchbase::core::operations::management::analytics_link_connect_request
 get_link_connect_request(struct analytics_mgmt_options* options)
 {
-    couchbase::operations::management::analytics_link_connect_request req{};
+    couchbase::core::operations::management::analytics_link_connect_request req{};
 
     PyObject* pyObj_dataverse_name = PyDict_GetItemString(options->op_args, "dataverse_name");
     if (pyObj_dataverse_name != nullptr) {

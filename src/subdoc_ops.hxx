@@ -42,11 +42,11 @@ struct lookup_in_spec {
 struct lookup_in_options {
     // required
     connection* conn;
-    couchbase::document_id id;
+    couchbase::core::document_id id;
     Operations::OperationType op_type = Operations::LOOKUP_IN;
 
     // optional
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::key_value_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
     bool access_deleted;
     PyObject* span;
     PyObject* specs;
@@ -59,7 +59,7 @@ struct lookup_in_options {
 struct mutate_in_options {
     // required
     connection* conn;
-    couchbase::document_id id;
+    couchbase::core::document_id id;
     Operations::OperationType op_type = Operations::MUTATE_IN;
 
     // optional
@@ -69,7 +69,7 @@ struct mutate_in_options {
     uint8_t semantics;
     uint32_t expiry;
     uint64_t cas;
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::key_value_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
     bool preserve_expiry;
     bool access_deleted;
     PyObject* span;

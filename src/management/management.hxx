@@ -18,8 +18,8 @@
 #pragma once
 
 #include "../client.hxx"
-#include <couchbase/operations/management/cluster_describe.hxx>
-#include <couchbase/operations/management/cluster_developer_preview_enable.hxx>
+#include <core/operations/management/cluster_describe.hxx>
+#include <core/operations/management/cluster_developer_preview_enable.hxx>
 #include "bucket_management.hxx"
 #include "collection_management.hxx"
 #include "user_management.hxx"

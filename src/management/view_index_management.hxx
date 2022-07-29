@@ -19,7 +19,7 @@
 
 #include "../client.hxx"
 
-#include <couchbase/operations/management/view.hxx>
+#include <core/operations/management/view.hxx>
 
 class ViewIndexManagementOperations
 {
@@ -67,7 +67,7 @@ class ViewIndexManagementOperations
 struct view_index_mgmt_options {
     PyObject* op_args;
     ViewIndexManagementOperations::OperationType op_type = ViewIndexManagementOperations::UNKNOWN;
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::management_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::management_timeout;
 };
 
 PyObject*

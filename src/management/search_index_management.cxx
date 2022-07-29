@@ -17,10 +17,10 @@
 
 #include "search_index_management.hxx"
 #include "../exceptions.hxx"
-#include <couchbase/management/search_index.hxx>
+#include <core/management/search_index.hxx>
 
 PyObject*
-build_search_index(couchbase::management::search::index index)
+build_search_index(couchbase::core::management::search::index index)
 {
     PyObject* pyObj_index = PyDict_New();
 
@@ -125,7 +125,7 @@ create_result_from_search_index_mgmt_response(const T& resp)
 
 template<>
 result*
-create_result_from_search_index_mgmt_response(const couchbase::operations::management::search_index_get_response& resp)
+create_result_from_search_index_mgmt_response(const couchbase::core::operations::management::search_index_get_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -163,7 +163,7 @@ create_result_from_search_index_mgmt_response(const couchbase::operations::manag
 
 template<>
 result*
-create_result_from_search_index_mgmt_response(const couchbase::operations::management::search_index_get_all_response& resp)
+create_result_from_search_index_mgmt_response(const couchbase::core::operations::management::search_index_get_all_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -208,7 +208,8 @@ create_result_from_search_index_mgmt_response(const couchbase::operations::manag
 
 template<>
 result*
-create_result_from_search_index_mgmt_response(const couchbase::operations::management::search_index_get_documents_count_response& resp)
+create_result_from_search_index_mgmt_response(
+  const couchbase::core::operations::management::search_index_get_documents_count_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -242,7 +243,7 @@ create_result_from_search_index_mgmt_response(const couchbase::operations::manag
 
 template<>
 result*
-create_result_from_search_index_mgmt_response(const couchbase::operations::management::search_index_get_stats_response& resp)
+create_result_from_search_index_mgmt_response(const couchbase::core::operations::management::search_index_get_stats_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -276,7 +277,7 @@ create_result_from_search_index_mgmt_response(const couchbase::operations::manag
 
 template<>
 result*
-create_result_from_search_index_mgmt_response(const couchbase::operations::management::search_index_analyze_document_response& resp)
+create_result_from_search_index_mgmt_response(const couchbase::core::operations::management::search_index_analyze_document_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -310,7 +311,7 @@ create_result_from_search_index_mgmt_response(const couchbase::operations::manag
 
 template<>
 result*
-create_result_from_search_index_mgmt_response(const couchbase::operations::management::search_index_stats_response& resp)
+create_result_from_search_index_mgmt_response(const couchbase::core::operations::management::search_index_stats_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -396,10 +397,10 @@ create_result_from_search_index_mgmt_op_response(const Response& resp,
     PyGILState_Release(state);
 }
 
-couchbase::management::search::index
+couchbase::core::management::search::index
 get_search_index(PyObject* pyObj_index)
 {
-    couchbase::management::search::index index{};
+    couchbase::core::management::search::index index{};
 
     PyObject* pyObj_uuid = PyDict_GetItemString(pyObj_index, "uuid");
     if (pyObj_uuid != nullptr) {
@@ -458,10 +459,10 @@ get_search_index(PyObject* pyObj_index)
     return index;
 }
 
-couchbase::operations::management::search_index_control_ingest_request
+couchbase::core::operations::management::search_index_control_ingest_request
 get_search_index_control_ingest_req(PyObject* op_args)
 {
-    couchbase::operations::management::search_index_control_ingest_request req{};
+    couchbase::core::operations::management::search_index_control_ingest_request req{};
 
     PyObject* pyObj_index_name = PyDict_GetItemString(op_args, "index_name");
     auto index_name = std::string(PyUnicode_AsUTF8(pyObj_index_name));
@@ -485,10 +486,10 @@ get_search_index_control_ingest_req(PyObject* op_args)
     return req;
 }
 
-couchbase::operations::management::search_index_control_plan_freeze_request
+couchbase::core::operations::management::search_index_control_plan_freeze_request
 get_search_index_control_freeze_req(PyObject* op_args)
 {
-    couchbase::operations::management::search_index_control_plan_freeze_request req{};
+    couchbase::core::operations::management::search_index_control_plan_freeze_request req{};
 
     PyObject* pyObj_index_name = PyDict_GetItemString(op_args, "index_name");
     auto index_name = std::string(PyUnicode_AsUTF8(pyObj_index_name));
@@ -512,10 +513,10 @@ get_search_index_control_freeze_req(PyObject* op_args)
     return req;
 }
 
-couchbase::operations::management::search_index_control_query_request
+couchbase::core::operations::management::search_index_control_query_request
 get_search_index_control_query_req(PyObject* op_args)
 {
-    couchbase::operations::management::search_index_control_query_request req{};
+    couchbase::core::operations::management::search_index_control_query_request req{};
 
     PyObject* pyObj_index_name = PyDict_GetItemString(op_args, "index_name");
     auto index_name = std::string(PyUnicode_AsUTF8(pyObj_index_name));
@@ -539,10 +540,10 @@ get_search_index_control_query_req(PyObject* op_args)
     return req;
 }
 
-couchbase::operations::management::search_index_analyze_document_request
+couchbase::core::operations::management::search_index_analyze_document_request
 get_search_index_analyze_doc_req(PyObject* op_args)
 {
-    couchbase::operations::management::search_index_analyze_document_request req{};
+    couchbase::core::operations::management::search_index_analyze_document_request req{};
 
     PyObject* pyObj_index_name = PyDict_GetItemString(op_args, "index_name");
     auto index_name = std::string(PyUnicode_AsUTF8(pyObj_index_name));
@@ -595,10 +596,10 @@ get_search_index_req(PyObject* op_args)
     return req;
 }
 
-couchbase::operations::management::search_index_upsert_request
+couchbase::core::operations::management::search_index_upsert_request
 get_search_index_upsert_req(PyObject* op_args)
 {
-    couchbase::operations::management::search_index_upsert_request req{};
+    couchbase::core::operations::management::search_index_upsert_request req{};
 
     PyObject* pyObj_index = PyDict_GetItemString(op_args, "index");
     Py_INCREF(pyObj_index);
@@ -640,56 +641,57 @@ handle_search_index_mgmt_op(connection* conn, struct search_index_mgmt_options* 
             auto req = get_search_index_upsert_req(options->op_args);
             req.timeout = options->timeout_ms;
 
-            res = do_search_index_mgmt_op<couchbase::operations::management::search_index_upsert_request>(
+            res = do_search_index_mgmt_op<couchbase::core::operations::management::search_index_upsert_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case SearchIndexManagementOperations::GET_INDEX: {
-            auto req = get_search_index_with_name_req<couchbase::operations::management::search_index_get_request>(options->op_args);
+            auto req = get_search_index_with_name_req<couchbase::core::operations::management::search_index_get_request>(options->op_args);
             req.timeout = options->timeout_ms;
 
-            res = do_search_index_mgmt_op<couchbase::operations::management::search_index_get_request>(
+            res = do_search_index_mgmt_op<couchbase::core::operations::management::search_index_get_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case SearchIndexManagementOperations::DROP_INDEX: {
-            auto req = get_search_index_with_name_req<couchbase::operations::management::search_index_drop_request>(options->op_args);
+            auto req = get_search_index_with_name_req<couchbase::core::operations::management::search_index_drop_request>(options->op_args);
             req.timeout = options->timeout_ms;
 
-            res = do_search_index_mgmt_op<couchbase::operations::management::search_index_drop_request>(
+            res = do_search_index_mgmt_op<couchbase::core::operations::management::search_index_drop_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case SearchIndexManagementOperations::GET_INDEX_DOCUMENT_COUNT: {
-            auto req =
-              get_search_index_with_name_req<couchbase::operations::management::search_index_get_documents_count_request>(options->op_args);
+            auto req = get_search_index_with_name_req<couchbase::core::operations::management::search_index_get_documents_count_request>(
+              options->op_args);
             req.timeout = options->timeout_ms;
 
-            res = do_search_index_mgmt_op<couchbase::operations::management::search_index_get_documents_count_request>(
+            res = do_search_index_mgmt_op<couchbase::core::operations::management::search_index_get_documents_count_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case SearchIndexManagementOperations::GET_ALL_INDEXES: {
-            auto req = get_search_index_req<couchbase::operations::management::search_index_get_all_request>(options->op_args);
+            auto req = get_search_index_req<couchbase::core::operations::management::search_index_get_all_request>(options->op_args);
             req.timeout = options->timeout_ms;
 
-            res = do_search_index_mgmt_op<couchbase::operations::management::search_index_get_all_request>(
+            res = do_search_index_mgmt_op<couchbase::core::operations::management::search_index_get_all_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case SearchIndexManagementOperations::GET_INDEX_STATS: {
-            auto req = get_search_index_with_name_req<couchbase::operations::management::search_index_get_stats_request>(options->op_args);
+            auto req =
+              get_search_index_with_name_req<couchbase::core::operations::management::search_index_get_stats_request>(options->op_args);
             req.timeout = options->timeout_ms;
 
-            res = do_search_index_mgmt_op<couchbase::operations::management::search_index_get_stats_request>(
+            res = do_search_index_mgmt_op<couchbase::core::operations::management::search_index_get_stats_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case SearchIndexManagementOperations::GET_ALL_STATS: {
-            auto req = get_search_index_req<couchbase::operations::management::search_index_stats_request>(options->op_args);
+            auto req = get_search_index_req<couchbase::core::operations::management::search_index_stats_request>(options->op_args);
             req.timeout = options->timeout_ms;
 
-            res = do_search_index_mgmt_op<couchbase::operations::management::search_index_stats_request>(
+            res = do_search_index_mgmt_op<couchbase::core::operations::management::search_index_stats_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
@@ -697,7 +699,7 @@ handle_search_index_mgmt_op(connection* conn, struct search_index_mgmt_options* 
             auto req = get_search_index_control_freeze_req(options->op_args);
             req.timeout = options->timeout_ms;
 
-            res = do_search_index_mgmt_op<couchbase::operations::management::search_index_control_plan_freeze_request>(
+            res = do_search_index_mgmt_op<couchbase::core::operations::management::search_index_control_plan_freeze_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
@@ -705,7 +707,7 @@ handle_search_index_mgmt_op(connection* conn, struct search_index_mgmt_options* 
             auto req = get_search_index_control_ingest_req(options->op_args);
             req.timeout = options->timeout_ms;
 
-            res = do_search_index_mgmt_op<couchbase::operations::management::search_index_control_ingest_request>(
+            res = do_search_index_mgmt_op<couchbase::core::operations::management::search_index_control_ingest_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
@@ -713,7 +715,7 @@ handle_search_index_mgmt_op(connection* conn, struct search_index_mgmt_options* 
             auto req = get_search_index_analyze_doc_req(options->op_args);
             req.timeout = options->timeout_ms;
 
-            res = do_search_index_mgmt_op<couchbase::operations::management::search_index_analyze_document_request>(
+            res = do_search_index_mgmt_op<couchbase::core::operations::management::search_index_analyze_document_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
@@ -721,7 +723,7 @@ handle_search_index_mgmt_op(connection* conn, struct search_index_mgmt_options* 
             auto req = get_search_index_control_query_req(options->op_args);
             req.timeout = options->timeout_ms;
 
-            res = do_search_index_mgmt_op<couchbase::operations::management::search_index_control_query_request>(
+            res = do_search_index_mgmt_op<couchbase::core::operations::management::search_index_control_query_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }

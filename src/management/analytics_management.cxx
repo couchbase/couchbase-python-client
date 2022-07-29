@@ -18,12 +18,12 @@
 #include "analytics_management.hxx"
 #include "analytics_link.hxx"
 #include "../exceptions.hxx"
-#include <couchbase/analytics_scan_consistency.hxx>
-#include <couchbase/management/analytics_link.hxx>
-#include <couchbase/management/analytics_index.hxx>
-#include <couchbase/management/analytics_dataset.hxx>
+#include <core/analytics_scan_consistency.hxx>
+#include <core/management/analytics_link.hxx>
+#include <core/management/analytics_index.hxx>
+#include <core/management/analytics_dataset.hxx>
 
-/* couchbase::operations::management::analytics_* request building methods */
+/* couchbase::core::operations::management::analytics_* request building methods */
 
 template<typename T>
 T
@@ -56,10 +56,10 @@ get_index_request_base(struct analytics_mgmt_options* options)
     return req;
 }
 
-couchbase::operations::management::analytics_index_drop_request
+couchbase::core::operations::management::analytics_index_drop_request
 get_index_drop_request(struct analytics_mgmt_options* options)
 {
-    auto req = get_index_request_base<couchbase::operations::management::analytics_index_drop_request>(options);
+    auto req = get_index_request_base<couchbase::core::operations::management::analytics_index_drop_request>(options);
 
     PyObject* pyObj_ignore_if_does_not_exist = PyDict_GetItemString(options->op_args, "ignore_if_does_not_exist");
     if (pyObj_ignore_if_does_not_exist) {
@@ -71,10 +71,10 @@ get_index_drop_request(struct analytics_mgmt_options* options)
     return req;
 }
 
-couchbase::operations::management::analytics_index_create_request
+couchbase::core::operations::management::analytics_index_create_request
 get_index_create_request(struct analytics_mgmt_options* options)
 {
-    auto req = get_index_request_base<couchbase::operations::management::analytics_index_create_request>(options);
+    auto req = get_index_request_base<couchbase::core::operations::management::analytics_index_create_request>(options);
 
     PyObject* pyObj_fields = PyDict_GetItemString(options->op_args, "fields");
 
@@ -135,10 +135,10 @@ get_dataset_request_base(struct analytics_mgmt_options* options)
     return req;
 }
 
-couchbase::operations::management::analytics_dataset_drop_request
+couchbase::core::operations::management::analytics_dataset_drop_request
 get_dataset_drop_request(struct analytics_mgmt_options* options)
 {
-    auto req = get_dataset_request_base<couchbase::operations::management::analytics_dataset_drop_request>(options);
+    auto req = get_dataset_request_base<couchbase::core::operations::management::analytics_dataset_drop_request>(options);
 
     PyObject* pyObj_ignore_if_does_not_exist = PyDict_GetItemString(options->op_args, "ignore_if_does_not_exist");
     if (pyObj_ignore_if_does_not_exist) {
@@ -150,10 +150,10 @@ get_dataset_drop_request(struct analytics_mgmt_options* options)
     return req;
 }
 
-couchbase::operations::management::analytics_dataset_create_request
+couchbase::core::operations::management::analytics_dataset_create_request
 get_dataset_create_request(struct analytics_mgmt_options* options)
 {
-    auto req = get_dataset_request_base<couchbase::operations::management::analytics_dataset_create_request>(options);
+    auto req = get_dataset_request_base<couchbase::core::operations::management::analytics_dataset_create_request>(options);
 
     PyObject* pyObj_bucket_name = PyDict_GetItemString(options->op_args, "bucket_name");
     auto bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
@@ -190,10 +190,10 @@ get_dataverse_request_base(struct analytics_mgmt_options* options)
     return req;
 }
 
-couchbase::operations::management::analytics_dataverse_drop_request
+couchbase::core::operations::management::analytics_dataverse_drop_request
 get_dataverse_drop_request(struct analytics_mgmt_options* options)
 {
-    auto req = get_dataverse_request_base<couchbase::operations::management::analytics_dataverse_drop_request>(options);
+    auto req = get_dataverse_request_base<couchbase::core::operations::management::analytics_dataverse_drop_request>(options);
 
     PyObject* pyObj_ignore_if_does_not_exist = PyDict_GetItemString(options->op_args, "ignore_if_does_not_exist");
     if (pyObj_ignore_if_does_not_exist) {
@@ -205,10 +205,10 @@ get_dataverse_drop_request(struct analytics_mgmt_options* options)
     return req;
 }
 
-couchbase::operations::management::analytics_dataverse_create_request
+couchbase::core::operations::management::analytics_dataverse_create_request
 get_dataverse_create_request(struct analytics_mgmt_options* options)
 {
-    auto req = get_dataverse_request_base<couchbase::operations::management::analytics_dataverse_create_request>(options);
+    auto req = get_dataverse_request_base<couchbase::core::operations::management::analytics_dataverse_create_request>(options);
 
     PyObject* pyObj_ignore_if_exists = PyDict_GetItemString(options->op_args, "ignore_if_exists");
     if (pyObj_ignore_if_exists) {
@@ -220,7 +220,7 @@ get_dataverse_create_request(struct analytics_mgmt_options* options)
     return req;
 }
 
-/* couchbase::operations::management::analytics_* response building methods */
+/* couchbase::core::operations::management::analytics_* response building methods */
 
 template<typename T>
 result*
@@ -282,7 +282,7 @@ create_result_from_analytics_mgmt_response(const T& resp)
 
 template<>
 result*
-create_result_from_analytics_mgmt_response(const couchbase::operations::management::analytics_dataset_get_all_response& resp)
+create_result_from_analytics_mgmt_response(const couchbase::core::operations::management::analytics_dataset_get_all_response& resp)
 {
     auto res = create_base_result_from_analytics_mgmt_response(resp);
     if (res == nullptr) {
@@ -341,7 +341,7 @@ create_result_from_analytics_mgmt_response(const couchbase::operations::manageme
 
 template<>
 result*
-create_result_from_analytics_mgmt_response(const couchbase::operations::management::analytics_index_get_all_response& resp)
+create_result_from_analytics_mgmt_response(const couchbase::core::operations::management::analytics_index_get_all_response& resp)
 {
     auto res = create_base_result_from_analytics_mgmt_response(resp);
     if (res == nullptr) {
@@ -405,7 +405,7 @@ create_result_from_analytics_mgmt_response(const couchbase::operations::manageme
 
 template<>
 result*
-create_result_from_analytics_mgmt_response(const couchbase::operations::management::analytics_get_pending_mutations_response& resp)
+create_result_from_analytics_mgmt_response(const couchbase::core::operations::management::analytics_get_pending_mutations_response& resp)
 {
     auto res = create_base_result_from_analytics_mgmt_response(resp);
     if (res == nullptr) {
@@ -435,7 +435,7 @@ create_result_from_analytics_mgmt_response(const couchbase::operations::manageme
 
 template<>
 result*
-create_result_from_analytics_mgmt_response(const couchbase::operations::management::analytics_link_get_all_response& resp)
+create_result_from_analytics_mgmt_response(const couchbase::core::operations::management::analytics_link_get_all_response& resp)
 {
     auto res = create_base_result_from_analytics_mgmt_response(resp);
     if (res == nullptr) {
@@ -591,24 +591,24 @@ handle_analytics_mgmt_op(connection* conn, struct analytics_mgmt_options* option
     switch (options->op_type) {
         case AnalyticsManagementOperations::CREATE_DATAVERSE: {
             auto req = get_dataverse_create_request(options);
-            res = do_analytics_mgmt_op<couchbase::operations::management::analytics_dataverse_create_request>(
+            res = do_analytics_mgmt_op<couchbase::core::operations::management::analytics_dataverse_create_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case AnalyticsManagementOperations::CREATE_DATASET: {
             auto req = get_dataset_create_request(options);
-            res = do_analytics_mgmt_op<couchbase::operations::management::analytics_dataset_create_request>(
+            res = do_analytics_mgmt_op<couchbase::core::operations::management::analytics_dataset_create_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case AnalyticsManagementOperations::CREATE_INDEX: {
             auto req = get_index_create_request(options);
-            res = do_analytics_mgmt_op<couchbase::operations::management::analytics_index_create_request>(
+            res = do_analytics_mgmt_op<couchbase::core::operations::management::analytics_index_create_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case AnalyticsManagementOperations::GET_ALL_DATASETS: {
-            couchbase::operations::management::analytics_dataset_get_all_request req{};
+            couchbase::core::operations::management::analytics_dataset_get_all_request req{};
             PyObject* pyObj_client_context_id = PyDict_GetItemString(options->op_args, "client_context_id");
             if (pyObj_client_context_id != nullptr) {
                 auto client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
@@ -616,12 +616,12 @@ handle_analytics_mgmt_op(connection* conn, struct analytics_mgmt_options* option
             }
 
             req.timeout = options->timeout_ms;
-            res = do_analytics_mgmt_op<couchbase::operations::management::analytics_dataset_get_all_request>(
+            res = do_analytics_mgmt_op<couchbase::core::operations::management::analytics_dataset_get_all_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case AnalyticsManagementOperations::GET_ALL_INDEXES: {
-            couchbase::operations::management::analytics_index_get_all_request req{};
+            couchbase::core::operations::management::analytics_index_get_all_request req{};
             PyObject* pyObj_client_context_id = PyDict_GetItemString(options->op_args, "client_context_id");
             if (pyObj_client_context_id != nullptr) {
                 auto client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
@@ -629,30 +629,30 @@ handle_analytics_mgmt_op(connection* conn, struct analytics_mgmt_options* option
             }
 
             req.timeout = options->timeout_ms;
-            res = do_analytics_mgmt_op<couchbase::operations::management::analytics_index_get_all_request>(
+            res = do_analytics_mgmt_op<couchbase::core::operations::management::analytics_index_get_all_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case AnalyticsManagementOperations::DROP_DATAVERSE: {
             auto req = get_dataverse_drop_request(options);
-            res = do_analytics_mgmt_op<couchbase::operations::management::analytics_dataverse_drop_request>(
+            res = do_analytics_mgmt_op<couchbase::core::operations::management::analytics_dataverse_drop_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case AnalyticsManagementOperations::DROP_DATASET: {
             auto req = get_dataset_drop_request(options);
-            res = do_analytics_mgmt_op<couchbase::operations::management::analytics_dataset_drop_request>(
+            res = do_analytics_mgmt_op<couchbase::core::operations::management::analytics_dataset_drop_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case AnalyticsManagementOperations::DROP_INDEX: {
             auto req = get_index_drop_request(options);
-            res = do_analytics_mgmt_op<couchbase::operations::management::analytics_index_drop_request>(
+            res = do_analytics_mgmt_op<couchbase::core::operations::management::analytics_index_drop_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case AnalyticsManagementOperations::GET_PENDING_MUTATIONS: {
-            couchbase::operations::management::analytics_get_pending_mutations_request req{};
+            couchbase::core::operations::management::analytics_get_pending_mutations_request req{};
             PyObject* pyObj_client_context_id = PyDict_GetItemString(options->op_args, "client_context_id");
             if (pyObj_client_context_id != nullptr) {
                 auto client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
@@ -660,7 +660,7 @@ handle_analytics_mgmt_op(connection* conn, struct analytics_mgmt_options* option
             }
 
             req.timeout = options->timeout_ms;
-            res = do_analytics_mgmt_op<couchbase::operations::management::analytics_get_pending_mutations_request>(
+            res = do_analytics_mgmt_op<couchbase::core::operations::management::analytics_get_pending_mutations_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
@@ -673,36 +673,35 @@ handle_analytics_mgmt_op(connection* conn, struct analytics_mgmt_options* option
             }
             auto link_type = std::string(PyUnicode_AsUTF8(pyObj_link_type));
             if (link_type.compare("couchbase") == 0) {
-                auto req = get_analytics_link_create_request<couchbase::management::analytics::couchbase_remote_link>(options);
-                res = do_analytics_mgmt_op<couchbase::operations::management::analytics_link_create_request<
-                  couchbase::management::analytics::couchbase_remote_link>>(*conn, req, pyObj_callback, pyObj_errback, barrier);
+                auto req = get_analytics_link_create_request<couchbase::core::management::analytics::couchbase_remote_link>(options);
+                res = do_analytics_mgmt_op<couchbase::core::operations::management::analytics_link_create_request<
+                  couchbase::core::management::analytics::couchbase_remote_link>>(*conn, req, pyObj_callback, pyObj_errback, barrier);
             } else if (link_type.compare("s3") == 0) {
-                auto req = get_analytics_link_create_request<couchbase::management::analytics::s3_external_link>(options);
-                res = do_analytics_mgmt_op<
-                  couchbase::operations::management::analytics_link_create_request<couchbase::management::analytics::s3_external_link>>(
-                  *conn, req, pyObj_callback, pyObj_errback, barrier);
+                auto req = get_analytics_link_create_request<couchbase::core::management::analytics::s3_external_link>(options);
+                res = do_analytics_mgmt_op<couchbase::core::operations::management::analytics_link_create_request<
+                  couchbase::core::management::analytics::s3_external_link>>(*conn, req, pyObj_callback, pyObj_errback, barrier);
             } else if (link_type.compare("azureblob") == 0) {
-                auto req = get_analytics_link_create_request<couchbase::management::analytics::azure_blob_external_link>(options);
-                res = do_analytics_mgmt_op<couchbase::operations::management::analytics_link_create_request<
-                  couchbase::management::analytics::azure_blob_external_link>>(*conn, req, pyObj_callback, pyObj_errback, barrier);
+                auto req = get_analytics_link_create_request<couchbase::core::management::analytics::azure_blob_external_link>(options);
+                res = do_analytics_mgmt_op<couchbase::core::operations::management::analytics_link_create_request<
+                  couchbase::core::management::analytics::azure_blob_external_link>>(*conn, req, pyObj_callback, pyObj_errback, barrier);
             }
             break;
         }
         case AnalyticsManagementOperations::LINK_CONNECT: {
             auto req = get_link_connect_request(options);
-            res = do_analytics_mgmt_op<couchbase::operations::management::analytics_link_connect_request>(
+            res = do_analytics_mgmt_op<couchbase::core::operations::management::analytics_link_connect_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case AnalyticsManagementOperations::GET_ALL_LINKS: {
             auto req = get_link_get_all_request(options);
-            res = do_analytics_mgmt_op<couchbase::operations::management::analytics_link_get_all_request>(
+            res = do_analytics_mgmt_op<couchbase::core::operations::management::analytics_link_get_all_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case AnalyticsManagementOperations::LINK_DISCONNECT: {
             auto req = get_link_disconnect_request(options);
-            res = do_analytics_mgmt_op<couchbase::operations::management::analytics_link_disconnect_request>(
+            res = do_analytics_mgmt_op<couchbase::core::operations::management::analytics_link_disconnect_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
@@ -716,24 +715,23 @@ handle_analytics_mgmt_op(connection* conn, struct analytics_mgmt_options* option
             }
             auto link_type = std::string(PyUnicode_AsUTF8(pyObj_link_type));
             if (link_type.compare("couchbase") == 0) {
-                auto req = get_analytics_link_replace_request<couchbase::management::analytics::couchbase_remote_link>(options);
-                res = do_analytics_mgmt_op<couchbase::operations::management::analytics_link_replace_request<
-                  couchbase::management::analytics::couchbase_remote_link>>(*conn, req, pyObj_callback, pyObj_errback, barrier);
+                auto req = get_analytics_link_replace_request<couchbase::core::management::analytics::couchbase_remote_link>(options);
+                res = do_analytics_mgmt_op<couchbase::core::operations::management::analytics_link_replace_request<
+                  couchbase::core::management::analytics::couchbase_remote_link>>(*conn, req, pyObj_callback, pyObj_errback, barrier);
             } else if (link_type.compare("s3") == 0) {
-                auto req = get_analytics_link_replace_request<couchbase::management::analytics::s3_external_link>(options);
-                res = do_analytics_mgmt_op<
-                  couchbase::operations::management::analytics_link_replace_request<couchbase::management::analytics::s3_external_link>>(
-                  *conn, req, pyObj_callback, pyObj_errback, barrier);
+                auto req = get_analytics_link_replace_request<couchbase::core::management::analytics::s3_external_link>(options);
+                res = do_analytics_mgmt_op<couchbase::core::operations::management::analytics_link_replace_request<
+                  couchbase::core::management::analytics::s3_external_link>>(*conn, req, pyObj_callback, pyObj_errback, barrier);
             } else if (link_type.compare("azureblob") == 0) {
-                auto req = get_analytics_link_replace_request<couchbase::management::analytics::azure_blob_external_link>(options);
-                res = do_analytics_mgmt_op<couchbase::operations::management::analytics_link_replace_request<
-                  couchbase::management::analytics::azure_blob_external_link>>(*conn, req, pyObj_callback, pyObj_errback, barrier);
+                auto req = get_analytics_link_replace_request<couchbase::core::management::analytics::azure_blob_external_link>(options);
+                res = do_analytics_mgmt_op<couchbase::core::operations::management::analytics_link_replace_request<
+                  couchbase::core::management::analytics::azure_blob_external_link>>(*conn, req, pyObj_callback, pyObj_errback, barrier);
             }
             break;
         }
         case AnalyticsManagementOperations::DROP_LINK: {
             auto req = get_link_drop_request(options);
-            res = do_analytics_mgmt_op<couchbase::operations::management::analytics_link_drop_request>(
+            res = do_analytics_mgmt_op<couchbase::core::operations::management::analytics_link_drop_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }

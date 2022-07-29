@@ -68,7 +68,7 @@ class BucketManagementOperations
 struct bucket_mgmt_options {
     PyObject* op_args;
     BucketManagementOperations::OperationType op_type = BucketManagementOperations::UNKNOWN;
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::management_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::management_timeout;
 };
 
 PyObject*

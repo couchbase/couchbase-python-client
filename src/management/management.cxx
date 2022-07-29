@@ -30,8 +30,8 @@ create_result_from_mgmt_response(const T& resp)
 
 template<>
 result*
-create_result_from_mgmt_response<couchbase::operations::management::cluster_describe_response>(
-  const couchbase::operations::management::cluster_describe_response& resp)
+create_result_from_mgmt_response<couchbase::core::operations::management::cluster_describe_response>(
+  const couchbase::core::operations::management::cluster_describe_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -294,7 +294,7 @@ handle_mgmt_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs
     }
 
     connection* conn = nullptr;
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::management_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::management_timeout;
 
     conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
     if (nullptr == conn) {
@@ -320,14 +320,14 @@ handle_mgmt_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs
 
             auto op = static_cast<ClusterManagementOperations::OperationType>(op_type);
             if (op == ClusterManagementOperations::GET_CLUSTER_INFO) {
-                couchbase::operations::management::cluster_describe_request req{};
+                couchbase::core::operations::management::cluster_describe_request req{};
                 req.timeout = timeout_ms;
-                res = do_mgmt_op<couchbase::operations::management::cluster_describe_request>(
+                res = do_mgmt_op<couchbase::core::operations::management::cluster_describe_request>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
             } else if (op == ClusterManagementOperations::ENABLE_DP) {
-                couchbase::operations::management::cluster_developer_preview_enable_request req{};
+                couchbase::core::operations::management::cluster_developer_preview_enable_request req{};
                 req.timeout = timeout_ms;
-                res = do_mgmt_op<couchbase::operations::management::cluster_developer_preview_enable_request>(
+                res = do_mgmt_op<couchbase::core::operations::management::cluster_developer_preview_enable_request>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
             }
 

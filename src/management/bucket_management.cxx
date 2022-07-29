@@ -17,12 +17,12 @@
 
 #include "bucket_management.hxx"
 #include "../exceptions.hxx"
-#include <couchbase/management/bucket_settings.hxx>
-#include <couchbase/operations/management/bucket.hxx>
-#include <couchbase/operations/management/bucket_describe.hxx> // should be in the include above, but isn't
+#include <core/management/bucket_settings.hxx>
+#include <core/operations/management/bucket.hxx>
+#include <core/operations/management/bucket_describe.hxx> // should be in the include above, but isn't
 
 PyObject*
-build_bucket_settings(couchbase::management::cluster::bucket_settings settings)
+build_bucket_settings(couchbase::core::management::cluster::bucket_settings settings)
 {
     PyObject* pyObj_bucket_settings = PyDict_New();
     PyObject* pyObj_tmp = PyUnicode_FromString(settings.name.c_str());
@@ -34,19 +34,19 @@ build_bucket_settings(couchbase::management::cluster::bucket_settings settings)
     Py_DECREF(pyObj_tmp);
 
     switch (settings.bucket_type) {
-        case couchbase::management::cluster::bucket_type::couchbase: {
+        case couchbase::core::management::cluster::bucket_type::couchbase: {
             pyObj_tmp = PyUnicode_FromString("membase");
             break;
         }
-        case couchbase::management::cluster::bucket_type::memcached: {
+        case couchbase::core::management::cluster::bucket_type::memcached: {
             pyObj_tmp = PyUnicode_FromString("memcached");
             break;
         }
-        case couchbase::management::cluster::bucket_type::ephemeral: {
+        case couchbase::core::management::cluster::bucket_type::ephemeral: {
             pyObj_tmp = PyUnicode_FromString("ephemeral");
             break;
         }
-        case couchbase::management::cluster::bucket_type::unknown: {
+        case couchbase::core::management::cluster::bucket_type::unknown: {
             pyObj_tmp = PyUnicode_FromString("unknown");
             break;
         }
@@ -87,19 +87,19 @@ build_bucket_settings(couchbase::management::cluster::bucket_settings settings)
     Py_DECREF(pyObj_tmp);
 
     switch (settings.compression_mode) {
-        case couchbase::management::cluster::bucket_compression::off: {
+        case couchbase::core::management::cluster::bucket_compression::off: {
             pyObj_tmp = PyUnicode_FromString("off");
             break;
         }
-        case couchbase::management::cluster::bucket_compression::active: {
+        case couchbase::core::management::cluster::bucket_compression::active: {
             pyObj_tmp = PyUnicode_FromString("active");
             break;
         }
-        case couchbase::management::cluster::bucket_compression::passive: {
+        case couchbase::core::management::cluster::bucket_compression::passive: {
             pyObj_tmp = PyUnicode_FromString("passive");
             break;
         }
-        case couchbase::management::cluster::bucket_compression::unknown: {
+        case couchbase::core::management::cluster::bucket_compression::unknown: {
             pyObj_tmp = PyUnicode_FromString("unknown");
             break;
         }
@@ -117,19 +117,19 @@ build_bucket_settings(couchbase::management::cluster::bucket_settings settings)
 
     if (settings.minimum_durability_level.has_value()) {
         switch (settings.minimum_durability_level.value()) {
-            case couchbase::protocol::durability_level::majority_and_persist_to_active: {
+            case couchbase::core::protocol::durability_level::majority_and_persist_to_active: {
                 pyObj_tmp = PyUnicode_FromString("majorityAndPersistActive");
                 break;
             }
-            case couchbase::protocol::durability_level::majority: {
+            case couchbase::core::protocol::durability_level::majority: {
                 pyObj_tmp = PyUnicode_FromString("majority");
                 break;
             }
-            case couchbase::protocol::durability_level::persist_to_majority: {
+            case couchbase::core::protocol::durability_level::persist_to_majority: {
                 pyObj_tmp = PyUnicode_FromString("persistToMajority");
                 break;
             }
-            case couchbase::protocol::durability_level::none: {
+            case couchbase::core::protocol::durability_level::none: {
                 pyObj_tmp = PyUnicode_FromString("none");
                 break;
             }
@@ -171,19 +171,19 @@ build_bucket_settings(couchbase::management::cluster::bucket_settings settings)
     Py_DECREF(pyObj_tmp);
 
     switch (settings.eviction_policy) {
-        case couchbase::management::cluster::bucket_eviction_policy::full: {
+        case couchbase::core::management::cluster::bucket_eviction_policy::full: {
             pyObj_tmp = PyUnicode_FromString("fullEviction");
             break;
         }
-        case couchbase::management::cluster::bucket_eviction_policy::value_only: {
+        case couchbase::core::management::cluster::bucket_eviction_policy::value_only: {
             pyObj_tmp = PyUnicode_FromString("valueOnly");
             break;
         }
-        case couchbase::management::cluster::bucket_eviction_policy::no_eviction: {
+        case couchbase::core::management::cluster::bucket_eviction_policy::no_eviction: {
             pyObj_tmp = PyUnicode_FromString("noEviction");
             break;
         }
-        case couchbase::management::cluster::bucket_eviction_policy::not_recently_used: {
+        case couchbase::core::management::cluster::bucket_eviction_policy::not_recently_used: {
             pyObj_tmp = PyUnicode_FromString("nruEviction");
             break;
         }
@@ -200,15 +200,15 @@ build_bucket_settings(couchbase::management::cluster::bucket_settings settings)
     Py_DECREF(pyObj_tmp);
 
     switch (settings.conflict_resolution_type) {
-        case couchbase::management::cluster::bucket_conflict_resolution::timestamp: {
+        case couchbase::core::management::cluster::bucket_conflict_resolution::timestamp: {
             pyObj_tmp = PyUnicode_FromString("lww");
             break;
         }
-        case couchbase::management::cluster::bucket_conflict_resolution::sequence_number: {
+        case couchbase::core::management::cluster::bucket_conflict_resolution::sequence_number: {
             pyObj_tmp = PyUnicode_FromString("seqno");
             break;
         }
-        case couchbase::management::cluster::bucket_conflict_resolution::custom: {
+        case couchbase::core::management::cluster::bucket_conflict_resolution::custom: {
             pyObj_tmp = PyUnicode_FromString("custom");
             break;
         }
@@ -225,15 +225,15 @@ build_bucket_settings(couchbase::management::cluster::bucket_settings settings)
     Py_DECREF(pyObj_tmp);
 
     switch (settings.storage_backend) {
-        case couchbase::management::cluster::bucket_storage_backend::couchstore: {
+        case couchbase::core::management::cluster::bucket_storage_backend::couchstore: {
             pyObj_tmp = PyUnicode_FromString("couchstore");
             break;
         }
-        case couchbase::management::cluster::bucket_storage_backend::magma: {
+        case couchbase::core::management::cluster::bucket_storage_backend::magma: {
             pyObj_tmp = PyUnicode_FromString("magma");
             break;
         }
-        case couchbase::management::cluster::bucket_storage_backend::unknown: {
+        case couchbase::core::management::cluster::bucket_storage_backend::unknown: {
             pyObj_tmp = PyUnicode_FromString("undefined");
             break;
         }
@@ -263,7 +263,7 @@ create_result_from_bucket_mgmt_response([[maybe_unused]] const Response& resp)
 
 template<>
 result*
-create_result_from_bucket_mgmt_response(const couchbase::operations::management::bucket_update_response& resp)
+create_result_from_bucket_mgmt_response(const couchbase::core::operations::management::bucket_update_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -285,7 +285,7 @@ create_result_from_bucket_mgmt_response(const couchbase::operations::management:
 
 template<>
 result*
-create_result_from_bucket_mgmt_response(const couchbase::operations::management::bucket_get_response& resp)
+create_result_from_bucket_mgmt_response(const couchbase::core::operations::management::bucket_get_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -307,7 +307,7 @@ create_result_from_bucket_mgmt_response(const couchbase::operations::management:
 
 template<>
 result*
-create_result_from_bucket_mgmt_response(const couchbase::operations::management::bucket_get_all_response& resp)
+create_result_from_bucket_mgmt_response(const couchbase::core::operations::management::bucket_get_all_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -328,7 +328,7 @@ create_result_from_bucket_mgmt_response(const couchbase::operations::management:
 
 template<>
 result*
-create_result_from_bucket_mgmt_response(const couchbase::operations::management::bucket_describe_response& resp)
+create_result_from_bucket_mgmt_response(const couchbase::core::operations::management::bucket_describe_response& resp)
 {
     PyObject* result_obj = create_result_obj();
     result* res = reinterpret_cast<result*>(result_obj);
@@ -371,15 +371,15 @@ create_result_from_bucket_mgmt_response(const couchbase::operations::management:
     Py_DECREF(pyObj_tmp);
 
     switch (resp.info.storage_backend) {
-        case couchbase::management::cluster::bucket_storage_backend::couchstore: {
+        case couchbase::core::management::cluster::bucket_storage_backend::couchstore: {
             pyObj_tmp = PyUnicode_FromString("couchstore");
             break;
         }
-        case couchbase::management::cluster::bucket_storage_backend::magma: {
+        case couchbase::core::management::cluster::bucket_storage_backend::magma: {
             pyObj_tmp = PyUnicode_FromString("magma");
             break;
         }
-        case couchbase::management::cluster::bucket_storage_backend::unknown: {
+        case couchbase::core::management::cluster::bucket_storage_backend::unknown: {
             pyObj_tmp = PyUnicode_FromString("undefined");
             break;
         }
@@ -416,14 +416,14 @@ get_bucket_mgmt_error_msg(const Response& resp)
 
 template<>
 std::string
-get_bucket_mgmt_error_msg(const couchbase::operations::management::bucket_create_response& resp)
+get_bucket_mgmt_error_msg(const couchbase::core::operations::management::bucket_create_response& resp)
 {
     return resp.error_message;
 }
 
 template<>
 std::string
-get_bucket_mgmt_error_msg(const couchbase::operations::management::bucket_update_response& resp)
+get_bucket_mgmt_error_msg(const couchbase::core::operations::management::bucket_update_response& resp)
 {
     return resp.error_message;
 }
@@ -504,10 +504,10 @@ create_result_from_bucket_mgmt_op_response(Response& resp,
     PyGILState_Release(state);
 }
 
-couchbase::management::cluster::bucket_settings
+couchbase::core::management::cluster::bucket_settings
 get_bucket_settings(PyObject* settings)
 {
-    couchbase::management::cluster::bucket_settings bucket_settings{};
+    couchbase::core::management::cluster::bucket_settings bucket_settings{};
 
     PyObject* pyObj_name = PyDict_GetItemString(settings, "name");
     if (pyObj_name == nullptr) {
@@ -521,11 +521,11 @@ get_bucket_settings(PyObject* settings)
     if (pyObj_bucket_type) {
         auto b_type = std::string(PyUnicode_AsUTF8(pyObj_bucket_type));
         if (b_type.compare("couchbase") == 0) {
-            bucket_settings.bucket_type = couchbase::management::cluster::bucket_type::couchbase;
+            bucket_settings.bucket_type = couchbase::core::management::cluster::bucket_type::couchbase;
         } else if (b_type.compare("memcached") == 0) {
-            bucket_settings.bucket_type = couchbase::management::cluster::bucket_type::memcached;
+            bucket_settings.bucket_type = couchbase::core::management::cluster::bucket_type::memcached;
         } else if (b_type.compare("ephemeral") == 0) {
-            bucket_settings.bucket_type = couchbase::management::cluster::bucket_type::ephemeral;
+            bucket_settings.bucket_type = couchbase::core::management::cluster::bucket_type::ephemeral;
         }
     }
 
@@ -543,11 +543,11 @@ get_bucket_settings(PyObject* settings)
     if (pyObj_compression_mode) {
         auto comp_mode = std::string(PyUnicode_AsUTF8(pyObj_compression_mode));
         if (comp_mode.compare("off") == 0) {
-            bucket_settings.compression_mode = couchbase::management::cluster::bucket_compression::off;
+            bucket_settings.compression_mode = couchbase::core::management::cluster::bucket_compression::off;
         } else if (comp_mode.compare("active") == 0) {
-            bucket_settings.compression_mode = couchbase::management::cluster::bucket_compression::active;
+            bucket_settings.compression_mode = couchbase::core::management::cluster::bucket_compression::active;
         } else if (comp_mode.compare("passive") == 0) {
-            bucket_settings.compression_mode = couchbase::management::cluster::bucket_compression::passive;
+            bucket_settings.compression_mode = couchbase::core::management::cluster::bucket_compression::passive;
         }
     }
 
@@ -555,13 +555,13 @@ get_bucket_settings(PyObject* settings)
     if (pyObj_durability_level != nullptr) {
         auto durability = std::string(PyUnicode_AsUTF8(pyObj_durability_level));
         if (durability.compare("majorityAndPersistActive") == 0) {
-            bucket_settings.minimum_durability_level = couchbase::protocol::durability_level::majority_and_persist_to_active;
+            bucket_settings.minimum_durability_level = couchbase::core::protocol::durability_level::majority_and_persist_to_active;
         } else if (durability.compare("majority") == 0) {
-            bucket_settings.minimum_durability_level = couchbase::protocol::durability_level::majority;
+            bucket_settings.minimum_durability_level = couchbase::core::protocol::durability_level::majority;
         } else if (durability.compare("persistToMajority") == 0) {
-            bucket_settings.minimum_durability_level = couchbase::protocol::durability_level::persist_to_majority;
+            bucket_settings.minimum_durability_level = couchbase::core::protocol::durability_level::persist_to_majority;
         } else if (durability.compare("none") == 0) {
-            bucket_settings.minimum_durability_level = couchbase::protocol::durability_level::none;
+            bucket_settings.minimum_durability_level = couchbase::core::protocol::durability_level::none;
         }
     }
 
@@ -592,13 +592,13 @@ get_bucket_settings(PyObject* settings)
     if (pyObj_eviction_policy != nullptr) {
         auto evict = std::string(PyUnicode_AsUTF8(pyObj_eviction_policy));
         if (evict.compare("fullEviction") == 0) {
-            bucket_settings.eviction_policy = couchbase::management::cluster::bucket_eviction_policy::full;
+            bucket_settings.eviction_policy = couchbase::core::management::cluster::bucket_eviction_policy::full;
         } else if (evict.compare("valueOnly") == 0) {
-            bucket_settings.eviction_policy = couchbase::management::cluster::bucket_eviction_policy::value_only;
+            bucket_settings.eviction_policy = couchbase::core::management::cluster::bucket_eviction_policy::value_only;
         } else if (evict.compare("noEviction") == 0) {
-            bucket_settings.eviction_policy = couchbase::management::cluster::bucket_eviction_policy::no_eviction;
+            bucket_settings.eviction_policy = couchbase::core::management::cluster::bucket_eviction_policy::no_eviction;
         } else if (evict.compare("nruEviction") == 0) {
-            bucket_settings.eviction_policy = couchbase::management::cluster::bucket_eviction_policy::not_recently_used;
+            bucket_settings.eviction_policy = couchbase::core::management::cluster::bucket_eviction_policy::not_recently_used;
         }
     }
 
@@ -606,11 +606,11 @@ get_bucket_settings(PyObject* settings)
     if (pyObj_conflict_res_type != nullptr) {
         auto crt = std::string(PyUnicode_AsUTF8(pyObj_conflict_res_type));
         if (crt.compare("lww") == 0) {
-            bucket_settings.conflict_resolution_type = couchbase::management::cluster::bucket_conflict_resolution::timestamp;
+            bucket_settings.conflict_resolution_type = couchbase::core::management::cluster::bucket_conflict_resolution::timestamp;
         } else if (crt.compare("seqno") == 0) {
-            bucket_settings.conflict_resolution_type = couchbase::management::cluster::bucket_conflict_resolution::sequence_number;
+            bucket_settings.conflict_resolution_type = couchbase::core::management::cluster::bucket_conflict_resolution::sequence_number;
         } else if (crt.compare("custom") == 0) {
-            bucket_settings.conflict_resolution_type = couchbase::management::cluster::bucket_conflict_resolution::custom;
+            bucket_settings.conflict_resolution_type = couchbase::core::management::cluster::bucket_conflict_resolution::custom;
         }
     }
 
@@ -618,10 +618,10 @@ get_bucket_settings(PyObject* settings)
     if (pyObj_storage_backend != nullptr) {
         auto backend = std::string(PyUnicode_AsUTF8(pyObj_storage_backend));
         if (backend.compare("couchstore") == 0) {
-            bucket_settings.storage_backend = couchbase::management::cluster::bucket_storage_backend::couchstore;
+            bucket_settings.storage_backend = couchbase::core::management::cluster::bucket_storage_backend::couchstore;
         }
         if (backend.compare("magma") == 0) {
-            bucket_settings.storage_backend = couchbase::management::cluster::bucket_storage_backend::magma;
+            bucket_settings.storage_backend = couchbase::core::management::cluster::bucket_storage_backend::magma;
         }
     }
     return bucket_settings;
@@ -696,54 +696,57 @@ handle_bucket_mgmt_op(connection* conn, struct bucket_mgmt_options* options, PyO
     try {
         switch (options->op_type) {
             case BucketManagementOperations::CREATE_BUCKET: {
-                auto req =
-                  get_bucket_mgmt_with_bucket_settings_req<couchbase::operations::management::bucket_create_request>(options->op_args);
+                auto req = get_bucket_mgmt_with_bucket_settings_req<couchbase::core::operations::management::bucket_create_request>(
+                  options->op_args);
                 req.timeout = options->timeout_ms;
-                res = do_bucket_mgmt_op<couchbase::operations::management::bucket_create_request>(
+                res = do_bucket_mgmt_op<couchbase::core::operations::management::bucket_create_request>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
                 break;
             }
             case BucketManagementOperations::UPDATE_BUCKET: {
-                auto req =
-                  get_bucket_mgmt_with_bucket_settings_req<couchbase::operations::management::bucket_update_request>(options->op_args);
+                auto req = get_bucket_mgmt_with_bucket_settings_req<couchbase::core::operations::management::bucket_update_request>(
+                  options->op_args);
                 req.timeout = options->timeout_ms;
-                res = do_bucket_mgmt_op<couchbase::operations::management::bucket_update_request>(
+                res = do_bucket_mgmt_op<couchbase::core::operations::management::bucket_update_request>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
                 break;
             }
             case BucketManagementOperations::DROP_BUCKET: {
-                auto req = get_bucket_mgmt_with_bucket_name_req<couchbase::operations::management::bucket_drop_request>(options->op_args);
+                auto req =
+                  get_bucket_mgmt_with_bucket_name_req<couchbase::core::operations::management::bucket_drop_request>(options->op_args);
                 req.timeout = options->timeout_ms;
-                res = do_bucket_mgmt_op<couchbase::operations::management::bucket_drop_request>(
+                res = do_bucket_mgmt_op<couchbase::core::operations::management::bucket_drop_request>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
                 break;
             }
             case BucketManagementOperations::GET_BUCKET: {
-                auto req = get_bucket_mgmt_with_bucket_name_req<couchbase::operations::management::bucket_get_request>(options->op_args);
+                auto req =
+                  get_bucket_mgmt_with_bucket_name_req<couchbase::core::operations::management::bucket_get_request>(options->op_args);
                 req.timeout = options->timeout_ms;
-                res = do_bucket_mgmt_op<couchbase::operations::management::bucket_get_request>(
+                res = do_bucket_mgmt_op<couchbase::core::operations::management::bucket_get_request>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
                 break;
             }
             case BucketManagementOperations::GET_ALL_BUCKETS: {
-                couchbase::operations::management::bucket_get_all_request req{};
+                couchbase::core::operations::management::bucket_get_all_request req{};
                 req.timeout = options->timeout_ms;
-                res = do_bucket_mgmt_op<couchbase::operations::management::bucket_get_all_request>(
+                res = do_bucket_mgmt_op<couchbase::core::operations::management::bucket_get_all_request>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
                 break;
             }
             case BucketManagementOperations::FLUSH_BUCKET: {
-                auto req = get_bucket_mgmt_with_bucket_name_req<couchbase::operations::management::bucket_flush_request>(options->op_args);
+                auto req =
+                  get_bucket_mgmt_with_bucket_name_req<couchbase::core::operations::management::bucket_flush_request>(options->op_args);
                 req.timeout = options->timeout_ms;
-                res = do_bucket_mgmt_op<couchbase::operations::management::bucket_flush_request>(
+                res = do_bucket_mgmt_op<couchbase::core::operations::management::bucket_flush_request>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
                 break;
             }
             case BucketManagementOperations::BUCKET_DESCRIBE: {
                 auto req =
-                  get_bucket_mgmt_with_bucket_name_req<couchbase::operations::management::bucket_describe_request>(options->op_args);
+                  get_bucket_mgmt_with_bucket_name_req<couchbase::core::operations::management::bucket_describe_request>(options->op_args);
                 req.timeout = options->timeout_ms;
-                res = do_bucket_mgmt_op<couchbase::operations::management::bucket_describe_request>(
+                res = do_bucket_mgmt_op<couchbase::core::operations::management::bucket_describe_request>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
                 break;
             }

@@ -19,7 +19,7 @@
 
 #include "../client.hxx"
 
-#include <couchbase/operations/management/analytics.hxx>
+#include <core/operations/management/analytics.hxx>
 
 class AnalyticsManagementOperations
 {
@@ -95,7 +95,7 @@ class AnalyticsManagementOperations
 struct analytics_mgmt_options {
     PyObject* op_args;
     AnalyticsManagementOperations::OperationType op_type = AnalyticsManagementOperations::UNKNOWN;
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::management_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::management_timeout;
 };
 
 PyObject*

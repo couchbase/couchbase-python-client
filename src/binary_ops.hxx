@@ -22,16 +22,16 @@
 struct counter_options {
     // required
     connection* conn;
-    couchbase::document_id id;
+    couchbase::core::document_id id;
     Operations::OperationType op_type;
     uint64_t delta;
 
     // optional
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::key_value_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
     uint32_t expiry;
     uint8_t replicate_to;
     uint8_t persist_to;
-    couchbase::protocol::durability_level durability;
+    couchbase::core::protocol::durability_level durability;
     uint64_t initial_value;
     PyObject* pyObj_span;
 };
@@ -39,15 +39,15 @@ struct counter_options {
 struct binary_mutation_options {
     // required
     connection* conn;
-    couchbase::document_id id;
+    couchbase::core::document_id id;
     Operations::OperationType op_type;
     PyObject* pyObj_value;
 
     // optional
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::key_value_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
     uint8_t replicate_to;
     uint8_t persist_to;
-    couchbase::protocol::durability_level durability;
+    couchbase::core::protocol::durability_level durability;
     couchbase::cas cas;
     PyObject* pyObj_span;
 };

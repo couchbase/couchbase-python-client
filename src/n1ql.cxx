@@ -18,33 +18,33 @@
 #include "n1ql.hxx"
 #include "exceptions.hxx"
 #include "result.hxx"
-#include <couchbase/query_scan_consistency.hxx>
-#include <couchbase/query_profile_mode.hxx>
+#include <core/query_scan_consistency.hxx>
+#include <core/query_profile_mode.hxx>
 
 std::string
-scan_consistency_type_to_string(couchbase::query_scan_consistency consistency)
+scan_consistency_type_to_string(couchbase::core::query_scan_consistency consistency)
 {
     switch (consistency) {
-        case couchbase::query_scan_consistency::not_bounded:
+        case couchbase::core::query_scan_consistency::not_bounded:
             return "not_bounded";
-        case couchbase::query_scan_consistency::request_plus:
+        case couchbase::core::query_scan_consistency::request_plus:
             return "request_plus";
     }
     // should not be able to reach here, since this is an enum class
     return "unknown";
 }
 
-couchbase::query_profile_mode
+couchbase::core::query_profile_mode
 str_to_profile_mode(std::string profile_mode)
 {
     if (profile_mode.compare("off") == 0) {
-        return couchbase::query_profile_mode::off;
+        return couchbase::core::query_profile_mode::off;
     }
     if (profile_mode.compare("phases") == 0) {
-        return couchbase::query_profile_mode::phases;
+        return couchbase::core::query_profile_mode::phases;
     }
     if (profile_mode.compare("timings") == 0) {
-        return couchbase::query_profile_mode::timings;
+        return couchbase::core::query_profile_mode::timings;
     }
     // TODO: better exception
     PyErr_SetString(PyExc_ValueError, "Invalid Profile Mode.");
@@ -52,27 +52,27 @@ str_to_profile_mode(std::string profile_mode)
 }
 
 std::string
-profile_mode_to_str(couchbase::query_profile_mode profile_mode)
+profile_mode_to_str(couchbase::core::query_profile_mode profile_mode)
 {
     switch (profile_mode) {
-        case couchbase::query_profile_mode::off:
+        case couchbase::core::query_profile_mode::off:
             return "off";
-        case couchbase::query_profile_mode::phases:
+        case couchbase::core::query_profile_mode::phases:
             return "phases";
-        case couchbase::query_profile_mode::timings:
+        case couchbase::core::query_profile_mode::timings:
             return "timings";
     }
     return "unknown profile_mode";
 }
 
-std::vector<couchbase::mutation_token>
+std::vector<couchbase::core::mutation_token>
 get_mutation_state(PyObject* pyObj_mutation_state)
 {
-    std::vector<couchbase::mutation_token> mut_state{};
+    std::vector<couchbase::core::mutation_token> mut_state{};
     size_t ntokens = static_cast<size_t>(PySet_GET_SIZE(pyObj_mutation_state));
     for (size_t ii = 0; ii < ntokens; ++ii) {
 
-        struct couchbase::mutation_token token = {};
+        struct couchbase::core::mutation_token token = {};
         PyObject* pyObj_mut_token = PyList_GetItem(pyObj_mutation_state, ii);
         PyObject* pyObj_bucket_name = PyDict_GetItemString(pyObj_mut_token, "bucket_name");
         token.bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
@@ -92,7 +92,7 @@ get_mutation_state(PyObject* pyObj_mutation_state)
 }
 
 PyObject*
-get_result_metrics(couchbase::operations::query_response::query_metrics metrics)
+get_result_metrics(couchbase::core::operations::query_response::query_metrics metrics)
 {
     PyObject* pyObj_metrics = PyDict_New();
     std::chrono::duration<unsigned long long, std::nano> int_nsec = metrics.elapsed_time;
@@ -157,7 +157,7 @@ get_result_metrics(couchbase::operations::query_response::query_metrics metrics)
 }
 
 PyObject*
-get_result_metadata(couchbase::operations::query_response::query_meta_data metadata, bool include_metrics)
+get_result_metadata(couchbase::core::operations::query_response::query_meta_data metadata, bool include_metrics)
 {
     PyObject* pyObj_metadata = PyDict_New();
     PyObject* pyObj_tmp = PyUnicode_FromString(metadata.request_id.c_str());
@@ -279,7 +279,7 @@ get_result_metadata(couchbase::operations::query_response::query_meta_data metad
 }
 
 result*
-create_result_from_query_response(couchbase::operations::query_response resp, bool include_metrics)
+create_result_from_query_response(couchbase::core::operations::query_response resp, bool include_metrics)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -304,7 +304,7 @@ create_result_from_query_response(couchbase::operations::query_response resp, bo
 }
 
 void
-create_query_result(couchbase::operations::query_response resp,
+create_query_result(couchbase::core::operations::query_response resp,
                     bool include_metrics,
                     std::shared_ptr<rows_queue<PyObject*>> rows,
                     PyObject* pyObj_callback,
@@ -473,7 +473,7 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     }
 
     connection* conn = nullptr;
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::query_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::query_timeout;
 
     conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
     if (nullptr == conn) {
@@ -486,9 +486,9 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
         timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
     }
 
-    couchbase::operations::query_request req{ statement };
+    couchbase::core::operations::query_request req{ statement };
     // positional parameters
-    std::vector<couchbase::json_string> positional_parameters{};
+    std::vector<couchbase::core::json_string> positional_parameters{};
     if (pyObj_positional_parameters && PyList_Check(pyObj_positional_parameters)) {
         size_t nargs = static_cast<size_t>(PyList_Size(pyObj_positional_parameters));
         size_t ii;
@@ -503,7 +503,7 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
             Py_INCREF(pyOb_param);
             if (PyUnicode_Check(pyOb_param)) {
                 auto res = std::string(PyUnicode_AsUTF8(pyOb_param));
-                positional_parameters.push_back(couchbase::json_string{ std::move(res) });
+                positional_parameters.push_back(couchbase::core::json_string{ std::move(res) });
             }
             Py_DECREF(pyOb_param);
             pyOb_param = nullptr;
@@ -514,7 +514,7 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     }
 
     // named parameters
-    std::map<std::string, couchbase::json_string> named_parameters{};
+    std::map<std::string, couchbase::core::json_string> named_parameters{};
     if (pyObj_named_parameters && PyDict_Check(pyObj_named_parameters)) {
         PyObject *pyObj_key, *pyObj_value;
         Py_ssize_t pos = 0;
@@ -527,7 +527,7 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
             }
             if (PyUnicode_Check(pyObj_value) && !k.empty()) {
                 auto res = std::string(PyUnicode_AsUTF8(pyObj_value));
-                named_parameters.emplace(k, couchbase::json_string{ std::move(res) });
+                named_parameters.emplace(k, couchbase::core::json_string{ std::move(res) });
             }
         }
     }
@@ -559,7 +559,7 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     }
 
     if (scan_consistency != nullptr) {
-        req.scan_consistency = str_to_scan_consistency_type<couchbase::query_scan_consistency>(scan_consistency);
+        req.scan_consistency = str_to_scan_consistency_type<couchbase::core::query_scan_consistency>(scan_consistency);
     }
 
     if (profile_mode != nullptr) {
@@ -583,7 +583,7 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     }
 
     // raw options
-    std::map<std::string, couchbase::json_string> raw_options{};
+    std::map<std::string, couchbase::core::json_string> raw_options{};
     if (pyObj_raw && PyDict_Check(pyObj_raw)) {
         PyObject *pyObj_key, *pyObj_value;
         Py_ssize_t pos = 0;
@@ -596,7 +596,7 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
             }
             if (PyUnicode_Check(pyObj_value) && !k.empty()) {
                 auto res = std::string(PyUnicode_AsUTF8(pyObj_value));
-                raw_options.emplace(k, couchbase::json_string{ std::move(res) });
+                raw_options.emplace(k, couchbase::core::json_string{ std::move(res) });
             }
         }
     }
@@ -619,14 +619,14 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     //     PyObject* pyObj_row = PyBytes_FromStringAndSize(row.c_str(), row.length());
     //     rows->put(pyObj_row);
     //     PyGILState_Release(state);
-    //     return couchbase::utils::json::stream_control::next_row;
+    //     return couchbase::core::utils::json::stream_control::next_row;
     // };
 
     {
         Py_BEGIN_ALLOW_THREADS conn->cluster_->execute(
           req,
           [rows = streamed_res->rows, include_metrics = req.metrics, pyObj_callback, pyObj_errback](
-            couchbase::operations::query_response resp) {
+            couchbase::core::operations::query_response resp) {
               create_query_result(resp, include_metrics, rows, pyObj_callback, pyObj_errback);
           });
         Py_END_ALLOW_THREADS

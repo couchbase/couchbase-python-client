@@ -17,7 +17,7 @@
 
 #include "connection.hxx"
 #include "exceptions.hxx"
-#include <couchbase/io/ip_protocol.hxx>
+#include <core/io/ip_protocol.hxx>
 
 static void
 dealloc_conn(PyObject* obj)
@@ -180,10 +180,10 @@ create_connection_callback(PyObject* pyObj_conn,
     PyGILState_Release(state);
 }
 
-couchbase::cluster_credentials
+couchbase::core::cluster_credentials
 get_cluster_credentials(PyObject* pyObj_auth)
 {
-    couchbase::cluster_credentials auth{};
+    couchbase::core::cluster_credentials auth{};
     PyObject* pyObj_username = PyDict_GetItemString(pyObj_auth, "username");
     if (pyObj_username != nullptr) {
         auto username = std::string(PyUnicode_AsUTF8(pyObj_username));
@@ -212,9 +212,9 @@ get_cluster_credentials(PyObject* pyObj_auth)
 }
 
 void
-update_cluster_logging_meter_options(couchbase::cluster_options& options, PyObject* pyObj_emit_interval)
+update_cluster_logging_meter_options(couchbase::core::cluster_options& options, PyObject* pyObj_emit_interval)
 {
-    couchbase::metrics::logging_meter_options logging_options{};
+    couchbase::core::metrics::logging_meter_options logging_options{};
     bool has_logging_meter_options = false;
 
     if (pyObj_emit_interval != nullptr) {
@@ -230,9 +230,9 @@ update_cluster_logging_meter_options(couchbase::cluster_options& options, PyObje
 }
 
 void
-update_cluster_tracing_options(couchbase::cluster_options& options, PyObject* pyObj_tracing_opts)
+update_cluster_tracing_options(couchbase::core::cluster_options& options, PyObject* pyObj_tracing_opts)
 {
-    couchbase::tracing::threshold_logging_options tracing_options{};
+    couchbase::core::tracing::threshold_logging_options tracing_options{};
     bool has_tracing_options = false;
 
     PyObject* pyObj_kv_threshold = PyDict_GetItemString(pyObj_tracing_opts, "key_value_threshold");
@@ -327,7 +327,7 @@ update_cluster_tracing_options(couchbase::cluster_options& options, PyObject* py
 }
 
 void
-update_cluster_timeout_options(couchbase::cluster_options& options, PyObject* pyObj_timeout_opts)
+update_cluster_timeout_options(couchbase::core::cluster_options& options, PyObject* pyObj_timeout_opts)
 {
     PyObject* pyObj_bootstrap_timeout = PyDict_GetItemString(pyObj_timeout_opts, "bootstrap_timeout");
     if (pyObj_bootstrap_timeout != nullptr) {
@@ -422,7 +422,7 @@ update_cluster_timeout_options(couchbase::cluster_options& options, PyObject* py
 }
 
 void
-update_cluster_options(couchbase::cluster_options& options, PyObject* pyObj_options, PyObject* pyObj_auth)
+update_cluster_options(couchbase::core::cluster_options& options, PyObject* pyObj_options, PyObject* pyObj_auth)
 {
     PyObject* pyObj_timeout_opts = PyDict_GetItemString(pyObj_options, "timeout_options");
     if (pyObj_timeout_opts != nullptr) {
@@ -470,11 +470,11 @@ update_cluster_options(couchbase::cluster_options& options, PyObject* pyObj_opti
     if (pyObj_use_ip_protocol != nullptr) {
         auto use_ip_protocol = std::string(PyUnicode_AsUTF8(pyObj_use_ip_protocol));
         if (use_ip_protocol.compare("force_ipv4") == 0) {
-            options.use_ip_protocol = couchbase::io::ip_protocol::force_ipv6;
+            options.use_ip_protocol = couchbase::core::io::ip_protocol::force_ipv6;
         } else if (use_ip_protocol.compare("force_ipv6") == 0) {
-            options.use_ip_protocol = couchbase::io::ip_protocol::force_ipv6;
+            options.use_ip_protocol = couchbase::core::io::ip_protocol::force_ipv6;
         } else {
-            options.use_ip_protocol = couchbase::io::ip_protocol::any;
+            options.use_ip_protocol = couchbase::core::io::ip_protocol::any;
         }
     }
 
@@ -523,9 +523,9 @@ update_cluster_options(couchbase::cluster_options& options, PyObject* pyObj_opti
     if (pyObj_tls_verify != nullptr) {
         auto tls_verify = std::string(PyUnicode_AsUTF8(pyObj_tls_verify));
         if (tls_verify.compare("none") == 0) {
-            options.tls_verify = couchbase::tls_verify_mode::none;
+            options.tls_verify = couchbase::core::tls_verify_mode::none;
         } else if (tls_verify.compare("peer") == 0) {
-            options.tls_verify = couchbase::tls_verify_mode::peer;
+            options.tls_verify = couchbase::core::tls_verify_mode::peer;
         }
     }
 
@@ -585,8 +585,8 @@ handle_create_connection([[maybe_unused]] PyObject* self, PyObject* args, PyObje
         return nullptr;
     }
 
-    couchbase::utils::connection_string connection_str = couchbase::utils::parse_connection_string(conn_str);
-    couchbase::cluster_credentials auth = get_cluster_credentials(pyObj_auth);
+    couchbase::core::utils::connection_string connection_str = couchbase::core::utils::parse_connection_string(conn_str);
+    couchbase::core::cluster_credentials auth = get_cluster_credentials(pyObj_auth);
     update_cluster_options(connection_str.options, pyObj_options, pyObj_auth);
 
     PyObject* pyObj_num_io_threads = PyDict_GetItemString(pyObj_options, "num_io_threads");
@@ -616,7 +616,7 @@ handle_create_connection([[maybe_unused]] PyObject* self, PyObject* args, PyObje
     {
         int callback_count = 0;
         Py_BEGIN_ALLOW_THREADS conn->cluster_->open(
-          couchbase::origin(auth, connection_str),
+          couchbase::core::origin(auth, connection_str),
           [pyObj_conn, pyObj_callback, pyObj_errback, callback_count, barrier](std::error_code ec) mutable {
               if (callback_count == 0) {
                   create_connection_callback(pyObj_conn, ec, pyObj_callback, pyObj_errback, barrier);

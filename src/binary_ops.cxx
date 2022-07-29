@@ -29,7 +29,8 @@ add_extras_to_result([[maybe_unused]] const T& t, result* res)
 
 template<>
 result*
-add_extras_to_result<couchbase::operations::increment_response>(const couchbase::operations::increment_response& resp, result* res)
+add_extras_to_result<couchbase::core::operations::increment_response>(const couchbase::core::operations::increment_response& resp,
+                                                                      result* res)
 {
     PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.content);
     if (-1 == PyDict_SetItemString(res->dict, "content", pyObj_tmp)) {
@@ -42,7 +43,8 @@ add_extras_to_result<couchbase::operations::increment_response>(const couchbase:
 
 template<>
 result*
-add_extras_to_result<couchbase::operations::decrement_response>(const couchbase::operations::decrement_response& resp, result* res)
+add_extras_to_result<couchbase::core::operations::decrement_response>(const couchbase::core::operations::decrement_response& resp,
+                                                                      result* res)
 {
     PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.content);
     if (-1 == PyDict_SetItemString(res->dict, "content", pyObj_tmp)) {
@@ -59,8 +61,8 @@ create_base_result_from_binary_op_response(const char* key, const T& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
-    res->ec = resp.ctx.ec;
-    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value);
+    res->ec = resp.ctx.ec();
+    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value());
     if (-1 == PyDict_SetItemString(res->dict, RESULT_CAS, pyObj_tmp)) {
         Py_XDECREF(pyObj_result);
         Py_XDECREF(pyObj_tmp);
@@ -95,7 +97,7 @@ create_result_from_binary_op_response(const char* key,
     PyObject* pyObj_callback_res = nullptr;
     auto set_exception = false;
 
-    if (resp.ctx.ec.value()) {
+    if (resp.ctx.ec().value()) {
         pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "Binary operation error.");
         if (pyObj_errback == nullptr) {
             if (multi_result != nullptr) {
@@ -212,7 +214,7 @@ prepare_and_execute_counter_op(struct counter_options* options,
                                result* multi_result = nullptr)
 {
     if (options->op_type == Operations::INCREMENT) {
-        couchbase::operations::increment_request req{ options->id };
+        couchbase::core::operations::increment_request req{ options->id };
         req.delta = options->delta;
         req.initial_value = options->initial_value;
         req.timeout = options->timeout_ms;
@@ -220,9 +222,10 @@ prepare_and_execute_counter_op(struct counter_options* options,
         if (0 < options->expiry) {
             req.expiry = options->expiry;
         }
-        do_binary_op<couchbase::operations::increment_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
+        do_binary_op<couchbase::core::operations::increment_request>(
+          *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
     } else {
-        couchbase::operations::decrement_request req{ options->id };
+        couchbase::core::operations::decrement_request req{ options->id };
         req.delta = options->delta;
         req.initial_value = options->initial_value;
         req.timeout = options->timeout_ms;
@@ -230,7 +233,8 @@ prepare_and_execute_counter_op(struct counter_options* options,
         if (0 < options->expiry) {
             req.expiry = options->expiry;
         }
-        do_binary_op<couchbase::operations::decrement_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
+        do_binary_op<couchbase::core::operations::decrement_request>(
+          *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
     }
     Py_RETURN_NONE;
 }
@@ -262,7 +266,7 @@ prepare_and_execute_binary_mutation_op(struct binary_mutation_options* options,
         return nullptr;
     }
 
-    couchbase::utils::binary value;
+    couchbase::core::utils::binary value;
     try {
         value = PyObject_to_binary(options->pyObj_value);
     } catch (const std::exception& e) {
@@ -286,23 +290,25 @@ prepare_and_execute_binary_mutation_op(struct binary_mutation_options* options,
     }
 
     if (options->op_type == Operations::APPEND) {
-        couchbase::operations::append_request req{ options->id };
+        couchbase::core::operations::append_request req{ options->id };
         // @TODO(): C++ client doesn't handle cas
         // req.cas = cas;
         req.timeout = options->timeout_ms;
         req.durability_level = options->durability;
         req.value = value;
-        do_binary_op<couchbase::operations::append_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
+        do_binary_op<couchbase::core::operations::append_request>(
+          *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
 
     } else {
 
-        couchbase::operations::prepend_request req{ options->id };
+        couchbase::core::operations::prepend_request req{ options->id };
         // @TODO(): C++ client doesn't handle cas
         // req.cas = cas;
         req.timeout = options->timeout_ms;
         req.durability_level = options->durability;
         req.value = value;
-        do_binary_op<couchbase::operations::prepend_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
+        do_binary_op<couchbase::core::operations::prepend_request>(
+          *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
     }
     Py_RETURN_NONE;
 }
@@ -371,9 +377,9 @@ handle_binary_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwar
         return nullptr;
     }
 
-    couchbase::document_id id{ bucket, scope, collection, key };
+    couchbase::core::document_id id{ bucket, scope, collection, key };
 
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::key_value_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
     if (0 < timeout) {
         timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
     }
@@ -398,9 +404,9 @@ handle_binary_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwar
     }
 
     // @TODO(): C++ client doesn't handle observable durability
-    couchbase::protocol::durability_level durability_level = couchbase::protocol::durability_level::none;
+    couchbase::core::protocol::durability_level durability_level = couchbase::core::protocol::durability_level::none;
     if (durability != 0) {
-        durability_level = static_cast<couchbase::protocol::durability_level>(durability);
+        durability_level = static_cast<couchbase::core::protocol::durability_level>(durability);
     }
 
     couchbase::cas cas = couchbase::cas{ 0 };
@@ -482,7 +488,7 @@ get_counter_options(PyObject* op_args)
         opts.expiry = expiry;
     }
 
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::key_value_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
     PyObject* pyObj_timeout = PyDict_GetItemString(op_args, "timeout");
     if (pyObj_timeout != nullptr) {
         auto timeout = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_timeout));
@@ -494,7 +500,7 @@ get_counter_options(PyObject* op_args)
 
     uint8_t durability = 0;
     PyObject* pyObj_durability = PyDict_GetItemString(op_args, "durability");
-    couchbase::protocol::durability_level durability_level = couchbase::protocol::durability_level::none;
+    couchbase::core::protocol::durability_level durability_level = couchbase::core::protocol::durability_level::none;
     if (pyObj_durability) {
         if (PyDict_Check(pyObj_durability)) {
             PyObject* pyObj_replicate_to = PyDict_GetItemString(pyObj_durability, "replicate_to");
@@ -512,7 +518,7 @@ get_counter_options(PyObject* op_args)
         }
 
         if (durability != 0) {
-            durability_level = static_cast<couchbase::protocol::durability_level>(durability);
+            durability_level = static_cast<couchbase::core::protocol::durability_level>(durability);
         }
         opts.durability = durability_level;
     }
@@ -542,7 +548,7 @@ get_binary_mutation_options(PyObject* op_args)
     }
     opts.cas = cas;
 
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::key_value_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
     PyObject* pyObj_timeout = PyDict_GetItemString(op_args, "timeout");
     if (pyObj_timeout != nullptr) {
         auto timeout = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_timeout));
@@ -554,7 +560,7 @@ get_binary_mutation_options(PyObject* op_args)
 
     uint8_t durability = 0;
     PyObject* pyObj_durability = PyDict_GetItemString(op_args, "durability");
-    couchbase::protocol::durability_level durability_level = couchbase::protocol::durability_level::none;
+    couchbase::core::protocol::durability_level durability_level = couchbase::core::protocol::durability_level::none;
     if (pyObj_durability) {
         if (PyDict_Check(pyObj_durability)) {
             PyObject* pyObj_replicate_to = PyDict_GetItemString(pyObj_durability, "replicate_to");
@@ -572,7 +578,7 @@ get_binary_mutation_options(PyObject* op_args)
         }
 
         if (durability != 0) {
-            durability_level = static_cast<couchbase::protocol::durability_level>(durability);
+            durability_level = static_cast<couchbase::core::protocol::durability_level>(durability);
         }
         opts.durability = durability_level;
     }
@@ -648,7 +654,7 @@ handle_binary_multi_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject
                             opts.pyObj_value = pyObj_value;
                         }
 
-                        couchbase::document_id id{ bucket, scope, collection, k };
+                        couchbase::core::document_id id{ bucket, scope, collection, k };
                         opts.conn = conn;
                         opts.id = id;
 
@@ -660,7 +666,7 @@ handle_binary_multi_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject
                         auto opts = get_counter_options(pyObj_op_dict);
                         opts.op_type = op_type;
 
-                        couchbase::document_id id{ bucket, scope, collection, k };
+                        couchbase::core::document_id id{ bucket, scope, collection, k };
                         opts.conn = conn;
                         opts.id = id;
 

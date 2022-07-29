@@ -19,7 +19,7 @@
 
 #include "../client.hxx"
 
-#include <couchbase/operations/management/collections.hxx>
+#include <core/operations/management/collections.hxx>
 
 class CollectionManagementOperations
 {
@@ -68,7 +68,7 @@ class CollectionManagementOperations
 struct collection_mgmt_options {
     PyObject* op_args;
     CollectionManagementOperations::OperationType op_type = CollectionManagementOperations::UNKNOWN;
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::management_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::management_timeout;
 };
 
 PyObject*

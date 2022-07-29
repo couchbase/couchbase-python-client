@@ -158,7 +158,7 @@ static PyObject*
 mutation_token_new(PyTypeObject* type, PyObject*, PyObject*)
 {
     mutation_token* self = reinterpret_cast<mutation_token*>(type->tp_alloc(type, 0));
-    self->token = new couchbase::mutation_token();
+    self->token = new couchbase::core::mutation_token();
     return reinterpret_cast<PyObject*>(self);
 }
 
@@ -225,7 +225,7 @@ pycbc_mutation_token_type_init(PyObject** ptr)
 }
 
 PyObject*
-create_mutation_token_obj(struct couchbase::mutation_token mt)
+create_mutation_token_obj(struct couchbase::core::mutation_token mt)
 {
     PyObject* pyObj_mut = PyObject_CallObject(reinterpret_cast<PyObject*>(&mutation_token_type), nullptr);
     mutation_token* mut_token = reinterpret_cast<mutation_token*>(pyObj_mut);

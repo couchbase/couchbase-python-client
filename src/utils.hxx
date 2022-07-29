@@ -18,12 +18,12 @@
 #pragma once
 
 #include "Python.h" // NOLINT
-#include <couchbase/utils/binary.hxx>
+#include <core/utils/binary.hxx>
 #include <stdexcept>
 
-couchbase::utils::binary
+couchbase::core::utils::binary
 PyObject_to_binary(PyObject*);
 PyObject*
-binary_to_PyObject(couchbase::utils::binary value);
+binary_to_PyObject(couchbase::core::utils::binary value);
 std::size_t py_ssize_t_to_size_t(Py_ssize_t);
 Py_ssize_t size_t_to_py_ssize_t(std::size_t);

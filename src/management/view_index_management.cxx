@@ -17,11 +17,11 @@
 
 #include "view_index_management.hxx"
 #include "../exceptions.hxx"
-#include <couchbase/management/design_document.hxx>
-#include <couchbase/design_document_namespace.hxx>
+#include <core/management/design_document.hxx>
+#include <core/design_document_namespace.hxx>
 
 PyObject*
-build_design_doc(couchbase::management::views::design_document dd)
+build_design_doc(couchbase::core::management::views::design_document dd)
 {
     PyObject* pyObj_dd = PyDict_New();
 
@@ -42,7 +42,7 @@ build_design_doc(couchbase::management::views::design_document dd)
     Py_DECREF(pyObj_tmp);
 
     std::string ns = "development";
-    if (dd.ns == couchbase::design_document_namespace::production) {
+    if (dd.ns == couchbase::core::design_document_namespace::production) {
         ns = "production";
     }
 
@@ -114,8 +114,8 @@ create_result_from_view_index_mgmt_response([[maybe_unused]] const T& resp)
 
 template<>
 result*
-create_result_from_view_index_mgmt_response<couchbase::operations::management::view_index_get_all_response>(
-  const couchbase::operations::management::view_index_get_all_response& resp)
+create_result_from_view_index_mgmt_response<couchbase::core::operations::management::view_index_get_all_response>(
+  const couchbase::core::operations::management::view_index_get_all_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -143,8 +143,8 @@ create_result_from_view_index_mgmt_response<couchbase::operations::management::v
 
 template<>
 result*
-create_result_from_view_index_mgmt_response<couchbase::operations::management::view_index_get_response>(
-  const couchbase::operations::management::view_index_get_response& resp)
+create_result_from_view_index_mgmt_response<couchbase::core::operations::management::view_index_get_response>(
+  const couchbase::core::operations::management::view_index_get_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -228,7 +228,7 @@ create_result_from_view_index_mgmt_op_response(const Response& resp,
     PyGILState_Release(state);
 }
 
-couchbase::management::views::design_document
+couchbase::core::management::views::design_document
 get_design_doc(PyObject* pyObj_dd)
 {
     PyObject* pyObj_name = PyDict_GetItemString(pyObj_dd, "name");
@@ -237,12 +237,12 @@ get_design_doc(PyObject* pyObj_dd)
     PyObject* pyObj_namespace = PyDict_GetItemString(pyObj_dd, "namespace");
     auto namespace_ = std::string(PyUnicode_AsUTF8(pyObj_namespace));
 
-    auto ns = couchbase::design_document_namespace::development;
+    auto ns = couchbase::core::design_document_namespace::development;
     if (namespace_.compare("production") == 0) {
-        ns = couchbase::design_document_namespace::production;
+        ns = couchbase::core::design_document_namespace::production;
     }
 
-    std::map<std::string, couchbase::management::views::design_document::view> views{};
+    std::map<std::string, couchbase::core::management::views::design_document::view> views{};
     PyObject* pyObj_views = PyDict_GetItemString(pyObj_dd, "views");
     if (pyObj_views && PyDict_Check(pyObj_views)) {
         PyObject *pyObj_key, *pyObj_value;
@@ -255,7 +255,7 @@ get_design_doc(PyObject* pyObj_dd)
                 k = std::string(PyUnicode_AsUTF8(pyObj_key));
             }
             if (PyDict_Check(pyObj_value) && !k.empty()) {
-                couchbase::management::views::design_document::view view{ k };
+                couchbase::core::management::views::design_document::view view{ k };
 
                 PyObject* pyObj_tmp = PyDict_GetItemString(pyObj_value, "map");
                 if (pyObj_tmp != nullptr) {
@@ -272,7 +272,7 @@ get_design_doc(PyObject* pyObj_dd)
             }
         }
     }
-    couchbase::management::views::design_document dd{};
+    couchbase::core::management::views::design_document dd{};
     dd.name = name;
     dd.ns = ns;
 
@@ -308,27 +308,27 @@ get_view_mgmt_req_base(PyObject* op_args)
     return req;
 }
 
-couchbase::operations::management::view_index_get_all_request
+couchbase::core::operations::management::view_index_get_all_request
 get_view_index_get_all_req(PyObject* op_args)
 {
-    auto req = get_view_mgmt_req_base<couchbase::operations::management::view_index_get_all_request>(op_args);
+    auto req = get_view_mgmt_req_base<couchbase::core::operations::management::view_index_get_all_request>(op_args);
 
     PyObject* pyObj_namespace = PyDict_GetItemString(op_args, "namespace");
     auto namespace_ = std::string(PyUnicode_AsUTF8(pyObj_namespace));
 
-    auto ns = couchbase::design_document_namespace::development;
+    auto ns = couchbase::core::design_document_namespace::development;
     if (namespace_.compare("production") == 0) {
-        ns = couchbase::design_document_namespace::production;
+        ns = couchbase::core::design_document_namespace::production;
     }
     req.ns = ns;
 
     return req;
 }
 
-couchbase::operations::management::view_index_get_request
+couchbase::core::operations::management::view_index_get_request
 get_view_index_get_req(PyObject* op_args)
 {
-    auto req = get_view_mgmt_req_base<couchbase::operations::management::view_index_get_request>(op_args);
+    auto req = get_view_mgmt_req_base<couchbase::core::operations::management::view_index_get_request>(op_args);
     PyObject* pyObj_document_name = PyDict_GetItemString(op_args, "document_name");
     auto document_name = std::string(PyUnicode_AsUTF8(pyObj_document_name));
     req.document_name = document_name;
@@ -336,19 +336,19 @@ get_view_index_get_req(PyObject* op_args)
     PyObject* pyObj_namespace = PyDict_GetItemString(op_args, "namespace");
     auto namespace_ = std::string(PyUnicode_AsUTF8(pyObj_namespace));
 
-    auto ns = couchbase::design_document_namespace::development;
+    auto ns = couchbase::core::design_document_namespace::development;
     if (namespace_.compare("production") == 0) {
-        ns = couchbase::design_document_namespace::production;
+        ns = couchbase::core::design_document_namespace::production;
     }
     req.ns = ns;
 
     return req;
 }
 
-couchbase::operations::management::view_index_drop_request
+couchbase::core::operations::management::view_index_drop_request
 get_view_index_drop_req(PyObject* op_args)
 {
-    auto req = get_view_mgmt_req_base<couchbase::operations::management::view_index_drop_request>(op_args);
+    auto req = get_view_mgmt_req_base<couchbase::core::operations::management::view_index_drop_request>(op_args);
     PyObject* pyObj_document_name = PyDict_GetItemString(op_args, "document_name");
     auto document_name = std::string(PyUnicode_AsUTF8(pyObj_document_name));
     req.document_name = document_name;
@@ -356,19 +356,19 @@ get_view_index_drop_req(PyObject* op_args)
     PyObject* pyObj_namespace = PyDict_GetItemString(op_args, "namespace");
     auto namespace_ = std::string(PyUnicode_AsUTF8(pyObj_namespace));
 
-    auto ns = couchbase::design_document_namespace::development;
+    auto ns = couchbase::core::design_document_namespace::development;
     if (namespace_.compare("production") == 0) {
-        ns = couchbase::design_document_namespace::production;
+        ns = couchbase::core::design_document_namespace::production;
     }
     req.ns = ns;
 
     return req;
 }
 
-couchbase::operations::management::view_index_upsert_request
+couchbase::core::operations::management::view_index_upsert_request
 get_view_index_upsert_req(PyObject* op_args)
 {
-    auto req = get_view_mgmt_req_base<couchbase::operations::management::view_index_upsert_request>(op_args);
+    auto req = get_view_mgmt_req_base<couchbase::core::operations::management::view_index_upsert_request>(op_args);
     PyObject* pyObj_design_doc = PyDict_GetItemString(op_args, "design_docucment");
     if (pyObj_design_doc != nullptr) {
         auto design_doc = get_design_doc(pyObj_design_doc);
@@ -403,7 +403,7 @@ handle_view_index_mgmt_op(connection* conn, struct view_index_mgmt_options* opti
             auto req = get_view_index_upsert_req(options->op_args);
             req.timeout = options->timeout_ms;
 
-            res = do_view_index_mgmt_op<couchbase::operations::management::view_index_upsert_request>(
+            res = do_view_index_mgmt_op<couchbase::core::operations::management::view_index_upsert_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
@@ -411,7 +411,7 @@ handle_view_index_mgmt_op(connection* conn, struct view_index_mgmt_options* opti
             auto req = get_view_index_get_req(options->op_args);
             req.timeout = options->timeout_ms;
 
-            res = do_view_index_mgmt_op<couchbase::operations::management::view_index_get_request>(
+            res = do_view_index_mgmt_op<couchbase::core::operations::management::view_index_get_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
@@ -419,7 +419,7 @@ handle_view_index_mgmt_op(connection* conn, struct view_index_mgmt_options* opti
             auto req = get_view_index_drop_req(options->op_args);
             req.timeout = options->timeout_ms;
 
-            res = do_view_index_mgmt_op<couchbase::operations::management::view_index_drop_request>(
+            res = do_view_index_mgmt_op<couchbase::core::operations::management::view_index_drop_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
@@ -427,7 +427,7 @@ handle_view_index_mgmt_op(connection* conn, struct view_index_mgmt_options* opti
             auto req = get_view_index_get_all_req(options->op_args);
             req.timeout = options->timeout_ms;
 
-            res = do_view_index_mgmt_op<couchbase::operations::management::view_index_get_all_request>(
+            res = do_view_index_mgmt_op<couchbase::core::operations::management::view_index_get_all_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }

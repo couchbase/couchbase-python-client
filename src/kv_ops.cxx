@@ -29,7 +29,8 @@ add_extras_to_result([[maybe_unused]] const T& t, result* res)
 
 template<>
 result*
-add_extras_to_result<couchbase::operations::get_projected_response>(const couchbase::operations::get_projected_response& resp, result* res)
+add_extras_to_result<couchbase::core::operations::get_projected_response>(const couchbase::core::operations::get_projected_response& resp,
+                                                                          result* res)
 {
     if (resp.expiry) {
         PyObject* pyObj_tmp = PyLong_FromUnsignedLong(resp.expiry.value());
@@ -44,7 +45,7 @@ add_extras_to_result<couchbase::operations::get_projected_response>(const couchb
 
 template<>
 result*
-add_extras_to_result<couchbase::operations::exists_response>(const couchbase::operations::exists_response& resp, result* res)
+add_extras_to_result<couchbase::core::operations::exists_response>(const couchbase::core::operations::exists_response& resp, result* res)
 {
     PyObject* pyObj_tmp = PyBool_FromLong(static_cast<long>(resp.exists()));
     if (-1 == PyDict_SetItemString(res->dict, RESULT_EXISTS, pyObj_tmp)) {
@@ -61,9 +62,9 @@ create_base_result_from_get_operation_response(const char* key, const T& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
-    res->ec = resp.ctx.ec;
+    res->ec = resp.ctx.ec();
 
-    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value);
+    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value());
     if (-1 == PyDict_SetItemString(res->dict, RESULT_CAS, pyObj_tmp)) {
         Py_XDECREF(pyObj_result);
         Py_XDECREF(pyObj_tmp);
@@ -108,14 +109,15 @@ create_base_result_from_get_operation_response(const char* key, const T& resp)
 
 template<>
 result*
-create_base_result_from_get_operation_response<couchbase::operations::exists_response>(const char* key,
-                                                                                       const couchbase::operations::exists_response& resp)
+create_base_result_from_get_operation_response<couchbase::core::operations::exists_response>(
+  const char* key,
+  const couchbase::core::operations::exists_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
-    res->ec = resp.ctx.ec;
+    res->ec = resp.ctx.ec();
 
-    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value);
+    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value());
     if (-1 == PyDict_SetItemString(res->dict, RESULT_CAS, pyObj_tmp)) {
         Py_XDECREF(pyObj_result);
         Py_XDECREF(pyObj_tmp);
@@ -137,14 +139,15 @@ create_base_result_from_get_operation_response<couchbase::operations::exists_res
 
 template<>
 result*
-create_base_result_from_get_operation_response<couchbase::operations::touch_response>(const char* key,
-                                                                                      const couchbase::operations::touch_response& resp)
+create_base_result_from_get_operation_response<couchbase::core::operations::touch_response>(
+  const char* key,
+  const couchbase::core::operations::touch_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
-    res->ec = resp.ctx.ec;
+    res->ec = resp.ctx.ec();
 
-    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value);
+    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value());
     if (-1 == PyDict_SetItemString(res->dict, RESULT_CAS, pyObj_tmp)) {
         Py_XDECREF(pyObj_result);
         Py_XDECREF(pyObj_tmp);
@@ -166,14 +169,15 @@ create_base_result_from_get_operation_response<couchbase::operations::touch_resp
 
 template<>
 result*
-create_base_result_from_get_operation_response<couchbase::operations::unlock_response>(const char* key,
-                                                                                       const couchbase::operations::unlock_response& resp)
+create_base_result_from_get_operation_response<couchbase::core::operations::unlock_response>(
+  const char* key,
+  const couchbase::core::operations::unlock_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
-    res->ec = resp.ctx.ec;
+    res->ec = resp.ctx.ec();
 
-    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value);
+    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value());
     if (-1 == PyDict_SetItemString(res->dict, RESULT_CAS, pyObj_tmp)) {
         Py_XDECREF(pyObj_result);
         Py_XDECREF(pyObj_tmp);
@@ -211,7 +215,7 @@ create_result_from_get_operation_response(const char* key,
     PyObject* pyObj_callback_res = nullptr;
     auto set_exception = false;
 
-    if (resp.ctx.ec.value()) {
+    if (resp.ctx.ec().value()) {
         pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "KV read operation error.");
         if (pyObj_errback == nullptr) {
             if (multi_result != nullptr) {
@@ -306,12 +310,13 @@ create_result_from_get_operation_response(const char* key,
 // Until CXXCBC-82 is resolved
 template<>
 void
-create_result_from_get_operation_response<couchbase::operations::exists_response>(const char* key,
-                                                                                  const couchbase::operations::exists_response& resp,
-                                                                                  PyObject* pyObj_callback,
-                                                                                  PyObject* pyObj_errback,
-                                                                                  std::shared_ptr<std::promise<PyObject*>> barrier,
-                                                                                  result* multi_result)
+create_result_from_get_operation_response<couchbase::core::operations::exists_response>(
+  const char* key,
+  const couchbase::core::operations::exists_response& resp,
+  PyObject* pyObj_callback,
+  PyObject* pyObj_errback,
+  std::shared_ptr<std::promise<PyObject*>> barrier,
+  result* multi_result)
 {
     PyGILState_STATE state = PyGILState_Ensure();
     PyObject* pyObj_args = NULL;
@@ -321,7 +326,7 @@ create_result_from_get_operation_response<couchbase::operations::exists_response
     PyObject* pyObj_callback_res = nullptr;
     auto set_exception = false;
 
-    if (resp.ctx.ec.value() && resp.ctx.ec.value() != 101) {
+    if (resp.ctx.ec().value() && resp.ctx.ec().value() != 101) {
         pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "KV read operation error.");
         if (pyObj_errback == nullptr) {
             if (multi_result != nullptr) {
@@ -438,9 +443,9 @@ prepare_and_execute_read_op(struct read_options* options,
 {
     switch (options->op_type) {
         case Operations::GET: {
-            couchbase::operations::get_request req{ options->id };
+            couchbase::core::operations::get_request req{ options->id };
             req.timeout = options->timeout_ms;
-            do_get<couchbase::operations::get_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
+            do_get<couchbase::core::operations::get_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         case Operations::GET_PROJECTED: {
@@ -484,48 +489,50 @@ prepare_and_execute_read_op(struct read_options* options,
                 }
             }
 
-            couchbase::operations::get_projected_request req{ options->id };
+            couchbase::core::operations::get_projected_request req{ options->id };
             req.timeout = options->timeout_ms;
             req.with_expiry = !!options->with_expiry;
             req.projections = projections;
-            do_get<couchbase::operations::get_projected_request>(
+            do_get<couchbase::core::operations::get_projected_request>(
               *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         case Operations::GET_AND_TOUCH: {
-            couchbase::operations::get_and_touch_request req{ options->id };
+            couchbase::core::operations::get_and_touch_request req{ options->id };
             req.expiry = options->expiry;
             req.timeout = options->timeout_ms;
-            do_get<couchbase::operations::get_and_touch_request>(
+            do_get<couchbase::core::operations::get_and_touch_request>(
               *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         case Operations::GET_AND_LOCK: {
-            couchbase::operations::get_and_lock_request req{ options->id };
+            couchbase::core::operations::get_and_lock_request req{ options->id };
             req.lock_time = options->lock_time;
             req.timeout = options->timeout_ms;
-            do_get<couchbase::operations::get_and_lock_request>(
+            do_get<couchbase::core::operations::get_and_lock_request>(
               *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         case Operations::EXISTS: {
-            couchbase::operations::exists_request req{ options->id };
+            couchbase::core::operations::exists_request req{ options->id };
             req.timeout = options->timeout_ms;
-            do_get<couchbase::operations::exists_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
+            do_get<couchbase::core::operations::exists_request>(
+              *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         case Operations::TOUCH: {
-            couchbase::operations::touch_request req{ options->id };
+            couchbase::core::operations::touch_request req{ options->id };
             req.expiry = options->expiry;
             req.timeout = options->timeout_ms;
-            do_get<couchbase::operations::touch_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
+            do_get<couchbase::core::operations::touch_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         case Operations::UNLOCK: {
-            couchbase::operations::unlock_request req{ options->id };
+            couchbase::core::operations::unlock_request req{ options->id };
             req.cas = options->cas;
             req.timeout = options->timeout_ms;
-            do_get<couchbase::operations::unlock_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
+            do_get<couchbase::core::operations::unlock_request>(
+              *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         default: {
@@ -559,8 +566,8 @@ create_base_result_from_mutation_operation_response(const char* key, const T& re
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
-    res->ec = resp.ctx.ec;
-    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value);
+    res->ec = resp.ctx.ec();
+    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value());
     if (-1 == PyDict_SetItemString(res->dict, RESULT_CAS, pyObj_tmp)) {
         Py_XDECREF(pyObj_tmp);
         return nullptr;
@@ -603,7 +610,7 @@ create_result_from_mutation_operation_response(const char* key,
     PyObject* pyObj_callback_res = nullptr;
     auto set_exception = false;
 
-    if (resp.ctx.ec.value()) {
+    if (resp.ctx.ec().value()) {
         pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "KV mutation operation error.");
         if (pyObj_errback == nullptr) {
             if (multi_result != nullptr) {
@@ -720,7 +727,7 @@ prepare_and_execute_mutation_op(struct mutation_options* options,
     // **DO NOT DECREF** these -- content from tuples are borrowed references!!
     PyObject* pyObj_flags = nullptr;
     PyObject* pyObj_value = nullptr;
-    couchbase::utils::binary value;
+    couchbase::core::utils::binary value;
 
     if (options->value) {
         pyObj_value = PyTuple_GET_ITEM(options->value, 0);
@@ -748,23 +755,24 @@ prepare_and_execute_mutation_op(struct mutation_options* options,
         }
     }
 
-    couchbase::protocol::durability_level durability_level = couchbase::protocol::durability_level::none;
+    couchbase::core::protocol::durability_level durability_level = couchbase::core::protocol::durability_level::none;
     if (options->durability != 0) {
-        durability_level = static_cast<couchbase::protocol::durability_level>(options->durability);
+        durability_level = static_cast<couchbase::core::protocol::durability_level>(options->durability);
     }
 
     switch (options->op_type) {
         case Operations::INSERT: {
-            couchbase::operations::insert_request req{ options->id, value };
+            couchbase::core::operations::insert_request req{ options->id, value };
             req.flags = static_cast<uint32_t>(PyLong_AsLong(pyObj_flags));
             req.timeout = options->timeout_ms;
             req.expiry = options->expiry;
             req.durability_level = durability_level;
-            do_mutation<couchbase::operations::insert_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
+            do_mutation<couchbase::core::operations::insert_request>(
+              *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         case Operations::UPSERT: {
-            couchbase::operations::upsert_request req{ options->id, value };
+            couchbase::core::operations::upsert_request req{ options->id, value };
             req.flags = static_cast<uint32_t>(PyLong_AsLong(pyObj_flags));
             req.timeout = options->timeout_ms;
             if (0 < options->expiry) {
@@ -774,11 +782,12 @@ prepare_and_execute_mutation_op(struct mutation_options* options,
             if (options->preserve_expiry) {
                 req.preserve_expiry = options->preserve_expiry;
             }
-            do_mutation<couchbase::operations::upsert_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
+            do_mutation<couchbase::core::operations::upsert_request>(
+              *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         case Operations::REPLACE: {
-            couchbase::operations::replace_request req{ options->id, value };
+            couchbase::core::operations::replace_request req{ options->id, value };
             req.flags = static_cast<uint32_t>(PyLong_AsLong(pyObj_flags));
             req.timeout = options->timeout_ms;
             if (0 < options->expiry) {
@@ -789,16 +798,17 @@ prepare_and_execute_mutation_op(struct mutation_options* options,
             if (options->preserve_expiry) {
                 req.preserve_expiry = options->preserve_expiry;
             }
-            do_mutation<couchbase::operations::replace_request>(
+            do_mutation<couchbase::core::operations::replace_request>(
               *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         case Operations::REMOVE: {
-            couchbase::operations::remove_request req{ options->id };
+            couchbase::core::operations::remove_request req{ options->id };
             req.timeout = options->timeout_ms;
             req.cas = options->cas;
             req.durability_level = durability_level;
-            do_mutation<couchbase::operations::remove_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
+            do_mutation<couchbase::core::operations::remove_request>(
+              *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
         default: {
@@ -890,7 +900,7 @@ handle_kv_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
     }
 
     connection* conn = nullptr;
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::key_value_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
 
     conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
     if (nullptr == conn) {
@@ -898,7 +908,7 @@ handle_kv_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwargs)
         return nullptr;
     }
     // PyErr_Clear();
-    couchbase::document_id id{ bucket, scope, collection, key };
+    couchbase::core::document_id id{ bucket, scope, collection, key };
     if (0 < timeout) {
         timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
     }
@@ -1014,7 +1024,7 @@ get_read_options(PyObject* op_args)
         opts.lock_time = lock_time;
     }
 
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::key_value_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
     PyObject* pyObj_timeout = PyDict_GetItemString(op_args, "timeout");
     if (pyObj_timeout != nullptr) {
         auto timeout = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_timeout));
@@ -1064,7 +1074,7 @@ get_mutation_options(PyObject* op_args)
         }
     }
 
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::key_value_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
     PyObject* pyObj_timeout = PyDict_GetItemString(op_args, "timeout");
     if (pyObj_timeout != nullptr) {
         auto timeout = static_cast<uint64_t>(PyLong_AsUnsignedLongLong(pyObj_timeout));
@@ -1167,7 +1177,7 @@ handle_kv_multi_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kw
                             opts.value = pyObj_value;
                         }
 
-                        couchbase::document_id id{ bucket, scope, collection, k };
+                        couchbase::core::document_id id{ bucket, scope, collection, k };
                         opts.conn = conn;
                         opts.id = id;
 
@@ -1201,7 +1211,7 @@ handle_kv_multi_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kw
                             opts.project = pyObj_project;
                         }
 
-                        couchbase::document_id id{ bucket, scope, collection, k };
+                        couchbase::core::document_id id{ bucket, scope, collection, k };
                         opts.conn = conn;
                         opts.id = id;
 

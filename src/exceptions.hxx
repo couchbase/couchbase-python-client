@@ -72,7 +72,7 @@ exception_base*
 create_exception_base_obj();
 
 std::string
-retry_reason_to_string(couchbase::io::retry_reason reason);
+retry_reason_to_string(couchbase::retry_reason reason);
 
 // start - needed for Pycbc error code
 enum class PycbcError {
@@ -96,15 +96,14 @@ make_error_code(PycbcError ec);
 // end - needed for Pycbc error code
 
 PyObject*
-build_kv_error_map_info(couchbase::error_map::error_info error_info);
+build_kv_error_map_info(couchbase::key_value_error_map_info error_info);
 
 /*
 
 Build exceptions via error context
 
 */
-
-template<typename T>
+template<class T>
 PyObject*
 build_base_error_context(const T& ctx)
 {
@@ -137,6 +136,60 @@ build_base_error_context(const T& ctx)
 
     PyObject* rr_set = PySet_New(nullptr);
     for (auto rr : ctx.retry_reasons) {
+        std::string reason = retry_reason_to_string(rr);
+        pyObj_tmp = PyUnicode_FromString(reason.c_str());
+        if (-1 == PySet_Add(rr_set, pyObj_tmp)) {
+            PyErr_Print();
+            PyErr_Clear();
+        }
+        Py_DECREF(pyObj_tmp);
+    }
+
+    Py_ssize_t set_size = PySet_Size(rr_set);
+    if (set_size > 0) {
+        if (-1 == PyDict_SetItemString(pyObj_error_context, RETRY_REASONS, rr_set)) {
+            PyErr_Print();
+            PyErr_Clear();
+        }
+    }
+    Py_DECREF(rr_set);
+
+    return pyObj_error_context;
+}
+
+template<>
+inline PyObject*
+build_base_error_context(const couchbase::key_value_error_context& ctx)
+{
+    PyObject* pyObj_error_context = PyDict_New();
+
+    PyObject* pyObj_tmp = nullptr;
+    if (ctx.last_dispatched_to().has_value()) {
+        pyObj_tmp = PyUnicode_FromString(ctx.last_dispatched_to().value().c_str());
+        if (-1 == PyDict_SetItemString(pyObj_error_context, DISPATCHED_TO, pyObj_tmp)) {
+            PyErr_Print();
+            PyErr_Clear();
+        }
+        Py_DECREF(pyObj_tmp);
+    }
+    if (ctx.last_dispatched_from().has_value()) {
+        pyObj_tmp = PyUnicode_FromString(ctx.last_dispatched_from().value().c_str());
+        if (-1 == PyDict_SetItemString(pyObj_error_context, DISPATCHED_FROM, pyObj_tmp)) {
+            PyErr_Print();
+            PyErr_Clear();
+        }
+        Py_DECREF(pyObj_tmp);
+    }
+
+    pyObj_tmp = PyLong_FromLong(ctx.retry_attempts());
+    if (-1 == PyDict_SetItemString(pyObj_error_context, RETRY_ATTEMPTS, pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_DECREF(pyObj_tmp);
+
+    PyObject* rr_set = PySet_New(nullptr);
+    for (auto rr : ctx.retry_reasons()) {
         std::string reason = retry_reason_to_string(rr);
         pyObj_tmp = PyUnicode_FromString(reason.c_str());
         if (-1 == PySet_Add(rr_set, pyObj_tmp)) {
@@ -216,54 +269,54 @@ build_exception_from_context(const T& ctx,
 
 template<>
 inline PyObject*
-build_exception_from_context(const couchbase::error_context::key_value& ctx,
+build_exception_from_context(const couchbase::key_value_error_context& ctx,
                              const char* file,
                              int line,
                              std::string error_msg,
                              std::string context_detail_type)
 {
     exception_base* exc = create_exception_base_obj();
-    exc->ec = ctx.ec;
+    exc->ec = ctx.ec();
     PyObject* pyObj_error_context = build_base_error_context(ctx);
 
     PyObject* pyObj_tmp = nullptr;
-    pyObj_tmp = PyUnicode_FromString(ctx.id.key().c_str());
+    pyObj_tmp = PyUnicode_FromString(ctx.id().c_str());
     if (-1 == PyDict_SetItemString(pyObj_error_context, KV_DOCUMENT_ID, pyObj_tmp)) {
         PyErr_Print();
         PyErr_Clear();
     }
     Py_DECREF(pyObj_tmp);
 
-    pyObj_tmp = PyUnicode_FromString(ctx.id.bucket().c_str());
+    pyObj_tmp = PyUnicode_FromString(ctx.bucket().c_str());
     if (-1 == PyDict_SetItemString(pyObj_error_context, KV_DOCUMENT_BUCKET, pyObj_tmp)) {
         PyErr_Print();
         PyErr_Clear();
     }
     Py_DECREF(pyObj_tmp);
 
-    pyObj_tmp = PyUnicode_FromString(ctx.id.scope().c_str());
+    pyObj_tmp = PyUnicode_FromString(ctx.scope().c_str());
     if (-1 == PyDict_SetItemString(pyObj_error_context, KV_DOCUMENT_SCOPE, pyObj_tmp)) {
         PyErr_Print();
         PyErr_Clear();
     }
     Py_DECREF(pyObj_tmp);
 
-    pyObj_tmp = PyUnicode_FromString(ctx.id.collection().c_str());
+    pyObj_tmp = PyUnicode_FromString(ctx.collection().c_str());
     if (-1 == PyDict_SetItemString(pyObj_error_context, KV_DOCUMENT_COLLECTION, pyObj_tmp)) {
         PyErr_Print();
         PyErr_Clear();
     }
     Py_DECREF(pyObj_tmp);
 
-    pyObj_tmp = PyLong_FromLong(ctx.opaque);
+    pyObj_tmp = PyLong_FromLong(ctx.opaque());
     if (-1 == PyDict_SetItemString(pyObj_error_context, KV_OPAQUE, pyObj_tmp)) {
         PyErr_Print();
         PyErr_Clear();
     }
     Py_DECREF(pyObj_tmp);
 
-    if (ctx.status_code.has_value()) {
-        pyObj_tmp = PyLong_FromLong(static_cast<uint16_t>(ctx.status_code.value()));
+    if (ctx.status_code().has_value()) {
+        pyObj_tmp = PyLong_FromLong(static_cast<uint16_t>(ctx.status_code().value()));
         if (-1 == PyDict_SetItemString(pyObj_error_context, KV_STATUS_CODE, pyObj_tmp)) {
             PyErr_Print();
             PyErr_Clear();
@@ -271,8 +324,8 @@ build_exception_from_context(const couchbase::error_context::key_value& ctx,
         Py_DECREF(pyObj_tmp);
     }
 
-    if (ctx.error_map_info.has_value()) {
-        PyObject* err_info = build_kv_error_map_info(ctx.error_map_info.value());
+    if (ctx.error_map_info().has_value()) {
+        PyObject* err_info = build_kv_error_map_info(ctx.error_map_info().value());
         if (-1 == PyDict_SetItemString(pyObj_error_context, KV_ERROR_MAP_INFO, err_info)) {
             PyErr_Print();
             PyErr_Clear();
@@ -280,16 +333,16 @@ build_exception_from_context(const couchbase::error_context::key_value& ctx,
         Py_DECREF(err_info);
     }
 
-    if (ctx.enhanced_error_info.has_value()) {
+    if (ctx.extended_error_info().has_value()) {
         PyObject* enhanced_err_info = PyDict_New();
-        pyObj_tmp = PyUnicode_FromString(ctx.enhanced_error_info.value().reference.c_str());
+        pyObj_tmp = PyUnicode_FromString(ctx.extended_error_info().value().reference().c_str());
         if (-1 == PyDict_SetItemString(enhanced_err_info, "reference", pyObj_tmp)) {
             PyErr_Print();
             PyErr_Clear();
         }
         Py_DECREF(pyObj_tmp);
 
-        pyObj_tmp = PyUnicode_FromString(ctx.enhanced_error_info.value().context.c_str());
+        pyObj_tmp = PyUnicode_FromString(ctx.extended_error_info().value().context().c_str());
         if (-1 == PyDict_SetItemString(enhanced_err_info, "context", pyObj_tmp)) {
             PyErr_Print();
             PyErr_Clear();
@@ -338,7 +391,7 @@ build_exception_from_context(const couchbase::error_context::key_value& ctx,
 
 template<>
 inline PyObject*
-build_exception_from_context(const couchbase::error_context::http& ctx,
+build_exception_from_context(const couchbase::core::error_context::http& ctx,
                              const char* file,
                              int line,
                              std::string error_msg,
@@ -395,7 +448,7 @@ build_exception_from_context(const couchbase::error_context::http& ctx,
 
 template<>
 inline PyObject*
-build_exception_from_context(const couchbase::error_context::query& ctx,
+build_exception_from_context(const couchbase::core::error_context::query& ctx,
                              const char* file,
                              int line,
                              std::string error_msg,
@@ -472,7 +525,7 @@ build_exception_from_context(const couchbase::error_context::query& ctx,
 
 template<>
 inline PyObject*
-build_exception_from_context(const couchbase::error_context::analytics& ctx,
+build_exception_from_context(const couchbase::core::error_context::analytics& ctx,
                              const char* file,
                              int line,
                              std::string error_msg,
@@ -549,7 +602,7 @@ build_exception_from_context(const couchbase::error_context::analytics& ctx,
 
 template<>
 inline PyObject*
-build_exception_from_context(const couchbase::error_context::search& ctx,
+build_exception_from_context(const couchbase::core::error_context::search& ctx,
                              const char* file,
                              int line,
                              std::string error_msg,
@@ -621,7 +674,7 @@ build_exception_from_context(const couchbase::error_context::search& ctx,
 
 template<>
 inline PyObject*
-build_exception_from_context(const couchbase::error_context::view& ctx,
+build_exception_from_context(const couchbase::core::error_context::view& ctx,
                              const char* file,
                              int line,
                              std::string error_msg,

@@ -418,8 +418,8 @@ class ExistsResult(Result):
         orig,  # type: result
     ):
         should_raise = False
-        if orig.strerror() is not None:
-            should_raise = orig.strerror().lower() != "document_not_found"
+        if orig.strerror() is not None and "document_not_found" not in orig.strerror():
+            should_raise = True
         super().__init__(orig, should_raise=should_raise)
 
     @property
@@ -605,7 +605,7 @@ class MutationToken:
         """
         return self._token['bucket_name']
 
-    def as_tuple(self) -> Tuple(int, int, int, str):
+    def as_tuple(self) -> Tuple[int, int, int, str]:
         return (self.partition_id, self.partition_uuid,
                 self.sequence_number, self.bucket_name)
 

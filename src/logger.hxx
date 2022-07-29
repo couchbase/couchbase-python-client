@@ -18,8 +18,8 @@
 #include <spdlog/sinks/base_sink.h>
 #include <spdlog/details/log_msg.h>
 #include <queue>
-#include <couchbase/logger/logger.hxx>
-#include <couchbase/logger/configuration.hxx>
+#include <core/logger/logger.hxx>
+#include <core/logger/configuration.hxx>
 #include <couchbase/transactions.hxx>
 
 // the spdlog::log_msg uses string_view, since it doesn't want
@@ -67,25 +67,25 @@ convert_spdlog_level(spdlog::level::level_enum lvl)
     }
 }
 
-couchbase::logger::level
+couchbase::core::logger::level
 convert_python_log_level(PyObject* level)
 {
     auto lvl = PyLong_AsSize_t(level);
     switch (lvl) {
         case 0:
-            return couchbase::logger::level::off;
+            return couchbase::core::logger::level::off;
         case 10:
-            return couchbase::logger::level::trace;
+            return couchbase::core::logger::level::trace;
         case 20:
-            return couchbase::logger::level::info;
+            return couchbase::core::logger::level::info;
         case 30:
-            return couchbase::logger::level::warn;
+            return couchbase::core::logger::level::warn;
         case 40:
-            return couchbase::logger::level::err;
+            return couchbase::core::logger::level::err;
         case 50:
-            return couchbase::logger::level::critical;
+            return couchbase::core::logger::level::critical;
         default:
-            return couchbase::logger::level::off;
+            return couchbase::core::logger::level::off;
     }
 }
 
@@ -315,12 +315,12 @@ configure_logging(PyObject* self, PyObject* args, PyObject* kwargs)
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, kw_format, const_cast<char**>(kw_list), &pyObj_logger, &pyObj_level)) {
         return nullptr;
     }
-    couchbase::logger::configuration logger_settings;
+    couchbase::core::logger::configuration logger_settings;
     logger_settings.console = false;
     logger_settings.sink = std::make_shared<pycbc_logger_sink<std::mutex>>(pyObj_logger);
     auto level = convert_python_log_level(pyObj_level);
     logger_settings.log_level = level;
     couchbase::transactions::create_loggers(logger_settings.log_level, logger_settings.sink);
-    couchbase::logger::create_file_logger(logger_settings);
+    couchbase::core::logger::create_file_logger(logger_settings);
     Py_RETURN_NONE;
 }

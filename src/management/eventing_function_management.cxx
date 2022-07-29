@@ -16,13 +16,13 @@
  */
 
 #include "eventing_function_management.hxx"
-#include <couchbase/management/eventing_function.hxx>
-#include <couchbase/management/eventing_status.hxx>
-#include <couchbase/operations/management/eventing_problem.hxx>
-#include <couchbase/query_scan_consistency.hxx>
+#include <core/management/eventing_function.hxx>
+#include <core/management/eventing_status.hxx>
+#include <core/operations/management/eventing_problem.hxx>
+#include <core/query_scan_consistency.hxx>
 
 PyObject*
-build_eventing_function_status_functions(std::vector<couchbase::management::eventing::function_state> functions)
+build_eventing_function_status_functions(std::vector<couchbase::core::management::eventing::function_state> functions)
 {
     PyObject* pyObj_functions = PyList_New(static_cast<Py_ssize_t>(0));
     PyObject* pyObj_tmp = nullptr;
@@ -40,27 +40,27 @@ build_eventing_function_status_functions(std::vector<couchbase::management::even
         Py_DECREF(pyObj_tmp);
 
         switch (function.status) {
-            case couchbase::management::eventing::function_status::undeployed: {
+            case couchbase::core::management::eventing::function_status::undeployed: {
                 pyObj_tmp = PyUnicode_FromString("undeployed");
                 break;
             }
-            case couchbase::management::eventing::function_status::undeploying: {
+            case couchbase::core::management::eventing::function_status::undeploying: {
                 pyObj_tmp = PyUnicode_FromString("undeploying");
                 break;
             }
-            case couchbase::management::eventing::function_status::deploying: {
+            case couchbase::core::management::eventing::function_status::deploying: {
                 pyObj_tmp = PyUnicode_FromString("deploying");
                 break;
             }
-            case couchbase::management::eventing::function_status::deployed: {
+            case couchbase::core::management::eventing::function_status::deployed: {
                 pyObj_tmp = PyUnicode_FromString("deployed");
                 break;
             }
-            case couchbase::management::eventing::function_status::pausing: {
+            case couchbase::core::management::eventing::function_status::pausing: {
                 pyObj_tmp = PyUnicode_FromString("pausing");
                 break;
             }
-            case couchbase::management::eventing::function_status::paused: {
+            case couchbase::core::management::eventing::function_status::paused: {
                 pyObj_tmp = PyUnicode_FromString("paused");
                 break;
             }
@@ -96,11 +96,11 @@ build_eventing_function_status_functions(std::vector<couchbase::management::even
         Py_DECREF(pyObj_tmp);
 
         switch (function.deployment_status) {
-            case couchbase::management::eventing::function_deployment_status::deployed: {
+            case couchbase::core::management::eventing::function_deployment_status::deployed: {
                 pyObj_tmp = PyUnicode_FromString("deployed");
                 break;
             }
-            case couchbase::management::eventing::function_deployment_status::undeployed: {
+            case couchbase::core::management::eventing::function_deployment_status::undeployed: {
                 pyObj_tmp = PyUnicode_FromString("undeployed");
                 break;
             }
@@ -118,11 +118,11 @@ build_eventing_function_status_functions(std::vector<couchbase::management::even
         Py_DECREF(pyObj_tmp);
 
         switch (function.processing_status) {
-            case couchbase::management::eventing::function_processing_status::paused: {
+            case couchbase::core::management::eventing::function_processing_status::paused: {
                 pyObj_tmp = PyUnicode_FromString("paused");
                 break;
             }
-            case couchbase::management::eventing::function_processing_status::running: {
+            case couchbase::core::management::eventing::function_processing_status::running: {
                 pyObj_tmp = PyUnicode_FromString("running");
                 break;
             }
@@ -169,7 +169,7 @@ build_eventing_function_status_functions(std::vector<couchbase::management::even
 }
 
 PyObject*
-build_eventing_function_status(const couchbase::management::eventing::status& status)
+build_eventing_function_status(const couchbase::core::management::eventing::status& status)
 {
     PyObject* pyObj_status = PyDict_New();
     PyObject* pyObj_tmp = nullptr;
@@ -198,7 +198,7 @@ build_eventing_function_status(const couchbase::management::eventing::status& st
 }
 
 PyObject*
-build_eventing_function_settings(const couchbase::management::eventing::function_settings& settings)
+build_eventing_function_settings(const couchbase::core::management::eventing::function_settings& settings)
 {
     PyObject* pyObj_settings = PyDict_New();
     PyObject* pyObj_tmp = nullptr;
@@ -215,11 +215,11 @@ build_eventing_function_settings(const couchbase::management::eventing::function
 
     if (settings.dcp_stream_boundary.has_value()) {
         switch (settings.dcp_stream_boundary.value()) {
-            case couchbase::management::eventing::function_dcp_boundary::everything: {
+            case couchbase::core::management::eventing::function_dcp_boundary::everything: {
                 pyObj_tmp = PyUnicode_FromString("everything");
                 break;
             }
-            case couchbase::management::eventing::function_dcp_boundary::from_now: {
+            case couchbase::core::management::eventing::function_dcp_boundary::from_now: {
                 pyObj_tmp = PyUnicode_FromString("from_now");
                 break;
             }
@@ -248,11 +248,11 @@ build_eventing_function_settings(const couchbase::management::eventing::function
 
     if (settings.deployment_status.has_value()) {
         switch (settings.deployment_status.value()) {
-            case couchbase::management::eventing::function_deployment_status::deployed: {
+            case couchbase::core::management::eventing::function_deployment_status::deployed: {
                 pyObj_tmp = PyUnicode_FromString("deployed");
                 break;
             }
-            case couchbase::management::eventing::function_deployment_status::undeployed: {
+            case couchbase::core::management::eventing::function_deployment_status::undeployed: {
                 pyObj_tmp = PyUnicode_FromString("undeployed");
                 break;
             }
@@ -271,11 +271,11 @@ build_eventing_function_settings(const couchbase::management::eventing::function
 
     if (settings.processing_status.has_value()) {
         switch (settings.processing_status.value()) {
-            case couchbase::management::eventing::function_processing_status::running: {
+            case couchbase::core::management::eventing::function_processing_status::running: {
                 pyObj_tmp = PyUnicode_FromString("running");
                 break;
             }
-            case couchbase::management::eventing::function_processing_status::paused: {
+            case couchbase::core::management::eventing::function_processing_status::paused: {
                 pyObj_tmp = PyUnicode_FromString("paused");
                 break;
             }
@@ -294,23 +294,23 @@ build_eventing_function_settings(const couchbase::management::eventing::function
 
     if (settings.log_level.has_value()) {
         switch (settings.log_level.value()) {
-            case couchbase::management::eventing::function_log_level::info: {
+            case couchbase::core::management::eventing::function_log_level::info: {
                 pyObj_tmp = PyUnicode_FromString("info");
                 break;
             }
-            case couchbase::management::eventing::function_log_level::error: {
+            case couchbase::core::management::eventing::function_log_level::error: {
                 pyObj_tmp = PyUnicode_FromString("error");
                 break;
             }
-            case couchbase::management::eventing::function_log_level::warning: {
+            case couchbase::core::management::eventing::function_log_level::warning: {
                 pyObj_tmp = PyUnicode_FromString("warning");
                 break;
             }
-            case couchbase::management::eventing::function_log_level::debug: {
+            case couchbase::core::management::eventing::function_log_level::debug: {
                 pyObj_tmp = PyUnicode_FromString("debug");
                 break;
             }
-            case couchbase::management::eventing::function_log_level::trace: {
+            case couchbase::core::management::eventing::function_log_level::trace: {
                 pyObj_tmp = PyUnicode_FromString("trace");
                 break;
             }
@@ -329,15 +329,15 @@ build_eventing_function_settings(const couchbase::management::eventing::function
 
     if (settings.language_compatibility.has_value()) {
         switch (settings.language_compatibility.value()) {
-            case couchbase::management::eventing::function_language_compatibility::version_6_0_0: {
+            case couchbase::core::management::eventing::function_language_compatibility::version_6_0_0: {
                 pyObj_tmp = PyUnicode_FromString("version_6_0_0");
                 break;
             }
-            case couchbase::management::eventing::function_language_compatibility::version_6_5_0: {
+            case couchbase::core::management::eventing::function_language_compatibility::version_6_5_0: {
                 pyObj_tmp = PyUnicode_FromString("version_6_5_0");
                 break;
             }
-            case couchbase::management::eventing::function_language_compatibility::version_6_6_2: {
+            case couchbase::core::management::eventing::function_language_compatibility::version_6_6_2: {
                 pyObj_tmp = PyUnicode_FromString("version_6_6_2");
                 break;
             }
@@ -398,11 +398,11 @@ build_eventing_function_settings(const couchbase::management::eventing::function
 
     if (settings.query_consistency.has_value()) {
         switch (settings.query_consistency.value()) {
-            case couchbase::query_scan_consistency::not_bounded: {
+            case couchbase::core::query_scan_consistency::not_bounded: {
                 pyObj_tmp = PyUnicode_FromString("not_bounded");
                 break;
             }
-            case couchbase::query_scan_consistency::request_plus: {
+            case couchbase::core::query_scan_consistency::request_plus: {
                 pyObj_tmp = PyUnicode_FromString("request_plus");
                 break;
             }
@@ -624,7 +624,7 @@ build_eventing_function_settings(const couchbase::management::eventing::function
 }
 
 PyObject*
-build_eventing_function_keyspace(const couchbase::management::eventing::function_keyspace& keyspace)
+build_eventing_function_keyspace(const couchbase::core::management::eventing::function_keyspace& keyspace)
 {
     PyObject* pyObj_keyspace = PyDict_New();
 
@@ -659,7 +659,7 @@ build_eventing_function_keyspace(const couchbase::management::eventing::function
 }
 
 PyObject*
-build_function_bucket_bindings(std::vector<couchbase::management::eventing::function_bucket_binding> bucket_bindings)
+build_function_bucket_bindings(std::vector<couchbase::core::management::eventing::function_bucket_binding> bucket_bindings)
 {
     PyObject* pyObj_bucket_bindings = PyList_New(static_cast<Py_ssize_t>(0));
     for (auto const& binding : bucket_bindings) {
@@ -689,11 +689,11 @@ build_function_bucket_bindings(std::vector<couchbase::management::eventing::func
         Py_DECREF(pyObj_tmp);
 
         switch (binding.access) {
-            case couchbase::management::eventing::function_bucket_access::read_only: {
+            case couchbase::core::management::eventing::function_bucket_access::read_only: {
                 pyObj_tmp = PyUnicode_FromString("read_only");
                 break;
             }
-            case couchbase::management::eventing::function_bucket_access::read_write: {
+            case couchbase::core::management::eventing::function_bucket_access::read_write: {
                 pyObj_tmp = PyUnicode_FromString("read_write");
                 break;
             }
@@ -716,7 +716,7 @@ build_function_bucket_bindings(std::vector<couchbase::management::eventing::func
 }
 
 PyObject*
-build_function_url_bindings(std::vector<couchbase::management::eventing::function_url_binding> url_bindings)
+build_function_url_bindings(std::vector<couchbase::core::management::eventing::function_url_binding> url_bindings)
 {
     PyObject* pyObj_url_bindings = PyList_New(static_cast<Py_ssize_t>(0));
     for (auto const& binding : url_bindings) {
@@ -768,7 +768,7 @@ build_function_url_bindings(std::vector<couchbase::management::eventing::functio
             }
         }
 
-        if (std::holds_alternative<couchbase::management::eventing::function_url_no_auth>(binding.auth)) {
+        if (std::holds_alternative<couchbase::core::management::eventing::function_url_no_auth>(binding.auth)) {
             pyObj_tmp = PyUnicode_FromString("no-auth");
             if (-1 == PyDict_SetItemString(pyObj_binding, "auth_type", pyObj_tmp)) {
                 Py_DECREF(pyObj_binding);
@@ -777,7 +777,7 @@ build_function_url_bindings(std::vector<couchbase::management::eventing::functio
                 return nullptr;
             }
             Py_DECREF(pyObj_tmp);
-        } else if (std::holds_alternative<couchbase::management::eventing::function_url_auth_basic>(binding.auth)) {
+        } else if (std::holds_alternative<couchbase::core::management::eventing::function_url_auth_basic>(binding.auth)) {
             pyObj_tmp = PyUnicode_FromString("basic");
             if (-1 == PyDict_SetItemString(pyObj_binding, "auth_type", pyObj_tmp)) {
                 Py_DECREF(pyObj_binding);
@@ -788,7 +788,7 @@ build_function_url_bindings(std::vector<couchbase::management::eventing::functio
             Py_DECREF(pyObj_tmp);
 
             pyObj_tmp =
-              PyUnicode_FromString(std::get<couchbase::management::eventing::function_url_auth_basic>(binding.auth).username.c_str());
+              PyUnicode_FromString(std::get<couchbase::core::management::eventing::function_url_auth_basic>(binding.auth).username.c_str());
             if (-1 == PyDict_SetItemString(pyObj_binding, "username", pyObj_tmp)) {
                 Py_DECREF(pyObj_binding);
                 Py_XDECREF(pyObj_url_bindings);
@@ -796,7 +796,7 @@ build_function_url_bindings(std::vector<couchbase::management::eventing::functio
                 return nullptr;
             }
             Py_DECREF(pyObj_tmp);
-        } else if (std::holds_alternative<couchbase::management::eventing::function_url_auth_digest>(binding.auth)) {
+        } else if (std::holds_alternative<couchbase::core::management::eventing::function_url_auth_digest>(binding.auth)) {
             pyObj_tmp = PyUnicode_FromString("digest");
             if (-1 == PyDict_SetItemString(pyObj_binding, "auth_type", pyObj_tmp)) {
                 Py_DECREF(pyObj_binding);
@@ -806,8 +806,8 @@ build_function_url_bindings(std::vector<couchbase::management::eventing::functio
             }
             Py_DECREF(pyObj_tmp);
 
-            pyObj_tmp =
-              PyUnicode_FromString(std::get<couchbase::management::eventing::function_url_auth_digest>(binding.auth).username.c_str());
+            pyObj_tmp = PyUnicode_FromString(
+              std::get<couchbase::core::management::eventing::function_url_auth_digest>(binding.auth).username.c_str());
             if (-1 == PyDict_SetItemString(pyObj_binding, "username", pyObj_tmp)) {
                 Py_DECREF(pyObj_binding);
                 Py_XDECREF(pyObj_url_bindings);
@@ -815,7 +815,7 @@ build_function_url_bindings(std::vector<couchbase::management::eventing::functio
                 return nullptr;
             }
             Py_DECREF(pyObj_tmp);
-        } else if (std::holds_alternative<couchbase::management::eventing::function_url_auth_bearer>(binding.auth)) {
+        } else if (std::holds_alternative<couchbase::core::management::eventing::function_url_auth_bearer>(binding.auth)) {
             pyObj_tmp = PyUnicode_FromString("bearer");
             if (-1 == PyDict_SetItemString(pyObj_binding, "auth_type", pyObj_tmp)) {
                 Py_DECREF(pyObj_binding);
@@ -834,7 +834,7 @@ build_function_url_bindings(std::vector<couchbase::management::eventing::functio
 }
 
 PyObject*
-build_function_constant_bindings(std::vector<couchbase::management::eventing::function_constant_binding> constant_bindings)
+build_function_constant_bindings(std::vector<couchbase::core::management::eventing::function_constant_binding> constant_bindings)
 {
     PyObject* pyObj_constant_bindings = PyList_New(static_cast<Py_ssize_t>(0));
     for (auto const& binding : constant_bindings) {
@@ -865,7 +865,7 @@ build_function_constant_bindings(std::vector<couchbase::management::eventing::fu
 }
 
 PyObject*
-build_eventing_function(const couchbase::management::eventing::function& function)
+build_eventing_function(const couchbase::core::management::eventing::function& function)
 {
     PyObject* pyObj_eventing_function = PyDict_New();
     PyObject* pyObj_tmp = PyUnicode_FromString(function.name.c_str());
@@ -1014,8 +1014,8 @@ create_result_from_eventing_function_mgmt_response([[maybe_unused]] const Respon
 
 template<>
 result*
-create_result_from_eventing_function_mgmt_response<couchbase::operations::management::eventing_get_function_response>(
-  const couchbase::operations::management::eventing_get_function_response& resp)
+create_result_from_eventing_function_mgmt_response<couchbase::core::operations::management::eventing_get_function_response>(
+  const couchbase::core::operations::management::eventing_get_function_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -1033,8 +1033,8 @@ create_result_from_eventing_function_mgmt_response<couchbase::operations::manage
 
 template<>
 result*
-create_result_from_eventing_function_mgmt_response<couchbase::operations::management::eventing_get_all_functions_response>(
-  const couchbase::operations::management::eventing_get_all_functions_response& resp)
+create_result_from_eventing_function_mgmt_response<couchbase::core::operations::management::eventing_get_all_functions_response>(
+  const couchbase::core::operations::management::eventing_get_all_functions_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -1067,8 +1067,8 @@ create_result_from_eventing_function_mgmt_response<couchbase::operations::manage
 
 template<>
 result*
-create_result_from_eventing_function_mgmt_response<couchbase::operations::management::eventing_get_status_response>(
-  const couchbase::operations::management::eventing_get_status_response& resp)
+create_result_from_eventing_function_mgmt_response<couchbase::core::operations::management::eventing_get_status_response>(
+  const couchbase::core::operations::management::eventing_get_status_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -1085,7 +1085,7 @@ create_result_from_eventing_function_mgmt_response<couchbase::operations::manage
 }
 
 PyObject*
-build_eventing_function_mgmt_problem(const couchbase::operations::management::eventing_problem& problem)
+build_eventing_function_mgmt_problem(const couchbase::core::operations::management::eventing_problem& problem)
 {
     PyObject* pyObj_problem = PyDict_New();
     PyObject* pyObj_tmp = PyUnicode_FromString(problem.name.c_str());
@@ -1193,10 +1193,10 @@ create_result_from_eventing_function_mgmt_op_response(Response& resp,
     PyGILState_Release(state);
 }
 
-couchbase::management::eventing::function_settings
+couchbase::core::management::eventing::function_settings
 get_event_function_settings(PyObject* pyObj_settings)
 {
-    couchbase::management::eventing::function_settings settings{};
+    couchbase::core::management::eventing::function_settings settings{};
 
     PyObject* pyObj_cpp_worker_count = PyDict_GetItemString(pyObj_settings, "cpp_worker_count");
     if (pyObj_cpp_worker_count != nullptr) {
@@ -1207,9 +1207,9 @@ get_event_function_settings(PyObject* pyObj_settings)
     if (pyObj_dcp_stream_boundary != nullptr) {
         auto dcp_boundary = std::string(PyUnicode_AsUTF8(pyObj_dcp_stream_boundary));
         if (dcp_boundary.compare("everything") == 0) {
-            settings.dcp_stream_boundary = couchbase::management::eventing::function_dcp_boundary::everything;
+            settings.dcp_stream_boundary = couchbase::core::management::eventing::function_dcp_boundary::everything;
         } else if (dcp_boundary.compare("from_now") == 0) {
-            settings.dcp_stream_boundary = couchbase::management::eventing::function_dcp_boundary::from_now;
+            settings.dcp_stream_boundary = couchbase::core::management::eventing::function_dcp_boundary::from_now;
         }
     }
 
@@ -1223,9 +1223,9 @@ get_event_function_settings(PyObject* pyObj_settings)
     if (pyObj_deployment_status != nullptr) {
         auto deployment_status = std::string(PyUnicode_AsUTF8(pyObj_deployment_status));
         if (deployment_status.compare("deployed") == 0) {
-            settings.deployment_status = couchbase::management::eventing::function_deployment_status::deployed;
+            settings.deployment_status = couchbase::core::management::eventing::function_deployment_status::deployed;
         } else if (deployment_status.compare("undeployed") == 0) {
-            settings.deployment_status = couchbase::management::eventing::function_deployment_status::undeployed;
+            settings.deployment_status = couchbase::core::management::eventing::function_deployment_status::undeployed;
         }
     }
 
@@ -1233,9 +1233,9 @@ get_event_function_settings(PyObject* pyObj_settings)
     if (pyObj_processing_status != nullptr) {
         auto processing_status = std::string(PyUnicode_AsUTF8(pyObj_processing_status));
         if (processing_status.compare("running") == 0) {
-            settings.processing_status = couchbase::management::eventing::function_processing_status::running;
+            settings.processing_status = couchbase::core::management::eventing::function_processing_status::running;
         } else if (processing_status.compare("paused") == 0) {
-            settings.processing_status = couchbase::management::eventing::function_processing_status::paused;
+            settings.processing_status = couchbase::core::management::eventing::function_processing_status::paused;
         }
     }
 
@@ -1243,15 +1243,15 @@ get_event_function_settings(PyObject* pyObj_settings)
     if (pyObj_log_level != nullptr) {
         auto log_level = std::string(PyUnicode_AsUTF8(pyObj_log_level));
         if (log_level.compare("info") == 0) {
-            settings.log_level = couchbase::management::eventing::function_log_level::info;
+            settings.log_level = couchbase::core::management::eventing::function_log_level::info;
         } else if (log_level.compare("error") == 0) {
-            settings.log_level = couchbase::management::eventing::function_log_level::error;
+            settings.log_level = couchbase::core::management::eventing::function_log_level::error;
         } else if (log_level.compare("warning") == 0) {
-            settings.log_level = couchbase::management::eventing::function_log_level::warning;
+            settings.log_level = couchbase::core::management::eventing::function_log_level::warning;
         } else if (log_level.compare("debug") == 0) {
-            settings.log_level = couchbase::management::eventing::function_log_level::debug;
+            settings.log_level = couchbase::core::management::eventing::function_log_level::debug;
         } else if (log_level.compare("trace") == 0) {
-            settings.log_level = couchbase::management::eventing::function_log_level::trace;
+            settings.log_level = couchbase::core::management::eventing::function_log_level::trace;
         }
     }
 
@@ -1259,11 +1259,11 @@ get_event_function_settings(PyObject* pyObj_settings)
     if (pyObj_language_compatibility != nullptr) {
         auto language_compatibility = std::string(PyUnicode_AsUTF8(pyObj_language_compatibility));
         if (language_compatibility.compare("version_6_0_0") == 0) {
-            settings.language_compatibility = couchbase::management::eventing::function_language_compatibility::version_6_0_0;
+            settings.language_compatibility = couchbase::core::management::eventing::function_language_compatibility::version_6_0_0;
         } else if (language_compatibility.compare("version_6_5_0") == 0) {
-            settings.language_compatibility = couchbase::management::eventing::function_language_compatibility::version_6_5_0;
+            settings.language_compatibility = couchbase::core::management::eventing::function_language_compatibility::version_6_5_0;
         } else if (language_compatibility.compare("version_6_6_2") == 0) {
-            settings.language_compatibility = couchbase::management::eventing::function_language_compatibility::version_6_6_2;
+            settings.language_compatibility = couchbase::core::management::eventing::function_language_compatibility::version_6_6_2;
         }
     }
 
@@ -1293,9 +1293,9 @@ get_event_function_settings(PyObject* pyObj_settings)
     if (pyObj_query_consistency != nullptr) {
         auto query_consistency = std::string(PyUnicode_AsUTF8(pyObj_query_consistency));
         if (query_consistency.compare("not_bounded") == 0) {
-            settings.query_consistency = couchbase::query_scan_consistency::not_bounded;
+            settings.query_consistency = couchbase::core::query_scan_consistency::not_bounded;
         } else if (query_consistency.compare("request_plus") == 0) {
-            settings.query_consistency = couchbase::query_scan_consistency::request_plus;
+            settings.query_consistency = couchbase::core::query_scan_consistency::request_plus;
         }
     }
 
@@ -1416,10 +1416,10 @@ get_event_function_settings(PyObject* pyObj_settings)
     return settings;
 }
 
-couchbase::management::eventing::function_keyspace
+couchbase::core::management::eventing::function_keyspace
 get_eventing_function_keyspace(PyObject* pyObj_keyspace)
 {
-    couchbase::management::eventing::function_keyspace keyspace{};
+    couchbase::core::management::eventing::function_keyspace keyspace{};
 
     PyObject* pyObj_bucket = PyDict_GetItemString(pyObj_keyspace, "bucket");
     if (pyObj_bucket == nullptr) {
@@ -1443,10 +1443,10 @@ get_eventing_function_keyspace(PyObject* pyObj_keyspace)
     return keyspace;
 }
 
-std::vector<couchbase::management::eventing::function_constant_binding>
+std::vector<couchbase::core::management::eventing::function_constant_binding>
 get_function_constant_bindings(PyObject* pyObj_function_constant_bindings)
 {
-    std::vector<couchbase::management::eventing::function_constant_binding> bindings{};
+    std::vector<couchbase::core::management::eventing::function_constant_binding> bindings{};
     if (pyObj_function_constant_bindings && PyList_Check(pyObj_function_constant_bindings)) {
         size_t nbindings = static_cast<size_t>(PyList_Size(pyObj_function_constant_bindings));
         size_t ii;
@@ -1458,7 +1458,7 @@ get_function_constant_bindings(PyObject* pyObj_function_constant_bindings)
             }
             // PyList_GetItem returns borrowed ref, inc while using, decr after done
             Py_INCREF(pyObj_binding);
-            couchbase::management::eventing::function_constant_binding constant_binding{};
+            couchbase::core::management::eventing::function_constant_binding constant_binding{};
             PyObject* pyObj_alias = PyDict_GetItemString(pyObj_binding, "alias");
             if (pyObj_alias != nullptr) {
                 constant_binding.alias = std::string(PyUnicode_AsUTF8(pyObj_alias));
@@ -1477,10 +1477,10 @@ get_function_constant_bindings(PyObject* pyObj_function_constant_bindings)
     return bindings;
 }
 
-std::vector<couchbase::management::eventing::function_url_binding>
+std::vector<couchbase::core::management::eventing::function_url_binding>
 get_function_url_bindings(PyObject* pyObj_function_url_bindings)
 {
-    std::vector<couchbase::management::eventing::function_url_binding> bindings{};
+    std::vector<couchbase::core::management::eventing::function_url_binding> bindings{};
     if (pyObj_function_url_bindings && PyList_Check(pyObj_function_url_bindings)) {
         size_t nbindings = static_cast<size_t>(PyList_Size(pyObj_function_url_bindings));
         size_t ii;
@@ -1492,7 +1492,7 @@ get_function_url_bindings(PyObject* pyObj_function_url_bindings)
             }
             // PyList_GetItem returns borrowed ref, inc while using, decr after done
             Py_INCREF(pyObj_binding);
-            couchbase::management::eventing::function_url_binding url_binding{};
+            couchbase::core::management::eventing::function_url_binding url_binding{};
             PyObject* pyObj_alias = PyDict_GetItemString(pyObj_binding, "alias");
             if (pyObj_alias != nullptr) {
                 url_binding.alias = std::string(PyUnicode_AsUTF8(pyObj_alias));
@@ -1520,21 +1520,21 @@ get_function_url_bindings(PyObject* pyObj_function_url_bindings)
             PyObject* pyObj_auth_type = PyDict_GetItemString(pyObj_binding, "auth_type");
             auto auth_type = std::string(PyUnicode_AsUTF8(pyObj_auth_type));
             if (auth_type.compare("basic") == 0) {
-                couchbase::management::eventing::function_url_auth_basic auth{};
+                couchbase::core::management::eventing::function_url_auth_basic auth{};
                 PyObject* pyObj_username = PyDict_GetItemString(pyObj_binding, "username");
                 auth.username = std::string(PyUnicode_AsUTF8(pyObj_username));
                 PyObject* pyObj_password = PyDict_GetItemString(pyObj_binding, "password");
                 auth.password = std::string(PyUnicode_AsUTF8(pyObj_password));
                 url_binding.auth = auth;
             } else if (auth_type.compare("digest") == 0) {
-                couchbase::management::eventing::function_url_auth_digest auth{};
+                couchbase::core::management::eventing::function_url_auth_digest auth{};
                 PyObject* pyObj_username = PyDict_GetItemString(pyObj_binding, "username");
                 auth.username = std::string(PyUnicode_AsUTF8(pyObj_username));
                 PyObject* pyObj_password = PyDict_GetItemString(pyObj_binding, "password");
                 auth.password = std::string(PyUnicode_AsUTF8(pyObj_password));
                 url_binding.auth = auth;
             } else if (auth_type.compare("bearer") == 0) {
-                couchbase::management::eventing::function_url_auth_bearer auth{};
+                couchbase::core::management::eventing::function_url_auth_bearer auth{};
                 PyObject* pyObj_key = PyDict_GetItemString(pyObj_binding, "bearer_key");
                 auth.key = std::string(PyUnicode_AsUTF8(pyObj_key));
                 url_binding.auth = auth;
@@ -1548,10 +1548,10 @@ get_function_url_bindings(PyObject* pyObj_function_url_bindings)
     return bindings;
 }
 
-std::vector<couchbase::management::eventing::function_bucket_binding>
+std::vector<couchbase::core::management::eventing::function_bucket_binding>
 get_function_bucket_bindings(PyObject* pyObj_bucket_bindings)
 {
-    std::vector<couchbase::management::eventing::function_bucket_binding> bindings{};
+    std::vector<couchbase::core::management::eventing::function_bucket_binding> bindings{};
     if (pyObj_bucket_bindings && PyList_Check(pyObj_bucket_bindings)) {
         size_t nbindings = static_cast<size_t>(PyList_Size(pyObj_bucket_bindings));
         size_t ii;
@@ -1563,7 +1563,7 @@ get_function_bucket_bindings(PyObject* pyObj_bucket_bindings)
             }
             // PyList_GetItem returns borrowed ref, inc while using, decr after done
             Py_INCREF(pyObj_binding);
-            couchbase::management::eventing::function_bucket_binding bucket_binding{};
+            couchbase::core::management::eventing::function_bucket_binding bucket_binding{};
             PyObject* pyObj_alias = PyDict_GetItemString(pyObj_binding, "alias");
             if (pyObj_alias != nullptr) {
                 bucket_binding.alias = std::string(PyUnicode_AsUTF8(pyObj_alias));
@@ -1576,7 +1576,7 @@ get_function_bucket_bindings(PyObject* pyObj_bucket_bindings)
             if (pyObj_access != nullptr) {
                 auto access = std::string(PyUnicode_AsUTF8(pyObj_access));
                 if (access.compare("read_only") == 0) {
-                    bucket_binding.access = couchbase::management::eventing::function_bucket_access::read_only;
+                    bucket_binding.access = couchbase::core::management::eventing::function_bucket_access::read_only;
                 }
             }
 
@@ -1588,10 +1588,10 @@ get_function_bucket_bindings(PyObject* pyObj_bucket_bindings)
     return bindings;
 }
 
-couchbase::management::eventing::function
+couchbase::core::management::eventing::function
 get_eventing_function(PyObject* pyObj_eventing_function)
 {
-    couchbase::management::eventing::function eventing_function{};
+    couchbase::core::management::eventing::function eventing_function{};
 
     PyObject* pyObj_name = PyDict_GetItemString(pyObj_eventing_function, "name");
     if (pyObj_name == nullptr) {
@@ -1710,7 +1710,7 @@ handle_eventing_function_mgmt_op(connection* conn,
     try {
         switch (options->op_type) {
             case EventingFunctionManagementOperations::UPSERT_FUNCTION: {
-                couchbase::operations::management::eventing_upsert_function_request req{};
+                couchbase::core::operations::management::eventing_upsert_function_request req{};
                 PyObject* pyObj_client_context_id = PyDict_GetItemString(options->op_args, "client_context_id");
                 if (pyObj_client_context_id != nullptr) {
                     auto client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
@@ -1720,66 +1720,66 @@ handle_eventing_function_mgmt_op(connection* conn,
                 req.function = get_eventing_function(pyObj_eventing_function);
                 req.timeout = options->timeout_ms;
 
-                res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_upsert_function_request>(
+                res = do_eventing_function_mgmt_op<couchbase::core::operations::management::eventing_upsert_function_request>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
                 break;
             }
             case EventingFunctionManagementOperations::DEPLOY_FUNCTION: {
-                auto req =
-                  get_eventing_function_mgmt_req<couchbase::operations::management::eventing_deploy_function_request>(options->op_args);
+                auto req = get_eventing_function_mgmt_req<couchbase::core::operations::management::eventing_deploy_function_request>(
+                  options->op_args);
                 req.timeout = options->timeout_ms;
 
-                res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_deploy_function_request>(
+                res = do_eventing_function_mgmt_op<couchbase::core::operations::management::eventing_deploy_function_request>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
                 break;
             }
             case EventingFunctionManagementOperations::GET_FUNCTION: {
                 auto req =
-                  get_eventing_function_mgmt_req<couchbase::operations::management::eventing_get_function_request>(options->op_args);
+                  get_eventing_function_mgmt_req<couchbase::core::operations::management::eventing_get_function_request>(options->op_args);
                 req.timeout = options->timeout_ms;
 
-                res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_get_function_request>(
+                res = do_eventing_function_mgmt_op<couchbase::core::operations::management::eventing_get_function_request>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
                 break;
             }
             case EventingFunctionManagementOperations::PAUSE_FUNCTION: {
-                auto req =
-                  get_eventing_function_mgmt_req<couchbase::operations::management::eventing_pause_function_request>(options->op_args);
+                auto req = get_eventing_function_mgmt_req<couchbase::core::operations::management::eventing_pause_function_request>(
+                  options->op_args);
                 req.timeout = options->timeout_ms;
 
-                res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_pause_function_request>(
+                res = do_eventing_function_mgmt_op<couchbase::core::operations::management::eventing_pause_function_request>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
                 break;
             }
             case EventingFunctionManagementOperations::RESUME_FUNCTION: {
-                auto req =
-                  get_eventing_function_mgmt_req<couchbase::operations::management::eventing_resume_function_request>(options->op_args);
+                auto req = get_eventing_function_mgmt_req<couchbase::core::operations::management::eventing_resume_function_request>(
+                  options->op_args);
                 req.timeout = options->timeout_ms;
 
-                res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_resume_function_request>(
+                res = do_eventing_function_mgmt_op<couchbase::core::operations::management::eventing_resume_function_request>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
                 break;
             }
             case EventingFunctionManagementOperations::UNDEPLOY_FUNCTION: {
-                auto req =
-                  get_eventing_function_mgmt_req<couchbase::operations::management::eventing_undeploy_function_request>(options->op_args);
+                auto req = get_eventing_function_mgmt_req<couchbase::core::operations::management::eventing_undeploy_function_request>(
+                  options->op_args);
                 req.timeout = options->timeout_ms;
 
-                res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_undeploy_function_request>(
+                res = do_eventing_function_mgmt_op<couchbase::core::operations::management::eventing_undeploy_function_request>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
                 break;
             }
             case EventingFunctionManagementOperations::DROP_FUNCTION: {
                 auto req =
-                  get_eventing_function_mgmt_req<couchbase::operations::management::eventing_drop_function_request>(options->op_args);
+                  get_eventing_function_mgmt_req<couchbase::core::operations::management::eventing_drop_function_request>(options->op_args);
                 req.timeout = options->timeout_ms;
 
-                res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_drop_function_request>(
+                res = do_eventing_function_mgmt_op<couchbase::core::operations::management::eventing_drop_function_request>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
                 break;
             }
             case EventingFunctionManagementOperations::GET_ALL_FUNCTIONS: {
-                couchbase::operations::management::eventing_get_all_functions_request req{};
+                couchbase::core::operations::management::eventing_get_all_functions_request req{};
                 PyObject* pyObj_client_context_id = PyDict_GetItemString(options->op_args, "client_context_id");
                 if (pyObj_client_context_id != nullptr) {
                     auto client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
@@ -1787,12 +1787,12 @@ handle_eventing_function_mgmt_op(connection* conn,
                 }
                 req.timeout = options->timeout_ms;
 
-                res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_get_all_functions_request>(
+                res = do_eventing_function_mgmt_op<couchbase::core::operations::management::eventing_get_all_functions_request>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
                 break;
             }
             case EventingFunctionManagementOperations::GET_STATUS: {
-                couchbase::operations::management::eventing_get_status_request req{};
+                couchbase::core::operations::management::eventing_get_status_request req{};
                 PyObject* pyObj_client_context_id = PyDict_GetItemString(options->op_args, "client_context_id");
                 if (pyObj_client_context_id != nullptr) {
                     auto client_context_id = std::string(PyUnicode_AsUTF8(pyObj_client_context_id));
@@ -1800,7 +1800,7 @@ handle_eventing_function_mgmt_op(connection* conn,
                 }
                 req.timeout = options->timeout_ms;
 
-                res = do_eventing_function_mgmt_op<couchbase::operations::management::eventing_get_status_request>(
+                res = do_eventing_function_mgmt_op<couchbase::core::operations::management::eventing_get_status_request>(
                   *conn, req, pyObj_callback, pyObj_errback, barrier);
                 break;
             }

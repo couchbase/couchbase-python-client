@@ -29,8 +29,8 @@ create_result_from_collection_mgmt_response([[maybe_unused]] const T& resp)
 
 template<>
 result*
-create_result_from_collection_mgmt_response<couchbase::operations::management::scope_get_all_response>(
-  const couchbase::operations::management::scope_get_all_response& resp)
+create_result_from_collection_mgmt_response<couchbase::core::operations::management::scope_get_all_response>(
+  const couchbase::core::operations::management::scope_get_all_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -194,33 +194,33 @@ handle_collection_mgmt_op(connection* conn, struct collection_mgmt_options* opti
         case CollectionManagementOperations::CREATE_SCOPE: {
             PyObject* pyObj_scope_name = PyDict_GetItemString(options->op_args, "scope_name");
             auto scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));
-            couchbase::operations::management::scope_create_request req{};
+            couchbase::core::operations::management::scope_create_request req{};
             req.bucket_name = bucket_name;
             req.scope_name = scope_name;
             req.timeout = options->timeout_ms;
 
-            res = do_collection_mgmt_op<couchbase::operations::management::scope_create_request>(
+            res = do_collection_mgmt_op<couchbase::core::operations::management::scope_create_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case CollectionManagementOperations::DROP_SCOPE: {
             PyObject* pyObj_scope_name = PyDict_GetItemString(options->op_args, "scope_name");
             auto scope_name = std::string(PyUnicode_AsUTF8(pyObj_scope_name));
-            couchbase::operations::management::scope_drop_request req{};
+            couchbase::core::operations::management::scope_drop_request req{};
             req.bucket_name = bucket_name;
             req.scope_name = scope_name;
             req.timeout = options->timeout_ms;
 
-            res = do_collection_mgmt_op<couchbase::operations::management::scope_drop_request>(
+            res = do_collection_mgmt_op<couchbase::core::operations::management::scope_drop_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case CollectionManagementOperations::GET_ALL_SCOPES: {
-            couchbase::operations::management::scope_get_all_request req{};
+            couchbase::core::operations::management::scope_get_all_request req{};
             req.bucket_name = bucket_name;
             req.timeout = options->timeout_ms;
 
-            res = do_collection_mgmt_op<couchbase::operations::management::scope_get_all_request>(
+            res = do_collection_mgmt_op<couchbase::core::operations::management::scope_get_all_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
@@ -232,7 +232,7 @@ handle_collection_mgmt_op(connection* conn, struct collection_mgmt_options* opti
             // optional
             PyObject* pyObj_max_expiry = PyDict_GetItemString(options->op_args, "max_expiry");
 
-            couchbase::operations::management::collection_create_request req{};
+            couchbase::core::operations::management::collection_create_request req{};
             req.bucket_name = bucket_name;
             req.scope_name = scope_name;
             req.collection_name = collection_name;
@@ -241,7 +241,7 @@ handle_collection_mgmt_op(connection* conn, struct collection_mgmt_options* opti
             }
             req.timeout = options->timeout_ms;
 
-            res = do_collection_mgmt_op<couchbase::operations::management::collection_create_request>(
+            res = do_collection_mgmt_op<couchbase::core::operations::management::collection_create_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
@@ -251,13 +251,13 @@ handle_collection_mgmt_op(connection* conn, struct collection_mgmt_options* opti
             PyObject* pyObj_collection_name = PyDict_GetItemString(options->op_args, "collection_name");
             auto collection_name = std::string(PyUnicode_AsUTF8(pyObj_collection_name));
 
-            couchbase::operations::management::collection_drop_request req{};
+            couchbase::core::operations::management::collection_drop_request req{};
             req.bucket_name = bucket_name;
             req.scope_name = scope_name;
             req.collection_name = collection_name;
             req.timeout = options->timeout_ms;
 
-            res = do_collection_mgmt_op<couchbase::operations::management::collection_drop_request>(
+            res = do_collection_mgmt_op<couchbase::core::operations::management::collection_drop_request>(
               *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }

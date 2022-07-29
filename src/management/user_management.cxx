@@ -17,26 +17,26 @@
 
 #include "user_management.hxx"
 #include "../exceptions.hxx"
-#include <couchbase/management/rbac.hxx>
+#include <core/management/rbac.hxx>
 
-couchbase::management::rbac::auth_domain
+couchbase::core::management::rbac::auth_domain
 str_to_auth_domain(std::string domain)
 {
     if (domain.compare("external") == 0) {
-        return couchbase::management::rbac::auth_domain::external;
+        return couchbase::core::management::rbac::auth_domain::external;
     }
-    return couchbase::management::rbac::auth_domain::local;
+    return couchbase::core::management::rbac::auth_domain::local;
     ;
 }
 
 PyObject*
-auth_domain_to_str(couchbase::management::rbac::auth_domain domain)
+auth_domain_to_str(couchbase::core::management::rbac::auth_domain domain)
 {
     PyObject* pyObj_domain = nullptr;
 
-    if (domain == couchbase::management::rbac::auth_domain::local) {
+    if (domain == couchbase::core::management::rbac::auth_domain::local) {
         pyObj_domain = PyUnicode_FromString("local");
-    } else if (domain == couchbase::management::rbac::auth_domain::external) {
+    } else if (domain == couchbase::core::management::rbac::auth_domain::external) {
         pyObj_domain = PyUnicode_FromString("external");
     } else {
         pyObj_domain = PyUnicode_FromString("unknown");
@@ -45,10 +45,10 @@ auth_domain_to_str(couchbase::management::rbac::auth_domain domain)
     return pyObj_domain;
 }
 
-couchbase::management::rbac::role
+couchbase::core::management::rbac::role
 get_role(PyObject* pyObj_role)
 {
-    couchbase::management::rbac::role role{};
+    couchbase::core::management::rbac::role role{};
 
     PyObject* role_name = PyDict_GetItemString(pyObj_role, "name");
     if (role_name) {
@@ -73,10 +73,10 @@ get_role(PyObject* pyObj_role)
     return role;
 }
 
-couchbase::management::rbac::user
+couchbase::core::management::rbac::user
 get_user(PyObject* pyObj_user)
 {
-    couchbase::management::rbac::user user{};
+    couchbase::core::management::rbac::user user{};
 
     PyObject* pyObj_username = PyDict_GetItemString(pyObj_user, "username");
     if (pyObj_username) {
@@ -113,10 +113,10 @@ get_user(PyObject* pyObj_user)
     return user;
 }
 
-couchbase::management::rbac::group
+couchbase::core::management::rbac::group
 get_group(PyObject* pyObj_group)
 {
-    couchbase::management::rbac::group group{};
+    couchbase::core::management::rbac::group group{};
 
     PyObject* pyObj_name = PyDict_GetItemString(pyObj_group, "name");
     if (pyObj_name) {
@@ -191,7 +191,7 @@ build_role(const T& role)
 }
 
 PyObject*
-build_role_and_origins(couchbase::management::rbac::role_and_origins role)
+build_role_and_origins(couchbase::core::management::rbac::role_and_origins role)
 {
     PyObject* pyObj_role_and_origin = PyDict_New();
     PyObject* pyObj_role = build_role(role);
@@ -248,7 +248,7 @@ build_role_and_origins(couchbase::management::rbac::role_and_origins role)
 }
 
 PyObject*
-build_user(couchbase::management::rbac::user_and_metadata uam)
+build_user(couchbase::core::management::rbac::user_and_metadata uam)
 {
     PyObject* pyObj_user = PyDict_New();
 
@@ -312,7 +312,7 @@ build_user(couchbase::management::rbac::user_and_metadata uam)
 }
 
 PyObject*
-build_user_and_metadata(couchbase::management::rbac::user_and_metadata uam)
+build_user_and_metadata(couchbase::core::management::rbac::user_and_metadata uam)
 {
     PyObject* pyObj_uam = PyDict_New();
 
@@ -390,7 +390,7 @@ build_user_and_metadata(couchbase::management::rbac::user_and_metadata uam)
 }
 
 PyObject*
-build_group(couchbase::management::rbac::group group)
+build_group(couchbase::core::management::rbac::group group)
 {
     PyObject* pyObj_group = PyDict_New();
 
@@ -468,8 +468,8 @@ create_result_from_user_mgmt_response([[maybe_unused]] const T& resp)
 
 template<>
 result*
-create_result_from_user_mgmt_response<couchbase::operations::management::user_get_response>(
-  const couchbase::operations::management::user_get_response& resp)
+create_result_from_user_mgmt_response<couchbase::core::operations::management::user_get_response>(
+  const couchbase::core::operations::management::user_get_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -490,8 +490,8 @@ create_result_from_user_mgmt_response<couchbase::operations::management::user_ge
 
 template<>
 result*
-create_result_from_user_mgmt_response<couchbase::operations::management::user_get_all_response>(
-  const couchbase::operations::management::user_get_all_response& resp)
+create_result_from_user_mgmt_response<couchbase::core::operations::management::user_get_all_response>(
+  const couchbase::core::operations::management::user_get_all_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -521,8 +521,8 @@ create_result_from_user_mgmt_response<couchbase::operations::management::user_ge
 
 template<>
 result*
-create_result_from_user_mgmt_response<couchbase::operations::management::role_get_all_response>(
-  const couchbase::operations::management::role_get_all_response& resp)
+create_result_from_user_mgmt_response<couchbase::core::operations::management::role_get_all_response>(
+  const couchbase::core::operations::management::role_get_all_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -571,8 +571,8 @@ create_result_from_user_mgmt_response<couchbase::operations::management::role_ge
 
 template<>
 result*
-create_result_from_user_mgmt_response<couchbase::operations::management::group_get_response>(
-  const couchbase::operations::management::group_get_response& resp)
+create_result_from_user_mgmt_response<couchbase::core::operations::management::group_get_response>(
+  const couchbase::core::operations::management::group_get_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -588,8 +588,8 @@ create_result_from_user_mgmt_response<couchbase::operations::management::group_g
 
 template<>
 result*
-create_result_from_user_mgmt_response<couchbase::operations::management::group_get_all_response>(
-  const couchbase::operations::management::group_get_all_response& resp)
+create_result_from_user_mgmt_response<couchbase::core::operations::management::group_get_all_response>(
+  const couchbase::core::operations::management::group_get_all_response& resp)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -681,8 +681,8 @@ create_result_from_user_mgmt_op_response(const Response& resp,
 
 template<>
 void
-create_result_from_user_mgmt_op_response<couchbase::operations::management::user_upsert_response>(
-  const couchbase::operations::management::user_upsert_response& resp,
+create_result_from_user_mgmt_op_response<couchbase::core::operations::management::user_upsert_response>(
+  const couchbase::core::operations::management::user_upsert_response& resp,
   PyObject* pyObj_callback,
   PyObject* pyObj_errback,
   std::shared_ptr<std::promise<PyObject*>> barrier)
@@ -754,8 +754,8 @@ create_result_from_user_mgmt_op_response<couchbase::operations::management::user
 
 template<>
 void
-create_result_from_user_mgmt_op_response<couchbase::operations::management::group_upsert_response>(
-  const couchbase::operations::management::group_upsert_response& resp,
+create_result_from_user_mgmt_op_response<couchbase::core::operations::management::group_upsert_response>(
+  const couchbase::core::operations::management::group_upsert_response& resp,
   PyObject* pyObj_callback,
   PyObject* pyObj_errback,
   std::shared_ptr<std::promise<PyObject*>> barrier)
@@ -854,13 +854,13 @@ handle_user_mgmt_op(connection* conn, struct user_mgmt_options* options, PyObjec
             PyObject* pyObj_user = PyDict_GetItemString(options->op_args, "user");
             auto user = get_user(pyObj_user);
 
-            couchbase::operations::management::user_upsert_request req{};
+            couchbase::core::operations::management::user_upsert_request req{};
             req.domain = domain;
             req.user = user;
             req.timeout = options->timeout_ms;
 
-            res =
-              do_user_mgmt_op<couchbase::operations::management::user_upsert_request>(*conn, req, pyObj_callback, pyObj_errback, barrier);
+            res = do_user_mgmt_op<couchbase::core::operations::management::user_upsert_request>(
+              *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case UserManagementOperations::GET_USER: {
@@ -869,24 +869,25 @@ handle_user_mgmt_op(connection* conn, struct user_mgmt_options* options, PyObjec
             PyObject* pyObj_username = PyDict_GetItemString(options->op_args, "username");
             auto username = std::string(PyUnicode_AsUTF8(pyObj_username));
 
-            couchbase::operations::management::user_get_request req{};
+            couchbase::core::operations::management::user_get_request req{};
             req.domain = domain;
             req.username = username;
             req.timeout = options->timeout_ms;
 
-            res = do_user_mgmt_op<couchbase::operations::management::user_get_request>(*conn, req, pyObj_callback, pyObj_errback, barrier);
+            res = do_user_mgmt_op<couchbase::core::operations::management::user_get_request>(
+              *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case UserManagementOperations::GET_ALL_USERS: {
             PyObject* pyObj_domain = PyDict_GetItemString(options->op_args, "domain");
             auto domain = str_to_auth_domain(std::string(PyUnicode_AsUTF8(pyObj_domain)));
 
-            couchbase::operations::management::user_get_all_request req{};
+            couchbase::core::operations::management::user_get_all_request req{};
             req.domain = domain;
             req.timeout = options->timeout_ms;
 
-            res =
-              do_user_mgmt_op<couchbase::operations::management::user_get_all_request>(*conn, req, pyObj_callback, pyObj_errback, barrier);
+            res = do_user_mgmt_op<couchbase::core::operations::management::user_get_all_request>(
+              *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case UserManagementOperations::DROP_USER: {
@@ -895,63 +896,65 @@ handle_user_mgmt_op(connection* conn, struct user_mgmt_options* options, PyObjec
             PyObject* pyObj_username = PyDict_GetItemString(options->op_args, "username");
             auto username = std::string(PyUnicode_AsUTF8(pyObj_username));
 
-            couchbase::operations::management::user_drop_request req{};
+            couchbase::core::operations::management::user_drop_request req{};
             req.domain = domain;
             req.username = username;
             req.timeout = options->timeout_ms;
 
-            res = do_user_mgmt_op<couchbase::operations::management::user_drop_request>(*conn, req, pyObj_callback, pyObj_errback, barrier);
+            res = do_user_mgmt_op<couchbase::core::operations::management::user_drop_request>(
+              *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case UserManagementOperations::GET_ROLES: {
-            couchbase::operations::management::role_get_all_request req{};
+            couchbase::core::operations::management::role_get_all_request req{};
             req.timeout = options->timeout_ms;
 
-            res =
-              do_user_mgmt_op<couchbase::operations::management::role_get_all_request>(*conn, req, pyObj_callback, pyObj_errback, barrier);
+            res = do_user_mgmt_op<couchbase::core::operations::management::role_get_all_request>(
+              *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case UserManagementOperations::UPSERT_GROUP: {
             PyObject* pyObj_group = PyDict_GetItemString(options->op_args, "group");
             auto group = get_group(pyObj_group);
 
-            couchbase::operations::management::group_upsert_request req{};
+            couchbase::core::operations::management::group_upsert_request req{};
             req.group = group;
             req.timeout = options->timeout_ms;
 
-            res =
-              do_user_mgmt_op<couchbase::operations::management::group_upsert_request>(*conn, req, pyObj_callback, pyObj_errback, barrier);
+            res = do_user_mgmt_op<couchbase::core::operations::management::group_upsert_request>(
+              *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case UserManagementOperations::GET_GROUP: {
             PyObject* pyObj_name = PyDict_GetItemString(options->op_args, "name");
             auto name = std::string(PyUnicode_AsUTF8(pyObj_name));
 
-            couchbase::operations::management::group_get_request req{};
+            couchbase::core::operations::management::group_get_request req{};
             req.name = name;
             req.timeout = options->timeout_ms;
 
-            res = do_user_mgmt_op<couchbase::operations::management::group_get_request>(*conn, req, pyObj_callback, pyObj_errback, barrier);
+            res = do_user_mgmt_op<couchbase::core::operations::management::group_get_request>(
+              *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case UserManagementOperations::GET_ALL_GROUPS: {
-            couchbase::operations::management::group_get_all_request req{};
+            couchbase::core::operations::management::group_get_all_request req{};
             req.timeout = options->timeout_ms;
 
-            res =
-              do_user_mgmt_op<couchbase::operations::management::group_get_all_request>(*conn, req, pyObj_callback, pyObj_errback, barrier);
+            res = do_user_mgmt_op<couchbase::core::operations::management::group_get_all_request>(
+              *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         case UserManagementOperations::DROP_GROUP: {
             PyObject* pyObj_name = PyDict_GetItemString(options->op_args, "name");
             auto name = std::string(PyUnicode_AsUTF8(pyObj_name));
 
-            couchbase::operations::management::group_drop_request req{};
+            couchbase::core::operations::management::group_drop_request req{};
             req.name = name;
             req.timeout = options->timeout_ms;
 
-            res =
-              do_user_mgmt_op<couchbase::operations::management::group_drop_request>(*conn, req, pyObj_callback, pyObj_errback, barrier);
+            res = do_user_mgmt_op<couchbase::core::operations::management::group_drop_request>(
+              *conn, req, pyObj_callback, pyObj_errback, barrier);
             break;
         }
         default: {

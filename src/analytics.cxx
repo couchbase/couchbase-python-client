@@ -18,16 +18,16 @@
 #include "analytics.hxx"
 #include "exceptions.hxx"
 #include "result.hxx"
-#include <couchbase/analytics_scan_consistency.hxx>
+#include <core/analytics_scan_consistency.hxx>
 
-couchbase::analytics_scan_consistency
+couchbase::core::analytics_scan_consistency
 str_to_scan_consistency_type(std::string consistency)
 {
     if (consistency.compare("not_bounded") == 0) {
-        return couchbase::analytics_scan_consistency::not_bounded;
+        return couchbase::core::analytics_scan_consistency::not_bounded;
     }
     if (consistency.compare("request_plus") == 0) {
-        return couchbase::analytics_scan_consistency::request_plus;
+        return couchbase::core::analytics_scan_consistency::request_plus;
     }
 
     // TODO: better exception
@@ -36,47 +36,47 @@ str_to_scan_consistency_type(std::string consistency)
 }
 
 PyObject*
-analytics_status_to_string(couchbase::operations::analytics_response::analytics_status status)
+analytics_status_to_string(couchbase::core::operations::analytics_response::analytics_status status)
 {
     std::string status_str;
     switch (status) {
-        case couchbase::operations::analytics_response::analytics_status::running: {
+        case couchbase::core::operations::analytics_response::analytics_status::running: {
             status_str = "running";
             break;
         }
-        case couchbase::operations::analytics_response::analytics_status::success: {
+        case couchbase::core::operations::analytics_response::analytics_status::success: {
             status_str = "success";
             break;
         }
-        case couchbase::operations::analytics_response::analytics_status::errors: {
+        case couchbase::core::operations::analytics_response::analytics_status::errors: {
             status_str = "errors";
             break;
         }
-        case couchbase::operations::analytics_response::analytics_status::completed: {
+        case couchbase::core::operations::analytics_response::analytics_status::completed: {
             status_str = "completed";
             break;
         }
-        case couchbase::operations::analytics_response::analytics_status::stopped: {
+        case couchbase::core::operations::analytics_response::analytics_status::stopped: {
             status_str = "stopped";
             break;
         }
-        case couchbase::operations::analytics_response::analytics_status::timedout: {
+        case couchbase::core::operations::analytics_response::analytics_status::timedout: {
             status_str = "timeout";
             break;
         }
-        case couchbase::operations::analytics_response::analytics_status::closed: {
+        case couchbase::core::operations::analytics_response::analytics_status::closed: {
             status_str = "closed";
             break;
         }
-        case couchbase::operations::analytics_response::analytics_status::fatal: {
+        case couchbase::core::operations::analytics_response::analytics_status::fatal: {
             status_str = "fatal";
             break;
         }
-        case couchbase::operations::analytics_response::analytics_status::aborted: {
+        case couchbase::core::operations::analytics_response::analytics_status::aborted: {
             status_str = "aborted";
             break;
         }
-        case couchbase::operations::analytics_response::analytics_status::unknown:
+        case couchbase::core::operations::analytics_response::analytics_status::unknown:
         default: {
             status_str = "unknown";
             break;
@@ -87,7 +87,7 @@ analytics_status_to_string(couchbase::operations::analytics_response::analytics_
 }
 
 PyObject*
-get_result_metrics(couchbase::operations::analytics_response::analytics_metrics metrics)
+get_result_metrics(couchbase::core::operations::analytics_response::analytics_metrics metrics)
 {
     PyObject* pyObj_metrics = PyDict_New();
     std::chrono::duration<unsigned long long, std::nano> int_nsec = metrics.elapsed_time;
@@ -145,7 +145,7 @@ get_result_metrics(couchbase::operations::analytics_response::analytics_metrics 
 }
 
 PyObject*
-get_result_metadata(couchbase::operations::analytics_response::analytics_meta_data metadata, bool include_metrics)
+get_result_metadata(couchbase::core::operations::analytics_response::analytics_meta_data metadata, bool include_metrics)
 {
     PyObject* pyObj_metadata = PyDict_New();
     PyObject* pyObj_tmp = PyUnicode_FromString(metadata.request_id.c_str());
@@ -254,7 +254,7 @@ get_result_metadata(couchbase::operations::analytics_response::analytics_meta_da
 }
 
 result*
-create_result_from_analytics_response(couchbase::operations::analytics_response resp, bool include_metrics)
+create_result_from_analytics_response(couchbase::core::operations::analytics_response resp, bool include_metrics)
 {
     PyObject* pyObj_result = create_result_obj();
     result* res = reinterpret_cast<result*>(pyObj_result);
@@ -279,7 +279,7 @@ create_result_from_analytics_response(couchbase::operations::analytics_response 
 }
 
 void
-create_analytics_result(couchbase::operations::analytics_response resp,
+create_analytics_result(couchbase::core::operations::analytics_response resp,
                         bool include_metrics,
                         std::shared_ptr<rows_queue<PyObject*>> rows,
                         PyObject* pyObj_callback,
@@ -418,7 +418,7 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
     }
 
     connection* conn = nullptr;
-    std::chrono::milliseconds timeout_ms = couchbase::timeout_defaults::analytics_timeout;
+    std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::analytics_timeout;
 
     conn = reinterpret_cast<connection*>(PyCapsule_GetPointer(pyObj_conn, "conn_"));
     if (nullptr == conn) {
@@ -431,9 +431,9 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
         timeout_ms = std::chrono::milliseconds(std::max(0ULL, timeout / 1000ULL));
     }
 
-    couchbase::operations::analytics_request req{ statement };
+    couchbase::core::operations::analytics_request req{ statement };
     // positional parameters
-    std::vector<couchbase::json_string> positional_parameters{};
+    std::vector<couchbase::core::json_string> positional_parameters{};
     if (pyObj_positional_parameters && PyList_Check(pyObj_positional_parameters)) {
         size_t nargs = static_cast<size_t>(PyList_Size(pyObj_positional_parameters));
         size_t ii;
@@ -448,7 +448,7 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
             Py_INCREF(pyOb_param);
             if (PyUnicode_Check(pyOb_param)) {
                 auto res = std::string(PyUnicode_AsUTF8(pyOb_param));
-                positional_parameters.push_back(couchbase::json_string{ std::move(res) });
+                positional_parameters.push_back(couchbase::core::json_string{ std::move(res) });
             }
             //@TODO: exception if this check fails??
             Py_DECREF(pyOb_param);
@@ -460,7 +460,7 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
     }
 
     // named parameters
-    std::map<std::string, couchbase::json_string> named_parameters{};
+    std::map<std::string, couchbase::core::json_string> named_parameters{};
     if (pyObj_named_parameters && PyDict_Check(pyObj_named_parameters)) {
         PyObject *pyObj_key, *pyObj_value;
         Py_ssize_t pos = 0;
@@ -473,7 +473,7 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
             }
             if (PyUnicode_Check(pyObj_value) && !k.empty()) {
                 auto res = std::string(PyUnicode_AsUTF8(pyObj_value));
-                named_parameters.emplace(k, couchbase::json_string{ std::move(res) });
+                named_parameters.emplace(k, couchbase::core::json_string{ std::move(res) });
             }
         }
     }
@@ -487,7 +487,7 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
     req.priority = priority == 1;
 
     if (scan_consistency) {
-        req.scan_consistency = str_to_scan_consistency_type<couchbase::analytics_scan_consistency>(scan_consistency);
+        req.scan_consistency = str_to_scan_consistency_type<couchbase::core::analytics_scan_consistency>(scan_consistency);
     }
 
     if (scope_qualifier != nullptr) {
@@ -495,7 +495,7 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
     }
 
     // raw options
-    std::map<std::string, couchbase::json_string> raw_options{};
+    std::map<std::string, couchbase::core::json_string> raw_options{};
     if (pyObj_raw && PyDict_Check(pyObj_raw)) {
         PyObject *pyObj_key, *pyObj_value;
         Py_ssize_t pos = 0;
@@ -508,7 +508,7 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
             }
             if (PyUnicode_Check(pyObj_value) && !k.empty()) {
                 auto res = std::string(PyUnicode_AsUTF8(pyObj_value));
-                raw_options.emplace(k, couchbase::json_string{ std::move(res) });
+                raw_options.emplace(k, couchbase::core::json_string{ std::move(res) });
             }
         }
     }
@@ -531,14 +531,14 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
     //     PyObject* pyObj_row = PyBytes_FromStringAndSize(row.c_str(), row.length());
     //     rows->put(pyObj_row);
     //     PyGILState_Release(state);
-    //     return couchbase::utils::json::stream_control::next_row;
+    //     return couchbase::core::utils::json::stream_control::next_row;
     // };
 
     {
         Py_BEGIN_ALLOW_THREADS conn->cluster_->execute(
           req,
           [rows = streamed_res->rows, include_metrics = metrics, pyObj_callback, pyObj_errback](
-            couchbase::operations::analytics_response resp) {
+            couchbase::core::operations::analytics_response resp) {
               create_analytics_result(resp, include_metrics, rows, pyObj_callback, pyObj_errback);
           });
         Py_END_ALLOW_THREADS
