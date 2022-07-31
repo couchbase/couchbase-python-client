@@ -14,6 +14,10 @@
 #  limitations under the License.
 
 try:
+    # Importing the ssl package allows us to utilize some Python voodoo to find OpenSSL.
+    # This is particularly helpful on M1 macs (PYCBC-1386).
+    import ssl  # noqa: F401
+
     import couchbase.pycbc_core  # noqa: F401
 except ImportError:
     import os
