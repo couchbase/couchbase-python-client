@@ -13,8 +13,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import json
-
 from twisted.internet.defer import Deferred
 
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
@@ -23,9 +21,7 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   ErrorMapper,
                                   ExceptionMap)
 from couchbase.exceptions import exception as CouchbaseBaseException
-from couchbase.logic.search import (SearchRequestLogic,
-                                    SearchRow,
-                                    SearchRowLocations)
+from couchbase.logic.search import SearchRequestLogic
 
 
 class SearchRequest(SearchRequestLogic):
@@ -81,28 +77,7 @@ class SearchRequest(SearchRequestLogic):
         if row is None:
             raise StopIteration
 
-        # TODO:  until streaming, a dict is returned, no deserializing...
-        # deserialized_row = self.serializer.deserialize(row)
-        deserialized_row = row
-        if issubclass(self.row_factory, SearchRow):
-            locations = deserialized_row.get('locations', None)
-            if locations:
-                locations = SearchRowLocations(locations)
-            deserialized_row['locations'] = locations
-
-            fields = deserialized_row.get('fields', None)
-            if fields and isinstance(fields, str):
-                fields = json.loads(fields)
-            deserialized_row['fields'] = fields
-
-            explanation = deserialized_row.get('explanation', None)
-            if explanation and isinstance(explanation, str):
-                explanation = json.loads(explanation)
-            deserialized_row['explanation'] = explanation
-
-            return self.row_factory(**deserialized_row)
-        else:
-            return deserialized_row
+        return self._deserialize_row(row)
 
     def __next__(self):
         try:

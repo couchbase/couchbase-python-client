@@ -14,7 +14,6 @@
 #  limitations under the License.
 
 import asyncio
-import json
 from typing import Awaitable
 
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
@@ -24,9 +23,7 @@ from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   ExceptionMap)
 from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.search import SearchQueryBuilder  # noqa: F401
-from couchbase.logic.search import (SearchRequestLogic,
-                                    SearchRow,
-                                    SearchRowLocations)
+from couchbase.logic.search import SearchRequestLogic
 
 
 class AsyncSearchRequest(SearchRequestLogic):
@@ -87,28 +84,7 @@ class AsyncSearchRequest(SearchRequestLogic):
         if row is None:
             raise StopAsyncIteration
 
-        # TODO:  until streaming, a dict is returned, no deserializing...
-        # deserialized_row = self.serializer.deserialize(row)
-        deserialized_row = row
-        if issubclass(self.row_factory, SearchRow):
-            locations = deserialized_row.get('locations', None)
-            if locations:
-                locations = SearchRowLocations(locations)
-            deserialized_row['locations'] = locations
-
-            fields = deserialized_row.get('fields', None)
-            if fields and isinstance(fields, str):
-                fields = json.loads(fields)
-            deserialized_row['fields'] = fields
-
-            explanation = deserialized_row.get('explanation', None)
-            if explanation and isinstance(explanation, str):
-                explanation = json.loads(explanation)
-            deserialized_row['explanation'] = explanation
-
-            await self._rows.put(self.row_factory(**deserialized_row))
-        else:
-            await self._rows.put(deserialized_row)
+        await self._rows.put(self._deserialize_row(row))
 
     async def __anext__(self):
         try:

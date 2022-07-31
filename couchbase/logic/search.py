@@ -30,7 +30,7 @@ from typing import (TYPE_CHECKING,
                     Tuple,
                     Union)
 
-from couchbase._utils import to_microseconds
+from couchbase._utils import is_null_or_empty, to_microseconds
 from couchbase.exceptions import ErrorMapper, InvalidArgumentException
 from couchbase.exceptions import exception as CouchbaseBaseException
 from couchbase.logic.options import SearchOptionsBase
@@ -328,32 +328,27 @@ class SearchMetrics:
     def _raw_metrics(self):
         return self._raw
 
-    @property
     def success_partition_count(self) -> int:
         return self._raw.get("success_partition_count", 0)
 
-    @property
     def error_partition_count(self) -> int:
         return self._raw.get("error_partition_count", 0)
 
-    @property
     def took(self) -> timedelta:
         us = self._raw.get("took") / 1000
         return timedelta(microseconds=us)
 
-    @property
     def total_partition_count(self) -> int:
-        success = self.success_partition_count
-        error = self.error_partition_count
-        return success + error
+        return self.success_partition_count() + self.error_partition_count()
 
-    @property
     def max_score(self) -> float:
         return self._raw.get("max_score", 0.0)
 
-    @property
     def total_rows(self) -> int:
         return self._raw.get("total_rows", 0)
+
+    def __repr__(self):
+        return 'SearchMetrics:{}'.format(self._raw)
 
 
 class SearchMetaData:
@@ -1351,8 +1346,36 @@ class SearchRequestLogic:
 
         result = search_response.raw_result.get('value', None)
         if result:
-            self._metadata = SearchMetaData(result)
+            self._metadata = SearchMetaData(result.get('metadata', None))
             self._set_facets(result.get('facets', None))
+
+    def _deserialize_row(self, row):
+        # TODO:  until streaming, a dict is returned, no deserializing...
+        # deserialized_row = self.serializer.deserialize(row)
+        if not issubclass(self.row_factory, SearchRow):
+            return row
+
+        deserialized_row = row
+        locations = deserialized_row.get('locations', None)
+        if locations:
+            locations = SearchRowLocations(locations)
+        deserialized_row['locations'] = locations
+
+        fields = deserialized_row.get('fields', None)
+        if is_null_or_empty(fields):
+            fields = None
+        else:
+            fields = SearchRowFields(**json.loads(fields))
+        deserialized_row['fields'] = fields
+
+        explanation = deserialized_row.get('explanation', None)
+        if is_null_or_empty(explanation):
+            explanation = {}
+        else:
+            explanation = json.loads(explanation)
+        deserialized_row['explanation'] = explanation
+
+        return self.row_factory(**deserialized_row)
 
     def _submit_query(self, **kwargs):
         if self.done_streaming:

@@ -21,7 +21,7 @@ import time
 from collections import namedtuple
 from configparser import ConfigParser
 from dataclasses import dataclass, fields
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum, IntEnum
 from typing import (List,
                     Optional,
@@ -30,6 +30,7 @@ from typing import (List,
 
 import pytest
 
+import couchbase.search as search
 from couchbase.auth import AuthDomain
 from couchbase.management.eventing import (EventingFunction,
                                            EventingFunctionBucketAccess,
@@ -51,6 +52,8 @@ from couchbase.management.logic.eventing_logic import QueryScanConsistency
 from couchbase.management.users import (Role,
                                         RoleAndOrigins,
                                         User)
+from couchbase.result import SearchResult
+from couchbase.search import SearchRow
 
 from .mock_server import (LegacyMockBucketSpec,
                           MockServer,
@@ -504,6 +507,76 @@ class CouchbaseTestEnvironment():
             pytest.skip(('CAVES does not seem to be happy. Skipping tests as failure is not'
                         ' an accurate representation of the state of the test, but rather'
                          ' there is an environment issue.'))
+
+    # common Search validation
+
+    def validate_search_row(self, row):
+        assert isinstance(row, SearchRow)  # nosec
+        assert isinstance(row.index, str)  # nosec
+        assert isinstance(row.id, str)  # nosec
+        assert isinstance(row.score, float)  # nosec
+        assert isinstance(row.explanation, dict)  # nosec
+        assert isinstance(row.fragments, dict)  # nosec
+
+        if row.locations:
+            assert isinstance(row.locations, search.SearchRowLocations)  # nosec
+
+        if row.fields:
+            assert isinstance(row.fields, search.SearchRowFields)  # nosec
+
+    def validate_search_metadata(self,
+                                 result,  # type: SearchResult
+                                 expected_count  # type: int
+                                 ) -> None:
+        meta = result.metadata()
+        assert isinstance(meta, search.SearchMetaData)  # nosec
+        metrics = meta.metrics()
+        assert isinstance(metrics, search.SearchMetrics)  # nosec
+        assert isinstance(metrics.error_partition_count(), int)  # nosec
+        assert isinstance(metrics.max_score(), float)  # nosec
+        assert isinstance(metrics.success_partition_count(), int)  # nosec
+        assert isinstance(metrics.total_partition_count(), int)  # nosec
+        total_count = metrics.error_partition_count() + metrics.success_partition_count()
+        assert total_count == metrics.total_partition_count()  # nosec
+        assert isinstance(metrics.took(), timedelta)  # nosec
+        assert metrics.took().total_seconds() >= 0  # nosec
+        assert metrics.total_rows() >= expected_count  # nosec
+
+    def assert_search_rows(self,
+                           result,  # type: SearchResult
+                           expected_count,  # type: int
+                           return_rows=False  # type: bool
+                           ) -> Optional[List[Union[SearchRow, dict]]]:
+        rows = []
+        assert isinstance(result, SearchResult)  # nosec
+        for row in result.rows():
+            assert row is not None  # nosec
+            self.validate_search_row(row)
+            rows.append(row)
+        assert len(rows) >= expected_count  # nosec
+
+        self.validate_search_metadata(result, expected_count)
+
+        if return_rows is True:
+            return rows
+
+    async def assert_search_rows_async(self,
+                                       result,  # type: SearchResult
+                                       expected_count,  # type: int
+                                       return_rows=False  # type: bool
+                                       ) -> Optional[List[Union[SearchRow, dict]]]:
+        rows = []
+        assert isinstance(result, SearchResult)  # nosec
+        async for row in result.rows():
+            assert row is not None  # nosec
+            self.validate_search_row(row)
+            rows.append(row)
+        assert len(rows) >= expected_count  # nosec
+
+        self.validate_search_metadata(result, expected_count)
+
+        if return_rows is True:
+            return rows
 
     # common User mgmt validation
 

@@ -18,9 +18,6 @@ import pathlib
 from copy import copy
 from datetime import timedelta
 from os import path
-from typing import (List,
-                    Optional,
-                    Union)
 
 import pytest
 
@@ -29,7 +26,7 @@ from couchbase.exceptions import InvalidArgumentException, SearchIndexNotFoundEx
 from couchbase.management.collections import CollectionSpec
 from couchbase.management.search import SearchIndex
 from couchbase.mutation_state import MutationState
-from couchbase.result import MutationToken, SearchResult
+from couchbase.result import MutationToken
 from couchbase.search import (HighlightStyle,
                               MatchOperator,
                               SearchDateRangeFacet,
@@ -112,25 +109,10 @@ class SearchTests:
         except Exception as ex:
             raise ex
 
-    def assert_rows(self,
-                    result,  # type: SearchResult
-                    expected_count,  # type: int
-                    return_rows=False  # type: bool
-                    ) -> Optional[List[Union[SearchRow, dict]]]:
-        rows = []
-        assert isinstance(result, SearchResult)
-        for row in result.rows():
-            assert row is not None
-            rows.append(row)
-        assert len(rows) >= expected_count
-
-        if return_rows is True:
-            return rows
-
     def test_cluster_search(self, cb_env):
         q = search.TermQuery('home')
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10))
-        self.assert_rows(res, 2)
+        cb_env.assert_search_rows(res, 2)
 
     def test_cluster_search_fields(self, cb_env):
         test_fields = ['name', 'activity']
@@ -138,23 +120,21 @@ class SearchTests:
         # verify fields works w/in kwargs
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10), fields=test_fields)
 
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         first_entry = rows[0]
         assert isinstance(first_entry, SearchRow)
         assert isinstance(first_entry.fields, dict)
         assert first_entry.fields != {}
-        res = list(map(lambda f: f in test_fields, first_entry.fields.keys()))
         assert all(map(lambda f: f in test_fields, first_entry.fields.keys())) is True
 
         # verify fields works w/in options
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10, fields=test_fields))
 
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         first_entry = rows[0]
         assert isinstance(first_entry, SearchRow)
         assert isinstance(first_entry.fields, dict)
         assert first_entry.fields != {}
-        res = list(map(lambda f: f in test_fields, first_entry.fields.keys()))
         assert all(map(lambda f: f in test_fields, first_entry.fields.keys())) is True
 
     # @TODO: 3.x raises a SearchException...
@@ -172,7 +152,7 @@ class SearchTests:
         q = search.TermQuery('home')
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10, facets={facet_name: facet}))
 
-        self.assert_rows(res, 1)
+        cb_env.assert_search_rows(res, 1)
         facets = res.facets()
         assert isinstance(facets, dict)
         result_facet = facets[facet_name]
@@ -191,7 +171,7 @@ class SearchTests:
         q = search.TermQuery('home')
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10, facets={facet_name: facet}))
 
-        self.assert_rows(res, 1)
+        cb_env.assert_search_rows(res, 1)
         facets = res.facets()
         assert isinstance(facets, dict)
         result_facet = facets[facet_name]
@@ -211,7 +191,7 @@ class SearchTests:
         q = search.TermQuery('home')
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10), facets={facet_name: facet})
 
-        self.assert_rows(res, 1)
+        cb_env.assert_search_rows(res, 1)
         facets = res.facets()
         assert isinstance(facets, dict)
         result_facet = facets[facet_name]
@@ -230,7 +210,7 @@ class SearchTests:
         q = search.TermQuery('home')
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10), facets={facet_name: facet})
 
-        self.assert_rows(res, 1)
+        cb_env.assert_search_rows(res, 1)
         facets = res.facets()
         assert isinstance(facets, dict)
         result_facet = facets[facet_name]
@@ -248,7 +228,7 @@ class SearchTests:
         q = search.TermQuery('home')
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10, facets={facet_name: facet}))
 
-        self.assert_rows(res, 1)
+        cb_env.assert_search_rows(res, 1)
         facets = res.facets()
         assert isinstance(facets, dict)
         result_facet = facets[facet_name]
@@ -268,7 +248,7 @@ class SearchTests:
         q = search.TermQuery('home')
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10, facets={facet_name: facet}))
 
-        self.assert_rows(res, 1)
+        cb_env.assert_search_rows(res, 1)
         facets = res.facets()
         assert isinstance(facets, dict)
         result_facet = facets[facet_name]
@@ -288,7 +268,7 @@ class SearchTests:
         q = search.TermQuery('home')
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10, facets={facet_name: facet}))
 
-        self.assert_rows(res, 1)
+        cb_env.assert_search_rows(res, 1)
         facets = res.facets()
         assert isinstance(facets, dict)
         result_facet = facets[facet_name]
@@ -304,22 +284,22 @@ class SearchTests:
         # verify disable scoring works w/in SearchOptions
         q = search.TermQuery('home')
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10, disable_scoring=True))
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         assert all(map(lambda r: r.score == 0, rows)) is True
 
         # verify disable scoring works w/in kwargs
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10), disable_scoring=True)
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         assert all(map(lambda r: r.score == 0, rows)) is True
 
         # verify setting disable_scoring to False works
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10, disable_scoring=False))
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         assert all(map(lambda r: r.score != 0, rows)) is True
 
         # verify default disable_scoring is False
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10))
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         assert all(map(lambda r: r.score != 0, rows)) is True
 
     def test_cluster_search_highlight(self, cb_env):
@@ -328,7 +308,7 @@ class SearchTests:
         # check w/in options
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10, highlight_style=HighlightStyle.Html))
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         locations = rows[0].locations
         fragments = rows[0].fragments
         assert isinstance(locations, search.SearchRowLocations)
@@ -338,7 +318,7 @@ class SearchTests:
         # check w/in options
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10), highlight_style=HighlightStyle.Html)
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         locations = rows[0].locations
         fragments = rows[0].fragments
         assert isinstance(locations, search.SearchRowLocations)
@@ -350,13 +330,13 @@ class SearchTests:
         q = search.TermQuery('home')
         # check w/in options
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10, include_locations=False))
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         locations = rows[0].locations
         assert locations is None
 
         # check w/in kwargs
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10), include_locations=False)
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         locations = rows[0].locations
         assert locations is None
 
@@ -364,14 +344,14 @@ class SearchTests:
         q = search.TermQuery('home')
         # check w/in options
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10, include_locations=True))
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         locations = rows[0].locations
         assert isinstance(locations, search.SearchRowLocations)
         assert all(map(lambda l: isinstance(l, search.SearchRowLocation), locations.get_all())) is True
 
         # check w/in kwargs
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10), include_locations=True)
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         locations = rows[0].locations
         assert isinstance(locations, search.SearchRowLocations)
         assert all(map(lambda l: isinstance(l, search.SearchRowLocation), locations.get_all())) is True
@@ -381,11 +361,11 @@ class SearchTests:
         # check w/in options
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10, scan_consistency=search.SearchScanConsistency.NOT_BOUNDED))
-        self.assert_rows(res, 1)
+        cb_env.assert_search_rows(res, 1)
 
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10, scan_consistency=search.SearchScanConsistency.REQUEST_PLUS))
-        self.assert_rows(res, 1)
+        cb_env.assert_search_rows(res, 1)
 
         with pytest.raises(InvalidArgumentException):
             cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
@@ -409,7 +389,7 @@ class SearchTests:
         q = search.MatchQuery(query_terms, match_operator=operator)
 
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, limit=10)
-        rows = self.assert_rows(res, 0, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 0, return_rows=True)
 
         if expect_rows:
             assert len(rows) > 0
@@ -426,13 +406,13 @@ class SearchTests:
                       "fuzziness": 2, "operator": "and"}
         q = search.RawQuery(query_args)
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, limit=10)
-        self.assert_rows(res, 1)
+        cb_env.assert_search_rows(res, 1)
 
     def test_cluster_sort_str(self, cb_env):
         q = search.TermQuery('home')
         # score - ascending
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10, sort=['_score']))
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         score = rows[0].score
         for row in rows[1:]:
             assert row.score >= score
@@ -440,7 +420,7 @@ class SearchTests:
 
         # score - descending
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10, sort=['-_score']))
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         score = rows[0].score
         for row in rows[1:]:
             assert score >= row.score
@@ -450,7 +430,7 @@ class SearchTests:
         q = search.TermQuery('home')
         # score - ascending
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10, sort=[search.SortScore()]))
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
 
         score = rows[0].score
         for row in rows[1:]:
@@ -460,7 +440,7 @@ class SearchTests:
         # score - descending
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10, sort=[search.SortScore(desc=True)]))
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
 
         score = rows[0].score
         for row in rows[1:]:
@@ -471,7 +451,7 @@ class SearchTests:
         q = search.TermQuery('home')
         # score - ascending
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10, sort=[search.SortID()]))
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
 
         id = rows[0].id
         for row in rows[1:]:
@@ -481,7 +461,7 @@ class SearchTests:
         # score - descending
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10, sort=[search.SortID(desc=True)]))
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
 
         id = rows[0].id
         for row in rows[1:]:
@@ -496,7 +476,7 @@ class SearchTests:
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10, sort=[sort], fields=[sort_field]))
 
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         rating = rows[0].fields[sort_field]
         for row in rows[1:]:
             assert row.fields[sort_field] >= rating
@@ -507,7 +487,7 @@ class SearchTests:
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10, sort=[sort], fields=[sort_field]))
 
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         rating = rows[0].fields[sort_field]
         for row in rows[1:]:
             assert rating >= row.fields[sort_field]
@@ -521,13 +501,13 @@ class SearchTests:
         sort = search.SortGeoDistance(field=sort_field, location=(37.7749, 122.4194), unit="meters")
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10, sort=[sort], fields=[sort_field]))
-        self.assert_rows(res, 1)
+        cb_env.assert_search_rows(res, 1)
 
         # geo - descending
         sort.desc = True
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10, sort=[sort], fields=[sort_field]))
-        self.assert_rows(res, 1)
+        cb_env.assert_search_rows(res, 1)
 
     def test_cluster_sort_field_multi(self, cb_env):
         sort_fields = [
@@ -541,7 +521,7 @@ class SearchTests:
         q = search.TermQuery('home')
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10, sort=sort_fields, fields=sort_field_names))
-        self.assert_rows(res, 1)
+        cb_env.assert_search_rows(res, 1)
 
         sort_fields = [
             search.SortField(field="rating", type="number",
@@ -552,11 +532,11 @@ class SearchTests:
         ]
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10, sort=sort_fields, fields=sort_field_names))
-        self.assert_rows(res, 1)
+        cb_env.assert_search_rows(res, 1)
 
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10, sort=["abv", "udpated", "-_score"]))
-        self.assert_rows(res, 1)
+        cb_env.assert_search_rows(res, 1)
 
 
 class SearchCollectionTests:
@@ -654,26 +634,11 @@ class SearchCollectionTests:
         except Exception as ex:
             raise ex
 
-    def assert_rows(self,
-                    result,  # type: SearchResult
-                    expected_count,  # type: int
-                    return_rows=False  # type: bool
-                    ) -> Optional[List[Union[SearchRow, dict]]]:
-        rows = []
-        assert isinstance(result, SearchResult)
-        for row in result.rows():
-            assert row is not None
-            rows.append(row)
-        assert len(rows) >= expected_count
-
-        if return_rows is True:
-            return rows
-
     def test_cluster_query_collections(self, cb_env):
         q = search.TermQuery('home')
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10, scope_name=cb_env.scope.name, collections=[cb_env.collection.name]))
-        rows = self.assert_rows(res, 2, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 2, return_rows=True)
 
         collections = list(map(lambda r: r.fields['_$c'], rows))
         assert all([c for c in collections if c == cb_env.collection.name]) is True
@@ -682,13 +647,13 @@ class SearchCollectionTests:
         q = search.TermQuery('home')
         res = cb_env.scope.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10, collections=[cb_env.collection.name]))
-        rows = self.assert_rows(res, 2, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 2, return_rows=True)
 
         collections = list(map(lambda r: r.fields['_$c'], rows))
         assert all([c for c in collections if c == cb_env.collection.name]) is True
 
         res = cb_env.scope.search_query(self.TEST_INDEX_NAME, q, SearchOptions(limit=10))
-        rows = self.assert_rows(res, 2, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 2, return_rows=True)
 
         collections = list(map(lambda r: r.fields['_$c'], rows))
         assert all([c for c in collections if c in [cb_env.collection.name, self.OTHER_COLLECTION]]) is True
@@ -705,7 +670,7 @@ class SearchCollectionTests:
 
         fields_with_col = copy(test_fields)
         fields_with_col.append('_$c')
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         first_entry = rows[0]
         assert isinstance(first_entry, SearchRow)
         assert isinstance(first_entry.fields, dict)
@@ -721,7 +686,7 @@ class SearchCollectionTests:
                                                       fields=test_fields,
                                                       collections=[cb_env.collection.name]))
 
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         first_entry = rows[0]
         assert isinstance(first_entry, SearchRow)
         assert isinstance(first_entry.fields, dict)
@@ -736,7 +701,7 @@ class SearchCollectionTests:
         # check w/in options
         res = cb_env.scope.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10, highlight_style=HighlightStyle.Html))
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         locations = rows[0].locations
         fragments = rows[0].fragments
         assert isinstance(locations, search.SearchRowLocations)
@@ -748,7 +713,7 @@ class SearchCollectionTests:
         # check w/in kwargs
         res = cb_env.scope.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10), highlight_style=HighlightStyle.Html, collections=[cb_env.collection.name])
-        rows = self.assert_rows(res, 1, return_rows=True)
+        rows = cb_env.assert_search_rows(res, 1, return_rows=True)
         locations = rows[0].locations
         fragments = rows[0].fragments
         assert isinstance(locations, search.SearchRowLocations)

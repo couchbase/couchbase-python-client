@@ -13,8 +13,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import json
-
 from couchbase.exceptions import NoChildrenException  # noqa: F401
 from couchbase.exceptions import (PYCBC_ERROR_MAP,
                                   AlreadyQueriedException,
@@ -32,7 +30,10 @@ from couchbase.logic.search import SearchMetaData  # noqa: F401
 from couchbase.logic.search import SearchMetrics  # noqa: F401
 from couchbase.logic.search import SearchNumericRangeFacet  # noqa: F401
 from couchbase.logic.search import SearchQueryBuilder  # noqa: F401
+from couchbase.logic.search import SearchRow  # noqa: F401
+from couchbase.logic.search import SearchRowFields  # noqa: F401
 from couchbase.logic.search import SearchRowLocation  # noqa: F401
+from couchbase.logic.search import SearchRowLocations  # noqa: F401
 from couchbase.logic.search import SearchScanConsistency  # noqa: F401
 from couchbase.logic.search import SearchTermFacet  # noqa: F401
 from couchbase.logic.search import Sort  # noqa: F401
@@ -41,9 +42,7 @@ from couchbase.logic.search import SortGeoDistance  # noqa: F401
 from couchbase.logic.search import SortID  # noqa: F401
 from couchbase.logic.search import SortScore  # noqa: F401
 from couchbase.logic.search import TermFacet  # noqa: F401
-from couchbase.logic.search import (SearchRequestLogic,
-                                    SearchRow,
-                                    SearchRowLocations)
+from couchbase.logic.search import SearchRequestLogic
 from couchbase.logic.search_queries import BooleanFieldQuery  # noqa: F401
 from couchbase.logic.search_queries import BooleanQuery  # noqa: F401
 from couchbase.logic.search_queries import ConjunctionQuery  # noqa: F401
@@ -114,28 +113,7 @@ class SearchRequest(SearchRequestLogic):
         if row is None:
             raise StopIteration
 
-        # TODO:  until streaming, a dict is returned, no deserializing...
-        # deserialized_row = self.serializer.deserialize(row)
-        deserialized_row = row
-        if issubclass(self.row_factory, SearchRow):
-            locations = deserialized_row.get('locations', None)
-            if locations:
-                locations = SearchRowLocations(locations)
-            deserialized_row['locations'] = locations
-
-            fields = deserialized_row.get('fields', None)
-            if fields and isinstance(fields, str):
-                fields = json.loads(fields)
-            deserialized_row['fields'] = fields
-
-            explanation = deserialized_row.get('explanation', None)
-            if explanation and isinstance(explanation, str):
-                explanation = json.loads(explanation)
-            deserialized_row['explanation'] = explanation
-
-            return self.row_factory(**deserialized_row)
-        else:
-            return deserialized_row
+        return self._deserialize_row(row)
 
     def __next__(self):
         try:
