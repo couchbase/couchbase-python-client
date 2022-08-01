@@ -56,3 +56,19 @@ class Supportability:
             cls.__init__ = new_init
             return cls
         return decorator
+
+
+class RemoveProperty:
+    """Used to override a get descriptor for a class property and raise an AttributeError to prevent access.
+
+    This helper class should only be used in **rare** instances.  Specifically, it allows for an inheritance
+    structure to remain intact while removing a property from a subclass.  In an ideal scenario, the hierarchy
+    structure is revisted, but in some cases it is easier to keep the current structure.  This class provides a
+    work-around.
+    """
+
+    def __init__(self, prop):
+        self._prop = prop
+
+    def __get__(self, instance, cls):
+        raise AttributeError(f'Property "{self._prop}" is no longer a part of the {cls.__name__} class.')

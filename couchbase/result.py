@@ -684,6 +684,19 @@ class MutateInResult(MutationResult):
 
 class CounterResult(MutationResult):
 
+    # Uncomment and delete previous property when ready to remove cas CounterResult.
+    # cas = RemoveProperty('cas')
+
+    @property
+    def cas(self) -> int:
+        """
+            .. warning::
+                This property is deprecated and will be removed in a future version.
+
+            int: **DEPRECATED** The CAS of the document.
+        """
+        return self._orig.raw_result.get("cas", 0)
+
     @property
     def content(self) -> Optional[int]:
         """
@@ -692,7 +705,10 @@ class CounterResult(MutationResult):
         return self._orig.raw_result.get("content", None)
 
     def __repr__(self):
-        return "CounterResult:{}".format(self._orig)
+        # Uncomment and delete previous return when ready to remove cas from CounterResult. Or, ideally,
+        # remove cas from the cxx client's response.
+        # return "CounterResult:{}".format({k:v for k,v in self._orig.raw_result.items() if k != 'cas'})
+        return "CounterResult:{}".format(self._orig.raw_result)
 
 
 class MultiCounterResult:
