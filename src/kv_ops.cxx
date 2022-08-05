@@ -23,19 +23,30 @@
 
 template<typename T>
 result*
-add_extras_to_result([[maybe_unused]] const T& t, result* res)
+add_extras_to_result([[maybe_unused]] const T& resp, result* res)
 {
     return res;
 }
 
-template<>
+template<typename T>
 result*
-add_extras_to_result<couchbase::core::operations::get_projected_response>(const couchbase::core::operations::get_projected_response& resp,
-                                                                          result* res)
+add_flags_and_value_to_result(const T& resp, result* res)
 {
-    if (resp.expiry) {
-        PyObject* pyObj_tmp = PyLong_FromUnsignedLong(resp.expiry.value());
-        if (-1 == PyDict_SetItemString(res->dict, RESULT_EXPIRY, pyObj_tmp)) {
+    PyObject* pyObj_tmp = PyLong_FromUnsignedLong(resp.flags);
+    if (-1 == PyDict_SetItemString(res->dict, RESULT_FLAGS, pyObj_tmp)) {
+        Py_XDECREF(pyObj_tmp);
+        return nullptr;
+    }
+    Py_XDECREF(pyObj_tmp);
+
+    if (!res->ec) {
+        try {
+            pyObj_tmp = binary_to_PyObject(resp.value);
+        } catch (const std::exception& e) {
+            PyErr_SetString(PyExc_TypeError, e.what());
+            return nullptr;
+        }
+        if (-1 == PyDict_SetItemString(res->dict, RESULT_VALUE, pyObj_tmp)) {
             Py_XDECREF(pyObj_tmp);
             return nullptr;
         }
@@ -57,6 +68,45 @@ add_extras_to_result<couchbase::core::operations::exists_response>(const couchba
     return res;
 }
 
+template<>
+result*
+add_extras_to_result<couchbase::core::operations::get_projected_response>(const couchbase::core::operations::get_projected_response& resp,
+                                                                          result* res)
+{
+    if (resp.expiry) {
+        PyObject* pyObj_tmp = PyLong_FromUnsignedLong(resp.expiry.value());
+        if (-1 == PyDict_SetItemString(res->dict, RESULT_EXPIRY, pyObj_tmp)) {
+            Py_XDECREF(pyObj_tmp);
+            return nullptr;
+        }
+        Py_DECREF(pyObj_tmp);
+    }
+
+    return add_flags_and_value_to_result(resp, res);
+}
+
+template<>
+result*
+add_extras_to_result<couchbase::core::operations::get_response>(const couchbase::core::operations::get_response& resp, result* res)
+{
+    return add_flags_and_value_to_result(resp, res);
+}
+template<>
+result*
+add_extras_to_result<couchbase::core::operations::get_and_lock_response>(const couchbase::core::operations::get_and_lock_response& resp,
+                                                                         result* res)
+{
+    return add_flags_and_value_to_result(resp, res);
+}
+
+template<>
+result*
+add_extras_to_result<couchbase::core::operations::get_and_touch_response>(const couchbase::core::operations::get_and_touch_response& resp,
+                                                                          result* res)
+{
+    return add_flags_and_value_to_result(resp, res);
+}
+
 template<typename T>
 result*
 create_base_result_from_get_operation_response(const char* key, const T& resp)
@@ -73,14 +123,6 @@ create_base_result_from_get_operation_response(const char* key, const T& resp)
     }
     Py_DECREF(pyObj_tmp);
 
-    pyObj_tmp = PyLong_FromUnsignedLong(resp.flags);
-    if (-1 == PyDict_SetItemString(res->dict, RESULT_FLAGS, pyObj_tmp)) {
-        Py_XDECREF(pyObj_result);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-    }
-    Py_XDECREF(pyObj_tmp);
-
     if (nullptr != key) {
         pyObj_tmp = PyUnicode_FromString(key);
         if (-1 == PyDict_SetItemString(res->dict, RESULT_KEY, pyObj_tmp)) {
@@ -90,112 +132,6 @@ create_base_result_from_get_operation_response(const char* key, const T& resp)
         }
         Py_DECREF(pyObj_tmp);
     }
-
-    if (!res->ec) {
-        try {
-            pyObj_tmp = binary_to_PyObject(resp.value);
-        } catch (const std::exception& e) {
-            PyErr_SetString(PyExc_TypeError, e.what());
-            return nullptr;
-        }
-        if (-1 == PyDict_SetItemString(res->dict, RESULT_VALUE, pyObj_tmp)) {
-            Py_XDECREF(pyObj_result);
-            Py_XDECREF(pyObj_tmp);
-            return nullptr;
-        }
-        Py_DECREF(pyObj_tmp);
-    }
-    return res;
-}
-
-template<>
-result*
-create_base_result_from_get_operation_response<couchbase::core::operations::exists_response>(
-  const char* key,
-  const couchbase::core::operations::exists_response& resp)
-{
-    PyObject* pyObj_result = create_result_obj();
-    result* res = reinterpret_cast<result*>(pyObj_result);
-    res->ec = resp.ctx.ec();
-
-    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value());
-    if (-1 == PyDict_SetItemString(res->dict, RESULT_CAS, pyObj_tmp)) {
-        Py_XDECREF(pyObj_result);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-    }
-    Py_DECREF(pyObj_tmp);
-
-    if (nullptr != key) {
-        pyObj_tmp = PyUnicode_FromString(key);
-        if (-1 == PyDict_SetItemString(res->dict, RESULT_KEY, pyObj_tmp)) {
-            Py_XDECREF(pyObj_result);
-            Py_XDECREF(pyObj_tmp);
-            return nullptr;
-        }
-        Py_DECREF(pyObj_tmp);
-    }
-    return res;
-}
-
-template<>
-result*
-create_base_result_from_get_operation_response<couchbase::core::operations::touch_response>(
-  const char* key,
-  const couchbase::core::operations::touch_response& resp)
-{
-    PyObject* pyObj_result = create_result_obj();
-    result* res = reinterpret_cast<result*>(pyObj_result);
-    res->ec = resp.ctx.ec();
-
-    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value());
-    if (-1 == PyDict_SetItemString(res->dict, RESULT_CAS, pyObj_tmp)) {
-        Py_XDECREF(pyObj_result);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-    }
-    Py_DECREF(pyObj_tmp);
-
-    if (nullptr != key) {
-        pyObj_tmp = PyUnicode_FromString(key);
-        if (-1 == PyDict_SetItemString(res->dict, RESULT_KEY, pyObj_tmp)) {
-            Py_XDECREF(pyObj_result);
-            Py_XDECREF(pyObj_tmp);
-            return nullptr;
-        }
-        Py_DECREF(pyObj_tmp);
-    }
-    return res;
-}
-
-template<>
-result*
-create_base_result_from_get_operation_response<couchbase::core::operations::unlock_response>(
-  const char* key,
-  const couchbase::core::operations::unlock_response& resp)
-{
-    PyObject* pyObj_result = create_result_obj();
-    result* res = reinterpret_cast<result*>(pyObj_result);
-    res->ec = resp.ctx.ec();
-
-    PyObject* pyObj_tmp = PyLong_FromUnsignedLongLong(resp.cas.value());
-    if (-1 == PyDict_SetItemString(res->dict, RESULT_CAS, pyObj_tmp)) {
-        Py_XDECREF(pyObj_result);
-        Py_XDECREF(pyObj_tmp);
-        return nullptr;
-    }
-    Py_DECREF(pyObj_tmp);
-
-    if (nullptr != key) {
-        pyObj_tmp = PyUnicode_FromString(key);
-        if (-1 == PyDict_SetItemString(res->dict, RESULT_KEY, pyObj_tmp)) {
-            Py_XDECREF(pyObj_result);
-            Py_XDECREF(pyObj_tmp);
-            return nullptr;
-        }
-        Py_DECREF(pyObj_tmp);
-    }
-
     return res;
 }
 
@@ -216,7 +152,7 @@ create_result_from_get_operation_response(const char* key,
     PyObject* pyObj_callback_res = nullptr;
     auto set_exception = false;
 
-    if (resp.ctx.ec().value()) {
+    if (resp.ctx.ec()) {
         pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "KV read operation error.");
         if (pyObj_errback == nullptr) {
             if (multi_result != nullptr) {
@@ -299,116 +235,6 @@ create_result_from_get_operation_response(const char* key,
         } else {
             PyErr_Print();
             // @TODO:  how to handle this situation?
-        }
-        Py_DECREF(pyObj_args);
-        Py_XDECREF(pyObj_kwargs);
-        Py_XDECREF(pyObj_callback);
-        Py_XDECREF(pyObj_errback);
-    }
-    PyGILState_Release(state);
-}
-
-// Until CXXCBC-82 is resolved
-template<>
-void
-create_result_from_get_operation_response<couchbase::core::operations::exists_response>(
-  const char* key,
-  const couchbase::core::operations::exists_response& resp,
-  PyObject* pyObj_callback,
-  PyObject* pyObj_errback,
-  std::shared_ptr<std::promise<PyObject*>> barrier,
-  result* multi_result)
-{
-    PyGILState_STATE state = PyGILState_Ensure();
-    PyObject* pyObj_args = NULL;
-    PyObject* pyObj_kwargs = nullptr;
-    PyObject* pyObj_exc = nullptr;
-    PyObject* pyObj_func = nullptr;
-    PyObject* pyObj_callback_res = nullptr;
-    auto set_exception = false;
-
-    if (resp.ctx.ec().value() && resp.ctx.ec().value() != 101) {
-        pyObj_exc = build_exception_from_context(resp.ctx, __FILE__, __LINE__, "KV read operation error.");
-        if (pyObj_errback == nullptr) {
-            if (multi_result != nullptr) {
-                Py_INCREF(Py_False);
-                barrier->set_value(Py_False);
-                if (-1 == PyDict_SetItemString(multi_result->dict, key, pyObj_exc)) {
-                    // TODO:  not much we can do here...maybe?
-                    PyErr_Print();
-                    PyErr_Clear();
-                }
-                // won't fall into logic path where pyObj_exc is decremented later
-                Py_DECREF(pyObj_exc);
-            } else {
-                barrier->set_value(pyObj_exc);
-            }
-        } else {
-            pyObj_func = pyObj_errback;
-            pyObj_args = PyTuple_New(1);
-            PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
-        }
-        // lets clear any errors
-        PyErr_Clear();
-    } else {
-        auto res = create_base_result_from_get_operation_response(key, resp);
-        if (res != nullptr) {
-            res = add_extras_to_result(resp, res);
-        }
-
-        if (res == nullptr || PyErr_Occurred() != nullptr) {
-            set_exception = true;
-        } else {
-            if (pyObj_callback == nullptr) {
-                if (multi_result != nullptr) {
-                    Py_INCREF(Py_True);
-                    barrier->set_value(Py_True);
-                    if (-1 == PyDict_SetItemString(multi_result->dict, key, reinterpret_cast<PyObject*>(res))) {
-                        // TODO:  not much we can do here...maybe?
-                        PyErr_Print();
-                        PyErr_Clear();
-                    }
-                    Py_DECREF(reinterpret_cast<PyObject*>(res));
-                } else {
-                    barrier->set_value(reinterpret_cast<PyObject*>(res));
-                }
-            } else {
-                pyObj_func = pyObj_callback;
-                pyObj_args = PyTuple_New(1);
-                PyTuple_SET_ITEM(pyObj_args, 0, reinterpret_cast<PyObject*>(res));
-            }
-        }
-    }
-
-    if (set_exception) {
-        pyObj_exc = pycbc_build_exception(PycbcError::UnableToBuildResult, __FILE__, __LINE__, "KV read operation error.");
-        if (pyObj_errback == nullptr) {
-            if (multi_result != nullptr) {
-                Py_INCREF(Py_False);
-                barrier->set_value(Py_False);
-                if (-1 == PyDict_SetItemString(multi_result->dict, key, pyObj_exc)) {
-                    // TODO:  not much we can do here...maybe?
-                    PyErr_Print();
-                    PyErr_Clear();
-                }
-                // won't fall into logic path where pyObj_exc is decremented later
-                Py_DECREF(pyObj_exc);
-            } else {
-                barrier->set_value(pyObj_exc);
-            }
-        } else {
-            pyObj_func = pyObj_errback;
-            pyObj_args = PyTuple_New(1);
-            PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
-        }
-    }
-
-    if (!set_exception && pyObj_func != nullptr) {
-        pyObj_callback_res = PyObject_Call(pyObj_func, pyObj_args, pyObj_kwargs);
-        if (pyObj_callback_res) {
-            Py_DECREF(pyObj_callback_res);
-        } else {
-            pycbc_set_python_exception(PycbcError::InternalSDKError, __FILE__, __LINE__, "KV read operation callback failed.");
         }
         Py_DECREF(pyObj_args);
         Py_XDECREF(pyObj_kwargs);

@@ -489,15 +489,6 @@ class MultiGetResult(MultiResult):
 
 class ExistsResult(Result):
 
-    def __init__(
-        self,
-        orig,  # type: result
-    ):
-        should_raise = False
-        if orig.strerror() is not None and "document_not_found" not in orig.strerror():
-            should_raise = True
-        super().__init__(orig, should_raise=should_raise)
-
     @property
     def exists(self) -> bool:
         """
