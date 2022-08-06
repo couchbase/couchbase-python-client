@@ -39,6 +39,7 @@ from couchbase.options import (SearchOptions,
                                UnsignedInt64)
 from couchbase.pycbc_core import search_query
 from couchbase.serializer import DefaultJsonSerializer, Serializer
+from couchbase.tracing import CouchbaseSpan
 
 if TYPE_CHECKING:
     from couchbase.mutation_state import MutationState  # noqa: F401
@@ -914,7 +915,8 @@ class SearchQueryBuilder:
         "client_context_id": {"client_context_id": lambda x: x},
         "serializer": {"serializer": lambda x: x},
         "facets": {},
-        "sort": {}
+        "sort": {},
+        "span": {"span": lambda x: x}
     }
 
     def __init__(self, index_name, query, **kwargs):
@@ -1228,6 +1230,17 @@ class SearchQueryBuilder:
             raise InvalidArgumentException(message='Serializer should implement Serializer interface.')
         self.set_option('serializer', value)
 
+    @property
+    def span(self) -> Optional[CouchbaseSpan]:
+        return self._params.get('span', None)
+
+    @span.setter
+    def span(self, value  # type: CouchbaseSpan
+             ):
+        if not issubclass(value.__class__, CouchbaseSpan):
+            raise InvalidArgumentException(message='Span should implement CouchbaseSpan interface')
+        self.set_option('span', value)
+
     @classmethod
     def create_search_query_object(cls, index_name, query, *options, **kwargs):
         # lets make a copy of the options, and update with kwargs...
@@ -1382,10 +1395,13 @@ class SearchRequestLogic:
             return
 
         self._started_streaming = True
+        span = self.encoded_query.pop('span', None)
         search_kwargs = {
             'conn': self._connection,
             'op_args': self.encoded_query
         }
+        if span:
+            search_kwargs['span'] = span
 
         # this is for txcouchbase...
         callback = kwargs.pop('callback', None)

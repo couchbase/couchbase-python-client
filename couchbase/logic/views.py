@@ -36,6 +36,7 @@ from couchbase.management.views import DesignDocumentNamespace
 from couchbase.options import UnsignedInt64, ViewOptions
 from couchbase.pycbc_core import view_query
 from couchbase.serializer import DefaultJsonSerializer, Serializer
+from couchbase.tracing import CouchbaseSpan
 
 if TYPE_CHECKING:
     from couchbase._utils import JSONType
@@ -109,7 +110,8 @@ class ViewQuery:
         "client_context_id": {"client_context_id": lambda x: x},
         "raw": {"raw": lambda x: x},
         "query_string": {"query_string": lambda x: x},
-        "serializer": {"serializer": lambda x: x}
+        "serializer": {"serializer": lambda x: x},
+        "span": {"span": lambda x: x}
     }
 
     def __init__(self,
@@ -426,6 +428,17 @@ class ViewQuery:
             raise InvalidArgumentException(message='Serializer should implement Serializer interface.')
         self.set_option('serializer', value)
 
+    @property
+    def span(self) -> Optional[CouchbaseSpan]:
+        return self._params.get('span', None)
+
+    @span.setter
+    def span(self, value  # type: CouchbaseSpan
+             ):
+        if not issubclass(value.__class__, CouchbaseSpan):
+            raise InvalidArgumentException(message='Span should implement CouchbaseSpan interface')
+        self.set_option('span', value)
+
     @classmethod
     def create_view_query_object(cls,
                                  bucket_name,  # type: str
@@ -513,11 +526,13 @@ class ViewRequestLogic:
             return
 
         self._started_streaming = True
+        span = self.encoded_query.pop('span', None)
         view_kwargs = {
             'conn': self._connection,
             'op_args': self.encoded_query
         }
-
+        if span:
+            view_kwargs['span'] = span
         # this is for txcouchbase...
         callback = kwargs.pop('callback', None)
         if callback:

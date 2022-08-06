@@ -34,6 +34,7 @@ from couchbase.logic.options import QueryOptionsBase
 from couchbase.options import QueryOptions, UnsignedInt64
 from couchbase.pycbc_core import n1ql_query
 from couchbase.serializer import DefaultJsonSerializer, Serializer
+from couchbase.tracing import CouchbaseSpan
 
 if TYPE_CHECKING:
     from couchbase.mutation_state import MutationState  # noqa: F401
@@ -330,7 +331,8 @@ class N1QLQuery:
         "preserve_expiry": {"preserve_expiry": lambda x: x},
         "serializer": {"serializer": lambda x: x},
         "positional_parameters": {},
-        "named_parameters": {}
+        "named_parameters": {},
+        "span": {"span": lambda x: x}
     }
 
     def __init__(self, query, *args, **kwargs):
@@ -646,6 +648,17 @@ class N1QLQuery:
                 raise TypeError("key for raw value must be str")
         raw_params = {f'{k}': json.dumps(v) for k, v in value.items()}
         self.set_option('raw', raw_params)
+
+    @property
+    def span(self) -> Optional[CouchbaseSpan]:
+        return self._params.get('span', None)
+
+    @span.setter
+    def span(self, value  # type CouchbaseSpan
+             ) -> None:
+        if not issubclass(value.__class__, CouchbaseSpan):
+            raise InvalidArgumentException(message='Span should implement CouchbaseSpan interface')
+        self.set_option('span', value)
 
     @property
     def serializer(self) -> Optional[Serializer]:

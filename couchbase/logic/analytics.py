@@ -30,6 +30,7 @@ from couchbase.logic.options import AnalyticsOptionsBase
 from couchbase.options import AnalyticsOptions, UnsignedInt64
 from couchbase.pycbc_core import analytics_query
 from couchbase.serializer import DefaultJsonSerializer, Serializer
+from couchbase.tracing import CouchbaseSpan
 
 
 class AnalyticsScanConsistency(Enum):
@@ -170,7 +171,8 @@ class AnalyticsQuery:
         'serializer': {'serializer': lambda x: x},
         'raw': {'raw': lambda x: x},
         'positional_parameters': {},
-        'named_parameters': {}
+        'named_parameters': {},
+        'span': {'span': lambda x: x}
     }
 
     def __init__(self, query, *args, **kwargs):
@@ -327,6 +329,17 @@ class AnalyticsQuery:
                 raise TypeError("key for raw value must be str")
         raw_params = {f'{k}': json.dumps(v) for k, v in value.items()}
         self.set_option('raw', raw_params)
+
+    @property
+    def span(self) -> Optional[CouchbaseSpan]:
+        return self._params.get('span', None)
+
+    @span.setter
+    def span(self, value  # type: CouchbaseSpan
+             ):
+        if not issubclass(value.__class__, CouchbaseSpan):
+            raise InvalidArgumentException('Span should implement CouchbaseSpan interface.')
+        self.set_option('span', value)
 
     @classmethod
     def create_query_object(cls, statement, *options, **kwargs):

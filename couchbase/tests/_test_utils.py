@@ -180,7 +180,7 @@ class TestEnvironment(CouchbaseTestEnvironment):
         return self._rate_limit_params if hasattr(self, '_rate_limit_params') else None
 
     @classmethod
-    def get_environment(cls, test_suite, couchbase_config, coll_type=CollectionType.DEFAULT, **kwargs):
+    def get_environment(cls, test_suite, couchbase_config, coll_type=CollectionType.DEFAULT, **kwargs):  # noqa: C901
 
         # this will only return False _if_ using the mock server
         mock_supports = CouchbaseTestEnvironment.mock_supports_feature(test_suite.split('.')[-1],
@@ -192,8 +192,11 @@ class TestEnvironment(CouchbaseTestEnvironment):
         username, pw = couchbase_config.get_username_and_pw()
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
         transcoder = kwargs.pop('transcoder', None)
+        tracer = kwargs.pop('tracer', None)
         if transcoder:
             opts['transcoder'] = transcoder
+        if tracer:
+            opts['tracer'] = tracer
         okay = False
         for _ in range(3):
             try:

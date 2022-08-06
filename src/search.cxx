@@ -19,6 +19,7 @@
 #include "exceptions.hxx"
 #include "result.hxx"
 #include "n1ql.hxx"
+#include "tracing.hxx"
 #include <core/search_highlight_style.hxx>
 #include <core/search_scan_consistency.hxx>
 
@@ -818,10 +819,11 @@ handle_search_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* k
     PyObject* pyObj_callback = nullptr;
     PyObject* pyObj_errback = nullptr;
     PyObject* pyObj_row_callback = nullptr;
+    PyObject* pyObj_span = nullptr;
 
-    static const char* kw_list[] = { "conn", "op_args", "serializer", "callback", "errback", "row_callback", nullptr };
+    static const char* kw_list[] = { "conn", "op_args", "serializer", "callback", "errback", "row_callback", "span", nullptr };
 
-    const char* kw_format = "O!|OOOOO";
+    const char* kw_format = "O!|OOOOOO";
     int ret = PyArg_ParseTupleAndKeywords(args,
                                           kwargs,
                                           kw_format,
@@ -832,7 +834,8 @@ handle_search_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* k
                                           &pyObj_serializer,
                                           &pyObj_callback,
                                           &pyObj_errback,
-                                          &pyObj_row_callback);
+                                          &pyObj_row_callback,
+                                          &pyObj_span);
     if (!ret) {
         PyErr_Print();
         PyErr_SetString(PyExc_ValueError, "Unable to parse arguments");
@@ -852,6 +855,9 @@ handle_search_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* k
     PyObject* pyObj_metrics = PyDict_GetItemString(pyObj_op_args, "metrics");
     if (pyObj_metrics != nullptr && pyObj_metrics == Py_False) {
         include_metrics = false;
+    }
+    if (nullptr != pyObj_span) {
+        req.parent_span = std::make_shared<pycbc::request_span>(pyObj_span);
     }
 
     // timeout is always set either to default, or timeout provided in options

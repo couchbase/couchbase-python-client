@@ -18,6 +18,7 @@
 #include "analytics.hxx"
 #include "exceptions.hxx"
 #include "result.hxx"
+#include "tracing.hxx"
 #include <core/analytics_scan_consistency.hxx>
 
 couchbase::core::analytics_scan_consistency
@@ -367,6 +368,7 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
     PyObject* pyObj_callback = nullptr;
     PyObject* pyObj_errback = nullptr;
     PyObject* pyObj_row_callback = nullptr;
+    PyObject* pyObj_span = nullptr;
 
     static const char* kw_list[] = { "conn",
                                      "statement",
@@ -386,9 +388,10 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
                                      "callback",
                                      "errback",
                                      "row_callback",
+                                     "span",
                                      nullptr };
 
-    const char* kw_format = "O!s|sssssLiiiOOOOOOO";
+    const char* kw_format = "O!s|sssssLiiiOOOOOOOO";
     int ret = PyArg_ParseTupleAndKeywords(args,
                                           kwargs,
                                           kw_format,
@@ -411,7 +414,8 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
                                           &pyObj_serializer,
                                           &pyObj_callback,
                                           &pyObj_errback,
-                                          &pyObj_row_callback);
+                                          &pyObj_row_callback,
+                                          &pyObj_span);
     if (!ret) {
         PyErr_SetString(PyExc_ValueError, "Unable to parse arguments");
         return nullptr;
@@ -514,6 +518,9 @@ handle_analytics_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject
     }
     if (raw_options.size() > 0) {
         req.raw = raw_options;
+    }
+    if (nullptr != pyObj_span) {
+        req.parent_span = std::make_shared<pycbc::request_span>(pyObj_span);
     }
 
     // PyObjects that need to be around for the cxx client lambda

@@ -163,7 +163,8 @@ class ClusterOptions(ClusterOptionsBase):
         timeout_options (:class:`~.ClusterTimeoutOptions`): Timeout options for
             various SDK operations. See :class:`~.options.ClusterTimeoutOptions` for details.
         tracing_options (:class:`~.options.ClusterTimeoutOptions`): Tracing options for SDK tracing bevavior.
-            See :class:`~.options.ClusterTracingOptions` for details.
+            See :class:`~.options.ClusterTracingOptions` for details.  These are ignored if an external tracer
+            is specified.
         enable_tls (bool, optional): Set to True to enable tls. Defaults to False (disabled).
         enable_mutation_tokens (bool, optional): Set to False to disable mutation tokens in mutation results.
             Defaults to True (enabled).
@@ -185,7 +186,6 @@ class ClusterOptions(ClusterOptionsBase):
             Defaults to :class:`~.serializer.DefaultJsonSerializer`.
         transcoder (:class:`~.transcoder.Transcoder`, optional): Global transcoder to use for kv-operations.
             Defaults to :class:`~.transcoder.JsonTranscoder`.
-        span (`CouchbaseSpan`, optional): Global span to use for tracing.  Defaults to None.
         tcp_keep_alive_interval (timedelta, optional): TCP keep-alive interval. Defaults to None.
         config_poll_interval (timedelta, optional): Config polling floor interval.
             Defaults to None.
@@ -200,6 +200,8 @@ class ClusterOptions(ClusterOptionsBase):
         compression_min_size (int, optional): Set compression min size.  Defaults to None.
         compression_min_ratio (float, optional): Set compression min size.  Defaults to None.
         compression (:class:`~.LockMode`, optional): Set LockMode mode.  Defaults to None.
+        tracer (Any, optional): Set an external tracer.  Defaults to None.   Note when this is set, the tracing_options
+            are ignored.
     """
 
 # Diagnostics Operations

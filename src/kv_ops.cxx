@@ -18,6 +18,7 @@
 #include "kv_ops.hxx"
 #include "exceptions.hxx"
 #include "result.hxx"
+#include "tracing.hxx"
 #include "utils.hxx"
 
 template<typename T>
@@ -445,6 +446,9 @@ prepare_and_execute_read_op(struct read_options* options,
         case Operations::GET: {
             couchbase::core::operations::get_request req{ options->id };
             req.timeout = options->timeout_ms;
+            if (nullptr != options->span) {
+                req.parent_span = std::make_shared<pycbc::request_span>(options->span);
+            }
             do_get<couchbase::core::operations::get_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
@@ -493,6 +497,9 @@ prepare_and_execute_read_op(struct read_options* options,
             req.timeout = options->timeout_ms;
             req.with_expiry = !!options->with_expiry;
             req.projections = projections;
+            if (nullptr != options->span) {
+                req.parent_span = std::make_shared<pycbc::request_span>(options->span);
+            }
             do_get<couchbase::core::operations::get_projected_request>(
               *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
@@ -501,6 +508,9 @@ prepare_and_execute_read_op(struct read_options* options,
             couchbase::core::operations::get_and_touch_request req{ options->id };
             req.expiry = options->expiry;
             req.timeout = options->timeout_ms;
+            if (nullptr != options->span) {
+                req.parent_span = std::make_shared<pycbc::request_span>(options->span);
+            }
             do_get<couchbase::core::operations::get_and_touch_request>(
               *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
@@ -509,6 +519,9 @@ prepare_and_execute_read_op(struct read_options* options,
             couchbase::core::operations::get_and_lock_request req{ options->id };
             req.lock_time = options->lock_time;
             req.timeout = options->timeout_ms;
+            if (nullptr != options->span) {
+                req.parent_span = std::make_shared<pycbc::request_span>(options->span);
+            }
             do_get<couchbase::core::operations::get_and_lock_request>(
               *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
@@ -516,6 +529,9 @@ prepare_and_execute_read_op(struct read_options* options,
         case Operations::EXISTS: {
             couchbase::core::operations::exists_request req{ options->id };
             req.timeout = options->timeout_ms;
+            if (nullptr != options->span) {
+                req.parent_span = std::make_shared<pycbc::request_span>(options->span);
+            }
             do_get<couchbase::core::operations::exists_request>(
               *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
@@ -524,6 +540,9 @@ prepare_and_execute_read_op(struct read_options* options,
             couchbase::core::operations::touch_request req{ options->id };
             req.expiry = options->expiry;
             req.timeout = options->timeout_ms;
+            if (nullptr != options->span) {
+                req.parent_span = std::make_shared<pycbc::request_span>(options->span);
+            }
             do_get<couchbase::core::operations::touch_request>(*(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
         }
@@ -531,6 +550,9 @@ prepare_and_execute_read_op(struct read_options* options,
             couchbase::core::operations::unlock_request req{ options->id };
             req.cas = options->cas;
             req.timeout = options->timeout_ms;
+            if (nullptr != options->span) {
+                req.parent_span = std::make_shared<pycbc::request_span>(options->span);
+            }
             do_get<couchbase::core::operations::unlock_request>(
               *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
@@ -767,6 +789,9 @@ prepare_and_execute_mutation_op(struct mutation_options* options,
             req.timeout = options->timeout_ms;
             req.expiry = options->expiry;
             req.durability_level = durability_level;
+            if (nullptr != options->span) {
+                req.parent_span = std::make_shared<pycbc::request_span>(options->span);
+            }
             do_mutation<couchbase::core::operations::insert_request>(
               *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
@@ -781,6 +806,9 @@ prepare_and_execute_mutation_op(struct mutation_options* options,
             req.durability_level = durability_level;
             if (options->preserve_expiry) {
                 req.preserve_expiry = options->preserve_expiry;
+            }
+            if (nullptr != options->span) {
+                req.parent_span = std::make_shared<pycbc::request_span>(options->span);
             }
             do_mutation<couchbase::core::operations::upsert_request>(
               *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
@@ -798,6 +826,9 @@ prepare_and_execute_mutation_op(struct mutation_options* options,
             if (options->preserve_expiry) {
                 req.preserve_expiry = options->preserve_expiry;
             }
+            if (nullptr != options->span) {
+                req.parent_span = std::make_shared<pycbc::request_span>(options->span);
+            }
             do_mutation<couchbase::core::operations::replace_request>(
               *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;
@@ -807,6 +838,9 @@ prepare_and_execute_mutation_op(struct mutation_options* options,
             req.timeout = options->timeout_ms;
             req.cas = options->cas;
             req.durability_level = durability_level;
+            if (nullptr != options->span) {
+                req.parent_span = std::make_shared<pycbc::request_span>(options->span);
+            }
             do_mutation<couchbase::core::operations::remove_request>(
               *(options->conn), req, pyObj_callback, pyObj_errback, barrier, multi_result);
             break;

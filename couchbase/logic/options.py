@@ -505,6 +505,7 @@ class ClusterOptionsBase(dict):
         "logging_meter_emit_interval": {"emit_interval": validate_int},
         "num_io_threads": {"num_io_threads": validate_int},
         "transaction_config": {"transaction_config": lambda x: x},
+        "tracer": {"tracer": lambda x: x},
     }
 
     @overload
@@ -528,7 +529,6 @@ class ClusterOptionsBase(dict):
         tls_verify=None,    # type: Optional[Union[TLSVerifyMode, str]]
         serializer=None,  # type: Optional[Serializer]
         transcoder=None,  # type: Optional[Transcoder]
-        span=None,  # type: Optional[Any]
         tcp_keep_alive_interval=None,  # type: Optional[timedelta]
         config_poll_interval=None,  # type: Optional[timedelta]
         config_poll_floor=None,  # type: Optional[timedelta]

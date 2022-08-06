@@ -18,6 +18,7 @@
 #include "n1ql.hxx"
 #include "exceptions.hxx"
 #include "result.hxx"
+#include "tracing.hxx"
 #include <core/query_scan_consistency.hxx>
 #include <core/query_profile_mode.hxx>
 
@@ -402,6 +403,7 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     PyObject* pyObj_callback = nullptr;
     PyObject* pyObj_errback = nullptr;
     PyObject* pyObj_row_callback = nullptr;
+    PyObject* pyObj_span = nullptr;
 
     static const char* kw_list[] = { "conn",
                                      "statement",
@@ -431,9 +433,10 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
                                      "callback",
                                      "errback",
                                      "row_callback",
+                                     "span",
                                      nullptr };
 
-    const char* kw_format = "O!s|sssssssLLLLLLiiiiiOOOOOOOO";
+    const char* kw_format = "O!s|sssssssLLLLLLiiiiiOOOOOOOOO";
     int ret = PyArg_ParseTupleAndKeywords(args,
                                           kwargs,
                                           kw_format,
@@ -466,7 +469,8 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
                                           &pyObj_serializer,
                                           &pyObj_callback,
                                           &pyObj_errback,
-                                          &pyObj_row_callback);
+                                          &pyObj_row_callback,
+                                          &pyObj_span);
     if (!ret) {
         PyErr_SetString(PyExc_ValueError, "Unable to parse arguments");
         return nullptr;
@@ -580,6 +584,10 @@ handle_n1ql_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
 
     if (pyObj_mutation_state != nullptr && PyList_Check(pyObj_mutation_state)) {
         req.mutation_state = get_mutation_state(pyObj_mutation_state);
+    }
+
+    if (pyObj_span != nullptr) {
+        req.parent_span = std::make_shared<pycbc::request_span>(pyObj_span);
     }
 
     // raw options

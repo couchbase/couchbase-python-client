@@ -209,6 +209,7 @@ TEST_SUITE_MAP = {
     'search_t': [ServerFeatures.Search, ServerFeatures.SearchIndexManagement],
     'searchmgmt_t': [ServerFeatures.SearchIndexManagement],
     'subdoc_t': [ServerFeatures.Subdoc],
+    'tracing_t': [ServerFeatures.Collections],
     'transactions_t': [ServerFeatures.Txns],
     'transcoder_t': [ServerFeatures.KeyValue],
     'usermgmt_t': [ServerFeatures.UserManagement],

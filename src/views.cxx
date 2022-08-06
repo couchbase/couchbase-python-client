@@ -18,6 +18,7 @@
 #include "views.hxx"
 #include "exceptions.hxx"
 #include "result.hxx"
+#include "tracing.hxx"
 #include <core/view_scan_consistency.hxx>
 #include <core/view_sort_order.hxx>
 #include <core/management/design_document.hxx>
@@ -406,10 +407,11 @@ handle_view_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     PyObject* pyObj_callback = nullptr;
     PyObject* pyObj_errback = nullptr;
     PyObject* pyObj_row_callback = nullptr;
+    PyObject* pyObj_span = nullptr;
 
-    static const char* kw_list[] = { "conn", "op_args", "serializer", "callback", "errback", "row_callback", nullptr };
+    static const char* kw_list[] = { "conn", "op_args", "serializer", "callback", "errback", "row_callback", "span", nullptr };
 
-    const char* kw_format = "O!|OOOOO";
+    const char* kw_format = "O!|OOOOOO";
     int ret = PyArg_ParseTupleAndKeywords(args,
                                           kwargs,
                                           kw_format,
@@ -420,7 +422,8 @@ handle_view_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
                                           &pyObj_serializer,
                                           &pyObj_callback,
                                           &pyObj_errback,
-                                          &pyObj_row_callback);
+                                          &pyObj_row_callback,
+                                          &pyObj_span);
     if (!ret) {
         PyErr_Print();
         PyErr_SetString(PyExc_ValueError, "Unable to parse arguments");
@@ -440,6 +443,9 @@ handle_view_query([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     // timeout is always set either to default, or timeout provided in options
     streamed_result* streamed_res = create_streamed_result_obj(req.timeout.value());
 
+    if (nullptr != pyObj_span) {
+        req.parent_span = std::make_shared<pycbc::request_span>(pyObj_span);
+    }
     // TODO:  let the couchbase++ streaming stabilize a bit more...
     // req.row_callback = [rows = streamed_res->rows](std::string&& row) {
     //     PyGILState_STATE state = PyGILState_Ensure();
