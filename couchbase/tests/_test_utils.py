@@ -179,7 +179,7 @@ class TestEnvironment(CouchbaseTestEnvironment):
         """Returns the rate limit testing data"""
         return self._rate_limit_params if hasattr(self, '_rate_limit_params') else None
 
-    @classmethod
+    @classmethod  # noqa: C901
     def get_environment(cls, test_suite, couchbase_config, coll_type=CollectionType.DEFAULT, **kwargs):  # noqa: C901
 
         # this will only return False _if_ using the mock server

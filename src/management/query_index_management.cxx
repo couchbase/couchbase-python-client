@@ -269,9 +269,59 @@ create_result_from_query_index_mgmt_op_response(const Response& resp,
             pyObj_args = PyTuple_New(1);
             PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
         }
+    } else if (pyObj_func != nullptr) {
+        pyObj_callback_res = PyObject_Call(pyObj_func, pyObj_args, pyObj_kwargs);
+        if (pyObj_callback_res) {
+            Py_DECREF(pyObj_callback_res);
+        } else {
+            PyErr_Print();
+            // @TODO:  how to handle this situation?
+        }
+        Py_DECREF(pyObj_args);
+        Py_XDECREF(pyObj_kwargs);
+        Py_XDECREF(pyObj_callback);
+        Py_XDECREF(pyObj_errback);
+    }
+    PyGILState_Release(state);
+}
+
+template<>
+void
+create_result_from_query_index_mgmt_op_response(const couchbase::manager_error_context& ctx,
+                                                PyObject* pyObj_callback,
+                                                PyObject* pyObj_errback,
+                                                std::shared_ptr<std::promise<PyObject*>> barrier)
+{
+    PyObject* pyObj_args = nullptr;
+    PyObject* pyObj_kwargs = nullptr;
+    PyObject* pyObj_func = nullptr;
+    PyObject* pyObj_exc = nullptr;
+    PyObject* pyObj_callback_res = nullptr;
+
+    PyGILState_STATE state = PyGILState_Ensure();
+    if (ctx.ec()) {
+        pyObj_exc = build_exception_from_context(ctx, __FILE__, __LINE__, "Error doing query index mgmt operation.", "QueryIndexMgmt");
+        if (pyObj_errback == nullptr) {
+            barrier->set_value(pyObj_exc);
+        } else {
+            pyObj_func = pyObj_errback;
+            pyObj_args = PyTuple_New(1);
+            PyTuple_SET_ITEM(pyObj_args, 0, pyObj_exc);
+        }
+        // lets clear any errors
+        PyErr_Clear();
+    } else {
+        Py_INCREF(Py_None);
+        if (pyObj_callback == nullptr) {
+            barrier->set_value(Py_None);
+        } else {
+            pyObj_func = pyObj_callback;
+            pyObj_args = PyTuple_New(1);
+            PyTuple_SET_ITEM(pyObj_args, 0, Py_None);
+        }
     }
 
-    if (!set_exception && pyObj_func != nullptr) {
+    if (pyObj_func != nullptr) {
         pyObj_callback_res = PyObject_Call(pyObj_func, pyObj_args, pyObj_kwargs);
         if (pyObj_callback_res) {
             Py_DECREF(pyObj_callback_res);
@@ -429,8 +479,12 @@ PyObject*
 handle_query_index_mgmt_op(connection* conn, struct query_index_mgmt_options* options, PyObject* pyObj_callback, PyObject* pyObj_errback)
 {
     PyObject* res = nullptr;
-    auto barrier = std::make_shared<std::promise<PyObject*>>();
-    auto f = barrier->get_future();
+    std::shared_ptr<std::promise<PyObject*>> barrier = nullptr;
+    std::future<PyObject*> fut;
+    if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
+        barrier = std::make_shared<std::promise<PyObject*>>();
+        fut = barrier->get_future();
+    }
     PyObject* pyObj_bucket_name = PyDict_GetItemString(options->op_args, "bucket_name");
     auto bucket_name = std::string(PyUnicode_AsUTF8(pyObj_bucket_name));
     std::string scope_name{};
@@ -491,18 +545,23 @@ handle_query_index_mgmt_op(connection* conn, struct query_index_mgmt_options* op
             break;
         }
         case QueryIndexManagementOperations::BUILD_DEFERRED_INDEXES: {
-            couchbase::core::operations::management::query_index_build_deferred_request req{};
-            req.bucket_name = bucket_name;
-            req.timeout = options->timeout_ms;
+            auto opts = couchbase::build_query_index_options{}.timeout(options->timeout_ms);
             if (!scope_name.empty()) {
-                req.scope_name = scope_name;
+                opts.scope_name(scope_name);
             }
             if (!collection_name.empty()) {
-                req.collection_name = collection_name;
+                opts.collection_name(collection_name);
             }
-
-            res = do_query_index_mgmt_op<couchbase::core::operations::management::query_index_build_deferred_request>(
-              *conn, req, pyObj_callback, pyObj_errback, barrier);
+            {
+                Py_BEGIN_ALLOW_THREADS couchbase::core::impl::initiate_build_deferred_indexes(
+                  conn->cluster_, bucket_name, opts.build(), [pyObj_callback, pyObj_errback, barrier](auto resp) {
+                      create_result_from_query_index_mgmt_op_response(resp, pyObj_callback, pyObj_errback, barrier);
+                  });
+                Py_END_ALLOW_THREADS
+            }
+            // for async ops
+            Py_INCREF(Py_None);
+            res = Py_None;
             break;
         }
         default: {
@@ -516,7 +575,7 @@ handle_query_index_mgmt_op(connection* conn, struct query_index_mgmt_options* op
     };
     if (nullptr == pyObj_callback || nullptr == pyObj_errback) {
         PyObject* ret = nullptr;
-        Py_BEGIN_ALLOW_THREADS ret = f.get();
+        Py_BEGIN_ALLOW_THREADS ret = fut.get();
         Py_END_ALLOW_THREADS return ret;
     }
     return res;

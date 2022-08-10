@@ -20,6 +20,7 @@
 #include "../client.hxx"
 
 #include <core/operations/management/query.hxx>
+#include <couchbase/build_query_index_options.hxx>
 
 class QueryIndexManagementOperations
 {

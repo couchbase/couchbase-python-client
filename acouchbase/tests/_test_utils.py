@@ -206,6 +206,7 @@ class TestEnvironment(CouchbaseTestEnvironment):
             try:
                 cluster = await Cluster.connect(conn_string, opts)
                 bucket = cluster.bucket(f"{couchbase_config.bucket_name}")
+                await bucket.on_connect()
                 await cluster.cluster_info()
                 okay = True
                 break

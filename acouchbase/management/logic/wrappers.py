@@ -69,11 +69,13 @@ class AsyncMgmtWrapper:
                         else:
                             retval = None
 
-                    self.loop.call_soon_threadsafe(ft.set_result, retval)
+                    if not ft.done():
+                        self.loop.call_soon_threadsafe(ft.set_result, retval)
 
                 def on_err(exc, exc_info=None, error_msg=None):
                     excptn = build_mgmt_exception(exc, mgmt_type, error_map)
-                    self.loop.call_soon_threadsafe(ft.set_exception, excptn)
+                    if not ft.done():
+                        self.loop.call_soon_threadsafe(ft.set_exception, excptn)
 
                 kwargs["callback"] = on_ok
                 kwargs["errback"] = on_err

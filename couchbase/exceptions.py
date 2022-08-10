@@ -74,67 +74,6 @@ class ErrorContext:
         return f'ErrorContext({self._base})'
 
 
-class TransactionsErrorContext(ErrorContext):
-    _TXN_EC_KEYS = ["failure_type"]
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.txn_err_ctx = {k: v for k,
-                            v in kwargs.items() if k in self._TXN_EC_KEYS}
-
-    @property
-    def failure_type(self) -> Optional[str]:
-        return self.txn_err_ctx.get("failure_type", None)
-
-    @property
-    def last_dispatched_to(self) -> Optional[str]:
-        return None
-
-    @property
-    def last_dispatched_from(self) -> Optional[str]:
-        return None
-
-    @property
-    def retry_attempts(self) -> int:
-        return None
-
-    @property
-    def retry_reasons(self) -> Set[str]:
-        return None
-
-    def __str__(self):
-        return f'TransactionsErrorContext{{{self.txn_err_ctx}}}'
-
-
-class KeyValueErrorContext(ErrorContext):
-    _KV_EC_KEYS = ["key", "bucket_name", "scope_name", "collection_name",
-                   "opaque", "status_code", "error_map_info", "extended_error_info"]
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._kv_err_ctx = {k: v for k,
-                            v in kwargs.items() if k in self._KV_EC_KEYS}
-
-    @property
-    def key(self) -> Optional[str]:
-        return self._kv_err_ctx.get("key", None)
-
-    @property
-    def bucket_name(self) -> Optional[str]:
-        return self._kv_err_ctx.get("bucket_name", None)
-
-    @property
-    def scope_name(self) -> Optional[str]:
-        return self._kv_err_ctx.get("scope_name", None)
-
-    @property
-    def collection_name(self) -> Optional[str]:
-        return self._kv_err_ctx.get("collection_name", None)
-
-    def __repr__(self):
-        return "KeyValueErrorContext:{}".format(self._kv_err_ctx)
-
-
 class HTTPErrorContext(ErrorContext):
     _HTTP_EC_KEYS = ["client_context_id", "method", "path", "http_status",
                      "http_body"]
@@ -168,32 +107,93 @@ class HTTPErrorContext(ErrorContext):
         return f'HTTPErrorContext({self._http_err_ctx})'
 
 
-class QueryErrorContext(HTTPErrorContext):
-    _QUERY_EC_KEYS = ["first_error_code", "first_error_message", "statement", "parameters"]
+class KeyValueErrorContext(ErrorContext):
+    _KV_EC_KEYS = ["key", "bucket_name", "scope_name", "collection_name",
+                   "opaque", "status_code", "error_map_info", "extended_error_info"]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._query_err_ctx = {k: v for k,
-                               v in kwargs.items() if k in self._QUERY_EC_KEYS}
+        self._kv_err_ctx = {k: v for k,
+                            v in kwargs.items() if k in self._KV_EC_KEYS}
 
     @property
-    def first_error_code(self) -> Optional[int]:
-        return self._query_err_ctx.get("first_error_code", None)
+    def key(self) -> Optional[str]:
+        return self._kv_err_ctx.get("key", None)
 
     @property
-    def first_error_message(self) -> Optional[str]:
-        return self._query_err_ctx.get("first_error_message", None)
+    def bucket_name(self) -> Optional[str]:
+        return self._kv_err_ctx.get("bucket_name", None)
 
     @property
-    def statement(self) -> Optional[str]:
-        return self._query_err_ctx.get("statement", None)
+    def scope_name(self) -> Optional[str]:
+        return self._kv_err_ctx.get("scope_name", None)
 
     @property
-    def parameters(self) -> Optional[str]:
-        return self._query_err_ctx.get("parameters", None)
+    def collection_name(self) -> Optional[str]:
+        return self._kv_err_ctx.get("collection_name", None)
 
     def __repr__(self):
-        return f'QueryErrorContext({self._get_base()})'
+        return "KeyValueErrorContext:{}".format(self._kv_err_ctx)
+
+
+class ManagementErrorContext(ErrorContext):
+    _MGMT_EC_KEYS = ["client_context_id", "content", "path", "http_status"]
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._mgmt_err_ctx = {k: v for k,
+                              v in kwargs.items() if k in self._MGMT_EC_KEYS}
+
+    @property
+    def response_code(self) -> Optional[int]:
+        return self._mgmt_err_ctx.get("http_status", None)
+
+    @property
+    def path(self) -> Optional[str]:
+        return self._mgmt_err_ctx.get("path", None)
+
+    @property
+    def content(self) -> Optional[str]:
+        return self._mgmt_err_ctx.get("content", None)
+
+    @property
+    def client_context_id(self) -> Optional[str]:
+        return self._mgmt_err_ctx.get("client_context_id", None)
+
+    def __repr__(self):
+        return f'ManagementErrorContext({self._mgmt_err_ctx})'
+
+
+class TransactionsErrorContext(ErrorContext):
+    _TXN_EC_KEYS = ["failure_type"]
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.txn_err_ctx = {k: v for k,
+                            v in kwargs.items() if k in self._TXN_EC_KEYS}
+
+    @property
+    def failure_type(self) -> Optional[str]:
+        return self.txn_err_ctx.get("failure_type", None)
+
+    @property
+    def last_dispatched_to(self) -> Optional[str]:
+        return None
+
+    @property
+    def last_dispatched_from(self) -> Optional[str]:
+        return None
+
+    @property
+    def retry_attempts(self) -> int:
+        return None
+
+    @property
+    def retry_reasons(self) -> Set[str]:
+        return None
+
+    def __str__(self):
+        return f'TransactionsErrorContext{{{self.txn_err_ctx}}}'
 
 
 class AnalyticsErrorContext(HTTPErrorContext):
@@ -222,6 +222,34 @@ class AnalyticsErrorContext(HTTPErrorContext):
 
     def __repr__(self):
         return f'AnalyticsErrorContext({self._get_base()})'
+
+
+class QueryErrorContext(HTTPErrorContext):
+    _QUERY_EC_KEYS = ["first_error_code", "first_error_message", "statement", "parameters"]
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._query_err_ctx = {k: v for k,
+                               v in kwargs.items() if k in self._QUERY_EC_KEYS}
+
+    @property
+    def first_error_code(self) -> Optional[int]:
+        return self._query_err_ctx.get("first_error_code", None)
+
+    @property
+    def first_error_message(self) -> Optional[str]:
+        return self._query_err_ctx.get("first_error_message", None)
+
+    @property
+    def statement(self) -> Optional[str]:
+        return self._query_err_ctx.get("statement", None)
+
+    @property
+    def parameters(self) -> Optional[str]:
+        return self._query_err_ctx.get("parameters", None)
+
+    def __repr__(self):
+        return f'QueryErrorContext({self._get_base()})'
 
 
 class SearchErrorContext(HTTPErrorContext):
@@ -272,12 +300,14 @@ class ViewErrorContext(HTTPErrorContext):
         return f'ViewErrorContext({self._get_base()})'
 
 
-ErrorContextType = Union[ErrorContext,
+ErrorContextType = Union[AnalyticsErrorContext,
+                         ErrorContext,
                          HTTPErrorContext,
                          KeyValueErrorContext,
+                         ManagementErrorContext,
                          QueryErrorContext,
-                         AnalyticsErrorContext,
                          SearchErrorContext,
+                         TransactionsErrorContext,
                          ViewErrorContext]
 
 

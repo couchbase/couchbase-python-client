@@ -20,7 +20,9 @@ import pytest
 import pytest_asyncio
 
 from acouchbase.cluster import get_event_loop
-from couchbase.exceptions import (ParsingFailedException,
+from couchbase.exceptions import (InternalServerFailureException,
+                                  ManagementErrorContext,
+                                  ParsingFailedException,
                                   QueryIndexAlreadyExistsException,
                                   QueryIndexNotFoundException,
                                   WatchQueryIndexTimeoutException)
@@ -334,9 +336,6 @@ class QueryIndexManagementTests:
     @pytest.mark.usefixtures("clear_all_indexes")
     @pytest.mark.asyncio
     async def test_deferred(self, cb_env):
-        if cb_env.server_version_short < 6.5:
-            pytest.skip(
-                f'Skipped on server versions < 6.5 (using {cb_env.server_version_short}). Pending CXX updates...')
         bucket_name = cb_env.bucket.name
         ixm = cb_env.ixm
         # Create primary index
@@ -364,7 +363,31 @@ class QueryIndexManagementTests:
                                 WatchQueryIndexOptions(timeout=timedelta(seconds=30),
                                                        watch_primary=True))  # Should be OK again
         with pytest.raises(QueryIndexNotFoundException):
-            await ixm.watch_indexes(bucket_name, ['idontexist'], WatchQueryIndexOptions(timeout=timedelta(seconds=10)))
+            await ixm.watch_indexes(bucket_name,
+                                    ['idontexist'],
+                                    WatchQueryIndexOptions(timeout=timedelta(seconds=10)))
+
+    @pytest.mark.usefixtures("check_query_index_mgmt_supported")
+    @pytest.mark.usefixtures("clear_all_indexes")
+    @pytest.mark.asyncio
+    async def test_deferred_fail(self, cb_env):
+        # Create a bunch of indexes
+        for n in range(10):
+            await cb_env.ixm.create_index(cb_env.bucket.name,
+                                          'ix{0}'.format(n),
+                                          ['fld{0}'.format(n)],
+                                          CreateQueryIndexOptions(deferred=True))
+
+        ixs = await cb_env.ixm.get_all_indexes(cb_env.bucket.name)
+        assert len(ixs) == 10
+        ix_names = list(map(lambda i: i.name, ixs))
+
+        # lets drop the last index while building all deferred indexes to trigger an exception
+        results = await asyncio.gather(cb_env.ixm.drop_index(cb_env.bucket.name, ix_names[-1]),
+                                       cb_env.ixm.build_deferred_indexes(cb_env.bucket.name),
+                                       return_exceptions=True)
+        assert isinstance(results[1], InternalServerFailureException)
+        assert isinstance(results[1].context, ManagementErrorContext)
 
 
 class QueryIndexCollectionManagementTests:
@@ -394,37 +417,46 @@ class QueryIndexCollectionManagementTests:
                                                 cb_env.teardown_named_collections,
                                                 raise_if_no_exception=False)
 
-    async def _clear_all_indexes(self, cb_env, ignore_fail=False):
-        # Drop all indexes!
-        bucket_name = cb_env.bucket.name
-        ixm = cb_env.ixm
-        indexes = await ixm.get_all_indexes(bucket_name,
-                                            GetAllQueryIndexOptions(scope_name=self.TEST_SCOPE,
-                                                                    collection_name=self.TEST_COLLECTION))
+    async def _drop_all_indexes(self, cb_env, indexes, scope_name='_default', collection_name='_default'):
         for index in indexes:
             # @TODO:  will need to update once named primary allowed
             if index.is_primary:
-                await ixm.drop_primary_index(bucket_name,
-                                             DropPrimaryQueryIndexOptions(scope_name=self.TEST_SCOPE,
-                                                                          collection_name=self.TEST_COLLECTION))
+                await cb_env.ixm.drop_primary_index(cb_env.bucket.name,
+                                                    DropPrimaryQueryIndexOptions(scope_name=scope_name,
+                                                                                 collection_name=collection_name))
             else:
-                await ixm.drop_index(bucket_name,
-                                     index.name,
-                                     DropQueryIndexOptions(scope_name=self.TEST_SCOPE,
-                                                           collection_name=self.TEST_COLLECTION))
+                await cb_env.ixm.drop_index(cb_env.bucket.name,
+                                            index.name,
+                                            DropQueryIndexOptions(scope_name=scope_name,
+                                                                  collection_name=collection_name))
         for _ in range(10):
-            indexes = await ixm.get_all_indexes(bucket_name,
-                                                GetAllQueryIndexOptions(scope_name=self.TEST_SCOPE,
-                                                                        collection_name=self.TEST_COLLECTION))
+            indexes = await cb_env.ixm.get_all_indexes(cb_env.bucket.name,
+                                                       GetAllQueryIndexOptions(scope_name=scope_name,
+                                                                               collection_name=collection_name))
             if 0 == len(indexes):
-                return
+                return True
             await asyncio.sleep(2)
 
-        if ignore_fail is True:
-            return
+        return False
 
-        pytest.xfail(
-            "Indexes were not dropped after {} waits of {} seconds each".format(10, 3))
+    async def _clear_all_indexes(self, cb_env, ignore_fail=False):
+        # Drop all indexes!
+        for scope_col in [(self.TEST_SCOPE, self.TEST_COLLECTION), ('_default', '_default')]:
+            indexes = await cb_env.ixm.get_all_indexes(cb_env.bucket.name,
+                                                       GetAllQueryIndexOptions(scope_name=scope_col[0],
+                                                                               collection_name=scope_col[1]))
+
+            success = await self._drop_all_indexes(cb_env,
+                                                   indexes,
+                                                   scope_name=scope_col[0],
+                                                   collection_name=scope_col[1])
+            if success:
+                continue
+            elif ignore_fail is True:
+                continue
+            else:
+                pytest.xfail(
+                    "Indexes were not dropped after {} waits of {} seconds each".format(10, 3))
 
     @pytest.fixture(scope="class")
     def check_query_index_mgmt_supported(self, cb_env):
@@ -830,3 +862,36 @@ class QueryIndexCollectionManagementTests:
                                     WatchQueryIndexOptions(timeout=timedelta(seconds=10),
                                                            scope_name=self.TEST_SCOPE,
                                                            collection_name=self.TEST_COLLECTION))
+
+    @pytest.mark.flaky(reruns=5, reruns_delay=2)
+    @pytest.mark.usefixtures("check_query_index_mgmt_supported")
+    @pytest.mark.usefixtures("clear_all_indexes")
+    @pytest.mark.asyncio
+    async def test_get_all_correct_collection(self, cb_env):
+        # create some indexes in the _default scope & collection
+        for i in range(2):
+            await cb_env.ixm.create_index(cb_env.bucket.name,
+                                          f'ix{i}',
+                                          [f'fld{i}'],
+                                          CreateQueryIndexOptions(deferred=True))
+
+        # create some indexes in the test scope & collection
+        for i in range(2):
+            await cb_env.ixm.create_index(cb_env.bucket.name,
+                                          f'ix{i}',
+                                          [f'fld{i}'],
+                                          CreateQueryIndexOptions(deferred=True,
+                                                                  scope_name=self.TEST_SCOPE,
+                                                                  collection_name=self.TEST_COLLECTION))
+
+        # all indexes in bucket (i.e. in test and _default scopes/collections)
+        all_ixs = await cb_env.ixm.get_all_indexes(cb_env.bucket.name)
+
+        # _should_ be only indexes in test scope & collection
+        collection_ixs = await cb_env.ixm.get_all_indexes(cb_env.bucket.name,
+                                                          scope_name=self.TEST_SCOPE,
+                                                          collection_name=self.TEST_COLLECTION)
+
+        assert len(all_ixs) != len(collection_ixs)
+        assert len(all_ixs) == 4
+        assert len(collection_ixs) == 2
