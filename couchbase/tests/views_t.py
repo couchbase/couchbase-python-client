@@ -223,6 +223,15 @@ class ViewTests:
         assert isinstance(metadata, ViewMetaData)
         assert metadata.total_rows() >= expected_count
 
+    def test_bad_view_query(self, cb_env):
+        view_result = cb_env.bucket.view_query('fake-ddoc',
+                                               'fake-view',
+                                               limit=10,
+                                               namespace=DesignDocumentNamespace.DEVELOPMENT)
+
+        with pytest.raises(DesignDocumentNotFoundException):
+            [r for r in view_result]
+
 
 class ViewParamTests:
 

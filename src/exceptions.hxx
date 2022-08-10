@@ -802,7 +802,7 @@ build_exception_from_context(const couchbase::core::error_context::view& ctx,
         PyErr_Print();
         PyErr_Clear();
     }
-    Py_DECREF(pyObj_tmp);
+    Py_DECREF(pyObj_query_string);
 
     std::string context_type = "ViewErrorContext";
     pyObj_tmp = PyUnicode_FromString(context_type.c_str());

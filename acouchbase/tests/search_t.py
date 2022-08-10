@@ -24,7 +24,9 @@ import pytest_asyncio
 
 import couchbase.search as search
 from acouchbase.cluster import get_event_loop
-from couchbase.exceptions import InvalidArgumentException, SearchIndexNotFoundException
+from couchbase.exceptions import (InvalidArgumentException,
+                                  QueryIndexNotFoundException,
+                                  SearchIndexNotFoundException)
 from couchbase.management.collections import CollectionSpec
 from couchbase.management.search import SearchIndex
 from couchbase.search import (HighlightStyle,
@@ -568,6 +570,12 @@ class SearchTests:
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10, sort=["abv", "udpated", "-_score"]))
         await cb_env.assert_search_rows_async(res, 1)
+
+    @pytest.mark.asyncio
+    async def test_bad_search_query(self, cb_env):
+        res = cb_env.cluster.search_query('not-an-index', search.TermQuery('home'))
+        with pytest.raises(QueryIndexNotFoundException):
+            [r async for r in res]
 
 
 class SearchCollectionTests:

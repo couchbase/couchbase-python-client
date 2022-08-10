@@ -22,7 +22,9 @@ from os import path
 import pytest
 
 import couchbase.search as search
-from couchbase.exceptions import InvalidArgumentException, SearchIndexNotFoundException
+from couchbase.exceptions import (InvalidArgumentException,
+                                  QueryIndexNotFoundException,
+                                  SearchIndexNotFoundException)
 from couchbase.management.collections import CollectionSpec
 from couchbase.management.search import SearchIndex
 from couchbase.mutation_state import MutationState
@@ -537,6 +539,11 @@ class SearchTests:
         res = cb_env.cluster.search_query(self.TEST_INDEX_NAME, q, SearchOptions(
             limit=10, sort=["abv", "udpated", "-_score"]))
         cb_env.assert_search_rows(res, 1)
+
+    def test_bad_search_query(self, cb_env):
+        res = cb_env.cluster.search_query('not-an-index', search.TermQuery('home'))
+        with pytest.raises(QueryIndexNotFoundException):
+            [r for r in res]
 
 
 class SearchCollectionTests:

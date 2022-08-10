@@ -23,6 +23,7 @@ import couchbase.subdocument as SD
 from acouchbase.cluster import get_event_loop
 from couchbase.exceptions import (CouchbaseException,
                                   KeyspaceNotFoundException,
+                                  ParsingFailedException,
                                   QueryErrorContext,
                                   QueryIndexNotFoundException,
                                   ScopeNotFoundException)
@@ -266,6 +267,11 @@ class QueryTests:
         assert expiry1 is not None
         assert expiry2 is not None
         assert expiry1 == expiry2
+
+    @pytest.mark.asyncio
+    async def test_bad_query(self, cb_env):
+        with pytest.raises(ParsingFailedException):
+            await cb_env.cluster.query("I'm not N1QL!").execute()
 
     @pytest.mark.asyncio
     async def test_query_error_context(self, cb_env):

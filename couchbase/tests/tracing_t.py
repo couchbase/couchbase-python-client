@@ -23,7 +23,8 @@ from couchbase.options import (AnalyticsOptions,
                                RemoveOptions,
                                ReplaceOptions,
                                SearchOptions,
-                               UpsertOptions)
+                               UpsertOptions,
+                               ViewOptions)
 from couchbase.search import TermQuery
 from couchbase.tracing import CouchbaseSpan, CouchbaseTracer
 
@@ -145,7 +146,7 @@ class TracerTests:
         ("query", "cb.query", QueryOptions, "Select 1", None),
         ("analytics_query", "cb.analytics", AnalyticsOptions, "Select 1", None),
         ("search_query", "cb.search", SearchOptions, "whatever", TermQuery("foo")),
-        #        ("view_query", "cb.views", ViewOptions, "whatever", "whatever_else")
+        ("view_query", "cb.views", ViewOptions, "whatever", "whatever_else")
     ])
     @pytest.mark.parametrize("http_with_parent", [True, False])
     @pytest.mark.usefixtures("skip_if_mock")

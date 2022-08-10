@@ -234,3 +234,13 @@ class ViewTests:
         metadata = view_result.metadata()
         assert isinstance(metadata, ViewMetaData)
         assert metadata.total_rows() >= expected_count
+
+    @pytest.mark.asyncio
+    async def test_bad_view_query(self, cb_env):
+        view_result = cb_env.bucket.view_query('fake-ddoc',
+                                               'fake-view',
+                                               limit=10,
+                                               namespace=DesignDocumentNamespace.DEVELOPMENT)
+
+        with pytest.raises(DesignDocumentNotFoundException):
+            [r async for r in view_result]

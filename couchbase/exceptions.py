@@ -1103,14 +1103,14 @@ class ErrorMapper:
                         base_exc,  # type: exception
                         mapping=None,  # type: Dict[str, CouchbaseException]
                         ) -> CouchbaseException:
-
         exc_class = None
         err_ctx = None
-        if base_exc.error_context() is None:
+        ctx = base_exc.error_context()
+        if ctx is None:
             exc_class = PYCBC_ERROR_MAP.get(base_exc.err(), CouchbaseException)
             err_info = base_exc.error_info()
         else:
-            err_ctx = ErrorContext.from_dict(**base_exc.error_context())
+            err_ctx = ErrorContext.from_dict(**ctx)
             err_info = base_exc.error_info()
 
             if isinstance(err_ctx, HTTPErrorContext):

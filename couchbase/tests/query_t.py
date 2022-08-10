@@ -21,6 +21,7 @@ import couchbase.subdocument as SD
 from couchbase.exceptions import (CouchbaseException,
                                   InvalidArgumentException,
                                   KeyspaceNotFoundException,
+                                  ParsingFailedException,
                                   QueryErrorContext,
                                   QueryIndexNotFoundException,
                                   ScopeNotFoundException)
@@ -242,6 +243,10 @@ class QueryTests:
         assert expiry1 is not None
         assert expiry2 is not None
         assert expiry1 == expiry2
+
+    def test_bad_query(self, cb_env):
+        with pytest.raises(ParsingFailedException):
+            cb_env.cluster.query("I'm not N1QL!").execute()
 
     def test_query_error_context(self, cb_env):
         try:
