@@ -177,8 +177,10 @@ class ClusterOptions(ClusterOptionsBase):
         enable_clustermap_notification (bool, optional): Set to False to disable cluster map notification.
             Defaults to True (enabled).
         enable_compression (bool, optional): Set to False to disable compression. Defaults to True (enabled).
-        enable_tracing (bool, optional): Set to False to disable tracing. Defaults to True (enabled).
-        enable_metrics (bool, optional): Set to False to disable metrics. Defaults to True (enabled).
+        enable_tracing (bool, optional): Set to False to disable tracing (enables no-op tracer).
+            Defaults to True (enabled).
+        enable_metrics (bool, optional): Set to False to disable metrics (enables no-op meter).
+            Defaults to True (enabled).
         network (str, optional): Set to False to disable compression. Defaults to True (enabled).
         tls_verify (Union[str, :class:`.TLSVerifyMode`], optional): Set tls verify mode. Defaults to
             TLSVerifyMode.PEER.
@@ -192,7 +194,7 @@ class ClusterOptions(ClusterOptionsBase):
         config_poll_floor (timedelta, optional): Config polling floor interval.
             Defaults to None.
         max_http_connections (int, optional): Maximum number of HTTP connections.  Defaults to None.
-        logging_meter_emit_interval (int, optional): Logging meter emit interval.  Defaults to None.
+        logging_meter_emit_interval (timedelta, optional): Logging meter emit interval.  Defaults to 10 minutes.
         transaction_config (:class:`.TransactionConfig`, optional): Global configuration for transactions.
             Defaults to None.
         log_redaction (bool, optional): Set to True to enable log redaction. Defaults to False (disabled).
@@ -200,8 +202,11 @@ class ClusterOptions(ClusterOptionsBase):
         compression_min_size (int, optional): Set compression min size.  Defaults to None.
         compression_min_ratio (float, optional): Set compression min size.  Defaults to None.
         compression (:class:`~.LockMode`, optional): Set LockMode mode.  Defaults to None.
-        tracer (Any, optional): Set an external tracer.  Defaults to None.   Note when this is set, the tracing_options
-            are ignored.
+        tracer (:class:`~couchbase.tracing.CouchbaseTracer`, optional): Set an external tracer.  Defaults to None,
+            enabling the `threshold_logging_tracer`. Note when this is set, all tracing_options
+            (see :class:`~.ClusterTracingOptions`) and then `enable_tracing` option are ignored.
+        meter (:class:`~couchbase.metrics.CouchbaseMeter`, optional): Set an external meter.  Defaults to None,
+            enabling the `logging_meter`.   Note when this is set, the `logging_meter_emit_interval` option is ignored.
     """
 
 # Diagnostics Operations

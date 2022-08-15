@@ -193,10 +193,13 @@ class TestEnvironment(CouchbaseTestEnvironment):
         opts = ClusterOptions(PasswordAuthenticator(username, pw))
         transcoder = kwargs.pop('transcoder', None)
         tracer = kwargs.pop('tracer', None)
+        meter = kwargs.pop('meter', None)
         if transcoder:
             opts['transcoder'] = transcoder
         if tracer:
             opts['tracer'] = tracer
+        if meter:
+            opts['meter'] = meter
         okay = False
         for _ in range(3):
             try:

@@ -199,6 +199,7 @@ TEST_SUITE_MAP = {
     'connection_t': [ServerFeatures.Diagnostics],
     'datastructures_t': [ServerFeatures.Subdoc],
     'eventingmgmt_t': [ServerFeatures.EventingFunctionManagement],
+    'metrics_t': [ServerFeatures.Collections],
     'mutation_tokens_t': [ServerFeatures.KeyValue],
     'query_t': [ServerFeatures.Query, ServerFeatures.QueryIndexManagement],
     'querymgmt_t': [ServerFeatures.QueryIndexManagement],

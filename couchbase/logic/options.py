@@ -43,6 +43,7 @@ if TYPE_CHECKING:
     from couchbase.diagnostics import ClusterState, ServiceType
     from couchbase.durability import DurabilityType
     from couchbase.management.views import DesignDocumentNamespace
+    from couchbase.metrics import CouchbaseMeter
     from couchbase.mutation_state import MutationState
     from couchbase.n1ql import QueryProfile, QueryScanConsistency
     from couchbase.search import (Facet,
@@ -51,6 +52,7 @@ if TYPE_CHECKING:
                                   Sort)
     from couchbase.serializer import Serializer
     from couchbase.subdocument import StoreSemantics
+    from couchbase.tracing import CouchbaseTracer
     from couchbase.transcoder import Transcoder
     from couchbase.views import (ViewErrorMode,
                                  ViewOrdering,
@@ -502,10 +504,11 @@ class ClusterOptionsBase(dict):
         "user_agent_extra": {"user_agent_extra": validate_str},
         "trust_store_path": {"trust_store_path": validate_str},
         "cert_path": {"cert_path": validate_str},
-        "logging_meter_emit_interval": {"emit_interval": validate_int},
+        "logging_meter_emit_interval": {"emit_interval": timedelta_as_microseconds},
         "num_io_threads": {"num_io_threads": validate_int},
         "transaction_config": {"transaction_config": lambda x: x},
         "tracer": {"tracer": lambda x: x},
+        "meter": {"meter": lambda x: x},
     }
 
     @overload
@@ -534,14 +537,15 @@ class ClusterOptionsBase(dict):
         config_poll_floor=None,  # type: Optional[timedelta]
         max_http_connections=None,  # type: Optional[int]
         user_agent_extra=None,  # type: Optional[str]
-        logging_meter_emit_interval=None,  # type: Optional[int]
+        logging_meter_emit_interval=None,  # type: Optional[timedelta]
         transaction_config=None,  # type: Optional[TransactionConfig]
         log_redaction=None,  # type: Optional[bool]
         compression=None,  # type: Optional[Compression]
         compression_min_size=None,  # type: Optional[int]
         compression_min_ratio=None,  # type: Optional[float]
         lockmode=None,  # type: Optional[LockMode]
-        tracer=None,  # type: Optional[Any]
+        tracer=None,  # type: Optional[CouchbaseTracer]
+        meter=None,  # type: Optional[CouchbaseMeter]
     ):
         """ClusterOptions instance."""
 

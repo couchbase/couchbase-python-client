@@ -18,6 +18,7 @@
 #include "connection.hxx"
 #include "exceptions.hxx"
 #include "tracing.hxx"
+#include "metrics.hxx"
 #include <core/io/ip_protocol.hxx>
 
 static void
@@ -562,9 +563,15 @@ update_cluster_options(couchbase::core::cluster_options& options, PyObject* pyOb
         auto max_http_connections = static_cast<size_t>(PyLong_AsUnsignedLong(pyObj_max_http_connections));
         options.max_http_connections = max_http_connections;
     }
+
     PyObject* pyObj_tracer = PyDict_GetItemString(pyObj_options, "tracer");
     if (pyObj_tracer != nullptr) {
         options.tracer = std::make_shared<pycbc::request_tracer>(pyObj_tracer);
+    }
+
+    PyObject* pyObj_meter = PyDict_GetItemString(pyObj_options, "meter");
+    if (pyObj_meter != nullptr) {
+        options.meter = std::make_shared<pycbc::meter>(pyObj_meter);
     }
 }
 

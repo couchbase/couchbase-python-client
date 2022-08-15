@@ -108,7 +108,7 @@ class ConnectionTests:
             "config_poll_floor": timedelta(seconds=30),
             "max_http_connections": 10,
             "user_agent_extra": 'Python SDK',
-            "logging_meter_emit_interval": 30,
+            "logging_meter_emit_interval": timedelta(seconds=30),
             "num_io_threads": 1
         }
 
@@ -127,8 +127,8 @@ class ConnectionTests:
         # TLSVerifyMode is translated to string
         expected_opts['tls_verify'] = 'none'
         # change name of logging meter emit int.
-        emit_interval = expected_opts.pop('logging_meter_emit_interval')
-        expected_opts['emit_interval'] = emit_interval
+        expected_opts.pop('logging_meter_emit_interval')
+        expected_opts['emit_interval'] = 30000000
 
         conn_string = couchbase_config.get_connection_string()
         username, pw = couchbase_config.get_username_and_pw()
