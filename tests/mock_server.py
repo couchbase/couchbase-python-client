@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import pathlib
+import platform
 import select
 import socket
 import sys
@@ -266,7 +267,7 @@ class CavesMockServer(MockServer):
 
         self._caves_version = caves_version
         if self._caves_version is None:
-            self._caves_version = 'v0.0.1-69'
+            self._caves_version = 'v0.0.1-74'
 
         self._build_caves_url(caves_url)
         self._validate_caves_path(caves_path)
@@ -286,7 +287,10 @@ class CavesMockServer(MockServer):
     def _build_caves_url(self, url):
 
         if sys.platform.startswith('linux'):
-            self._caves_url = f"{url}/{self._caves_version}/gocaves-linux-amd64"
+            if platform.machine() == 'aarch64':
+                self._caves_url = f"{url}/{self._caves_version}/gocaves-linux-arm64"
+            else:
+                self._caves_url = f"{url}/{self._caves_version}/gocaves-linux-amd64"
         elif sys.platform.startswith('darwin'):
             self._caves_url = f"{url}/{self._caves_version}/gocaves-macos"
         elif sys.platform.startswith('win32'):
@@ -297,7 +301,7 @@ class CavesMockServer(MockServer):
     def _validate_caves_path(self, caves_path=None):
         if not (caves_path and not caves_path.isspace()):
             if sys.platform.startswith('linux'):
-                caves_path = 'gocaves-linux-amd64'
+                caves_path = 'gocaves-linux-arm64' if platform.machine() == 'aarch64' else 'gocaves-linux-amd64'
             elif sys.platform.startswith('darwin'):
                 caves_path = 'gocaves-macos'
             elif sys.platform.startswith('win32'):
