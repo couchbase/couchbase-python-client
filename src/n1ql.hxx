@@ -42,7 +42,7 @@ str_to_scan_consistency_type(std::string consistency)
 std::string
 scan_consistency_type_to_string(couchbase::core::query_scan_consistency consistency);
 
-std::vector<couchbase::core::mutation_token>
+std::vector<couchbase::mutation_token>
 get_mutation_state(PyObject* pyObj_mutation_state);
 
 std::string

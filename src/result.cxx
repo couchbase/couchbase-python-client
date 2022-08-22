@@ -158,7 +158,7 @@ static PyObject*
 mutation_token_new(PyTypeObject* type, PyObject*, PyObject*)
 {
     mutation_token* self = reinterpret_cast<mutation_token*>(type->tp_alloc(type, 0));
-    self->token = new couchbase::core::mutation_token();
+    self->token = new couchbase::mutation_token();
     return reinterpret_cast<PyObject*>(self);
 }
 
@@ -167,28 +167,28 @@ mutation_token__get__(mutation_token* self, [[maybe_unused]] PyObject* args)
 {
     PyObject* pyObj_mutation_token = PyDict_New();
 
-    PyObject* pyObj_tmp = PyUnicode_FromString(self->token->bucket_name.c_str());
+    PyObject* pyObj_tmp = PyUnicode_FromString(self->token->bucket_name().c_str());
     if (-1 == PyDict_SetItemString(pyObj_mutation_token, "bucket_name", pyObj_tmp)) {
         PyErr_Print();
         PyErr_Clear();
     }
     Py_XDECREF(pyObj_tmp);
 
-    pyObj_tmp = PyLong_FromUnsignedLongLong(self->token->partition_uuid);
+    pyObj_tmp = PyLong_FromUnsignedLongLong(self->token->partition_uuid());
     if (-1 == PyDict_SetItemString(pyObj_mutation_token, "partition_uuid", pyObj_tmp)) {
         PyErr_Print();
         PyErr_Clear();
     }
     Py_XDECREF(pyObj_tmp);
 
-    pyObj_tmp = PyLong_FromUnsignedLongLong(self->token->sequence_number);
+    pyObj_tmp = PyLong_FromUnsignedLongLong(self->token->sequence_number());
     if (-1 == PyDict_SetItemString(pyObj_mutation_token, "sequence_number", pyObj_tmp)) {
         PyErr_Print();
         PyErr_Clear();
     }
     Py_XDECREF(pyObj_tmp);
 
-    pyObj_tmp = PyLong_FromUnsignedLong(self->token->partition_id);
+    pyObj_tmp = PyLong_FromUnsignedLong(self->token->partition_id());
     if (-1 == PyDict_SetItemString(pyObj_mutation_token, "partition_id", pyObj_tmp)) {
         PyErr_Print();
         PyErr_Clear();
@@ -225,14 +225,12 @@ pycbc_mutation_token_type_init(PyObject** ptr)
 }
 
 PyObject*
-create_mutation_token_obj(struct couchbase::core::mutation_token mt)
+create_mutation_token_obj(couchbase::mutation_token mt)
 {
     PyObject* pyObj_mut = PyObject_CallObject(reinterpret_cast<PyObject*>(&mutation_token_type), nullptr);
     mutation_token* mut_token = reinterpret_cast<mutation_token*>(pyObj_mut);
-    mut_token->token->bucket_name = mt.bucket_name;
-    mut_token->token->partition_uuid = mt.partition_uuid;
-    mut_token->token->sequence_number = mt.sequence_number;
-    mut_token->token->partition_id = mt.partition_id;
+    auto token = couchbase::mutation_token{ mt.partition_uuid(), mt.sequence_number(), mt.partition_id(), mt.bucket_name() };
+    *mut_token->token = token;
     return reinterpret_cast<PyObject*>(mut_token);
 }
 

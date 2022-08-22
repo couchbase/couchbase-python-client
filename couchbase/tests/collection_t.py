@@ -20,7 +20,11 @@ import pytest
 
 import couchbase.subdocument as SD
 from couchbase.diagnostics import ServiceType
-from couchbase.durability import DurabilityLevel, ServerDurability
+from couchbase.durability import (ClientDurability,
+                                  DurabilityLevel,
+                                  PersistTo,
+                                  ReplicateTo,
+                                  ServerDurability)
 from couchbase.exceptions import (AmbiguousTimeoutException,
                                   CasMismatchException,
                                   DocumentExistsException,
@@ -579,7 +583,7 @@ class CollectionTests:
             cb_env.collection.get_all_replicas('not-a-key')
 
     @pytest.mark.usefixtures("check_replicas")
-    def test_get_all_replicas_results(self, cb_env, default_kvp):
+    def test_get_all_replicas_results(self, cb_env, default_kvp, num_replicas):
         result = cb_env.try_n_times(10, 3, cb_env.collection.get_all_replicas, default_kvp.key)
         active_cnt = 0
         replica_cnt = 0
@@ -593,7 +597,8 @@ class CollectionTests:
                 active_cnt += 1
 
         assert active_cnt == 1
-        assert replica_cnt >= active_cnt
+        if num_replicas > 0:
+            assert replica_cnt >= active_cnt
 
     @pytest.mark.usefixtures("check_sync_durability_supported")
     def test_server_durable_upsert(self, cb_env, default_kvp_and_reset, num_replicas):
@@ -669,44 +674,55 @@ class CollectionTests:
             except DurabilityImpossibleException:
                 pass  # this is okay -- server not setup correctly
 
-    def test_client_durable_upsert(self, cb_env):
-        pytest.skip("C++ client has not implemented replicate/persist durability.")
-    #     num_replicas = self.bucket._bucket.configured_replica_count
-    #     durability = ClientDurability(
-    #         persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
-    #     self.cb.upsert(self.NOKEY, self.CONTENT,
-    #                    UpsertOptions(durability=durability))
-    #     result = self.cb.get(self.NOKEY)
-    #     self.assertEqual(self.CONTENT, result.content_as[dict])
+    def test_client_durable_upsert(self, cb_env, default_kvp_and_reset, num_replicas):
+        cb = cb_env.collection
+        key = default_kvp_and_reset.key
+        value = default_kvp_and_reset.value
 
-    def test_client_durable_insert(self, cb_env):
-        pytest.skip("C++ client has not implemented replicate/persist durability.")
-    #     num_replicas = self.bucket._bucket.configured_replica_count
-    #     durability = ClientDurability(
-    #         persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
-    #     self.cb.insert(self.NOKEY, self.CONTENT,
-    #                    InsertOptions(durability=durability))
-    #     result = self.cb.get(self.NOKEY)
-    #     self.assertEqual(self.CONTENT, result.content_as[dict])
+        durability = ClientDurability(
+            persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
 
-    def test_client_durable_replace(self, cb_env):
-        pytest.skip("C++ client has not implemented replicate/persist durability.")
-    #     num_replicas = self.bucket._bucket.configured_replica_count
-    #     content = {"new": "content"}
-    #     durability = ClientDurability(
-    #         persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
-    #     self.cb.replace(self.KEY, content,
-    #                     ReplaceOptions(durability=durability))
-    #     result = self.cb.get(self.KEY)
-    #     self.assertEqual(content, result.content_as[dict])
+        cb.upsert(key, value,
+                  UpsertOptions(durability=durability))
+        result = cb.get(key)
+        assert value == result.content_as[dict]
 
-    def test_client_durable_remove(self):
-        pytest.skip("C++ client has not implemented replicate/persist durability.")
-    #     num_replicas = self.bucket._bucket.configured_replica_count
-    #     durability = ClientDurability(
-    #         persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
-    #     self.cb.remove(self.KEY, RemoveOptions(durability=durability))
-    #     self.assertRaises(DocumentNotFoundException, self.cb.get, self.KEY)
+    def test_client_durable_insert(self, cb_env, new_kvp, num_replicas):
+        cb = cb_env.collection
+        key = new_kvp.key
+        value = new_kvp.value
+
+        durability = ClientDurability(
+            persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+
+        cb.insert(key, value,
+                  InsertOptions(durability=durability))
+        result = cb.get(key)
+        assert value == result.content_as[dict]
+
+    def test_client_durable_replace(self, cb_env, default_kvp_and_reset, num_replicas):
+        cb = cb_env.collection
+        key = default_kvp_and_reset.key
+        value = default_kvp_and_reset.value
+
+        durability = ClientDurability(
+            persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+
+        cb.replace(key, value,
+                   ReplaceOptions(durability=durability))
+        result = cb.get(key)
+        assert value == result.content_as[dict]
+
+    def test_client_durable_remove(self, cb_env, default_kvp_and_reset, num_replicas):
+        cb = cb_env.collection
+        key = default_kvp_and_reset.key
+
+        durability = ClientDurability(
+            persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+
+        cb.remove(key, RemoveOptions(durability=durability))
+        with pytest.raises(DocumentNotFoundException):
+            cb.get(key)
 
     # @TODO(jc): - should an expiry of -1 raise an InvalidArgumentException?
     @pytest.mark.usefixtures("check_xattr_supported")
@@ -714,22 +730,24 @@ class CollectionTests:
                                         FIFTY_YEARS,
                                         THIRTY_DAYS - 1,
                                         THIRTY_DAYS,
-                                        int(time() - 1.0), 60, -1])
+                                        int(time() - 1.0),
+                                        60,
+                                        -1])
     def test_document_expiry_values(self, cb_env, new_kvp, expiry):
         cb = cb_env.collection
         key = new_kvp.key
         value = new_kvp.value
-        before = int(time() - 1.0)
-        try:
+        if expiry == -1:
+            with pytest.raises(InvalidArgumentException):
+                cb.upsert(key, value, expiry=timedelta(seconds=expiry))
+        else:
+            before = int(time() - 1.0)
             result = cb.upsert(key, value, expiry=timedelta(seconds=expiry))
             assert result.cas is not None
-        except InvalidArgumentException:
-            if expiry != -1:
-                raise
 
-        expiry_path = "$document.exptime"
-        res = cb_env.try_n_times(10, 3, cb.lookup_in, key, (SD.get(expiry_path, xattr=True),))
-        res_expiry = res.content_as[int](0)
+            expiry_path = "$document.exptime"
+            res = cb_env.try_n_times(10, 3, cb.lookup_in, key, (SD.get(expiry_path, xattr=True),))
+            res_expiry = res.content_as[int](0)
 
-        after = int(time() + 1.0)
-        before + expiry <= res_expiry <= after + expiry
+            after = int(time() + 1.0)
+            before + expiry <= res_expiry <= after + expiry

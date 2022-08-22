@@ -230,6 +230,87 @@ build_kv_error_map_info(couchbase::key_value_error_map_info error_info)
     return err_info;
 }
 
+void
+build_kv_error_context(const couchbase::key_value_error_context& ctx, PyObject* pyObj_error_ctx)
+{
+    PyObject* pyObj_tmp = nullptr;
+    pyObj_tmp = PyUnicode_FromString(ctx.id().c_str());
+    if (-1 == PyDict_SetItemString(pyObj_error_ctx, KV_DOCUMENT_ID, pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyUnicode_FromString(ctx.bucket().c_str());
+    if (-1 == PyDict_SetItemString(pyObj_error_ctx, KV_DOCUMENT_BUCKET, pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyUnicode_FromString(ctx.scope().c_str());
+    if (-1 == PyDict_SetItemString(pyObj_error_ctx, KV_DOCUMENT_SCOPE, pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyUnicode_FromString(ctx.collection().c_str());
+    if (-1 == PyDict_SetItemString(pyObj_error_ctx, KV_DOCUMENT_COLLECTION, pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_DECREF(pyObj_tmp);
+
+    pyObj_tmp = PyLong_FromLong(ctx.opaque());
+    if (-1 == PyDict_SetItemString(pyObj_error_ctx, KV_OPAQUE, pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_DECREF(pyObj_tmp);
+
+    if (ctx.status_code().has_value()) {
+        pyObj_tmp = PyLong_FromLong(static_cast<uint16_t>(ctx.status_code().value()));
+        if (-1 == PyDict_SetItemString(pyObj_error_ctx, KV_STATUS_CODE, pyObj_tmp)) {
+            PyErr_Print();
+            PyErr_Clear();
+        }
+        Py_DECREF(pyObj_tmp);
+    }
+
+    if (ctx.error_map_info().has_value()) {
+        PyObject* err_info = build_kv_error_map_info(ctx.error_map_info().value());
+        if (-1 == PyDict_SetItemString(pyObj_error_ctx, KV_ERROR_MAP_INFO, err_info)) {
+            PyErr_Print();
+            PyErr_Clear();
+        }
+        Py_DECREF(err_info);
+    }
+
+    if (ctx.extended_error_info().has_value()) {
+        PyObject* enhanced_err_info = PyDict_New();
+        pyObj_tmp = PyUnicode_FromString(ctx.extended_error_info().value().reference().c_str());
+        if (-1 == PyDict_SetItemString(enhanced_err_info, "reference", pyObj_tmp)) {
+            PyErr_Print();
+            PyErr_Clear();
+        }
+        Py_DECREF(pyObj_tmp);
+
+        pyObj_tmp = PyUnicode_FromString(ctx.extended_error_info().value().context().c_str());
+        if (-1 == PyDict_SetItemString(enhanced_err_info, "context", pyObj_tmp)) {
+            PyErr_Print();
+            PyErr_Clear();
+        }
+        Py_DECREF(pyObj_tmp);
+
+        if (-1 == PyDict_SetItemString(pyObj_error_ctx, KV_EXTENDED_ERROR_INFO, enhanced_err_info)) {
+            PyErr_Print();
+            PyErr_Clear();
+        }
+        Py_DECREF(enhanced_err_info);
+    }
+}
+
 struct PycbcErrorCategory : std::error_category {
     const char* name() const noexcept override;
     std::string message(int ec) const override;

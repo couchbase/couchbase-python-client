@@ -18,7 +18,11 @@ from datetime import datetime, timedelta
 import pytest
 
 import couchbase.subdocument as SD
-from couchbase.durability import DurabilityLevel, ServerDurability
+from couchbase.durability import (ClientDurability,
+                                  DurabilityLevel,
+                                  PersistTo,
+                                  ReplicateTo,
+                                  ServerDurability)
 from couchbase.exceptions import (DocumentExistsException,
                                   DocumentNotFoundException,
                                   DurabilityImpossibleException,
@@ -384,9 +388,16 @@ class SubDocumentTests:
             except DurabilityImpossibleException:
                 pass  # this is okay -- server not setup correctly
 
-    @pytest.mark.usefixtures("skip_if_less_than_alice")
+    # @pytest.mark.usefixtures("skip_if_less_than_alice")
     def test_mutate_in_client_durability(self, cb_env, default_kvp_and_reset, num_replicas):
-        pytest.skip("C++ client has not implemented replicate/persist durability.")
+        cb = cb_env.collection
+        key = default_kvp_and_reset.key
+        durability = ClientDurability(
+            persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+        cb.mutate_in(key,
+                     (SD.upsert("city", "New City"),
+                      SD.replace("faa", "CTY")),
+                     MutateInOptions(durability=durability))
 
     """
         @TODO(jc): verify the RFC store semantics terminology.  Should it really

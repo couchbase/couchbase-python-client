@@ -20,6 +20,7 @@
 #include <core/management/bucket_settings.hxx>
 #include <core/operations/management/bucket.hxx>
 #include <core/operations/management/bucket_describe.hxx> // should be in the include above, but isn't
+#include "../utils.hxx"
 
 PyObject*
 build_bucket_settings(couchbase::core::management::cluster::bucket_settings settings)
@@ -117,19 +118,19 @@ build_bucket_settings(couchbase::core::management::cluster::bucket_settings sett
 
     if (settings.minimum_durability_level.has_value()) {
         switch (settings.minimum_durability_level.value()) {
-            case couchbase::core::protocol::durability_level::majority_and_persist_to_active: {
+            case couchbase::durability_level::majority_and_persist_to_active: {
                 pyObj_tmp = PyUnicode_FromString("majorityAndPersistActive");
                 break;
             }
-            case couchbase::core::protocol::durability_level::majority: {
+            case couchbase::durability_level::majority: {
                 pyObj_tmp = PyUnicode_FromString("majority");
                 break;
             }
-            case couchbase::core::protocol::durability_level::persist_to_majority: {
+            case couchbase::durability_level::persist_to_majority: {
                 pyObj_tmp = PyUnicode_FromString("persistToMajority");
                 break;
             }
-            case couchbase::core::protocol::durability_level::none: {
+            case couchbase::durability_level::none: {
                 pyObj_tmp = PyUnicode_FromString("none");
                 break;
             }
@@ -553,16 +554,7 @@ get_bucket_settings(PyObject* settings)
 
     PyObject* pyObj_durability_level = PyDict_GetItemString(settings, "durabilityMinLevel");
     if (pyObj_durability_level != nullptr) {
-        auto durability = std::string(PyUnicode_AsUTF8(pyObj_durability_level));
-        if (durability.compare("majorityAndPersistActive") == 0) {
-            bucket_settings.minimum_durability_level = couchbase::core::protocol::durability_level::majority_and_persist_to_active;
-        } else if (durability.compare("majority") == 0) {
-            bucket_settings.minimum_durability_level = couchbase::core::protocol::durability_level::majority;
-        } else if (durability.compare("persistToMajority") == 0) {
-            bucket_settings.minimum_durability_level = couchbase::core::protocol::durability_level::persist_to_majority;
-        } else if (durability.compare("none") == 0) {
-            bucket_settings.minimum_durability_level = couchbase::core::protocol::durability_level::none;
-        }
+        bucket_settings.minimum_durability_level = PyObject_to_durability_level(pyObj_durability_level);
     }
 
     PyObject* pyObj_num_rep = PyDict_GetItemString(settings, "numReplicas");

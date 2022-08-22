@@ -19,8 +19,8 @@
 
 #include "client.hxx"
 
-#include <couchbase/get_all_replicas.hxx>
-#include <couchbase/get_any_replica.hxx>
+#include <couchbase/get_all_replicas_options.hxx>
+#include <couchbase/get_any_replica_options.hxx>
 
 PyObject*
 handle_replica_op(PyObject* self, PyObject* args, PyObject* kwargs);

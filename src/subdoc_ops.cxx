@@ -19,6 +19,7 @@
 #include "exceptions.hxx"
 #include "result.hxx"
 #include <couchbase/cas.hxx>
+#include "utils.hxx"
 
 template<typename T>
 result*
@@ -119,9 +120,9 @@ add_extras_to_result<couchbase::core::operations::mutate_in_response>(const couc
 
     if (!res->ec) {
         PyObject* pyObj_fields = PyList_New(static_cast<Py_ssize_t>(0));
-        for (auto f : resp.fields) {
+        for (int i = 0; i < resp.fields.size(); i++) {
             PyObject* pyObj_field = PyDict_New();
-            PyObject* pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.opcode));
+            PyObject* pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(resp.fields_meta[i].opcode));
             if (-1 == PyDict_SetItemString(pyObj_field, "opcode", pyObj_tmp)) {
                 Py_XDECREF(pyObj_fields);
                 Py_XDECREF(pyObj_field);
@@ -130,7 +131,7 @@ add_extras_to_result<couchbase::core::operations::mutate_in_response>(const couc
             }
             Py_DECREF(pyObj_tmp);
 
-            pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.status));
+            pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(resp.fields_meta[i].status));
             if (-1 == PyDict_SetItemString(pyObj_field, "status", pyObj_tmp)) {
                 Py_XDECREF(pyObj_fields);
                 Py_XDECREF(pyObj_field);
@@ -139,7 +140,7 @@ add_extras_to_result<couchbase::core::operations::mutate_in_response>(const couc
             }
             Py_DECREF(pyObj_tmp);
 
-            pyObj_tmp = PyUnicode_DecodeUTF8(f.path.c_str(), f.path.length(), "strict");
+            pyObj_tmp = PyUnicode_DecodeUTF8(resp.fields[i].path.c_str(), resp.fields[i].path.length(), "strict");
             if (-1 == PyDict_SetItemString(pyObj_field, "path", pyObj_tmp)) {
                 Py_XDECREF(pyObj_fields);
                 Py_XDECREF(pyObj_field);
@@ -148,7 +149,7 @@ add_extras_to_result<couchbase::core::operations::mutate_in_response>(const couc
             }
             Py_DECREF(pyObj_tmp);
 
-            pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(f.original_index));
+            pyObj_tmp = PyLong_FromUnsignedLong(static_cast<unsigned long>(resp.fields[i].original_index));
             if (-1 == PyDict_SetItemString(pyObj_field, "original_index", pyObj_tmp)) {
                 Py_XDECREF(pyObj_fields);
                 Py_XDECREF(pyObj_field);
@@ -157,8 +158,16 @@ add_extras_to_result<couchbase::core::operations::mutate_in_response>(const couc
             }
             Py_DECREF(pyObj_tmp);
 
-            if (f.value.length()) {
-                pyObj_tmp = PyBytes_FromStringAndSize(f.value.c_str(), f.value.length());
+            if (resp.fields[i].value.size()) {
+                try {
+                    pyObj_tmp = binary_to_PyObject(resp.fields[i].value);
+                } catch (const std::exception& e) {
+                    PyErr_SetString(PyExc_TypeError, e.what());
+                    Py_XDECREF(pyObj_fields);
+                    Py_XDECREF(pyObj_field);
+                    Py_XDECREF(pyObj_tmp);
+                    return nullptr;
+                }
                 if (-1 == PyDict_SetItemString(pyObj_field, RESULT_VALUE, pyObj_tmp)) {
                     Py_XDECREF(pyObj_fields);
                     Py_XDECREF(pyObj_field);
@@ -352,8 +361,7 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
                                  std::shared_ptr<std::promise<PyObject*>> barrier)
 {
     size_t ii;
-    couchbase::core::protocol::mutate_in_request_body::mutate_in_specs specs =
-      couchbase::core::protocol::mutate_in_request_body::mutate_in_specs{};
+    couchbase::mutate_in_specs mut_specs;
     for (ii = 0; ii < nspecs; ++ii) {
 
         struct mutate_in_spec new_spec = {};
@@ -384,7 +392,6 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
             Py_XDECREF(pyObj_errback);
             return nullptr;
         }
-        new_spec.flags = specs.build_path_flags(new_spec.xattr, new_spec.create_parents, new_spec.expand_macros);
 
         // **DO NOT DECREF** these -- things from tuples are borrowed references!!
         PyObject* pyObj_value = nullptr;
@@ -416,12 +423,85 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
             }
         };
 
-        specs.add_spec(new_spec.op, new_spec.flags, new_spec.path, new_spec.value);
+        switch (couchbase::core::protocol::subdoc_opcode(new_spec.op)) {
+            case couchbase::core::protocol::subdoc_opcode::dict_add: {
+                mut_specs.push_back(couchbase::mutate_in_specs::insert_raw(
+                                      new_spec.path, couchbase::core::utils::to_binary(new_spec.value), new_spec.expand_macros)
+                                      .xattr(new_spec.xattr)
+                                      .create_path(new_spec.create_parents));
+                break;
+            }
+            case couchbase::core::protocol::subdoc_opcode::dict_upsert: {
+                mut_specs.push_back(couchbase::mutate_in_specs::upsert_raw(
+                                      new_spec.path, couchbase::core::utils::to_binary(new_spec.value), new_spec.expand_macros)
+                                      .xattr(new_spec.xattr)
+                                      .create_path(new_spec.create_parents));
+                break;
+            }
+            case couchbase::core::protocol::subdoc_opcode::remove: {
+                mut_specs.push_back(couchbase::mutate_in_specs::remove(new_spec.path).xattr(new_spec.xattr));
+                break;
+            }
+            case couchbase::core::protocol::subdoc_opcode::replace: {
+                mut_specs.push_back(couchbase::mutate_in_specs::replace_raw(
+                                      new_spec.path, couchbase::core::utils::to_binary(new_spec.value), new_spec.expand_macros)
+                                      .xattr(new_spec.xattr));
+                break;
+            }
+            case couchbase::core::protocol::subdoc_opcode::array_push_last: {
+                mut_specs.push_back(
+                  couchbase::mutate_in_specs::array_append_raw(new_spec.path, couchbase::core::utils::to_binary(new_spec.value))
+                    .xattr(new_spec.xattr)
+                    .create_path(new_spec.create_parents));
+                break;
+            }
+            case couchbase::core::protocol::subdoc_opcode::array_push_first: {
+                mut_specs.push_back(
+                  couchbase::mutate_in_specs::array_prepend_raw(new_spec.path, couchbase::core::utils::to_binary(new_spec.value))
+                    .xattr(new_spec.xattr)
+                    .create_path(new_spec.create_parents));
+                break;
+            }
+            case couchbase::core::protocol::subdoc_opcode::array_insert: {
+                mut_specs.push_back(
+                  couchbase::mutate_in_specs::array_insert_raw(new_spec.path, couchbase::core::utils::to_binary(new_spec.value))
+                    .xattr(new_spec.xattr)
+                    .create_path(new_spec.create_parents));
+                break;
+            }
+            case couchbase::core::protocol::subdoc_opcode::array_add_unique: {
+                mut_specs.push_back(couchbase::mutate_in_specs::array_add_unique_raw(
+                                      new_spec.path, couchbase::core::utils::to_binary(new_spec.value), new_spec.expand_macros)
+                                      .xattr(new_spec.xattr)
+                                      .create_path(new_spec.create_parents));
+                break;
+            }
+            case couchbase::core::protocol::subdoc_opcode::counter: {
+                auto value_i = static_cast<std::int64_t>(std::stoi(new_spec.value));
+                if (value_i < 0) {
+                    mut_specs.push_back(couchbase::mutate_in_specs::decrement(new_spec.path, -1 * value_i)
+                                          .xattr(new_spec.xattr)
+                                          .create_path(new_spec.create_parents));
+                } else {
+                    mut_specs.push_back(couchbase::mutate_in_specs::increment(new_spec.path, value_i)
+                                          .xattr(new_spec.xattr)
+                                          .create_path(new_spec.create_parents));
+                }
+                break;
+            }
+            default: {
+                pycbc_set_python_exception(
+                  PycbcError::InvalidArgument, __FILE__, __LINE__, "Invalide sub_document opcode provided for spec.");
+                Py_XDECREF(pyObj_callback);
+                Py_XDECREF(pyObj_errback);
+                return nullptr;
+            }
+        };
     }
 
-    couchbase::core::protocol::durability_level durability_level = couchbase::core::protocol::durability_level::none;
+    couchbase::durability_level durability_level = couchbase::durability_level::none;
     if (options->durability != 0) {
-        durability_level = static_cast<couchbase::core::protocol::durability_level>(options->durability);
+        durability_level = static_cast<couchbase::durability_level>(options->durability);
     }
 
     couchbase::cas cas = couchbase::cas{ 0 };
@@ -429,18 +509,18 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
         cas = couchbase::cas{ options->cas };
     }
 
-    couchbase::core::protocol::mutate_in_request_body::store_semantics_type store_semantics;
+    couchbase::store_semantics store_semantics;
     switch (options->semantics) {
         case 1: {
-            store_semantics = couchbase::core::protocol::mutate_in_request_body::store_semantics_type::upsert;
+            store_semantics = couchbase::store_semantics::upsert;
             break;
         }
         case 2: {
-            store_semantics = couchbase::core::protocol::mutate_in_request_body::store_semantics_type::insert;
+            store_semantics = couchbase::store_semantics::insert;
             break;
         }
         default: {
-            store_semantics = couchbase::core::protocol::mutate_in_request_body::store_semantics_type::replace;
+            store_semantics = couchbase::store_semantics::replace;
             break;
         }
     };
@@ -452,7 +532,7 @@ prepare_and_execute_mutate_in_op(struct mutate_in_options* options,
         req.expiry = options->expiry;
     }
     req.store_semantics = store_semantics;
-    req.specs = specs;
+    req.specs = mut_specs.specs();
     req.durability_level = durability_level;
     if (options->preserve_expiry) {
         req.preserve_expiry = options->preserve_expiry;

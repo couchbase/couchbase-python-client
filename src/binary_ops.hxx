@@ -18,6 +18,12 @@
 #pragma once
 
 #include "client.hxx"
+#include <couchbase/append_options.hxx>
+#include <couchbase/decrement_options.hxx>
+#include <couchbase/increment_options.hxx>
+#include <couchbase/prepend_options.hxx>
+#include <couchbase/persist_to.hxx>
+#include <couchbase/replicate_to.hxx>
 
 struct counter_options {
     // required
@@ -28,10 +34,10 @@ struct counter_options {
 
     // optional
     std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
-    uint32_t expiry;
-    uint8_t replicate_to;
-    uint8_t persist_to;
-    couchbase::core::protocol::durability_level durability;
+    std::chrono::seconds expiry;
+    couchbase::durability_level* durability_level;
+    couchbase::replicate_to* replicate_to;
+    couchbase::persist_to* persist_to;
     uint64_t initial_value;
     PyObject* pyObj_span;
 };
@@ -45,9 +51,9 @@ struct binary_mutation_options {
 
     // optional
     std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
-    uint8_t replicate_to;
-    uint8_t persist_to;
-    couchbase::core::protocol::durability_level durability;
+    couchbase::durability_level* durability_level;
+    couchbase::replicate_to* replicate_to;
+    couchbase::persist_to* persist_to;
     couchbase::cas cas;
     PyObject* pyObj_span;
 };

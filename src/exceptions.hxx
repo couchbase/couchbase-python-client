@@ -58,6 +58,10 @@
 #define SEARCH_QUERY "query"
 #define SEARCH_PARAMETERS "parameters"
 
+#define SUBDOC_PATH "first_error_path"
+#define SUBDOC_INDEX "first_error_index"
+#define SUBDOC_DELETED "deleted"
+
 #define VIEW_DDOC_NAME "design_document_name"
 #define VIEW_NAME "view_name"
 #define VIEW_QUERY "query_string"
@@ -102,6 +106,9 @@ make_error_code(PycbcError ec);
 
 PyObject*
 build_kv_error_map_info(couchbase::key_value_error_map_info error_info);
+
+void
+build_kv_error_context(const couchbase::key_value_error_context& ctx, PyObject* pyObj_ctx);
 
 /*
 
@@ -266,7 +273,7 @@ build_exception_from_context(const T& ctx,
                              std::string context_detail_type = std::string())
 {
     exception_base* exc = create_exception_base_obj();
-    exc->ec = ctx.ec;
+    exc->ec = ctx.ec();
     exc->error_context = build_base_error_context(ctx);
 
     return reinterpret_cast<PyObject*>(exc);
@@ -284,85 +291,10 @@ build_exception_from_context(const couchbase::key_value_error_context& ctx,
     exc->ec = ctx.ec();
     PyObject* pyObj_error_context = build_base_error_context_new(ctx);
 
-    PyObject* pyObj_tmp = nullptr;
-    pyObj_tmp = PyUnicode_FromString(ctx.id().c_str());
-    if (-1 == PyDict_SetItemString(pyObj_error_context, KV_DOCUMENT_ID, pyObj_tmp)) {
-        PyErr_Print();
-        PyErr_Clear();
-    }
-    Py_DECREF(pyObj_tmp);
-
-    pyObj_tmp = PyUnicode_FromString(ctx.bucket().c_str());
-    if (-1 == PyDict_SetItemString(pyObj_error_context, KV_DOCUMENT_BUCKET, pyObj_tmp)) {
-        PyErr_Print();
-        PyErr_Clear();
-    }
-    Py_DECREF(pyObj_tmp);
-
-    pyObj_tmp = PyUnicode_FromString(ctx.scope().c_str());
-    if (-1 == PyDict_SetItemString(pyObj_error_context, KV_DOCUMENT_SCOPE, pyObj_tmp)) {
-        PyErr_Print();
-        PyErr_Clear();
-    }
-    Py_DECREF(pyObj_tmp);
-
-    pyObj_tmp = PyUnicode_FromString(ctx.collection().c_str());
-    if (-1 == PyDict_SetItemString(pyObj_error_context, KV_DOCUMENT_COLLECTION, pyObj_tmp)) {
-        PyErr_Print();
-        PyErr_Clear();
-    }
-    Py_DECREF(pyObj_tmp);
-
-    pyObj_tmp = PyLong_FromLong(ctx.opaque());
-    if (-1 == PyDict_SetItemString(pyObj_error_context, KV_OPAQUE, pyObj_tmp)) {
-        PyErr_Print();
-        PyErr_Clear();
-    }
-    Py_DECREF(pyObj_tmp);
-
-    if (ctx.status_code().has_value()) {
-        pyObj_tmp = PyLong_FromLong(static_cast<uint16_t>(ctx.status_code().value()));
-        if (-1 == PyDict_SetItemString(pyObj_error_context, KV_STATUS_CODE, pyObj_tmp)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        Py_DECREF(pyObj_tmp);
-    }
-
-    if (ctx.error_map_info().has_value()) {
-        PyObject* err_info = build_kv_error_map_info(ctx.error_map_info().value());
-        if (-1 == PyDict_SetItemString(pyObj_error_context, KV_ERROR_MAP_INFO, err_info)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        Py_DECREF(err_info);
-    }
-
-    if (ctx.extended_error_info().has_value()) {
-        PyObject* enhanced_err_info = PyDict_New();
-        pyObj_tmp = PyUnicode_FromString(ctx.extended_error_info().value().reference().c_str());
-        if (-1 == PyDict_SetItemString(enhanced_err_info, "reference", pyObj_tmp)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        Py_DECREF(pyObj_tmp);
-
-        pyObj_tmp = PyUnicode_FromString(ctx.extended_error_info().value().context().c_str());
-        if (-1 == PyDict_SetItemString(enhanced_err_info, "context", pyObj_tmp)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        Py_DECREF(pyObj_tmp);
-
-        if (-1 == PyDict_SetItemString(pyObj_error_context, KV_EXTENDED_ERROR_INFO, enhanced_err_info)) {
-            PyErr_Print();
-            PyErr_Clear();
-        }
-        Py_DECREF(enhanced_err_info);
-    }
+    build_kv_error_context(ctx, pyObj_error_context);
 
     std::string context_type = "KeyValueErrorContext";
-    pyObj_tmp = PyUnicode_FromString(context_type.c_str());
+    PyObject* pyObj_tmp = PyUnicode_FromString(context_type.c_str());
     if (-1 == PyDict_SetItemString(pyObj_error_context, CONTEXT_TYPE, pyObj_tmp)) {
         PyErr_Print();
         PyErr_Clear();
@@ -451,6 +383,53 @@ build_exception_from_context(const couchbase::manager_error_context& ctx,
         }
         Py_DECREF(pyObj_tmp);
     }
+
+    exc->error_context = pyObj_error_context;
+
+    PyObject* pyObj_exc_info = PyDict_New();
+
+    PyObject* pyObj_cinfo = Py_BuildValue("(s,i)", file, line);
+    if (-1 == PyDict_SetItemString(pyObj_exc_info, "cinfo", pyObj_cinfo)) {
+        PyErr_Print();
+        Py_XDECREF(pyObj_cinfo);
+    }
+    Py_DECREF(pyObj_cinfo);
+
+    if (!error_msg.empty()) {
+        PyObject* pyObj_error_msg = PyUnicode_FromString(error_msg.c_str());
+        if (-1 == PyDict_SetItemString(pyObj_exc_info, "error_message", pyObj_error_msg)) {
+            PyErr_Print();
+            Py_XDECREF(pyObj_error_msg);
+        }
+        Py_DECREF(pyObj_error_msg);
+    }
+
+    exc->exc_info = pyObj_exc_info;
+
+    return reinterpret_cast<PyObject*>(exc);
+}
+
+template<>
+inline PyObject*
+build_exception_from_context(const couchbase::subdocument_error_context& ctx,
+                             const char* file,
+                             int line,
+                             std::string error_msg,
+                             std::string context_detail_type)
+{
+    exception_base* exc = create_exception_base_obj();
+    exc->ec = ctx.ec();
+    PyObject* pyObj_error_context = build_base_error_context_new(ctx);
+
+    build_kv_error_context(ctx, pyObj_error_context);
+
+    std::string context_type = "SubdocumentErrorContext";
+    PyObject* pyObj_tmp = PyUnicode_FromString(context_type.c_str());
+    if (-1 == PyDict_SetItemString(pyObj_error_context, CONTEXT_TYPE, pyObj_tmp)) {
+        PyErr_Print();
+        PyErr_Clear();
+    }
+    Py_DECREF(pyObj_tmp);
 
     exc->error_context = pyObj_error_context;
 

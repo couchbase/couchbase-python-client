@@ -20,6 +20,12 @@
 
 #include "client.hxx"
 #include <couchbase/cas.hxx>
+#include <couchbase/insert_options.hxx>
+#include <couchbase/remove_options.hxx>
+#include <couchbase/replace_options.hxx>
+#include <couchbase/upsert_options.hxx>
+#include <couchbase/persist_to.hxx>
+#include <couchbase/replicate_to.hxx>
 
 /**
  * GET, GET_PROJECTED, GET_AND_LOCK, GET_AND_TOUCH
@@ -58,10 +64,10 @@ struct mutation_options {
     PyObject* value; // not for REMOVE
 
     // common - optional
-    uint8_t durability;
-    uint8_t replicate_to;
-    uint8_t persist_to;
-    uint32_t expiry;
+    couchbase::durability_level* durability_level;
+    couchbase::replicate_to* replicate_to;
+    couchbase::persist_to* persist_to;
+    std::chrono::seconds expiry;
     std::chrono::milliseconds timeout_ms = couchbase::core::timeout_defaults::key_value_timeout;
     PyObject* span;
 

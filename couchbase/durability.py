@@ -31,9 +31,9 @@ class ReplicateTo(IntEnum):
 
 class PersistTo(IntEnum):
     NONE = 0
-    ONE = 1
-    TWO = 2
-    THREE = 3
+    ONE = 1  # cxx = ACTIVE
+    TWO = 2  # cxx = 1
+    THREE = 3  # cxx = 2
 
 
 class Durability(IntEnum):

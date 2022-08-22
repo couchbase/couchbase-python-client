@@ -19,7 +19,14 @@
 
 #include "Python.h" // NOLINT
 #include <core/utils/binary.hxx>
+#include <couchbase/persist_to.hxx>
+#include <couchbase/replicate_to.hxx>
+#include <couchbase/durability_level.hxx>
 #include <stdexcept>
+#include <string>
+#include <chrono>
+
+constexpr std::chrono::seconds FIFTY_YEARS{ 50 * 365 * 24 * 60 * 60 };
 
 couchbase::core::utils::binary
 PyObject_to_binary(PyObject*);
@@ -27,3 +34,12 @@ PyObject*
 binary_to_PyObject(couchbase::core::utils::binary value);
 std::size_t py_ssize_t_to_size_t(Py_ssize_t);
 Py_ssize_t size_t_to_py_ssize_t(std::size_t);
+
+couchbase::persist_to
+PyObject_to_persist_to(PyObject* pyObj_persist_to);
+couchbase::replicate_to
+PyObject_to_replicate_to(PyObject* pyObj_replicate_to);
+std::pair<couchbase::persist_to, couchbase::replicate_to>
+PyObject_to_durability(PyObject*);
+couchbase::durability_level
+PyObject_to_durability_level(PyObject*);

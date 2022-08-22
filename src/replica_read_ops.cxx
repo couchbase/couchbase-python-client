@@ -286,7 +286,7 @@ handle_replica_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
     }
 
     if (op_type == Operations::GET_ANY_REPLICA) {
-        auto opts = couchbase::get_any_replica_options{ timeout_ms };
+        auto opts = couchbase::get_any_replica_options{}.timeout(timeout_ms).build();
         Py_BEGIN_ALLOW_THREADS couchbase::core::impl::initiate_get_any_replica_operation(
           conn->cluster_,
           id.bucket(),
@@ -299,7 +299,7 @@ handle_replica_op([[maybe_unused]] PyObject* self, PyObject* args, PyObject* kwa
           });
         Py_END_ALLOW_THREADS
     } else if (op_type == Operations::GET_ALL_REPLICAS) {
-        auto opts = couchbase::get_all_replicas_options{ timeout_ms };
+        auto opts = couchbase::get_all_replicas_options{}.timeout(timeout_ms).build();
         Py_BEGIN_ALLOW_THREADS couchbase::core::impl::initiate_get_all_replicas_operation(
           conn->cluster_,
           id.bucket(),
@@ -397,7 +397,7 @@ handle_replica_multi_op([[maybe_unused]] PyObject* self, PyObject* args, PyObjec
                 }
 
                 if (op_type == Operations::GET_ANY_REPLICA) {
-                    auto opts = couchbase::get_any_replica_options{ timeout_ms };
+                    auto opts = couchbase::get_any_replica_options{}.timeout(timeout_ms).build();
                     Py_BEGIN_ALLOW_THREADS couchbase::core::impl::initiate_get_any_replica_operation(
                       conn->cluster_,
                       id.bucket(),
@@ -411,7 +411,7 @@ handle_replica_multi_op([[maybe_unused]] PyObject* self, PyObject* args, PyObjec
                     Py_END_ALLOW_THREADS
 
                 } else if (op_type == Operations::GET_ALL_REPLICAS) {
-                    auto opts = couchbase::get_all_replicas_options{ timeout_ms };
+                    auto opts = couchbase::get_all_replicas_options{}.timeout(timeout_ms).build();
                     Py_BEGIN_ALLOW_THREADS couchbase::core::impl::initiate_get_all_replicas_operation(
                       conn->cluster_,
                       id.bucket(),

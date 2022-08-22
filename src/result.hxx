@@ -19,7 +19,7 @@
 
 #include "client.hxx"
 #include <queue>
-#include <core/mutation_token.hxx>
+#include <couchbase/mutation_token.hxx>
 
 template<class T>
 class rows_queue
@@ -82,14 +82,14 @@ PyObject*
 create_result_obj();
 
 struct mutation_token {
-    PyObject_HEAD couchbase::core::mutation_token* token;
+    PyObject_HEAD couchbase::mutation_token* token;
 };
 
 int
 pycbc_mutation_token_type_init(PyObject** ptr);
 
 PyObject*
-create_mutation_token_obj(struct couchbase::core::mutation_token mt);
+create_mutation_token_obj(struct couchbase::mutation_token mt);
 
 struct streamed_result {
     PyObject_HEAD std::error_code ec;

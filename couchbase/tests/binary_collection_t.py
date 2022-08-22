@@ -15,10 +15,19 @@
 
 import pytest
 
-from couchbase.exceptions import DocumentNotFoundException, InvalidArgumentException
-from couchbase.options import (DecrementOptions,
+from couchbase.durability import (ClientDurability,
+                                  DurabilityLevel,
+                                  PersistTo,
+                                  ReplicateTo,
+                                  ServerDurability)
+from couchbase.exceptions import (DocumentNotFoundException,
+                                  DurabilityImpossibleException,
+                                  InvalidArgumentException)
+from couchbase.options import (AppendOptions,
+                               DecrementOptions,
                                DeltaValue,
                                IncrementOptions,
+                               PrependOptions,
                                SignedInt64)
 from couchbase.result import CounterResult, MutationResult
 from couchbase.transcoder import RawBinaryTranscoder, RawStringTranscoder
@@ -32,7 +41,7 @@ class BinaryCollectionTests:
 
     @pytest.fixture(scope="class", name="cb_env", params=[CollectionType.DEFAULT, CollectionType.NAMED])
     def couchbase_test_environment(self, couchbase_config, request):
-        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param)
+        cb_env = TestEnvironment.get_environment(__name__, couchbase_config, request.param, manage_buckets=True)
 
         if request.param == CollectionType.NAMED:
             cb_env.try_n_times(5, 3, cb_env.setup_named_collections)
@@ -89,6 +98,16 @@ class BinaryCollectionTests:
                                           cb_env.collection.remove,
                                           key,
                                           expected_exceptions=(DocumentNotFoundException,))
+
+    @pytest.fixture(scope="class")
+    def check_sync_durability_supported(self, cb_env):
+        cb_env.check_if_feature_supported('sync_durability')
+
+    @pytest.fixture(scope="class")
+    def num_replicas(self, cb_env):
+        bucket_settings = cb_env.try_n_times(10, 1, cb_env.bm.get_bucket, cb_env.bucket.name)
+        num_replicas = bucket_settings.get("num_replicas")
+        return num_replicas
 
     # tests
 
@@ -302,3 +321,113 @@ class BinaryCollectionTests:
         assert 0x7FFFFFFFFFFFFFFF == x.value
         x = SignedInt64(-0x7FFFFFFFFFFFFFFF - 1)
         assert -0x7FFFFFFFFFFFFFFF - 1 == x.value
+
+    @pytest.mark.usefixtures("check_sync_durability_supported")
+    def test_server_durable_append(self, cb_env, utf8_empty_kvp, num_replicas):
+        cb = cb_env.collection
+        key = utf8_empty_kvp.key
+        durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
+
+        if num_replicas > 1:
+            cb.binary().append(key, 'foo',  AppendOptions(durability=durability))
+            result = cb.get(key, transcoder=RawStringTranscoder())
+            assert result.content_as[str] == 'foo'
+        else:
+            try:
+                cb.binary().append(key, 'foo',  AppendOptions(durability=durability))
+            except DurabilityImpossibleException:
+                pass  # this is okay -- server not setup correctly
+
+    def test_client_durable_append(self, cb_env, utf8_empty_kvp, num_replicas):
+        cb = cb_env.collection
+        key = utf8_empty_kvp.key
+
+        durability = ClientDurability(
+            persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+
+        cb.binary().append(key, 'foo',  AppendOptions(durability=durability))
+        result = cb.get(key, transcoder=RawStringTranscoder())
+        assert result.content_as[str] == 'foo'
+
+    @pytest.mark.usefixtures("check_sync_durability_supported")
+    def test_server_durable_prepend(self, cb_env, utf8_empty_kvp, num_replicas):
+        cb = cb_env.collection
+        key = utf8_empty_kvp.key
+        durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
+
+        if num_replicas > 1:
+            cb.binary().append(key, 'foo',  AppendOptions(durability=durability))
+            result = cb.get(key, transcoder=RawStringTranscoder())
+            assert result.content_as[str] == 'foo'
+        else:
+            try:
+                cb.binary().prepend(key, 'foo',  PrependOptions(durability=durability))
+            except DurabilityImpossibleException:
+                pass  # this is okay -- server not setup correctly
+
+    def test_client_durable_prepend(self, cb_env, utf8_empty_kvp, num_replicas):
+        cb = cb_env.collection
+        key = utf8_empty_kvp.key
+
+        durability = ClientDurability(
+            persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+
+        cb.binary().prepend(key, 'foo',  PrependOptions(durability=durability))
+        result = cb.get(key, transcoder=RawStringTranscoder())
+        assert result.content_as[str] == 'foo'
+
+    @pytest.mark.usefixtures("check_sync_durability_supported")
+    def test_server_durable_increment(self, cb_env, counter_kvp, num_replicas):
+        cb = cb_env.collection
+        key = counter_kvp.key
+        value = counter_kvp.value
+
+        durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
+
+        if num_replicas > 1:
+            result = cb.binary().increment(key, IncrementOptions(durability=durability))
+            assert result.content == value + 1
+        else:
+            try:
+                result = cb.binary().increment(key, IncrementOptions(durability=durability))
+            except DurabilityImpossibleException:
+                pass  # this is okay -- server not setup correctly
+
+    def test_client_durable_increment(self, cb_env, counter_kvp, num_replicas):
+        cb = cb_env.collection
+        key = counter_kvp.key
+        value = counter_kvp.value
+
+        durability = ClientDurability(
+            persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+
+        result = cb.binary().increment(key, IncrementOptions(durability=durability))
+        assert result.content == value + 1
+
+    @pytest.mark.usefixtures("check_sync_durability_supported")
+    def test_server_durable_decrement(self, cb_env, counter_kvp, num_replicas):
+        cb = cb_env.collection
+        key = counter_kvp.key
+        value = counter_kvp.value
+
+        durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
+
+        if num_replicas > 1:
+            result = cb.binary().decrement(key, DecrementOptions(durability=durability))
+            assert result.content == value - 1
+        else:
+            try:
+                result = cb.binary().decrement(key, DecrementOptions(durability=durability))
+            except DurabilityImpossibleException:
+                pass  # this is okay -- server not setup correctly
+
+    def test_client_durable_decrement(self, cb_env, counter_kvp, num_replicas):
+        cb = cb_env.collection
+        key = counter_kvp.key
+        value = counter_kvp.value
+
+        durability = ClientDurability(
+            persist_to=PersistTo.ONE, replicate_to=ReplicateTo(num_replicas))
+
+        result = cb.binary().decrement(key, DecrementOptions(durability=durability))
+        assert result.content == value - 1

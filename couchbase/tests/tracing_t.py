@@ -113,6 +113,9 @@ class TracerTests:
     ])
     @pytest.mark.parametrize("with_parent", [True, False])
     def test_kv(self, cb_env, default_kvp, op, span_name, opts, value, with_parent):
+        # @TODO(): Pending CXXCBC-211 as recent changes do not allow for the parent_span to be passed in as an option
+        if with_parent is True and op in ['upsert', 'insert', 'replace', 'remove']:
+            pytest.skip("Pending CXXCBC-211")
         # have to reset between parameterized runs
         self.TRACER.reset()
         cb = cb_env.collection

@@ -300,6 +300,30 @@ class ViewErrorContext(HTTPErrorContext):
         return f'ViewErrorContext({self._get_base()})'
 
 
+class SubdocumentErrorContext(KeyValueErrorContext):
+    _SUBDOC_EC_KEYS = ["first_error_path", "first_error_index", "deleted"]
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._subdoc_err_ctx = {k: v for k,
+                                v in kwargs.items() if k in self._SUBDOC_EC_KEYS}
+
+    @property
+    def first_error_path(self) -> Optional[str]:
+        return self._subdoc_err_ctx.get("first_error_path", None)
+
+    @property
+    def first_error_index(self) -> Optional[int]:
+        return self._subdoc_err_ctx.get("first_error_index", None)
+
+    @property
+    def deleted(self) -> bool:
+        return self._subdoc_err_ctx.get("deleted", False)
+
+    def __repr__(self):
+        return f'ViewErrorContext({self._get_base()})'
+
+
 ErrorContextType = Union[AnalyticsErrorContext,
                          ErrorContext,
                          HTTPErrorContext,
@@ -307,6 +331,7 @@ ErrorContextType = Union[AnalyticsErrorContext,
                          ManagementErrorContext,
                          QueryErrorContext,
                          SearchErrorContext,
+                         SubdocumentErrorContext,
                          TransactionsErrorContext,
                          ViewErrorContext]
 

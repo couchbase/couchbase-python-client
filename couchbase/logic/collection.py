@@ -120,9 +120,9 @@ class CollectionLogic:
             )
         op_type = operations.GET.value
         return kv_operation(**self._get_connection_args(),
-                            **kwargs,
                             key=key,
-                            op_type=op_type)
+                            op_type=op_type,
+                            op_args=kwargs)
 
     def get_any_replica(
         self,
@@ -180,7 +180,7 @@ class CollectionLogic:
     ) -> Optional[ExistsResult]:
         op_type = operations.EXISTS.value
         return kv_operation(
-            **self._get_connection_args(), **forward_args(kwargs, *opts), key=key, op_type=op_type
+            **self._get_connection_args(), key=key, op_type=op_type, op_args=forward_args(kwargs, *opts)
         )
 
     def insert(
@@ -196,10 +196,10 @@ class CollectionLogic:
         op_type = operations.INSERT.value
         return kv_operation(
             **self._get_connection_args(),
-            **final_args,
             key=key,
             value=transcoded_value,
             op_type=op_type,
+            op_args=final_args
         )
 
     def upsert(
@@ -216,10 +216,10 @@ class CollectionLogic:
         op_type = operations.UPSERT.value
         return kv_operation(
             **self._get_connection_args(),
-            **final_args,
             key=key,
             value=transcoded_value,
             op_type=op_type,
+            op_args=final_args
         )
 
     def replace(self,
@@ -242,10 +242,10 @@ class CollectionLogic:
         op_type = operations.REPLACE.value
         return kv_operation(
             **self._get_connection_args(),
-            **final_args,
             key=key,
             value=transcoded_value,
             op_type=op_type,
+            op_args=final_args
         )
 
     def remove(self,
@@ -255,7 +255,7 @@ class CollectionLogic:
                ) -> Optional[MutationResult]:
         op_type = operations.REMOVE.value
         return kv_operation(
-            **self._get_connection_args(), **forward_args(kwargs, *opts), key=key, op_type=op_type
+            **self._get_connection_args(), key=key, op_type=op_type, op_args=forward_args(kwargs, *opts)
         )
 
     def touch(self,
@@ -267,7 +267,7 @@ class CollectionLogic:
         kwargs["expiry"] = expiry
         op_type = operations.TOUCH.value
         return kv_operation(
-            **self._get_connection_args(), **forward_args(kwargs, *opts), key=key, op_type=op_type
+            **self._get_connection_args(), key=key, op_type=op_type, op_args=forward_args(kwargs, *opts)
         )
 
     def get_and_touch(self,
@@ -276,7 +276,7 @@ class CollectionLogic:
                       ) -> Optional[GetResult]:
         op_type = operations.GET_AND_TOUCH.value
         return kv_operation(
-            **self._get_connection_args(), **kwargs, key=key, op_type=op_type
+            **self._get_connection_args(), key=key, op_type=op_type, op_args=kwargs
         )
 
     def get_and_lock(self,
@@ -285,7 +285,7 @@ class CollectionLogic:
                      ) -> Optional[GetResult]:
         op_type = operations.GET_AND_LOCK.value
         return kv_operation(
-            **self._get_connection_args(), **kwargs, key=key, op_type=op_type
+            **self._get_connection_args(), key=key, op_type=op_type, op_args=kwargs
         )
 
     def unlock(self,
@@ -295,12 +295,13 @@ class CollectionLogic:
                **kwargs,  # type: Any
                ) -> None:
         op_type = operations.UNLOCK.value
+        final_args = forward_args(kwargs, *opts)
+        final_args['cas'] = cas
         return kv_operation(
             **self._get_connection_args(),
-            **forward_args(kwargs, *opts),
             key=key,
-            cas=cas,
             op_type=op_type,
+            op_args=final_args
         )
 
     def lookup_in(self,
@@ -423,10 +424,12 @@ class CollectionLogic:
                                      initial=final_args['initial'])
 
         op_type = operations.INCREMENT.value
+        final_args['initial'] = int(final_args['initial'])
+        final_args['delta'] = int(final_args['delta'])
         return binary_operation(**self._get_connection_args(),
-                                **final_args,
                                 key=key,
-                                op_type=op_type)
+                                op_type=op_type,
+                                op_args=final_args)
 
     def decrement(
         self,
@@ -444,10 +447,12 @@ class CollectionLogic:
                                      initial=final_args['initial'])
 
         op_type = operations.DECREMENT.value
+        final_args['initial'] = int(final_args['initial'])
+        final_args['delta'] = int(final_args['delta'])
         return binary_operation(**self._get_connection_args(),
-                                **final_args,
                                 key=key,
-                                op_type=op_type)
+                                op_type=op_type,
+                                op_args=final_args)
 
     def append(
         self,
@@ -468,10 +473,10 @@ class CollectionLogic:
 
         op_type = operations.APPEND.value
         return binary_operation(**self._get_connection_args(),
-                                **final_args,
                                 key=key,
                                 op_type=op_type,
-                                value=value)
+                                value=value,
+                                op_args=final_args)
 
     def prepend(
         self,
@@ -492,7 +497,7 @@ class CollectionLogic:
 
         op_type = operations.PREPEND.value
         return binary_operation(**self._get_connection_args(),
-                                **final_args,
                                 key=key,
                                 op_type=op_type,
-                                value=value)
+                                value=value,
+                                op_args=final_args)

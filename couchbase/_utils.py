@@ -13,7 +13,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import time
 from datetime import timedelta
 from enum import Enum
 from typing import (Any,
@@ -91,16 +90,11 @@ def timedelta_as_timestamp(
         raise InvalidArgumentException(
             "Expected timedelta instead of {}".format(duration))
 
-    # PYCBC-1177 remove deprecated heuristic from PYCBC-948:
-    #   if (duration > 50 years):
-    #     log.warn(“suspicious duration; don’t do this”)
-    #     return duration in seconds;
-    #
-    seconds = int(duration.total_seconds())
-    if seconds < THIRTY_DAYS_IN_SECONDS:
-        return seconds
+    # The cxx client now handles the expiry logic, only need to return total
+    # seconds.  See cxx client commit:  384839ccc01ee8d144dd6922d891e0c3cf09e98e
+    # Also: https://github.com/couchbaselabs/couchbase-cxx-client/blob/main/core/impl/expiry.cxx
 
-    return seconds + int(time.time())
+    return int(duration.total_seconds())
 
 
 def validate_int(value  # type: int
