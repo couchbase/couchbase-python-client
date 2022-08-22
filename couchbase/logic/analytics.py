@@ -89,10 +89,6 @@ class AnalyticsMetrics(object):
                  ) -> None:
         self._raw = raw
 
-    @property
-    def _raw_metrics(self):
-        return self._raw
-
     def elapsed_time(self) -> timedelta:
         us = self._raw.get("elapsed_time") / 1000
         return timedelta(microseconds=us)

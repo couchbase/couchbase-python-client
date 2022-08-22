@@ -147,10 +147,6 @@ class QueryMetrics(object):
                  ) -> None:
         self._raw = raw
 
-    @property
-    def _raw_metrics(self):
-        return self._raw
-
     def elapsed_time(self) -> timedelta:
         """Get the total amount of time spent running the query.
 

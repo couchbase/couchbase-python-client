@@ -325,10 +325,6 @@ class SearchMetrics:
                  ):
         self._raw = raw
 
-    @property
-    def _raw_metrics(self):
-        return self._raw
-
     def success_partition_count(self) -> int:
         return self._raw.get("success_partition_count", 0)
 
